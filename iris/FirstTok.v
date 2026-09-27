@@ -473,9 +473,9 @@ Section FirstTok.
            kit 2's last two rows (round C): what fsinit builds the commit's
            law from *)
         FsCrash.fs_crash_seam_at app_guest fsc_cov fsc_logst ∗
-        app_merge ∗
-        (* ...and the sync runner beside it (sync K3-3) *)
-        app_sync_run.
+        (* ...and the sync runner with it, one package (sync K3-3,
+           SY3-A1) *)
+        app_merge.
   Proof using .
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
@@ -484,7 +484,7 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge & #Hrun)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge)".
     iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
             sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
@@ -492,7 +492,7 @@ Section FirstTok.
     iSplitR; [iPureIntro; exact Hp |].
     iSplitR; [rewrite /fsabs_env; iExact "Henv" |].
     iSplitR; [iExact "Hseam" |].
-    iSplitR; [iExact "Hmerge" | iExact "Hrun"].
+    iExact "Hmerge".
   Qed.
 
   (* ================================================================== *)

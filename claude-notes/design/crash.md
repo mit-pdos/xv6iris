@@ -461,6 +461,58 @@ nothing on this path may close with a bare `iFrame` — `P_fs_named`'s body
 owns `disk_img_bytes γd 0 (disk_read dk0 0 N)`, a big-op of `N` bytes
 behind a `Definition`, and framing delta-unfolds it (SystemAdequacy.v:
 7 s → unbounded at 32 GB).
+### The two loans (sync SY3-A1)
+
+Two resources the machine holds are LENT to the application at the two
+points where it meets its old durable copy, and both come straight back.
+
+- **The turn into the swap.**  The PowerOn arm runs `Hobs` (the trace
+  slot) and then `Hswap` (the crash slot) -- two invariant openings in one
+  power step -- and `Hobs`'s on-arm yield `Tn (S gen)` is bound before the
+  crash invariant is opened, so `wp_power_loop` hands it to `Hswap`, which
+  returns a second family `Tn' (S gen)` in its place (the return path
+  below turns it into `Tn''`, which `power_boot_res` carries to the boot).
+  `riscv_power_adequacy` takes the three families (`Tn Tn' Tn'' : CT ->
+  nat -> iProp Σ`) declared before `Hswap`; a client with nothing to pass
+  across takes them equal and hands the turn back
+  (`SystemAdequacy.app_xfer_boot_raw_of_clone`, `back_id`).  The boot
+  splits `Tn''`
+  with `power_boot_res_turn` (the twin of `power_boot_res_lend`) and the
+  application's FOUNDING takes the era's sync token out of it before the
+  mint.
+- **The started auth into the merge.**  `FsDurSnap.dur_merge G T gd`'s
+  left arm is lent `start_auth n` at `n = gd + 1`; both of its appliers
+  hold it -- the header write's permit (`FsCrash.fs_rec_permit` binds it)
+  and the ghost commit (`HartCustody.wp_crash_fupd`'s hook, through the
+  hooked law `LogSnapLaw.snap_law_ghost_at`) -- and `gd` is pinned to the
+  era's `gen_id` by `LogInv.log_ctx`.  The application's
+  `AppInv.app_merge_raw A T gd` carries the loan on its WAND only (the
+  collection that builds the wand runs without it).  What it buys: an
+  old copy's era certificate `gen_started k` against the auth at
+  `gen_id + 1` gives `k ≤ gen_id`.
+
+- **The return path.**  After the swap the arm opens `obsN` once more
+  and runs `Hback` on the trace slot at the SAME history (no event),
+  turning `Tn'` into `Tn''`, which is what `power_boot_res` carries to the
+  boot -- so what the crash slot's swap learned can be filed in the
+  ledger.  `obs_ledger_at_back` is it at a ledger; `back_id` hands the turn
+  straight back.
+
+**The birth** is handed the machine's four fixed gnames (disk, swap
+counter, registry, started counter -- all allocated before it), and its
+yield is split: `Hbirth : ∀ γdisk γsw γreg γst, ⊢ |==> ∃ c, ⌜Born γdisk
+γsw γreg γst c⌝ ∗ Cls c ∗ Clt c`; `HPc` founding the crash slot takes
+`Cls c`, `HPt` the trace slot `Clt c`, and every boot is told `Born …
+c` at the record's own gnames (`Hboot`'s premise).  That is how an
+application that keeps the started counter's name in its fixed part
+reads its era certificates against the merge's loaned `start_auth`: the
+merge law takes `Born` at the record's four name fields, and the counter's
+camera instance is the pre-structure's by the same equation device as the
+generation counter's (`riscvF_genGS = riscv_pre_genGS`, which covers
+`start_auth`: both counters are `riscvF_genGS`).  The sync slots `Tk`/`Hk`
+are functions of the fixed part alone.  A client with nothing to keep
+takes `Born`, `Cls` trivial.
+
 ### Custody mid-era: the second opener of `crash_inv` (`HartCustody`, sync K3-1)
 
 `RiscvPtsto.crash_inv`'s comment names the DMA completion

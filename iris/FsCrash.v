@@ -3053,7 +3053,7 @@ Section fs_crash_seam.
        K3-3) and leaves in the permit's residual, beside the receipt: it
        rides the write's receipt to the commit's tail, which re-deposits
        it in the log invariant. *)
-    dur_pair G T (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
+    dur_pair G T gen_id (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit G cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
              take virtio_sector_bytes bs))
@@ -3137,8 +3137,13 @@ Section fs_crash_seam.
        section 8 (deposited client fupds that MOVE durable resources) does
        not bite.  [D'] is [fs_restrict (dv_of_D L) (fs_home_set cov ls)],
        exactly the map the premise is stated at. ---- *)
-    iMod (dsnap_step_merge G T gt (fr_D r) D' with "Hepoch Hdur HG")
-      as "[Hpair HT]".
+    (* ...with the started auth LENT to the merge (sync SY3-A1): it is
+       the permit's own, at this era's [gen_id + 1] *)
+    iAssert (start_auth n) with "[Hsa]" as "Hsa".
+    { rewrite /start_auth -Hstn. iExact "Hsa". }
+    iMod (dsnap_step_merge G T gen_id gt (fr_D r) D' n Hn1
+            with "Hepoch Hdur Hsa HG")
+      as "(Hpair & HT & Hsa)".
     iDestruct "Hpair" as (gt') "[Hdur HG]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
@@ -3168,7 +3173,7 @@ Section fs_crash_seam.
         split_and!; [exact Hbc | exact Hbl | exact (Hinsb b Hb)].
       }
     iSplitL "HG"; [iExact "HG"|].
-    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hsa"; [iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
     iSplitR "HT".
     { rewrite /fs_receipt_any. iExists γs.
@@ -3565,7 +3570,7 @@ Section fs_crash_seam.
        which is sound because [disk_seq_permit_two] offers them as a
        CONJUNCTION -- only one of them ever runs.  The application's token
        [T] rides the pair in and the residual out (sync K3-3). *)
-    dur_pair G T (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
+    dur_pair G T gen_id (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))

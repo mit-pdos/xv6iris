@@ -902,33 +902,9 @@ Section Snap.
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof using . rewrite /P_dur. apply _. Qed.
 
-  (* THE GUEST'S MERGE (SY3-K2): the new guest at [gt] out of whichever
-     old guest the crash slot holds.  The commit builds it at the
-     collection, where the running claim is in hand and the old guest is
-     not, and the header write's permit -- where the old guest is in hand
-     and the running claim is not -- applies it ([dsnap_step_merge]).  A
-     BASIC update, so it runs at the permit's mask [∅]; the guest stays
-     OPAQUE, and a guest with nothing to carry drops the old one
-     ([AppInv.app_merge_raw_of_xfer]).
-     ...AND THE APPLICATION'S TOKEN [T] RIDES IT (sync K3-3,
-     claude-notes/design/sync.md §4.3 item 2): the collection hands the
-     token in, and whichever arm the commit takes gives it back -- the
-     header write's permit applies the LEFT arm to the old guest (the
-     token comes out beside the new guest, bare: the wand captured it), the
-     EMPTY-LOG commit, which writes no header, takes the RIGHT arm.  An
-     additive pair because exactly one of the two fires. *)
-  Definition dur_merge (G : gname -> iProp Σ) (T : iProp Σ) (gt : gname)
-    : iProp Σ :=
-    ((∀ gt_o : gname, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T)%I.
-
-  (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name
-     -- since SY3-K2 the guest's MERGE rather than the guest itself, so the
-     old durable copy is read, not dropped.  Under a later, because the
-     application's laws yield [▷ A]; this is the shape the WAL's commit
-     permit takes ([LogSnapLaw.snap_law_out]).  The WAL never learns what
-     [G] is; the one value the tree supplies is [AppDur.app_guest]. *)
-  Definition dur_pair (G : gname -> iProp Σ) (T : iProp Σ) D : iProp Σ :=
-    (∃ gt : gname, P_dur_at gt D ∗ dur_merge G T gt)%I.
+  (* [dur_merge]/[dur_pair] and the commit's step over them live in
+     section [SnapMerge] below: the merge takes the machine's started
+     auth on loan (sync SY3-A1), which needs [riscvFixedGS]. *)
 
 
 
@@ -1479,28 +1455,7 @@ Section Snap.
     iSplitR; [by iPureIntro | iExact "H"].
   Qed.
 
-  (* THE COMMIT'S STEP TAKES THE NEXT PAIR ITSELF (durable-disk lane H2;
-     round C).  Its predecessor [dsnap_step_of] took the VALUE and the pure
-     tie and built the epoch inside the WAL's permit -- the value-first
-     entry, wrong at the commit for the reason plan section 4 gives -- and
-     is DELETED: the file system builds its own epoch, and the guest beside
-     it, at its own ghost step where its invariants are open
-     ([FsCollectAll.fs_snap_law_build]), and the WAL only swaps the pair
-     over.  The old snapshot is DISCARDED (affine) and nothing is read out
-     of it, which is why the step needs no premise about [D] at all; the
-     old GUEST goes to the pair's merge (SY3-K2), which yields the new one.
-     The guest stays OPAQUE here, and so does the token the merge hands
-     back (sync K3-3). *)
-  Lemma dsnap_step_merge (G : gname -> iProp Σ) (T : iProp Σ) (gt : gname)
-      D D' :
-    dur_pair G T D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗
-      (∃ gt' : gname, P_dur_at gt' D' ∗ ▷ G gt') ∗ T.
-  Proof using .
-    iIntros "H _ HG". rewrite /dur_pair /dur_merge.
-    iDestruct "H" as (gt') "[Hd [Hm _]]".
-    iMod ("Hm" with "HG") as "[HG HT]". iModIntro. iFrame "HT".
-    iExists gt'. iFrame "Hd HG".
-  Qed.
+  (* [dsnap_step_merge] lives in section [SnapMerge] below. *)
 
   (* ------------------------------------------------------------------ *)
   (*  8.  WHAT A CONSUMER READS OFF THE CURRENT SNAPSHOT                  *)
@@ -1543,6 +1498,79 @@ Section Snap.
   Qed.
 
 End Snap.
+
+(* ====================================================================== *)
+(*  THE GUEST'S MERGE, WITH THE MACHINE'S LOAN (sync SY3-A1)               *)
+(*                                                                        *)
+(*  Its own section because the merge's left arm is LENT the machine's     *)
+(*  started-generations auth [RiscvPtsto.start_auth], a [riscvFixedGS]     *)
+(*  resource, and section [Snap] must stay free of that class (its        *)
+(*  [mono_natG] field would compete with the snapshot's own instances).    *)
+(*  [diskImgG] comes out of the record ([RiscvPtsto.riscvF_diskGS]).       *)
+(* ====================================================================== *)
+Section SnapMerge.
+  Context `{!riscvFixedGS Σ, !fsLinkG Σ, !fsTopG Σ}.
+
+  (* THE GUEST'S MERGE (SY3-K2): the new guest at [gt] out of whichever
+     old guest the crash slot holds.  The commit builds it at the
+     collection, where the running claim is in hand and the old guest is
+     not, and the header write's permit -- where the old guest is in hand
+     and the running claim is not -- applies it ([dsnap_step_merge]).  A
+     BASIC update, so it runs at the permit's mask [∅]; the guest stays
+     OPAQUE, and a guest with nothing to carry drops the old one
+     ([AppInv.app_merge_raw_of_xfer]).
+     ...AND THE APPLICATION'S TOKEN [T] RIDES IT (sync K3-3,
+     claude-notes/design/sync.md §4.3 item 2): the collection hands the
+     token in, and whichever arm the commit takes gives it back -- the
+     header write's permit applies the LEFT arm to the old guest (the
+     token comes out beside the new guest, bare: the wand captured it), the
+     EMPTY-LOG commit, which writes no header, takes the RIGHT arm.  An
+     additive pair because exactly one of the two fires.
+     ...AND THE LEFT ARM IS LENT THE MACHINE'S STARTED AUTH (sync SY3-A1,
+     design §4.5 "The merge"): [start_auth n] at [n = gd + 1], [gd] the
+     era's generation.  Both appliers hold it -- the header write's permit
+     ([FsCrash.fs_rec_permit] binds it) and the ghost commit (the custody
+     fupd, [HartCustody.wp_crash_fupd]) -- and it comes back untouched; an
+     application reads the era bound off it against the old copy's own
+     era certificate.  [gd] is a parameter, pinned to the era's [gen_id]
+     by [LogInv.log_ctx]. *)
+  Definition dur_merge (G : gname -> iProp Σ) (T : iProp Σ) (gd : nat)
+      (gt : gname) : iProp Σ :=
+    ((∀ (gt_o : gname) (n : nat), ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
+        ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ start_auth n) ∧ T)%I.
+
+  (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name
+     -- since SY3-K2 the guest's MERGE rather than the guest itself, so the
+     old durable copy is read, not dropped.  Under a later, because the
+     application's laws yield [▷ A]; this is the shape the WAL's commit
+     permit takes ([LogSnapLaw.snap_law_out]).  The WAL never learns what
+     [G] is; the one value the tree supplies is [AppDur.app_guest]. *)
+  Definition dur_pair (G : gname -> iProp Σ) (T : iProp Σ) (gd : nat) D
+    : iProp Σ :=
+    (∃ gt : gname, P_dur_at gt D ∗ dur_merge G T gd gt)%I.
+
+  (* THE COMMIT'S STEP TAKES THE NEXT PAIR ITSELF (durable-disk lane H2;
+     round C).  The file system builds its own epoch, and the guest beside
+     it, at its own ghost step where its invariants are open
+     ([FsCollectAll.fs_snap_law_build]), and the WAL only swaps the pair
+     over.  The old snapshot is DISCARDED (affine) and nothing is read out
+     of it, which is why the step needs no premise about [D] at all; the
+     old GUEST goes to the pair's merge (SY3-K2), which yields the new one.
+     The guest stays OPAQUE here, and so does the token the merge hands
+     back (sync K3-3); the started auth is lent through (SY3-A1). *)
+  Lemma dsnap_step_merge (G : gname -> iProp Σ) (T : iProp Σ) (gd : nat)
+      (gt : gname) D D' (n : nat) :
+    n = (gd + 1)%nat ->
+    dur_pair G T gd D' -∗ P_dur_at gt D -∗ start_auth n -∗ ▷ G gt ==∗
+      (∃ gt' : gname, P_dur_at gt' D' ∗ ▷ G gt') ∗ T ∗ start_auth n.
+  Proof using .
+    intros Hn. iIntros "H _ Hsa HG". rewrite /dur_pair /dur_merge.
+    iDestruct "H" as (gt') "[Hd [Hm _]]".
+    iMod ("Hm" $! gt n with "[//] Hsa HG") as "(HG & HT & Hsa)".
+    iModIntro. iFrame "HT Hsa".
+    iExists gt'. iFrame "Hd HG".
+  Qed.
+End SnapMerge.
 
 (* ===================================================================== *)
 (*  9.  THE NON-VACUITY CHECK: THE CORE AT THE ERA'S OWN VIEW             *)

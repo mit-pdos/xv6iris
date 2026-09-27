@@ -159,8 +159,10 @@ Section LogGhostCommit.
     assert (Hbt : bytes_tie Lb C) by (apply bytes_tie_exc_empty; exact Htiex).
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     (* ---- 4. the hooked law ---- *)
-    iMod ("Hlaw" $! Lb C Qs gt_o with "[%] [%] [%] [%] Hba Htx HG HT HQs")
-      as "(Hpair & HT & HQs & Hba & Htx)";
+    (* ...LENT the custody fupd's started auth, which it lends the merge
+       (sync SY3-A1) and hands back *)
+    iMod ("Hlaw" $! Lb C Qs gt_o n with "[%] [%] [%] [%] Hba Htx HG HT [//] Hsa HQs")
+      as "(Hpair & HT & Hsa & HQs & Hba & Htx)";
       [exact Hdom | exact Hlens | exact Hbt | exact Hdm |].
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
     { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }

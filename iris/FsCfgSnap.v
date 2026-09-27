@@ -875,10 +875,8 @@ Section SnapMint.
     (* ...the merge, parked in the invariant and handed to fsinit on
        the kit, and the crash seam at the application's guest, handed to
        fsinit on the kit (round C) *)
+    (* ...with the SYNC RUNNER (sync K3-3) in the same package (SY3-A1) *)
     app_merge (APP := APP) -∗
-    (* ...and the SYNC RUNNER (sync K3-3), which rides beside the merge to
-       fsinit on the kit *)
-    app_sync_run (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
     (* ---- THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3):
        the application's opaque durability token for this era, a client
@@ -935,7 +933,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hrun #Hseamg Hstok Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hstok Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1360,7 +1358,7 @@ Section SnapMint.
       iSplitL "Hxo"; [iExact "Hxo" |].
       iSplitR; [iExact "Henv" |].
       iSplitR; [iExact "Hseamg" |].
-      iSplitR; [iExact "Hmerge" | iExact "Hrun"]. }
+      iExact "Hmerge". }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

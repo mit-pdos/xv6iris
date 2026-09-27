@@ -196,15 +196,62 @@ Record xv6_app (Σ : gFunctors) := MkApp {
      linear right to speak first on the console -- which is exactly what an
      echo discipline needs and what nothing per-era can say by itself. *)
   app_turn  : app_fixed -> nat -> iProp Σ;
+  (* ...IN THREE STAGES (sync SY3-A1, design/sync.md §4.5 "PowerOn").
+     [app_turn] is what the power-on step yields; the crash slot's swap
+     is LENT it and hands on [app_turn'] ([al_xfer]); the FOUNDING takes
+     the era's sync token out of that ([al_found]) and leaves [app_iturn]
+     for <init> ([al_programs]).  An application with no sync ledger has
+     the three equal and takes nothing out. *)
+  app_turn' : app_fixed -> nat -> iProp Σ;
+  (* ...and a fourth since the SY3-A1 re-cut: [app_turn''] is what the
+     trace slot's RETURN PATH ([al_back]) makes of [app_turn'] after the
+     swap, and the founding splits IT. *)
+  app_turn'' : app_fixed -> nat -> iProp Σ;
+  app_iturn : app_fixed -> nat -> iProp Σ;
+  (* THE BIRTH'S CRASH-SLOT PART (sync SY3-A1): [al_birth] yields it beside
+     [app_cl], and it founds era 0's durable copy beside the image's claim
+     ([xv6_app_adequacy]'s [Happ_init]).  [app_triv_cls] for an application
+     that founds nothing there. *)
+  app_cls   : app_fixed -> iProp Σ;
+  (* WHAT THE BIRTH SAYS ABOUT WHERE IT KEPT THE MACHINE'S GNAMES (sync
+     SY3-A1 re-cut): the birth is handed the durable disk's, the swap
+     counter's, the generation registry's and the started counter's
+     names, and this is what it promises of the fixed part it returns --
+     read by [al_merge] against the machine's own names.
+     [app_triv_born] for an application that keeps none. *)
+  app_born  : gname -> gname -> gname -> gname -> app_fixed -> Prop;
+  (* THE ERA'S RECORD PREDICATE (sync SY3-A1 re-cut): what a record of
+     the era numbered [k] satisfies -- for an application that cannot pin
+     its running claim's era from ghost state, "this record's era field
+     is [k]".  The boot resource carries it ([al_boot_ok]); the merge and
+     the sync runner are stated at it.  [app_triv_ok] for an application
+     that says nothing. *)
+  app_ok    : app_fixed -> nat -> app_names -> Prop;
+  (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): the era's
+     opaque TOKEN, which the log invariant holds while no commit is in
+     flight and the merge pins the running claim against the old copy
+     with, and the family of a [sync] waiter's HOOKS, which the ghost
+     commit fires through [al_sync_run].  The machine's fixed record
+     carries both ([RiscvPtsto.riscv_sync_tok]/[riscv_sync_hook]).
+     DATA, so they are fields here and not laws: a proof that fires a hook
+     has to be able to read what it is.  [app_triv_tk]/[app_triv_hk] for
+     an application with no sync ledger. *)
+  app_tk    : app_fixed -> nat -> iProp Σ;
+  app_hk    : app_fixed -> nat -> iProp Σ -> iProp Σ;
   (* the conclusion, over the operational state and the run's trace *)
   app_phi   : gstate -> list mobs -> Prop;
 }.
-Arguments MkApp {Σ} _ _ _ _ _ _ _ _ _.
+Arguments MkApp {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
 Arguments app_fixed {Σ} _. Arguments app_cl {Σ} _ _.
 Arguments app_names {Σ} _. Arguments app_pred {Σ} _ _ _ _.
 Arguments app_boot {Σ} _ _ _ _.
 Arguments app_R {Σ} _ _ _. Arguments app_ifc {Σ} _ _.
 Arguments app_turn {Σ} _ _ _.
+Arguments app_turn' {Σ} _ _ _. Arguments app_turn'' {Σ} _ _ _.
+Arguments app_iturn {Σ} _ _ _.
+Arguments app_cls {Σ} _ _. Arguments app_born {Σ} _ _ _ _ _ _.
+Arguments app_ok {Σ} _ _ _ _.
+Arguments app_tk {Σ} _ _ _. Arguments app_hk {Σ} _ _ _ _.
 
 (* the interface's three components, as projections: every site that named
    a field still names one, and the record carries ONE thing. *)
@@ -242,9 +289,47 @@ Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
            kill, nothing claimed of the console (redesign R2/R4) *)
         (fun _ => app_iface_triv Σ)
         (* the era's turn: the generic application has no console
-           discipline, so it is [emp] (lane CONS-IO F) *)
+           discipline, so it is [emp] (lane CONS-IO F) -- at all three
+           stages (sync SY3-A1) *)
+        (fun _ _ => emp%I) (fun _ _ => emp%I) (fun _ _ => emp%I)
         (fun _ _ => emp%I)
+        (* no sync ledger: nothing for the crash slot at birth, nothing
+           kept of the machine's names, no record predicate, the trivial
+           token and hooks (sync SY3-A1) *)
+        app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
         (fun _ _ => True).
+
+(* A LANDED APPLICATION WITH NOTHING FOR THE CRASH SLOT AT BIRTH (sync
+   SY3-A1): its birth step is its old one, and its era-0 claim is founded
+   without the birth's slot part *)
+Lemma app_birth_of_valid_cls {Σ} (A : xv6_app Σ) :
+  (forall c : app_fixed A, ⊢ app_cls A c) ->
+  (forall (γd γsw γreg γst : gname) (c : app_fixed A),
+     app_born A γd γsw γreg γst c) ->
+  (⊢ |==> ∃ c : app_fixed A, app_cl A c) ->
+  forall γd γsw γreg γst : gname,
+    ⊢ |==> ∃ c : app_fixed A,
+        ⌜app_born A γd γsw γreg γst c⌝ ∗ app_cls A c ∗ app_cl A c.
+Proof.
+  intros Hc Hn Hb γd γsw γreg γst. iMod Hb as (c) "H". iModIntro. iExists c.
+  iSplitR; [iPureIntro; apply Hn |].
+  iFrame "H". iApply Hc.
+Qed.
+
+(* ...and its return path: nothing to file, the turn goes on whole *)
+Lemma app_back_id {Σ} (A : xv6_app Σ) (c : app_fixed A) (h : list mobs)
+    (k : nat) :
+  app_turn'' A c k = app_turn' A c k ->
+  ⊢ app_R A c h -∗ app_turn' A c k ==∗ app_R A c h ∗ app_turn'' A c k.
+Proof.
+  intros Heq. rewrite Heq. iIntros "HR HT". iModIntro.
+  iSplitL "HR"; [iExact "HR" | iExact "HT"].
+Qed.
+
+Lemma app_init_of_valid {Σ} (A : xv6_app Σ) (P : app_fixed A -> iProp Σ) :
+  (forall c : app_fixed A, ⊢ P c) ->
+  forall c : app_fixed A, app_cls A c ⊢ P c.
+Proof. intros HP c. iIntros "_". iApply HP. Qed.
 
 (* ====================================================================== *)
 (*  WHAT AN APPLICATION OWES (post-qed-redesign §3.2, R4).                 *)
@@ -273,7 +358,12 @@ Context `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ
 Context `{!ufdG Σ}.
 
 Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
-  al_birth : ⊢ |==> ∃ c : app_fixed A, app_cl A c;
+  (* the birth, its yield split between the two slots (sync SY3-A1) *)
+  (* ...handed the machine's four fixed gnames, and saying where it kept
+     them (SY3-A1 re-cut) *)
+  al_birth : forall γd γsw γreg γst : gname,
+       ⊢ |==> ∃ c : app_fixed A,
+           ⌜app_born A γd γsw γreg γst c⌝ ∗ app_cls A c ∗ app_cl A c;
   al_Rt : forall (c : app_fixed A) (h : list mobs), Timeless (app_R A c h);
   al_kill : forall (c : app_fixed A) (r : app_names A),
        AppInv.app_sup_raw (app_pred A c) r ⊢ □ app_kill A c;
@@ -366,8 +456,11 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
                 ={⊤ ∖ ↑uartN i ∖ ↑obsN}=∗
               uart_ghosts γ u' ∗ app_R A c (h ++ [ObsUartIn i b])%list ∗
               app_tag A c (h ++ [ObsUartIn i b])%list);
+  (* THE POWER-ON TRANSPORT, lent the era's turn and handing on the boot's
+     (sync SY3-A1; [SystemAdequacy.app_xfer_boot_raw]) *)
   al_xfer : forall (c : app_fixed A) (k : nat),
-       ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c k);
+       ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c k)
+           (app_turn A c k) (app_turn' A c k);
   al_programs :
        forall (HR : riscvGS Σ) (GEN : GenId)
               (HBs : bioslotG Σ) (HFd : fdslotG Σ) (HIr : irefslotG Σ)
@@ -406,8 +499,9 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
            (* ...and (a') THE ERA'S TURN beside it (lane CONS-IO milestone
               F): the application's own per-era credential, minted at the
               power-on step and carried here by the kernel.  <init> holds
-              it; lane IO-LEAF spends it at the era's first banner byte. *)
-           app_turn A c (S gen_id) -∗
+              it; lane IO-LEAF spends it at the era's first banner byte.
+              What the founding left of it (sync SY3-A1). *)
+           app_iturn A c (S gen_id) -∗
            |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0;
   al_echo :
        forall (HR : riscvGS Σ) (c : app_fixed A),
@@ -420,6 +514,40 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
             quantified over the generation as it is over the context. *)
          ⊢ ∀ (GEN : GenId) (XI : CurCtx),
              @SpecConsoleintr.cons_echo_shift Σ HR GEN XI;
+  (* THE FOUNDING (sync SY3-A1, design/sync.md §4.5): the era's sync token
+     out of the turn the swap handed on, the rest for <init>.  The token is
+     indexed by the era's generation [k], the turns by its number [S k]. *)
+  al_found : forall (c : app_fixed A) (k : nat),
+       ⊢ app_turn'' A c (S k) -∗ |==> app_tk A c k ∗ app_iturn A c (S k);
+  (* THE RETURN PATH (SY3-A1 re-cut): the ledger's second step at the
+     power-on, at the same history and with no event, after the crash
+     slot's swap -- what the swap learned reaches the ledger here *)
+  al_back : forall (c : app_fixed A) (h : list mobs) (k : nat),
+       ⊢ app_R A c h -∗ app_turn' A c k ==∗ app_R A c h ∗ app_turn'' A c k;
+  (* the era's record predicate, off the boot resource the transport
+     mints beside the era's record: a persistent projection *)
+  al_boot_ok : forall (c : app_fixed A) (k : nat) (r : app_names A),
+       app_boot A c k r ⊢ ⌜app_ok A c k r⌝;
+  (* THE MERGE (SY3-K2), the commit's law, at the era's token and the
+     generation its wand's loan of the started auth is bound at (SY3-A1),
+     at the era's ambient record -- whose generation counter is the
+     pre-structure's, the one fact about the record the application's
+     predicate can use (it is fixed before the record exists) *)
+  (* ...and whose fixed part was born at the record's own four gnames
+     (SY3-A1 re-cut): what lets an application read its own era
+     certificate against the loaned started auth.  At the record of the
+     era numbered [S k]. *)
+  al_merge : forall (HR : riscvGS Σ) (c : app_fixed A) (k : nat),
+       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
+       app_born A (@riscv_disk_name Σ (@riscv_fixedGS Σ HR))
+         (@riscv_swap_name Σ (@riscv_fixedGS Σ HR))
+         (@riscv_registry_name Σ (@riscv_fixedGS Σ HR))
+         (@riscv_start_name Σ (@riscv_fixedGS Σ HR)) c ->
+       ⊢ app_merge_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k) k;
+  (* THE SYNC RUNNER (K3-3): the one place a hook's meaning is used *)
+  al_sync_run : forall (HR : riscvGS Σ) (c : app_fixed A) (k : nat),
+       ⊢ app_sync_run_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k)
+           (app_hk A c k);
 }.
 End AppLaws.
 
@@ -445,8 +573,9 @@ Theorem xv6_app_adequacy Σ
        list.  The two that are NOT in it are the two about an IMAGE:
        [Happ_init] and [Hphi] below. ---- *)
     `{AL : !xv6_app_laws A}
+    (* ...founded out of the birth's crash-slot part (sync SY3-A1) *)
     (Happ_init : forall c : app_fixed A,
-       ⊢ |==> ∃ r : app_names A,
+       app_cls A c ⊢ |==> ∃ r : app_names A,
            app_pred A c r (abs_view (fss_inodes (FsDurImg.img_state
               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
     (* ...and THE FIRST PROCESS'S EXEC BUNDLE (ARM-c): the one thing the
@@ -462,7 +591,7 @@ Theorem xv6_app_adequacy Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               (fun _ => True%I) (fun _ Q => Q)
+               (app_tk A c) (app_hk A c)
                γobs T (obs_ledger_at (app_R A c) γobs) γhist
                (app_ifc A c)
                (app_fixed A) c) g' -∗
@@ -489,7 +618,7 @@ Proof.
            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
-             (fun _ => True%I) (fun _ Q => Q)
+             (app_tk A c) (app_hk A c)
              γobs T (obs_ledger_at (app_R A c) γobs) γhist
              (app_ifc A c)
              (app_fixed A) c
@@ -504,16 +633,17 @@ Proof.
                     (al_rx HRg GEN HFi Gcl ri i γ Happ Huart));
       rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
-           (app_fixed A) (app_cl A) al_birth
+           (app_fixed A) (app_cls A) (app_cl A) (app_born A) al_birth
            (app_names A) (app_pred A) (app_boot A)
            (app_ifc A)
-           (app_turn A)
-           (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): no
-              application states a sync ledger yet, so the token is [True]
-              and a hook is its own [Q] (SY3-A gives the record fields) *)
-           (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
-           ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
-           ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
+           (app_turn A) (app_turn' A) (app_turn'' A) (app_iturn A)
+           (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2), off the
+              record, and their laws (sync SY3-A1) *)
+           (app_tk A) (app_hk A)
+           (fun c k => al_found c k)
+           (app_ok A) al_boot_ok
+           (fun H c k Hg Hb => al_merge H c k Hg Hb)
+           (fun H c k => al_sync_run H c k)
            al_xfer Happ_init
            al_kill
            al_sup al_programs
@@ -525,6 +655,10 @@ Proof.
               obs_ledger_at_step XV6_DISK_BYTES (app_R A c) (al_Rt c)
                 (app_cons A c) (app_turn A c)
                 (al_pow c) γd γobs)
+           (* the return path: the ledger's own second step (SY3-A1) *)
+           (fun γobs c h gen =>
+              obs_ledger_at_back (app_R A c) (al_Rt c) _ _
+                (fun h' => al_back c h' (S gen)) γobs h)
            Hperm (app_phi A) Hphi Hgen0 Hpow0 Himg).
 Qed.
 
@@ -537,27 +671,44 @@ Section AppTriv.
   Context {Σ : gFunctors} `{!riscvGpreS Σ}.
 
   (* the birth step: no fixed part, so [()] and nothing about it *)
-  Lemma app_triv_birth :
-    ⊢ |==> ∃ c : app_fixed (app_triv Σ), app_cl (app_triv Σ) c.
+  Lemma app_triv_birth (γd γsw γreg γst : gname) :
+    ⊢ |==> ∃ c : app_fixed (app_triv Σ),
+        ⌜app_born (app_triv Σ) γd γsw γreg γst c⌝ ∗
+        app_cls (app_triv Σ) c ∗ app_cl (app_triv Σ) c.
   Proof using .
-    iModIntro. cbn [app_triv app_fixed app_cl].
-    iExists (). iPureIntro. exact Logic.I.
+    apply (app_birth_of_valid_cls (app_triv Σ)).
+    - intros c. exact (app_triv_cls_intro c).
+    - intros. exact Logic.I.
+    - iModIntro. iExists (). cbn [app_triv app_cl]. iPureIntro. exact Logic.I.
   Qed.
 
   (* the transport: a predicate that holds of every view is its own copy,
      and the generic application hands its first process nothing *)
   Lemma app_triv_xfer (c : app_fixed (app_triv Σ)) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_boot (app_triv Σ) c k).
+    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_boot (app_triv Σ) c k)
+        (app_turn (app_triv Σ) c k) (app_turn' (app_triv Σ) c k).
   Proof using .
-    cbn [app_triv app_pred app_boot].
+    cbn [app_triv app_pred app_boot app_turn app_turn'].
     apply app_xfer_boot_raw_triv. intros r av. reflexivity.
+  Qed.
+
+  (* ...and its merge: the transport's, the old copy dropped (SY3-K2) *)
+  Lemma app_triv_merge `{!riscvFixedGS Σ} (c : app_fixed (app_triv Σ))
+      (k : nat) :
+    ⊢ app_merge_raw (app_pred (app_triv Σ) c) (app_ok (app_triv Σ) c (S k))
+        (app_tk (app_triv Σ) c k) k.
+  Proof using .
+    apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+    cbn [app_triv app_pred].
+    apply app_xfer_raw_triv. intros r av. reflexivity.
   Qed.
 
   (* era 0: the claim at any view, at the one instance *)
   Lemma app_triv_init (c : app_fixed (app_triv Σ)) (av : aview) :
-    ⊢ |==> ∃ r : app_names (app_triv Σ), app_pred (app_triv Σ) c r av.
+    app_cls (app_triv Σ) c ⊢
+      |==> ∃ r : app_names (app_triv Σ), app_pred (app_triv Σ) c r av.
   Proof using .
-    iModIntro. cbn [app_triv app_names app_pred].
+    iIntros "_". iModIntro. cbn [app_triv app_names app_pred].
     iExists (). iPureIntro. exact Logic.I.
   Qed.
 
@@ -587,7 +738,7 @@ Section AppTriv.
 
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot (app_triv Σ) c (S gen_id) r -∗
       (* ...and the era's turn, likewise taken and not used *)
-      app_turn (app_triv Σ) c (S gen_id) -∗
+      app_iturn (app_triv Σ) c (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using .
     intros Heq Hiface _. iIntros "_ _ _". iModIntro.
@@ -644,6 +795,12 @@ Section AppTriv.
       iApply (SpecConsoleintr.cons_echo_shift_triv (XI := XI)).
       rewrite /riscv_cons_res Hiface.
       cbn [app_triv app_ifc app_iface_triv ai_cons]. reflexivity.
+    - (* the founding: the token is [True], the turn goes on whole *)
+      intros c k. exact (app_triv_found c k _).
+    - intros c h k. by apply app_back_id.
+    - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
+    - intros HR c k _ _. exact (app_triv_merge c k).
+    - intros HR c k. exact (app_triv_sync_run _ _ c k).
   Qed.
 End AppTriv.
 

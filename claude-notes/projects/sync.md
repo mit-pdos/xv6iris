@@ -106,10 +106,19 @@ so a linear hook cannot be their premise -- the hook RIDES THE LEND:
 sync child becomes `Wcu I 3 ∗ hook_opt gen_id oQ`; SY3-A4 does it.
 Cleanups left for a later sweep (none blocking): the old `flushed_sync`
 receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
-`WpSconfBtype`; the trivial `Tk`/`Hk` values spelled inside two adequacy
-statements until SY3-A1 moves them onto the `App` record.
-SY3-A: A1 and A2 in flight (branches `sync3-a1` in `/shared/xv6iris-3k`,
-`sync3-a2` in `/shared/xv6iris-3n`); A3, A4 after both.
+`WpSconfBtype`.
+SY3-A: A2 ON MAIN (`b875e390b`).  A1 DONE on branch `sync3-a1` (re-cut
+included): the merge's started-auth loan (`dur_merge G T gd`,
+`app_merge_raw A Ok T gd`, the hooked law lent the custody auth), the
+era's record predicate `Ok` on both raw laws (pinned as ONE package
+`AppInv.app_merge := ∃ Ok, ⌜Ok app_run⌝ ∗ merge ∗ runner`, the runner's
+own kit row gone), the swap's turn loan and the return path (`Tn`, `Tn'`,
+`Tn''`, `Hback`), the birth handed the four fixed gnames with `Born` told
+to every boot, `Tk`/`Hk` at the fixed part alone, and the `App` record's
+data (`app_turn'`, `app_turn''`, `app_iturn`, `app_cls`, `app_born`,
+`app_ok`, `app_tk`, `app_hk`) and laws (`al_xfer`, `al_back`, `al_found`,
+`al_boot_ok`, `al_merge`, `al_sync_run`); every landed application at the
+trivial values.  A3, A4 next.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 

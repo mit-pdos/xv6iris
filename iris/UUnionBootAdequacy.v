@@ -94,7 +94,7 @@ Section UnionAdequacy.
       @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_union c ->
       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
       ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_union c (S gen_id) r -∗
-        app_turn app_union c (S gen_id) -∗
+        app_iturn app_union c (S gen_id) -∗
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
 
   Context (Hprog : union_prog_law).
@@ -126,7 +126,7 @@ Section UnionAdequacy.
     (* EVERY OBLIGATION GOES IN AS A HOLE ([UInitBootAdequacy]'s measured
        rule) *)
     refine (xv6_app_adequacy Σ g sb nib cov app_union
-              (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov)
+              (app_init_of_valid _ _ (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
               _ Hgen0 Hpow0 Himg n κs t2 g2 Hn).
     (* [Hphi]: a PURE reading of the application's trace ledger *)
     intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h.

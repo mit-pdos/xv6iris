@@ -1462,7 +1462,12 @@ Section EchoApp.
 
   Definition app_echo : xv6_app Σ :=
     MkApp echo_fixed echo_cl echo_names echo_pred echo_boot echo_R
-          echo_ifc echo_turn echo_phi.
+          echo_ifc
+          (* the turn, the same at all three stages: no sync ledger
+             (sync SY3-A1) *)
+          echo_turn echo_turn echo_turn echo_turn
+          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+          echo_phi.
 
   (* ---- THE BIRTH STEP ---- *)
   Lemma echo_Hbirth : ⊢ |==> ∃ c : app_fixed app_echo, app_cl app_echo c.
@@ -1659,15 +1664,20 @@ Section EchoApp.
   Qed.
 
   (* ---- THE TRANSPORT, WITH THE FIRST PROCESS'S BOOT RESOURCE ---- *)
+  (* ...at the identity on the turn, the slot keeping its copy (sync
+     SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
   Lemma echo_Happ_boot (c : app_fixed app_echo) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_boot app_echo c k).
+    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_boot app_echo c k)
+        (app_turn app_echo c k) (app_turn' app_echo c k).
   Proof using .
-    cbn [app_echo app_fixed app_names app_pred app_boot] in c |- *.
-    rewrite /app_xfer_boot_raw. iApply echo_xfer_boot.
+    cbn [app_echo app_fixed app_names app_pred app_boot app_turn app_turn']
+      in c |- *.
+    apply app_xfer_boot_raw_of_clone.
+    rewrite /app_clone_raw. iApply echo_xfer_boot.
   Qed.
 
-  (* ...and the old obligation, which the commit's law and the era mint
-     still take ([SystemAdequacy.app_xfer_raw_of_boot]) *)
+  (* ...and the plain transport, which the commit's merge is made of
+     ([AppInv.app_merge_raw_of_xfer]) *)
   Lemma echo_Happ_xfer (c : app_fixed app_echo) :
     ⊢ app_xfer_raw (app_pred app_echo c).
   Proof using .

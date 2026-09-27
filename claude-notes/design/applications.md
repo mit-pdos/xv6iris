@@ -106,14 +106,47 @@ definition and never a vacuous theorem):
 
 | premise | what it says | generic app |
 |---|---|---|
-| `Hbirth` | `⊢ \|==> ∃ c, app_cl A c` — the fixed part's birth | `iExists ()` |
-| `Happ_xfer` | `∀ c, ⊢ app_xfer_raw (app_pred A c)` — the TRANSPORT (§3), the one durability obligation | `app_xfer_raw_triv` |
-| `Happ_init` | `∀ c, ⊢ \|==> ∃ r, app_pred A c r (abs_view (fss_inodes (img_state …)))` — era 0's claim at the mkfs image | trivial |
+| `al_birth` | `∀ γd γsw γreg γst, ⊢ \|==> ∃ c, ⌜app_born A γd γsw γreg γst c⌝ ∗ app_cls A c ∗ app_cl A c` — the fixed part's birth, handed the machine's four fixed gnames, saying where it kept them, its yield split between the crash slot (`app_cls`, to `HPc`) and the trace slot (`app_cl`, to `HR0`) | `app_birth_of_valid_cls` |
+| `al_xfer` | `∀ c k, ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c k) (app_turn A c k) (app_turn' A c k)` — the POWER-ON transport (§3 crossing 2) | `app_xfer_boot_raw_of_clone` of a clone |
+| `al_merge` | `∀ HR c k, genGS eq -> app_born A (the record's four names) c -> ⊢ app_merge_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k) k` — the COMMIT's merge (§3 crossing 1) | `app_merge_raw_of_xfer` of the plain transport |
+| `al_back` | `∀ c h k, ⊢ app_R A c h -∗ app_turn' A c k ==∗ app_R A c h ∗ app_turn'' A c k` — the power-on's RETURN PATH: the ledger's second step after the swap, same history, no event | `app_back_id` |
+| `al_found` | `∀ c k, ⊢ app_turn'' A c (S k) -∗ \|==> app_tk A c k ∗ app_iturn A c (S k)` — the era's sync token out of the returned turn | `app_triv_found` |
+| `al_boot_ok` | `∀ c k r, app_boot A c k r ⊢ ⌜app_ok A c k r⌝` — the era's record predicate off the boot resource, which is how the mint learns `⌜Ok app_run⌝` | trivial |
+| `al_sync_run` | `∀ HR c k, ⊢ app_sync_run_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k) (app_hk A c k)` — what a sync hook means ([`sync.md`](sync.md) §4.2) | `app_triv_sync_run` |
+| `Happ_init` | `∀ c, app_cls A c ⊢ \|==> ∃ r, app_pred A c r (abs_view (fss_inodes (img_state …)))` — era 0's claim at the mkfs image, out of the birth's slot part | `app_init_of_valid` |
 | `Happ_sup` | `∀ c r, ⊢ app_sup_raw (app_pred A c) r` — the predicate holds at EVERY view: the SUPPLY the generic slot mints its deposits from (§2). Trivially true for the generic application; a constraining application does not instantiate the generic theorem (its slots are verified; the tainted generic slot's supply arrives through the exec bundle) | `app_sup_raw_triv` |
 | `HR0`, `HRt`, `Hpow`, `Htx`, `Hrx` | `xv6_trace_adequacy`'s ledger obligations, `HR0` RECEIVING `app_cl A c` | as today |
 | `Hphi` | the conclusion, holding the COMPOSITE crash slot `xv6_slot` and the ledger at the end of the run (§5) | as today |
 
-`app_triv` is `MkApp unit (fun _ => True) unit (fun _ _ _ => True) (fun _ _ => emp) (fun _ _ => True)`.
+The record's DATA beside the predicate and the ledger (`App.xv6_app`; data
+and not laws because a proof that fires a hook or spends a token must be
+able to read what it is, and a law instance is proved opaquely): the
+era's turn in four stages -- `app_turn` (what the power-on step yields
+and the swap is lent), `app_turn'` (what the swap hands on), `app_turn''`
+(what the ledger's return path makes of it), `app_iturn` (what the
+founding leaves for <init>); `app_cls`, the birth's crash-slot part;
+`app_born`, what the birth says about where it kept the machine's names;
+`app_ok c k r`, the ERA'S RECORD PREDICATE (for an application that cannot
+pin its running claim's era from ghost state: "this record belongs to
+era `k`"); and the two sync slots `app_tk`/`app_hk`, which the machine's
+fixed record carries as `riscv_sync_tok`/`riscv_sync_hook`.  An
+application with no sync ledger takes the four turns equal and
+`SystemAdequacy.app_triv_cls`/`app_triv_born`/`app_triv_ok`/`app_triv_tk`/
+`app_triv_hk`, and pays `al_back`/`al_found`/`al_sync_run` with
+`app_back_id`/`app_triv_found`/`app_triv_sync_run`; `app_triv` is that
+application with every other field trivial.
+
+ERA NUMBERING: the era booted at generation `gen_id` is era `S gen_id`
+(ledger numbering, birth = 0) -- the turns, the boot resource and
+`app_ok` are indexed by it; the token and hooks `app_tk c k`/`app_hk c k`
+by the generation `k = gen_id` (an application reads `S k` inside).
+
+The era's two durability laws reach the mint as ONE package
+(`AppInv.app_merge := ∃ Ok, ⌜Ok app_run⌝ ∗ app_merge_raw app_pred Ok T
+gen_id ∗ app_sync_run_raw app_pred Ok T Hk`, kit 2's last row): the two
+must agree on `Ok`, and `appcfg` does not carry it.  `xv6_boot_era` builds
+it at `Ok := app_ok c (S gen_id)`, reading `⌜Ok rap⌝` off the lent boot
+resource by `al_boot_ok`; the collection reads it off the kit.
 
 ## 2. The RUNNING instance: its own invariant, tied by half the map's authority
 
@@ -227,8 +260,9 @@ on `m`, an update needs the whole:
      running claim read off `app_inv` (the two halves agree on `I`) and
      returns the claim.  Its output is the PAIR
 
-         dur_merge G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T
-         dur_pair G T D   := ∃ gt, P_dur_at gt D ∗ dur_merge G T gt
+         dur_merge G T gd gt := (∀ gt_o n, ⌜n = gd + 1⌝ -∗ start_auth n -∗
+                                  ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ start_auth n) ∧ T
+         dur_pair G T gd D   := ∃ gt, P_dur_at gt D ∗ dur_merge G T gd gt
 
      at `G := app_guest := app_dur_raw app_pred`, and the header write's
      permit applies the wand to the OLD guest (`FsDurSnap.dsnap_step_merge`)
@@ -239,18 +273,34 @@ on `m`, an update needs the whole:
      era's sync token `T := riscv_sync_tok gen_id` -- sync K3-3, which
      threads the token through the pair -- on the kit and the mint):
 
-         app_merge_raw A T := □ ∀ r av, ▷ A r av -∗ T ==∗ ▷ A r av ∗
-                                ∃ r', (((▷ ∃ r_o av_o, A r_o av_o) ==∗ ▷ A r' av ∗ T) ∧ T)
+         app_merge_raw A Ok T gd := □ ∀ r av, ⌜Ok r⌝ -∗ ▷ A r av -∗ T ==∗ ▷ A r av ∗
+                                   ∃ r', ⌜Ok r'⌝ ∗
+                                     ((∀ n, ⌜n = gd + 1⌝ -∗ start_auth n -∗
+                                         (▷ ∃ r_o av_o, A r_o av_o) ==∗
+                                         ▷ A r' av ∗ T ∗ start_auth n) ∧ T)
 
-     Whatever the new copy needs of the running claim goes INTO the wand at
-     the collection.  Every landed application gets it from its transport
-     (`app_merge_raw_of_xfer`: the old copy dropped), at the one site
-     `SystemAdequacy` builds the era's premise `Happ_merge`; the App record
-     still carries the transport only.
+     The WAND is LENT the machine's started auth at the era's `gd + 1`
+     (`gd` pinned to `gen_id` by `log_ctx` and `app_merge`; see
+     [`crash.md`](crash.md), "The two loans"): it is the one arm that meets
+     the old copy, whose era certificate the auth bounds.  Whatever the new
+     copy needs of the running claim goes INTO the wand at the collection.
+     A landed application proves `al_merge` from its own PLAIN transport
+     (`app_merge_raw_of_xfer`, at a total `Ok`: the old copy dropped, the
+     loan handed back).
   2. **PowerOn.**  `FsCrash.P_fs_swap` clones the snapshot
      (`P_dur_at_clone` returns the clone's guest half at the same map),
-     adequacy runs `app_xfer` on the slot's claim, and the lend carries
-     both: `Rb c dk := ∃ gt, P_fs_lend_at gt cov ls dk ∗ ▷ app_dur_raw (app_fs c) gt`.
+     adequacy runs the power-on transport on the slot's claim, and the lend
+     carries both: `Rb c dk := ∃ gt r, P_fs_lend_at gt cov ls dk ∗
+     ▷ app_dur_at (app_fs c) gt r ∗ app_boot c (S k) r`.  The transport
+
+         app_xfer_boot_raw A B Tn Tn' := □ ∀ r av, Tn -∗ ▷ A r av ==∗
+                                           Tn' ∗ ∃ r_s r', ▷ A r_s av ∗ ▷ A r' av ∗ B r'
+
+     is LENT the era's turn the ledger's on-arm just yielded and hands on
+     the boot's, and REPACKS the slot at `r_s` -- which is where a copy
+     re-based to the new era goes back.  A landed application passes the
+     turn through and keeps its copy (`app_xfer_boot_raw_of_clone` of its
+     `app_clone_raw`, the old shape).
   3. **Boot.**  `xv6_boot_era` unpacks the lend, founds the era's `γtop`
      at `fss_inodes S` (`FsCfgSnap.fs_cfg_alloc_snap`), and founds
      `app_inv` from the lent `▷ app_pred r' …` directly (the guest half

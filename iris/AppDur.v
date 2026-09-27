@@ -45,6 +45,7 @@ Require Import FsNode.          (* [fs_node] *)
 Require Import FsAbsDefs.       (* [aview], [abs_view] *)
 Require Import AppCfg.          (* [appcfg]: [app_pred] *)
 Require Import AppInv.          (* [app_xfer_raw]: the transport; [app_merge_raw]: the merge *)
+Require Import RiscvPtsto.      (* [riscvFixedGS]/[start_auth]: the merge's loan *)
 
 Local Open Scope Z_scope.
 
@@ -102,35 +103,6 @@ Section AppDurRaw.
     iModIntro. iFrame "Hp". iApply (app_dur_raw_pack with "Hh Hnew").
   Qed.
 
-  (* THE MERGE (the commit, SY3-K2): run the merge on the running claim,
-     keep the original, and hand out the guest-level wand the WAL applies
-     to the old guest at the header write ([FsDurSnap.dur_merge]).  The
-     fresh guest half goes INTO the wand beside the merge's own; the old
-     guest's half is dropped with it, its claim goes to the merge.  The
-     token [T] (sync K3-3) goes in with the running claim and comes back on
-     either arm of the additive pair. *)
-  Lemma app_dur_raw_merge {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
-      (gt : gname) (I : gmap Z fs_node) (r : N) :
-    app_merge_raw A T -∗
-    ghost_map_auth gt (1/2) I -∗
-    ▷ A r (abs_view I) -∗
-    T ==∗
-      ▷ A r (abs_view I) ∗
-      ((∀ gt_o : gname, ▷ app_dur_raw A gt_o ==∗ ▷ app_dur_raw A gt ∗ T)
-       ∧ T).
-  Proof using .
-    iIntros "#Hm Hh Hp HT". rewrite /app_merge_raw.
-    iMod ("Hm" with "Hp HT") as "[Hp Hw]". iDestruct "Hw" as (r') "Hw".
-    iModIntro. iFrame "Hp". iSplit; [| iDestruct "Hw" as "[_ HT]"; iExact "HT"].
-    iDestruct "Hw" as "[Hw _]".
-    iIntros (gt_o) "Hold".
-    iMod ("Hw" with "[Hold]") as "[Hnew HT]".
-    { iNext. iEval (rewrite /app_dur_raw) in "Hold".
-      iDestruct "Hold" as (r_o I_o) "[_ Hold]".
-      iExists r_o, (abs_view I_o). iExact "Hold". }
-    iModIntro. iFrame "HT".
-    iApply (app_dur_raw_pack with "Hh"). iExists r'. iExact "Hnew".
-  Qed.
 
   (* AGREEMENT (the boot, and the PowerOn arm): a guest against a kernel
      fraction of the same map pins the guest's map, and the claim comes out
@@ -148,6 +120,46 @@ Section AppDurRaw.
     iModIntro. iFrame "Hk Hh". iExists r. iExact "Hp".
   Qed.
 End AppDurRaw.
+
+(* THE MERGE'S GUEST FORM needs the fixed record's class: its wand is lent
+   the machine's started auth (sync SY3-A1) *)
+Section AppDurMerge.
+  Context `{!fsTopG Σ, !riscvFixedGS Σ}.
+
+  (* THE MERGE (the commit, SY3-K2): run the merge on the running claim,
+     keep the original, and hand out the guest-level wand the WAL applies
+     to the old guest at the header write ([FsDurSnap.dur_merge]).  The
+     fresh guest half goes INTO the wand beside the merge's own; the old
+     guest's half is dropped with it, its claim goes to the merge.  The
+     token [T] (sync K3-3) goes in with the running claim and comes back on
+     either arm of the additive pair; the started auth the wand is lent
+     (SY3-A1) passes straight through to the application's own wand. *)
+  Lemma app_dur_raw_merge {N} (A : N -> aview -> iProp Σ) (Ok : N -> Prop)
+      (T : iProp Σ) (gd : nat) (gt : gname) (I : gmap Z fs_node) (r : N) :
+    (* the running record satisfies the era's record predicate *)
+    Ok r ->
+    app_merge_raw A Ok T gd -∗
+    ghost_map_auth gt (1/2) I -∗
+    ▷ A r (abs_view I) -∗
+    T ==∗
+      ▷ A r (abs_view I) ∗
+      ((∀ (gt_o : gname) (n : nat), ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
+          ▷ app_dur_raw A gt_o ==∗ ▷ app_dur_raw A gt ∗ T ∗ start_auth n)
+       ∧ T).
+  Proof using .
+    intros HOk. iIntros "#Hm Hh Hp HT". rewrite /app_merge_raw.
+    iMod ("Hm" with "[//] Hp HT") as "[Hp Hw]". iDestruct "Hw" as (r') "[_ Hw]".
+    iModIntro. iFrame "Hp". iSplit; [| iDestruct "Hw" as "[_ HT]"; iExact "HT"].
+    iDestruct "Hw" as "[Hw _]".
+    iIntros (gt_o n Hn) "Hsa Hold".
+    iMod ("Hw" $! n with "[//] Hsa [Hold]") as "(Hnew & HT & Hsa)".
+    { iNext. iEval (rewrite /app_dur_raw) in "Hold".
+      iDestruct "Hold" as (r_o I_o) "[_ Hold]".
+      iExists r_o, (abs_view I_o). iExact "Hold". }
+    iModIntro. iFrame "HT Hsa".
+    iApply (app_dur_raw_pack with "Hh"). iExists r'. iExact "Hnew".
+  Qed.
+End AppDurMerge.
 
 Section AppDur.
   Context `{!fsTopG Σ}.

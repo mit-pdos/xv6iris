@@ -79,7 +79,7 @@ Section UInitUnion.
     iIntros "#Hinv Hb Hturn".
     iApply (union_Hinit_boot_at HR GEN c r Heq Hiface with "Hinv [Hb] [Hturn]").
     - cbn [app_union app_boot]. iExact "Hb".
-    - cbn [app_union app_turn union_turn]. iExact "Hturn".
+    - cbn [app_union app_iturn union_turn]. iExact "Hturn".
   Qed.
 
 End UInitUnion.

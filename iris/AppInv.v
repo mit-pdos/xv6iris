@@ -191,6 +191,13 @@ Section AppCredsRaw.
     iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
   Qed.
 
+End AppCredsRaw.
+
+(* the merge's wand is LENT the machine's started auth (sync SY3-A1), so it
+   needs the fixed record's class; nothing else in it does *)
+Section AppMergeRaw.
+  Context `{!riscvFixedGS Σ}.
+
   (* ------------------------------------------------------------------ *)
   (*  1c.  THE MERGE (sync design section 4, operation 2; SY3-K2)         *)
   (* ------------------------------------------------------------------ *)
@@ -225,35 +232,58 @@ Section AppCredsRaw.
      which writes no header).  The token lets the law pin the running
      claim's share against the old copy's inside the wand; an application
      with nothing to pin passes it straight through
-     ([app_merge_raw_of_xfer]). *)
+     ([app_merge_raw_of_xfer]).
+
+     ...AND THE WAND IS LENT THE MACHINE'S STARTED AUTH (sync SY3-A1,
+     design §4.5 "The merge"): [start_auth n] at [n = gd + 1], [gd] the
+     era's generation, handed back untouched.  Only the WAND carries the
+     loan -- it is the one arm that meets the old copy, whose era
+     certificate the auth bounds; the collection that builds the wand
+     runs without it.  [gd] is pinned to the era's [gen_id] by [app_merge]
+     below.
+
+     ...AND AT THE ERA'S RECORD PREDICATE [Ok] (SY3-A1 re-cut): a pure
+     predicate on the application's instances that the era's running
+     record satisfies and the new copy's record is born satisfying -- an
+     application that cannot pin its running claim's era from ghost
+     state reads it here (for the union, "this record's era field is the
+     era's number").  The collection supplies [⌜Ok app_run⌝] off the pinned
+     package [app_merge] below. *)
   Definition app_merge_raw {N : Type} (A : N -> aview -> iProp Σ)
-      (T : iProp Σ) : iProp Σ :=
+      (Ok : N -> Prop) (T : iProp Σ) (gd : nat) : iProp Σ :=
     (□ (∀ (r : N) (av : aview),
-          ▷ A r av -∗ T ==∗ ▷ A r av ∗
-          ∃ r' : N,
-            (((▷ ∃ (r_o : N) (av_o : aview), A r_o av_o) ==∗ ▷ A r' av ∗ T)
+          ⌜Ok r⌝ -∗ ▷ A r av -∗ T ==∗ ▷ A r av ∗
+          ∃ r' : N, ⌜Ok r'⌝ ∗
+            ((∀ n : nat, ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
+                (▷ ∃ (r_o : N) (av_o : aview), A r_o av_o) ==∗
+                ▷ A r' av ∗ T ∗ start_auth n)
              ∧ T)))%I.
 
   Global Instance app_merge_raw_persistent {N} (A : N -> aview -> iProp Σ)
-      (T : iProp Σ) :
-    Persistent (app_merge_raw A T).
+      (Ok : N -> Prop) (T : iProp Σ) (gd : nat) :
+    Persistent (app_merge_raw A Ok T gd).
   Proof using . rewrite /app_merge_raw. apply _. Qed.
 
-  (* EVERY TRANSPORT IS A MERGE, AT ANY TOKEN: drop the old copy, copy the
-     running claim, and hand the token back on either arm.  This is what
-     every application with nothing to carry across the commit
-     instantiates the merge with (the commit behaves as before). *)
-  Lemma app_merge_raw_of_xfer {N} (A : N -> aview -> iProp Σ) (T : iProp Σ) :
-    (⊢ app_xfer_raw A) -> ⊢ app_merge_raw A T.
+  (* EVERY TRANSPORT IS A MERGE, AT ANY TOKEN AND ANY ERA: drop the old
+     copy, copy the running claim, and hand the token and the loan back on
+     either arm.  This is what every application with nothing to carry
+     across the commit instantiates the merge with (the commit behaves as
+     before).  AT A TOTAL [Ok]: the transport's fresh instance is not
+     known to satisfy anything, so an application whose record predicate
+     says something writes its own merge. *)
+  Lemma app_merge_raw_of_xfer {N} (A : N -> aview -> iProp Σ) (Ok : N -> Prop)
+      (T : iProp Σ) (gd : nat) :
+    (forall r : N, Ok r) -> (⊢ app_xfer_raw A) -> ⊢ app_merge_raw A Ok T gd.
   Proof using .
-    intros Hx. iPoseProof Hx as "#Hx".
-    rewrite /app_xfer_raw /app_merge_raw. iIntros "!>" (r av) "Hp HT".
+    intros HOk Hx. iPoseProof Hx as "#Hx".
+    rewrite /app_xfer_raw /app_merge_raw. iIntros "!>" (r av) "_ Hp HT".
     iMod ("Hx" with "Hp") as "[Hp Hn]". iDestruct "Hn" as (r') "Hn".
-    iModIntro. iFrame "Hp". iExists r'. iSplit; [| iExact "HT"].
-    iIntros "_". iModIntro. iFrame "Hn HT".
+    iModIntro. iFrame "Hp". iExists r'. iSplitR; [iPureIntro; apply HOk |].
+    iSplit; [| iExact "HT"].
+    iIntros (n _) "Hsa _". iModIntro. iFrame "Hn HT Hsa".
   Qed.
 
-End AppCredsRaw.
+End AppMergeRaw.
 
 (* the runner names the guest's half of the map's authority, so it needs the
    top map's ghost class; and it is a FANCY update at [∅] (an application's
@@ -276,10 +306,13 @@ Section AppSyncRaw.
      mask [∅]: it runs inside the collection, with the file system's
      invariants open.  The running claim's instance [r] is quantified
      here; the collection applies it at [app_run].  RAW for
-     [app_xfer_raw]'s reason. *)
+     [app_xfer_raw]'s reason.  Both instances satisfy the era's record
+     predicate [Ok] (SY3-A1 re-cut, [app_merge_raw]'s): the running one by
+     the pinned package, the new copy's by the merge. *)
   Definition app_sync_run_raw {N : Type} (A : N -> aview -> iProp Σ)
-      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) : iProp Σ :=
+      (Ok : N -> Prop) (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) : iProp Σ :=
     (□ (∀ (Q : iProp Σ) (gt : gname) (I : gmap Z fs_node) (r r' : N),
+          ⌜Ok r⌝ -∗ ⌜Ok r'⌝ -∗
           Hk Q -∗
           ghost_map_auth gt (1/2) I -∗
           ▷ A r' (abs_view I) -∗
@@ -291,18 +324,18 @@ Section AppSyncRaw.
             T ∗ Q))%I.
 
   Global Instance app_sync_run_raw_persistent {N} (A : N -> aview -> iProp Σ)
-      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) :
-    Persistent (app_sync_run_raw A T Hk).
+      (Ok : N -> Prop) (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) :
+    Persistent (app_sync_run_raw A Ok T Hk).
   Proof using . rewrite /app_sync_run_raw. apply _. Qed.
 
   (* AN APPLICATION WITH NO SYNC LEDGER: every hook is its own [Q], and the
      runner hands it straight back. *)
-  Lemma app_sync_run_raw_triv {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
-      (Hk : iProp Σ -> iProp Σ) :
-    (forall Q : iProp Σ, Hk Q ⊣⊢ Q) -> ⊢ app_sync_run_raw A T Hk.
+  Lemma app_sync_run_raw_triv {N} (A : N -> aview -> iProp Σ) (Ok : N -> Prop)
+      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) :
+    (forall Q : iProp Σ, Hk Q ⊣⊢ Q) -> ⊢ app_sync_run_raw A Ok T Hk.
   Proof using .
     intros Hid. rewrite /app_sync_run_raw.
-    iIntros "!>" (Q gt I r r') "HQ Hh Hn Hp HT". iModIntro.
+    iIntros "!>" (Q gt I r r') "_ _ HQ Hh Hn Hp HT". iModIntro.
     iFrame "Hh Hn Hp HT". iApply (bi.equiv_entails_1_1 _ _ (Hid Q)).
     iExact "HQ".
   Qed.
@@ -310,10 +343,12 @@ Section AppSyncRaw.
   (* ...FIRED ONCE PER HOOK: the collection's reading of a list of waiters'
      hooks, at any mask (the runner itself runs at [∅]).  Every resource
      comes back, and each hook's [Q] beside them. *)
-  Lemma app_sync_run_list {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
+  Lemma app_sync_run_list {N} (A : N -> aview -> iProp Σ) (Ok : N -> Prop)
+      (T : iProp Σ)
       (Hk : iProp Σ -> iProp Σ) (E : coPset) (Qs : list (iProp Σ))
       (gt : gname) (I : gmap Z fs_node) (r r' : N) :
-    app_sync_run_raw A T Hk -∗
+    Ok r -> Ok r' ->
+    app_sync_run_raw A Ok T Hk -∗
     ([∗ list] Q ∈ Qs, Hk Q) -∗
     ghost_map_auth gt (1/2) I -∗
     ▷ A r' (abs_view I) -∗
@@ -324,12 +359,14 @@ Section AppSyncRaw.
       ▷ A r (abs_view I) ∗
       T ∗ ([∗ list] Q ∈ Qs, Q).
   Proof using .
+    intros Hr Hr'.
     induction Qs as [|Q Qs IH]; simpl.
     - iIntros "_ _ Hh Hn Hp HT". iModIntro. iFrame "Hh Hn Hp HT".
     - iIntros "#Hrun [HQ HQs] Hh Hn Hp HT".
       iMod (IH with "Hrun HQs Hh Hn Hp HT") as "(Hh & Hn & Hp & HT & HQs)".
       iMod (fupd_mask_subseteq ∅) as "Hcl"; [set_solver |].
-      iMod ("Hrun" $! Q gt I r r' with "HQ Hh Hn Hp HT") as "(Hh & Hn & Hp & HT & HQ)".
+      iMod ("Hrun" $! Q gt I r r' with "[//] [//] HQ Hh Hn Hp HT")
+        as "(Hh & Hn & Hp & HT & HQ)".
       iMod "Hcl" as "_". iModIntro. iFrame "Hh Hn Hp HT HQ HQs".
   Qed.
 End AppSyncRaw.
@@ -401,27 +438,26 @@ Section AppInv.
     iIntros "[H | H]"; [by iApply Hs | by iApply Hw].
   Qed.
 
-  (* THE MERGE, PINNED (round C's transport; the merge since SY3-K2) at
-     the era's sync token (K3-3): the application-side premise of the era
-     mint, which hands it to fsinit on the kit.  The commit is its one
-     runner. *)
+  (* THE ERA'S DURABILITY LAWS, PINNED, AS ONE PACKAGE: the merge (round
+     C's transport; the merge since SY3-K2) and the sync runner (K3-3), at
+     the era's sync token and hook family -- the two slots of the fixed
+     record ([RiscvPtsto.riscv_sync_tok]/[riscv_sync_hook]) -- and the era's
+     generation (the loan's bound, SY3-A1), both at ONE record predicate
+     [Ok] that the era's running record satisfies (SY3-A1 re-cut).  ONE
+     package because the two laws must agree on [Ok]; the predicate is
+     EXISTENTIAL so that [appcfg] need not carry it.  The application-side
+     premise of the era mint, which hands it to fsinit on the kit, where
+     the commit's law and the hooked law are built out of it
+     ([FsCollectAll.fs_snap_law_build]/[fs_snap_law_ghost_build]). *)
   Definition app_merge : iProp Σ :=
-    app_merge_raw app_pred (riscv_sync_tok RiscvLang.gen_id).
+    (∃ Ok : app_names -> Prop, ⌜Ok app_run⌝ ∗
+       app_merge_raw app_pred Ok (riscv_sync_tok RiscvLang.gen_id)
+         RiscvLang.gen_id ∗
+       app_sync_run_raw app_pred Ok (riscv_sync_tok RiscvLang.gen_id)
+         (riscv_sync_hook RiscvLang.gen_id))%I.
 
   Global Instance app_merge_persistent : Persistent app_merge.
   Proof using . rewrite /app_merge. apply _. Qed.
-
-  (* THE SYNC RUNNER, PINNED (sync K3-3): at the era's token and hook
-     family, the two slots of the fixed record
-     ([RiscvPtsto.riscv_sync_tok]/[riscv_sync_hook]).  It rides beside the
-     merge from the mint to fsinit on the kit, where the hooked law is
-     built out of it ([FsCollectAll.fs_snap_law_ghost_build]). *)
-  Definition app_sync_run : iProp Σ :=
-    app_sync_run_raw app_pred (riscv_sync_tok RiscvLang.gen_id)
-      (riscv_sync_hook RiscvLang.gen_id).
-
-  Global Instance app_sync_run_persistent : Persistent app_sync_run.
-  Proof using . rewrite /app_sync_run. apply _. Qed.
 
   (* THE DOMAIN ROW (round C).  The abstract map names EXACTLY the region's
      inums.  [InodeRegion.ftop_body] carries no such row, so the commit's

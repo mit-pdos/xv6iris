@@ -160,11 +160,24 @@ Section UnionApp.
     MkApp union_gn union_cl_all file_names
           (fun c => file_pred (fgn_cl (ugn_file c)))
           (fun c k r => file_boot (fgn_cl (ugn_file c)) k r)
-          union_R union_ifc union_turn union_phi.
+          union_R union_ifc
+          (* the turn, the same at all three stages, and the trivial sync
+             values: no sync ledger yet (sync SY3-A1; SY3-A3 gives the
+             union its own) *)
+          union_turn union_turn union_turn union_turn
+          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+          union_phi.
 
   (* ---- the birth step ---- *)
-  Lemma union_al_birth : ⊢ |==> ∃ c : app_fixed app_union, app_cl app_union c.
-  Proof using . cbn [app_union app_fixed app_cl]. exact union_birth_all. Qed.
+  Lemma union_al_birth (γd γsw γreg γst : gname) :
+    ⊢ |==> ∃ c : app_fixed app_union,
+        ⌜app_born app_union γd γsw γreg γst c⌝ ∗
+        app_cls app_union c ∗ app_cl app_union c.
+  Proof using .
+    apply app_birth_of_valid_cls;
+      [exact app_triv_cls_intro | intros; exact Logic.I |].
+    cbn [app_union app_fixed app_cl]. exact union_birth_all.
+  Qed.
 
   Lemma union_al_Rt (c : app_fixed app_union) (h : list mobs) :
     Timeless (app_R app_union c h).
@@ -314,10 +327,24 @@ Section UnionApp.
   (* ---- the transport, with the first process's boot resource: the
          file application's ---- *)
   Lemma union_al_xfer (c : app_fixed app_union) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_union c) (app_boot app_union c k).
+    ⊢ app_xfer_boot_raw (app_pred app_union c) (app_boot app_union c k)
+        (app_turn app_union c k) (app_turn' app_union c k).
   Proof using .
-    cbn [app_union app_fixed app_names app_pred app_boot] in c |- *.
-    rewrite /app_xfer_boot_raw. iApply file_xfer_boot.
+    cbn [app_union app_fixed app_names app_pred app_boot app_turn app_turn']
+      in c |- *.
+    (* at the identity on the turn, the slot keeping its copy (SY3-A1) *)
+    apply app_xfer_boot_raw_of_clone.
+    rewrite /app_clone_raw. iApply file_xfer_boot.
+  Qed.
+
+  (* ---- the plain transport, which the merge is made of: the file
+         application's (SY3-K2, [AppFile.file_xfer]; the old durable copy
+         is dropped, [AppInv.app_merge_raw_of_xfer]) ---- *)
+  Lemma union_al_xfer_plain (c : app_fixed app_union) :
+    ⊢ app_xfer_raw (app_pred app_union c).
+  Proof using .
+    cbn [app_union app_fixed app_pred] in c |- *.
+    exact (file_xfer (fgn_cl (ugn_file c))).
   Qed.
 
   (* ---- the echo shift ---- *)
@@ -387,7 +414,7 @@ Section UnionLaws.
       @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_union c ->
       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
       ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_union c (S gen_id) r -∗
-        app_turn app_union c (S gen_id) -∗
+        app_iturn app_union c (S gen_id) -∗
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).
 
   Global Instance union_laws : App.xv6_app_laws (app_union (Σ := Σ)).
@@ -406,5 +433,12 @@ Section UnionLaws.
     - exact union_al_xfer.
     - exact Hprog.
     - exact union_al_echo.
+    - (* the founding: the token is [True], the turn goes on whole *)
+      intros c k. exact (app_triv_found c k _).
+    - intros c h k. by apply app_back_id.
+    - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
+    - intros HR c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+      exact (union_al_xfer_plain c).
+    - intros HR c k. exact (app_triv_sync_run _ _ c k).
   Qed.
 End UnionLaws.

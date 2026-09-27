@@ -681,6 +681,57 @@ Section power.
     iPureIntro. exact H27.
   Qed.
 
+  (* THE ERA'S TURN COMES BACK OUT, AND ANOTHER GOES IN ITS PLACE (sync
+     SY3-A1).  The boot splits the turn the PowerOn arm carried (the
+     slot's swap's yield) BEFORE the mint -- the application's founding
+     takes its sync token out of it for [initlog] -- and hands the mint
+     what is left.  Everything else crosses unchanged; placed BY NAME,
+     for [power_boot_res_lend]'s reason. *)
+  Lemma power_boot_res_turn (HE : riscvEraGS) (gen : nat)
+      (D : CPU -> gset register) (nproc ndisk : nat)
+      (Mof : (Z -> bv 8) -> log_mirror)
+      (Rb : (Z -> bv 8) -> iProp Σ) (Tn : iProp Σ) (g' : gstate) :
+    power_boot_res HE gen D nproc ndisk Mof Rb Tn g' ⊢
+      Tn ∗ ∀ Tn2 : iProp Σ,
+        Tn2 -∗ power_boot_res HE gen D nproc ndisk Mof Rb Tn2 g'.
+  Proof using .
+    rewrite /power_boot_res.
+    iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 &
+              H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & HRb & H22 &
+              Hores & Htn & H23 & H24 & H25 & H26 & %H27)".
+    iSplitL "Htn"; [ iExact "Htn" | ].
+    iIntros (Tn2) "Htn2".
+    iSplitL "H1"; [ iExact "H1" | ].
+    iSplitL "H2"; [ iExact "H2" | ].
+    iSplitL "H3"; [ iExact "H3" | ].
+    iSplitL "H4"; [ iExact "H4" | ].
+    iSplitL "H5"; [ iExact "H5" | ].
+    iSplitL "H6"; [ iExact "H6" | ].
+    iSplitL "H7"; [ iExact "H7" | ].
+    iSplitL "H8"; [ iExact "H8" | ].
+    iSplitL "H9"; [ iExact "H9" | ].
+    iSplitL "H10"; [ iExact "H10" | ].
+    iSplitL "H11"; [ iExact "H11" | ].
+    iSplitL "H12"; [ iExact "H12" | ].
+    iSplitL "H13"; [ iExact "H13" | ].
+    iSplitL "H14"; [ iExact "H14" | ].
+    iSplitL "H15"; [ iExact "H15" | ].
+    iSplitL "H16"; [ iExact "H16" | ].
+    iSplitL "H17"; [ iExact "H17" | ].
+    iSplitL "H18"; [ iExact "H18" | ].
+    iSplitL "H19"; [ iExact "H19" | ].
+    iSplitL "H20"; [ iExact "H20" | ].
+    iSplitL "HRb"; [ iExact "HRb" | ].
+    iSplitL "H22"; [ iExact "H22" | ].
+    iSplitL "Hores"; [ iExact "Hores" | ].
+    iSplitL "Htn2"; [ iExact "Htn2" | ].
+    iSplitL "H23"; [ iExact "H23" | ].
+    iSplitL "H24"; [ iExact "H24" | ].
+    iSplitL "H25"; [ iExact "H25" | ].
+    iSplitL "H26"; [ iExact "H26" | ].
+    iPureIntro. exact H27.
+  Qed.
+
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
       (* THE CLIENT'S PURE PROJECTION OF THE CRASH PREDICATE (stage H0,
          claude-notes/projects/durable-disk.md).  A crash predicate that is a
@@ -712,6 +763,20 @@ Section power.
          [Hobs]'s power-ON arm produces it (that is [App.Hpow]) and
          [power_boot_res] carries it to the boot. *)
       (Tn : nat -> iProp Σ)
+      (* ...AND WHAT THE SLOT'S SWAP MAKES OF IT (sync SY3-A1): [Hswap] is
+         LENT the turn [Hobs] just yielded -- the two run in the same power
+         step, one invariant opening apart, and the turn is the only thing
+         the trace slot's step can hand the crash slot's -- and yields this
+         one in its place, which is what [power_boot_res] carries to the
+         boot.  A client with nothing to pass across takes [Tn' := Tn]. *)
+      (Tn' : nat -> iProp Σ)
+      (* ...AND WHAT THE TRACE SLOT MAKES OF THAT (sync SY3-A1 re-cut): the
+         RETURN PATH.  After the swap the arm opens the trace slot once
+         more, at the SAME history (no event), and [Hback] turns [Tn'] into
+         the turn the boot is handed, [Tn''] -- so what the crash slot's
+         swap learned can reach the application's ledger.  A client with
+         nothing to file takes [Tn'' := Tn'] and hands it straight back. *)
+      (Tn'' : nat -> iProp Σ)
       (* THE CUSTODY HOOK (durable-disk 1a), the second client hook and the
          reason the era's mirror can be BORN TRUE.  A born-true value alone
          is not enough: a later WAL permit's disk image is ∀-bound, so the
@@ -738,7 +803,9 @@ Section power.
          ⊢ era_registered gen HE -∗ gen_started gen -∗
            start_auth (gen + 1)%nat -∗ disk_fixed_auth dk -∗
            ghost_var (era_mirror_name HE) 1 (Mof dk) -∗
-           ▷ riscv_crash_pred ==∗
+           ▷ riscv_crash_pred -∗
+           (* the era's turn, lent by [Hobs]'s on-arm (sync SY3-A1) *)
+           Tn (S gen) ==∗
              ◇ (start_auth (gen + 1)%nat ∗ disk_fixed_auth dk ∗
                 ▷ riscv_crash_pred ∗
                 ghost_var (era_mirror_name HE) (1/2) (Mof dk) ∗
@@ -751,7 +818,10 @@ Section power.
                    transport needs; so it is where a resource comes OUT of
                    the crash predicate, not just where the mirror's other
                    half goes in. *)
-                Rb gen dk))
+                Rb gen dk ∗
+                (* ...and the turn the boot is handed in place of the one
+                   it was lent (sync SY3-A1) *)
+                Tn' (S gen)))
       (* THE TRACE HOOK (claude-notes/completed/uart-trace.md).  Both power
          arms are OBSERVED (RiscvLang §3b'), and the history ghost can only
          move with the client's half, which lives in its trace predicate --
@@ -790,6 +860,14 @@ Section power.
                        the only place a per-era linear thing can be minted,
                        and the turn is handed to <init>. *)
                     Tn (S (obs_boots h)))))
+      (* THE RETURN PATH (sync SY3-A1 re-cut; see [Tn''] above): the trace
+         slot's second step at the power-on, at the history the on-arm left
+         and with no event, after the crash slot's swap.  The machine's half
+         of the history is lent so the client can agree its ledger with it;
+         a basic update under a [◇] for [Hobs]'s reasons. *)
+      (Hback : forall (h : list mobs) (gen : nat),
+         ⊢ ▷ riscv_obs_pred -∗ obs_half h -∗ Tn' (S gen) ==∗
+           ◇ (▷ riscv_obs_pred ∗ obs_half h ∗ Tn'' (S gen)))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -803,7 +881,7 @@ Section power.
          (* ...and the trace invariant, FIXED-layer like [crash_inv]: the
             boot client threads it to the UART thread's permit *)
          ⊢ obs_inv -∗
-           power_boot_res HE gen D nproc ndisk Mof (Rb gen) (Tn (S gen)) g'
+           power_boot_res HE gen D nproc ndisk Mof (Rb gen) (Tn'' (S gen)) g'
            ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                mWP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1044,10 +1122,22 @@ Section power.
       iAssert (gen_started g.(ggen)) as "#Hgst".
       { rewrite /gen_started -Hsg. iExact "Hstartlb". }
       iInv "Hcinv" as "HPsw" "Hclosesw".
+      (* ...LENT the turn [Hobs] yielded above, and yielding the one the
+         boot is handed (sync SY3-A1) *)
       iMod (Hswap HE g.(ggen) (v_disk (g2.(gdev).(dvirtio)))
-              with "HRelem Hgst Hsauth Htie Hmir HPsw")
-        as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb & HRb)".
+              with "HRelem Hgst Hsauth Htie Hmir HPsw Htn")
+        as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb & HRb & Htn)".
       iMod ("Hclosesw" with "HPsw") as "_".
+      (* THE RETURN PATH (sync SY3-A1 re-cut): the trace slot once more, at
+         the history the on-arm left, and the swap's yield through the
+         client's [Hback] into the turn the boot is handed *)
+      iInv "Hoinv" as "HPt2" "Hoclose2".
+      iDestruct "Hoauth" as "[Hovar Hohist]".
+      iMod (Hback (h ++ [ObsPowerOn])%list g.(ggen) with "HPt2 Hovar Htn")
+        as ">(HPt2 & Hovar & Htn)".
+      iAssert (obs_auth (h ++ [ObsPowerOn])%list) with "[Hovar Hohist]" as "Hoauth";
+        [ rewrite /obs_auth; iFrame "Hovar Hohist" | ].
+      iMod ("Hoclose2" with "HPt2") as "_".
       iEval (rewrite big_sepM_fmap) in "Htsfrags2".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
               "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hkptb2 Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
@@ -1520,6 +1610,36 @@ Proof.
   iSplitL "Hauth"; [iExact "Hauth" | iExact "Hfound"].
 Qed.
 
+(* THE RETURN PATH AT THE LEDGER (sync SY3-A1 re-cut): the power-on's
+   second trace-slot step, at the same history, is the client's own ledger
+   step [Hb] turning the swap's yield [T] into the boot's [T'] with the
+   ledger at that history in hand; the machine's half pins the history. *)
+Lemma obs_ledger_at_back {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (T T' : iProp Σ)
+    (Hb : forall h : list mobs, ⊢ R h -∗ T ==∗ R h ∗ T')
+    (γobs : gname) (h : list mobs) :
+  ⊢ ▷ obs_ledger_at R γobs -∗ ghost_var γobs (1/2) h -∗ T ==∗
+    ◇ (▷ obs_ledger_at R γobs ∗ ghost_var γobs (1/2) h ∗ T').
+Proof.
+  iIntros "HP Hauth HT". iDestruct "HP" as (h') "[>Hfrag >HR]".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iMod (Hb h with "HR HT") as "[HR HT]".
+  (* placed by position: the ledger holds the history's other half, which
+     a bare [iFrame "Hauth"] would match under the later *)
+  iModIntro. iModIntro.
+  iSplitL "Hfrag HR"; [iNext; iExists h; iFrame "Hfrag HR" |].
+  iSplitL "Hauth"; [iExact "Hauth" | iExact "HT"].
+Qed.
+
+(* ...and a client with nothing to file: the turn goes straight back *)
+Lemma back_id {Σ : gFunctors} (P G T : iProp Σ) :
+  ⊢ ▷ P -∗ G -∗ T ==∗ ◇ (▷ P ∗ G ∗ T).
+Proof.
+  iIntros "HP HG HT". iModIntro. iApply bi.except_0_intro.
+  iFrame "HP HG HT".
+Qed.
+
 Lemma obs_ledger_at_phi {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
     (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
@@ -1544,9 +1664,21 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        the crash predicate and the trace slot can both NAME the value.  The
        value rides the fixed record ([riscv_client_T]/[riscv_client]) and
        every era can name it; the machine never reads it.  A client with
-       no fixed part takes [CT := unit], [Cl := fun _ => True]. *)
-    (CT : Type) (Cl : CT -> iProp Σ)
-    (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
+       no fixed part takes [CT := unit], [Cls := Clt := fun _ => True].
+       ...ITS YIELD IS SPLIT BETWEEN THE TWO SLOTS (sync SY3-A1): [Cls c]
+       goes to the CRASH slot's birth ([HPc]), [Clt c] to the TRACE slot's
+       ([HPt]), so an application can found its initial durable copy with
+       resources born beside its ledger's.  A client with nothing for the
+       crash slot takes [Cls := fun _ => True]. *)
+    (* ...AND IT IS HANDED THE MACHINE'S FOUR FIXED GNAMES (sync SY3-A1
+       re-cut) -- the durable disk's, the swap counter's, the generation
+       registry's and the started counter's, allocated before it -- so an
+       application can keep them in its fixed part; [Born] is what it says
+       about where it kept them, and every boot is told it ([Hboot]). *)
+    (CT : Type) (Cls Clt : CT -> iProp Σ)
+    (Born : gname -> gname -> gname -> gname -> CT -> Prop)
+    (Hbirth : forall γdisk γsw γreg γst : gname,
+       ⊢ |==> ∃ c : CT, ⌜Born γdisk γsw γreg γst c⌝ ∗ Cls c ∗ Clt c)
     (* the crash predicate (see [riscv_system_adequacy]): allocated ONCE, into
        the fixed layer, so the SAME [crash_inv] is handed to every boot --
        which is what makes a durability property span power cycles.  Taken
@@ -1561,7 +1693,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        every PowerOn boots into a disk the predicate describes, and it
        describes it through the fragments it owns (design/crash.md, "The
        durable disk"). *)
+    (* ...and from the birth's crash-slot part (sync SY3-A1) *)
     (HPc : forall (γdisk γsw γreg γst : gname) (c : CT),
+       Cls c ∗
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ⊢
          |==> Pc γdisk γsw γreg γst c)
@@ -1573,8 +1707,10 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        no hook of this layer reads them, and [Hboot] learns them through
        the record-shape equation.  A client with no sync ledger takes
        [fun _ _ _ _ _ _ => True] and [fun _ _ _ _ _ _ Q => Q]. *)
-    (Tk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ)
-    (Hk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ -> iProp Σ)
+    (* ...at the fixed part alone since SY3-A1's re-cut: the birth is
+       handed the gnames, so the fixed part can name them *)
+    (Tk : CT -> nat -> iProp Σ)
+    (Hk : CT -> nat -> iProp Σ -> iProp Σ)
     (* THE PURE PROJECTION HOOK (stage H0, claude-notes/projects/
        durable-disk.md).  [Ppure] is a client-chosen pure consequence of [Pc]
        AT THE MACHINE'S OWN DISK IMAGE, and [Hproj] is its proof -- stated,
@@ -1610,6 +1746,13 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        this layer never looks inside it.  A client with nothing to lend
        instantiates it at [emp]. *)
     (Rb : CT -> nat -> (Z -> bv 8) -> iProp Σ)
+    (* THE ERA'S TURN, as [Hobs] below yields it ([Tn]), and as the swap
+       hands it on to the boot ([Tn']) -- declared here because [Hswap] is
+       LENT the first and yields the second (sync SY3-A1): the trace slot's
+       step and the crash slot's run in one power step, and the turn is
+       the one thing the first hands the second.  A client with nothing to
+       pass across takes [Tn' := Tn] and hands the turn straight back. *)
+    (Tn Tn' Tn'' : CT -> nat -> iProp Σ)
     (Hswap : forall (γdisk γsw γreg γst : gname) (c : CT)
                     (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
@@ -1618,7 +1761,8 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
          mono_nat_auth_own γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
          ghost_var (era_mirror_name E) 1 (Mof dk) -∗
-         ▷ Pc γdisk γsw γreg γst c ==∗
+         ▷ Pc γdisk γsw γreg γst c -∗
+         Tn c (S gen) ==∗
            ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
               ▷ Pc γdisk γsw γreg γst c ∗
@@ -1626,7 +1770,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               mono_nat_lb_own γsw (S gen) ∗
               (* ...and the client's lent resource (durable-disk BT-1), at
                  the application's fixed part (app-instances.md §6) *)
-              Rb c gen dk))
+              Rb c gen dk ∗
+              (* ...and the boot's turn (sync SY3-A1) *)
+              Tn' c (S gen)))
     (* THE TRACE PREDICATE (claude-notes/completed/uart-trace.md): the SECOND
        fixed-layer named slot, beside the crash predicate and for a
        different job.  The crash predicate is the file system's durable
@@ -1650,14 +1796,14 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        layer reads it at the power hook's founding and nowhere else *)
     (* ...and the ERA'S TURN (lane CONS-IO milestone F), which is NOT a
        field: the application's per-era credential for <init>, produced by
-       the same arm and carried by [power_boot_res] to the boot bundle. *)
-    (Tn : CT -> nat -> iProp Σ)
+       the same arm ([Tn] above), lent to [Hswap], and carried by
+       [power_boot_res] to the boot bundle as [Tn']. *)
     (* ...born holding the empty history AND what the application's birth
        step yielded (app-instances.md §6 ruling 1): the birth ran first,
        and the trace slot is the owner of its yield from the slot's own
        birth. *)
     (HPt : forall (γobs : gname) (c : CT),
-       Cl c ∗ ghost_var γobs (1/2) ([] : list mobs)
+       Clt c ∗ ghost_var γobs (1/2) ([] : list mobs)
          ⊢ |==> Pt γobs c)
     (* THE POWER HOOK: a power event is observed, and the client moves its
        half of the history by it, knowing the shape of the history so far
@@ -1688,6 +1834,13 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                     (* ...and the era's turn (lane CONS-IO milestone F), on
                        the claim's mould *)
                     Tn c (S (obs_boots h)))))
+    (* THE RETURN PATH (sync SY3-A1 re-cut): after the crash slot's swap,
+       the trace slot's second step at the same history, turning the
+       swap's yield [Tn'] into the boot's [Tn''] (see [wp_power_loop]).  A
+       client with nothing to file hands the turn straight back. *)
+    (Hback : forall (γobs : gname) (c : CT) (h : list mobs) (gen : nat),
+       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) h -∗ Tn' c (S gen) ==∗
+         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) h ∗ Tn'' c (S gen)))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
        [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
        boot; these two export one OUT of the whole execution.
@@ -1737,7 +1890,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
                (Pc γdisk γswap γreg γstart c)
-               (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
+               (Tk c) (Hk c)
                γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
@@ -1783,10 +1936,13 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               (c : CT) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
              (Pc γdisk γswap γreg γstart c)
-             (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
+             (Tk c) (Hk c)
              γobs T (Pt γobs c) γhist (Ai c) CT c ->
+       (* ...and what the birth said about where it kept the machine's
+          gnames (sync SY3-A1 re-cut) *)
+       Born γdisk γswap γreg γstart c ->
        ⊢ obs_inv -∗
-         power_boot_res HE gen D nproc ndisk Mof (Rb c gen) (Tn c (S gen)) g'
+         power_boot_res HE gen D nproc ndisk Mof (Rb c gen) (Tn'' c (S gen)) g'
          ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              mWP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1836,9 +1992,9 @@ Proof.
   (* THE APPLICATION'S BIRTH STEP (app-instances.md §6 ruling 1), FIRST:
      the fixed part's one value exists before the crash slot is allocated,
      so the slot can name it; its yield goes to the trace slot below. *)
-  iMod Hbirth as (c) "Hcl".
+  iMod (Hbirth γfdisk γswap γreg γstart) as (c) "(%Hborn & Hcls & Hcl)".
   iMod (HPc γfdisk γswap γreg γstart c
-          with "[$Hfdfrags $Hswap]") as "HPc0".
+          with "[$Hcls $Hfdfrags $Hswap]") as "HPc0".
   iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart c) with "HPc0")
     as "#Hcinv".
   (* THE HISTORY GHOST, at the EMPTY history: the machine's half goes into
@@ -1864,7 +2020,7 @@ Proof.
      lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
               (Pc γfdisk γswap γreg γstart c)
-              (Tk γfdisk γswap γreg γstart c) (Hk γfdisk γswap γreg γstart c)
+              (Tk c) (Hk c)
               γobs κs (Pt γobs c) γhist (Ai c) CT c).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
@@ -1901,11 +2057,11 @@ Proof.
        DEFINITION, so [eq_refl] is the proof *)
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
               (Hproj γfdisk γswap γreg γstart c)
-              Mof (Rb c) (Tn c) (Hswap γfdisk γswap γreg γstart c)
-              (Hobs γfdisk γobs c)
+              Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (Hswap γfdisk γswap γreg γstart c)
+              (Hobs γfdisk γobs c) (Hback γobs c)
               (fun HE gen g' Hbf Hp =>
                  Hboot F HE gen g' Hbf Hp Hinv γgen γstart γreg γfdisk γswap
-                   γobs γhist c κs eq_refl)
+                   γobs γhist c κs eq_refl Hborn)
               with "Hcinv Hoinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
 
@@ -2019,18 +2175,31 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
 Proof.
   apply (riscv_power_adequacy Σ D nproc ndisk g
-           unit (fun _ => True%I) ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
+           (* no fixed part: nothing born for either slot *)
+           unit (fun _ => True%I) (fun _ => True%I) (fun _ _ _ _ _ => True)
+           ltac:(intros; iModIntro; iExists (); cbv beta;
+                 iSplit; [| iSplit]; iPureIntro; exact Logic.I)
            (fun γdisk γsw γreg γst _ => Pc γdisk γsw γreg γst)
-           (fun γdisk γsw γreg γst _ => HPc γdisk γsw γreg γst)
+           ltac:(intros γdisk γsw γreg γst c; cbv beta; iIntros "[_ H]";
+                 iApply (HPc γdisk γsw γreg γst with "H"))
            (* no sync ledger at this packaged theorem *)
-           (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
+           (fun _ _ => True%I) (fun _ _ Q => Q)
            Ppure (fun γdisk γsw γreg γst _ => Hproj γdisk γsw γreg γst)
-           Mof (fun _ _ => Rb) (fun γdisk γsw γreg γst _ => Hswap γdisk γsw γreg γst)
+           Mof (fun _ _ => Rb)
+           (* no turn at this packaged theorem, so nothing crosses the
+              swap (sync SY3-A1) *)
+           (fun (_ : unit) (_ : nat) => emp%I) (fun (_ : unit) (_ : nat) => emp%I)
+           (fun (_ : unit) (_ : nat) => emp%I)
+           ltac:(intros γdisk γsw γreg γst c E gen dk; cbv beta;
+                 iIntros "Hr Hl Ha Hd Hm HP _";
+                 iMod (Hswap γdisk γsw γreg γst E gen dk
+                         with "Hr Hl Ha Hd Hm HP") as "H";
+                 iModIntro; iMod "H" as "(H1 & H2 & H3 & H4 & H5 & H6)";
+                 iModIntro; iFrame "H1 H2 H3 H4 H5 H6")
            (fun γobs _ => obs_ledger_at R γobs)
            (* the console interface, trivial at this packaged theorem's
               generic application (redesign R2/R4) *)
            (fun _ : unit => app_iface_triv Σ)
-           (fun (_ : unit) (_ : nat) => emp%I)
            (fun γobs _ => obs_ledger_at_alloc_cl R γobs True%I
                             ltac:(iIntros "_"; iMod HR0 as "HR"; by iModIntro))
            (fun γdisk γobs _ =>
@@ -2041,9 +2210,16 @@ Proof.
                       iSplitL "HR"; [iExact "HR" |];
                       destruct on; by repeat iSplitR)
                 γdisk γobs)
+           (* no return path: the (empty) turn goes straight back *)
+           (fun _ _ _ _ => back_id _ _ _)
            (fun _ h => P h)
            ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs γhist c T g' h;
                  iIntros "_ Hauth _ _ HPt";
                  iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
-           Hgen0 Hpow0 Hboot).
+           Hgen0 Hpow0
+           (* the birth says nothing, so the boot is told nothing new *)
+           (fun F HE gen g' Hbf Hp Hinv γgen γstart γreg γdisk γswap γobs γhist
+                c T Heq _ =>
+              Hboot F HE gen g' Hbf Hp Hinv γgen γstart γreg γdisk γswap γobs
+                γhist c T Heq)).
 Qed.

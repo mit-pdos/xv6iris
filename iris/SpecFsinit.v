@@ -397,11 +397,11 @@ Definition wp_fsinit_sconf_body
      initlog's arity-free seam from the first.  Then the era certificate
      and the era's BORN-TRUE mirror half + swap receipt (durable-disk 1a). *)
   fs_crash_seam_at app_guest fsc_cov fsc_logst -∗
-  app_merge -∗
-  (* ...THE SYNC RUNNER, kit 2's last row (sync K3-3): fsinit builds the
-     ghost commit's HOOKED law from it beside the merge
+  (* ...the merge WITH THE SYNC RUNNER, kit 2's last row (sync K3-3,
+     one package since SY3-A1): fsinit builds the commit's law and the
+     ghost commit's HOOKED law from it
      ([FsCollectAll.fs_snap_law_ghost_build]) *)
-  app_sync_run -∗
+  app_merge -∗
   gen_cert -∗
   (* ...and THE CRASH INVARIANT (sync K3-3), off [FirstTok.first_boot_persist]
      beside the certificate: initlog parks it into [LogInv.log_ctx] for the

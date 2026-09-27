@@ -386,7 +386,8 @@ Definition wp_initlog_sconf_body
      this contract: no gname of the region, no cache configuration, no
      geometry, and [wp_end_op] is untouched.  LAST, before the
      continuation. *)
-  □ (sb_park γfs sbrec -∗ snap_law γ γfs cov logstart (riscv_sync_tok gen_id)) -∗
+  □ (sb_park γfs sbrec -∗
+     snap_law γ γfs cov logstart (riscv_sync_tok gen_id) gen_id) -∗
   (* THE GHOST COMMIT'S TWO (sync K3-3, claude-notes/design/sync.md §4.3
      item 3): the HOOKED law, minus block 1's park for the same reason as
      the law above -- the file system's law in the form that takes the old
@@ -394,7 +395,7 @@ Definition wp_initlog_sconf_body
      invariant the ghost commit opens.  Both are parked into [log_ctx]
      beside [gen_cert], which this contract already takes. *)
   □ (sb_park γfs sbrec -∗
-     snap_law_ghost γ γfs cov logstart (riscv_sync_tok gen_id)
+     snap_law_ghost γ γfs cov logstart (riscv_sync_tok gen_id) gen_id
        (riscv_sync_hook gen_id)) -∗
   crash_inv -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP

@@ -827,7 +827,7 @@ Section EndOpDefs.
          [G], and what the file system's law hands down as a pair *)
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
-         snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart)) ∗
+         snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart)) ∗
       ghost_map_auth (fs_cache γfs) 1 L ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof using .
@@ -991,7 +991,7 @@ Section EndOpDefs.
     riscv_sync_tok gen_id ={⊤}=∗
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
-         snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart)) ∗
+         snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart)) ∗
       eo_open bn γfs cov logstart n W L Db Lw t ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof using .
@@ -2090,7 +2090,7 @@ Section EndOpBlocks.
        write's permit applies the pair's merge, and the token comes back in
        the write's receipt, for [eo_tail] to re-deposit. *)
     fs_crash_seam_at G cov logstart -∗
-    snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart) -∗
+    snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -2872,7 +2872,7 @@ Section EndOpBlocks.
        the law's guest [G], with the crash seam at that [G] beside it (and,
        since sync K3-3, the era's token inside it). *)
     fs_crash_seam_at G cov logstart -∗
-    snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart) -∗
+    snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -3995,9 +3995,9 @@ Section EndOpBlocks.
     (* the law's map is untouched by a slot write (lane CE), so the EPOCH in
        the walk's hand is already at the bumped cursor's map -- one rewrite,
        no re-reading of the law (durable-disk lane H2) *)
-    assert (Hsnapmap : snap_law_out G (riscv_sync_tok gen_id) (<[uint bnol := bs2]> L)
+    assert (Hsnapmap : snap_law_out G (riscv_sync_tok gen_id) gen_id (<[uint bnol := bs2]> L)
                          (fs_home_set cov logstart)
-                       = snap_law_out G (riscv_sync_tok gen_id) L
+                       = snap_law_out G (riscv_sync_tok gen_id) gen_id L
                            (fs_home_set cov logstart)).
     { rewrite /snap_law_out.
       rewrite (eo_home_restrict_upd L cov logstart (uint bnol) bs2

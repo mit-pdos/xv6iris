@@ -114,7 +114,7 @@ Section TreeAdequacy.
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_tree c ->
     @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_tree c (S gen_id) r -∗
-      app_turn app_tree c (S gen_id) -∗
+      app_iturn app_tree c (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using ufdG0.
     intros Heq Hiface _.
@@ -130,7 +130,7 @@ Section TreeAdequacy.
     iIntros "_ _ Hturn".
     (* THE LICENCE IS SPENT HERE, and this is the only place the tree
        application ever reaches [AppInv.app_sup]. *)
-    iEval (cbn [app_tree app_turn]) in "Hturn".
+    iEval (cbn [app_tree app_iturn]) in "Hturn".
     iMod (tree_sup_of_bump c r with "Hturn") as "#Hsup".
     iModIntro.
     iApply (init_boot_of_sup (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).
@@ -180,6 +180,14 @@ Section TreeAdequacy.
       iApply (SpecConsoleintr.cons_echo_shift_triv (XI := XI)).
       rewrite /riscv_cons_res Hiface.
       by cbn [app_tree app_ifc app_iface_triv ai_cons].
+    - (* the founding: no sync ledger, the turn goes on whole (SY3-A1) *)
+      intros c k. exact (app_triv_found c k _).
+    - intros c h k. by apply app_back_id.
+    - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
+    - (* the merge: the plain transport's (SY3-K2) *)
+      intros HRg c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+      exact (app_tree_xfer c).
+    - intros HRg c k. exact (app_triv_sync_run _ _ c k).
   Qed.
 
   (* =================================================================== *)
@@ -205,7 +213,7 @@ Section TreeAdequacy.
        elaborator unify each against a record field whose type it is still
        solving. *)
     refine (xv6_app_adequacy Σ g sb nib cov app_tree
-              (tree_Happ_init g sb nib cov Himg Hdk Hsb Hcov)
+              (app_init_of_valid _ _ (tree_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
               _ Hgen0 Hpow0 Himg n κs t2 g2 Hn).
     (* [Hphi]: the conclusion is [True] -- see the header for why it is not
        a placeholder *)

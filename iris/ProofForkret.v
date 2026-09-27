@@ -1113,7 +1113,7 @@ Proof.
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem &
-      #Hbinvf & Hxo & #Hfsabs & #Hseamg & #Hxfer & #Hrun)".
+      #Hbinvf & Hxo & #Hfsabs & #Hseamg & #Hxfer)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdrwf [H1cov [H1log [Hsbparse [Hsbok
                        [Hcgeom [Hbmq [Hszq Hxvslot]]]]]]]]].
@@ -1214,7 +1214,7 @@ Proof.
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb
             Hhdrbnd Hhdrnd Hhdrok Hxvslot HLdk Hjlt Hgl
             HB4a0 ltac:(lkbelow)
-            with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseamg Hxfer Hrun Hgen Hcinv
+            with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseamg Hxfer Hgen Hcinv
                   Hmirf Hlfree Hbinvf Hb1 Hxo Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
                   Hbits Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc
                   Hlhn Hlhblk HauthL HauthD Hdirty Hhdr Hlslots Hpbare Hpinv

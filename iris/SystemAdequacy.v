@@ -209,11 +209,11 @@ Qed.
 (* [riscv_power_adequacy]'s PowerOn arm, which clones the crash slot's      *)
 (* claim at fresh names.  [Happ_init]'s instance never reaches a boot.      *)
 (*                                                                        *)
-(* So the transport is the producer: [app_xfer_boot_raw A B] is             *)
-(* [AppInv.app_xfer_raw A] with the clone's own [B r'] beside it.  It is    *)
-(* STRICTLY STRONGER ([app_xfer_raw_of_boot]), so the commit's law and the  *)
-(* era mint keep taking the old one and only the PowerOn arm reads the new  *)
-(* conjunct.                                                               *)
+(* So the transport is the producer: [app_clone_raw A B] is                 *)
+(* [AppInv.app_xfer_raw A] with the clone's own [B r'] beside it, and      *)
+(* [app_xfer_boot_raw] is the PowerOn arm's full shape around it.  The      *)
+(* commit takes the application's MERGE ([AppInv.app_merge_raw]), which a  *)
+(* landed application proves from its own plain transport.                *)
 (* ---------------------------------------------------------------------- *)
 (* ...AND IT NO LONGER FOUNDS THE ERA'S PORT CLAIMS (lane CONS-IO milestone
    E, e5-design REVISION 8).  Lanes OUT-FUPD and CONS-IO put the two claims
@@ -227,39 +227,106 @@ Qed.
    own ledger and can mint a LINEAR per-era seed; the kernel carries the
    yield from there to the boot on [RiscvAdequacy.power_boot_res].  So this
    is back to what lane APP-IFACE left: the clone and its boot resource. *)
-Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type}
+Definition app_clone_raw {Σ : gFunctors} {N : Type}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (B : N -> iProp Σ) : iProp Σ :=
   (□ (∀ (r : N) (av : FsAbsDefs.aview),
         ▷ A r av ==∗ ▷ A r av ∗
         ∃ r' : N, ▷ A r' av ∗ B r'))%I.
 
-Global Instance app_xfer_boot_raw_persistent {Σ} {N}
+Global Instance app_clone_raw_persistent {Σ} {N}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (B : N -> iProp Σ) :
-  Persistent (app_xfer_boot_raw A B).
+  Persistent (app_clone_raw A B).
+Proof. rewrite /app_clone_raw. apply _. Qed.
+
+(* THE POWER-ON TRANSPORT (sync SY3-A1, design/sync.md §4.5 "PowerOn").
+   The PowerOn arm runs the application's ledger step and then the crash
+   slot's swap, and since SY3-A1 the first LENDS its yield to the second:
+   the transport is handed the era's turn [Tn] (what the ledger's on-arm
+   produced) and hands back the turn the boot is given, [Tn'].  And it
+   REPACKS the slot: the durable copy that goes back into the crash slot
+   is at an instance [r_s] of the transport's choosing -- the one the
+   PowerOn re-bases to the new era -- beside the clone [r'] and its boot
+   resource.  [app_xfer_boot_raw_of_clone] is every application that
+   passes the turn across and puts the copy back as it was. *)
+Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type}
+    (A : N -> FsAbsDefs.aview -> iProp Σ) (B : N -> iProp Σ)
+    (Tn Tn' : iProp Σ) : iProp Σ :=
+  (□ (∀ (r : N) (av : FsAbsDefs.aview),
+        Tn -∗ ▷ A r av ==∗
+        Tn' ∗ ∃ r_s r' : N, ▷ A r_s av ∗ ▷ A r' av ∗ B r'))%I.
+
+Global Instance app_xfer_boot_raw_persistent {Σ} {N}
+    (A : N -> FsAbsDefs.aview -> iProp Σ) (B : N -> iProp Σ)
+    (Tn Tn' : iProp Σ) :
+  Persistent (app_xfer_boot_raw A B Tn Tn').
 Proof. rewrite /app_xfer_boot_raw. apply _. Qed.
 
-Lemma app_xfer_raw_of_boot {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ)
-    (B : N -> iProp Σ) :
-  (⊢ app_xfer_boot_raw A B) -> ⊢ AppInv.app_xfer_raw A.
+(* A CLONE IS A POWER-ON TRANSPORT AT THE IDENTITY ON THE TURN: the slot
+   keeps its copy ([r_s := r]) and the turn crosses untouched *)
+Lemma app_xfer_boot_raw_of_clone {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ)
+    (B : N -> iProp Σ) (Tn : iProp Σ) :
+  (⊢ app_clone_raw A B) -> ⊢ app_xfer_boot_raw A B Tn Tn.
 Proof.
-  intros Hb. rewrite /AppInv.app_xfer_raw.
-  iPoseProof Hb as "#H". iEval (rewrite /app_xfer_boot_raw) in "H".
-  iIntros "!>" (r av) "HA".
-  iMod ("H" with "HA") as "[HA Hn]". iDestruct "Hn" as (r') "[HA' _]".
-  iModIntro. iFrame "HA". iExists r'. iExact "HA'".
+  intros Hc. iPoseProof Hc as "#H". iEval (rewrite /app_clone_raw) in "H".
+  rewrite /app_xfer_boot_raw. iIntros "!>" (r av) "Htn HA".
+  iMod ("H" with "HA") as "[HA Hn]". iDestruct "Hn" as (r') "[HA' HB]".
+  iModIntro. iFrame "Htn". iExists r, r'. iFrame "HA HA' HB".
 Qed.
 
 (* the generic application's: nothing claimed and nothing handed over *)
-Lemma app_xfer_boot_raw_triv {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ) :
+Lemma app_clone_raw_triv {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ) :
   (forall r av, A r av ⊣⊢ True) ->
-  ⊢ app_xfer_boot_raw A (fun _ => emp%I).
+  ⊢ app_clone_raw A (fun _ => emp%I).
 Proof.
-  intros Htriv. rewrite /app_xfer_boot_raw. iIntros "!>" (r av) "H".
+  intros Htriv. rewrite /app_clone_raw. iIntros "!>" (r av) "H".
   iModIntro. iSplitL "H"; [iExact "H" |]. iExists r.
   iSplitL; [| done].
   iNext. iApply (bi.equiv_entails_1_2 _ _ (Htriv r av)).
   iPureIntro. exact Logic.I.
 Qed.
+
+Lemma app_xfer_boot_raw_triv {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ)
+    (Tn : iProp Σ) :
+  (forall r av, A r av ⊣⊢ True) ->
+  ⊢ app_xfer_boot_raw A (fun _ => emp%I) Tn Tn.
+Proof.
+  intros Htriv. apply app_xfer_boot_raw_of_clone. by apply app_clone_raw_triv.
+Qed.
+
+(* THE TRIVIAL SYNC VALUES (sync SY3-A1), ONCE: an application with no
+   sync ledger has a token that says nothing, hooks that are their own
+   [Q], and nothing for the crash slot at its birth.  [App.app_triv] and
+   every landed application take these; the generic corollaries below are
+   stated at them. *)
+Definition app_triv_tk {Σ : gFunctors} {CT : Type} (_ : CT) (_ : nat)
+  : iProp Σ := True%I.
+Definition app_triv_hk {Σ : gFunctors} {CT : Type} (_ : CT) (_ : nat)
+    (Q : iProp Σ) : iProp Σ := Q.
+Definition app_triv_cls {Σ : gFunctors} {CT : Type} (_ : CT) : iProp Σ :=
+  True%I.
+Definition app_triv_born {CT : Type} (_ _ _ _ : gname) (_ : CT) : Prop := True.
+Definition app_triv_ok {CT N : Type} (_ : CT) (_ : nat) (_ : N) : Prop := True.
+
+Lemma app_triv_tk_intro {Σ} {CT} (c : CT) (k : nat) :
+  ⊢ @app_triv_tk Σ CT c k.
+Proof. rewrite /app_triv_tk. iPureIntro. exact Logic.I. Qed.
+
+Lemma app_triv_cls_intro {Σ} {CT} (c : CT) : ⊢ @app_triv_cls Σ CT c.
+Proof. rewrite /app_triv_cls. iPureIntro. exact Logic.I. Qed.
+
+(* THE TRIVIAL FOUNDING: the token is [True], so the turn the swap handed
+   on goes to <init> whole *)
+Lemma app_triv_found {Σ} {CT} (c : CT) (k : nat) (T : iProp Σ) :
+  ⊢ T -∗ |==> @app_triv_tk Σ CT c k ∗ T.
+Proof.
+  iIntros "HT". iModIntro. iFrame "HT". iApply app_triv_tk_intro.
+Qed.
+
+(* ...and the trivial RUNNER: a hook that is its own [Q] runs itself *)
+Lemma app_triv_sync_run `{!riscvGS Σ, !fsTopG Σ} {CT} {N}
+    (A : N -> FsAbsDefs.aview -> iProp Σ) (Ok : N -> Prop) (c : CT) (k : nat) :
+  ⊢ app_sync_run_raw A Ok (app_triv_tk c k) (app_triv_hk c k).
+Proof. apply app_sync_run_raw_triv. intros Q. reflexivity. Qed.
 
 (* THE TRIVIAL TRACE SLOT'S FOUNDING (lane CONS-IO milestone E).  Since the
    era's console claim is founded at the POWER-ON step, every client of
@@ -506,9 +573,18 @@ Section SystemBoot.
          per-era credential for <init>, minted at the power-on step and
          carried here on [power_boot_res] beside the two claims.  An opaque
          [iProp] already applied at this era's number -- the system theorem
-         instantiates it at [App.app_turn A c (S gen_id)] -- because nothing
-         at this altitude may name the application's record. *)
-      (Tn : iProp Σ)
+         instantiates it at [App.app_turn' A c (S gen_id)] -- because nothing
+         at this altitude may name the application's record.
+         ...SINCE SY3-A1 IT IS WHAT THE SLOT'S SWAP HANDED ON, and the
+         FOUNDING ([Hfound]) splits it: the era's sync token for the mint,
+         and [Tn_init] for <init>. *)
+      (Tn Tn_init : iProp Σ)
+      (* THE ERA'S RECORD PREDICATE (sync SY3-A1 re-cut): what the era's
+         running record satisfies, read off its boot resource ([Hbok]) --
+         the transport minted both at the era's PowerOn -- and the one
+         predicate the merge and the sync runner are stated at. *)
+      (Ok : N -> Prop)
+      (Hbok : forall r : N, B (Datatypes.S gen_id) r ⊢ ⌜Ok r⌝)
       (* NO PORT-CLAIM PARAMETERS (lane CONS-IO milestone E).  The era's
          two claims used to be produced by the transport at the clone and
          carried here by the lend, with two equations ([Houteq]/[Hineq])
@@ -523,14 +599,18 @@ Section SystemBoot.
          the old durable copy into each fresh snapshot's.  The boot itself
          needs neither it nor the transport: the lent durable claim IS the
          era's running one. *)
-      (Happ_merge : ⊢ app_merge_raw A (riscv_sync_tok gen_id))
-      (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3): the
-         application's opaque slot of the fixed record at this era, which
-         the mint puts into the log names' free bundle and initlog seals
-         into the first [log_res].  A Coq-level premise beside the merge,
-         because what the token IS is the application's: the system
-         theorem discharges it from its [Tk] off the record shape. *)
-      (Htok : ⊢ |==> riscv_sync_tok gen_id)
+      (* ...its wand LENT the started auth at this era's [gen_id + 1]
+         (sync SY3-A1) *)
+      (Happ_merge : ⊢ app_merge_raw A Ok (riscv_sync_tok gen_id) gen_id)
+      (* THE FOUNDING (sync SY3-A1, design/sync.md §4.5, replacing K3-2's
+         token birth): the era's sync token -- the application's opaque
+         slot of the fixed record at this era, which the mint puts into the
+         log names' free bundle and initlog seals into the first [log_res]
+         -- comes OUT OF THE TURN the slot's swap handed on, and what is
+         left of the turn goes to <init>.  A Coq-level premise, because what
+         the token IS is the application's: the system theorem discharges
+         it from the application's founding off the record shape. *)
+      (Hfound : ⊢ Tn -∗ |==> riscv_sync_tok gen_id ∗ Tn_init)
       (* THE SYNC RUNNER (claude-notes/design/sync.md §4.2-4.3, K3-3): the
          one place the meaning of a [sync] waiter's hook is used -- fired
          by the ghost commit on the guest half, the new durable claim, the
@@ -538,7 +618,7 @@ Section SystemBoot.
          beside the merge, where fsinit builds the hooked law from it.
          Stated at the era's two fixed-record slots; the system theorem
          discharges it from its [Hk] off the record shape. *)
-      (Happ_sync_run : ⊢ app_sync_run_raw A (riscv_sync_tok gen_id)
+      (Happ_sync_run : ⊢ app_sync_run_raw A Ok (riscv_sync_tok gen_id)
                              (riscv_sync_hook gen_id))
       (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c), and it is the ONE thing
          the application owes the kernel about user execution.  THE KERNEL
@@ -576,8 +656,9 @@ Section SystemBoot.
                 power-on step and handed to <init> in the boot bundle's one
                 linear slot ([UInitKernel.init_boot_pay]).  What it buys is
                 what no per-era resource can say on its own -- that THIS
-                era's console turn is <init>'s, once. *)
-             Tn -∗
+                era's console turn is <init>'s, once.  Since SY3-A1 it is
+                what the founding left of the swap's turn. *)
+             Tn_init -∗
              |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0)
       (* THE ECHO'S JUSTIFICATION (lane OUT-FUPD, F3), the second thing the
          application owes the kernel about the console and the twin of
@@ -789,15 +870,27 @@ Section SystemBoot.
        instance [r] the transport minted; the merge comes with it, and
        the seam at the application's guest goes down to fsinit on the kit.
        All of it goes into the mint through [boot_shared_alloc]. *)
-    iPoseProof Happ_merge as "#Hmerge".
-    iPoseProof Happ_sync_run as "#Hrun".
-    iMod Htok as "Hstok".
+    (* THE ERA'S DURABILITY LAWS, ONE PACKAGE AT THE ERA'S RECORD PREDICATE
+       (sync SY3-A1 re-cut): the running record [rap] satisfies it, read
+       off the boot resource the transport minted beside it *)
+    iAssert (B (Datatypes.S gen_id) rap ∧ ⌜Ok rap⌝)%I with "[Hbres]"
+      as "[Hbres %HOk]".
+    { iSplit; [iExact "Hbres" | iApply (Hbok with "Hbres")]. }
+    iAssert (app_merge (APP := MkAppcfg N A rap)) as "#Hmerge".
+    { rewrite /app_merge. iExists Ok. iSplitR; [iPureIntro; exact HOk |].
+      iSplitR; [iApply Happ_merge | iApply Happ_sync_run]. }
+    (* THE FOUNDING (sync SY3-A1): the swap's turn off [power_boot_res],
+       the era's sync token out of it, and the rest back in its place --
+       the mint carries it to <init> as it carried the turn before *)
+    iDestruct (power_boot_res_turn with "Hres") as "[Htn Hres]".
+    iMod (Hfound with "Htn") as "[Hstok Htni]".
+    iDestruct ("Hres" with "Htni") as "Hres".
     (* THE ERA'S TWO PORT CLAIMS ARE NOT HERE (lane CONS-IO milestone E):
        they ride [power_boot_res] straight into the mint, which unpacks and
        consumes them at [Uart0]. *)
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn gsn gln gtn Hbf Hbundle
-            with "Hok Hmerge Hrun Hseamg Hstok Hdursnap Hres")
+            S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn_init gsn gln gtn Hbf Hbundle
+            with "Hok Hmerge Hseamg Hstok Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
       "(%Hdimg & %Hcnu & %Hcne & %Happ & #Htext & #Hdata &
         #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
@@ -1121,9 +1214,18 @@ Theorem xv6_power_adequacy_gen Σ
        the raw forms at the record's [c] ARE [xv6_boot_era]'s pinned ones
        by iota.  The generic application is [unit] / [fun _ => True] /
        [fun _ _ _ => True] / [emp] / [init_boot_of_sup] (the instances
-       after this theorem). *)
-    (CT : Type) (Cl : CT -> iProp Σ)
-    (Hbirth : ⊢ |==> ∃ c : CT, Cl c)
+       after this theorem).
+       ...THE BIRTH'S YIELD SPLIT between the two slots (sync SY3-A1):
+       [Cls c] founds the crash slot's era-0 copy beside [Happ_init], [Clt
+       c] the trace slot ([HPt]).  The generic application's [Cls] is
+       [app_triv_cls]. *)
+    (* ...HANDED THE MACHINE'S FOUR FIXED GNAMES (SY3-A1 re-cut), with
+       [Born] what it says about where it kept them -- told to every era,
+       where the merge reads the machine's own names against it. *)
+    (CT : Type) (Cls Clt : CT -> iProp Σ)
+    (Born : gname -> gname -> gname -> gname -> CT -> Prop)
+    (Hbirth : forall γd γsw γreg γst : gname,
+       ⊢ |==> ∃ c : CT, ⌜Born γd γsw γreg γst c⌝ ∗ Cls c ∗ Clt c)
     (app_names : Type) (app_fs : CT -> app_names -> gmap Z FsAbsDefs.anode -> iProp Σ)
     (* THE FIRST PROCESS'S BOOT RESOURCE (lane APP-IFACE item (a),
        review-echo-plan finding 6): what the application hands the era's
@@ -1159,46 +1261,84 @@ Theorem xv6_power_adequacy_gen Σ
     (Ai : CT -> app_iface Σ)
     (* ...and the ERA'S TURN, which is no field at all: the application's
        per-era credential for <init>, produced by the same power-on step and
-       delivered to [Hinit_boot] below.  [App.xv6_app]'s [app_turn]. *)
-    (Tnn : CT -> nat -> iProp Σ)
+       delivered to [Hinit_boot] below.  [App.xv6_app]'s [app_turn].
+       ...IN THREE STAGES SINCE SY3-A1: [Tnn] is what the power-on step
+       yields and the slot's swap is LENT ([Happ_boot]); [Tnn'] is what the
+       swap hands on; [Tnn''] is what the trace slot's RETURN PATH
+       ([Hback], SY3-A1 re-cut) makes of that for the boot; the FOUNDING
+       ([Hfound]) takes the era's sync token out of it and leaves
+       [Tnn_init] for <init>.  [App]'s [app_turn], [app_turn'],
+       [app_turn''], [app_iturn]; every landed application has all four
+       the same and takes nothing out. *)
+    (Tnn Tnn' Tnn'' Tnn_init : CT -> nat -> iProp Σ)
     (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2), passed
        through to [RiscvAdequacy.riscv_power_adequacy]'s [Tk]/[Hk] at the
        same raw gnames and fixed part: the era's opaque token and the
-       family of a waiter's hooks.  [HTk] is the token's birth at every
-       era -- the boot's mint hands it to the log names' free bundle
-       ([xv6_boot_era]'s [Htok], read off the record shape).  Every landed
-       application takes [True] and [Q]. *)
-    (Tk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ)
-    (Hk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ -> iProp Σ)
-    (HTk : forall (γd γsw γreg γst : gname) (c : CT) (k : nat),
-       ⊢ |==> Tk γd γsw γreg γst c k)
+       family of a waiter's hooks, at the fixed part alone (the birth is
+       handed the gnames, SY3-A1 re-cut).  Every landed application takes
+       [app_triv_tk] and [app_triv_hk]. *)
+    (Tk : CT -> nat -> iProp Σ)
+    (Hk : CT -> nat -> iProp Σ -> iProp Σ)
+    (* THE FOUNDING (sync SY3-A1, design/sync.md §4.5), replacing K3-2's
+       token birth: at every era the token comes OUT OF the turn the slot's
+       swap handed on ([Tnn'] at the era's number [S k]), and what is left
+       goes to <init> ([Tnn_init]).  [xv6_boot_era]'s [Hfound] is it read
+       off the record shape. *)
+    (Hfound : forall (c : CT) (k : nat),
+       ⊢ Tnn'' c (Datatypes.S k) -∗
+         |==> Tk c k ∗ Tnn_init c (Datatypes.S k))
+    (* THE ERA'S RECORD PREDICATE (SY3-A1 re-cut): what an era's records
+       satisfy, at the era's NUMBER; the transport's boot resource carries
+       it ([Hboot_ok], a persistent projection), and the two laws below are
+       stated at it *)
+    (Ok : CT -> nat -> app_names -> Prop)
+    (Hboot_ok : forall (c : CT) (k : nat) (r : app_names),
+       app_boot c k r ⊢ ⌜Ok c k r⌝)
+    (* THE MERGE (app-instances.md round C, section 1; SY3-K2), the
+       application's durability obligation at the commit, at the era's
+       token (K3-3) and the era its wand's loan of the started auth is
+       bound at (SY3-A1).  At ANY machine instance whose generation counter
+       is the pre-structure's (the era's does not exist yet); [xv6_boot_era]'s
+       [Happ_merge] is it at the record's slot.  Every landed application
+       proves it from its own plain transport
+       ([AppInv.app_merge_raw_of_xfer]). *)
+    (* ...and the fixed part was born at the machine's own gnames (SY3-A1
+       re-cut: what lets an application's era certificate be read against
+       the loaned started auth) *)
+    (Happ_merge : forall (H : riscvGS Σ) (c : CT) (k : nat),
+       @riscvF_genGS Σ (@riscv_fixedGS Σ H) = riscv_pre_genGS ->
+       Born (@riscv_disk_name Σ (@riscv_fixedGS Σ H))
+            (@riscv_swap_name Σ (@riscv_fixedGS Σ H))
+            (@riscv_registry_name Σ (@riscv_fixedGS Σ H))
+            (@riscv_start_name Σ (@riscv_fixedGS Σ H)) c ->
+       ⊢ app_merge_raw (app_fs c) (Ok c (Datatypes.S k)) (Tk c k) k)
     (* ...AND THE SYNC RUNNER at every era (sync K3-3): the application's
        one law about what a hook [Hk .. Q] means -- fired by the ghost
        commit on the new durable claim, the running claim and the token at
        one map ([AppInv.app_sync_run_raw]).  At ANY machine instance,
        because the era's does not exist yet; [xv6_boot_era]'s
        [Happ_sync_run] is it at the record's slots.  Every landed
-       application's hooks are their own [Q], and the runner is
-       [AppInv.app_sync_run_raw_triv]. *)
-    (HHk : forall (H : riscvGS Σ) (γd γsw γreg γst : gname) (c : CT) (k : nat),
-       ⊢ app_sync_run_raw (app_fs c) (Tk γd γsw γreg γst c k)
-                          (Hk γd γsw γreg γst c k))
+       application's hooks are their own [Q] ([app_triv_sync_run]). *)
+    (Happ_sync_run : forall (H : riscvGS Σ) (c : CT) (k : nat),
+       ⊢ app_sync_run_raw (app_fs c) (Ok c (Datatypes.S k)) (Tk c k) (Hk c k))
     (* THE TRANSPORT (app-instances.md round C, section 1; section 6 ruling
        5): a copy of the claim can be made at fresh instance names without
        spending the original, under the later every crossing hands it over
        at.  It is what copies the running claim onto each commit's snapshot
        and the crash slot's claim onto each PowerOn clone.
        SINCE lane APP-IFACE item (a) it also hands the clone its own boot
-       resource; [app_xfer_raw_of_boot] is the old obligation, which is what
-       the commit's law and the era mint keep taking. *)
+       resource; since SY3-A1 it is LENT the era's turn and hands on the
+       boot's, and repacks the slot at an instance of its choosing
+       ([app_xfer_boot_raw]).  The commit takes [Happ_merge] instead. *)
     (Happ_boot : forall (c : CT) (k : nat),
-       ⊢ app_xfer_boot_raw (app_fs c) (app_boot c k))
+       ⊢ app_xfer_boot_raw (app_fs c) (app_boot c k) (Tnn c k) (Tnn' c k))
     (* ERA 0 (round C, section 1): the claim at the IMAGE's own abstract
        state -- the one snapshot in the tree with no source instance -- at
        some instance; packed against the image snapshot's guest half into
        the initial crash slot *)
+    (* ...out of the birth's crash-slot part (sync SY3-A1) *)
     (Happ_init : forall c : CT,
-       ⊢ |==> ∃ r : app_names,
+       Cls c ⊢ |==> ∃ r : app_names,
            app_fs c r (FsAbsDefs.abs_view
              (fss_inodes (FsDurImg.img_state
                 (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
@@ -1277,8 +1417,9 @@ Theorem xv6_power_adequacy_gen Σ
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot c (Datatypes.S gen_id) r -∗
            (* ...AND THE ERA'S TURN (lane CONS-IO milestone F), beside the
               boot resource: the application's own per-era credential,
-              minted at the power-on step and handed to <init>. *)
-           Tnn c (Datatypes.S gen_id) -∗
+              minted at the power-on step and handed to <init> -- what the
+              founding left of it (SY3-A1). *)
+           Tnn_init c (Datatypes.S gen_id) -∗
            |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0)
     (* THE ECHO'S JUSTIFICATION (lane OUT-FUPD, F3), the SECOND thing the
        application owes the kernel about the console.  consoleintr echoes
@@ -1322,7 +1463,7 @@ Theorem xv6_power_adequacy_gen Σ
        (app-instances.md section 6 ruling 1): born by [Hbirth] before the
        crash slot, and its yield owned by the trace slot from birth *)
     (HPt : forall (γobs : gname) (c : CT),
-       Cl c ∗ ghost_var γobs (1/2) ([] : list mobs)
+       Clt c ∗ ghost_var γobs (1/2) ([] : list mobs)
          ⊢ |==> Pt γobs c)
     (* ...AND ON THE POWER-ON ARM IT FOUNDS THE ERA'S TWO PORT CLAIMS (lane
        CONS-IO milestone E): the transport founded them until e5-design
@@ -1343,6 +1484,11 @@ Theorem xv6_power_adequacy_gen Σ
                     (* ...AND THE ERA'S TURN (lane CONS-IO milestone F),
                        the same arm's other yield: it goes to <init>. *)
                     Tnn c (Datatypes.S (obs_boots h)))))
+    (* THE RETURN PATH (SY3-A1 re-cut), passed through to
+       [RiscvAdequacy.riscv_power_adequacy]'s [Hback] *)
+    (Hback : forall (γobs : gname) (c : CT) (h : list mobs) (gen : nat),
+       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) h -∗ Tnn' c (Datatypes.S gen) ==∗
+         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) h ∗ Tnn'' c (Datatypes.S gen)))
     (* ...AND SINCE lane APP-IFACE item (c) (review-echo-plan finding 3) IT
        IS STATED AT THE ERA'S OWN UART NAMES.  It used to be quantified over
        an ARBITRARY [γ : uart_names], and a ledger's tx/rx wands inherit that
@@ -1359,7 +1505,7 @@ Theorem xv6_power_adequacy_gen Σ
             boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
               (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                  γd γsw γreg γstart c)
-              (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
+              (Tk c) (Hk c)
               γobs T (Pt γobs c) γhist (Ai c) CT c
           /\ @file_app Σ HF = MkAppcfg app_names (app_fs c) r
           /\ (i = Uart0 -> FsCfg.fsc_uart = γ)) ->
@@ -1375,7 +1521,7 @@ Theorem xv6_power_adequacy_gen Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
+               (Tk c) (Hk c)
                γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
@@ -1469,7 +1615,7 @@ Proof.
   refine (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
            (* THE APPLICATION'S BIRTH STEP, straight through: the power
               theorem runs it first (app-instances.md section 6 ruling 1) *)
-           CT Cl Hbirth
+           CT Cls Clt Born Hbirth
            (* THE COMPOSITE SLOT (round C): the record at its snapshot's map
               name, beside the application's durable claim at that name, at
               the application's fixed part [c] *)
@@ -1477,13 +1623,13 @@ Proof.
            (* ERA 0: the record from mkfs's recovery fact and the image's
               snapshot, whose guest half packs the application's era-0
               claim ([Happ_init]) *)
-           ltac:(intros γd γsw γreg γst c; iIntros "(Hfr & Hsw)";
+           ltac:(intros γd γsw γreg γst c; iIntros "(Hcls & Hfr & Hsw)";
                  iMod (P_fs_alloc γsw γreg γst _ D0
                          (FsDurImg.img_state
                             (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib)
                          cov (FsImg.sb_logstart sb) Hrec Hhwf Hsnap0
                          with "Hsw") as (γs gt) "(%Hseq & HP & Hguest & _)";
-                 iMod (Happ_init c) as (r) "Hcl";
+                 iMod (Happ_init c with "Hcls") as (r) "Hcl";
                  iModIntro; rewrite /xv6_slot; iExists gt;
                  iSplitR "Hguest Hcl";
                  [ rewrite /P_fs_named_at;
@@ -1549,8 +1695,12 @@ Proof.
            (fun c k dk => ∃ (gt : gname) (r : app_names),
               P_fs_lend_at gt cov (FsImg.sb_logstart sb) dk ∗
               ▷ app_dur_at (app_fs c) gt r ∗ app_boot c (Datatypes.S k) r)%I
+           (* THE ERA'S TURN INTO THE SWAP AND OUT (sync SY3-A1): the
+              power-on step's yield is lent to the transport, which hands
+              on the boot's *)
+           Tnn Tnn' Tnn''
            ltac:(intros γd γsw γreg γst c Er gen dk; cbv beta;
-                 iIntros "#Hreg #Hst Hsa Ha HM HP";
+                 iIntros "#Hreg #Hst Hsa Ha HM HP Htn";
                  rewrite /xv6_slot; iDestruct "HP" as (gt) "[HP HG]";
                  iMod (app_dur_raw_open with "HG") as (r I) "[Hh Hcl]";
                  iMod (P_fs_swap gt γd XV6_DISK_BYTES γsw γreg γst cov
@@ -1560,8 +1710,8 @@ Proof.
                  [rewrite /snap_guest; iExact "Hh" |];
                  iPoseProof (Happ_boot c (Datatypes.S gen)) as "#Hxfer";
                  iEval (rewrite /app_xfer_boot_raw) in "Hxfer";
-                 iMod ("Hxfer" with "Hcl") as "[Hcl Hnew]";
-                 iDestruct "Hnew" as (rnew) "[Hnew Hbnew]";
+                 iMod ("Hxfer" with "Htn Hcl") as "[Htn Hnew]";
+                 iDestruct "Hnew" as (rs rnew) "(Hcl & Hnew & Hbnew)";
                  iDestruct "Hl" as (gt') "[Hl Hg']";
                  iEval (rewrite /snap_guest) in "Hh Hg'";
                  (* NO BARE [iFrame] PAST THE SLOT (durable-notes: "[iFrame]
@@ -1573,12 +1723,15 @@ Proof.
                  iModIntro; iModIntro;
                  iSplitL "Hsa"; [iExact "Hsa" |];
                  iSplitL "Ha"; [iExact "Ha" |];
+                 (* the slot is REPACKED at the transport's own instance
+                    [rs] (sync SY3-A1) *)
                  iSplitL "HP Hh Hcl";
                  [ iNext; iExists gt; iSplitL "HP"; [iExact "HP" |];
-                   rewrite /app_dur_raw; iExists r, I;
+                   rewrite /app_dur_raw; iExists rs, I;
                    iSplitL "Hh"; [iExact "Hh" | iExact "Hcl"] |];
                  iSplitL "HM"; [iExact "HM" |];
                  iSplitR; [iExact "Hsw" |];
+                 iSplitR "Htn"; [| iExact "Htn"];
                  iExists gt', rnew; iSplitL "Hl"; [iExact "Hl" |];
                  iSplitL "Hg' Hnew";
                  [ iApply (app_dur_at_pack with "Hg' Hnew")
@@ -1586,13 +1739,13 @@ Proof.
            (* THE TRACE SLOT AND THE TRACE HOOK, threaded straight through:
               this layer fixes the crash predicate but says nothing about the
               trace, so both pass down unexamined. *)
-           Pt Ai Tnn HPt Hobs phi Hphi
+           Pt Ai HPt Hobs Hback phi Hphi
            Hgen0 Hpow _ n κs t2 g2 Hn).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
-  intros F HE gen g' Hbf Hpure Hi Gg Gs Gr Gt Gsw Gob Ghist Gcl GT Hfix.
+  intros F HE gen g' Hbf Hpure Hi Gg Gs Gr Gt Gsw Gob Ghist Gcl GT Hfix Hborn.
   (* THE INTERFACE EQUATION (redesign R4, on lane APP-IFACE item (b)'s
      mould), read off the record BEFORE it is substituted away: the equation
      is a projection of the literal this theorem itself builds, so it is
@@ -1610,17 +1763,28 @@ Proof.
      counter IS the pre-structure's here. *)
   assert (Hgenfix : @riscvF_genGS Σ F = riscv_pre_genGS)
     by (rewrite Hfix; reflexivity).
-  (* ...AND THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2), off
-     the same literal and for the same reason: at it the record's
-     [riscv_sync_tok] IS the application's [Tk] at this era's raw gnames. *)
-  assert (Htokfix : ⊢ |==> @riscv_sync_tok Σ F gen)
-    by (rewrite Hfix; exact (HTk Gt Gsw Gr Gs Gcl gen)).
+  (* ...AND THE FOUNDING (sync SY3-A1, design/sync.md §4.5), off the same
+     literal and for the same reason: at it the record's [riscv_sync_tok]
+     IS the application's [Tk] at this era's raw gnames. *)
+  assert (Hfoundfix : ⊢ Tnn'' Gcl (Datatypes.S gen) -∗
+                        |==> @riscv_sync_tok Σ F gen ∗ Tnn_init Gcl (Datatypes.S gen))
+    by (rewrite Hfix; exact (Hfound Gcl gen)).
+  (* ...AND THE MERGE at the record's token and this era's generation
+     (SY3-K2, SY3-A1), at whatever machine instance the era is booted over
+     whose generation counter is the pre-structure's *)
+  (* ...at the era's machine instance, where the fixed part's birth fact
+     IS about the record's own gnames ([Hborn], SY3-A1 re-cut) *)
+  assert (Hmergefix :
+            ⊢ @app_merge_raw Σ F _ (app_fs Gcl) (Ok Gcl (Datatypes.S gen))
+                (@riscv_sync_tok Σ F gen) gen).
+  { pose proof (Happ_merge (RiscvGS Σ F HE) Gcl gen Hgenfix) as Hm.
+    rewrite Hfix in Hm |- *. exact (Hm Hborn). }
   (* ...AND THE SYNC RUNNER at the record's two slots (K3-3), at whatever
      machine instance the era is booted over *)
   assert (Hrunfix : forall H : riscvGS Σ,
-            ⊢ app_sync_run_raw (app_fs Gcl) (@riscv_sync_tok Σ F gen)
-                               (@riscv_sync_hook Σ F gen))
-    by (intros H; rewrite Hfix; exact (HHk H Gt Gsw Gr Gs Gcl gen)).
+            ⊢ app_sync_run_raw (app_fs Gcl) (Ok Gcl (Datatypes.S gen))
+                (@riscv_sync_tok Σ F gen) (@riscv_sync_hook Σ F gen))
+    by (intros H; rewrite Hfix; exact (Happ_sync_run H Gcl gen)).
   subst F.
   (* THE RECORD'S SHAPE, substituted: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
@@ -1639,14 +1803,14 @@ Proof.
      [riscv_client], so they are terms here, not holes *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ _ gen g' sb nib cov
             app_names (app_fs Gcl) (app_boot Gcl)
-            (Tnn Gcl (Datatypes.S gen))
-            (* every landed application's merge is its transport's
-               (SY3-K2): the old durable copy dropped, the running claim
-               copied *)
-            (app_merge_raw_of_xfer _ _
-               (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen))))
-            (* the era's sync token, read off the record above *)
-            Htokfix
+            (Tnn'' Gcl (Datatypes.S gen)) (Tnn_init Gcl (Datatypes.S gen))
+            (* the era's record predicate, off the boot resource (SY3-A1) *)
+            (Ok Gcl (Datatypes.S gen)) (Hboot_ok Gcl (Datatypes.S gen))
+            (* the application's merge, read off the record above at the
+               era's generation (SY3-K2, SY3-A1) *)
+            Hmergefix
+            (* the founding, read off the record above (SY3-A1) *)
+            Hfoundfix
             (* ...and the sync runner at the record's slots (K3-3) *)
             (Hrunfix (RiscvGS Σ _ HE))
             (fun HBs HFd HIr HPav HWc HF r Hr =>
@@ -1689,7 +1853,7 @@ Theorem xv6_power_adequacy Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
-               (fun _ => True%I) (fun _ Q => Q)
+               (app_triv_tk c) (app_triv_hk c)
                γobs T (obs_pred_at γobs) γhist (app_iface_triv Σ) unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -1706,19 +1870,30 @@ Proof.
   refine (xv6_power_adequacy_gen Σ g sb nib cov
             (* the GENERIC application (applications.md section 0): no fixed
                part, any abstract state, nothing lent, the supply outright *)
-            unit (fun _ => True%I)
-            ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ => True%I) (fun _ => True%I) (fun _ _ _ _ _ => True)
+            ltac:(intros; iModIntro; iExists (); cbv beta;
+                  iSplit; [| iSplit]; iPureIntro; exact Logic.I)
             unit (fun _ _ _ => True%I)
             (fun _ _ _ => emp%I)
             (fun _ : unit => app_iface_triv _)
+            (* the turn: nothing, at all three stages (sync SY3-A1) *)
             (fun (_ : unit) (_ : nat) => emp%I)
-            (* no sync ledger: the token is [True], a hook is its own [Q] *)
-            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
-            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the trivial token and hooks (SY3-A1) *)
+            app_triv_tk app_triv_hk
+            (fun c k => app_triv_found c k emp%I)
+            (* ...and a record predicate that says nothing *)
+            (fun _ _ _ => True)
+            ltac:(intros; iIntros "_"; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_merge_raw_of_xfer;
+                  [intros; exact Logic.I | apply app_xfer_raw_triv;
+                   intros; reflexivity])
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
-            ltac:(intros c; cbv beta; iModIntro; iExists ();
+            ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
             ltac:(intros ci ri; iIntros "_"; iModIntro; done)
             ltac:(intros ci ri; rewrite /ai_cons /app_iface_triv /cons_res_triv;
@@ -1739,6 +1914,8 @@ Proof.
                obs_pred_at_step XV6_DISK_BYTES cons_res_triv
                  (fun _ => emp%I)
                  (cons_res_triv_founded Σ) (turn_triv_founded Σ) γd γobs)
+            (* no return path: the (empty) turn goes straight back *)
+            (fun _ _ _ _ => back_id _ _ _)
             _ (fun g _ => phi g)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "Hsi _ _ HP _";
@@ -1886,8 +2063,9 @@ Proof.
   refine (xv6_power_adequacy_gen Σ g sb nib cov
             (* the GENERIC application (applications.md section 0): no fixed
                part, any abstract state, nothing lent, the supply outright *)
-            unit (fun _ => True%I)
-            ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ => True%I) (fun _ => True%I) (fun _ _ _ _ _ => True)
+            ltac:(intros; iModIntro; iExists (); cbv beta;
+                  iSplit; [| iSplit]; iPureIntro; exact Logic.I)
             unit (fun _ _ _ => True%I)
             (fun _ _ _ => emp%I)
             (* the interface: the CLIENT's tag family and console claim,
@@ -1903,16 +2081,26 @@ Proof.
                  wild_none (@wild_none_persistent _) (@wild_none_timeless _)
                  (wild_none_lic Cres)
                  wild_none (@wild_none_persistent _) (@wild_none_timeless _))
+            (* the turn: nothing, at all three stages (sync SY3-A1) *)
             (fun (_ : unit) (_ : nat) => emp%I)
-            (* no sync ledger: the token is [True], a hook is its own [Q] *)
-            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
-            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the trivial token and hooks (SY3-A1) *)
+            app_triv_tk app_triv_hk
+            (fun c k => app_triv_found c k emp%I)
+            (* ...and a record predicate that says nothing *)
+            (fun _ _ _ => True)
+            ltac:(intros; iIntros "_"; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_merge_raw_of_xfer;
+                  [intros; exact Logic.I | apply app_xfer_raw_triv;
+                   intros; reflexivity])
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
-            ltac:(intros c; cbv beta; iModIntro; iExists ();
+            ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
             ltac:(intros ci ri; iIntros "_"; iModIntro; done)
             ltac:(intros ci ri; iIntros "_"; iApply Hout_lic)
@@ -1941,6 +2129,8 @@ Proof.
                        destruct on; [done |];
                        iSplitL "Hf"; [iExact "Hf" | done])
                  γd γobs)
+            (* no return path: the (empty) turn goes straight back *)
+            (fun _ _ _ _ => back_id _ _ _)
             _ (fun _ h => P h)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ Hauth _ _ HPt";
@@ -2182,7 +2372,7 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
                   (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c)
-               (fun _ => True%I) (fun _ Q => Q)
+               (app_triv_tk c) (app_triv_hk c)
                γobs T (obs_pred_at γobs) γhist (app_iface_triv xv6Σ)
                unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
@@ -2248,7 +2438,7 @@ Proof.
               xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb)
                 unit unit (fun _ _ _ => True%I)
                 Hinv γgen γstart γreg γd γsw γobs γhist c T
-                (app_iface_triv xv6Σ) (fun _ => True%I) (fun _ Q => Q) g')
+                (app_iface_triv xv6Σ) (app_triv_tk c) (app_triv_hk c) g')
            Hgen0 Hpow Hdisk).
 Qed.
 
@@ -2359,19 +2549,30 @@ Proof.
   refine (xv6_power_adequacy_gen xv6Σ g fsimg_sb fsimg_nib fsimg_cov
             (* the GENERIC application (applications.md section 0): no fixed
                part, any abstract state, nothing lent, the supply outright *)
-            unit (fun _ => True%I)
-            ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
+            unit (fun _ => True%I) (fun _ => True%I) (fun _ _ _ _ _ => True)
+            ltac:(intros; iModIntro; iExists (); cbv beta;
+                  iSplit; [| iSplit]; iPureIntro; exact Logic.I)
             unit (fun _ _ _ => True%I)
             (fun _ _ _ => emp%I)
             (fun _ : unit => app_iface_triv _)
+            (* the turn: nothing, at all three stages (sync SY3-A1) *)
             (fun (_ : unit) (_ : nat) => emp%I)
-            (* no sync ledger: the token is [True], a hook is its own [Q] *)
-            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
-            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the trivial token and hooks (SY3-A1) *)
+            app_triv_tk app_triv_hk
+            (fun c k => app_triv_found c k emp%I)
+            (* ...and a record predicate that says nothing *)
+            (fun _ _ _ => True)
+            ltac:(intros; iIntros "_"; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_merge_raw_of_xfer;
+                  [intros; exact Logic.I | apply app_xfer_raw_triv;
+                   intros; reflexivity])
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
-            ltac:(intros c; cbv beta; iModIntro; iExists ();
+            ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iPureIntro; exact Logic.I)
             ltac:(intros ci ri; iIntros "_"; iModIntro; done)
             ltac:(intros ci ri; rewrite /ai_cons /app_iface_triv /cons_res_triv;
@@ -2392,6 +2593,8 @@ Proof.
                obs_pred_at_step XV6_DISK_BYTES cons_res_triv
                  (fun _ => emp%I)
                  (cons_res_triv_founded xv6Σ) (turn_triv_founded xv6Σ) γd γobs)
+            (* no return path: the (empty) turn goes straight back *)
+            (fun _ _ _ _ => back_id _ _ _)
             _ (fun g h => obs_wf h g)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ _ %Hwf _ _"; iModIntro; iPureIntro; exact Hwf)

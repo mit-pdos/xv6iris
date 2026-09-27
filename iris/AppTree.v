@@ -1751,11 +1751,11 @@ Section AppTree.
      and the claim itself is TIMELESS, so the refutation runs inside the
      transport's own [==∗] with no later in the way. *)
   Lemma tree_xfer_boot_at (c : tree_fixed) :
-    ⊢ app_xfer_boot_raw (tree_pred c)
+    ⊢ app_clone_raw (tree_pred c)
         (fun r' : tree_names =>
            ∃ (g : gname) (t : ttree), tree_own r' g FsImg.ROOTINO t)%I.
   Proof using .
-    rewrite /app_xfer_boot_raw. iIntros "!>" (r av) "H".
+    rewrite /app_clone_raw. iIntros "!>" (r av) "H".
     (* THE VIEW IS AVAILABLE OUTSIDE THE LATER (echo's [cons_inum av]
        trick), so the clone's entry is allocated AT THE ERA'S OWN ROOT
        SUBTREE -- unconditionally, because the deed is only ever cashed
@@ -2559,12 +2559,25 @@ Section AppTreeRecord.
              application to the era's first process, and the ONLY route by
              which [AppInv.app_sup] is ever reachable at this record. *)
           (fun c _ => tree_turn c)           (* app_turn *)
+          (* ...the same at the swap's and <init>'s stages, and the
+             trivial sync values: no sync ledger (sync SY3-A1) *)
+          (fun c _ => tree_turn c)           (* app_turn' *)
+          (fun c _ => tree_turn c)           (* app_turn'' *)
+          (fun c _ => tree_turn c)           (* app_iturn *)
+          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
           (fun _ _ => True).                 (* app_phi *)
 
   (* ---- the obligations of [App.xv6_app_adequacy] that are lemmas ---- *)
 
-  Lemma app_tree_birth : ⊢ |==> ∃ c : app_fixed app_tree, app_cl app_tree c.
-  Proof using . cbn [app_tree app_fixed app_cl]. iApply tree_birth. Qed.
+  Lemma app_tree_birth (γd γsw γreg γst : gname) :
+    ⊢ |==> ∃ c : app_fixed app_tree,
+        ⌜app_born app_tree γd γsw γreg γst c⌝ ∗
+        app_cls app_tree c ∗ app_cl app_tree c.
+  Proof using .
+    apply app_birth_of_valid_cls;
+      [exact app_triv_cls_intro | intros; exact Logic.I |].
+    cbn [app_tree app_fixed app_cl]. iApply tree_birth.
+  Qed.
 
   Lemma app_tree_Rt (c : app_fixed app_tree) (h : list mobs) :
     Timeless (app_R app_tree c h).
@@ -2637,12 +2650,22 @@ Section AppTreeRecord.
     iSplitL "H"; [iExact "H" |]. iSplitR; [done |]. iExact "Ht".
   Qed.
 
+  (* ...at the identity on the turn, the slot keeping its copy (sync
+     SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
   Lemma app_tree_boot (c : app_fixed app_tree) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_tree c) (app_boot app_tree c k).
+    ⊢ app_xfer_boot_raw (app_pred app_tree c) (app_boot app_tree c k)
+        (app_turn app_tree c k) (app_turn' app_tree c k).
   Proof using .
-    cbn [app_tree app_pred app_boot]. rewrite /tree_boot.
+    cbn [app_tree app_pred app_boot app_turn app_turn']. rewrite /tree_boot.
+    apply app_xfer_boot_raw_of_clone.
     iApply tree_xfer_boot_at.
   Qed.
+
+  (* ...and the plain transport the commit's merge is made of
+     ([AppInv.app_merge_raw_of_xfer]) *)
+  Lemma app_tree_xfer (c : app_fixed app_tree) :
+    ⊢ app_xfer_raw (app_pred app_tree c).
+  Proof using . cbn [app_tree app_pred]. exact (tree_xfer c). Qed.
 
 End AppTreeRecord.
 
