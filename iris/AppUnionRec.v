@@ -165,7 +165,10 @@ Section UnionApp.
              values: no sync ledger yet (sync SY3-A1; SY3-A3 gives the
              union its own) *)
           union_turn union_turn union_turn union_turn
-          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+          (* the birth keeps the machine's started counter's name (sync
+             SY3-A3a, [UnionOut.union_born]); the rest trivial until
+             SY3-A3b/c *)
+          app_triv_cls union_born app_triv_ok app_triv_tk app_triv_hk
           union_phi.
 
   (* ---- the birth step ---- *)
@@ -174,9 +177,10 @@ Section UnionApp.
         ⌜app_born app_union γd γsw γreg γst c⌝ ∗
         app_cls app_union c ∗ app_cl app_union c.
   Proof using .
-    apply app_birth_of_valid_cls;
-      [exact app_triv_cls_intro | intros; exact Logic.I |].
-    cbn [app_union app_fixed app_cl]. exact union_birth_all.
+    cbn [app_union app_fixed app_born app_cls app_cl].
+    iMod (union_birth_all γst) as (ug) "[%Hst Hc]".
+    iModIntro. iExists ug. iSplitR; [iPureIntro; exact Hst |].
+    iFrame "Hc". iApply app_triv_cls_intro.
   Qed.
 
   Lemma union_al_Rt (c : app_fixed app_union) (h : list mobs) :

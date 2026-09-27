@@ -524,6 +524,43 @@ at the boot era from the record-shape equation and carried in
 `union_links`; the hook's body uses sh's lend (the deed's state `s`, the
 tie `f_ok av s`, `◯⊒ls'` from `flw` over the full list).
 
+**As built (A3a, `iris/UnionSync.v`).**  Fields: `union_gn` gains
+`ugn_st`/`ugn_reg`/`ugn_cm` (`union_birth_all γst` stores the machine's
+started gname; `union_born` is the union's `app_born`: `ugn_st c = γst`;
+the registry and counter gnames are fresh and their ghosts are A3b's);
+`file_names` gains `fn_sync`/`fn_era`/`fn_role` (`fnames_alloc` takes
+them; the transports copy the source's, `file_init` placeholders);
+`fileAppG` gains `fa_sync` (`mono_listR (leibnizO srec)`) and `fa_reg`
+(`ghost_mapG Σ nat gname`).  THE COUNTERS' CAMERA IS AN EXPLICIT
+PARAMETER `HSt : mono_natG Σ` of every counter-reading definition
+(`sync_claim HSt`, `union_tk HSt`, ...), and `ugn_cm` shares it: `ugn_st`
+must be read at the MACHINE's instance (`riscv_pre_genGS`, lined up with
+the record's by A1's equation), which no `fileAppG` camera can be, and a
+second implicit `mono_natG` beside `echoOutG`'s would resolve silently to
+the wrong one.  The claim is `sync_claim c r av := ∃ ls Ls, sync_body c r
+av ls Ls` (the view's files `fcont_of av := dst_content (fcontent_of
+av)`; `slast Ls` the last record, `srec0` on `[]`).  CORRECTION forced by
+the lemmas: `sync_chain ls Ls` is the rise of `srec0 :: Ls` AND "the last
+record's sync line is in `ls`" (`ls !! pred p = Some LSync`, or `p = 0`);
+it bounds the last position by the claim's lower bound and tells a
+redirect line from the record's sync line.  The merge
+(`union_merge_closes`), the PowerOn re-base (`sync_claim_rebase`, with
+the boot fact `sync_chain_shrink`) and the birth (`sync_claim_birth`)
+close as stated; `union_merge_closes_sat`/`sync_claim_rebase_sat` check
+their premises.  OPEN (for A3c/A4): the HOOK (`union_hook_closes`) and a
+REDIRECT round (`sync_claim_redir_step`) close only with a POSITION
+premise over the running claim's body, `(slast Ls).1 <= length ls'` --
+the last record is not younger than the caller's line.  Two lower bounds
+of the line list are merely comparable, so a stale lower bound (an older
+sync line; a writer's older redirect) refutes nothing; the fact is sh's
+serial order, not ghost state.  Candidate: a round CURSOR (`mono_nat`,
+authority with the deed holder at the current round's line count, the
+claim's last record carrying a lower bound minted by the hook) -- the
+cursor's auth against the record's bound is exactly the premise.  The
+merge also needs the old copy's `fn_role r_o = true`, which
+`app_merge_raw`'s `▷ ∃ r_o av_o, A r_o av_o` does not supply (A3b/c:
+guard the slot's instance, or make the union's claim role-blind there).
+
 **Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
 `al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
 birth's slot part and its gnames; the transport's

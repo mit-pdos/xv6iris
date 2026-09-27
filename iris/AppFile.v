@@ -90,6 +90,7 @@ Require Import AppEcho.            (* [echo_taint], [echo_cl], [cons_state],
 Require Export FileState.          (* [fstate], [echo_chunks], [subseq], [sel_ok] *)
 Require Import FileFsPure.         (* [file_fs_pure] = echo's pins and cat's *)
 Require FileDisc.                  (* the class [FileDisc.uname] *)
+Require UnionAdm.                  (* [UnionAdm.srec]: the sync lists' records *)
 Require Import FileName.           (* its laws: [txt_laws], L4 at era 0 *)
 Local Open Scope Z_scope.
 
@@ -130,6 +131,14 @@ Record file_names := MkFileNames {
   fn_deed : gname;
   fn_tkt  : gname;
   fn_esc  : gname;                     (* THE ESCROW LEDGER (section 2a) *)
+  (* THE SYNC PART (sync design section 4.5, lane SY3-A3a; the union's
+     [UnionSync.sync_claim] reads them): the instance's SYNC LIST (a
+     [mono_list] of [UnionAdm.srec]), its ERA -- pure, in the LEDGER's
+     numbering (the birth is era 0, the boot at [gen_id] era [S gen_id])
+     -- and its ROLE: [true] the durable copy, [false] the running claim *)
+  fn_sync : gname;
+  fn_era  : nat;
+  fn_role : bool;
 }.
 
 (* THE DEED'S STATE: the model's [fstate] with each file's INUM beside its
@@ -160,16 +169,26 @@ Proof using . exact (fmap_empty _). Qed.
    linear (section 2a). *)
 Definition esc_rec : Type := dst * gname.
 
+(* ...and the union's SYNC cameras (sync design section 4.5, lane SY3-A3a):
+   the per-era SYNC LISTS, and the REGISTRY era -> that era's sync list's
+   gname.  The two counters ([ugn_st], [ugn_cm]) take NO camera here: they
+   are [mono_nat]s at the MACHINE's instance, which [UnionSync] takes as an
+   explicit parameter (a second [mono_natG] beside [echoOutG]'s would be the
+   duplicate-class trap, and one here could never be the machine's). *)
 Class fileAppG (Σ : gFunctors) := FileAppG {
   fa_deed : ghost_varG Σ dst;
   fa_fl   : inG Σ (mono_listR (leibnizO fl_line));
   fa_esc  : inG Σ (mono_listR (leibnizO esc_rec));
+  fa_sync : inG Σ (mono_listR (leibnizO UnionAdm.srec));
+  fa_reg  : ghost_mapG Σ nat gname;
 }.
-#[global] Existing Instances fa_deed fa_fl fa_esc.
+#[global] Existing Instances fa_deed fa_fl fa_esc fa_sync fa_reg.
 
 Definition fileAppΣ : gFunctors :=
   #[ ghost_varΣ dst; GFunctor (mono_listR (leibnizO fl_line));
-     GFunctor (mono_listR (leibnizO esc_rec)) ].
+     GFunctor (mono_listR (leibnizO esc_rec));
+     GFunctor (mono_listR (leibnizO UnionAdm.srec));
+     ghost_mapΣ nat gname ].
 
 Global Instance subG_fileAppΣ {Σ} : subG fileAppΣ Σ -> fileAppG Σ.
 Proof. solve_inG. Qed.
@@ -509,17 +528,19 @@ Section FileClaim.
      escrow ledger EMPTY: what every transport and the era-0 mint
      allocate.  (Lane F-OPEN-5: the ledger is the claim's alone -- no
      half of it is ever outside the claim, which is why [fown] did not
-     have to change.) *)
-  Lemma fnames_alloc (r1 : echo_names) (s : dst) :
+     have to change.)  The SYNC PART's data ([fn_sync], [fn_era],
+     [fn_role]) is the caller's: it names ghosts the caller owns. *)
+  Lemma fnames_alloc (r1 : echo_names) (s : dst) (γs : gname) (k : nat)
+      (b : bool) :
     ⊢ |==> ∃ r : file_names,
-        ⌜fn_cons r = r1⌝ ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s
-        ∗ esc_auth r [].
+        ⌜fn_cons r = r1⌝ ∗ ⌜fn_sync r = γs /\ fn_era r = k /\ fn_role r = b⌝
+        ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s ∗ esc_auth r [].
   Proof using .
     iMod (ghost_var_alloc s) as (gd) "Hd".
     iMod (ghost_var_alloc s) as (gt) "Ht".
     iMod (own_alloc (●ML ([] : list (leibnizO esc_rec)))) as (ge) "He";
       [ apply mono_list_auth_valid |].
-    iModIntro. iExists (MkFileNames r1 gd gt ge).
+    iModIntro. iExists (MkFileNames r1 gd gt ge γs k b).
     rewrite /fdeed /ftkt /esc_auth /=.
     iDestruct "Hd" as "[Hd1 Hd2]". iDestruct "Ht" as "[Ht1 Ht2]".
     iFrame "Hd1 Hd2 Ht1 Ht2 He". by iPureIntro.
@@ -1241,7 +1262,8 @@ Section FileClaim.
     { iNext. by iApply file_pred_split. }
     iMod ("Hex" $! (fn_cons r) av with "He") as "[He He']".
     iDestruct "He'" as (rc) "He'".
-    iMod (fnames_alloc rc (fcontent_of av)) as (r') "(%Hrc & Hd1 & _ & Ht1 & _ & Ha1)".
+    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r))
+      as (r') "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1)".
     iModIntro.
     iAssert (▷ (file_pred c r av ∗ file_pred c r' av))%I
       with "[He He' Hrest Hd1 Ht1 Ha1]" as "[H1 H2]"; last first.
@@ -1288,7 +1310,8 @@ Section FileClaim.
     { iNext. by iApply file_pred_split. }
     iMod ("Hex" $! (fn_cons r) av with "He") as "[He He']".
     iDestruct "He'" as (rc) "[He' Hb]".
-    iMod (fnames_alloc rc (fcontent_of av)) as (r') "(%Hrc & Hd1 & Hd2 & Ht1 & Ht2 & Ha1)".
+    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r))
+      as (r') "(%Hrc & _ & Hd1 & Hd2 & Ht1 & Ht2 & Ha1)".
     iModIntro.
     iAssert (▷ (file_pred c r av ∗ file_pred c r' av
                 ∗ (f_typed c (fcontent_of av) ∨ file_taint c)))%I
@@ -1329,7 +1352,10 @@ Section FileClaim.
   Proof using .
     intros Hdk Hrec HS.
     iMod (echo_init c.1 dk D S Hdk Hrec HS) as (rc) "He".
-    iMod (fnames_alloc rc ∅) as (r) "(%Hrc & Hd1 & _ & Ht1 & _ & Ha1)".
+    (* the sync data: placeholders until the birth founds the era-0 copy
+       (sync SY3-A3b) *)
+    iMod (fnames_alloc rc ∅ 1%positive 0%nat true)
+      as (r) "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1)".
     iModIntro. iExists r.
     iApply (file_pred_join with "[He]").
     { rewrite Hrc. iExact "He". }

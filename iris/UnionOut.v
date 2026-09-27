@@ -85,7 +85,21 @@ Local Open Scope list_scope.
 Record union_gn := MkUnionGn {
   ugn_file : file_gn;   (* the file application's: taint, era maps, lines *)
   ugn_pera : gname;     (* ghost_map nat pipe_era: the era's BYTE LEDGER *)
+  (* THE SYNC PART's fixed names (sync design section 4.5; UnionSync.v):
+     the MACHINE's started counter's gname, which the birth is handed and
+     stores ([union_born]); the sync REGISTRY, era -> that era's sync
+     list ([ghost_map nat gname]); the COMMIT-ERA counter ([mono_nat],
+     its full authority in the durable copy).  Both counters are at the
+     machine's [mono_natG] (UnionSync.v's [HSt]). *)
+  ugn_st   : gname;
+  ugn_reg  : gname;
+  ugn_cm   : gname;
 }.
+
+(* WHAT THE UNION'S BIRTH PROMISES OF THE MACHINE'S NAMES
+   ([App.app_born]): it keeps the started counter's *)
+Definition union_born (_ _ _ : gname) (γst : gname) (ug : union_gn) : Prop :=
+  ugn_st ug = γst.
 
 (* the pipeline stack's fixed part: the file's echo half and the byte
    ledger's map *)
@@ -781,11 +795,18 @@ Section union_birth.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,
             !fileOutG Σ, !pipeOutG Σ}.
 
-  Lemma union_birth_all : ⊢ |==> ∃ ug : union_gn, union_cl_all ug.
+  (* the birth, handed the machine's started counter's name.  The sync
+     registry's and the commit-era counter's names are fresh; their
+     ghosts are founded by the birth's split (sync SY3-A3b), and until
+     then nothing is kept at them *)
+  Lemma union_birth_all (γst : gname) :
+    ⊢ |==> ∃ ug : union_gn, ⌜ugn_st ug = γst⌝ ∗ union_cl_all ug.
   Proof using .
     iMod file_birth_all as (gf) "Hf".
     iMod (ghost_map_alloc_empty (K := nat) (V := pipe_era)) as (gm) "Hm".
-    iModIntro. iExists (MkUnionGn gf gm). rewrite /union_cl_all /=.
-    iFrame "Hf Hm".
+    iMod (ghost_map_alloc_empty (K := nat) (V := gname)) as (greg) "_".
+    iMod (mono_nat_own_alloc 0) as (gcm) "_".
+    iModIntro. iExists (MkUnionGn gf gm γst greg gcm). rewrite /union_cl_all /=.
+    iSplitR; [done |]. iFrame "Hf Hm".
   Qed.
 End union_birth.

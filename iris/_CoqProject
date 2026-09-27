@@ -1757,6 +1757,7 @@ UnionOutPure.v
 UnionAdmDemo.v
 PipesLinksV.v
 UnionOut.v
+UnionSync.v
 UnionLinks.v
 UnionLinkInst.v
 UnionReadInst.v

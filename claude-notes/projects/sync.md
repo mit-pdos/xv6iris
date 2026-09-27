@@ -129,8 +129,12 @@ ledger and `union_adequacy_closed` KEEP the landed `UnionOutPure.union_phi`
 (over `s0s`), the model's body lands beside it as `union_phi_sync`
 (`union_phi_sync_body` and its steps; the demos state it) -- a completed
 sync forces the drain to file `Some r` (`lm_good_sync`), so the switch of
-the conclusion, and that filing, is A4's.  A3a in flight (branch
-`sync3-a3a`, `/shared/xv6iris-3k`); A3b, A3c, A4 next.
+the conclusion, and that filing, is A4's.  A3a DONE on branch
+`sync3-a3a` (`iris/UnionSync.v`; design §4.5 "As built (A3a)"): fields and
+cameras, the claim, token and hook, the five closure lemmas; merge,
+re-base and birth close; the hook and the redirect step need a POSITION
+premise (the open point, with the cursor candidate, is in the design);
+the old copy's role in the merge is A3b/c's.  A3b, A3c, A4 next.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
