@@ -1347,7 +1347,7 @@ Section BoBodies.
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
     iDestruct "Hres" as (out cmt nc om Ep Xr Tx)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1382,7 +1382,7 @@ Section BoBodies.
          in (the goal was unfolded by the [rewrite /log_res] above, so it is
          named here rather than restated) *)
       iAssert (log_res γ bn γfs cov logstart)%I
-        with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hrest]" as "Hres".
+        with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp Hrest]" as "Hres".
       { rewrite /log_res. iExists out, true, nc, om, Ep, Xr, Tx. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
         iSplitR; [iPureIntro; exact Hbnd|].
@@ -1398,6 +1398,7 @@ Section BoBodies.
         (* the bank rides back untouched: persistent, and this step does
            not move the counter it is indexed by *)
         iSplitR; [iExact "Hbank"|].
+        iSplitL "Hhelp"; [iExact "Hhelp"|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1694,7 +1695,7 @@ Section BoBodies.
         iDestruct (log_opSe_opS with "HopS") as "HopS".
         iDestruct (log_opS_op with "HopS Htx") as "Hop".
         iAssert (log_res γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hstok Hlhn Hbclose]" as "Hres".
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp Hstok Hlhn Hbclose]" as "Hres".
         { rewrite /log_res.
           iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om), Ep, Xr,
                   (<[t := tt]> Tx).
@@ -1731,6 +1732,10 @@ Section BoBodies.
           (* a begin_op does not commit, so the counter -- and with it
              the bank's index -- stands *)
           iSplitR; [iExact "Hbank"|].
+          (* the helping slot at [out+1]: a Pending entry's guard clause
+             only gets easier ([LogHelp.log_help_cells]) *)
+          iSplitL "Hhelp".
+          { iApply (log_help_cells with "Hhelp"). intros _. right. lia. }
           iExists n, LB. iSplitR.
           { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, (∅ : gset Z), Ep) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
@@ -1765,7 +1770,7 @@ Section BoBodies.
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)
         iAssert (log_res γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hstok Hlhn Hbclose]" as "Hres".
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp Hstok Hlhn Hbclose]" as "Hres".
         { rewrite /log_res. iExists out, false, nc, om, Ep, Xr, Tx.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR; [iPureIntro; exact Hsz|].
@@ -1780,6 +1785,7 @@ Section BoBodies.
           iFrame "Htxa".
           iSplitR; [iPureIntro; exact Hszt|].
           iSplitR; [iExact "Hbank"|].
+          iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].
           iSplitR; [iPureIntro; exact Hreg|].

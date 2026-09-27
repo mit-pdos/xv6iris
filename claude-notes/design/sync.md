@@ -229,6 +229,19 @@ stripped by the waiter's next instruction.  The two pure clauses are what
 the two readers need: a fast-path `sys_sync` (`cmt = false`, `out = 0`)
 knows every entry is `Done`, so it flips nothing.
 
+As built (`LogHelp.v`): `log_help γ nc out cmt := ∃ m, ghost_map_auth
+(ln_help γ) 1 m ∗ [∗ map] w ↦ e ∈ m, log_help_entry nc out cmt w e`, the
+entry being the `∃ Q, inv (helpN .@ w) (esc Q e.1) ∗ (Pending ∨ Done)`
+above.  Four lemmas: `log_help_deposit` (at `cmt = true ∨ out ≠ 0`; a
+fresh `w ∉ dom m`), `log_help_extract` (every Pending hook out, and a
+return wand `∀ nc' out' cmt', ([∗ list] Q ∈ Qs, Q) ={⊤}=∗ log_help γ nc'
+out' cmt'` -- the flip, `esc_flip`, per Pending entry), `log_help_collect`
+(`n0 ≠ nc`), `log_help_cells` (the writers that keep `nc`); genesis is
+`log_help_empty`.  The waiter reads the escrow through ITS OWN handle: the
+entry's `Q` is existential and never compared with the waiter's, since
+the full authority `● 1` out of the Done entry refutes the escrow's two
+token arms whichever invariant it is read through.
+
 ### 4.3 The operations
 
 1. **An ordinary file step** (echo's write): `I_app` moves σ and the deed;
@@ -304,9 +317,12 @@ knows every entry is `Done`, so it flips nothing.
      deposit `Pending` in `H` at `n0 = ncommit`, sleep (the C is
      UNCHANGED).  The committer's `eo_tail` (after a real or an empty-log
      commit; `committing` still reads 1, the lock held) extracts every
-     `Pending` hook (`LogHelp.log_help_extract`), runs `GC(all)`, fills
-     each escrow with its `Q` and flips the entry to `Done` -- all BEFORE
-     `committing := 0` and `ncommit++`.  `sys_sync` wakes with `ncommit ≠
+     `Pending` hook (`LogHelp.log_help_extract`) and runs `GC(all)` BEFORE
+     the `committing := 0` store; the `Q`s ride in the committer's hand
+     through the stores, `ncommit++` and `wakeup` (all under the lock), and
+     the re-deposit feeds them to the extract's wand, which fills each
+     escrow and flips every entry to `Done` at the NEW cells -- no waiter
+     can observe the slot in between.  `sys_sync` wakes with `ncommit ≠
      n0`, so its entry is `Done` (`log_help_collect`): it deletes the
      entry, takes the token, opens its escrow and leaves with `▷ Q`,
      stripped at the next instruction.  Correct because a waiter

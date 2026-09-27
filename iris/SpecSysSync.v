@@ -19,15 +19,44 @@
 
    ========================== ONE CONTRACT ============================
 
-   [Module Type SYS_SYNC] is sys_sync's only seal, and it is the DURABILITY
-   form: the caller hands in its invocation-time batch witness
-   [log_epoch_lb γ e] and gets the receipt [flushed_sync γ e] back beside
-   the machine half.  There is no second, receipt-free statement and no
-   weakening functor.  A caller that wants neither takes the witness at zero
-   from nothing ([sync_witness_0]) and drops the receipt at the return --
-   two lines, which is exactly what the syscall dispatcher's arm 22 does.
-   The witness therefore constrains no caller: it is persistent, free at
-   [0], and available at the caller's own batch from [begin_op]'s mint.
+   [Module Type SYS_SYNC] is sys_sync's only seal.  It carries TWO
+   durability clauses, the application's and the WAL's.
+
+   THE APPLICATION'S (sync K3-4, claude-notes/design/sync.md §4.3 item 4):
+   the caller hands in an OPTIONAL HOOK, [hook_opt gen_id oQ] -- nothing at
+   [oQ = None], the era's [riscv_sync_hook gen_id Q] at [oQ = Some Q] -- and
+   gets [Q_opt oQ] back ([Q] at [Some Q]).  The hook is fired EXACTLY ONCE,
+   at a GHOST COMMIT ([LogGhostCommit.log_ghost_commit]: a commit with no
+   disk write, which rebuilds the crash invariant's durable copy from the
+   running claim at the unchanged committed map) whose durable state covers
+   every change linearised before the call:
+     - FAST branch ([!committing && outstanding == 0] at the acquire): the
+       log is quiescent, so this call runs the ghost commit itself, with the
+       quiescent loan and the era's sync token out of [LogInv.log_res]'s
+       idle arm, and returns [Q];
+     - SLOW branch: the hook is DEPOSITED in [log_res]'s helping slot
+       ([LogHelp.log_help_deposit]) at the [ncommit] word the wait loop
+       watches, and the call sleeps (the C is unchanged).  The first commit
+       tail after the deposit ([ProofEndOp.eo_tail], [committing] still set,
+       "log" held) extracts every pending hook, runs the ghost commit on all
+       of them, and leaves each [Q] in its waiter's escrow before it moves
+       [ncommit]; the waiter, woken with [ncommit] past its word, collects
+       [▷ Q] ([LogHelp.log_help_collect]) and strips the later at its next
+       instruction.  One commit suffices: a waiter depositing while a commit
+       is in flight does so after that commit's collection, and commits are
+       serialised.
+   The syscall dispatcher's arm 22 passes [None]; [/sync] will pass its
+   ledger's [Some Q] (lane SY3-K4).
+
+   THE WAL'S (the old receipt): the caller hands in its invocation-time
+   batch witness [log_epoch_lb γ e] and gets [flushed_sync γ e] back beside
+   the machine half.  A caller that wants neither takes the witness at zero
+   from nothing ([sync_witness_0]) and drops the receipt at the return.  The
+   witness constrains no caller: it is persistent, free at [0], and
+   available at the caller's own batch from [begin_op]'s mint.  THIS RECEIPT
+   IS A CLEANUP CANDIDATE: the hook above is what a consumer of a sync
+   needs, and nothing reads [flushed_sync] today; the bank below and the
+   receipt stay until that cleanup lands.
 
    ============================ THE SHAPE =============================
 
@@ -244,6 +273,15 @@ Section sys_sync.
     iExists b, D. iSplitL; [iExact "Hf" | by iPureIntro].
   Qed.
 
+  (* THE OPTIONAL HOOK AND ITS RECEIPT (sync K3-4).  At [None] both are
+     [emp] (the dispatcher's arm 22); at [Some Q] the caller hands in the
+     era's hook at [Q] and gets [Q] back, fired once at a ghost commit. *)
+  Definition hook_opt (gen : nat) (oQ : option (iProp Σ)) : iProp Σ :=
+    (match oQ with None => emp | Some Q => riscv_sync_hook gen Q end)%I.
+
+  Definition Q_opt (oQ : option (iProp Σ)) : iProp Σ :=
+    (match oQ with None => emp | Some Q => Q end)%I.
+
   (* the caller's witness is always obtainable, so the contract's premise
      costs nothing: a client with no operation history takes it at zero. *)
   Lemma sync_witness_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
@@ -308,12 +346,14 @@ End sys_sync.
 (*  [K_sys_sync], the order premise, the parking crossing (the literal     *)
 (*  [true], because sys_sync sleeps), the callee-saved and [a0 = 0]        *)
 (*  postconditions, and the [trap_csrs_ext] / [cpu_claim_ext] complement   *)
-(*  in and out.  The durability half is two clauses:                       *)
+(*  in and out.  The durability half is four clauses:                      *)
 (*    (in)  [log_epoch_lb γ e] -- the caller's invocation-time batch       *)
 (*          witness.  Persistent, obtainable at [0] from nothing           *)
 (*          ([sync_witness_0]) and at the caller's own batch from          *)
 (*          [begin_op]'s mint, so it constrains no caller.                 *)
-(*    (out) [flushed_sync γ e] -- the receipt.                            *)
+(*    (in)  [hook_opt gen_id oQ] -- the caller's optional hook.            *)
+(*    (out) [flushed_sync γ e] -- the WAL's receipt.                       *)
+(*    (out) [Q_opt oQ] -- the hook's [Q], fired once at a ghost commit.    *)
 (*  No disk fabric, no [bio_ctx], no operation token: this takes           *)
 (*  [log_ctx] plus the running-process bundle and nothing else.            *)
 (* ====================================================================== *)
@@ -325,7 +365,8 @@ Definition wp_sys_sync_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string)
-    (e : nat) :=                                      (* the caller's batch *)
+    (e : nat)                                         (* the caller's batch *)
+    (oQ : option (iProp Σ)) :=                        (* the caller's hook  *)
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sync in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -342,6 +383,9 @@ Definition wp_sys_sync_sconf_body
   (* THE CALLER'S BATCH WITNESS.  Persistent; the contract reads it only to
      name the bound its receipt has to reach. *)
   log_epoch_lb γ e -∗
+  (* THE CALLER'S OPTIONAL HOOK (sync K3-4): fired exactly once, at a ghost
+     commit covering every change linearised before the call. *)
+  hook_opt gen_id oQ -∗
   procs_inv γs -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
@@ -353,6 +397,8 @@ Definition wp_sys_sync_sconf_body
       cpu_claim_ext eb pj -∗
       (* THE RECEIPT *)
       flushed_sync γ e -∗
+      (* ...AND THE HOOK'S [Q] *)
+      Q_opt oQ -∗
       pc_is ret_tgt -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
@@ -365,6 +411,6 @@ Module Type SYS_SYNC.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (e : nat),
-      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
+      (b : bool) (lks : gset string) (e : nat) (oQ : option (iProp Σ)),
+      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e oQ.
 End SYS_SYNC.

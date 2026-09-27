@@ -467,9 +467,10 @@ client slots), and `AppInv` pins `app_merge`/`app_sync_run` there.
   EMPTY-LOG path, which writes no header, takes the RIGHT arm
   (`LogSnapLaw.snap_law_out_tok`).  `eo_tail` re-deposits it.  `initlog`
   seals the genesis token off `LogDefs.log_free_tok`.  So a reader holding
-  the idle arm knows the token is home.  The quiet loan
-  (`LogQuiet.log_res_quiet_acc`) does NOT lend it; the ghost commit takes
-  it separately.
+  the idle arm knows the token is home.  The guard's reader
+  (`LogQuiet.log_res_quiet_acc`) lends it beside the quiet loan, in the
+  additive arm that needs `out = 0` and `cmt = false`: those are the ghost
+  commit's two inputs.
 - **The hooked law** (`LogSnapLaw.snap_law_ghost`, parked in `log_ctx` with
   `crash_inv` and `gen_cert` after `exc_sealed`) is the parked law's twin
   for a commit with NO disk write: it takes the OLD guest, the token and
@@ -484,6 +485,25 @@ client slots), and `AppInv` pins `app_merge`/`app_sync_run` there.
   claim and `AppInv.app_sync_run_list` once per hook -- the one place the
   fresh guest half, the new durable claim, the running claim and the token
   meet at one map), and fsinit builds both laws side by side.
+- **The helping slot and the tail's flip** (`LogHelp.v`; [`sync.md`](sync.md)
+  §4.2).  `log_res` holds `log_help γ nc out cmt` in BOTH arms, the last
+  conjunct before the arm: a `ghost_map` at `ln_help` of the `sys_sync`
+  waiters' entries `(γw, n0)`, each with an escrow invariant at `helpN .@ w`
+  and a Pending (`hook ∗ ●{½}0 ∗ ⌜n0 = nc⌝ ∗ ⌜cmt ∨ out ≠ 0⌝`) or Done (`● 1`)
+  state.  The pure clauses are re-established at every writer of the three
+  cells: `log_help_cells` for `begin_op`'s `out+1` and `end_op`'s `out-1 ≠ 0`
+  and `cmt := true` (all keep `nc`), the extract's return wand for the one
+  writer that moves `nc`.  That writer is `eo_tail`: after the re-acquire,
+  `committing` still set, it lends the checked-out batch at `n = 0` as the
+  quiet loan (`LogGhostCommit.log_state_quiet_acc`), extracts every Pending
+  hook (`log_help_extract`), runs the ghost commit on all of them
+  (`log_ghost_commit_loop`), and at the re-deposit feeds each `Q` to the
+  extract's wand, which flips every entry to Done and re-closes the slot at
+  `(nc+1, out, false)`.  A slow-path `sys_sync` deposits at the guard's
+  `cmt ∨ out ≠ 0` with the cells still open, so its entry's word is the one
+  its wait loop holds in s2; it collects at the exit's `n0 ≠ nc'`.  Genesis
+  is `initlog`'s seal, off the empty map in `log_free_tok`
+  (`log_help_empty`).
 
 #### The exception set, and why recovery needs no clean image
 

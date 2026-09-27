@@ -1605,10 +1605,9 @@ Section ProofInitlog.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iModIntro.
     iEval (rewrite /log_free_tok) in "Hlfree".
-    (* the helping slot's empty authority is not sealed yet
-       (claude-notes/projects/sync.md K3-4); the era's sync token goes into
-       the first [log_res] below (K3-3) *)
-    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa & _ & Hstok)".
+    (* the helping slot's empty authority (sync K3-4) and the era's sync
+       token (K3-3) both go into the first [log_res] below *)
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa & Hhelp & Hstok)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     assert (Hsbad : add_vec (rget mil Rs3)
                       (sign_extend' 64 (mword_of_int 20 : mword 12))
@@ -2696,7 +2695,7 @@ Section ProofInitlog.
     iDestruct (log_flushed_bank_mk γ 1%nat with "Hepa Hnewbank")
       as "[Hepa #Hbank0]".
     iAssert (log_res γ bn γfs cov logstart)
-      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hstok Hbatch]" as "Hres".
+      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hhelp Hstok Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
          "never observed" counter value is zero, and the two must not
@@ -2726,6 +2725,9 @@ Section ProofInitlog.
       iSplitL "Htxa"; [iExact "Htxa"|].
       iSplitR; [iPureIntro; rewrite !map_size_empty; reflexivity|].
       iSplitR; [iExact "Hbank0"|].
+      (* THE HELPING SLOT, born empty (sync K3-4): no [sync] waiter yet,
+         off the era's empty map in the log names' free bundle *)
+      iSplitL "Hhelp"; [iApply (log_help_empty with "Hhelp")|].
       iExists 0%nat, (∅ : gset Z).
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].

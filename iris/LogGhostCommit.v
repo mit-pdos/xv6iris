@@ -178,4 +178,22 @@ Section LogGhostCommit.
     iPureIntro. split; [exact Hhdr | exact Htie].
   Qed.
 
+  (* ...at the one expression a kernel proof's goal ever has: a hart's
+     [Loop] (the fast-path [sys_sync] and the committer's tail both apply
+     it there, and the generation premise is closed here once). *)
+  Lemma log_ghost_commit_loop (c : CPU) (Qs : list (iProp Σ))
+      (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
+      (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
+    log_ctx γ bn γfs cov ls dev -∗
+    log_quiet γ γfs cov ls L M -∗
+    riscv_sync_tok gen_id -∗
+    ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) -∗
+    (log_quiet γ γfs cov ls L M -∗ riscv_sync_tok gen_id -∗
+       ([∗ list] Q ∈ Qs, Q) -∗ mWP (LoopE gen_id c)) -∗
+    mWP (LoopE gen_id c).
+  Proof using .
+    apply (log_ghost_commit (LoopE gen_id c) Qs γ bn γfs cov ls dev L M).
+    reflexivity.
+  Qed.
+
 End LogGhostCommit.

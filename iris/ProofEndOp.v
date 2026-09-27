@@ -113,6 +113,7 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import LogSnapLaw.   (* [snap_law_out]: what [log_ctx]'s law hands down *)
 Require Import FsBlocks LogInv.
 Require Import LogQuiet.     (* [eo_cache_body_sub], [eo_restrict_of_sub]: the byte view read at the commit *)
+Require Import LogGhostCommit. (* [log_state_quiet_acc], [log_ghost_commit_loop]: the tail's flip (sync K3-4) *)
 Require Import CodeEndOp.
 Require Import KernelDataInv.
 Require Import SpecPanic.
@@ -1451,7 +1452,7 @@ Section EndOpBlocks.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlctx #Hprocs Hppid
               Hframe Hjunk Hbatch Hstok #Hnewbank Hcont".
-    iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & _)".
+    iPoseProof "Hlctx" as "(#Hlock & #Hdevc & #Hstc & _)".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     (* ===== +0x42 auipc s1,0x1e ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.end_op + 0x42)) Rs1 (mword_of_int 30 : mword 20)
@@ -1589,7 +1590,7 @@ Section EndOpBlocks.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
     (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
@@ -1599,6 +1600,29 @@ Section EndOpBlocks.
          iDestruct "Hb2" as (W2 L2 D2 M2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
          iDestruct (ghost_map_auth_valid_2 with "Ha1 Ha2") as %[Hbad _].
          exfalso. by apply (Qp.not_add_le_l 1 1). }
+    (* ================ THE FLIP (sync K3-4, design sync.md §4.3 item 4) =====
+       [committing] is STILL set and "log" is re-held, so no waiter can
+       deposit or wake in between: this is the instant every Pending hook
+       of the helping slot fires.  The batch is checked out at [n = 0] (the
+       re-formed empty batch, or the one the empty-log path found), and
+       with [out = 0] the transaction map is empty, so the batch lends the
+       quiescent loan ([LogGhostCommit.log_state_quiet_acc]); the slot's
+       Pending hooks come out ([LogHelp.log_help_extract]); the ghost
+       commit fires them all at a fresh durable pair with the era's token
+       and hands back each [Q] ([LogGhostCommit.log_ghost_commit_loop]).
+       The [Q]s are fed to the extract's return wand at the re-deposit
+       below, which flips every entry to Done -- so the slot re-closes at
+       the NEW [ncommit] with its pure clauses vacuous. *)
+    assert (HTx0 : Tx = ∅).
+    { apply map_size_empty_iff. rewrite Hszt Hsz. exact (Hcmt0 eq_refl). }
+    subst Tx.
+    iDestruct (log_state_quiet_acc bn γ γfs cov logstart with "Hbatch Htxa")
+      as (Lq Mq) "[Hq Hqclose]".
+    iDestruct (log_help_extract with "Hhelp") as (Qs) "[Hhooks Hflip]".
+    iApply (log_ghost_commit_loop _ Qs γ bn γfs cov logstart dev Lq Mq
+              with "Hlctx Hq Hstok Hhooks").
+    iIntros "Hq Hstok HQs".
+    iDestruct ("Hqclose" with "Hq") as "[Htxa Hbatch]".
     (* ===== +0x50 sw zero,32(s1) : committing := 0 ===== *)
     assert (Hcmta : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 32 : mword 12))
                     = l_cmt).
@@ -1828,9 +1852,15 @@ Section EndOpBlocks.
        [log_res] at the re-acquire above) is simply superseded. *)
     iDestruct (log_flushed_bank_mk γ (S Ep) with "Hepa Hnewbank")
       as "[Hepa #Hbank2]".
+    (* ---- THE FLIP LANDS (sync K3-4): each hook's [Q] goes into its
+       escrow, every entry is Done, and the slot re-closes at the cells
+       this re-deposit writes ---- *)
+    iApply fupd_wp.
+    iMod ("Hflip" $! nc' out false with "HQs") as "Hhelp".
+    iModIntro.
     iAssert (log_res γ bn γfs cov logstart)
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok Hbatch]" as "HRres".
-    { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr, Tx.
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hhelp Hstok Hbatch]" as "HRres".
+    { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr, (∅ : gmap nat unit).
       iSplitL "Houtc"; [iExact "Houtc"|].
       iSplitL "Hcmtc"; [iExact "Hcmtc"|].
       iSplitL "Hncc"; [iExact "Hncc"|].
@@ -1853,6 +1883,7 @@ Section EndOpBlocks.
       iSplitR; [iPureIntro; exact Hszt|].
       (* the bank goes in at the BUMPED counter *)
       iSplitR; [iExact "Hbank2"|].
+      iSplitL "Hhelp"; [iExact "Hhelp"|].
       iExists 0%nat, (∅ : gset Z). iSplitR; [iPureIntro; exact Hsum|].
       iSplitR.
       { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
@@ -4662,7 +4693,7 @@ Section ProofEndOp.
     (* ================= THE ACCOUNTING CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     (* the "log.committing" PANIC IS DEAD: an op token forces out >= 1, and
        log_res's own conjunct then refutes committing. *)
@@ -4970,7 +5001,7 @@ Section ProofEndOp.
       clear Hsv34.
       (* ---- the batch is CHECKED OUT and log_res re-closed at cmt = true ---- *)
       iAssert (log_res γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa]" as "HRres".
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hhelp]" as "HRres".
       { rewrite /log_res. iExists (out - 1)%nat, true, nc, (delete i0 om), Ep, Xr,
                 (delete tt0 Tx).
         iSplitL "Houtc"; [iExact "Houtc"|].
@@ -4992,7 +5023,12 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hsztd|].
         (* the batch is checked out but nothing has committed yet, so the
            bank goes back at the epoch it was read at *)
-        iSplitR; [iExact "Hbank"|]. done. }
+        iSplitR; [iExact "Hbank"|].
+        (* the helping slot at [cmt := true]: a Pending entry's guard
+           clause holds outright ([LogHelp.log_help_cells]) *)
+        iSplitL "Hhelp".
+        { iApply (log_help_cells with "Hhelp"). intros _. left. reflexivity. }
+        done. }
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.end_op + 0x34) : mword 64) 2
                       = mword_of_int (KernelSyms.end_op + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -5361,7 +5397,7 @@ Section ProofEndOp.
         destruct (out - 1)%nat; [contradiction | reflexivity]. }
       (* the batch goes straight back in, at the decremented outstanding *)
       iAssert (log_res γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok Hbatch]" as "HRres".
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hhelp Hstok Hbatch]" as "HRres".
       { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om), Ep, Xr,
                 (delete tt0 Tx).
         iSplitL "Houtc"; [iExact "Houtc"|].
@@ -5383,6 +5419,9 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hsztd|].
         (* the FAST path does not commit, so the bank stands too *)
         iSplitR; [iExact "Hbank"|].
+        (* the helping slot at [out - 1 ≠ 0] ([LogHelp.log_help_cells]) *)
+        iSplitL "Hhelp".
+        { iApply (log_help_cells with "Hhelp"). intros _. right. exact Hnzero. }
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
         iSplitR; [iPureIntro; exact Hreg|].

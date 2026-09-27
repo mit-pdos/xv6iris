@@ -2025,7 +2025,7 @@ Section ProofLogWrite.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hbatch)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hbatch)".
     (* THIS OP'S BIRTH EPOCH ARRIVES NAMED (fs-log.md §G.19): the credit's
        group form is stated against it, so the contract takes [log_opSe] and
        [e0] is a parameter.  The auth's own soundness clause is about to pin
@@ -2477,7 +2477,7 @@ Section ProofLogWrite.
     (* ================= THE TWO CLOSING WANDS ================= *)
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hhelp Hstok HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
              Hmirh Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
@@ -2513,6 +2513,7 @@ Section ProofLogWrite.
           (* a log_write does not commit: the counter stands and so does
              the bank standing at it *)
           iSplitR; [iExact "Hbank"|].
+          iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
           (* ABSORB: W is unchanged, so LB is too, and the block is already
              in it -- which is exactly what [Hmem] says. *)
@@ -2614,6 +2615,7 @@ Section ProofLogWrite.
           (* a log_write does not commit: the counter stands and so does
              the bank standing at it *)
           iSplitR; [iExact "Hbank"|].
+          iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists (S nl), (LB ∪ {[uint bno]}).
           (* THE APPEND BRANCH IS UNREACHABLE UNDER A CREDIT: the scan
              reported [bno] absent from lh.block[], but a credit says it is

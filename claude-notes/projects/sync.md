@@ -97,8 +97,18 @@ State: K3-1 ON MAIN (`61ebcc249`); K3-2 ON MAIN (`6a9fdb836`); K3-3 ON
 MAIN (`0da661d35`: the token through `log_res`/the merge/the permits/the
 tail, `AppInv.app_sync_run_raw`, `LogSnapLaw.snap_law_ghost` parked in
 `log_ctx` beside `crash_inv` and `gen_cert`, `iris/LogGhostCommit.v`;
-`app_body` no longer parks the merge -- nothing read it); K3-4 in flight
-on branch `sync3-k3-4` (worktree `/shared/xv6iris-3k`).
+`app_body` no longer parks the merge -- nothing read it); K3-4 GREEN on
+branch `sync3-k3-4` (worktree `/shared/xv6iris-3k`), awaiting merge:
+`iris/LogHelp.v` (the slot, `log_help_entry`, the four lemmas and
+`log_help_empty`) in `log_res`'s both arms; `LogQuiet.log_res_quiet_acc`
+exposes the slot and lends the token beside the quiet loan;
+`LogGhostCommit.log_ghost_commit_loop`; `eo_tail` extracts and runs the
+ghost commit before the `committing := 0` store and flips at the
+re-deposit; `wp_sys_sync_sconf_body ... e oQ` with `hook_opt`/`Q_opt`
+(`ProofSysSync`: `ss_deposit`/`ss_collect`/`ss_ghost_commit`, the slow
+path keeps the guard's reading open into the spill block, the loop
+carries `s2 = sext n0` and the ticket, `ss_bge_fall_later` strips the
+collect's later); arm 22 passes `None`.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 

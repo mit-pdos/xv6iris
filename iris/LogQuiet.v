@@ -131,10 +131,13 @@ Section LogQuiet.
      ⌜log_mirror_tie_body M L cov logstart ∅⌝)%I.
 
   (* THE READER'S ACCESSOR.  The three cells the guard reads come out as
-     [ProofSysSync.ss_cells] hands them, and the way back is an ADDITIVE
-     pair: either the cells alone (any arm), or -- when the cells read
-     [outstanding = 0] and [committing = 0] -- the quiescent loan as well,
-     returned unchanged beside the cells. *)
+     [ProofSysSync.ss_cells] hands them, beside the helping slot at those
+     cells ([LogHelp.log_help]: the slow path deposits into it), and the way
+     back is an ADDITIVE pair: either the cells and the slot alone (any
+     arm), or -- when the cells read [outstanding = 0] and
+     [committing = 0] -- the quiescent loan and the era's sync token as
+     well (the ghost commit's two inputs), returned unchanged beside the
+     cells and the slot. *)
   Lemma log_res_quiet_acc (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) :
     log_res γ bn γfs cov logstart -∗
@@ -143,33 +146,38 @@ Section LogQuiet.
       l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
       l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
       l_ncommit ↦₄ nc ∗
+      log_help γ nc out cmt ∗
       ((l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) -∗
         l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) -∗
         l_ncommit ↦₄ nc -∗
+        log_help γ nc out cmt -∗
         log_res γ bn γfs cov logstart)
        ∧
        (⌜out = 0%nat⌝ -∗ ⌜cmt = false⌝ -∗
         ∃ (L : gmap Z (list (bv 8))) (M : log_mirror),
-          log_quiet γ γfs cov logstart L M ∗
+          log_quiet γ γfs cov logstart L M ∗ riscv_sync_tok gen_id ∗
           (log_quiet γ γfs cov logstart L M -∗
+           riscv_sync_tok gen_id -∗
            l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) -∗
            l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) -∗
            l_ncommit ↦₄ nc -∗
+           log_help γ nc out cmt -∗
            log_res γ bn γfs cov logstart))).
   Proof using .
     rewrite /log_res.
     iIntros "H". iDestruct "H" as (out cmt nc om E X T)
       "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa &
-        %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
+        %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
     iExists out, cmt, nc.
     iSplitR; [iPureIntro; exact Hout3|].
-    iFrame "Hout Hcmt Hnc".
+    iFrame "Hout Hcmt Hnc Hhelp".
     iSplit.
-    - (* the cells alone *)
-      iIntros "Hout Hcmt Hnc".
-      iExists out, cmt, nc, om, E, X, T. iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hrest".
+    - (* the cells and the slot alone *)
+      iIntros "Hout Hcmt Hnc Hhelp".
+      iExists out, cmt, nc, om, E, X, T.
+      iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp Hrest".
       iFrame "Hbank". iPureIntro. done.
-    - (* the quiescent loan *)
+    - (* the quiescent loan and the token *)
       iIntros (Hout0 Hcmtf). subst cmt.
       (* nothing outstanding: the ledger, hence the transaction map, is empty *)
       assert (HT : T = ∅) by (apply map_size_empty_iff; rewrite Hszt Hsz; exact Hout0).
@@ -184,19 +192,17 @@ Section LogQuiet.
       assert (HLB0 : LB = ∅).
       { destruct Hlen as [HlenW _]. rewrite Hn0 in HlenW.
         symmetry in HlenW. apply nil_length_inv in HlenW. subst W. exact HLB. }
-      iExists L, M. iFrame "Htxa HLauth Hmirh".
+      iExists L, M. iFrame "Htxa HLauth Hmirh Htok".
       iSplitR; [iPureIntro; split; [exact Hmhdr | rewrite -HLB0; exact Hmtie]|].
-      iIntros "(Htxa & HLauth & Hmirh & _ & _) Hout Hcmt Hnc".
+      iIntros "(Htxa & HLauth & Hmirh & _ & _) Htok Hout Hcmt Hnc Hhelp".
       iExists out, false, nc, om, E, X, (∅ : gmap nat unit).
-      iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hbank".
+      iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hbank Hhelp".
       repeat (iSplitR; [iPureIntro; first [done | intros; discriminate]|]).
       iExists n, LB.
       iSplitR; [iPureIntro; exact Hsum|].
       iSplitR; [iPureIntro; exact Hsub|].
       iSplitR; [iPureIntro; exact Hreg|].
       iSplitR; [iPureIntro; exact Hquiet|].
-      (* the token never left: the loan does not include it (the ghost
-         commit takes it separately) *)
       iSplitL "Htok"; [iExact "Htok"|].
       iExists W, L, D, M. iFrame. iPureIntro. done.
   Qed.

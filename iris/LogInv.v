@@ -72,6 +72,7 @@ Require Import FsFlushedCore.
    per-op finalize.  What the log parks instead is the client's own OPAQUE
    payload, which it never reads. *)
 Require Export LogDefs.
+Require Export LogHelp.   (* [log_help]: [log_res]'s helping slot (sync K3-4) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -1251,8 +1252,8 @@ Section LogInv.
           value -- see [log_flushed_bank] above for what it says and why a
           reader that writes no block has no other way to get one.
 
-          POSITION: LAST among the conjuncts that are not the committing
-          arm, which is the same cheapest slot the transaction authority
+          POSITION: last among the conjuncts that are not the committing
+          arm but for the helping slot below, which is the same cheapest slot the transaction authority
           above documents and for the same reason -- the arm is what every
           opener destructures FURTHER, so a conjunct placed after it would
           cost each of them a restructuring rather than one name in a
@@ -1266,6 +1267,20 @@ Section LogInv.
           [initlog] makes before it seals this lock -- so sys_sync has an
           answer from the first instant the log exists. *)
        log_flushed_bank γ E ∗
+       (* THE HELPING SLOT (sync K3-4, claude-notes/design/sync.md §4.2;
+          [LogHelp.log_help]): the [sys_sync] waiters' hooks, deposited
+          while a commit is in flight or operations are open, each Pending
+          entry pinned to THIS [ncommit] word and to [cmt = true ∨ out ≠ 0].
+          In BOTH arms: a waiter deposits while committing, and the
+          committer's tail -- [committing] still set, the lock re-held --
+          extracts every Pending hook, fires it at a ghost commit and flips
+          the entry to Done before it moves [nc].  Every writer of the three
+          cells re-closes it: [LogHelp.log_help_cells] where [nc] stays, the
+          extract's any-cells return where the tail moves it.  LAST among the
+          non-arm conjuncts (after the bank), so every opener gains exactly
+          one name and the openers that stop early carry it inside their
+          [Hrest]. *)
+       log_help γ nc out cmt ∗
        (if cmt then emp
         else ∃ (n : nat) (LB : gset Z),
           ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗

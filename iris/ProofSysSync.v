@@ -48,13 +48,23 @@
      between +0x46 and +0x50 this thread holds no lock at all, and that
      window is where the park lives.
 
-   NO GHOST STEP ANYWHERE.  [log_res] is opened to READ the three cells the
-   guard and the loop test look at -- [committing], [outstanding] and
-   [ncommit] -- and to COPY the bank out ([SpecSysSync.flushed_sync_of_res],
-   everything it hands over being persistent); it closes verbatim in both
-   cases.  The only thing the proof needs from the invariant besides the
-   bank is [outstanding <= 3], which makes the [bge zero,a5] guard a
-   comparison of 64-bit literals.
+   THE HOOK (sync K3-4, SpecSysSync's header).  [log_res] is opened to READ
+   the three cells the guard and the loop test look at -- [committing],
+   [outstanding] and [ncommit] -- to COPY the bank out
+   ([SpecSysSync.flushed_sync_of_res]), and for the caller's optional hook:
+   - on the FAST path the guard's reader ([LogQuiet.log_res_quiet_acc])
+     lends the quiescent loan and the era's sync token, and the hook fires
+     at a ghost commit right there ([ss_ghost_commit]);
+   - on the SLOW path the resource stays OPEN from the guard into the spill
+     block, where the hook is deposited in the helping slot ([ss_deposit])
+     at the very [ncommit] word +0x32 loads into s2; the loop carries the
+     ticket and [s2 = sext n0]; at the exit the failed compare says the
+     counter moved past [n0], so the entry is Done and the waiter collects
+     [▷ Q] ([ss_collect]), stripped by the exit branch's own step
+     ([ss_bge_fall_later]).
+   Otherwise [log_res] closes verbatim.  The only thing the proof needs
+   from the invariant besides these is [outstanding <= 3], which makes the
+   [bge zero,a5] guard a comparison of 64-bit literals.
 
    A functor over ACQUIRE / RELEASE / SLEEP_PREPARE / SLEEP. *)
 From Stdlib Require Import ZArith Lia List.
@@ -84,6 +94,9 @@ Require Import SchedCtx.
 Require Import WpLock.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
+Require Import LogQuiet.        (* [log_res_quiet_acc]: the guard's reader, with the quiescent loan *)
+Require Import LogGhostCommit.  (* [log_ghost_commit_loop]: the fast path's ghost commit (sync K3-4) *)
+Require Import WpSconfEngine.   (* [wp_btype_fall_s_sconf]: the loop exit's later (sync K3-4) *)
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecSysSync.
 Require Import CodeSysSync.
@@ -228,10 +241,13 @@ Definition ss_regs0 (m M : regfile) (spd : mword 64) : Prop :=
   M !!! Regidx Rs2 = m !!! Regidx Rs2 /\
   ss_saved m M.
 
-Definition ss_regs (m M : regfile) (spd : mword 64) : Prop :=
+Definition ss_regs (m M : regfile) (spd : mword 64) (n0 : mword 32) : Prop :=
   M !!! Regidx Rs1 = log_addr /\
   M !!! Regidx csp_rs1 = spd /\
-  ss_saved m M.
+  ss_saved m M /\
+  (* s2 holds the [ncommit] word read at the spill block -- the one the
+     waiter's helping-slot entry records (sync K3-4) *)
+  M !!! Regidx Rs2 = sign_extend' 64 n0.
 
 Lemma ss_saved_cs (m M1 M2 : regfile) :
   callee_saved M1 M2 -> ss_saved m M1 -> ss_saved m M2.
@@ -260,24 +276,61 @@ Proof.
   - exact (ss_saved_cs m M1 M2 Hcs D).
 Qed.
 
-Lemma ss_regs_cs (m M1 M2 : regfile) (spd : mword 64) :
-  callee_saved M1 M2 -> ss_regs m M1 spd -> ss_regs m M2 spd.
+Lemma ss_regs_cs (m M1 M2 : regfile) (spd : mword 64) {n0 : mword 32} :
+  callee_saved M1 M2 -> ss_regs m M1 spd n0 -> ss_regs m M2 spd n0.
 Proof.
-  intros Hcs (A & B & Cc). split; [| split].
+  intros Hcs (A & B & Cc & D). split; [| split; [| split]].
   - rewrite (callee_saved_lookup Hcs Rs1 ltac:(vm_compute; reflexivity)). exact A.
   - rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact B.
   - exact (ss_saved_cs m M1 M2 Hcs Cc).
+  - rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)). exact D.
 Qed.
 
 (* ===================================================================== *)
+
+(* THE LOOP EXIT'S BRANCH, WITH ITS LATER (sync K3-4).  [WpSconfBtype]'s
+   [wp_bge_fall_s_sconf] introduces the engine's [▷] for its caller; the wait
+   loop's exit needs it instead, to strip the [▷ Q] the waiter's collect
+   hands back.  The leaf's own proof, one line shorter. *)
+Section SsLeaf.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context {kt : ktier} {p : mword 64}.
+
+  Lemma ss_bge_fall_later
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (m : regfile) (n : nat) (b : bool) :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zKzJ_s (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
+    ▷ wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
+    assert (Hcmp_all : forall hh : CpuId,
+               zopz0zKzJ_s (rget (CID := hh) m rs1) (rget (CID := hh) m rs2) = false)
+      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID);
+          rewrite (src_ok_rget_indep m rs2 hh CID); exact Hcmp).
+    iApply (wp_btype_fall_s_sconf pc false imm rs2 rs1
+              (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
+              zopz0zKzJ_s m n b eq_refl
+              with "[] Hcg Hpc Hinstr Hcont").
+    iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
+  Qed.
+End SsLeaf.
 
 Section SsProps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{XI : CurCtx}.
 
   (* The log lock's resource, opened for exactly the three cells sys_sync
-     reads.  Nothing else in [log_res] is touched, and the closing wand puts
-     the same three back -- there is no ghost step anywhere in this proof. *)
+     reads and the helping slot at those cells (sync K3-4: the wait loop's
+     exit collects from it).  Nothing else in [log_res] is touched, and the
+     closing wand puts the same four back. *)
   Lemma ss_cells `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) :
     log_res γ bn γfs cov logstart -∗
@@ -286,31 +339,85 @@ Section SsProps.
       l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
       l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
       l_ncommit ↦₄ nc ∗
+      log_help γ nc out cmt ∗
       (l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) -∗
        l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) -∗
        l_ncommit ↦₄ nc -∗
+       log_help γ nc out cmt -∗
        log_res γ bn γfs cov logstart).
   Proof using .
-    rewrite /log_res.
-    iIntros "H". iDestruct "H" as (out cmt nc om E X T)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Hrest)".
+    iIntros "H".
+    iDestruct (log_res_quiet_acc with "H")
+      as (out cmt nc) "(%Hout3 & Hout & Hcmt & Hnc & Hhelp & [Hclose _])".
     iExists out, cmt, nc.
     iSplitR; [iPureIntro; exact Hout3|].
-    iFrame "Hout Hcmt Hnc".
-    iIntros "Hout Hcmt Hnc".
-    iExists out, cmt, nc, om, E, X, T.
-    iFrame "Hout Hcmt Hnc Hauth".
-    iSplitR; [iPureIntro; exact Hsz|].
-    iSplitR; [iPureIntro; exact Hbnd|].
-    iSplitR; [iPureIntro; exact Hout3|].
-    iSplitR; [iPureIntro; exact Hcmt0|].
-    iFrame "Hepa".
-    iSplitR; [iPureIntro; exact Hepos|].
-    iFrame "Hxa".
-    iSplitR; [iPureIntro; exact Hlive|].
-    iSplitR; [iPureIntro; exact Hcap|].
-    iExact "Hrest".
+    iFrame "Hout Hcmt Hnc Hhelp Hclose".
   Qed.
+
+  (* THE WAITER'S TICKET (sync K3-4): at [Some Q], the full fragment of its
+     helping-slot entry at the [ncommit] word [n0] and the escrow's handle;
+     at [None], nothing. *)
+  Definition ss_ticket `{GEN : GenId} (γ : log_names) (oQ : option (iProp Σ))
+      (n0 : SailStdpp.Values.mword 32) : iProp Σ :=
+    (match oQ with
+     | None => emp
+     | Some Q => ∃ (w : nat) (γw : gname),
+         w ↪[ln_help γ] (γw, n0) ∗ inv (helpN .@ w) (esc Q γw)
+     end)%I.
+
+  (* the deposit, at either option *)
+  Lemma ss_deposit `{GEN : GenId} (γ : log_names) (nc : SailStdpp.Values.mword 32)
+      (out : nat) (cmt : bool) (oQ : option (iProp Σ)) :
+    cmt = true \/ out ≠ 0%nat ->
+    log_help γ nc out cmt -∗ hook_opt gen_id oQ ={⊤}=∗
+    log_help γ nc out cmt ∗ ss_ticket γ oQ nc.
+  Proof using .
+    intros Hg. iIntros "Hhelp Hhook". destruct oQ as [Q|]; rewrite /hook_opt /ss_ticket.
+    - iMod (log_help_deposit γ nc out cmt Q Hg with "Hhelp Hhook")
+        as (w γw) "(Hhelp & Hw & #Hesc)".
+      iModIntro. iFrame "Hhelp". iExists w, γw. iFrame "Hw Hesc".
+    - iModIntro. iFrame "Hhelp".
+  Qed.
+
+  (* the collect, at either option: the entry's word is not the current
+     one, so the committer has flipped it *)
+  Lemma ss_collect `{GEN : GenId} (γ : log_names) (nc : SailStdpp.Values.mword 32)
+      (out : nat) (cmt : bool) (oQ : option (iProp Σ)) (n0 : SailStdpp.Values.mword 32) :
+    n0 ≠ nc ->
+    ss_ticket γ oQ n0 -∗ log_help γ nc out cmt ={⊤}=∗
+    log_help γ nc out cmt ∗ ▷ Q_opt oQ.
+  Proof using .
+    intros Hne. iIntros "Htk Hhelp". destruct oQ as [Q|]; rewrite /ss_ticket /Q_opt.
+    - iDestruct "Htk" as (w γw) "[Hw #Hesc]".
+      iApply (log_help_collect γ nc out cmt w γw n0 Q with "Hw Hesc [%] Hhelp").
+      exact Hne.
+    - iModIntro. iSplitL "Hhelp"; [iExact "Hhelp" | by iNext].
+  Qed.
+
+  (* the fast path's ghost commit, at either option *)
+  Lemma ss_ghost_commit `{GEN : GenId} (c : CPU) (oQ : option (iProp Σ))
+      (γ : log_names) (bn : bio_names) (γfs : fs_names) (cov : gset Z) (ls : Z)
+      (dev : mword 32) (L : gmap Z (list (bv 8))) (M : log_mirror) :
+    log_ctx γ bn γfs cov ls dev -∗
+    log_quiet γ γfs cov ls L M -∗
+    riscv_sync_tok gen_id -∗
+    hook_opt gen_id oQ -∗
+    (log_quiet γ γfs cov ls L M -∗ riscv_sync_tok gen_id -∗ Q_opt oQ -∗
+       mWP (LoopE gen_id c)) -∗
+    mWP (LoopE gen_id c).
+  Proof using .
+    iIntros "#Hctx Hq Htk Hhook Hk". destruct oQ as [Q|]; rewrite /hook_opt /Q_opt.
+    - iApply (log_ghost_commit_loop c [Q] γ bn γfs cov ls dev L M
+                with "Hctx Hq Htk [Hhook]").
+      { rewrite big_sepL_singleton. iExact "Hhook". }
+      iIntros "Hq Htk HQ". rewrite big_sepL_singleton.
+      iApply ("Hk" with "Hq Htk HQ").
+    - iApply (log_ghost_commit_loop c [] γ bn γfs cov ls dev L M
+                with "Hctx Hq Htk []").
+      { by rewrite big_sepL_nil. }
+      iIntros "Hq Htk _". iApply ("Hk" with "Hq Htk []"). done.
+  Qed.
+
 
   (* The shared TAIL, control at +0x5e (a0 := &log, release, return 0), and
      the WAIT LOOP's invariant, control at +0x3e (the log lock held).  Both
@@ -322,7 +429,7 @@ Section SsProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (K : nat) (eb : bool) (lks : gset string)
-      (spd sp0 : mword 64) : iProp Σ :=
+      (spd sp0 : mword 64) (R : iProp Σ) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ ss_regs0 m M spd ⌝ -∗
@@ -337,6 +444,9 @@ Section SsProps.
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (SS + 0x5e)) -∗
+      (* what the exit hands the caller beside the machine half: the
+         hook's [Q] (sync K3-4) *)
+      R -∗
       mWP (Loop : expr riscv_lang)))%I.
 
   Definition ss_loop `{GEN : GenId} (CID0 : CPU)
@@ -344,10 +454,10 @@ Section SsProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (K : nat) (eb : bool) (lks : gset string)
-      (spd sp0 : mword 64) : iProp Σ :=
+      (spd sp0 : mword 64) (oQ : option (iProp Σ)) (n0 : mword 32) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
-      ⌜ ss_regs m M spd ⌝ -∗
+      ⌜ ss_regs m M spd n0 ⌝ -∗
       pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
       pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
       pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
@@ -359,7 +469,9 @@ Section SsProps.
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (SS + 0x3e)) -∗
-      ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+      (* the waiter's ticket at the word s2 holds (sync K3-4) *)
+      ss_ticket γ oQ n0 -∗
+      ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 (Q_opt oQ) -∗
       mWP (Loop : expr riscv_lang)))%I.
 
 End SsProps.
@@ -642,14 +754,14 @@ Section SsBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (K : nat) (eb : bool) (lks : gset string)
-      (spd sp0 : mword 64) :
+      (spd sp0 : mword 64) (oQ : option (iProp Σ)) (n0 : mword 32) :
     let pj := proc_addr j in
     (K_sys_sync <= K)%nat ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
-    ss_regs m M spd ->
+    ss_regs m M spd n0 ->
     (* sys_sync acquires "log" (3) DIRECTLY and, while holding it, reaches
        "proc" (11) via sleep_prepare/sleep's own re-acquire -- ONE premise at
        "log" covers the whole cone (LockRank.v: [locks_below_mono] lifts it to
@@ -659,8 +771,8 @@ Section SsBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    ▷ ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    ▷ ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 oQ n0 -∗
+    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 (Q_opt oQ) -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
     pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx Rs1) -∗
@@ -672,6 +784,7 @@ Section SsBodies.
     cpu_claim pj -∗
     sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false pj -∗
     pc_is (mword_of_int (SS + 0x3e)) -∗
+    ss_ticket γ oQ n0 -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros pj HK Hj Hjl Hanch Hspd Hss Hbelow.
@@ -679,10 +792,10 @@ Section SsBodies.
       by lkbelow.
     assert (Hbeloweproc : locks_below ({["log"]} ∪ lks) "proc")
       by (apply locks_below_union_singleton; [vm_compute; lia | exact Hbelowproc]).
-    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart & _)".
-    assert (HssM : ss_regs m M spd) by exact Hss.
-    destruct Hss as (Hs1 & Hsp & Hsv).
+    assert (HssM : ss_regs m M spd n0) by exact Hss.
+    destruct Hss as (Hs1 & Hsp & Hsv & Hs2n).
     (* THE SPLIT SLEEP PROTOCOL: the loop invariant carries [trap_csrs] and
        [cpu_claim pj] index-free; the interior release wants the PAY half and
        the lock-free sleep() wants the COMPLEMENT. *)
@@ -724,7 +837,7 @@ Section SsBodies.
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_refl. }
-    assert (HssA1 : ss_regs m A1 spd) by (apply (ss_regs_cs m M A1 spd HcsA1 HssM)).
+    assert (HssA1 : ss_regs m A1 spd n0) by (apply (ss_regs_cs m M A1 spd HcsA1 HssM)).
     assert (HA1nz : eq_vec (A1 !!! Regidx Ra0) (zero_reg : mword 64) = false)
       by (rewrite HA1a0; exact ss_log_nz).
     (* -------------------- sleep_prepare(&log) -------------------- *)
@@ -737,7 +850,7 @@ Section SsBodies.
     assert (Hp44 : ret_pc (A1 !!! Regidx Rra) = mword_of_int (SS + 0x44))
       by (rewrite HA1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp44) in "Hpc".
-    assert (HssPr : ss_regs m mfp spd) by (apply (ss_regs_cs m A1 mfp spd Hpcs HssA1)).
+    assert (HssPr : ss_regs m mfp spd n0) by (apply (ss_regs_cs m A1 mfp spd Hpcs HssA1)).
     assert (HPrs1 : mfp !!! Regidx Rs1 = log_addr) by (destruct HssPr as (Xx & _); exact Xx).
     (* +0x44 c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (SS + 0x44)) Ra0 Rs1
@@ -776,7 +889,7 @@ Section SsBodies.
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_refl. }
-    assert (HssA3 : ss_regs m A3 spd) by (apply (ss_regs_cs m mfp A3 spd HcsA3 HssPr)).
+    assert (HssA3 : ss_regs m A3 spd n0) by (apply (ss_regs_cs m mfp A3 spd HcsA3 HssPr)).
     assert (Hrel_lka : add_vec (A3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HA3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
@@ -790,7 +903,7 @@ Section SsBodies.
     assert (Hp4a : ret_pc (A3 !!! Regidx Rra) = mword_of_int (SS + 0x4a))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4a) in "Hpc".
-    assert (HssRl : ss_regs m mfr spd) by (apply (ss_regs_cs m A3 mfr spd Hrcs HssA3)).
+    assert (HssRl : ss_regs m mfr spd n0) by (apply (ss_regs_cs m A3 mfr spd Hrcs HssA3)).
     (* +0x4a jal ra,sleep *)
     iApply (wp_jal_s_sconf (mword_of_int (SS + 0x4a)) Rra
               (mword_of_int 2088876 : mword 21) mfr (K - 4)%nat eb
@@ -809,7 +922,7 @@ Section SsBodies.
       by (rewrite /A4; apply upd_eq).
     assert (HcsA4 : callee_saved mfr A4).
     { rewrite /A4. apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
-    assert (HssA4 : ss_regs m A4 spd) by (apply (ss_regs_cs m mfr A4 spd HcsA4 HssRl)).
+    assert (HssA4 : ss_regs m A4 spd n0) by (apply (ss_regs_cs m mfr A4 spd HcsA4 HssRl)).
     (* ========================== sleep() ========================== *)
     iDestruct (cpu_own_transport CIDr CIDj 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID CIDj eb pj ltac:(wp_next_chain) with "Htcx") as "Htcx".
@@ -822,7 +935,7 @@ Section SsBodies.
     assert (Hp4e : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SS + 0x4e))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4e) in "Hpc".
-    assert (HssSl : ss_regs m mfs spd) by (apply (ss_regs_cs m A4 mfs spd Hscs HssA4)).
+    assert (HssSl : ss_regs m mfs spd n0) by (apply (ss_regs_cs m A4 mfs spd Hscs HssA4)).
     assert (HSls1 : mfs !!! Regidx Rs1 = log_addr) by (destruct HssSl as (Xx & _); exact Xx).
     (* +0x4e c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (SS + 0x4e)) Ra0 Rs1
@@ -861,7 +974,7 @@ Section SsBodies.
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_refl. }
-    assert (HssA6 : ss_regs m A6 spd) by (apply (ss_regs_cs m mfs A6 spd HcsA6 HssSl)).
+    assert (HssA6 : ss_regs m A6 spd n0) by (apply (ss_regs_cs m mfs A6 spd HcsA6 HssSl)).
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDs CIDn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
@@ -874,7 +987,7 @@ Section SsBodies.
     assert (Hp54 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (SS + 0x54))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp54) in "Hpc".
-    assert (HssAq : ss_regs m mfa spd) by (apply (ss_regs_cs m A6 mfa spd Hacs HssA6)).
+    assert (HssAq : ss_regs m mfa spd n0) by (apply (ss_regs_cs m A6 mfa spd Hacs HssA6)).
     assert (HAqs1 : mfa !!! Regidx Rs1 = log_addr) by (destruct HssAq as (Xx & _); exact Xx).
     (* the pair, rebuilt at the hart the test is reached on *)
     iDestruct (trap_csrs_ext_transport CIDs CIDa eb pj ltac:(wp_next_chain) with "Htcx") as "Htcx".
@@ -882,7 +995,7 @@ Section SsBodies.
     iDestruct (arm_pay_ext_join eb pj with "Hpay [Htcx Hclmx]") as "[Htc Hclm]".
     { iSplitL "Htcx"; [iExact "Htcx" | iExact "Hclmx"]. }
     (* +0x54 c.lw a5,40(s1) : a5 := log.ncommit *)
-    iDestruct (ss_cells with "Hres") as (out2 cmt2 nc2) "(%Hout3b & Hout & Hcmt & Hnc & Hclose)".
+    iDestruct (ss_cells with "Hres") as (out2 cmt2 nc2) "(%Hout3b & Hout & Hcmt & Hnc & Hhelp & Hclose)".
     assert (Hnca : add_vec (rget mfa Rs1) (sign_extend' 64 (mword_of_int 40 : mword 12)) = l_ncommit).
     { rgne. rewrite HAqs1. exact ss_addr_nc. }
     iEval (rewrite -Hnca) in "Hnc".
@@ -894,7 +1007,6 @@ Section SsBodies.
     { iApply (ssi_54 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hnc".
     iEval (rewrite Hnca) in "Hnc".
-    iDestruct ("Hclose" with "Hout Hcmt Hnc") as "Hres".
     set (Z1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 nc2)]> mfa).
     change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 nc2)]> mfa) with Z1.
     assert (Hp56 : add_vec_int (mword_of_int (SS + 0x54) : mword 64) 2 = mword_of_int (SS + 0x56))
@@ -902,10 +1014,11 @@ Section SsBodies.
     iEval (rewrite Hp56) in "Hpc".
     assert (HcsZ1 : callee_saved mfa Z1).
     { rewrite /Z1. apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
-    assert (HssZ1 : ss_regs m Z1 spd) by (apply (ss_regs_cs m mfa Z1 spd HcsZ1 HssAq)).
+    assert (HssZ1 : ss_regs m Z1 spd n0) by (apply (ss_regs_cs m mfa Z1 spd HcsZ1 HssAq)).
     (* +0x56 bge s2,a5 : loop while the OLD count is still >= the current *)
     destruct (zopz0zKzJ_s (rget Z1 Rs2) (rget Z1 Ra5)) eqn:Hcmp56.
     - (* ---- TAKEN: the counter has not moved; back edge to +0x3e ---- *)
+      iDestruct ("Hclose" with "Hout Hcmt Hnc Hhelp") as "Hres".
       assert (Htgt3e : add_vec (mword_of_int (SS + 0x56) : mword 64)
                          (sign_extend' 64 (mword_of_int 8168 : mword 13))
                        = mword_of_int (SS + 0x3e))
@@ -920,19 +1033,33 @@ Section SsBodies.
       iEval (rewrite Htgt3e) in "Hpc".
       rewrite /ss_loop.
       iSpecialize ("IH" $! CIDa with "[%]"); [wp_next_chain|].
-      iApply ("IH" $! Z1 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hexit").
+      iApply ("IH" $! Z1 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk Hexit").
       exact HssZ1.
     - (* ---- FALL: the counter advanced; restore s1/s2 and take the tail ---- *)
-      iApply (wp_bge_fall_s_sconf (mword_of_int (SS + 0x56)) (mword_of_int 8168 : mword 13)
+      (* THE COLLECT (sync K3-4).  The compare failed, so the word s2 holds
+         is not the one just read: [ncommit] moved past the waiter's word,
+         so the commit tail that moved it flipped the waiter's entry.  The
+         [▷ Q] is stripped by this very branch's step. *)
+      pose proof HssZ1 as (_ & _ & _ & HZ1s2).
+      assert (HZ1a5 : Z1 !!! Regidx Ra5 = sign_extend' 64 nc2)
+        by (rewrite /Z1; apply upd_eq).
+      assert (Hne : n0 ≠ nc2).
+      { intros Heq. revert Hcmp56. rgne. rgne. rewrite HZ1s2 HZ1a5 Heq.
+        unfold zopz0zKzJ_s. rewrite Z.geb_leb Z.leb_refl. discriminate. }
+      iApply fupd_wp.
+      iMod (ss_collect γ nc2 out2 cmt2 oQ n0 Hne with "Htk Hhelp") as "[Hhelp HQ]".
+      iModIntro.
+      iDestruct ("Hclose" with "Hout Hcmt Hnc Hhelp") as "Hres".
+      iApply (ss_bge_fall_later (mword_of_int (SS + 0x56)) (mword_of_int 8168 : mword 13)
                 Ra5 Rs2 Z1 (trap_res eb + (K - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp56 with "Hcg Hpc []").
       { iApply (ssi_56 with "Htext"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hp5a : add_vec_int (mword_of_int (SS + 0x56) : mword 64) 4 = mword_of_int (SS + 0x5a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5a) in "Hpc".
-      destruct HssZ1 as (HZ1s1 & HZ1sp & HZ1sv).
+      destruct HssZ1 as (HZ1s1 & HZ1sp & HZ1sv & _).
       assert (Hb3 : add_vec (Z1 !!! Regidx csp_rs1)
                       (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
       { rewrite HZ1sp -Hspd. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
@@ -982,7 +1109,7 @@ Section SsBodies.
                   | exact P24 | exact P25 | exact P26 | exact P27 ]. }
       rewrite /ss_exit.
       iSpecialize ("Hexit" $! CIDa with "[%]"); [wp_next_chain|].
-      iApply ("Hexit" $! Z3 with "[%] Hr24 Hr16 [Hr8] [Hr0] Htok Hres Hown Htc Hclm Hcg Hpc").
+      iApply ("Hexit" $! Z3 with "[%] Hr24 Hr16 [Hr8] [Hr0] Htok Hres Hown Htc Hclm Hcg Hpc HQ").
       { exact HssZ3. }
       { iExists (m !!! Regidx Rs1). iExact "Hr8". }
       { iExists (m !!! Regidx Rs2). iExact "Hr0". }
@@ -990,27 +1117,42 @@ Section SsBodies.
 
   (* ---- THE SPILL BLOCK: +0x2a (save s1/s2) .. +0x3a (s1 := &log), the
      entry to the wait loop.  Both guard arms -- "committing" (taken) and
-     "outstanding > 0" (fallen) -- converge here. ---- *)
+     "outstanding > 0" (fallen) -- converge here, the lock's resource STILL
+     OPEN at the guard's reading (sync K3-4): the waiter's hook is deposited
+     in the helping slot at the very [ncommit] word +0x32 loads into s2, so
+     the loop's exit test and the slot's entry name the same word. ---- *)
   Lemma ss_entry_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m M : regfile) (K : nat) (eb : bool) (lks : gset string)
-      (spd sp0 : mword 64) :
+      (spd sp0 : mword 64)
+      (out : nat) (cmt : bool) (nc : mword 32) (oQ : option (iProp Σ)) :
     let pj := proc_addr j in
     (K_sys_sync <= K)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
     ss_regs0 m M spd ->
+    (* the guard's reading: a commit is in flight or an operation is open *)
+    cmt = true \/ out ≠ 0%nat ->
     kernel_text -∗
-    ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    (∀ n0 : mword 32, ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 oQ n0) -∗
+    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 (Q_opt oQ) -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx Rs0) -∗
     (∃ v : mword 64, pa_stk sp0 3 ↦₈[KT1] v) -∗
     (∃ v : mword 64, pa_stk sp0 4 ↦₈[KT1] v) -∗
     locked (ln_lk γ) cpu_id -∗
-    log_res γ bn γfs cov logstart -∗
+    l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) -∗
+    l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) -∗
+    l_ncommit ↦₄ nc -∗
+    log_help γ nc out cmt -∗
+    (l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) -∗
+     l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) -∗
+     l_ncommit ↦₄ nc -∗
+     log_help γ nc out cmt -∗
+     log_res γ bn γfs cov logstart) -∗
+    hook_opt gen_id oQ -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
     trap_csrs KT1 -∗
     cpu_claim pj -∗
@@ -1018,8 +1160,14 @@ Section SsBodies.
     pc_is (mword_of_int (SS + 0x2a)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros pj HK Hanch Hspd Hss.
-    iIntros "#Htext Hloop Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
+    intros pj HK Hanch Hspd Hss Hg.
+    iIntros "#Htext Hloop Hexit Hr24 Hr16 Hr8 Hr0 Htok Hout Hcmt Hnc Hhelp Hclose Hhook
+             Hown Htc Hclm Hcg Hpc".
+    (* THE DEPOSIT (sync K3-4): the hook goes into the helping slot, Pending
+       at this [ncommit] word; the waiter keeps the ticket *)
+    iApply fupd_wp.
+    iMod (ss_deposit γ nc out cmt oQ Hg with "Hhelp Hhook") as "[Hhelp Htk]".
+    iModIntro.
     destruct Hss as (Hsp & Hs1v & Hs2v & Hsv).
     iDestruct "Hr8" as (v3) "Hr8". iDestruct "Hr0" as (v4) "Hr0".
     assert (Hb3 : add_vec (M !!! Regidx csp_rs1)
@@ -1067,8 +1215,8 @@ Section SsBodies.
     assert (HY1s2 : Y1 !!! Regidx Rs2
                     = add_vec (mword_of_int (SS + 0x2e) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))
       by (rewrite /Y1; apply upd_eq).
-    (* +0x32 lw s2,1256(s2) : s2 := log.ncommit *)
-    iDestruct (ss_cells with "Hres") as (out cmt nc) "(%Hout3 & Hout & Hcmt & Hnc & Hclose)".
+    (* +0x32 lw s2,1256(s2) : s2 := log.ncommit -- the cell still open at
+       the guard's reading *)
     assert (Hnca : add_vec (rget Y1 Rs2) (sign_extend' 64 (mword_of_int 1552 : mword 12)) = l_ncommit).
     { rgne. rewrite HY1s2. exact ss_reloc_nc_2e. }
     iEval (rewrite -Hnca) in "Hnc".
@@ -1080,7 +1228,7 @@ Section SsBodies.
     { iApply (ssi_32 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hnc".
     iEval (rewrite Hnca) in "Hnc".
-    iDestruct ("Hclose" with "Hout Hcmt Hnc") as "Hres".
+    iDestruct ("Hclose" with "Hout Hcmt Hnc Hhelp") as "Hres".
     set (Y2 := <[Regidx Rs2 := regval_into_reg (sign_extend' 64 nc)]> Y1).
     change (<[Regidx Rs2 := regval_into_reg (sign_extend' 64 nc)]> Y1) with Y2.
     assert (Hp36 : add_vec_int (mword_of_int (SS + 0x32) : mword 64) 4 = mword_of_int (SS + 0x36))
@@ -1115,8 +1263,8 @@ Section SsBodies.
     assert (Hp3e : add_vec_int (mword_of_int (SS + 0x3a) : mword 64) 4 = mword_of_int (SS + 0x3e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp3e) in "Hpc".
-    assert (HssY4 : ss_regs m Y4 spd).
-    { split; [| split].
+    assert (HssY4 : ss_regs m Y4 spd nc).
+    { split; [| split; [| split]].
       - rewrite /Y4 upd_eq /Y3 upd_eq. exact ss_reloc_s1_36.
       - rewrite /Y4 upd_ne; [| reg_neq]. rewrite /Y3 upd_ne; [| reg_neq].
         rewrite /Y2 upd_ne; [| reg_neq]. rewrite /Y1 upd_ne; [| reg_neq]. exact Hsp.
@@ -1125,10 +1273,12 @@ Section SsBodies.
           (rewrite /Y4 upd_ne; [| reg_neq]; rewrite /Y3 upd_ne; [| reg_neq];
            rewrite /Y2 upd_ne; [| reg_neq]; rewrite /Y1 upd_ne; [| reg_neq]);
           first [ exact P19 | exact P20 | exact P21 | exact P22 | exact P23
-                | exact P24 | exact P25 | exact P26 | exact P27 ]. }
+                | exact P24 | exact P25 | exact P26 | exact P27 ].
+      - rewrite /Y4 upd_ne; [| reg_neq]. rewrite /Y3 upd_ne; [| reg_neq].
+        rewrite /Y2 upd_eq. reflexivity. }
     rewrite /ss_loop.
-    iSpecialize ("Hloop" $! CID with "[%]"); [wp_next_chain|].
-    iApply ("Hloop" $! Y4 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hexit").
+    iSpecialize ("Hloop" $! nc CID with "[%]"); [wp_next_chain|].
+    iApply ("Hloop" $! Y4 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk Hexit").
     exact HssY4.
   Qed.
 
@@ -1154,22 +1304,23 @@ Section ProofSysSync.
      acquire: the counter only grows, so a copy taken at the FIRST one
      already satisfies the post on every path through the function.  That is
      what keeps the loop's raw case split -- the [log.ncommit] cell's value
-     is still unconstrained by [log_res], and this proof still never needs
-     it. *)
+     is still unconstrained by [log_res].  (The HOOK does need a word: the
+     one +0x32 loads, which the loop carries in s2 and the helping slot's
+     entry records -- see the header.) *)
   Lemma wp_sys_sync_sconf
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (e : nat)
-    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
+      (b : bool) (lks : gset string) (e : nat) (oQ : option (iProp Σ))
+    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e oQ.
   Proof using .
     cbv beta delta [wp_sys_sync_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx #Hlbe #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx #Hlbe Hhook #Hpinv Hcont".
     iPoseProof "Hlogx" as "#Hlog".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart & _)".
@@ -1343,12 +1494,13 @@ Section ProofSysSync.
        (iii), and it happens before the guard is even read. *)
     iDestruct (flushed_sync_of_res γ bn γfs cov logstart e with "Hlbe Hres")
       as "[#Hflush Hres]".
-    iAssert (ss_exit CID j γ bn γfs cov logstart m K eb lks spd sp0) with "[Hcont]" as "Hexit".
+    iAssert (ss_exit CID j γ bn γfs cov logstart m K eb lks spd sp0 (Q_opt oQ))
+      with "[Hcont]" as "Hexit".
     { rewrite /ss_exit.
-      iIntros (CIDx Hsx Mx) "%HssE Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
+      iIntros (CIDx Hsx Mx) "%HssE Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc HQ".
       iApply (ss_tail_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx K eb lks spd sp0
                 HK Hsx Hspd Hsp0 HssE Hbelow
-                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc [Hcont]").
+                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc [Hcont HQ]").
       (* [ss_tail_body] promises the RECEIPT-FREE continuation -- an
          abstract exit, so the same tail serves whatever the contract adds
          above it -- and the receipt is injected here, on the way into the
@@ -1358,15 +1510,20 @@ Section ProofSysSync.
       iSpecialize ("Hc" $! mfret).
       iSpecialize ("Hc" with "[%]"); [exact Hcsret |].
       iSpecialize ("Hc" with "[%]"); [exact Ha0ret |].
-      iApply ("Hc" with "Hcgf Hcntf Hextcf Hextmf Hflush Hpcf"). }
-    iAssert (ss_loop CID j γ bn γfs cov logstart m K eb lks spd sp0) with "[]" as "Hloop".
-    { iLöb as "IH". rewrite /ss_loop.
-      iIntros (CIDy Hsy My) "%HssL Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hexit".
+      iApply ("Hc" with "Hcgf Hcntf Hextcf Hextmf Hflush HQ Hpcf"). }
+    iAssert (∀ n0 : mword 32, ss_loop CID j γ bn γfs cov logstart m K eb lks spd sp0 oQ n0)%I
+      with "[]" as "Hloop".
+    { iIntros (n0). iLöb as "IH". rewrite /ss_loop.
+      iIntros (CIDy Hsy My) "%HssL Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk Hexit".
       iApply (ss_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My K eb lks spd sp0
-                HK Hj Hjl Hsy Hspd HssL Hbelow
-                with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc"). }
+                oQ n0 HK Hj Hjl Hsy Hspd HssL Hbelow
+                with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk"). }
     (* ============ +0x14..+0x26: the two-part guard ============ *)
-    iDestruct (ss_cells with "Hres") as (out cmt nc) "(%Hout3 & Hout & Hcmt & Hnc & Hclose)".
+    (* the cells, the helping slot, and -- additively -- the quiescent loan
+       with the era's token (sync K3-4): the fast path takes the loan, the
+       slow path keeps the resource open into the spill block *)
+    iDestruct (log_res_quiet_acc with "Hres")
+      as (out cmt nc) "(%Hout3 & Hout & Hcmt & Hnc & Hhelp & Hclose)".
     (* +0x14 auipc a5,0x1e *)
     iApply (wp_auipc_s_sconf (mword_of_int (SS + 0x14)) Ra5
               (mword_of_int 30 : mword 20) Macq (trap_res eb + (K - 4))%nat false
@@ -1419,7 +1576,7 @@ Section ProofSysSync.
       by (apply bv_eq; vm_compute; reflexivity).
     destruct cmt.
     - (* ============== COMMITTING: straight to the spill block ============ *)
-      iDestruct ("Hclose" with "Hout Hcmt Hnc") as "Hres".
+      iDestruct "Hclose" as "[Hclose _]".
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (SS + 0x1c)) (mword_of_int 7 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 G2 (trap_res eb + (K - 4))%nat false
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -1430,8 +1587,10 @@ Section ProofSysSync.
       iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt2a) in "Hpc".
       iApply (ss_entry_body (CID := CIDa) CID j γ bn γfs cov logstart m G2 K eb lks spd sp0
-                HK ltac:(wp_next_chain) Hspd HssG2
-                with "Htext Hloop Hexit Hr24 Hr16 [S3] [S4] Htok Hres Hown Htc Hclm Hcg Hpc").
+                out true nc oQ
+                HK ltac:(wp_next_chain) Hspd HssG2 (or_introl eq_refl)
+                with "Htext Hloop Hexit Hr24 Hr16 [S3] [S4] Htok Hout Hcmt Hnc Hhelp Hclose
+                      Hhook Hown Htc Hclm Hcg Hpc").
       { iExact "S3". }
       { iExact "S4". }
     - (* ============== NOT COMMITTING: test [outstanding] ================= *)
@@ -1474,7 +1633,6 @@ Section ProofSysSync.
       { iApply (ssi_22 with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hout".
       iEval (rewrite Houta) in "Hout".
-      iDestruct ("Hclose" with "Hout Hcmt Hnc") as "Hres".
       set (G4 := <[Regidx Ra5 := regval_into_reg
           (sign_extend' 64 (mword_of_int (Z.of_nat out) : mword 32))]> G3).
       change (<[Regidx Ra5 := regval_into_reg
@@ -1498,6 +1656,20 @@ Section ProofSysSync.
         by (apply bv_eq; vm_compute; reflexivity).
       destruct (Z.geb 0 (Z.of_nat out)) eqn:Hgb.
       + (* ---- FAST PATH: no operation is open, and none is committing ---- *)
+        (* THE GHOST COMMIT (sync K3-4, design sync.md §4.3 item 4): the log
+           is quiescent, so its loan and the era's token come out of the
+           idle arm, the caller's hook fires at a fresh durable pair, and
+           both go straight back -- the slot untouched (every entry is Done
+           at [cmt = false], [out = 0]). *)
+        assert (Hout0 : out = 0%nat).
+        { apply Z.geb_le in Hgb. lia. }
+        iDestruct "Hclose" as "[_ Hquiet]".
+        iDestruct ("Hquiet" with "[%] [%]") as (Lq Mq) "(Hq & Hstok & Hqclose)";
+          [exact Hout0 | reflexivity |].
+        iApply (ss_ghost_commit _ oQ γ bn γfs cov logstart dev Lq Mq
+                  with "Hlog Hq Hstok Hhook").
+        iIntros "Hq Hstok HQ".
+        iDestruct ("Hqclose" with "Hq Hstok Hout Hcmt Hnc Hhelp") as "Hres".
         iApply (wp_bge_x0_taken_s_sconf (mword_of_int (SS + 0x26)) (mword_of_int 56 : mword 13)
                   Ra5 G4 (trap_res eb + (K - 4))%nat false
                   ltac:(vm_compute; discriminate)
@@ -1509,11 +1681,14 @@ Section ProofSysSync.
         iEval (rewrite Htgt5e) in "Hpc".
         rewrite /ss_exit.
         iSpecialize ("Hexit" $! CIDa with "[%]"); [wp_next_chain|].
-        iApply ("Hexit" $! G4 with "[%] Hr24 Hr16 [S3] [S4] Htok Hres Hown Htc Hclm Hcg Hpc").
+        iApply ("Hexit" $! G4 with "[%] Hr24 Hr16 [S3] [S4] Htok Hres Hown Htc Hclm Hcg Hpc HQ").
         { exact HssG4. }
         { iExact "S3". }
         { iExact "S4". }
       + (* ---- SOMETHING IS PENDING: fall into the spill block ---- *)
+        assert (Hout0 : out ≠ 0%nat).
+        { intros ->. vm_compute in Hgb. discriminate. }
+        iDestruct "Hclose" as "[Hclose _]".
         iApply (wp_bge_x0_fall_s_sconf (mword_of_int (SS + 0x26)) (mword_of_int 56 : mword 13)
                   Ra5 G4 (trap_res eb + (K - 4))%nat false
                   ltac:(vm_compute; discriminate)
@@ -1525,8 +1700,10 @@ Section ProofSysSync.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp2a) in "Hpc".
         iApply (ss_entry_body (CID := CIDa) CID j γ bn γfs cov logstart m G4 K eb lks spd sp0
-                  HK ltac:(wp_next_chain) Hspd HssG4
-                  with "Htext Hloop Hexit Hr24 Hr16 [S3] [S4] Htok Hres Hown Htc Hclm Hcg Hpc").
+                  out false nc oQ
+                  HK ltac:(wp_next_chain) Hspd HssG4 (or_intror Hout0)
+                  with "Htext Hloop Hexit Hr24 Hr16 [S3] [S4] Htok Hout Hcmt Hnc Hhelp Hclose
+                        Hhook Hown Htc Hclm Hcg Hpc").
         { iExact "S3". }
         { iExact "S4". }
   Qed.

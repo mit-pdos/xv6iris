@@ -5819,10 +5819,13 @@ Section SyscallArms.
     iModIntro.
     iApply (SysSync.wp_sys_sync_sconf γs j γl fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev
-              M (av - 4)%nat true true ∅ 0%nat
+              M (av - 4)%nat true true ∅ 0%nat None
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
-              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb Hprocs").
-    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ Hpc".
+              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb [] Hprocs").
+    { (* NO HOOK at the dispatcher (sync K3-4): [hook_opt gen_id None] is
+         [emp], and so is the [Q_opt None] dropped below *)
+      rewrite /hook_opt /=. done. }
+    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ _ Hpc".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).
