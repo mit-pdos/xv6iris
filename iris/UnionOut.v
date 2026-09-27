@@ -75,6 +75,7 @@ Require Import UnionDiscDec.
 Require Import UnionDecU.          (* [lm_disc_ulmG_dec]: the ledger's counter *)
 Require Import UnionView.
 Require Import UnionOutPure.
+Require Import UnionAdm.           (* [ulines_of]: the ledger's full line list *)
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
@@ -497,11 +498,13 @@ Section union_out.
   (* =================================================================== *)
 
   (* [FileOut.ftag] at the union's discipline: the trace's shape, the
-     discipline or the taint, and a lower bound of the ledger's typed line
-     list -- which is how a typed line reaches the child's create step *)
+     discipline or the taint, and a lower bound of the ledger's line list
+     (EVERY complete line, [UnionAdm.ulines_of]; its redirect lines are
+     the projection, [UnionAdm.ulines_of_echof]) -- which is how a typed
+     line reaches the child's create step *)
   Definition utag (h : list mobs) : iProp Σ :=
     (⌜trace_shape h true⌝ ∗ (⌜lm_disc U h⌝ ∨ UT)
-     ∗ fl_lb (fgn_cl gf) (efl_of h))%I.
+     ∗ fl_lb (fgn_cl gf) (ulines_of h))%I.
 
   Global Instance utag_persistent h : Persistent (utag h).
   Proof using . rewrite /utag. apply _. Qed.
@@ -580,7 +583,7 @@ Section union_out.
      ∗ pin_map (fgn_echo gf) h
      ∗ f0_map gf h
      ∗ pera_map pg h
-     ∗ fl_auth (fgn_cl gf) (efl_of h)
+     ∗ fl_auth (fgn_cl gf) (ulines_of h)
      ∗ (union_phi_res h ∨ UT))%I.
 
   Global Instance union_led_timeless h : Timeless (union_led h).
@@ -596,8 +599,8 @@ Section union_out.
       /f0_map /pera_map.
     iIntros "[[[[Ht Hm] Hfl] Hmf] Hme]".
     rewrite decide_True; [| exact (lm_disc_nil U)].
-    rewrite (_ : efl_of [] = []); last first.
-    { rewrite /efl_of /echof_lines_of /cycles_of /cycles_rev /=. reflexivity. }
+    rewrite (_ : ulines_of [] = []); last first.
+    { rewrite /ulines_of /cycles_of /cycles_rev /=. reflexivity. }
     iFrame "Ht Hfl".
     iSplitL "Hm"; [iExists ∅; iFrame "Hm"; iPureIntro; apply pin_dom_empty |].
     iSplitL "Hmf"; [iExists ∅; iFrame "Hmf"; iPureIntro; apply pin_dom_empty |].
@@ -620,8 +623,8 @@ Section union_out.
     iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi)". rewrite /union_led.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat
                (lm_disc_power U h on union_st_ok)).
-    rewrite (_ : efl_of (h ++ [if on then ObsPowerOff else ObsPowerOn])
-                 = efl_of h); [| exact (efl_of_power h on)].
+    rewrite (_ : ulines_of (h ++ [if on then ObsPowerOff else ObsPowerOn])
+                 = ulines_of h); [| exact (ulines_of_power h on)].
     destruct on.
     - iDestruct (pin_map_step (fgn_echo gf) h ObsPowerOff eq_refl with "Hpm") as "Hpm".
       iDestruct (f0_map_step gf h ObsPowerOff eq_refl with "Hfm") as "Hfm".
@@ -677,8 +680,8 @@ Section union_out.
     iDestruct (pera_map_step pg h (ObsUartOut i b) eq_refl with "Hme") as "Hme".
     rewrite /union_led.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat (lm_disc_out U h i b Hsh)).
-    rewrite (_ : efl_of (h ++ [ObsUartOut i b]) = efl_of h);
-      [| exact (efl_of_out h i b Hsh)].
+    rewrite (_ : ulines_of (h ++ [ObsUartOut i b]) = ulines_of h);
+      [| exact (ulines_of_out h i b Hsh)].
     iFrame "Ht Hpm Hfm Hme".
     iDestruct "Hphi" as "[Hphi | HT]"; last first.
     { iModIntro. iFrame "Hfl". by iRight. }
@@ -694,8 +697,9 @@ Section union_out.
     iDestruct "Hgo" as "[#HT | Hgo]".
     { iModIntro. iFrame "Hfl". by iRight. }
     iDestruct "Hgo" as (s0 vf) "(%Hgo & #Hty & #Hfp & #Hlb)".
-    iDestruct (f0_typed_adm gf (echof_lines_of h) s0
+    iDestruct (f0_typed_adm gf (ulines_of h) s0
                  with "Hfl Hty") as "[Hfl %Hadm]".
+    rewrite ulines_of_echof in Hadm.
     iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
                exists u1, s0s = u1 ++ [s0]⌝)%I as "%Hlast".
     { destruct (decide (obs_wire Uart0 (open_seg h) = [])) as [Hw | Hw].
@@ -723,8 +727,8 @@ Section union_out.
                  with "Hpm") as "Hpm".
     iDestruct (f0_map_step gf h (ObsUartIn i b) eq_refl with "Hfm") as "Hfm".
     iDestruct (pera_map_step pg h (ObsUartIn i b) eq_refl with "Hme") as "Hme".
-    iMod (fl_auth_grow_pre gf (efl_of h) (efl_of (h ++ [ObsUartIn i b]))
-            (efl_of_snoc h (ObsUartIn i b)) with "Hfl")
+    iMod (fl_auth_grow_pre gf (ulines_of h) (ulines_of (h ++ [ObsUartIn i b]))
+            (ulines_of_snoc h (ObsUartIn i b)) with "Hfl")
       as "[Hfl #Hfllb]".
     assert (Hin : lm_disc U (h ++ [ObsUartIn i b]) -> lm_disc U h).
     { destruct i;

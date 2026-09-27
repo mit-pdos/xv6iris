@@ -100,15 +100,26 @@ Local Open Scope Z_scope.
 (* a typed line, as the console sees it: the words of one [echo … > N] *)
 Definition wordline : Type := list (list (bv 8)).
 
-(* ...AND THE LINE THE LEDGER FILES: the file the line redirects to beside
-   its words -- the model's [FileDisc.echof_ws] shape, so the ledger's list
-   IS the history's [FileDisc.echof_lines_of] (cut W2 of
-   claude-notes/design/filenames.md) *)
+(* ...AND A REDIRECT LINE AS THE FILE MODEL READS IT: the file the line
+   redirects to beside its words -- the model's [FileDisc.echof_ws] shape
+   (cut W2 of claude-notes/design/filenames.md) *)
 Definition fwline : Type := list (bv 8) * wordline.
 
+(* THE LINE THE LEDGER FILES: EVERY complete line, as the model parses it
+   (a [sync] line an entry like a redirect, sync design section 4.5), so a
+   lower bound ending in a line names that line's global position; the
+   redirect lines are the list's projection ([fl_redirs]) *)
+Definition fl_line : Type := FileDisc.uline.
+
+Notation fl_redirs ls := (omap FileDisc.echof_ws ls).
+
+Lemma fl_redirs_prefix (ls ls' : list fl_line) :
+  ls `prefix_of` ls' -> fl_redirs ls `prefix_of` fl_redirs ls'.
+Proof using . intros [z ->]. rewrite omap_app. by eexists. Qed.
+
 (* THE FIXED PART: echo's (the taint counter and the era map) beside the
-   LINE LIST's name -- a [mono_list] of the [echo … > N] lines the console
-   has received, in order, whose authority the ledger keeps and whose
+   LINE LIST's name -- a [mono_list] of the complete lines ([fl_line]) the
+   console has received, in order, whose authority the ledger keeps and whose
    lower bounds ride the input tag (design section 4). *)
 Definition file_fixed : Type := echo_fixed * gname.
 
@@ -151,13 +162,13 @@ Definition esc_rec : Type := dst * gname.
 
 Class fileAppG (Σ : gFunctors) := FileAppG {
   fa_deed : ghost_varG Σ dst;
-  fa_fl   : inG Σ (mono_listR (leibnizO fwline));
+  fa_fl   : inG Σ (mono_listR (leibnizO fl_line));
   fa_esc  : inG Σ (mono_listR (leibnizO esc_rec));
 }.
 #[global] Existing Instances fa_deed fa_fl fa_esc.
 
 Definition fileAppΣ : gFunctors :=
-  #[ ghost_varΣ dst; GFunctor (mono_listR (leibnizO fwline));
+  #[ ghost_varΣ dst; GFunctor (mono_listR (leibnizO fl_line));
      GFunctor (mono_listR (leibnizO esc_rec)) ].
 
 Global Instance subG_fileAppΣ {Σ} : subG fileAppΣ Σ -> fileAppG Σ.
@@ -181,11 +192,11 @@ Section FileClaim.
   (*  1b.  THE LINE LIST: authority (the ledger's) and lower bounds     *)
   (* ---------------------------------------------------------------- *)
 
-  Definition fl_auth (c : file_fixed) (ls : list fwline) : iProp Σ :=
-    own c.2 (●ML (ls : list (leibnizO fwline))).
+  Definition fl_auth (c : file_fixed) (ls : list fl_line) : iProp Σ :=
+    own c.2 (●ML (ls : list (leibnizO fl_line))).
 
-  Definition fl_lb (c : file_fixed) (ls : list fwline) : iProp Σ :=
-    own c.2 (◯ML (ls : list (leibnizO fwline))).
+  Definition fl_lb (c : file_fixed) (ls : list fl_line) : iProp Σ :=
+    own c.2 (◯ML (ls : list (leibnizO fl_line))).
 
   Global Instance fl_lb_persistent c ls : Persistent (fl_lb c ls).
   Proof using . rewrite /fl_lb. apply _. Qed.
@@ -194,16 +205,16 @@ Section FileClaim.
   Global Instance fl_auth_timeless c ls : Timeless (fl_auth c ls).
   Proof using . rewrite /fl_auth. apply _. Qed.
 
-  Lemma fl_auth_lb (c : file_fixed) (ls : list fwline) :
+  Lemma fl_auth_lb (c : file_fixed) (ls : list fl_line) :
     fl_auth c ls -∗ fl_auth c ls ∗ fl_lb c ls.
   Proof using .
     rewrite /fl_auth /fl_lb. iIntros "Ha".
-    iDestruct (own_mono _ _ (◯ML (ls : list (leibnizO fwline))) with "Ha")
+    iDestruct (own_mono _ _ (◯ML (ls : list (leibnizO fl_line))) with "Ha")
       as "#Hb"; [ apply mono_list_included |].
     iFrame "Ha Hb".
   Qed.
 
-  Lemma fl_lb_prefix (c : file_fixed) (ls ls' : list fwline) :
+  Lemma fl_lb_prefix (c : file_fixed) (ls ls' : list fl_line) :
     fl_auth c ls -∗ fl_lb c ls' -∗ ⌜ls' `prefix_of` ls⌝.
   Proof using .
     rewrite /fl_auth /fl_lb. iIntros "Ha Hb".
@@ -212,7 +223,7 @@ Section FileClaim.
   Qed.
 
   (* two lower bounds of one list are comparable *)
-  Lemma fl_lb_lb (c : file_fixed) (ls ls' : list fwline) :
+  Lemma fl_lb_lb (c : file_fixed) (ls ls' : list fl_line) :
     fl_lb c ls -∗ fl_lb c ls' -∗ ⌜ls `prefix_of` ls' \/ ls' `prefix_of` ls⌝.
   Proof using .
     rewrite /fl_lb. iIntros "Ha Hb".
@@ -220,11 +231,11 @@ Section FileClaim.
     by iPureIntro.
   Qed.
 
-  Lemma fl_auth_grow (c : file_fixed) (ls : list fwline) (ws : fwline) :
+  Lemma fl_auth_grow (c : file_fixed) (ls : list fl_line) (ws : fl_line) :
     fl_auth c ls ==∗ fl_auth c (ls ++ [ws]) ∗ fl_lb c (ls ++ [ws]).
   Proof using .
     rewrite /fl_auth. iIntros "Ha".
-    iMod (own_update _ _ (●ML ((ls ++ [ws]) : list (leibnizO fwline)))
+    iMod (own_update _ _ (●ML ((ls ++ [ws]) : list (leibnizO fl_line)))
             with "Ha") as "Ha".
     { apply mono_list_update. by exists [ws]. }
     iModIntro. iApply (fl_auth_lb with "Ha").
@@ -237,7 +248,7 @@ Section FileClaim.
   Lemma file_birth : ⊢ |==> ∃ c : file_fixed, file_cl c.
   Proof using .
     iMod echo_birth as (γ) "He".
-    iMod (own_alloc (●ML ([] : list (leibnizO fwline)))) as (g) "Hl";
+    iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (g) "Hl";
       [ apply mono_list_auth_valid |].
     iModIntro. iExists (γ, g). rewrite /file_cl /fl_auth /=. iFrame "He Hl".
   Qed.
@@ -667,9 +678,10 @@ Section FileClaim.
      holds no file. *)
   Definition f_typed (c : file_fixed) (s : dst) : iProp Σ :=
     (⌜s = ∅⌝
-     ∨ ∃ ls : list fwline,
+     ∨ ∃ ls : list fl_line,
          fl_lb c ls
-         ∗ ⌜map_Forall (fun N p => FileDisc.uname N /\ f_bytes_typed ls N p.2) s⌝)%I.
+         ∗ ⌜map_Forall (fun N p => FileDisc.uname N
+                                   /\ f_bytes_typed (fl_redirs ls) N p.2) s⌝)%I.
 
   Global Instance f_typed_persistent c s : Persistent (f_typed c s).
   Proof using . rewrite /f_typed. apply _. Qed.
@@ -683,7 +695,7 @@ Section FileClaim.
   Lemma f_typed_lookup (c : file_fixed) (s : dst) (N : fname) (i : Z)
       (bs : list (bv 8)) :
     s !! N = Some (i, bs) ->
-    f_typed c s -∗ ∃ ls : list fwline, fl_lb c ls ∗ ⌜f_bytes_typed ls N bs⌝.
+    f_typed c s -∗ ∃ ls : list fl_line, fl_lb c ls ∗ ⌜f_bytes_typed (fl_redirs ls) N bs⌝.
   Proof using .
     intros Hs. rewrite /f_typed. iIntros "[%He | (%ls & Hlb & %Hall)]".
     { subst s. by rewrite lookup_empty in Hs. }
@@ -694,9 +706,9 @@ Section FileClaim.
      entry it wrote, typed at a lower bound of its own, joins the rest --
      two lower bounds of one list are comparable, and the longer serves
      both *)
-  Lemma f_typed_insert (c : file_fixed) (s : dst) (ls : list fwline)
+  Lemma f_typed_insert (c : file_fixed) (s : dst) (ls : list fl_line)
       (N : fname) (i : Z) (bs : list (bv 8)) :
-    FileDisc.uname N -> f_bytes_typed ls N bs ->
+    FileDisc.uname N -> f_bytes_typed (fl_redirs ls) N bs ->
     f_typed c s -∗ fl_lb c ls -∗ f_typed c (<[N := (i, bs)]> s).
   Proof using .
     intros HN Hbt. iIntros "Hty #Hlb". rewrite /f_typed.
@@ -706,19 +718,19 @@ Section FileClaim.
     iDestruct (fl_lb_lb with "Hlb Hlb0") as %[Hp | Hp].
     - iRight. iExists ls0. iFrame "Hlb0". iPureIntro.
       apply map_Forall_insert_2;
-        [split; [exact HN | exact (f_bytes_typed_mono ls ls0 N bs Hp Hbt)] |].
+        [split; [exact HN | exact (f_bytes_typed_mono _ _ N bs (fl_redirs_prefix ls ls0 Hp) Hbt)] |].
       exact Hall.
     - iRight. iExists ls. iFrame "Hlb". iPureIntro.
       apply map_Forall_insert_2; [by split |].
       intros M p Hp'. destruct (Hall M p Hp') as [HM Hb].
-      split; [exact HM | exact (f_bytes_typed_mono ls0 ls M p.2 Hp Hb)].
+      split; [exact HM | exact (f_bytes_typed_mono _ _ M p.2 (fl_redirs_prefix ls0 ls Hp) Hb)].
   Qed.
 
   (* ...at a chunk subset of a line the list holds *)
-  Lemma f_typed_some (c : file_fixed) (s : dst) (ls : list fwline) (N : fname)
+  Lemma f_typed_some (c : file_fixed) (s : dst) (ls : list fl_line) (N : fname)
       (ws : wordline) (sel : list nat) (i : Z) :
     FileDisc.uname N ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws -> sel_ok (echo_chunks ws) sel ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws -> sel_ok (echo_chunks ws) sel ->
     f_typed c s -∗ fl_lb c ls -∗
     f_typed c (<[N := (i, subseq (echo_chunks ws) sel)]> s).
   Proof using .

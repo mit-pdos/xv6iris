@@ -385,7 +385,7 @@ Section UShUPipes.
       change (snd <$> (s !! nm) = Some c) in Hc.
       destruct (s !! nm) as [[i0 bs0] |] eqn:Hs; [| discriminate Hc].
       injection Hc as <-. destruct (Hall nm (i0, bs0) Hs) as [_ Hbt].
-      pose proof (FileDeltas.f_bytes_typed_short ls0 nm bs0 Hbt) as Hb.
+      pose proof (FileDeltas.f_bytes_typed_short _ nm bs0 Hbt) as Hb.
       unfold EchoDisc.line_max in Hb. lia.
   Qed.
 

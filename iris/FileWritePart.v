@@ -124,7 +124,7 @@ Section FileWritePart.
     (* ...and the content is a line's worth, so the chunk does NOT straddle *)
     iDestruct "Hq" as (ls) "(_ & _ & %Hline & %Hsel & _ & %Hin)".
     iExFalso. iPureIntro. apply Hns.
-    pose proof (f_bytes_typed_short ls N (subseq (echo_chunks ws) sel)
+    pose proof (f_bytes_typed_short (fl_redirs ls) N (subseq (echo_chunks ws) sel)
                   (ex_intro _ ws (ex_intro _ sel
                      (conj Hin (conj Hline (conj Hsel eq_refl)))))) as Hshort.
     apply fwp_single_block; [ exact Hnpos | ].

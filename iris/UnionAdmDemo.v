@@ -3,7 +3,7 @@
 (*  (lane SY3-M; design: claude-notes/design/sync.md section 5).  PURE.   *)
 (*                                                                        *)
 (*  Four two-cycle histories, each [power on; cycle 0; power off; power  *)
-(*  on; cycle 1], the conclusion [UnionOutPure.union_phi_body] read at   *)
+(*  on; cycle 1], the conclusion [UnionOutPure.union_phi_sync_body] read at *)
 (*  them:                                                                 *)
 (*    - POSITIVE: [echo a > a.txt; echo b > a.txt; sync; <cut>; cat      *)
 (*      a.txt] printing [b] is admitted ([demo_sync_cut]);               *)
@@ -175,9 +175,9 @@ Proof using.
 Qed.
 
 Theorem demo_sync_cut :
-  union_phi_body h_sb [(∅, Some (3, st_b)); (st_b, None)].
+  union_phi_sync_body h_sb [(∅, Some (3, st_b)); (st_b, None)].
 Proof using.
-  rewrite /union_phi_body.
+  rewrite /union_phi_sync_body.
   assert (Hr : ulast_before h_sb (snd <$> [(∅, Some (3, st_b)); (st_b, None)]) 1 = (3, st_b))
     by (vm_compute; reflexivity).
   split_and!.
@@ -189,9 +189,9 @@ Proof using.
     constructor; [exact c1_good_b | constructor].
 Qed.
 
-Corollary demo_sync_cut_phi : union_phi h_sb.
+Corollary demo_sync_cut_phi : union_phi_sync h_sb.
 Proof using.
-  apply (union_phi_of_body h_sb [(∅, Some (3, st_b)); (st_b, None)]).
+  apply (union_phi_sync_of_body h_sb [(∅, Some (3, st_b)); (st_b, None)]).
   intros _. exact demo_sync_cut.
 Qed.
 
@@ -381,7 +381,7 @@ Proof using.
   exact (ab_cat_head _ r sel _ _ Hok0 Hsel Hst Hh ltac:(vm_compute; reflexivity)).
 Qed.
 
-Theorem demo_sync_cut_neg : forall W, ~ union_phi_body h_sa W.
+Theorem demo_sync_cut_neg : forall W, ~ union_phi_sync_body h_sa W.
 Proof using.
   intros W (Hlen & H0 & Hadm & HF).
   rewrite cyc_sa in Hlen HF.
@@ -432,9 +432,9 @@ Proof using.
 Qed.
 
 Theorem demo_nosync_cut :
-  union_phi_body h_na [(∅, None); (st_a, None)].
+  union_phi_sync_body h_na [(∅, None); (st_a, None)].
 Proof using.
-  rewrite /union_phi_body.
+  rewrite /union_phi_sync_body.
   split_and!.
   - by rewrite cyc_na.
   - intros w Hw. injection Hw as <-. reflexivity.
@@ -463,9 +463,9 @@ Proof using.
 Qed.
 
 Theorem demo_sync_inflight :
-  union_phi_body h_fa [(∅, None); (st_a, None)].
+  union_phi_sync_body h_fa [(∅, None); (st_a, None)].
 Proof using.
-  rewrite /union_phi_body.
+  rewrite /union_phi_sync_body.
   split_and!.
   - by rewrite cyc_fa.
   - intros w Hw. injection Hw as <-. reflexivity.

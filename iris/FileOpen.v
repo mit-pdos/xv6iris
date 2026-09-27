@@ -499,10 +499,10 @@ Section FileOpen.
      view, so no other file holds it ([f_ok_fresh]). *)
   Lemma file_acre_commit (γfs : fs_names) (c : file_fixed) (r : file_names)
       (jo : option Z) (n : nat) (N : fname) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline) :
+      (ls : list fl_line) (ws : wordline) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     acre_commit_at_gen_nm (fs_gamma_L γfs) appE (fun _ _ => AFile [])
@@ -600,7 +600,7 @@ Section FileOpen.
       as %Hshort.
     { iIntros (N i bs Hs).
       iDestruct (f_typed_lookup c s N i bs Hs with "Hty") as (ls) "[_ %Hbt]".
-      iPureIntro. exact (f_bytes_typed_short ls N bs Hbt). }
+      iPureIntro. exact (f_bytes_typed_short _ N bs Hbt). }
     iPureIntro. split; [ exact Hpins |]. intros N i HN Hst.
     destruct (s !! N) as [[i0 bs0] |] eqn:Hs.
     - destruct (f_ok_pin v s N i0 bs0 Hok Hs) as (Hst0 & Hrow0).
@@ -866,13 +866,13 @@ Section FileOpen.
      and resync. *)
   Lemma file_trunc_of_exists (γfs : fs_names) (c : file_fixed) (r : file_names)
       (jo : option Z) (n : nat) (N : fname) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline)
+      (ls : list fl_line) (ws : wordline)
       (i : Z) (avx : aview) (entsx : gmap fname Z) (nlx : nat) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
     avx !! FsImg.ROOTINO = Some (MkAnode (ADir entsx) nlx) ->
     entsx !! N = Some i ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     ((⌜fclaim_free avx⌝ ∗ (⌜f_ok avx s⌝ ∨ esc_spent g)) ∨ file_taint c) -∗
@@ -975,13 +975,13 @@ Section FileOpen.
 
   Lemma file_trunc_piece (γfs : fs_names) (c : file_fixed) (r : file_names)
       (jo : option Z) (n : nat) (N : fname) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline)
+      (ls : list fl_line) (ws : wordline)
       (M : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
     arg_path_of M pv pl ->
     list_basics.last (path_elems pl) = Some N ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     pf_at (atrunc_of_permit (fs_gamma_L γfs) appE
@@ -1044,7 +1044,7 @@ Section FileOpen.
      F-OK's found DEVICE. *)
   Lemma file_open_create_au (γfs : fs_names) (c : file_fixed) (r : file_names)
       (jo : option Z) (n : nat) (N : fname) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline)
+      (ls : list fl_line) (ws : wordline)
       (cw : Z) (M : gmap Z (bv 8)) (pv vom : mword 64) (pl : list (bv 8)) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
@@ -1052,7 +1052,7 @@ Section FileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = ROOTINO ->
     list_basics.last (path_elems pl) = Some N ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g -∗
     open_au_create_at (fs_gamma_L γfs) γfs cw M pv vom
@@ -1125,7 +1125,7 @@ Section FileOpen.
      premise, kept only so a caller at 0x201 need not read the guard. *)
   Lemma file_open_create_au_notrunc (γfs : fs_names) (c : file_fixed)
       (r : file_names) (jo : option Z) (n : nat) (N : fname) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline)
+      (ls : list fl_line) (ws : wordline)
       (cw : Z) (M : gmap Z (bv 8)) (pv vom : mword 64) (pl : list (bv 8)) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
@@ -1134,7 +1134,7 @@ Section FileOpen.
     um_start_of cw pl = ROOTINO ->
     list_basics.last (path_elems pl) = Some N ->
     om_trunc vom = false ->
-    (N, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (N, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g -∗
     open_au_create_at (fs_gamma_L γfs) γfs cw M pv vom

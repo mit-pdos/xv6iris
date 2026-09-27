@@ -312,12 +312,12 @@ Section FileWrite.
      by the writes, and the line the chunks come from is typed at [N]. *)
   Definition file_wq (c : file_fixed) (r : file_names) (N : fname) (s : dst)
       (i : Z) (ws : wordline) (sel : list nat) (off : nat) : iProp Σ :=
-    ((∃ ls : list fwline,
+    ((∃ ls : list fl_line,
         fown r (<[N := (i, subseq (echo_chunks ws) sel)]> s)
         ∗ ⌜off = length (subseq (echo_chunks ws) sel)⌝
         ∗ ⌜EchoDisc.line_ok ws⌝
         ∗ ⌜sel_ok (echo_chunks ws) sel⌝
-        ∗ fl_lb c ls ∗ ⌜(N, ws) ∈ ls⌝)
+        ∗ fl_lb c ls ∗ ⌜(N, ws) ∈ fl_redirs ls⌝)
      ∨ file_taint c)%I.
 
   (* the tainted fire's step, [TreeMove.tree_app_step_taint]'s twin *)

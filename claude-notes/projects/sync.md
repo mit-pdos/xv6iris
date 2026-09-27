@@ -40,15 +40,13 @@ Open cleanups it left, none blocking:
   `AppDur.app_dur_raw_merge`; every application derives the merge from its
   transport at `SystemAdequacy`'s call of `xv6_boot_era` (`Happ_merge`)).
   Merged at `966c6d815`; whole tree green, audits 13/13/14.
-- ON BRANCH `sync3-m` (worktree `/shared/xv6iris-3m`, `855896fb8`, based on
-  `2bbb6fdf5`; NOT on main because the ledger above it is red until SY3-A):
-  the pure model -- `iris/UnionAdm.v` (line list `ulines_of`, records
-  `srec`, `uadm`, `srec_le`, the shrink lemmas, `usync_last`,
-  `lm_good_sync`), `iris/UnionOutPure.v` (the new `union_phi` over `W :
-  list (fstate * option srec)` and its four ledger step lemmas),
-  `iris/UnionAdmDemo.v` (the four demos, including the NEGATIVE
-  `demo_sync_cut_neg`), and design §5 "as built".  First red file:
-  `UnionOut.v` line ~572 (`union_phi_res`).
+- The pure model (lane SY3-M, branch `sync3-m` at `855896fb8`, merged by
+  A2): `iris/UnionAdm.v` (line list `ulines_of`, records `srec`, `uadm`,
+  `srec_le`, the shrink lemmas, `usync_last`, `lm_good_sync`),
+  `iris/UnionOutPure.v` section 3 (`union_phi_sync` over `W : list
+  (fstate * option srec)` and its ledger step lemmas, beside the landed
+  `union_phi`), `iris/UnionAdmDemo.v` (the four demos, including the
+  NEGATIVE `demo_sync_cut_neg`), design §5 "as built".
 - NOT STARTED: K3 (four sub-lanes K3-1..K3-4 below; its rulings are in
   design §4.2-4.3), K4 (the dispatcher's arm 22 and `/sync`'s payload),
   A (the application side and the ledger).
@@ -108,8 +106,16 @@ Cleanups left for a later sweep (none blocking): the old `flushed_sync`
 receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
 `WpSconfBtype`; the trivial `Tk`/`Hk` values spelled inside two adequacy
 statements until SY3-A1 moves them onto the `App` record.
-SY3-A: A1 and A2 in flight (branches `sync3-a1` in `/shared/xv6iris-3k`,
-`sync3-a2` in `/shared/xv6iris-3n`); A3, A4 after both.
+SY3-A: A1 in flight (branch `sync3-a1` in `/shared/xv6iris-3k`).  A2 DONE
+on branch `sync3-a2` (`/shared/xv6iris-3n`, awaiting the owner's landing):
+`sync3-m` merged; the full line list (`AppFile.fl_line := FileDisc.uline`,
+readers through `fl_redirs ls = omap FileDisc.echof_ws ls`, the union's
+ledger and tag at `UnionAdm.ulines_of`); RULING at A2's stop (owner): the
+ledger and `union_adequacy_closed` KEEP the landed `UnionOutPure.union_phi`
+(over `s0s`), the model's body lands beside it as `union_phi_sync`
+(`union_phi_sync_body` and its steps; the demos state it) -- a completed
+sync forces the drain to file `Some r` (`lm_good_sync`), so the switch of
+the conclusion, and that filing, is A4's.  A3, A4 after A1 and A2.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
@@ -444,7 +450,12 @@ on-arm's allocation/registration/yield; `/init`'s filing through `f0_bl`
 (extended with the persistent fragment and the pure fact; `fturn_file`
 takes them); `union_led_tx` reads them: `F_{k+1} := Ls_c` and the model's
 boot relation `uadm (ulines_before h (S k)) r_m s0` with `r_m = last F_k`
-(`union_phi_body_drain`'s premise -- still with every filed `o = None`).
+(`union_phi_sync_body_drain`'s premise).  A3 KEEPS the landed conclusion
+(`union_phi` over `s0s`, the ledger and `union_adequacy_closed` as A2
+left them): the per-cycle record is forced by the resolution
+(`lm_good_sync`'s `o = usync_last …`, and `sync` admits `RSyncRan`), so
+no ledger can file `o = None` after a completed sync -- the new body is
+provable only with sh's filing, A4.
 Acceptance: green; `union_adequacy_closed` unchanged from A2; risks R5
 (the count `Hswap` lends), R6 (`file_pred` stays Timeless), R7 (the
 transport's `▷`: the copy's sync part is timeless and comes out of the
@@ -461,7 +472,11 @@ ls', fcontent av)⌝`, the hook proved by sh from its lend (the deed, `f_ok`,
 `flw` over the full list); sh files `Q` at the round's prompt
 (`uksh_w_prompt_pend`'s `RSyncRan` arm) into the console claim; the drain
 carries it; `union_led_tx` extends the floor and files `o := Some r` with
-the model's `usync_last` (`lm_good_sync`); `demo_sync_cut_neg` is the
+the model's `usync_last` (`lm_good_sync`); the ledger and `union_adequacy_closed` SWITCH from the landed
+`union_phi` to `UnionOutPure.union_phi_sync` (its `_step_io`/`_off`/`_on`/
+`_drain` steps; the drain files the forced `Some r` whenever the cycle's
+resolution completed a sync, the next era's first drain meets `uadm` at
+it through the floor); `demo_sync_cut_neg` is the
 theorem's negative witness (a `Corollary` beside `union_adequacy_closed`);
 design §3-§5 "as built"; the state block here; `completed/` gets the
 narrative when the whole effort closes.

@@ -118,6 +118,38 @@ Proof using.
   - rewrite app_assoc. etrans; [exact IH | apply ulines_of_snoc].
 Qed.
 
+(* an event that completes no line leaves the list ([echof_lines_of_io]'s
+   twin): console output, and the power steps *)
+Lemma ulines_of_io (h : list mobs) (e : mobs) :
+  trace_shape h true -> is_io e = true -> ins [e] = [] ->
+  ulines_of (h ++ [e]) = ulines_of h.
+Proof using.
+  intros Hsh Hio Hin.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  rewrite /ulines_of H1 H2 !fmap_app !concat_app.
+  f_equal. cbn [fmap list_fmap concat].
+  rewrite /ulines_cyc ins_app Hin (app_nil_r (ins (open_seg h))).
+  reflexivity.
+Qed.
+
+Lemma ulines_of_out (h : list mobs) (i : uart_id) (b : bv 8) :
+  trace_shape h true -> ulines_of (h ++ [ObsUartOut i b]) = ulines_of h.
+Proof using.
+  intros Hsh. apply ulines_of_io; [exact Hsh | by destruct i | by destruct i].
+Qed.
+
+Lemma ulines_of_power (h : list mobs) (on : bool) :
+  ulines_of (h ++ [if on then ObsPowerOff else ObsPowerOn]) = ulines_of h.
+Proof using.
+  rewrite /ulines_of. destruct on.
+  - by rewrite cycles_of_off.
+  - rewrite cycles_of_on fmap_app concat_app.
+    cbn [fmap list_fmap concat]. rewrite /ulines_cyc.
+    rewrite (_ : ins [] = []); [| reflexivity].
+    rewrite /ulines_in bodies_of_nil fmap_nil.
+    by rewrite !app_nil_r.
+Qed.
+
 Lemma ulines_before_cut (h : list mobs) (cs : list (list mobs)) (o : list mobs) :
   cycles_of h = cs ++ [o] -> ulines_before h (length cs) = concat (ulines_cyc <$> cs).
 Proof using. intros Hc. rewrite /ulines_before Hc take_app_length. reflexivity. Qed.

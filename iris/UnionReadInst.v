@@ -39,6 +39,7 @@ Require Import PipeOut.           (* [pipeOutG]: the section binds it *)
 Require Import PipesLinksV.
 Require Import UnionDisc.
 Require Import UnionOut.
+Require Import UnionAdm.           (* [ulines_of], [ulines_of_echof] *)
 Require Import UnionLinks.
 Require Import UnionLinkInst.
 Require Import GenLinksLine.
@@ -259,9 +260,9 @@ Section union_read_inst.
       iEval (rewrite Htag /utag) in "Hty".
       iDestruct "Hty" as "(%Hsh & _ & #Hfl)".
       iLeft. rewrite /flw. iRight.
-      iExists (efl_of y.1). iFrame "Hfl". iPureIntro.
+      iExists (ulines_of y.1). iFrame "Hfl". iPureIntro.
       intros w Hw. rewrite <- HJ in Hw. destruct y as [hy cy].
-      rewrite /efl_of.
+      cbn [fst]. rewrite ulines_of_echof.
       apply (echof_lines_of_consumed (S gen_id) (dl ++ ws) hy cy w).
       - rewrite /seg_of.
         destruct Hpref as [z Hz].

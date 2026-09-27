@@ -294,9 +294,9 @@ Section file_out.
      name otherwise (cut W2 of claude-notes/design/filenames.md) *)
   Definition f0_typed (s : fstate) : iProp Σ :=
     (⌜s = ∅⌝
-     ∨ ∃ ls : list fwline,
+     ∨ ∃ ls : list fl_line,
          fl_lb (fgn_cl g) ls
-         ∗ ⌜map_Forall (fun N bs => uname N /\ f_bytes_typed ls N bs) s⌝)%I.
+         ∗ ⌜map_Forall (fun N bs => uname N /\ f_bytes_typed (fl_redirs ls) N bs) s⌝)%I.
 
   Global Instance f0_typed_persistent s : Persistent (f0_typed s).
   Proof using . rewrite /f0_typed. apply _. Qed.
@@ -407,8 +407,17 @@ Section file_out.
   Proof using . rewrite /fecl. apply _. Qed.
 
   (* THE LINE LIST the console has received, as a pure function of the
-     history: the words of every complete [echo … > f] line, in order. *)
-  Definition efl_of (h : list mobs) : list fwline := echof_lines_of h.
+     history: every complete line, in order, as the file model parses it;
+     its redirect lines are [echof_lines_of h] ([efl_of_echof]). *)
+  Definition efl_of (h : list mobs) : list fl_line :=
+    concat ((fun seg => lines_of (ins seg)) <$> cycles_of h).
+
+  Lemma efl_of_echof (h : list mobs) : fl_redirs (efl_of h) = echof_lines_of h.
+  Proof using .
+    rewrite /efl_of /echof_lines_of /echof_cyc /echof_lines_in.
+    induction (cycles_of h) as [| seg segs IH]; [reflexivity |].
+    by rewrite /= omap_app IH.
+  Qed.
 
   (* THE TAG: [EchoOut.etag] at the FILE discipline, with a lower bound of
      the ledger's line list beside it -- which is how a typed line reaches
@@ -523,7 +532,14 @@ Section file_out.
   Lemma efl_of_io (h : list mobs) (e : mobs) :
     trace_shape h true -> is_io e = true -> ins [e] = [] ->
     efl_of (h ++ [e]) = efl_of h.
-  Proof using . intros Hsh Hio Hin. by rewrite /efl_of echof_lines_of_io. Qed.
+  Proof using .
+    intros Hsh Hio Hin.
+    destruct (cycles_of_io h [e] Hsh (io_singleton e Hio)) as (cs & H1 & H2).
+    rewrite /efl_of H1 H2 !fmap_app !concat_app.
+    f_equal. cbn [fmap list_fmap concat].
+    rewrite ins_app Hin (app_nil_r (ins (open_seg h))).
+    reflexivity.
+  Qed.
 
   Lemma efl_of_out (h : list mobs) (i : uart_id) (b : bv 8) :
     trace_shape h true -> efl_of (h ++ [ObsUartOut i b]) = efl_of h.
@@ -537,10 +553,28 @@ Section file_out.
     intros Hsh. apply echof_lines_of_io; [exact Hsh | by destruct i | by destruct i].
   Qed.
 
+  Lemma efl_cyc_app (seg k : list mobs) :
+    lines_of (ins seg) `prefix_of` lines_of (ins (seg ++ k)).
+  Proof using .
+    rewrite ins_app /lines_of. destruct (bodies_of_app (ins seg) (ins k)) as [z Hz].
+    rewrite Hz fmap_app. by eexists.
+  Qed.
+
   Lemma efl_of_snoc (h : list mobs) (e : mobs) : efl_of h `prefix_of` efl_of (h ++ [e]).
   Proof using .
-    destruct (echof_lines_of_snoc h e) as [z Hz]. exists z.
-    by rewrite /efl_of Hz.
+    rewrite /efl_of /cycles_of cycles_rev_app /=.
+    destruct e as [i b | i b | |]; cbn [cyc_step].
+    - destruct (cycles_rev h) as [| c cs].
+      + rewrite /=. apply prefix_nil.
+      + cbn [rev]. rewrite !fmap_app !concat_app /=.
+        rewrite !app_nil_r. apply prefix_app, efl_cyc_app.
+    - destruct (cycles_rev h) as [| c cs].
+      + rewrite /=. apply prefix_nil.
+      + cbn [rev]. rewrite !fmap_app !concat_app /=.
+        rewrite !app_nil_r. apply prefix_app, efl_cyc_app.
+    - cbn [rev]. rewrite fmap_app concat_app.
+      apply prefix_app_r. reflexivity.
+    - reflexivity.
   Qed.
 
   Lemma echof_lines_of_power (h : list mobs) (on : bool) :
@@ -557,7 +591,15 @@ Section file_out.
 
   Lemma efl_of_power (h : list mobs) (on : bool) :
     efl_of (h ++ [if on then ObsPowerOff else ObsPowerOn]) = efl_of h.
-  Proof using . by rewrite /efl_of echof_lines_of_power. Qed.
+  Proof using .
+    rewrite /efl_of. destruct on.
+    - by rewrite cycles_of_off.
+    - rewrite cycles_of_on fmap_app concat_app.
+      cbn [fmap list_fmap concat].
+      rewrite (_ : ins [] = []); [| reflexivity].
+      rewrite /lines_of bodies_of_nil fmap_nil.
+      by rewrite !app_nil_r.
+  Qed.
 
 
   (* ---- THE ERA'S PIN IN THE LEDGER.
@@ -646,27 +688,27 @@ Section file_out.
 
 
   (* the deed's typed witness, read against the ledger's own line list *)
-  Lemma f0_typed_adm (Lp : list fwline) (s0 : fstate) :
+  Lemma f0_typed_adm (Lp : list fl_line) (s0 : fstate) :
     fl_auth (fgn_cl g) Lp -∗ f0_typed s0 -∗
-      fl_auth (fgn_cl g) Lp ∗ ⌜fadm_boot Lp s0⌝.
+      fl_auth (fgn_cl g) Lp ∗ ⌜fadm_boot (fl_redirs Lp) s0⌝.
   Proof using .
     iIntros "Ha [%He | (%ls & Hlb & %Hall)]".
     { subst s0. iFrame "Ha". iPureIntro. apply fadm_boot_empty. }
     iDestruct (fl_lb_prefix with "Ha Hlb") as %Hpre.
     iFrame "Ha". iPureIntro. intros N bs Hs.
-    destruct (f_bytes_typed_mono ls _ N bs Hpre (proj2 (Hall N bs Hs)))
+    destruct (f_bytes_typed_mono _ _ N bs (fl_redirs_prefix _ _ Hpre) (proj2 (Hall N bs Hs)))
       as (ws & sel & Hin & _ & Hsel & ->).
     by exists ws, sel.
   Qed.
 
   (* the line list grows by whatever the new input completed *)
-  Lemma fl_auth_grow_pre (ls ls' : list fwline) :
+  Lemma fl_auth_grow_pre (ls ls' : list fl_line) :
     ls `prefix_of` ls' ->
     fl_auth (fgn_cl g) ls ==∗
       fl_auth (fgn_cl g) ls' ∗ fl_lb (fgn_cl g) ls'.
   Proof using .
     intros Hp. rewrite /f0f_auth. iIntros "Ha".
-    iMod (own_update _ _ (●ML (ls' : list (leibnizO fwline))) with "Ha")
+    iMod (own_update _ _ (●ML (ls' : list (leibnizO fl_line))) with "Ha")
       as "Ha".
     { apply mono_list_update. by destruct Hp as [z ->]; exists z. }
     iModIntro. iApply (fl_auth_lb with "Ha").

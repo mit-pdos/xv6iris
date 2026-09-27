@@ -489,6 +489,25 @@ registry's auth; the PREVIOUS era's floor `◯⊒_{γs_k} F_k` with `F_k` pure
 (persistent) and the ledger extends the floor and matches `r` with the
 model's `usync_last`.
 
+*Built (SY3-A2):* the full line list.  `AppFile.fl_auth`/`fl_lb` are over
+`fl_line := FileDisc.uline` (camera `fa_fl : mono_listR (leibnizO fl_line)`);
+every reader of redirect lines reads `fl_redirs ls` (a notation for `omap
+FileDisc.echof_ws ls`): `f_typed`'s and `FileOut.f0_typed`'s rows
+(`f_bytes_typed` itself stays over the projected `fwline` list), sh's
+`FileLinksLine.flw`, `f0_typed_adm`'s `fadm_boot (fl_redirs Lp)`, and
+every open/write contract's `(N, ws) ∈ fl_redirs ls`.  The union's
+`union_led` and `utag` hold `UnionAdm.ulines_of h` (grown at the rx step
+by `ulines_of_snoc`, fixed by `ulines_of_out`/`ulines_of_power`); the
+file application's `FileOut.efl_of` is the file parser's full list
+(`efl_of_echof`).  **The conclusion is NOT yet switched**: the ledger and
+`union_adequacy_closed` keep the landed `union_phi` (over `s0s : list
+fstate`); the model's body is `union_phi_sync`.  The per-cycle record is
+FORCED by the cycle's resolution (`lm_good_sync`'s `o = usync_last …`),
+and `sync` is admitted with `RSyncRan`, so once a sync completes the
+drain must file `Some r` and the next era's first drain must meet `uadm`
+at that record -- which only the durability link (A3) and sh's filing
+(A4) provide.  The switch is A4's.
+
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
 persistent seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted
@@ -551,7 +570,9 @@ relation is the landed one (k = 0).
   On the machine the record is minted by `Fs` (it knows σ); the counter
   numbers the fires and the ledger files, at the prompt, the record of
   the latest completed sync.
-- `union_phi`: `∃ W : list (fstate * option srec)`, cycle 0 boots `∅`,
+- `union_phi_sync` (beside the landed `union_phi`, which the ledger and
+  the theorem state until SY3-A4): `∃ W : list (fstate * option srec)`,
+  cycle 0 boots `∅`,
   cycle `k+1` boots in `uadm (ulines_before h (S k)) (ulast_before h (snd
   <$> W) (S k))` -- the last completed sync of the earlier cycles, at its
   global position -- and `Forall2 (λ w seg, lm_good_sync w.1 seg w.2)`.
