@@ -259,17 +259,10 @@ runner takes both claims under `▷`, the token bare.
 #### K3-4 -- the helping slot, the tail's flip, `sys_sync`'s contract (after K3-3)
 
 1. `iris/LogHelp.v` (below `LogInv`, imports `LogDefs`, `RiscvPtsto`):
-   `helpN := nroot .@ "loghelp"`, `help_tok γw := mono_nat_auth_own γw 1
-   0%nat`, and
-
-    Definition log_help γ (nc : mword 32) (out : nat) (cmt : bool) : iProp Σ :=
-      ∃ m : gmap nat (gname * mword 32),
-        ghost_map_auth (ln_help γ) 1 m ∗
-        [∗ map] w ↦ e ∈ m, ∃ Q : iProp Σ,
-          inv (helpN .@ w) (Q ∨ help_tok e.1) ∗
-          ((riscv_sync_hook gen_id Q ∗ ⌜e.2 = nc⌝ ∗ ⌜cmt = true \/ out ≠ 0%nat⌝)
-           ∨ help_tok e.1).
-
+   `helpN := nroot .@ "loghelp"`, the three-arm escrow `esc Q γw` and
+   `log_help γ nc out cmt` EXACTLY as design §4.2 "The helping slot"
+   states them (the `Pending` arm carries the waiter's half authority at
+   `0`; `Done` is the full authority at `1`),
    with `log_help_deposit` (at `cmt = true ∨ out ≠ 0`: allocate `γw`,
    the escrow at the caller's `Q`, a fresh `w`; returns `w ↪[ln_help γ]
    (γw, nc)` and the escrow's handle), `log_help_extract` (`log_help γ nc
@@ -277,7 +270,7 @@ runner takes both claims under `▷`, the token bare.
    (([∗ list] Q ∈ Qs, Q) ={⊤}=∗ log_help γ nc' out' cmt')` for ANY `nc'
    out' cmt'` -- every entry is `Done` afterwards), `log_help_collect`
    (a waiter's fragment at `n0 ≠ nc` -∗ the entry is `Done`; delete it,
-   take the token, open the escrow: `▷ Q`), `log_help_cells` (the two
+   take `● 1`, open the escrow: `▷ Q`, close it in its terminal arm), `log_help_cells` (the two
    pure clauses are monotone in `out`'s growth and in `cmt := true`, so
    `begin_op` and `end_op`'s non-final arm re-close by entailment).
    `LogInv.log_res` gains `log_help γ nc out cmt` in BOTH arms (LAST
