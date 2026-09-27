@@ -1378,37 +1378,12 @@ Section BoBodies.
       by (rewrite /E1 upd_ne; [exact Hs1 | reg_neq]).
     destruct cmt.
     - (* ================= COMMITTING: c.bnez TAKEN -> +0x24 ================= *)
-      iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat op_entry)
-                 (E : nat) (X : gset (nat * Z)) (T : gmap nat unit),
-                 l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
-                 l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
-                 l_ncommit ↦₄ nc ∗
-                 ghost_map_auth (ln_ops γ) 1 om ∗
-                 ⌜size om = out⌝ ∗
-                 ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
-                 ⌜(out <= 3)%nat⌝ ∗
-                 ⌜cmt = true -> out = 0%nat⌝ ∗
-                 mono_nat_auth_own (ln_ep γ) 1 E ∗
-                 ⌜(1 <= E)%nat⌝ ∗
-                 own (ln_lg γ) (● X) ∗
-                 ⌜forall i e, om !! i = Some e -> e.2 = E⌝ ∗
-                 ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
-                 ghost_map_auth (ln_tx γ) 1 T ∗
-                 ⌜size T = size om⌝ ∗
-                 (* THE BANK (fs-syscall-specs lane Y).  This assertion
-                    RESTATES [LogInv.log_res]'s body verbatim -- it is the
-                    one site in the tree that does -- so the banked receipt
-                    has to be spelled here too, in its own position: last
-                    before the committing arm. *)
-                 log_flushed_bank γ E ∗
-                 (if cmt then emp
-                  else ∃ (n : nat) (LB : gset Z),
-                       ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
-                       ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
-                       ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
-                       log_state bn γfs cov logstart n LB (op_pending om)))%I
+      (* the lock's resource, re-closed at the committing arm it was found
+         in (the goal was unfolded by the [rewrite /log_res] above, so it is
+         named here rather than restated) *)
+      iAssert (log_res γ bn γfs cov logstart)%I
         with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hrest]" as "Hres".
-      { iExists out, true, nc, om, Ep, Xr, Tx. iFrame "Hout Hcmt Hnc Hauth".
+      { rewrite /log_res. iExists out, true, nc, om, Ep, Xr, Tx. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; exact Hout3|].
@@ -1441,7 +1416,7 @@ Section BoBodies.
                 Upr HK Hj Hjl Hanch HboE1 Hbelow
                 with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
-      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
+      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1770,6 +1745,8 @@ Section BoBodies.
               apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
           iSplitR; [iPureIntro; exact Hreg|].
+          (* the new operation is outstanding, so the log is not quiescent *)
+          iSplitR; [iPureIntro; intros Hc; discriminate|].
           (* THE PENDING SET GROWS (durable-disk stage G1): the fresh op
              contributes its own (empty) already-logged set, so [pend] only
              gets bigger and every row of [log_state] that excludes it only
@@ -1804,6 +1781,7 @@ Section BoBodies.
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].
           iSplitR; [iPureIntro; exact Hreg|].
+          iSplitR; [iPureIntro; exact Hquiet|].
           iApply ("Hbclose" with "Hlhn"). }
         iApply (wp_bge_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x50)) (mword_of_int 28 : mword 13)
                   (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (trap_res eb + (K - 4))%nat false

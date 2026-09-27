@@ -1282,6 +1282,18 @@ Section LogInv.
              unconstrained, which is exactly the self-invalidation -- they
              can never be used, because using one needs [e = E]. *)
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
+          (* QUIESCENT MEANS NOTHING IS LOGGED (sync design section 4,
+             obligation K1).  Not committing and nothing outstanding, the
+             batch is EMPTY: every [log_write] runs inside an operation, the
+             last [end_op] of a group always takes the committing arm, and
+             the commit's re-deposit is at [n = 0].  With [LB = ∅] row (b)
+             covers the WHOLE home set, so at such an instant the logged
+             view IS the committed one ([LogQuiet.log_quiet_committed]):
+             what [sys_sync]'s fast path reads at the lock.  Maintained for
+             free -- every step that grows [n] or leaves it non-zero holds an
+             operation ([out >= 1]) -- and placed just before the bundle so
+             that each opener gains one name. *)
+          ⌜out = 0%nat -> n = 0%nat⌝ ∗
           log_state bn γfs cov logstart n LB (op_pending om)))%I.
 
   (* ---------------------------------------------------------------- *)

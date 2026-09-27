@@ -2033,7 +2033,7 @@ Section ProofLogWrite.
     iDestruct (log_opSe_positive with "Hoauth Hop") as %Hpos.
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
+    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
     rewrite /log_state.
     iDestruct "Hbatch" as (W L D M)
       "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie)".
@@ -2527,6 +2527,8 @@ Section ProofLogWrite.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hreg b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as ->. exact HbnoLB. }
+          (* an operation is open, so the log is not quiescent *)
+          iSplitR; [iPureIntro; intros Hc; lia|].
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
           rewrite /log_state. iExists W, (<[uint bno := bs]> L), D, M.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
@@ -2629,6 +2631,8 @@ Section ProofLogWrite.
             - apply elem_of_union_l. exact (Hreg b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as ->.
               apply elem_of_union_r, elem_of_singleton. reflexivity. }
+          (* an operation is open, so the log is not quiescent *)
+          iSplitR; [iPureIntro; intros Hc; lia|].
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
           rewrite /log_state. iExists (W ++ [bno]), (<[uint bno := bs]> L),
                                      (<[uint bno := true]> D), M.

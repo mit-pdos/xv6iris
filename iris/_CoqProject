@@ -733,6 +733,7 @@ CodeLogWrite.v
 CodeSysSync.v
 SbPark.v
 LogInv.v
+LogQuiet.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v

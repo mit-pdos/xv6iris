@@ -2728,6 +2728,8 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros b' Hi;
                 exfalso; exact (not_elem_of_empty _ Hi)|].
+      (* genesis is quiescent, and recovery left the batch empty *)
+      iSplitR; [iPureIntro; intros _; reflexivity|].
       rewrite op_pending_empty. iExact "Hbatch". }
     (* THE SEAL, AT THE GIVEN NAME.  [newlock_at] is [newlock] over a gname
        the caller already owns the free ghost state of -- the era fupd's

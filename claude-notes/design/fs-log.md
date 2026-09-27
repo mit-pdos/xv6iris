@@ -328,6 +328,24 @@ the abstract target state and the per-op finalize obligation outright, so
 both moves (`log_state_pend_mono`, `log_state_fin`) are the identity and
 `pend` survives only as the name of what the ledger's union is.
 
+**Quiescence empties the batch.**  `log_res`'s non-committing arm carries
+`⌜out = 0 → n = 0⌝` (just before `log_state`): every `log_write` holds an
+operation, the last `end_op` always takes the committing arm, and the
+re-deposit and `initlog` are at `n = 0`.  So at a quiescent instant row (b)
+covers the whole home set and the logged view IS the committed map:
+`LogQuiet.log_quiet_committed` (pure, off the custody arm's `log_mirror_ok`
+and a clean header).  `LogQuiet.log_res_quiet_acc` is the lock-holder's
+reader -- the three cells, and when they read `out = 0 ∧ ¬committing` the
+loan `log_quiet` (the EMPTY `ln_tx` authority, the cache authority at `L`,
+the mirror half and its two rows), returned unchanged; `P_fs_rec_quiet_acc`
+opens the crash record's snapshot slot at `fs_restrict (dv_of_D L) home`
+(the squeeze, so it takes `start_auth`) and closes it at any snapshot name
+over the same map.  The abstract "running = durable" is NOT a log conjunct:
+no mover of `fs_top` holds anything of the log's.  A quiescent reader gets
+it by running the file system's law on the loan -- the pair it hands down
+stands at the committed map with its guest at the running map -- and
+swapping the record's pair, the committed map not moving.
+
 ### The log's FS-facing interface
 
 The WAL is FILE-SYSTEM-AGNOSTIC in the strong sense: its lock resource

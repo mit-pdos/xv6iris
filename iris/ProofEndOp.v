@@ -1607,7 +1607,7 @@ Section EndOpBlocks.
     (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
-    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & Hb2)".
+    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & _ & Hb2)".
          rewrite /log_state.
          iDestruct "Hbatch" as (W1 L1 D1 M1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
          iDestruct "Hb2" as (W2 L2 D2 M2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
@@ -1877,6 +1877,8 @@ Section EndOpBlocks.
       iSplitR.
       { iPureIntro. intros b' Hin. exfalso.
         pose proof (Hcap (S Ep) b' Hin). lia. }
+      (* the batch goes back EMPTY, so quiescence finds nothing logged *)
+      iSplitR; [iPureIntro; intros _; reflexivity|].
       (* THE PENDING SET AT THE RE-DEPOSIT (durable-disk stage G1): the
          ledger is EMPTY here ([Hommt] -- that is what makes the epoch bump
          above sound), so nothing is pending and the batch's [∅] is already
@@ -4667,7 +4669,7 @@ Section ProofEndOp.
        log_res's own conjunct then refutes committing. *)
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
+    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
     (* the token splits into the budget half the ledger retires and the
        transaction element the authority deletes (durable-disk lane A).  A
        transaction that still has an inode's row suspended cannot be here:
@@ -5382,6 +5384,8 @@ Section ProofEndOp.
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
         iSplitR; [iPureIntro; exact Hreg|].
+        (* other operations are still outstanding: not quiescent *)
+        iSplitR; [iPureIntro; intros Hc; contradiction|].
         (* THE PENDING SET SHRINKS, AND THE RE-DEPOSIT IS EXACT
            (durable-disk 1d).  The retiring op's own already-logged BLOCK
            set leaves the union, and the two steps are [log_state_fin]
