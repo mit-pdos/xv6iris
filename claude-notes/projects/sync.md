@@ -94,33 +94,22 @@ as revised at the K3 cut are the rulings; the four sub-lanes below are
 sequential except where marked, each a green landing on `main`.
 
 State: K3 COMPLETE ON MAIN (K3-1 `61ebcc249`, K3-2 `6a9fdb836`, K3-3
-`0da661d35`, K3-4 `1a6f95a4d`).  What is on main: `iris/HartCustody.v`;
-the fixed record's `riscv_sync_tok`/`riscv_sync_hook` with adequacy's
-`Tk`/`Hk`, the `_gen` theorem's `HTk`/`HHk`, `Htok`/`Happ_sync_run` at
-`xv6_boot_era`; the token through `log_res`'s idle arm, the merge
-(`dur_merge G T`), the permits and `eo_tail`; `AppInv.app_sync_run_raw`;
-`LogSnapLaw.snap_law_ghost` parked in `log_ctx` beside `crash_inv` and
-`gen_cert`; `iris/LogGhostCommit.v`; `iris/LogHelp.v` in `log_res`'s
-both arms, the tail's flip, `wp_sys_sync_sconf_body ... e oQ` with
-`hook_opt`/`Q_opt`; arm 22 passes `None`.  `app_body` no longer parks the
-merge.  Cleanups left for a later sweep (none blocking): the old
-`flushed_sync` receipt and its bank are now dead weight in the contract;
-`ProofSysSync.ss_bge_fall_later` is a copy of `WpSconfBtype`'s fall rule
-with its later kept and belongs there; the trivial `Tk`/`Hk` values are
-spelled inside two adequacy statements (`xv6_power_adequacy_xv6Σ`,
-`xv6_app_adequacy`) until SY3-A moves them onto the `App` record.
-K4 LANDED ON BRANCH `sync3-k4` (not yet merged): `iris/SyncHook.v`
-(`hook_opt`/`Q_opt`, re-exported by `SpecSysSync`); `xfam.sy_oQ`, rows 22
-of `xv6_sbundle`/`xv6_spost` and their four readers, `xfam_sy`;
-`sysc_num_nofs` excludes 22; `sysc_dep_sync`/`sysc_out_sync`, and arm 22
-passes the process's `sy_oQ fdep`; `UkSync.sync_pay P Qr R`,
-`ksync_leaf` (the ecall as a parameter) with `ksync_leaf_none`, and
-`wp_ksync_sync/main/start` at `oQ`; `UkSyncEntry.ksync_leaf_xv6` (every
-`oQ`); `usync_ran_pay I oQ`.  OPEN (owner's call, SY3-A): the entry and the
-round deposit `None` -- `image_entry` and `sh_exec_sup_echo_at` are `□`,
-so a linear `hook_opt gen_id oQ` premise on `sync_image_entry` /
-`usync_exec_sup` is unprovable at `Some Q`; the hook has to ride the lend
-(`Pay`, i.e. the round's `Cr`).
+`0da661d35`, K3-4 `1a6f95a4d`); K4 ON MAIN (`6ec6feccd`: `iris/SyncHook.v`
+(`hook_opt`/`Q_opt`), `UexecExecInst.xfam.sy_oQ` with row 22 in the bundle
+and the post and the four readers, `sysc_arm_sync` passes `sy_oQ fdep`,
+`UkSync.sync_pay P Qr R`, the abstract ecall leaf `ksync_leaf oQ`
+discharged at `None` generically and at any `oQ` at the xv6 instance,
+`usync_ran_pay I oQ`; the entry and the round still at `None`).  RULING
+from K4's stop: the entry (`image_entry`) and sh's exec supply are `□`,
+so a linear hook cannot be their premise -- the hook RIDES THE LEND:
+`/sync`'s `Pay` becomes `P ∗ hook_opt gen_id oQ` and sh's `Cr` for the
+sync child becomes `Wcu I 3 ∗ hook_opt gen_id oQ`; SY3-A4 does it.
+Cleanups left for a later sweep (none blocking): the old `flushed_sync`
+receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
+`WpSconfBtype`; the trivial `Tk`/`Hk` values spelled inside two adequacy
+statements until SY3-A1 moves them onto the `App` record.
+SY3-A: A1 and A2 in flight (branches `sync3-a1` in `/shared/xv6iris-3k`,
+`sync3-a2` in `/shared/xv6iris-3n`); A3, A4 after both.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
@@ -348,37 +337,131 @@ tie row is over the whole home set there.
 
 ### Lane SY3-A -- the application side and the ledger (after K3, K4; merges `sync3-m`)
 
-1. Merge branch `sync3-m` (the pure model) into the lane branch first.
-2. The typed-line list: the ledger's authoritative list (`AppFile.fl_auth`
-   / `fl_lb`, `AppFile.v` ~184-193, over `fwline`s) becomes (or gains) the
-   full line list `UnionAdm.ulines_of` (every complete line, the sync line
-   included; decision recorded in sync.md §5 "as built"); the rx wand
-   appends `uline_of_u b` at the newline completing `b`.
-3. The claims: the union's running claim (`AppFile.f_state`/`f_typed`,
-   `AppFile.v` ~668, `file_pred` ~788) gains the running `●{¼} Ls`, `◯⊒ls`
-   and the witness `state ∈ uadm ls (last Ls)`; the durable copy (the same
-   predicate at fresh names, via the transport/merge) carries `●{½} Ls`;
-   `T := ●{¼} Ls` is the union's token.  Provide the union's MERGE law
-   (not derived from the transport any more: it moves the `½` and checks
-   `T` against it) -- this needs an App-record field for the merge (today
-   `Happ_merge` is derived from `al_xfer` in `SystemAdequacy`; add
-   `al_merge` or widen `al_xfer`), and `T`'s birth in the era mint.
-4. The union's `Fs` (design §4.3 item 5) and its instantiation in sh's
-   sync round; `Q` filed at the prompt.
-5. The ledger (`UnionOut.v` and above): the new `union_phi` body from
-   `sync3-m` -- `union_phi_res`, the per-cycle record filed at the sync
-   prompt, the boot comparison (design §4.3 item 7) at the era's first
-   drain (where `f0_typed` is filed today, app-file.md §4.3).
-6. Risk (R4), decide early: the durable copy must be RE-BASED to the new
-   era's `γs` before the new era can crash (if the new era crashes before
-   its first commit, `CI` still holds the previous era's copy with the
-   previous `γs`).  Check whether the boot's genesis write
-   (`ProofInitlog`'s seal, the recovery's header clear) runs the commit law
-   / merge; if not, add a merge there or re-base at the PowerOn arm
-   (`FsCrash.P_fs_swap`, `SystemAdequacy` ~1476-1492).  The ledger's floor
-   likewise moves to the new era's `γs` at the boot (the era's first
-   drain).
-Acceptance: green; `union_adequacy_closed` restated only through
-`union_phi`'s new body (from `sync3-m`); `demo_sync_cut_neg` is the
-theorem's negative witness; design §4-§5 updated to "as built";
-`sync3-m` deleted after the merge.
+Design: `sync.md` §4.5 (RULED 2026-09-27) is the contract; §5 the model.
+Four sub-lanes; A1 ∥ A2, then A3, then A4.  Green at every landing.
+
+#### A1 -- the machine's two loans and the `App` record (full rebuild)
+
+1. THE MERGE'S LOAN.  `FsDurSnap.dur_merge G T gd gt := (∀ gt_o n, ⌜n =
+   (gd + 1)%nat⌝ -∗ start_auth n -∗ ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ start_auth n)
+   ∧ T` (`gd` a parameter as in `FsCrash.fs_rec_permit`; `dur_pair G T gd
+   D`); `dsnap_step_merge` takes and returns the started auth;
+   `FsCrash.fs_commit_L_sector0_rec`/`fs_commit_L_seq_permit` apply the
+   left arm with the permit's own `start_auth n` (they have it);
+   `LogSnapLaw`, `LogInv.log_ctx`'s parked laws, `FsCollectAll`'s builders,
+   `LogGhostCommit.log_ghost_commit` (the custody fupd's `start_auth n` is
+   in hand: lend it to the ghost law, which lends it to the merge) follow;
+   `AppInv.app_merge_raw A T gd := □ ∀ r av n, ⌜n = gd+1⌝ -∗ start_auth n
+   -∗ ▷ A r av -∗ T ==∗ ▷ A r av ∗ start_auth n ∗ ∃ r', ((∀ n, ⌜n = gd+1⌝ -∗
+   start_auth n -∗ (▷ ∃ r_o av_o, A r_o av_o) ==∗ ▷ A r' av ∗ T ∗ start_auth
+   n) ∧ T)` -- or the simpler form where the loan is only on the wand;
+   choose the one `AppDur.app_dur_raw_merge` packs cleanly and record it;
+   `app_merge_raw_of_xfer` still holds at any `T`/`gd` (the loan is
+   returned untouched).
+2. THE SWAP'S LOAN.  `RiscvAdequacy.riscv_power_adequacy`'s `Hswap` (its
+   type ~1613-1638 and the power loop ~1046-1051) takes the client's
+   power-on yield `Tn` (the same `Tn` `Hobs` produced at ~906) as an input
+   and returns a second yield `Tn'`; `power_boot_res` carries `Tn'` to
+   `Hboot` instead of `Tn`.  Two new type parameters of the theorem
+   (`Tnn Tnn' : CT -> nat -> iProp Σ`, or `Tn'` derived), every landed
+   application's `Tn' := Tn`.  `SystemAdequacy.app_xfer_boot_raw A B`
+   becomes `□ (∀ r av, Tn -∗ ▷ A r av ==∗ Tn' ∗ ∃ r_s r', ▷ A r_s av ∗ ▷ A r'
+   av ∗ B r')` at parameters `Tn Tn' : iProp Σ` (the `Hswap` lambda ~1551
+   repacks the slot at `r_s`); `app_xfer_boot_raw_triv` and every landed
+   transport (`AppFile.file_xfer_boot`, `AppEcho.echo_xfer_boot`,
+   `AppTree.tree_xfer_boot_at`) take `r_s := r`, `Tn' := Tn`;
+   `app_xfer_raw_of_boot` is DELETED (see 4).
+3. THE BIRTH'S SPLIT.  `riscv_power_adequacy`'s `Hbirth : ⊢ |==> ∃ c, Cl c`
+   becomes `∃ c, Cls c ∗ Clt c`; `HPc` receives `Cls c` beside the disk
+   fragments and the swap counter; `HPt` receives `Clt c` (today's `Cl`).
+   `SystemAdequacy` and `App.v` follow; every landed application's `Cls
+   := fun _ => True`.
+4. THE `App` RECORD (`App.v`): new fields `al_tk : app_fixed A -> nat ->
+   iProp Σ`, `al_hk : app_fixed A -> nat -> iProp Σ -> iProp Σ`, `al_cls :
+   app_fixed A -> iProp Σ` (with `al_birth` yielding `al_cls c ∗ app_cl A c`),
+   `al_merge : ∀ (HR : riscvGS Σ) (GEN : GenId) c r, … ⊢ app_merge_raw
+   (app_pred A c) (al_tk c gen_id) gen_id` (at the era's ambient record, as
+   `al_tx`/`al_rx` are stated), `al_sync_run` likewise for
+   `app_sync_run_raw`, `al_found : ∀ HR GEN c k, ⊢ Tn' -∗ |==> al_tk c k ∗
+   Tn''` (the founding: the token out of the swap's yield; the remainder
+   goes on to `/init`), and `al_xfer` at the new transport shape (`Tn :=
+   app_turn A c k`, `Tn' := app_turn' A c k`, a new `app_turn'` field or
+   the same).  `SystemAdequacy.xv6_power_adequacy_gen`'s `HTk`, `HHk`,
+   `Htok`, `Happ_sync_run`, `Happ_merge` and the
+   `app_merge_raw_of_xfer (app_xfer_raw_of_boot …)` derivation are
+   REPLACED by these fields; `xv6_boot_era` takes `Happ_merge`,
+   `Happ_sync_run`, `Hfound` from them.  The trivial values move OUT of
+   the statements of `xv6_power_adequacy_xv6Σ`/`xv6_app_adequacy` onto the
+   record (`app_triv_*`).  Landed applications (echo, tree, union) prove
+   `al_merge` from their own `app_xfer_raw` (`AppFile.file_xfer` is the
+   union's, dead today; `AppEcho.echo_xfer`; `AppTree`'s) via
+   `app_merge_raw_of_xfer`.
+Acceptance: green; `union_adequacy_closed`'s statement unchanged; a
+paragraph in `design/applications.md` (the record's new fields) and
+`design/crash.md` (the two loans); the state line here.
+
+#### A2 -- the pure model lands: the full line list and the ledger at `W` (parallel with A1)
+
+1. Merge branch `sync3-m` (`/shared/xv6iris-3m`, `855896fb8`; conflicts
+   only in `_CoqProject` and the notes).
+2. The ledger's line list becomes the FULL list: `AppFile.fl_auth`/`fl_lb`
+   over `UnionAdm.uline` (every complete line, `UnionAdm.ulines_of`);
+   `f_bytes_typed`/`f_typed` and sh's `FileLinksLine.flw` read the redirect
+   lines through `omap echof_ws` (`UnionAdm.ulines_of_echof`,
+   `ulines_in_echof`); the rx step (`FileOut.fl_auth_grow_pre`,
+   `union_led_rx`) appends `uline_of_u b` at a completing newline (the
+   projection to `echof_lines_of` is the old growth).  `f0_typed_adm`
+   (`FileOut.v` ~649) states its conclusion over the projected list.
+3. `UnionOut.union_phi_res` over `W : list (fstate * option srec)`
+   (`sync3-m`'s `union_phi_body`), `f0_pinned` over `W` (every `o = None`
+   at this lane: no sync is filed yet), the four ledger steps re-proved
+   with `sync3-m`'s `union_phi_body_step_io`/`_off`/`_on`/`_drain`; the boot
+   comparison at the first drain stays today's (`fadm_boot` =
+   `uadm ls srec0`, `UnionAdm.uadm_srec0`; `ulast_before` of an all-`None`
+   `W` is `srec0`).  `union_adequacy_closed` restated through the new
+   `union_phi` (its body changes BY DESIGN; the statement's shape does
+   not); `UnionAdmDemo`'s four demos compile; `demo_sync_cut_neg` is not
+   yet the theorem's witness (A4).
+Acceptance: green; audits at baseline (union 14; a new axiom is a
+failure); `sync3-m` deleted after the merge; the state line here.
+
+#### A3 -- the union's claims, merge, founding, PowerOn and ledger floors (after A1, A2)
+
+Design §4.5 verbatim: `union_gn` gains `ugn_reg` (registry, auth in
+`union_led`) and `ugn_cm` (counter); `file_names` gains `fn_sync` and the
+role; `sync_claim c r av` (two arms, one per instance) as a conjunct of
+`file_pred` (Timeless: `own` of discrete cameras and pure facts; a new
+`mono_listR (leibnizO srec)` and a `mono_natR` in `fileAppG`, `unionΣ`);
+`Tk c k`, `Hk c k Q` as the union's `al_tk`/`al_hk`; `al_merge` per §4.5's
+merge; `al_sync_run` firing `Hk`; `al_xfer` re-basing at PowerOn with
+`Tn` (the on-arm's yield: the fresh `γs_{k+1}` at `[]`, its registration,
+the previous era's floor) and producing `Tn'` (the token, the running
+claim's pieces, `◯⊒_{γs_{k+1}} Ls_c` and the pure boot fact for `/init`);
+`al_found`; `al_cls` (the birth's slot part: `●{½}_{γs_0} []`, `● ugn_cm 0`,
+`0 ↪□ γs_0`) and `file_init` taking it; the ledger's registry auth,
+floor (`◯⊒_{γs_k} F_k`, pure `F_k`, timeless, kept across PowerOff) and the
+on-arm's allocation/registration/yield; `/init`'s filing through `f0_bl`
+(extended with the persistent fragment and the pure fact; `fturn_file`
+takes them); `union_led_tx` reads them: `F_{k+1} := Ls_c` and the model's
+boot relation `uadm (ulines_before h (S k)) r_m s0` with `r_m = last F_k`
+(`union_phi_body_drain`'s premise -- still with every filed `o = None`).
+Acceptance: green; `union_adequacy_closed` unchanged from A2; risks R5
+(the count `Hswap` lends), R6 (`file_pred` stays Timeless), R7 (the
+transport's `▷`: the copy's sync part is timeless and comes out of the
+later; the claim stays under it).
+
+#### A4 -- sh's sync round and the theorem's witness (after A3)
+
+The hook seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted at
+the boot era from the record-shape equation (`SystemAdequacy` has `Hfix`)
+and carried in `union_links`; `/sync`'s `Pay := P ∗ hook_opt gen_id oQ` and
+sh's `Cr := Wcu I 3 ∗ hook_opt gen_id oQ` (K4's ruling); `usync_exec_sup`
+at `Some Q` with `Q := ◯⊒_{γs} (Ls ++ [r]) ∗ ◯ ugn_cm gen_id ∗ ⌜r = (length
+ls', fcontent av)⌝`, the hook proved by sh from its lend (the deed, `f_ok`,
+`flw` over the full list); sh files `Q` at the round's prompt
+(`uksh_w_prompt_pend`'s `RSyncRan` arm) into the console claim; the drain
+carries it; `union_led_tx` extends the floor and files `o := Some r` with
+the model's `usync_last` (`lm_good_sync`); `demo_sync_cut_neg` is the
+theorem's negative witness (a `Corollary` beside `union_adequacy_closed`);
+design §3-§5 "as built"; the state block here; `completed/` gets the
+narrative when the whole effort closes.
