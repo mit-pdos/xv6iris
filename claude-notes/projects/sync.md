@@ -11,7 +11,8 @@ durability link.
   three audits at the baseline (system 13, tree 13, union 14); whole-tree
   gate on the VM before every landing; commit and push to `main` at green
   checkpoints (owner, 2026-09-26).
-- One lane at a time.
+- One lane per cone at a time; independent lanes (disjoint files) run in
+  parallel in separate worktrees with separate remote trees.
 
 ## SY1 -- DONE: xv6 d66e41c, no silent alternative (design §1-§2)
 
@@ -47,9 +48,6 @@ Open cleanups it left, none blocking:
   (fstate * option srec)` and its ledger step lemmas, beside the landed
   `union_phi`), `iris/UnionAdmDemo.v` (the four demos, including the
   NEGATIVE `demo_sync_cut_neg`), design §5 "as built".
-- NOT STARTED: K3 (four sub-lanes K3-1..K3-4 below; its rulings are in
-  design §4.2-4.3), K4 (the dispatcher's arm 22 and `/sync`'s payload),
-  A (the application side and the ledger).
 
 ### Rules for every lane
 
@@ -106,6 +104,14 @@ Cleanups left for a later sweep (none blocking): the old `flushed_sync`
 receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
 `WpSconfBtype`; the trivial `Tk`/`Hk` values spelled inside two adequacy
 statements until SY3-A1 moves them onto the `App` record.
+REVIEW (Fable, 2026-09-27, on this plan): three defects in §4.5 fixed in
+the design (the running claim's era is a PURE record fact through an
+`Ok` predicate on the raw laws, not a counter bound; the copy's started
+certificate needs the machine's gnames at the birth; ledger numbering
+throughout), a fourth in the PowerOn floor (a drainless era strands the
+ledger's floor at an old gname -- fixed by a RETURN hook after the swap,
+so `/init` files nothing), the taint arm and the hook's record over the
+deed's state; A1 re-cut in flight accordingly; A3 split into A3a/b/c.
 SY3-A: A1 in flight (branch `sync3-a1` in `/shared/xv6iris-3k`).  A2 ON
 MAIN (`b875e390b`; `sync3-m` and `sync3-a2` deleted):
 `sync3-m` merged; the full line list (`AppFile.fl_line := FileDisc.uline`,
@@ -402,9 +408,18 @@ Four sub-lanes; A1 ∥ A2, then A3, then A4.  Green at every landing.
    `al_merge` from their own `app_xfer_raw` (`AppFile.file_xfer` is the
    union's, dead today; `AppEcho.echo_xfer`; `AppTree`'s) via
    `app_merge_raw_of_xfer`.
+5. RE-CUT (review): the raw laws take an era-record predicate `Ok : N ->
+   Prop` (`app_merge_raw A Ok T gd`, `app_sync_run_raw A Ok T Hk`, with
+   `⌜Ok r⌝` premises and `⌜Ok r'⌝` on the merge's output; `app_ok` at the
+   mint, parked in `app_body`, read by the collection); the birth receives
+   the machine's four gnames (`Hbirth : ∀ γdisk γsw γreg γst, …`) and
+   `Tk`/`Hk` lose theirs (`CT -> nat -> …`); the power loop runs a RETURN
+   hook `Hback` on the trace slot after `Hswap` (`Tn' -∗ ledger ==∗ ledger
+   ∗ Tn''`) and `power_boot_res` carries `Tn''`; `App` gains `al_ok`,
+   `al_boot_ok`, `al_back`; eras in ledger numbering.
 Acceptance: green; `union_adequacy_closed`'s statement unchanged; a
 paragraph in `design/applications.md` (the record's new fields) and
-`design/crash.md` (the two loans); the state line here.
+`design/crash.md` (the loans, the return hook); the state line here.
 
 #### A2 -- the pure model lands: the full line list and the ledger at `W` (parallel with A1)
 
@@ -431,35 +446,35 @@ paragraph in `design/applications.md` (the record's new fields) and
 Acceptance: green; audits at baseline (union 14; a new axiom is a
 failure); `sync3-m` deleted after the merge; the state line here.
 
-#### A3 -- the union's claims, merge, founding, PowerOn and ledger floors (after A1, A2)
+#### A3 -- the union's claims, merge, founding, PowerOn and the floor (after A1; three landings)
 
-Design §4.5 verbatim: `union_gn` gains `ugn_reg` (registry, auth in
-`union_led`) and `ugn_cm` (counter); `file_names` gains `fn_sync` and the
-role; `sync_claim c r av` (two arms, one per instance) as a conjunct of
-`file_pred` (Timeless: `own` of discrete cameras and pure facts; a new
-`mono_listR (leibnizO srec)` and a `mono_natR` in `fileAppG`, `unionΣ`);
-`Tk c k`, `Hk c k Q` as the union's `al_tk`/`al_hk`; `al_merge` per §4.5's
-merge; `al_sync_run` firing `Hk`; `al_xfer` re-basing at PowerOn with
-`Tn` (the on-arm's yield: the fresh `γs_{k+1}` at `[]`, its registration,
-the previous era's floor) and producing `Tn'` (the token, the running
-claim's pieces, `◯⊒_{γs_{k+1}} Ls_c` and the pure boot fact for `/init`);
-`al_found`; `al_cls` (the birth's slot part: `●{½}_{γs_0} []`, `● ugn_cm 0`,
-`0 ↪□ γs_0`) and `file_init` taking it; the ledger's registry auth,
-floor (`◯⊒_{γs_k} F_k`, pure `F_k`, timeless, kept across PowerOff) and the
-on-arm's allocation/registration/yield; `/init`'s filing through `f0_bl`
-(extended with the persistent fragment and the pure fact; `fturn_file`
-takes them); `union_led_tx` reads them: `F_{k+1} := Ls_c` and the model's
-boot relation `uadm (ulines_before h (S k)) r_m s0` with `r_m = last F_k`
-(`union_phi_sync_body_drain`'s premise).  A3 KEEPS the landed conclusion
-(`union_phi` over `s0s`, the ledger and `union_adequacy_closed` as A2
-left them): the per-cycle record is forced by the resolution
-(`lm_good_sync`'s `o = usync_last …`, and `sync` admits `RSyncRan`), so
-no ledger can file `o = None` after a completed sync -- the new body is
-provable only with sh's filing, A4.
-Acceptance: green; `union_adequacy_closed` unchanged from A2; risks R5
-(the count `Hswap` lends), R6 (`file_pred` stays Timeless), R7 (the
-transport's `▷`: the copy's sync part is timeless and comes out of the
-later; the claim stays under it).
+Design §4.5 as amended at the review.  Common: `union_gn` gains `ugn_st`,
+`ugn_reg`, `ugn_cm`; `file_names` gains `fn_sync`, `fn_era`, the role;
+`sync_claim c r av` inside `file_pred`'s non-taint arm (Timeless: `own` of
+discrete cameras and pure facts; new `mono_listR (leibnizO srec)` and
+`mono_natR` members of `fileAppG`, `unionΣ`); `union_adequacy_closed`
+unchanged at every landing (the theorem keeps `union_phi` until A4).
+- A3a (cone-free first): the definitions above; `Tk c k`/`Hk c k Q` as the
+  union's `al_tk`/`al_hk`; `al_ok := fn_era r = k`; and BEFORE any sweep
+  the two closure lemmas that are the design's checker --
+  `union_merge_closes` (any old copy, a running claim at `Ok`, the token,
+  the loan ⊢ the new copy at `Ok`, the token, the loan) and
+  `union_hook_closes` (guest and running claim at `Ok`, the token, sh's
+  lend ⊢ the same and `Q`) -- then `al_merge`, `al_sync_run`.
+- A3b: `al_xfer` (PowerOn's re-base with `Tn`, producing `Tn'`), `al_back`
+  (the ledger's floor and the cycle's boot relation), `al_found`,
+  `al_boot_ok`, `al_cls` (the birth's slot part: `●{½}_{γs_0} []`, `●
+  ugn_cm 0`, `0 ↪□ γs_0`) and `file_init` taking it; the ledger's registry
+  auth, floor and on-arm allocation/registration/yield.
+- A3c: the `file_pred` opener sweep (every `f_state` destructure in
+  `FileOpen`, `FileWrite`, `UkFileOpen`, …: the sync conjunct LAST so each
+  pattern gains one name; the file steps keep the witness by
+  `uadm_ustep`).
+Risks: R5 (the count `Hswap` lends is the new era's `gen + 1`), R6
+(`file_pred` stays Timeless), R7 (the transport's `▷`: the sync part is
+timeless and comes out of the later; the claim stays under it), R8 (the
+started counter's `mono_natG` instance at the raw gname `ugn_st` must be
+the ambient one -- A1's equation device).
 
 #### A4 -- sh's sync round and the theorem's witness (after A3)
 
@@ -472,7 +487,11 @@ ls', fcontent av)⌝`, the hook proved by sh from its lend (the deed, `f_ok`,
 `flw` over the full list); sh files `Q` at the round's prompt
 (`uksh_w_prompt_pend`'s `RSyncRan` arm) into the console claim; the drain
 carries it; `union_led_tx` extends the floor and files `o := Some r` with
-the model's `usync_last` (`lm_good_sync`); the ledger and `union_adequacy_closed` SWITCH from the landed
+the model's `usync_last` (`lm_good_sync`, an EQUALITY: the bridge from the
+deed's `s` at the hook to the model's `lm_upto` is A4's FIRST lemma, and
+the prompt byte's step must know it completes a sync round's block --
+`uksh_w_prompt_pend`'s `RSyncRan` arm hands the ledger that); the switch
+of `union_phi_res` and the theorem's conclusion to `union_phi_sync`; the ledger and `union_adequacy_closed` SWITCH from the landed
 `union_phi` to `UnionOutPure.union_phi_sync` (its `_step_io`/`_off`/`_on`/
 `_drain` steps; the drain files the forced `Some r` whenever the cycle's
 resolution completed a sync, the next era's first drain meets `uadm` at

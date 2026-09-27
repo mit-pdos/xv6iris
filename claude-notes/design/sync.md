@@ -1,6 +1,6 @@
 # Design: `sync` in the union -- a completed sync pins what the next boot sees
 
-§1-§3 LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2); §4-§5 PROPOSAL (the worklist is
+§1-§4.4 LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2, §4.1-4.4 lanes K1-K4); §4.5 and §5 IN PROGRESS (the worklist is
 [`../projects/sync.md`](../projects/sync.md)).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
 [`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
@@ -398,77 +398,105 @@ meets a copy of another era and the boot never meets a copy older than
 the era that just ended.  What makes that a ghost fact is a COMMIT-ERA
 COUNTER whose full authority travels with the copy.
 
-**Names.**  The fixed part `union_gn` gains two gnames born at
-`al_birth`: `ugn_reg`, the sync REGISTRY (`ghost_map nat gname`, era ↦ that
+**Names and numbering.**  ERAS ARE COUNTED THE LEDGER'S WAY throughout
+this section: the birth is era 0 and the boot at `gen_id` is era `S
+gen_id` (`union_led_pow` yields the turn at `S (obs_boots h)`); the
+kernel's `Tk c k`/`Hk c k` are indexed by `gen_id` and use `S k` inside.
+The birth receives the machine's four gnames (`Hbirth : ∀ γdisk γsw γreg
+γst, ⊢ |==> ∃ c, Cls c ∗ Clt c`, ruled at the review of 2026-09-27), so the
+fixed part can NAME the started counter: `union_gn` gains `ugn_st` (=
+`γst`), `ugn_reg`, the sync REGISTRY (`ghost_map nat gname`, era ↦ that
 era's sync-list gname; auth in the LEDGER, fragments `k ↪□ γs`
 persistent), and `ugn_cm`, the commit-era COUNTER (`mono_nat`; the full
 authority is born into the initial copy, see "Birth").  `file_names`
-gains `fn_sync : gname` (the instance's sync list).  The token and the
-hook family, as the fixed record's closed terms over `c` and `k`:
+gains `fn_sync : gname` (the instance's sync list), `fn_era : nat` (the
+instance's era, PURE) and its role.  The era-record predicate the raw laws
+take (`Ok r := fn_era r = k`, `App.al_ok`) is how a law learns the running
+claim's era: it is a pure fact about the record, parked at the mint
+(`⌜app_ok app_run⌝` in `app_body`) and minted from `app_boot` at the
+boot era (`al_boot_ok`); a `mono_nat` fragment bounds only from below
+and cannot pin it.  The token and the hook family, closed terms over `c`
+and `k`:
 
-    Tk c k   := ∃ γs Ls, k ↪[ugn_reg c]□ γs ∗ ●{¼}_{γs} Ls
-    Hk c k Q := ∀ gt I r r', ghost_map_auth gt ½ I -∗ ▷ file_pred c r' (abs_view I)
+    Tk c k   := ∃ γs Ls, S k ↪[ugn_reg c]□ γs ∗ ●{¼}_{γs} Ls ∗ ◯ ugn_cm (S k)
+    Hk c k Q := ∀ gt I r r', ⌜fn_era r = S k⌝ -∗ ⌜fn_era r' = S k⌝ -∗
+                 ghost_map_auth gt ½ I -∗ ▷ file_pred c r' (abs_view I)
                  -∗ ▷ file_pred c r (abs_view I) -∗ Tk c k ={∅}=∗ (the same four) ∗ Q
 
 **The sync part of the claim** (`file_pred c r av` gains `sync_claim c r
 av`; `role r` tells the copy from the running claim, a field of
 `file_names`):
 
-    copy:     ∃ k Ls, k ↪□ (fn_sync r) ∗ ●{½}_{fn_sync r} Ls ∗ ● ugn_cm k ∗ gen_started k
-              ∗ ◯⊒ls ∗ ⌜chain ls Ls⌝ ∗ ⌜fcontent av ∈ uadm ls (last Ls)⌝
-    running:  ∃ k Ls, k ↪□ (fn_sync r) ∗ ●{¼}_{fn_sync r} Ls ∗ ◯ ugn_cm k ∗ gen_started k
+    copy:     ∃ Ls, fn_era r ↪□ (fn_sync r) ∗ ●{½}_{fn_sync r} Ls ∗ ● ugn_cm (fn_era r)
+              ∗ ◯ ugn_st (fn_era r) ∗ ◯⊒ls ∗ ⌜chain ls Ls⌝ ∗ ⌜fcontent av ∈ uadm ls (last Ls)⌝
+    running:  ∃ Ls, fn_era r ↪□ (fn_sync r) ∗ ●{¼}_{fn_sync r} Ls ∗ ◯ ugn_cm (fn_era r)
               ∗ ◯⊒ls ∗ ⌜chain ls Ls⌝ ∗ ⌜fcontent av ∈ uadm ls (last Ls)⌝
 
 (`chain ls Ls`: consecutive records rise, `srec_le`; `●`/`◯` on `ugn_cm`
-are `mono_nat` authority and lower bound; `gen_started g` is the
-machine's persistent "era `g` has started"; `AppFile` has no `GenId`, so
-the era is existential in both arms and pinned by the counter.)
+are `mono_nat` authority and lower bound; `◯ ugn_st k` is the machine's
+started counter's lower bound at the fixed part's own copy of its gname,
+"`k` PowerOns have happened"; the era is the record's PURE field, and the
+laws learn the running claim's from `al_ok`.)  Both arms sit INSIDE the
+non-taint arm of `file_pred`; under the taint the sync part is absent and
+the hook's `Q` is `UT ∨ (…)`, as the ledger's conclusion already is.
 
 **The merge** (`al_merge`, the union's own; the WAL LENDS `start_auth n`
 with `n = gen_id + 1` into it -- `dur_merge` gains the loan, the permit and
-the ghost commit both hold it): the running claim's `◯ ugn_cm k_r` against
-the copy's `● ugn_cm k` gives `k_r ≤ k`; the copy's `gen_started k` against
-the loan gives `k ≤ gen_id`; the running claim's era is `gen_id` (its
-registration was minted at this era's PowerOn, and the founding keeps
-`k_r = gen_id` as a pure fact in the era's record), so `k = gen_id`; the
-registry pins `fn_sync r_o = fn_sync r`; the token agrees the three lists;
-the half and the counter move into the new copy, the token is returned,
-the new copy's witness is the running claim's.
+the ghost commit both hold it): the law is at `Ok r := fn_era r = S
+gen_id`, so the running claim's era is `S gen_id`; its `◯ ugn_cm (S
+gen_id)` against the copy's `● ugn_cm (fn_era r_o)` gives `S gen_id ≤
+fn_era r_o`; the copy's `◯ ugn_st (fn_era r_o)` against the loan's
+`start_auth (gen_id + 1)` gives `fn_era r_o ≤ S gen_id`; so the eras agree,
+the registry pins `fn_sync r_o = fn_sync r`, the token agrees the three
+lists, the half and the counter move into the new copy (`r' := r{role :=
+copy}`, so `Ok r'`), the token is returned, the new copy's witness is the
+running claim's.
 
-**The hook** (`Hk` above, the union's `Fs`): the guest is the new copy
-(the hooked law applied the merge first), so guest ½ + running ¼ + token ¼
-is the full authority; append `r = (length ls', fcontent av)` with `ls'`
-sh's lower bound including the sync line; rewrite both witnesses to `uadm
-ls' r` (`uadm_self`; the chain rises because the running state was in
-`uadm ls (last Ls)`); `Q := ◯⊒_{γs} (Ls ++ [r]) ∗ ◯ ugn_cm gen_id ∗ ⌜r =
-(length ls', fcontent av)⌝`.
+**The hook** (`Hk` above, the union's `Fs`): both records are this era's
+(`Ok`), the guest is the new copy (the hooked law applied the merge
+first), so guest ½ + running ¼ + token ¼ is the full authority; append
+`r = (length ls', s)` with `ls'` sh's lower bound including the sync line
+and `s` THE DEED'S STATE (sh spends `f_ok av s` inside the hook, so the
+record is stated over what the model's `lm_upto` is stated over, not over
+the view); rewrite both witnesses to `uadm ls' r` (`uadm_self`; the chain
+rises because the running state was in `uadm ls (last Ls)`); `Q := UT ∨
+(◯⊒_{γs} (Ls ++ [r]) ∗ ◯ ugn_cm (S gen_id) ∗ ⌜r = (length ls', s)⌝)`.  The
+bridge to the model's `usync_last` (an EQUALITY, `lm_good_sync`) is
+checked FIRST in lane A4.
 
-**PowerOn.**  The machine's power step runs the ledger's hook `Hobs` and
-then the slot's `Hswap`; SY3-A LENDS `Hobs`'s yield (the turn `Tn`) INTO
-`Hswap` and takes a second yield `Tn'` out of it to the boot
-(`RiscvAdequacy.riscv_power_adequacy`'s `Hswap` and `power_boot_res`; a
-small machine change, the only one besides `dur_merge`'s loan).  The
-transport (`al_xfer`, now `□ ∀ r av, Tn -∗ ▷ A r av ==∗ Tn' ∗ ∃ r_s r', ▷
-A r_s av ∗ ▷ A r' av ∗ B r'`, the slot repacked at `r_s`) then has, from
-the copy: `●{½}_{γs_k} Ls_c`, `● ugn_cm k`, its witness; from `Tn` (the
-ledger's on-arm at era `k+1` allocates `γs_{k+1}` at `[]` with full
-authority and registers it): `k+1 ↪□ γs_{k+1}`, `●_{γs_{k+1}} []`, the
-ledger's FLOOR of era `k`, `◯⊒_{γs_k} F_k`, and the pure data `F_k`.  It
-derives `F_k ⊑ Ls_c` (the half against the fragment), hence the last
-completed record `r_m = last F_k` is in `Ls_c` and `s0 ∈ uadm ls (last
-Ls_c) ⊆ uadm ls r_m` (`uadm_shrink_chain`); updates `γs_{k+1}`'s list to
-`Ls_c`; bumps the counter to `k+1` (the started auth `Hswap` is lent
-gives the bound; RISK R5: confirm the count is the new era's); splits: ½
-and the counter into the re-based copy `r_s = r{fn_sync := γs_{k+1}}`, ¼
-into `r'` (the running claim, with `◯ ugn_cm (k+1)` and `gen_started
-(k+1)`), ¼ into `Tn'` as the token `Tk c (k+1)`; drops the dead era's
-half; and puts into `Tn'`, for `/init`, the persistent `◯⊒_{γs_{k+1}}
-Ls_c` and the pure boot fact.  **The founding** (`al_found`, replacing
-K3-2's `HTk`; at `xv6_boot_era` with `Tn'`): hands the token to `initlog`
-(`Htok`), the running claim to `app_inv_alloc`, and the rest of `Tn'` to
-`/init`, which files it with `f0_bl`; the ledger reads it at the first
-drain: `F_{k+1} := Ls_c`, and the model's boot relation `s0 ∈ uadm
-(ulines_before h (S k)) r_m`.
+**PowerOn.**  The machine's power step runs the ledger's hook `Hobs`,
+then the slot's `Hswap`, then (ruled at the review) the ledger's RETURN
+hook `Hback`, all in one power step; SY3-A lends `Hobs`'s yield (the turn
+`Tn`) INTO `Hswap`, takes `Tn'` out of it into `Hback`, and `Tn''` out of
+`Hback` to the boot (`RiscvAdequacy.riscv_power_adequacy` and
+`power_boot_res`; a small machine change, the only one besides
+`dur_merge`'s loan and the birth's gnames).  The transport (`al_xfer`,
+now `□ ∀ r av, Tn -∗ ▷ A r av ==∗ Tn' ∗ ∃ r_s r', ▷ A r_s av ∗ ▷ A r' av ∗
+B r'`, the slot repacked at `r_s`) has, from the copy: `●{½}_{γs_c} Ls_c`
+at the copy's era `fn_era r`, `● ugn_cm (fn_era r)`, its witness; from `Tn`
+(the ledger's on-arm at era `S gen` allocates `γs` at `[]` with full
+authority and registers it): `S gen ↪□ γs`, `●_{γs} []`, and the ledger's
+FLOOR `◯⊒_{γs_c'} F` at the era `c'` of the copy it last saw (see "The
+ledger").  It derives `F ⊑ Ls_c` (the half against the fragment -- the
+ledger's floor is always at the copy's gname, by the return path), hence
+the last completed record `r_m = last F` is in `Ls_c` and `s0 ∈ uadm ls
+(last Ls_c) ⊆ uadm ls r_m` (`uadm_shrink_chain`); updates `γs`'s list to
+`Ls_c`; bumps the counter to `S gen` (the started auth `Hswap` is lent,
+at the new era's count `gen + 1`, bounds it; R5); splits: ½ and the
+counter into the re-based copy `r_s = r{fn_sync := γs; fn_era := S gen}`,
+¼ into `r'` (the running claim at `S gen`, with `◯ ugn_cm (S gen)`), ¼ into
+`Tn'` as the token `Tk c gen`; drops the dead era's half; and puts into
+`Tn'`, for the ledger's return hook, `◯⊒_{γs} Ls_c`, `◯ ugn_cm (S gen)` and
+the pure `Ls_c` and boot fact.  **The return hook** (`al_back`): the ledger
+takes those, sets its floor to `(γs, Ls_c)` and files the model's boot
+relation for the cycle (`s0 ∈ uadm (ulines_before h (S k)) r_m`, its
+premise for `union_phi_sync_body_drain` at the era's first drain), and
+passes the rest of `Tn'` on as `Tn''`.  **The founding** (`al_found`,
+replacing K3-2's `HTk`; at `xv6_boot_era` with `Tn''`): hands the token
+to `initlog` (`Htok`), `⌜al_ok … app_run⌝` (from `al_boot_ok`) and the
+running claim to the mint, and the rest to `/init`'s turn.  `/init` files
+NOTHING for the sync part (the drainless-era trace is thereby covered: the
+ledger's floor is refreshed at every PowerOn, drain or no drain).
 
 **Birth** (era 0, before the first PowerOn): `al_birth` allocates
 `ugn_reg` with `{0 ↦ γs_0}` and `ugn_cm` at `0`; its yield is SPLIT: the
@@ -477,36 +505,17 @@ registry's auth, `●{½}_{γs_0} []` and the era-0 floor go to the trace slot
 ↪□ γs_0` go to the CRASH slot's `Happ_init` (`RiscvAdequacy`'s `HPc` gains
 the birth's slot part; every landed application's slot part is `True`).
 So the initial copy is an ordinary copy at era 0 and the first PowerOn
-re-bases it like every other.
+re-bases it like every other.  With the four gnames at the birth, the
+kernel's `Tk`/`Hk` take no gnames (`CT -> nat -> …`).
 
-**The ledger** (`union_led`): the line list becomes the FULL list
-(`UnionAdm.ulines_of`, every complete line; sh's `flw` and `f_typed` read
-the redirect lines through `omap echof_ws`, `ulines_of_echof`); the
-registry's auth; the PREVIOUS era's floor `◯⊒_{γs_k} F_k` with `F_k` pure
-(kept across PowerOff, timeless; replaced at the next era's first drain by
-`F_{k+1}`, extended at every sync prompt); `union_phi_res` over `sync3-m`'s
-`W : list (fstate * option srec)`; at a sync round's prompt sh files `Q`
-(persistent) and the ledger extends the floor and matches `r` with the
-model's `usync_last`.
-
-*Built (SY3-A2):* the full line list.  `AppFile.fl_auth`/`fl_lb` are over
-`fl_line := FileDisc.uline` (camera `fa_fl : mono_listR (leibnizO fl_line)`);
-every reader of redirect lines reads `fl_redirs ls` (a notation for `omap
-FileDisc.echof_ws ls`): `f_typed`'s and `FileOut.f0_typed`'s rows
-(`f_bytes_typed` itself stays over the projected `fwline` list), sh's
-`FileLinksLine.flw`, `f0_typed_adm`'s `fadm_boot (fl_redirs Lp)`, and
-every open/write contract's `(N, ws) ∈ fl_redirs ls`.  The union's
-`union_led` and `utag` hold `UnionAdm.ulines_of h` (grown at the rx step
-by `ulines_of_snoc`, fixed by `ulines_of_out`/`ulines_of_power`); the
-file application's `FileOut.efl_of` is the file parser's full list
-(`efl_of_echof`).  **The conclusion is NOT yet switched**: the ledger and
-`union_adequacy_closed` keep the landed `union_phi` (over `s0s : list
-fstate`); the model's body is `union_phi_sync`.  The per-cycle record is
-FORCED by the cycle's resolution (`lm_good_sync`'s `o = usync_last …`),
-and `sync` is admitted with `RSyncRan`, so once a sync completes the
-drain must file `Some r` and the next era's first drain must meet `uadm`
-at that record -- which only the durability link (A3) and sh's filing
-(A4) provide.  The switch is A4's.
+**The ledger** (`union_led`): the line list is the FULL list (landed,
+A2); the registry's auth; ONE floor `(γs_F, F)` -- `◯⊒_{γs_F} F` with `F`
+pure, timeless, kept across PowerOff -- always at the gname of the copy
+the ledger last saw: set by the return hook at every PowerOn, extended at
+every sync prompt (`Q`'s fragment is at the same gname: the hook ran in
+the era the return hook set); `union_phi_res` switches to `union_phi_sync`
+at A4, with the cycle's boot relation filed by the return hook and the
+completed sync's `o = Some r` filed at the prompt.
 
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
@@ -515,8 +524,9 @@ at the boot era from the record-shape equation and carried in
 `union_links`; the hook's body uses sh's lend (the deed's state `s`, the
 tie `f_ok av s`, `◯⊒ls'` from `flw` over the full list).
 
-**Adequacy**: the `App` record gains `al_merge`, `al_found`, `al_sync_run`,
-the values `al_tk`/`al_hk`, and the birth's slot part; the transport's
+**Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
+`al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
+birth's slot part and its gnames; the transport's
 shape changes as above; `SystemAdequacy.xv6_power_adequacy_gen` takes them
 in place of K3-2/K3-3's `HTk`/`HHk`/`Htok`/`Happ_sync_run` and of the
 merge-from-transport derivation (`app_xfer_raw_of_boot` goes; landed
