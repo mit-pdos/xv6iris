@@ -93,8 +93,13 @@ branches of the UNCHANGED C (`kernel/log.c` `sys_sync`).  Design §4.2-4.3
 as revised at the K3 cut are the rulings; the four sub-lanes below are
 sequential except where marked, each a green landing on `main`.
 
-State: K3-1 ON MAIN (`61ebcc249`: `iris/HartCustody.v`); K3-2 in flight on
-branch `sync3-k3-2` (worktree `/shared/xv6iris-3k`); K3-3, K3-4 not started.
+State: K3-1 ON MAIN (`61ebcc249`: `iris/HartCustody.v`); K3-2 ON MAIN
+(`6a9fdb836`: the two fixed-record slots with adequacy's `Tk`/`Hk` and the
+`_gen` theorem's birth premise `HTk`, `logG.loghelp_inG`, `ln_help`, the
+token and the empty help map in `log_free_tok`, `Htok` at `xv6_boot_era`;
+`FsCfg*`'s `GenId` binders qualified -- they were fresh type variables);
+K3-3 in flight on branch `sync3-k3-3` (worktree `/shared/xv6iris-3k`);
+K3-4 not started.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
