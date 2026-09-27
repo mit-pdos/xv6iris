@@ -34,7 +34,7 @@
 (*  WAL's commit permit no longer ALLOCATES the file system's snapshot     *)
 (*  from a value it cannot check: the file system builds its own epoch,    *)
 (*  at the one ghost step where its invariants are open, and the WAL only  *)
-(*  swaps the registry over ([FsDurSnap.dsnap_step_xfer]).                 *)
+(*  swaps the registry over ([FsDurSnap.dsnap_step_merge]).                *)
 (*                                                                        *)
 (*  WHY THE PREMISES ARE THE ROWS OF [FsBlocks.fs_bytes_body] AND NOT      *)
 (*  [FsCollect.col_auth].  This file sits BELOW [LogInv], which sits below *)
@@ -84,7 +84,8 @@ Section SnapLaw.
 
      ...AND THE GUEST BESIDE IT (app-instances.md round C).  The law
      produces the PAIR [FsDurSnap.dur_pair]: the file system's snapshot and
-     an OPAQUE guest [G] at the snapshot's map name, under a later.  The WAL
+     the MERGE of an OPAQUE guest [G] at the snapshot's map name, the wand
+     the commit's permit applies to the old guest (SY3-K2).  The WAL
      never learns what [G] is -- the one law the tree builds is at
      [AppDur.app_guest] ([FsCollectAll.fs_snap_law_build]) -- and no file
      below [fileG] binds the application's record. *)

@@ -38,7 +38,7 @@
 (*  epoch is [FsDurSnap.P_dur], whose gname family is existentially        *)
 (*  closed and which is INDEXED BY THE COMMITTED MAP ALONE: an epoch is    *)
 (*  named only by the map it stands at.  A commit DROPS the old epoch and  *)
-(*  allocates a fresh one ([FsDurSnap.dsnap_step_xfer]), so no resource of *)
+(*  allocates a fresh one ([FsDurSnap.dsnap_step_merge]), so no resource of*)
 (*  the epoch survives to be compared.  What does survive is the mono-list *)
 (*  [FsCrash.fcn_hist], and it is exactly a counter with its values        *)
 (*  attached: index [b] IS the b-th commit, and [flushed_at_agree] below   *)

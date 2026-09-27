@@ -38,7 +38,7 @@
    epoch's shape ([fs_snap], [P_dur]), the mint off a SOURCE INSTANCE
    ([P_dur_alloc_xfer], EV-Y: the transport is the caller and no pure
    disjointness fact is materialised), the reading back out
-   ([fs_snap_read_ok]) and the commit's swap ([dsnap_step_xfer]).
+   ([fs_snap_read_ok]) and the commit's swap ([dsnap_step_merge]).
 
    [FsStateDefs.phi_excl] HOLDS AT THE SNAPSHOT ([snap_gamma_excl]), so
    [FsStateBitmap.free_pool_used] -- hence xv6's "freeing free block"
@@ -902,14 +902,25 @@ Section Snap.
   Global Instance P_dur_timeless D : Timeless (P_dur D).
   Proof using . rewrite /P_dur. apply _. Qed.
 
-  (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name,
-     the guest UNDER A LATER -- the transport yields [▷ A], so this is the
-     shape every producer of a durable pair can reach, and the shape the
-     WAL's commit permit takes ([LogSnapLaw.snap_law_out]).  The WAL never
-     learns what [G] is; the one value the tree supplies is
-     [AppDur.app_guest]. *)
+  (* THE GUEST'S MERGE (SY3-K2): the new guest at [gt] out of whichever
+     old guest the crash slot holds.  The commit builds it at the
+     collection, where the running claim is in hand and the old guest is
+     not, and the header write's permit -- where the old guest is in hand
+     and the running claim is not -- applies it ([dsnap_step_merge]).  A
+     BASIC update, so it runs at the permit's mask [∅]; the guest stays
+     OPAQUE, and a guest with nothing to carry drops the old one
+     ([AppInv.app_merge_raw_of_xfer]). *)
+  Definition dur_merge (G : gname -> iProp Σ) (gt : gname) : iProp Σ :=
+    (∀ gt_o : gname, ▷ G gt_o ==∗ ▷ G gt)%I.
+
+  (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name
+     -- since SY3-K2 the guest's MERGE rather than the guest itself, so the
+     old durable copy is read, not dropped.  Under a later, because the
+     application's laws yield [▷ A]; this is the shape the WAL's commit
+     permit takes ([LogSnapLaw.snap_law_out]).  The WAL never learns what
+     [G] is; the one value the tree supplies is [AppDur.app_guest]. *)
   Definition dur_pair (G : gname -> iProp Σ) D : iProp Σ :=
-    (∃ gt : gname, P_dur_at gt D ∗ ▷ G gt)%I.
+    (∃ gt : gname, P_dur_at gt D ∗ dur_merge G gt)%I.
 
 
 
@@ -1467,12 +1478,18 @@ Section Snap.
      is DELETED: the file system builds its own epoch, and the guest beside
      it, at its own ghost step where its invariants are open
      ([FsCollectAll.fs_snap_law_build]), and the WAL only swaps the pair
-     over.  The old snapshot AND the old guest are DISCARDED (affine);
-     nothing is read out of either, which is why the step needs no premise
-     about [D] at all.  The guest stays OPAQUE here. *)
-  Lemma dsnap_step_xfer (G : gname -> iProp Σ) (gt : gname) D D' :
-    dur_pair G D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗ dur_pair G D'.
-  Proof using . iIntros "H _ _". by iModIntro. Qed.
+     over.  The old snapshot is DISCARDED (affine) and nothing is read out
+     of it, which is why the step needs no premise about [D] at all; the
+     old GUEST goes to the pair's merge (SY3-K2), which yields the new one.
+     The guest stays OPAQUE here. *)
+  Lemma dsnap_step_merge (G : gname -> iProp Σ) (gt : gname) D D' :
+    dur_pair G D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗
+      ∃ gt' : gname, P_dur_at gt' D' ∗ ▷ G gt'.
+  Proof using .
+    iIntros "H _ HG". rewrite /dur_pair /dur_merge.
+    iDestruct "H" as (gt') "[Hd Hm]".
+    iMod ("Hm" with "HG") as "HG". iModIntro. iExists gt'. iFrame "Hd HG".
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  8.  WHAT A CONSUMER READS OFF THE CURRENT SNAPSHOT                  *)

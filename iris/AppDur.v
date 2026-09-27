@@ -13,11 +13,13 @@
     claim about the map's view.  Agreement ([ghost_map_auth_agree]) is the
     identification: no binder is shared with the snapshot's own record.
 
-    THREE CROSSINGS, ONE TRANSPORT ([AppInv.app_xfer_raw]).  At the COMMIT
-    the file system's law ([FsCollectAll.fs_snap_law_build]) mints a fresh
-    snapshot and hands its guest half here, where the running claim is
-    copied onto it ([app_dur_raw_clone]).  At POWER-ON the clone
-    ([FsCrash.P_fs_swap]) does the same off the crash slot's own guest.  At
+    THREE CROSSINGS.  At the COMMIT the file system's law
+    ([FsCollectAll.fs_snap_law_build]) mints a fresh snapshot and hands its
+    guest half here, where the MERGE ([AppInv.app_merge_raw], SY3-K2) turns
+    the running claim into a wand from the old guest to the new one
+    ([app_dur_raw_merge]), applied at the header write.  At POWER-ON the clone
+    ([FsCrash.P_fs_swap]) runs the TRANSPORT ([AppInv.app_xfer_raw]) on
+    the crash slot's own guest (the shape [app_dur_raw_clone] states).  At
     the BOOT the lent guest meets the clone's kernel half, agreement pins
     the founded map, and the claim goes straight into the era's running
     invariant ([app_dur_raw_agree], then [AppInv.app_inv_alloc]).
@@ -42,7 +44,7 @@ Require Import Xv6Cameras.      (* [fsTopG]: the top map's ghost class *)
 Require Import FsNode.          (* [fs_node] *)
 Require Import FsAbsDefs.       (* [aview], [abs_view] *)
 Require Import AppCfg.          (* [appcfg]: [app_pred] *)
-Require Import AppInv.          (* [app_xfer_raw]: the transport *)
+Require Import AppInv.          (* [app_xfer_raw]: the transport; [app_merge_raw]: the merge *)
 
 Local Open Scope Z_scope.
 
@@ -98,6 +100,29 @@ Section AppDurRaw.
     iIntros "#Hx Hh Hp". rewrite /app_xfer_raw.
     iMod ("Hx" with "Hp") as "[Hp Hnew]".
     iModIntro. iFrame "Hp". iApply (app_dur_raw_pack with "Hh Hnew").
+  Qed.
+
+  (* THE MERGE (the commit, SY3-K2): run the merge on the running claim,
+     keep the original, and hand out the guest-level wand the WAL applies
+     to the old guest at the header write ([FsDurSnap.dur_merge]).  The
+     fresh guest half goes INTO the wand beside the merge's own; the old
+     guest's half is dropped with it, its claim goes to the merge. *)
+  Lemma app_dur_raw_merge {N} (A : N -> aview -> iProp Σ) (gt : gname)
+      (I : gmap Z fs_node) (r : N) :
+    app_merge_raw A -∗
+    ghost_map_auth gt (1/2) I -∗
+    ▷ A r (abs_view I) ==∗
+      ▷ A r (abs_view I) ∗
+      ∀ gt_o : gname, ▷ app_dur_raw A gt_o ==∗ ▷ app_dur_raw A gt.
+  Proof using .
+    iIntros "#Hm Hh Hp". rewrite /app_merge_raw.
+    iMod ("Hm" with "Hp") as "[Hp Hw]". iDestruct "Hw" as (r') "Hw".
+    iModIntro. iFrame "Hp". iIntros (gt_o) "Hold".
+    iMod ("Hw" with "[Hold]") as "Hnew".
+    { iNext. iEval (rewrite /app_dur_raw) in "Hold".
+      iDestruct "Hold" as (r_o I_o) "[_ Hold]".
+      iExists r_o, (abs_view I_o). iExact "Hold". }
+    iModIntro. iApply (app_dur_raw_pack with "Hh"). iExists r'. iExact "Hnew".
   Qed.
 
   (* AGREEMENT (the boot, and the PowerOn arm): a guest against a kernel

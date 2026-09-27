@@ -514,13 +514,14 @@ Section SystemBoot.
          APPLICATION's yield at the power-on step now and ride
          [power_boot_res] itself, already AT the fixed record's fields, so
          this entailment neither names them nor ties them. *)
-      (* THE TRANSPORT (app-instances.md round C, section 1): the
-         application's one durability obligation, parked in the era's
-         invariant by the mint and carried to fsinit on the kit, where the
-         commit's law copies the running claim onto each fresh snapshot.
-         The boot itself needs no transport: the lent durable claim IS the
+      (* THE MERGE (app-instances.md round C, section 1; SY3-K2): the
+         application's durability obligation at the commit, parked in the
+         era's invariant by the mint and carried to fsinit on the kit,
+         where the commit's law turns the running claim into the merge of
+         the old durable copy into each fresh snapshot's.  The boot itself
+         needs neither it nor the transport: the lent durable claim IS the
          era's running one. *)
-      (Happ_xfer : ⊢ app_xfer_raw A)
+      (Happ_merge : ⊢ app_merge_raw A)
       (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c), and it is the ONE thing
          the application owes the kernel about user execution.  THE KERNEL
          NEVER MINTS A SLOT: forkret's boot arm runs kexec("/init") between
@@ -767,16 +768,16 @@ Section SystemBoot.
     iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
     (* THE APPLICATION'S RUNNING CLAIM IS THE LENT DURABLE ONE (round C):
        [Hok] is at the founded map [fss_inodes S], later-shaped, at the
-       instance [r] the transport minted; the transport comes with it, and
+       instance [r] the transport minted; the merge comes with it, and
        the seam at the application's guest goes down to fsinit on the kit.
        All of it goes into the mint through [boot_shared_alloc]. *)
-    iPoseProof Happ_xfer as "#Hxfer".
+    iPoseProof Happ_merge as "#Hmerge".
     (* THE ERA'S TWO PORT CLAIMS ARE NOT HERE (lane CONS-IO milestone E):
        they ride [power_boot_res] straight into the mint, which unpacks and
        consumes them at [Uart0]. *)
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn gsn gln gtn Hbf Hbundle
-            with "Hok Hxfer Hseamg Hdursnap Hres")
+            with "Hok Hmerge Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
       "(%Hdimg & %Hcnu & %Hcne & %Happ & #Htext & #Hdata &
         #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
@@ -1581,7 +1582,11 @@ Proof.
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ Hufd _ _ _ _ _ _ gen g' sb nib cov
             app_names (app_fs Gcl) (app_boot Gcl)
             (Tnn Gcl (Datatypes.S gen))
-            (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen)))
+            (* every landed application's merge is its transport's
+               (SY3-K2): the old durable copy dropped, the running claim
+               copied *)
+            (app_merge_raw_of_xfer _
+               (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen))))
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
                  Hr Hifacefix Hgenfix)
