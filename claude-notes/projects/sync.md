@@ -111,7 +111,7 @@ throughout), a fourth in the PowerOn floor (a drainless era strands the
 ledger's floor at an old gname -- fixed by a RETURN hook after the swap,
 so `/init` files nothing), the taint arm and the hook's record over the
 deed's state; A1 re-cut done; A3 split into A3a/b/c.
-SY3-A: A2 ON MAIN (`b875e390b`).  A1 DONE on branch `sync3-a1` (re-cut
+SY3-A: A2 ON MAIN (`b875e390b`).  A1 ON MAIN (`0c50c0dd9`; re-cut
 included): the merge's started-auth loan (`dur_merge G T gd`,
 `app_merge_raw A Ok T gd`, the hooked law lent the custody auth), the
 era's record predicate `Ok` on both raw laws (pinned as ONE package
@@ -129,7 +129,8 @@ ledger and `union_adequacy_closed` KEEP the landed `UnionOutPure.union_phi`
 (over `s0s`), the model's body lands beside it as `union_phi_sync`
 (`union_phi_sync_body` and its steps; the demos state it) -- a completed
 sync forces the drain to file `Some r` (`lm_good_sync`), so the switch of
-the conclusion, and that filing, is A4's.  A3, A4 next.
+the conclusion, and that filing, is A4's.  A3a in flight (branch
+`sync3-a3a`, `/shared/xv6iris-3k`); A3b, A3c, A4 next.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
