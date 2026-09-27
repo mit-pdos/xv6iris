@@ -444,6 +444,28 @@ nothing on this path may close with a bare `iFrame` — `P_fs_named`'s body
 owns `disk_img_bytes γd 0 (disk_read dk0 0 N)`, a big-op of `N` bytes
 behind a `Definition`, and framing delta-unfolds it (SystemAdequacy.v:
 7 s → unbounded at 32 GB).
+### Custody mid-era: the second opener of `crash_inv` (`HartCustody`, sync K3-1)
+
+`RiscvPtsto.crash_inv`'s comment names the DMA completion
+(`WpUart.wp_disk_loop`) as the invariant's only opener; that comment is
+left as it stands (an edit there would rebuild the whole tree) and this
+paragraph amends it.  **`HartCustody.wp_crash_fupd` is the second
+opener**: for any expression of a thread's own generation, a client fupd
+runs with `crashN` open at `⊤`, against `state_interp`'s
+`start_auth (gen_id + 1)`, and hands back `mWP e` -- a `mWP e -∗ mWP e`
+rule the durability work's ghost commit uses at an arbitrary point of a
+kernel proof (`design/sync.md` §4.3 item 3a).  It needs NO step because
+the WP is unfolded once (`wp_unfold`): the fupd runs at `⊤` before
+`wp_pre`'s `={⊤,∅}` mask change, and the SAME `state_interp` is handed to
+the continuation's own unfolding, which then takes whatever step it was
+going to take.  The live/dead split is `RiscvExec.wp_hart_step`'s: LIVE
+pins `start_count g = gen_id + 1`; DEAD hands the untouched
+`state_interp` to the unfolded `wp_dead` (the hook never runs -- a dead
+thread's continuation is unreachable); current-but-off is refuted by
+`gen_started`.  Nothing in the instruction chain changes -- no leaf rule
+takes a hook, and the opening composes with the DMA completion's because
+the two never overlap in one fupd.
+
 ## Decision record (rejected shapes, and why)
 
 - **Per-thread crash `prim_step` absorbed by a WP engine** (the
