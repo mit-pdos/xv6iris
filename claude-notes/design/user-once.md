@@ -282,7 +282,11 @@ statement with the constants named as parameters.
   vs `5`) and entry theorem as fields.  The `line_ok` premise is NOT a
   field: it is the echo instance's way of establishing `cs_argv`, and
   `UkShCat.cat_line_premises_absurd` is the proof that it must not be
-  generic.
+  generic.  AS LANDED (C2, 2026-09-27): no record.  Upstream's
+  `UkShEcho.wp_kshr_exec_x_at` is the arm with the fields as parameters
+  (`Fd1`, `ws` at the command's own base, `dg`; premise `exec_ok`), the
+  union already runs cat through it, and cat's twin arm chain in
+  `UkShCat` / `UShCatPay` was dead and is deleted.
 - **`exec_sup (P : program) (S : fd_stream)`**: the U-tier exec rule
   `ExecRun.udepw_at_refR_of_sup` with (W) `exec_walk_of_pin` at the
   program's pin, (L) `kexec_loadable P.elf`, (E) `P.entry S`, the taint

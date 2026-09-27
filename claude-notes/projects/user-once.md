@@ -316,10 +316,26 @@ console instance waits for its M3.
   `0x3000 + 8 * Z.of_nat 12` is conversion).  cat's own three rows
   (`cat_kexec_bufrow`/`_argnz`/`_argpath`) stay cat's, off `cat_kexec_geom`.
   Gate: 27 files (the cone above `UShEcho`), 0 errors, nothing pending; audits unmoved (system 13, tree 13, file 14, pipe 14).
-- [ ] **C2** `cmd_spec` and `sh_exec_arm C` (from `UkShEcho`; the three
-  differences `UkShCat.v`'s header lists are the fields); echo's and cat's
-  arms as instances; `cat_line_premises_absurd` becomes the note on why
-  `line_ok` is not a field.
+- [x] **C2** `cmd_spec` and `sh_exec_arm C` -- LANDED AS READ OFF THE TREE
+  (2026-09-27, branch `user-once/A4`).  No record was needed: upstream's
+  `UkShEcho.wp_kshr_exec_x_at` (2026-09-21) IS the one exec arm, with the
+  three differences as its parameters -- the fd row `Fd1`, the words `ws`
+  read at the command's own base through `echo_argv_bytes` (the union's
+  pipe stages apply it for cat at `s0 + co` / `fun j => gs (co + j)`,
+  `UShPipesStage`), the diagnostic's alternative `dg` with the law index
+  `13 + length (ws !!! 0)` -- and its line premise is `exec_ok`, not
+  `line_ok`.  Its instances: echo's `wp_kshr_exec_echo_at_holds`, the
+  redirect child (`UkShRedirChild`), the union's filter stages and the cat
+  file stage (`UShCatFStage`).  cat's OWN arm chain was a dead twin:
+  `UkShCat`'s supply `sh_exec_sup_cat_at`, the node accessors, the
+  diagnostic instance `wp_kshd_execfail_cat` and the arm
+  `wp_kshr_exec_cat_at_holds` (S2-S4), and `UShCatPay`'s readings over
+  `ExecArgs`, `sh_exec_sup_cat_of_entry` and
+  `wp_kshr_exec_cat_paid_of_entry` (sections 3 and 7) had no consumer.
+  DELETED: `UkShCat` 739 -> 163 lines (the command as a value and the
+  anti-vacuity witness stay; `cat_line_premises_absurd` is the note on why
+  `line_ok` is not a parameter), `UShCatPay` 462 -> 225 (the path, the pin,
+  the slot ingredients stay).  Gate and audits: with A4's commit.
 - [ ] **C3** `exec_sup P S` (from `UShEchoPay`); `UShEchoPipePay`,
   `UShRedirPay`, `UShCatPay` as instances.  Exit: one supply lemma, four
   one-line instances.
@@ -392,7 +408,10 @@ blocked steps 2-3 for a day.
 **A4 (2026-09-27) closed lane A for real**: see the A4 entry above -- the
 symbol-free copy was still live under `UkShEcho`'s child walks; now gone.
 
-**Next.**  C2 (`cmd_spec` / `sh_exec_arm C`); C3 shrank (upstream deleted
+**C2 (2026-09-27)** landed as a deletion: the one arm already existed
+upstream (see the C2 entry).
+
+**Next.**  C3 shrank (upstream deleted
 `UShEchoPay` / `UShRedirPay`; `UShCatPay` and `UShEchoPipePay` remain);
 lane B must be re-scoped first: upstream's sweeps (2026-09-24/25) deleted
 `UCatKernel` / `UCatOut` / `UCatPipe` / `UShPipeCatRound` / `UShRound` /
