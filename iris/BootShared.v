@@ -1662,6 +1662,9 @@ Section BootAlloc.
        fsinit's kit (round C) *)
     app_merge (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (FsImg.sb_logstart sb) -∗
+    (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2), straight
+       through to the mint, which puts it in the log names' free bundle *)
+    riscv_sync_tok gen_id -∗
     (* THE DURABLE SNAPSHOT, LENT BY THE POWER ARM (durable-disk BT-3).
        It arrives on [power_boot_res]'s [Rb] conjunct as
        [FsCrash.P_fs_lend]; the caller splits that off
@@ -1877,7 +1880,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hok #Hmerge #Hseamg Hdursnap H".
+    iIntros "Hok #Hmerge #Hseamg Hstok Hdursnap H".
     iDestruct (power_boot_res_unpack Rb Tn g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -2289,7 +2292,7 @@ Section BootAlloc.
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
-            with "Hdimg Hbsauth Hbslots Hok Hmerge Hseamg Hdursnap")
+            with "Hdimg Hbsauth Hbslots Hok Hmerge Hseamg Hstok Hdursnap")
       as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried

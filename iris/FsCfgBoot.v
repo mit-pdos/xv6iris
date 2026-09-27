@@ -410,7 +410,7 @@ Qed.
 
 Section FsCfgBootPool.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, !irefslotG Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : RiscvLang.GenId}.
 
   (* the carve indexes by [elements A]; the pool by [A] *)
   Lemma big_sepS_of_elements {A0 : Type} `{Countable A0}
@@ -507,7 +507,7 @@ Section FsCfgBootEra.
      ([fsTopG] since durable-disk 2b-inode-3, [fsLinkG] since 2b-inode-4),
      so this file -- which is ABOVE the bundle -- binds [xv6G] and NEITHER
      member (durable-notes, "ONE BUNDLE PER GHOST CLASS"). *)
-  Context `{GEN : GenId}.
+  Context `{GEN : RiscvLang.GenId}.
 
   (* ---- two list/set conversions the era fupd needs -------------------- *)
 
@@ -713,7 +713,7 @@ Definition fs_boot_snap_wf (dk : Z -> bv 8) (ndisk : nat)
     [FirstTok.first_fsinit] reads any of them, so all three travel
     existentially. *)
 Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
-    `{XI : CtxIdDefs.CurCtx}
+    `{GEN : RiscvLang.GenId} `{XI : CtxIdDefs.CurCtx}
     (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (γd : uart_names) (γv : disk_names) (cnm : cons_names)
@@ -747,7 +747,7 @@ Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
    holds.  Stated at [∧] because that is what a persistent consequence of a
    linear bundle is; the proofmode splits it into the copy and the bundle. *)
 Lemma fs_boot_supply_app_inv `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}
-    `{GEN : GenId} `{XI : CtxIdDefs.CurCtx}
+    `{GEN : RiscvLang.GenId} `{XI : CtxIdDefs.CurCtx}
     (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ) (dk : Z -> bv 8)
     (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
     (γd : uart_names) (γv : disk_names) (cnm : cons_names)

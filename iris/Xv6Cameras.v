@@ -488,10 +488,16 @@ Class logG (Σ : gFunctors) := LogG {
      transaction" is what makes "every inode is well-formed" readable at a
      commit ([LogInv.log_tx], [InodeRegion.ireg_locked]). *)
   logtx_inG :: ghost_mapG Σ nat unit;
+  (* THE HELPING SLOT'S MAP (claude-notes/design/sync.md §4.2; [LogDefs.
+     ln_help]): a [sync] waiter's id to its escrow token's gname and the
+     [ncommit] word it read at its deposit.  A value type no other class
+     carries, so no second [ghost_mapG] instance can be confused with it
+     (the duplicate-class trap, [LogInv.v]'s header). *)
+  loghelp_inG :: ghost_mapG Σ nat (gname * SailStdpp.Values.mword 32);
 }.
 Definition logΣ : gFunctors :=
   #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)));
-    ghost_mapΣ nat unit].
+    ghost_mapΣ nat unit; ghost_mapΣ nat (gname * SailStdpp.Values.mword 32)].
 Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
 Proof. solve_inG. Qed.
 

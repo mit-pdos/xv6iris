@@ -613,7 +613,7 @@ Qed.
 
 Section SnapPool.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, !irefslotG Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : RiscvLang.GenId}.
 
   Lemma ipool_alloc_of_snap (γfs : fs_names) (γi : gname)
       (S : fs_state_rec) (P : Z -> list (bv 8)) (cov C A : gset Z) :
@@ -806,7 +806,7 @@ Definition snap_spent (S : fs_state_rec) (nib : nat) : gset Z :=
 
 Section SnapMint.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : RiscvLang.GenId}.
   (* the off ledgers' bodies hold ξ-indexed cells (off-ledger ruling), so
      the era mint runs at an ambient context, exactly as the kits do *)
   Context `{XI : CtxIdDefs.CurCtx}.
@@ -877,6 +877,12 @@ Section SnapMint.
        fsinit on the kit (round C) *)
     app_merge (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
+    (* ---- THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3):
+       the application's opaque durability token for this era, a client
+       slot of the fixed record.  Its birth is the log names' birth: it
+       goes into [LogDefs.log_free_tok], which initlog seals into the
+       first [log_res]. ---- *)
+    riscv_sync_tok gen_id -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
@@ -926,7 +932,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hstok Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -935,7 +941,7 @@ Section SnapMint.
     pose proof (sk_bytes Hok) as Hb.
     pose proof (sk_local Hok) as Hloc.
     (* ---- 1. the log's four gnames, at their genesis values ---------- *)
-    iMod log_ghost_alloc as (γlog) "Hlogtok".
+    iMod (log_ghost_alloc with "Hstok") as (γlog) "Hlogtok".
     (* ---- 2. THE INODE CACHE'S RECORD -------------------------------- *)
     iMod (icfg_alloc ROOTDEV nib
             (link_boot_map (region_inums nib))

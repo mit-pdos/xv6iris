@@ -77,7 +77,7 @@ Local Open Scope Z_scope.
 
 Section FsCfgKits.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : RiscvLang.GenId}.
   Context `{XI : CurCtx}.
 
   (* ==================================================================== *)

@@ -441,6 +441,9 @@ Record log_names := MkLogNames {
   ln_ep  : gname;   (* the batch epoch *)
   ln_lg  : gname;   (* the append registry *)
   ln_tx  : gname;   (* the open transactions (durable-disk lane A) *)
+  ln_help : gname;  (* the helping slot's map: sync waiters' ids to their
+                       escrow-token gname and the [ncommit] word they read
+                       (claude-notes/design/sync.md §4.2) *)
 }.
 
 (* ==================================================================== *)
@@ -580,6 +583,8 @@ End LogFrags.
 (* ==================================================================== *)
 Section LogGhostAlloc.
   Context `{!riscvGS Σ, !lockG Σ, !logG Σ}.
+  (* the era: the sync token below is this era's *)
+  Context `{GEN : GenId}.
 
   Definition log_free_tok (γ : log_names) : iProp Σ :=
     (lock_free_tok (ln_lk γ) ∗
@@ -588,17 +593,30 @@ Section LogGhostAlloc.
      own (ln_lg γ) (● (∅ : gset (nat * Z))) ∗
      (* the open-transaction authority, born empty: no transaction has run
         yet, which is [LogInv.log_res]'s [size T = size om] at both zeroes *)
-     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit))%I.
+     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ∗
+     (* the helping slot's authority, born empty: no [sync] waiter yet
+        (claude-notes/design/sync.md §4.2) *)
+     ghost_map_auth (ln_help γ) 1
+       (∅ : gmap nat (gname * SailStdpp.Values.mword 32)) ∗
+     (* ...and THE ERA'S SYNC TOKEN, the application's opaque slot of the
+        fixed record ([RiscvPtsto.riscv_sync_tok]).  Its birth is the
+        era's mint, which hands it here; initlog seals it into the first
+        [log_res] (sync.md §4.3 item 7). *)
+     riscv_sync_tok gen_id)%I.
 
-  Lemma log_ghost_alloc : ⊢ |==> ∃ γ : log_names, log_free_tok γ.
+  Lemma log_ghost_alloc :
+    riscv_sync_tok gen_id -∗ |==> ∃ γ : log_names, log_free_tok γ.
   Proof using .
+    iIntros "Hstok".
     iMod lock_ghost_alloc as (γlk) "Hlk".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=op_entry)) as (γops) "Hops".
     iMod (mono_nat_own_alloc 1%nat) as (γep) "[Hep _]".
     iMod (own_alloc (● (∅ : gset (nat * Z)))) as (γlg) "Hlg";
       [ apply auth_auth_valid; done | ].
     iMod (ghost_map_alloc_empty (K:=nat) (V:=unit)) as (γtx) "Htx".
-    iModIntro. iExists (MkLogNames γlk γops γep γlg γtx).
-    rewrite /log_free_tok /=. iFrame "Hlk Hops Hep Hlg Htx".
+    iMod (ghost_map_alloc_empty (K:=nat)
+            (V:=gname * SailStdpp.Values.mword 32)) as (γhelp) "Hhelp".
+    iModIntro. iExists (MkLogNames γlk γops γep γlg γtx γhelp).
+    rewrite /log_free_tok /=. iFrame "Hlk Hops Hep Hlg Htx Hhelp Hstok".
   Qed.
 End LogGhostAlloc.

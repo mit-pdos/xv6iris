@@ -325,7 +325,7 @@ Qed.
    lines later.  This is that pure conjunct, peeled off without spending the
    supply ([FsCfgBoot.fs_boot_supply_app_inv] is the shape). *)
 Lemma fs_boot_supply_uart {Sg : gFunctors} `{!riscvGS Sg, !xv6G Sg, !bioslotG Sg}
-    `{XI : CtxIdDefs.CurCtx}
+    `{GEN : GenId} `{XI : CtxIdDefs.CurCtx}
     (ICFG : icfg) (FSC : FsCfg.fscfg) (APP : appcfg Sg) (dk : Z -> bv 8)
     (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
     (gud : uart_names) (guv : DiskPtsto.disk_names) (cnm : cons_names)
@@ -386,13 +386,14 @@ Lemma fs_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (cov : gset Z) (ls : Z) (CT N : Type)
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname) (c : CT)
-    (* the application's console interface (redesign R4): carried by the
-       record literal, read by nothing here *)
+    (* the application's console interface (redesign R4) and its two sync
+       slots: carried by the record literal, read by nothing here *)
     (T : list mobs) (Ai : app_iface Σ)
+    (Tkp : nat -> iProp Σ) (Hkp : nat -> iProp Σ -> iProp Σ)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-          (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
+          (xv6_slot N app_fs cov ls γd γsw γreg γstart c) Tkp Hkp
           γobs T (obs_pred_at γobs) γhist Ai CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜fs_boot_pure cov ls (v_disk (g'.(gdev).(dvirtio)))⌝.
@@ -401,7 +402,7 @@ Proof.
            (xv6_slot N app_fs cov ls)
            (fs_boot_pure cov ls)
            (xv6_slot_project N app_fs cov ls)
-           Hinv γgen γstart γreg γd γsw γobs T (obs_pred_at γobs) γhist
+           Hinv γgen γstart γreg γd γsw Tkp Hkp γobs T (obs_pred_at γobs) γhist
            Ai c g').
 Qed.
 
@@ -431,10 +432,11 @@ Lemma xv6_trace_hook (Σ : gFunctors) `{!xv6G Σ, !riscvGpreS Σ}
     (app_fs : CT -> N -> FsAbsDefs.aview -> iProp Σ)
     (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs γhist : gname) (c : CT)
     (T : list mobs) (Ai : app_iface Σ)
+    (Tkp : nat -> iProp Σ) (Hkp : nat -> iProp Σ -> iProp Σ)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-          (xv6_slot N app_fs cov ls γd γsw γreg γstart c)
+          (xv6_slot N app_fs cov ls γd γsw γreg γstart c) Tkp Hkp
           γobs T (obs_pred_at γobs) γhist Ai CT c) g' -∗
     ▷ xv6_slot N app_fs cov ls γd γsw γreg γstart c -∗
     ◇ ⌜xv6_trace_pure cov ls g'⌝.
@@ -444,7 +446,7 @@ Proof.
      not spent and the disk projection still has it *)
   iDestruct (power_interp_resv_ok with "Hsi") as %Hresv.
   iDestruct (fs_trace_hook Σ cov ls CT N app_fs Hinv γgen γstart γreg γd γsw
-               γobs γhist c T Ai g' with "Hsi HP") as ">%Hdisk".
+               γobs γhist c T Ai Tkp Hkp g' with "Hsi HP") as ">%Hdisk".
   iModIntro. iPureIntro. split; [exact Hdisk | exact Hresv].
 Qed.
 
@@ -522,6 +524,13 @@ Section SystemBoot.
          needs neither it nor the transport: the lent durable claim IS the
          era's running one. *)
       (Happ_merge : ⊢ app_merge_raw A)
+      (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3): the
+         application's opaque slot of the fixed record at this era, which
+         the mint puts into the log names' free bundle and initlog seals
+         into the first [log_res].  A Coq-level premise beside the merge,
+         because what the token IS is the application's: the system
+         theorem discharges it from its [Tk] off the record shape. *)
+      (Htok : ⊢ |==> riscv_sync_tok gen_id)
       (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c), and it is the ONE thing
          the application owes the kernel about user execution.  THE KERNEL
          NEVER MINTS A SLOT: forkret's boot arm runs kexec("/init") between
@@ -772,12 +781,13 @@ Section SystemBoot.
        the seam at the application's guest goes down to fsinit on the kit.
        All of it goes into the mint through [boot_shared_alloc]. *)
     iPoseProof Happ_merge as "#Hmerge".
+    iMod Htok as "Hstok".
     (* THE ERA'S TWO PORT CLAIMS ARE NOT HERE (lane CONS-IO milestone E):
        they ride [power_boot_res] straight into the mint, which unpacks and
        consumes them at [Uart0]. *)
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn gsn gln gtn Hbf Hbundle
-            with "Hok Hmerge Hseamg Hdursnap Hres")
+            with "Hok Hmerge Hseamg Hstok Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
       "(%Hdimg & %Hcnu & %Hcne & %Happ & #Htext & #Hdata &
         #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
@@ -1140,6 +1150,17 @@ Theorem xv6_power_adequacy_gen Σ
        per-era credential for <init>, produced by the same power-on step and
        delivered to [Hinit_boot] below.  [App.xv6_app]'s [app_turn]. *)
     (Tnn : CT -> nat -> iProp Σ)
+    (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2), passed
+       through to [RiscvAdequacy.riscv_power_adequacy]'s [Tk]/[Hk] at the
+       same raw gnames and fixed part: the era's opaque token and the
+       family of a waiter's hooks.  [HTk] is the token's birth at every
+       era -- the boot's mint hands it to the log names' free bundle
+       ([xv6_boot_era]'s [Htok], read off the record shape).  Every landed
+       application takes [True] and [Q]. *)
+    (Tk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ)
+    (Hk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ -> iProp Σ)
+    (HTk : forall (γd γsw γreg γst : gname) (c : CT) (k : nat),
+       ⊢ |==> Tk γd γsw γreg γst c k)
     (* THE TRANSPORT (app-instances.md round C, section 1; section 6 ruling
        5): a copy of the claim can be made at fresh instance names without
        spending the original, under the later every crossing hands it over
@@ -1316,6 +1337,7 @@ Theorem xv6_power_adequacy_gen Σ
             boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
               (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                  γd γsw γreg γstart c)
+              (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
               γobs T (Pt γobs c) γhist (Ai c) CT c
           /\ @file_app Σ HF = MkAppcfg app_names (app_fs c) r
           /\ (i = Uart0 -> FsCfg.fsc_uart = γ)) ->
@@ -1331,6 +1353,7 @@ Theorem xv6_power_adequacy_gen Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
+               (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
                γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot app_names app_fs cov (FsImg.sb_logstart sb)
@@ -1451,6 +1474,8 @@ Proof.
                    iExists r, (fss_inodes (FsDurImg.img_state
                       (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib));
                    iSplitL "Hguest"; [iExact "Hguest" | iExact "Hcl"] ])
+           (* THE TWO SYNC SLOTS, straight through *)
+           Tk Hk
            (* THE PURE PROJECTION (stage H0): the crash predicate's own
               reading of the physical disk, at every era.  [P_fs_project] IS
               the obligation on the file system's half -- the durable auth
@@ -1587,6 +1612,9 @@ Proof.
                copied *)
             (app_merge_raw_of_xfer _
                (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen))))
+            (* the era's sync token: [riscv_sync_tok gen] IS [Tk .. Gcl gen]
+               at the record literal, by iota *)
+            (HTk Gt Gsw Gr Gs Gcl gen)
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
                  Hr Hifacefix Hgenfix)
@@ -1627,6 +1655,7 @@ Theorem xv6_power_adequacy Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
+               (fun _ => True%I) (fun _ Q => Q)
                γobs T (obs_pred_at γobs) γhist (app_iface_triv Σ) unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
@@ -1649,6 +1678,9 @@ Proof.
             (fun _ _ _ => emp%I)
             (fun _ : unit => app_iface_triv _)
             (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the token is [True], a hook is its own [Q] *)
+            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
+            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
@@ -1837,6 +1869,9 @@ Proof.
                  (wild_none_lic Cres)
                  wild_none (@wild_none_persistent _) (@wild_none_timeless _))
             (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the token is [True], a hook is its own [Q] *)
+            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
+            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
@@ -2111,6 +2146,7 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
                   (FsImg.sb_logstart fsimg_sb) γd γsw γreg γstart c)
+               (fun _ => True%I) (fun _ Q => Q)
                γobs T (obs_pred_at γobs) γhist (app_iface_triv xv6Σ)
                unit c) g' -∗
          ▷ xv6_slot unit (fun _ _ _ => True%I) fsimg_cov
@@ -2176,7 +2212,7 @@ Proof.
               xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb)
                 unit unit (fun _ _ _ => True%I)
                 Hinv γgen γstart γreg γd γsw γobs γhist c T
-                (app_iface_triv xv6Σ) g')
+                (app_iface_triv xv6Σ) (fun _ => True%I) (fun _ Q => Q) g')
            Hgen0 Hpow Hdisk).
 Qed.
 
@@ -2293,6 +2329,9 @@ Proof.
             (fun _ _ _ => emp%I)
             (fun _ : unit => app_iface_triv _)
             (fun (_ : unit) (_ : nat) => emp%I)
+            (* no sync ledger: the token is [True], a hook is its own [Q] *)
+            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
+            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();

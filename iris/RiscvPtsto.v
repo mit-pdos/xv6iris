@@ -632,6 +632,21 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ([disk_write_permit]).  Still an ARBITRARY predicate, and still nothing
      between here and the device thread names it. *)
   riscv_crash_pred : iProp Σ;
+  (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2, “where the WAL
+     names the application's two opaque things”).  The application's
+     durability token and the hooks a [sync] waiter hands the committer
+     live inside the LOG invariant -- the token in [log_res]'s idle arm,
+     the hooks in its helping slot -- so both need a type the WAL can write
+     and the application can match, at one place both can name.  This is
+     that place: [riscv_sync_tok k] is era [k]'s opaque token,
+     [riscv_sync_hook k Q] the family of a waiter's hooks at its promised
+     [Q].  Client slots exactly as [riscv_crash_pred] is: adequacy fills
+     them from two parameters stated at the same raw gnames and fixed part
+     ([RiscvAdequacy.riscv_power_adequacy]'s [Tk]/[Hk]), every boot learns
+     them through the record-shape equation, and the machine never reads
+     them.  An application with no sync ledger takes [True] and [Q]. *)
+  riscv_sync_tok : nat -> iProp Σ;
+  riscv_sync_hook : nat -> iProp Σ -> iProp Σ;
   (* THE SWAP COUNTER (phase C2b/D1): a mono-nat whose FULL auth lives inside
      [P_fs]'s checked-out arm and whose value is the generation currently in
      custody of the FS record.  FIXED-layer, and the auth never strands

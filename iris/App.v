@@ -462,6 +462,7 @@ Theorem xv6_app_adequacy Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
+               (fun _ => True%I) (fun _ Q => Q)
                γobs T (obs_ledger_at (app_R A c) γobs) γhist
                (app_ifc A c)
                (app_fixed A) c) g' -∗
@@ -488,6 +489,7 @@ Proof.
            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
              (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
+             (fun _ => True%I) (fun _ Q => Q)
              γobs T (obs_ledger_at (app_R A c) γobs) γhist
              (app_ifc A c)
              (app_fixed A) c
@@ -505,7 +507,13 @@ Proof.
            (app_fixed A) (app_cl A) al_birth
            (app_names A) (app_pred A) (app_boot A)
            (app_ifc A)
-           (app_turn A) al_xfer Happ_init
+           (app_turn A)
+           (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): no
+              application states a sync ledger yet, so the token is [True]
+              and a hook is its own [Q] (SY3-A gives the record fields) *)
+           (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
+           ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+           al_xfer Happ_init
            al_kill
            al_sup al_programs
            al_echo

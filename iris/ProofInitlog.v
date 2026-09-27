@@ -1605,7 +1605,9 @@ Section ProofInitlog.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iModIntro.
     iEval (rewrite /log_free_tok) in "Hlfree".
-    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa)".
+    (* the helping slot's empty authority and the era's sync token are
+       not sealed yet (claude-notes/projects/sync.md K3-3/K3-4) *)
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa & _ & _)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     assert (Hsbad : add_vec (rget mil Rs3)
                       (sign_extend' 64 (mword_of_int 20 : mword 12))

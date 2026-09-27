@@ -204,6 +204,23 @@ Three principles, in order of force:
    taint — [`applications.md`](applications.md) §1), beside the client's
    two opaque predicates `riscv_crash_pred`/`riscv_obs_pred : iProp Σ`.
 
+   **Two more client slots, the sync slots** (design [`sync.md`](sync.md)
+   §4.2): `riscv_sync_tok : nat -> iProp Σ` (era `k`'s opaque durability
+   token, which the WAL keeps in `log_res`'s idle arm) and `riscv_sync_hook
+   : nat -> iProp Σ -> iProp Σ` (the family of a `sync` waiter's hooks,
+   kept in the log invariant's helping slot).  They sit in the fixed record
+   because it is the one place the WAL and the application can both name:
+   `riscv_power_adequacy` fills them from `Tk`/`Hk`, functions of the same
+   four raw gnames and fixed part as `Pc` plus the era index, and the boot
+   learns them through the `boot_fixedGS` shape equation like every other
+   field; the machine never reads them.  The token's birth is the era
+   mint: `xv6_power_adequacy_gen`'s `HTk` discharges `xv6_boot_era`'s
+   `Htok : ⊢ |==> riscv_sync_tok gen_id` off the record shape, and the
+   token rides `BootShared.boot_shared_alloc` → `FsCfgSnap.
+   fs_cfg_alloc_snap` into `LogDefs.log_ghost_alloc`'s `log_free_tok`
+   (beside the helping map's empty authority at `ln_help`).  Every landed
+   application takes `Tk := True`, `Hk := fun _ Q => Q`.
+
    **THERE IS NO FIXED-LAYER DURABLE VIEW, and that is what the snapshot
    buys.**  A committed BYTE view at a fixed gname, plus a record of the
    file system's own durable ghosts hanging off `riscvFixedGS`, is exactly

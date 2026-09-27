@@ -1220,6 +1220,10 @@ End power.
 Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
     (Hinv : invGS Σ) (γgen γstart γreg γdisk : gname) (ndisk : nat)
     (γswap : gname) (Pcp : iProp Σ)
+    (* the two sync slots (claude-notes/design/sync.md §4.2): the era's
+       opaque token and the family of a waiter's hooks, applied at the raw
+       gnames and fixed part as [Pcp] is; read by nothing in this layer *)
+    (Tkp : nat -> iProp Σ) (Hkp : nat -> iProp Σ -> iProp Σ)
     (* the trace layer (uart-trace.md): the history ghost's name, the run's
        whole trace, and the client's trace predicate *)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
@@ -1249,7 +1253,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
      runs of underscores are one longer each; the trace fields at the end
      are main's.  All resolve from [riscvGpreS]. *)
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ _ γdisk ndisk Pcp γswap _ γobs T Ptp _ γhist Ai CT c.
+    _ _ _ γdisk ndisk Pcp Tkp Hkp γswap _ γobs T Ptp _ γhist Ai CT c.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1313,12 +1317,13 @@ Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
             ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname)
+    (Tkp : nat -> iProp Σ) (Hkp : nat -> iProp Σ -> iProp Σ)
     (γobs : gname) (T : list mobs) (Ptp : iProp Σ) (γhist : gname)
     (Ai : app_iface Σ) (c : CT)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart c) γobs T Ptp γhist Ai CT c) g' -∗
+          (Pc γdisk γswap γreg γstart c) Tkp Hkp γobs T Ptp γhist Ai CT c) g' -∗
     ▷ Pc γdisk γswap γreg γstart c -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
@@ -1560,6 +1565,16 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ⊢
          |==> Pc γdisk γsw γreg γst c)
+    (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): the era's
+       opaque token and the family of a waiter's hooks, which the WAL
+       writes into the log invariant and the application's runner fires.
+       Client slots of the fixed record like [Pc], stated at the same raw
+       gnames and fixed part for the same reason, and indexed by the era;
+       no hook of this layer reads them, and [Hboot] learns them through
+       the record-shape equation.  A client with no sync ledger takes
+       [fun _ _ _ _ _ _ => True] and [fun _ _ _ _ _ _ Q => Q]. *)
+    (Tk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ)
+    (Hk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ -> iProp Σ)
     (* THE PURE PROJECTION HOOK (stage H0, claude-notes/projects/
        durable-disk.md).  [Ppure] is a client-chosen pure consequence of [Pc]
        AT THE MACHINE'S OWN DISK IMAGE, and [Hproj] is its proof -- stated,
@@ -1721,8 +1736,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-               (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
-               (Ai c) CT c) g' -∗
+               (Pc γdisk γswap γreg γstart c)
+               (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
+               γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
          ◇ ⌜phi g' h⌝)
@@ -1766,8 +1782,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γhist : gname)
               (c : CT) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-             (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
-             (Ai c) CT c ->
+             (Pc γdisk γswap γreg γstart c)
+             (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
+             γobs T (Pt γobs c) γhist (Ai c) CT c ->
        ⊢ obs_inv -∗
          power_boot_res HE gen D nproc ndisk Mof (Rb c gen) (Tn c (S gen)) g'
          ={⊤}=∗
@@ -1846,8 +1863,9 @@ Proof.
   (* the run's whole trace [κs] is a FIELD of the fixed record: that is what
      lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
-              (Pc γfdisk γswap γreg γstart c) γobs κs (Pt γobs c) γhist
-              (Ai c) CT c).
+              (Pc γfdisk γswap γreg γstart c)
+              (Tk γfdisk γswap γreg γstart c) (Hk γfdisk γswap γreg γstart c)
+              γobs κs (Pt γobs c) γhist (Ai c) CT c).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
@@ -1985,7 +2003,9 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        forall (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs γhist : gname)
               (c : unit) (T : list mobs),
        F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-             (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs) γhist
+             (Pc γdisk γswap γreg γstart)
+             (fun _ => True%I) (fun _ Q => Q)
+             γobs T (obs_ledger_at R γobs) γhist
              (app_iface_triv Σ) unit c ->
        ⊢ obs_inv -∗
          power_boot_res HE gen D nproc ndisk Mof Rb emp%I g' ={⊤}=∗
@@ -2002,6 +2022,8 @@ Proof.
            unit (fun _ => True%I) ltac:(iModIntro; iExists (); iPureIntro; exact Logic.I)
            (fun γdisk γsw γreg γst _ => Pc γdisk γsw γreg γst)
            (fun γdisk γsw γreg γst _ => HPc γdisk γsw γreg γst)
+           (* no sync ledger at this packaged theorem *)
+           (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
            Ppure (fun γdisk γsw γreg γst _ => Hproj γdisk γsw γreg γst)
            Mof (fun _ _ => Rb) (fun γdisk γsw γreg γst _ => Hswap γdisk γsw γreg γst)
            (fun γobs _ => obs_ledger_at R γobs)
