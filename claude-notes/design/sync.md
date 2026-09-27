@@ -123,102 +123,151 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
   `ushq_body_law_union`; `UShUPipes.sh_round_holds_union_closed` takes
   `sh_sync_slot`, which `UInitUnionBoot` builds from the fixed part.
 
-## 4. The durability link (RULED, owner 2026-09-27)
+## 4. The durability link (RULED, owner 2026-09-27; revised after two reviews)
 
-**What the kernel gave before.** `SpecSysSync.wp_sys_sync_sconf` returned
-`flushed_sync γ e := ∃ e' ≥ e, log_flushed_bank γ e'` with `LogInv.
-log_flushed_bank γ E := ∃ b D, log_epoch_lb γ E ∗ flushed b D ∗ ⌜snap_holds
-D⌝` -- three INDEPENDENT conjuncts: "some committed file system exists",
-nothing about the caller's state; the dispatcher's arm 22 dropped it.
+**Why an action at the sync is needed.**  In `echo a > f; echo b > f;
+sync; <cut>`, `echo b`'s last `end_op` commits synchronously, `sync` finds
+the log quiescent, and nothing commits after: the crash slot keeps the copy
+minted during `echo b`, whose witness still admits `a`.  So the sync must
+strengthen the DURABLE copy, and the boot must use it without ordering
+copies (lower bounds carry no time).  The kernel's old receipt
+(`flushed_sync`, three independent conjuncts) said nothing about the
+caller's state, and the dispatcher's arm 22 dropped it.
 
-**Why nothing weaker than an action at the sync instant works.** In
-`echo a > f; echo b > f; sync; <cut>`, `echo b`'s last `end_op` commits
-synchronously, `sync` takes the fast path, and nothing commits after: the
-crash slot keeps the copy minted during `echo b`, whose witness admits `a`.
-Some resource must strengthen the durable copy AT THE SYNC, and the boot
-must be able to use it without ordering copies (lower bounds carry no
-time; comparing two of them says nothing about which is newer).
+### 4.1 Vocabulary
 
-**Notation.**  σ: the running abstract state (the file system's
-authoritative `●σ`); σ_d: the durable state (what recovery yields; the
-committed map); `I_app`: the application invariant holding the running
-claim `A(σ)`; `CI`: the crash invariant `∃ σ_d, disk recovers to σ_d ∗
-D(σ_d)` with `D` the application's durable claim (`AppDur.app_dur_raw`,
-an iProp, exclusive parts at fresh names); `I_obs`: the ledger, crash-
-surviving, owner of the typed-line list `●L`.
+- σ: the running abstract state (the file system's authoritative map,
+  `fs_top`), agreed with the application invariant's half.  σ_d: the
+  durable (committed) state.  `I_app`: the application invariant; its body
+  holds the running claim `A`.  `CI`: the crash invariant (`crash_inv`,
+  `RiscvPtsto.v`), holding the snapshot beside the opaque application
+  GUEST `G gt` (`AppDur.app_dur_raw`: `∃ r I, ghost_map_auth gt (1/2) I ∗ A
+  r (abs_view I)` -- an iProp with exclusive parts at fresh names).  The
+  ledger `I_obs` survives crashes and owns the typed-line list.
+- Sync RECORDS (the pure model, §5 and `UnionAdm.v` on branch `sync3-m`):
+  `srec := (p, S)` -- `S` the user-file state at the sync, `p` the sync
+  line's global position + 1; `srec0 = (0, ∅)`; `uadm ls r s` the states
+  admissible after record `r` given lines `ls`; `srec_le ls r r'` the
+  preorder along which `uadm` SHRINKS (`uadm_shrink`,
+  `uadm_shrink_chain`); `uadm_ustep`: a round of a line at position ≥ p
+  stays inside.
 
-**The ghost state.**  Per era, a monotone counter γ_k with FRACTIONAL
-authority `●{q} k` and persistent fragments `◯≥j`:
-`●{½}k ∗ ●{½}k' ⊢ k = k'`; `●{q}k ∗ ◯≥j ⊢ j ≤ k`; `●{1}k ==∗ ●{1}(k+1) ∗
-◯≥(k+1)`.  The typed-line list gains `sync` entries (appended by the
-ledger's rx wand like redirect lines).  `Adm(ls, k)`: for k = 0 the
-landed admissible set; for k ≥ 1, {the state at the k-th `sync` entry of
-ls} ∪ {states of redirect rounds after that entry} -- the sets SHRINK in
-k, so `Adm(ls, k) ⊆ Adm(ls, m)` for m ≤ k.
+### 4.2 The ghost state
 
-    A(σ) := … ∗ ◯⊒ls ∗ ●{½} k ∗ ⌜state(σ) ∈ Adm(ls, k)⌝     (running, in I_app)
-    D(σ) := … ∗ ◯⊒ls ∗ ●{½} k ∗ ⌜state(σ) ∈ Adm(ls, k)⌝     (durable, in CI)
+**The sync list `γs`** (per era): a `mono_list` of sync records with
+FRACTIONAL authority, `●{q} Ls` (`iris.base_logic.lib.mono_list`:
+`mono_list_auth_own γs q Ls`, fragments `mono_list_lb_own γs Ls`).  Laws
+used: halves agree; `●{q} Ls ∗ ◯⊒Ls' ⊢ Ls' ⊑ Ls`; with total `1`, append.
+Invariant of every list: consecutive records rise (`srec_le` over the line
+list), so the last record gives the SMALLEST admissible set.
+Shares, at all times:
 
-The counter's two halves are split between the running claim and the
-durable copy: neither moves k alone, and whoever holds both knows they
-agree.  The authority TRAVELS WITH THE CURRENT DURABLE COPY.
+    durable  ●{½} Ls   in the current durable copy (the guest in CI)
+    running  ●{¼} Ls   in the running claim (I_app)
+    S        ●{¼} Ls   opaque application token held by the LOG
+                       invariant's non-committing arm while no commit is in
+                       flight; in the committer's hand from a real commit's
+                       collection to its tail
 
-**The operations.**
+Both claims' witnesses: `state(σ) ∈ uadm ls (last Ls)` (`srec0` when `Ls =
+[]`), with `◯⊒ls` a lower bound on the ledger's line list.
 
-1. **An ordinary file step** (echo's write): `I_app` moves σ and the
-   deed; the new state is a round's state after the last `sync` entry, so
-   `Adm(ls, k)` holds at the same k.  `CI` is untouched.
-2. **Commit** (at the header write, `outstanding = 0`): the commit law
-   today collects `A(σ)` at quiescence, runs the persistent transport
-   `app_xfer_raw` (`□ ∀ r av, ▷ A r av ==∗ ▷ A r av ∗ ∃ r', ▷ A r' av`)
-   and DROPS the old durable guest unread (`FsDurSnap.dsnap_step_xfer`).
-   It becomes a MERGE: a second persistent application-supplied law,
-   proved once per application,
+**The helping slot `H`** (in the log invariant, both arms): `∃ m,
+ghost_map_auth γH 1 m ∗ [∗ map] w ↦ st ∈ m, (Pending w Fs ∗ Fs | Done w Q ∗
+Q)`, entries tagged by `saved_prop`s so the depositor recognises its own.
 
-       □ ∀ …, ▷ D_old ∗ ▷ A(σ) ==∗ ▷ A(σ) ∗ ▷ D(σ)
+### 4.3 The operations
 
-   which moves the counter's half from the old copy to the new one (the
-   halves agree on k) and gives the new copy the running witness.  The
-   WAL stays application-agnostic: the law is over the opaque guest `G`.
-   Applications with nothing to carry prove it from the transport.
-3. **`sys_sync(Fs)`**, generic in the caller's `Q`:
+1. **An ordinary file step** (echo's write): `I_app` moves σ and the deed;
+   the new state is a round's state after the last record (`uadm_ustep`),
+   so the witness holds at the same `Ls`.  `CI` untouched.
+2. **A real commit** (`end_op` with `outstanding = 0`; the collection runs
+   at quiescence, the header write later on the disk thread).  The
+   collection (`FsCollectAll.fs_collect_dur`) takes `S` from the log
+   invariant (it holds the checked-out `log_res`) and agrees it with the
+   running `¼`; it builds the MERGE WAND (`FsDurSnap.dur_merge`, landed by
+   K2 as `∀ gt_o, ▷ G gt_o ==∗ ▷ G gt`) extended to carry `S`:
 
-       Fs : ∀ σ, ⌜σ is running = durable⌝ ∗ ▷ G(σ) ={E}=∗ ▷ G(σ) ∗ Q
+       dur_merge' G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ ▷ T) ∧ T
 
-   The kernel fires `Fs` EXACTLY ONCE, at an instant between the call and
-   the return where σ = σ_d, and returns `Q`.  FAST PATH (`!committing &&
-   outstanding == 0` at the acquire of `log.lock`): the instant is the
-   acquire; the equality is a new log-invariant conjunct, "quiescent ⇒ σ =
-   σ_d", which needs EVERY change to σ to happen inside a transaction;
-   `sys_sync` opens `CI` for this ghost-only step (the first opener of the
-   crash invariant that is not a disk write).  SLOW PATH: `sys_sync`
-   deposits `Fs` in the log invariant and sleeps; the committer fires every
-   pending `Fs` right after the merge of step 2 (σ = σ_d there by
-   construction: the commit captured σ with nothing outstanding and
-   `begin_op` blocks while committing); the deposit is consumed, and
-   `sys_sync` collects `Q` when it wakes.
-   At the union, `Fs` opens `I_app`, bumps k with both halves, rewrites
-   both witnesses to `Adm(ls', k+1)` (ls' contains this `sync` entry;
-   true because the state IS the state at this sync, and σ = σ_d says the
-   durable one is the same), and yields `Q := ∃ k, ◯≥k ∗ ◯⊒ls'`.
-4. **Back to sh**: `/sync`'s exit payload (`UkSync.sync_pay`) carries `Q`
-   through `wait()`; sh files it on the ledger's record of the round when
-   it prints the prompt.  The ledger holds `◯≥m` for the m-th completed
-   sync.
-5. **Crash and boot**: the running claim and its half are lost; `CI`
-   holds `D(σ_d)` with `●{½} k`.  Validity gives `m ≤ k`, so `state(σ_d)
-   ∈ Adm(ls, k) ⊆ Adm(ls, m)`: the state at the last completed sync or a
-   later round's -- the model's boot relation (§5).  The new era allocates
-   a fresh counter with both halves AT THE COPY'S k, so the count (and the
-   `sync` entries it numbers) runs across eras and a floor survives an era
-   with no sync of its own.
+   The header-write permit (`FsCrash.fs_commit_L_sector0_rec`, mask ∅,
+   inside the DMA completion) applies the left arm: `S` agrees with the old
+   copy's `½` (so the list the new copy's witness was proved at is the old
+   copy's), the `½` moves into the new copy, and `▷ T` comes back in the
+   permit's `Q` (timeless, stripped by the permit's own update).  The
+   EMPTY-LOG path (`n = 0`, no header write; `ProofEndOp.v` ~5133-5170)
+   takes the right arm.  The commit's TAIL (`eo_tail`) re-deposits `S` into
+   the log invariant.  WHY `S`: the collection holds the running claim but
+   not the old copy, the permit holds the old copy but not the running
+   claim (and not the log invariant: the lock may be held by another hart
+   during `commit()`), so a share must travel from the collection to the
+   header write to pin the list and block any append in between; the fast
+   path knows `S` is home because it holds the log invariant's IDLE arm.
+3. **The GHOST COMMIT `GC(Fss)`** -- a commit with no disk write, run with
+   `log.lock` held, `outstanding = 0` and `committing = 0` (or by the
+   committer at its tail, where the same holds):
+   a. the hart lifting lemma lends the era's custody token `start_auth`
+      (today lent only to the DMA completion, `RiscvExec.wp_disk_step`);
+   b. open `CI` at `⊤`; K1's `LogQuiet.P_fs_rec_quiet_acc` gives the
+      snapshot `P_dur_at gt_o D` and a closer at any name over the same
+      map; `LogQuiet.log_res_quiet_acc` lends the bundle the commit law
+      consumes; `log_quiet_committed`: the committed map is the logged
+      view;
+   c. run the HOOKED commit law at `⊤ ∖ ↑crashN ∖ ↑fsbN`: the collection
+      (the one place where the running claim and the fresh guest meet at
+      one map -- `HSI` in `fs_collect_dur`), the merge applied at once to
+      the old guest, then each `Fs ∈ Fss` fired INSIDE the collection with
+      the running claim and the new guest at the same map;
+   d. close `CI` with the new pair (same committed map), return the loan.
+   Nothing changes on disk.  `Fs` has: the new guest's `½`, the running
+   `¼` (it opens `I_app`), `S` -- full authority.
+4. **`sys_sync(Fs)`**, generic in the caller's `Q`, with `Fs : ∀ gt I, G⁰
+   gt I ∗ T ∗ R I ={E}=∗ G⁰ gt I ∗ T ∗ R I ∗ Q` (`G⁰ gt I` the guest
+   unpacked at map `I`, `R I` the running claim at `I`):
+   - FAST branch (`!committing && outstanding == 0` at the acquire,
+     `ProofSysSync.v` ~1500): `GC([Fs])`, return `Q`.
+   - SLOW branch: allocate `w`, deposit `Pending w Fs` in `H`, remember
+     `n0 = ncommit`, sleep (the C is UNCHANGED).  The committer's `eo_tail`
+     (after a real or an empty-log commit) runs `GC(all Pending)`, flips
+     each to `Done w Q`, then bumps `ncommit` and wakes.  `sys_sync` wakes
+     with `ncommit > n0`, finds `Done w Q`, removes it, returns `Q`.
+     Correct because a waiter depositing while `committing = 1` does so
+     after that commit's collection, so the FIRST `eo_tail` after the
+     deposit is the one that moves `ncommit` past `n0` and lands a state
+     covering every change before the call; commits are serialised.
+5. **The union's `Fs`**: with full authority, append the record `r =
+   (p, state(σ))` (p from sh's lower bound `◯⊒ls'` INCLUDING the sync
+   line, carried in by the payload -- the running claim's own lower bound
+   cannot contain it, no file step runs after the line is typed); rewrite
+   both witnesses to `uadm ls' r` (the state is `r.2` itself: `uadm_self`);
+   the chain rises because the running state was in `uadm ls (last Ls)`.
+   `Q := ◯⊒(Ls ++ [r]) ∗ ⌜r = (p, state)⌝`.
+6. **Back to sh**: `/sync`'s exit payload (`UkSync.sync_pay`) carries `Q`
+   through `wait()`; sh files the record on the ledger at the sync round's
+   prompt (the model's `usync_last`, §5).
+7. **Crash and boot**: the running claim and its `¼` die; `S` dies with
+   the log.  `CI`'s copy has `●{½} Ls` and `state ∈ uadm ls (last Ls)`; the
+   ledger's fragment `◯⊒Ls_m` (ending in the last completed record) gives
+   `Ls_m ⊑ Ls`, so the last completed record is in `Ls` and, the chain
+   rising, `state ∈ uadm ls (last Ls) ⊆ uadm ls r_m` -- the model's boot
+   relation.  The new era allocates a FRESH `γs` with all three shares AT
+   `Ls`; the ledger's floor is RE-STATED as a fragment of the new era's
+   `γs` (the counter is per era), and the durable copy must be re-based to
+   the new era's `γs` before the new era can crash (see the plan's risk
+   R4).
 
-**Kernel/WAL obligations.** (K1) the quiescent conjunct and the
-in-transaction-only property of every running-state mover; (K2) the
-commit's merge in place of the drop (`dsnap_step_xfer`, `fs_rec_permit`,
-the commit law); (K3) `sys_sync`'s new contract with `Fs`: the fast-path
-open of `CI` (masks unverified) and the slow-path deposit fired by the
-committer; (K4) the dispatcher's arm 22 carrying `Fs`/`Q` to the user tier.
+### 4.4 What is NOT done, and why
+
+- No C change (a quiescence loop in `sys_sync` was proposed and rejected:
+  the helping slot keeps the current, correct code).
+- No change to the disk write permit (a fancy-update permit is sound and
+  needs no device-model change, but the running = durable tie exists only
+  inside a collection, the log invariant is unreachable at the DMA instant,
+  and the empty-log commit has no header write -- so the header write is
+  never the firing point).
+- No log-invariant fact "quiescent ⇒ σ = σ_d" (the three invariants share
+  no ghost state; the empty-log path re-quiesces with an old snapshot):
+  the ghost commit makes the durable copy from the running claim instead.
 
 ## 5. The crash semantics (the model's boot relation)
 
@@ -244,6 +293,15 @@ relation is the landed one (k = 0).
   cannot see it because `write` carries no receipt (app-file.md §6).
 
 ## 7. Rejected
+
+- **A quiescence loop in `sys_sync`'s C** (fire only at a quiescent
+  point): works, but the current C is correct; helping (§4.3 item 4) keeps it.
+- **Firing `Fs` at the header write** (with a fancy-update permit): the
+  tie running = durable is not a resource there, the log invariant is
+  unreachable at the DMA instant, and empty-log commits have no header
+  write.
+- **A log conjunct "quiescent ⇒ running = durable"**: not maintainable
+  (SY3-K1's finding); the ghost commit replaces it.
 
 - **Commit POSITIONS** (the commit told its index in the committed
   history, the durable copy carrying it, the boot comparing it with the
