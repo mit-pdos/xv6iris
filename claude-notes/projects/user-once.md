@@ -342,16 +342,46 @@ console instance waits for its M3.
 
 ## B. `fd_stream`
 
-- [ ] **B1** the record (`UkFdStream.v`, after `UkRun`); the INODE
-  instance (`Hold p`, `kcat_r_of_deed_at`, `ef_pay`'s `uoff` + deed) and
-  the PIPE instance (`pcat_hold`, `pipe_rpay_of_inv`/`pipe_wpay_of_inv`,
-  `ro_shot` as `fs_shut`); `echo_entry S`; `UEchoFile`/`UEchoPipe` as
-  instances.
-- [ ] **B2** (after app-both M3) the CONSOLE instance over `GenOut`'s
-  chain (the block-first byte is the instance's law); `UEchoOut` as an
-  instance; `cat_round Sin Sout`; `UCatKernel`/`UCatPipe`/
-  `UShPipeCatRound` as instances.  Exit: one echo entry, one cat round,
-  three instance files each.
+RE-SCOPED AGAINST THE TREE (2026-09-27).  Upstream landed the abstraction
+this lane proposed, in a better form, under
+[`../design/program-specs.md`](../design/program-specs.md) (cuts 1-5,
+2026-09-23/25): the endpoint interface `UkHandler.ep_iface` IS the
+`fd_stream` record (a resource per descriptor binding, the laws at the
+tree's holes for out / in / open / close / copy, with the taint arm), the
+programs' specs are interaction trees (`ProgTree.echo_tree` / `cat_tree`,
+paid once by `UkTree.tree_pay`), the device instances are one file each
+(`UkConsOut` the console, `UkFileDev` the file, `UkPipeDev` the pipe),
+the two program entries are stated once at a handler parameter
+(`UkTreeEntry`) and instantiated per application (`UkFileEntries`,
+`UkUnionEntries`, `UkPipesEntries`).  So:
+
+- [x] **B1** the record and the inode / pipe instances, `echo_entry`,
+  `UEchoFile` / `UEchoPipe` as instances -- DONE UPSTREAM as above.
+  `UEchoFile` (317 lines) and `UEchoPipe` (185) are already only the
+  instance's own vocabulary (cursor, lend, exit payload), consumed by the
+  devices.
+- [x] **B2** the console instance and cat's round -- DONE UPSTREAM
+  (`UkConsOut`; `UkCatTree.kcat_round_tree`; the two-writer console stays
+  the pipe module's by design).  The cat-side files this lane named
+  (`UCatKernel` / `UCatOut` / `UCatPipe` / `UShPipeCatRound`) were deleted
+  by upstream's sweeps once the tree route replaced them.
+- [x] **B3** the console payer copy retired -- LANDED (2026-09-27, branch
+  `user-once/B`).  What was left of this lane's row: `UEchoOut` still paid
+  echo's whole walk itself -- the console chain (`ech_chain_at`), the
+  deposit and post of one write at row 16 (`kecho_w_of_link_data_at`, the
+  text-half twin with `echo_wtxt`), the chain's payment
+  (`kecho_pay_of_link_at`) and the entry at the era's stage
+  (`echo_uexec_slot_at`) -- the per-destination copy of what `UkConsOut` +
+  `UkTreeEntry` + `UkUnionEntries.uecho_cons_image_entry` state once.  No
+  code consumed it (seven files named `echo_uexec_slot_at` in comments
+  only).  DELETED: `UEchoOut` 992 -> 225 lines (the cursor family `ech` /
+  `echq` / `ech_step` and the pure output facts stay, consumed by
+  `EchoLinksLine`, `StageRec`, `UkTreeEntry`, `UkFileEntries`,
+  `UShEchoOut`).  Gate and audits: see the RESUME block.
+
+Nothing else of lane B remains: the three theorems reach the user tier
+only through the union, and every per-destination payer the design table
+listed is either an instance file of the interface or gone.
 
 ## RESUME HERE (2026-09-26, lane A complete on d66e41c)
 
@@ -410,6 +440,9 @@ symbol-free copy was still live under `UkShEcho`'s child walks; now gone.
 
 **C2 (2026-09-27)** landed as a deletion: the one arm already existed
 upstream (see the C2 entry).
+
+**Lane B (2026-09-27)** re-scoped and closed: B1/B2 landed upstream as
+program-specs, B3 (this) deleted the last console payer copy.
 
 **Next.**  C3 shrank (upstream deleted
 `UShEchoPay` / `UShRedirPay`; `UShCatPay` and `UShEchoPipePay` remain);

@@ -590,7 +590,11 @@ bounds, `r`/`Heq`/`pifRegG` in `UShPipeLaw`'s section; then its sweep.
 NOT dead after both: `UShEchoPay` (the pipeline's echo at the console,
 `UShPipeRound` 419/545, and the echo application's `UShRest`), so
 `UEchoOut`/`UkEcho`'s landed walks stay until a console exit wand at
-`PDCons` in the pipe instance and M5.  Audits expected unchanged: the
+`PDCons` in the pipe instance and M5.  (2026-09-27, user-once B3: with
+`UShEchoPay` gone and echo at the console entered through
+`UkUnionEntries.uecho_cons_image_entry`, `UEchoOut`'s payer chain and its
+era-stage entry had no consumer and were deleted; `UkEcho`'s walks stay as
+what `UkEchoTree` instantiates.)  Audits expected unchanged: the
 new cones use only `functional_extensionality`, derived from the
 already-counted `functional_extensionality_dep`.
 

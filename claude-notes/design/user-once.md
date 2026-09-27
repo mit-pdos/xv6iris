@@ -240,6 +240,14 @@ else:
   `pipe_wpay_of_inv`; `fs_shut` is `pipe_wQe_ro_shot` +
   `pipe_wpay_of_inv_after_short`.
 
+**AS LANDED (2026-09-27): by upstream, as [`program-specs.md`](program-specs.md).**
+`UkHandler.ep_iface` is this record (per descriptor binding, laws at the
+tree's holes, the taint arm), the programs' specs are interaction trees
+paid once (`UkTree.tree_pay`), the instances are `UkConsOut` / `UkFileDev`
+/ `UkPipeDev`, and the entries are `UkTreeEntry`'s at a handler parameter.
+This lane's own landing (B3) was the last copy: `UEchoOut`'s per-program
+console payer and era-stage entry, which nothing consumed, deleted.
+
 Over the record, ONCE:
 
     echo_entry (S : fd_stream) : S.fs_fd = 1 → … → echo_uexec_slot (with kecho_pay_all discharged from S.fs_write)
