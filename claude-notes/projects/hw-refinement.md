@@ -212,9 +212,9 @@ SystemVerilog or Chisel.
 Kami/Kôika/Quartz are not the target: translating CVA6 into a rule language
 by hand would itself be a large trusted step.
 
-### 7.2 The easiest thing to define: a flattened word-level netlist from Yosys
+### 7.2 The easiest thing to define: a hierarchical word-level netlist from Yosys
 
-Options compared: (a) flattened Yosys RTLIL; (b) BTOR2 or `write_smt2`;
+Options compared: (a) Yosys RTLIL after `proc`; (b) BTOR2 or `write_smt2`;
 (c) AIGER (bit-level, loses word structure, 10–100× bigger); (d) CIRCT
 hw/comb/seq (clean, and the only IR both Chisel and SV reach, but the
 dialects move and the SV import is unproven on these cores); (e) LoFIRRTL
@@ -225,7 +225,7 @@ execute); (g) Verilator output (no IR).
 **Recommendation: (a).**
 
 - Pinned Yosys script: `read_slang` (or `sv2v` + `read_verilog`),
-  `hierarchy -top`, `proc`, `flatten`, `opt_clean`, `memory -nomap`,
+  `hierarchy -top`, `proc`, `opt_clean`, `memory -nomap`,
   `async2sync`, `write_json`.
 - About 40 coarse `$`-cells, each with a reference model in Yosys's
   `techlibs/common/simlib.v`; memories stay word-level (`$mem_v2`); signal
@@ -246,9 +246,11 @@ execute); (g) Verilator output (no IR).
   interpreter against Verilator on the original SV for every test, and keep
   a second, independent export (`write_btor`) checked cycle by cycle against
   the JSON one.
-- Later refinement proofs: work on the unflattened RTLIL hierarchy (same
-  cells plus instances) to go module by module; flattening is a simple,
-  provable transformation.
+- **Owner's ruling (2026-09-27): do not flatten.**  The semantics is
+  hierarchical from the start (§7.3a), for conformance runs as well as proofs;
+  a flattened form exists only as the target of the one generic
+  hierarchical = flattened theorem, if ever needed (e.g. to cross-check
+  against `write_btor`, which flattens).
 
 ### 7.3 Per-core front-end cost
 
@@ -312,10 +314,10 @@ opt_clean; memory -nomap; write_json`):
   outputs depend combinationally on which inputs).  The global
   well-formedness check composes the summaries.  One generic theorem, proved
   once: the hierarchical semantics equals the flattened one.
-- Flattening selectively is fine: inline leaf utility modules (arbiters,
-  FIFOs, encoders in `common_cells`) with `flatten` on selected modules;
-  keep the architectural ones (MMU, PTW, TLB, CSR file, load/store unit,
-  commit, caches) as instances.
+- Default: no flattening at all, not even of leaf utility modules
+  (`common_cells` arbiters, FIFOs, encoders); each keeps its own
+  lemmas, reused at every instance.  Selectively inlining a leaf is a
+  later option only if one proves pure noise.
 
 ### 7.4 Next steps
 
