@@ -830,7 +830,7 @@ Section UShURound.
                (Z.of_nat (length bs) < 2 ^ 31)%Z⌝)%I as %Hshort.
     { iIntros (i bs Hs).
       iDestruct (f_typed_lookup (fgn_cl gf) s nm i bs Hs with "Hty") as (ls0) "[_ %Hbt]".
-      iPureIntro. pose proof (FileDeltas.f_bytes_typed_short ls0 nm bs Hbt) as Hb.
+      iPureIntro. pose proof (FileDeltas.f_bytes_typed_short _ nm bs Hbt) as Hb.
       unfold EchoDisc.line_max in Hb. lia. }
     iPoseProof (ucat_image_entry (PS := uprogSG_free)
                   ug Hcons nm (ucat_ws nm) M sa t gb fdv
@@ -1463,10 +1463,10 @@ Section UShURound.
   (* THE REDIRECT CHILD'S EXEC SUPPLY: [exec /echo] with fd 1 on [f], at
      the union's redirect entry *)
   Lemma uredir_exec_sup (I : list (bv 8)) (ws : wordline) (nm : list (bv 8)) (v' : era_pins)
-      (cs : list nat) (ls : list fwline) (sp : dst) :
+      (cs : list nat) (ls : list fl_line) (sp : dst) :
     FileDisc.uname nm ->
     ul I = LEchoF ws nm -> upre_tie cs s0 I (dst_content sp) ->
-    EchoDisc.line_ok ws -> (nm, ws) ∈ ls ->
+    EchoDisc.line_ok ws -> (nm, ws) ∈ fl_redirs ls ->
     length cs = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
       UShEcho.sh_echo_slot T -∗

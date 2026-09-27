@@ -310,9 +310,9 @@ Section UShFileRedir.
      the parse with its lend whole, and the deed flows lend -> call ->
      receipt ([UkShRedirAns.ush_open_call2]'s [Dd]). *)
   Lemma Hopen_hand (N : uk_names Σ) (file : Z) (l : list fdstate) (s0 : dst)
-      (ls : list fwline) (ws : wordline) (jo : option Z) (nm : list (bv 8)) :
+      (ls : list fl_line) (ws : wordline) (jo : option Z) (nm : list (bv 8)) :
     FileDisc.uname nm ->
-    (nm, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (nm, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ file_cons_cred (fgn_cl g) r jo -∗ fl_lb (fgn_cl g) ls -∗
     (* ...AND THE CWD'S CAMERA IS PINNED TOO (the PROGRAM STREAM's rule,
        one class further out than the deposit): [UserCwd.ucwd] takes a

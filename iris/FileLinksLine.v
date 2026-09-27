@@ -699,14 +699,14 @@ Section file_links_line.
      [echo ... > f] line of the input the reader has consumed is in a list
      the LEDGER has a lower bound of -- which is what the child that writes
      the line to its file owes the claim ([FileWrite.file_wq]'s
-     [(N, ws) ∈ ls]).  It
+     [(N, ws) ∈ fl_redirs ls], read through the full list's projection).  It
      is read off the consumed bytes' TAGS ([FileOut.ftag]) by
      [FileLineWit.echof_lines_of_consumed], and the left arm is the era's
      head, where no lower bound exists to be had. *)
   Definition flw (I : list (bv 8)) : iProp Σ :=
     (⌜echof_lines_in I = []⌝
-     ∨ ∃ ls : list fwline,
-         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w ∈ ls⌝)%I.
+     ∨ ∃ ls : list fl_line,
+         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w ∈ fl_redirs ls⌝)%I.
 
   Global Instance flw_persistent I : Persistent (flw I).
   Proof using . rewrite /flw. apply _. Qed.

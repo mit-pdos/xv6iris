@@ -872,7 +872,7 @@ Section UkFileOpen.
   (* THE DEPOSIT: the 0x601 bundle, from one deed. *)
   Lemma file_create_sup (N : uk_names Σ) (omo : offmode) (c : file_fixed) (r : file_names)
       (jo : option Z) (Nf : list (bv 8)) (n : nat) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline) (cw : Z)
+      (ls : list fl_line) (ws : wordline) (cw : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (m : regfile) (pc : mword 64)
       (pl : list (bv 8)) :
     FileDisc.uname Nf ->
@@ -883,7 +883,7 @@ Section UkFileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
     list_basics.last (path_elems pl) = Some Nf ->
-    (Nf, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (Nf, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ utext_img (ukn_t N) Img -∗
     file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g -∗
@@ -931,7 +931,7 @@ Section UkFileOpen.
   Lemma wp_uk_ecall_open_create_deed (N : uk_names Σ) (omo : offmode) (h : CpuId)
       (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat)
       (c : file_fixed) (r : file_names) (jo : option Z) (Nf : list (bv 8)) (s : dst)
-      (ls : list fwline) (ws : wordline) (cw : Z)
+      (ls : list fl_line) (ws : wordline) (cw : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) :
     FileDisc.uname Nf ->
     file_app = MkAppcfg file_names (file_pred c) r ->
@@ -944,7 +944,7 @@ Section UkFileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
     list_basics.last (path_elems pl) = Some Nf ->
-    (Nf, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (Nf, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     utext_img (ukn_t N) Img -∗
     urun N h m pc avail -∗
@@ -1130,7 +1130,7 @@ Section UkFileOpen.
 
   Lemma file_create_sup_v (N : uk_names Σ) (omo : offmode) (c : file_fixed) (r : file_names)
       (jo : option Z) (Nf : list (bv 8)) (n : nat) (s : dst) (g : gname)
-      (ls : list fwline) (ws : wordline) (cw : Z)
+      (ls : list fl_line) (ws : wordline) (cw : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (m : regfile) (pc : mword 64)
       (pl : list (bv 8)) :
     FileDisc.uname Nf ->
@@ -1141,7 +1141,7 @@ Section UkFileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
     list_basics.last (path_elems pl) = Some Nf ->
-    (Nf, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (Nf, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ uimg_view N Img -∗
     file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g -∗
@@ -1342,7 +1342,7 @@ Section UkFileOpen.
       (N : uk_names Σ) (omo : offmode) (h : CpuId)
       (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat)
       (c : file_fixed) (r : file_names) (jo : option Z) (Nf : list (bv 8)) (s : dst)
-      (ls : list fwline) (ws : wordline) (cw : Z)
+      (ls : list fl_line) (ws : wordline) (cw : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) :
     FileDisc.uname Nf ->
     file_app = MkAppcfg file_names (file_pred c) r ->
@@ -1355,7 +1355,7 @@ Section UkFileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
     list_basics.last (path_elems pl) = Some Nf ->
-    (Nf, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (Nf, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     uimg_view N Img -∗
     urun N h m pc avail -∗
@@ -1548,7 +1548,7 @@ Section UkFileOpen.
       (N : uk_names Σ) (omo : offmode) (h : CpuId)
       (m : regfile) (pc : mword 64) (l : list fdstate) (avail : nat)
       (c : file_fixed) (r : file_names) (jo : option Z) (Nf : list (bv 8)) (s : dst)
-      (ls : list fwline) (ws : wordline) (cw : Z)
+      (ls : list fl_line) (ws : wordline) (cw : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) :
     FileDisc.uname Nf ->
     file_app = MkAppcfg file_names (file_pred c) r ->
@@ -1561,7 +1561,7 @@ Section UkFileOpen.
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
     list_basics.last (path_elems pl) = Some Nf ->
-    (Nf, ws) ∈ ls -> EchoDisc.line_ok ws ->
+    (Nf, ws) ∈ fl_redirs ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     ([∗ map] a ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded a b) -∗
     urun N h m pc avail -∗
