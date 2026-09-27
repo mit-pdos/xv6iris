@@ -106,8 +106,8 @@ Cleanups left for a later sweep (none blocking): the old `flushed_sync`
 receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
 `WpSconfBtype`; the trivial `Tk`/`Hk` values spelled inside two adequacy
 statements until SY3-A1 moves them onto the `App` record.
-SY3-A: A1 in flight (branch `sync3-a1` in `/shared/xv6iris-3k`).  A2 DONE
-on branch `sync3-a2` (`/shared/xv6iris-3n`, awaiting the owner's landing):
+SY3-A: A1 in flight (branch `sync3-a1` in `/shared/xv6iris-3k`).  A2 ON
+MAIN (`b875e390b`; `sync3-m` and `sync3-a2` deleted):
 `sync3-m` merged; the full line list (`AppFile.fl_line := FileDisc.uline`,
 readers through `fl_redirs ls = omap FileDisc.echof_ws ls`, the union's
 ledger and tag at `UnionAdm.ulines_of`); RULING at A2's stop (owner): the
@@ -115,7 +115,7 @@ ledger and `union_adequacy_closed` KEEP the landed `UnionOutPure.union_phi`
 (over `s0s`), the model's body lands beside it as `union_phi_sync`
 (`union_phi_sync_body` and its steps; the demos state it) -- a completed
 sync forces the drain to file `Some r` (`lm_good_sync`), so the switch of
-the conclusion, and that filing, is A4's.  A3, A4 after A1 and A2.
+the conclusion, and that filing, is A4's.  A3, A4 after A1.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
