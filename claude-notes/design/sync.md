@@ -123,48 +123,115 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
   `ushq_body_law_union`; `UShUPipes.sh_round_holds_union_closed` takes
   `sh_sync_slot`, which `UInitUnionBoot` builds from the fixed part.
 
-## 4. What the kernel gives, and what it does not (the durability link)
+## 4. The durability link (RULED, owner 2026-09-27)
 
-`SpecSysSync.wp_sys_sync_sconf` returns `flushed_sync γ e := ∃ e' ≥ e,
-log_flushed_bank γ e'`, and `log_flushed_bank γ E := ∃ b D, log_epoch_lb γ
-E ∗ flushed b D ∗ ⌜snap_holds D⌝`.  The three conjuncts are INDEPENDENT:
-the receipt says "some committed file-system state exists" (true at
-genesis) and nothing ties `D` to the caller's state; "D is the state as of
-batch E" is asserted in the header comment, not carried.  `FsFlushed.dur_at`
-(the per-node reading) was never built, and the dispatcher's arm 22 drops
-the receipt at `sync_witness_0`.  What IS there: a receipt's `D` is in the
-committed history and recovery lands on its last element
-(`FsCrash.P_fs_receipt_committed`).
+**What the kernel gave before.** `SpecSysSync.wp_sys_sync_sconf` returned
+`flushed_sync γ e := ∃ e' ≥ e, log_flushed_bank γ e'` with `LogInv.
+log_flushed_bank γ E := ∃ b D, log_epoch_lb γ E ∗ flushed b D ∗ ⌜snap_holds
+D⌝` -- three INDEPENDENT conjuncts: "some committed file system exists",
+nothing about the caller's state; the dispatcher's arm 22 dropped it.
 
-So SY3 owes: (K1) a receipt that says `D` contains every delta linearized
-before the call (the bank's pairing made a statement at its two deposits,
-`ProofEndOp.eo_tail` and `ProofInitlog`'s seal); (K2) arm 22 carrying it to
-the U tier; (K3) the application's durable copy tied to it, so the running
-claim learns at sync's return that the crash slot's copy was made from a
-state at or after the sync point.  Two shapes for K3, undecided: a commit
-receipt (the commit law passes its batch index to the transport;
-app-file.md §6's plan, which would also give `write` a receipt), or a
-durable REGISTER (the transport also receives the OLD durable copy, which
-`fs_rec_permit`'s guest already carries, so one ghost value split between
-the running claim and the durable copy is updated at each commit).
+**Why nothing weaker than an action at the sync instant works.** In
+`echo a > f; echo b > f; sync; <cut>`, `echo b`'s last `end_op` commits
+synchronously, `sync` takes the fast path, and nothing commits after: the
+crash slot keeps the copy minted during `echo b`, whose witness admits `a`.
+Some resource must strengthen the durable copy AT THE SYNC, and the boot
+must be able to use it without ordering copies (lower bounds carry no
+time; comparing two of them says nothing about which is newer).
+
+**Notation.**  σ: the running abstract state (the file system's
+authoritative `●σ`); σ_d: the durable state (what recovery yields; the
+committed map); `I_app`: the application invariant holding the running
+claim `A(σ)`; `CI`: the crash invariant `∃ σ_d, disk recovers to σ_d ∗
+D(σ_d)` with `D` the application's durable claim (`AppDur.app_dur_raw`,
+an iProp, exclusive parts at fresh names); `I_obs`: the ledger, crash-
+surviving, owner of the typed-line list `●L`.
+
+**The ghost state.**  Per era, a monotone counter γ_k with FRACTIONAL
+authority `●{q} k` and persistent fragments `◯≥j`:
+`●{½}k ∗ ●{½}k' ⊢ k = k'`; `●{q}k ∗ ◯≥j ⊢ j ≤ k`; `●{1}k ==∗ ●{1}(k+1) ∗
+◯≥(k+1)`.  The typed-line list gains `sync` entries (appended by the
+ledger's rx wand like redirect lines).  `Adm(ls, k)`: for k = 0 the
+landed admissible set; for k ≥ 1, {the state at the k-th `sync` entry of
+ls} ∪ {states of redirect rounds after that entry} -- the sets SHRINK in
+k, so `Adm(ls, k) ⊆ Adm(ls, m)` for m ≤ k.
+
+    A(σ) := … ∗ ◯⊒ls ∗ ●{½} k ∗ ⌜state(σ) ∈ Adm(ls, k)⌝     (running, in I_app)
+    D(σ) := … ∗ ◯⊒ls ∗ ●{½} k ∗ ⌜state(σ) ∈ Adm(ls, k)⌝     (durable, in CI)
+
+The counter's two halves are split between the running claim and the
+durable copy: neither moves k alone, and whoever holds both knows they
+agree.  The authority TRAVELS WITH THE CURRENT DURABLE COPY.
+
+**The operations.**
+
+1. **An ordinary file step** (echo's write): `I_app` moves σ and the
+   deed; the new state is a round's state after the last `sync` entry, so
+   `Adm(ls, k)` holds at the same k.  `CI` is untouched.
+2. **Commit** (at the header write, `outstanding = 0`): the commit law
+   today collects `A(σ)` at quiescence, runs the persistent transport
+   `app_xfer_raw` (`□ ∀ r av, ▷ A r av ==∗ ▷ A r av ∗ ∃ r', ▷ A r' av`)
+   and DROPS the old durable guest unread (`FsDurSnap.dsnap_step_xfer`).
+   It becomes a MERGE: a second persistent application-supplied law,
+   proved once per application,
+
+       □ ∀ …, ▷ D_old ∗ ▷ A(σ) ==∗ ▷ A(σ) ∗ ▷ D(σ)
+
+   which moves the counter's half from the old copy to the new one (the
+   halves agree on k) and gives the new copy the running witness.  The
+   WAL stays application-agnostic: the law is over the opaque guest `G`.
+   Applications with nothing to carry prove it from the transport.
+3. **`sys_sync(Fs)`**, generic in the caller's `Q`:
+
+       Fs : ∀ σ, ⌜σ is running = durable⌝ ∗ ▷ G(σ) ={E}=∗ ▷ G(σ) ∗ Q
+
+   The kernel fires `Fs` EXACTLY ONCE, at an instant between the call and
+   the return where σ = σ_d, and returns `Q`.  FAST PATH (`!committing &&
+   outstanding == 0` at the acquire of `log.lock`): the instant is the
+   acquire; the equality is a new log-invariant conjunct, "quiescent ⇒ σ =
+   σ_d", which needs EVERY change to σ to happen inside a transaction;
+   `sys_sync` opens `CI` for this ghost-only step (the first opener of the
+   crash invariant that is not a disk write).  SLOW PATH: `sys_sync`
+   deposits `Fs` in the log invariant and sleeps; the committer fires every
+   pending `Fs` right after the merge of step 2 (σ = σ_d there by
+   construction: the commit captured σ with nothing outstanding and
+   `begin_op` blocks while committing); the deposit is consumed, and
+   `sys_sync` collects `Q` when it wakes.
+   At the union, `Fs` opens `I_app`, bumps k with both halves, rewrites
+   both witnesses to `Adm(ls', k+1)` (ls' contains this `sync` entry;
+   true because the state IS the state at this sync, and σ = σ_d says the
+   durable one is the same), and yields `Q := ∃ k, ◯≥k ∗ ◯⊒ls'`.
+4. **Back to sh**: `/sync`'s exit payload (`UkSync.sync_pay`) carries `Q`
+   through `wait()`; sh files it on the ledger's record of the round when
+   it prints the prompt.  The ledger holds `◯≥m` for the m-th completed
+   sync.
+5. **Crash and boot**: the running claim and its half are lost; `CI`
+   holds `D(σ_d)` with `●{½} k`.  Validity gives `m ≤ k`, so `state(σ_d)
+   ∈ Adm(ls, k) ⊆ Adm(ls, m)`: the state at the last completed sync or a
+   later round's -- the model's boot relation (§5).  The new era allocates
+   a fresh counter with both halves AT THE COPY'S k, so the count (and the
+   `sync` entries it numbers) runs across eras and a floor survives an era
+   with no sync of its own.
+
+**Kernel/WAL obligations.** (K1) the quiescent conjunct and the
+in-transaction-only property of every running-state mover; (K2) the
+commit's merge in place of the drop (`dsnap_step_xfer`, `fs_rec_permit`,
+the commit law); (K3) `sys_sync`'s new contract with `Fs`: the fast-path
+open of `CI` (masks unverified) and the slow-path deposit fired by the
+committer; (K4) the dispatcher's arm 22 carrying `Fs`/`Q` to the user tier.
 
 ## 5. The crash semantics (the model's boot relation)
 
-`fadm_boot` ("any subsequence of any earlier redirect line, or absent")
-becomes a relation between CONSECUTIVE cycles.  Per round, `rmid s l a`:
-the states the round passes through (for `RFRan sel` from `s`: `s`, `Some
-[]` at f, and the chunk subsets at f); for the round in flight at the cut,
-the union over its admissible alternatives.  The FLOOR of a cycle is its
-last `sync` round whose block's first byte is ON THE WIRE (observational:
-the pad of §2 may name a "ran" alternative for a round in flight, and must
-not raise the floor), or the cycle's start.  Then
-
-    boot_{k+1} ∈ {state before the floor round} ∪ ⋃_{rounds i ≥ floor} rmid(round i).
-
-The unsynced half (floor = the cycle's start) is provable WITHOUT §4: the
-durable copy's typed witness becomes a lower bound of the era's f-state
-TRAJECTORY whose last element is the content, in place of the line-list
-lower bound.  The synced half is §4's.
+`fadm_boot` ("absent, or states admissible given every earlier line")
+becomes, per cycle, `Adm(lines before the cut, m)` with m the number of
+`sync` rounds of ALL previous cycles whose prompt is ON THE WIRE (the pad
+of an in-flight line may name the RAN alternative and must not count).
+Per round the states a redirect round passes through are the model's
+intermediate states (the truncate's `[]`, the chunk subsets).  Two
+negative demos carry it: within an era, `echo a > f; echo b > f; cat f` ->
+`a` refuted (landed, `UnionDiscDec.demo_no_silent`); across a cut, `echo a
+> f; echo b > f; sync; <cut>; cat f` -> `a` refuted.  Without any sync the
+relation is the landed one (k = 0).
 
 ## 6. Honest limits
 
@@ -175,3 +242,20 @@ lower bound.  The synced half is §4's.
 - In reality this kernel commits at the last `end_op`, and sh serialises
   rounds, so a completed `echo b > f` is durable without a sync; the model
   cannot see it because `write` carries no receipt (app-file.md §6).
+
+## 7. Rejected
+
+- **Commit POSITIONS** (the commit told its index in the committed
+  history, the durable copy carrying it, the boot comparing it with the
+  sync's index): works, but puts a disk-log ordering into the WAL's
+  interface and the application; the counter-in-the-copy (§4) needs no
+  order of copies at all.
+- **A persistent "shrinking set" fact alone**: `Adm(ls, k)` shrinks in k,
+  but an old copy carries a small k and the boot needs the large one;
+  fragments bound the count from the wrong side.  The fix is to put the
+  counter's AUTHORITY in the durable copy (§4).
+- **A counter authority in the ledger**: the copy's fragment is then
+  bounded ABOVE by the completed syncs -- the wrong direction.
+- **A durable register without the merge**: the transport never sees the
+  old copy; the commit's merge (§4 step 2) is what makes the register
+  idea work.
