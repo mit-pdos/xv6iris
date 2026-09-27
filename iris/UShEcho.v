@@ -1186,7 +1186,7 @@ Section UShEcho.
        alen i = UkShEcho.echo_alen ws i) ->
     kexec_sz ElfUser.echo_elf - PGSIZE + 96
       <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen na.
-  Proof.
+  Proof using .
   exact (UShGeom.img_room_of_det_x ElfUser.echo_elf 12 ws na alen echo_kexec_sz ltac:(lia)).
   Qed.
 
@@ -1198,7 +1198,7 @@ Section UShEcho.
        alen i = UkShEcho.echo_alen ws i) ->
     kexec_sz ElfUser.echo_elf - PGSIZE + 96
       <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen na.
-  Proof.
+  Proof using .
   exact (UShGeom.img_room_of_det ElfUser.echo_elf 12 ws na alen echo_kexec_sz ltac:(lia)).
   Qed.
 
@@ -1316,7 +1316,7 @@ Section UShEcho.
                  = afun i j).
 
   Lemma echo_key_args_holds : echo_key_args.
-  Proof.
+  Proof using .
     exact (UShGeom.img_key_args_holds ElfUser.echo_elf echo_kexec_sz).
   Qed.
 
