@@ -275,6 +275,48 @@ first, Wally in parallel.**
 - BlackParrot needs a two-phase semantics (negedge + latch).
 - XiangShan is too large for whole-core execution in Rocq; sub-blocks only.
 
+### 7.3a Keeping the implementation's modularity (owner's question)
+
+The netlist need not be one anonymous expression: **do not `flatten`.**
+Checked on a toy design with local Yosys 0.21 (`hierarchy; proc;
+opt_clean; memory -nomap; write_json`):
+
+- **Kept:** every source module stays a JSON module with its ports; each
+  instance is a cell carrying its instance name (`i_itlb`, `i_dtlb`) whose
+  type is the module; a parameterisation becomes its own derived module
+  (`$paramod\tlb\N=…`); register names survive `proc` (the `$dff`'s output
+  net is the source `reg`, e.g. `valid`); every cell carries a `src`
+  attribute (file:line.col range).
+- **Lost:** packed-struct field names and array structure.  CVA6's TLB
+  state is `tags_q`/`content_q`, arrays of packed structs
+  (`core/cva6_mmu/cva6_tlb.sv:59-79`); after Yosys each is one wide vector,
+  and fields are bit ranges.  Recover the layout from the elaborator (slang
+  knows the types) and generate Rocq record views: projection functions
+  plus lemmas.  Whether yosys-slang can keep field-level wires is
+  unverified.
+- Internal combinational nets get `$`-names; avoid `opt_clean -purge` so
+  named source nets stay; `(* keep *)` / `keep_hierarchy` pin anything
+  Yosys would otherwise optimise away or inline.
+
+**Semantic consequence.**
+- The state of a design is a tree of per-instance states (instance path →
+  register/memory valuation).  An invariant or abstraction function is
+  stated about one instance's substate (e.g. the ITLB inside the MMU inside
+  the load/store unit), and each module gets its own refinement lemma.
+- The subtlety: combinational paths cross module boundaries (a module's
+  output can depend combinationally on its inputs, and paths can go out
+  through one instance and back into another), so acyclicity is a property
+  of the whole design, not of each module.  So a module's meaning is a
+  Mealy-style pair — output function (state × inputs → outputs) and
+  next-state function — plus a per-module port-dependency summary (which
+  outputs depend combinationally on which inputs).  The global
+  well-formedness check composes the summaries.  One generic theorem, proved
+  once: the hierarchical semantics equals the flattened one.
+- Flattening selectively is fine: inline leaf utility modules (arbiters,
+  FIFOs, encoders in `common_cells`) with `flatten` on selected modules;
+  keep the architectural ones (MMU, PTW, TLB, CSR file, load/store unit,
+  commit, caches) as instances.
+
 ### 7.4 Next steps
 
 1. On the build VM: install a current Yosys (≥ 0.67, which bundles
