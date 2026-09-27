@@ -3,8 +3,8 @@
 **STATUS: RESEARCH, nothing implemented.  Started 2026-09-27 at the owner's
 request.  Nothing in the tree depends on it.  §1–§6 record the initial
 survey (findings as of 2026-09-27, from web research and shallow clones of
-the core repositories); §7 is the open next step (lifting a core's RTL into
-Rocq).  Claims marked (unverified) were not checked against source.**
+the core repositories); §7 surveys lifting a core's RTL into Rocq and
+proposes a Yosys-netlist semantics — its §7.4 is the worklist.  Claims marked (unverified) were not checked against source.**
 
 Audience: the owner, choosing a hardware target so the xv6 guarantee can be
 stated about a real chip rather than about the Sail model.
@@ -177,4 +177,119 @@ Question from the owner (2026-09-27): what would it take to lift Wally,
 CVA6, BlackParrot or XiangShan into Rocq so it connects to the conformance
 tests; are there existing Rocq execution semantics these can map into
 (Verilog, netlist, RTL, Chisel); if not, what is the easiest thing to give
-semantics to?  Findings to be recorded here.
+semantics to?
+
+### 7.1 Existing Rocq hardware semantics — none can ingest these cores
+
+Every Rocq hardware framework covers only designs written in its own
+language or typed in by hand as a Coq AST; none has an importer from real
+SystemVerilog or Chisel.
+
+- **Kami** (`mit-plv/kami`): Bluespec-like rules; relational, not
+  executable as-is; the best maintained (commits Sept 2026, Rocq dev CI).
+  Lightbulb's RV32IM core.
+- **Kôika** (`mit-plv/koika`): rule language, executable interpreter,
+  verified compiler to a circuit graph (the Verilog printing is unverified);
+  pinned to Coq 8.18.
+- **Quartz / Granite** (`mit-plv/quartz`, `mit-plv/granite`, 2026, Rocq
+  9.1, stdpp bitvectors): shallow HDL printed to SV by a trusted
+  pretty-printer; a pipelined core with speculation and interrupts.
+- **PFV, "Revamping Verilog Semantics"** (Choi, Kim, Kang, OOPSLA 2025): a
+  real Verilog/SV-subset semantics proven equivalent to event scheduling
+  for synthesizable designs, but no parser, not computable, Coq 8.18,
+  Zenodo artifact only.
+- Vericert (the Verilog subset its HLS emits), Cava/Silver Oak (archived
+  2022), Coquet/Fe-Si (dormant), Vélus (Lustre, not hardware), Fjfj (Lee &
+  Kang 2026, no public repo).
+- Nothing found for FIRRTL as a whole, CIRCT, BTOR2, AIGER or Yosys
+  RTLIL/JSON in Rocq.
+- Outside Rocq: Lööw's HOL4 Verilog semantics + Lutsig; Isabelle
+  VeriFormal; K Verilog and K-CIRCT; Lean-MLIR (comb dialect), Sparkle,
+  Rtl2lean, CircuitProver.  **The strongest "real Verilog" precedent is
+  Knox/Parfait, which trust Yosys `write_smt2` read into Rosette (`rtlv`);
+  Lakeroad uses `write_btor`.**
+
+Kami/Kôika/Quartz are not the target: translating CVA6 into a rule language
+by hand would itself be a large trusted step.
+
+### 7.2 The easiest thing to define: a flattened word-level netlist from Yosys
+
+Options compared: (a) flattened Yosys RTLIL; (b) BTOR2 or `write_smt2`;
+(c) AIGER (bit-level, loses word structure, 10–100× bigger); (d) CIRCT
+hw/comb/seq (clean, and the only IR both Chisel and SV reach, but the
+dialects move and the SV import is unproven on these cores); (e) LoFIRRTL
+(XiangShan only); (f) a Verilog subset à la PFV (the trusted definition
+keeps blocking/non-blocking scheduling — hardest to get right and to
+execute); (g) Verilator output (no IR).
+
+**Recommendation: (a).**
+
+- Pinned Yosys script: `read_slang` (or `sv2v` + `read_verilog`),
+  `hierarchy -top`, `proc`, `flatten`, `opt_clean`, `memory -nomap`,
+  `async2sync`, `write_json`.
+- About 40 coarse `$`-cells, each with a reference model in Yosys's
+  `techlibs/common/simlib.v`; memories stay word-level (`$mem_v2`); signal
+  names and source locations are kept.
+- Semantics: values in stdpp `bv`, which is exactly Sail's word type here
+  (`coq-sail-stdpp` `src-stdpp/MachineWord.v:75`, `word := bv`).  A
+  per-cycle `step : state → inputs → state × outputs` over an acyclic
+  combinational graph, with a decidable well-formedness check (widths, no
+  combinational loops).  Undefined results (`$shiftx` out of range,
+  uninitialised registers) become explicit oracle inputs, not chosen
+  values.  A relational spec plus a computable interpreter proven equal to
+  it.
+- Execution: `vm_compute` is hopeless at 10^5–10^7 cycles × ~5·10^4 cells.
+  Extract the interpreter to OCaml with a precompiled schedule (rough
+  estimate: 10^6 cycles in minutes); `native_compute` for proof-grade checks
+  on short traces.
+- Front-end trust (Yosys + yosys-slang/sv2v): co-simulate the extracted
+  interpreter against Verilator on the original SV for every test, and keep
+  a second, independent export (`write_btor`) checked cycle by cycle against
+  the JSON one.
+- Later refinement proofs: work on the unflattened RTLIL hierarchy (same
+  cells plus instances) to go module by module; flattening is a simple,
+  provable transformation.
+
+### 7.3 Per-core front-end cost
+
+| | CVA6 cv64a6_imafdc_sv39 | Wally rv64gc | BlackParrot unicore | XiangShan |
+|---|---|---|---|---|
+| Source | SV, heavy type/struct parameters | SV, one struct parameter `cvw_t`, very plain | SV, macro-declared structs + basejump_stl | Chisel → firtool |
+| Open front end proven on the whole core | **yes**: yosys-slang (ORFS PR #2939, Basilisk 2025); SymbiYosys on submodules (`codeadpool/cva6-priv-sva`) | none published; Verilator only | yosys-slang compat suite, Synlig, Surelog | yosys-slang / UHDM, but ~4.3M cells, tens of GB |
+| Core size | ~33k lines + cvfpu; 210 kGE (GF22) | ~11.6k lines; no published area | ~31k lines + basejump | 131k lines Scala → 2–3M lines SV |
+| Word-level cells (estimate, unmeasured) | 50–150k | 30–80k | 60–150k | ≫ 1M |
+| Clocking | one posedge; async active-low reset | **integer and FP register files write on `negedge clk`** (`src/ieu/regfile.sv:52`, `src/fpu/fregfile.sv:46`); uncore has async resets and a negedge SPI | **posedge + negedge + a `bsg_dlatch`** in the memory pipe | gated clocks, async resets, several domains |
+| Memories | `tc_sram` behavioural | `ram1p1rwbe` etc. behavioural | `bsg_mem_*` | SRAMTemplate + MBIST |
+| Retire trace | RVFI | RVVI (for ImperasDV) | commit trace + Dromajo | difftest |
+| SoC harness | Verilator testharness: CLINT, PLIC, UART, bootrom | uncore: CLINT, PLIC, 16550, SPI | host/CLINT putchar | SimTop (AXI) |
+
+**Front-end ranking (the lifting cost, not the §6 Sail-match ranking): CVA6
+first, Wally in parallel.**
+
+- CVA6 is the only core whose whole-core open front end is settled, it has
+  a single clock, and its RVFI port plus testharness give a conformance
+  oracle.
+- Wally is 2–3× smaller and the plainest, but needs its two negedge
+  register files rewritten to posedge-with-bypass (or a two-phase
+  semantics), and a first-hand check that yosys-slang/sv2v accept `cvw_t`.
+- BlackParrot needs a two-phase semantics (negedge + latch).
+- XiangShan is too large for whole-core execution in Rocq; sub-blocks only.
+
+### 7.4 Next steps
+
+1. On the build VM: install a current Yosys (≥ 0.67, which bundles
+   yosys-slang; this host has 0.21) plus Verilator.  Run the §7.2 script on
+   CVA6 and on Wally to get real cell counts and see what breaks.
+2. Write the netlist semantics (`$`-cell set from `simlib.v`, `bv` values,
+   `step`, well-formedness check, extracted interpreter) and a JSON
+   importer.
+3. Co-simulate against Verilator on small tests; add the `write_btor`
+   cross-check.
+4. Connect to `tools/vtest`: run a conformance test's image on the extracted
+   interpreter with a minimal SoC shim, emit the observation trace, and feed
+   it to the existing "does the model allow it" checker as a third
+   platform beside QEMU and JH7110.
+
+Unverified in §7: all cell-count estimates; that yosys-slang/sv2v accept
+Wally's `cvw_t`; the interpreter throughput; which CVA6 configuration ORFS
+PR #2939 used.
