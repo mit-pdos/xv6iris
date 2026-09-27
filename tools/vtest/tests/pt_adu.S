@@ -37,7 +37,7 @@
    DEFENSIVELY -- their leaves already carry PTE_A/PTE_D, so no A/D update
    ever needs to happen -- and those run on the board under its native mode.
    This one does not, so it does not claim to. */
-/* vtest: platforms=qemu */
+/* vtest: platforms=qemu,cva6 */
 #include "abi.h"
 
 #define PTE_V   0x001

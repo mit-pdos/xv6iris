@@ -20,7 +20,12 @@
 /* NOT ON THE BOARD: the U74 traps executing `csrr menvcfg` (finding 31),
    and with mtvec=0 the second trap overwrites mcause/mepc/mtval, so the
    run never publishes and there is nothing to capture.  This case would
-   also never agree there: its fields are counters. */
+   also never agree there: its fields are counters.
+   NOT ON CVA6 either, for the same shape of reason: CVA6 has no `time` CSR
+   (rdtime is left to firmware, as on the U74), so `csrr time` at +0x64 is
+   an illegal instruction and, with mtvec=0, the run parks in the boot ROM's
+   wfi loop without publishing.  core_csrprobe asks it by stepping over the
+   refusal. */
 #include "abi.h"
 
     .globl _vtest_body

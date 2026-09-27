@@ -16,7 +16,9 @@
      +88  satp     0x180     +96  stimecmp 0x14D  */
 /* vtest: platforms=qemu */
 /* NOT ON THE BOARD: same as core_regs_mcsr -- the run traps on menvcfg
-   and never publishes, so no board capture exists to compare against. */
+   and never publishes, so no board capture exists to compare against.
+   NOT ON CVA6 either: CVA6 has no Sstc, so `csrr stimecmp` (0x14D, the
+   last field) is an illegal instruction and the run never publishes. */
 #include "abi.h"
 
     .globl _vtest_body

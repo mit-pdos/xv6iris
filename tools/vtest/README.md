@@ -11,12 +11,13 @@ state and a literal captured from QEMU.  Nothing here is restricted to what
 the xv6 driver's proofs assume -- a test may program the queue illegally, and
 the only question is whether the model has a run that matches.
 
-## ONE SET OF CASES, TWO PLATFORMS, ONE THEOREM
+## ONE SET OF CASES, THREE PLATFORMS, ONE THEOREM
 
 The suite has one set of test **cases** (`tests/*.S`).  A case declares, in
 its own `vtest:` directive, which **platforms** it is meaningful on.
 Executing a case on a platform produces a test **run**, so a case yields
-zero, one or two runs -- and every run, whichever platform it came from, is
+zero or more runs (QEMU, the VisionFive 2 board, the CVA6 RTL) -- and every
+run, whichever platform it came from, is
 the same kind of object and is judged by the same theorem.
 
     /* vtest: platforms=qemu  builder=multi  budget=4000  tick=1
@@ -26,7 +27,7 @@ Every knob defaults, so most cases declare nothing:
 
 | | default | what it says |
 |---|---|---|
-| `platforms=` | `qemu,jh7110` | which platforms this case is MEANINGFUL on.  A case is narrowed when the question cannot be ASKED on the other platform -- not when it merely fails there.  A failure is a finding and belongs in the table. |
+| `platforms=` | `qemu,jh7110,cva6` | which platforms this case is MEANINGFUL on.  A case is narrowed when the question cannot be ASKED on the other platform -- not when it merely fails there.  A failure is a finding and belongs in the table. |
 | `builder=` | `single` | how the model side is run.  `multi` = races two harts, needs a `VConc` schedule; `sched` = needs an explicit `VSched` item list (a serial byte ARRIVING is a schedule choice); `icache` = the case stores over its OWN code, so its outcomes are the FETCH VIEW's choice and the model side is one run per fetch schedule of a hand-written `<Case>Sched.v` over [`VIcache.v`](../../vtest-rocq/VIcache.v), which threads the hart's instruction view.  `VRun` has a builder only for `single`, so the others produce NO run module and the table says `no builder` -- which is honest, where running them through the single-hart builder would compute an outcome in which the second hart never ran. |
 | `budget=` | `2000` | steps the model is given |
 | `tick=` | `0` | step the CLOCK-TICKING branch of the boundary's `exists tick : bool` |
@@ -540,6 +541,55 @@ completes on the machine while the model takes a load access fault at
 `0x8000006c` with `mtval` = `0x2000008` and trap-loops forever.  It is the
 same shape as findings 11 and 12, where the PLIC was indexed by hart instead
 of by CONTEXT and half the register file was simply absent.
+
+## The third platform: the CVA6 RTL
+
+`tools/vtest/cva6.py` asks the same question of the **RTL** of the OpenHW
+CVA6 core (`cv64a6_imafdc_sv39`, pinned in `tools/vtest/cva6/build.py`),
+inside CVA6's own `corev_apu` testharness, simulated by Verilator.  It is the
+first platform that is a hardware *design* rather than an emulator or a
+chip, and it exists because of the effort in
+`claude-notes/projects/hw-refinement.md`: xv6 proved on a specific core.
+The runner's docstring says what a run claims; in short:
+
+| | QEMU | VisionFive 2 | CVA6 RTL |
+|---|---|---|---|
+| the image | the image | rebuilt with board `-D`s | **QEMU's, byte for byte** |
+| start state | reset | what firmware left, patched over JTAG | **a real reset** through CVA6's boot ROM (a0 = hartid, a1 = its DTB, **s0 = 0x80000000**) |
+| determinism | racy cases vary | varies | **deterministic**, one run |
+| harts | as many as asked | 4 U74s | **one** -- `conc_*` say `platforms=qemu,jh7110` |
+| UART | 16550, byte stride | DW-APB, reg-shift 2 | PULP apb_uart, **reg-shift 2, PLIC source 1** -- no `uart_` case yet |
+| PLIC | 96 sources | 96 | **30 sources** |
+| disk | virtio | none | none |
+
+`cva6` is in the default `platforms=`, so a case runs there unless it says
+otherwise.  The simulator is built on the build VM (`tools/vtest/cva6/`:
+`build.py` takes CVA6's own Verilator file list and swaps in
+`vtest_tb.cpp`, which backdoor-loads DRAM, polls DONE and decodes the
+16550's SOUT pin; Verilator v5.008 with CVA6's patch, as CVA6's CI pins).
+A run is a fraction of a second.
+
+**First sweep, 2026-09-27: 30 cases runnable, 30 captured, 19 pass** (18
+agree, 1 stuck -- `core_csrwide`, as on QEMU).  Eighteen of the thirty
+result regions are byte-identical to QEMU's.  Of the eleven red, five are
+the value dumps that are red on every platform (`clint_raw`, `core_dtb`,
+`core_csrvals`, `core_regs_fpr`, `pt_tlb_set0`); the other six are these:
+
+| # | what | model | CVA6 | kind | found by |
+|---|------|-------|------|------|----------|
+| 37 | **no Svadu: `menvcfg.ADUE` is hardwired 0** | ADUE is writable, so after the write the walker updates A/D and the access succeeds | the write is dropped (WARL), the access page-faults (`0xbad1`), the PTE is untouched | **model NARROWER** -- no execution in which ADUE ignores the write; also the gap between this core and xv6's `start()` | `pt_adu`, `pt_ident` |
+| 38 | CSRs CVA6 refuses: `time` (no hardware `rdtime`; left to firmware as on the U74) and `tselect` (no trigger module in this config) | implemented | illegal instruction | **model WIDER**, as finding 31 | `core_csrprobe` (and why `core_regs_ctr` is not run here) |
+| 39 | **no Sstc: `stimecmp` is an illegal instruction** | implemented | illegal instruction | **model WIDER** -- and xv6's timer uses it | `core_regs_scsr` (not run here: it never publishes) |
+| 40 | reset and identity values: `mtvec` = `0x10040` (the boot ROM's park loop), `mvendorid` = `0x602` (OpenHW), `marchid` = 3 (CVA6) | 0, 0, 0 | as stated | incompleteness, as finding 33 | `core_regs_mcsr` |
+| 41 | the boot ROM leaves **s0 = 0x80000000** | s0 = 0 | the jump register | boot-contract difference, like QEMU's a2 | `core_regs_gpr` |
+| 42 | the PLIC has **30 sources**: source 32's priority register does not exist (write dropped, reads 0) | 96 sources, reads back 4 | 0 | platform parameter | `plic_prio0` |
+
+**Where CVA6 sides with the MODEL against QEMU:** `pt_ad`.  The case leaves
+`menvcfg` alone; the model's power-on ADUE is 0, CVA6's is 0 (it has no
+Svadu at all), QEMU's is 1 (finding 20).  So CVA6 takes the page fault the
+model takes, and the run passes.  And `core_icache` is **stale** on CVA6
+exactly as on the U74 (finding 34) -- `ipol_cva6=stale` -- where QEMU is
+coherent: the model's non-coherent fetch view is right about this core too.
 
 <a id="findings-fixed"></a>
 ## Findings fixed

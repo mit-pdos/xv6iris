@@ -39,7 +39,7 @@ BUILDDIR = os.path.join(HERE, "build")
 # infix on the board side, so the two platforms' globals stay distinct even
 # though their files are now both <Case>Test.v.
 # ---------------------------------------------------------------------------
-PLATDIR = {"qemu": "QEMU", "jh7110": "JH7110"}
+PLATDIR = {"qemu": "QEMU", "jh7110": "JH7110", "cva6": "CVA6"}
 
 
 def rp(fname, platform=None):
@@ -125,7 +125,7 @@ def config(name):
            # test cases; executing a case on a platform produces a test RUN,
            # so a case yields zero, one or two runs.  The default is both.
            #
-           #   platforms=qemu,jh7110   (the default -- may be omitted)
+           #   platforms=qemu,jh7110,cva6   (the default -- may be omitted)
            #   platforms=qemu          QEMU only
            #   platforms=jh7110        board only
            #   platforms=none          runs nowhere, and the directive says why
@@ -134,7 +134,7 @@ def config(name):
            # MEANINGFUL run on the other -- not when it merely fails there.
            # A failure is a finding and belongs in the table; an exclusion
            # is a statement that the question cannot be asked.
-           "platforms": "qemu,jh7110",
+           "platforms": "qemu,jh7110,cva6",
            # THE MODEL-SIDE CONFIGURATION, which is also a property of the
            # case and so also lives here.  vtest-rocq/VRun.v consumes these.
            #   budget=N    steps the model is given.  Too small reads as a
@@ -546,6 +546,16 @@ def parse_csched(spec):
     return out
 
 
+def platform_knob(cfg, k, pl):
+    """A model-side knob that can differ PER PLATFORM, because the machines
+    differ: `ipol_cva6=stale` says CVA6's fetch was stale where QEMU's was
+    fresh.  `<k>_hw` is the board's older spelling of `<k>_jh7110`."""
+    for key in ("%s_%s" % (k, pl),) + (("%s_hw" % k,) if pl == "jh7110" else ()):
+        if cfg.get(key):
+            return cfg[key]
+    return cfg[k]
+
+
 def emit_passes(built=None, reset=False):
     """One proof per RUN, in ONE of the two forms.
 
@@ -592,12 +602,10 @@ def emit_passes(built=None, reset=False):
                and rrel(mod, pl) not in built:
                 v = "stuck" if was == "agree" else "agree"
             conc = int(cfg["smp"]) > 1
-            spec = cfg["csched_hw"] if pl == "jh7110" and cfg["csched_hw"] \
-                   else cfg["csched"]
+            spec = platform_knob(cfg, "csched", pl)
             scheds = parse_csched(spec) if spec.strip() else []
             picks = [q.strip() for q in cfg.get("picks", "").split(",") if q.strip()]
-            ipspec = cfg["ipol_hw"] if pl == "jh7110" and cfg["ipol_hw"] \
-                     else cfg["ipol"]
+            ipspec = platform_knob(cfg, "ipol", pl)
             ipols = [("IStale" if q.strip() == "stale" else "IFresh")
                      for q in ipspec.split(";") if q.strip()]
             # ONE if/elif CHAIN, AND NOTHING BETWEEN ITS ARMS.  Twice now a
@@ -780,6 +788,15 @@ PROJECT_HEAD = """-R . VTest
 -R ../kernel-rocq Kernel
 -arg -w
 -arg -notation-overridden
+# a quotation in a comment must not swallow a `*)` (tools/comment_quote_check.py)
+-arg -w
+-arg +comment-terminator-in-string
+# two notations sharing a prefix at different levels leave one unparseable
+-arg -w
+-arg +notation-incompatible-prefix
+# a nat literal of 5000+ is meant to be an of_num_uint term, not unary
+-arg -w
+-arg -abstract-large-number
 """
 
 
@@ -827,7 +844,7 @@ def write_project(from_build=False):
         here = rocq_listdir(pl)
         gens = sorted(f for f in here if f.endswith("Test.v"))
         runs = sorted(f for f in here if f.endswith("Run.v"))
-        if from_build:
+        if from_build is True or from_build == pl:
             ok = {f[:-len("Pass.vo")] for f in here if f.endswith("Pass.vo")}
         else:
             ok = _passing(pl)
@@ -926,37 +943,36 @@ def print_table(fmt="text"):
     Everything is read off the tree -- the case's own directive, whether a
     run module exists, whether its proof compiles --
     so it cannot drift."""
-    rows = [(n, _run_state(n, "qemu"), _run_state(n, "jh7110"))
+    rows = [(n,) + tuple(_run_state(n, pl) for pl in PLATFORMS)
             for n in all_tests()]
+    heads = [PLATDIR[pl] for pl in PLATFORMS]
     if fmt == "md":
         print("## Device conformance: every case, every run\n")
-        print("| case | QEMU | JH7110 |")
-        print("|---|---|---|")
-        for n, q, b in rows:
-            print("| `%s` | %s | %s |" % (n, _MD[q], _MD[b]))
+        print("| case | " + " | ".join(heads) + " |")
+        print("|---" * (len(heads) + 1) + "|")
+        for r in rows:
+            print("| `%s` | " % r[0] + " | ".join(_MD[v] for v in r[1:]) + " |")
     else:
         w = max(len(r[0]) for r in rows)
-        print("%-*s | %-13s | %-13s" % (w, "case", "qemu", "jh7110"))
-        print("-" * (w + 32))
-        for n, q, b in rows:
-            print("%-*s | %-13s | %-13s" % (w, n, _TXT[q], _TXT[b]))
-        print("-" * (w + 32))
+        rule = "-" * (w + 16 * len(PLATFORMS))
+        print("%-*s" % (w, "case") + "".join(" | %-13s" % pl for pl in PLATFORMS))
+        print(rule)
+        for r in rows:
+            print("%-*s" % (w, r[0]) + "".join(" | %-13s" % _TXT[v] for v in r[1:]))
+        print(rule)
     def c(i, v): return sum(1 for r in rows if r[i] == v)
-    if any(r[1] == "unbuilt" or r[2] == "unbuilt" for r in rows):
+    if any("unbuilt" in r[1:] for r in rows):
         print("\nNOTE: nothing is built here, so `not built` means the proof "
               "is listed in _CoqProject but has not been checked in this "
               "tree.  CI generates this table AFTER the build, where every "
               "verdict is a .vo.")
     # BOTH VERDICTS ARE PASSES; the split says what each one claims.
     def npass(i): return c(i, "pass") + c(i, "agree") + c(i, "stuck")
-    line = ("%d cases.  QEMU: %d pass (%d agree, %d stuck), %d no proof, "
-            "%d excluded.  "
-            "JH7110: %d pass (%d agree, %d stuck), %d no proof, %d excluded."
-            % (len(rows),
-               npass(1), c(1, "agree"), c(1, "stuck"),
-               c(1, "no-proof"), c(1, "excluded"),
-               npass(2), c(2, "agree"), c(2, "stuck"),
-               c(2, "no-proof"), c(2, "excluded")))
+    line = "%d cases.  " % len(rows) + "  ".join(
+        "%s: %d pass (%d agree, %d stuck), %d no proof, %d excluded."
+        % (PLATDIR[pl], npass(i), c(i, "agree"), c(i, "stuck"),
+           c(i, "no-proof"), c(i, "excluded"))
+        for i, pl in enumerate(PLATFORMS, 1))
     if fmt == "md":
         print("\n" + line)
         print("""
@@ -1208,12 +1224,12 @@ def repeat(name, n, drive_opts, smp=1):
         seen[key] += 1
     return seen
 
-PLATFORMS = ["qemu", "jh7110"]
+PLATFORMS = ["qemu", "jh7110", "cva6"]
 
 
 def platforms_of(name):
     """The platforms this CASE declares itself meaningful on."""
-    v = config(name).get("platforms", "qemu,jh7110").strip()
+    v = config(name).get("platforms", "qemu,jh7110,cva6").strip()
     if v in ("none", ""):
         return []
     return [p for p in v.split(",") if p in PLATFORMS]
@@ -1254,6 +1270,11 @@ def main():
                         "already on disk, so re-running a case cannot lose a "
                         "rare outcome somebody spent many runs catching; pass "
                         "this only when the stored capture is known bad.")
+    p.add_argument("--from-build-platform", metavar="PLAT",
+                   help="--from-build for ONE platform only (e.g. cva6): its "
+                        "proofs are taken from the .vo on disk, every other "
+                        "platform keeps its current listing.  For a build "
+                        "that checked one platform's runs and not the rest.")
     p.add_argument("--check", action="store_true",
                    help="exit nonzero if anything listed in _CoqProject has "
                         "no .vo, i.e. did not compile")
@@ -1297,7 +1318,7 @@ def main():
             sys.exit(1)
         return
     if a.cmd == "project":
-        files, _, passes = write_project(a.from_build)
+        files, _, passes = write_project(a.from_build_platform or a.from_build)
         print("_CoqProject: %d files (%d run proofs)" % (len(files), len(passes)))
         return
     if a.cmd == "passes":

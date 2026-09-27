@@ -1,0 +1,8 @@
+`verilator_config
+// The signals vtest_tb.cpp reads through rootp, kept from being optimised
+// away -- and only those, since --public-flat-rw on the whole design costs
+// simulation speed everywhere.
+public_flat_rw -module "tc_sram" -var "sram"
+public_flat_rd -module "apb_uart" -var "iDLL"
+public_flat_rd -module "apb_uart" -var "iDLM"
+public_flat_rd -module "ariane_testharness" -var "tx"

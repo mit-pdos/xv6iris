@@ -152,7 +152,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep seccomp:Secc
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-ucode check-ucode \
         audit audit-only audit-tree audit-tree-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
-        hwtest hwtest-gen hwtest-gen-all hwtest-probe \
+        hwtest hwtest-gen hwtest-gen-all hwtest-probe cva6test-sim cva6test-gen \
         vtest-runs vtest-passes vtest-table \
         clean clean-proofs distclean model-gen
 
@@ -493,6 +493,27 @@ hwtest-gen-all:
 	  $$($(PYTHON) tools/vtest/board.py runnable --board $(HWTEST_BOARD))
 
 hwtest: hwtest-gen-all vtest-check
+
+# ---- 5b'. cva6test: the same semantics, against the CVA6 RTL (Verilator) ----
+#
+# tools/vtest/cva6.py is the third runner: the OpenHW CVA6 core's RTL
+# (cv64a6_imafdc_sv39, inside CVA6's own corev_apu testharness), simulated
+# by Verilator, writing vtest-rocq/CVA6/<Name>{Test,Run}.v.  The image is
+# byte-for-byte QEMU's, and the simulator starts from a real reset.  See the
+# docstring of tools/vtest/cva6.py and README.md "The third platform".
+#
+# THE SIMULATOR LIVES ON THE BUILD VM.  Run the scripts there directly, not
+# through a remote top-level make (remote-build-gcp.md says why):
+#   ./gcp-rocq/run-on-gcp tools/vtest/cva6/build.py          (once per pin)
+#   ./gcp-rocq/run-on-gcp tools/vtest/cva6.py gen --all -k
+#   ./gcp-rocq/run-on-gcp --no-sync --pull vtest-rocq/CVA6/ true
+# These two targets are the same commands, for a machine that has Verilator.
+# Checking the captures is `vtest-check`, like every other platform's.
+cva6test-sim:
+	$(PYTHON) tools/vtest/cva6/build.py
+
+cva6test-gen:
+	$(PYTHON) tools/vtest/cva6.py gen --all -k
 
 # ---- 5c. the uniform test-run framework (vtest-rocq/VRun.v) ----
 #

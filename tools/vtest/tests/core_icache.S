@@ -23,7 +23,7 @@
    policy that reads at the top of the log (fresh) and one that reads at the
    instruction view (stale), each until the fence.i raises the view.
 
-   vtest: repeat=3 board_repeat=5 budget=4000 selfmod=1 ipol=fresh ipol_hw=stale */
+   vtest: repeat=3 board_repeat=5 budget=4000 selfmod=1 ipol=fresh ipol_hw=stale ipol_cva6=stale */
 #include "abi.h"
 
     .option norvc

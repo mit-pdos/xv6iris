@@ -373,6 +373,26 @@ netlist; `tools/hw/netlist_summary.py` summarises it.  About 12 s and 0.6 GB.
    it to the existing "does the model allow it" checker as a third
    platform beside QEMU and JH7110.
 
+### 7.5 CVA6 as a vtest platform, via Verilator (2026-09-27)
+
+Owner's ordering: vtests on the RTL FIRST (Verilator, independent of any Rocq
+semantics of the hardware), the netlist semantics later.  Done: `cva6` is
+the third vtest platform (`tools/vtest/cva6.py`, `tools/vtest/cva6/`,
+tools/vtest/README.md "The third platform").  CVA6's own corev_apu
+testharness with the real 16550 switched back on, driven by a testbench that
+backdoor-loads DRAM; Verilator v5.008 (CVA6's pin) in `~/hw/` on the VM;
+the image is QEMU's byte for byte and the run starts from a real reset.
+
+First sweep: 30 runnable cases, 19 proved (18 agree + 1 stuck); 18 of 30
+result regions byte-identical to QEMU's.  The six CVA6-specific reds are
+vtest findings 37-42, and the two that matter for this effort are the ones
+§2 predicted: **no Svadu** (ADUE hardwired 0; finding 37) and **no Sstc /
+no `time` CSR** (findings 38, 39).  CVA6 sides with the model against QEMU
+on power-on ADUE (`pt_ad`) and has a non-coherent I-cache like the U74
+(`core_icache`).  Not yet asked of CVA6: the `uart_` and PLIC-interrupt
+cases (its UART is reg-shift 2 at PLIC source 1 -- the model's UART window
+is byte-strided), the multi-hart cases (one hart), disk (no virtio).
+
 Unverified in §7: the cell-count estimates for Wally, BlackParrot and
 XiangShan (CVA6 is measured, §7.3b); that yosys-slang/sv2v accept
 Wally's `cvw_t`; the interpreter throughput; which CVA6 configuration ORFS

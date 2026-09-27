@@ -39,7 +39,7 @@
      +120 mvendorid 0xF11     +128 marchid       0xF12
      +136 mimpid   0xF13      +144 mhartid       0xF14
      +152 mconfigptr 0xF15    +160 tselect       0x7A0  */
-/* vtest: platforms=qemu */
+/* vtest: platforms=qemu,cva6 */
 /* NOT ON THE BOARD: the U74 traps executing `csrr menvcfg` (finding 31),
    and with mtvec=0 the second trap overwrites mcause/mepc/mtval, so the
    run never publishes and there is nothing to capture.  Reading the same

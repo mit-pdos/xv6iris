@@ -36,7 +36,7 @@
  *   +0x800     the total number of traps taken
  *   +0x810..   the trap records: mcause, mepc, mtval, 0
  */
-/* vtest: repeat=1 platforms=qemu */
+/* vtest: repeat=1 platforms=qemu,cva6 */
     .option norvc
 #include "abi.h"
 
