@@ -385,7 +385,7 @@ Section LogWriteDefs.
   (* ABSORB: the slot array comes back UNCHANGED (the store rewrote W[i]
      with the same word), the junk head and lh.n untouched, and the
      caller's own slot unit passes straight through. *)
-  Definition lw_closeA (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeA `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) (W : list (mword 32)) : iProp Σ :=
@@ -400,7 +400,7 @@ Section LogWriteDefs.
 
   (* APPEND: the junk cell at index nl now holds bno, bpin's reference has
      been minted, and lh.n has been bumped. *)
-  Definition lw_closeB (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeB `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) (W : list (mword 32)) : iProp Σ :=
@@ -415,7 +415,7 @@ Section LogWriteDefs.
 
   (* what [lw_pin] (+0x66) still owes: the bpin reference and the bumped
      lh.n cell *)
-  Definition lw_closeP (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeP `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) : iProp Σ :=
@@ -426,7 +426,7 @@ Section LogWriteDefs.
      lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud)%I.
 
   (* ... and what the absorb path still owes at the +0xaa fall-through *)
-  Definition lw_closeR (γ : log_names) (bn : bio_names) (γfs : fs_names)
+  Definition lw_closeR `{GEN : GenId} (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (γd : disk_names) (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
       (nl : nat) : iProp Σ :=
@@ -2033,7 +2033,7 @@ Section ProofLogWrite.
     iDestruct (log_opSe_positive with "Hoauth Hop") as %Hpos.
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
+    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hstok & Hbatch)".
     rewrite /log_state.
     iDestruct "Hbatch" as (W L D M)
       "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie)".
@@ -2477,7 +2477,7 @@ Section ProofLogWrite.
     (* ================= THE TWO CLOSING WANDS ================= *)
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
              Hmirh Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
@@ -2529,6 +2529,8 @@ Section ProofLogWrite.
             - apply elem_of_singleton in Hin. injection Hin as ->. exact HbnoLB. }
           (* an operation is open, so the log is not quiescent *)
           iSplitR; [iPureIntro; intros Hc; lia|].
+          (* a log_write does not commit: the sync token stays home *)
+          iSplitL "Hstok"; [iExact "Hstok"|].
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
           rewrite /log_state. iExists W, (<[uint bno := bs]> L), D, M.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
@@ -2633,6 +2635,8 @@ Section ProofLogWrite.
               apply elem_of_union_r, elem_of_singleton. reflexivity. }
           (* an operation is open, so the log is not quiescent *)
           iSplitR; [iPureIntro; intros Hc; lia|].
+          (* a log_write does not commit: the sync token stays home *)
+          iSplitL "Hstok"; [iExact "Hstok"|].
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
           rewrite /log_state. iExists (W ++ [bno]), (<[uint bno := bs]> L),
                                      (<[uint bno := true]> D), M.

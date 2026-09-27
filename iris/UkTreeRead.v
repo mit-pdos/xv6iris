@@ -426,7 +426,7 @@ Section UkTreeRead.
     rewrite /aread_commit_at. iIntros (I off a d) "%Hpre Hka Hoff".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp]" as "Hpc".
@@ -434,7 +434,7 @@ Section UkTreeRead.
     iDestruct "Hpc" as "[Hp Hc]".
     iMod "Hc".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka".
     iSplitL "Hoff"; [iApply (off_ret_of_link with "Hoff") |]. iExact "Hc".

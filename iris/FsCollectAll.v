@@ -276,6 +276,25 @@ Qed.
 (*  the three yields [col_side]; the union is then [region_inums nib].     *)
 (* ====================================================================== *)
 
+(* THE GHOST COMMIT'S MASK (sync K3-3): the seven namespaces the collection
+   opens are all [nroot] children (or, for [sbN], a child of [logN]) with
+   names distinct from [crashN]'s, so the hooked law's mask misses the crash
+   invariant the ghost commit holds open *)
+Lemma fs_collect_ns_crashN :
+  (↑crashN : coPset) ## ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
+                          ∪ ↑icEscN ∪ ↑appN).
+Proof.
+  assert (Hft : (↑crashN : coPset) ## ↑ftopN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hir : (↑crashN : coPset) ## ↑iregN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hbm : (↑crashN : coPset) ## ↑bitmapN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hip : (↑crashN : coPset) ## ↑ipoolN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hic : (↑crashN : coPset) ## ↑icEscN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hap : (↑crashN : coPset) ## ↑appN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hlg : (↑crashN : coPset) ## ↑logN) by (apply ndot_ne_disjoint; discriminate).
+  assert (Hsb : (↑sbN : coPset) ⊆ ↑logN) by (apply nclose_subseteq).
+  set_solver.
+Qed.
+
 Section CollectAll.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
@@ -1799,34 +1818,36 @@ Section CollectAll.
 
   Lemma fs_collect_dur (E : coPset) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
-      (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) :
+      (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
+      (T : iProp Σ) :
     col_geom sb (FsImg.sb_inodestart sb) icfg_nib (fs_home_set cov ls) ->
     ↑appN ⊆ E ->
     ↑ftopN ⊆ E -> ↑iregN ⊆ E -> ↑bitmapN ⊆ E -> ↑sbN ⊆ E ->
     ↑ipoolN ⊆ E -> ↑icEscN ⊆ E ->
     (* the merge, the application's one durability obligation at the
-       commit (SY3-K2) *)
-    app_merge -∗
+       commit (SY3-K2), at the token the committer hands in (K3-3) *)
+    app_merge_raw app_pred T -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) icfg_nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
     ipool_inv cn γfs γi cov ls icfg_nib -∗
     sb_park γfs sb -∗
     col_auth γfs Lb C (fs_home_set cov ls) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E}=∗
-      dur_pair app_guest (col_view C (fs_home_set cov ls))
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    T ={E}=∗
+      dur_pair app_guest T (col_view C (fs_home_set cov ls))
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
       ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien.
-    iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx".
+    iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx HT".
     iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 0. the application's invariant: its half, its claim, the domain
        row (the transport stays put) ---- *)
     iMod (inv_acc E appN with "Happ") as "[Hab Hclapp]"; [exact Hap |].
     iEval (rewrite /app_body) in "Hab".
-    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom & #Hxa)".
+    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom)".
     (* ---- 1. the abstract map's authority ---- *)
     iMod (inv_acc (E ∖ ↑appN) ftopN with "Hftop") as "[Hfb Hclft]";
       [solve_ndisj |].
@@ -1895,7 +1916,7 @@ Section CollectAll.
        invariant below ---- *)
     iDestruct "Hdur" as (gt) "[Hdur Hguest]".
     iEval (rewrite HSI /snap_guest) in "Hguest".
-    iMod (app_dur_raw_merge app_pred gt I app_run with "Hmerge Hguest Hpa")
+    iMod (app_dur_raw_merge app_pred T gt I app_run with "Hmerge Hguest Hpa HT")
       as "[Hpa Hg]".
     iAssert (∃ kv : ity, ireg_keep γfs ireg_root kv)%I
       with "[Hkeep]" as "Hkeep".
@@ -1917,13 +1938,177 @@ Section CollectAll.
     { iApply bi.later_intro. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
       iPureIntro. exact Hclean. }
     iMod ("Hclapp" with "[Hha Hpa]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hha Hpa Hxa".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hha Hpa".
       iPureIntro. exact Hdom. }
     (* the pair, placed by name: [P_dur_at]'s head conjunct is a byte
        AUTHORITY, so no bare [iFrame] here (see [fs_snap_law_build]) *)
     iModIntro. iSplitR "Hauth Htx"; [| iFrame "Hauth Htx"].
     rewrite /dur_pair. iExists gt. iSplitL "Hdur"; [iExact "Hdur" |].
     rewrite /dur_merge /app_guest. iExact "Hg".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  4b.  THE GHOST COMMIT'S COLLECTION (sync K3-3, claude-notes/design/  *)
+  (*  sync.md §4.3 item 3c).  [fs_collect_dur]'s twin, up to the fresh     *)
+  (*  guest half at the running map: the ghost commit holds the OLD guest  *)
+  (*  (it has the crash invariant open), so instead of handing out the     *)
+  (*  merge for a header write to apply, it applies the merge's left arm   *)
+  (*  to the old guest's claim HERE -- where the running claim is in hand  *)
+  (*  -- then fires every waiter's hook through the application's runner   *)
+  (*  at the one map where the guest half, the new durable claim, the      *)
+  (*  running claim and the token meet, and returns the new guest itself. *)
+  (* ==================================================================== *)
+
+  Lemma fs_collect_ghost (E : coPset) (cn : ic_names)
+      (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
+      (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
+      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) (Qs : list (iProp Σ))
+      (gt_o : gname) :
+    col_geom sb (FsImg.sb_inodestart sb) icfg_nib (fs_home_set cov ls) ->
+    ↑appN ⊆ E ->
+    ↑ftopN ⊆ E -> ↑iregN ⊆ E -> ↑bitmapN ⊆ E -> ↑sbN ⊆ E ->
+    ↑ipoolN ⊆ E -> ↑icEscN ⊆ E ->
+    (* the merge, at the token, and the runner of the waiters' hooks *)
+    app_merge_raw app_pred T -∗
+    app_sync_run_raw app_pred T Hk -∗
+    ireg_reg γi γfs (FsImg.sb_inodestart sb) icfg_nib -∗
+    bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
+    ic_escrows cn γfs γi cov ls -∗
+    ipool_inv cn γfs γi cov ls icfg_nib -∗
+    sb_park γfs sb -∗
+    col_auth γfs Lb C (fs_home_set cov ls) -∗
+    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    (* the OLD durable guest, the token, and the hooks *)
+    ▷ app_guest gt_o -∗
+    T -∗
+    ([∗ list] Q ∈ Qs, Hk Q) ={E}=∗
+      (∃ gt : gname,
+         P_dur_at gt (col_view C (fs_home_set cov ls)) ∗ ▷ app_guest gt)
+      ∗ T
+      ∗ ([∗ list] Q ∈ Qs, Q)
+      ∗ col_auth γfs Lb C (fs_home_set cov ls)
+      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
+  Proof using .
+    intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien.
+    iIntros "#Hmerge #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT HQs".
+    iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
+    iDestruct "Hbmi" as "(#Hbmb & _)".
+    (* ---- 0. the application's invariant: its half, its claim, the domain
+       row (the transport stays put) ---- *)
+    iMod (inv_acc E appN with "Happ") as "[Hab Hclapp]"; [exact Hap |].
+    iEval (rewrite /app_body) in "Hab".
+    iDestruct "Hab" as (Ia) "(>Hha & Hpa & >%Hdom)".
+    (* ---- 1. the abstract map's authority ---- *)
+    iMod (inv_acc (E ∖ ↑appN) ftopN with "Hftop") as "[Hfb Hclft]";
+      [solve_ndisj |].
+    iDestruct "Hfb" as ">Hfb".
+    iDestruct "Hfb" as (I A) "(Hta & Hlk & Hpk & %Hclean)".
+    (* the two halves agree: the application's claim is about THIS map *)
+    iDestruct (ghost_map_auth_agree with "Hta Hha") as %HIa. subst Ia.
+    (* ---- 2. the region ---- *)
+    iMod (inv_acc (E ∖ ↑appN ∖ ↑ftopN) iregN with "Hiregi") as "[Hib Hclir]";
+      [solve_ndisj |].
+    iDestruct "Hib" as ">Hib".
+    iDestruct "Hib" as (m) "(Hma & Hblks & Hreg)".
+    (* ---- 3. the bitmap ---- *)
+    iMod (inv_acc (E ∖ ↑appN ∖ ↑ftopN ∖ ↑iregN) bitmapN with "Hbmb")
+      as "[Hbb Hclbm]"; [solve_ndisj |].
+    iDestruct "Hbb" as ">Hbb". iDestruct "Hbb" as (used) "Hbres".
+    (* ---- 4. block 1 ---- *)
+    iMod (sb_park_acc (E ∖ ↑appN ∖ ↑ftopN ∖ ↑iregN ∖ ↑bitmapN) γfs sb
+            with "Hpark")
+      as (sbb) "(%Hparse & Hsbb & Hclsb)"; [solve_ndisj |].
+    (* ---- 5. the pool, at a quiescent ledger ---- *)
+    iMod (ipool_quiesce_acc (E ∖ ↑appN ∖ ↑ftopN ∖ ↑iregN ∖ ↑bitmapN ∖ ↑sbN)
+            cn γfs γi cov ls icfg_nib with "Hpool Htx")
+      as (O X ids) "(%Hlen & %Hrow & Htx & Hrows & Hids & Hmks & Hclp)";
+      [solve_ndisj |].
+    (* ---- 6. the fifty escrows ---- *)
+    assert (Hsube : esc_ns (seq 0%nat NINODE)
+                    ⊆ E ∖ ↑appN ∖ ↑ftopN ∖ ↑iregN ∖ ↑bitmapN ∖ ↑sbN ∖ ↑ipoolN).
+    { etrans; [apply esc_ns_sub |]. solve_ndisj. }
+    iMod (ic_escrows_open_list (seq 0%nat NINODE) _ cn γfs γi cov ls
+            (ks_ok_seq NINODE 0%nat) Hsube with "Hesc")
+      as "[Hbodies Hcle]".
+    (* ---- THE COLLECTION, AS AN ACCESSOR (durable-disk EV-Y) ---- *)
+    iDestruct (col_bodies_acc cn γfs γi cov ls icfg_nib sb sbb used m I O X
+                 ids Lb C Hgeom Hrow Hlen Hparse
+                 with "[$Htx $Hauth $Hta $Hma $Hblks $Hbres $Hsbb $Hrows
+                        $Hmks $Hids $Hbodies]")
+      as (S) "(%Hsh & %HSI & Hauth & Hkeep & HS & Hback)".
+    (* the collected node map IS the running map: the restriction is the
+       identity on a map whose inums are exactly the region's *)
+    rewrite (col_reg_map_id I Hdom) in HSI.
+    (* the epoch's own identity: the source's map sits inside the committed
+       view's flattening *)
+    iAssert (⌜Lb ⊆ fs_dbytes (col_view C (fs_home_set cov ls))⌝
+             ∧ col_auth γfs Lb C (fs_home_set cov ls))%I
+      with "[Hauth]" as "[%Hle Hauth]".
+    { iSplit; [iApply (col_auth_dbytes with "Hauth") | iExact "Hauth"]. }
+    (* the root's keep-alive IS the transport's spare link fragment *)
+    assert (Hr : ireg_root = FsImg.ROOTINO) by (vm_compute; reflexivity).
+    iDestruct "Hkeep" as (kv) "Hkeep".
+    iAssert (own (fs_link γfs) (link_tok_elem FsImg.ROOTINO kv))%I
+      with "[Hkeep]" as "Hkeep".
+    { rewrite /ireg_keep
+        (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl).
+      rewrite -Hr. iExact "Hkeep". }
+    (* ---- THE TRANSPORT IS THE MINT'S CALLER ---- *)
+    iMod (P_dur_alloc_xfer (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
+            (col_auth γfs Lb C (fs_home_set cov ls)) Lb
+            (col_agree γfs Lb C (fs_home_set cov ls)) (3/4)%Qp S
+            (col_view C (fs_home_set cov ls)) kv qp_half_lt_34 Hsh Hle
+            with "Hauth HS Hkeep") as "(Hauth & HS & Hkeep & Hdur)".
+    (* ---- THE APPLICATION'S CROSSING: the fresh guest half stands at the
+       collected map, which is the running map; the merge runs on the
+       running claim and hands out the wand from the old guest to the new
+       one at [gt] (SY3-K2), and the original returns to the application's
+       invariant below ---- *)
+    iDestruct "Hdur" as (gt) "[Hdur Hguest]".
+    iEval (rewrite HSI /snap_guest) in "Hguest".
+    (* the merge on the running claim, with the token; its LEFT arm on the
+       old guest's claim (the old half is dropped with it) *)
+    iMod ("Hmerge" $! app_run _ with "Hpa HT") as "[Hpa Hw]".
+    iDestruct "Hw" as (r') "[Hw _]".
+    iMod ("Hw" with "[Hold]") as "[Hnew HT]".
+    { iNext. iEval (rewrite /app_guest /app_dur_raw) in "Hold".
+      iDestruct "Hold" as (r_o I_o) "[_ Hold]".
+      iExists r_o, (FsAbsDefs.abs_view I_o). iExact "Hold". }
+    (* every hook fires HERE, at one map: the fresh guest half, the new
+       durable claim, the running claim and the token *)
+    iMod (app_sync_run_list app_pred T Hk _ Qs gt I app_run r'
+            with "Hrun HQs Hguest Hnew Hpa HT")
+      as "(Hguest & Hnew & Hpa & HT & HQs)".
+    iPoseProof (app_dur_raw_pack app_pred gt I with "Hguest [Hnew]") as "Hg".
+    { iExists r'. iExact "Hnew". }
+    iAssert (∃ kv : ity, ireg_keep γfs ireg_root kv)%I
+      with "[Hkeep]" as "Hkeep".
+    { iExists kv. rewrite /ireg_keep
+        (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl).
+      rewrite -Hr. iExact "Hkeep". }
+    (* ---- and the source goes back, so every body does ---- *)
+    iDestruct ("Hback" with "Hauth Hkeep HS")
+      as "(Htx & Hauth & Hta & Hma & Hblks & Hbres & Hsbb & Hrows
+           & Hmks & Hids & Hbodies)".
+    iMod ("Hcle" with "Hbodies") as "_".
+    iMod ("Hclp" with "[$Hrows $Hids $Hmks]") as "_".
+    iMod ("Hclsb" with "Hsbb") as "_".
+    iMod ("Hclbm" with "[Hbres]") as "_".
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists used. iExact "Hbres". }
+    iMod ("Hclir" with "[Hma Hblks Hreg]") as "_".
+    { iApply bi.later_intro. rewrite /ireg_body. iExists m. iFrame "Hma Hblks Hreg". }
+    iMod ("Hclft" with "[Hta Hlk Hpk]") as "_".
+    { iApply bi.later_intro. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
+      iPureIntro. exact Hclean. }
+    iMod ("Hclapp" with "[Hha Hpa]") as "_".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hha Hpa".
+      iPureIntro. exact Hdom. }
+    (* the pair, placed by name: [P_dur_at]'s head conjunct is a byte
+       AUTHORITY, so no bare [iFrame] here (see [fs_snap_law_build]) *)
+    iModIntro. iSplitL "Hdur Hg".
+    { iExists gt. iSplitL "Hdur"; [iExact "Hdur" |].
+      rewrite /app_guest. iExact "Hg". }
+    iFrame "HT HQs Hauth Htx".
   Qed.
 
 
@@ -1951,24 +2136,25 @@ Section CollectAll.
   (* ==================================================================== *)
 
   Lemma fs_snap_law_build (γ : log_names) (cn : ic_names) (γfs : fs_names)
-      (γi : gname) (cov : gset Z) (ls : Z) (nib : nat) (sb : fs_sb) :
+      (γi : gname) (cov : gset Z) (ls : Z) (nib : nat) (sb : fs_sb)
+      (T : iProp Σ) :
     γ = icfg_log ->
     nib = icfg_nib ->
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
     FsCrash.fs_crash_seam_at app_guest cov ls -∗
-    app_merge -∗
+    app_merge_raw app_pred T -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
     ipool_inv cn γfs γi cov ls nib -∗
     sb_park γfs sb -∗
-    snap_law γ γfs cov ls.
+    snap_law γ γfs cov ls T.
   Proof using .
     intros -> -> Hgeom.
     iIntros "#Hseam #Hmerge #Hireg #Hbm #Hesc #Hpool #Hpark".
     iApply (snap_law_intro icfg_log γfs cov ls
               ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
-               ∪ ↑icEscN ∪ ↑appN) app_guest with "Hseam").
+               ∪ ↑icEscN ∪ ↑appN) app_guest T with "Hseam").
     (* [sbN] IS A CHILD OF [logN] (durable-disk lane E-blk1), so
        [solve_ndisj] alone no longer closes this: block 1's park is a
        SIBLING of the byte view's own [fsbN] under one parent, and the fact
@@ -1981,7 +2167,7 @@ Section CollectAll.
       pose proof (fsbN_sbN_disj) as Hsb.
       set_solver. }
     rewrite /snap_law_at.
-    iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht".
+    iModIntro. iIntros (E Lb C) "%HN %Hdom %Hlens %Htie %Hdm Hb Ht HT".
     assert (Hap : (↑appN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hir : (↑iregN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
@@ -1989,9 +2175,9 @@ Section CollectAll.
     assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
-    iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C Hgeom
+    iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C T Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen
-            with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht")
+            with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht HT")
       as "(Hdur & Hauth & Ht)".
     { rewrite /col_auth. iFrame "Hb".
       iSplitR; [iPureIntro; exact Hdom |].
@@ -2012,6 +2198,71 @@ Section CollectAll.
        conjunct off by name first. *)
     iModIntro. rewrite /snap_law_out /col_view.
     iSplitL "Hdur"; [iExact "Hdur" |]. iFrame "Hb Ht".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  5b.  THE HOOKED LAW, DISCHARGED (sync K3-3)                         *)
+  (*                                                                      *)
+  (*  [LogSnapLaw.snap_law_ghost] is the law the GHOST COMMIT runs: the    *)
+  (*  same mask as [fs_snap_law_build]'s, the same seam at the same guest, *)
+  (*  over [fs_collect_ghost].  The one new fact about the mask is that    *)
+  (*  [crashN] is not in it -- the ghost commit runs the law with the      *)
+  (*  crash invariant open ([fs_collect_ns_crashN]).                       *)
+  (* ==================================================================== *)
+
+  Lemma fs_snap_law_ghost_build (γ : log_names) (cn : ic_names)
+      (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z) (nib : nat)
+      (sb : fs_sb) (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) :
+    γ = icfg_log ->
+    nib = icfg_nib ->
+    col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
+    FsCrash.fs_crash_seam_at app_guest cov ls -∗
+    app_merge_raw app_pred T -∗
+    app_sync_run_raw app_pred T Hk -∗
+    ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
+    bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
+    ic_escrows cn γfs γi cov ls -∗
+    ipool_inv cn γfs γi cov ls nib -∗
+    sb_park γfs sb -∗
+    snap_law_ghost γ γfs cov ls T Hk.
+  Proof using .
+    intros -> -> Hgeom.
+    iIntros "#Hseam #Hmerge #Hrun #Hireg #Hbm #Hesc #Hpool #Hpark".
+    iApply (snap_law_ghost_intro icfg_log γfs cov ls
+              ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
+               ∪ ↑icEscN ∪ ↑appN) app_guest T Hk with "Hseam").
+    (* [fsbN]: as [fs_snap_law_build] *)
+    { assert (Hoth : (↑logN : coPset)
+                     ## ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑ipoolN
+                         ∪ ↑icEscN ∪ ↑appN)) by solve_ndisj.
+      pose proof (fsbN_logN) as Hfb.
+      pose proof (fsbN_sbN_disj) as Hsb.
+      set_solver. }
+    (* [crashN]: a sibling of all seven under [nroot] *)
+    { exact fs_collect_ns_crashN. }
+    rewrite /snap_law_ghost_at.
+    iModIntro. iIntros (E Lb C Qs gt_o)
+      "%HN %Hdom %Hlens %Htie %Hdm Hb Ht Hold HT HQs".
+    assert (Hap : (↑appN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hft : (↑ftopN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hir : (↑iregN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hbn : (↑bitmapN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
+    iMod (fs_collect_ghost E cn γfs γi cov ls sb Lb C T Hk Qs gt_o Hgeom
+            Hap Hft Hir Hbn Hsn Hpn Hen
+            with "Hmerge Hrun Hireg Hbm Hesc Hpool Hpark [Hb] Ht Hold HT HQs")
+      as "(Hdur & HT & HQs & Hauth & Ht)".
+    { rewrite /col_auth. iFrame "Hb".
+      iSplitR; [iPureIntro; exact Hdom |].
+      iSplitR; [iPureIntro; exact Hlens |].
+      iSplitR; [iPureIntro; exact Htie |].
+      iPureIntro; exact Hdm. }
+    rewrite /col_auth. iDestruct "Hauth" as "(Hb & _ & _ & _ & _)".
+    (* the snapshot conjunct by name first, as in [fs_snap_law_build] *)
+    iModIntro. rewrite /col_view.
+    iSplitL "Hdur"; [iExact "Hdur" |]. iFrame "HT HQs Hb Ht".
   Qed.
 
 End CollectAll.

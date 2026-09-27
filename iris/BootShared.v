@@ -1661,6 +1661,9 @@ Section BootAlloc.
        straight through to the mint, which parks the one and puts both on
        fsinit's kit (round C) *)
     app_merge (APP := APP) -∗
+    (* ...and the sync runner beside the merge (sync K3-3), straight onto
+       fsinit's kit *)
+    app_sync_run (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (FsImg.sb_logstart sb) -∗
     (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2), straight
        through to the mint, which puts it in the log names' free bundle *)
@@ -1880,7 +1883,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hok #Hmerge #Hseamg Hstok Hdursnap H".
+    iIntros "Hok #Hmerge #Hrun #Hseamg Hstok Hdursnap H".
     iDestruct (power_boot_res_unpack Rb Tn g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -2292,7 +2295,7 @@ Section BootAlloc.
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
-            with "Hdimg Hbsauth Hbslots Hok Hmerge Hseamg Hstok Hdursnap")
+            with "Hdimg Hbsauth Hbslots Hok Hmerge Hrun Hseamg Hstok Hdursnap")
       as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried

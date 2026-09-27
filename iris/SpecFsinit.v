@@ -398,7 +398,15 @@ Definition wp_fsinit_sconf_body
      and the era's BORN-TRUE mirror half + swap receipt (durable-disk 1a). *)
   fs_crash_seam_at app_guest fsc_cov fsc_logst -∗
   app_merge -∗
+  (* ...THE SYNC RUNNER, kit 2's last row (sync K3-3): fsinit builds the
+     ghost commit's HOOKED law from it beside the merge
+     ([FsCollectAll.fs_snap_law_ghost_build]) *)
+  app_sync_run -∗
   gen_cert -∗
+  (* ...and THE CRASH INVARIANT (sync K3-3), off [FirstTok.first_boot_persist]
+     beside the certificate: initlog parks it into [LogInv.log_ctx] for the
+     ghost commit to open *)
+  crash_inv -∗
   log_mirror_born M -∗
   (* THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE
      [icfg_log]'s.  Threaded straight into [initlog] at +0x4e, which fills

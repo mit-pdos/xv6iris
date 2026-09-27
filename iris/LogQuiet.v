@@ -76,11 +76,43 @@ Proof.
   symmetry. exact (Hok b (fs_home_in_ext cov ls b Hb)).
 Qed.
 
+(* THE BYTE VIEW'S CACHE PICTURE AGAINST THE LOGGED VIEW, pure half: the
+   law's conclusion is stated at the byte invariant's own cache picture [C],
+   a committer's at the checked-out [L], and on the home set -- which is
+   [dom C] -- the two are the same map.  Here rather than in [ProofEndOp]
+   (whose commit is its first reader) because the ghost commit
+   ([LogGhostCommit]) reads the byte view the same way (sync K3-3). *)
+Lemma eo_restrict_of_sub (C L : gmap Z (list (bv 8))) (home : gset Z) :
+  dom C = home -> C ⊆ L ->
+  fs_restrict (dv_of_D C) home = fs_restrict (dv_of_D L) home.
+Proof.
+  intros Hdom Hsub. apply fs_restrict_ext. intros b Hb.
+  assert (Hin : is_Some (C !! b))
+    by (apply elem_of_dom; rewrite Hdom; exact Hb).
+  destruct Hin as [bs Hbs].
+  rewrite /dv_of_D Hbs (lookup_weaken _ _ _ _ Hbs Hsub) //.
+Qed.
+
 Section LogQuiet.
   Context `{XI : CurCtx}.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
             !fsLinkG Σ, !fsTopG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId}.
+
+  (* the checked-out CACHE authority against the halves the byte view's
+     invariant parks: every home block's cached value is the one the
+     committer holds.  [ghost_map_lookup_big] is stated at fraction 1 only in
+     iris 4.4.0, so this is [FsBlocks.byte_range_q_lookup]'s three-line
+     idiom at a half.  (The commit's [ProofEndOp.eo_snap_law_of_auth] and the
+     ghost commit both read it.) *)
+  Lemma eo_cache_body_sub (γfs : fs_names) (L C : gmap Z (list (bv 8))) :
+    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ([∗ map] b ↦ bs ∈ C, b ↪[fs_cache γfs]{#(1/2)} bs) -∗ ⌜C ⊆ L⌝.
+  Proof using .
+    iIntros "Ha HC". rewrite map_subseteq_spec. iIntros (k v Hk).
+    iDestruct (ghost_map_lookup with "Ha [HC]") as %->; [| done].
+    rewrite big_sepM_lookup; done.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  2.  WHAT THE QUIESCENT LOCK RESOURCE LENDS                       *)
@@ -142,7 +174,7 @@ Section LogQuiet.
       (* nothing outstanding: the ledger, hence the transaction map, is empty *)
       assert (HT : T = ∅) by (apply map_size_empty_iff; rewrite Hszt Hsz; exact Hout0).
       subst T.
-      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
+      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Htok & Hbatch)".
       pose proof (Hquiet Hout0) as Hn0.
       rewrite /log_state.
       iDestruct "Hbatch" as (W L D M)
@@ -163,6 +195,9 @@ Section LogQuiet.
       iSplitR; [iPureIntro; exact Hsub|].
       iSplitR; [iPureIntro; exact Hreg|].
       iSplitR; [iPureIntro; exact Hquiet|].
+      (* the token never left: the loan does not include it (the ghost
+         commit takes it separately) *)
+      iSplitL "Htok"; [iExact "Htok"|].
       iExists W, L, D, M. iFrame. iPureIntro. done.
   Qed.
 

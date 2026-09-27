@@ -909,9 +909,17 @@ Section Snap.
      and the running claim is not -- applies it ([dsnap_step_merge]).  A
      BASIC update, so it runs at the permit's mask [∅]; the guest stays
      OPAQUE, and a guest with nothing to carry drops the old one
-     ([AppInv.app_merge_raw_of_xfer]). *)
-  Definition dur_merge (G : gname -> iProp Σ) (gt : gname) : iProp Σ :=
-    (∀ gt_o : gname, ▷ G gt_o ==∗ ▷ G gt)%I.
+     ([AppInv.app_merge_raw_of_xfer]).
+     ...AND THE APPLICATION'S TOKEN [T] RIDES IT (sync K3-3,
+     claude-notes/design/sync.md §4.3 item 2): the collection hands the
+     token in, and whichever arm the commit takes gives it back -- the
+     header write's permit applies the LEFT arm to the old guest (the
+     token comes out beside the new guest, bare: the wand captured it), the
+     EMPTY-LOG commit, which writes no header, takes the RIGHT arm.  An
+     additive pair because exactly one of the two fires. *)
+  Definition dur_merge (G : gname -> iProp Σ) (T : iProp Σ) (gt : gname)
+    : iProp Σ :=
+    ((∀ gt_o : gname, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T)%I.
 
   (* THE PAIR (round C): the snapshot AND an OPAQUE guest at its map name
      -- since SY3-K2 the guest's MERGE rather than the guest itself, so the
@@ -919,8 +927,8 @@ Section Snap.
      application's laws yield [▷ A]; this is the shape the WAL's commit
      permit takes ([LogSnapLaw.snap_law_out]).  The WAL never learns what
      [G] is; the one value the tree supplies is [AppDur.app_guest]. *)
-  Definition dur_pair (G : gname -> iProp Σ) D : iProp Σ :=
-    (∃ gt : gname, P_dur_at gt D ∗ dur_merge G gt)%I.
+  Definition dur_pair (G : gname -> iProp Σ) (T : iProp Σ) D : iProp Σ :=
+    (∃ gt : gname, P_dur_at gt D ∗ dur_merge G T gt)%I.
 
 
 
@@ -1481,14 +1489,17 @@ Section Snap.
      over.  The old snapshot is DISCARDED (affine) and nothing is read out
      of it, which is why the step needs no premise about [D] at all; the
      old GUEST goes to the pair's merge (SY3-K2), which yields the new one.
-     The guest stays OPAQUE here. *)
-  Lemma dsnap_step_merge (G : gname -> iProp Σ) (gt : gname) D D' :
-    dur_pair G D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗
-      ∃ gt' : gname, P_dur_at gt' D' ∗ ▷ G gt'.
+     The guest stays OPAQUE here, and so does the token the merge hands
+     back (sync K3-3). *)
+  Lemma dsnap_step_merge (G : gname -> iProp Σ) (T : iProp Σ) (gt : gname)
+      D D' :
+    dur_pair G T D' -∗ P_dur_at gt D -∗ ▷ G gt ==∗
+      (∃ gt' : gname, P_dur_at gt' D' ∗ ▷ G gt') ∗ T.
   Proof using .
     iIntros "H _ HG". rewrite /dur_pair /dur_merge.
-    iDestruct "H" as (gt') "[Hd Hm]".
-    iMod ("Hm" with "HG") as "HG". iModIntro. iExists gt'. iFrame "Hd HG".
+    iDestruct "H" as (gt') "[Hd [Hm _]]".
+    iMod ("Hm" with "HG") as "[HG HT]". iModIntro. iFrame "HT".
+    iExists gt'. iFrame "Hd HG".
   Qed.
 
   (* ------------------------------------------------------------------ *)

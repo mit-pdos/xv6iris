@@ -1294,6 +1294,17 @@ Section LogInv.
              operation ([out >= 1]) -- and placed just before the bundle so
              that each opener gains one name. *)
           ⌜out = 0%nat -> n = 0%nat⌝ ∗
+          (* THE APPLICATION'S TOKEN (sync K3-3, claude-notes/design/sync.md
+             §4.2's share [S]): the era's opaque [RiscvPtsto.riscv_sync_tok],
+             held here while no commit is in flight.  The last [end_op]
+             checks it out WITH the batch, the file system's law puts it
+             into the durable pair's merge, whichever arm of the merge the
+             commit takes gives it back, and the commit's tail
+             ([ProofEndOp.eo_tail]) re-deposits it; genesis is [initlog]'s
+             seal, off [LogDefs.log_free_tok].  So a reader holding this arm
+             knows the token is HOME.  Placed last before the bundle so that
+             each opener gains one name. *)
+          riscv_sync_tok gen_id ∗
           log_state bn γfs cov logstart n LB (op_pending om)))%I.
 
   (* ---------------------------------------------------------------- *)
@@ -1451,8 +1462,12 @@ Section LogCtx.
         already open).  The WAL supplies nothing to it and reads nothing out
         of it but an epoch it immediately hands to its own commit permit,
         so the log's lock resource still carries no client payload.  LAST, after the park, so no pattern that
-        opens this bundle moves. *)
-     snap_law γ γfs cov logstart ∗
+        opens this bundle moves.
+        ...AT THE ERA'S TOKEN (sync K3-3): the law carries the application's
+        opaque token into the durable pair and back, and this is where the
+        WAL-generic law is pinned at [riscv_sync_tok gen_id], the token
+        [log_res]'s idle arm holds. *)
+     snap_law γ γfs cov logstart (riscv_sync_tok gen_id) ∗
      (* RECOVERY IS DONE (durable-disk lane E-except).  The byte view's
         exception set -- the pending home blocks of a dirty on-disk log
         header, on which [FsBlocks.bytes_tie] is false until the recovering
@@ -1463,7 +1478,23 @@ Section LogCtx.
         [InodeRegion.ireg_inv] are minted at PowerOn and cannot carry it;
         their own crossings read it off here.  LAST, so no pattern that
         opens this bundle moves. *)
-     exc_sealed (fs_exc γfs))%I.
+     exc_sealed (fs_exc γfs) ∗
+     (* THE GHOST COMMIT'S THREE (sync K3-3, claude-notes/design/sync.md
+        §4.3 item 3).  A commit with no disk write
+        ([LogGhostCommit.log_ghost_commit]) runs at any point of a kernel
+        proof that holds the batch quiescent, and needs, beside the lock:
+        the HOOKED LAW -- the file system's law in the form that takes the
+        old durable guest, the token and the waiters' hooks and returns the
+        new guest ([LogSnapLaw.snap_law_ghost]), pinned at the era's two
+        fixed-record slots; the CRASH INVARIANT it opens
+        ([HartCustody.wp_crash_fupd]); and the ERA CERTIFICATE that custody
+        and the record's squeeze read.  All persistent, all parked by
+        [initlog], which builds this context.  LAST, so no pattern that
+        opens this bundle moves. *)
+     snap_law_ghost γ γfs cov logstart (riscv_sync_tok gen_id)
+       (riscv_sync_hook gen_id) ∗
+     crash_inv ∗
+     gen_cert)%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -1504,7 +1535,7 @@ Section LogCtx.
   (* THE SEAL, off the same context (durable-disk lane E-except) *)
   Lemma log_ctx_seal γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ exc_sealed (fs_exc γfs).
-  Proof using . rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & $)". Qed.
+  Proof using . rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
   (* ...and the home-set-free form every bread client above takes *)
   Lemma log_ctx_bytes_any γ bn γfs cov logstart dev :
@@ -1534,8 +1565,30 @@ Section LogCtx.
      the law at its own ghost step, gets a pure fact, and hands both
      authorities back.  [LogSnapLaw.snap_law_run] is the reading. *)
   Lemma log_ctx_snap_law γ bn γfs cov logstart dev :
-    log_ctx γ bn γfs cov logstart dev -∗ snap_law γ γfs cov logstart.
+    log_ctx γ bn γfs cov logstart dev -∗
+    snap_law γ γfs cov logstart (riscv_sync_tok gen_id).
   Proof using . rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & $ & _)". Qed.
+
+  (* THE GHOST COMMIT'S THREE, off the same context (sync K3-3) *)
+  Lemma log_ctx_snap_law_ghost γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗
+    snap_law_ghost γ γfs cov logstart (riscv_sync_tok gen_id)
+      (riscv_sync_hook gen_id).
+  Proof using .
+    rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & _)".
+  Qed.
+
+  Lemma log_ctx_crash_inv γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ crash_inv.
+  Proof using .
+    rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)".
+  Qed.
+
+  Lemma log_ctx_gen_cert γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ gen_cert.
+  Proof using .
+    rewrite /log_ctx. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)".
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)
@@ -1746,21 +1799,24 @@ Section LogCtx.
     bytes_dom Lb (fs_home_set cov logstart) ->
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-    ghost_map_auth (ln_tx γ) 1 T ={⊤ ∖ ↑fsbN}=∗
+    ghost_map_auth (ln_tx γ) 1 T -∗
+    (* the era's token, checked out of [log_res] with the batch (sync
+       K3-3): the law puts it into the pair *)
+    riscv_sync_tok gen_id ={⊤ ∖ ↑fsbN}=∗
       (* the epoch AND the crash seam, at the law's own guest
          (app-instances.md round C): the commit permit takes both at one
          [G], and this is where they come off one handle *)
       (∃ G : gname -> iProp Σ,
          FsCrash.fs_crash_seam_at G cov logstart ∗
-         snap_law_out G C (fs_home_set cov logstart))
+         snap_law_out G (riscv_sync_tok gen_id) C (fs_home_set cov logstart))
       ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
       ∗ ghost_map_auth (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht".
+    intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht HT".
     rewrite (log_tx_empty_of_ops om T Hsz Hom).
     iDestruct (log_ctx_snap_law with "Hctx") as "#Hlaw".
-    iApply (snap_law_run γ γfs cov logstart Lb C Hdom Hlens Htie Hdm
-              with "Hlaw Hb Ht").
+    iApply (snap_law_run γ γfs cov logstart (riscv_sync_tok gen_id) Lb C
+              Hdom Hlens Htie Hdm with "Hlaw Hb Ht HT").
   Qed.
 
   (* an op token against the authority: out >= 1 (kills log_write's

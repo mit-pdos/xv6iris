@@ -1411,14 +1411,14 @@ Section FileClaimEra.
     intros HE Heq Hcont Hne. iIntros "#Hinv Htk Hka".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp". rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf)]".
     { (* TAINTED: the ticket comes back beside the taint *)
-      iMod ("Hclose" with "[Hh Hx]") as "_".
-      { iNext. rewrite /app_body. iExists I'. iFrame "Hh Hx".
+      iMod ("Hclose" with "[Hh]") as "_".
+      { iNext. rewrite /app_body. iExists I'. iFrame "Hh".
         rewrite Heq. cbn [app_pred app_run app_names]. rewrite /file_pred.
         iSplitL; [ by iLeft | by iPureIntro ]. }
       iModIntro. iFrame "Hka". iRight. iFrame "Htk Ht". }
@@ -1445,8 +1445,8 @@ Section FileClaimEra.
     iMod (fdeed_whole_update r s s' with "Hwh") as "Hwh".
     iDestruct (fdeed_split with "Hwh") as "[Hd1 Hd2]".
     iMod (ftkt_update r s s s' with "Htk Ht'") as "[Htk Ht']".
-    iMod ("Hclose" with "[Hh Hx Hc Hw Hd2 Ht']") as "_".
-    { iNext. rewrite /app_body. iExists I'. iFrame "Hh Hx".
+    iMod ("Hclose" with "[Hh Hc Hw Hd2 Ht']") as "_".
+    { iNext. rewrite /app_body. iExists I'. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names].
       iApply (file_pred_exact c r _ s' Hpins Hok with "Hc Hw Hd2 Ht' Hty"). }
@@ -1476,12 +1476,12 @@ Section FileClaimEra.
     intros HE Heq. iIntros "#Hinv [Hd Htk]".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp". rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf)]".
-    { iMod ("Hclose" with "[Hka Hx]") as "_".
-      { iNext. rewrite /app_body. iExists I0. iFrame "Hka Hx".
+    { iMod ("Hclose" with "[Hka]") as "_".
+      { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
         iSplitL; [| by iPureIntro ].
         rewrite Heq. cbn [app_pred app_run app_names]. rewrite /file_pred.
         by iLeft. }
@@ -1504,8 +1504,8 @@ Section FileClaimEra.
     iMod esc_alloc as (g) "Htok".
     rewrite /f_esc_wrap. iDestruct "Hwr" as (h) "[Ha #Hrec]".
     iMod (esc_auth_grow r h s g with "Ha") as "[Ha #Hwit]".
-    iMod ("Hclose" with "[Hka Hx Hc Ha Hwh Htk']") as "_".
-    { iNext. rewrite /app_body. iExists I0. iFrame "Hka Hx".
+    iMod ("Hclose" with "[Hka Hc Ha Hwh Htk']") as "_".
+    { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. rewrite /file_pred.
       iRight. iSplitR; [ by iPureIntro |]. iFrame "Hc".
@@ -1531,12 +1531,12 @@ Section FileClaimEra.
     { iModIntro. by iRight. }
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp". rewrite /file_pred.
     iDestruct "Hp" as "[#Ht | (%Hpins & Hc & Hf)]".
-    { iMod ("Hclose" with "[Hka Hx]") as "_".
-      { iNext. rewrite /app_body. iExists I0. iFrame "Hka Hx".
+    { iMod ("Hclose" with "[Hka]") as "_".
+      { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
         iSplitL; [| by iPureIntro ].
         rewrite Heq. cbn [app_pred app_run app_names]. rewrite /file_pred.
         by iLeft. }
@@ -1555,8 +1555,8 @@ Section FileClaimEra.
       iDestruct (esc_tok_spent g with "Htok Hsp") as %[]. }
     iMod (esc_spend g with "Htok") as "#Hsp".
     iDestruct (fdeed_split with "Hwh") as "[Hd1 Hd2]".
-    iMod ("Hclose" with "[Hka Hx Hc Ha Hd2 Htk']") as "_".
-    { iNext. rewrite /app_body. iExists I0. iFrame "Hka Hx".
+    iMod ("Hclose" with "[Hka Hc Ha Hd2 Htk']") as "_".
+    { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names].
       iApply (file_pred_exact c r _ s Hpins Hok with "Hc [Ha] Hd2 Htk' Hty").

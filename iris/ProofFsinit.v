@@ -577,7 +577,7 @@ Section FsinitMain.
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
       by (rewrite Hbnou; exact H1cov).
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseamg #Hmerge #Hgen
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseamg #Hmerge #Hrun #Hgen #Hcinv
               Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
@@ -608,12 +608,25 @@ Section FsinitMain.
                (FsImg.sb_size sbrec)) as "#Hbm'".
     { rewrite Hbmq Hszq. iExact "Hbm". }
     iPoseProof (is_itable2_pool with "Hitb2") as "#Hpoolinv".
-    iAssert (□ (sb_park fsc_fs sbrec -∗ snap_law icfg_log fsc_fs fsc_cov fsc_logst))%I
+    iAssert (□ (sb_park fsc_fs sbrec -∗
+                snap_law icfg_log fsc_fs fsc_cov fsc_logst (riscv_sync_tok gen_id)))%I
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
       iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib sbrec
-                eq_refl eq_refl Hcgeom'
+                (riscv_sync_tok gen_id) eq_refl eq_refl Hcgeom'
                 with "Hseamg Hmerge Hireg' Hbm' Hesc Hpoolinv Hpark"). }
+    (* ...AND THE GHOST COMMIT'S HOOKED LAW (sync K3-3), the same assembly
+       over the runner beside the merge, at the era's two fixed-record
+       slots *)
+    iAssert (□ (sb_park fsc_fs sbrec -∗
+                snap_law_ghost icfg_log fsc_fs fsc_cov fsc_logst
+                  (riscv_sync_tok gen_id) (riscv_sync_hook gen_id)))%I
+      as "#Hlawg".
+    { iModIntro. iIntros "#Hpark".
+      iApply (fs_snap_law_ghost_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov
+                fsc_logst icfg_nib sbrec (riscv_sync_tok gen_id)
+                (riscv_sync_hook gen_id) eq_refl eq_refl Hcgeom'
+                with "Hseamg Hmerge Hrun Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID)
  v_magic v_size v_nblocks v_nlog
                pidv dq j m K eb b lks Upr)%I with "[Hcont]" as "Hcont";
@@ -1465,7 +1478,7 @@ Section FsinitMain.
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbinv Hxo HauthL HauthD
-                    Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf").
+                    Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf Hlawg Hcinv").
     all: try lkbelow.
     iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
     (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] has sealed

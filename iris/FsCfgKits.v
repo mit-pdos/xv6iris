@@ -333,7 +333,12 @@ Section FsCfgKits.
         to forkret's fsinit arm ([FirstTok.first_fsinit]).  Persistent;
         LAST, after the application's invariant. *)
      FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-     AppInv.app_merge (APP := APP))%I.
+     AppInv.app_merge (APP := APP) ∗
+     (* ...AND THE SYNC RUNNER (sync K3-3), the application's other closed
+        lemma about its durable claim, beside the merge and for the same
+        reason: fsinit builds the ghost commit's hooked law from the two
+        ([FsCollectAll.fs_snap_law_ghost_build]).  Persistent; LAST. *)
+     AppInv.app_sync_run (APP := APP))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -359,7 +364,8 @@ Section FsCfgKits.
       exc_own (fs_exc fsc_fs) Xexc ∗
       AppInv.app_inv (APP := APP) fsc_fs ∗
       FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-      AppInv.app_merge (APP := APP).
+      AppInv.app_merge (APP := APP) ∗
+      AppInv.app_sync_run (APP := APP).
   Proof using . iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -488,11 +494,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer & #Hrun)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv Hseam Hxfer".
+            Henv Hseam Hxfer Hrun".
   Qed.
 
   (* ...and the same peel for the equally-persistent BITMAP row, so a
@@ -508,11 +514,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           #Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
+           #Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer & #Hrun)".
     iSplitR; [iExact "Hbmres" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv Hseam Hxfer".
+            Henv Hseam Hxfer Hrun".
   Qed.
 
 End FsCfgKits.

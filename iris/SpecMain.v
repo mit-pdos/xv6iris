@@ -716,6 +716,10 @@ Section SpecMain.
        ([fsc_cov = cov], [fsc_logst = sb_logstart sb]) are what connect the
        two.  [ProofMain] holds both and does the rewrite. ---- *)
     gen_cert -∗
+    (* ...and THE CRASH INVARIANT beside it (sync K3-3): persistent, not
+       read by main, parked in [FirstTok.first_boot_persist] for fsinit to
+       hand to initlog *)
+    crash_inv -∗
     FsCrash.fs_crash_seam cov (FsImg.sb_logstart sb) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)

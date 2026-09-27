@@ -628,13 +628,13 @@ Section UInitCons.
           iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]";
             [ set_solver | ].
           iEval (rewrite /app_body) in "Hbody".
-          iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom & #Hx)".
+          iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
           iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
           iDestruct "Hp" as ">Hp".
           iMod ("Hshoot" $! (abs_view I') i with "[%] Hp") as "[Hp Hm]";
             [ exact Hpr | ].
           iMod ("Hclose" with "[Hh Hp]") as "_".
-          { iNext. rewrite /app_body. iExists I'. iFrame "Hh Hp Hx".
+          { iNext. rewrite /app_body. iExists I'. iFrame "Hh Hp".
             iPureIntro. exact Hdom. }
           iModIntro. iFrame "Hka". rewrite /init_cons_fok. iRight. iExact "Hm".
         + iDestruct ("Hsup" with "HT") as "#Hs".
@@ -671,7 +671,7 @@ Section UInitCons.
       iIntros (I i) "%Hnone %Hsome Hka".
       iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
       iEval (rewrite /app_body) in "Hbody".
-      iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom & #Hx)".
+      iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
       iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
       iAssert (▷ (app_pred app_run (abs_view I)
                   ∗ (⌜Pure (abs_view I)⌝ ∨ T)))%I
@@ -685,7 +685,7 @@ Section UInitCons.
       { iNext. iApply ("Habs" with "HK Hp"). }
       iDestruct "Hpv" as "[Hp [HK Hcv]]". iMod "Hcv". iMod "HK".
       iMod ("Hclose" with "[Hh Hp]") as "_".
-      { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+      { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
         iPureIntro. exact Hdom. }
       iModIntro. iFrame "Hka". iSplitR.
       { rewrite /app_step. iIntros (n') "%Heq Hp". rewrite Heq.
@@ -716,7 +716,7 @@ Section UInitCons.
        ([FsConsPin.cons_absent_unarm]). *)
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K
                 ∗ (⌜Pv (abs_view I)⌝ ∨ T)))%I
@@ -724,7 +724,7 @@ Section UInitCons.
     { iNext. iApply ("Habs" with "HK0 Hp"). }
     iDestruct "Hpc" as "[Hp [HK0 Hc]]". iMod "Hc". iMod "HK0".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka".
     iDestruct "Hc" as "[%Hab | #HT]".

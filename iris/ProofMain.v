@@ -1647,6 +1647,7 @@ Section ProofMain.
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
     gen_cert -∗
+    crash_inv -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
     flive_own ((● ∅) : fliveUR) -∗
     (* r25 (item 24/33): the off boxes' per-inode-slot set authorities, minted
@@ -1771,7 +1772,7 @@ Section ProofMain.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle Hrdtok #Htramp #Hccaps #Hu1caps #Hcready #Htl #Hwaitlk
-             #Hpenv #Hkmem #Hcert #Hseam Hfolauth Hoffa Hfirst
+             #Hpenv #Hkmem #Hcert #Hcinv #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
@@ -2178,6 +2179,7 @@ Section ProofMain.
       iSplitR; [iExact "Hireg"|].
       iSplitR; [iExact "Hbminv"|].
       iSplitR; [iExact "Hkmem"|].
+      iSplitR; [iExact "Hcinv"|].
       iPureIntro; exact Hgeomok. }
     (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned
        `first` cell: userinit is the one function that PARKS, and forkret --
@@ -2456,7 +2458,7 @@ Section ProofMain.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv Hprim #Hwand #Hecho Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
-    iIntros "Hparks Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
+    iIntros "Hparks Hpst Hpavail Hchb Hfs Hmir Hirslot Hirauth #Hcert #Hcinv #Hseam".
     (* <INIT>'S SAVED-PID CELL COMES OFF THE BOOT ROW HERE (lane
        TRAP-ROWS-3/4, T4(b)) and goes to the assembly that CALLS userinit
        ([mn_grp_fs], main+0x9e); the three columns below it are procinit's
@@ -2608,7 +2610,7 @@ Section ProofMain.
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok
               with "Hcg Htext Hkdata Hdev Hwire Hbundle Hrdtok Htramp Hccaps Hu1caps Hcready Htl Hwaitlock
-                    Hpenvc Hkmem Hcert Hseamc Hfolat Hoffa Hfirst
+                    Hpenvc Hkmem Hcert Hcinv Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2

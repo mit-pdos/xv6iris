@@ -214,29 +214,125 @@ Section AppCredsRaw.
      The old copy arrives as the crash slot holds it, [▷] over its
      existentials ([AppDur.app_dur_raw]), and is not stripped: a basic
      update cannot eliminate the [◇] that pulling an existential through
-     a later costs.  RAW for [app_xfer_raw]'s reason. *)
-  Definition app_merge_raw {N : Type} (A : N -> aview -> iProp Σ) : iProp Σ :=
-    (□ (∀ (r : N) (av : aview),
-          ▷ A r av ==∗ ▷ A r av ∗
-          ∃ r' : N,
-            ((▷ ∃ (r_o : N) (av_o : aview), A r_o av_o) ==∗ ▷ A r' av)))%I.
+     a later costs.  RAW for [app_xfer_raw]'s reason.
 
-  Global Instance app_merge_raw_persistent {N} (A : N -> aview -> iProp Σ) :
-    Persistent (app_merge_raw A).
+     ...AND THE TOKEN [T] (sync K3-3, claude-notes/design/sync.md §4.3 item
+     2): the application's opaque share the log invariant holds while no
+     commit is in flight.  The collection hands it in with the running
+     claim, and the law returns an ADDITIVE pair -- the wand that turns the
+     old copy into the new one and gives the token back (the header
+     write's permit applies it), or the token alone (the empty-log commit,
+     which writes no header).  The token lets the law pin the running
+     claim's share against the old copy's inside the wand; an application
+     with nothing to pin passes it straight through
+     ([app_merge_raw_of_xfer]). *)
+  Definition app_merge_raw {N : Type} (A : N -> aview -> iProp Σ)
+      (T : iProp Σ) : iProp Σ :=
+    (□ (∀ (r : N) (av : aview),
+          ▷ A r av -∗ T ==∗ ▷ A r av ∗
+          ∃ r' : N,
+            (((▷ ∃ (r_o : N) (av_o : aview), A r_o av_o) ==∗ ▷ A r' av ∗ T)
+             ∧ T)))%I.
+
+  Global Instance app_merge_raw_persistent {N} (A : N -> aview -> iProp Σ)
+      (T : iProp Σ) :
+    Persistent (app_merge_raw A T).
   Proof using . rewrite /app_merge_raw. apply _. Qed.
 
-  (* EVERY TRANSPORT IS A MERGE: drop the old copy, copy the running claim.
-     This is what every application with nothing to carry across the
-     commit instantiates the merge with (the commit behaves as before). *)
-  Lemma app_merge_raw_of_xfer {N} (A : N -> aview -> iProp Σ) :
-    (⊢ app_xfer_raw A) -> ⊢ app_merge_raw A.
+  (* EVERY TRANSPORT IS A MERGE, AT ANY TOKEN: drop the old copy, copy the
+     running claim, and hand the token back on either arm.  This is what
+     every application with nothing to carry across the commit
+     instantiates the merge with (the commit behaves as before). *)
+  Lemma app_merge_raw_of_xfer {N} (A : N -> aview -> iProp Σ) (T : iProp Σ) :
+    (⊢ app_xfer_raw A) -> ⊢ app_merge_raw A T.
   Proof using .
     intros Hx. iPoseProof Hx as "#Hx".
-    rewrite /app_xfer_raw /app_merge_raw. iIntros "!>" (r av) "Hp".
+    rewrite /app_xfer_raw /app_merge_raw. iIntros "!>" (r av) "Hp HT".
     iMod ("Hx" with "Hp") as "[Hp Hn]". iDestruct "Hn" as (r') "Hn".
-    iModIntro. iFrame "Hp". iExists r'. iIntros "_". iModIntro. iExact "Hn".
+    iModIntro. iFrame "Hp". iExists r'. iSplit; [| iExact "HT"].
+    iIntros "_". iModIntro. iFrame "Hn HT".
   Qed.
+
 End AppCredsRaw.
+
+(* the runner names the guest's half of the map's authority, so it needs the
+   top map's ghost class; and it is a FANCY update at [∅] (an application's
+   hook may strip the [◇] a timeless share under a later costs), so it
+   needs the invariant class -- [riscvGS], for [AppInv]'s reason below *)
+Section AppSyncRaw.
+  Context `{!riscvGS Σ, !fsTopG Σ}.
+
+  (* ------------------------------------------------------------------ *)
+  (*  1d.  THE SYNC RUNNER (sync design section 4.2-4.3; K3-3)            *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE ONE PLACE A SYNC HOOK'S MEANING IS USED.  A [sync] caller hands
+     the kernel a hook [Hk Q] -- an opaque member of the application's hook
+     family, which the WAL only moves -- and the GHOST COMMIT fires it
+     where the new durable copy is built out of the running claim: with
+     the fresh guest half, the new durable claim, the running claim and
+     the token all at ONE map ([FsCollectAll.fs_collect_ghost]).  The hook
+     returns every resource it is handed and yields its [Q].  A fupd at
+     mask [∅]: it runs inside the collection, with the file system's
+     invariants open.  The running claim's instance [r] is quantified
+     here; the collection applies it at [app_run].  RAW for
+     [app_xfer_raw]'s reason. *)
+  Definition app_sync_run_raw {N : Type} (A : N -> aview -> iProp Σ)
+      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) : iProp Σ :=
+    (□ (∀ (Q : iProp Σ) (gt : gname) (I : gmap Z fs_node) (r r' : N),
+          Hk Q -∗
+          ghost_map_auth gt (1/2) I -∗
+          ▷ A r' (abs_view I) -∗
+          ▷ A r (abs_view I) -∗
+          T ={∅}=∗
+            ghost_map_auth gt (1/2) I ∗
+            ▷ A r' (abs_view I) ∗
+            ▷ A r (abs_view I) ∗
+            T ∗ Q))%I.
+
+  Global Instance app_sync_run_raw_persistent {N} (A : N -> aview -> iProp Σ)
+      (T : iProp Σ) (Hk : iProp Σ -> iProp Σ) :
+    Persistent (app_sync_run_raw A T Hk).
+  Proof using . rewrite /app_sync_run_raw. apply _. Qed.
+
+  (* AN APPLICATION WITH NO SYNC LEDGER: every hook is its own [Q], and the
+     runner hands it straight back. *)
+  Lemma app_sync_run_raw_triv {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
+      (Hk : iProp Σ -> iProp Σ) :
+    (forall Q : iProp Σ, Hk Q ⊣⊢ Q) -> ⊢ app_sync_run_raw A T Hk.
+  Proof using .
+    intros Hid. rewrite /app_sync_run_raw.
+    iIntros "!>" (Q gt I r r') "HQ Hh Hn Hp HT". iModIntro.
+    iFrame "Hh Hn Hp HT". iApply (bi.equiv_entails_1_1 _ _ (Hid Q)).
+    iExact "HQ".
+  Qed.
+
+  (* ...FIRED ONCE PER HOOK: the collection's reading of a list of waiters'
+     hooks, at any mask (the runner itself runs at [∅]).  Every resource
+     comes back, and each hook's [Q] beside them. *)
+  Lemma app_sync_run_list {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
+      (Hk : iProp Σ -> iProp Σ) (E : coPset) (Qs : list (iProp Σ))
+      (gt : gname) (I : gmap Z fs_node) (r r' : N) :
+    app_sync_run_raw A T Hk -∗
+    ([∗ list] Q ∈ Qs, Hk Q) -∗
+    ghost_map_auth gt (1/2) I -∗
+    ▷ A r' (abs_view I) -∗
+    ▷ A r (abs_view I) -∗
+    T ={E}=∗
+      ghost_map_auth gt (1/2) I ∗
+      ▷ A r' (abs_view I) ∗
+      ▷ A r (abs_view I) ∗
+      T ∗ ([∗ list] Q ∈ Qs, Q).
+  Proof using .
+    induction Qs as [|Q Qs IH]; simpl.
+    - iIntros "_ _ Hh Hn Hp HT". iModIntro. iFrame "Hh Hn Hp HT".
+    - iIntros "#Hrun [HQ HQs] Hh Hn Hp HT".
+      iMod (IH with "Hrun HQs Hh Hn Hp HT") as "(Hh & Hn & Hp & HT & HQs)".
+      iMod (fupd_mask_subseteq ∅) as "Hcl"; [set_solver |].
+      iMod ("Hrun" $! Q gt I r r' with "HQ Hh Hn Hp HT") as "(Hh & Hn & Hp & HT & HQ)".
+      iMod "Hcl" as "_". iModIntro. iFrame "Hh Hn Hp HT HQ HQs".
+  Qed.
+End AppSyncRaw.
 
 (* ------------------------------------------------------------------ *)
 (*  2.  The invariant, at the ambient configuration                     *)
@@ -305,13 +401,27 @@ Section AppInv.
     iIntros "[H | H]"; [by iApply Hs | by iApply Hw].
   Qed.
 
-  (* THE MERGE, PINNED (round C's transport; the merge since SY3-K2):
-     parked in the body so the era owns it, and the one application-side
-     premise of the era mint.  The commit is its one runner. *)
-  Definition app_merge : iProp Σ := app_merge_raw app_pred.
+  (* THE MERGE, PINNED (round C's transport; the merge since SY3-K2) at
+     the era's sync token (K3-3): the application-side premise of the era
+     mint, which hands it to fsinit on the kit.  The commit is its one
+     runner. *)
+  Definition app_merge : iProp Σ :=
+    app_merge_raw app_pred (riscv_sync_tok RiscvLang.gen_id).
 
   Global Instance app_merge_persistent : Persistent app_merge.
   Proof using . rewrite /app_merge. apply _. Qed.
+
+  (* THE SYNC RUNNER, PINNED (sync K3-3): at the era's token and hook
+     family, the two slots of the fixed record
+     ([RiscvPtsto.riscv_sync_tok]/[riscv_sync_hook]).  It rides beside the
+     merge from the mint to fsinit on the kit, where the hooked law is
+     built out of it ([FsCollectAll.fs_snap_law_ghost_build]). *)
+  Definition app_sync_run : iProp Σ :=
+    app_sync_run_raw app_pred (riscv_sync_tok RiscvLang.gen_id)
+      (riscv_sync_hook RiscvLang.gen_id).
+
+  Global Instance app_sync_run_persistent : Persistent app_sync_run.
+  Proof using . rewrite /app_sync_run. apply _. Qed.
 
   (* THE DOMAIN ROW (round C).  The abstract map names EXACTLY the region's
      inums.  [InodeRegion.ftop_body] carries no such row, so the commit's
@@ -336,15 +446,18 @@ Section AppInv.
   Qed.
 
   (* THE BODY: the application's half of the authority, the claim about the
-     map it carries (read through the view), the domain row and the
-     merge.  NOT timeless: the claim is an arbitrary iProp and stays
-     under the later. *)
+     map it carries (read through the view) and the domain row.  NOT
+     timeless: the claim is an arbitrary iProp and stays under the later.
+     THE MERGE IS NOT PARKED HERE (sync K3-3): it is pinned at the era's
+     token ([app_merge] above), so parking it would make the invariant --
+     and every bundle that carries it -- depend on the era; and nothing
+     read it here anyway (a fupd under the invariant's later cannot run
+     without a step).  The commit takes [app_merge] off fsinit's kit. *)
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (fs_top γfs) (1/2) I ∗
        app_pred app_run (abs_view I) ∗
-       ⌜app_dom I⌝ ∗
-       app_merge)%I.
+       ⌜app_dom I⌝)%I.
 
   Definition app_inv (γfs : fs_names) : iProp Σ := inv appN (app_body γfs).
 
@@ -354,16 +467,15 @@ Section AppInv.
   (* ALLOCATION, at the era mint: the guest half of the authority the boot
      founded, the claim at the founded map -- LATER-SHAPED, because it
      arrives from the durable instance through the transport (round C) and
-     [inv_alloc] takes the later -- the domain row and the merge. *)
+     [inv_alloc] takes the later -- and the domain row. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
     app_dom I ->
     ghost_map_auth (fs_top γfs) (1/2) I -∗
-    ▷ app_pred app_run (abs_view I) -∗
-    app_merge -∗ |={E}=> app_inv γfs.
+    ▷ app_pred app_run (abs_view I) -∗ |={E}=> app_inv γfs.
   Proof using .
-    iIntros (Hd) "Hh Hp #Hx". rewrite /app_inv.
+    iIntros (Hd) "Hh Hp". rewrite /app_inv.
     iApply (inv_alloc appN E with "[Hh Hp]").
-    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
     iPureIntro. exact Hd.
   Qed.
 
@@ -392,7 +504,7 @@ Section AppInv.
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd)".
     iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
     iDestruct (ghost_map_lookup with "Hk Hf") as %Hi.
     iAssert (ghost_map_auth (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
@@ -401,7 +513,7 @@ Section AppInv.
     iDestruct "Hk" as "[Hk Hh]".
     iMod ("Hstep" with "[//] Hp") as "Hp".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists (<[i := n']> I). iFrame "Hh Hp".
       iPureIntro. exact (app_dom_insert I i n n' Hi Hd). }
     iModIntro. iFrame "Hk Hf".
   Qed.
@@ -499,25 +611,6 @@ Section AppInv.
     iExact "Hp".
   Qed.
 
-  (* THE MERGE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so
-     the body closes unchanged.
-     Note what this is NOT good for: a fupd under a later cannot run
-     without a step, so the commit's law does not read the merge here
-     -- it takes [app_merge] itself, carried from the mint on the fsinit
-     kit ([FsCfgKits.fs_kit_fsinit_ghost]). *)
-  Lemma app_merge_acc (E : coPset) (γfs : fs_names) :
-    ↑appN ⊆ E ->
-    app_inv γfs ={E}=∗ ▷ app_merge.
-  Proof using .
-    iIntros (HE) "#Hinv".
-    iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
-    iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(Hh & Hp & Hd & #Hx)".
-    iMod ("Hclose" with "[Hh Hp Hd]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hd Hx". }
-    iModIntro. iExact "Hx".
-  Qed.
-
   (* AN UPDATE OF THE CLAIM THAT DOES NOT MOVE THE MAP (lane E2 / SH-OPEN).
      [app_top_update] is for a party that HOLDS half the authority and is
      moving a row; this is for one that holds neither and only wants to
@@ -539,10 +632,10 @@ Section AppInv.
     iIntros (HE) "#Hinv #Hstep HR".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hd & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hd)".
     iMod ("Hstep" $! (abs_view I) with "HR Hp") as "[Hp HQ]".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hd. }
     iModIntro. iExact "HQ".
   Qed.

@@ -1416,7 +1416,7 @@ Section BoBodies.
                 Upr HK Hj Hjl Hanch HboE1 Hbelow
                 with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
-      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
+      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hstok & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1694,7 +1694,7 @@ Section BoBodies.
         iDestruct (log_opSe_opS with "HopS") as "HopS".
         iDestruct (log_opS_op with "HopS Htx") as "Hop".
         iAssert (log_res γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hlhn Hbclose]" as "Hres".
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hstok Hlhn Hbclose]" as "Hres".
         { rewrite /log_res.
           iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, (∅ : gset Z), Ep)]> om), Ep, Xr,
                   (<[t := tt]> Tx).
@@ -1747,6 +1747,8 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hreg|].
           (* the new operation is outstanding, so the log is not quiescent *)
           iSplitR; [iPureIntro; intros Hc; discriminate|].
+          (* begin_op does not commit: the sync token stays home *)
+          iSplitL "Hstok"; [iExact "Hstok"|].
           (* THE PENDING SET GROWS (durable-disk stage G1): the fresh op
              contributes its own (empty) already-logged set, so [pend] only
              gets bigger and every row of [log_state] that excludes it only
@@ -1763,7 +1765,7 @@ Section BoBodies.
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)
         iAssert (log_res γ bn γfs cov logstart)
-          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hlhn Hbclose]" as "Hres".
+          with "[Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hstok Hlhn Hbclose]" as "Hres".
         { rewrite /log_res. iExists out, false, nc, om, Ep, Xr, Tx.
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR; [iPureIntro; exact Hsz|].
@@ -1782,6 +1784,7 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hsub|].
           iSplitR; [iPureIntro; exact Hreg|].
           iSplitR; [iPureIntro; exact Hquiet|].
+          iSplitL "Hstok"; [iExact "Hstok"|].
           iApply ("Hbclose" with "Hlhn"). }
         iApply (wp_bge_fall_s_sconf (mword_of_int (KernelSyms.begin_op + 0x50)) (mword_of_int 28 : mword 13)
                   (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (trap_res eb + (K - 4))%nat false

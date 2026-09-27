@@ -279,7 +279,7 @@ Section PinnedObs.
     rewrite /aopen_commit_at /pobs_recv. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp]" as "Hpc".
@@ -287,7 +287,7 @@ Section PinnedObs.
     iDestruct "Hpc" as "[Hp Hc]".
     iMod "Hc".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka".
     iSplitR; [ by iPureIntro | ]. iExact "Hc".
@@ -325,7 +325,7 @@ Section PinnedObs.
     subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp]" as "Hpc".
     { iNext. iApply ("Hcl" with "Hp"). }
@@ -334,7 +334,7 @@ Section PinnedObs.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -517,7 +517,7 @@ Section PinnedObs.
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
     { iNext. iApply ("Hcl" with "HK Hp"). }
@@ -526,7 +526,7 @@ Section PinnedObs.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -681,7 +681,7 @@ Section PinnedObs.
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
     { iNext. iApply ("Hcl" with "HK Hp"). }
@@ -690,7 +690,7 @@ Section PinnedObs.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I d0 dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -891,7 +891,7 @@ Section PinnedObsAbs.
     subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp]" as "Hpc".
     { iNext. iApply ("Hcl" with "Hp"). }
@@ -900,7 +900,7 @@ Section PinnedObsAbs.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -1090,7 +1090,7 @@ Section PinnedObsPar.
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp]" as "Hpc".
     { iNext. iApply ("Hcl" with "Hp"). }
@@ -1099,7 +1099,7 @@ Section PinnedObsPar.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -1232,7 +1232,7 @@ Section PinnedObsPar.
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
     { iNext. iApply ("Hcl" with "HK Hp"). }
@@ -1241,7 +1241,7 @@ Section PinnedObsPar.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -1344,7 +1344,7 @@ Section PinnedObsAbsLin.
     subst d0.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
     { iNext. iApply ("Hcl" with "HK Hp"). }
@@ -1353,7 +1353,7 @@ Section PinnedObsAbsLin.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I (hops !!! k) dqv ents s
                  with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.
@@ -1434,7 +1434,7 @@ Section PinnedObsAbsLin.
     rewrite /aopen_commit_at /pobs_recv. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K ∗ (⌜Pin (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
@@ -1442,7 +1442,7 @@ Section PinnedObsAbsLin.
     iDestruct "Hpc" as "[Hp [_ Hc]]".
     iMod "Hc".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka".
     iSplitR; [ by iPureIntro | ]. iExact "Hc".

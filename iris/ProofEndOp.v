@@ -112,6 +112,7 @@ Require Import BufOwn BcacheInv BioInv.
    layer's below. *)
 Require Import LogSnapLaw.   (* [snap_law_out]: what [log_ctx]'s law hands down *)
 Require Import FsBlocks LogInv.
+Require Import LogQuiet.     (* [eo_cache_body_sub], [eo_restrict_of_sub]: the byte view read at the commit *)
 Require Import CodeEndOp.
 Require Import KernelDataInv.
 Require Import SpecPanic.
@@ -797,33 +798,9 @@ Section EndOpDefs.
   (*  THE FILE SYSTEM'S LAW, READ AT THE COMMIT (lane CE, plan section 3)  *)
   (* ==================================================================== *)
 
-  (* the checked-out CACHE authority against the halves the byte view's
-     invariant parks: every home block's cached value is the one the
-     committer holds.  [ghost_map_lookup_big] is stated at fraction 1 only in
-     iris 4.4.0, so this is [FsBlocks.byte_range_q_lookup]'s three-line
-     idiom at a half. *)
-  Lemma eo_cache_body_sub (γfs : fs_names) (L C : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗
-    ([∗ map] b ↦ bs ∈ C, b ↪[fs_cache γfs]{#(1/2)} bs) -∗ ⌜C ⊆ L⌝.
-  Proof using .
-    iIntros "Ha HC". rewrite map_subseteq_spec. iIntros (k v Hk).
-    iDestruct (ghost_map_lookup with "Ha [HC]") as %->; [| done].
-    rewrite big_sepM_lookup; done.
-  Qed.
-
-  (* ...and the pure consequence: the law's conclusion is stated at the byte
-     invariant's own cache picture [C], the commit's at the checked-out [L],
-     and on the home set -- which is [dom C] -- the two are the same map. *)
-  Lemma eo_restrict_of_sub (C L : gmap Z (list (bv 8))) (home : gset Z) :
-    dom C = home -> C ⊆ L ->
-    fs_restrict (dv_of_D C) home = fs_restrict (dv_of_D L) home.
-  Proof using .
-    intros Hdom Hsub. apply fs_restrict_ext. intros b Hb.
-    assert (Hin : is_Some (C !! b))
-      by (apply elem_of_dom; rewrite Hdom; exact Hb).
-    destruct Hin as [bs Hbs].
-    rewrite /dv_of_D Hbs (lookup_weaken _ _ _ _ Hbs Hsub) //.
-  Qed.
+  (* [eo_cache_body_sub] and [eo_restrict_of_sub] live in [LogQuiet] (sync
+     K3-3): the ghost commit ([LogGhostCommit]) reads the byte view exactly
+     as the commit below does, and must not import this file. *)
 
   (* THE READING THE COMMITTER TAKES, at the AUTHORITY it holds.  Given the
      empty ledger -- so the transaction authority is empty too, by
@@ -840,17 +817,20 @@ Section EndOpDefs.
     size T = size om -> om = ∅ ->
     log_ctx γ bn γfs cov logstart dev -∗
     ghost_map_auth (fs_cache γfs) 1 L -∗
-    ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
+    ghost_map_auth (ln_tx γ) 1 T -∗
+    (* the era's token, checked out of [log_res] with the batch (sync
+       K3-3): the law puts it into the pair *)
+    riscv_sync_tok gen_id ={⊤}=∗
       (* the epoch AND the crash seam at the law's own guest
          (app-instances.md round C): what the commit permit takes, at one
          [G], and what the file system's law hands down as a pair *)
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
-         snap_law_out G L (fs_home_set cov logstart)) ∗
+         snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart)) ∗
       ghost_map_auth (fs_cache γfs) 1 L ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom. iIntros "#Hctx HcL Ht".
+    intros Hsz Hom. iIntros "#Hctx HcL Ht HT".
     iPoseProof (log_ctx_bytes with "Hctx") as "#Hbrow".
     iPoseProof (log_ctx_seal with "Hctx") as "#Hbseal".
     iDestruct "Hbrow" as (Xv) "#Hbinv".
@@ -864,7 +844,7 @@ Section EndOpDefs.
     assert (Htie : bytes_tie Lb C) by (apply bytes_tie_exc_empty; exact Htiex).
     iDestruct (eo_cache_body_sub γfs L C with "HcL HC") as %Hsub.
     iMod (log_ctx_snap_law_of_ops γ bn γfs cov logstart dev om T Lb C
-            Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht")
+            Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht HT")
       as "(Hlaw & Hba & Ht)".
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
     { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }
@@ -1006,19 +986,20 @@ Section EndOpDefs.
     size T = size om -> om = ∅ ->
     log_ctx γ bn γfs cov logstart dev -∗
     eo_open bn γfs cov logstart n W L Db Lw t -∗
-    ghost_map_auth (ln_tx γ) 1 T ={⊤}=∗
+    ghost_map_auth (ln_tx γ) 1 T -∗
+    riscv_sync_tok gen_id ={⊤}=∗
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
-         snap_law_out G L (fs_home_set cov logstart)) ∗
+         snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart)) ∗
       eo_open bn γfs cov logstart n W L Db Lw t ∗
       ghost_map_auth (ln_tx γ) 1 T.
   Proof using .
-    intros Hsz Hom. iIntros "#Hctx Hopen Ht".
+    intros Hsz Hom. iIntros "#Hctx Hopen Ht HT".
     rewrite /eo_open.
     iDestruct "Hopen" as
       "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hdone & Hrest & Hpool)".
     iMod (eo_snap_law_of_auth γ bn γfs cov logstart dev om T L Hsz Hom
-            with "Hctx HauthL Ht") as "(Hlaw & HauthL & Ht)".
+            with "Hctx HauthL Ht HT") as "(Hlaw & HauthL & Ht)".
     iModIntro. iFrame "Hlaw Ht". rewrite /eo_open. iFrame.
   Qed.
 
@@ -1449,6 +1430,11 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameJ m -∗
     log_state bn γfs cov logstart 0 ∅ ∅ -∗
+    (* THE ERA'S SYNC TOKEN, BACK FROM THE COMMIT (sync K3-3): the header
+       write's permit returned it (the merge's left arm), or the empty-log
+       path took the pair's right arm; the re-deposit below puts it back
+       into [log_res]'s idle arm. *)
+    riscv_sync_tok gen_id -∗
     (* THE COMMIT'S DURABILITY COPY (fs-syscall-specs lane Y, owner-ruled).
        [eo_commit] takes it off the CLEAR -- the last write of the commit --
        and this is where it is BANKED: the re-deposit below runs
@@ -1464,7 +1450,7 @@ Section EndOpBlocks.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlctx #Hprocs Hppid
-              Hframe Hjunk Hbatch #Hnewbank Hcont".
+              Hframe Hjunk Hbatch Hstok #Hnewbank Hcont".
     iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & _)".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     (* ===== +0x42 auipc s1,0x1e ===== *)
@@ -1607,7 +1593,7 @@ Section EndOpBlocks.
     (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
-    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & _ & Hb2)".
+    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & _ & _ & Hb2)".
          rewrite /log_state.
          iDestruct "Hbatch" as (W1 L1 D1 M1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
          iDestruct "Hb2" as (W2 L2 D2 M2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
@@ -1843,7 +1829,7 @@ Section EndOpBlocks.
     iDestruct (log_flushed_bank_mk γ (S Ep) with "Hepa Hnewbank")
       as "[Hepa #Hbank2]".
     iAssert (log_res γ bn γfs cov logstart)
-      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hbatch]" as "HRres".
+      with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok Hbatch]" as "HRres".
     { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr, Tx.
       iSplitL "Houtc"; [iExact "Houtc"|].
       iSplitL "Hcmtc"; [iExact "Hcmtc"|].
@@ -1879,6 +1865,8 @@ Section EndOpBlocks.
         pose proof (Hcap (S Ep) b' Hin). lia. }
       (* the batch goes back EMPTY, so quiescence finds nothing logged *)
       iSplitR; [iPureIntro; intros _; reflexivity|].
+      (* the token is HOME again (sync K3-3) *)
+      iSplitL "Hstok"; [iExact "Hstok"|].
       (* THE PENDING SET AT THE RE-DEPOSIT (durable-disk stage G1): the
          ledger is EMPTY here ([Hommt] -- that is what makes the epoch bump
          above sound), so nothing is pending and the batch's [∅] is already
@@ -2066,9 +2054,12 @@ Section EndOpBlocks.
        ...AND SINCE ROUND C IT IS THE PAIR -- the snapshot and the
        application's durable claim beside it, at the law's opaque guest
        [G] -- with the crash seam at that same [G] beside it, both read off
-       [log_ctx]'s one law handle. *)
+       [log_ctx]'s one law handle.
+       ...AND THE ERA'S SYNC TOKEN INSIDE IT (sync K3-3): the header
+       write's permit applies the pair's merge, and the token comes back in
+       the write's receipt, for [eo_tail] to re-deposit. *)
     fs_crash_seam_at G cov logstart -∗
-    snap_law_out G L (fs_home_set cov logstart) -∗
+    snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -2132,7 +2123,9 @@ Section EndOpBlocks.
               (fun bs' : list (bv 8) =>
                  log_mirror_half (lm_upd Mc (log_hdr_bno logstart) bs')
                  ∗ fs_receipt_any
-                     (fs_restrict (dv_of_D L) (fs_home_set cov logstart)))%I
+                     (fs_restrict (dv_of_D L) (fs_home_set cov logstart))
+                 (* the era's token, out of the merge (sync K3-3) *)
+                 ∗ riscv_sync_tok gen_id)%I
               lks Upr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
@@ -2144,7 +2137,8 @@ Section EndOpBlocks.
        and the mirror half comes back at the header picture the write just
        laid down, which is what the install fupds below then read. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_commit_L_seq_permit G cov logstart Mc (lm_view Mc) L n
+      iApply (fs_commit_L_seq_permit G (riscv_sync_tok gen_id) cov logstart Mc
+                (lm_view Mc) L n
                 (map uint W) bs'
                 ltac:(exact Hlen') ltac:(exact Hdec')
                 ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
@@ -2165,8 +2159,10 @@ Section EndOpBlocks.
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
     (* the mirror half back (the receipt is dropped: nothing in this stage
-       consumes a durability receipt -- sys_sync is phase D's) *)
-    iDestruct "HQ1" as "[>Hmirc _]".
+       consumes a durability receipt -- sys_sync is phase D's), and the
+       era's token, still under the write's later: it is stripped at the
+       [c.j] into [eo_tail] below (sync K3-3) *)
+    iDestruct "HQ1" as "(>Hmirc & _ & Hstok)".
     (* ---- THE COMMIT'S PICTURE, NAMED.  The header row is the image
        write_head just laid down; every slot is untouched, so the copy
        loop's row survives the commit verbatim. ---- *)
@@ -2731,7 +2727,8 @@ Section EndOpBlocks.
               B3 (K - 8)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (eoi_120 with "Htext"). }
-    iIntros (CIDa10 Hsa10). iApply bi.later_intro. iIntros "Hcg Hpc".
+    (* the jump's later strips the token's (sync K3-3) *)
+    iIntros (CIDa10 Hsa10). iNext. iIntros "Hcg Hpc".
     assert (Htgt120 : add_vec (mword_of_int (KernelSyms.end_op + 0x120) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 1937 : mword 11) ('b"0"))))
@@ -2754,7 +2751,7 @@ Section EndOpBlocks.
     iApply (eo_tail (CID0 := CIDa10)  γs j γl bn γ γfs cov logstart dev pidv dq
               m B3 K eb lks Upr HK HB3regsE Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
-                    Hframe Hjunk2 Hbatch Hnewbank Hcont").
+                    Hframe Hjunk2 Hbatch Hstok Hnewbank Hcont").
   Qed.
 
 
@@ -2841,9 +2838,10 @@ Section EndOpBlocks.
        authority is in hand; every fill writes a log SLOT, which is not a
        home block, so the map it stands at is literally the same term at the
        back edge ([eo_home_restrict_upd]).  Since round C it is the PAIR at
-       the law's guest [G], with the crash seam at that [G] beside it. *)
+       the law's guest [G], with the crash seam at that [G] beside it (and,
+       since sync K3-3, the era's token inside it). *)
     fs_crash_seam_at G cov logstart -∗
-    snap_law_out G L (fs_home_set cov logstart) -∗
+    snap_law_out G (riscv_sync_tok gen_id) L (fs_home_set cov logstart) -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -3966,9 +3964,10 @@ Section EndOpBlocks.
     (* the law's map is untouched by a slot write (lane CE), so the EPOCH in
        the walk's hand is already at the bumped cursor's map -- one rewrite,
        no re-reading of the law (durable-disk lane H2) *)
-    assert (Hsnapmap : snap_law_out G (<[uint bnol := bs2]> L)
+    assert (Hsnapmap : snap_law_out G (riscv_sync_tok gen_id) (<[uint bnol := bs2]> L)
                          (fs_home_set cov logstart)
-                       = snap_law_out G L (fs_home_set cov logstart)).
+                       = snap_law_out G (riscv_sync_tok gen_id) L
+                           (fs_home_set cov logstart)).
     { rewrite /snap_law_out.
       rewrite (eo_home_restrict_upd L cov logstart (uint bnol) bs2
                  ltac:(rewrite Hubnol;
@@ -4669,7 +4668,7 @@ Section ProofEndOp.
        log_res's own conjunct then refutes committing. *)
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hbatch)".
+    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & %Hreg & %Hquiet & Hstok & Hbatch)".
     (* the token splits into the budget half the ledger retires and the
        transaction element the authority deletes (durable-disk lane A).  A
        transaction that still has an inode's row suspended cannot be here:
@@ -4869,7 +4868,7 @@ Section ProofEndOp.
       iApply fupd_wp.
       iMod (eo_open_snap_law γ bn γfs cov logstart dev
               (delete i0 om) (delete tt0 Tx) nl W L Dd (fun _ => []) 0
-              Hsztd Hommt0 with "Hlctx Hopen Htxa")
+              Hsztd Hommt0 with "Hlctx Hopen Htxa Hstok")
         as "(Hepoch & Hopen & Htxa)".
       (* the law's guest, named where its existential is opened (round C):
          the seam and the epoch at it go down together *)
@@ -5166,10 +5165,13 @@ Section ProofEndOp.
            invariant's own copy, recycled, is exactly right: the durable
            state did not move. *)
         iDestruct (log_flushed_bank_recycle with "Hbank") as "#Hnewbank".
+        (* ...AND THE TOKEN COMES BACK OUT OF THE PAIR'S RIGHT ARM (sync
+           K3-3): no header write, so the merge is never applied *)
+        iDestruct (snap_law_out_tok with "Hepoch") as "Hstok".
         iApply (eo_tail (CID0 := CIDs2)  γs j γl bn γ γfs cov logstart dev pidv dq
                   m V1 K eb lks Upr HK HV1regsE Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
-                        Hframe Hjunk Hbatch Hnewbank Hcont").
+                        Hframe Hjunk Hbatch Hstok Hnewbank Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
         assert (Hcmp : zopz0zI_s (zero_reg : mword 64) (rget V1 Ra5) = true).
         { rgne. rewrite HV1a5 (eo_lt_s0 (Z.of_nat nl) (eo_n_small nl Hn30)).
@@ -5359,7 +5361,7 @@ Section ProofEndOp.
         destruct (out - 1)%nat; [contradiction | reflexivity]. }
       (* the batch goes straight back in, at the decremented outstanding *)
       iAssert (log_res γ bn γfs cov logstart)
-        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hbatch]" as "HRres".
+        with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hstok Hbatch]" as "HRres".
       { rewrite /log_res. iExists (out - 1)%nat, false, nc, (delete i0 om), Ep, Xr,
                 (delete tt0 Tx).
         iSplitL "Houtc"; [iExact "Houtc"|].
@@ -5386,6 +5388,8 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hreg|].
         (* other operations are still outstanding: not quiescent *)
         iSplitR; [iPureIntro; intros Hc; contradiction|].
+        (* the token stays home: no commit on the fast path (sync K3-3) *)
+        iSplitL "Hstok"; [iExact "Hstok"|].
         (* THE PENDING SET SHRINKS, AND THE RE-DEPOSIT IS EXACT
            (durable-disk 1d).  The retiring op's own already-logged BLOCK
            set leaves the union, and the two steps are [log_state_fin]

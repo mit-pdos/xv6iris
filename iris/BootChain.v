@@ -438,6 +438,8 @@ Section BootPrimary.
        [FsCfgBoot.fs_boot_supply]'s ties are what connect the two, and
        [ProofMain] is where they are spent. ---- *)
     gen_cert -∗
+    (* ...and the crash invariant beside it (sync K3-3), for the same trip *)
+    crash_inv -∗
     FsCrash.fs_crash_seam cov (FsImg.sb_logstart sb) -∗
     dev_inv γd γv -∗
     wire_inv -∗
@@ -493,7 +495,7 @@ Section BootPrimary.
   Proof.
     intros Hreset Hz Hprun Hlen Hlive Hl0 Hl1 Hcnu Hcne Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim #Hecho Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
-             Hfs Hmir Hirslot Hirauth #Hcert #Hseam
+             Hfs Hmir Hirslot Hirauth #Hcert #Hcinv #Hseam
              #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hhi Hlgh Harm Hdlab
              #Huinv1 #Hplic #Hpinned #Hubw0 #Hurw0 #Hubw1 #Hurw1
              Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hlgh1 Harm1 Hdlab1
@@ -512,7 +514,7 @@ Section BootPrimary.
               Hlive Hcnu Hcne Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hprim [] Hecho Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hchb Hfs Hmir Hirslot Hirauth
-                    Hcert Hseam
+                    Hcert Hcinv Hseam
                     Hdev Hwire Hinitb Htx Hsent Hlb Htok Hhi Hlgh Harm Hdlab
                     Huinv1 Hplic Hpinned Hubw0 Hurw0 Hubw1 Hurw1
                     Htx1 Hsent1 Hlb1 Htok1 Hhi1 Hlgh1 Harm1 Hdlab1

@@ -106,23 +106,30 @@ Section AppDurRaw.
      keep the original, and hand out the guest-level wand the WAL applies
      to the old guest at the header write ([FsDurSnap.dur_merge]).  The
      fresh guest half goes INTO the wand beside the merge's own; the old
-     guest's half is dropped with it, its claim goes to the merge. *)
-  Lemma app_dur_raw_merge {N} (A : N -> aview -> iProp Σ) (gt : gname)
-      (I : gmap Z fs_node) (r : N) :
-    app_merge_raw A -∗
+     guest's half is dropped with it, its claim goes to the merge.  The
+     token [T] (sync K3-3) goes in with the running claim and comes back on
+     either arm of the additive pair. *)
+  Lemma app_dur_raw_merge {N} (A : N -> aview -> iProp Σ) (T : iProp Σ)
+      (gt : gname) (I : gmap Z fs_node) (r : N) :
+    app_merge_raw A T -∗
     ghost_map_auth gt (1/2) I -∗
-    ▷ A r (abs_view I) ==∗
+    ▷ A r (abs_view I) -∗
+    T ==∗
       ▷ A r (abs_view I) ∗
-      ∀ gt_o : gname, ▷ app_dur_raw A gt_o ==∗ ▷ app_dur_raw A gt.
+      ((∀ gt_o : gname, ▷ app_dur_raw A gt_o ==∗ ▷ app_dur_raw A gt ∗ T)
+       ∧ T).
   Proof using .
-    iIntros "#Hm Hh Hp". rewrite /app_merge_raw.
-    iMod ("Hm" with "Hp") as "[Hp Hw]". iDestruct "Hw" as (r') "Hw".
-    iModIntro. iFrame "Hp". iIntros (gt_o) "Hold".
-    iMod ("Hw" with "[Hold]") as "Hnew".
+    iIntros "#Hm Hh Hp HT". rewrite /app_merge_raw.
+    iMod ("Hm" with "Hp HT") as "[Hp Hw]". iDestruct "Hw" as (r') "Hw".
+    iModIntro. iFrame "Hp". iSplit; [| iDestruct "Hw" as "[_ HT]"; iExact "HT"].
+    iDestruct "Hw" as "[Hw _]".
+    iIntros (gt_o) "Hold".
+    iMod ("Hw" with "[Hold]") as "[Hnew HT]".
     { iNext. iEval (rewrite /app_dur_raw) in "Hold".
       iDestruct "Hold" as (r_o I_o) "[_ Hold]".
       iExists r_o, (abs_view I_o). iExact "Hold". }
-    iModIntro. iApply (app_dur_raw_pack with "Hh"). iExists r'. iExact "Hnew".
+    iModIntro. iFrame "HT".
+    iApply (app_dur_raw_pack with "Hh"). iExists r'. iExact "Hnew".
   Qed.
 
   (* AGREEMENT (the boot, and the PowerOn arm): a guest against a kernel

@@ -513,6 +513,7 @@ Proof.
               and a hook is its own [Q] (SY3-A gives the record fields) *)
            (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
            ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+           ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
            al_xfer Happ_init
            al_kill
            al_sup al_programs

@@ -1171,7 +1171,7 @@ Section ProofInitlog.
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk #Hbrow Hxo HLauth HDauth Hcovf Hfsb
-              Hslotsfs Hslots Hb1 #Hlawf Hcont".
+              Hslotsfs Hslots Hb1 #Hlawf #Hlawg #Hcinv Hcont".
     (* THE ERA'S MIRROR, BORN TRUE AND IN CUSTODY (durable-disk 1a): the
        half at a NAMED picture and the swap receipt PowerOn's custody hook
        already earned.  There is no boot swap here any more; every write
@@ -1605,9 +1605,10 @@ Section ProofInitlog.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iModIntro.
     iEval (rewrite /log_free_tok) in "Hlfree".
-    (* the helping slot's empty authority and the era's sync token are
-       not sealed yet (claude-notes/projects/sync.md K3-3/K3-4) *)
-    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa & _ & _)".
+    (* the helping slot's empty authority is not sealed yet
+       (claude-notes/projects/sync.md K3-4); the era's sync token goes into
+       the first [log_res] below (K3-3) *)
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa & Htxa & _ & Hstok)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     assert (Hsbad : add_vec (rget mil Rs3)
                       (sign_extend' 64 (mword_of_int 20 : mword 12))
@@ -2695,7 +2696,7 @@ Section ProofInitlog.
     iDestruct (log_flushed_bank_mk γ 1%nat with "Hepa Hnewbank")
       as "[Hepa #Hbank0]".
     iAssert (log_res γ bn γfs cov logstart)
-      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hbatch]" as "Hres".
+      with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hstok Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
          "never observed" counter value is zero, and the two must not
@@ -2732,6 +2733,9 @@ Section ProofInitlog.
                 exfalso; exact (not_elem_of_empty _ Hi)|].
       (* genesis is quiescent, and recovery left the batch empty *)
       iSplitR; [iPureIntro; intros _; reflexivity|].
+      (* THE ERA'S SYNC TOKEN, sealed in at genesis (sync K3-3): the era's
+         mint put it into the log names' free bundle *)
+      iSplitL "Hstok"; [iExact "Hstok"|].
       rewrite op_pending_empty. iExact "Hbatch". }
     (* THE SEAL, AT THE GIVEN NAME.  [newlock_at] is [newlock] over a gname
        the caller already owns the free ghost state of -- the era fupd's
@@ -2760,13 +2764,19 @@ Section ProofInitlog.
       iSplitR; [iExact "Hswlb"|].
       iSplitR; [iExists Xv; iExact "Hbrow"|].
       iSplitR; [iExact "Hsbparked"|].
-      iSplitR; [| iExact "Hseal"].
       (* THE FILE SYSTEM'S LAW (durable-disk C-8).  The caller handed it in
          minus block 1's park, which is the one piece it could not have --
          nobody owns block 1 until the line above runs.  Composing the two
          HERE is what makes the law arity-free at [log_ctx] and keeps the
          WAL from ever naming a file-system gname. *)
-      iApply ("Hlawf" with "Hsbp"). }
+      iSplitR; [iApply ("Hlawf" with "Hsbp")|].
+      iSplitR; [iExact "Hseal"|].
+      (* ...and the ghost commit's three (sync K3-3): the hooked law,
+         composed with the same park, the crash invariant and the era
+         certificate *)
+      iSplitR; [iApply ("Hlawg" with "Hsbp")|].
+      iSplitR; [iExact "Hcinv"|].
+      iExact "Hcert". }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".

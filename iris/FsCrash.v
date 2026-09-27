@@ -3008,7 +3008,7 @@ Section fs_crash_seam.
      [lm_view M0] at the header could not serve both branches with ONE
      receipt. ---- *)
   Lemma fs_commit_L_sector0_rec `{GEN : GenId} (G : gname -> iProp Σ)
-      (cov : gset Z) (ls : Z)
+      (T : iProp Σ) (cov : gset Z) (ls : Z)
       (M0 : log_mirror) (V : Z -> list (bv 8)) (L : gmap Z (list (bv 8)))
       (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
@@ -3048,14 +3048,19 @@ Section fs_crash_seam.
        ...AND THE GUEST'S MERGE BESIDE IT (round C; SY3-K2): the law built
        the PAIR, and this is the one permit that moves the guest -- the old
        one goes to the pair's merge ([FsDurSnap.dur_merge]), which yields
-       the new one at the new map name; the old snapshot is dropped. *)
-    dur_pair G (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
+       the new one at the new map name; the old snapshot is dropped.
+       ...AND THE APPLICATION'S TOKEN [T] COMES BACK OUT OF THE MERGE (sync
+       K3-3) and leaves in the permit's residual, beside the receipt: it
+       rides the write's receipt to the commit's tail, which re-deposits
+       it in the log invariant. *)
+    dur_pair G T (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit G cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
              take virtio_sector_bytes bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls)
           (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))
+       ∗ T
        ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝).
   Proof using .
     intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Htie Hslot.
@@ -3132,7 +3137,8 @@ Section fs_crash_seam.
        section 8 (deposited client fupds that MOVE durable resources) does
        not bite.  [D'] is [fs_restrict (dv_of_D L) (fs_home_set cov ls)],
        exactly the map the premise is stated at. ---- *)
-    iMod (dsnap_step_merge G gt (fr_D r) D' with "Hepoch Hdur HG") as "Hpair".
+    iMod (dsnap_step_merge G T gt (fr_D r) D' with "Hepoch Hdur HG")
+      as "[Hpair HT]".
     iDestruct "Hpair" as (gt') "[Hdur HG]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
@@ -3164,10 +3170,11 @@ Section fs_crash_seam.
     iSplitL "HG"; [iExact "HG"|].
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir"; [rewrite /log_mirror_half; iExact "Hmir"|].
-    iSplitR "".
+    iSplitR "HT".
     { rewrite /fs_receipt_any. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /fs_receipt. iExists (fr_hist r). iExact "Hlb". }
+    iSplitL "HT"; [iExact "HT"|].
     iPureIntro. exact Hlold.
   Qed.
 
@@ -3522,7 +3529,7 @@ Section fs_crash_seam.
      do not appear in the conclusion -- what the client sees is
      [D' = L|home], which is what its debt is stated against. ---- *)
   Lemma fs_commit_L_seq_permit `{GEN : GenId} (G : gname -> iProp Σ)
-      (cov : gset Z) (ls : Z)
+      (T : iProp Σ) (cov : gset Z) (ls : Z)
       (M0 : log_mirror) (V : Z -> list (bv 8)) (L : gmap Z (list (bv 8)))
       (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
@@ -3556,11 +3563,13 @@ Section fs_crash_seam.
        [LogInv.log_ctx_snap_law_of_ops] while it still holds the log lock;
        see [fs_commit_L_sector0_rec].  It is used on BOTH sector orders,
        which is sound because [disk_seq_permit_two] offers them as a
-       CONJUNCTION -- only one of them ever runs. *)
-    dur_pair G (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
+       CONJUNCTION -- only one of them ever runs.  The application's token
+       [T] rides the pair in and the residual out (sync K3-3). *)
+    dur_pair G T (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
-       ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
+       ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))
+       ∗ T).
   (* NO BANK HERE, deliberately (fs-syscall-specs lane Y).  The committer
      does not need one at THIS write: [end_op] runs a second [write_head] --
      the preserving CLEAR below -- after the install, and that one is the
@@ -3591,9 +3600,10 @@ Section fs_crash_seam.
                     (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
                  ∗ fs_receipt_any
                      (fs_restrict (dv_of_D L) (fs_home_set cov ls))
+                 ∗ T
                  ∗ ⌜length (lm_view M0 (log_hdr_bno ls)) = BSIZE⌝)%I _
                 with "[] [Hmir Hepoch]").
-      { iIntros "(Hm & #Hrc & _)".
+      { iIntros "(Hm & #Hrc & HT & _)".
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono G cov ls gen_id _
                   (log_mirror_half (lm_upd
@@ -3606,15 +3616,15 @@ Section fs_crash_seam.
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
-                  with "[] [Hm]").
+                  with "[HT] [Hm]").
         { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_01 M0 (log_hdr_bno ls) bs Hlen). iExact "Hm2". }
-          iExact "Hrc". }
+          iSplitR; [iExact "Hrc"|]. iExact "HT". }
         iApply (fs_v_sector1_rec G cov ls (log_hdr_bno ls) bs _ Hlen Hext
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
-      iApply (fs_commit_L_sector0_rec G cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
+      iApply (fs_commit_L_sector0_rec G T cov ls M0 V L nn Ws bs Hlen Hdec Hnn Hnd
                 Hin Hinsb HM0 Hoff Hrow Hslot
                 with "Hreg Hswlb [Hmir] Hepoch").
       iNext. iExact "Hmir".
@@ -3648,15 +3658,16 @@ Section fs_crash_seam.
                          (log_hdr_bno ls)) bs))
                    ∗ fs_receipt_any
                        (fs_restrict (dv_of_D L) (fs_home_set cov ls))
+                   ∗ T
                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                         (log_hdr_bno ls)) = BSIZE⌝)%I _
                   with "[] [Hm Hepoch]").
-        { iIntros "(Hm2 & Hrc & _)". iApply disk_write_permit_intro.
+        { iIntros "(Hm2 & Hrc & HT & _)". iApply disk_write_permit_intro.
           iSplitL "Hm2".
           { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
-          iExact "Hrc". }
-        iApply (fs_commit_L_sector0_rec G cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
+          iSplitL "Hrc"; [iExact "Hrc"|]. iExact "HT". }
+        iApply (fs_commit_L_sector0_rec G T cov ls _ V L nn Ws bs Hlen Hdec Hnn Hnd
                   Hin Hinsb HM1 HoffM1 Hrow Hslot
                   with "Hreg Hswlb [Hm] Hepoch").
         iNext. iExact "Hm". }

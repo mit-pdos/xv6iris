@@ -844,7 +844,7 @@ Section SnapMint.
          GUEST HALF of the top map's authority it has just minted, at the
          founded map [fss_inodes S]: it takes the claim at that map's view
          -- the boot obligation, paid one rung up by the power arm's lend --
-         and the MERGE the application parks there ([app_merge]), and
+         (the MERGE, [app_merge], goes on the kit rather than into it), and
          hands the invariant to the region bundle and to kit 2's last row, AT
          [APP].  Spelled at the record's own projections so nothing ambient
          is consulted. ---- *)
@@ -876,6 +876,9 @@ Section SnapMint.
        the kit, and the crash seam at the application's guest, handed to
        fsinit on the kit (round C) *)
     app_merge (APP := APP) -∗
+    (* ...and the SYNC RUNNER (sync K3-3), which rides beside the merge to
+       fsinit on the kit *)
+    app_sync_run (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
     (* ---- THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3):
        the application's opaque durability token for this era, a client
@@ -932,7 +935,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hstok Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hrun #Hseamg Hstok Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1074,7 +1077,7 @@ Section SnapMint.
     assert (Hdomapp : app_dom (fss_inodes S)).
     { intros z. rewrite (snap_ok_inum_dom S _ Hok z) Hnibeq. done. }
     iMod (app_inv_alloc (APP := APP) γfs (fss_inodes S) E Hdomapp
-            with "Htopb Hok Hmerge")
+            with "Htopb Hok")
       as "#Henv".
     iEval (rewrite (big_sepM_as_set (fss_inodes S)
                       (fun i n => top_frag (fs_gamma_L γfs) i n))) in "Htopf".
@@ -1356,7 +1359,8 @@ Section SnapMint.
       iSplitR; [iExact "Hbinv" |].
       iSplitL "Hxo"; [iExact "Hxo" |].
       iSplitR; [iExact "Henv" |].
-      iSplitR; [iExact "Hseamg" | iExact "Hmerge"]. }
+      iSplitR; [iExact "Hseamg" |].
+      iSplitR; [iExact "Hmerge" | iExact "Hrun"]. }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

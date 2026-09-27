@@ -264,6 +264,12 @@ Section FirstTok.
      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+     (* THE CRASH INVARIANT (sync K3-3), beside the certificate in spirit:
+        fixed-layer, persistent, minted once at adequacy and handed to every
+        era's boot bundle; fsinit hands it to initlog, which parks it into
+        [LogInv.log_ctx] for the ghost commit to open.  Just before the
+        pure row, so a pattern that ends at the pure row gains one name. *)
+     crash_inv ∗
      ⌜fs_geom_ok⌝)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.
@@ -467,7 +473,9 @@ Section FirstTok.
            kit 2's last two rows (round C): what fsinit builds the commit's
            law from *)
         FsCrash.fs_crash_seam_at app_guest fsc_cov fsc_logst ∗
-        app_merge.
+        app_merge ∗
+        (* ...and the sync runner beside it (sync K3-3) *)
+        app_sync_run.
   Proof using .
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
@@ -476,14 +484,15 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge & #Hrun)".
     iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
             sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
             Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
     iSplitR; [iPureIntro; exact Hp |].
     iSplitR; [rewrite /fsabs_env; iExact "Henv" |].
-    iSplitR; [iExact "Hseam" | iExact "Hmerge"].
+    iSplitR; [iExact "Hseam" |].
+    iSplitR; [iExact "Hmerge" | iExact "Hrun"].
   Qed.
 
   (* ================================================================== *)
@@ -659,7 +668,7 @@ Section FirstTok.
   Proof using .
     iIntros "HP HK HL #HC". rewrite /fs_ready_pre /first_boot_persist.
     iDestruct "HP" as "(H1 & H2 & H3 & H5 & H7 & H8 & H9 & H10 & H11 &
-                        H12 & H13 & H14 & H15 & H16 & H17 & %H18)".
+                        H12 & H13 & H14 & H15 & H16 & H17 & _ & %H18)".
     (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] sealed the
        byte view's exception set into [log_ctx], so the region and the
        bitmap main built at PowerOn are upgraded to the SEALED forms every

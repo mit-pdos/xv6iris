@@ -1088,7 +1088,7 @@ Proof.
   iEval (rewrite /first_boot_persist) in "Hbp".
   iDestruct "Hbp" as "(_ & #Hkdata & #Hpenv & #Hbio & #Hseam & #Hgen &
                        #Hdevi & #Hdisk & #Hitb2 & #Hitbl & #Hesc & #Hslks &
-                       #Hireg & #Hbits & #Hkmem & %Hgeom)".
+                       #Hireg & #Hbits & #Hkmem & #Hcinv & %Hgeom)".
   iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlock]".
   (* fsinit's (c)/(d)/(e)/(f) and its log geometry are all projections of
      [FsReady.fs_geom_ok], which is why the token carries the record and not
@@ -1113,7 +1113,7 @@ Proof.
     "(%Hpures & Hmirf & Hlfree & Hb1 & Hsbraw & _ & Hboot & _ &
       Hlock0 & Hlname & Hlcpu & Hlstart & Hldev & Hlout & Hlcmt & Hlnc & Hlhn &
       Hlhblk & Hauths & Hdirty & Hhdr & Hlslots & Hsl35 & Hirs2 & Hrem &
-      #Hbinvf & Hxo & #Hfsabs & #Hseamg & #Hxfer)".
+      #Hbinvf & Hxo & #Hfsabs & #Hseamg & #Hxfer & #Hrun)".
   destruct Hpures as [[v_magic [v_nblocks [v_nlog [Himg Hmagic]]]]
                       [Hhdrwf [H1cov [H1log [Hsbparse [Hsbok
                        [Hcgeom [Hbmq [Hszq Hxvslot]]]]]]]]].
@@ -1214,7 +1214,7 @@ Proof.
             Hist0 Hiregb Hsize Hbm0 Hbmcov Hbmlog Hcovb
             Hhdrbnd Hhdrnd Hhdrok Hxvslot HLdk Hjlt Hgl
             HB4a0 ltac:(lkbelow)
-            with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseamg Hxfer Hgen
+            with "Hcg Hcpu Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hseamg Hxfer Hrun Hgen Hcinv
                   Hmirf Hlfree Hbinvf Hb1 Hxo Hsbraw Hireg Hboot Hitb2 Hitbl Hesc Hslks
                   Hbits Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc
                   Hlhn Hlhblk HauthL HauthD Hdirty Hhdr Hlslots Hpbare Hpinv
@@ -1317,6 +1317,7 @@ Proof.
     iSplitR; [iExact "Hireg" |].
     iSplitR; [iExact "Hbits" |].
     iSplitR; [iExact "Hkmem" |].
+    iSplitR; [iExact "Hcinv" |].
     iPureIntro; exact Hgeom. }
   iMod (fs_ready_establish with "Hpre Hboot") as "#Hfsr".
   (* THE APPLICATION-SIDE ABSTRACT-STATE INVARIANT ([FirstTok.fsabs_env])

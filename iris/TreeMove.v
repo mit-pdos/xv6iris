@@ -253,7 +253,7 @@ Section TreeMove.
     iDestruct (tree_own_claim_law c r Heq) as "#Hlaw".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I)
                 ∗ (tree_own r g root t
@@ -264,7 +264,7 @@ Section TreeMove.
       iFrame "A B C". }
     iMod "Hrest" as "[Hown Hfact]".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka Hown Hfact".
   Qed.
@@ -283,14 +283,14 @@ Section TreeMove.
     intros Heq Hsub Hne. iIntros "#Hinv Htk Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp".
     iMod (tree_resync c r g root t t' (abs_view I') Hsub Hne with "Htk Hp")
       as "[Hp Hout]".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I'. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I'. iFrame "Hh".
       iSplitL "Hp".
       - rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp".
       - iPureIntro. exact Hdom. }
@@ -792,7 +792,7 @@ Section TreeMove.
       iApply (tree_pred_facts c r v with "Hp"). }
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iAssert (▷ (app_pred app_run (abs_view I)
                 ∗ (⌜aview_tree_wf (abs_view I)
@@ -803,7 +803,7 @@ Section TreeMove.
       iFrame "A B". }
     iMod "Hrest" as "Hfact".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "Hka Hfact".
   Qed.

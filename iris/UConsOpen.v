@@ -355,7 +355,7 @@ Section UConsOpen.
     destruct Hpd as [_ Hd]. subst d.
     iMod (inv_acc ⊤ appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I) "(>Hh & Hp & >%Hdom)".
     iAssert (▷ (app_pred app_run (abs_view I) ∗ K
                 ∗ (⌜cons_absent (abs_view I)⌝ ∨ T)))%I
       with "[Hp HK]" as "Hpc".
@@ -365,7 +365,7 @@ Section UConsOpen.
     iDestruct (pobs_elend_astep γfs (1/2)%Qp I FsImg.ROOTINO dqv ents
                  fname_console with "Hh HF") as %Hae.
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hp".
       iPureIntro. exact Hdom. }
     iModIntro. iFrame "HF".
     iDestruct "Hc" as "[%HP | #HT]"; last first.

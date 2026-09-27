@@ -523,7 +523,7 @@ Section SystemBoot.
          the old durable copy into each fresh snapshot's.  The boot itself
          needs neither it nor the transport: the lent durable claim IS the
          era's running one. *)
-      (Happ_merge : ⊢ app_merge_raw A)
+      (Happ_merge : ⊢ app_merge_raw A (riscv_sync_tok gen_id))
       (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3): the
          application's opaque slot of the fixed record at this era, which
          the mint puts into the log names' free bundle and initlog seals
@@ -531,6 +531,15 @@ Section SystemBoot.
          because what the token IS is the application's: the system
          theorem discharges it from its [Tk] off the record shape. *)
       (Htok : ⊢ |==> riscv_sync_tok gen_id)
+      (* THE SYNC RUNNER (claude-notes/design/sync.md §4.2-4.3, K3-3): the
+         one place the meaning of a [sync] waiter's hook is used -- fired
+         by the ghost commit on the guest half, the new durable claim, the
+         running claim and the token at one map.  Parked on fsinit's kit
+         beside the merge, where fsinit builds the hooked law from it.
+         Stated at the era's two fixed-record slots; the system theorem
+         discharges it from its [Hk] off the record shape. *)
+      (Happ_sync_run : ⊢ app_sync_run_raw A (riscv_sync_tok gen_id)
+                             (riscv_sync_hook gen_id))
       (* THE FIRST PROCESS'S EXEC BUNDLE (ARM-c), and it is the ONE thing
          the application owes the kernel about user execution.  THE KERNEL
          NEVER MINTS A SLOT: forkret's boot arm runs kexec("/init") between
@@ -781,13 +790,14 @@ Section SystemBoot.
        the seam at the application's guest goes down to fsinit on the kit.
        All of it goes into the mint through [boot_shared_alloc]. *)
     iPoseProof Happ_merge as "#Hmerge".
+    iPoseProof Happ_sync_run as "#Hrun".
     iMod Htok as "Hstok".
     (* THE ERA'S TWO PORT CLAIMS ARE NOT HERE (lane CONS-IO milestone E):
        they ride [power_boot_res] straight into the mint, which unpacks and
        consumes them at [Uart0]. *)
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn gsn gln gtn Hbf Hbundle
-            with "Hok Hmerge Hseamg Hstok Hdursnap Hres")
+            with "Hok Hmerge Hrun Hseamg Hstok Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
       "(%Hdimg & %Hcnu & %Hcne & %Happ & #Htext & #Hdata &
         #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
@@ -930,6 +940,7 @@ Section SystemBoot.
         iSpecialize ("HP" with "Hirslot").
         iSpecialize ("HP" with "Hirauth").
         iSpecialize ("HP" with "Hcert").
+        iSpecialize ("HP" with "Hcinv").
         iSpecialize ("HP" with "Hseam").
         iSpecialize ("HP" with "Hdev").
         iSpecialize ("HP" with "Hwinv").
@@ -1161,6 +1172,17 @@ Theorem xv6_power_adequacy_gen Σ
     (Hk : gname -> gname -> gname -> gname -> CT -> nat -> iProp Σ -> iProp Σ)
     (HTk : forall (γd γsw γreg γst : gname) (c : CT) (k : nat),
        ⊢ |==> Tk γd γsw γreg γst c k)
+    (* ...AND THE SYNC RUNNER at every era (sync K3-3): the application's
+       one law about what a hook [Hk .. Q] means -- fired by the ghost
+       commit on the new durable claim, the running claim and the token at
+       one map ([AppInv.app_sync_run_raw]).  At ANY machine instance,
+       because the era's does not exist yet; [xv6_boot_era]'s
+       [Happ_sync_run] is it at the record's slots.  Every landed
+       application's hooks are their own [Q], and the runner is
+       [AppInv.app_sync_run_raw_triv]. *)
+    (HHk : forall (H : riscvGS Σ) (γd γsw γreg γst : gname) (c : CT) (k : nat),
+       ⊢ app_sync_run_raw (app_fs c) (Tk γd γsw γreg γst c k)
+                          (Hk γd γsw γreg γst c k))
     (* THE TRANSPORT (app-instances.md round C, section 1; section 6 ruling
        5): a copy of the claim can be made at fresh instance names without
        spending the original, under the later every crossing hands it over
@@ -1593,6 +1615,12 @@ Proof.
      [riscv_sync_tok] IS the application's [Tk] at this era's raw gnames. *)
   assert (Htokfix : ⊢ |==> @riscv_sync_tok Σ F gen)
     by (rewrite Hfix; exact (HTk Gt Gsw Gr Gs Gcl gen)).
+  (* ...AND THE SYNC RUNNER at the record's two slots (K3-3), at whatever
+     machine instance the era is booted over *)
+  assert (Hrunfix : forall H : riscvGS Σ,
+            ⊢ app_sync_run_raw (app_fs Gcl) (@riscv_sync_tok Σ F gen)
+                               (@riscv_sync_hook Σ F gen))
+    by (intros H; rewrite Hfix; exact (HHk H Gt Gsw Gr Gs Gcl gen)).
   subst F.
   (* THE RECORD'S SHAPE, substituted: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
@@ -1615,10 +1643,12 @@ Proof.
             (* every landed application's merge is its transport's
                (SY3-K2): the old durable copy dropped, the running claim
                copied *)
-            (app_merge_raw_of_xfer _
+            (app_merge_raw_of_xfer _ _
                (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen))))
             (* the era's sync token, read off the record above *)
             Htokfix
+            (* ...and the sync runner at the record's slots (K3-3) *)
+            (Hrunfix (RiscvGS Σ _ HE))
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
                  Hr Hifacefix Hgenfix)
@@ -1685,6 +1715,7 @@ Proof.
             (* no sync ledger: the token is [True], a hook is its own [Q] *)
             (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
             ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();
@@ -1876,6 +1907,7 @@ Proof.
             (* no sync ledger: the token is [True], a hook is its own [Q] *)
             (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
             ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
@@ -2336,6 +2368,7 @@ Proof.
             (* no sync ledger: the token is [True], a hook is its own [Q] *)
             (fun _ _ _ _ _ _ => True%I) (fun _ _ _ _ _ _ Q => Q)
             ltac:(intros; cbv beta; iModIntro; iPureIntro; exact Logic.I)
+            ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             ltac:(intros c k; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iModIntro; iExists ();

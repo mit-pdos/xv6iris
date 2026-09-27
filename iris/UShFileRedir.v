@@ -221,7 +221,7 @@ Section UShFileRedir.
     iDestruct "HK" as (i γo) "(%Hty & [Hd Htk] & Hpub)".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [ exact HE | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I0) "(>Hka & Hp & >%Hdom)".
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp".
     iDestruct (AppFileCons.file_deed_inum_acc (fgn_cl g) r _
@@ -229,8 +229,8 @@ Section UShFileRedir.
                  (lookup_insert _ _ _)
                  ltac:(cbn [length]; rewrite /EchoDisc.line_max; lia)
                  with "Hd Hp") as "(Hp & Hd & Hres)".
-    iMod ("Hclose" with "[Hka Hp Hx]") as "_".
-    { iNext. rewrite /app_body. iExists I0. iFrame "Hka Hx".
+    iMod ("Hclose" with "[Hka Hp]") as "_".
+    { iNext. rewrite /app_body. iExists I0. iFrame "Hka".
       iSplitL; [ | by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iSplitL "Hd Htk Hpub".

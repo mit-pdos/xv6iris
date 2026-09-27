@@ -216,7 +216,7 @@ Section FileOpen.
     iDestruct (file_cons_cred_law c r jo with "Hm") as "#Hcl".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iAssert (▷ (file_pred c r (abs_view I) ∗ fdq r q s
@@ -230,7 +230,7 @@ Section FileOpen.
     { iNext. iApply ("Hcl" with "Hp"). }
     iDestruct "Hpd" as "[Hp Hc2]". iMod "Hc2".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iFrame "Hka Hd".
@@ -262,7 +262,7 @@ Section FileOpen.
     iDestruct (file_cons_cred_law c r jo with "Hm") as "#Hcl".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iAssert (▷ (file_pred c r (abs_view I) ∗ esc_tok g
@@ -277,7 +277,7 @@ Section FileOpen.
     { iNext. iApply ("Hcl" with "Hp"). }
     iDestruct "Hpd" as "[Hp Hc2]". iMod "Hc2".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iFrame "Hka Htok".
@@ -303,7 +303,7 @@ Section FileOpen.
     iDestruct (file_escrow_read c r) as "#Hlaw".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iAssert (▷ (file_pred c r (abs_view I)
@@ -313,7 +313,7 @@ Section FileOpen.
     { iNext. iApply ("Hlaw" with "Hwit Hp"). }
     iDestruct "Hpc" as "[Hp Hc]". iMod "Hc".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iFrame "Hka".
@@ -621,7 +621,7 @@ Section FileOpen.
     intros Heq. iIntros "#Hinv Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iDestruct "Hp" as ">Hp".
@@ -661,7 +661,7 @@ Section FileOpen.
       - iRight. iSplitR; [ by iPureIntro |]. iFrame "Hc Hf".
       - iLeft. by iPureIntro. }
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iFrame "Hka Hres".
@@ -2038,7 +2038,7 @@ Section FileOpen.
     rewrite /aopen_commit_at. iIntros (I i a) "%Hrow Hka".
     iMod (inv_acc appE appN with "Hinv") as "[Hbody Hclose]"; [ set_solver | ].
     iEval (rewrite /app_body) in "Hbody".
-    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom & #Hx)".
+    iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hdom)".
     iDestruct (ghost_map_auth_agree with "Hka Hh") as %<-.
     iEval (rewrite Heq; cbn [app_pred app_run app_names]) in "Hp".
     iAssert (▷ (file_pred c r (abs_view I) ∗ fdq r q s
@@ -2047,7 +2047,7 @@ Section FileOpen.
     { iNext. iApply ("Hlaw" with "Hd Hp"). }
     iDestruct "Hpc" as "[Hp [Hd Hc]]". iMod "Hc". iMod "Hd".
     iMod ("Hclose" with "[Hh Hp]") as "_".
-    { iNext. rewrite /app_body. iExists I. iFrame "Hh Hx".
+    { iNext. rewrite /app_body. iExists I. iFrame "Hh".
       iSplitL; [| by iPureIntro ].
       rewrite Heq. cbn [app_pred app_run app_names]. iExact "Hp". }
     iModIntro. iFrame "Hka Hd". iSplitR; [ by iPureIntro |].
