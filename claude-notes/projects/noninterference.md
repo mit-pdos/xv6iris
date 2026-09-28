@@ -59,7 +59,11 @@ M1's ledgers are fresh ground and go first.
   contracts with no consumer yet; what remains of M1 is the per-process
   key history `uhist : mono_list uvis` beside `proc_priv`, and the
   first consumers (the dispatcher's rows reading the receipts), which
-  is M0's territory.
+  is M0's territory.  UHIST DESIGN PASS 2026-09-28:
+  [`design/ni-uhist.md`](../design/ni-uhist.md) — a ghost list of rounds
+  `(sc, W, W')` in the residue beside the block, named by `ut_names`,
+  appended once per round by the trap loop with the round relation as
+  its invariant; rulings R1-R3 open.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT

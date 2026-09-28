@@ -313,6 +313,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   name, kwait's led twin; deliberately untied, because no resource under
   the wait lock knows which slots are zombies.  LANDED the same day;
   §5 is the as-landed record.  With it M1's four ledgers are in.
+- **[`ni-uhist.md`](design/ni-uhist.md)** — DESIGN PASS (2026-09-28):
+  the per-process key history, M1's last item — a ghost list of rounds
+  (cause, trapped key, resumed key) in the trap residue beside the
+  block, named by the residue's own name record, appended once per
+  round by the trap loop, with "every round is lawful" as the
+  invariant.  Rulings R1-R3 pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
