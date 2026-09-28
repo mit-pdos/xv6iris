@@ -1,6 +1,7 @@
 # The pid ledger (NI-LEDGER-REST, first item)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
+STATUS: LANDED 2026-09-28 (rulings R1-R4 as recommended, owner, 2026-09-28;
+W1 d66e99d0d, W2 f43d32a72; §5 below is the as-landed record).  The
 second ledger of the campaign's M1
 ([`../projects/noninterference.md`](../projects/noninterference.md) §6),
 on the shape the allocator's set ([`ni-kalloc-ledger.md`](ni-kalloc-ledger.md)):
@@ -134,3 +135,36 @@ value, and the outcome IS the event.
 - **R4 led twins as copies of the found arm** (recommended: safe for
   the two consumers that destruct `allocproc_post`) vs a receipt-hook
   parameter on `allocproc_post` itself.
+
+## 5. As landed (2026-09-28, f43d32a72)
+
+- **Files.**  `iris/PidEv.v` (pure; after `KallocEv.v`); `Xv6Cameras.v`
+  (`wchGpreS`/`wchG` gain the mono-list `inG` and `wpl_name`, `wchΣ`,
+  `wchG_preS`); `SlotGen.v` (the ghost: `pid_led_auth`, `pid_led_lb`,
+  the four `led` lemmas, `pid_receipt h e := pid_led_lb (h ++ [e])` —
+  here and not in `PidLock` because the boot's row bundle mints the
+  authority and `WaitInv` does not import `PidLock`); `WaitInv.v`
+  (`children_boot_rows` gains `pid_led_auth []`; the constructor call
+  in `children_res_alloc` gains the name); `PidLock.v` (`pid_ledger R :=
+  ∃ h, pid_led_auth h ∗ ⌜live_of h = dom R⌝`, the payload's new
+  conjunct beside `pid_reg_auth R`, `pid_ledger_empty/alloc/free`);
+  `SpecFreeproc.v` / `SpecAllocproc.v` (the led twins and
+  `Parameter`s — `wp_allocproc_core_led` in `ALLOCPROC_GEN`,
+  `wp_allocproc_sconf_led` in `ALLOCPROC`, `wp_freeproc_led_sconf` in
+  `FREEPROC`); `ProofAllocproc.v` (`ap_pid_post` takes the receipt; the
+  three loop statements of `wp_ap_pidsec` carry `pid_ledger PR`; the
+  append at the insert), `ProofFreeproc.v` (the append at the delete),
+  `ProofMain.v` (two lines at the birth).  9 files, +520 / -47, plus the
+  pure file.  `nextpid_res_at_morph` needed nothing: the conjunct is
+  context-free.
+- **The counter tie and first-ness** (R2 b/c) are not stated, as ruled.
+  The pid section's merge point still knows only the interval.
+- **Gate.**  1023 files rebuilt (the camera changed), 0 errors; audits
+  system 13, tree 13, union 14.  The four consumers of the landed
+  contracts (`ProofKforkB6`, `ProofUserinit`, `ProofKwait`,
+  `ProofKforkB1`) compiled untouched.
+- **What a consumer does next.**  kfork switches to
+  `AK.wp_allocproc_core_led` and destructs the found arm's first
+  conjunct as `(%h & #Hrcpt & …)`; the fork row can then carry `PAlloc
+  parent pid` to the U tier.  Nobody does yet.
+

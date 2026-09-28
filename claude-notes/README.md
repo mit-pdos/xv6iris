@@ -298,8 +298,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   (2026-09-28): the pid ledger on the allocator's shape — `PAlloc act
   pid | PFree act pid` inside `<pid_lock>`'s payload, the live set of the
   history tied to the pid register's domain, the ledger's name a `wchG`
-  field, receipts on led twins of allocproc and freeproc.  Rulings R1-R4
-  pending.
+  field, receipts on led twins of allocproc and freeproc.  LANDED the
+  same day; §5 is the as-landed record.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

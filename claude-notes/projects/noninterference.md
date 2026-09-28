@@ -41,8 +41,9 @@ M1's ledgers are fresh ground and go first.
   DESIGN PASS 2026-09-28: [`design/ni-pid-ledger.md`](../design/ni-pid-ledger.md)
   (events `PAlloc act pid | PFree act pid` inside `<pid_lock>`'s payload,
   tied to the pid register's domain, the name a `wchG` field, receipts
-  on allocproc/freeproc led twins; rulings R1-R4 open; W1 `PidEv.v` in
-  flight).
+  on allocproc/freeproc led twins).  PID LEDGER LANDED 2026-09-28
+  (d66e99d0d, f43d32a72; as-landed record in the design note §5; no consumer
+  yet).  Next: `ticks`, then the zombie set.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
