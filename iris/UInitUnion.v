@@ -123,3 +123,10 @@ Proof.
   destruct (Hphi sa_disc) as (W & H1 & H2 & H3 & H4).
   exact (demo_sync_cut_neg W (conj H1 (conj H2 (conj H3 H4)))).
 Qed.
+
+(* ===================================================================== *)
+(*  THE TWO RESULTS AS ONE TERM, for the assumption audit             *)
+(*  ([UnionAssumptions.v]): one [Print Assumptions] walks both cones,  *)
+(*  the corollary's [sa_disc] and [demo_sync_cut_neg] included.        *)
+(* ===================================================================== *)
+Definition union_results := conj union_adequacy_closed union_sync_cut_neg.

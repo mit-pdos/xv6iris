@@ -227,7 +227,7 @@ jobs:
             cat "$RUNNER_TEMP/assumptions-system.log"
             echo '```'
             echo
-            echo "### \`UInitUnion.union_adequacy_closed\`"
+            echo "### \`UInitUnion.union_results\` (\`union_adequacy_closed\` + \`union_sync_cut_neg\`)"
             echo
             if [ "$rc_app" -ne 0 ]; then
               echo "> :x: exit $rc_app — output below is partial."

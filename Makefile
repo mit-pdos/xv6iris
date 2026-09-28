@@ -376,7 +376,8 @@ audit-tree-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob TreeAssumptions.v
 
 # The SAME audit for THE APPLICATION theorem (iris/UnionAssumptions.v): `Print
-# Assumptions` on UInitUnion.union_adequacy_closed, the whole-system theorem at
+# Assumptions` on UInitUnion.union_results -- union_adequacy_closed, the
+# whole-system theorem, paired with its corollary union_sync_cut_neg -- at
 # AppUnionRec.app_union -- the echo, echo > f and cat f lines and the pipelines
 # echo ... | cat^n and cat f | cat^n, across power cycles.  Its cone walks the
 # whole Uk*/USh*/UInit* program tier and the union stage (UnionDisc/UnionOut/

@@ -1070,7 +1070,9 @@ downgrade, never an error.
 
 **UPDATE (2026-09-25, union C9g):** the application audit is now `make
 audit-union-only` (`iris/UnionAssumptions.v`), which prints
-`UInitUnion.union_adequacy_closed` -- ONE application for `echo ws`,
+`UInitUnion.union_results` -- `union_adequacy_closed` paired with its
+corollary `union_sync_cut_neg` in ONE term, so one print walks both
+cones -- ONE application for `echo ws`,
 `echo ws > N`, `cat N`, and pipelines `echo ws | ..` / `cat N | ..` of
 any mix of `cat` and `grep pat` stages, N any `stem.txt` name
 (`FileClass.txt_name`, since W4), at the union model `ulmG` (concrete functor list `unionΣ`, disk at the mkfs

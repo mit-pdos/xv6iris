@@ -2,7 +2,10 @@
 (* UnionAssumptions.v -- THE ASSUMPTION AUDIT of the UNION APPLICATION's   *)
 (* top theorem.                                                            *)
 (*                                                                        *)
-(* [Print Assumptions] on [UInitUnion.union_adequacy_closed]: safety of    *)
+(* [Print Assumptions] on [UInitUnion.union_results], the pair of          *)
+(* [union_adequacy_closed] and its corollary [union_sync_cut_neg] (the     *)
+(* sync's cut refuted: the negative demo's trace is no run of the         *)
+(* machine).  [union_adequacy_closed] states safety of                    *)
 (* the whole machine plus the console trace property for the application  *)
 (* of claude-notes/design/union.md -- the user types lines of the shapes   *)
 (* `echo ws', `echo ws > f', `cat f', and `p | F1 | ... | Fn' for a      *)
@@ -51,4 +54,4 @@
 (* ====================================================================== *)
 Require Import UInitUnion.
 
-Print Assumptions union_adequacy_closed.
+Print Assumptions union_results.
