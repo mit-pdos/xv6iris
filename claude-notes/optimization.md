@@ -602,6 +602,18 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
 - **`vm_compute; reflexivity` is rechecked by the kernel's LAZY conversion at
   `Qed`.** Close such goals with `vm_cast_no_check`, and compute a result ONCE
   into its own `Definition` plus a single VM-cast lemma.
+- **`cbn`/`change … in H` leave NO cast: the kernel pays the conversion at H's
+  next USE.** So the sentence is free and the `Qed` is not — `UnionDiscDec`'s
+  `demo_secc_d4` and `demo_no_silent` and `UnionAdmDemo`'s `s0_rec` spent 118 s,
+  137 s and 34 s at `Qed` on `cbn [ulmG ulm lm_of lm_ok] in H; rewrite
+  line_eq in H`, where the kernel ended up evaluating a concrete line parse
+  lazily. (Bisect by `cheat_`: the cost appears only once H is consumed.) Reach
+  the shape by syntactic rewrites instead: `rewrite b_eq (line_eq : lm_of M b =
+  _) in H`, then apply a lemma stated at the model's own field (`uok … (LEchoF
+  ws N) a -> …`). All three dropped under a second.
+- **`vm_compute; reflexivity` on a computed `gmap` state is ~12 s + ~9 s of
+  `Qed`** even when tiny: close it with `vm_cast_no_check (eq_refl <the
+  literal>)` (`sc1_step1`, `s0b_good`, `demo_sync_cut`).
 - **A guard fixed by `change` pushes a slow non-VM conversion to `Qed`** — use
   `replace g with v by (vm_compute; reflexivity)`. **NEVER `cbv -[…]`** on a Sail
   dispatch guard.
