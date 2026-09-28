@@ -1131,7 +1131,7 @@ Section ProofMain.
     (* THE ORPHAN VAR IS THE MIDDLE ONE ([WaitInv.children_boot]): the boot
        fupd mints it at [∅] beside the map's authority, and it goes into
        <wait_lock>'s payload with the children half. *)
-    iDestruct "Hchb" as "[Hchres [Horph [Hpreg Hchrows]]]".
+    iDestruct "Hchb" as "[Hchres [Horph [Hpreg [Hpled Hchrows]]]]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1346,7 +1346,7 @@ Section ProofMain.
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
-            with "Hpnm Hrun Hpw Hpc0 [Hnpid Hpshare Hpreg]") as "[Hrun Hpid0]".
+            with "Hpnm Hrun Hpw Hpc0 [Hnpid Hpshare Hpreg Hpled]") as "[Hrun Hpid0]".
     (* the payload's [1 <= nextpid <= PIDMAX] is FOUNDED here: the .data
        word arrives at the pinned value the loader left ([BootShared]'s
        carve), so the invariant the scan keeps has an inhabitant. *)
@@ -1364,7 +1364,10 @@ Section ProofMain.
          domain fact holds vacuously ([SlotGen.pid_reg_dom_empty]). *)
       iExists (replicate NPROC (mword_of_int 0 : mword 32)),
               (∅ : gmap Z gname).
-      iFrame "Hpreg". iSplitR.
+      (* ...AND THE PID LEDGER BESIDE IT, at the empty history, whose live
+         set is the empty register's domain ([PidLock.pid_ledger_empty]). *)
+      iDestruct (pid_ledger_empty with "Hpled") as "Hpled".
+      iFrame "Hpreg Hpled". iSplitR.
       { iPureIntro. split; [apply length_replicate | apply pid_reg_dom_empty]. }
       iSplitL.
       { iDestruct (pid_shares_gather NPROC 0 (mword_of_int 0 : mword 32)

@@ -68,7 +68,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra.lib Require Import dfrac_agree.
+From iris.algebra.lib Require Import dfrac_agree mono_list.
 From iris.base_logic.lib Require Import gen_heap ghost_var ghost_map own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -101,6 +101,7 @@ Require Export SlotGen.
    lives with the U tier's half of that reading because every party from
    kwait to the trap loop relays it and the leaf reports it. *)
 Require Export UserChildren.
+Require Import PidEv.   (* [pev]: the pid ledger's boot mint *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -1622,6 +1623,7 @@ Section WaitInv.
   Definition children_boot_rows : iProp Σ :=
     (children_res_boot ∗ orphans_own (∅ : orph_map) ∗
      pid_reg_auth (∅ : gmap Z gname) ∗
+     pid_led_auth [] ∗
      [∗ list] i ∈ seq 0 NPROC,
        ∃ γ0 g : gname,
          ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g)%I.
@@ -1900,15 +1902,20 @@ Section WaitInvBoot.
                              ((mword_of_int 0 : mword 32) : leibnizO (mword 32)))
                      : ipidUR)) as (γnp) "Hnp";
       [ done | ].
-    iModIntro. iExists (WchG Σ _ _ _ _ _ γ γo γsg γpr γip γnp).
+    (* ...and the pid ledger, at the empty history (design
+       ni-pid-ledger.md D2): no pid has been handed out *)
+    iMod (own_alloc (●ML ([] : list (leibnizO pev)))) as (γpl) "Hpl";
+      [ apply mono_list_auth_valid | ].
+    iModIntro. iExists (WchG Σ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl).
     rewrite /children_boot /children_boot_rows /children_res_boot
             /children_own_at /orphans_own
-            /pid_reg_auth /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
+            /pid_reg_auth /pid_led_auth /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
     iSplitR "Hnp"; [| iExact "Hnp"].
     iSplitL "Hip"; [iExact "Hip" |].
     iSplitL "Ha"; [iExists m'; iFrame "Ha"; iPureIntro; exact Hok |].
     iSplitL "Ho"; [iExact "Ho" |].
     iSplitL "Hpr"; [iExact "Hpr" |].
+    iSplitL "Hpl"; [iExact "Hpl" |].
     iDestruct (big_sepL_sep_2 with "Hrows Hsg") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) Hsg]".
     iExists γ0, γ. iFrame "Hrow Hsg".

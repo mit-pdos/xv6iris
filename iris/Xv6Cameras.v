@@ -69,6 +69,7 @@ From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap gset
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 Require Import PipeNames.   (* [pipe_st]: the byte queue's abstract state, plain data *)
 Require Import KallocEv.    (* [kev]: the allocator ledger's events, plain data *)
+Require Import PidEv.       (* [pev]: the pid ledger's events, plain data *)
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var ghost_map saved_prop
      mono_nat cancelable_invariants.
@@ -1179,13 +1180,22 @@ Class wchGpreS (Σ : gFunctors) :=
     worph_pre_inG :: ghost_varG Σ orph_map;
     wsg_pre_inG :: inG Σ sgenUR;
     wpr_pre_inG :: ghost_mapG Σ Z gname;
-    wip_pre_inG :: inG Σ ipidUR }.
+    wip_pre_inG :: inG Σ ipidUR;
+    wpl_pre_inG :: inG Σ (mono_listR (leibnizO pev)) }.
+(* THE PID LEDGER (NI-LEDGER-REST, design ni-pid-ledger.md D2): a mono-list
+   of [PidEv.pev], the actor-labelled history of every pid allocation and
+   release, whose authority lives in <pid_lock>'s payload beside the pid
+   register ([PidLock.pid_ledger]).  Its name rides here, at [wpl_name], as
+   the other wait/pid names do: one canonical ghost, born with the rest of
+   the register in [WaitInv.children_res_alloc], so no contract gains a
+   name binder. *)
 Class wchG (Σ : gFunctors) :=
   WchG { wch_inG :: ghost_mapG Σ gname (SailStdpp.Values.mword 64 * gset gname);
          worph_inG :: ghost_varG Σ orph_map;
          wsg_inG :: inG Σ sgenUR;
          wpr_inG :: ghost_mapG Σ Z gname;
          wip_inG :: inG Σ ipidUR;
+         wpl_inG :: inG Σ (mono_listR (leibnizO pev));
          wch_name : gname;
          worph_name : gname;
          wsg_name : gname;
@@ -1203,17 +1213,20 @@ Class wchG (Σ : gFunctors) :=
             what lets userinit read <init>'s pid off the counter as the
             LITERAL 1 while every later caller of allocproc, which holds
             only the sealed regime, re-establishes the payload for free. *)
-         npid_name : gname }.
+         npid_name : gname;
+         (* THE PID LEDGER'S NAME (design ni-pid-ledger.md D2). *)
+         wpl_name : gname }.
 Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
   {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG;
      wsg_pre_inG := wsg_inG; wpr_pre_inG := wpr_inG;
-     wip_pre_inG := wip_inG |}.
+     wip_pre_inG := wip_inG; wpl_pre_inG := wpl_inG |}.
 Definition wchΣ : gFunctors :=
   #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname);
      ghost_varΣ orph_map;
      GFunctor sgenUR;
      ghost_mapΣ Z gname;
-     GFunctor ipidUR ].
+     GFunctor ipidUR;
+     GFunctor (mono_listR (leibnizO pev)) ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.
 Proof. solve_inG. Qed.
 

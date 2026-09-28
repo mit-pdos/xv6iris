@@ -23,7 +23,7 @@
    (allocproc, freeproc, kfork, sys_fork, userinit, the syscall environment,
    main's [newlock]), and that is what lives here.
 
-   WHAT THE LOCK PROTECTS.  Three things, and the last two are the pid
+   WHAT THE LOCK PROTECTS.  Four things; the middle two are the pid
    scan's:
 
    - the counter cell <nextpid>, IN [1, PIDMAX].  The bound is the whole
@@ -60,6 +60,15 @@
      the authority is under THIS lock -- and freeproc deletes at its
      [p->pid = 0].
 
+   - THE PID LEDGER ([pid_ledger], NI-LEDGER-REST, design
+     ni-pid-ledger.md D3): the authority of the actor-labelled history of
+     every allocation and release ([PidEv.pev], at the canonical
+     [Xv6Cameras.wpl_name]), tied to the register by -- the history's live
+     set IS the register's domain.  allocproc appends [PAlloc p pid] at its
+     insert and freeproc [PFree p pid] at its delete, each handing its
+     caller a persistent receipt ([SlotGen.pid_receipt]) -- a fourth thing
+     the lock protects, riding beside the register it mirrors.
+
    procinit produces the lock's raw fields; main seals them into this
    [is_lock] over the .data word and the 64 quarters
    ([BootCarveMain.boot_procs_raw] carves them, [SpecMain.main_globals_raw]
@@ -80,6 +89,7 @@ Require Import SchedCtx.   (* [pid_lock_share_at]: the lock's quarter of each pi
    [SchedCtx], which only Imports it. *)
 Require Import Xv6Cameras.  (* [wchG]: the register's canonical name *)
 Require Import SlotGen.
+Require Import PidEv.   (* [pev] / [live_of]: the pid ledger's vocabulary *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TsoCtx.
@@ -142,6 +152,16 @@ Section PidLock.
      that does (an uncounted allocproc) holds the shot already, off
      [ProcAvail.procs_avail None].  The marks are CONTEXT-FREE, so the
      payload is still a [TsoCtx.CtxMorph]. *)
+  (* ...AND THE PID LEDGER (design ni-pid-ledger.md D3, ruling R2(a)): the
+     history's authority, tied to the register by its live set alone.  The
+     counter tie and the scan's first-ness are not stated (R2(b)/(c)).
+     CONTEXT-FREE, so the payload is still a [TsoCtx.CtxMorph]. *)
+  Definition pid_ledger (R : gmap Z gname) : iProp Σ :=
+    (∃ h : list pev, pid_led_auth h ∗ ⌜live_of h = dom R⌝)%I.
+
+  Global Instance pid_ledger_timeless R : Timeless (pid_ledger R).
+  Proof using . rewrite /pid_ledger. apply _. Qed.
+
   Definition nextpid_res_at (ξ : CtxIdDefs.CtxId) : iProp Σ :=
     ((∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ alp_nextpid (DfracOwn 1) v ∗
                       ⌜1 <= bv_unsigned v <= PIDMAX⌝ ∗
@@ -149,7 +169,7 @@ Section PidLock.
      (∃ (pids : list (mword 32)) (R : gmap Z gname),
         ⌜length pids = NPROC /\ pid_reg_dom R pids⌝ ∗
         ([∗ list] j ↦ p ∈ pids, pid_lock_share_at ξ (proc_addr j) p) ∗
-        pid_reg_auth R ∗
+        pid_reg_auth R ∗ pid_ledger R ∗
         (⌜Forall (fun q : mword 32 => bv_unsigned q <> 1) pids⌝
          ∨ SlotGen.nextpid_shot)))%I.
   Definition nextpid_res : iProp Σ := nextpid_res_at CtxIdDefs.cur_ctx.
@@ -187,9 +207,43 @@ Section PidLock.
       (∃ (pids : list (mword 32)) (R : gmap Z gname),
          ⌜length pids = NPROC /\ pid_reg_dom R pids⌝ ∗
          ([∗ list] j ↦ p ∈ pids, pid_lock_share (proc_addr j) p) ∗
-         pid_reg_auth R ∗
+         pid_reg_auth R ∗ pid_ledger R ∗
          (⌜Forall (fun q : mword 32 => bv_unsigned q <> 1) pids⌝
           ∨ SlotGen.nextpid_shot)).
   Proof using . rewrite /nextpid_res /nextpid_res_at /pid_lock_share. reflexivity. Qed.
+
+  (* THE LEDGER'S GHOST STEPS (design ni-pid-ledger.md §3 W2).  Each mirrors
+     the register step it rides beside ([SlotGen.pid_reg_insert] /
+     [pid_reg_delete]) and hands back the receipt of the event it appended.
+     The boot's: the empty history is the empty register's ledger. *)
+  Lemma pid_ledger_empty : pid_led_auth [] -∗ pid_ledger ∅.
+  Proof using .
+    iIntros "Ha". iExists []. iFrame "Ha". iPureIntro.
+    by rewrite live_of_nil dom_empty_L.
+  Qed.
+
+  Lemma pid_ledger_alloc R (act : mword 64) (pid : mword 32) (g : gname) :
+    pid_ledger R ==∗ pid_ledger (<[bv_unsigned pid := g]> R) ∗
+                     ∃ h, pid_receipt h (PAlloc act pid).
+  Proof using .
+    iIntros "(%h & Ha & %Hl)".
+    iMod (pid_led_auth_grow h (PAlloc act pid) with "Ha") as "[Ha #Hb]".
+    iModIntro. iSplitL "Ha".
+    - iExists _. iFrame "Ha". iPureIntro.
+      by rewrite live_of_snoc_alloc dom_insert_L Hl.
+    - iExists h. iExact "Hb".
+  Qed.
+
+  Lemma pid_ledger_free R (act : mword 64) (pid : mword 32) :
+    pid_ledger R ==∗ pid_ledger (delete (bv_unsigned pid) R) ∗
+                     ∃ h, pid_receipt h (PFree act pid).
+  Proof using .
+    iIntros "(%h & Ha & %Hl)".
+    iMod (pid_led_auth_grow h (PFree act pid) with "Ha") as "[Ha #Hb]".
+    iModIntro. iSplitL "Ha".
+    - iExists _. iFrame "Ha". iPureIntro.
+      by rewrite live_of_snoc_free dom_delete_L Hl.
+    - iExists h. iExact "Hb".
+  Qed.
 
 End PidLock.

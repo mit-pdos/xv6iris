@@ -96,6 +96,7 @@ Require Import SchedCtx.
 Require Import ChildTok.  (* [gen_own] -- the incarnation this function mints *)
 Require Import KvmSpec.
 Require Import PidLock.
+Require Import PidEv.   (* [PAlloc]: the ledger event the led twins' receipt names *)
 Require Import LockRank.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -360,6 +361,92 @@ Definition allocproc_post
         is spent here too *)
      pav_spent op))%I.
 
+(* THE LED TWIN OF [allocproc_post] (NI-LEDGER-REST W2, design
+   ni-pid-ledger.md D4, ruling R4): a COPY, comments stripped (read them on
+   the original above), whose FOUND arm also carries the pid ledger's
+   RECEIPT of the allocation the inlined allocpid made -- [PAlloc pme pid]
+   appended right after some history [h] ([SlotGen.pid_receipt]), the actor
+   being the hart's proc word [pme].  The two null arms are unchanged: they
+   never reached a registration.  [allocproc_post_led_post] drops the
+   receipt. *)
+Definition allocproc_post_led
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
+    (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+    (b : bool) (lks : gset string)
+    (mr : regfile) (K : nat)
+    (Q : Z -> iProp Σ)
+    (rv : mword 64) : iProp Σ :=
+  ( 
+    (⌜ rv = (zero_reg : mword 64) ⌝ ∗
+     ⌜ avail_zero op ⌝ ∗
+     sie_cap_gpr KT1 mr K b pme ∗
+     cpu_own lvl eb pme b lks ∗
+     kalloc_env_at γa γk on ∗
+     procs_avail_at op tk)
+  ∨ 
+    (∃ (j : nat) (γl : gname) (ch : mword 64) (pid : mword 32)
+       (U : ustate) (root tfp : mword 44) (ks : mword 64)
+       (rest : list (mword 64)) (nc : nat),
+       (∃ h, pid_receipt h (PAlloc pme pid)) ∗
+       ⌜ rv = proc_addr j /\
+         (j < NPROC)%nat /\ γs !! j = Some γl /\
+         (1 <= bv_unsigned pid <= PIDMAX)%Z /\
+         (if pav_boot op tk then bv_unsigned pid = 1 else bv_unsigned pid <> 1) /\
+         pv_upt (us_V U) = upt_desc root tfp /\
+         pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) /\
+         pv_cwd (us_V U) = (zero_reg : mword 64) /\
+         length rest = 12%nat /\ (nc <= K_allocproc)%nat ⌝ ∗
+       proc_held cpu_id j γl USED ch ∗
+       hart_at_any (proc_addr j) ∗
+       proc_priv_nocwd γf (proc_addr j) pid U ∗
+       gen_new (pv_gen (us_V U)) (proc_addr j) pid Q ∗
+       slot_gen (proc_addr j) (DfracOwn 1) (pv_gen (us_V U)) ∗
+       pid_reg_rest pid (pv_gen (us_V U)) ∗
+       fd_frags (pv_fdg (us_V U)) fdt0 ∗
+       ch_frag (pv_chg (us_V U)) (proc_addr j) ∅ ∗
+       (∃ xsv : mword 32, p_xstate (proc_addr j) ↦₄{DfracOwn (1/2)} xsv) ∗
+       pslot_used_at (proc_addr j) ∗
+       fd_slots FDSPARE ∗
+       iref_slots (1 + IREFSPARE) ∗
+       bslots 3 ∗
+       is_kstack (proc_addr j) ks ∗
+       kstack_free (proc_addr j) ∗
+       ctx_cells (p_context (proc_addr j))
+         (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
+       sie_cap_gpr KT1 mr (trap_res b + K)%nat false pme ∗
+       cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) ∗
+       arm_pay KT1 lvl eb pme ∗
+       kalloc_env_at γa γk (avail_sub on nc) ∗
+       pav_spent (avail_dec op))
+  ∨ 
+    (⌜ rv = (zero_reg : mword 64) ⌝ ∗
+     ⌜ exists n : nat, (n <= K_allocproc)%nat /\ avail_zero (avail_sub on n) ⌝ ∗
+     sie_cap_gpr KT1 mr K b pme ∗
+     cpu_own lvl eb pme b lks ∗
+     kalloc_env_at γa γk None ∗
+     pav_spent op))%I.
+
+Lemma allocproc_post_led_post
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
+    (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+    (b : bool) (lks : gset string)
+    (mr : regfile) (K : nat)
+    (Q : Z -> iProp Σ)
+    (rv : mword 64) :
+  allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q rv ⊢
+  allocproc_post γa γk γf γs lvl eb pme on op tk b lks mr K Q rv.
+Proof.
+  rewrite /allocproc_post_led /allocproc_post.
+  iIntros "[Hnull | [Hfound | Hdead]]".
+  - iLeft. iExact "Hnull".
+  - iRight. iLeft.
+    iDestruct "Hfound" as (j γl ch pid U root tfp ks rest nc) "[_ Hfound]".
+    iExists j, γl, ch, pid, U, root, tfp, ks, rest, nc. iExact "Hfound".
+  - iRight. iRight. iExact "Hdead".
+Qed.
+
 Definition wp_allocproc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
@@ -412,6 +499,37 @@ Definition wp_allocproc_sconf_body
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 
+(* THE LED TWIN of [wp_allocproc_sconf_body] (NI-LEDGER-REST W2): verbatim, comments
+   stripped, at [allocproc_post_led]. *)
+Definition wp_allocproc_sconf_led_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
+    (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+    (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (48 <= K)%nat ->
+  (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (exists nb, on = Some nb /\ (K_allocproc < nb)%nat) ->
+  locks_below lks "proc" ->
+  □ (app_taint -∗ Q (-1)) -∗
+  sie_cap_gpr KT1 m K b pme -∗
+  cpu_own lvl eb pme b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
+  kalloc_env_at γa γk on -∗
+  procs_avail_at op tk -∗
+  wp_next b pme (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+      ⌜ callee_saved m mr ⌝ -∗
+      pc_is ret_tgt -∗
+      allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
+        (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      mWP (Loop : expr riscv_lang)) -∗
+  mWP (Loop : expr riscv_lang).
+
 (* THE GENERAL CONTRACT.  Identical to the one below except that it drops the
    counted premise: everything allocproc actually does is here, and the third
    arm of [allocproc_post] is what makes an uncounted run STATABLE.  kfork
@@ -460,6 +578,36 @@ Definition wp_allocproc_core_body
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 
+(* THE LED TWIN of [wp_allocproc_core_body] (NI-LEDGER-REST W2): verbatim, comments
+   stripped, at [allocproc_post_led]. *)
+Definition wp_allocproc_core_led_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
+    (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+    (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (48 <= K)%nat ->
+  (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  locks_below lks "proc" ->
+  □ (app_taint -∗ Q (-1)) -∗
+  sie_cap_gpr KT1 m K b pme -∗
+  cpu_own lvl eb pme b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
+  kalloc_env_at γa γk on -∗
+  procs_avail_at op tk -∗
+  wp_next b pme (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+      ⌜ callee_saved m mr ⌝ -∗
+      pc_is ret_tgt -∗
+      allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
+        (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      mWP (Loop : expr riscv_lang)) -∗
+  mWP (Loop : expr riscv_lang).
+
 Module Type ALLOCPROC_GEN.
   Parameter wp_allocproc_core :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -467,6 +615,12 @@ Module Type ALLOCPROC_GEN.
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
       (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
       wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+  Parameter wp_allocproc_core_led :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
+      wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
 End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
@@ -476,4 +630,10 @@ Module Type ALLOCPROC.
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
       (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
       wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+  Parameter wp_allocproc_sconf_led :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
+      wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
 End ALLOCPROC.

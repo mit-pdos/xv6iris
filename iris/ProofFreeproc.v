@@ -225,15 +225,17 @@ Section ProofFreeproc.
 
   Ltac thr_done := thr_peel; first [ apply fr_thr_refl | assumption ].
 
-  Lemma wp_freeproc_sconf
+  (* THE LED FORM (NI-LEDGER-REST W2): the proof of record; the landed
+     contract below is its corollary. *)
+  Lemma wp_freeproc_led_sconf
       (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string)
-    : wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+    : wp_freeproc_led_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
   Proof using .
-    cbv beta delta [wp_freeproc_sconf_body].
+    cbv beta delta [wp_freeproc_led_sconf_body].
     intros pcE pa ret_tgt HK Hj Hilvl Ha0 Hbelow_pid.
     (* the contract's floor is "nextpid" (the lock this function takes);
        kfree's "kmem" sits one rank above it *)
@@ -528,7 +530,7 @@ Section ProofFreeproc.
       assert (Hacq_thr : fr_thr mm macq) by exact (fr_thr_cs mm Z3 macq Hcsacq HZ3thr).
       (* the lock's quarter of THIS slot's pid cell, out of its payload,
          AND the pid register whose key this store is about to free *)
-      iDestruct "HR" as "[Hnp (%pids & %R & [%Hplen %Hpdom] & Hshares & Hauth & Hmark)]".
+      iDestruct "HR" as "[Hnp (%pids & %R & [%Hplen %Hpdom] & Hshares & Hauth & Hled & Hmark)]".
       assert (Hsj : is_Some (pids !! j)) by (apply lookup_lt_is_Some_2; rewrite Hplen; exact Hj).
       destruct Hsj as [pid3 Hsj].
       iDestruct (big_sepL_insert_acc _ pids j pid3 Hsj with "Hshares") as "[Hshj Hshback]".
@@ -575,12 +577,15 @@ Section ProofFreeproc.
       { rewrite pid_reg_rest_whole /pid_reg_rest. iFrame "Hpr34 Hpr8 Htie8". }
       iApply fupd_wp.
       iMod (pid_reg_delete R pid g with "Hauth Hpr") as "Hauth".
+      (* ...AND THE LEDGER RECORDS THE RELEASE, beside the register it
+         mirrors: [PFree pme pid], whose receipt the continuation gets. *)
+      iMod (pid_ledger_free R pme pid with "Hled") as "[Hled #Hrcpt]".
       iModIntro.
-      iAssert nextpid_res with "[Hnp Hshares Hauth Hmark]" as "HR".
+      iAssert nextpid_res with "[Hnp Hshares Hauth Hled Hmark]" as "HR".
       { rewrite /nextpid_res /nextpid_res_at. iFrame "Hnp".
         iExists (<[j := (mword_of_int 0 : mword 32)]> pids),
                 (delete (bv_unsigned pid) R).
-        iFrame "Hshares Hauth". iSplitR.
+        iFrame "Hshares Hauth Hled". iSplitR.
         { iPureIntro. split.
           - rewrite length_insert. exact Hplen.
           - apply (pid_reg_dom_delete R pids j pid (mword_of_int 0 : mword 32)
@@ -853,7 +858,7 @@ Section ProofFreeproc.
       assert (Hxhalf2 : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
       iEval (rewrite -Hxhalf2 ctx_word4_pointsto_frac_split) in "Hxstate".
       iDestruct "Hxstate" as "[Hxs1 Hxs2]".
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxs1 Hpid2]
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] Hrcpt [Hlk Hstate Hpsg Hchan Hkilled Hxs1 Hpid2]
                                   [Hpid Hsz Hcwd Hnm Hsecc Hof Hunits Hspare Hkst Hctx Hrow Hsg Hxs2 Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
@@ -1219,6 +1224,26 @@ Section ProofFreeproc.
       iSpecialize ("PGT" $! CID8 with "[%]"); [wp_next_chain|].
       iApply ("PGT" $! T0 (zero_reg : mword 64) with "[%] Hcg Hcpu Hpc Htf Hsz").
       split_and!; [exact HT0sp | exact HT0s1 | exact HT0thr].
+  Qed.
+
+  (* THE LANDED CONTRACT, a corollary of the led form: the receipt is
+     dropped. *)
+  Lemma wp_freeproc_sconf
+      (γp γa : gname) (mm : regfile)
+      (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
+      (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
+      (K : nat) (eb : bool) (pme : mword 64)
+      (ilvl : nat) (lks : gset string)
+    : wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+  Proof using .
+    cbv beta delta [wp_freeproc_sconf_body].
+    intros pcE pa ret_tgt HK Hj Hilvl Ha0 Hbelow_pid.
+    iIntros "Hcg Hcpu Htext Hpc Hplk Hheld Hrest Hrow Hsg Hpr Hxb Hpg Htf Henv Hcont".
+    iApply (wp_freeproc_led_sconf γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks
+              HK Hj Hilvl Ha0 Hbelow_pid
+              with "Hcg Hcpu Htext Hpc Hplk Hheld Hrest Hrow Hsg Hpr Hxb Hpg Htf Henv").
+    rewrite /wp_next. iIntros (CID' Hs mr) "Hcg Hcpu Hpc %Hcs _".
+    iApply ("Hcont" $! CID' Hs mr with "Hcg Hcpu Hpc [%]"); exact Hcs.
   Qed.
 
 End ProofFreeproc.

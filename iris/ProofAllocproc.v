@@ -88,6 +88,7 @@ Require Import SpecAcquire SpecRelease PidLock SpecKalloc SpecProcPagetable Spec
 Require Import SpecFreeproc.
 Require Import SpecProcinit.
 Require Import SpecAllocproc.
+Require Import PidEv.   (* [PAlloc]: the event [ap_pid_post]'s receipt names *)
 Require Import CodeAllocproc.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -665,6 +666,10 @@ Definition ap_pid_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !wchG Σ} `{GEN : 
         <init>'s permanent registration instead, and the scan's own "this
         key is free" refutes the candidate 1. *)
      ⌜ if tk then bv_unsigned pidn = 1 else bv_unsigned pidn <> 1 ⌝ -∗
+     (* ...AND THE PID LEDGER'S RECEIPT of the allocation (NI-LEDGER-REST
+        W2): [PAlloc p pidn] appended at the register's insert, the actor
+        being this hart's proc word [p].  Persistent. *)
+     (∃ h, pid_receipt h (PAlloc p pidn)) -∗
      (* ...AND THE BOOT-ERA TOKEN IS SPENT.  The store to <nextpid> is what
         shoots it, and the shot is what put the payload's two marks back.
         PERSISTENT, so it costs the block nothing to hand out. *)
@@ -803,7 +808,7 @@ Section ProofAllocprocPid.
     assert (Hacq_s1 : macq !!! Regidx ap_s1 = proc_addr k).
     { rewrite (callee_saved_lookup Hcsacq ap_s1 ltac:(vm_compute; reflexivity)). exact HA3s1. }
     assert (Hacq_cs : callee_saved m macq) by exact (callee_saved_trans _ _ _ HA3cs Hcsacq).
-    iDestruct "HR" as "[Hnp (%pids & %PR & [%Hplen %Hpdom] & Hshares & Hauth & Hmark2)]".
+    iDestruct "HR" as "[Hnp (%pids & %PR & [%Hplen %Hpdom] & Hshares & Hauth & Hled & Hmark2)]".
     iDestruct "Hnp" as (nv0) "(Hnp & %Hnv0 & Hmark1)".
     (* ================= THE BOOT ERA'S TWO MARKS, READ ONCE =================
        (lane TRAP-ROWS-4, B1b.)  In the COUNTED regime the token in hand
@@ -947,6 +952,7 @@ Section ProofAllocprocPid.
         alp_nextpid ↦₄ nv -∗
         ([∗ list] i ↦ pv ∈ pids, pid_lock_share_at cur_ctx (proc_addr i) pv) -∗
         pid_reg_auth PR -∗
+        pid_ledger PR -∗
         slot_gen (proc_addr k) (DfracOwn 1) g0 -∗
         locked γp cpu_id -∗
         cpu_own (S n) eb p false ({["nextpid"]} ∪ lks) -∗
@@ -956,7 +962,7 @@ Section ProofAllocprocPid.
         wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks tk Q) -∗
         mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iLöb as "IH".
-      iIntros (CIDl Hsl R nv) "%HR %HRa3 %HRtr Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      iIntros (CIDl Hsl R nv) "%HR %HRa3 %HRtr Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
       (* +0x62 c.mv a1,a0 : the next counter value defaults to 1 (the wrap) *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.allocproc + 0x62)) ap_a1 ap_a0 R (trap_res false + av)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -984,6 +990,7 @@ Section ProofAllocprocPid.
           alp_nextpid ↦₄ nv -∗
           ([∗ list] i ↦ pv ∈ pids, pid_lock_share_at cur_ctx (proc_addr i) pv) -∗
           pid_reg_auth PR -∗
+          pid_ledger PR -∗
           slot_gen (proc_addr k) (DfracOwn 1) g0 -∗
           locked γp cpu_id -∗
           cpu_own (S n) eb p false ({["nextpid"]} ∪ lks) -∗
@@ -992,7 +999,7 @@ Section ProofAllocprocPid.
           p_pid (proc_addr k) ↦₄{DfracOwn (1/2)} pidh -∗
           wp_next (CID0 := CID) false p (fun (CIDc : CpuId) => ap_pid_post (CID := CIDc) m k av n eb p lks tk Q) -∗
           mWP (Loop : expr riscv_lang)))%I with "[]" as "Hbody".
-      { iIntros (CIDm Hsm Rm) "(%HRm & %HRma3 & %HRma1) Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+      { iIntros (CIDm Hsm Rm) "(%HRm & %HRma3 & %HRma1) Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
         (* +0x6c auipc a5,0x11 ; +0x70 addi a5,a5,-916 : q := proc *)
         iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.allocproc + 0x6c)) ap_a5 (mword_of_int 17 : mword 20) Rm (trap_res false + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
@@ -1041,6 +1048,7 @@ Section ProofAllocprocPid.
             alp_nextpid ↦₄ nv -∗
             ([∗ list] i ↦ pv ∈ pids, pid_lock_share_at cur_ctx (proc_addr i) pv) -∗
             pid_reg_auth PR -∗
+            pid_ledger PR -∗
             slot_gen (proc_addr k) (DfracOwn 1) g0 -∗
             locked γp cpu_id -∗
             cpu_own (S n) eb p false ({["nextpid"]} ∪ lks) -∗
@@ -1051,7 +1059,7 @@ Section ProofAllocprocPid.
             mWP (Loop : expr riscv_lang)))%I with "[]" as "Hscan".
         { iIntros (CIDs Hss fuel). iInduction fuel as [|fuel] "IHf".
           { iIntros (j Rj) "%Hfuel %Hj _ _ _ _ _ _ _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 j Hfuel Hj). }
-          iIntros (j Rj) "%Hfuel %Hj (%HRj & %HRja3 & %HRja1 & %HRja5) %Hfresh Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
+          iIntros (j Rj) "%Hfuel %Hj (%HRj & %HRja3 & %HRja1 & %HRja5) %Hfresh Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont".
           pose proof HRj as (HRjs1 & _ & _ & HRja2 & _).
           (* +0x74 c.lw a4,48(a5) : q->pid, read out of the lock's quarter *)
           assert (Hsj : is_Some (pids !! j))
@@ -1129,7 +1137,7 @@ Section ProofAllocprocPid.
                 exact (HRtr eq_refl). }
               exact (Forall_lookup_1 _ _ _ _ Hall Hpvj Hpv1). }
             iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain |].
-            iApply ("IH" $! Re nv with "[%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+            iApply ("IH" $! Re nv with "[%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
             + exact HRe.
             + exact HRea3.
             + rewrite Htf. intro Hc. discriminate Hc.
@@ -1283,8 +1291,11 @@ Section ProofAllocprocPid.
               iMod (gen_alloc (proc_addr k) pidn Q) as (γg) "[Hgen Hpend]".
               iMod (slot_gen_update (proc_addr k) g0 γg with "Hsg") as "Hsg".
               iMod (pid_reg_insert PR pidn γg Hfree with "Hauth") as "[Hauth Hpr]".
+              (* ...AND THE LEDGER RECORDS IT, beside the register it
+                 mirrors: [PAlloc p pidn], whose receipt the post gets. *)
+              iMod (pid_ledger_alloc PR p pidn γg with "Hled") as "[Hled #Hrcpt]".
               iModIntro.
-              iAssert nextpid_res with "[Hnp Hshares Hauth]" as "HR".
+              iAssert nextpid_res with "[Hnp Hshares Hauth Hled]" as "HR".
               { rewrite /nextpid_res /nextpid_res_at. iSplitL "Hnp".
                 { iExists _. iSplitL "Hnp"; [iExact "Hnp" |].
                   iSplitR; [iPureIntro; exact Hnvb |].
@@ -1292,7 +1303,7 @@ Section ProofAllocprocPid.
                      three instructions up moved the counter off 1. *)
                   iRight. iExact "Hshot". }
                 iExists (<[k := pidn]> pids), (<[bv_unsigned pidn := γg]> PR).
-                iFrame "Hshares Hauth". iSplitR.
+                iFrame "Hshares Hauth Hled". iSplitR.
                 { iPureIntro. split.
                   - rewrite length_insert. exact Hplen.
                   - apply (pid_reg_dom_insert PR pids k pk pidn γg Hpdom Hsk Hpk0).
@@ -1363,7 +1374,7 @@ Section ProofAllocprocPid.
               iSpecialize ("Hcont" $! CIDrel with "[%]"); [wp_next_chain |].
               iEval (rewrite /ap_pid_post) in "Hcont".
               iApply ("Hcont" $! mrel pidn γg
-                        with "[%] [%] [%] Hshot Hcg Hcpu Hpc Hpidi Hpidh Hgen Hpend Hsg Hpr").
+                        with "[%] [%] [%] Hrcpt Hshot Hcg Hcpu Hpc Hpidi Hpidh Hgen Hpend Hsg Hpr").
               * exact (callee_saved_trans _ _ _ HRrcs Hcsrel).
               * exact Hpidnb.
               * exact Hpidn1.
@@ -1379,14 +1390,14 @@ Section ProofAllocprocPid.
               assert (Htgt74 : add_vec (mword_of_int (KernelSyms.allocproc + 0x7e) : mword 64) (sign_extend' 64 (mword_of_int 8182 : mword 13))
                                = mword_of_int (KernelSyms.allocproc + 0x74)) by pcstep.
               iEval (rewrite Htgt74) in "Hpc".
-              iApply ("IHf" $! (S j) Rf with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+              iApply ("IHf" $! (S j) Rf with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
               * exact (ap_fuelS j fuel Hfuel).
               * exact HjS.
               * split; [exact HRf | split; [exact HRfa3 | split; [exact HRfa1 | exact HRf_a5]]].
               * exact Hfresh'. }
         (* enter the scan at q = &proc[0] *)
         iSpecialize ("Hscan" $! CIDm with "[%]"); [wp_next_chain |].
-        iApply ("Hscan" $! NPROC 0%nat Rc with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+        iApply ("Hscan" $! NPROC 0%nat Rc with "[%] [%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
         - exact ap_fuel_init.
         - exact ap_nproc_pos.
         - split; [exact HRc | split; [exact HRca3 | split; [exact HRca1 | exact HRc_a5]]].
@@ -1408,7 +1419,7 @@ Section ProofAllocprocPid.
            inside the interval with nothing read off a3 at all. *)
         assert (HR1a1 : R1 !!! Regidx ap_a1 = add_vec zero_reg ap_c1).
         { rewrite /R1 upd_eq. destruct HR as (_ & Ha0 & _). by rewrite Ha0. }
-        iApply ("Hbody" $! R1 with "[%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+        iApply ("Hbody" $! R1 with "[%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
         (* [split_and!] would split the interval too, so the last conjunct is
            handed over whole (durable-notes' off-by-one). *)
         split; [exact HR1 | split; [reflexivity | ]].
@@ -1448,7 +1459,7 @@ Section ProofAllocprocPid.
           lia. }
         assert (Hpre : (1 <= bv_unsigned (R1 !!! Regidx ap_a3 : mword 64) < PIDMAX)%Z)
           by (split; [exact (proj1 HR1a3b) | exact HR1lt]).
-        iApply ("Hbody" $! R2 with "[%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+        iApply ("Hbody" $! R2 with "[%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
         split;
           [ exact HR2
           | split; [ rewrite /R2 upd_ne; [reflexivity | vm_compute; discriminate] | ]].
@@ -1473,7 +1484,7 @@ Section ProofAllocprocPid.
                          (regval_into_reg (sign_extend' 64 (nv0 : mword 32)))))))). }
     assert (HB6a3 : (1 <= bv_unsigned (B6 !!! Regidx ap_a3 : mword 64) <= PIDMAX)%Z).
     { rewrite HB6a3e (ap_sext_val nv0 Hnv31). exact Hnv0. }
-    iApply ("Hloop" $! B6 nv0 with "[%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
+    iApply ("Hloop" $! B6 nv0 with "[%] [%] [%] Hcg Hpc Hnp Hshares Hauth Hled Hsg Hlocked Hcpu Hpay Hpidi Hpidh Hcont").
     - exact HB6regs.
     - exact HB6a3.
     - intro Ht. rewrite HB6a3e (ap_sext_val nv0 Hnv31).
@@ -1491,14 +1502,16 @@ Section ProofAllocproc.
      [wp_next (CID0 := CID0)] and [wp_next_chain] compose against). *)
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_allocproc_core
+  (* THE LED FORM (NI-LEDGER-REST W2): the proof of record; the landed
+     [wp_allocproc_core] below is its corollary. *)
+  Lemma wp_allocproc_core_led
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
       (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+    : wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
   Proof using .
-    cbv beta delta [wp_allocproc_core_body].
+    cbv beta delta [wp_allocproc_core_led_body].
     intros pcE ret_tgt HK Hlvl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -1840,7 +1853,7 @@ Section ProofAllocproc.
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
                        pc_is ret_tgt -∗
-                       allocproc_post γa γk γf γs lvl eb pme on op tk b lks mr K Q
+                       allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
                          (mr !!! Regidx ap_a0) -∗
                        mWP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr KT1 Mk (K - 4)%nat b pme -∗
@@ -2028,7 +2041,7 @@ Section ProofAllocproc.
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K14 K HK); lia) Hk HL3s1 (ap_below_nextpid lks Hbelow) Hpid00
                   with "Hcg Hcpu Htext Hpc Hpidlk Hpidinv Hpidhalf Hsg Htok").
         iApply wp_next_off_intro. rewrite /ap_pid_post.
-        iIntros (mfa pidn γg) "%Hcsfa %Hpidnb %Hpidn1 #Hshot Hcg Hcpu Hpc Hpidinv Hpidown Hgen Hpend Hsg Hpr".
+        iIntros (mfa pidn γg) "%Hcsfa %Hpidnb %Hpidn1 #Hrcpt #Hshot Hcg Hcpu Hpc Hpidinv Hpidown Hgen Hpend Hsg Hpr".
         iAssert (pav_spent op) with "[Hpcore]" as "Hpav";
           [ rewrite /pav_spent; iFrame "Hpcore Hshot" | ].
         (* THE TIE FOR THE NEW INCARNATION (lane SELF-KILL, §1).  The
@@ -2441,7 +2454,7 @@ Section ProofAllocproc.
           iApply ("Hcont" $! Mf with "[%] Hpcf").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
-          rewrite /allocproc_post. iRight. iRight.
+          rewrite /allocproc_post_led. iRight. iRight.
           iSplitR; [done|].
           iSplitR.
           { iPureIntro. exists 0%nat. split; [apply Nat.le_0_l|].
@@ -2812,7 +2825,7 @@ Section ProofAllocproc.
           iApply ("Hcont" $! Mf with "[%] Hpcf").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
-          rewrite /allocproc_post. iRight. iRight.
+          rewrite /allocproc_post_led. iRight. iRight.
           iSplitR; [done|].
           iSplitR.
           { iPureIntro. destruct Hdry as (n & Hn & Hz).
@@ -3150,10 +3163,12 @@ Section ProofAllocproc.
         { exact Hcsf. }
         iEval (rewrite Ha0f).
         (* the post is now THREE-way; the found arm is the middle one *)
-        rewrite /allocproc_post. iRight. iLeft.
+        rewrite /allocproc_post_led. iRight. iLeft.
         iExists k, γl, ch, pidn,
                 (us_pt (MkUstate (upd_gen V γg) M0) (upt_desc (pt_base t) tfp) tfws),
                 (pt_base t), tfp, ks, rest, (S (pt_nodes t)).
+        (* the pid ledger's receipt, out of the pid section's post *)
+        iSplitR; [iExact "Hrcpt" |].
         iSplitR.
         { iPureIntro. split; [reflexivity|]. split; [exact Hk|]. split; [exact Hγl|].
           split; [exact Hpidnb|]. split; [exact Hpidn1|]. split; [reflexivity|].
@@ -3357,7 +3372,7 @@ Section ProofAllocproc.
           iApply ("Hcont" $! Mf with "[%] Hpcf").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
-          rewrite /allocproc_post. iLeft. iFrame "Hcgf Hcpu Henv Hpav".
+          rewrite /allocproc_post_led. iLeft. iFrame "Hcgf Hcpu Henv Hpav".
           iSplitR; [done | iPureIntro; exact Hz].
         + (* keep scanning: branch back to +0x1c *)
           assert (HkS : (S k < NPROC)%nat) by exact (ap_kS_lt k Hk Hend).
@@ -3397,6 +3412,26 @@ Section ProofAllocproc.
     - (* the scan has passed no slot yet *) done.
   Qed.
 
+  (* THE LANDED CONTRACT, a corollary of the led form: the found arm's
+     receipt is dropped ([SpecAllocproc.allocproc_post_led_post]). *)
+  Lemma wp_allocproc_core
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
+      (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
+    : wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+  Proof using .
+    cbv beta delta [wp_allocproc_core_body].
+    intros pcE ret_tgt HK Hlvl Hbelow.
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
+    iApply (wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q
+              HK Hlvl Hbelow
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
+    iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc [Hpost]"); [exact Hcs|].
+    by iApply allocproc_post_led_post.
+  Qed.
+
 End ProofAllocproc.
 
 End AllocprocCore.
@@ -3419,18 +3454,20 @@ Section SealAllocproc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_allocproc_sconf
+  (* THE LED COUNTED CONTRACT (NI-LEDGER-REST W2): the seal, at the led
+     core. *)
+  Lemma wp_allocproc_sconf_led
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
       (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+    : wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
   Proof using .
-    cbv beta delta [wp_allocproc_sconf_body].
+    cbv beta delta [wp_allocproc_sconf_led_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
-    iApply (Core.wp_allocproc_core γa γk γp γf γs m lvl K eb pme (Some nb) op tk b lks Q
+    iApply (Core.wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme (Some nb) op tk b lks Q
               HK Hlvl Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
     all: try lkbelow.
@@ -3443,6 +3480,25 @@ Section SealAllocproc.
     - iDestruct "Hdead" as "(_ & %Hdry & _ & _ & _ & _)".
       destruct Hdry as (n & Hn & Hz).
       destruct (ap_refute_dry nb n Hnb Hn Hz).
+  Qed.
+
+  (* THE LANDED COUNTED CONTRACT, a corollary of the led one. *)
+  Lemma wp_allocproc_sconf
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
+      (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
+    : wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+  Proof using .
+    cbv beta delta [wp_allocproc_sconf_body].
+    intros pcE ret_tgt HK Hlvl Hex Hbelow.
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
+    iApply (wp_allocproc_sconf_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q
+              HK Hlvl Hex Hbelow
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
+    iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc [Hpost]"); [exact Hcs|].
+    by iApply allocproc_post_led_post.
   Qed.
 
 End SealAllocproc.

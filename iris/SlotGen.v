@@ -54,7 +54,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import dfrac gmap agree.
-From iris.algebra.lib Require Import dfrac_agree.
+From iris.algebra.lib Require Import dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_map.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
@@ -65,6 +65,7 @@ Require Import ProcGeom.
    its reason: a class that carries a gname is not a member of that
    bundle. *)
 Require Import Xv6Cameras.
+Require Import PidEv.   (* [pev]: the pid ledger's events *)
 Local Open Scope Z_scope.
 
 (* AN EIGHTH.  [Qp_scope]'s numerals stop at 4 (stdpp's [Qp.notations]
@@ -665,6 +666,68 @@ Section SlotGen.
       by (vm_compute; reflexivity).
     rewrite Hone in Hl. rewrite -He in Hl. rewrite Hl in Hfree. discriminate.
   Qed.
+
+  (* THE PID LEDGER'S GHOST (NI-LEDGER-REST W2, design ni-pid-ledger.md D2):
+     a mono-list of [PidEv.pev] at the canonical [Xv6Cameras.wpl_name].
+     The authority rides <pid_lock>'s payload ([PidLock.pid_ledger], whose
+     live set is the register's domain); a lower bound is what a call hands
+     back.  HERE and not in [PidLock] because the boot's row bundle
+     ([WaitInv.children_boot_rows]) mints the authority, and [WaitInv] does
+     not import [PidLock]; this file is the earliest both import. *)
+  Definition pid_led_auth (h : list pev) : iProp Σ :=
+    own wpl_name (●ML (h : list (leibnizO pev))).
+  Definition pid_led_lb (h : list pev) : iProp Σ :=
+    own wpl_name (◯ML (h : list (leibnizO pev))).
+
+  Global Instance pid_led_lb_persistent h : Persistent (pid_led_lb h).
+  Proof using . rewrite /pid_led_lb. apply _. Qed.
+  Global Instance pid_led_lb_timeless h : Timeless (pid_led_lb h).
+  Proof using . rewrite /pid_led_lb. apply _. Qed.
+  Global Instance pid_led_auth_timeless h : Timeless (pid_led_auth h).
+  Proof using . rewrite /pid_led_auth. apply _. Qed.
+
+  Lemma pid_led_auth_lb h : pid_led_auth h -∗ pid_led_auth h ∗ pid_led_lb h.
+  Proof using .
+    rewrite /pid_led_auth /pid_led_lb. iIntros "Ha".
+    iDestruct (own_mono _ _ (◯ML (h : list (leibnizO pev))) with "Ha")
+      as "#Hb"; [ apply mono_list_included |].
+    iFrame "Ha Hb".
+  Qed.
+
+  Lemma pid_led_lb_prefix h h' : pid_led_auth h -∗ pid_led_lb h' -∗ ⌜h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /pid_led_auth /pid_led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    by iPureIntro.
+  Qed.
+
+  (* two lower bounds of the one ledger are comparable *)
+  Lemma pid_led_lb_lb h h' :
+    pid_led_lb h -∗ pid_led_lb h' -∗ ⌜h `prefix_of` h' \/ h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /pid_led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_lb_op_valid_L.
+    by iPureIntro.
+  Qed.
+
+  Lemma pid_led_auth_grow h e :
+    pid_led_auth h ==∗ pid_led_auth (h ++ [e]) ∗ pid_led_lb (h ++ [e]).
+  Proof using .
+    rewrite /pid_led_auth. iIntros "Ha".
+    iMod (own_update _ _ (●ML ((h ++ [e]) : list (leibnizO pev))) with "Ha") as "Ha".
+    { apply mono_list_update. by exists [e]. }
+    iModIntro. iApply (pid_led_auth_lb with "Ha").
+  Qed.
+
+  (* the receipt a pid call hands back: event [e] was appended right after
+     history [h].  The ledger's name is canonical, so unlike
+     [KallocInv.led_receipt] it carries no name. *)
+  Definition pid_receipt (h : list pev) (e : pev) : iProp Σ :=
+    pid_led_lb (h ++ [e]).
+  Global Instance pid_receipt_persistent h e : Persistent (pid_receipt h e).
+  Proof using . rewrite /pid_receipt. apply _. Qed.
+  Global Instance pid_receipt_timeless h e : Timeless (pid_receipt h e).
+  Proof using . rewrite /pid_receipt. apply _. Qed.
 
 End SlotGen.
 
