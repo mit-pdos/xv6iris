@@ -65,7 +65,10 @@ DEFERRED (owner, 2026-09-28) until the sync lane settles: three of the
 last five upstream fetches rewrote the child laws this stage would factor
 (the round position through the deed, the sync hook), and a factoring
 landed now would be re-derived at every fetch.  Resume when
-`projects/sync.md` is closed.  Landings since stage 1: the landing was
+`projects/sync.md` is closed.  THE SYNC LANE CLOSED LATER THE SAME DAY
+(upstream's "sync cleanups A-I", `projects/sync.md` deleted, outcomes in
+`completed/sync.md`), so the condition is met: S5 may resume on the
+owner's word.  Landings since stage 1: the landing was
 re-derived twice on upstream's sync batches (851a3f82a, 065b8b3de) and
 rebased four times; each re-derivation rebuilds the module files from
 upstream's round text plus the modules' own additions (a script in the
