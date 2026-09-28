@@ -2,7 +2,8 @@
 
 Design of record: [`../design/shape-modules.md`](../design/shape-modules.md)
 (ruled as recommended, R1-R5, 2026-09-27).  STAGE 1 LANDED 2026-09-27
-(S1-S4 below); stage 1b (S5) open.  Follows [`user-once.md`](user-once.md) (complete):
+(S1-S4 below); STAGE 1b (S5) LANDED 2026-09-28 -- the worklist is
+COMPLETE.  Follows [`user-once.md`](user-once.md) (complete):
 this is the last copy axis of that campaign's table.
 
 ## Rules
@@ -74,8 +75,27 @@ rebased four times; each re-derivation rebuilds the module files from
 upstream's round text plus the modules' own additions (a script in the
 session, one pass each time).
 
-- [ ] **S5** `ushf_child_law_of_x`: the shared prologue of the
+- [x] **S5** `ushf_child_law_of_x`: the shared prologue of the
   whole-lend child laws (sync, seccomp's clean arm, echo) as one lemma
   taking the module's program (pin slot, ELF, alternative code, row) and
   the two per-shape wands (the lend opened into the walk's `Cr`; the
-  exit paying the round).
+  exit paying the round).  AS LANDED (2026-09-28, an Opus attempt under
+  R5's stop rule, which it passed): `iris/UShUModX.v` holds the lemma in
+  the modules' verbatim context block; it takes the module's line
+  predicate, decider and pin slot, one pure line fact per shape and one
+  Iris law (the exec supply, the two exec-failed laws and the pay wand,
+  at EXISTENTIAL `Cr`/`Cd`/alternative code inside the law), and gives
+  `ushf_child_law_at … 68`; the prologue -- the intros, the line fact off
+  the fork's words, the era pin off the lend from either deed arm, the
+  taint payload, the budget, the walk and its four arms -- is proved
+  once.  Sync and seccomp are its instances (69 -> 23 and 90 -> 31
+  lines); both now go through the `_v` walk (`usync_exec_sup` takes the
+  view and ignores it).  ECHO is NOT an instance: it already goes through
+  `UkShEcho.ushf_child_law_holds_at_D` and shares nothing.  THE NUMBERS,
+  honestly, as for stage 1: lemma plus instances 153 lines against 159
+  before, but the new file is 286 lines of which 187 are the import and
+  context block, so the tree grows by ~184 net; the gain is that the next
+  whole-lend shape costs ~25 lines.  One maintenance point the stop rule
+  flagged and accepted: the lemma's statement restates the TYPES of the
+  walk's four arms, so an upstream change to those arms touches it too.
+  Gate: the 12-file cone; audits 13/13/14.

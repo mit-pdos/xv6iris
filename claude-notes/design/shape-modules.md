@@ -4,7 +4,9 @@
 (see the worklist for the as-landed shape, which is better than §5's exit:
 the round file is gone; and for the honest line count, which is WORSE
 than §4's estimate -- about 1,400 lines in, not 300 out, from the per-file
-overhead; the gain is structural).  Stage 1b (§3) open.**  Read off the
+overhead; the gain is structural).  Stage 1b (§3) LANDED 2026-09-28: one
+lemma, sync and seccomp as instances, echo not (see the worklist's S5
+for the honest count: ~184 lines in, from the same per-file overhead).**  Read off the
 tree at `main` 55b61ea45 after user-once closed.  Predecessors:
 [`user-once.md`](user-once.md) §0's table (row 5, "sh's ROUND and child
 dispatch -- the era's list of line shapes"), [`app-both.md`](app-both.md)

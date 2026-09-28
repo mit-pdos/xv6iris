@@ -274,8 +274,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   (2026-09-27): the shell round over a LIST of line-shape modules (a
   record per constructor family: the line predicate, the first-byte
   class, the child law), the body law folded over the list, one file per
-  shape; the last copy axis user-once left.  Stage 1b deferred until the
-  sync lane settles.
+  shape; the last copy axis user-once left.  Stage 1b (the whole-lend
+  child laws' shared prologue as one lemma, `UShUModX.v`) landed
+  2026-09-28; the worklist is complete.
 - **[`ni-kalloc-ledger.md`](design/ni-kalloc-ledger.md)** — LANDED
   (2026-09-28), the noninterference campaign's first lane: the
   allocator's actor-labelled event ledger (`KallocEv.kev`: `KAlloc |

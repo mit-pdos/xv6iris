@@ -1203,6 +1203,13 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 
 ## Proofmode & bitvector gotchas
 
+- **Two silent hangs at the U tier (shape-modules 1b, 2026-09-28):**
+  restating `UkRun.urun N' …` inside an `iAssert` hangs (instance
+  search on the engine's typeclass arguments, apparently) -- keep the
+  `□ ∀ W, T -∗ my_pay … -∗ uslot W` form the modules use; and `iSplit`
+  on a goal `ush_execfail_law_at … ∗ …` hangs in the Persistent search
+  -- use `iSplitR`/`iSplitL`.
+
 - **`simpl` on `decide (n = 0)` / `Nat.eq_dec x 0` at a VARIABLE unfolds
   the decision into a `match`**, after which `rewrite decide_True` finds
   no `if decide`; likewise a `Decision (A ∨ B)` instance.  Reduce with
