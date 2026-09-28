@@ -28,7 +28,12 @@ M1's ledgers are fresh ground and go first.
   appends an actor-labelled `Alloc`/`Free` event.  Deliverables: the
   event vocabulary + ledger file; `SpecKalloc`'s rows deterministic in
   the ledger; callers served by the invariant (not per-caller
-  fragments).  Cut the lane brief from §2/§7.
+  fragments).  DESIGN PASS DONE 2026-09-28:
+  [`design/ni-kalloc-ledger.md`](../design/ni-kalloc-ledger.md) — the
+  ledger inside `kmem_avail_auth` (no landed contract moves), the actor
+  is `cpu_own`'s `c->proc`, events `KAlloc | KNull | KFree`, a second
+  led-form contract per function with the landed one as corollary; work
+  order W1-W4, rulings R1-R5 open for the owner.
 - [ ] **NI-LEDGER-REST** (M1 remainder): `nextpid` — coordinate with
   the landed TRAP-ROWS `upid`/`ukn_pid` work, the U tier already sees
   pid numbers — then `ticks`, the zombie set; then the per-process key

@@ -270,11 +270,18 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   model, the generic families and the generic claim, then the union as a
   listing); §5 the endpoint proposal, superseded by `program-specs.md`.
 
-- **[`shape-modules.md`](design/shape-modules.md)** — PROPOSAL (2026-09-27):
-  the shell round over a LIST of line-shape modules (a record per
-  constructor family: the line predicate, the first-byte class, the child
-  law), the body law folded over the list, one file per shape; the last
-  copy axis user-once left.  Rulings R1-R5 pending.
+- **[`shape-modules.md`](design/shape-modules.md)** — LANDED stage 1
+  (2026-09-27): the shell round over a LIST of line-shape modules (a
+  record per constructor family: the line predicate, the first-byte
+  class, the child law), the body law folded over the list, one file per
+  shape; the last copy axis user-once left.  Stage 1b deferred until the
+  sync lane settles.
+- **[`ni-kalloc-ledger.md`](design/ni-kalloc-ledger.md)** — DESIGN PASS
+  (2026-09-28) for the noninterference campaign's first lane: the
+  allocator's actor-labelled event ledger (`KAlloc | KNull | KFree` at
+  the hart's `c->proc`) inside `kmem_avail_auth`, `kalloc` null iff the
+  history's pool is empty, exported by a led-form contract beside the
+  landed one; no landed contract moves.  Rulings R1-R5 pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
