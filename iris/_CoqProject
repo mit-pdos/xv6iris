@@ -864,6 +864,7 @@ CodeProcPagetable.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
+VmfaultQuiet.v
 UmCovered.v
 PtFree.v
 BarePt.v
