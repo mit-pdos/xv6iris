@@ -89,6 +89,7 @@ PermInv.v
 PageGeom.v
 KallocEv.v
 PidEv.v
+ZombEv.v
 KptExecMap.v
 RiscvExec.v
 HartCustody.v

@@ -1255,7 +1255,7 @@ Section KexitPark.
                     = mword_of_int (KX + 0x6c))
       by (rewrite HP2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc6c) in "Hpc".
-    iDestruct "Hres" as (ps gs mc O) "(Hpar & Hch & Ho & Hci)".
+    iDestruct "Hres" as (ps gs mc O) "(Hpar & Hch & Ho & Hci & (%hz & Hzl))".
     iDestruct (parents_own_length with "Hpar") as "%Hpslen".
     (* THE CHILDREN MOVE, and this is the only place it can happen: the
        authority is <wait_lock>'s and the row is the dying process's own,
@@ -1649,6 +1649,13 @@ Section KexitPark.
     { iEval (rewrite Hsaddr). iExact "Hstate". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hstate".
     iEval (rewrite Hsaddr Hsval) in "Hstate".
+    (* THE ZOMBIE LEDGER RECORDS THE EXIT (design ni-zombie-ledger.md D2,
+       ruling R1), here, at the ZOMBIE store, with BOTH locks held: actor
+       [pj], this process's pid, and the status the escrow is keyed at.
+       kexit has no post, so the receipt is dropped. *)
+    iApply fupd_wp.
+    iMod (zomb_exit hz pj pid (xstate_of sv) with "Hzl") as "[Hzl _]".
+    iModIntro.
     assert (Hpp8a : add_vec_int (mword_of_int (KX + 0x86) : mword 64) 4 = mword_of_int (KX + 0x8a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp8a) in "Hpc".
@@ -1716,11 +1723,11 @@ Section KexitPark.
               (wait_res_at) PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
-              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hch Ho Hci] Hown Hpay2").
+              with "Hcg Htext Hpc Hwl Hlkw [Hpar Hch Ho Hci Hzl] Hown Hpay2").
     { iExists (rp_map pj ip ps), gs,
               (<[pv_chg (us_V U) := (pj, (∅ : gset gname))]> mc),
               (op_map pj ip O cs).
-      iFrame "Hpar Hch Ho Hci". }
+      iFrame "Hpar Hch Ho Hci". iExists _. iExact "Hzl". }
     iApply wp_next_off_intro.
     iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
     assert (Hpc96 : ret_pc (PC !!! Regidx (mword_of_int 1 : mword 5))

@@ -286,6 +286,57 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 
+(* THE LED TWIN (NI-LEDGER-REST, design ni-zombie-ledger.md D4):
+   [wp_kwait_sconf_body] verbatim, with the answer at
+   [UserChildren.wait_ans_led]: the reaping arm also hands back the zombie
+   ledger's receipt of [ZReap pj rv], appended by the caller's own proc word
+   [pj] under <wait_lock>.  The landed [wp_kwait_sconf] is its corollary
+   ([UserChildren.wait_ans_led_post]). *)
+Definition wp_kwait_led_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa γp γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
+    (m : regfile) (av : nat) (eb : bool) (b : bool)
+    (pid : mword 32) (U : ustate) (lks : gset string) (cs : gset gname)
+    :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kwait in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let addr := m !!! Regidx (mword_of_int 10 : mword 5) in
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (K_kwait <= av)%nat ->
+  eb = true ->
+  locks_below lks "wait_lock" ->
+  sie_cap_gpr KT1 m av b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  is_lock γw wait_lock_addr "wait_lock"%string (wait_res_at) -∗
+  kalloc_env γa None -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
+  proc_priv γf pj pid U -∗
+  ch_frag (pv_chg (us_V U)) pj cs -∗
+  SlotGen.init_pid_is (mword_of_int 1 : mword 32) -∗
+  wp_next b pj (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
+      (cs' : gset gname),
+      ⌜ callee_saved m mf /\
+        mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
+      ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
+      ⌜ (d <= 4)%nat ⌝ -∗
+      ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
+      ⌜ addr <> (zero_reg : mword 64) ->
+        rv <> (mword_of_int (-1) : mword 32) -> d = 4%nat ⌝ -∗
+      wait_ans_led rv (xstate_val xw) cs cs' (pv_gen (us_V U))
+        (bool_decide (addr = (zero_reg : mword 64))) pid pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
+      cpu_own 0 eb pj b lks -∗
+      pc_is ret_tgt -∗
+      proc_priv γf pj pid
+        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
+      ch_frag (pv_chg (us_V U)) pj cs' -∗
+      mWP (Loop : expr riscv_lang)) -∗
+  mWP (Loop : expr riscv_lang).
+
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -293,4 +344,10 @@ Module Type KWAIT.
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) (cs : gset gname),
       wp_kwait_sconf_body γa γp γf γw γs j γl m av eb b pid U lks cs.
+  Parameter wp_kwait_led_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γa γp γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
+      (m : regfile) (av : nat) (eb : bool) (b : bool)
+      (pid : mword 32) (U : ustate) (lks : gset string) (cs : gset gname),
+      wp_kwait_led_sconf_body γa γp γf γw γs j γl m av eb b pid U lks cs.
 End KWAIT.

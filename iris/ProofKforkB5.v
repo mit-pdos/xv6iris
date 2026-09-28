@@ -549,7 +549,7 @@ Section ProofKforkB5.
     (* -------------------------------------------------------------- *)
     (* +0xdc sd s5,56(s4) : np->parent = p  -- regime OFF (wait_lock held) *)
     (* -------------------------------------------------------------- *)
-    iDestruct "Hwaitres" as (ps gs mch O) "(Hpo & Hch & Ho & Hci)".
+    iDestruct "Hwaitres" as (ps gs mch O) "(Hpo & Hch & Ho & Hci & Hzl)".
     iDestruct (WaitInv.parents_own_length with "Hpo") as %Hpolen.
     destruct (lookup_lt_is_Some_2 ps j ltac:(rewrite Hpolen; exact Hj)) as [vold Hvold].
     iDestruct (WaitInv.parents_own_acc ps j vold Hvold with "Hpo") as "[Hpcell Hpoback]".
@@ -605,10 +605,10 @@ Section ProofKforkB5.
     iDestruct (WaitInv.children_inv_fork ps gs mch O j pme
                  (ProcDefs.pv_gen (us_V Uc)) pid_c gpar csPar Hnoent Hrowl
                  with "Hci Hsg34 Hpr34 Hgslot Hgpid") as "Hci".
-    iAssert (WaitInv.wait_res) with "[Hpo Hch Ho Hci]" as "Hwaitres".
+    iAssert (WaitInv.wait_res) with "[Hpo Hch Ho Hci Hzl]" as "Hwaitres".
     { iExists (<[j := pme]> ps), (<[j := ProcDefs.pv_gen (us_V Uc)]> gs),
               (<[gpar := (pme, csPar ∪ {[ProcDefs.pv_gen (us_V Uc)]})]> mch), O.
-      iFrame "Hpo Hch Ho Hci". }
+      iFrame "Hpo Hch Ho Hci Hzl". }
     assert (Hpp_e0 : add_vec_int (mword_of_int (KF + 0xdc) : mword 64) 4 = mword_of_int (KF + 0xe0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_e0) in "Hpc".

@@ -41,6 +41,7 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var.
+From iris.algebra.lib Require Import mono_list.
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.  (* [sign_extend'] *)
 Require Import RiscvExtras.  (* [sext32_64_moi] & co -- the reaped pid's word *)
@@ -48,6 +49,7 @@ Require Import ProcGeom.  (* [PIDMAX] -- kernel/param.h, the reaped pid's range 
 Require Import ChildTok.   (* [exit_tok] / [gen_uniq] -- what a reap answers
                               with beside the set it moved *)
 Require Import Xv6Cameras. (* [wchG] -- [init_pid_is]'s class *)
+Require Import ZombEv.     (* [zev]: the zombie ledger's events -- the reap's receipt *)
 Require Import SlotGen.    (* [init_pid_is] -- the saved pid the reaping arm's
                               second disjunct is stated at (T4(b)) *)
 Local Open Scope Z_scope.
@@ -466,6 +468,89 @@ End WaitAns.
 (* [SlotGen.init_pid_is] (kwait's contract premise) and the caller's       *)
 (* [ChildTok.gen_pid] (off its block) are both in hand --                  *)
 (* [wait_ans_of_gen].                                                      *)
+(* ===================================================================== *)
+(* THE ZOMBIE LEDGER'S GHOST (NI-LEDGER-REST, design ni-zombie-ledger.md  *)
+(* D2): a mono-list of [ZombEv.zev] at the canonical                     *)
+(* [Xv6Cameras.wzl_name].  The authority rides <wait_lock>'s payload      *)
+(* ([WaitInv.wait_res_at]'s last conjunct); kexit appends [ZExit] at its  *)
+(* ZOMBIE store and kwait [ZReap] at its reap, both under the lock.  No   *)
+(* tie (ruling R2): the zombie state lives in the per-slot locks, so      *)
+(* [zombies_of h] is the zombie set by construction of the two proofs.   *)
+(* HERE and not in [WaitInv] because the reap's receipt is part of        *)
+(* [wait_ans_led] below, and [WaitInv] imports this file.                 *)
+(* ===================================================================== *)
+Section ZombLedger.
+  Context `{!wchG Σ}.
+
+  Definition zomb_led_auth (h : list zev) : iProp Σ :=
+    own wzl_name (●ML (h : list (leibnizO zev))).
+  Definition zomb_led_lb (h : list zev) : iProp Σ :=
+    own wzl_name (◯ML (h : list (leibnizO zev))).
+
+  Global Instance zomb_led_lb_persistent h : Persistent (zomb_led_lb h).
+  Proof using . rewrite /zomb_led_lb. apply _. Qed.
+  Global Instance zomb_led_lb_timeless h : Timeless (zomb_led_lb h).
+  Proof using . rewrite /zomb_led_lb. apply _. Qed.
+  Global Instance zomb_led_auth_timeless h : Timeless (zomb_led_auth h).
+  Proof using . rewrite /zomb_led_auth. apply _. Qed.
+
+  Lemma zomb_led_auth_lb h : zomb_led_auth h -∗ zomb_led_auth h ∗ zomb_led_lb h.
+  Proof using .
+    rewrite /zomb_led_auth /zomb_led_lb. iIntros "Ha".
+    iDestruct (own_mono _ _ (◯ML (h : list (leibnizO zev))) with "Ha")
+      as "#Hb"; [ apply mono_list_included |].
+    iFrame "Ha Hb".
+  Qed.
+
+  Lemma zomb_led_lb_prefix h h' : zomb_led_auth h -∗ zomb_led_lb h' -∗ ⌜h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /zomb_led_auth /zomb_led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    by iPureIntro.
+  Qed.
+
+  (* two lower bounds of the one ledger are comparable *)
+  Lemma zomb_led_lb_lb h h' :
+    zomb_led_lb h -∗ zomb_led_lb h' -∗ ⌜h `prefix_of` h' \/ h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /zomb_led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_lb_op_valid_L.
+    by iPureIntro.
+  Qed.
+
+  Lemma zomb_led_auth_grow h e :
+    zomb_led_auth h ==∗ zomb_led_auth (h ++ [e]) ∗ zomb_led_lb (h ++ [e]).
+  Proof using .
+    rewrite /zomb_led_auth. iIntros "Ha".
+    iMod (own_update _ _ (●ML ((h ++ [e]) : list (leibnizO zev))) with "Ha") as "Ha".
+    { apply mono_list_update. by exists [e]. }
+    iModIntro. iApply (zomb_led_auth_lb with "Ha").
+  Qed.
+
+  (* the receipt an exit or a reap hands back: event [e] was appended right
+     after history [h].  The name is canonical, so it carries none. *)
+  Definition zomb_receipt (h : list zev) (e : zev) : iProp Σ :=
+    zomb_led_lb (h ++ [e]).
+  Global Instance zomb_receipt_persistent h e : Persistent (zomb_receipt h e).
+  Proof using . rewrite /zomb_receipt. apply _. Qed.
+  Global Instance zomb_receipt_timeless h e : Timeless (zomb_receipt h e).
+  Proof using . rewrite /zomb_receipt. apply _. Qed.
+
+  (* THE TWO GHOST STEPS: kexit's at its ZOMBIE store (actor: the exiting
+     process's own proc word; the status it exits with), kwait's at its
+     reap (actor: the reaper; the reaped child's pid). *)
+  Lemma zomb_exit h (act : mword 64) (pid : mword 32) (xs : Z) :
+    zomb_led_auth h ==∗
+    zomb_led_auth (h ++ [ZExit act pid xs]) ∗ zomb_receipt h (ZExit act pid xs).
+  Proof using . apply zomb_led_auth_grow. Qed.
+
+  Lemma zomb_reap h (act : mword 64) (pid : mword 32) :
+    zomb_led_auth h ==∗
+    zomb_led_auth (h ++ [ZReap act pid]) ∗ zomb_receipt h (ZReap act pid).
+  Proof using . apply zomb_led_auth_grow. Qed.
+
+End ZombLedger.
+
 Section WaitAnsGen.
   Context `{!ctokG Σ}.
   Context `{!wchG Σ}.
@@ -477,6 +562,46 @@ Section WaitAnsGen.
          ⌜cs' = cs ∖ {[γ']} /\ (1 <= bv_unsigned rv <= PIDMAX)%Z⌝ ∗
          (⌜γ' ∈ cs⌝ ∨ gen_is_init gn) ∗
          exit_tok γ' rv xs ∗ gen_uniq cs rv γ')%I.
+
+  (* THE ANSWER WITH THE REAP'S RECEIPT (design ni-zombie-ledger.md D4):
+     [wait_ans] verbatim, with the zombie ledger's receipt of the reap --
+     [ZReap act rv], appended by the reaper [act] -- as the reaping arm's
+     first conjunct.  kwait's led twin [SpecKwait.wp_kwait_led_sconf_body]
+     answers this; [wait_ans_led_post] is the step back to the landed row. *)
+  Definition wait_ans_led (rv : mword 32) (xs : Z) (cs cs' : gset gname)
+      (gn : gname) (nullst : bool) (pidv : mword 32) (act : mword 64) : iProp Σ :=
+    (⌜rv = (mword_of_int (-1) : mword 32) /\ cs' = cs⌝ ∗ wait_why cs gn nullst
+     ∨ (∃ h, zomb_receipt h (ZReap act rv)) ∗
+       ∃ γ' : gname,
+         ⌜cs' = cs ∖ {[γ']} /\ (1 <= bv_unsigned rv <= PIDMAX)%Z⌝ ∗
+         ⌜γ' ∈ cs \/ pidv = (mword_of_int 1 : mword 32)⌝ ∗
+         exit_tok γ' rv xs ∗ gen_uniq cs rv γ')%I.
+
+  Lemma wait_ans_led_post (rv : mword 32) (xs : Z) (cs cs' : gset gname)
+      (gn : gname) (nullst : bool) (pidv : mword 32) (act : mword 64) :
+    wait_ans_led rv xs cs cs' gn nullst pidv act -∗
+    wait_ans rv xs cs cs' gn nullst pidv.
+  Proof using .
+    iIntros "[Hneg | [_ Hr]]"; [ iLeft; iExact "Hneg" | iRight; iExact "Hr" ].
+  Qed.
+
+  (* ...and the way in: the landed row, plus the receipt wherever a pid came
+     back.  The -1 answer is never in [1, PIDMAX], so the reaping arm of
+     [wait_ans] always finds the receipt's arm of the side row. *)
+  Lemma wait_ans_led_of (rv : mword 32) (xs : Z) (cs cs' : gset gname)
+      (gn : gname) (nullst : bool) (pidv : mword 32) (act : mword 64) :
+    wait_ans rv xs cs cs' gn nullst pidv -∗
+    (⌜rv = (mword_of_int (-1) : mword 32)⌝ ∨ ∃ h, zomb_receipt h (ZReap act rv)) -∗
+    wait_ans_led rv xs cs cs' gn nullst pidv act.
+  Proof using .
+    iIntros "[Hneg | (%γ' & [%Hc %Hrng] & Hr)] Hz"; [ iLeft; iExact "Hneg" | ].
+    iDestruct "Hz" as "[%Hm1 | Hz]".
+    - exfalso. subst rv. unfold PIDMAX in Hrng.
+      assert (Hv : bv_unsigned (mword_of_int (-1) : mword 32) = 4294967295%Z)
+        by (vm_compute; reflexivity).
+      rewrite Hv in Hrng. lia.
+    - iRight. iFrame "Hz". iExists γ'. iFrame "Hr". by iPureIntro.
+  Qed.
 
   (* the failing arm, exactly as [wait_ans_neg] *)
   Lemma wait_ans_gen_neg (xs : Z) (cs : gset gname) (gn : gname)

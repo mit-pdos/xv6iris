@@ -1136,7 +1136,7 @@ Section ProofMain.
     (* THE ORPHAN VAR IS THE MIDDLE ONE ([WaitInv.children_boot]): the boot
        fupd mints it at [∅] beside the map's authority, and it goes into
        <wait_lock>'s payload with the children half. *)
-    iDestruct "Hchb" as "[Hchres [Horph [Hpreg [Hpled [Htk Hchrows]]]]]".
+    iDestruct "Hchb" as "[Hchres [Horph [Hpreg [Hpled [Htk [Hzled Hchrows]]]]]]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1402,7 +1402,9 @@ Section ProofMain.
        CANONICAL ([Xv6Cameras.wch_name]) -- a row of it has to be spellable
        in [ProcDefs.proc_dormant] -- so nothing travels with the lock's own
        gname any more. *)
-    iDestruct (WaitInv.wait_res_alloc with "Hwres Hchres Horph") as "Hwres".
+    (* ...and the zombie ledger's authority, at the empty history (design
+       ni-zombie-ledger.md D2), off [children_boot_rows] *)
+    iDestruct (WaitInv.wait_res_alloc with "Hwres Hchres Horph Hzled") as "Hwres".
     iMod (newlock ⊤ wait_lock_addr "wait_lock"%string (wait_res_at)
             with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".

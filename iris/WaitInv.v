@@ -102,6 +102,7 @@ Require Export SlotGen.
    kwait to the trap loop relays it and the leaf reports it. *)
 Require Export UserChildren.
 Require Import PidEv.   (* [pev]: the pid ledger's boot mint *)
+Require Import ZombEv.  (* [zev]: the zombie ledger's boot mint *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -1668,6 +1669,7 @@ Section WaitInv.
      pid_reg_auth (∅ : gmap Z gname) ∗
      pid_led_auth [] ∗
      tick_cnt 0 ∗
+     zomb_led_auth [] ∗
      [∗ list] i ∈ seq 0 NPROC,
        ∃ γ0 g : gname,
          ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g)%I.
@@ -1686,12 +1688,16 @@ Section WaitInv.
      between them: a holder opens all four or it cannot put any of them
      back.  The three resources come first, in the order the payload has
      always had them, and [children_inv] -- which carries the generation
-     shares as well as the pure ties -- is LAST. *)
+     shares as well as the pure ties -- follows them.
+     ...AND THE ZOMBIE LEDGER'S AUTHORITY, LAST (design
+     ni-zombie-ledger.md D2): every exit and every reap is appended here,
+     under this lock.  Untied (ruling R2): nothing in this payload knows
+     which slots are ZOMBIE. *)
   Definition wait_res_at (ξ : CtxId) : iProp Σ :=
     (∃ (ps : list (mword 64)) (gs : list gname)
        (m : gmap gname (mword 64 * gset gname)) (O : orph_map),
        parents_own_at ξ ps ∗ children_own_at m ∗ orphans_own O ∗
-       children_inv_at ξ ps gs m O)%I.
+       children_inv_at ξ ps gs m O ∗ ∃ h : list zev, zomb_led_auth h)%I.
   Definition wait_res : iProp Σ := wait_res_at cur_ctx.
 
   Global Instance parents_res_at_morph : CtxMorph parents_res_at.
@@ -1756,9 +1762,10 @@ Section WaitInv.
      and there are no orphans.  The generation column is therefore
      arbitrary -- nothing reads a name at an unoccupied slot. *)
   Lemma wait_res_alloc :
-    parents_res -∗ children_res_boot -∗ orphans_own (∅ : orph_map) -∗ wait_res.
+    parents_res -∗ children_res_boot -∗ orphans_own (∅ : orph_map) -∗
+    zomb_led_auth [] -∗ wait_res.
   Proof using .
-    iIntros "Hp Hc Ho".
+    iIntros "Hp Hc Ho Hzl".
     iDestruct "Hp" as (ps) "[Hps %Hz]".
     iDestruct "Hc" as (m) "[Hm %Hm0]".
     destruct Hm0 as [Hru Hempty].
@@ -1766,6 +1773,7 @@ Section WaitInv.
     rewrite /wait_res /wait_res_at /children_inv_at.
     iExists ps, (replicate (length ps) (1%positive : gname)), m, (∅ : orph_map).
     iFrame "Hps Hm Ho".
+    iSplitR "Hzl"; [| iExists []; iExact "Hzl" ].
     iSplitR; [iApply (gen_halves_zeros ps _ Hz) |].
     (* THE ORPHAN COLUMN IS EMPTY AT BOOT, so its tie to <init> is free --
        which is what lets the conjunct be founded here, at a [newlock] that
@@ -1953,10 +1961,14 @@ Section WaitInvBoot.
     (* ...and the tick counter's mirror, at 0 (design ni-ticks-ledger.md
        D1): main raises it to the cell's boot value before sealing *)
     iMod (mono_nat_own_alloc 0) as (γtk) "[Htk _]".
-    iModIntro. iExists (WchG Σ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl γtk).
+    (* ...and the zombie ledger, at the empty history (design
+       ni-zombie-ledger.md D2): nothing has exited *)
+    iMod (own_alloc (●ML ([] : list (leibnizO zev)))) as (γzl) "Hzl";
+      [ apply mono_list_auth_valid | ].
+    iModIntro. iExists (WchG Σ _ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl γtk γzl).
     rewrite /children_boot /children_boot_rows /children_res_boot
             /children_own_at /orphans_own
-            /pid_reg_auth /pid_led_auth /tick_cnt /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
+            /pid_reg_auth /pid_led_auth /tick_cnt /zomb_led_auth /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
     iSplitR "Hnp"; [| iExact "Hnp"].
     iSplitL "Hip"; [iExact "Hip" |].
     iSplitL "Ha"; [iExists m'; iFrame "Ha"; iPureIntro; exact Hok |].
@@ -1964,6 +1976,7 @@ Section WaitInvBoot.
     iSplitL "Hpr"; [iExact "Hpr" |].
     iSplitL "Hpl"; [iExact "Hpl" |].
     iSplitL "Htk"; [iExact "Htk" |].
+    iSplitL "Hzl"; [iExact "Hzl" |].
     iDestruct (big_sepL_sep_2 with "Hrows Hsg") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) Hsg]".
     iExists γ0, γ. iFrame "Hrow Hsg".
