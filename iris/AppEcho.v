@@ -1666,9 +1666,11 @@ Section EchoApp.
   (* ---- THE TRANSPORT, WITH THE FIRST PROCESS'S BOOT RESOURCE ---- *)
   (* ...at the identity on the turn, the slot keeping its copy (sync
      SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
-  Lemma echo_Happ_boot (c : app_fixed app_echo) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_okc app_echo c) (app_boot app_echo c k)
-        (app_turn app_echo c k) (app_turn' app_echo c k).
+  Lemma echo_Happ_boot (HSt : mono_natG Σ) (c : app_fixed app_echo) (k : nat)
+      (γst : gname) (gen : nat) :
+    ⊢ app_xfer_boot_raw HSt (app_pred app_echo c) (app_okc app_echo c)
+        (app_boot app_echo c k)
+        (app_turn app_echo c k) (app_turn' app_echo c k) γst gen.
   Proof using .
     cbn [app_echo app_fixed app_names app_pred app_boot app_turn app_turn']
       in c |- *.

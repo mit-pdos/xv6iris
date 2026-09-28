@@ -250,31 +250,41 @@ Proof. rewrite /app_clone_raw. apply _. Qed.
    passes the turn across and puts the copy back as it was.
    ...AT THE DURABLE-COPY PREDICATE [Okc] (sync SY3-A3b): the slot's copy
    comes in satisfying it ([AppDur.app_dur_raw]) and the repacked one
-   [r_s] goes back satisfying it. *)
-Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type}
+   [r_s] goes back satisfying it.
+   ...AND LENT THE MACHINE'S STARTED AUTH (sync SY3-A3bc, design 4.5 ruling
+   (iii)): the swap holds [mono_nat_auth_own γst 1 (gen + 1)] for the era
+   generation [gen] it runs at, and passes it in and takes it back -- what
+   lets an application bound its durable copy's era certificate (the
+   union's re-base bumps its commit-era counter to [S gen] under it).  At
+   the camera [HSt] the swap holds it at ([RiscvAdequacy.riscv_pre_genGS],
+   passed EXPLICITLY: a scope has several [mono_natG]). *)
+Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type} (HSt : mono_natG Σ)
     (A : N -> FsAbsDefs.aview -> iProp Σ) (Okc : N -> Prop) (B : N -> iProp Σ)
-    (Tn Tn' : iProp Σ) : iProp Σ :=
-  (□ (∀ (r : N) (av : FsAbsDefs.aview),
+    (Tn Tn' : iProp Σ) (γst : gname) (gen : nat) : iProp Σ :=
+  (□ (∀ (r : N) (av : FsAbsDefs.aview) (n : nat),
+        ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own Σ HSt γst 1 n -∗
         ⌜Okc r⌝ -∗ Tn -∗ ▷ A r av ==∗
-        Tn' ∗ ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r'))%I.
+        @mono_nat_auth_own Σ HSt γst 1 n ∗ Tn' ∗
+        ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r'))%I.
 
-Global Instance app_xfer_boot_raw_persistent {Σ} {N}
+Global Instance app_xfer_boot_raw_persistent {Σ} {N} (HSt : mono_natG Σ)
     (A : N -> FsAbsDefs.aview -> iProp Σ) (Okc : N -> Prop) (B : N -> iProp Σ)
-    (Tn Tn' : iProp Σ) :
-  Persistent (app_xfer_boot_raw A Okc B Tn Tn').
+    (Tn Tn' : iProp Σ) (γst : gname) (gen : nat) :
+  Persistent (app_xfer_boot_raw HSt A Okc B Tn Tn' γst gen).
 Proof. rewrite /app_xfer_boot_raw. apply _. Qed.
 
 (* A CLONE IS A POWER-ON TRANSPORT AT THE IDENTITY ON THE TURN: the slot
    keeps its copy ([r_s := r], so its durable-copy predicate is the input's)
    and the turn crosses untouched *)
-Lemma app_xfer_boot_raw_of_clone {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ)
-    (Okc : N -> Prop) (B : N -> iProp Σ) (Tn : iProp Σ) :
-  (⊢ app_clone_raw A B) -> ⊢ app_xfer_boot_raw A Okc B Tn Tn.
+Lemma app_xfer_boot_raw_of_clone {Σ} {N} (HSt : mono_natG Σ)
+    (A : N -> FsAbsDefs.aview -> iProp Σ)
+    (Okc : N -> Prop) (B : N -> iProp Σ) (Tn : iProp Σ) (γst : gname) (gen : nat) :
+  (⊢ app_clone_raw A B) -> ⊢ app_xfer_boot_raw HSt A Okc B Tn Tn γst gen.
 Proof.
   intros Hc. iPoseProof Hc as "#H". iEval (rewrite /app_clone_raw) in "H".
-  rewrite /app_xfer_boot_raw. iIntros "!>" (r av) "%Hr Htn HA".
+  rewrite /app_xfer_boot_raw. iIntros "!>" (r av n) "_ Hsa %Hr Htn HA".
   iMod ("H" with "HA") as "[HA Hn]". iDestruct "Hn" as (r') "[HA' HB]".
-  iModIntro. iFrame "Htn". iExists r, r'. iFrame "HA HA' HB". by iPureIntro.
+  iModIntro. iFrame "Hsa Htn". iExists r, r'. iFrame "HA HA' HB". by iPureIntro.
 Qed.
 
 (* the generic application's: nothing claimed and nothing handed over *)
@@ -289,10 +299,11 @@ Proof.
   iPureIntro. exact Logic.I.
 Qed.
 
-Lemma app_xfer_boot_raw_triv {Σ} {N} (A : N -> FsAbsDefs.aview -> iProp Σ)
-    (Okc : N -> Prop) (Tn : iProp Σ) :
+Lemma app_xfer_boot_raw_triv {Σ} {N} (HSt : mono_natG Σ)
+    (A : N -> FsAbsDefs.aview -> iProp Σ)
+    (Okc : N -> Prop) (Tn : iProp Σ) (γst : gname) (gen : nat) :
   (forall r av, A r av ⊣⊢ True) ->
-  ⊢ app_xfer_boot_raw A Okc (fun _ => emp%I) Tn Tn.
+  ⊢ app_xfer_boot_raw HSt A Okc (fun _ => emp%I) Tn Tn γst gen.
 Proof.
   intros Htriv. apply app_xfer_boot_raw_of_clone. by apply app_clone_raw_triv.
 Qed.
@@ -1359,9 +1370,14 @@ Theorem xv6_power_adequacy_gen Σ
        resource; since SY3-A1 it is LENT the era's turn and hands on the
        boot's, and repacks the slot at an instance of its choosing
        ([app_xfer_boot_raw]).  The commit takes [Happ_merge] instead. *)
-    (Happ_boot : forall (c : CT) (k : nat),
-       ⊢ app_xfer_boot_raw (app_fs c) (app_okc c) (app_boot c k) (Tnn c k)
-           (Tnn' c k))
+    (* ...LENT THE STARTED AUTH at the machine's camera, at a fixed part
+       born at the machine's names (sync SY3-A3bc: what ties the loan's
+       gname to the application's copy of it) *)
+    (Happ_boot : forall (c : CT) (gen : nat) (γd γsw γreg γst : gname),
+       Born γd γsw γreg γst c ->
+       ⊢ app_xfer_boot_raw riscv_pre_genGS (app_fs c) (app_okc c)
+           (app_boot c (Datatypes.S gen)) (Tnn c (Datatypes.S gen))
+           (Tnn' c (Datatypes.S gen)) γst gen)
     (* ERA 0 (round C, section 1): the claim at the IMAGE's own abstract
        state -- the one snapshot in the tree with no source instance -- at
        some instance; packed against the image snapshot's guest half into
@@ -1730,7 +1746,7 @@ Proof.
               power-on step's yield is lent to the transport, which hands
               on the boot's *)
            Tnn Tnn' Tnn''
-           ltac:(intros γd γsw γreg γst c Er gen dk; cbv beta;
+           ltac:(intros γd γsw γreg γst c Hborn Er gen dk; cbv beta;
                  iIntros "#Hreg #Hst Hsa Ha HM HP Htn";
                  rewrite /xv6_slot; iDestruct "HP" as (gt) "[HP HG]";
                  iMod (app_dur_raw_open with "HG") as (r I) "(%Hr & Hh & Hcl)";
@@ -1739,9 +1755,10 @@ Proof.
                          with "Hreg Hst Hsa Ha HM [Hh] HP")
                    as ">(Hsa & Ha & HP & HM & #Hsw & Hh & Hl)";
                  [rewrite /snap_guest; iExact "Hh" |];
-                 iPoseProof (Happ_boot c (Datatypes.S gen)) as "#Hxfer";
+                 iPoseProof (Happ_boot c gen γd γsw γreg γst Hborn) as "#Hxfer";
                  iEval (rewrite /app_xfer_boot_raw) in "Hxfer";
-                 iMod ("Hxfer" with "[//] Htn Hcl") as "[Htn Hnew]";
+                 iMod ("Hxfer" $! _ _ (gen + 1)%nat with "[//] Hsa [//] Htn Hcl")
+                   as "(Hsa & Htn & Hnew)";
                  iDestruct "Hnew" as (rs rnew) "(%Hrs & Hcl & Hnew & Hbnew)";
                  iDestruct "Hl" as (gt') "[Hl Hg']";
                  iEval (rewrite /snap_guest) in "Hh Hg'";
@@ -1927,7 +1944,7 @@ Proof.
                   [intros; exact Logic.I | intros; exact Logic.I | apply app_xfer_raw_triv;
                    intros; reflexivity])
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
-            ltac:(intros c k; apply app_xfer_boot_raw_triv;
+            ltac:(intros c gen γd γsw γreg γst _; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iSplit; iPureIntro; exact Logic.I)
@@ -2136,7 +2153,7 @@ Proof.
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)
-            ltac:(intros c k; apply app_xfer_boot_raw_triv;
+            ltac:(intros c gen γd γsw γreg γst _; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iSplit; iPureIntro; exact Logic.I)
@@ -2610,7 +2627,7 @@ Proof.
                   [intros; exact Logic.I | intros; exact Logic.I | apply app_xfer_raw_triv;
                    intros; reflexivity])
             ltac:(intros; apply app_sync_run_raw_triv; intros; reflexivity)
-            ltac:(intros c k; apply app_xfer_boot_raw_triv;
+            ltac:(intros c gen γd γsw γreg γst _; apply app_xfer_boot_raw_triv;
                   intros r av; reflexivity)
             ltac:(intros c; cbv beta; iIntros "_"; iModIntro; iExists ();
                   iSplit; iPureIntro; exact Logic.I)

@@ -172,7 +172,8 @@ Section TreeAdequacy.
       intros HRg GEN HFi c r i γ _ _. rewrite /app_tag.
       cbn [app_tree app_R app_ifc app_iface_triv ai_tag].
       iIntros "!>" (h b u u') "_ _ _ Hg HR". iModIntro. iFrame "Hg HR".
-    - exact app_tree_boot.
+    - intros c gen γd γsw γreg γst _.
+      exact (app_tree_boot riscv_pre_genGS c (S gen) γst gen).
     - exact @tree_Hinit_boot.
     - (* [al_echo]: the shift justifies itself at the trivial console
          claim, exactly as the generic application's does *)

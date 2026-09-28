@@ -330,9 +330,11 @@ Section UnionApp.
 
   (* ---- the transport, with the first process's boot resource: the
          file application's ---- *)
-  Lemma union_al_xfer (c : app_fixed app_union) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_union c) (app_okc app_union c) (app_boot app_union c k)
-        (app_turn app_union c k) (app_turn' app_union c k).
+  Lemma union_al_xfer (HSt : mono_natG Σ) (c : app_fixed app_union) (k : nat)
+      (γst : gname) (gen : nat) :
+    ⊢ app_xfer_boot_raw HSt (app_pred app_union c) (app_okc app_union c)
+        (app_boot app_union c k)
+        (app_turn app_union c k) (app_turn' app_union c k) γst gen.
   Proof using .
     cbn [app_union app_fixed app_names app_pred app_boot app_turn app_turn']
       in c |- *.
@@ -434,7 +436,8 @@ Section UnionLaws.
       exact (union_al_tx (HF := HF) HR GEN c r i γ Heq Huart).
     - intros HR GEN HF c r i γ Heq Huart.
       exact (union_al_rx (HF := HF) HR GEN c r i γ Heq Huart).
-    - exact union_al_xfer.
+    - intros c gen γd γsw γreg γst _.
+      exact (union_al_xfer riscv_pre_genGS c (S gen) γst gen).
     - exact Hprog.
     - exact union_al_echo.
     - (* the founding: the token is [True], the turn goes on whole *)

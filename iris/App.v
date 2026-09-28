@@ -479,9 +479,14 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
               app_tag A c (h ++ [ObsUartIn i b])%list);
   (* THE POWER-ON TRANSPORT, lent the era's turn and handing on the boot's
      (sync SY3-A1; [SystemAdequacy.app_xfer_boot_raw]) *)
-  al_xfer : forall (c : app_fixed A) (k : nat),
-       ⊢ app_xfer_boot_raw (app_pred A c) (app_okc A c) (app_boot A c k)
-           (app_turn A c k) (app_turn' A c k);
+  (* ...LENT THE MACHINE'S STARTED AUTH at the era's generation [gen]
+     (sync SY3-A3bc, design/sync.md §4.5 ruling (iii)), at a fixed part
+     born at the machine's names *)
+  al_xfer : forall (c : app_fixed A) (gen : nat) (γd γsw γreg γst : gname),
+       app_born A γd γsw γreg γst c ->
+       ⊢ app_xfer_boot_raw riscv_pre_genGS (app_pred A c) (app_okc A c)
+           (app_boot A c (S gen)) (app_turn A c (S gen)) (app_turn' A c (S gen))
+           γst gen;
   al_programs :
        forall (HR : riscvGS Σ) (GEN : GenId)
               (HBs : bioslotG Σ) (HFd : fdslotG Σ) (HIr : irefslotG Σ)
@@ -706,10 +711,11 @@ Section AppTriv.
 
   (* the transport: a predicate that holds of every view is its own copy,
      and the generic application hands its first process nothing *)
-  Lemma app_triv_xfer (c : app_fixed (app_triv Σ)) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_okc (app_triv Σ) c)
+  Lemma app_triv_xfer (HSt : mono_natG Σ) (c : app_fixed (app_triv Σ)) (k : nat)
+      (γst : gname) (gen : nat) :
+    ⊢ app_xfer_boot_raw HSt (app_pred (app_triv Σ) c) (app_okc (app_triv Σ) c)
         (app_boot (app_triv Σ) c k)
-        (app_turn (app_triv Σ) c k) (app_turn' (app_triv Σ) c k).
+        (app_turn (app_triv Σ) c k) (app_turn' (app_triv Σ) c k) γst gen.
   Proof using .
     cbn [app_triv app_pred app_boot app_turn app_turn'].
     apply app_xfer_boot_raw_triv. intros r av. reflexivity.
@@ -812,7 +818,8 @@ Section AppTriv.
       cbn [app_triv app_R app_ifc app_iface_triv ai_tag].
       iIntros "!>" (h b u u') "_ _ _ Hg _"; iModIntro.
       iFrame "Hg"; auto.
-    - exact app_triv_xfer.
+    - intros c gen γd γsw γreg γst _.
+      exact (app_triv_xfer riscv_pre_genGS c (S gen) γst gen).
     - exact app_triv_init_boot.
     - (* the echo justifies itself at the trivial console claim *)
       intros HR c Hiface. iIntros (GEN XI).

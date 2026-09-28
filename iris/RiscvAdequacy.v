@@ -1753,8 +1753,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        the one thing the first hands the second.  A client with nothing to
        pass across takes [Tn' := Tn] and hands the turn straight back. *)
     (Tn Tn' Tn'' : CT -> nat -> iProp Σ)
-    (Hswap : forall (γdisk γsw γreg γst : gname) (c : CT)
-                    (E : riscvEraGS)
+    (* ...at a fixed part born at these names (sync SY3-A3bc: the swap
+       LENDS the started auth to the application's transport, which reads
+       it at its own copy of the started counter's name) *)
+    (Hswap : forall (γdisk γsw γreg γst : gname) (c : CT),
+                    Born γdisk γsw γreg γst c ->
+                    forall (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
          mono_nat_lb_own γst (S gen) -∗
@@ -2057,7 +2061,7 @@ Proof.
        DEFINITION, so [eq_refl] is the proof *)
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
               (Hproj γfdisk γswap γreg γstart c)
-              Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (Hswap γfdisk γswap γreg γstart c)
+              Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (Hswap γfdisk γswap γreg γstart c Hborn)
               (Hobs γfdisk γobs c) (Hback γobs c)
               (fun HE gen g' Hbf Hp =>
                  Hboot F HE gen g' Hbf Hp Hinv γgen γstart γreg γfdisk γswap
@@ -2190,7 +2194,7 @@ Proof.
               swap (sync SY3-A1) *)
            (fun (_ : unit) (_ : nat) => emp%I) (fun (_ : unit) (_ : nat) => emp%I)
            (fun (_ : unit) (_ : nat) => emp%I)
-           ltac:(intros γdisk γsw γreg γst c E gen dk; cbv beta;
+           ltac:(intros γdisk γsw γreg γst c _ E gen dk; cbv beta;
                  iIntros "Hr Hl Ha Hd Hm HP _";
                  iMod (Hswap γdisk γsw γreg γst E gen dk
                          with "Hr Hl Ha Hd Hm HP") as "H";

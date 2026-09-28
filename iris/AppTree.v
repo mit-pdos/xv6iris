@@ -2652,9 +2652,11 @@ Section AppTreeRecord.
 
   (* ...at the identity on the turn, the slot keeping its copy (sync
      SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
-  Lemma app_tree_boot (c : app_fixed app_tree) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_tree c) (app_okc app_tree c) (app_boot app_tree c k)
-        (app_turn app_tree c k) (app_turn' app_tree c k).
+  Lemma app_tree_boot (HSt : mono_natG Σ) (c : app_fixed app_tree) (k : nat)
+      (γst : gname) (gen : nat) :
+    ⊢ app_xfer_boot_raw HSt (app_pred app_tree c) (app_okc app_tree c)
+        (app_boot app_tree c k)
+        (app_turn app_tree c k) (app_turn' app_tree c k) γst gen.
   Proof using .
     cbn [app_tree app_pred app_boot app_turn app_turn']. rewrite /tree_boot.
     apply app_xfer_boot_raw_of_clone.
