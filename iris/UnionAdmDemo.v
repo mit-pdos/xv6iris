@@ -146,7 +146,7 @@ Proof using.
     intros i Hi. rewrite s0_nlines in Hi.
     destruct i as [| [| [| i]]]; [dec_yes | dec_yes | dec_yes | lia].
   - apply (bool_decide_unpack _). vm_compute. exact I.
-  - vm_compute. reflexivity.
+  - vm_cast_no_check (eq_refl (Some (3, st_b))).
 Qed.
 
 Definition st_a : fstate := {[txt_a := c_a]}.
@@ -179,7 +179,7 @@ Theorem demo_sync_cut :
 Proof using.
   rewrite /union_phi_sync_body.
   assert (Hr : ulast_before h_sb (snd <$> [(∅, Some (3, st_b)); (st_b, None)]) 1 = (3, st_b))
-    by (vm_compute; reflexivity).
+    by vm_cast_no_check (eq_refl (3, st_b)).
   split_and!.
   - by rewrite cyc_sb.
   - intros w Hw. injection Hw as <-. reflexivity.
@@ -277,7 +277,7 @@ Proof using.
   assert (Hok1 : uok adm_u_g (lm_upto U cs ∅ (bodies_of I_s0) 1) (LEchoF ws_b txt_a)
                    (lm_at U cs 1)).
   { pose proof (proj2 Hcs 1 ltac:(rewrite s0_nlines; lia)) as H.
-    rewrite s0_b1 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ab_line1 in H. exact H. }
+    rewrite s0_b1 (ab_line1 : lm_of U b_eb = _) in H. exact H. }
   pose proof (Hcnt 1 ltac:(rewrite s0_nlines; lia)) as H1.
   rewrite (_ : lm_cont_at U [3; 0] cs_s0 ∅ (bodies_of I_s0) 1 = u_prompt) in H1;
     [| vm_compute; reflexivity].
@@ -292,8 +292,7 @@ Proof using.
   (* round 2, [sync], printed the bare prompt: /sync RAN *)
   assert (Hok2 : uok adm_u_g (lm_upto U cs ∅ (bodies_of I_s0) 2) LSync (lm_at U cs 2)).
   { pose proof (proj2 Hcs 2 ltac:(rewrite s0_nlines; lia)) as H.
-    rewrite s0_b2 in H. cbn [ulmG ulm lm_of lm_ok] in H.
-    rewrite (proj1 demo_sync_parse) in H. exact H. }
+    rewrite s0_b2 (proj1 demo_sync_parse : lm_of U b_sync = _) in H. exact H. }
   pose proof (Hcnt 2 ltac:(rewrite s0_nlines; lia)) as H2.
   rewrite (_ : lm_cont_at U [3; 0] cs_s0 ∅ (bodies_of I_s0) 2 = u_prompt) in H2;
     [| vm_compute; reflexivity].

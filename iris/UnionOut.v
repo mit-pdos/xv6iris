@@ -763,7 +763,7 @@ Section union_out.
     pwitV U I sR tm pre.
 
   Global Instance pwc_blkU_timeless v I sR k pre tm : Timeless (pwc_blkU v I sR k pre tm).
-  Proof using . rewrite /pwc_blkU /pwc_blkV /pledV. apply _. Qed.
+  Proof using . rewrite /pwc_blkU. apply pwc_blkV_timeless; apply _. Qed.
 
   Global Instance ptkU_persistent v I k : Persistent (ptkU v I k).
   Proof using . rewrite /ptkU /ptkV. apply _. Qed.

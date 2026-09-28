@@ -611,7 +611,8 @@ Lemma sc1_step1 :
   lm_step ulmS ∅ (lm_of ulmS (bodies_of I_sc1 !!! 0)) a_sc1 = {[txt_a := c_hi]}.
 Proof using.
   rewrite sc1_bodies. change ([b_hif; b_secc] !!! 0) with b_hif.
-  cbn [ulmS ulm lm_of lm_step]. rewrite sc1_line1. vm_compute. reflexivity.
+  cbn [ulmS ulm lm_of lm_step]. rewrite sc1_line1.
+  vm_cast_no_check (eq_refl ({[txt_a := c_hi]} : fstate)).
 Qed.
 
 Lemma sc1_upto1 : lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 1 = {[txt_a := c_hi]}.
@@ -665,16 +666,19 @@ Qed.
 Example demo_secc_alts : lm_alts_ok ulmS ∅ I_sc1 cs_sc1.
 Proof using. exact (conj sc1_len sc1_alts_at). Qed.
 
+(* a round of a redirect line is never coverage-ending *)
+Lemma echof_noterm adm s ws N a : uok adm s (LEchoF ws N) a -> uterm a = false.
+Proof using. destruct a; cbn [uok]; first [contradiction | reflexivity]. Qed.
+
 (* D4: the seccomp line is the input's last, typed as its last byte *)
 Example demo_secc_d4 : lm_d4 ulmS cs_sc1 ∅ I_sc1.
 Proof using.
   assert (H2 : nlines I_sc1 = 2) by (rewrite /nlines sc1_bodies; reflexivity).
   intros i Hi Hex _. destruct i as [| [| i]]; [| | rewrite H2 in Hi; lia].
   - (* the redirect line ends no coverage *)
-    exfalso. destruct Hex as (c & Hc & Ht). cbn [lm_upto] in Hc. rewrite sc1_bodies in Hc.
-    change ([b_hif; b_secc] !!! 0) with b_hif in Hc.
-    cbn [ulmS ulm lm_of lm_ok lm_term] in Hc, Ht. rewrite sc1_line1 in Hc.
-    destruct c as [r | x | x | u]; cbn [uok uterm] in Hc, Ht; first [discriminate Ht | contradiction].
+    exfalso. destruct Hex as (c & Hc & Ht). rewrite sc1_bodies in Hc.
+    rewrite (sc1_line1 : lm_of ulmS ([b_hif; b_secc] !!! 0) = _) in Hc.
+    exact (eq_true_false_abs _ Ht (echof_noterm _ _ _ _ _ Hc)).
   - split; [exact H2 | vm_compute; reflexivity].
 Qed.
 
@@ -882,7 +886,7 @@ Proof using. intros H. exact (bool_decide_eq_true_1 _ H). Qed.
 
 (* a round of a redirect line is never coverage-ending *)
 Lemma ab_echof_noterm s ws N a : uok adm_u_g s (LEchoF ws N) a -> uterm a = false.
-Proof using. destruct a; cbn [uok]; first [contradiction | reflexivity]. Qed.
+Proof using. exact (echof_noterm adm_u_g s ws N a). Qed.
 
 (* THE REDIRECT'S BARE PROMPT IS ITS RUN: every other admitted round of
    [echo ws > N] prints a line first -- the exec and open diagnostics,
@@ -942,15 +946,15 @@ Proof using.
   assert (Hok0 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 0) (LEchoF ws_a txt_a)
                    (lm_at ulmG cs 0)).
   { pose proof (proj2 Hcs 0 ltac:(rewrite ab_nlines; lia)) as H.
-    rewrite ab_b0 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ab_line0 in H. exact H. }
+    rewrite ab_b0 (ab_line0 : lm_of ulmG b_ea = _) in H. exact H. }
   assert (Hok1 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 1) (LEchoF ws_b txt_a)
                    (lm_at ulmG cs 1)).
   { pose proof (proj2 Hcs 1 ltac:(rewrite ab_nlines; lia)) as H.
-    rewrite ab_b1 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ab_line1 in H. exact H. }
+    rewrite ab_b1 (ab_line1 : lm_of ulmG b_eb = _) in H. exact H. }
   assert (Hok2 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 2) (LCat txt_a)
                    (lm_at ulmG cs 2)).
   { pose proof (proj2 Hcs 2 ltac:(rewrite ab_nlines; lia)) as H.
-    rewrite ab_b2 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ca_line in H. exact H. }
+    rewrite ab_b2 (ca_line : lm_of ulmG b_ca = _) in H. exact H. }
   (* no round of the two redirects ends coverage *)
   assert (Hd4 : forall i, i < nlines J_ab -> lm_term ulmG (lm_at ulmG cs i) = true ->
                 S i = nlines I_ab /\ rest_of I_ab = []).
@@ -967,9 +971,9 @@ Proof using.
   { intros i Hi (c & Hc & Ht). exfalso. rewrite ab_nlinesJ in Hi.
     change (lm_term ulmG) with uterm in Ht.
     destruct i as [| [| i]]; [| | lia].
-    - rewrite abJ_b0 in Hc. cbn [ulmG ulm lm_of lm_ok] in Hc. rewrite ab_line0 in Hc.
+    - rewrite abJ_b0 (ab_line0 : lm_of ulmG b_ea = _) in Hc.
       rewrite (ab_echof_noterm _ _ _ _ Hc) in Ht. discriminate Ht.
-    - rewrite abJ_b1 in Hc. cbn [ulmG ulm lm_of lm_ok] in Hc. rewrite ab_line1 in Hc.
+    - rewrite abJ_b1 (ab_line1 : lm_of ulmG b_eb = _) in Hc.
       rewrite (ab_echof_noterm _ _ _ _ Hc) in Ht. discriminate Ht. }
   (* the honest transcript through [J_ab] is below the wire, so every
      resolution agrees with it there, round by round *)
