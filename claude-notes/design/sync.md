@@ -663,8 +663,9 @@ gname, `union_born` reads `ff_st`.  `app_xfer_boot_raw HSt A Okc B Tn Tn'
 application reads the loan at its own copy of the gname; `al_xfer c gen
 γd γsw γreg γst : app_born … c -> …` at the era `S gen`.
 
-**OPEN after A3bc's first landing: the round position's advance is not
-monotone in the ghost state.**  `file_pos_advance` moves both halves from
+**OPEN after A3bc's first landing (CLOSED, see "As built (A3bc,
+complete)" below): the round position's advance is not monotone in the
+ghost state.**  `file_pos_advance` moves both halves from
 `n` to `n' := length (ls0' ++ ulines_in I')` and must keep `∀ rec ∈ Ls,
 rec.1 ≤ n'`, i.e. needs `n ≤ n'`.  (a) Between rounds: the holder's `n =
 length (ls0 ++ ulines_in I)` and the new `flw` are two lower bounds with
@@ -681,6 +682,52 @@ the pinned `ls0`; (b) the transport PINS the copy's `ls_c` at a gname the
 on-arm lends in `Tn` (so `B r'` and `Tn'` name the same list), and
 `al_back`, holding the line list's authority, files `ls_c ⊑ ls0` into
 `Tn''` for sh's first advance.
+
+**As built (A3bc, complete; branch `sync3-a3bc`).**  The OPEN above is
+closed by the owner's ruling (canonical era base; first-round
+certificate), with these shapes.  THE CLAIM: `file_pred c r av := taint ∨
+(⌜file_fs_pure av⌝ ∗ cons_state ∗ f_state c r av ∗ sync_claim c r av)`
+(`file_rest` the same without the console pair); the in-flight arm of
+`f_core` parks a position QUARTER (`∃ s s' n, fdeed_whole ∗ ftkt ∗
+f_typed s' ∗ ⌜f_ok av s'⌝ ∗ fposq r n`); phase 1 of a move
+(`file_step_park`, `file_escrow_step`) takes the redirect permit
+`sync_redir c r S S'` (a lower bound `ls_w` ENDING at the writer's line
+`LEchoF ws N`, `n = length ls_w`, the parked quarter), phase 2
+(`file_resync … n`) returns the half.  `union_tk c k := file_taint c ∨
+union_tkb c k`; the hook `union_hk` is a basic update under `◇` (the
+record has no `invGS`/`fsTopG`).  THE POSITION'S SHARES (deviation,
+forced): the running claim holds a QUARTER (`fposf r (1/4) n`), the deed
+holder `fposh r n := fpos r n ∗ fposq r n` (half + a WITNESS quarter);
+only all three move it (`fposf_update`, `file_pos_advance … (n ≤ n') :
+fposh r n ={E}=∗ fposh r n' ∨ taint`).  Why: the writer's `file_wq`
+carries `fpos r (length ls)` at an EXISTENTIAL `ls` through the echo
+program and the kernel's file interface; the witness quarter stays in the
+round's lend (`Wq`/`Cr'`) and at every exit agrees with the returning
+half, which names the value without widening `file_wq`, `efq`, `FDFile`.
+THE ERA BASE: `file_era` gains `fe_base` (set at the on-arm's `f0_alloc
+(ulines_of h)`) and `fe_cp` (a `mono_list` gname the transport SETS to
+the copy's `ls_c`, `fcp_pin`); `utag` hands out `file_era_pin (obs_boots
+h) vf ∗ ⌜ulines_of h = fe_base vf ++ ulast_cyc h⌝`; `flw I := ∃ vf,
+file_era_pin (S gen_id) vf ∗ fl_lb (fe_base vf ++ ulines_in I)`.  sh's
+deed carries `urpos I := ∃ vf n, file_era_pin (S gen_id) vf ∗ fposh r n ∗
+⌜n ≤ length (fe_base vf) + nlines I⌝` (a BOUND: rounds grow it by
+`urpos_mono`; LAZY ADVANCE -- only the redirect round advances, to
+exactly `length (fe_base vf ++ ulines_in I)`, whose last line is the
+round's, `ulines_in_last`).  THE LEDGER: `union_led` gains the registry
+(`dom R = [0, obs_boots h]`), the persistent floor `(kF, γF, F)` and the
+base row; the on-arm allocates and registers the era's list and the era
+record; the turns are `uturn` (→ transport), `uturn'` (the pinned `ls_c`
+and the token's pieces), `uturn''` (after `al_back`: `⌜ls_c ⊑ fe_base
+vf⌝`, `fl_lb (fe_base vf)`), `uturn_i` (/init: the same less the token,
+`al_found` mints `union_tk`).  `Hback`/`al_back` are at the history `h ++
+[ObsPowerOn]` and the era `S (obs_boots h)`.  THE TRANSPORT
+`file_xfer_boot` re-bases, founds the position at `length ls` and hands
+`fposh r' (length ls)` in `union_boot` beside the pin/`fcp_pin`; the
+result is under `◇` (`app_xfer_boot_raw` too).  /init turns `union_boot`
+and `uturn_i` into `urpos []` (pin and `fcp_pin` agreement, `ls_c ⊑
+fe_base`).  OPEN for A4: when the floor's era is not the copy's, the
+transport uses `F = []` (no boot fact from a stale floor); `usync_exec_sup`
+is still at `None`.
 
 **Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
 `al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
