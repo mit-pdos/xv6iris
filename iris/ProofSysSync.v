@@ -60,7 +60,7 @@
      ticket and [s2 = sext n0]; at the exit the failed compare says the
      counter moved past [n0], so the entry is Done and the waiter collects
      [▷ Q] ([ss_collect]), stripped by the exit branch's own step
-     ([ss_bge_fall_later]).
+     ([WpSconfBtype.wp_bge_fall_s_sconf_later]).
    Otherwise [log_res] closes verbatim.  The only thing the proof needs
    from the invariant besides these is [outstanding <= 3], which makes the
    [bge zero,a5] guard a comparison of 64-bit literals.
@@ -287,40 +287,6 @@ Qed.
 
 (* ===================================================================== *)
 
-(* THE LOOP EXIT'S BRANCH, WITH ITS LATER (sync K3-4).  [WpSconfBtype]'s
-   [wp_bge_fall_s_sconf] introduces the engine's [▷] for its caller; the wait
-   loop's exit needs it instead, to strip the [▷ Q] the waiter's collect
-   hands back.  The leaf's own proof, one line shorter. *)
-Section SsLeaf.
-  Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-  Context {kt : ktier} {p : mword 64}.
-
-  Lemma ss_bge_fall_later
-      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
-      (m : regfile) (n : nat) (b : bool) :
-    uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zKzJ_s (rget m rs1) (rget m rs2) = false ->
-    sie_cap_gpr kt m n b p -∗
-    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
-    ▷ wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr kt m n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      mWP (Loop : expr riscv_lang)) -∗
-    mWP (Loop : expr riscv_lang).
-  Proof using .
-    iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    assert (Hcmp_all : forall hh : CpuId,
-               zopz0zKzJ_s (rget (CID := hh) m rs1) (rget (CID := hh) m rs2) = false)
-      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID);
-          rewrite (src_ok_rget_indep m rs2 hh CID); exact Hcmp).
-    iApply (wp_btype_fall_s_sconf pc false imm rs2 rs1
-              (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
-              zopz0zKzJ_s m n b eq_refl
-              with "[] Hcg Hpc Hinstr Hcont").
-    iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-  Qed.
-End SsLeaf.
 
 Section SsProps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
@@ -1049,7 +1015,7 @@ Section SsBodies.
       iMod (ss_collect γ nc2 out2 cmt2 oQ n0 Hne with "Htk Hhelp") as "[Hhelp HQ]".
       iModIntro.
       iDestruct ("Hclose" with "Hout Hcmt Hnc Hhelp") as "Hres".
-      iApply (ss_bge_fall_later (mword_of_int (SS + 0x56)) (mword_of_int 8168 : mword 13)
+      iApply (wp_bge_fall_s_sconf_later (mword_of_int (SS + 0x56)) (mword_of_int 8168 : mword 13)
                 Ra5 Rs2 Z1 (trap_res eb + (K - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp56 with "Hcg Hpc []").

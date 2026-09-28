@@ -362,6 +362,36 @@ Section WpSconfBtype.
     - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
+  (* ...WITH ITS LATER KEPT.  [wp_bge_fall_s_sconf] introduces the engine's
+     [▷] for its caller; this form hands it to the continuation instead, so
+     a caller holding a [▷ P] -- sys_sync's wait-loop exit, stripping the
+     [▷ Q] the helping slot's collect hands back -- strips it at this
+     instruction. *)
+  Lemma wp_bge_fall_s_sconf_later
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
+      (m : regfile) (n : nat) (b : bool) :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zKzJ_s (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
+    ▷ wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
+    assert (Hcmp_all : forall hh : CpuId,
+               zopz0zKzJ_s (rget (CID := hh) m rs1) (rget (CID := hh) m rs2) = false)
+      by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID);
+          rewrite (src_ok_rget_indep m rs2 hh CID); exact Hcmp).
+    iApply (wp_btype_fall_s_sconf pc false imm rs2 rs1
+              (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
+              zopz0zKzJ_s m n b eq_refl
+              with "[] Hcg Hpc Hinstr Hcont").
+    iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
+  Qed.
+
   Lemma wp_bge_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
       (m : regfile) (n : nat) (b : bool) :
