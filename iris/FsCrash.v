@@ -1420,7 +1420,7 @@ Proof.
   assert (Hfit : (0 + length (take virtio_sector_bytes bs) <= BSIZE)%nat)
     by (rewrite Hs0 bsize_two_sectors; lia).
   rewrite (fs_blocks_splice dk blk 0 (take virtio_sector_bytes bs) Hfit).
-  rewrite /blk_sec0 take_0 /= Hs0 //.
+  rewrite /blk_sec0 take_0 app_nil_l Nat.add_0_l Hs0 //.
 Qed.
 
 Lemma fs_blocks_blk_sec1 (dk : Z -> bv 8) (blk : Z) (bs : list (bv 8)) :
