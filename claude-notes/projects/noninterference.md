@@ -39,11 +39,17 @@ M1's ledgers are fresh ground and go first.
   pid numbers — then `ticks`, the zombie set; then the per-process key
   history `uhist : mono_list uvis` beside `proc_priv`.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
-  appends no events — provable in-logic now that NI-LEDGER-KALLOC has
-  landed; the campaign's first theorem.  Device recommended in
-  `design/ni-kalloc-ledger.md` D6: a per-actor event counter whose
-  exclusive fragment rides in the hart bundle at the proc field, moved
-  only by `cpu_own_set_proc`; needs its own design pass before a brief.
+  appends no events.  DESIGN PASS 2026-09-28,
+  [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
+  a free consequence of the ledger — absence is ownership, and kalloc's
+  premises do not distinguish a quiet round from a syscall, so the
+  in-logic form needs an exclusive per-process permit threaded through
+  the allocating cone, which is the whole syscall/fs layer (69 contracts:
+  vmfault sits under copyin/copyout/copyinstr).  Recommendation D: defer
+  the permit sweep until NI-LEDGER-REST so it is paid once for all
+  ledgers; land now the pure `vmfault_quiet` (lazy flag off ⇒ vmfault's
+  kalloc arm is unreachable) and a functor-inventory check.  Rulings
+  R1-R4 open for the owner.
 - [ ] **NI-DET-ROWS** (M0): `usys_det` and the ecall arm's re-cut, the
   loop's `round_det` discharge — after the post-Qed redesign settles;
   §4 lists the row set to start from.

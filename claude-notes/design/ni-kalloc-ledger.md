@@ -166,6 +166,15 @@ changes in this lane.
 
 ### D6 — where the strong instance goes (not this lane)
 
+**SUPERSEDED 2026-09-28** by [`ni-strong-instance.md`](ni-strong-instance.md)
+§2.3: the device below does not work — with the counter inside the
+cells it is `∃ k` there, and every split that lets the block prove
+silence takes from kalloc the resource it must consume.  The in-logic
+strong instance needs a permit threaded through the allocating cone (69
+contracts); see that note.  The paragraph is kept as the record of what
+was tried.
+
+
 "A process before its first syscall appends no events" is NI-STRONG-INSTANCE.
 With D3, "events labelled A" are calls made on a hart whose `c->proc = A`,
 and A's syscall-free rounds (the transparent arm, `yield`, `scheduler`)

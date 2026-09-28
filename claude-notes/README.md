@@ -284,6 +284,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   contracts `wp_kalloc_led_sconf` / `wp_kfree_led_sconf` beside the
   landed ones, which are their corollaries; no landed contract moved, no
   call site touched.  §7 is the as-landed record.
+- **[`ni-strong-instance.md`](design/ni-strong-instance.md)** — DESIGN PASS
+  (2026-09-28): why "a quiet process appends no events" is not a free
+  consequence of the ledger (absence is ownership; kalloc's premises do
+  not tell a quiet round from a syscall), the allocating cone measured
+  (69 contracts, vmfault under the copy layer), the permit design and its
+  cost, and the recommendation to defer the sweep until the other ledgers
+  are in.  Rulings R1-R4 pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
