@@ -246,6 +246,8 @@ Section UShUPipes.
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
   Context (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ _) = usecc_tok ug).
   Context (Hrdw : ush_rdwild_of_shape ug).
+  (* the record's sync-hook family is the union's (sync SY3-A4) *)
+  Context (Hhk : @riscv_sync_hook Σ (@riscv_fixedGS Σ _) = union_hk file_pred (fgn_cl gf)).
 
   (* THE CLAIM A PIPELINE ROUND WRITES THROUGH: the union's, which pays the
      N-writer family's obligation at every pipeline line (a pipeline line
@@ -924,7 +926,7 @@ Section UShUPipes.
       UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
         N γp T Wcu Wbu Pm ush_line_union
         (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
-  Proof using Hcons Hkill Hwild Hrdw Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
+  Proof using Hcons Hkill Hwild Hrdw Hhk Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
     iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hsync #Hpin #Hmade".
     iDestruct "Hpin" as (v) "#Hp".
     iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
@@ -933,7 +935,7 @@ Section UShUPipes.
     iPoseProof (uHchild_redir ug r Heq s0 Hkill PT PD with "Hlk Hdep Hslot Hmade") as "#Hred".
     iPoseProof (uHchild_cat ug r Heq s0 Hcons Hkill PT PD with "Hlk Hdep Hcat Hmade") as "#Hcatl".
     iPoseProof (uHchild_secc ug r s0 Hcons Hkill Hwild Hrdw PT PD with "Hdep Hsecc") as "#Hsecl".
-    iPoseProof (uHchild_sync ug r s0 Hkill PT PD with "Hlk Hdep Hsync") as "#Hsyncl".
+    iPoseProof (uHchild_sync ug r s0 Hkill Hhk PT PD with "Hlk Hdep Hsync") as "#Hsyncl".
     iPoseProof (uHpanic ug r s0 PT PD with "Hlk") as "#Hplaw".
     iPoseProof (upipes_child_law_echo with "Hlk Hslot Hcat Hgrep") as "#Hche".
     iPoseProof (upipes_child_law_catf with "Hlk Hslot Hcat Hgrep Hmade") as "#Hchc".

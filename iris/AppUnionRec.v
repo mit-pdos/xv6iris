@@ -169,7 +169,11 @@ Section UnionApp.
             ∗ fl_lb (fgn_cl (ugn_file c)) ls
             ∗ ⌜UnionAdm.uadm ls (slast (fe_floor vf)) (dst_content s)⌝
             (* ...and the deed's typed witness, out of the later *)
-            ∗ f_typed (fgn_cl (ugn_file c)) s))%I.
+            ∗ f_typed (fgn_cl (ugn_file c)) s
+            (* ...and the running claim's registration at the era (sync
+               SY3-A4: how the deed's holder knows the record a sync hook
+               is fired at is its own) *)
+            ∗ run_reg (fgn_cl (ugn_file c)) k (fn_pos r) (fn_deed r)))%I.
 
   (* ====================================================================== *)
   (*  2.  THE RECORD                                                        *)
@@ -368,7 +372,7 @@ Section UnionApp.
       as ">(Hsa & Hs & %r' & %ls & %Hr' & Hr'p & Hb & #Hls & Hrest)".
     iMod (fcp_set vf ls with "Hcp") as "#Hcp".
     iModIntro. iModIntro. iFrame "Hsa".
-    iDestruct "Hrest" as "[#HT | (Hpos & Htk & #Hty & %Ls_c & _ & _ & %HFb)]".
+    iDestruct "Hrest" as "[#HT | (Hpos & Htk & #Hty & #Hrr & %Ls_c & _ & _ & %HFb)]".
     { iSplitL "Hft".
       { rewrite /uturn'. iFrame "Hft". iExists vf, ls. iFrame "Hpin Hcp Hls". by iLeft. }
       iExists (fn_with r γ (S gen) true), r'.
@@ -383,7 +387,7 @@ Section UnionApp.
     iSplitR; [iPureIntro; by destruct r |]. iFrame "Hs Hr'p".
     rewrite /union_boot. iExists (fcontent_of av). iFrame "Hb". iRight.
     iExists vf, ls. iFrame "Hpin Hcp Hpos". iSplitR; [iExact "Hls" |].
-    iSplitR; [iPureIntro; exact (proj2 HFb) |]. iExact "Hty".
+    iSplitR; [iPureIntro; exact (proj2 HFb) |]. iSplitR; [iExact "Hty" |]. iExact "Hrr".
   Qed.
 
   (* ---- THE MERGE (sync SY3-A3bc): the file application's, the started
@@ -449,9 +453,9 @@ Section UnionApp.
   Proof using .
     intros Himg Hdk Hsb Hcov c.
     cbn [app_union app_fixed app_names app_pred app_cls app_okc] in c |- *.
-    rewrite /union_cls. iIntros "(%γ0 & #Hreg & Hh & Hcm & Hhi & #Hlb)".
+    rewrite /union_cls. iIntros "(%γ0 & #Hreg & Hh & Hcm & Hhi & Hra & #Hlb)".
     iApply (file_init_img (fgn_cl (ugn_file c)) _ XV6_DISK_BYTES sb nib cov γ0
-              Himg Hdk Hsb Hcov with "Hreg Hh Hcm Hhi Hlb").
+              Himg Hdk Hsb Hcov with "Hreg Hh Hcm Hhi Hra Hlb").
   Qed.
 
   (* ---- the conclusion's one ingredient ---- *)
@@ -487,6 +491,7 @@ Section UnionLaws.
         = MkAppcfg (app_names app_union) (app_pred app_union c) r ->
       @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_union c ->
       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
+      @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk app_union c ->
       ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_union c (S gen_id) r -∗
         app_iturn app_union c (S gen_id) -∗
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).

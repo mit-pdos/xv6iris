@@ -517,8 +517,9 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
             assumption about the world, and the premise that lets the
             record's predicate meet [AppInv]'s laws. *)
          @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
-
-
+         (* ...and THE SYNC-HOOK EQUATION (sync SY3-A4): the record's hook
+            family is this application's *)
+         @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk A c ->
          (* ...and (a) THE BOOT RESOURCE, LINEARLY, at the instance the
             record equation names *)
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot A c (S gen_id) r -∗
@@ -768,13 +769,14 @@ Section AppTriv.
     (* ...and the generation-counter equation (lane APP-IFACE (b')), which
        the generic application takes and does not use *)
     @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
-
+    (* ...and the sync-hook equation (sync SY3-A4), likewise unused *)
+    @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk (app_triv Σ) c ->
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot (app_triv Σ) c (S gen_id) r -∗
       (* ...and the era's turn, likewise taken and not used *)
       app_iturn (app_triv Σ) c (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using .
-    intros Heq Hiface _. iIntros "_ _ _". iModIntro.
+    intros Heq Hiface _ _. iIntros "_ _ _". iModIntro.
     (* the rewrite goes BEFORE the [intros]: [r'] is typed at
        [app_names file_app], so rewriting under it is a dependent rewrite *)
     iApply init_boot_of_triv.

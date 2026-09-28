@@ -139,6 +139,17 @@ Proof using.
   - exact (UnionAdm.usync_at_round ps cs cs' s0 I I' w a c Hlen Hpos Hl Ha Hc Hcc HII Hw).
 Qed.
 
+(* /sync RAN is the one alternative of a [sync] line whose block is the
+   bare prompt (sync SY3-A4): the others print a diagnostic first *)
+Lemma usync_prompt_ran (s : fstate) (a : nat) :
+  lm_ok U s LSync (lm_dec U a) -> lm_cont U s LSync (lm_dec U a) = u_prompt ->
+  lm_dec U a = UR RSyncRan.
+Proof using.
+  intros Hok Hc. destruct (demo_sync_only s _ Hok) as [H | [H | [H | H]]]; [exact H | | |];
+    rewrite H in Hc; change (lm_cont ulmG) with ucont in Hc; cbn [ucont cont] in Hc;
+    vm_compute in Hc; discriminate Hc.
+Qed.
+
 (* ---- the identity steps ---- *)
 
 (* THE OUT-OF-MEMORY ALTERNATIVE (sync design section 2): admissible at
@@ -364,7 +375,10 @@ Section UShURoundDefs.
      ([AppFile.file_pos_advance]); a later round only grows the bound *)
   Definition urpos (I : list (bv 8)) : iProp Σ :=
     (∃ (vf : file_era) (n : nat), file_era_pin gf (S gen_id) vf ∗ fposh r n
-       ∗ ⌜(n <= length (fe_base vf) + nlines I)%nat⌝)%I.
+       ∗ ⌜(n <= length (fe_base vf) + nlines I)%nat⌝
+       (* ...and the running claim's registration at the era: the record a
+          sync hook is fired at is this one (sync SY3-A4) *)
+       ∗ run_reg (fgn_cl gf) (S gen_id) (fn_pos r) (fn_deed r))%I.
 
   Global Instance urpos_timeless I : Timeless (urpos I).
   Proof using . rewrite /urpos. apply _. Qed.
@@ -372,8 +386,8 @@ Section UShURoundDefs.
   Lemma urpos_mono (I I' : list (bv 8)) :
     (nlines I <= nlines I')%nat -> urpos I -∗ urpos I'.
   Proof using .
-    intros Hle. iIntros "(%vf & %n & #Hp & Hpos & %Hn)".
-    iExists vf, n. iFrame "Hp Hpos". iPureIntro. lia.
+    intros Hle. iIntros "(%vf & %n & #Hp & Hpos & %Hn & #Hrr)".
+    iExists vf, n. iFrame "Hp Hpos Hrr". iPureIntro. lia.
   Qed.
 
   (* THE DEED, tied to the model's state by a pure tie over the choice
@@ -448,10 +462,36 @@ Section UShURoundDefs.
     iSplitL; [iApply (ush_deed_taint with "HT") | by iRight].
   Qed.
 
+  (* THE SYNC ROUND'S RECORD (sync SY3-A4), what /sync's receipt carries
+     back to sh and sh files at the round's prompt: the choices before the
+     round (their lower bound at the era's pin), the era's record, and a
+     lower bound of the RUN-LONG sync history ending at the round's record
+     -- the position the line list [fe_base ++ ulines_in I] has, the state
+     the model reaches before the round.  Persistent. *)
+  Definition usync_pay (I : list (bv 8)) : iProp Σ :=
+    (∃ (v : era_pins) (cs : list nat) (vf : file_era) (L : list UnionAdm.srec),
+       era_pin (fgn_echo gf) (S gen_id) v ∗ cs_lb v cs
+       ∗ ⌜length cs = (nlines I - 1)%nat⌝ ∗ file_era_pin gf (S gen_id) vf
+       ∗ sl_lb (ff_hist (fgn_cl gf))
+           (L ++ [(length (fe_base vf ++ UnionAdm.ulines_in I), ust cs s0 I)]))%I.
+
+  (* ...owed at a PEND deed of a [sync] line, and only there *)
+  Definition usync_rec (I : list (bv 8)) : iProp Σ :=
+    (T ∨ ⌜ul I <> LSync⌝ ∨ usync_pay I)%I.
+
+  Global Instance usync_pay_persistent I : Persistent (usync_pay I).
+  Proof using . rewrite /usync_pay. apply _. Qed.
+  Global Instance usync_pay_timeless I : Timeless (usync_pay I).
+  Proof using . rewrite /usync_pay. apply _. Qed.
+  Global Instance usync_rec_persistent I : Persistent (usync_rec I).
+  Proof using . rewrite /usync_rec /file_taint /echo_taint. apply _. Qed.
+  Global Instance usync_rec_timeless I : Timeless (usync_rec I).
+  Proof using . rewrite /usync_rec /file_taint /echo_taint. apply _. Qed.
+
   (* THE FILE FAMILY AT THE UNION ([UShRound.Wcf]'s positions) *)
   Definition uWcf (I : list (bv 8)) (p : nat) : iProp Σ :=
     match p with
-    | O => ((uWcl I 0%nat ∗ DONE I) ∨ (uWcl I 3%nat ∗ PEND I))%I
+    | O => ((uWcl I 0%nat ∗ DONE I) ∨ (uWcl I 3%nat ∗ PEND I ∗ usync_rec I))%I
     | S O => (uWcl I 1%nat ∗ DONE I)%I
     | S (S O) => (uWcl I 2%nat ∗ DONE I)%I
     | _ => (uWcl I 3%nat ∗ PRE I)%I
@@ -492,7 +532,7 @@ Section UShURoundDefs.
     ((uWbl I ∗ DONE I) ∨ useccomp_shape I)%I.
 
   Lemma uWcf_0 I :
-    uWcf I 0%nat = ((uWcl I 0%nat ∗ DONE I) ∨ (uWcl I 3%nat ∗ PEND I))%I.
+    uWcf I 0%nat = ((uWcl I 0%nat ∗ DONE I) ∨ (uWcl I 3%nat ∗ PEND I ∗ usync_rec I))%I.
   Proof using . reflexivity. Qed.
   Lemma uWcf_1 I : uWcf I 1%nat = (uWcl I 1%nat ∗ DONE I)%I.
   Proof using . reflexivity. Qed.
@@ -511,6 +551,7 @@ Section UShURoundDefs.
     | |- Timeless (ush_done_at _ _) => apply ush_deed_at_timeless
     | |- Timeless (ush_pend_at _ _) => apply ush_deed_at_timeless
     | |- Timeless (useccomp_shape _) => apply useccomp_shape_timeless
+    | |- Timeless (usync_rec _) => apply usync_rec_timeless
     | |- _ => apply _
     end.
 
@@ -610,11 +651,11 @@ Section UShURoundDefs.
      position-0 credential whenever every alternative of the line leaves
      [f] alone, at a file line (the X arm refuted) *)
   Lemma uWcf0_of_pre_line_id (I : list (bv 8)) :
-    uline_nopipe (ul I) ->
+    uline_nopipe (ul I) -> ul I <> LSync ->
     (forall (s : fstate) (a : lm_alt U), lm_step U s (ul I) a = s) ->
     uWcl I 0%nat -∗ PRE I -∗ uWcf I 0%nat.
   Proof using .
-    intros Hnp Hid. iIntros "Hc Hp". rewrite uWcf_0.
+    intros Hnp Hns Hid. iIntros "Hc Hp". rewrite uWcf_0.
     rewrite {1}/ush_pre_at /ush_deed_at. iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last first.
     { iLeft. iFrame "Hc". iApply (ush_deed_taint with "HT"). }
@@ -679,7 +720,8 @@ Section UShURoundDefs.
         * iApply (uWcl3_close I v ps cs P Hw with "Hpin [Htn]").
           rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
           iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
-        * rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
+        * iSplitL; [| iRight; iLeft; by iPureIntro].
+          rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
           iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro. exists a.
           destruct Htie as [Hl Hc]. destruct Hapr as (Hok & _ & Hterm).
           split_and!; [exact Hl | lia | exact (Hok _) | exact Hterm | exact Hpr |].
@@ -704,7 +746,7 @@ Section UShURoundDefs.
      [a]'s own step from the round's entry state *)
   Lemma uWcf0_of_posts_alt (I : list (bv 8)) (a : nat) (v v' : era_pins)
       (cs' : list nat) (s : dst) :
-    lm_aprs U I a -> uwild (ul I) = false ->
+    lm_aprs U I a -> uwild (ul I) = false -> lm_dec U a <> UR RSyncRan ->
     length cs' = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     dst_content s = lm_step U (ust cs' s0 I) (ul I) (lm_dec U a) ->
     lk_pin FI (S gen_id) v -∗
@@ -713,7 +755,7 @@ Section UShURoundDefs.
     era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs' -∗
     uWcf I 0%nat.
   Proof using .
-    intros Hapr Hnw Hlen Hpos Hc.
+    intros Hapr Hnw Hna Hlen Hpos Hc.
     iIntros "#Hpin Hblk Hd Hup #Hty #Hpin' #Hcs'". rewrite uWcf_0.
     cbn [lk_pin union_link_inst_at gen_link_inst].
     iDestruct (era_pin_agree (fgn_echo gf) (S gen_id) v v' with "Hpin Hpin'") as %<-.
@@ -740,11 +782,16 @@ Section UShURoundDefs.
       + iApply (uWcl3_close I v ps cs P Hw with "Hpin [Htn]").
         rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
         iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
-      + rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
-        iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro. exists a.
-        destruct Hapr as (Hok & _ & Hterm).
-        split_and!; [exact Hlen | exact Hpos | exact (Hok _) | exact Hterm
-                    | exact Hpr | exact Hc].
+      + iSplitL.
+        { rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
+          iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro. exists a.
+          destruct Hapr as (Hok & _ & Hterm).
+          split_and!; [exact Hlen | exact Hpos | exact (Hok _) | exact Hterm
+                      | exact Hpr | exact Hc]. }
+        (* not /sync's run, so not a [sync] line *)
+        iRight. iLeft. iPureIntro. intros Hl. apply Hna.
+        destruct Hapr as (Hok & _ & _).
+        apply (usync_prompt_ran (ust cs s0 I) a); rewrite -Hl; [exact (Hok _) | exact Hpr].
     - (* a byte before the prompt: [a] is filed, deed DONE *)
       cbn [lm_blkcs].
       iDestruct (ucs_lb_prefix_len v (cs ++ [a]) cs'
@@ -775,7 +822,7 @@ Section UShURoundDefs.
   (* ...and at the record's own block ([lk_post]): the instance *)
   Lemma uWcf0_of_post_alt (I : list (bv 8)) (a : nat) (v v' : era_pins)
       (cs' : list nat) (s : dst) :
-    lm_apr U K I a -> uwild (ul I) = false ->
+    lm_apr U K I a -> uwild (ul I) = false -> lm_dec U a <> UR RSyncRan ->
     length cs' = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     dst_content s = lm_step U (ust cs' s0 I) (ul I) (lm_dec U a) ->
     lk_pin FI (S gen_id) v -∗ lk_post FI (S gen_id) v I a -∗
@@ -783,8 +830,8 @@ Section UShURoundDefs.
     era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs' -∗
     uWcf I 0%nat.
   Proof using .
-    intros Hapr Hnw Hlen Hpos Hc. iIntros "#Hpin Hblk Hd Hup #Hty #Hpin' #Hcs'".
-    iApply (uWcf0_of_posts_alt I a v v' cs' s (lm_apr_aprs U K I a Hapr) Hnw Hlen Hpos Hc
+    intros Hapr Hnw Hna Hlen Hpos Hc. iIntros "#Hpin Hblk Hd Hup #Hty #Hpin' #Hcs'".
+    iApply (uWcf0_of_posts_alt I a v v' cs' s (lm_apr_aprs U K I a Hapr) Hnw Hna Hlen Hpos Hc
               with "Hpin [Hblk] Hd Hup Hty Hpin' Hcs'").
     rewrite /lk_post. cbn [lk_blk lk_ab union_link_inst_at gen_link_inst].
     iApply (gwc_post_of_blk U PA (S gen_id) v I a Hapr with "Hblk").
@@ -797,18 +844,19 @@ Section UShURoundDefs.
      out-of-memory death is the one caller ([uHoom]): it dies in the
      parse, before any line shape moves [f]. *)
   Lemma uWcf0_of_post_pre_id (I : list (bv 8)) (a : nat) (v : era_pins) :
-    lm_apr U K I a -> uwild (ul I) = false -> (0 < nlines I)%nat ->
+    lm_apr U K I a -> uwild (ul I) = false -> lm_dec U a <> UR RSyncRan ->
+    (0 < nlines I)%nat ->
     (forall s : fstate, lm_step U s (ul I) (lm_dec U a) = s) ->
     lk_pin FI (S gen_id) v -∗ lk_post FI (S gen_id) v I a -∗ PRE I -∗
     uWcf I 0%nat.
   Proof using .
-    intros Hapr Hnw Hpos Hid. iIntros "#Hpin Hblk Hp".
+    intros Hapr Hnw Hna Hpos Hid. iIntros "#Hpin Hblk Hp".
     rewrite {1}/ush_pre_at /ush_deed_at. iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last first.
     { iApply (uWcf_taint I 0%nat v with "Hpin HT"). }
     iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & _ & Hup)".
     destruct Htie as [Hlen Hc].
-    iApply (uWcf0_of_post_alt I a v v' cs' s Hapr Hnw Hlen Hpos
+    iApply (uWcf0_of_post_alt I a v v' cs' s Hapr Hnw Hna Hlen Hpos
               ltac:(rewrite Hid; exact Hc) with "Hpin Hblk Hd Hup Hty Hpin' Hcs'").
   Qed.
 
@@ -976,7 +1024,7 @@ Section UShURoundDefs.
     iExists Pf. iFrame "H0 Hs". iIntros "!> Hp".
     iDestruct ("He" with "Hp") as (v) "(#Hpin & Hblk & Hpre)".
     iApply uWcu_of.
-    iApply (uWcf0_of_post_pre_id I uoom v (ulm_apr_oom I) Hnw Hpos
+    iApply (uWcf0_of_post_pre_id I uoom v (ulm_apr_oom I) Hnw ltac:(by vm_compute) Hpos
               (fun s => ulm_step_oom s (ul I)) with "Hpin Hblk Hpre").
   Qed.
 

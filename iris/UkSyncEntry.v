@@ -21,9 +21,10 @@
 (* THE ECALL LEAF AT THIS INSTANCE ([ksync_leaf_xv6], sync K4): 22's rows *)
 (* are the optional hook and its receipt, readable here and nowhere       *)
 (* below, so this is where [UkSync.ksync_leaf] is discharged -- at EVERY  *)
-(* hook, through the receipt-keeping quiet leaf.  THE ENTRY DEPOSITS NO   *)
-(* HOOK ([None]): [image_entry] is a [□], so a linear hook can reach the  *)
-(* program only through the lend [Pay], which is lane SY3-A's to shape.   *)
+(* hook, through the receipt-keeping quiet leaf.  THE HOOK RIDES THE LEND *)
+(* (sync SY3-A4): [image_entry] is a [□], so the linear hook reaches the  *)
+(* program inside [Pay := P ∗ hook_opt gen_id oQ], and the receipt       *)
+(* [Q_opt oQ] is what [sync_pay] is handed.                              *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -116,17 +117,17 @@ Section UkSyncEntry.
   Lemma sync_image_entry (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
       (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
-      (Q : Z -> iProp Σ) (P : iProp Σ) :
+      (Q : Z -> iProp Σ) (P : iProp Σ) (oQ : option (iProp Σ)) :
     (forall x y : Z, Q x = Q y) ->
     exec_ok ws ->
     UShEcho.echo_node_img ws Mn sv t gn ->
     UkShEcho.echo_argv_bytes ws gn ->
     length sts = NOFILE ->
-    □ sync_pay P (Q_opt None) (Q (-1)) -∗
+    □ sync_pay P (Q_opt oQ) (Q (-1)) -∗
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.sync_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw ProcDefs.secc_all cs pidv Q P uslot.
+      cw ProcDefs.secc_all cs pidv Q (P ∗ hook_opt gen_id oQ) uslot.
   Proof using ghost_varG0 ghost_varG1 ufdG0.
     intros HQc Hok Himg Hbytes Hfdl.
     iIntros "#Hpay #Hnpw #Hdep".
@@ -135,7 +136,7 @@ Section UkSyncEntry.
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
     pose proof (UShSync.sync_room_of_det_x ws na alen Hok Hna Halen) as Hroom.
     rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp HP".
+    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp [HP Hhook]".
     destruct (UShSync.sync_kexec_pages na alen afun sts W' Hokk)
       as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hwr & Hrp).
     destruct (UShSync.sync_kexec_entry_rows na alen afun sts W' Hokk Hroom
@@ -155,12 +156,11 @@ Section UkSyncEntry.
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ Hcwf _ _ Hrun".
     pose proof (UkRun.ukn_const_of_eq N Q Hpayeq HQc) as Hc.
     rewrite Hpc.
-    iApply (wp_ksync_start N None h (tf_resume_gpr0 (uvis_tf W')) _ 38 P
-              (uvis_cwd W') eq_refl with "[] [] [] Hcwf HP [] Hrun").
+    iApply (wp_ksync_start N oQ h (tf_resume_gpr0 (uvis_tf W')) _ 38 P
+              (uvis_cwd W') eq_refl with "[] [] Hhook Hcwf HP [] Hrun").
     - iApply (sync_code_of_text (ukn_t N) (uvis_M W') (uvis_perm W') Hsub Hx
                 with "Ht").
-    - iApply (ksync_leaf_xv6 N None).
-    - cbv [hook_opt]. by iEmpIntro.
+    - iApply (ksync_leaf_xv6 N oQ).
     - rewrite Hpayeq. iExact "Hpay".
   Qed.
 

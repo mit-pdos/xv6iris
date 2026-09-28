@@ -154,11 +154,13 @@ Section UnionInitBoot.
       (ug : union_gn) (r : file_names) :
     @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
+    (* the record's sync-hook family is the union's (sync SY3-A4) *)
+    @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = union_hk file_pred (fgn_cl (ugn_file ug)) ->
     ⊢ app_inv fsc_fs -∗ union_boot ug (S gen_id) r -∗
       uturn_i ug (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
-    intros Heq Hiface.
+    intros Heq Hiface Hhk.
     (* the five projections, off the one equation *)
     assert (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
       by (rewrite /riscv_rx_tag Hiface; by cbn [union_ifc ai_tag union_tag]).
@@ -187,12 +189,12 @@ Section UnionInitBoot.
                     ∗ ⌜UnionAdm.uadm ls1 (slast (fe_floor vf)) (dst_content s)⌝
                     ∗ f_typed (fgn_cl (ugn_file ug)) s))%I
       with "[Hbp]" as "[Hup #Hbf]".
-    { iDestruct "Hbp" as "[#HT | (%vf' & %ls' & #Hvf' & #Hcp' & Hposh & #Hl1 & %Hu & #Hty1)]";
+    { iDestruct "Hbp" as "[#HT | (%vf' & %ls' & #Hvf' & #Hcp' & Hposh & #Hl1 & %Hu & #Hty1 & #Hrr)]";
         [iSplitL; by iLeft |].
       iDestruct (file_era_pin_agree with "Hvf Hvf'") as %<-.
       iDestruct (fcp_pin_agree with "Hcp Hcp'") as %<-.
       iSplitL "Hposh".
-      - iRight. iExists vf, (length ls). iFrame "Hvf Hposh". iPureIntro.
+      - iRight. iExists vf, (length ls). iFrame "Hvf Hposh Hrr". iPureIntro.
         apply prefix_length in Hls. rewrite /nlines bodies_of_nil /=. lia.
       - iRight. iExists ls. iSplitR; [iExact "Hl1" |].
         iSplitR; [by iPureIntro |]. iExact "Hty1". }
@@ -288,7 +290,7 @@ Section UnionInitBoot.
                 with "[] [] Htg");
         [iApply UInitSh.sh_pay_state_holds |].
       iIntros (γp N).
-      iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill Hwild Hrdw γp N
+      iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill Hwild Hrdw Hhk γp N
                 with "Hlks [] Hslot Hcat Hgrep Hsecc Hsync Hpine []").
       - iApply (udep_free).
       - iExists jo. iExact "Hcred". }

@@ -538,6 +538,9 @@ Section UShURound.
      and the reader-side one is the open premise (seccomp design 10.12) *)
   Context (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ _) = usecc_tok ug).
   Context (Hrdw : ush_rdwild_of_shape ug).
+  (* THE RECORD'S SYNC-HOOK FAMILY IS THE UNION'S (sync SY3-A4): the seam
+     through which /sync's lend carries the hook sh mints *)
+  Context (Hhk : @riscv_sync_hook Σ (@riscv_fixedGS Σ _) = union_hk file_pred (fgn_cl gf)).
 
   Local Notation T := (file_taint (fgn_cl gf)).
   Local Notation FI := (union_link_inst_at ug s0).
@@ -607,7 +610,7 @@ Section UShURound.
     iDestruct ("Hend" with "Hp") as "[Hc Hh]".
     iApply (uWcu_of ug r s0 PT PD I 0%nat).
     pose proof (union_D_nopipe I HD) as Hnp. destruct HD as [_ Hl].
-    iApply (uWcf0_of_pre_line_id ug r s0 I Hnp
+    iApply (uWcf0_of_pre_line_id ug r s0 I Hnp ltac:(rewrite Hl; discriminate)
               ltac:(intros s a; rewrite Hl; exact (ustep_id_echo s _ a))
               with "[Hc] Hh").
     rewrite /uWcl. iExact "Hc".
@@ -644,7 +647,7 @@ Section UShURound.
     intro HD. iIntros "#Hp Hc HR".
     pose proof (union_D_nopipe I0 HD) as Hnp. destruct HD as [Hok Hl].
     iApply (uWcu_of ug r s0 PT PD I0 0%nat).
-    iApply (uWcf0_of_pre_line_id ug r s0 I0 Hnp
+    iApply (uWcf0_of_pre_line_id ug r s0 I0 Hnp ltac:(rewrite Hl; discriminate)
               ltac:(intros s a; rewrite Hl; exact (ustep_id_echo s _ a))
               with "[Hc] HR").
     assert (Haprs : lm_aprs U I0 0%nat).
@@ -866,11 +869,11 @@ Section UShURound.
       apply elem_of_cons in Ha as [-> | Ha]; [| apply elem_of_list_singleton in Ha as ->].
       - iApply (uWcf0_of_posts_alt ug r s0 I (ualt_code (UR RCRan)) v v cs s
                   (ulm_aprs_R I RCRan Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl)
-                  ltac:(rewrite Hul; reflexivity) Hlen Hpos Hc' with "[] Hpost Hown Hup Hty Hpin Hcs").
+                  ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos Hc' with "[] Hpost Hown Hup Hty Hpin Hcs").
         cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hpin".
       - iApply (uWcf0_of_posts_alt ug r s0 I (ualt_code (UR RCNoOpen)) v v cs s
                   (ulm_aprs_R I RCNoOpen Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl)
-                  ltac:(rewrite Hul; reflexivity) Hlen Hpos Hc' with "[] Hpost Hown Hup Hty Hpin Hcs").
+                  ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos Hc' with "[] Hpost Hown Hup Hty Hpin Hcs").
         cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hpin". }
     rewrite /image_entry.
     iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
@@ -891,11 +894,12 @@ Section UShURound.
      witness quarter the round kept agree, and the era's pin bounds them *)
   Local Lemma urpos_of_halves (I : list (bv 8)) (vf : file_era) (n n' : nat) :
     (n' <= length (fe_base vf) + nlines I)%nat ->
-    file_era_pin gf (S gen_id) vf -∗ fpos r n -∗ fposq r n' -∗ urpos ug r I.
+    file_era_pin gf (S gen_id) vf -∗ fpos r n -∗ fposq r n' -∗
+    run_reg (fgn_cl gf) (S gen_id) (fn_pos r) (fn_deed r) -∗ urpos ug r I.
   Proof using .
-    intros Hle. iIntros "#Hp [%Hr H1] [_ H2]".
+    intros Hle. iIntros "#Hp [%Hr H1] [_ H2] #Hrr".
     iDestruct (fposf_agree with "H1 H2") as %->.
-    iExists vf, n'. iFrame "Hp". rewrite /fposh /fpos /fposq.
+    iExists vf, n'. iFrame "Hp Hrr". rewrite /fposh /fpos /fposq.
     iSplitL; [| iPureIntro; exact Hle].
     iSplitL "H1"; (iSplitR; [iPureIntro; exact Hr |]); [iExact "H1" | iExact "H2"].
   Qed.
@@ -944,7 +948,7 @@ Section UShURound.
     iDestruct ("He" with "Hp") as (v) "(#Hp & Hblk & Hd & Hup)".
     iDestruct ("HX" with "Hup") as "Hup".
     iApply (uWcu_of ug r s0 PT PD I 0%nat).
-    iApply (uWcf0_of_post_alt ug r s0 I uoom v v' cs s (ulm_apr_oom I) Hnw Hlen Hpos
+    iApply (uWcf0_of_post_alt ug r s0 I uoom v v' cs s (ulm_apr_oom I) Hnw ltac:(by vm_compute) Hlen Hpos
               ltac:(rewrite ulm_step_oom; exact Hc) with "Hp Hblk Hd Hup Hty Hpin' Hcs").
   Qed.
 
@@ -1055,7 +1059,7 @@ Section UShURound.
       iDestruct "H" as (v) "(#Hp & Hblk & Hd & Hup)".
       iApply (uWcf0_of_post_alt ug r s0 I (ualt_code (UR RCExec)) v v' cs s
                 (ulm_apr_R I RCExec Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
-                ltac:(rewrite Hul; reflexivity) Hlen Hpos ltac:(rewrite ulm_step_R Hul; exact Hcon)
+                ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos ltac:(rewrite ulm_step_R Hul; exact Hcon)
                 with "Hp Hblk Hd Hup Hty Hpin' Hcs").
     - iFrame "Hc Hd Hup".
   Qed.
@@ -1236,32 +1240,90 @@ Section UShURound.
   (*  memory death are the record's own blocks beside the deed as found. *)
   (* =================================================================== *)
 
-  (* THE PAYMENT AT RAN: the lend is the round's credential at the block's
-     head, and the deed moves from PRE to PEND at [RSyncRan] -- its step
-     is the identity.  AT ANY HOOK [oQ] (sync K4): the kernel's receipt
-     [Q_opt oQ] is [sync_pay]'s second premise, and this payment does not
-     spend it -- filing it on the ledger is lane SY3-A's. *)
-  Lemma usync_ran_pay (I : list (bv 8)) (oQ : option (iProp Σ)) :
-    ul I = LSync -> (0 < nlines I)%nat ->
-    ⊢ UkSync.sync_pay (Wcu I 3%nat) (Q_opt oQ) (UkShFork.ushf_wq Wcu I).
+  (* /sync's RECEIPT (sync SY3-A4): the deed at PEND ([RSyncRan], the
+     identity) and the round's record, both built by the hook *)
+  Definition usync_q (I : list (bv 8)) : iProp Σ :=
+    (ush_pend_at ug r s0 I ∗ usync_rec ug s0 I)%I.
+
+  (* THE PAYMENT AT RAN: the round's credential at the block's head, beside
+     the receipt, is the position-0 credential -- the block still owed
+     whole, the deed PEND with the record beside it *)
+  Lemma usync_ran_pay (I : list (bv 8)) :
+    ⊢ UkSync.sync_pay (Wcl I 3%nat) (usync_q I) (UkShFork.ushf_wq Wcu I).
   Proof using .
-    intros Hul Hpos. rewrite /UkSync.sync_pay /UkShFork.ushf_wq. iIntros "Hc _".
-    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hc") as "Hc".
-    rewrite uWcf_S3. iDestruct "Hc" as "[Hc [Hd _]]".
-    iApply (uWcu_of ug r s0 PT PD I 0%nat). rewrite uWcf_0. iRight. iFrame "Hc".
-    rewrite /ush_pend_at /ush_deed_at.
-    iDestruct "Hd" as "[Hd | #HT]"; [| by iRight].
-    iLeft. iDestruct "Hd" as (cs s v) "(Hown & %Htie & #Hty & #Hpin & #Hcs & %Hnw & Hup)".
-    iExists cs, s, v. iFrame "Hown Hty Hpin Hcs Hup". iPureIntro.
-    split; [| exact Hnw].
-    destruct Htie as [Hlen Hcon]. exists (ualt_code (UR RSyncRan)).
-    rewrite /upend_tie_at ulm_term_R ulm_cont_R ulm_step_R Hul.
-    split_and!; [exact Hlen | exact Hpos | | reflexivity | reflexivity | exact Hcon].
-    apply (ulm_ok_R' _ LSync RSyncRan ltac:(intros; discriminate)). exact Logic.I.
+    rewrite /UkSync.sync_pay /UkShFork.ushf_wq /usync_q. iIntros "Hc [Hd Hr]".
+    iApply (uWcu_of ug r s0 PT PD I 0%nat). rewrite uWcf_0. iRight. iFrame "Hc Hd Hr".
   Qed.
 
-  (* THE EXEC SUPPLY: [exec sync] at the union's /sync entry, the lend
-     going whole to the program *)
+  (* THE LEND (sync SY3-A4): the round's lend at its head splits into the
+     credential /sync keeps and THE HOOK, minted through the seam out of
+     the deed's half, the round position, the line's witness and the
+     running claim's registration ([AppFile.union_hook_file]); the hook's
+     receipt is the deed at PEND and the round's record ([usync_q]) *)
+  Lemma usync_lend (I : list (bv 8)) :
+    ul I = LSync -> (0 < nlines I)%nat ->
+    ⊢ Wcu I 3%nat -∗ Wcl I 3%nat ∗ hook_opt gen_id (Some (usync_q I)).
+  Proof using Hhk.
+    intros Hul Hpos. iIntros "Hc".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hc") as "Hc".
+    rewrite uWcf_S3. iDestruct "Hc" as "[Hc [Hd Hw]]". iFrame "Hc".
+    rewrite /hook_opt Hhk.
+    (* the taint's hook: every piece back, the receipt out of the taint *)
+    iAssert (T -∗ union_hk file_pred (fgn_cl gf) gen_id (usync_q I))%I as "Htaint".
+    { iIntros "#HT". rewrite /union_hk. iIntros (Ih rh rh') "_ _ _ Hg Hp Htk".
+      iModIntro. iModIntro. iFrame "Hg Hp Htk". rewrite /usync_q. iSplitL.
+      - iApply (ush_deed_taint ug r with "HT").
+      - by iLeft. }
+    rewrite {1}/ush_deed_at. iDestruct "Hd" as "[Hd | #HT]"; [| by iApply "Htaint"].
+    rewrite /uline_wit. iDestruct "Hw" as "[Hw | #HT]"; [| by iApply "Htaint"].
+    iDestruct "Hd" as (cs s v) "(Hown & %Htie & #Hty & #Hpin & #Hcs & %Hnw & Hup)".
+    iDestruct "Hup" as (vf n) "(#Hvf & Hpos & %Hn & #Hrr)".
+    rewrite /FileLinksLine.flw. iDestruct "Hw" as (vf') "[#Hvf' #Hfl]".
+    iDestruct (file_era_pin_agree with "Hvf Hvf'") as %<-.
+    set (ls := (fe_base vf ++ UnionAdm.ulines_in I)%list).
+    assert (Hlst : stdpp.list_basics.last ls = Some LSync).
+    { rewrite /ls last_app (ulines_in_last I Hpos) Hul. reflexivity. }
+    assert (Hls : length ls = (length (fe_base vf) + nlines I)%nat).
+    { rewrite /ls length_app UnionAdm.ulines_in_length. reflexivity. }
+    rewrite /fown. iDestruct "Hown" as "[Hdd Htk]".
+    iApply (union_hook_file (fgn_cl gf) gen_id r s ls n (usync_q I) Hlst ltac:(lia)
+              with "Hdd Hpos Hfl Hrr").
+    iSplit.
+    - (* the append: the deed PEND at /sync's run, the record beside it *)
+      iIntros "Hdd Hpos" (Ls) "#Hnew". rewrite /usync_q. iSplitL.
+      + rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
+        rewrite /fown. iFrame "Hdd Htk Hty Hpin Hcs".
+        iSplitR.
+        { iPureIntro. destruct Htie as [Hlen Hcon]. exists (ualt_code (UR RSyncRan)).
+          rewrite /upend_tie_at ulm_term_R ulm_cont_R ulm_step_R Hul.
+          split_and!; [exact Hlen | exact Hpos | | reflexivity | reflexivity | exact Hcon].
+          apply (ulm_ok_R' _ LSync RSyncRan ltac:(intros; discriminate)). exact Logic.I. }
+        iSplitR; [by iPureIntro |].
+        iExists vf, (length ls). iFrame "Hvf Hpos Hrr". iPureIntro. lia.
+      + iRight. iRight. iExists v, cs, vf, Ls. iFrame "Hpin Hcs Hvf".
+        iSplitR; [iPureIntro; exact (proj1 Htie) |].
+        rewrite -(proj2 Htie). iExact "Hnew".
+    - (* the taint: the receipt out of it *)
+      iIntros "#HT _ _". rewrite /usync_q. iSplitL.
+      + iApply (ush_deed_taint ug r with "HT").
+      + by iLeft.
+  Qed.
+
+  (* an entry is contravariant in its lend *)
+  Local Lemma image_entry_lend (f : ElfFile.elf_bytes) (M : gmap Z (bv 8)) (av : mword 64)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (Q : Z -> iProp Σ) (Pay Pay' : iProp Σ) (X : UexecSlot.uvis -d> iPropO Σ) :
+    □ (Pay' -∗ Pay) -∗ image_entry f M av sts cw secc cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay' X.
+  Proof using .
+    iIntros "#Hc #He". rewrite /image_entry.
+    iIntros "!>" (na alen afun W') "H1 H2 H3 H4 H5 H6 H7 Hmy HP".
+    iApply ("He" with "H1 H2 H3 H4 H5 H6 H7 Hmy"). iApply ("Hc" with "HP").
+  Qed.
+
+  (* THE EXEC SUPPLY: [exec sync] at the union's /sync entry, at the
+     HOOK (sync SY3-A4): the lend is split at the entry into the credential
+     and the hook ([usync_lend]); an exec failure hands the lend back whole *)
   Lemma usync_exec_sup (I : list (bv 8)) :
     ul I = LSync -> (0 < nlines I)%nat ->
     ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
@@ -1271,11 +1333,9 @@ Section UShURound.
         (ghost_varG0 := offbox_offG)
         ucat_rows (FileDisc.uline_ws LSync)
         (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat).
-  Proof using .
+  Proof using Hhk.
     intros Hul Hpos. iIntros "#Hdep #Hslot #Hkt".
-    (* NO HOOK: the round deposits none (sync K4; the union's [Some Q] is
-       lane SY3-A's) *)
-    iPoseProof (usync_ran_pay I None Hul Hpos) as "#Hpay".
+    iPoseProof (usync_ran_pay I) as "#Hpay".
     iApply (UShExecPin.sh_exec_sup_x_of_entry (ghost_varG0 := offbox_offG)
               ucat_rows (FileDisc.uline_ws LSync) UShExecPin.sync_pl
               FsSyncPin.era0_sync_pins [FsImg.ROOTINO; FsSyncPin.SYNC_INO]
@@ -1284,11 +1344,14 @@ Section UShURound.
               usync_ws_exec_ok eq_refl UShSync.sync_elf_loadable
               UShExecPin.sh_sync_pin_resolves with "[] Hkt Hslot").
     iIntros "!>" (M sa t gn sts cs pidv) "%Himg %Hbytes %Hlen %Hrows #Hnp".
+    iApply (image_entry_lend with "[]").
+    { iIntros "!> Hc". iApply (usync_lend I Hul Hpos with "Hc"). }
     iApply (UkSyncEntry.sync_image_entry (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
               (FileDisc.uline_ws LSync) M sa t gn sts FsImg.ROOTINO cs pidv
-              (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)
+              (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcl I 3%nat) (Some (usync_q I))
               (fun _ _ => eq_refl) usync_ws_exec_ok Himg Hbytes Hlen
-              with "Hpay Hnp Hdep").
+              with "[] Hnp Hdep").
+    iModIntro. cbn [Q_opt]. iExact "Hpay".
   Qed.
 
   (* THE EXEC FAILED: [exec sync failed], the record's block at
@@ -1327,7 +1390,7 @@ Section UShURound.
     iApply (uWcu_of ug r s0 PT PD I 0%nat).
     iApply (uWcf0_of_post_pre_id ug r s0 I (ualt_code (UR RSyncExec)) v
               (ulm_apr_R' I RSyncExec Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
-              Hnw Hpos
+              Hnw ltac:(by vm_compute) Hpos
               ltac:(intros s; rewrite ulm_step_R Hul; reflexivity)
               with "Hpin Hblk Hpre").
   Qed.
@@ -1339,7 +1402,7 @@ Section UShURound.
       UShExecPin.sh_sync_slot T -∗
       UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
         (ghost_varG0 := offbox_offG) T Wcu usync_lp 68.
-  Proof using Hkill.
+  Proof using Hkill Hhk inG0.
     iIntros "#Hlk #Hdep #Hslot".
     rewrite /UkShFork.ushf_child_law_at.
     iIntros "!>" (N' h m dw dv sa len ws gb sz ld n I)
@@ -1417,19 +1480,21 @@ Section UShURound.
     length cs = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     (np <= length (fe_base vf) + nlines I)%nat ->
     Wcl I 3%nat -∗ fposq r np -∗ file_era_pin gf (S gen_id) vf -∗
+    run_reg (fgn_cl gf) (S gen_id) (fn_pos r) (fn_deed r) -∗
     era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs -∗
     f_typed (fgn_cl gf) sp -∗
     FileWrite.file_wq (fgn_cl gf) r nm sp i ws sel
       (length (subseq (echo_chunks ws) sel)) -∗
     Wcf I 0%nat.
   Proof using .
-    intros Hu Hul Htp Hlen Hpos Hnp. iIntros "Hc Hwq #Hvf #Hpin #Hcs #Htyp Hq".
+    intros Hu Hul Htp Hlen Hpos Hnp. iIntros "Hc Hwq #Hvf #Hrr #Hpin #Hcs #Htyp Hq".
     rewrite /FileWrite.file_wq. iDestruct "Hq" as "[Hq | #HT]"; last first.
     { iApply (uWcf_taint ug r s0 I 0%nat v' with "Hpin HT"). }
     iDestruct "Hq" as (ls) "(Hd & _ & %Hok & %Hsel & #Hlb & %Hlst & Hposn)".
     pose proof (fl_redirs_last ls ws nm Hlst) as Hin.
-    iPoseProof (urpos_of_halves I vf _ np Hnp with "Hvf Hposn Hwq") as "Hup".
+    iPoseProof (urpos_of_halves I vf _ np Hnp with "Hvf Hposn Hwq Hrr") as "Hup".
     rewrite uWcf_0. iRight. iFrame "Hc".
+    iSplitL; [| iRight; iLeft; iPureIntro; rewrite Hul; discriminate].
     rewrite /ush_pend_at /ush_deed_at. iLeft.
     iExists cs, (<[nm := (i, subseq (echo_chunks ws) sel)]> sp), v'.
     iFrame "Hd Hpin Hcs Hup". iSplit.
@@ -1465,7 +1530,7 @@ Section UShURound.
     iApply (uWcf0_of_post_alt ug r s0 I (ualt_code (UR RFExec)) v v' cs
               (<[nm := (i, [])]> sp)
               (ulm_apr_R I RFExec Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
-              ltac:(rewrite Hul; reflexivity) Hlen Hpos Hst
+              ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos Hst
               with "Hp Hblk Hd Hup Hty Hpin' Hcs").
   Qed.
 
@@ -1485,7 +1550,7 @@ Section UShURound.
     assert (Hnp : uline_nopipe (ul I)) by (rewrite Hul; exact (uline_nopipe_echof ws nm)).
     iApply (uWcf0_of_post_alt ug r s0 I (ualt_code (UR RFOpenU)) v v' cs s
               (ulm_apr_R I RFOpenU Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
-              ltac:(rewrite Hul; reflexivity) Hlen Hpos ltac:(rewrite ulm_step_R Hul; exact Hc)
+              ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos ltac:(rewrite ulm_step_R Hul; exact Hc)
               with "Hp Hblk Hd Hup Hty Hpin' Hcs").
   Qed.
 
@@ -1512,7 +1577,7 @@ Section UShURound.
     iApply (uWcf0_of_post_alt ug r s0 I (ualt_code (UR RFOpenM)) v v' cs
               (<[nm := (i, [])]> sp)
               (ulm_apr_R I RFOpenM Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
-              ltac:(rewrite Hul; reflexivity) Hlen Hpos Hst
+              ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos Hst
               with "Hp Hblk Hd Hup Hty Hpin' Hcs").
   Qed.
 
@@ -1530,6 +1595,7 @@ Section UShURound.
       era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs -∗
       fl_lb (fgn_cl gf) ls -∗ f_typed (fgn_cl gf) sp -∗
       file_era_pin gf (S gen_id) vf -∗
+      run_reg (fgn_cl gf) (S gen_id) (fn_pos r) (fn_deed r) -∗
       ∀ ty : fdtype,
         UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
           (ghost_varG0 := offbox_offG)
@@ -1539,7 +1605,7 @@ Section UShURound.
            ∗ UShFileRedir.redir_K' gf r nm sp (length ls) ty).
   Proof using Heq Hkill HfifR.
     intros Hu Hul Htp Hokws Hlst Hnp Hlen Hpos.
-    iIntros "#Hdep #Hslot #Hpin' #Hcs #Hlb #Htyp #Hvf" (ty).
+    iIntros "#Hdep #Hslot #Hpin' #Hcs #Hlb #Htyp #Hvf #Hrr" (ty).
     iPoseProof "Hslot" as "(#Hinv & #Hcl & #Hgen)".
     assert (Hhead : ws !!! 0%nat = UShEcho.echo_pl).
     { rewrite (list_lookup_total_correct ws 0%nat EchoDisc.cmd_echo
@@ -1597,7 +1663,7 @@ Section UShURound.
       - iApply (uWcu_of ug r s0 PT PD I 0%nat).
         iDestruct "Hc" as "[Hc Hwq]".
         iApply (uredir_ran_exit I ws nm i sel v' cs sp vf (length ls) Hu Hul Htp Hlen
-                  Hpos Hnp with "Hc Hwq Hvf Hpin' Hcs Htyp Hq").
+                  Hpos Hnp with "Hc Hwq Hvf Hrr Hpin' Hcs Htyp Hq").
       - iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
     { iIntros "!> Hk". iApply uHktaint'. iExact "Hk". }
     { iIntros "!> HT". rewrite Hkill. iExact "HT". }
@@ -1722,7 +1788,7 @@ Section UShURound.
     assert (Hnp : (length ls <= length (fe_base vf) + nlines I)%nat).
     { rewrite /ls length_app UnionAdm.ulines_in_length. lia. }
     (* ---- THE ROUND POSITION, advanced to the line's count ---- *)
-    iDestruct "Hup" as (vf0 n0) "(#Hvf0 & Hposh & %Hn0)".
+    iDestruct "Hup" as (vf0 n0) "(#Hvf0 & Hposh & %Hn0 & #Hrr)".
     iDestruct (file_era_pin_agree with "Hvf0 Hvf") as %->.
     iApply ur_fupd_mwp.
     iMod (file_pos_advance _ (fgn_cl gf) r n0 (length ls) ⊤ ltac:(solve_ndisj)
@@ -1774,7 +1840,7 @@ Section UShURound.
       iModIntro. rewrite /UShFileRedir.redir_K'. iFrame "HK Hi".
     - (* exec /echo at the file *)
       iApply (uredir_exec_sup I ws file v' cs ls s vf Hfile Hul Htie Hokws Hlst Hnp Hlen Hpos
-                with "Hdep Hslot Hpin' Hcs Hfl Hty Hvf").
+                with "Hdep Hslot Hpin' Hcs Hfl Hty Hvf Hrr").
     - (* exec failed *)
       iIntros (ty).
       iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
@@ -1791,7 +1857,7 @@ Section UShURound.
       iDestruct "HK" as "[HK | #HT]"; last first.
       { iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
       iDestruct "HK" as (i γo) "(_ & Hd & Hposn & _)".
-      iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq") as "Hup".
+      iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq Hrr") as "Hup".
       iApply (uWcu_of ug r s0 PT PD I 0%nat).
       iApply (uredir_execfail_exit I ws file i v v' cs s Hul Htie Hlen Hpos
                 with "Hp Hblk Hd Hup Hty0 Hpin' Hcs").
@@ -1804,7 +1870,7 @@ Section UShURound.
       iDestruct ("Hlkw" with "Hlk") as "#Hlk'".
       rewrite /UShFileRedir.redir_Kf.
       iDestruct "HK" as "[[Hd Hposn] | [[%HsN Hd] | #HT]]".
-      + iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq") as "Hup".
+      + iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq Hrr") as "Hup".
         iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG)
                       FI (fown r s ∗ urpos ug r I) I (ualt_code (UR RFOpenU))
@@ -1819,7 +1885,7 @@ Section UShURound.
         iApply (uredir_openfail_exit_u I ws file s v v' cs Hul Htie Hpos
                   with "Hp' Hblk Hd Hup Hty Hpin' Hcs").
       + iDestruct "Hd" as (i) "[Hd Hposn]".
-        iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq") as "Hup".
+        iPoseProof (urpos_of_halves I vf _ (length ls) Hnp with "Hvf Hposn Hwq Hrr") as "Hup".
         iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG)
                       FI (fown r (<[file := (i, [])]> s) ∗ urpos ug r I) I
@@ -1854,7 +1920,7 @@ Section UShURound.
                 Hfd2 with "[] [] Hcode []").
       + iApply (uoom_law_deed I cs s v' (fposh r (length ls))
                   ltac:(rewrite Hul; reflexivity) Htie Hpos with "Hlk Hty Hpin' Hcs []").
-        iIntros "!> Hposh". iExists vf, (length ls). iFrame "Hvf Hposh".
+        iIntros "!> Hposh". iExists vf, (length ls). iFrame "Hvf Hposh Hrr".
         iPureIntro. exact Hnp.
       + iIntros "!> H". rewrite Hpeq /UkShFork.ushf_wq. iExact "H".
       + iApply (UkSh.ush_jtab_ro with "Hjt").

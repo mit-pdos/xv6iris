@@ -726,7 +726,7 @@ Section union_out.
   Definition union_cls : iProp Σ :=
     (∃ γ0 : gname, sync_reg (fgn_cl gf) 0 γ0 ∗ sl_auth γ0 (1/2) []
        ∗ sync_cm_auth (fgn_cl gf) 0 ∗ sl_auth (ff_hist (fgn_cl gf)) 1 []
-       ∗ fl_lb (fgn_cl gf) [])%I.
+       ∗ run_auth (fgn_cl gf) 0 ∗ fl_lb (fgn_cl gf) [])%I.
 
   Lemma union_led_init : union_cl_all -∗ union_led [].
   Proof using .
@@ -1082,7 +1082,7 @@ Section union_birth.
     ⊢ |==> ∃ ug : union_gn, ⌜ff_st (fgn_cl (ugn_file ug)) = γst⌝
           ∗ union_cls ug ∗ union_cl_all ug.
   Proof using .
-    iMod (file_birth_all γst) as (gf) "(%Hst & Hf & Hreg & Hcm & Hhi)".
+    iMod (file_birth_all γst) as (gf) "(%Hst & Hf & Hreg & Hcm & Hhi & Hra)".
     iMod (ghost_map_alloc_empty (K := nat) (V := pipe_era)) as (gm) "Hm".
     iMod (own_alloc (●ML ([] : list (leibnizO srec)))) as (γ0) "H0";
       [apply mono_list_auth_valid |].
@@ -1094,8 +1094,8 @@ Section union_birth.
     iDestruct (sl_lb_get with "Hhi") as "#Hhl".
     iModIntro. iExists (MkUnionGn gf gm). rewrite /union_cls /union_cl_all /=.
     iSplitR; [done |].
-    iSplitL "Hh Hcm Hhi".
-    { iExists γ0. iFrame "Hel Hh Hlb Hhi". iExact "Hcm". }
+    iSplitL "Hh Hcm Hhi Hra".
+    { iExists γ0. iFrame "Hel Hh Hlb Hhi Hra". iExact "Hcm". }
     iFrame "Hm". iSplitL "He Hfl Hme".
     { rewrite /file_cl_all /file_cl. iFrame "He Hfl Hme". }
     iSplitL "Hreg"; [iExists γ0; rewrite insert_empty; iFrame "Hreg" |].

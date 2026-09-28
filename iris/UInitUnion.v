@@ -74,10 +74,10 @@ Section UInitUnion.
      lane S5b), so [UInitUnionBoot.union_Hinit_boot_at] needs nothing more. *)
   Theorem union_Hinit_boot : union_prog_law (Σ := Σ).
   Proof using HU HfifR HPP HPR HPN HCR.
-    intros HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen.
-    cbn [app_union app_names app_pred app_ifc] in Heq, Hiface.
+    intros HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen Hhk.
+    cbn [app_union app_names app_pred app_ifc app_hk] in Heq, Hiface, Hhk.
     iIntros "#Hinv Hb Hturn".
-    iApply (union_Hinit_boot_at HR GEN c r Heq Hiface with "Hinv [Hb] [Hturn]").
+    iApply (union_Hinit_boot_at HR GEN c r Heq Hiface Hhk with "Hinv [Hb] [Hturn]").
     - cbn [app_union app_boot]. iExact "Hb".
     - cbn [app_union app_iturn union_turn]. iExact "Hturn".
   Qed.

@@ -93,6 +93,7 @@ Section UnionAdequacy.
         = MkAppcfg (app_names app_union) (app_pred app_union c) r ->
       @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_union c ->
       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
+      @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk app_union c ->
       ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_union c (S gen_id) r -∗
         app_iturn app_union c (S gen_id) -∗
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.

@@ -1461,6 +1461,11 @@ Theorem xv6_power_adequacy_gen Σ
             assumption about the world, and the premise that lets the
             record's predicate meet [AppInv]'s laws. *)
          @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
+         (* ...and (b''') THE SYNC-HOOK EQUATION (sync SY3-A4), the same
+            pattern: the record's hook family IS the application's, which
+            is what lets <init>'s shell mint the seam from the application's
+            hook to the machine's *)
+         @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = Hk c ->
          ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot c (Datatypes.S gen_id) r -∗
            (* ...AND THE ERA'S TURN (lane CONS-IO milestone F), beside the
               boot resource: the application's own per-era credential,
@@ -1815,6 +1820,10 @@ Proof.
      counter IS the pre-structure's here. *)
   assert (Hgenfix : @riscvF_genGS Σ F = riscv_pre_genGS)
     by (rewrite Hfix; reflexivity).
+  (* ...AND ITS TWIN FOR THE SYNC-HOOK FAMILY (sync SY3-A4), off the same
+     literal *)
+  assert (Hhkfix : @riscv_sync_hook Σ F = Hk Gcl)
+    by (rewrite Hfix; reflexivity).
   (* ...AND THE FOUNDING (sync SY3-A1, design/sync.md §4.5), off the same
      literal and for the same reason: at it the record's [riscv_sync_tok]
      IS the application's [Tk] at this era's raw gnames. *)
@@ -1869,7 +1878,7 @@ Proof.
             (Hrunfix (RiscvGS Σ _ HE))
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
-                 Hr Hifacefix Hgenfix)
+                 Hr Hifacefix Hgenfix Hhkfix)
             (Happ_echo (RiscvGS Σ _ HE) Gcl Hifacefix)
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
   (* the descriptor class comes back as a GOAL here rather than being
@@ -1955,7 +1964,7 @@ Proof.
             ltac:(intros ci ri; rewrite /ai_cons /app_iface_triv /cons_res_triv;
                   iIntros "_ !>" (k h H ev) "_"; by iModIntro)
             ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
-                         Heq Hiface Hgeni;
+                         Heq Hiface Hgeni Hhki;
                   iIntros "_ _ _"; iModIntro; iApply init_boot_of_triv;
                   [ rewrite Heq; intros r' av; reflexivity
                   | rewrite /app_taint Hiface; reflexivity ])
@@ -2165,7 +2174,7 @@ Proof.
             (* the first process's slot, on the GENERIC supply and the
                client's own licences *)
             ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
-                         Heq Hiface Hgeni;
+                         Heq Hiface Hgeni Hhki;
                   iIntros "_ _ _"; iModIntro; iApply init_boot_of_sup;
                   [ iApply app_sup_of_triv; rewrite Heq; intros r' av;
                     reflexivity
@@ -2638,7 +2647,7 @@ Proof.
             ltac:(intros ci ri; rewrite /ai_cons /app_iface_triv /cons_res_triv;
                   iIntros "_ !>" (k h H ev) "_"; by iModIntro)
             ltac:(intros HRi GENi HBsi HFdi HIri HPavi HWci HFi ci ri
-                         Heq Hiface Hgeni;
+                         Heq Hiface Hgeni Hhki;
                   iIntros "_ _ _"; iModIntro; iApply init_boot_of_triv;
                   [ rewrite Heq; intros r' av; reflexivity
                   | rewrite /app_taint Hiface; reflexivity ])

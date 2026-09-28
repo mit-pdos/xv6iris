@@ -805,11 +805,13 @@ Section file_birth.
     ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g
         ∗ ghost_map_auth (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
         ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) 1 0%nat
-        ∗ sl_auth (ff_hist (fgn_cl g)) 1 [].
+        ∗ sl_auth (ff_hist (fgn_cl g)) 1 []
+        ∗ run_auth (fgn_cl g) 0.
   Proof using .
-    iMod (file_birth γst) as (c) "(%Hst & Hc & Hreg & Hcm & Hh)".
+    iMod (file_birth γst) as (c) "(%Hst & Hc & Hreg & Hcm & Hh & Hrun)".
+    iDestruct (run_auth_0 with "Hrun") as "Hrun".
     iMod (ghost_map_alloc (∅ : gmap nat file_era)) as (ge) "[Hm _]".
     iModIntro. iExists (MkFileGn c ge). rewrite /file_cl_all /=.
-    iSplitR; [done |]. iFrame "Hc Hm Hreg Hcm". iExact "Hh".
+    iSplitR; [done |]. iFrame "Hc Hm Hreg Hcm Hrun". iExact "Hh".
   Qed.
 End file_birth.

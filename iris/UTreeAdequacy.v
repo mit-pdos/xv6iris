@@ -113,11 +113,12 @@ Section TreeAdequacy.
     @file_app Σ HF = MkAppcfg (app_names app_tree) (app_pred app_tree c) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = app_ifc app_tree c ->
     @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
+    @riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk app_tree c ->
     ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_tree c (S gen_id) r -∗
       app_iturn app_tree c (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using ufdG0.
-    intros Heq Hiface _.
+    intros Heq Hiface _ _.
     (* the console claim and the kill credential, off the one equation:
        both are the GENERIC slot's at this record ([AppTree]'s
        [app_iface_triv]) *)

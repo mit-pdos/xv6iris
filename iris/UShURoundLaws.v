@@ -601,11 +601,11 @@ Section UShURoundLaws.
     union_links ug -∗ UCodeShK.shk_rodata (ukn_t N) -∗
     UkSh.ksh_w (PS := uprogSG_free) N (mword_of_int 2 : mword 64)
       (mword_of_int UkSh.sh_prompt_pv) 2%nat
-      (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 3%nat ∗ PEND I))
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 3%nat ∗ (PEND I ∗ usync_rec ug s0 I)))
       (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 2%nat ∗ DONE I)).
   Proof using Hcons.
     intros Hl2. iIntros "#Hlk #Hro" (h m avail)
-      "%Ha0 %Ha1 %Ha2 #Hcode [Hstd [Hc Hp]] Hrun Hcont".
+      "%Ha0 %Ha1 %Ha2 #Hcode [Hstd [Hc [Hp #Hsrec]]] Hrun Hcont".
     (* a tainted deed: the record's law, DONE := T *)
     rewrite {1}/ush_pend_at /ush_deed_at.
     iDestruct "Hp" as "[Hp | #HT]"; last first.
@@ -661,7 +661,7 @@ Section UShURoundLaws.
     - iIntros (I l vw) "%Hfd". pose proof Hfd as [rb Hl2].
       rewrite uWcf_0 uWcf_2.
       iApply (uksh_w_or N _ _ _ (UserFd.ustd_at (ukn_fd N) l vw)
-                (Wcl I 0%nat ∗ DONE I)%I (Wcl I 3%nat ∗ PEND I)%I
+                (Wcl I 0%nat ∗ DONE I)%I (Wcl I 3%nat ∗ (PEND I ∗ usync_rec ug s0 I))%I
                 with "[] []").
       + iApply ("Hdopen" $! I l vw). by iPureIntro.
       + iApply (uksh_w_prompt_pend N I l vw rb Hl2 with "Hlk Hro").
