@@ -748,7 +748,9 @@ Section UkFileDev.
       iApply fdev_src_op. iFrame "Hs1 Hs2". }
     (* ---- THE DEPOSIT: the chain at the key's image, the piece riding it
             to the stop ---- *)
-    iApply (udepwf_K_std N m1 _ 16 _ l).
+    (* folded by [rewrite], not [iApply]: at the goal's [udepwf_K] spelling
+       the [iApply] below spent 22 s in its [IntoWand] search *)
+    rewrite -(udepwf_K_std N m1 _ 16 _ l).
     iApply (fdev_udepwf_std_write_held m1 _ l fd rb i γo _
               (Z.of_nat (length bs)) Hfd Hl Hi0 Hcnt).
     iIntros (M pm sz) "Hheap".

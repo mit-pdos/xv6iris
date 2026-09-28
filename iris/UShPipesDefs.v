@@ -136,6 +136,11 @@ Section UShPipesDefs.
   Local Notation WITN := (pwitV LM I sR).
   Local Notation TOKN := (tokN fcR lR).
 
+  (* the credential's timelessness, found by name: without it every [>]
+     at the family's invariant re-derives it through [pwc_blkV]'s body *)
+  Local Instance PWN_timeless k pre tm : Timeless (PWN k pre tm) :=
+    PWN_tl g LM CP v I sR k pre tm.
+
   (* ---- the one-shots ---- *)
   Definition osP (γo : gname) : iProp Σ := own γo (Cinl (Excl ()) : pipe_roR).
   Definition osS (γo : gname) : iProp Σ := own γo (Cinr (to_agree ()) : pipe_roR).

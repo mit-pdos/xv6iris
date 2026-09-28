@@ -614,6 +614,16 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
 - **`vm_compute; reflexivity` on a computed `gmap` state is ~12 s + ~9 s of
   `Qed`** even when tiny: close it with `vm_cast_no_check (eq_refl <the
   literal>)` (`sc1_step1`, `s0b_good`, `demo_sync_cut`).
+- **A `Timeless` proved as a LEMMA is invisible to instance search**, so
+  `apply _` and every `>` intro pattern (`iInv … as ">Hb"`) re-derive it
+  through the definition's body: ~19 s a site for `pwc_blkV`. Apply the lemma
+  (`apply pwc_blkV_timeless; apply _`), or register it where the sites are
+  (`Local Instance PWN_timeless … := PWN_tl …` in `UShPipesDefs`).
+- **`iApply` a lemma whose conclusion is a FOLDED spelling of the goal and its
+  `IntoWand` search pays the unfolding** — 22 s for `udepwf_std …` against a
+  goal spelled `udepwf_K …`, 99.9 % `typeclasses eauto`. Fold the goal with
+  `rewrite -(the ⊣⊢ lemma)` first (`UkFileDev`), never by `iApply` of the
+  `⊣⊢`, which pays the same search.
 - **A guard fixed by `change` pushes a slow non-VM conversion to `Qed`** — use
   `replace g with v by (vm_compute; reflexivity)`. **NEVER `cbv -[…]`** on a Sail
   dispatch guard.
