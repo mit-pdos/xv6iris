@@ -48,7 +48,9 @@ M1's ledgers are fresh ground and go first.
   monotone counter at a `wchG` name mirroring the cell inside
   `<tickslock>`'s payload, uptime's led twin returns the count; ONE
   landed statement moves by a binder (`wp_sys_uptime_sconf_body` gains
-  `!wchG Σ`), rulings R1-R3 open.  Then the zombie set.
+  `!wchG Σ`, ruling R1).  TICKS LANDED 2026-09-28 (dd1843b7a; as-landed
+  record in the design note §5).  Remaining in M1: the zombie set, then
+  the per-process key history `uhist`.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT

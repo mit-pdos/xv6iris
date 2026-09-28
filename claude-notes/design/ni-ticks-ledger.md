@@ -1,6 +1,7 @@
 # The ticks ledger (NI-LEDGER-REST, second item)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
+STATUS: LANDED 2026-09-28 (rulings R1-R3 as recommended, owner, 2026-09-28;
+dd1843b7a; §5 below is the as-landed record).  The
 third ledger of the campaign's M1
 ([`../projects/noninterference.md`](../projects/noninterference.md) §6),
 after the allocator's ([`ni-kalloc-ledger.md`](ni-kalloc-ledger.md)) and
@@ -111,3 +112,28 @@ lower bounds as receipts.  No event vocabulary file is needed.
   of a one-constructor event for uniformity with the other ledgers.
 - **R3 modulo tie** `t = n mod 2^32` (recommended) vs a premise that the
   count stays below `2^32`.
+
+## 5. As landed (2026-09-28, dd1843b7a)
+
+- **Files** (8, +265 / -47): `Xv6Cameras.v` (`wtk_name`, a name-only
+  field; no new camera, the ambient `mono_natG` serves), `WaitInv.v`
+  (`tick_cnt`/`tick_lb` and their four lemmas live HERE, not in
+  `SlotGen`, because `SlotGen`'s section lacks `riscvGS` and the ambient
+  `mono_natG` comes from it; `TicksInv` now imports `WaitInv`, no cycle;
+  `children_boot_rows` gains `tick_cnt 0`), `TicksInv.v` (the binder,
+  `ticks_tie`, the payload, `ticks_res_intro t n`, `ticks_tie_step`
+  stated on the exact word the `c.sw` commits — `trunc32` of the
+  `c.addiw` over the sign-extended `c.lw` — and `ticks_tie_of_int`;
+  `new_tickslock` gains `n`, the tie and the mirror: no callers),
+  `SpecSysUptime.v` / `ProofSysUptime.v` (the binder; the led twin; the
+  corollary), `ProofClockintr.v` (the step), `ProofSysPause.v` (two
+  frames), `ProofMain.v` (the raise before the seal; two `Local` boot
+  lemmas `mn_grp_kvm` / `mn_grp_trap` pass `tick_cnt 0` between the
+  group that unpacks the boot bundle and the one that seals the ticks
+  cell — main's contract untouched).
+- **Gate.**  1018 files (the camera changed), 0 errors; audits 13/13/14.
+- **What a consumer does next.**  `ProofSyscall`'s uptime arm can switch
+  to `wp_sys_uptime_led_sconf` and carry `tick_lb n` with `a0 = n` to the
+  dispatcher's row; pause's row (M0) reads two receipts of the one
+  counter, comparable by `tick_lb_le`.  Nobody does yet.
+

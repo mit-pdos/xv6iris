@@ -304,8 +304,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`ni-ticks-ledger.md`](design/ni-ticks-ledger.md)** — DESIGN PASS
   (2026-09-28): the tick counter's ledger is a monotone counter (a tick
   has no actor) at a `wchG` name, mirroring the cell inside the ticks
-  lock's payload modulo 2^32; uptime's led twin returns the count.  One
-  binder moves on uptime's landed contract, which is the ruling asked.
+  lock's payload modulo 2^32; uptime's led twin returns the count.  LANDED
+  the same day (one binder moved on uptime's contract, as ruled); §5 is
+  the as-landed record.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
