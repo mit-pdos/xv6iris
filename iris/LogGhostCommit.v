@@ -85,7 +85,9 @@ Section LogGhostCommit.
     iExists L, M. rewrite /log_quiet. iFrame "Htx HLauth Hmirh".
     iSplitR; [iPureIntro; split; [exact Hmhdr | exact Hmtie]|].
     iIntros "(Htx & HLauth & Hmirh & _ & _)". iFrame "Htx".
-    iExists W, L, D, M. iFrame. iPureIntro. done.
+    (* the rows by name: a bare [iFrame] here spent 5 s *)
+    iExists W, L, D, M.
+    iFrame "Hncell HW Hjunk HLauth HDauth Hcov Hhdr Hlogr Hpool Hmirh". iPureIntro. done.
   Qed.
 
   (* ---------------------------------------------------------------- *)

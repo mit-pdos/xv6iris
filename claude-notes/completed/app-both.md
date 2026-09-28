@@ -824,7 +824,7 @@ under the relaxed rule):
   `nlines_done` in `Hag0`'s bound).
 Every file passed its warm check at the first try; whole-tree gate
 `--proofs -k` EXIT=0 (113 files), `audit-all-only` 13/14 (the baseline,
-no new axiom).  Design note `design/app-file.md` updated at `disc_f`'s
+no new axiom).  Design note `completed/app-file-design.md` updated at `disc_f`'s
 paragraph.
 NEXT: `LineModel.lm_disc_pt ps cs s p`/`lm_disc_seg' s`/`lm_disc`/
 `lm_expected_rel s`/`lm_good_out s` with `disc`/`disc_f`/`disc_p` as

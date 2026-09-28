@@ -1,8 +1,9 @@
 # Design: user programs ONCE — the parser as a refinement, the descriptor stream, the program-generic exec (proposal)
 
-**Status: PROPOSAL (2026-09-23, asked by the owner: "we might have multiple
-cat and sh proofs … design the appropriate abstractions so that we can have
-just one proof … include echo too").**  The worklist is
+**Status: LANDED (ruled 2026-09-23, complete 2026-09-27; every row of §0's
+table is marked as landed in place).  Proposed 2026-09-23, asked by the
+owner: "we might have multiple cat and sh proofs … design the appropriate
+abstractions so that we can have just one proof … include echo too".**  The worklist is
 [`../projects/user-once.md`](../projects/user-once.md).  Builds on
 [`app-both.md`](app-both.md) (the console record made generic — this design
 is the layer BELOW it), [`user-exec.md`](user-exec.md) (the (W)/(L)/(E)
@@ -34,7 +35,7 @@ Copied, along three axes:
 | echo's ENTRY | `UEchoOut` (fd 1 = console), `UEchoFile` (fd 1 = a held descriptor on `f`), `UEchoPipe` (fd 1 = a pipe's write end) | ~3.3k | what fd 1's LEDGER ROW is |  **DONE (upstream's program-specs + B3): the entry once in `UkTreeEntry`, the three files are the devices' own vocabulary** |
 | cat's ROUND + ENTRY | `UCatKernel`/`UCatOut` (fd = `f`, offset held), `UCatPipe` + `UShPipeCatRound` (fd 0 = a pipe's read end) | ~4.3k | what the read fd's ROW is, and which output chain the turn writes through |  **DONE (upstream): `UkCatTree.kcat_round_tree` once, the four files deleted by the sweeps** |
 | the PROGRAM twins | `UShEcho`↔`UShCat` (image geometry), `UkShEcho`↔`UkShCat` (sh's exec arm), `UShEchoPay`↔`UShEchoPipePay`↔`UShRedirPay`↔`UShCatPay` (sh's exec supply) | ~5k | which PROGRAM, and which stream it is exec'd onto |  **DONE (C1-C3, 2026-09-27): `UShGeom` once, `wp_kshr_exec_x_at` once, `UShExecPin.sh_exec_sup_x_of_entry` once; the twins gone or corollaries** |
-| sh's ROUND and child dispatch | `UShRound` (file era) vs `UShPipeRound` (pipe era); `UkShRedirBody`'s three-way case | ~3.7k | the era's list of line shapes — **[`app-both.md`](app-both.md) M4's** |
+| sh's ROUND and child dispatch | `UShRound` (file era) vs `UShPipeRound` (pipe era); `UkShRedirBody`'s three-way case | ~3.7k | the era's list of line shapes — **[`app-both.md`](app-both.md) M4's** |  **DONE (shape-modules stage 1, 2026-09-27): the union round folds over a list of shape modules, one file per shape; see `shape-modules.md`** |
 
 Echo's axis and cat's are duals of one object — a descriptor row seen from
 the program, with a position and a payment — and the program twins are the

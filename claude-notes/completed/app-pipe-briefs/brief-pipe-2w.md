@@ -1,7 +1,7 @@
 # Lane PIPE-2W — two console writers at once: the `PBoth` block
 
 Clone: `/shared/xv6iris-pipe-2w`, branch `app-pipe/pipe-2w`.  Read
-`brief-common.md` first.  Design: `claude-notes/design/app-pipe.md` §4.3
+`brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md` §4.3
 (the requirement) and **§4.3b (the RULING, read against the stage: the
 merge pattern needs a SECOND per-round ledger, because the stage files a
 round's alternative at its first byte — `EchoLinksLine.blkcs`)**, §1

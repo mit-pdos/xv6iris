@@ -4,7 +4,7 @@ LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2, §4 lanes K1-K4 and
 SY3-A1..A4, §5 lane SY3-A4); the narrative is
 [`../completed/sync.md`](../completed/sync.md).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
-[`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
+[`app-file.md`](../completed/app-file-design.md) (the deed, the durable copy, honest limit 2,
 §6's commit receipt), [`applications.md`](applications.md) §3 (the durable
 instance and the transport) and `fs-syscall-specs.md` §5 (the SNAPSHOT /
 BOUND / PER-NODE principles `sys_sync` was specified against).

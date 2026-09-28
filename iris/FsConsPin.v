@@ -52,7 +52,7 @@ Require Import FsDurSnap.
 Require Import FsCfgBoot.
 Require Import FsBootParams.    (* [fsimg_cov]                            *)
 Require Import FsImgDisk.
-Require Import FsImgCheck.     (* [fsimg_byte], [fsimg_path_root]        *)
+Require Import FsImgCheck.     (* [fsimg_byte], [fsimg_path_root_blk]    *)
 Require Import FsImg.
 Require Import FsAbsDefs.      (* [arun]/[astep]/[abs_view]: FsAbs's pure *)
 Require Import FsInitPin.      (* [era0_D], [img_astep_root], [era0_root_row] *)
@@ -110,7 +110,7 @@ Definition cons_dev : anode := MkAnode (ADev CONSOLE 0) 1%nat.
 
 Lemma fsimg_console_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_console] = None.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 (* ...and `console` is not one of the four names the image DOES hold: the
    four inequalities the delta lemmas of section 5 need at the root's

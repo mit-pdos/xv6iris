@@ -16,7 +16,7 @@ names, and to REPORT — precisely — anything the design got wrong.
   ends with the two attribution lines your own system reminder gives you.
 - Read `claude-notes/README.md`, then `claude-notes/durable-notes.md`
   (guiding principle, gotchas — especially "Vacuity", "Proof using", the
-  `Context` binder trap), then `claude-notes/design/app-pipe.md` (the
+  `Context` binder trap), then `claude-notes/completed/app-pipe-design.md` (the
   design of record for this campaign) and `claude-notes/projects/app-pipe.md`
   (the worklist; your lane's entry is your contract), then the design pages
   your brief lists.

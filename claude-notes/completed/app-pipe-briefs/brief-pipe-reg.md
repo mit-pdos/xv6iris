@@ -1,7 +1,7 @@
 # Lane PIPE-REG — the registry replaces the taint for a pipe-holding program
 
 Clone: `/shared/xv6iris-pipe-reg`, branch `app-pipe/pipe-reg`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md` §2
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md` §2
 (the ruling, the shapes, the STOP rule), §7 (what was rejected and why).
 Background: `claude-notes/design/pipe.md` "The exit path" and "a program
 that never calls pipe(2) pays nothing"; `claude-notes/design/user-fd.md`;

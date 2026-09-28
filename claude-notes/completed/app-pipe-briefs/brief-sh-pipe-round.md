@@ -2,7 +2,7 @@
 
 Clone: `/shared/xv6iris-pipe-round`, branch `app-pipe/sh-pipe-round` (off
 main with the stage, the claim and the protocol merged).  Read
-`brief-common.md` first.  Design: `claude-notes/design/app-pipe.md` §4.2
+`brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md` §4.2
 (as amended: the symmetric payload + side tokens), §5.1 as landed (the
 arm's premises: `ush_pipe_call`, `RcL RcR`, one `Qc`, the two `ush_cldep`s
 riding the answer), §3 as landed (`pipe_proto_alloc`'s quintuple,

@@ -1758,7 +1758,9 @@ Qed.
 
 Lemma ralt_dec_enc a : ralt_dec (ralt_enc a) = a.
 Proof using.
-  destruct a as [k | sel | | | | | | | | | | | |]; try (by vm_compute).
+  (* the closed codes compute; the two symbolic ones are never handed to
+     [vm_compute], whose failed attempt at them cost 20 s *)
+  destruct a as [k | sel | | | | | | | | | | | |]; [| | by vm_compute ..].
   - (* REcho: its own index below 4, and out of every other code's way
        above it *)
     rewrite /ralt_enc. case_decide as Hk.

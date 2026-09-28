@@ -1,7 +1,7 @@
 # Lane SH-PIPE — `runcmd`'s PIPE arm, at call premises
 
 Clone: `/shared/xv6iris-pipe-sh-pipe`, branch `app-pipe/sh-pipe`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md`
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md`
 §5.1 (the arm), §4.2 (what the arm's two waits hand back — you state it
 ABSTRACTLY here), §2 (the pipe leaf's coming shape — you do NOT depend on
 it; you take the call as a premise).  The mould is upstream's REDIR arm:

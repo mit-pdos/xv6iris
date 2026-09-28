@@ -6,7 +6,7 @@ at fourteen; RULING F0-BOOT).  Its successor is the `app-both` campaign
 (`app-both.md`, now archived here), whose union retires this tier's theorem into a
 corollary.  Lane findings: `app-file-findings/` beside this file.  The
 worklist below is kept as it stood (started 2026-09-17).  Design of record:
-[`../design/app-file.md`](../design/app-file.md).  Read that first; this
+[`../completed/app-file-design.md`](../completed/app-file-design.md).  Read that first; this
 file is only what is LEFT, lane by lane, and what each lane found.
 
 The target: `App.xv6_app_adequacy` at `AppFile.app_file`, closed at the
@@ -603,7 +603,7 @@ landed statement moved.
   give.**  `uoff_surr` names its position under an `∃` (right for a
   boundary, which does not care), so `off_supply_of_st` hands its receipt
   back at the KERNEL's offset.  A held FILE MEMBER has to promise more:
-  design/app-file.md §3's append step needs `uoff γo off` in and
+  completed/app-file-design.md §3's append step needs `uoff γo off` in and
   `uoff γo (off + d)` out at the CALLER's own `off`.  These take the payment
   at `uoff_rcpt`'s (exact) shape and return, beside the supplier, THE TIE
   `⌜m = OffHeld -> off' = off⌝` — the kernel learns it by agreement against
@@ -815,7 +815,7 @@ eleven `PrimString`/`PrimInt63` primitives on `file_awrite_phases`,
    subsequences, so that arm's step cannot be paid at all — and it is one of
    the two arms the kernel may pick at EVERY node (`awrite_chain`'s `∧` is the
    kernel's choice, which is why `TreeMove.tree_awrite_chain` proves both).
-   **design/app-file.md section 0's limit 1 ("the concatenation of the SUBSET
+   **completed/app-file-design.md section 0's limit 1 ("the concatenation of the SUBSET
    of echo's chunks that landed") is therefore too strong.**  Two ways out,
    both the designer's call: admit a partial last chunk plus a bounded junk
    tail in `FileDisc`'s `ralt`/`fsm` and in `f_bytes_typed`; or refute the
@@ -2203,7 +2203,7 @@ twin; `UkRunExecRef`'s two supply shapes; `TreeExec`'s entry wand;
 
 **THE ONE THING LANES ECHO-FILE AND CAT-ENTRY NEED FIRST: a ruling on finding
 2, because it decides whether the REDIR child may exec at all while it holds
-f.**  design/app-file.md §3 has the child `open(f,…)` at a HELD offset, write
+f.**  completed/app-file-design.md §3 has the child `open(f,…)` at a HELD offset, write
 four times, and then `exec /echo` carrying the held row into echo's entry.
 With the carrier this lane landed, a record that answers for its offsets
 (`ukn_park = true`) may not hold a held row at all, and a record at `false`
@@ -2753,7 +2753,7 @@ header declines.
 
 ### OFF-HAND-4 (kernel/U tier, 2026-09-17) — THE CARRIER IS THE SET; THE VERIFIED ENTRIES DROP THE ROW; THE SURRENDER'S HOME IS NOT THE TAINT ARM, AND THE EVIDENCE IS ONE CONSUMER CHAIN
 
-**The lane's verdict in one line: S1 landed exactly as design/app-file.md
+**The lane's verdict in one line: S1 landed exactly as completed/app-file-design.md
 §3 fact 4 rules it, and so did the HALF of S2 the ruling is really about —
 a verified entry no longer receives "the table is all parked", so a held
 row may cross `exec` into a verified image.  The OTHER half — the taint
@@ -2953,7 +2953,7 @@ yet pay.
 
 ### READ-RELAY (2026-09-17) — THE COPYOUT'S REASON RIDES READ'S `-1` ARM ALL THE WAY UP, AND A MAPPED BUFFER REFUTES IT IN ONE LINE
 
-**The lane's verdict in one line: design/app-file.md §5.3 (c) is SETTLED
+**The lane's verdict in one line: completed/app-file-design.md §5.3 (c) is SETTLED
 AS REFUTED — the `cat: read error` tail is unreachable at a U-tier caller
 whose destination buffer it owns, `RCReadErr` is not added, and there is
 NO second reason for the failing copyout that the U tier cannot exclude.**
@@ -6432,7 +6432,7 @@ carries the count the fire was called with, `FileWrite.file_awrite_full_anchored
 `filewrite` moved; RELAY 4 is STOPPED at the brief's own stop condition, because
 `FsAbsWriteFire.awrite_part_at` is NOT the disturbed-tail arm — since round E2
 (lane E2-W) it is ALSO the disk-full SHORT-write arm — so a caller whose source
-run is readable-mapped still meets it, and design/app-file.md §0 limit 1's "a
+run is readable-mapped still meets it, and completed/app-file-design.md §0 limit 1's "a
 chunk lands whole or not at all" is false of the landed tree.**
 
 Branch `app-file/write-relay`, four commits on top of main.  Whole tree green on
@@ -6616,12 +6616,12 @@ tree, and not for want of proof effort:
   nothing unnamed in it.  `SpecWritei.v:753` / `:1036` is where the post stops —
   `⌜(tot = n)%nat -> dist = 0%nat⌝` and `⌜user = false -> dist = 0%nat⌝` are its
   only `dist` clauses, nothing says `tot < n -> 0 < dist`, and nothing could.
-- **The U tier cannot exclude it**, and design/app-file.md §0 says why in its own
+- **The U tier cannot exclude it**, and completed/app-file-design.md §0 says why in its own
   words: "the disk is not full" is a bitmap fact no application-tier claim can
   see, and refuting it "is a kernel-tier lane … and is NOT taken".
   `UkRunSys.usrc_ok`'s mapped row (`iris/UkRunSys.v:4188`) refutes copyin faults
   and says nothing about the bitmap.
-- **Therefore design/app-file.md §0 limit 1 is FALSE as stated.**  "A chunk
+- **Therefore completed/app-file-design.md §0 limit 1 is FALSE as stated.**  "A chunk
   either lands whole or not at all" fails at a chunk that STRADDLES A BLOCK
   BOUNDARY whose second block balloc cannot allocate: the first block's bytes are
   committed (`log_write` ran before the break), the second never starts, and `f`
@@ -7565,7 +7565,7 @@ MEASUREMENTS that price the shape the review has now replaced.**
 **BRANCH STATE.** `git merge main` from `4bc427216` fast-forwarded through
 `da12f4845` to `79d0e349e`.  No lane commit, no half-sweep: the in-progress
 J1 edit to `iris/FileInvDefs.v` was `git checkout`ed away rather than
-landed.  `claude-notes/design/app-file.md` is main's copy, untouched.
+landed.  `claude-notes/completed/app-file-design.md` is main's copy, untouched.
 
 **THE MERGE'S FIX-FORWARD** (three files; all three were breakages of the
 OFF-HAND-6 + F-OPEN-5 + CAT-WALK-2 + upstream combination, not of this
@@ -8069,7 +8069,7 @@ than the brief's (no reason disjunct) and it was already relayed to
    nothing, at any `REST`.
 8. **`FsAbsWriteFire.awrite_fchain` / `awrite_chain_mapped_single`** — the
    chain of FULL nodes alone, and the lemma that turns it into the real chain.
-   This is design/app-file.md section 0's limit 1 AS A THEOREM, at the two
+   This is completed/app-file-design.md section 0's limit 1 AS A THEOREM, at the two
    premises the U tier and the deed supply: `UkRunSys.usrc_ok`'s SECOND conjunct
    is the mapped row, and the line's own length bound
    (`FileDeltas.f_bytes_typed_short`, `EchoDisc.line_max` = 100 < BSIZE) is the

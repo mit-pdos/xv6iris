@@ -127,7 +127,9 @@ Definition grep_rk (pat : bytes) (fd : Z) (skip : bool) (left : bytes)
 Lemma grep_go_read (pat : bytes) (fd : Z) (skip : bool) (left : bytes) (rest : proc) :
   grep_go pat fd skip [] left rest
   = Vis (ERead fd (grep_room left)) (grep_rk pat fd skip left rest).
-Proof. rewrite grep_go_unfold. reflexivity. Qed.
+(* unfold the two continuations first: left to [reflexivity], the unifier
+   took 3 s (and the [Qed] 2 s more) to see the [let] as [grep_k]'s body *)
+Proof. rewrite grep_go_unfold. unfold grep_rk, grep_k. reflexivity. Qed.
 
 Lemma grep_rk_bytes (pat : bytes) (fd : Z) (skip : bool) (left : bytes)
     (rest : proc) (l : bytes) :

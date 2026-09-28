@@ -87,6 +87,7 @@ CtxPinMint.v
 PtTreeMorph.v
 PermInv.v
 PageGeom.v
+KallocEv.v
 KptExecMap.v
 RiscvExec.v
 HartCustody.v
@@ -863,6 +864,7 @@ CodeProcPagetable.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
+VmfaultQuiet.v
 UmCovered.v
 PtFree.v
 BarePt.v
@@ -1764,7 +1766,13 @@ UkUnionEntries.v
 UShFileRedir.v
 UShURoundDefs.v
 UkShCatForkTwin.v
-UShURound.v
+UkShShape.v
+UShUModBase.v
+UShUModSync.v
+UShUModSecc.v
+UShUModCat.v
+UShUModRedir.v
+UShUModEcho.v
 UShURoundShapes.v
 UShUPipes.v
 UnionReadInstAt.v

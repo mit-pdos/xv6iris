@@ -826,30 +826,6 @@ Section UkShPipeForkTwin.
     exact Hfd0.
   Qed.
 
-  Lemma ushf_body_law_echo_pipe (sz : Z) :
-    8344 <= sz ->
-    UserPtTree.pgroundup sz = sz ->
-    usz_ok (sz + 65536) ->
-    ushf_kill_law -∗
-    ushf_child_law -∗
-    UkShDiag.ush_panic_law Wc Wb -∗
-    ushf_body_law UkSh.ush_line_echo sz.
-  Proof using HT Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok.
-    iIntros "#Hkl #Hchl #Hplaw !>" (lu h m f k len l n)
-      "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
-       #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct Hd as [ ws -> ].
-    iDestruct (ush_jtab_ro γt with "Hjt") as "#Hro".
-    iApply (wp_kshm_body_pipe UkSh.ush_line_is 60 h m f k len ws sz l n
-              ltac:(lia) UkShFork.ushf_lp0_echo Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat
-              Hszlo Hszal Hszok Hpm1 Hpmwb
-              with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
-                    Hdat Hsz Hbuf Hrun").
-    - iApply (ushf_code_shp with "Hcode").
-    - exact Hfd0.
-  Qed.
-
   Lemma ushf_rest_of_body_at_pipe
       (D : FileDisc.uline -> Prop) (sz : Z) :
     (* the break, as [exec] leaves it *)

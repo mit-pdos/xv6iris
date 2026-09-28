@@ -424,7 +424,12 @@ Section PipeProto.
      strippable under a plain [iInv .. as ">"].  This is why (P3) is stated
      as the cell's two OWNED arms and not as the design's wand
      [∀ w, γeof ↦ Some w -∗ ⌜..⌝]: a wand is not timeless. *)
-  Global Instance pipe_body_timeless pn γp L : Timeless (pipe_body pn γp L).
+  (* priority 10, and the landed invariant's twin below the same: tried
+     FIRST, either one's failure at a [pipe_bodyU]/[pipe_invU] goal unfolds
+     both bodies to find [U <> True] -- 1.9 s at every [iIntros "#Hinv"]
+     over [pipe_invU], tree-wide.  The general instances resolve the landed
+     goals anyway, by one unfolding. *)
+  Global Instance pipe_body_timeless pn γp L : Timeless (pipe_body pn γp L) | 10.
   Proof using . rewrite /pipe_body. apply _. Qed.
 
   Definition pipe_invU (pn : pnames) (γp : pipe_names) (L : list (bv 8))
@@ -439,7 +444,7 @@ Section PipeProto.
     Persistent (pipe_invU pn γp L U).
   Proof using . rewrite /pipe_invU. apply _. Qed.
 
-  Global Instance pipe_inv_persistent pn γp L : Persistent (pipe_inv pn γp L).
+  Global Instance pipe_inv_persistent pn γp L : Persistent (pipe_inv pn γp L) | 10.
   Proof using . rewrite /pipe_inv. apply _. Qed.
 
   (* ---- (P1)--(P3), each against the KERNEL'S authority (which is the
@@ -612,7 +617,8 @@ Section PipeProto.
     pipe_invU pn γp L U -∗ pipe_clink (pn_queue γp) w emp.
   Proof using .
     intros HE. rewrite /pipe_invU /pipe_clink. iIntros "#Hinv" (s) "Ha".
-    iInv "Hinv" as (s0) ">(Hf & Hh & Hw & Hr & %Hpre & %Hrle & Heof & Hro & HU)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0) "(Hf & Hh & Hw & Hr & %Hpre & %Hrle & Heof & Hro & HU)".
     iDestruct (pipe_queue_agree with "Ha Hf") as %<-.
     iMod (pipe_queue_update _ _ _ (pst_close w s0) with "Ha Hf") as "[Ha Hf]".
     iMod ("Hclose" with "[Hf Hh Hw Hr Heof Hro HU]") as "_".
@@ -667,7 +673,8 @@ Section PipeProto.
     pipe_invU pn γp L U -∗ pipe_qfrag (pn_queue γp) s ={⊤}=∗ False.
   Proof using .
     iIntros "#Hinv Hfr".
-    iInv "Hinv" as (s0) ">(Hf & _ & _ & _ & _ & _)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0) "(Hf & _ & _ & _ & _ & _)".
     iDestruct (pipe_qfrag_excl with "Hf Hfr") as %[].
   Qed.
 
@@ -803,8 +810,9 @@ Section PipeProto.
          [pipe_short_round_realisable], now retired in SS8). *)
       rewrite /pipe_wolink. iIntros (s) "%Hwo Ha".
       destruct (decide (ps_ro s = false)) as [Hro | Hro].
-      - iInv "Hinv" as (s0)
-          ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro' & HU)" "Hclose".
+      - iInv "Hinv" as ">Hpbody" "Hclose".
+        iDestruct "Hpbody" as (s0)
+          "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro' & HU)".
         iDestruct (pipe_queue_agree with "Ha Hf") as %<-.
         (* (P3)'S SNAPSHOT ARM IS REFUTED BY THE WRITE-OPEN PREMISE, exactly
            as it is at the write link below: an end-of-file is read at a
@@ -840,8 +848,9 @@ Section PipeProto.
        spends, in the DERAILED builder past a short write. *)
     iIntros (b) "%Hb". rewrite /pipe_wlink. iIntros (s) "%Hwo %Hro Ha".
     iDestruct "HQ" as "[Hw #Hlb]".
-    iInv "Hinv" as (s0)
-      ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro' & _)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0)
+      "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro' & _)".
     iDestruct (pipe_queue_agree with "Ha Hf") as %<-.
     iDestruct (wcur_agree with "Hbw Hw") as %Hlen.
     (* (P3)'S SNAPSHOT ARM IS REFUTED BY THE WRITE LINK'S OWN PREMISE.  This
@@ -936,7 +945,8 @@ Section PipeProto.
     pipe_invU pn γp L U -∗ wcur pn c ={⊤}=∗ wcur pn c ∗ pws_lb pn (take c L).
   Proof using .
     iIntros "#Hinv Hw".
-    iInv "Hinv" as (s0) ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0) "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)".
     iDestruct (wcur_agree with "Hbw Hw") as %Hlen.
     assert (Hws : ps_ws s0 = take c L).
     { destruct Hpre as [t Ht]. rewrite -Hlen Ht take_app_length. reflexivity. }
@@ -1130,8 +1140,9 @@ Section PipeProto.
       iDestruct "HQ" as "[Hr %Hacc]".
       destruct (decide (pst_eof s)) as [Heof | Hne].
       - (* an end-of-file: SHOOT the snapshot at the frozen contents *)
-        iInv "Hinv" as (s0)
-          ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro & HU)" "Hclose".
+        iInv "Hinv" as ">Hpbody" "Hclose".
+        iDestruct "Hpbody" as (s0)
+          "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro & HU)".
         iDestruct (pipe_queue_agree with "Ha Hf") as %<-.
         iDestruct (rcur_agree with "Hbr Hr") as %Hrp.
         assert (Hws : ps_ws s0 = take (c + length acc)%nat L).
@@ -1183,8 +1194,9 @@ Section PipeProto.
        spent one node over, at the OBSERVATION above. *)
     rewrite /pipe_rlink. iIntros (s b) "%Hroo %Hnext Ha".
     iDestruct "HQ" as "[Hr %Hacc]".
-    iInv "Hinv" as (s0)
-      ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro & HU)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0)
+      "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro & HU)".
     iDestruct (pipe_queue_agree with "Ha Hf") as %<-.
     iDestruct (rcur_agree with "Hbr Hr") as %Hrp.
     (* THE DEQUEUED BYTE IS THE LINE'S, at the reader's own cursor: (P1) at
@@ -1267,8 +1279,9 @@ Section PipeProto.
     pipe_invU pn γp L U -∗ rcur pn c ={E}=∗ rcur pn c ∗ pws_lb pn (take c L).
   Proof using .
     intros HE. iIntros "#Hinv Hr".
-    iInv "Hinv" as (s0)
-      ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0)
+      "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)".
     iDestruct (rcur_agree with "Hbr Hr") as %Hrp.
     iDestruct (pws_auth_lb with "Hh") as "[Hh #Hlb]".
     (* (P1) + (P5): the reader's cursor is inside the contents, and the
@@ -1306,8 +1319,9 @@ Section PipeProto.
     □ (wcur pn 0%nat -∗ pws_lb pn (take 1%nat L) ={E}=∗ False).
   Proof using .
     intros HE HL. iIntros "#Hinv !> Hw #Hlb".
-    iInv "Hinv" as (s0)
-      ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0)
+      "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)".
     iDestruct (wcur_agree with "Hbw Hw") as %Hlen.
     assert (Hws : ps_ws s0 = []) by (by apply nil_length_inv).
     iDestruct (pws_lb_prefix with "Hh Hlb") as %Hp.
@@ -2320,8 +2334,9 @@ Section PipeProto.
     pipe_invU pn γp L U -∗ pws_lb pn (take 1 L) ={E}=∗ U.
   Proof using .
     intros HE HL. iIntros "#Hinv #Hlb".
-    iInv "Hinv" as (s0)
-      ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)" "Hclose".
+    iInv "Hinv" as ">Hpbody" "Hclose".
+    iDestruct "Hpbody" as (s0)
+      "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro & HU)".
     iDestruct (pws_lb_prefix with "Hh Hlb") as %Hp.
     iDestruct "HU" as "[%Hemp | #HU]".
     { exfalso. rewrite Hemp in Hp. apply prefix_nil_inv in Hp.

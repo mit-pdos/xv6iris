@@ -5,7 +5,7 @@ first — see `completed/spec-cleanup.md`, CLOSED 2026-09-17; its
 RD-1/RD-2 owned-offset and functional file rows were this campaign's §4
 determinism prerequisites arriving early.  The parked offset form landed
 there; the OWNED form is now upstream's OFF-LINK, so §4 should be re-read
-against `design/app-file.md` §3 before a lane is briefed).  Resumes on the
+against `completed/app-file-design.md` §3 before a lane is briefed).  Resumes on the
 owner's word only.  Below: CAMPAIGN OPENED
 2026-09-15 (owner's word, the day after the echo adequacy theorem
 closed).  §§0–7 below are the design discussion as
@@ -22,20 +22,36 @@ claim files around the engine, so M0's re-cut of `uexec_ret_F` WAITS for
 that to settle (or goes to upstream with it — relay if they want it);
 M1's ledgers are fresh ground and go first.
 
-- [ ] **NI-LEDGER-KALLOC** (M1's first ledger; kernel).  The allocator's ghost ledger on the FREE POOL pattern
+- [x] **NI-LEDGER-KALLOC** (M1's first ledger; kernel) — LANDED 2026-09-28
+  (b5e67a96b, bed7ee0dd; as-landed record in
+  [`design/ni-kalloc-ledger.md`](../design/ni-kalloc-ledger.md) §7: the
+  ledger inside `kmem_avail_auth`, no landed contract moved, led-form
+  contracts beside the landed ones, no consumer yet).  Original brief:
+  the allocator's ghost ledger on the FREE POOL pattern
   (`bitmap_inv`, per §2/§7): an abstract free set in the allocator's
   invariant; `kalloc` fails iff it is empty; each `kalloc`/`kfree`
   appends an actor-labelled `Alloc`/`Free` event.  Deliverables: the
   event vocabulary + ledger file; `SpecKalloc`'s rows deterministic in
   the ledger; callers served by the invariant (not per-caller
-  fragments).  Cut the lane brief from §2/§7.
+  fragments).  Rulings R1-R5 taken as recommended (owner, 2026-09-28).
 - [ ] **NI-LEDGER-REST** (M1 remainder): `nextpid` — coordinate with
   the landed TRAP-ROWS `upid`/`ukn_pid` work, the U tier already sees
   pid numbers — then `ticks`, the zombie set; then the per-process key
   history `uhist : mono_list uvis` beside `proc_priv`.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
-  appends no events — provable in-logic once NI-LEDGER-KALLOC lands;
-  the campaign's first theorem.
+  appends no events.  DESIGN PASS 2026-09-28,
+  [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
+  a free consequence of the ledger — absence is ownership, and kalloc's
+  premises do not distinguish a quiet round from a syscall, so the
+  in-logic form needs an exclusive per-process permit threaded through
+  the allocating cone, which is the whole syscall/fs layer (69 contracts:
+  vmfault sits under copyin/copyout/copyinstr).  Recommendation D: defer
+  the permit sweep until NI-LEDGER-REST so it is paid once for all
+  ledgers; land now the pure `vmfault_quiet` (lazy flag off ⇒ vmfault's
+  kalloc arm is unreachable) and a functor-inventory check.  RULED D
+  (owner, 2026-09-28); `vmfault_quiet` LANDED (`iris/VmfaultQuiet.v`);
+  the inventory check is open; the permit sweep waits for
+  NI-LEDGER-REST.
 - [ ] **NI-DET-ROWS** (M0): `usys_det` and the ecall arm's re-cut, the
   loop's `round_det` discharge — after the post-Qed redesign settles;
   §4 lists the row set to start from.
@@ -47,7 +63,7 @@ and [`design/user-heap.md`](../design/user-heap.md) (the U tiers whose
 determinism is half of any proof), [`design/adequacy.md`](../design/adequacy.md)
 (`Hphi`, and its item (d) — "hyperproperties are out of
 `wp_strong_adequacy`'s reach" — which §4 says how to sidestep),
-[`uart-trace.md`](uart-trace.md) (the trace-export pattern §6 reuses),
+[`uart-trace.md`](../completed/uart-trace.md) (the trace-export pattern §6 reuses),
 [`design/fs-bitmap.md`](../design/fs-bitmap.md) (the FREE POOL: the in-tree
 precedent for §3's ledger).
 

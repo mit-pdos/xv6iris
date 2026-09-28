@@ -611,6 +611,13 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
   the shape by syntactic rewrites instead: `rewrite b_eq (line_eq : lm_of M b =
   _) in H`, then apply a lemma stated at the model's own field (`uok … (LEchoF
   ws N) a -> …`). All three dropped under a second.
+  The proofmode twin is `iEval (vm_compute f) in "H"`: `UShFileRedir`'s two
+  mode bits cost 8 s at `Qed`; state them as `f lit = b` by `vm_compute;
+  reflexivity` and `iEval (rewrite …)` instead.
+- **`iInv "Hinv" as (s0) ">(…)"` strips the later AFTER the `∃`**, so the
+  `Timeless` search walks every conjunct of the opened body (~0.8 s a site
+  on the pipe invariant). `iInv "Hinv" as ">Hpbody" "Hclose". iDestruct
+  "Hpbody" as (s0) "(…)"` hits the body's own instance and is ~0.06 s.
 - **`vm_compute; reflexivity` on a computed `gmap` state is ~12 s + ~9 s of
   `Qed`** even when tiny: close it with `vm_cast_no_check (eq_refl <the
   literal>)` (`sc1_step1`, `s0b_good`, `demo_sync_cut`).
@@ -619,6 +626,17 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
   through the definition's body: ~19 s a site for `pwc_blkV`. Apply the lemma
   (`apply pwc_blkV_timeless; apply _`), or register it where the sites are
   (`Local Instance PWN_timeless … := PWN_tl …` in `UShPipesDefs`).
+- **A specialised TWIN instance declared after the general one is tried FIRST,
+  and its failure can unfold both bodies.** `pipe_inv := pipe_invU … True`
+  with its own `Persistent` instance cost 1.9 s at EVERY `iIntros "#Hinv"`
+  over a `pipe_invU … U`: the unifier walks both invariant bodies before it
+  finds `U <> True`. The tell is a uniform per-sentence cost on `#`/`>`
+  intros across a file; the proof is `Set Typeclasses Debug` showing the
+  twin's `failed with … Unable to unify`, and `assert (Persistent …) by exact
+  (the_general_instance …)` running free. Fix: `| 10` on the twin (the
+  general instance still resolves the landed goal by one unfolding).
+  PipeProto 78 s → 18 s. There are ~130 definition/instance twins in the
+  tree; demote one only when a profile shows its uniform tax.
 - **`iApply` a lemma whose conclusion is a FOLDED spelling of the goal and its
   `IntoWand` search pays the unfolding** — 22 s for `udepwf_std …` against a
   goal spelled `udepwf_K …`, 99.9 % `typeclasses eauto`. Fold the goal with

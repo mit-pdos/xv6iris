@@ -2,7 +2,7 @@
 
 Clone: `/shared/xv6iris-pipe-neg1`, branch `app-pipe/pipe-neg1`.
 Read `brief-common.md` first.  Why: lane SH-PIPE's finding R-1
-(`projects/app-pipe.md`, `### SH-PIPE`, and `claude-notes/design/app-pipe.md`
+(`projects/app-pipe.md`, `### SH-PIPE`, and `claude-notes/completed/app-pipe-design.md`
 §5.1 as landed): `UsysMemOk.usys_fd_ok`'s pipe row says only `uint r ≠ 0`
 on failure (`if decide (uint r = 0) then … else sts' = sts`), while the
 open and dup rows beside it pin `r = mword_of_int (-1)`; sh's instruction

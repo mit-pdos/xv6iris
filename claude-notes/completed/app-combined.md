@@ -3,7 +3,7 @@
 **STATUS: COMPLETE 2026-09-25 (started 2026-09-25, owner: "combine the two
 apps … stage this work: first relax the input discipline for the pipe app,
 then allow both commands in one combined app").**  Design of record:
-[`../design/app-pipe.md`](../design/app-pipe.md) §0.2.  Builds on the GCP
+[`../completed/app-pipe-design.md`](../completed/app-pipe-design.md) §0.2.  Builds on the GCP
 VM (`claude-notes/remote-build-gcp.md`); one remote tree per checkout.
 
 ## Stage 1 — relax the pipeline discipline (drop D2) — LANDED 2026-09-25

@@ -1855,7 +1855,7 @@ never a member class.  Lane seccomp S5b.
 
 ## An `_` argument to a lemma in a section without its class binder elaborates at a searched instance, and never finishes (2026-09-26)
 
-`UShURound.usecc_execfail_law` applied `UShPanic.ksh_w1_of_step N _ _ …`
+`UShUModSecc.usecc_execfail_law` (then `UShURound.usecc_execfail_law`) applied `UShPanic.ksh_w1_of_step N _ _ …`
 (sh's one-byte write stub) in a section with no `ghost_varG Σ Z` binder.
 Elaboration took a typeclass-found `ghost_varG` instance with the
 families as evars and sat at a flat 2.5 GB without returning; with the
@@ -1876,7 +1876,7 @@ off `HE`).  A witness carries pipe → echo and never back.
 ## Lessons of the pipeline campaign (2026-09-17..23), in one place
 
 The whole-system theorem for `echo … | cat` (`UInitPipeAdequacy.
-pipe_adequacy_pipeΣ_final`) closed after 38 lanes; `design/app-pipe.md`
+pipe_adequacy_pipeΣ_final`) closed after 38 lanes; `completed/app-pipe-design.md`
 §0.1 is the summary.  What generalises:
 
 - **A per-round invariant has no carrier at the boundary between two

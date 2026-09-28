@@ -1,16 +1,20 @@
 (* ===================================================================== *)
-(*  UShUPipes.v -- THE UNION ROUND'S PIPELINE BRANCH, AND THE ROUND LAW   *)
-(*  WITH NO PREMISE (cut C9f2; design: claude-notes/design/union.md       *)
-(*  section 3, 'The pipeline walk with cat f at stage 0', review B3).     *)
+(*  UShUPipes.v -- THE UNION ROUND'S PIPELINE SHAPES, THE UNION'S LIST OF *)
+(*  SHAPE MODULES, AND THE ROUND LAW WITH NO PREMISE (cut C9f2; design:   *)
+(*  claude-notes/design/union.md section 3, review B3; the modules:       *)
+(*  claude-notes/design/shape-modules.md sections 2 and 5).               *)
 (*                                                                        *)
-(*  [UShURound.sh_round_holds_union] took the pipeline lines as a premise *)
-(*  ([ush_pipes_branch]).  This file discharges it at the union claim     *)
-(*  [UnionOut.ucl], its view [UnionView.pview_unionU] and the widened     *)
-(*  credential at the pipeline's shapes [UShURoundShapes.upterm_shape] /  *)
-(*  [updone_shape]:                                                       *)
-(*    - the CHILD LAWS: [echo ws | F1 | .. | Fn] ([PipesCut.pipes_lpg])  *)
-(*      and [cat f | F1 | .. | Fn] ([PipesCut.pipes_lpcg]), each stage    *)
-(*      [cat] or [grep w] (cut G8), parse the line stage by stage         *)
+(*  At the union claim [UnionOut.ucl], its view [UnionView.pview_unionU]  *)
+(*  and the widened credential at the pipeline's shapes                   *)
+(*  [UShURoundShapes.upterm_shape] / [updone_shape]:                      *)
+(*    - the TWO PIPELINE MODULES [mod_pipes_echo] ([PipesCut.pipes_lpg],  *)
+(*      first byte 'e') and [mod_pipes_catf] ([PipesCut.pipes_lpcg],      *)
+(*      first bytes 'c' 'a'), room [68 + ush_Dpipe], and the union's list *)
+(*      [union_mods] (the five line modules [UShUMod*] and these two),    *)
+(*      which covers [ush_line_union] ([ush_line_union_mods]);            *)
+(*    - the CHILD LAWS: [echo ws | F1 | .. | Fn] and                      *)
+(*      [cat f | F1 | .. | Fn], each stage [cat] or [grep w] (cut G8),    *)
+(*      parse the line stage by stage                                     *)
 (*      ([UkShPipesLex.ushq_lines_ws_bars], cut at [PipesCut.pcut_fs])    *)
 (*      ([UkShPipesRound.wp_kshm_child_pipes_g]), open the lend and the   *)
 (*      deed, allocate the N-writer family at the round's state [sR]      *)
@@ -25,11 +29,11 @@
 (*      The committed round hands the deed back at its PRE tie            *)
 (*      ([UShURoundDefs.uWcu]'s index-0 arm); a TERMINAL round (a fork    *)
 (*      failed) carries no deed (B3: the stray [cat f] may hold it);      *)
-(*    - the BODY LAW at the pipeline lines: echo's through                *)
-(*      [UkShPipeForkTwin.wp_kshm_body_pipe], [cat f]'s through the cat   *)
-(*      body walk at any [ca] line ([UkShRedirBody.wp_kshm_body_ca_with]) *)
-(*      at the pipe era's fork twin;                                      *)
-(*    - [sh_round_holds_union_closed]: the round law with no premise.     *)
+(*    - the two modules' BODY LAWS, by the generic                        *)
+(*      [UkShShape.ushf_body_law_of_mod];                                 *)
+(*    - [sh_round_holds_union_closed]: the round law with no premise, the *)
+(*      body law folded over [union_mods]                                 *)
+(*      ([UkShShape.ushf_body_law_mods]).                                 *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -74,8 +78,14 @@ Require Import PipesUline PipesCut.
 Require Import UkCatFIface UShCatFStage UShExecPin.
 Require Import ExecWords UkShPipesLex.
 Require Import UnionDisc UnionView UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
-Require Import UShLine UShURoundDefs UShURound UShURoundShapes.
+Require Import UShLine UShURoundDefs UShUModBase UShURoundShapes.
+Require Import UShUModSync.       (* the [sync] line's module *)
+Require Import UShUModSecc.       (* the [seccomp x] line's module *)
+Require Import UShUModCat.        (* the [cat f] line's module *)
+Require Import UShUModRedir.      (* the [echo ws > f] line's module *)
+Require Import UShUModEcho.       (* the [echo ws] line's module *)
 Require Import UkShPipeForkTwin UkShCatForkTwin UkShRedirBody.
+Require Import UkShShape.
 Require UShKernel UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
 Require User.ShSyms.
 Local Open Scope Z_scope.
@@ -220,6 +230,71 @@ Lemma catf_short (sR : fstate) (nm : list (bv 8)) :
 Proof using.
   intros H. change (pv_fc pview_unionU) with files_of. rewrite catf_content /pns_short.
   destruct (sR !! nm) as [c |] eqn:E; cbn [default]; [first [exact (H c E) | exact (H c eq_refl)] | by vm_compute].
+Qed.
+
+(* ===================================================================== *)
+(*  S0m  THE TWO PIPELINE MODULES, AND THE UNION'S LIST OF MODULES        *)
+(* ===================================================================== *)
+
+(* [echo ws | F1 | .. | Fn]: the pipe era's walk (first byte 'e'), room
+   [68 + ush_Dpipe] *)
+Lemma upipes_Dc_le : (68 + UkSh.ush_Dpipe <= 68 + UkSh.ush_Dpipe)%nat.
+Proof using . lia. Qed.
+
+Lemma upipes_echo_lp_at (lu : FileDisc.uline) (f : nat -> bv 8) (k len : nat) :
+  (exists (ws : list (list (bv 8))) (fs : list filt),
+     lu = LPipe (PrEcho ws) fs /\ ush_line_pipeU (PrEcho ws) fs) ->
+  UkSh.ush_line_at lu f k len ->
+  pipes_lpg (FileDisc.uline_ws lu) (fun j : nat => f (k + j)%nat) 0%nat len.
+Proof using .
+  intros (ws & fs & -> & _) Hlat. exact (pipes_lpg_of_at ws fs f k len Hlat).
+Qed.
+
+Definition mod_pipes_echo : shape_mod :=
+  {| sm_D := fun l => exists (ws : list (list (bv 8))) (fs : list filt),
+                l = LPipe (PrEcho ws) fs /\ ush_line_pipeU (PrEcho ws) fs;
+     sm_Lp := pipes_lpg; sm_head := HeadE; sm_Dc := (68 + UkSh.ush_Dpipe)%nat;
+     sm_Dc_le := upipes_Dc_le; sm_lp0 := pipes_lpg0;
+     sm_lp_at := upipes_echo_lp_at |}.
+
+(* [cat f | F1 | .. | Fn]: the cat walk at a [ca] line, room
+   [68 + ush_Dpipe]; the name is a [uname] by the union's admission *)
+Lemma upipes_catf_lp0 (ws : list (list (bv 8))) (g : nat -> bv 8) (k len : nat) :
+  pipes_lpcg ws g k len -> head_ok HeadCA g k len.
+Proof using . exact (pipes_lpcg_bytes ws g k len). Qed.
+
+Lemma upipes_catf_lp_at (lu : FileDisc.uline) (f : nat -> bv 8) (k len : nat) :
+  (exists (nm : list (bv 8)) (fs : list filt),
+     lu = LPipe (PrCatF nm) fs /\ ush_line_pipeU (PrCatF nm) fs) ->
+  UkSh.ush_line_at lu f k len ->
+  pipes_lpcg (FileDisc.uline_ws lu) (fun j : nat => f (k + j)%nat) 0%nat len.
+Proof using .
+  intros (nm & fs & -> & Ha & _) Hlat. apply adm_u_g_catf in Ha as [Hu _].
+  exact (pipes_lpcg_of_at nm fs f k len Hu Hlat).
+Qed.
+
+Definition mod_pipes_catf : shape_mod :=
+  {| sm_D := fun l => exists (nm : list (bv 8)) (fs : list filt),
+                l = LPipe (PrCatF nm) fs /\ ush_line_pipeU (PrCatF nm) fs;
+     sm_Lp := pipes_lpcg; sm_head := HeadCA; sm_Dc := (68 + UkSh.ush_Dpipe)%nat;
+     sm_Dc_le := upipes_Dc_le; sm_lp0 := upipes_catf_lp0;
+     sm_lp_at := upipes_catf_lp_at |}.
+
+(* THE UNION'S SHAPES: the round admits exactly these modules' families *)
+Definition union_mods : list shape_mod :=
+  [mod_echo; mod_redir; mod_cat; mod_secc; mod_sync; mod_pipes_echo; mod_pipes_catf].
+
+Lemma ush_line_union_mods (l : uline) : ush_line_union l -> mods_D union_mods l.
+Proof using .
+  intros Hl. destruct l as [ws | ws nm | nm | p fs | wsx |].
+  - exists mod_echo. split; [set_solver | by exists ws].
+  - exists mod_redir. split; [set_solver | by exists ws, nm].
+  - exists mod_cat. split; [set_solver | by exists nm].
+  - destruct p as [ws | nm].
+    + exists mod_pipes_echo. split; [set_solver | by exists ws, fs].
+    + exists mod_pipes_catf. split; [set_solver | by exists nm, fs].
+  - exists mod_secc. split; [set_solver | by exists wsx].
+  - exists mod_sync. split; [set_solver | reflexivity].
 Qed.
 
 (* ===================================================================== *)
@@ -496,7 +571,7 @@ Section UShUPipes.
     iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I))%I as "#Hkillq".
     { iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
       iApply (uWcu_taint ug r s0 PT PD I 0%nat v0 with "Hpin0").
-      iApply (uHktaint' ug Hkill with "Hk"). }
+      iApply (uHktaint ug Hkill with "Hk"). }
     iIntros "!>" (W) "#HT' #Hmy". rewrite Hpeq.
     iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W with "HT' Hmy Hkillq").
   Qed.
@@ -829,90 +904,45 @@ Section UShUPipes.
   Context (γp : gname).
   Local Notation Pm := (UShLine.ush_mid_at (lk_rres FI) (fgn_echo gf) γp).
 
-  (* the body walk at an admitted pipeline: echo's line begins with [e],
-     [cat f]'s with [ca], and each forks its own child law -- at any
-     admissible stage list *)
-  Lemma ushq_body_law_upipes (N : uk_names Σ) `{Hp : !ukn_const N} (sz : Z) :
-    8344 <= sz ->
-    UserPtTree.pgroundup sz = sz ->
-    usz_ok (sz + 65536) ->
+  (* THE BODY LAWS at the two pipeline modules, from their child laws: the
+     generic wrapper's instances *)
+  Lemma upipes_echo_body_law (N : uk_names Σ) `{Hp : !ukn_const N} (sz : Z) :
+    8344 <= sz -> UserPtTree.pgroundup sz = sz -> usz_ok (sz + 65536) ->
     UkShFork.ushf_kill_law Wcu -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) T Wcu pipes_lpg (68 + UkSh.ush_Dpipe) -∗
+    UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
+    UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
+      (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (sm_D mod_pipes_echo) sz.
+  Proof using .
+    intros Hszlo Hszal Hszok. iIntros "#Hkl #Hchl #Hplaw".
+    iApply (UkShShape.ushf_body_law_of_mod (PS := uprogSG_free) (SG := uexecSG_xv6)
+              (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (fun k H => H)
+              mod_pipes_echo sz Hszlo Hszal Hszok with "Hkl [] Hplaw").
+    rewrite /UkShShape.sm_law. cbn [sm_Lp sm_Dc mod_pipes_echo]. iExact "Hchl".
+  Qed.
+
+  Lemma upipes_catf_body_law (N : uk_names Σ) `{Hp : !ukn_const N} (sz : Z) :
+    8344 <= sz -> UserPtTree.pgroundup sz = sz -> usz_ok (sz + 65536) ->
+    UkShFork.ushf_kill_law Wcu -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) T Wcu pipes_lpcg (68 + UkSh.ush_Dpipe) -∗
     UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
-      (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm ush_line_upipe sz.
+      (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (sm_D mod_pipes_catf) sz.
   Proof using .
-    intros Hszlo Hszal Hszok.
-    iIntros "#Hkl #Hche #Hchc #Hplaw".
-    rewrite /UkShFork.ushf_body_law.
-    iIntros "!>" (lu h m f k len l n)
-      "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
-       #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct Hd as (p & np & -> & Ha & Hplok).
-    iDestruct (UkSh.ush_jtab_ro (ukn_t N) with "Hjt") as "#Hro".
-    destruct p as [ws | g].
-    - (* [echo ws | F1 | .. | Fn] -- the pipe era's body walk *)
-      iApply (UkShPipeForkTwin.wp_kshm_body_pipe (PS := uprogSG_free)
-                (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm
-                (fun k0 H => H) pipes_lpg (68 + UkSh.ush_Dpipe) h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) np)) sz l n
-                ltac:(lia) pipes_lpg0
-                Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (pipes_lpg_of_at ws np f k len Hlat)
-                Hszlo Hszal Hszok Hpm1 Hpmwb
-                with "Hgen Hhead Hcode Hro [] Hjt Hkl Hche Hplaw [%] Hstd
-                      Hdat Hsz Hbuf Hrun").
-      + iApply (UkShFork.ushf_code_shp (ukn_t N) with "Hcode").
-      + exact Hfd0.
-    - (* [cat f | F1 | .. | Fn] -- the cat body walk at the pipeline's line *)
-      apply adm_u_g_catf in Ha as [Hu _].
-      destruct (pipes_lpcg_bytes _ f k len
-                  (ex_intro _ g (ex_intro _ np (conj Hu (conj eq_refl Hlat)))))
-        as (Hb0 & Hb1 & Hl2).
-      iApply (UkShRedirBody.wp_kshm_body_ca_with (PS := uprogSG_free) (SG := uexecSG_xv6)
-                (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm
-                (UkShCatForkTwin.kshf_fork_law_pipe (PS := uprogSG_free) (SG := uexecSG_xv6)
-                   (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (fun k0 H => H))
-                pipes_lpcg (68 + UkSh.ush_Dpipe) h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe (PrCatF g) np)) sz l n
-                ltac:(lia) Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (pipes_lpcg_of_at g np f k len Hu Hlat) Hb0 Hb1 Hl2
-                Hszlo Hszal Hszok Hpm1 Hpmwb
-                with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchc Hplaw [%] Hstd
-                      Hdat Hsz Hbuf Hrun").
-      + iApply (UkShFork.ushf_code_shp (ukn_t N) with "Hcode").
-      + exact Hfd0.
-  Qed.
-
-  (* THE PIPELINE BRANCH, DISCHARGED at a pay-constant name bundle *)
-  Lemma ush_pipes_branch_holds (N : uk_names Σ) `{Hp : !ukn_const N} :
-    ⊢ union_links ug -∗
-      UShEcho.sh_echo_slot T -∗
-      UShCatPay.sh_cat_slot T -∗
-      sh_grep_slot T -∗
-      (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
-      (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
-      ush_pipes_branch ug r s0 PT PD γp N.
-  Proof using Hcons Hkill Heq cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
-    iIntros "#Hlk #Hslot #Hcat #Hgrep #Hpin #Hmade".
-    iDestruct "Hpin" as (v) "#Hp".
-    iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
-    iPoseProof (uHpanic ug r s0 PT PD with "Hlk") as "#Hplaw".
-    iPoseProof (upipes_child_law_echo with "Hlk Hslot Hcat Hgrep") as "#Hche".
-    iPoseProof (upipes_child_law_catf with "Hlk Hslot Hcat Hgrep Hmade") as "#Hchc".
-    rewrite /ush_pipes_branch.
-    iApply (ushq_body_law_upipes N (SpecKexec.kexec_sz ElfUser.sh_elf)
-              UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
-              with "Hkl Hche Hchc Hplaw").
+    intros Hszlo Hszal Hszok. iIntros "#Hkl #Hchl #Hplaw".
+    iApply (UkShShape.ushf_body_law_of_mod (PS := uprogSG_free) (SG := uexecSG_xv6)
+              (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (fun k H => H)
+              mod_pipes_catf sz Hszlo Hszal Hszok with "Hkl [] Hplaw").
+    rewrite /UkShShape.sm_law. cbn [sm_Lp sm_Dc mod_pipes_catf]. iExact "Hchl".
   Qed.
 
   (* THE ROUND LAW WITH NO PREMISE: the command loop's body obligation at
-     the union's families, at every line the union admits -- the file
-     shapes and echo ([UShURound]), the pipelines at either producer
-     (above), at the pipeline's own terminal and committed shapes *)
+     the union's families, at every line the union admits: the body law
+     folded over [union_mods] ([UkShShape.ushf_body_law_mods]), each
+     module at its child law, at the pipeline's own terminal and
+     committed shapes *)
   Lemma sh_round_holds_union_closed (N : uk_names Σ) :
     ⊢ union_links ug -∗
       udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
@@ -940,13 +970,28 @@ Section UShUPipes.
     iPoseProof (upipes_child_law_echo with "Hlk Hslot Hcat Hgrep") as "#Hche".
     iPoseProof (upipes_child_law_catf with "Hlk Hslot Hcat Hgrep Hmade") as "#Hchc".
     iIntros "!>" (l) "%Hc".
-    iPoseProof (ushq_body_law_upipes N (Hp := Hc) (SpecKexec.kexec_sz ElfUser.sh_elf)
+    (* the body law over the union's modules, each at its child law *)
+    iPoseProof (UkShShape.ushf_body_law_mods (PS := uprogSG_free) (SG := uexecSG_xv6)
+                  (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (Hpay := Hc) (fun k H => H)
+                  union_mods (SpecKexec.kexec_sz ElfUser.sh_elf)
                   UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
-                  with "Hkl Hche Hchc Hplaw") as "#Hpipes".
-    iPoseProof (ushq_body_law_union ug r s0 PT PD γp N (Hp := Hc)
-                  (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
-                  with "Hkl Hchl Hred Hcatl Hsecl Hsyncl Hplaw Hpipes") as "#Hbody".
+                  with "Hkl [] Hplaw") as "#Hmods".
+    { (* NOT a bare [rewrite] / [cbn] here: they walk the whole proof
+         context (minutes); [iEval] touches the goal only *)
+      iEval (rewrite /union_mods !big_sepL_cons big_sepL_nil /UkShShape.sm_law).
+      iEval (cbn [sm_Lp sm_Dc mod_echo mod_redir mod_cat mod_secc mod_sync
+                  mod_pipes_echo mod_pipes_catf]).
+      iSplitL; [iEval (rewrite /UkShFork.ushf_child_law) in "Hchl"; iExact "Hchl" |].
+      iSplitL; [iApply (UkShRedirBody.ushf_child_law_at_of_redir (PS := uprogSG_free)
+                          (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) T Wcu
+                          with "Hred") |].
+      iSplitL; [iExact "Hcatl" |]. iSplitL; [iExact "Hsecl" |].
+      iSplitL; [iExact "Hsyncl" |]. iSplitL; [iExact "Hche" |].
+      iSplitL; [iExact "Hchc" |]. done. }
+    iPoseProof (UkShShape.ushf_body_law_mono (PS := uprogSG_free) (SG := uexecSG_xv6)
+                  (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm
+                  (mods_D union_mods) ush_line_union (SpecKexec.kexec_sz ElfUser.sh_elf)
+                  ush_line_union_mods with "Hmods") as "#Hbody".
     iPoseProof (UkShPipeForkTwin.ushf_rest_of_body_at_pipe
                   (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                   (Hpay := Hc) N γp T Wcu Wbu Pm (fun k H => H) ush_line_union

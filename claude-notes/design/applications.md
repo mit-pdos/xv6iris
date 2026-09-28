@@ -26,7 +26,7 @@ re-cut the console claim under it has landed).
   8 files / 338 definitions / 2845 lines — it must never drag the ghost
   layer).
 - **The ECHO application** (`AppEcho`; since 2026-09-25 a corollary of the
-  PIPELINE application, [`app-pipe.md`](app-pipe.md) §0.2, whose lines are
+  PIPELINE application, [`app-pipe.md`](../completed/app-pipe-design.md) §0.2, whose lines are
   `echo …` and `echo … | cat` and whose claim adds /cat's pin): init spawns sh, a user types
   `echo` lines at the console -- a different one each round, any words
   (`echo hi`, then `echo bye now`, ...) -- sh forks and execs echo, echo

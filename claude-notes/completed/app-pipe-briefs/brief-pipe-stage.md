@@ -1,7 +1,7 @@
 # Lane PIPE-STAGE — the pipeline application's record, stage, ledger and links
 
 Clone: `/shared/xv6iris-pipe-stage`, branch `app-pipe/pipe-stage`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md`
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md`
 §4.1, §5.5 (and §0, §1 for the claim), `claude-notes/design/applications.md`
 (the scaffold: `App.xv6_app`, `xv6_app_laws`, the transport, `Hphi`).
 THE MOULD is upstream's FILE application's stage, file for file — this

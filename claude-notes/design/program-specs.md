@@ -1,6 +1,19 @@
 # Design: the programs' specs as INTERACTION TREES (proposal, 2026-09-23)
 
-**Status: PROPOSAL, awaiting the owner's ruling.**  Asked by the owner
+**Status (read off the tree, 2026-09-27): LANDED as the design of record
+for the user tier.**  Cuts 1-5 of §4 are in; the union theorem
+(`union.md`, C9a-C9h) and the N-stage pipelines (`pipes-general.md`,
+`grep-pipes.md`) are built on it; §4's "NEXT" items have all been
+overtaken -- the close law carries `drained_at_close`, the assemblies
+were repointed and the old payers deleted (`UShRound` by C9h,
+`UShCatPay`/`UShEchoPipePay`/`UEchoOut` by user-once C2/C3/B3), the shape
+modules and the union are C9's, and the middle cat (`h = true`) is
+`UkPipesIface`'s `PDCopy` at a `CSPipe` sink.  What stays open is the
+§3.4d ruling: the pipeline console's first-byte fact `YR` is supplied
+from the read side, so that instance admits only programs that read
+before they write (cat, grep); a general producer at a pipe's console
+end would need the coupled device kind (`DOutOf`).  The text below is
+kept as written (2026-09-23).  Originally: PROPOSAL.  Asked by the owner
 (2026-09-23): unified specs for the user programs (echo, cat, later grep,
 sort, …) so that each program is proved ONCE and its spec serves every
 line it can appear in — `echo foo`, `echo foo > f`, `echo foo | cat`,
@@ -9,7 +22,8 @@ landed specs, and [`app-both.md`](app-both.md) §5's endpoint proposal,
 are general enough.  This file is that evaluation (§1, §2) and the
 proposal it leads to (§3, §4).  Its pure half is built:
 `iris/ProgTree.v` (the events, the two programs' trees, an interpreter,
-and every line shape above computed by `vm_compute`).  Nothing imports it.
+and every line shape above computed by `vm_compute`).  (2026-09-27: some
+fifty files import it now.)
 
 ## 0. What a program spec has to do
 

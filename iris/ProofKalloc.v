@@ -49,13 +49,16 @@ Section ProofKalloc.
 
 
   Context {kt : ktier}.
-  Lemma wp_kalloc_sconf
+  (* THE LED FORM is the proof; the landed [wp_kalloc_sconf] follows as a
+     corollary below.  The actor of the ledger's event is [p], the
+     [cpu_own] proc word (claude-notes/design/ni-kalloc-ledger.md, D3). *)
+  Lemma wp_kalloc_led_sconf
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
       (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_kalloc_sconf_body kt γl γk fl m on n eb p K b lks.
+    : wp_kalloc_led_sconf_body kt γl γk fl m on n eb p K b lks.
   Proof using .
-    cbv beta delta [wp_kalloc_sconf_body].
+    cbv beta delta [wp_kalloc_led_sconf_body].
     intros pcE ret_tgt HK Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail Hcont".
@@ -238,6 +241,9 @@ Section ProofKalloc.
       iEval (rewrite Htgtbeq) in "Hpc".
       (* the empty list pins the caller's count (if any) to 0 *)
       iDestruct (kalloc_avail_zero γk on with "Havail Hauth") as %Hzero.
+      (* the ledger: append the actor's [KNull]; the history was empty *)
+      iMod (kmem_avail_null γk on p with "Havail Hauth")
+        as "(Havail & Hauth & %h & #Hrcpt & %Hemp)".
       iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HRres".
       { iApply (kmem_res_close γk fl head []). rewrite /word_at.
         iFrame "Hflw Hauth". iPureIntro. exact Hhead. }
@@ -457,14 +463,17 @@ Section ProofKalloc.
           rewrite /P44 upd_eq.
           rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-      { rewrite /kalloc_post. iLeft. iFrame "Havail".
-        iSplit; iPureIntro; [exact HP45a0 | exact Hzero]. }
+      { rewrite /kalloc_post_led HP45a0 kev_of_null. iExists h. iFrame "Hrcpt".
+        iSplitR; [iPureIntro; tauto |].
+        rewrite /kalloc_post. iLeft. iFrame "Havail".
+        iSplit; iPureIntro; [reflexivity | exact Hzero]. }
     - (* ===== NONEMPTY: head=pg, pop + release + memset(p,5,4096) ===== *)
       iDestruct "Hchain" as "(-> & %Hpv & Hrun)".
       iDestruct "Hrun" as (nxt) "[Hrun Hchain]".
       (* the pop's ghost step: count S (length ps) -> length ps *)
       iEval (cbn [length]) in "Hauth".
-      iMod (kmem_avail_dec γk on (length ps) with "Havail Hauth") as "[Havail Hauth]".
+      iMod (kmem_avail_dec γk on p (length ps) with "Havail Hauth")
+        as "(Havail & Hauth & %h & #Hrcpt & %Hnemp)".
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
                 R7 (trap_res b + (K - 4))%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Hs1R7; apply eq_vec_false_iff; intro Hpz;
@@ -822,11 +831,31 @@ Section ProofKalloc.
           rewrite /Q44 upd_eq.
           rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
         repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
-      { rewrite /kalloc_post HQ45a0. iRight. iFrame "Havail".
+      { rewrite /kalloc_post_led HQ45a0 (kev_of_page p pg (page_valid_ne_null pg Hpv)).
+        iExists h. iFrame "Hrcpt".
+        iSplitR; [iPureIntro; pose proof (page_valid_ne_null pg Hpv); tauto |].
+        rewrite /kalloc_post. iRight. iFrame "Havail".
         iSplitR; [iPureIntro; exact Hpv |].
         rewrite /page_filled /kalloc_junk.
         iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H".
         iExact "H". }
+  Qed.
+
+  (* the landed contract: the led form with the receipt dropped *)
+  Lemma wp_kalloc_sconf
+      (γl : gname) (γk : gname * gname) (fl : mword 64)
+      (m : regfile)
+      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_kalloc_sconf_body kt γl γk fl m on n eb p K b lks.
+  Proof using .
+    cbv beta delta [wp_kalloc_sconf_body].
+    intros pcE ret_tgt HK Hfl Hn Hfresh.
+    iIntros "Hcg Hcnt Htext Hpc Hlock Havail Hcont".
+    iApply (wp_kalloc_led_sconf γl γk fl m on n eb p K b lks HK Hfl Hn Hfresh
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
+    rewrite /wp_next. iIntros (CID' Hs mr) "Hcg Hcnt Hpc %Hcs Hpost".
+    iApply ("Hcont" $! CID' Hs mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
+    by iApply kalloc_post_led_post.
   Qed.
 
 End ProofKalloc.

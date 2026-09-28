@@ -11,7 +11,7 @@
 (*  boot state ([UnionLinkInstAt.union_link_inst_at ug s0]), the          *)
 (*  discipline the union model's ([lm_disc_input ulmG]), and the line     *)
 (*  constructor the union's three file shapes and its admitted pipelines  *)
-(*  ([UShURound.ush_line_union]).                                         *)
+(*  ([UShUModBase.ush_line_union]).                                       *)
 (*                                                                        *)
 (*  The pieces at the claim ([AppFile.file_pred]) are the file            *)
 (*  application's own and are applied, not twinned: the union's claim IS  *)
@@ -82,7 +82,7 @@ Require Import UnionReadInstAt.
 Require Import UShURoundDefs.
 Require Import UShURoundShapes.
 Require Import UShURoundLaws.
-Require Import UShURound.          (* [ush_line_union] *)
+Require Import UShUModBase.        (* [ush_line_union] *)
 Require Import UInitFileLeaves.    (* the claim's laws at /init; [file_cons_in_of_Cns], [file_cons_cred_of_init] *)
 Require Import AppFileCons.        (* [file_cons_cred] *)
 Local Open Scope Z_scope.

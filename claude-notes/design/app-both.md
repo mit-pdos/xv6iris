@@ -4,8 +4,8 @@
 you unify the app-file app with the app-pipe app"), after the file theorem
 closed (`UInitFile.file_adequacy_closed`) beside the pipeline theorem
 (`UInitPipeAdequacy.pipe_adequacy_pipeΣ_final`, which already subsumes echo:
-[`app-pipe.md`](app-pipe.md) §0.2).  Builds on [`applications.md`](applications.md),
-[`app-file.md`](app-file.md), [`app-pipe.md`](app-pipe.md).
+[`app-pipe.md`](../completed/app-pipe-design.md) §0.2).  Builds on [`applications.md`](applications.md),
+[`app-file.md`](../completed/app-file-design.md), [`app-pipe.md`](../completed/app-pipe-design.md).
 
 ## 0. What "unified" means here, by the precedent
 

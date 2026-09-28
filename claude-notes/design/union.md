@@ -343,7 +343,7 @@ ucl g := gcl (ulm adm_u) (ucparams g) None (uwa g) ∨ popenU g
 - `Wcu I p` widens `(Wcl_u I p ∗ deed tie)` the way `UkShPipesFork.pterm_wcN` does (`:209-211`), with `pterm_shapeN`/`pdone_shapeN` also carrying `DONE I`.
 - A terminal pipeline round returns the deed, and a pipeline leaves the state unchanged (`fsm_pipe`, `UShRound.v:188`; `done_tie_of_pre_id` `:264`).
 
-**Dispatch.** The widened credential is not timeless, so every branch goes through `UkShPipeForkTwin` (`:130-775`):
+**Dispatch.** (2026-09-27: SUPERSEDED by [`shape-modules.md`](shape-modules.md) -- the round is a fold over `UShUPipes.union_mods`, one module file per shape, and `UShURound.v` is gone; the text below is how it was first built.)  The widened credential is not timeless, so every branch goes through `UkShPipeForkTwin` (`:130-775`):
 - `echo` goes through `ushf_body_law_echo_pipe`, using the file's tree-route supply `UShRound.echo_exec_sup_file` (`:1929`) rather than `UShEchoPay` (which is what `UShPipesRound.v:306` uses);
 - `echo > f` goes through `wp_kshm_body_pipe` at `ushs_lp`;
 - `cat f` needs a new twin of `UkShRedirBody.wp_kshm_body_cat`. Its only fork call is `UkShFork.wp_kshf_fork_at` (`UkShRedirBody.v:~570`), so take that as a parameter instead of copying;

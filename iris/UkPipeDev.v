@@ -1040,7 +1040,8 @@ Section UkPipeDev.
     iSplit; [ | iSplit ].
     - (* the chunk after the end: (P3) and (P5) against the moved permit *)
       iIntros (cb) "[%Hne %Hchk] Hstd Hr".
-      iInv "Hinv" as (s0) ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro)" "Hclose".
+      iInv "Hinv" as ">Hpbody" "Hclose".
+      iDestruct "Hpbody" as (s0) "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro)".
       iDestruct (rcur_agree with "Hbr Hr") as %Hrp.
       iDestruct "Hoe" as "[Hp | (%w0 & #Hs0 & %Hw0 & Hrpe)]".
       { iDestruct (eof_pending_shot with "Hp Heof") as %[]. }

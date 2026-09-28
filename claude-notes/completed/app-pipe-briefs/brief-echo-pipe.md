@@ -2,7 +2,7 @@
 
 Clone: `/shared/xv6iris-pipe-echo`, branch `app-pipe/echo-pipe` (off main
 AFTER the upstream merge is green).  Read `brief-common.md` first.
-Design: `claude-notes/design/app-pipe.md` §5.2, §3 AS LANDED (PIPE-PROTO:
+Design: `claude-notes/completed/app-pipe-design.md` §5.2, §3 AS LANDED (PIPE-PROTO:
 the permits `wcur`, the M-premise, the exit payload), §2 AS LANDED, §4.2 as
 amended (the symmetric payload: echo's side is `side_L ∗ (pws_lb pn L ∨
 wtok pn)`-shaped — read `PipeProto.pipe_payL`/`pipe_Qc`).  THE MOULDS are

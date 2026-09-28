@@ -367,6 +367,18 @@ Section real.
   Lemma so_prod_cons s : so_cons (so_prod s) = s.
   Proof using. unfold so_prod. case_decide as Hw; [by subst s | reflexivity]. Qed.
 
+  (* [lrv_node] at the producer's block read through [so_prod], so a caller
+     whose list holds the block itself applies it directly: a [rewrite <-
+     so_prod_cons at 1] over the node's goal cost 4-11 s a site *)
+  Lemma lrv_node_so s vs :
+    stage_out fc (prod_content fc p) (SProd p) (so_prod s) ->
+    sfx_runV fc (prod_content fc p) fs (wr_of (so_prod s)) (prod_cat p) vs ->
+    line_runV fc (LPipes p fs) ([] :: s :: vs).
+  Proof using.
+    intros H1 H2. pose proof (lrv_node fc p fs (so_prod s) vs H1 H2) as H.
+    rewrite so_prod_cons in H. exact H.
+  Qed.
+
   (* the producer wrote the whole line (echo's words, or f's content) *)
   Lemma so_whole_ok : L <> [] -> stage_out fc L (SProd p) (MkSO [] None (Some (WrAll L))).
   Proof using.
@@ -390,6 +402,17 @@ Section real.
 
   Lemma so_mid_cons s : so_cons (so_mid s) = s.
   Proof using. unfold so_mid. case_decide as Hw; [by subst s | reflexivity]. Qed.
+
+  (* [stt_next] at a middle block read through [so_mid], for the same reason
+     as [lrv_node_so] above *)
+  Lemma stt_next_mid L F F' fs' win wc s W t :
+    stage_out fc L (SMid F) (so_mid s) -> pipe_pairB L wc win (rd_of (so_mid s)) ->
+    sfx_term fc L (F' :: fs') (wr_of (so_mid s)) (filt_is_cat F) W t ->
+    sfx_term fc L (F :: F' :: fs') win wc (s :: W) t.
+  Proof using.
+    intros H1 H2 H3. pose proof (stt_next fc L F F' fs' win wc (so_mid s) W t H1 H2 H3) as H.
+    rewrite so_mid_cons in H. exact H.
+  Qed.
 
   Lemma so_mid_rd s : rd_of (so_mid s) = RdGone.
   Proof using. unfold so_mid. case_decide; reflexivity. Qed.
@@ -808,8 +831,7 @@ Section real3.
         rewrite (Hsh 0 ltac:(lia) ltac:(lia)).
         set (so := fun i : nat => so_mid (v (WLeft i))).
         pose proof (so_prod_ok fc p fs (v (WLeft 0)) (Hab 0 ltac:(lia))) as Hso0.
-        rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-        apply (lrv_node fc p fs (so_prod (v (WLeft 0))) _ Hso0).
+        apply (lrv_node_so fc p fs (v (WLeft 0)) _ Hso0).
         rewrite Hsub.
         apply (sfx_build_pf fc p F v so k' 1 m' _ _ ltac:(lia)).
         * intros i Hi. split; [apply Hsh; lia |].
@@ -828,8 +850,7 @@ Section real3.
       destruct (decide (v WLast = [] \/ v WLast = filt_dg_exec (F (S m)))) as [Hnd | Hd].
       + (* no data demand: every stage's outcome is its own, every reader gone *)
         set (so := fun i : nat => if decide (i = S m) then so_lastd (F (S m)) (v WLast) else so_mid (v (WLeft i))).
-        rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-        apply (lrv_node fc p fs (so_prod (v (WLeft 0))) _ Hso0).
+        apply (lrv_node_so fc p fs (v (WLeft 0)) _ Hso0).
         rewrite Hsub.
         apply (sfx_build fc p F v so m 1 _ _).
         * intros i Hi. unfold so. rewrite decide_False by lia.
@@ -875,8 +896,7 @@ Section real3.
           assert (Hcopy : forall i, i0 < i -> i < S m -> wr_of (so i) = WrAll D).
           { intros i H1 H2. unfold so. rewrite decide_False by lia. rewrite decide_True by lia.
             cbn [so_copy wr_of so_wr]. rewrite (Hif i ltac:(lia)). reflexivity. }
-          rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-          apply (lrv_node fc p fs (so_prod (v (WLeft 0))) _ Hso0).
+          apply (lrv_node_so fc p fs (v (WLeft 0)) _ Hso0).
           rewrite Hsub.
           apply (sfx_build fc p F v so m 1 _ _).
           -- intros i Hi. unfold so. rewrite decide_False by lia.
@@ -958,8 +978,7 @@ Section term.
                (so_mid_ok fc p (F j) _ (Ha j ltac:(lia)))).
     - destruct m as [| m]; [lia |].
       cbn [seq]. rewrite !fmap_cons. cbn [app].
-      rewrite <- (so_mid_cons (v (WLeft j))) at 1.
-      apply (stt_next fc L (F j) (F (S j)) (map F (seq (S (S j)) (S m))) win wc (so_mid (v (WLeft j))) _ _
+      apply (stt_next_mid fc L (F j) (F (S j)) (map F (seq (S (S j)) (S m))) win wc (v (WLeft j)) _ _
                (so_mid_ok fc p (F j) _ (Ha j ltac:(lia)))).
       + rewrite so_mid_rd. apply pipe_pairB_gone.
       + change (F (S j) :: map F (seq (S (S j)) (S m))) with (subf F (S j) (S m)).
