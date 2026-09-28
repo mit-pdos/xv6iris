@@ -1,7 +1,8 @@
 # Design: `sync` in the union -- a completed sync pins what the next boot sees
 
-§1-§4.4 LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2, §4.1-4.4 lanes K1-K4); §4.5 and §5 IN PROGRESS (the worklist is
-[`../projects/sync.md`](../projects/sync.md)).  Builds on
+LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2, §4 lanes K1-K4 and
+SY3-A1..A4, §5 lane SY3-A4); the narrative is
+[`../completed/sync.md`](../completed/sync.md).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
 [`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
 §6's commit receipt), [`applications.md`](applications.md) §3 (the durable
@@ -59,11 +60,16 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
   free.  It is the one "the command did not run" outcome the console shows.
 - **No file line has a silent alternative.**  Pipelines keep `PLRun []` in
   the shell's always-admitted three (`PipesDisc.plsafe`): an empty pipeline
-  output is real (`cat f | cat` at an empty `f`), and taking it out of
-  `plsafe` reaches the N-stage layer (`PipesView.pv_ok`,
-  `PipeOutNEv.pwc_blkV_file_empty`) -- an open cleanup, not a hole.
+  output is real (`cat f | cat` at an empty `f`).  Taking it out of
+  `plsafe` is a MODEL change, not a proof repair: at a pipeline the
+  application does not admit, `uok` is `plsafe` alone, so the silent
+  round's hook (`UnionDisc.unoc`, `Some (PLRun [])` at every pipeline,
+  law `unoc_ok`) and the free-ness of a `cat f` pipeline's silent run
+  (`UnionDisc.ufree`, `ufree_ok`) both rest on it -- an open cleanup, not
+  a hole.
 - **The hook** `LineModelLinks.lmh_noc : lm_line M -> option nat`, its laws
-  under `Some`; the pad of an in-flight line (`GenOutPure.lm_alts_pad`)
+  under `Some` (no proof reads it any more: its readers were the silent
+  round's own lemmas); the pad of an in-flight line (`GenOutPure.lm_alts_pad`)
   uses `lmh_exf`; the decider's canonical re-resolution
   (`UnionDecU.u_canon_name`) uses `uoom`.
 - **The proofs name the true alternative** wherever the silent one used to
@@ -157,9 +163,9 @@ sync; <cut>`, `echo b`'s last `end_op` commits synchronously, `sync` finds
 the log quiescent, and nothing commits after: the crash slot keeps the copy
 minted during `echo b`, whose witness still admits `a`.  So the sync must
 strengthen the DURABLE copy, and the boot must use it without ordering
-copies (lower bounds carry no time).  The kernel's old receipt
-(`flushed_sync`, three independent conjuncts) said nothing about the
-caller's state, and the dispatcher's arm 22 dropped it.
+copies (lower bounds carry no time).  A WAL-side receipt (a durable map
+at a batch bound) says nothing about the caller's state; `sys_sync`'s
+contract carries none -- only the hook of §4.3.
 
 ### 4.1 Vocabulary
 
@@ -764,7 +770,10 @@ ruling where noted.
   `FileOut.f0_bt v s0 := taint ∨ ∃ ls, fl_lb ls ∗ ⌜uadm ls (slast
   (fe_floor v)) s0⌝` in `union_boot` (`file_boot_at`); `file_era` gains
   `fe_floor`, pinned at the on-arm (`f0_alloc base F`) and NEVER written
-  at PowerOn (`union_led_back` only certifies `ls_c ⊑ fe_base`); the boot
+  at PowerOn (`union_led_back` only certifies `ls_c ⊑ fe_base`).  The
+  ledger's floor is the conclusion's own (inside `union_phi_res`); under
+  the taint the arm is `UT ∗ union_floor`, which is what a tainted PowerOn
+  pins; the boot
   ledger's entry is `f0_bl g v s0 := ◯ML [s0] ∗ f0_bt v s0`, so /init
   files the fact (`UInitFileLeaves.file_f0bw_of_boot`) and the ledger
   reads it at the era's first drain.

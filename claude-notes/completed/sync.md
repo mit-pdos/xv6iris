@@ -12,8 +12,8 @@ before it (`UnionAdm.uadm` at `ulast_before`).  Beside it
 green on the VM (`run-on-gcp --proofs -k`, no `Error`, `make -n` 0),
 audits system 13 / union 14 / tree 13 at the baseline.  Design of record:
 [`../design/sync.md`](../design/sync.md) (§3 the line, §4 the durability
-link with "As built" paragraphs per lane, §5 the boot relation).  Open
-cleanups: [`../projects/sync.md`](../projects/sync.md).
+link with "As built" paragraphs per lane, §5 the boot relation).  The
+cleanup sweep that followed is the last section below; one item is open.
 
 ## A4 as it ran
 
@@ -44,16 +44,7 @@ The brief's six steps ran in order with two owner rulings mid-lane.
 
 ## SY1 -- DONE: xv6 d66e41c, no silent alternative (design §1-§2)
 
-Open cleanups it left, none blocking:
-- pipelines' `PLRun []` still in `PipesDisc.plsafe` (reaches the N-stage
-  layer: `PipesView.pv_ok`, `PipeOutNEv.pwc_blkV_file_empty`);
-- `LineModelLinks.lm_ab_noc`/`lm_apr_noc`/`lm_ab_noc_len` have no users;
-- the user-tier LOAD/STORE leaves carry an in-page premise redundant with
-  alignment (`WpUmodeLoad`, `UkLoad`, `UkLoadText`, `UkStore`,
-  `WpUmodeStore`) -- the fetch clause's twin, which the owner had removed
-  from `uinstr`; ask before touching;
-- `UInitTreeBoot.v`'s header cites a lemma `tree_cc_wb_conj8_is_turn_to_taint`
-  that does not exist.
+Its cleanups are in the last section.
 
 ## SY2 -- DONE: the `sync` line (design §3)
 
@@ -151,9 +142,8 @@ from K4's stop: the entry (`image_entry`) and sh's exec supply are `□`,
 so a linear hook cannot be their premise -- the hook RIDES THE LEND:
 `/sync`'s `Pay` becomes `P ∗ hook_opt gen_id oQ` and sh's `Cr` for the
 sync child becomes `Wcu I 3 ∗ hook_opt gen_id oQ`; SY3-A4 does it.
-Cleanups left for a later sweep (none blocking): the old `flushed_sync`
-receipt and its bank; `ProofSysSync.ss_bge_fall_later` belongs in
-`WpSconfBtype`.
+Its two cleanups (the old `flushed_sync` receipt and its bank;
+`ss_bge_fall_later`'s home) are in the last section.
 REVIEW (Fable, 2026-09-27, on this plan): three defects in §4.5 fixed in
 the design (the running claim's era is a PURE record fact through an
 `Ok` predicate on the raw laws, not a counter bound; the copy's started
@@ -604,3 +594,33 @@ unchanged at every landing (the theorem keeps `union_phi` until A4).
    (the theorem's negative witness).
 5. Notes: design §3-§5 "as built"; the state block; `completed/sync.md`
    with the narrative; the cleanups list.
+
+## Cleanups (branch `sync-cleanups`)
+
+Every landing kept `union_adequacy_closed` closed and the three audits at
+the baseline (system 13, tree 13, union 14).
+- Unused lemmas deleted: `lm_ab_noc`/`lm_apr_noc`/`lm_ab_noc_len`,
+  `gdrain_ret_good`, `lm_good_out_of_stage_open`, `lm_good_out_wild`,
+  `usync_last_round`, `upend_sync_record` with `usync_at_round`, and the
+  two they orphaned (`GenOutPure.lm_good_out_of_stage`,
+  `UnionAdm.ustep_sync_ran`).
+- `UInitTreeBoot`: the lemma existed under a stale ordinal; it is
+  `tree_cc_wb_law_is_turn_to_taint`, about the SEVENTH conjunct.
+- `union_led`'s floor rides the taint arm (`UT ∗ union_floor`); the ledger
+  has one floor.
+- The union audit prints `UInitUnion.union_results`, the theorem and
+  `union_sync_cut_neg` as one term; 14.
+- `WpSconfBtype.wp_bge_fall_s_sconf_later` replaces
+  `ProofSysSync.ss_bge_fall_later`.
+- `sys_sync`'s contract lost the pre-sync receipt (`log_epoch_lb` in,
+  `flushed_sync` out); `log_res`'s bank, its deposits (`eo_tail`, the
+  genesis seal, the empty-log recycle), `FsCrash.fs_bank`/
+  `fs_rec_permit_bank`/`fs_receipt_any` and `FsFlushedCore.v` went with
+  it -- nothing outside the sync path read them.
+- The user-tier LOAD/STORE leaves take alignment and no in-page premise
+  (`WpUmodeStore.uinpage_of_aligned` derives it).
+- OPEN: `PLRun []` in `PipesDisc.plsafe`.  STOPPED, it is a model change:
+  `UnionDisc.unoc` (the silent round at every pipeline, law `unoc_ok`) and
+  `UnionDisc.ufree` (`ufree_ok`: a `cat f` pipeline's silent run is free)
+  both read it at pipelines the application does not admit, where `uok` is
+  `plsafe` alone; `LineModelLinks.lmh_noc` itself has no reader left.
