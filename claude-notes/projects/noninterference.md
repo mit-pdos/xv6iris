@@ -49,8 +49,12 @@ M1's ledgers are fresh ground and go first.
   `<tickslock>`'s payload, uptime's led twin returns the count; ONE
   landed statement moves by a binder (`wp_sys_uptime_sconf_body` gains
   `!wchG Σ`, ruling R1).  TICKS LANDED 2026-09-28 (dd1843b7a; as-landed
-  record in the design note §5).  Remaining in M1: the zombie set, then
-  the per-process key history `uhist`.
+  record in the design note §5).  ZOMBIE DESIGN PASS 2026-09-28:
+  [`design/ni-zombie-ledger.md`](../design/ni-zombie-ledger.md) — exits
+  (with the status) and reaps under `<wait_lock>`'s payload at a `wchG`
+  name, kwait's led twin; NO tie, since nothing under the wait lock
+  knows the zombie slots (D3); rulings R1-R3 open.  Then the
+  per-process key history `uhist`.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT

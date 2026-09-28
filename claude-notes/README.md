@@ -307,6 +307,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   lock's payload modulo 2^32; uptime's led twin returns the count.  LANDED
   the same day (one binder moved on uptime's contract, as ruled); §5 is
   the as-landed record.
+- **[`ni-zombie-ledger.md`](design/ni-zombie-ledger.md)** — DESIGN PASS
+  (2026-09-28): the last M1 ledger — a process's exit (with its status)
+  and its reap as events under the wait lock's payload at a `wchG`
+  name, kwait's led twin; deliberately untied, because no resource under
+  the wait lock knows which slots are zombies.  Rulings R1-R3 pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
