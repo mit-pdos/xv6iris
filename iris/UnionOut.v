@@ -964,7 +964,9 @@ Section union_out.
   (* THE FLOOR (sync SY3-A4, the owner's ruling): a lower bound of the
      RUN-LONG sync history, which the durable copy holds the authority of --
      no era, no registration.  The PowerOn pins it into the era's record
-     ([fe_floor]) and never writes it *)
+     ([fe_floor]) and never writes it.  The conclusion's resource carries
+     its own ([union_phi_res]); this one rides the ledger's TAINT arm, so a
+     tainted PowerOn still has a floor to pin *)
   Definition union_floor : iProp Σ :=
     (∃ F : list srec, sl_lb (ff_hist (fgn_cl gf)) F)%I.
 
@@ -989,8 +991,8 @@ Section union_out.
      ∗ f0_map gf h
      ∗ pera_map pg h
      ∗ fl_auth (fgn_cl gf) (ulines_of h)
-     ∗ (union_phi_res h ∨ UT)
-     ∗ union_reg h ∗ union_floor ∗ union_base h)%I.
+     ∗ (union_phi_res h ∨ UT ∗ union_floor)
+     ∗ union_reg h ∗ union_base h)%I.
 
   Global Instance union_led_timeless h : Timeless (union_led h).
   Proof using . rewrite /union_led. apply _. Qed.
@@ -1030,7 +1032,6 @@ Section union_out.
     iSplitL "Hreg".
     { iExists {[0%nat := γ0]}. iFrame "Hreg". iPureIntro. intros k.
       rewrite dom_singleton_L elem_of_singleton. cbn. lia. }
-    iSplitR; [iExists []; iFrame "Hlb0" |].
     iLeft. by iPureIntro.
   Qed.
 
@@ -1097,7 +1098,7 @@ Section union_out.
          else ucl (S (obs_boots h)) [] (LogEntryDefs.MkCH [] [] [] None)
               ∗ uturn (S (obs_boots h))).
   Proof using .
-    iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hfloor & #Hbase)".
+    iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hbase)".
     rewrite /union_led.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat
                (lm_disc_power U h on union_st_ok)).
@@ -1109,7 +1110,7 @@ Section union_out.
       iDestruct (pin_map_step (fgn_echo gf) h ObsPowerOff eq_refl with "Hpm") as "Hpm".
       iDestruct (f0_map_step gf h ObsPowerOff eq_refl with "Hfm") as "Hfm".
       iDestruct (pera_map_step pg h ObsPowerOff eq_refl with "Hme") as "Hme".
-      iModIntro. iSplitR ""; [| done]. iFrame "Ht Hpm Hfm Hme Hfl Hfloor".
+      iModIntro. iSplitR ""; [| done]. iFrame "Ht Hpm Hfm Hme Hfl".
       iSplitL "Hphi".
       { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
         iLeft. iDestruct "Hphi" as (W) "(%Hbd & _ & (%F & #HF & %HFr) & #Hera)".
@@ -1137,7 +1138,7 @@ Section union_out.
         by (rewrite obs_boots_app /=; lia).
       iMod era_full_alloc as (v) "Hfull".
       (* the floor the era's record pins: the conclusion's, or (tainted)
-         any *)
+         the taint arm's *)
       iAssert (∃ F : list srec, sl_lb (ff_hist (fgn_cl gf)) F
                  ∗ ((∃ W : list (fstate * option srec),
                        ⌜lm_disc U h -> union_phi_sync_body h W⌝
@@ -1146,7 +1147,7 @@ Section union_out.
       { iDestruct "Hphi" as "[Hphi | #HT]".
         - iDestruct "Hphi" as (W) "(%Hbd & _ & (%F & #HF & %HFr) & _)".
           iExists F. iFrame "HF". iLeft. iExists W. by iSplit; iPureIntro.
-        - iDestruct "Hfloor" as (F) "#HF". iExists F. iFrame "HF". by iRight. }
+        - iDestruct "HT" as "[#HT (%F & #HF)]". iExists F. iFrame "HF". by iRight. }
       iMod (f0_alloc (ulines_of h) F) as (vf) "(%Hbv & %Hfv & Hf0 & Hfla & Hcp)".
       iMod blk_alloc as (w gb) "(Hblk & Hrb & Hcur1)".
       iMod (pin_map_on (fgn_echo gf) h v with "Hpm") as "[Hpm #Hpin]".
@@ -1164,7 +1165,8 @@ Section union_out.
       iModIntro. iSplitR "Hcl Hturn Hγ Hcp".
       + iFrame "Ht Hpm Hfm Hme Hfl".
         iSplitL "Hphi".
-        { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
+        { iDestruct "Hphi" as "[Hphi | #HT]";
+            [| iRight; iFrame "HT"; iExists F; iExact "HF"].
           iLeft. iDestruct "Hphi" as (W) "[%Hbd %HFr]".
           iExists (W ++ [((union_rec_now h W).2, None)]). iSplitR.
           { iPureIntro. intros Hd.
@@ -1185,7 +1187,6 @@ Section union_out.
         iSplitL "HR".
         { iExists (<[S (obs_boots h) := γ]> R). iFrame "HR". iPureIntro. intros k.
           rewrite dom_insert_L elem_of_union elem_of_singleton HR Hb. lia. }
-        iSplitR; [iExists F; iExact "HF" |].
         rewrite /union_base Hb. iRight. iExists vf. iFrame "Hfp". iPureIntro.
         rewrite Hbv. exact (ubase_on h).
       + iFrame "Hcl Hturn". rewrite /union_tn.
@@ -1205,7 +1206,7 @@ Section union_out.
      end) -∗
     union_led h ==∗ union_led (h ++ [ObsUartOut i b]).
   Proof using .
-    intros Hsh. iIntros "Hgo (Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hfloor & #Hbase)".
+    intros Hsh. iIntros "Hgo (Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hbase)".
     assert (Hbo : obs_boots (h ++ [ObsUartOut i b]) = obs_boots h)
       by (rewrite obs_boots_app /=; lia).
     assert (Hsh' : trace_shape (h ++ [ObsUartOut i b]) true)
@@ -1226,7 +1227,7 @@ Section union_out.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat (lm_disc_out U h i b Hsh)).
     rewrite (_ : ulines_of (h ++ [ObsUartOut i b]) = ulines_of h);
       [| exact (ulines_of_out h i b Hsh)].
-    iFrame "Ht Hpm Hfm Hme Hreg Hfloor Hbase'".
+    iFrame "Ht Hpm Hfm Hme Hreg Hbase'".
     iDestruct "Hphi" as "[Hphi | HT]"; last first.
     { iModIntro. iFrame "Hfl". by iRight. }
     iDestruct "Hphi" as (W) "(%Hb & #Hpin0 & (%F & #HF & %HFr) & #Hera)".
@@ -1253,7 +1254,7 @@ Section union_out.
                                    | exact Hlen]. }
     rewrite /udrain_ret.
     iDestruct "Hgo" as "[#HT | Hgo]".
-    { iModIntro. iFrame "Hfl". by iRight. }
+    { iModIntro. iFrame "Hfl". iRight. iFrame "HT". iExists F. iExact "HF". }
     iDestruct "Hgo" as (s0 vf o) "(%Hgo & _ & #Hty & #Hfp & #Hlb & Ho)".
     iDestruct "Hera" as "[%H0 | (%vfE & #HpE & #HflE & %HrE)]".
     { exfalso. exact (trace_shape_boots h true Hsh eq_refl H0). }
@@ -1263,7 +1264,8 @@ Section union_out.
     rewrite Hbo. iDestruct (file_era_pin_agree with "Hfp HpB") as %<-.
     (* THE ERA'S BOOT FACT: the boot state is admissible at the era's floor *)
     iDestruct (f0_bl_bt with "[]") as "[#HT | (%ls & #Hls & %Hadm0)]";
-      [iApply (f0_lb_bl with "Hlb") | iModIntro; iFrame "Hfl"; by iRight |].
+      [iApply (f0_lb_bl with "Hlb")
+      | iModIntro; iFrame "Hfl"; iRight; iFrame "HT"; iExists F; iExact "HF" |].
     iDestruct (fl_lb_prefix with "Hfl Hls") as %Hlsp.
     pose proof (uadm_mono _ _ _ _ Hlsp Hadm0) as Hadm.
     iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
@@ -1323,7 +1325,7 @@ Section union_out.
     union_led h ==∗
       union_led (h ++ [ObsUartIn i b]) ∗ utag (h ++ [ObsUartIn i b]).
   Proof using .
-    intros Hsh. iIntros "(Hcnt & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hfloor & #Hbase)".
+    intros Hsh. iIntros "(Hcnt & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hbase)".
     assert (Hbo : obs_boots (h ++ [ObsUartIn i b]) = obs_boots h)
       by (rewrite obs_boots_app /=; lia).
     iAssert (union_reg (h ++ [ObsUartIn i b])
@@ -1348,7 +1350,7 @@ Section union_out.
     { destruct i;
         [ exact (lm_disc_in U UB h b Hsh)
         | exact (proj1 (lm_disc_other U h (ObsUartIn Uart1 b) eq_refl I Hsh)) ]. }
-    iAssert (union_phi_res (h ++ [ObsUartIn i b]) ∨ UT)%I
+    iAssert (union_phi_res (h ++ [ObsUartIn i b]) ∨ UT ∗ union_floor)%I
       with "[Hphi]" as "Hphi".
     { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
       iLeft. iDestruct "Hphi" as (W) "(%Hb & #Hp & (%F & #HF & %HFr) & #Hera)".
@@ -1376,13 +1378,13 @@ Section union_out.
     rewrite /union_led /utag.
     destruct (decide (lm_disc U (h ++ [ObsUartIn i b]))) as [Hd' | Hd'].
     - rewrite decide_True; [| exact (Hin Hd')].
-      iModIntro. iFrame "Hcnt Hpm Hfm Hme Hfl Hphi Hfllb Hreg Hfloor".
+      iModIntro. iFrame "Hcnt Hpm Hfm Hme Hfl Hphi Hfllb Hreg".
       iSplitR; [iRight; iExact "Hbase'" |].
       iSplitR; [by iPureIntro |]. iSplitR; [iLeft; by iPureIntro |].
       iExact "Hbase'".
     - iMod (mono_nat_own_update 1%nat with "Hcnt") as "[Hcnt #Hlb]";
         [destruct (decide (lm_disc U h)); lia |].
-      iModIntro. iFrame "Hcnt Hpm Hfm Hme Hfl Hphi Hfllb Hreg Hfloor".
+      iModIntro. iFrame "Hcnt Hpm Hfm Hme Hfl Hphi Hfllb Hreg".
       iSplitR; [iRight; iExact "Hbase'" |].
       iSplitR; [by iPureIntro |]. iSplitR; [iRight; rewrite /file_taint /echo_taint;
         iExact "Hlb" |].
@@ -1395,7 +1397,7 @@ Section union_out.
   Lemma union_led_phi (h : list mobs) :
     union_led h -∗ ⌜union_phi_sync h⌝.
   Proof using .
-    iIntros "(Hcnt & _ & _ & _ & _ & [Hphi | HT'] & _)".
+    iIntros "(Hcnt & _ & _ & _ & _ & [Hphi | [HT' _]] & _)".
     { iDestruct "Hphi" as (W) "[%Hb _]". iPureIntro.
       exact (union_phi_sync_of_body h W Hb). }
     rewrite /file_taint /echo_taint.
@@ -1413,7 +1415,7 @@ Section union_out.
   Proof using .
     assert (Hb : obs_boots (h ++ [ObsPowerOn]) = S (obs_boots h))
       by (rewrite obs_boots_app /=; lia).
-    iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hfloor & #Hbase)".
+    iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hbase)".
     iIntros "(Hturn & %vf & %ls & #Hp & #Hcp & #Hls & Htk)".
     iDestruct "Hbase" as "[%H0 | (%vf' & #Hp' & %Hu)]"; [lia |].
     rewrite Hb. iDestruct (file_era_pin_agree with "Hp Hp'") as %<-.
@@ -1430,7 +1432,7 @@ Section union_out.
     { iDestruct "Htk" as "[#HT | (%γ & %Ls & #Hr & Hq & #Hl & #Hc)]"; [by iLeft |].
       iRight. iExists γ, Ls. iFrame "Hr Hq Hc". }
     iModIntro. iSplitR "Hturn Htk".
-    { iFrame "Ht Hpm Hfm Hme Hfl Hphi Hreg Hfloor". iRight. iExists vf.
+    { iFrame "Ht Hpm Hfm Hme Hfl Hphi Hreg". iRight. iExists vf.
       rewrite Hb. iFrame "Hp". iPureIntro. rewrite ulast_cyc_on app_nil_r. exact Hu. }
     iFrame "Hturn". iExists vf, ls. iFrame "Hp Hcp Hlbb Htk". by iPureIntro.
   Qed.
