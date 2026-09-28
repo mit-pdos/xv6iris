@@ -2352,17 +2352,7 @@ Section ProofInitlog.
                  log_mirror_half (lm_upd
                    (lm_install M ((hdr_dec bs_hdr).2)
                       (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1))
-                   (log_hdr_bno logstart) bs')
-                 (* THE BANK AT GENESIS (fs-syscall-specs lane Y,
-                    owner-ruled).  This is the ONE write [initlog] makes
-                    after recovery has caught the home blocks up, so it is
-                    the one instant at which the boot chain can see the
-                    crash predicate -- and [LogInv.log_res]'s banked receipt
-                    has to exist from the moment the "log" spinlock is
-                    sealed, a few lines below.  The clear PRESERVES the
-                    committed map, so the copy is the recovered disk's own
-                    durable state. *)
-                 ∗ fs_bank)%I
+                   (log_hdr_bno logstart) bs'))%I
               _ Upr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirn]").
@@ -2597,12 +2587,7 @@ Section ProofInitlog.
        on it strips inside this update.  There is no swap receipt to collect
        here any more: custody was installed at birth and [Hswlb] has been in
        hand since the first instruction. *)
-    iDestruct "HQ" as "[HQ Hbk1]".
     iMod "HQ" as "Hmirc".
-    (* ...and with it the GENESIS BANK, off the same permit (lane Y).
-       Persistent and timeless, so it strips its later in this same update
-       and is then free to leave in the invariant. *)
-    iMod "Hbk1" as "#Hnewbank".
     (* the era's picture after the whole boot: the install chain, then the
        clear's header.  Its header reading is the clean one by computation
        on the bytes write_head laid down. *)
@@ -2687,13 +2672,6 @@ Section ProofInitlog.
                      HnnW Hmiss2).
           exact (HLmir bb Hbcov). }
       iPureIntro. exact Hrow0. }
-    (* THE BANK IS FULL FROM THE FIRST INSTANT (lane Y).  [Hepa] is the
-       counter's auth at genesis (E = 1) and [Hnewbank] is the copy the
-       clear just took, so the two are minted together here exactly as they
-       are at every later commit -- and sys_sync has an answer before any
-       transaction has ever run.  The auth comes straight back. *)
-    iDestruct (log_flushed_bank_mk γ 1%nat with "Hepa Hnewbank")
-      as "[Hepa #Hbank0]".
     iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Htxa Hhelp Hstok Hbatch]" as "Hres".
     { rewrite /log_res.
@@ -2724,7 +2702,6 @@ Section ProofInitlog.
          are empty, which is the cardinality tie read at zero. *)
       iSplitL "Htxa"; [iExact "Htxa"|].
       iSplitR; [iPureIntro; rewrite !map_size_empty; reflexivity|].
-      iSplitR; [iExact "Hbank0"|].
       (* THE HELPING SLOT, born empty (sync K3-4): no [sync] waiter yet,
          off the era's empty map in the log names' free bundle *)
       iSplitL "Hhelp"; [iApply (log_help_empty with "Hhelp")|].

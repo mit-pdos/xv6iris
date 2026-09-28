@@ -3,11 +3,9 @@
    the only place the five ever meet.
 
    ONE MODULE: [SpecSysSync.SYS_SYNC] is sys_sync's only contract -- the
-   machine frame plus the caller's batch witness and optional hook in, and
-   the durability receipt [flushed_sync γ e] and the hook's [Q_opt oQ] out
-   -- so the walk seals it directly and nothing is derived here.
-   [ProofSyscall]'s arm 22 takes the witness at zero, passes no hook, and
-   drops both receipts at its own call site. *)
+   machine frame plus the caller's optional hook in and the hook's
+   [Q_opt oQ] out -- so the walk seals it directly and nothing is derived
+   here.  [ProofSyscall]'s arm 22 passes the process's own hook. *)
 Require Import LinkAcquire LinkRelease LinkSleepPrepare LinkSleep ProofSysSync.
 
 Module SysSync := SysSyncProof Acquire Release SleepPrepare Sleep.

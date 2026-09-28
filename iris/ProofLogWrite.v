@@ -2025,7 +2025,7 @@ Section ProofLogWrite.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hbatch)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hhelp & Hbatch)".
     (* THIS OP'S BIRTH EPOCH ARRIVES NAMED (fs-log.md §G.19): the credit's
        group form is stated against it, so the contract takes [log_opSe] and
        [e0] is a parameter.  The auth's own soundness clause is about to pin
@@ -2510,9 +2510,6 @@ Section ProofLogWrite.
             - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
           iFrame "Htxa".
           iSplitR; [iPureIntro; rewrite Hszt Hsz -HszL; reflexivity|].
-          (* a log_write does not commit: the counter stands and so does
-             the bank standing at it *)
-          iSplitR; [iExact "Hbank"|].
           iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
           (* ABSORB: W is unchanged, so LB is too, and the block is already
@@ -2612,9 +2609,6 @@ Section ProofLogWrite.
             - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
           iFrame "Htxa".
           iSplitR; [iPureIntro; rewrite Hszt Hsz -HszL; reflexivity|].
-          (* a log_write does not commit: the counter stands and so does
-             the bank standing at it *)
-          iSplitR; [iExact "Hbank"|].
           iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists (S nl), (LB ∪ {[uint bno]}).
           (* THE APPEND BRANCH IS UNREACHABLE UNDER A CREDIT: the scan

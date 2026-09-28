@@ -1435,7 +1435,6 @@ FsCollect.v
 FsCollectImg.v
 FsCollectAll.v
 LogSnapLaw.v
-FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
 SysMknodDefs.v

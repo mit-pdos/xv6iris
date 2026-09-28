@@ -50,8 +50,7 @@
 
    THE HOOK (sync K3-4, SpecSysSync's header).  [log_res] is opened to READ
    the three cells the guard and the loop test look at -- [committing],
-   [outstanding] and [ncommit] -- to COPY the bank out
-   ([SpecSysSync.flushed_sync_of_res]), and for the caller's optional hook:
+   [outstanding] and [ncommit] -- and for the caller's optional hook:
    - on the FAST path the guard's reader ([LogQuiet.log_res_quiet_acc])
      lends the quiescent loan and the era's sync token, and the hook fires
      at a ghost commit right there ([ss_ghost_commit]);
@@ -1290,37 +1289,24 @@ Section ProofSysSync.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  (* THE CAPSTONE.  The contract's durability half costs the walk one step:
-     the receipt is minted ONCE, at the first acquire, off [LogInv.log_res]
-     itself ([SpecSysSync.flushed_sync_of_res]), and being persistent it
-     rides the intuitionistic context past the guard, through the
-     Löb-closed wait loop and out at the tail.
-
-     WHY THAT IS ENOUGH FOR BOTH ARMS, and why the wait loop needs no new
-     invariant.  The post asks for a bank at some [e' >= e] and NOT for a
-     strict increase (SpecSysSync's header argues at length that [S e]
-     would be unprovable on the fast path and would make no consumer
-     stronger).  So the receipt does not have to be taken at the LAST
-     acquire: the counter only grows, so a copy taken at the FIRST one
-     already satisfies the post on every path through the function.  That is
-     what keeps the loop's raw case split -- the [log.ncommit] cell's value
-     is still unconstrained by [log_res].  (The HOOK does need a word: the
-     one +0x32 loads, which the loop carries in s2 and the helping slot's
-     entry records -- see the header.) *)
+  (* THE CAPSTONE.  The wait loop keeps its raw case split -- the
+     [log.ncommit] cell's value is unconstrained by [log_res]; the HOOK
+     needs a word, the one +0x32 loads, which the loop carries in s2 and
+     the helping slot's entry records (see the header). *)
   Lemma wp_sys_sync_sconf
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (e : nat) (oQ : option (iProp Σ))
-    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e oQ.
+      (b : bool) (lks : gset string) (oQ : option (iProp Σ))
+    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks oQ.
   Proof using .
     cbv beta delta [wp_sys_sync_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx #Hlbe Hhook #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx Hhook #Hpinv Hcont".
     iPoseProof "Hlogx" as "#Hlog".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart & _)".
@@ -1486,14 +1472,6 @@ Section ProofSysSync.
         first [ exact Hacq_csp
               | apply Hacq_rest; [vm_compute; reflexivity | reg_neq..] ]. }
     (* ============ the anchored TAIL and the Löb-closed WAIT LOOP ========= *)
-    (* ===== THE RECEIPT, MINTED ONCE (fs-syscall-specs lane Y) =====
-       The lock is held and [Hres] is the invariant's own resource, so the
-       bank the committer left there is readable right here -- and [Hres]
-       comes back untouched, because everything the bank hands out is
-       persistent.  This is the whole of the design's derivation-chain item
-       (iii), and it happens before the guard is even read. *)
-    iDestruct (flushed_sync_of_res γ bn γfs cov logstart e with "Hlbe Hres")
-      as "[#Hflush Hres]".
     iAssert (ss_exit CID j γ bn γfs cov logstart m K eb lks spd sp0 (Q_opt oQ))
       with "[Hcont]" as "Hexit".
     { rewrite /ss_exit.
@@ -1501,16 +1479,15 @@ Section ProofSysSync.
       iApply (ss_tail_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx K eb lks spd sp0
                 HK Hsx Hspd Hsp0 HssE Hbelow
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc [Hcont HQ]").
-      (* [ss_tail_body] promises the RECEIPT-FREE continuation -- an
-         abstract exit, so the same tail serves whatever the contract adds
-         above it -- and the receipt is injected here, on the way into the
-         contract's own continuation *)
+      (* [ss_tail_body] promises an abstract exit, so the same tail serves
+         whatever the contract adds above it; the hook's [Q] is injected
+         here, on the way into the contract's own continuation *)
       iIntros (CIDret) "%Hgret". iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
       iDestruct ("Hcont" $! CIDret with "[%]") as "Hc"; [exact Hgret |].
       iSpecialize ("Hc" $! mfret).
       iSpecialize ("Hc" with "[%]"); [exact Hcsret |].
       iSpecialize ("Hc" with "[%]"); [exact Ha0ret |].
-      iApply ("Hc" with "Hcgf Hcntf Hextcf Hextmf Hflush HQ Hpcf"). }
+      iApply ("Hc" with "Hcgf Hcntf Hextcf Hextmf HQ Hpcf"). }
     iAssert (∀ n0 : mword 32, ss_loop CID j γ bn γfs cov logstart m K eb lks spd sp0 oQ n0)%I
       with "[]" as "Hloop".
     { iIntros (n0). iLöb as "IH". rewrite /ss_loop.

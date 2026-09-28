@@ -1347,7 +1347,7 @@ Section BoBodies.
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
     iDestruct "Hres" as (out cmt nc om Ep Xr Tx)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hhelp & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1395,9 +1395,6 @@ Section BoBodies.
         iSplitR; [iPureIntro; exact Hcap|].
         iFrame "Htxa".
         iSplitR; [iPureIntro; exact Hszt|].
-        (* the bank rides back untouched: persistent, and this step does
-           not move the counter it is indexed by *)
-        iSplitR; [iExact "Hbank"|].
         iSplitL "Hhelp"; [iExact "Hhelp"|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
@@ -1729,9 +1726,6 @@ Section BoBodies.
           iSplitR.
           { iPureIntro. rewrite (map_size_insert_None _ _ _ Ht).
             rewrite (map_size_insert_None _ _ _ Hi). by rewrite Hszt. }
-          (* a begin_op does not commit, so the counter -- and with it
-             the bank's index -- stands *)
-          iSplitR; [iExact "Hbank"|].
           (* the helping slot at [out+1]: a Pending entry's guard clause
              only gets easier ([LogHelp.log_help_cells]) *)
           iSplitL "Hhelp".
@@ -1784,7 +1778,6 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hcap|].
           iFrame "Htxa".
           iSplitR; [iPureIntro; exact Hszt|].
-          iSplitR; [iExact "Hbank"|].
           iSplitL "Hhelp"; [iExact "Hhelp"|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].

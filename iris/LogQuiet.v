@@ -167,7 +167,7 @@ Section LogQuiet.
     rewrite /log_res.
     iIntros "H". iDestruct "H" as (out cmt nc om E X T)
       "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa &
-        %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hhelp & Hrest)".
+        %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hhelp & Hrest)".
     iExists out, cmt, nc.
     iSplitR; [iPureIntro; exact Hout3|].
     iFrame "Hout Hcmt Hnc Hhelp".
@@ -176,7 +176,7 @@ Section LogQuiet.
       iIntros "Hout Hcmt Hnc Hhelp".
       iExists out, cmt, nc, om, E, X, T.
       iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp Hrest".
-      iFrame "Hbank". iPureIntro. done.
+      iPureIntro. done.
     - (* the quiescent loan and the token *)
       iIntros (Hout0 Hcmtf). subst cmt.
       (* nothing outstanding: the ledger, hence the transaction map, is empty *)
@@ -196,7 +196,7 @@ Section LogQuiet.
       iSplitR; [iPureIntro; split; [exact Hmhdr | rewrite -HLB0; exact Hmtie]|].
       iIntros "(Htxa & HLauth & Hmirh & _ & _) Htok Hout Hcmt Hnc Hhelp".
       iExists out, false, nc, om, E, X, (∅ : gmap nat unit).
-      iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hbank Hhelp".
+      iFrame "Hout Hcmt Hnc Hauth Hepa Hxa Htxa Hhelp".
       repeat (iSplitR; [iPureIntro; first [done | intros; discriminate]|]).
       iExists n, LB.
       iSplitR; [iPureIntro; exact Hsum|].

@@ -5841,24 +5841,15 @@ Section SyscallArms.
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hlog & _)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    (* THE WITNESS AND THE RECEIPT, AT THE TRIVIAL END.  sys_sync's contract
-       is the durability one: it asks for the caller's invocation-time batch
-       witness and hands back [flushed_sync].  A dispatch has no batch
-       history to speak of, so it takes the witness at zero -- free from
-       nothing ([SpecSysSync.sync_witness_0]) -- and drops the receipt at the
-       return, which is the whole of what a receipt-free reading costs. *)
-    iApply fupd_wp.
-    iMod (sync_witness_0 icfg_log) as "#Hlb".
-    iModIntro.
     (* THE PROCESS'S HOOK, out of its own deposit (sync K4) *)
     iDestruct (sysc_dep_sync U sts gn cs pid fdep
                  ltac:(rewrite Hnum; reflexivity) with "Hxin") as "Hhook".
     iApply (SysSync.wp_sys_sync_sconf γs j γl fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev
-              M (av - 4)%nat true true ∅ 0%nat (sy_oQ fdep)
+              M (av - 4)%nat true true ∅ (sy_oQ fdep)
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
-              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb Hhook Hprocs").
-    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ HQo Hpc".
+              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hhook Hprocs").
+    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ HQo Hpc".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).
