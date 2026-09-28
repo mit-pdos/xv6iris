@@ -1,7 +1,7 @@
 # Project: the PIPELINE application — `echo … | cat` prints the line
 
 **STATUS: OPEN (started 2026-09-17, owner: "go for the pipeline
-application").**  Design of record: [`../design/app-pipe.md`](../design/app-pipe.md).
+application").**  Design of record: [`../completed/app-pipe-design.md`](../completed/app-pipe-design.md).
 Read that first; this file is only what is LEFT, lane by lane, and what
 each lane found.
 
@@ -4206,7 +4206,7 @@ the term travelling.
    pipewrite used `kill_paid_shot` and dropped the credential on the
    floor).  The design page's "The exit path" should say the row, not the
    site.
-2. **`design/app-pipe.md` §5.3's queued kernel lane READ-KILL-TAINT asks
+2. **`completed/app-pipe-design.md` §5.3's queued kernel lane READ-KILL-TAINT asks
    for a twin that cannot be written.**  It says the honest discharge is
    "the pipe twin of `uexec_live_ok`'s read clause = usertrap's second
    `killed()` check".  The KILL arm really is dead at a resumed process,

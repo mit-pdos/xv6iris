@@ -110,7 +110,7 @@ candidate below is judged against A and B.
   `OffGv.off_user_inv γo` (parked row; existential, nobody reads it) or
   `UserOff.uoff γo off` (held row) via `FdSlots.foff_row` (`:762`).  The
   generic-proof sites that conjured a precondition for it are the four refuted
-  shapes (design/app-file.md §7), and what is STILL IN THE TREE of them:
+  shapes (completed/app-file-design.md §7), and what is STILL IN THE TREE of them:
   `UsysMemOk.usys_fd_ok`'s open arm conjunct `fdst_parked (FdOpen rd wr t)`
   (`UsysMemOk.v` open row, "WHY IT BELONGS HERE … LICENSES A GENERIC OPEN TO
   INSTALL A HELD DESCRIPTOR"), `usys_fd_ok_parked` (`:791`),

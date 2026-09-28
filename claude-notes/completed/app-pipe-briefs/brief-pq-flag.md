@@ -1,7 +1,7 @@
 # Lane PQ-FLAG — one pure premise on the pipe's write and read links
 
 Clone: `/shared/xv6iris-pipe-pq-flag`, branch `app-pipe/pq-flag`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md` §3.1
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md` §3.1
 (why), §3 (who consumes it).  Background: `claude-notes/design/pipe.md`
 "The byte queue" (the links, the coupled arm, where the steps fire);
 `claude-notes/completed/pipe-queue.md` (what each pipe file is).

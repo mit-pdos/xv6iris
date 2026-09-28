@@ -2,7 +2,7 @@
 
 Clone: `/shared/xv6iris-pipe-cat`, branch `app-pipe/cat-pipe` (off main
 AFTER the upstream merge is green).  Read `brief-common.md` first.
-Design: `claude-notes/design/app-pipe.md` §5.3, §4.1 (cat's output is
+Design: `claude-notes/completed/app-pipe-design.md` §5.3, §4.1 (cat's output is
 echo's line at the stage's cursor; the cursor is the READ POINTER — no
 offset, no held descriptor), §3 AS LANDED (`rcur`, `pipe_rQ`'s pure
 conjunct, the EOF one-shot, the exit payload `∃ w, eof_shot pn w`), §4.2

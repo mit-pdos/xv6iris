@@ -3,7 +3,7 @@
 §1-§4.4 LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2, §4.1-4.4 lanes K1-K4); §4.5 and §5 IN PROGRESS (the worklist is
 [`../projects/sync.md`](../projects/sync.md)).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
-[`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
+[`app-file.md`](../completed/app-file-design.md) (the deed, the durable copy, honest limit 2,
 §6's commit receipt), [`applications.md`](applications.md) §3 (the durable
 instance and the transport) and `fs-syscall-specs.md` §5 (the SNAPSHOT /
 BOUND / PER-NODE principles `sys_sync` was specified against).

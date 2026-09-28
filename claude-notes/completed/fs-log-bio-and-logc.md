@@ -1,6 +1,6 @@
 # Completed: the FS block layer, stages 1–3 (the bio rework + all of log.c)
 
-Archived from [`../projects/fs-log.md`](../projects/fs-log.md) when stage 4
+Archived from [`../projects/fs-log.md`](../design/fs-log.md) when stage 4
 reached phase D. Design: [`../design/fs-log.md`](../design/fs-log.md); the
 physical bio layer these stages rework is [`bio.md`](bio.md) (instruction
 maps, escrow swap lemmas and proof-agent notes there all still apply).

@@ -1,7 +1,7 @@
 # Lane PIPE-MODEL — the pure model `iris/PipeDisc.v`
 
 Clone: `/shared/xv6iris-pipe-model`, branch `app-pipe/pipe-model`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md` §1
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md` §1
 (the definitions are the DESIGNER's: land them VERBATIM; a definition you
 find wrong is REPORTED with the counterexample, not fixed).  Moulds:
 `iris/EchoDisc.v` (sections 1–2c: `line_ok`, `disc_input`, `line_alts_of`,

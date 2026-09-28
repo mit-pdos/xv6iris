@@ -1,13 +1,15 @@
 # Design: the FILE application (`AppFile`) — `echo … > f` survives a power cycle, `cat f` prints it
 
+**ARCHIVED 2026-09-28 (note hygiene): this is the design of an application that no longer exists as such -- the union (`design/union.md`) replaced the file application (C9h, 2026-09-25).  Kept for the record of how the pieces were first built and why; the design of record for what stands is [`../design/union.md`](../design/union.md), with [`../design/program-specs.md`](../design/program-specs.md) for the programs and [`../design/user-once.md`](../design/user-once.md) / [`../design/shape-modules.md`](../design/shape-modules.md) for sh.  Links below were rewritten for the new location; the text is otherwise as it was.**
+
 Status: DESIGN OF RECORD (2026-09-17, Fable).  The worklist is
-[`../completed/app-file.md`](../completed/app-file.md).  This page builds on
-[`applications.md`](applications.md) (the two-instance claim, the
+[`../completed/app-file.md`](app-file.md).  This page builds on
+[`applications.md`](../design/applications.md) (the two-instance claim, the
 transport, the record), the echo application (`iris/AppEcho.v`,
 `iris/EchoDisc.v`, `iris/EchoOut.v`, `iris/EchoOutPure.v`: the console
-discipline, the per-era STAGE and the ledger), [`user-write.md`](user-write.md)
-/ [`user-read.md`](user-read.md) (the file members, the offset) and
-[`user-fd.md`](user-fd.md) (the descriptor ledger, which is what makes
+discipline, the per-era STAGE and the ledger), [`user-write.md`](../design/user-write.md)
+/ [`user-read.md`](../design/user-read.md) (the file members, the offset) and
+[`user-fd.md`](../design/user-fd.md) (the descriptor ledger, which is what makes
 sh's `close(1); open(f)` land on 1).
 
 ## 0. The target, in one paragraph
@@ -69,7 +71,7 @@ echo line (the round in flight at the cut).  `f` never contains junk.
    subsequence of ANY earlier `echo … > f` line, or absent.  Within an
    era the model is EXACT.  The commit receipt at `write` is priced in
    §6 and is milestone 2.
-3. **No silent alternative** (superseded by [`sync.md`](sync.md) §1-§2):
+3. **No silent alternative** (superseded by [`sync.md`](../design/sync.md) §1-§2):
    since xv6 `d66e41c` sh's out-of-memory death prints, every forked line
    admits `ROom` (`out of memory\n$ `, f unchanged), and no line admits a
    bare-prompt alternative that moves nothing.  The `RFSilent`/`RCSilent`

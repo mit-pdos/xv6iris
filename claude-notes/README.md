@@ -255,22 +255,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   `App.xv6_app_adequacy`; and the lanes the echo application
   (`echo hello world`, file system unmodified) still owes.
 
-- **[`app-file.md`](design/app-file.md)** — THE FILE APPLICATION: `echo … > f`,
-  a power cycle, `cat f` prints it — the pure model with the f-state
-  threaded across rounds and cycles, the claim as a DEED (one ghost_var
-  half the shell's process chain holds) over the inode abstract state,
-  the create/truncate/append steps, the held offset (why the append needs
-  it and the one kernel pin that blocks it), the stage's f-state history,
-  and the three honest limits with their prices.
+- **[`app-file-design.md`](completed/app-file-design.md)** — ARCHIVED: the file
+  application's design (`echo … > f`, a power cycle, `cat f`), superseded by
+  the union; read `union.md` instead.  Its lessons that outlived it are in
+  `durable-notes.md`.
 
-- **[`app-pipe.md`](design/app-pipe.md)** — THE PIPELINE APPLICATION, since §0.2 THE application (`echo …` and `echo … | cat` lines, a line typed as a burst; the echo theorem is its corollary; `pipe_adequacy_pipeΣ_final`, no premise; worklist + findings in `completed/app-pipe.md`):
-  `echo … | cat` prints the line — the first application to HOLD A PIPE:
-  the registry that replaces the taint for a pipe-holding program (the
-  pipe-queue campaign's deferred ruling), the per-pipe protocol invariant
-  three processes share (echo writes, cat reads, sh reads the round off
-  the two exit payloads), the one premise on the write link that freezes
-  the contents at EOF, sh's PIPE arm, the two-writer console lease for the
-  both-execs-failed arm, and the three honest limits.
+- **[`app-pipe-design.md`](completed/app-pipe-design.md)** — ARCHIVED: the
+  pipeline application's design (`echo … | cat`, the pipe protocol, the
+  registry, the two-writer console), superseded by the union and the N-stage
+  pipelines; read `union.md` and `pipes-general.md` instead.
 
 - **[`app-both.md`](design/app-both.md)** — ONE APPLICATION: the file lines and
   the pipeline line together (RULED: Route B, abstract first — the line

@@ -5,7 +5,7 @@ first — see `completed/spec-cleanup.md`, CLOSED 2026-09-17; its
 RD-1/RD-2 owned-offset and functional file rows were this campaign's §4
 determinism prerequisites arriving early.  The parked offset form landed
 there; the OWNED form is now upstream's OFF-LINK, so §4 should be re-read
-against `design/app-file.md` §3 before a lane is briefed).  Resumes on the
+against `completed/app-file-design.md` §3 before a lane is briefed).  Resumes on the
 owner's word only.  Below: CAMPAIGN OPENED
 2026-09-15 (owner's word, the day after the echo adequacy theorem
 closed).  §§0–7 below are the design discussion as
@@ -47,7 +47,7 @@ and [`design/user-heap.md`](../design/user-heap.md) (the U tiers whose
 determinism is half of any proof), [`design/adequacy.md`](../design/adequacy.md)
 (`Hphi`, and its item (d) — "hyperproperties are out of
 `wp_strong_adequacy`'s reach" — which §4 says how to sidestep),
-[`uart-trace.md`](uart-trace.md) (the trace-export pattern §6 reuses),
+[`uart-trace.md`](../completed/uart-trace.md) (the trace-export pattern §6 reuses),
 [`design/fs-bitmap.md`](../design/fs-bitmap.md) (the FREE POOL: the in-tree
 precedent for §3's ledger).
 

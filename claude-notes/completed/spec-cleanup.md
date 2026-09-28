@@ -1054,7 +1054,7 @@ audit 13, both unmoved.
 
 1. ~~**The R-a walls + the `uheld` proposal**~~ — **RETIRED 2026-09-17:
    upstream took the route in-house** (lanes OFF-HAND-1..7 and OFF-LINK;
-   `design/app-file.md` §3 "the offset").  OFF-HAND-3 refuted every
+   `completed/app-file-design.md` §3 "the offset").  OFF-HAND-3 refuted every
    resource-shaped carrier (the `uheld` ghost included) and put a static
    bit on the run record; OFF-LINK deleted `FdPark.v` and moved the held
    half back to the program.  The design history stays in

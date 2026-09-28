@@ -1,8 +1,9 @@
 # Design: user programs ONCE — the parser as a refinement, the descriptor stream, the program-generic exec (proposal)
 
-**Status: PROPOSAL (2026-09-23, asked by the owner: "we might have multiple
-cat and sh proofs … design the appropriate abstractions so that we can have
-just one proof … include echo too").**  The worklist is
+**Status: LANDED (ruled 2026-09-23, complete 2026-09-27; every row of §0's
+table is marked as landed in place).  Proposed 2026-09-23, asked by the
+owner: "we might have multiple cat and sh proofs … design the appropriate
+abstractions so that we can have just one proof … include echo too".**  The worklist is
 [`../projects/user-once.md`](../projects/user-once.md).  Builds on
 [`app-both.md`](app-both.md) (the console record made generic — this design
 is the layer BELOW it), [`user-exec.md`](user-exec.md) (the (W)/(L)/(E)

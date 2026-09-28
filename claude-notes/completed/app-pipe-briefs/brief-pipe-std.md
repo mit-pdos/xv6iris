@@ -1,7 +1,7 @@
 # Lane PIPE-STD — the pipe's read and write leaves at the STANDARD slots
 
 Clone: `/shared/xv6iris-pipe-std`, branch `app-pipe/pipe-std`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md`
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md`
 §5.4.  Background: `claude-notes/design/user-fd.md` (the program's
 descriptor ledger: `UserFd.ustd l` for the standard slots below `NSTD`,
 `UserFd.ufd fd st` handles above), `claude-notes/design/user-read.md` and
@@ -46,7 +46,7 @@ two walks; `wp_uk_ecall_dup*` `:985/:1181/:1337`; `wp_uk_ecall_close_std`
    `close(1); dup(3)` at a ledger `[c; c; c]` + handle `3 ↦ pipe write end`
    ending at ledger `[c; W; c]`.
 4. `UkReadPipe.v:414` / `UkWritePipe.v` headers: the "pays its tear-down
-   out of the taint" sentences updated to point at design/app-pipe.md §2
+   out of the taint" sentences updated to point at completed/app-pipe-design.md §2
    (lane PIPE-REG lands the registry; you only fix the prose).
 
 ## Bar

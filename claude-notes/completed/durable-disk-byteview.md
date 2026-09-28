@@ -16,7 +16,7 @@ Design of record: [`../design/crash.md`](../design/crash.md) §"The durable
 disk: ONE fixed gname, owned by the crash predicate" (ruled by the owner,
 2026-08-22). Read it first. This file is the WORKLIST, written so an agent
 can pick any stage up cold: every item names its file:line in the tree at
-`739654bc`. Subsumes [`fs-log.md`](fs-log.md)'s items (1)/(3) (stage D).
+`739654bc`. Subsumes [`fs-log.md`](../design/fs-log.md)'s items (1)/(3) (stage D).
 
 ## 0. Why, in one paragraph (so nobody re-derives it)
 

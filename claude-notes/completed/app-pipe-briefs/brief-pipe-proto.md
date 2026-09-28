@@ -1,7 +1,7 @@
 # Lane PIPE-PROTO — the per-pipe protocol invariant three processes share
 
 Clone: `/shared/xv6iris-pipe-proto`, branch `app-pipe/pipe-proto`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md`
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md`
 §3 WHOLE (the body (P1)–(P3), the table of links, §3.1 as landed), §2 AS
 LANDED (the registrar shape you must produce), §4.2 AS AMENDED (the
 symmetric payload and the two exclusive SIDE TOKENS — you mint them),

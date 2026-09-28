@@ -1,15 +1,17 @@
 # Design: the PIPELINE application (`AppPipe`) — `echo … | cat` prints the line
 
+**ARCHIVED 2026-09-28 (note hygiene): this is the design of an application that no longer exists as such -- the union (`design/union.md`) and the N-stage pipelines (`design/pipes-general.md`) replaced the pipeline application (C8/C9, 2026-09-24/25).  Kept for the record of how the pieces were first built and why; the design of record for what stands is [`../design/union.md`](../design/union.md), with [`../design/program-specs.md`](../design/program-specs.md) for the programs and [`../design/user-once.md`](../design/user-once.md) / [`../design/shape-modules.md`](../design/shape-modules.md) for sh.  Links below were rewritten for the new location; the text is otherwise as it was.**
+
 **Design of record, opened 2026-09-17 (Fable, on the owner's "go for the
-pipeline application").**  Worklist: [`../projects/app-pipe.md`](../projects/app-pipe.md).
-Builds on [`applications.md`](applications.md) (the claim scaffold),
-[`pipe.md`](pipe.md) "The byte queue" (the pipe's exact ghost state and its
-links), [`user-fd.md`](user-fd.md) (the program's descriptor ledger),
-[`user-exec.md`](user-exec.md) (the exec channel `image_entry`),
-[`user-proc.md`](user-proc.md) (fork's lend / exit payload, wait) and the
+pipeline application").**  Worklist: [`../projects/app-pipe.md`](app-pipe.md).
+Builds on [`applications.md`](../design/applications.md) (the claim scaffold),
+[`pipe.md`](../design/pipe.md) "The byte queue" (the pipe's exact ghost state and its
+links), [`user-fd.md`](../design/user-fd.md) (the program's descriptor ledger),
+[`user-exec.md`](../design/user-exec.md) (the exec channel `image_entry`),
+[`user-proc.md`](../design/user-proc.md) (fork's lend / exit payload, wait) and the
 echo application's statement (`iris/EchoDisc.v`, `iris/EchoOut.v`,
 `iris/EchoLinks.v`; worklist `../completed/app-echo.md`).  Upstream's FILE
-application ([`app-file.md`](app-file.md)) is the mould for the campaign's
+application ([`app-file.md`](app-file-design.md)) is the mould for the campaign's
 SHAPE (a pure model beside `EchoDisc`, a record beside `AppEcho`, an
 adequacy file and an audit); this design shares no file with it.
 

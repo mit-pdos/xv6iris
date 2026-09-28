@@ -24,7 +24,7 @@ rebuilds — that is expected, upstream touched 688 files).  Read
   only — NOT Iris's `WP e @ s; E {{ Φ }}` if any of ours uses it; check
   `RiscvPtsto.v` on origin/main for the exact new notations).  Also
   comments quoting the shorthand in our files and in the LIVE
-  claude-notes (`design/app-pipe.md`, `projects/app-pipe.md`, the briefs)
+  claude-notes (`completed/app-pipe-design.md`, `projects/app-pipe.md`, the briefs)
   — upstream's rule: code quotations follow, prose "WP" does not.
 - `92249f035` **relax-d2**: the echo discipline without the per-byte echo
   wait.  `EchoOutPure.D2_next_input` is DELETED; the claim now reads the

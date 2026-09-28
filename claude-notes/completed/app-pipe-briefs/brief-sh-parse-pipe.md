@@ -1,7 +1,7 @@
 # Lane SH-PARSE-PIPE — sh's parser at the pipe shape `echo w1 … wn | cat`
 
 Clone: `/shared/xv6iris-pipe-sh-parse`, branch `app-pipe/sh-parse-pipe`.
-Read `brief-common.md` first.  Design: `claude-notes/design/app-pipe.md`
+Read `brief-common.md` first.  Design: `claude-notes/completed/app-pipe-design.md`
 §5.1 (the parser paragraph) and §1 (the canonical line: one blank each
 side of `|`, the right command the single word `cat`).  THE MOULD is
 upstream's redirect-shape parser work, lane for lane: read

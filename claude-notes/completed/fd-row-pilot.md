@@ -21,7 +21,7 @@ Related: [`user-wp-slot.md`](../design/user-wp-slot.md) (the trap contract this
 enriches; its part (A) PARKS exactly this refinement: "a later refinement
 adds an iProp premise under the same ∀ … without changing the shape"),
 [`fs-syscall-specs.md`](../design/fs-syscall-specs.md) (v3 — the kernel-side AU
-receipts the payload reads), [`uk-engine.md`](uk-engine.md) (the u-tier
+receipts the payload reads), [`uk-engine.md`](../design/uk-engine.md) (the u-tier
 engine the pilot's walk runs on).
 
 ## 0. The pilot, in one sentence

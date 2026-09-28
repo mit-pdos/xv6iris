@@ -1874,7 +1874,7 @@ off `HE`).  A witness carries pipe → echo and never back.
 ## Lessons of the pipeline campaign (2026-09-17..23), in one place
 
 The whole-system theorem for `echo … | cat` (`UInitPipeAdequacy.
-pipe_adequacy_pipeΣ_final`) closed after 38 lanes; `design/app-pipe.md`
+pipe_adequacy_pipeΣ_final`) closed after 38 lanes; `completed/app-pipe-design.md`
 §0.1 is the summary.  What generalises:
 
 - **A per-round invariant has no carrier at the boundary between two
