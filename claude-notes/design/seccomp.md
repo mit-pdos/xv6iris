@@ -298,7 +298,7 @@ newline: `GenOutHist.gin_pure`'s last conjunct records `lm_disc (le_hist e)
 
 `pwclV_drain` at the third arm returns `udrain_ret`'s right arm with
 `lm_good_out U s0 seg` at `cs ++ [ualt_code (US u')]`, `u' := u` if
-non-empty else `[wl_nl]` (`lm_good_out_wild`).  `pwclV_wild_lic` is the
+non-empty else `[wl_nl]` (`lm_good_out_pad_wild`).  `pwclV_wild_lic` is the
 union's `ai_wild_lic`: the third arm is closed under `EvOut` (extends
 `u`) and `EvRead` (under `read_ok` and `ch_dl = echoed ch_log` every
 read delivers nothing), the middle arm is refuted, the first rebuilt.

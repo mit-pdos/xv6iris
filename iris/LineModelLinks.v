@@ -821,25 +821,6 @@ Section line_model_links.
     split; [apply lmh_exf_ok |]. split; [apply lmh_exf_free | apply lmh_exf_nopanic].
   Qed.
 
-  (* ...and the silent round, at a line whose model has one *)
-  Lemma lm_ab_noc (I : list (bv 8)) (c : nat) :
-    lmh_noc K (lm_line_at I) = Some c -> lm_ab I c = u_prompt.
-  Proof using K.
-    intros Hc. rewrite (lm_ab_is I _ (lmh_noc_ok K _ _ _ Hc) (lmh_noc_free K _ _ Hc)).
-    exact (lmh_noc_cont K _ _ _ Hc).
-  Qed.
-
-  Lemma lm_apr_noc (I : list (bv 8)) (c : nat) :
-    lmh_noc K (lm_line_at I) = Some c -> lm_apr I c.
-  Proof using K.
-    intros Hc. split; [exact (lmh_noc_ok K _ _ _ Hc) |].
-    split; [exact (lmh_noc_free K _ _ Hc) | exact (lmh_noc_nopanic K _ _ Hc)].
-  Qed.
-
-  Lemma lm_ab_noc_len (I : list (bv 8)) (c : nat) :
-    lmh_noc K (lm_line_at I) = Some c -> length (lm_ab I c) - 2 = 0.
-  Proof using K. intros Hc. rewrite (lm_ab_noc I c Hc) ll_prompt_len. lia. Qed.
-
   (* ================================================================== *)
   (*  5.  THE PURE LEMMAS ([FileLinksLine] S2)                           *)
   (* ================================================================== *)

@@ -8,7 +8,7 @@
 (*  the arm read back, the read, the echo, the byte and the drain.  The  *)
 (*  claim-side steps are [GenOut]'s; the open reading's are proved here  *)
 (*  ONCE, over any line model ([gcl_pure_o_close] .. [_no_echo],          *)
-(*  [lm_good_out_of_stage_open]), and read at [pipes_lm].                 *)
+(*  [lm_good_out_pad_of_stage_open]), and read at [pipes_lm].             *)
 (*                                                                       *)
 (*  1. The open reading's pure steps, over any model.                    *)
 (*  2. The events at [popenN] and at [pecl'], and the filing of an EMPTY *)
@@ -269,60 +269,9 @@ Section open_events_pure.
     reflexivity.
   Qed.
 
-  (* ---- the DRAIN: F4 at a block whose code is not filed -- the witness
-          the existential wants is the round's own code, appended ---- *)
-  Lemma lm_good_out_of_stage_open (K : lm_hooks M) (B : lm_byte_laws M)
-      (ps cs : list nat) (s : lm_st M) (E : list (list mobs * bv 8))
-      (w : list (bv 8)) (a : nat) (seg : list mobs) :
-    Forall (fun x => (x < length pro_alts)%nat) ps ->
-    lm_alts_pre M s (ins seg) cs ->
-    lm_E_disc M E ->
-    lm_pro_pin M ps cs (snd <$> E) ->
-    lm_blk_at M cs (snd <$> E) s w a ->
-    obs_wire Uart0 seg `prefix_of` (lm_D M ps cs s E ++ w) ->
-    (snd <$> E) `prefix_of` ins seg ->
-    lm_good_out M s seg.
-  Proof using.
-    intros Hps Hao HE Hpin Hblk Hwire Hinp.
-    pose proof Hblk as (Hne & Hr & Hq & Hok0 & Hpan & Hpre).
-    pose proof (nlines_pos_of_rest_nil _ Hne Hr) as Hpos.
-    assert (Hnl : (nlines (snd <$> E) <= nlines (ins seg))%nat) by (by apply nlines_prefix).
-    assert (Hbod : bodies_of (ins seg) !!! (nlines (snd <$> E) - 1)%nat
-                   = bodies_of (snd <$> E) !!! (nlines (snd <$> E) - 1)%nat).
-    { destruct (bodies_of_prefix (snd <$> E) (ins seg) Hinp) as [z Hz].
-      rewrite Hz !list_lookup_total_alt lookup_app_l;
-        [reflexivity | rewrite /nlines in Hpos |- *; lia]. }
-    assert (Hbodj : forall j, (j < nlines (snd <$> E))%nat ->
-              bodies_of (ins seg) !!! j = bodies_of (snd <$> E) !!! j).
-    { destruct (bodies_of_prefix (snd <$> E) (ins seg) Hinp) as [z Hz].
-      intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
-        [reflexivity | rewrite /nlines in Hj; lia]. }
-    assert (Hao' : lm_alts_pre M s (ins seg) (cs ++ [a])).
-    { apply (lm_alts_pre_snoc M s (ins seg) cs a Hao); [rewrite Hq; lia |].
-      rewrite Hq Hbod.
-      rewrite (lm_upto_ext M cs cs s (bodies_of (ins seg)) (bodies_of (snd <$> E))
-                 (nlines (snd <$> E) - 1) ltac:(intros j _; reflexivity)
-                 ltac:(intros j Hj; apply Hbodj; lia)).
-      exact Hok0. }
-    assert (Hpin' : lm_pro_pin M ps (cs ++ [a]) (snd <$> E)).
-    { intros q Hq'. rewrite (lm_pro_idx_app_le M); [by apply Hpin |].
-      rewrite (ll_nstarted_rest_nil _ Hr) in Hq'. rewrite Hq. lia. }
-    assert (HD : lm_D M ps (cs ++ [a]) s E = lm_D M ps cs s E).
-    { symmetry. apply (lm_D_cs_prefix M); [reflexivity | by eexists | exact Hpin |].
-      rewrite (ll_nlines_removelast _ Hr) Hq. lia. }
-    apply (lm_good_out_of_stage M K B ps (cs ++ [a]) s E w seg Hps Hao').
-    - rewrite (ll_nlines_removelast _ Hr) length_app Hq /=. lia.
-    - left. rewrite length_app Hq /=. lia.
-    - exact HE.
-    - exact Hpin'.
-    - rewrite /lm_pending (lm_pending_filed ps cs s (snd <$> E) a Hne Hr Hq Hpan).
-      exact Hpre.
-    - by rewrite HD.
-    - exact Hinp.
-  Qed.
-
-  (* ...and at the resolution the stage names, the open round's code
-     appended (sync SY3-A4) *)
+  (* ---- the DRAIN: F4 at a block whose code is not filed, at the
+          resolution the stage names -- the witness the existential wants
+          is the round's own code, appended ---- *)
   Lemma lm_good_out_pad_of_stage_open (K : lm_hooks M) (B : lm_byte_laws M)
       (ps cs : list nat) (s : lm_st M) (E : list (list mobs * bv 8))
       (w : list (bv 8)) (a : nat) (seg : list mobs) :

@@ -1887,16 +1887,6 @@ Section gen_out.
              /\ Forall (fun I => I `prefix_of` ins seg) Is⌝
           ∗ [∗ list] i ↦ J ∈ Is, gitem (gpr A) k v i J ((csf ++ ex) !!! i))%I.
 
-  Lemma gdrain_ret_good (k : nat) (seg : list mobs) :
-    gdrain_ret k seg -∗
-    (T ∨ ∃ s0 : lm_st M,
-          ⌜lm_good_out M s0 seg⌝ ∗ ⌜lm_st_ok M s0⌝ ∗ gwa_ty A s0 ∗ gcW G k s0).
-  Proof using.
-    iIntros "[#HT | (%s0 & %csf & %ex & %v & %Is & %Hg & %Hok & #Hty & #HW & _)]"; [by iLeft |].
-    iRight. iExists s0. iFrame "Hty HW". iPureIntro.
-    split; [exact (lm_good_out_of_pad M (gcK G) s0 seg _ Hg) | exact Hok].
-  Qed.
-
   Lemma gcl_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
       (seg : list mobs) :
     trace_shape h true ->

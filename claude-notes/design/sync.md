@@ -768,18 +768,14 @@ ruling where noted.
   ledger's entry is `f0_bl g v s0 := ◯ML [s0] ∗ f0_bt v s0`, so /init
   files the fact (`UInitFileLeaves.file_f0bw_of_boot`) and the ledger
   reads it at the era's first drain.
-- THE BRIDGE (step 1, `UnionAdm` §5): `usync_at_round` (a sync round
-  whose whole block is on the wire is recorded at `(nlines I, c)`),
-  `usync_last_round` (and is the LAST when the wire ends there),
-  `ulast_before_snoc_some`/`_none`, `usync_bridge` and, over the era's
-  base, `UnionOut.usync_bridge_era`: `trace_shape h true -> ulines_of h =
-  B ++ ulast_cyc h -> S (length os) = length (cycles_of h) -> ulast_before
-  h (os ++ [Some (nlines I, c)]) (S (length os)) = (length (B ++ ulines_in
-  I), c)`; sh's side `UShURoundDefs.upend_sync_record`.  The ledger in the
-  end uses `usync_bridge_era` and reads the record straight off
-  `usync_at` (`UnionAdm.usync_last_pad`: at a padded resolution the last
-  completed sync is a FILED round's -- the pad's exec failures are never
-  `RSyncRan`); `usync_last_round`/`upend_sync_record` are unused.
+- THE BRIDGE (step 1, `UnionAdm` §5): `ulast_before_snoc_some`/`_none`,
+  `usync_bridge` and, over the era's base, `UnionOut.usync_bridge_era`:
+  `trace_shape h true -> ulines_of h = B ++ ulast_cyc h -> S (length os)
+  = length (cycles_of h) -> ulast_before h (os ++ [Some (nlines I, c)])
+  (S (length os)) = (length (B ++ ulines_in I), c)`.  The ledger reads
+  the record straight off `usync_at` (`UnionAdm.usync_last_pad`: at a
+  padded resolution the last completed sync is a FILED round's -- the
+  pad's exec failures are never `RSyncRan`).
 - THE SEAM AND SH'S ROUND (step 2): the seam is a RECORD EQUATION,
   `@riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk A c`, a premise of
   `App.al_programs` and of `SystemAdequacy`'s `Hinit_boot` (discharged

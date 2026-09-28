@@ -607,45 +607,6 @@ Section gen_out_pure.
     rewrite HD. exact (lm_D_stage_prefix ps cs' s E w HE Hw').
   Qed.
 
-  (* THE CLAIM GIVES [lm_good_out] AT THE SEGMENT, at the stage's own boot
-     state (the file's former [good_out_f_of_stage] once): the prologue list is
-     padded with settled rounds and the choice list with silent ones *)
-  Lemma lm_good_out_of_stage (ps cs : list nat) (s : lm_st M)
-      (E : list (list mobs * bv 8)) (w : list (bv 8)) (seg : list mobs) :
-    Forall (fun a => (a < length pro_alts)%nat) ps ->
-    lm_alts_pre M s (ins seg) cs ->
-    (nlines (removelast (snd <$> E)) <= length cs)%nat ->
-    ((nlines (snd <$> E) <= length cs)%nat \/ w = []) ->
-    lm_E_disc E ->
-    lm_pro_pin M ps cs (snd <$> E) ->
-    w `prefix_of` lm_pending ps cs s E ->
-    obs_wire Uart0 seg `prefix_of` (lm_D ps cs s E ++ w) ->
-    (snd <$> E) `prefix_of` ins seg ->
-    lm_good_out M s seg.
-  Proof using B K.
-    intros Hps Hao Hrl Hlast HE Hpin Hw Hwire Hinp.
-    set (ps' := (ps ++ replicate (S (nlines (ins seg))) 0%nat)%list).
-    set (cs' := lm_alts_pad (ins seg) cs).
-    assert (Hpp : ps `prefix_of` ps') by (rewrite /ps'; by eexists).
-    assert (Hcc : cs `prefix_of` cs') by apply lm_alts_pad_prefix.
-    assert (Hpin' : lm_pro_pin M ps' cs (snd <$> E))
-      by exact (lm_pro_pin_mono M ps ps' cs _ Hpp Hpin).
-    exists ps', cs'. split.
-    { apply lm_pro_ok_pad; [exact Hps | lia]. }
-    split; [exact (lm_alts_pad_ok s (ins seg) cs Hao) |].
-    etrans; [exact Hwire |].
-    rewrite (lm_D_ps_ext ps ps' cs s E Hpp Hpin).
-    rewrite (lm_D_cs_prefix ps' ps' cs cs' s E ltac:(reflexivity) Hcc Hpin' Hrl).
-    assert (Hw' : w `prefix_of` lm_pending ps' cs' s E).
-    { destruct Hlast as [Hle | ->]; [| apply prefix_nil].
-      etrans; [exact Hw |].
-      etrans; [exact (lm_pending_ps_mono ps ps' cs s E Hpp) |].
-      rewrite /lm_pending (lm_pending_at_cs_ext M ps' cs cs' s (snd <$> E) Hcc Hle).
-      reflexivity. }
-    etrans; [exact (lm_D_stage_prefix ps' cs' s E w HE Hw') |].
-    by apply (lm_sess_mono M ps' cs' s (snd <$> E) (ins seg)).
-  Qed.
-
   (* THE RESOLUTION A STAGE NAMES (sync SY3-A4): the filed choices, padded
      with the lines' exec failures -- what the drain hands the ledger, so
      that a per-round payload filed with a choice is read at the round the
