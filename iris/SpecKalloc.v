@@ -51,8 +51,43 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
     mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 
+(* THE LED FORM (claude-notes/design/ni-kalloc-ledger.md, D3/D5): the same
+   body with the post [kalloc_post_led], which adds the call's receipt in the
+   allocator's event ledger -- the event [kev_of p r], labelled by the actor
+   [p] (the [cpu_own] proc word: the hart's current process), appended at a
+   history [h] with [r = nullp <-> pool_empty h].  The led form is the
+   contract; the landed [wp_kalloc_sconf_body] is its corollary
+   ([kalloc_post_led_post]). *)
+Definition wp_kalloc_led_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (14 <= K)%nat ->
+  fl = mword_of_int (KernelSyms.kmem + 24) ->
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* THE FRESHNESS PREMISE: kalloc acquires and releases [kmem.lock]
+     internally (balanced -- [lks] is unchanged across the whole call), so
+     the caller must already hold only locks BELOW "kmem"'s rank. *)
+  locks_below lks "kmem" ->
+  sie_cap_gpr kt m K b p -∗
+  cpu_own n eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl) -∗
+  kalloc_avail γk on -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr kt mr K b p -∗
+    cpu_own n eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    kalloc_post_led γk on p (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+    mWP (Loop : expr riscv_lang)) -∗
+  mWP (Loop : expr riscv_lang).
+
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_kalloc_sconf_body kt γl γk fl m on n eb p K b lks.
+  Parameter wp_kalloc_led_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
+      wp_kalloc_led_sconf_body kt γl γk fl m on n eb p K b lks.
 End KALLOC.

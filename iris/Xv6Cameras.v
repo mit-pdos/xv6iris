@@ -68,6 +68,7 @@ From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap gset
      gset gmultiset numbers updates local_updates.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 Require Import PipeNames.   (* [pipe_st]: the byte queue's abstract state, plain data *)
+Require Import KallocEv.    (* [kev]: the allocator ledger's events, plain data *)
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var ghost_map saved_prop
      mono_nat cancelable_invariants.
@@ -147,13 +148,21 @@ Proof. solve_inG. Qed.
 (* ===================================================================== *)
 
 (* ghost state for the page-count layer: a nat-valued ghost_var (the count,
-   γk.1) and a one-shot (the boot->steady seal, γk.2). *)
-Definition kalloc_oneshotR := csumR (exclR unitO) (agreeR unitO).
+   γk.1) and a pair at γk.2 whose FIRST component is the one-shot
+   boot->steady seal and whose SECOND is a persistent agree on the NAME of
+   the allocator's event ledger (a mono-list of [KallocEv.kev], the third
+   camera below).  The name rides in the oneshot's camera so the ledger is
+   reachable from the pair [γk] without changing the pair's type
+   (claude-notes/design/ni-kalloc-ledger.md, D4). *)
+Definition kalloc_oneshotR :=
+  prodR (optionUR (csumR (exclR unitO) (agreeR unitO))) (optionUR (agreeR gnameO)).
 Class kallocG (Σ : gFunctors) := KallocG {
   kalloc_count_inG :: ghost_varG Σ nat;
   kalloc_seal_inG :: inG Σ kalloc_oneshotR;
+  kalloc_led_inG :: inG Σ (mono_listR (leibnizO kev));
 }.
-Definition kallocΣ : gFunctors := #[ghost_varΣ nat; GFunctor kalloc_oneshotR].
+Definition kallocΣ : gFunctors :=
+  #[ghost_varΣ nat; GFunctor kalloc_oneshotR; GFunctor (mono_listR (leibnizO kev))].
 Global Instance subG_kallocΣ {Σ} : subG kallocΣ Σ -> kallocG Σ.
 Proof. solve_inG. Qed.
 

@@ -62,6 +62,7 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.algebra Require Import excl agree csum.
+From iris.algebra.lib Require Import mono_list.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var.
 From iris.program_logic Require Import weakestpre.
@@ -72,6 +73,7 @@ Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Export PageGeom.  (* the pure page geometry: page_valid / page_base / nullp *)
 Local Open Scope Z_scope.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+Require Export KallocEv.    (* the ledger's events; the led-form posts mention [kev_of]/[pool_empty] *)
 Import Defs.
 
 
@@ -293,16 +295,89 @@ Section Kalloc.
   (* ===== the page-count ghost (see the header) ===== *)
 
   (* the one-shot seal: [pending] is the exclusive boot-mode token; firing it
-     yields the persistent [sealed] witness.  They cannot coexist. *)
+     yields the persistent [sealed] witness.  They cannot coexist.  Both live
+     in the FIRST component of the pair camera at γk.2; the second component
+     carries the ledger's name ([kalloc_ledname] below). *)
   Definition kalloc_pending (γs : gname) : iProp Σ :=
-    own γs (Cinl (Excl ()) : kalloc_oneshotR).
+    own γs ((Some (Cinl (Excl ())), None) : kalloc_oneshotR).
   Definition kalloc_sealed (γs : gname) : iProp Σ :=
-    own γs (Cinr (to_agree ()) : kalloc_oneshotR).
+    own γs ((Some (Cinr (to_agree ())), None) : kalloc_oneshotR).
   Global Instance kalloc_sealed_persistent γs : Persistent (kalloc_sealed γs).
   Proof using . apply _. Qed.
 
   Lemma kalloc_pending_sealed γs : kalloc_pending γs -∗ kalloc_sealed γs -∗ False.
-  Proof using . iIntros "Hp Hs". iDestruct (own_valid_2 with "Hp Hs") as %[]. Qed.
+  Proof using .
+    iIntros "Hp Hs". iDestruct (own_valid_2 with "Hp Hs") as %[Hv _].
+    by destruct Hv.
+  Qed.
+
+  (* ===== the event ledger (claude-notes/design/ni-kalloc-ledger.md, D4) ===== *)
+
+  (* the ledger's NAME, pinned persistently in the pair's second component *)
+  Definition kalloc_ledname (γk : gname * gname) (γe : gname) : iProp Σ :=
+    own γk.2 ((None, Some (to_agree γe)) : kalloc_oneshotR).
+  Global Instance kalloc_ledname_persistent γk γe : Persistent (kalloc_ledname γk γe).
+  Proof using . rewrite /kalloc_ledname. apply _. Qed.
+
+  Lemma kalloc_ledname_agree γk γe γe' :
+    kalloc_ledname γk γe -∗ kalloc_ledname γk γe' -∗ ⌜γe = γe'⌝.
+  Proof using .
+    iIntros "H1 H2". iDestruct (own_valid_2 with "H1 H2") as %[_ Hv].
+    move: Hv. rewrite /= -Some_op Some_valid. by move=> /to_agree_op_valid_L.
+  Qed.
+
+  (* the ledger itself: the authoritative history and its lower bounds *)
+  Definition led_auth (γe : gname) (h : list kev) : iProp Σ :=
+    own γe (●ML (h : list (leibnizO kev))).
+  Definition led_lb (γe : gname) (h : list kev) : iProp Σ :=
+    own γe (◯ML (h : list (leibnizO kev))).
+
+  Global Instance led_lb_persistent γe h : Persistent (led_lb γe h).
+  Proof using . rewrite /led_lb. apply _. Qed.
+  Global Instance led_lb_timeless γe h : Timeless (led_lb γe h).
+  Proof using . rewrite /led_lb. apply _. Qed.
+  Global Instance led_auth_timeless γe h : Timeless (led_auth γe h).
+  Proof using . rewrite /led_auth. apply _. Qed.
+
+  Lemma led_auth_lb γe h : led_auth γe h -∗ led_auth γe h ∗ led_lb γe h.
+  Proof using .
+    rewrite /led_auth /led_lb. iIntros "Ha".
+    iDestruct (own_mono _ _ (◯ML (h : list (leibnizO kev))) with "Ha")
+      as "#Hb"; [ apply mono_list_included |].
+    iFrame "Ha Hb".
+  Qed.
+
+  Lemma led_lb_prefix γe h h' : led_auth γe h -∗ led_lb γe h' -∗ ⌜h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /led_auth /led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_both_valid_L.
+    by iPureIntro.
+  Qed.
+
+  (* two lower bounds of one ledger are comparable *)
+  Lemma led_lb_lb γe h h' :
+    led_lb γe h -∗ led_lb γe h' -∗ ⌜h `prefix_of` h' \/ h' `prefix_of` h⌝.
+  Proof using .
+    rewrite /led_lb. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %Hv%mono_list_lb_op_valid_L.
+    by iPureIntro.
+  Qed.
+
+  Lemma led_auth_grow γe h e :
+    led_auth γe h ==∗ led_auth γe (h ++ [e]) ∗ led_lb γe (h ++ [e]).
+  Proof using .
+    rewrite /led_auth. iIntros "Ha".
+    iMod (own_update _ _ (●ML ((h ++ [e]) : list (leibnizO kev))) with "Ha") as "Ha".
+    { apply mono_list_update. by exists [e]. }
+    iModIntro. iApply (led_auth_lb with "Ha").
+  Qed.
+
+  (* the receipt a call hands back: the ledger's name and a lower bound
+     ending in the call's own event [e], appended at history [h] *)
+  Definition led_receipt (γk : gname * gname) (h : list kev) (e : kev) : iProp Σ :=
+    (∃ γe, kalloc_ledname γk γe ∗ led_lb γe (h ++ [e]))%I.
+  Global Instance led_receipt_persistent γk h e : Persistent (led_receipt γk h e).
+  Proof using . rewrite /led_receipt. apply _. Qed.
 
   (* the caller-side count: exclusive exact count (boot) or persistent no-info
      witness (steady state). *)
@@ -317,18 +392,38 @@ Section Kalloc.
   (* the invariant-side authority: while counting, the ghost_var's other half
      (tied to [length pages]); once the seal has fired, any lock holder may
      reclose into the count-free [sealed] arm -- and after the first such
-     reclose the count is gone for good. *)
+     reclose the count is gone for good.
+     ...and, in BOTH epochs, the event ledger [kmem_ledger]: the ledger's
+     name, the authoritative history [h], and the tie
+     [npages + allocs h = frees h].  The LIST is the count: the tie holds
+     from birth through boot and steady state, so the seal forgets the
+     number but not the list. *)
+  Definition kmem_ledger (γk : gname * gname) (npages : nat) : iProp Σ :=
+    (∃ (γe : gname) (h : list kev),
+        kalloc_ledname γk γe ∗ led_auth γe h ∗ ⌜(npages + allocs h = frees h)%nat⌝)%I.
   Definition kmem_avail_auth (γk : gname * gname) (npages : nat) : iProp Σ :=
-    (ghost_var γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2)%I.
+    ((ghost_var γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2) ∗ kmem_ledger γk npages)%I.
 
   Lemma kalloc_avail_alloc n :
     ⊢ |==> ∃ γk, kalloc_avail γk (Some n) ∗ kmem_avail_auth γk n.
+  (* the ledger is born at [replicate n (KFree nullp)] so the tie holds at
+     the statement's [n]; honest because the one caller ([FsCfgSnap.v])
+     passes [0], i.e. the empty history. *)
   Proof using .
     iMod (ghost_var_alloc n) as (γc) "Hg".
     iEval (rewrite -Qp.half_half) in "Hg".
     iDestruct (ghost_var_split with "Hg") as "[H1 H2]".
-    iMod (own_alloc (Cinl (Excl ()) : kalloc_oneshotR)) as (γs) "Hp"; [done|].
-    iModIntro. iExists (γc, γs). cbn. iFrame "Hp H1". iLeft. iFrame "H2".
+    iMod (own_alloc (●ML (replicate n (KFree nullp) : list (leibnizO kev))))
+      as (γe) "Hled"; [apply mono_list_auth_valid|].
+    iMod (own_alloc ((Some (Cinl (Excl ())), Some (to_agree γe)) : kalloc_oneshotR))
+      as (γs) "Hs"; [done|].
+    assert (((Some (Cinl (Excl ())), Some (to_agree γe)) : kalloc_oneshotR) =
+            ((Some (Cinl (Excl ())), None) : kalloc_oneshotR) ⋅ (None, Some (to_agree γe)))
+      as Heq by done.
+    rewrite Heq. iDestruct "Hs" as "[Hp #Hn]".
+    iModIntro. iExists (γc, γs). cbn. iFrame "Hp H1". iSplitL "H2".
+    - iLeft. iFrame "H2".
+    - iExists γe, _. iFrame "Hn Hled". iPureIntro. apply tie_birth.
   Qed.
 
   (* boot -> steady state: fire the one-shot, forget the count.  Irreversible;
@@ -337,14 +432,15 @@ Section Kalloc.
     kalloc_avail γk (Some n) ==∗ kalloc_avail γk None.
   Proof using .
     iIntros "[Hp _]". iApply (own_update with "Hp").
-    by apply cmra_update_exclusive.
+    apply prod_update; [| done]. cbn.
+    apply option_update. by apply cmra_update_exclusive.
   Qed.
 
   (* boot mode agrees with the invariant's count *)
   Lemma kalloc_avail_agree γk n npages :
     kalloc_avail γk (Some n) -∗ kmem_avail_auth γk npages -∗ ⌜n = npages⌝.
   Proof using .
-    iIntros "[Hp Hv] [Hv'|Hs]".
+    iIntros "[Hp Hv] [[Hv'|Hs] _]".
     - iApply (ghost_var_agree with "Hv Hv'").
     - iExFalso. iApply (kalloc_pending_sealed with "Hp Hs").
   Qed.
@@ -358,34 +454,70 @@ Section Kalloc.
     - auto.
   Qed.
 
-  (* kalloc's ghost step: pop one page off the count *)
-  Lemma kmem_avail_dec γk on npages :
+  (* kalloc's ghost step: pop one page off the count, and append the
+     actor's [KAlloc] to the ledger; the history at the call was nonempty *)
+  Lemma kmem_avail_dec γk on (act : mword 64) npages :
     kalloc_avail γk on -∗ kmem_avail_auth γk (S npages) ==∗
-    kalloc_avail γk (avail_dec on) ∗ kmem_avail_auth γk npages.
+    kalloc_avail γk (avail_dec on) ∗ kmem_avail_auth γk npages ∗
+    ∃ h, led_receipt γk h (KAlloc act) ∗ ⌜~ pool_empty h⌝.
   Proof using .
-    iIntros "Hav Hauth". destruct on as [n|]; cbn.
-    - iDestruct "Hav" as "[Hp Hv]".
-      iDestruct "Hauth" as "[Hv'|Hs]";
-        [| iExFalso; iApply (kalloc_pending_sealed with "Hp Hs")].
-      iDestruct (ghost_var_agree with "Hv Hv'") as %->.
-      iMod (ghost_var_update_halves npages with "Hv Hv'") as "[Hv Hv']".
-      iModIntro. iFrame "Hp Hv". iLeft. iFrame "Hv'".
-    - iDestruct "Hav" as "#Hs". iModIntro. iSplitR; [iExact "Hs" | iRight; iExact "Hs"].
+    iIntros "Hav [Hauth (%γe & %h & #Hn & Hled & %Htie)]".
+    iMod (led_auth_grow γe h (KAlloc act) with "Hled") as "[Hled #Hlb]".
+    iAssert (|==> kalloc_avail γk (avail_dec on) ∗
+               (ghost_var γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2))%I
+      with "[Hav Hauth]" as ">[Hav Hauth]".
+    { destruct on as [n|]; cbn.
+      - iDestruct "Hav" as "[Hp Hv]".
+        iDestruct "Hauth" as "[Hv'|Hs]";
+          [| iExFalso; iApply (kalloc_pending_sealed with "Hp Hs")].
+        iDestruct (ghost_var_agree with "Hv Hv'") as %->.
+        iMod (ghost_var_update_halves npages with "Hv Hv'") as "[Hv Hv']".
+        iModIntro. iFrame "Hp Hv". iLeft. iFrame "Hv'".
+      - iDestruct "Hav" as "#Hs". iModIntro. iSplitR; [iExact "Hs" | iRight; iExact "Hs"]. }
+    iModIntro. iFrame "Hav Hauth". iSplitL "Hled".
+    - iExists γe, _. iFrame "Hn Hled". iPureIntro. by apply tie_alloc.
+    - iExists h. iSplit; [iExists γe; by iFrame "Hn Hlb" |].
+      iPureIntro. by eapply tie_nonempty.
   Qed.
 
-  (* kfree's ghost step: push one page onto the count *)
-  Lemma kmem_avail_inc γk on npages :
-    kalloc_avail γk on -∗ kmem_avail_auth γk npages ==∗
-    kalloc_avail γk (avail_inc on) ∗ kmem_avail_auth γk (S npages).
+  (* kalloc's null arm: the count stays at 0; the actor's [KNull] is
+     appended, and the history at the call was empty *)
+  Lemma kmem_avail_null γk on (act : mword 64) :
+    kalloc_avail γk on -∗ kmem_avail_auth γk 0%nat ==∗
+    kalloc_avail γk on ∗ kmem_avail_auth γk 0%nat ∗
+    ∃ h, led_receipt γk h (KNull act) ∗ ⌜pool_empty h⌝.
   Proof using .
-    iIntros "Hav Hauth". destruct on as [n|]; cbn.
-    - iDestruct "Hav" as "[Hp Hv]".
-      iDestruct "Hauth" as "[Hv'|Hs]";
-        [| iExFalso; iApply (kalloc_pending_sealed with "Hp Hs")].
-      iDestruct (ghost_var_agree with "Hv Hv'") as %->.
-      iMod (ghost_var_update_halves (S npages) with "Hv Hv'") as "[Hv Hv']".
-      iModIntro. iFrame "Hp Hv". iLeft. iFrame "Hv'".
-    - iDestruct "Hav" as "#Hs". iModIntro. iSplitR; [iExact "Hs" | iRight; iExact "Hs"].
+    iIntros "Hav [Hauth (%γe & %h & #Hn & Hled & %Htie)]".
+    iMod (led_auth_grow γe h (KNull act) with "Hled") as "[Hled #Hlb]".
+    iModIntro. iFrame "Hav Hauth". iSplitL "Hled".
+    - iExists γe, _. iFrame "Hn Hled". iPureIntro. by apply tie_null.
+    - iExists h. iSplit; [iExists γe; by iFrame "Hn Hlb" |].
+      iPureIntro. by apply tie_empty.
+  Qed.
+
+  (* kfree's ghost step: push one page onto the count, and append the
+     actor's [KFree] to the ledger *)
+  Lemma kmem_avail_inc γk on (act : mword 64) npages :
+    kalloc_avail γk on -∗ kmem_avail_auth γk npages ==∗
+    kalloc_avail γk (avail_inc on) ∗ kmem_avail_auth γk (S npages) ∗
+    ∃ h, led_receipt γk h (KFree act).
+  Proof using .
+    iIntros "Hav [Hauth (%γe & %h & #Hn & Hled & %Htie)]".
+    iMod (led_auth_grow γe h (KFree act) with "Hled") as "[Hled #Hlb]".
+    iAssert (|==> kalloc_avail γk (avail_inc on) ∗
+               (ghost_var γk.1 (1/2)%Qp (S npages) ∨ kalloc_sealed γk.2))%I
+      with "[Hav Hauth]" as ">[Hav Hauth]".
+    { destruct on as [n|]; cbn.
+      - iDestruct "Hav" as "[Hp Hv]".
+        iDestruct "Hauth" as "[Hv'|Hs]";
+          [| iExFalso; iApply (kalloc_pending_sealed with "Hp Hs")].
+        iDestruct (ghost_var_agree with "Hv Hv'") as %->.
+        iMod (ghost_var_update_halves (S npages) with "Hv Hv'") as "[Hv Hv']".
+        iModIntro. iFrame "Hp Hv". iLeft. iFrame "Hv'".
+      - iDestruct "Hav" as "#Hs". iModIntro. iSplitR; [iExact "Hs" | iRight; iExact "Hs"]. }
+    iModIntro. iFrame "Hav Hauth". iSplitL "Hled".
+    - iExists γe, _. iFrame "Hn Hled". iPureIntro. by apply tie_free.
+    - iExists h, γe. by iFrame "Hn Hlb".
   Qed.
 
   (* the allocator's protected resource: the global freelist head pointer at
@@ -414,18 +546,19 @@ Section Kalloc.
   (* kfree's logical core: after the function has written [p->next := oldhead]
      and [fl := p], the pieces refold into the invariant with [p] prepended and
      the count stepped up. *)
-  Lemma kmem_res_push γk fl p oldhead pages on :
+  Lemma kmem_res_push γk fl p oldhead pages on (act : mword 64) :
     page_valid p ->
     kalloc_avail γk on -∗
     word_at fl p -∗
     run_page p oldhead -∗
     freelist_chain oldhead pages -∗
     kmem_avail_auth γk (length pages) ==∗
-    kalloc_avail γk (avail_inc on) ∗ kmem_res γk fl.
+    kalloc_avail γk (avail_inc on) ∗ kmem_res γk fl ∗ ∃ h, led_receipt γk h (KFree act).
   Proof using .
     iIntros (Hp) "Hav Hfl Hrun Hchain Hauth".
-    iMod (kmem_avail_inc γk on (length pages) with "Hav Hauth") as "[Hav Hauth]".
-    iModIntro. iFrame "Hav".
+    iMod (kmem_avail_inc γk on act (length pages) with "Hav Hauth")
+      as "(Hav & Hauth & #Hrcpt)".
+    iModIntro. iFrame "Hav Hrcpt".
     iApply (kmem_res_close γk fl p (p :: pages)). iFrame "Hfl".
     iSplitR "Hauth"; [| iExact "Hauth"].
     rewrite freelist_chain_cons. iSplit; [done|]. iSplit; [done|].
@@ -443,6 +576,21 @@ Section Kalloc.
      claim about its contents -- in the spelling it always had. *)
   Definition kfree_pre (p : mword 64) : iProp Σ :=
     (⌜page_valid p⌝ ∗ page_own p)%I.
+
+  (* the LED-FORM posts (design D5): the landed post plus the call's
+     receipt in the ledger -- the event [kev_of act r] (resp. [KFree act])
+     appended at history [h] -- and, for kalloc, the determinism
+     [r = nullp <-> pool_empty h]: the outcome is a function of the
+     history at the call.  The landed posts are corollaries. *)
+  Definition kalloc_post_led (γk : gname * gname) (on : option nat) (act r : mword 64) : iProp Σ :=
+    (∃ h, led_receipt γk h (kev_of act r) ∗ ⌜r = nullp <-> pool_empty h⌝ ∗ kalloc_post γk on r)%I.
+  Definition kfree_post_led (γk : gname * gname) (on : option nat) (act : mword 64) : iProp Σ :=
+    (∃ h, led_receipt γk h (KFree act) ∗ kalloc_avail γk (avail_inc on))%I.
+
+  Lemma kalloc_post_led_post γk on act r : kalloc_post_led γk on act r -∗ kalloc_post γk on r.
+  Proof using . iIntros "(%h & _ & _ & $)". Qed.
+  Lemma kfree_post_led_avail γk on act : kfree_post_led γk on act -∗ kalloc_avail γk (avail_inc on).
+  Proof using . iIntros "(%h & _ & $)". Qed.
 
   (* boot-mode corollary: with a positive exact count, kalloc CANNOT fail.
      A6.87: kept at [page_own], so that no client of it moves -- the ones

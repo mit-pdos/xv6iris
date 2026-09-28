@@ -49,14 +49,17 @@ Section ProofKfree.
 
 
   Context {kt : ktier}.
-  Lemma wp_kfree_sconf
+  (* THE LED FORM is the proof; the landed [wp_kfree_sconf] follows as a
+     corollary below.  The actor of the ledger's event is [pcur], the
+     [cpu_own] proc word (claude-notes/design/ni-kalloc-ledger.md, D3). *)
+  Lemma wp_kfree_led_sconf
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
 
       (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_kfree_sconf_body kt γl γk lk fl m on n eb pcur K b lks.
+    : wp_kfree_led_sconf_body kt γl γk lk fl m on n eb pcur K b lks.
   Proof using .
-    cbv beta delta [wp_kfree_sconf_body].
+    cbv beta delta [wp_kfree_led_sconf_body].
     intros pcE p ret_tgt HK Hlk Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hcont".
@@ -566,8 +569,8 @@ Section ProofKfree.
     iEval (rewrite Hsdaddr2) in "Hflw".
     iEval (rewrite HRlds1) in "Hflw".
     (* refold the freelist invariant with [p] pushed; the count ghost-steps up *)
-    iMod (kmem_res_push γk fl p head pages on Hpv with "Havail [Hflw] Hrun Hchain Hauth")
-      as "[Havail HRres]".
+    iMod (kmem_res_push γk fl p head pages on pcur Hpv with "Havail [Hflw] Hrun Hchain Hauth")
+      as "(Havail & HRres & %hled & #Hrcpt)".
     { rewrite /word_at. iExact "Hflw". }
     assert (Hpp4e : add_vec_int (mword_of_int (KernelSyms.kfree + 0x4a) : mword 64) 4 = mword_of_int (KernelSyms.kfree + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4e) in "Hpc".
@@ -735,7 +738,8 @@ Section ProofKfree.
     iDestruct (cpu_own_transport CIDrel CIDe6 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail").
+    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] [Havail]"); last first.
+    { rewrite /kfree_post_led. iExists hled. iFrame "Hrcpt Havail". }
     { (* callee_saved m Q5c *)
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
@@ -781,6 +785,24 @@ Section ProofKfree.
         rewrite /Q5a upd_eq.
         rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
       repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate]. }
+  Qed.
+
+  (* the landed contract: the led form with the receipt dropped *)
+  Lemma wp_kfree_sconf
+      (γl : gname) (γk : gname * gname) (lk fl : mword 64)
+      (m : regfile)
+
+      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_kfree_sconf_body kt γl γk lk fl m on n eb pcur K b lks.
+  Proof using .
+    cbv beta delta [wp_kfree_sconf_body].
+    intros pcE p ret_tgt HK Hlk Hfl Hn Hfresh.
+    iIntros "Hcg Hcnt Htext Hpc Hkmem Hpre Havail Hcont".
+    iApply (wp_kfree_led_sconf γl γk lk fl m on n eb pcur K b lks HK Hlk Hfl Hn Hfresh
+              with "Hcg Hcnt Htext Hpc Hkmem Hpre Havail").
+    rewrite /wp_next. iIntros (CID' Hs mr) "Hcg Hcnt Hpc %Hcs Hpost".
+    iApply ("Hcont" $! CID' Hs mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
+    by iApply kfree_post_led_avail.
   Qed.
 
 End ProofKfree.
