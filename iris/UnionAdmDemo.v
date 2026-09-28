@@ -479,3 +479,60 @@ Proof using.
   - rewrite cyc_fa. constructor; [exact f0_good |].
     constructor; [exact c1_good_a | constructor].
 Qed.
+
+(* ===================================================================== *)
+(*  5.  THE NEGATIVE DEMO'S TRACE IS DISCIPLINED (sync SY3-A4): so the    *)
+(*      top theorem's conclusion ([UnionOutPure.union_phi_sync]) speaks  *)
+(*      of it, and refutes it ([UInitUnion.union_sync_cut_neg])          *)
+(* ===================================================================== *)
+
+(* a line with no terminal alternative: neither a pipeline nor [seccomp] *)
+Definition uplain (l : uline) : Prop :=
+  match l with LPipe _ _ | LSecc _ => False | _ => True end.
+
+Lemma d4_plain (cs : list nat) (s : fstate) (I : list (bv 8)) :
+  (forall i, i < nlines I -> uplain (uline_of_u (bodies_of I !!! i))) ->
+  lm_d4 U cs s I.
+Proof using.
+  intros Hp i Hi (c & Hok & Ht). specialize (Hp i Hi). revert Hp Hok Ht.
+  cbn [ulmG ulm lm_ok lm_of lm_term].
+  destruct (uline_of_u (bodies_of I !!! i)); intros Hp; try contradiction;
+    destruct c; cbn [uok uterm]; intros Hok Ht; try contradiction; discriminate.
+Qed.
+
+Local Instance demo_pro_ok_dec ps cs q : Decision (lm_pro_ok U ps cs q).
+Proof. rewrite /lm_pro_ok. apply _. Defined.
+Local Instance demo_disc_pt_dec ps cs (s : fstate) p : Decision (lm_disc_pt U ps cs s p).
+Proof. rewrite /lm_disc_pt. apply _. Defined.
+
+Lemma st_a_ok : fstate_ok st_a.
+Proof using.
+  rewrite /fstate_ok /st_a map_Forall_singleton. split; [dec_yes |].
+  right. exists (sb "a"). split; [dec_yes | reflexivity].
+Qed.
+
+Lemma sa_disc : lm_disc U h_sa.
+Proof using.
+  rewrite /lm_disc cyc_sa. constructor; [| constructor; [| constructor]].
+  - exists ∅. split; [exact fstate_ok_empty |].
+    rewrite /lm_disc_seg' s0_ins.
+    split; [apply disc_in; vm_compute; reflexivity |].
+    exists [3; 0], cs_s0b. split_and!.
+    + split; [rewrite s0_nlines; reflexivity |].
+      intros i Hi. rewrite s0_nlines in Hi.
+      destruct i as [| [| [| i]]]; [dec_yes | dec_yes | dec_yes | lia].
+    + apply d4_plain. intros i Hi. rewrite s0_nlines in Hi.
+      destruct i as [| [| [| i]]]; [vm_compute; exact I | vm_compute; exact I
+                                   | vm_compute; exact I | lia].
+    + apply Forall_forall. dec_yes.
+  - exists st_a. split; [exact st_a_ok |].
+    rewrite /lm_disc_seg' c1_ins.
+    split; [apply disc_in; vm_compute; reflexivity |].
+    exists [3; 0], cs_c1. split_and!.
+    + split; [reflexivity |].
+      intros i Hi. rewrite (_ : nlines I_c1 = 1) in Hi; [| reflexivity].
+      destruct i as [| i]; [dec_yes | lia].
+    + apply d4_plain. intros i Hi. rewrite (_ : nlines I_c1 = 1) in Hi; [| reflexivity].
+      destruct i as [| i]; [vm_compute; exact I | lia].
+    + apply Forall_forall. dec_yes.
+Qed.

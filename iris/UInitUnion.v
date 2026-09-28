@@ -100,3 +100,26 @@ Proof.
   exact (union_adequacy_unionΣ (union_Hinit_boot (Σ := unionΣ))
            g Hgen0 Hpow0 Hdisk).
 Qed.
+
+(* ===================================================================== *)
+(*  THE SYNC'S CUT, REFUTED (sync SY3-A4): the negative demo's trace --  *)
+(*  [echo a > a.txt; echo b > a.txt; sync], a power cut, then [cat       *)
+(*  a.txt] printing [a] ([UnionAdmDemo.h_sa]) -- is no run of the        *)
+(*  machine: the trace is disciplined ([UnionAdmDemo.sa_disc]), so the   *)
+(*  theorem's conclusion holds of it, which the demo refutes at every    *)
+(*  choice of boot states and records ([demo_sync_cut_neg]).             *)
+(* ===================================================================== *)
+Require Import UnionAdmDemo.
+
+Corollary union_sync_cut_neg
+    (g : gstate)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = fsimg_dk) :
+  forall (n : nat) t2 g2,
+    ~ language.nsteps n ([PowerLoopE : language.expr riscv_lang], g) h_sa (t2, g2).
+Proof.
+  intros n t2 g2 Hn.
+  destruct (union_adequacy_closed g Hgen0 Hpow0 Hdisk n h_sa t2 g2 Hn) as [_ Hphi].
+  destruct (Hphi sa_disc) as (W & H1 & H2 & H3 & H4).
+  exact (demo_sync_cut_neg W (conj H1 (conj H2 (conj H3 H4)))).
+Qed.
