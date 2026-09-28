@@ -88,6 +88,7 @@ PtTreeMorph.v
 PermInv.v
 PageGeom.v
 KallocEv.v
+PidEv.v
 KptExecMap.v
 RiscvExec.v
 HartCustody.v
