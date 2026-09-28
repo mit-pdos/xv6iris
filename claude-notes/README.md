@@ -294,6 +294,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   fault-arm fact) and `make intr-cone-check` (`tools/intr_cone.py`, the
   interrupt arm's functor cone implements no allocator) landed; the
   permit sweep waits for the other ledgers.
+- **[`ni-pid-ledger.md`](design/ni-pid-ledger.md)** — DESIGN PASS
+  (2026-09-28): the pid ledger on the allocator's shape — `PAlloc act
+  pid | PFree act pid` inside `<pid_lock>`'s payload, the live set of the
+  history tied to the pid register's domain, the ledger's name a `wchG`
+  field, receipts on led twins of allocproc and freeproc.  Rulings R1-R4
+  pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

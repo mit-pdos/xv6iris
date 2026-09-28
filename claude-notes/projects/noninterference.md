@@ -37,7 +37,12 @@ M1's ledgers are fresh ground and go first.
 - [ ] **NI-LEDGER-REST** (M1 remainder): `nextpid` — coordinate with
   the landed TRAP-ROWS `upid`/`ukn_pid` work, the U tier already sees
   pid numbers — then `ticks`, the zombie set; then the per-process key
-  history `uhist : mono_list uvis` beside `proc_priv`.
+  history `uhist : mono_list uvis` beside `proc_priv`.  PID LEDGER
+  DESIGN PASS 2026-09-28: [`design/ni-pid-ledger.md`](../design/ni-pid-ledger.md)
+  (events `PAlloc act pid | PFree act pid` inside `<pid_lock>`'s payload,
+  tied to the pid register's domain, the name a `wchG` field, receipts
+  on allocproc/freeproc led twins; rulings R1-R4 open; W1 `PidEv.v` in
+  flight).
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
