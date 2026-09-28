@@ -43,7 +43,12 @@ M1's ledgers are fresh ground and go first.
   tied to the pid register's domain, the name a `wchG` field, receipts
   on allocproc/freeproc led twins).  PID LEDGER LANDED 2026-09-28
   (d66e99d0d, f43d32a72; as-landed record in the design note §5; no consumer
-  yet).  Next: `ticks`, then the zombie set.
+  yet).  TICKS DESIGN PASS 2026-09-28:
+  [`design/ni-ticks-ledger.md`](../design/ni-ticks-ledger.md) — a
+  monotone counter at a `wchG` name mirroring the cell inside
+  `<tickslock>`'s payload, uptime's led twin returns the count; ONE
+  landed statement moves by a binder (`wp_sys_uptime_sconf_body` gains
+  `!wchG Σ`), rulings R1-R3 open.  Then the zombie set.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
