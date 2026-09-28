@@ -97,6 +97,7 @@ Require Import UkPipesIface.       (* [pipesNG], [pnsRegG] *)
 Require Import UkCatFIface.        (* [cifRegG] *)
 Require Import UnionDisc.
 Require Import UnionOut.
+Require UnionAdm.
 Require Import UnionLinks.
 Require Import UnionLinkInstAt.
 Require Import UnionReadInstAt.    (* [union_tag_law_holds] *)
@@ -174,25 +175,43 @@ Section UnionInitBoot.
       by (rewrite /riscv_wild Hiface; by cbn [union_ifc ai_wild]).
     assert (Hktaint : ⊢ app_taint -∗ file_taint (fgn_cl (ugn_file ug))).
     { rewrite Hkill. iIntros "#H". iExact "H". }
-    iIntros "#Hinv [Hb Hbp] [Hturn Hti]".
+    iIntros "#Hinv (%s & Hb & Hbp) [Hturn Hti]".
     (* ---- THE ROUND POSITION (sync SY3-A3bc): the boot's share, founded at
        the copy's line count the era's record pins, is at most the era's
-       base -- the turn's certificate ---- *)
+       base -- the turn's certificate; and THE BOOT FACT (sync SY3-A4) at
+       the deed's state, with the deed's typed witness out of the later ---- *)
     iDestruct "Hti" as (vf ls) "(#Hvf & #Hcp & %Hls & #Hbase)".
-    iAssert (file_taint (fgn_cl (ugn_file ug)) ∨ urpos ug r [])%I with "[Hbp]" as "Hup".
-    { iDestruct "Hbp" as "[#HT | (%vf' & %ls' & #Hvf' & #Hcp' & Hposh)]"; [by iLeft |].
+    iAssert ((file_taint (fgn_cl (ugn_file ug)) ∨ urpos ug r [])
+             ∗ (file_taint (fgn_cl (ugn_file ug))
+                ∨ ∃ ls1 : list fl_line, fl_lb (fgn_cl (ugn_file ug)) ls1
+                    ∗ ⌜UnionAdm.uadm ls1 (slast (fe_floor vf)) (dst_content s)⌝
+                    ∗ f_typed (fgn_cl (ugn_file ug)) s))%I
+      with "[Hbp]" as "[Hup #Hbf]".
+    { iDestruct "Hbp" as "[#HT | (%vf' & %ls' & #Hvf' & #Hcp' & Hposh & #Hl1 & %Hu & #Hty1)]";
+        [iSplitL; by iLeft |].
       iDestruct (file_era_pin_agree with "Hvf Hvf'") as %<-.
       iDestruct (fcp_pin_agree with "Hcp Hcp'") as %<-.
-      iRight. iExists vf, (length ls). iFrame "Hvf Hposh". iPureIntro.
-      apply prefix_length in Hls. rewrite /nlines bodies_of_nil /=. lia. }
+      iSplitL "Hposh".
+      - iRight. iExists vf, (length ls). iFrame "Hvf Hposh". iPureIntro.
+        apply prefix_length in Hls. rewrite /nlines bodies_of_nil /=. lia.
+      - iRight. iExists ls. iSplitR; [iExact "Hl1" |].
+        iSplitR; [by iPureIntro |]. iExact "Hty1". }
     (* ---- THE DEED, AND THE BOOT STATE IT NAMES ---- *)
-    rewrite /file_boot. iDestruct "Hb" as "(Hcb & _ & Hd)".
-    iDestruct "Hd" as (s) "[Hd Hty]". rewrite bi.later_or.
-    iAssert (∃ s0 : fstate, ▷ boot_at (ugn_file ug) s0 s)%I with "[Hty]" as (s0) "#Hbt".
-    { iDestruct "Hty" as "[#Hty | #HT]".
-      - iExists (dst_content s). iNext. rewrite /boot_at. iLeft. by iFrame "Hty".
-      - iExists ∅. iNext. rewrite /boot_at. iRight. by iFrame "HT". }
-    iMod (file_f0bw_of_boot (ugn_file ug) s0 with "Hturn") as "[Hturn #Hbw]".
+    rewrite /file_boot_at. iDestruct "Hb" as "(Hcb & _ & Hd & Hty)".
+    iAssert (∃ s0 : fstate, ▷ boot_at (ugn_file ug) s0 s
+               ∗ ∃ vf0 : file_era, file_era_pin (ugn_file ug) (S gen_id) vf0
+                   ∗ f0_bt (ugn_file ug) vf0 s0)%I
+      with "[Hty]" as (s0) "[#Hbt #Hbtf]".
+    { iDestruct "Hbf" as "[#HT | (%ls1 & #Hl1 & %Hu & #Hty1)]".
+      - rewrite bi.later_or. iDestruct "Hty" as "[#Hty | #HT']".
+        + iExists (dst_content s). iSplitR; [iNext; rewrite /boot_at; iLeft; by iFrame "Hty" |].
+          iExists vf. iFrame "Hvf". by iLeft.
+        + iExists ∅. iSplitR; [iNext; rewrite /boot_at; iRight; by iFrame "HT'" |].
+          iExists vf. iFrame "Hvf". by iLeft.
+      - iExists (dst_content s).
+        iSplitR; [iNext; rewrite /boot_at; iLeft; by iFrame "Hty1" |].
+        iExists vf. iFrame "Hvf". iRight. iExists ls1. iFrame "Hl1". by iPureIntro. }
+    iMod (file_f0bw_of_boot (ugn_file ug) s0 with "Hturn Hbtf") as "[Hturn #Hbw]".
     iAssert (▷ f0pre_at (ugn_file ug) s0)%I as "#Hpre".
     { iNext. iApply (file_f0pre_at_of_bw (ugn_file ug) s0 s with "Hbw Hbt"). }
     (* ---- THE ERA'S PIN, out of the (filed) turn ---- *)

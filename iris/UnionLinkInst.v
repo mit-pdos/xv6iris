@@ -113,7 +113,7 @@ Section union_link_inst.
   (* the reader's witness at an era: the boot-ledger entry beside the
      era's file pin *)
   Definition uf0bwk (k : nat) (s0 : fstate) : iProp Σ :=
-    (∃ vf : file_era, file_era_pin gf k vf ∗ f0_bl vf s0)%I.
+    (∃ vf : file_era, file_era_pin gf k vf ∗ f0_bl gf vf s0)%I.
 
   Global Instance uf0bwk_persistent k s : Persistent (uf0bwk k s).
   Proof using . rewrite /uf0bwk. apply _. Qed.

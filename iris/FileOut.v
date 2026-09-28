@@ -58,6 +58,7 @@ Require Import GenOutHist.
 Require Import GenOut.           (* the claim once: [gcl] and its steps *)
 Require Import AppEcho.          (* [echo_fixed] *)
 Require Import AppFile.          (* [file_fixed], [fl_auth], [f_bytes_typed] *)
+Require UnionAdm.                (* [srec], [uadm]: the era's floor and boot fact *)
 Local Open Scope list_scope.
 
 (* the history of an entry of E *)
@@ -125,6 +126,11 @@ Record file_era := MkFEra {
      the turn share, so the ledger's certificate that the list is inside the
      era's base reaches the position the transport founded *)
   fe_cp : gname;
+  (* THE ERA'S FLOOR (sync SY3-A4): the ledger's floor at the era's
+     PowerOn, PURE -- a list of sync records whose last is the model's last
+     completed sync of the earlier cycles; the boot fact /init files
+     ([f0_bt]) is stated after its last record *)
+  fe_floor : list UnionAdm.srec;
 }.
 
 Class fileOutG (Σ : gFunctors) := FileOutG {
@@ -170,8 +176,26 @@ Section file_out.
      credential [fturn], and init files the boot state at boot. *)
   Definition f0_auth (v : file_era) (l : list fstate) : iProp Σ :=
     own (fe_f0 v) (●ML (l : list (leibnizO fstate))).
+  (* THE BOOT FACT (sync SY3-A4): the era's boot state is admissible
+     after the era's floor's last record, against a lower bound of the line
+     list -- what the PowerOn transport derived from the durable copy, and
+     what the ledger reads at the era's first drain; or the taint *)
+  Definition f0_bt (v : file_era) (s0 : fstate) : iProp Σ :=
+    (file_taint (fgn_cl g)
+     ∨ ∃ ls : list fl_line, fl_lb (fgn_cl g) ls
+         ∗ ⌜UnionAdm.uadm ls (slast (fe_floor v)) s0⌝)%I.
+
+  Global Instance f0_bt_persistent v s : Persistent (f0_bt v s).
+  Proof using . rewrite /f0_bt. apply _. Qed.
+  Global Instance f0_bt_timeless v s : Timeless (f0_bt v s).
+  Proof using . rewrite /f0_bt. apply _. Qed.
+
+  (* the boot ledger's entry, AND the era's boot fact beside it *)
   Definition f0_bl (v : file_era) (s0 : fstate) : iProp Σ :=
-    own (fe_f0 v) (◯ML ([s0] : list (leibnizO fstate))).
+    (own (fe_f0 v) (◯ML ([s0] : list (leibnizO fstate))) ∗ f0_bt v s0)%I.
+
+  Lemma f0_bl_bt (v : file_era) (s0 : fstate) : f0_bl v s0 -∗ f0_bt v s0.
+  Proof using . rewrite /f0_bl. by iIntros "[_ $]". Qed.
 
   (* THE FILED LEDGER: its authority lives in the console claim, and the
      era's first process byte files the (already decided) boot state. *)
@@ -230,7 +254,7 @@ Section file_out.
   Lemma f0_bl_agree (v : file_era) (s s' : fstate) :
     f0_bl v s -∗ f0_bl v s' -∗ ⌜s = s'⌝.
   Proof using .
-    rewrite /f0_bl. iIntros "H1 H2".
+    rewrite /f0_bl. iIntros "[H1 _] [H2 _]".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     iPureIntro.
     destruct (mono_list_lb_op_valid_1_L _ _ Hv) as [[z Hz] | [z Hz]];
@@ -258,9 +282,9 @@ Section file_out.
   (* INIT FILES THE BOOT STATE AT BOOT, once and for all; the authority is
      spent, since two lower bounds of a one-entry list agree on their own *)
   Lemma f0_file (v : file_era) (s : fstate) :
-    f0_auth v [] ==∗ f0_bl v s.
+    f0_auth v [] -∗ f0_bt v s ==∗ f0_bl v s.
   Proof using .
-    rewrite /f0_auth /f0_bl. iIntros "Ha".
+    rewrite /f0_auth /f0_bl. iIntros "Ha #Hbt". iFrame "Hbt".
     iMod (own_update _ _ (●ML ([s] : list (leibnizO fstate))) with "Ha") as "Ha".
     { apply mono_list_update. by exists [s]. }
     iDestruct (own_mono _ _ (◯ML ([s] : list (leibnizO fstate))) with "Ha")
@@ -309,9 +333,9 @@ Section file_out.
   Qed.
 
   (* ...AT THE ON-ARM: the era's record at the ledger's list [base] *)
-  Lemma f0_alloc (base : list fl_line) :
-    ⊢ |==> ∃ v : file_era, ⌜fe_base v = base⌝ ∗ f0_auth v [] ∗ f0f_auth v []
-                          ∗ fcp_auth v [].
+  Lemma f0_alloc (base : list fl_line) (floor : list UnionAdm.srec) :
+    ⊢ |==> ∃ v : file_era, ⌜fe_base v = base⌝ ∗ ⌜fe_floor v = floor⌝
+                          ∗ f0_auth v [] ∗ f0f_auth v [] ∗ fcp_auth v [].
   Proof using .
     iMod (own_alloc (●ML ([] : list (leibnizO fstate)))) as (gf) "Hf";
       [apply mono_list_auth_valid |].
@@ -319,8 +343,8 @@ Section file_out.
       [apply mono_list_auth_valid |].
     iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (gc) "Hc";
       [apply mono_list_auth_valid |].
-    iModIntro. iExists (MkFEra gf gl base gc). rewrite /f0_auth /fcp_auth /=.
-    iSplitR; [done |]. iFrame "Hf Hl Hc".
+    iModIntro. iExists (MkFEra gf gl base gc floor). rewrite /f0_auth /fcp_auth /=.
+    iSplitR; [done |]. iSplitR; [done |]. iFrame "Hf Hl Hc".
   Qed.
 
   (* THE CLAIM'S COPY OF THE BOOT WITNESS, deposited by the first byte, so
@@ -503,13 +527,15 @@ Section file_out.
   Global Instance fturn_timeless k : Timeless (fturn k).
   Proof using . rewrite /fturn. apply _. Qed.
 
+  (* ...handed the era's boot fact at the state it files (sync SY3-A4) *)
   Lemma fturn_file (k : nat) (s0 : fstate) :
-    fturn k ==∗
+    fturn k -∗ (∃ vf : file_era, file_era_pin k vf ∗ f0_bt vf s0) ==∗
       fturn_core k ∗ ∃ vf : file_era, file_era_pin k vf ∗ f0_bl vf s0.
   Proof using .
-    rewrite /fturn /fturn_core. iIntros "H".
+    rewrite /fturn /fturn_core. iIntros "H (%vf' & #Hfp' & #Hbt)".
     iDestruct "H" as (v vf) "(#Hpin & #Hfp & Ht & Hdl & #Hcs & #Hps & #HE & Hrp & Hf0)".
-    iMod (f0_file vf s0 with "Hf0") as "#Hbl".
+    iDestruct (file_era_pin_agree with "Hfp Hfp'") as %<-.
+    iMod (f0_file vf s0 with "Hf0 Hbt") as "#Hbl".
     iModIntro. iSplitL.
     - iExists v, vf. iFrame "Hpin Hfp Ht Hdl Hcs Hps HE Hrp".
     - iExists vf. iFrame "Hfp Hbl".
@@ -778,11 +804,12 @@ Section file_birth.
   Lemma file_birth_all (γst : gname) :
     ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g
         ∗ ghost_map_auth (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) 1 0%nat.
+        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) 1 0%nat
+        ∗ sl_auth (ff_hist (fgn_cl g)) 1 [].
   Proof using .
-    iMod (file_birth γst) as (c) "(%Hst & Hc & Hreg & Hcm)".
+    iMod (file_birth γst) as (c) "(%Hst & Hc & Hreg & Hcm & Hh)".
     iMod (ghost_map_alloc (∅ : gmap nat file_era)) as (ge) "[Hm _]".
     iModIntro. iExists (MkFileGn c ge). rewrite /file_cl_all /=.
-    iSplitR; [done |]. iFrame "Hc Hm Hreg Hcm".
+    iSplitR; [done |]. iFrame "Hc Hm Hreg Hcm". iExact "Hh".
   Qed.
 End file_birth.

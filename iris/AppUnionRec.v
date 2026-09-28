@@ -66,6 +66,7 @@ Require Import UnionDisc.
 Require Import UnionOutPure.
 Require Import UnionOut.
 Require Import UnionLinks.
+Require UnionAdm.
 Local Open Scope Z_scope.
 
 Local Notation U := ulmG.
@@ -158,10 +159,17 @@ Section UnionApp.
      of the running claim's round position, founded at the length of the
      copy's line list the era's record pins (or the taint) *)
   Definition union_boot (c : union_gn) (k : nat) (r : file_names) : iProp Σ :=
-    (file_boot (fgn_cl (ugn_file c)) k r
+    (∃ s : dst, file_boot_at (fgn_cl (ugn_file c)) k r s
      ∗ (file_taint (fgn_cl (ugn_file c))
         ∨ ∃ (vf : file_era) (ls : list fl_line),
-            file_era_pin (ugn_file c) k vf ∗ fcp_pin vf ls ∗ fposh r (length ls)))%I.
+            file_era_pin (ugn_file c) k vf ∗ fcp_pin vf ls ∗ fposh r (length ls)
+            (* ...AND THE BOOT FACT at the deed's state (sync SY3-A4): the
+               copy's files admissible after the era's floor's last record,
+               which /init files beside the boot state ([FileOut.f0_bt]) *)
+            ∗ fl_lb (fgn_cl (ugn_file c)) ls
+            ∗ ⌜UnionAdm.uadm ls (slast (fe_floor vf)) (dst_content s)⌝
+            (* ...and the deed's typed witness, out of the later *)
+            ∗ f_typed (fgn_cl (ugn_file c)) s))%I.
 
   (* ====================================================================== *)
   (*  2.  THE RECORD                                                        *)
@@ -284,7 +292,7 @@ Section UnionApp.
                                         (open_seg h ++ [ObsUartOut Uart0 b])⌝
                                      ∗ f0_typed (ugn_file c) s0
                                      ∗ file_era_pin (ugn_file c) (obs_boots h) vf
-                                     ∗ f0_lb vf s0
+                                     ∗ f0_lb (ugn_file c) vf s0
                         | _ => True
                         end)))%I with "[Ho]" as ">[Ho Hgo]".
     { destruct i; last first.
@@ -354,19 +362,18 @@ Section UnionApp.
       in c |- *.
     rewrite /app_xfer_boot_raw.
     iIntros "!>" (r av n ->) "Hsa %Hr Htn Hp".
-    iDestruct "Htn" as "(Hft & (%γ & %vf & #Hreg & Hγ & #Hpin & Hcp & #Hbase) & #Hfloor)".
-    iDestruct "Hfloor" as (kF γF F) "(#HrF & #HlF & _)".
-    iMod (file_xfer_boot (fgn_cl (ugn_file c)) gen r av γ (fe_base vf) kF γF F Hr
-            with "Hsa Hγ Hreg Hbase HrF HlF Hp")
+    iDestruct "Htn" as "(Hft & %γ & %vf & #Hreg & Hγ & #Hpin & Hcp & #Hbase & #HF)".
+    iMod (file_xfer_boot (fgn_cl (ugn_file c)) gen r av γ (fe_base vf) (fe_floor vf) Hr
+            with "Hsa Hγ Hreg Hbase HF Hp")
       as ">(Hsa & Hs & %r' & %ls & %Hr' & Hr'p & Hb & #Hls & Hrest)".
     iMod (fcp_set vf ls with "Hcp") as "#Hcp".
     iModIntro. iModIntro. iFrame "Hsa".
-    iDestruct "Hrest" as "[#HT | (Hpos & Htk & _)]".
+    iDestruct "Hrest" as "[#HT | (Hpos & Htk & #Hty & %Ls_c & _ & _ & %HFb)]".
     { iSplitL "Hft".
       { rewrite /uturn'. iFrame "Hft". iExists vf, ls. iFrame "Hpin Hcp Hls". by iLeft. }
       iExists (fn_with r γ (S gen) true), r'.
       iSplitR; [iPureIntro; by destruct r |]. iFrame "Hs Hr'p".
-      rewrite /union_boot. iFrame "Hb". by iLeft. }
+      rewrite /union_boot. iExists (fcontent_of av). iFrame "Hb". by iLeft. }
     iDestruct "Htk" as (γ' Ls) "(#Hreg' & Hq & #Hcm)".
     iDestruct (sl_lb_get with "Hq") as "#Hql".
     iSplitL "Hft Hq".
@@ -374,7 +381,9 @@ Section UnionApp.
       iRight. iExists γ', Ls. iFrame "Hreg' Hq Hql Hcm". }
     iExists (fn_with r γ (S gen) true), r'.
     iSplitR; [iPureIntro; by destruct r |]. iFrame "Hs Hr'p".
-    rewrite /union_boot. iFrame "Hb". iRight. iExists vf, ls. iFrame "Hpin Hcp Hpos".
+    rewrite /union_boot. iExists (fcontent_of av). iFrame "Hb". iRight.
+    iExists vf, ls. iFrame "Hpin Hcp Hpos". iSplitR; [iExact "Hls" |].
+    iSplitR; [iPureIntro; exact (proj2 HFb) |]. iExact "Hty".
   Qed.
 
   (* ---- THE MERGE (sync SY3-A3bc): the file application's, the started
@@ -406,7 +415,7 @@ Section UnionApp.
     app_boot app_union c k r ⊢ ⌜app_ok app_union c k r⌝.
   Proof using .
     cbn [app_union app_fixed app_names app_boot app_ok] in c, r |- *.
-    rewrite /union_boot /file_boot. iIntros "((_ & %H & _) & _)". by iPureIntro.
+    rewrite /union_boot /file_boot_at. iIntros "(%s & (_ & %H & _) & _)". by iPureIntro.
   Qed.
 
   (* ---- the echo shift ---- *)
@@ -440,9 +449,9 @@ Section UnionApp.
   Proof using .
     intros Himg Hdk Hsb Hcov c.
     cbn [app_union app_fixed app_names app_pred app_cls app_okc] in c |- *.
-    rewrite /union_cls. iIntros "(%γ0 & #Hreg & Hh & Hcm & #Hlb)".
+    rewrite /union_cls. iIntros "(%γ0 & #Hreg & Hh & Hcm & Hhi & #Hlb)".
     iApply (file_init_img (fgn_cl (ugn_file c)) _ XV6_DISK_BYTES sb nib cov γ0
-              Himg Hdk Hsb Hcov with "Hreg Hh Hcm Hlb").
+              Himg Hdk Hsb Hcov with "Hreg Hh Hcm Hhi Hlb").
   Qed.
 
   (* ---- the conclusion's one ingredient ---- *)

@@ -143,6 +143,12 @@ Record file_fixed := MkFileFixed {
   ff_reg  : gname;
   ff_cm   : gname;
   ff_st   : gname;
+  (* THE RUN-LONG SYNC HISTORY (sync SY3-A4, the owner's ruling on the
+     floor): a [mono_list] of sync records whose FULL authority travels
+     with the durable copy across every era (the copy's list and it have
+     the same content), so a lower bound of it -- the ledger's floor --
+     is below every later copy's list without naming an era *)
+  ff_hist : gname;
 }.
 
 (* THE INSTANCE: echo's console pair beside THE DEED's and THE TICKET's
@@ -316,15 +322,18 @@ Section FileClaim.
   Lemma file_birth (γst : gname) :
     ⊢ |==> ∃ c : file_fixed, ⌜ff_st c = γst⌝ ∗ file_cl c
         ∗ ghost_map_auth (ff_reg c) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm c) 1 0%nat.
+        ∗ @mono_nat_auth_own Σ fa_st (ff_cm c) 1 0%nat
+        ∗ own (ff_hist c) (●ML ([] : list (leibnizO UnionAdm.srec))).
   Proof using .
     iMod echo_birth as (γ) "He".
     iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (g) "Hl";
       [ apply mono_list_auth_valid |].
     iMod (ghost_map_alloc_empty (K := nat) (V := gname)) as (greg) "Hreg".
     iMod (@mono_nat_own_alloc Σ fa_st 0) as (gcm) "[Hcm _]".
-    iModIntro. iExists (MkFileFixed γ g greg gcm γst).
-    rewrite /file_cl /fl_auth /=. iSplitR; [done |]. iFrame "He Hl Hreg Hcm".
+    iMod (own_alloc (●ML ([] : list (leibnizO UnionAdm.srec)))) as (gh) "Hh";
+      [ apply mono_list_auth_valid |].
+    iModIntro. iExists (MkFileFixed γ g greg gcm γst gh).
+    rewrite /file_cl /fl_auth /=. iSplitR; [done |]. iFrame "He Hl Hreg Hcm Hh".
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1269,7 +1278,10 @@ Section sync.
   Definition sync_role (c : file_fixed) (r : file_names) (Ls : list srec) : iProp Σ :=
     if fn_role r
     then (sl_auth (fn_sync r) (1/2) Ls ∗ sync_cm_auth c (fn_era r)
-          ∗ sync_st_lb c (fn_era r))%I
+          ∗ sync_st_lb c (fn_era r)
+          (* ...and THE RUN-LONG HISTORY's authority, at the same content
+             (sync SY3-A4) *)
+          ∗ sl_auth (ff_hist c) 1 Ls)%I
     else (sl_auth (fn_sync r) (1/4) Ls ∗ sync_cm_lb c (fn_era r)
           ∗ ∃ n : nat, fposf r (1/4) n ∗ ⌜forall rec : srec, rec ∈ Ls -> rec.1 <= n⌝)%I.
 
@@ -1345,7 +1357,7 @@ Section sync.
     iIntros "(%ls & %Ls & #Hreg & #Hlb & %Hch & %Hw & Hr)".
     iIntros "(%γ & %Lt & #Hregt & Hqt & #Hcmt) Hst".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
-    iDestruct "Hro" as "(Ho & Hcmo & #Hsto)".
+    iDestruct "Hro" as "(Ho & Hcmo & #Hsto & Hho)".
     iDestruct "Hr" as "(Hq & #Hcml & Hpos)".
     iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcml") as %[_ Hle1].
     iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hle2].
@@ -1355,9 +1367,9 @@ Section sync.
     iDestruct (sl_auth_agree with "Ho Hq") as %->.
     iDestruct (sl_auth_agree with "Hq Hqt") as %<-.
     iModIntro.
-    iSplitL "Ho Hcmo".
+    iSplitL "Ho Hcmo Hho".
     { iExists ls, Ls. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch Hw) "Hreg Hlb Ho Hcmo Hsto". }
+      iFrame (Hch Hw) "Hreg Hlb Ho Hcmo Hsto Hho". }
     iSplitL "Hq Hpos".
     { iExists ls, Ls. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch Hw) "Hreg Hlb Hq Hcml Hpos". }
@@ -1389,7 +1401,7 @@ Section sync.
     sync_claim c r' av -∗ sync_body c r av ls Ls -∗ union_tkb c gen -∗
     fl_lb c ls' -∗ fpos r n ==∗
       sync_claim c r' av ∗ sync_claim c r av ∗ union_tkb c gen
-      ∗ sl_lb (fn_sync r) (Ls ++ [(length ls', s)]) ∗ sync_cm_lb c (S gen)
+      ∗ sl_lb (ff_hist c) (Ls ++ [(length ls', s)])
       ∗ fpos r n.
   Proof using .
     destruct r' as [gc gd gt ge gγ gk gb gp]; destruct r as [rc rd rt re rγ rk rb rp].
@@ -1397,7 +1409,7 @@ Section sync.
     iIntros "(%ls_g & %Ls_g & #Hregg & _ & _ & _ & Hg)".
     iIntros "(#Hreg & #Hlb & %Hch & %Hw & Hr) (%γ & %Lt & #Hregt & Hqt & #Hcmt) #Hlb' Hph".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
-    iDestruct "Hg" as "(Hg & Hcmg & #Hstg)".
+    iDestruct "Hg" as "(Hg & Hcmg & #Hstg & Hhg)".
     iDestruct "Hr" as "(Hq & #Hcml & %m & Hpm & %Hbm)".
     iDestruct "Hph" as "[%Hrole Hph]".
     iDestruct (fposf_agree with "Hpm Hph") as %->.
@@ -1410,8 +1422,11 @@ Section sync.
     iDestruct (sl_auth_join3 with "Hg Hq Hqt") as "Ha".
     iMod (sl_auth_update _ Ls (Ls ++ [(length ls', fcont_of av)]) with "Ha") as "Ha";
       [by apply prefix_app_r |].
-    iDestruct (sl_lb_get with "Ha") as "#Hnew".
     iDestruct (sl_auth_split3_1 with "Ha") as "(Hg & Hq & Hqt)".
+    (* ...and the run-long history, at the same content *)
+    iMod (sl_auth_update _ Ls (Ls ++ [(length ls', fcont_of av)]) with "Hhg") as "Hhg";
+      [by apply prefix_app_r |].
+    iDestruct (sl_lb_get with "Hhg") as "#Hnew".
     (* the line list covering both *)
     iDestruct (fl_lb_join with "Hlb Hlb'") as (L) "[#HL %HL]".
     destruct HL as [HlsL Hls'L].
@@ -1428,16 +1443,16 @@ Section sync.
     { intros rec Hin. apply elem_of_app in Hin as [Hin | Hin]; [exact (Hbm rec Hin) |].
       apply elem_of_list_singleton in Hin as ->. cbn. lia. }
     iModIntro.
-    iSplitL "Hg Hcmg".
+    iSplitL "Hg Hcmg Hhg".
     { iExists L, (Ls ++ [(length ls', fcont_of av)]).
       unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch' Hw') "Hregg HL Hg Hcmg Hstg". }
+      iFrame (Hch' Hw') "Hregg HL Hg Hcmg Hstg Hhg". }
     iSplitL "Hq Hpm".
     { iExists L, (Ls ++ [(length ls', fcont_of av)]).
       unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch' Hw') "Hreg HL Hq Hcml". iExists (length ls').
       iFrame "Hpm". iPureIntro. exact Hbm'. }
-    iFrame "Hcml Hnew". iSplitR "Hph".
+    iFrame "Hnew". iSplitR "Hph".
     { iExists γ, (Ls ++ [(length ls', fcont_of av)]). iFrame "Hregt Hqt Hcmt". }
     rewrite /fpos. iFrame "Hph". done.
   Qed.
@@ -1516,19 +1531,6 @@ Section sync.
     Ls' `prefix_of` Ls -> sl_lb γ Ls -∗ sl_lb γ Ls'.
   Proof using .
     intros Hp. rewrite /sl_lb. iApply own_mono. by apply mono_list_lb_mono.
-  Qed.
-
-  (* a durable copy hands out the empty lower bound of its list *)
-  Lemma sync_claim_lb_nil (c : file_fixed) (r : file_names) (av : aview) :
-    fn_role r = true ->
-    sync_claim c r av -∗ sync_claim c r av ∗ sl_lb (fn_sync r) [].
-  Proof using .
-    intros Hr. iIntros "(%ls & %Ls & #Hreg & #Hlb & %Hch & %Hw & Hro)".
-    rewrite /sync_role Hr. iDestruct "Hro" as "(Ho & Hcm & #Hst)".
-    iDestruct (sl_lb_get with "Ho") as "#Hl".
-    iSplitL; [| iApply (sl_lb_mono with "Hl"); apply prefix_nil].
-    iExists ls, Ls. iFrame "Hreg Hlb". iSplitR; [by iPureIntro |].
-    iSplitR; [by iPureIntro |]. rewrite /sync_role Hr. iFrame "Ho Hcm Hst".
   Qed.
 
   (* A MOVE THAT LEAVES THE FILES: the claim reads the view through its
@@ -1614,13 +1616,13 @@ Section sync.
       (gen : nat) (F : list srec) :
     fn_role r = true ->
     sync_claim c r av -∗ sl_auth γ 1 [] -∗ sync_reg c (S gen) γ -∗
-    sl_lb (fn_sync r) F -∗ sync_st_auth c (gen + 1) ==∗
+    sl_lb (ff_hist c) F -∗ sync_st_auth c (gen + 1) ==∗
       ∃ γp : gname,
       sync_claim c (fn_with r γ (S gen) true) av
       ∗ sync_claim c (fn_with_pos r γ (S gen) false γp) av
       ∗ union_tkb c gen
       ∗ (∃ (ls : list fl_line) (Ls_c : list srec),
-           fl_lb c ls ∗ sl_lb γ Ls_c
+           fl_lb c ls ∗ sl_lb γ Ls_c ∗ sl_lb (ff_hist c) Ls_c
            ∗ ⌜F `prefix_of` Ls_c⌝ ∗ ⌜uadm ls (slast F) (fcont_of av)⌝
            ∗ fposh (fn_with_pos r γ (S gen) false γp) (length ls))
       ∗ sync_st_auth c (gen + 1).
@@ -1629,8 +1631,9 @@ Section sync.
     cbn [fn_role fn_era fn_sync fn_with fn_with_pos fn_pos]. intros ->.
     iIntros "(%ls & %Ls_c & _ & #Hlb & %Hch & %Hw & Hr) Hnew #Hreg #HF Hst".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
-    iDestruct "Hr" as "(Ho & Hcm & #Hsto)".
-    iDestruct (sl_auth_lb_prefix with "Ho HF") as %HFc.
+    iDestruct "Hr" as "(Ho & Hcm & #Hsto & Hho)".
+    iDestruct (sl_auth_lb_prefix with "Hho HF") as %HFc.
+    iDestruct (sl_lb_get with "Hho") as "#Hhlb".
     iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hk].
     (* the fresh list at the copy's *)
     iMod (sl_auth_update γ [] Ls_c with "Hnew") as "Hnew"; [apply prefix_nil |].
@@ -1647,16 +1650,16 @@ Section sync.
       pose proof (sync_chain_pos ls Ls_c Hch). lia. }
     rewrite (_ : (gen + 1)%nat = S gen); [| lia].
     iModIntro. iExists γp.
-    iSplitL "Hh Hcm".
+    iSplitL "Hh Hcm Hho".
     { iExists ls, Ls_c. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch Hw) "Hreg Hlb Hh Hcm Hst'". }
+      iFrame (Hch Hw) "Hreg Hlb Hh Hcm Hst' Hho". }
     iSplitL "Hq Hp1".
     { iExists ls, Ls_c. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch Hw) "Hreg Hlb Hq Hcml". iExists (length ls).
       rewrite /fposf /=. iFrame "Hp1". iPureIntro. exact Hbm. }
     iSplitL "Hqt".
     { iExists γ, Ls_c. iFrame "Hreg Hqt Hcml". }
-    iFrame "Hst". iExists ls, Ls_c. iFrame "Hlb Hnlb".
+    iFrame "Hst". iExists ls, Ls_c. iFrame "Hlb Hnlb Hhlb".
     iSplitR; [iPureIntro; exact HFc |].
     iSplitR; [iPureIntro; exact (sync_chain_shrink ls Ls_c F _ Hch HFc Hw) |].
     rewrite /fposh /fpos /fposq /fposf /=. iFrame "Hp2 Hp3". done.
@@ -1670,17 +1673,17 @@ Section sync.
       (γ0 : gname) (ls : list fl_line) :
     fn_role r0 = true -> fn_era r0 = 0 -> fn_sync r0 = γ0 -> fcontent_of av0 = ∅ ->
     sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗
-    fl_lb c ls ==∗ sync_claim c r0 av0.
+    sl_auth (ff_hist c) 1 [] -∗ fl_lb c ls ==∗ sync_claim c r0 av0.
   Proof using .
     destruct r0 as [rc rd rt re rγ rk rb rp].
     cbn [fn_role fn_era fn_sync]. intros -> -> -> Hav.
-    iIntros "#Hreg Hh Hcm #Hlb".
+    iIntros "#Hreg Hh Hcm Hhi #Hlb".
     iMod (mono_nat_lb_own_0 (mono_natG0 := fa_st) (ff_st c)) as "#Hst".
     assert (Hw : uadm ls (slast []) (fcont_of av0)).
     { rewrite /fcont_of Hav dst_content_empty. exact (uadm_self ls srec0). }
     pose proof (sync_chain_nil ls) as Hch.
     iModIntro. iExists ls, []. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-    iFrame (Hch Hw) "Hreg Hlb Hh Hcm Hst".
+    iFrame (Hch Hw) "Hreg Hlb Hh Hcm Hst Hhi".
   Qed.
 
   (* =================================================================== *)
@@ -1705,19 +1708,21 @@ Section sync.
     iMod (@mono_nat_own_alloc Σ fa_st (S gen)) as (γcm) "[Hcm #Hcml]".
     iMod (@mono_nat_own_alloc Σ fa_st (gen + 1)) as (γst) "[Hst #Hstl]".
     iMod (fpos_alloc 0) as (γp) "(Hp & _ & _)".
-    iDestruct (fl_auth_lb (MkFileFixed ef γfl γreg γcm γst) [] with "Hfl") as "[_ #Hlb]".
+    iMod (own_alloc (●ML ([] : list (leibnizO srec)))) as (γh) "Hhi";
+      [apply mono_list_auth_valid |].
+    iDestruct (fl_auth_lb (MkFileFixed ef γfl γreg γcm γst γh) [] with "Hfl") as "[_ #Hlb]".
     iDestruct (sl_auth_split3_1 γs [] with "Hs") as "(Hh & Hq & Hqt)".
     rewrite (_ : (gen + 1)%nat = S gen); [| lia].
     iModIntro.
-    iExists (MkFileFixed ef γfl γreg γcm γst),
+    iExists (MkFileFixed ef γfl γreg γcm γst γh),
       (fn_with r0 γs (S gen) true), (fn_with_pos r0 γs (S gen) false γp), ∅.
     iSplitR; [iPureIntro; cbn [fn_role fn_era fn_with fn_with_pos]; done |].
     assert (Hw : uadm [] (slast []) (fcont_of ∅)).
     { rewrite fcont_of_empty. exact (uadm_self [] srec0). }
     pose proof (sync_chain_nil []) as Hch.
-    iSplitL "Hh Hcm".
+    iSplitL "Hh Hcm Hhi".
     { iExists [], []. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync fn_with fn_with_pos].
-      iFrame (Hch Hw) "Hel Hlb Hh Hcm Hstl". }
+      iFrame (Hch Hw) "Hel Hlb Hh Hcm Hstl". iExact "Hhi". }
     iSplitL "Hq Hp".
     { iExists [], []. unfold sync_body, sync_role;
         cbn [fn_role fn_era fn_sync fn_with fn_with_pos].
@@ -1732,7 +1737,7 @@ Section sync.
     ⊢ |==> ∃ (c : file_fixed) (r : file_names) (av : aview) (γ : gname) (F : list srec),
         ⌜fn_role r = true⌝
         ∗ sync_claim c r av ∗ sl_auth γ 1 [] ∗ sync_reg c (S gen) γ
-        ∗ sl_lb (fn_sync r) F ∗ sync_st_auth c (gen + 1).
+        ∗ sl_lb (ff_hist c) F ∗ sync_st_auth c (gen + 1).
   Proof using .
     iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (γfl) "Hfl";
       [apply mono_list_auth_valid |].
@@ -1747,15 +1752,17 @@ Section sync.
       [by rewrite lookup_insert_ne |].
     iMod (@mono_nat_own_alloc Σ fa_st 0) as (γcm) "[Hcm _]".
     iMod (@mono_nat_own_alloc Σ fa_st (gen + 1)) as (γst) "[Hst _]".
-    iDestruct (fl_auth_lb (MkFileFixed ef γfl γreg γcm γst) [] with "Hfl") as "[_ #Hlb]".
+    iMod (own_alloc (●ML ([] : list (leibnizO srec)))) as (γh) "Hhi";
+      [apply mono_list_auth_valid |].
+    iDestruct (fl_auth_lb (MkFileFixed ef γfl γreg γcm γst γh) [] with "Hfl") as "[_ #Hlb]".
     iDestruct (sl_auth_split3_1 γ0 [] with "H0") as "(Hh & _ & _)".
-    iDestruct (sl_lb_get with "Hh") as "#HF".
-    iMod (sync_claim_birth (MkFileFixed ef γfl γreg γcm γst)
-            (fn_with r0 γ0 0 true) ∅ γ0 [] with "H0el Hh Hcm Hlb") as "Hcl";
+    iDestruct (sl_lb_get γh 1 [] with "Hhi") as "#HF".
+    iMod (sync_claim_birth (MkFileFixed ef γfl γreg γcm γst γh)
+            (fn_with r0 γ0 0 true) ∅ γ0 [] with "H0el Hh Hcm Hhi Hlb") as "Hcl";
       [reflexivity | reflexivity | reflexivity
       | rewrite /fcontent_of /aents lookup_empty; reflexivity |].
     iModIntro.
-    iExists (MkFileFixed ef γfl γreg γcm γst),
+    iExists (MkFileFixed ef γfl γreg γcm γst γh),
       (fn_with r0 γ0 0 true), ∅, γ, [].
     iSplitR; [done |]. iFrame "Hcl Hnew Hel HF Hst".
   Qed.
@@ -2378,42 +2385,49 @@ Section FileClaim2.
      The witness sits under ONE later: it is read off the original arm,
      which the transport only sees under [▷]; /init strips it at its first
      step, everything under it being timeless. *)
-  Definition file_boot (c : file_fixed) (k : nat) (r : file_names) : iProp Σ :=
+  Definition file_boot_at (c : file_fixed) (k : nat) (r : file_names) (s : dst) : iProp Σ :=
     (echo_boot (ff_echo c) k (fn_cons r) ∗ ⌜fn_era r = k⌝
-     ∗ ∃ s : dst, fown r s ∗ ▷ (f_typed c s ∨ file_taint c))%I.
+     ∗ fown r s ∗ ▷ (f_typed c s ∨ file_taint c))%I.
 
-  (* THE POWER-ON TRANSPORT (sync SY3-A3bc, design 4.5 "PowerOn"): the
-     slot's durable copy [r] (a COPY) re-based to the new era's list [γ]
-     (full authority at [[]], registered at [S gen]) under the loan of the
-     started auth; the slot keeps it at [fn_with r γ (S gen) true]; the era's
-     running claim [r'] at fresh deed names, the copy's re-based sync part
-     and a FRESH round position founded at the copy's line count [length
-     ls] -- whose holder's half goes out with the boot resource -- and the
-     token.  The ledger's floor [(kF, γF, F)] is read when it is at the
-     copy's era (the boot fact); a lower bound [ls0] of the line list stands
-     in for [ls] when the copy is tainted.  The result is under [◇]: the
-     copy's contents are timeless, and the counter bump needs them out of
-     the slot's later. *)
+  (* ...at SOME deed state *)
+  Definition file_boot (c : file_fixed) (k : nat) (r : file_names) : iProp Σ :=
+    (∃ s : dst, file_boot_at c k r s)%I.
+
+  (* THE POWER-ON TRANSPORT (sync SY3-A3bc, design 4.5 "PowerOn"; the floor
+     re-ruled at SY3-A4): the slot's durable copy [r] (a COPY) re-based to
+     the new era's list [γ] (full authority at [[]], registered at [S gen])
+     under the loan of the started auth; the slot keeps it at [fn_with r γ
+     (S gen) true]; the era's running claim [r'] at fresh deed names, the
+     copy's re-based sync part and a FRESH round position founded at the
+     copy's line count [length ls] -- whose holder's half goes out with the
+     boot resource -- and the token.  THE FLOOR is a lower bound [F] of the
+     RUN-LONG HISTORY, which the copy holds the authority of: [F ⊑ Ls_c],
+     and the BOOT FACT -- the copy's files admissible after [F]'s last
+     record -- follows along the copy's chain ([sync_chain_shrink]); no
+     era is compared.  The boot resource names the deed's state, the
+     copy's content, so the boot fact reaches /init at the state it files.
+     A lower bound [ls0] of the line list stands in for [ls] when the copy
+     is tainted.  The result is under [◇]: the copy's contents are
+     timeless, and the counter bump needs them out of the slot's later. *)
   Lemma file_xfer_boot (c : file_fixed) (gen : nat) (r : file_names) (av : aview)
-      (γ : gname) (ls0 : list fl_line) (kF : nat) (γF : gname) (F : list srec) :
+      (γ : gname) (ls0 : list fl_line) (F : list srec) :
     fn_role r = true ->
     sync_st_auth c (gen + 1) -∗ sl_auth γ 1 [] -∗ sync_reg c (S gen) γ -∗
-    fl_lb c ls0 -∗ sync_reg c kF γF -∗ sl_lb γF F -∗
+    fl_lb c ls0 -∗ sl_lb (ff_hist c) F -∗
     ▷ file_pred c r av ==∗ ◇ (
       sync_st_auth c (gen + 1) ∗
       ▷ file_pred c (fn_with r γ (S gen) true) av ∗
       ∃ (r' : file_names) (ls : list fl_line),
         ⌜fn_era r' = S gen /\ fn_role r' = false /\ fn_sync r' = γ⌝ ∗
-        ▷ file_pred c r' av ∗ file_boot c (S gen) r' ∗ fl_lb c ls ∗
+        ▷ file_pred c r' av ∗ file_boot_at c (S gen) r' (fcontent_of av) ∗ fl_lb c ls ∗
         (file_taint c
-         ∨ (fposh r' (length ls) ∗ union_tkb c gen
-            ∗ ∃ Ls_c : list srec, sl_lb γ Ls_c
-                ∗ ⌜kF = fn_era r -> F `prefix_of` Ls_c /\
-                                    uadm ls (slast F) (fcont_of av)⌝))).
+         ∨ (fposh r' (length ls) ∗ union_tkb c gen ∗ f_typed c (fcontent_of av)
+            ∗ ∃ Ls_c : list srec, sl_lb γ Ls_c ∗ sl_lb (ff_hist c) Ls_c
+                ∗ ⌜F `prefix_of` Ls_c /\ uadm ls (slast F) (fcont_of av)⌝))).
   Proof using .
     destruct r as [oc od ot oe oγ ok ob op]; cbn [fn_role fn_era fn_sync fn_with fn_with_pos].
     intros ->.
-    iIntros "Hst Hnew #Hreg #Hls0 #HregF #HF Hp".
+    iIntros "Hst Hnew #Hreg #Hls0 #HF Hp".
     iApply bupd_except_0_elim.
     iDestruct "Hp" as ">Hp". iModIntro.
     iDestruct (file_pred_split with "Hp") as "[He Hrest]".
@@ -2438,27 +2452,13 @@ Section FileClaim2.
                          with "He'"). by iLeft. }
       iSplitL; last first.
       { iSplitR; [iExact "Hls0" | by iLeft]. }
-      rewrite /file_boot. iFrame "Hb". iSplitR; [done |].
-      iExists (fcontent_of av). rewrite /fown. iFrame "Hd2 Ht2". iNext. by iRight. }
-    (* the floor, at the copy's era or not *)
-    iAssert (∃ F' : list srec, sl_lb oγ F'
-               ∗ ⌜kF = ok -> F' = F⌝
-               ∗ sync_claim c (MkFileNames oc od ot oe oγ ok true op) av)%I
-      with "[Hsy]" as (F') "(#HF' & %HF'F & Hsy)".
-    { destruct (decide (kF = ok)) as [Hk | Hk].
-      - iDestruct "Hsy" as (ls Ls) "(#Hrg & Hb')".
-        rewrite Hk. iDestruct (sync_reg_agree with "HregF Hrg") as %Hγ.
-        cbn [fn_sync] in Hγ. subst γF.
-        iExists F. iFrame "HF". iSplitR; [by iPureIntro |].
-        iExists ls, Ls. iFrame "Hrg Hb'".
-      - iDestruct (sync_claim_lb_nil c (MkFileNames oc od ot oe oγ ok true op) av eq_refl
-                     with "Hsy") as "[Hsy #H0]".
-        iExists []. iFrame "H0 Hsy". iPureIntro. intros Hc. by destruct (Hk Hc). }
+      rewrite /file_boot_at. iFrame "Hb". iSplitR; [done |].
+      rewrite /fown. iFrame "Hd2 Ht2". iNext. by iRight. }
     iDestruct (f_state_typed_at with "Hf") as "[Hf #Hty]".
-    iMod (sync_claim_rebase c (MkFileNames oc od ot oe oγ ok true op) av γ gen F' eq_refl
-            with "Hsy Hnew Hreg HF' Hst")
+    iMod (sync_claim_rebase c (MkFileNames oc od ot oe oγ ok true op) av γ gen F eq_refl
+            with "Hsy Hnew Hreg HF Hst")
       as (γp) "(Hsys & Hsyr & Htk & Hout & Hst)".
-    iDestruct "Hout" as (ls Ls_c) "(#Hlb & #HLc & %HFc & %Hadm & Hpos)".
+    iDestruct "Hout" as (ls Ls_c) "(#Hlb & #HLc & #HHc & %HFc & %Hadm & Hpos)".
     iDestruct (f_state_copy c (MkFileNames oc od ot oe oγ ok true op)
                  (MkFileNames rc d1 t1 e1 γ (S gen) false γp) av
                  with "Ha1 Hd1 Ht1 Hf") as "[Hf Hf']".
@@ -2476,14 +2476,13 @@ Section FileClaim2.
       iSplitR; [by iPureIntro |]. iFrame "Hf'".
       iApply (sync_claim_rec_eq with "Hsyr"); reflexivity. }
     iSplitL "Hb Hd2 Ht2".
-    { rewrite /file_boot. iFrame "Hb". iSplitR; [done |].
-      iExists (fcontent_of av). rewrite /fown. iFrame "Hd2 Ht2".
+    { rewrite /file_boot_at. iFrame "Hb". iSplitR; [done |].
+      rewrite /fown. iFrame "Hd2 Ht2".
       iNext. iLeft. iExact "Hty". }
     iSplitR; [iExact "Hlb" |].
     iRight. iSplitL "Hpos"; [iApply (fposh_rec_eq with "Hpos"); reflexivity |].
-    iFrame "Htk".
-    iExists Ls_c. iFrame "HLc". iPureIntro. intros Hk. rewrite (HF'F Hk) in HFc Hadm.
-    done.
+    iFrame "Htk Hty".
+    iExists Ls_c. iFrame "HLc HHc". iPureIntro. done.
   Qed.
 
   (* ERA 0'S DURABLE COPY (sync SY3-A3bc, design 4.5 "Birth"): at the map a
@@ -2497,10 +2496,11 @@ Section FileClaim2.
     fs_blocks dk = fsimg_P ->
     fs_recovery (fs_blocks dk) D fsimg_cov (FsImg.sb_logstart fsimg_sb) ->
     snap_ok S D ->
-    sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗ fl_lb c [] ==∗
+    sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗
+    sl_auth (ff_hist c) 1 [] -∗ fl_lb c [] ==∗
       ∃ r : file_names, ⌜fn_role r = true⌝ ∗ file_pred c r (abs_view (fss_inodes S)).
   Proof using .
-    intros Hdk Hrec HS. iIntros "#Hreg Hh Hcm #Hlb".
+    intros Hdk Hrec HS. iIntros "#Hreg Hh Hcm Hhi #Hlb".
     iMod (echo_init (ff_echo c) dk D S Hdk Hrec HS) as (rc) "He".
     iMod (fnames_alloc rc ∅ γ0 0%nat true 0)
       as (r) "(%Hrc & %Hsy & Hd1 & _ & Ht1 & _ & Ha1 & _)".
@@ -2510,7 +2510,7 @@ Section FileClaim2.
       exact (era0_recovery_class_absent txt_name dk D S N txt_laws
                Hdk Hrec HS HN). }
     iMod (sync_claim_birth c r (abs_view (fss_inodes S)) γ0 [] Hb Hk Hγ
-            (f_ok_fcontent _ _ Hok) with "Hreg Hh Hcm Hlb") as "Hsy".
+            (f_ok_fcontent _ _ Hok) with "Hreg Hh Hcm Hhi Hlb") as "Hsy".
     iModIntro. iExists r. iSplitR; [done |].
     iApply (file_pred_join with "[He]").
     { rewrite Hrc. iExact "He". }
@@ -2534,7 +2534,8 @@ Section FileClaim2.
     fs_blocks dk = fsimg_P ->
     sb = fsimg_sb ->
     cov = fsimg_cov ->
-    sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗ fl_lb c [] ==∗
+    sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗
+    sl_auth (ff_hist c) 1 [] -∗ fl_lb c [] ==∗
       ∃ r : file_names, ⌜fn_role r = true⌝ ∗
         file_pred c r (abs_view (fss_inodes
           (FsDurImg.img_state (fs_blocks dk) sb nib))).
@@ -2639,7 +2640,7 @@ Section FileMerge.
       with "[Hroo Hqt Hsa]" as "[#Hag2 (Hroo & Hqt & Hsa)]".
     { iSplit; [| iFrame "Hroo Hqt Hsa"].
       iNext. iDestruct "Hro_o" as %Hro_o. rewrite /sync_role Hro_o.
-      iDestruct "Hroo" as "(Ho & Hcmo & #Hsto)".
+      iDestruct "Hroo" as "(Ho & Hcmo & #Hsto & _)".
       rewrite /sync_cm_auth /sync_cm_lb /sync_st_lb /sync_st_auth.
       iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcmt")
         as %[_ Hle1].

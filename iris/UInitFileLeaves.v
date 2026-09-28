@@ -101,7 +101,8 @@ Section UInitFileLeaves.
   (* THE BOOT FILING (RULING F0-BOOT).  The deed's typed witness names the
      era's boot state; init files it into the boot ledger it holds in
      [fturn], and what comes out is the head precondition AT THAT STATE.
-     Under the taint the witness names nothing, so the state is empty. *)
+     Under the taint the witness names nothing, so the state is empty.  The
+     era's BOOT FACT ([FileOut.f0_bt], sync SY3-A4) is filed beside it. *)
   Definition boot_at (s0 : fstate) (s : dst) : iProp Σ :=
     ((⌜s0 = dst_content s⌝ ∗ f_typed (fgn_cl g) s) ∨ (⌜s0 = ∅⌝ ∗ FT))%I.
 
@@ -110,11 +111,12 @@ Section UInitFileLeaves.
 
   (* THE FILING, out of the boot ledger's authority alone *)
   Lemma file_f0bw_of_boot (s0 : fstate) :
-    FileOut.fturn g (S gen_id) ==∗
+    FileOut.fturn g (S gen_id) -∗
+    (∃ vf : FileOut.file_era, FileOut.file_era_pin g (S gen_id) vf ∗ FileOut.f0_bt g vf s0) ==∗
     FileOut.fturn_core g (S gen_id) ∗ FileLinksLine.f0bw g (S gen_id) s0.
   Proof using .
-    iIntros "Ht".
-    iMod (FileOut.fturn_file g (S gen_id) s0 with "Ht") as "[Ht Hbl]".
+    iIntros "Ht Hbt".
+    iMod (FileOut.fturn_file g (S gen_id) s0 with "Ht Hbt") as "[Ht Hbl]".
     iDestruct "Hbl" as (vf) "[#Hvf #Hbl]".
     iModIntro. iFrame "Ht". rewrite /FileLinksLine.f0bw.
     iSplitR; [ by iPureIntro | ]. iExists vf. iFrame "Hvf Hbl".

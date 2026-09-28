@@ -567,7 +567,7 @@ Section file_links_line.
      CONSOLE era because the reader's residue has to agree with it and the
      record's [lk_rres] field is not indexed by the era. *)
   Definition f0w (k : nat) (s0 : fstate) : iProp Σ :=
-    (⌜k = S gen_id⌝ ∗ ∃ vf : file_era, file_era_pin g k vf ∗ f0_lb vf s0)%I.
+    (⌜k = S gen_id⌝ ∗ ∃ vf : file_era, file_era_pin g k vf ∗ f0_lb g vf s0)%I.
 
   Global Instance f0w_persistent k s : Persistent (f0w k s).
   Proof using . rewrite /f0w. apply _. Qed.
@@ -588,7 +588,7 @@ Section file_links_line.
      the era's head, where nothing has been filed yet.  A writer's [f0w]
      is this beside the filed token, and the two agree on the state. *)
   Definition f0bw (k : nat) (s0 : fstate) : iProp Σ :=
-    (⌜k = S gen_id⌝ ∗ ∃ vf : file_era, file_era_pin g k vf ∗ f0_bl vf s0)%I.
+    (⌜k = S gen_id⌝ ∗ ∃ vf : file_era, file_era_pin g k vf ∗ f0_bl g vf s0)%I.
 
   Global Instance f0bw_persistent k s : Persistent (f0bw k s).
   Proof using . rewrite /f0bw. apply _. Qed.

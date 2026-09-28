@@ -69,7 +69,7 @@ Section file_links.
            ∗ (⌜ws = []⌝
               ∨ ∃ (cs0 ps0 : list nat) (vf : file_era) (s0 : fstate),
                   cs_lb v cs0 ∗ ps_lb v ps0
-                  ∗ file_era_pin g k vf ∗ f0_lb vf s0
+                  ∗ file_era_pin g k vf ∗ f0_lb g vf s0
                   ∗ ⌜(nlines (snd <$> (dl ++ ws)) <= S (length cs0))%nat⌝
                   ∗ turn_lb v (length (proc_before_f ps0 cs0 (Some s0)
                                  (snd <$> (dl ++ ws))))

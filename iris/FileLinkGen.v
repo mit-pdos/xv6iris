@@ -137,7 +137,7 @@ Section file_link_gen.
      era's file pin, with no index pin ([FileLinksLine.f0bw] is it at the
      console era with the pin) *)
   Definition f0bwk (k : nat) (s0 : fstate) : iProp Σ :=
-    (∃ vf : file_era, file_era_pin g k vf ∗ f0_bl vf s0)%I.
+    (∃ vf : file_era, file_era_pin g k vf ∗ f0_bl g vf s0)%I.
 
   Global Instance f0bwk_persistent k s : Persistent (f0bwk k s).
   Proof using . rewrite /f0bwk. apply _. Qed.
