@@ -48,8 +48,10 @@ M1's ledgers are fresh ground and go first.
   vmfault sits under copyin/copyout/copyinstr).  Recommendation D: defer
   the permit sweep until NI-LEDGER-REST so it is paid once for all
   ledgers; land now the pure `vmfault_quiet` (lazy flag off ⇒ vmfault's
-  kalloc arm is unreachable) and a functor-inventory check.  Rulings
-  R1-R4 open for the owner.
+  kalloc arm is unreachable) and a functor-inventory check.  RULED D
+  (owner, 2026-09-28); `vmfault_quiet` LANDED (`iris/VmfaultQuiet.v`);
+  the inventory check is open; the permit sweep waits for
+  NI-LEDGER-REST.
 - [ ] **NI-DET-ROWS** (M0): `usys_det` and the ecall arm's re-cut, the
   loop's `round_det` discharge — after the post-Qed redesign settles;
   §4 lists the row set to start from.

@@ -290,7 +290,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   not tell a quiet round from a syscall), the allocating cone measured
   (69 contracts, vmfault under the copy layer), the permit design and its
   cost, and the recommendation to defer the sweep until the other ledgers
-  are in.  Rulings R1-R4 pending.
+  are in.  Ruled as recommended; `iris/VmfaultQuiet.v` landed (the
+  pure fault-arm fact); the permit sweep waits for the other ledgers.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

@@ -1,6 +1,11 @@
 # The strong instance: a quiet process appends no events (NI-STRONG-INSTANCE)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
+STATUS: RULED 2026-09-28 (owner: D, R1-R4 as recommended).  R4's first
+artefact LANDED the same day: `iris/VmfaultQuiet.v` (`vmfault_vpn_live`,
+`vmfault_quiet`; pure, closed under the global context, nothing imports it
+yet — the fault row's discharge when P is done).  R4's second artefact,
+the functor-inventory check, is open.  The permit sweep (P) waits for
+NI-LEDGER-REST.  Below: the design pass as written.  The
 lane the campaign note ([`../projects/noninterference.md`](../projects/noninterference.md)
 §3.1, §6 M1) promised as "provable in-logic once NI-LEDGER-KALLOC lands".
 The pass finds that promise was wrong as stated: the in-logic form needs
