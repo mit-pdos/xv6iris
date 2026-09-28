@@ -453,33 +453,67 @@ Proof.
   - exact fsimg_root_type.
 Qed.
 
+(* **...AND THE BLOCK IT READS, HOISTED.**  [fsimg_root_data] re-decodes the
+   root's block out of the 2 MB image at EVERY byte a scan touches, which
+   priced each lookup below at ~25 s (claude-notes/optimization.md, "an
+   image reading indexed by BLOCK").  The 64 records are exactly block 0,
+   so the scan is read off that block, decoded ONCE into a literal, and
+   tied back by [DirView]'s agreement lemmas. *)
+Definition fsimg_root_blk : list (bv 8) := Eval vm_compute in fsimg_root_data 0.
+
+Lemma fsimg_root_blk_eq : fsimg_root_data 0 = fsimg_root_blk.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_root_nrec_64 : fsimg_root_nrec = 64%nat.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_root_agree (k : nat) :
+  (k < 64)%nat -> dir_win_agree fsimg_root_data (fun _ => fsimg_root_blk) k.
+Proof.
+  intros Hk j Hj. unfold InodeDefs.file_byte.
+  rewrite (Nat.div_small (16 * k + j) BioDefs.BSIZE); [| unfold BioDefs.BSIZE; lia].
+  rewrite fsimg_root_blk_eq. reflexivity.
+Qed.
+
+Lemma fsimg_path_root_blk (f : fname) :
+  path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [f]
+  = (fun k => bv_unsigned (dir_inum (fun _ => fsimg_root_blk) k))
+      <$> dir_first (fun _ => fsimg_root_blk) 64 f.
+Proof.
+  rewrite fsimg_path_root, fsimg_root_nrec_64.
+  rewrite (dir_first_agree fsimg_root_data (fun _ => fsimg_root_blk) 64 f fsimg_root_agree).
+  destruct (dir_first fsimg_root_data 64 f) as [k |] eqn:E; [| reflexivity].
+  cbn [fmap option_fmap option_map]. f_equal.
+  rewrite (dir_inum_agree _ _ k (fsimg_root_agree k (dfirst_lt _ _ _ E))). reflexivity.
+Qed.
+
 Lemma fsimg_echo_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_echo] = Some 4.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_init_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_init] = Some 7.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_sh_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_sh] = Some 13.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_sync_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_sync] = Some 22.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_cat_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_cat] = Some 3.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_grep_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_grep] = Some 6.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 Lemma fsimg_seccomp_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_seccomp] = Some 23.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 (* ====================================================================== *)
 (*  4.  THE FILES' BYTES                                                   *)

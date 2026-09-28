@@ -39,7 +39,7 @@ Require Import FsDurSnap.
 Require Import FsCfgBoot.
 Require Import FsBootParams.    (* [fsimg_cov]                            *)
 Require Import FsImgDisk.
-Require Import FsImgCheck.      (* [fname_f], [fsimg_path_root]           *)
+Require Import FsImgCheck.      (* [fname_f], [fsimg_path_root_blk]       *)
 Require Import FsImg.
 Require Import FsAbsDefs.       (* [astep]/[apath_at]/[abs_view]          *)
 Require Import FsInitPin.       (* [era0_D], [img_astep_root],
@@ -63,7 +63,7 @@ Definition f_path : list fname := [fname_f].
 (* THE ONE COMPUTATION: no `f` in the root directory of mkfs's image. *)
 Lemma fsimg_f_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_f] = None.
-Proof. rewrite fsimg_path_root. vm_eq. Qed.
+Proof. rewrite fsimg_path_root_blk. vm_eq. Qed.
 
 (* ...and `f` is none of the five names the image DOES hold.  Decidable
    at the literals, and what the delta lemmas want at the root's entry
