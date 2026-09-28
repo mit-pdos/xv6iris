@@ -424,7 +424,12 @@ Section PipeProto.
      strippable under a plain [iInv .. as ">"].  This is why (P3) is stated
      as the cell's two OWNED arms and not as the design's wand
      [∀ w, γeof ↦ Some w -∗ ⌜..⌝]: a wand is not timeless. *)
-  Global Instance pipe_body_timeless pn γp L : Timeless (pipe_body pn γp L).
+  (* priority 10, and the landed invariant's twin below the same: tried
+     FIRST, either one's failure at a [pipe_bodyU]/[pipe_invU] goal unfolds
+     both bodies to find [U <> True] -- 1.9 s at every [iIntros "#Hinv"]
+     over [pipe_invU], tree-wide.  The general instances resolve the landed
+     goals anyway, by one unfolding. *)
+  Global Instance pipe_body_timeless pn γp L : Timeless (pipe_body pn γp L) | 10.
   Proof using . rewrite /pipe_body. apply _. Qed.
 
   Definition pipe_invU (pn : pnames) (γp : pipe_names) (L : list (bv 8))
@@ -439,7 +444,7 @@ Section PipeProto.
     Persistent (pipe_invU pn γp L U).
   Proof using . rewrite /pipe_invU. apply _. Qed.
 
-  Global Instance pipe_inv_persistent pn γp L : Persistent (pipe_inv pn γp L).
+  Global Instance pipe_inv_persistent pn γp L : Persistent (pipe_inv pn γp L) | 10.
   Proof using . rewrite /pipe_inv. apply _. Qed.
 
   (* ---- (P1)--(P3), each against the KERNEL'S authority (which is the
