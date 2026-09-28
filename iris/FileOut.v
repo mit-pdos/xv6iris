@@ -114,6 +114,17 @@ Record file_era := MkFEra {
   fe_fl : gname;   (* mono_list fstate: [] until the era's FIRST PROCESS BYTE
                       files that state into the console claim, [s0] after;
                       its lower bound [f0_fd] is the writer's "filed" token *)
+  (* THE ERA'S BASE (sync SY3-A3bc, design 4.5 ruling (ii) as amended): the
+     ledger's line list at the era's PowerOn, PURE -- pinned per era by
+     [file_era_pin], so every lower bound sh's rounds of one era read is
+     [fe_base ++] the era's own lines *)
+  fe_base : list fl_line;
+  (* THE COPY'S LINE LIST (sync SY3-A3bc): a [mono_list fl_line] the
+     on-arm allocates at [[]] and the PowerOn transport SETS, discarded, to
+     the durable copy's line lower bound -- the name the boot resource and
+     the turn share, so the ledger's certificate that the list is inside the
+     era's base reaches the position the transport founded *)
+  fe_cp : gname;
 }.
 
 Class fileOutG (Σ : gFunctors) := FileOutG {
@@ -267,14 +278,49 @@ Section file_out.
     iModIntro. iApply (f0f_lb_get with "Ha").
   Qed.
 
-  Lemma f0_alloc : ⊢ |==> ∃ v : file_era, f0_auth v [] ∗ f0f_auth v [].
+  (* the copy's line list: the full authority, and the discarded one *)
+  Definition fcp_auth (v : file_era) (ls : list fl_line) : iProp Σ :=
+    own (fe_cp v) (●ML (ls : list (leibnizO fl_line))).
+  Definition fcp_pin (v : file_era) (ls : list fl_line) : iProp Σ :=
+    own (fe_cp v) (●ML□ (ls : list (leibnizO fl_line))).
+
+  Global Instance fcp_auth_timeless v ls : Timeless (fcp_auth v ls).
+  Proof using . rewrite /fcp_auth. apply _. Qed.
+  Global Instance fcp_pin_timeless v ls : Timeless (fcp_pin v ls).
+  Proof using . rewrite /fcp_pin. apply _. Qed.
+  Global Instance fcp_pin_persistent v ls : Persistent (fcp_pin v ls).
+  Proof using . rewrite /fcp_pin. apply _. Qed.
+
+  Lemma fcp_set (v : file_era) (ls : list fl_line) :
+    fcp_auth v [] ==∗ fcp_pin v ls.
+  Proof using .
+    rewrite /fcp_auth /fcp_pin. iIntros "Ha".
+    iMod (own_update _ _ (●ML (ls : list (leibnizO fl_line))) with "Ha") as "Ha".
+    { apply mono_list_update. apply prefix_nil. }
+    iApply (own_update with "Ha"). apply mono_list_auth_persist.
+  Qed.
+
+  Lemma fcp_pin_agree (v : file_era) (ls ls' : list fl_line) :
+    fcp_pin v ls -∗ fcp_pin v ls' -∗ ⌜ls = ls'⌝.
+  Proof using .
+    rewrite /fcp_pin. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %[_ ?]%mono_list_auth_dfrac_op_valid_L.
+    done.
+  Qed.
+
+  (* ...AT THE ON-ARM: the era's record at the ledger's list [base] *)
+  Lemma f0_alloc (base : list fl_line) :
+    ⊢ |==> ∃ v : file_era, ⌜fe_base v = base⌝ ∗ f0_auth v [] ∗ f0f_auth v []
+                          ∗ fcp_auth v [].
   Proof using .
     iMod (own_alloc (●ML ([] : list (leibnizO fstate)))) as (gf) "Hf";
       [apply mono_list_auth_valid |].
     iMod (own_alloc (●ML ([] : list (leibnizO fstate)))) as (gl) "Hl";
       [apply mono_list_auth_valid |].
-    iModIntro. iExists (MkFEra gf gl). rewrite /f0_auth /fl_auth /=.
-    iFrame "Hf Hl".
+    iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (gc) "Hc";
+      [apply mono_list_auth_valid |].
+    iModIntro. iExists (MkFEra gf gl base gc). rewrite /f0_auth /fcp_auth /=.
+    iSplitR; [done |]. iFrame "Hf Hl Hc".
   Qed.
 
   (* THE CLAIM'S COPY OF THE BOOT WITNESS, deposited by the first byte, so
@@ -730,11 +776,13 @@ Section file_birth.
   (* handed the machine's started counter's name, which the fixed part
      keeps ([AppFile.file_birth]) *)
   Lemma file_birth_all (γst : gname) :
-    ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g.
+    ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g
+        ∗ ghost_map_auth (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
+        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) 1 0%nat.
   Proof using .
-    iMod (file_birth γst) as (c) "[%Hst Hc]".
+    iMod (file_birth γst) as (c) "(%Hst & Hc & Hreg & Hcm)".
     iMod (ghost_map_alloc (∅ : gmap nat file_era)) as (ge) "[Hm _]".
     iModIntro. iExists (MkFileGn c ge). rewrite /file_cl_all /=.
-    iSplitR; [done |]. iFrame "Hc Hm".
+    iSplitR; [done |]. iFrame "Hc Hm Hreg Hcm".
   Qed.
 End file_birth.

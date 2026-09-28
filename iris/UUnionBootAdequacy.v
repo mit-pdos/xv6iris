@@ -98,11 +98,14 @@ Section UnionAdequacy.
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
 
   Context (Hprog : union_prog_law).
+  (* the file application's started-counter camera is the machine's (sync
+     SY3-A3bc, ruling (i)): [union_fileAppG] below is built so *)
+  Context (Hfa : fa_st = riscv_pre_genGS).
 
   (* THE ELEVEN LAWS, AS THE INSTANCE, at priority 0 so that resolution
      never reaches [AppUnionRec.union_laws] itself *)
   #[local] Instance union_laws_at : App.xv6_app_laws (app_union (Σ := Σ)) | 0 :=
-    AppUnionRec.union_laws (Σ := Σ) Hprog.
+    AppUnionRec.union_laws (Σ := Σ) Hprog Hfa.
 
   (* =================================================================== *)
   (*  2.  THE THEOREM, over an abstract [Σ] and at the image's facts      *)
@@ -119,15 +122,14 @@ Section UnionAdequacy.
         κs (t2, g2) ->
       (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
       /\ app_phi app_union g2 κs.
-  Proof using Hprog bioslotGpreS0 echoOutG0 fdslotGpreS0 fileAppG0 fileGpreS0
+  Proof using Hfa Hprog bioslotGpreS0 echoOutG0 fdslotGpreS0 fileAppG0 fileGpreS0
               fileOutG0 inG0 irefslotGpreS0 pavGpreS0 pipeOutG0 riscvGpreS0 ufdG0
               wchGpreS0 xv6G0.
     intros n κs t2 g2 Hn.
     (* EVERY OBLIGATION GOES IN AS A HOLE ([UInitBootAdequacy]'s measured
        rule) *)
     refine (xv6_app_adequacy Σ g sb nib cov app_union
-              (app_init_of_valid_okc app_union _ (fun _ _ => Logic.I)
-                 (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
+              (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov)
               _ Hgen0 Hpow0 Himg n κs t2 g2 Hn).
     (* [Hphi]: a PURE reading of the application's trace ledger *)
     intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h.
@@ -198,6 +200,6 @@ Proof.
   assert (Hdk : fs_blocks (v_disk (g.(gdev).(dvirtio))) = fsimg_P)
     by (rewrite Hdisk; reflexivity).
   intros n κs t2 g2 Hn.
-  exact (union_adequacy_at_img (Σ := unionΣ) Hprog g fsimg_sb fsimg_nib
+  exact (union_adequacy_at_img (Σ := unionΣ) Hprog eq_refl g fsimg_sb fsimg_nib
            fsimg_cov Hgen0 Hpow0 Himg Hdk eq_refl eq_refl n κs t2 g2 Hn).
 Qed.

@@ -264,8 +264,8 @@ Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type} (HSt : mono_natG Σ)
   (□ (∀ (r : N) (av : FsAbsDefs.aview) (n : nat),
         ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own Σ HSt γst 1 n -∗
         ⌜Okc r⌝ -∗ Tn -∗ ▷ A r av ==∗
-        @mono_nat_auth_own Σ HSt γst 1 n ∗ Tn' ∗
-        ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r'))%I.
+        ◇ (@mono_nat_auth_own Σ HSt γst 1 n ∗ Tn' ∗
+           ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r')))%I.
 
 Global Instance app_xfer_boot_raw_persistent {Σ} {N} (HSt : mono_natG Σ)
     (A : N -> FsAbsDefs.aview -> iProp Σ) (Okc : N -> Prop) (B : N -> iProp Σ)
@@ -284,7 +284,8 @@ Proof.
   intros Hc. iPoseProof Hc as "#H". iEval (rewrite /app_clone_raw) in "H".
   rewrite /app_xfer_boot_raw. iIntros "!>" (r av n) "_ Hsa %Hr Htn HA".
   iMod ("H" with "HA") as "[HA Hn]". iDestruct "Hn" as (r') "[HA' HB]".
-  iModIntro. iFrame "Hsa Htn". iExists r, r'. iFrame "HA HA' HB". by iPureIntro.
+  iModIntro. iModIntro. iFrame "Hsa Htn". iExists r, r'. iFrame "HA HA' HB".
+  by iPureIntro.
 Qed.
 
 (* the generic application's: nothing claimed and nothing handed over *)
@@ -1532,9 +1533,11 @@ Theorem xv6_power_adequacy_gen Σ
                     Tnn c (Datatypes.S (obs_boots h)))))
     (* THE RETURN PATH (SY3-A1 re-cut), passed through to
        [RiscvAdequacy.riscv_power_adequacy]'s [Hback] *)
-    (Hback : forall (γobs : gname) (c : CT) (h : list mobs) (gen : nat),
-       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) h -∗ Tnn' c (Datatypes.S gen) ==∗
-         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) h ∗ Tnn'' c (Datatypes.S gen)))
+    (Hback : forall (γobs : gname) (c : CT) (h : list mobs),
+       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list -∗
+         Tnn' c (Datatypes.S (obs_boots h)) ==∗
+         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list
+            ∗ Tnn'' c (Datatypes.S (obs_boots h))))
     (* ...AND SINCE lane APP-IFACE item (c) (review-echo-plan finding 3) IT
        IS STATED AT THE ERA'S OWN UART NAMES.  It used to be quantified over
        an ARBITRARY [γ : uart_names], and a ledger's tx/rx wands inherit that
@@ -1758,7 +1761,7 @@ Proof.
                  iPoseProof (Happ_boot c gen γd γsw γreg γst Hborn) as "#Hxfer";
                  iEval (rewrite /app_xfer_boot_raw) in "Hxfer";
                  iMod ("Hxfer" $! _ _ (gen + 1)%nat with "[//] Hsa [//] Htn Hcl")
-                   as "(Hsa & Htn & Hnew)";
+                   as ">(Hsa & Htn & Hnew)";
                  iDestruct "Hnew" as (rs rnew) "(%Hrs & Hcl & Hnew & Hbnew)";
                  iDestruct "Hl" as (gt') "[Hl Hg']";
                  iEval (rewrite /snap_guest) in "Hh Hg'";
@@ -1968,7 +1971,7 @@ Proof.
                  (fun _ => emp%I)
                  (cons_res_triv_founded Σ) (turn_triv_founded Σ) γd γobs)
             (* no return path: the (empty) turn goes straight back *)
-            (fun _ _ _ _ => back_id _ _ _)
+            (fun _ _ _ => back_id _ _ _)
             _ (fun g _ => phi g)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "Hsi _ _ HP _";
@@ -2185,7 +2188,7 @@ Proof.
                        iSplitL "Hf"; [iExact "Hf" | done])
                  γd γobs)
             (* no return path: the (empty) turn goes straight back *)
-            (fun _ _ _ _ => back_id _ _ _)
+            (fun _ _ _ => back_id _ _ _)
             _ (fun _ h => P h)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ Hauth _ _ HPt";
@@ -2651,7 +2654,7 @@ Proof.
                  (fun _ => emp%I)
                  (cons_res_triv_founded xv6Σ) (turn_triv_founded xv6Σ) γd γobs)
             (* no return path: the (empty) turn goes straight back *)
-            (fun _ _ _ _ => back_id _ _ _)
+            (fun _ _ _ => back_id _ _ _)
             _ (fun g h => obs_wf h g)
             ltac:(intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h;
                   iIntros "_ _ %Hwf _ _"; iModIntro; iPureIntro; exact Hwf)

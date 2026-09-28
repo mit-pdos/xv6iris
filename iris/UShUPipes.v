@@ -398,12 +398,12 @@ Section UShUPipes.
           ⌜upre_tie cs s0 I (dst_content s)⌝
           ∗ era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ cs_lb v cs
           ∗ f0cw gf (S gen_id) s0
-          ∗ f_typed (fgn_cl gf) s ∗ fown r s
+          ∗ f_typed (fgn_cl gf) s ∗ fown r s ∗ urpos ug r I
           ∗ pwc_blkU ug v I (dst_content s) (S gen_id) [] false.
   Proof using .
     iIntros "Hc [Hpre _]".
     rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last by iLeft.
-    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
+    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw & Hup)".
     rewrite /uWcl /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr]. rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last by iLeft.
@@ -422,7 +422,7 @@ Section UShUPipes.
     rewrite Hcon /ust.
     iPoseProof (pwc_blkU_entry ug v I (S gen_id) ps cs s0 P0 Hw with "Hpin Hcw Htn Hps Hcs HE")
       as "HPW".
-    iFrame "HPW Hd Hty Hpin' Hcs HE Hcw".
+    iFrame "HPW Hd Hup Hty Hpin' Hcs HE Hcw".
   Qed.
 
   (* =================================================================== *)
@@ -580,7 +580,7 @@ Section UShUPipes.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                 N' T h' m' (mword_of_int ShSyms.runcmd) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
-    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & HPW)".
+    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & Hup & HPW)".
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
     pose proof (upv_line_pipe I (PrEcho ws) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
@@ -644,11 +644,11 @@ Section UShUPipes.
               N' h' m' q (sz + 65536) (FdOpen true wr0 (FdDevice ConsoleInv.CONSOLE))
               (32 + (96 + nn - 6 * S (length fs')))%nat
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
-              with "Hfam Hpl Hss Hh Hnodes [Hown] [//] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
+              with "Hfam Hpl Hss Hh Hnodes [Hown Hup] [//] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
                     Hcwd Hch Hrun").
     iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |]. iSplitR; [iExact "Hcw" |].
     rewrite /ush_deed_at. iLeft. iExists cs, s, v.
-    iFrame "Hown Hty Hpin Hcsl". by iPureIntro.
+    iFrame "Hown Hty Hpin Hcsl Hup". by iPureIntro.
   Qed.
 
   Local Notation PWC nm := (prod_words (PrCatF nm)).
@@ -729,16 +729,16 @@ Section UShUPipes.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                 N' T h' m' (mword_of_int ShSyms.runcmd) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
-    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & HPW)".
+    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & Hup & HPW)".
     iDestruct (udeed_typed s with "Hty") as %[Hsok Hshort].
     (* THE DEED, split: node 0 keeps the ticket, the producer borrows the
        deed's half *)
     rewrite /fown. iDestruct "Hown" as "[Hdq Htk]".
     assert (Hdeed : (ftkt r s ∗ f_typed (fgn_cl gf) s ∗ era_pin (fgn_echo gf) (S gen_id) v
-                     ∗ cs_lb v cs) ∗ fdq r (1/2)%Qp s ⊢ DPRE I).
-    { iIntros "[(Htk & #Hty' & #Hpin' & #Hcs') Hdq]". rewrite /ush_deed_at. iLeft.
+                     ∗ cs_lb v cs ∗ urpos ug r I) ∗ fdq r (1/2)%Qp s ⊢ DPRE I).
+    { iIntros "[(Htk & #Hty' & #Hpin' & #Hcs' & Hup) Hdq]". rewrite /ush_deed_at. iLeft.
       iExists cs, s, v. rewrite /fown /fdeed /FileOpen.fdq.
-      iFrame "Hdq Htk Hty' Hpin' Hcs'". by iPureIntro. }
+      iFrame "Hdq Htk Hty' Hpin' Hcs' Hup". by iPureIntro. }
     pose proof (upv_line_pipe I (PrCatF nm) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
       by exact (pview_union_fc_ok adm_u_g adm_s_on (dst_content s) Hsok).
@@ -799,7 +799,7 @@ Section UShUPipes.
               (UkShFork.ushf_wq Wcu I)
               (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0
                ∗ (ftkt r s ∗ f_typed (fgn_cl gf) s ∗ era_pin (fgn_echo gf) (S gen_id) v
-                  ∗ cs_lb v cs))%I
+                  ∗ cs_lb v cs ∗ urpos ug r I))%I
               (ufin v I (dst_content s) (LPipes (PrCatF nm) (F :: fs'))
                  (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF nm))
                  (PrCatF nm) (fdq r (1/2)%Qp s) _ P gF gG γc γm HlR Hfc
@@ -815,10 +815,10 @@ Section UShUPipes.
               N' h' m' q (sz + 65536) (FdOpen true wr0 (FdDevice ConsoleInv.CONSOLE))
               (32 + (96 + nn - 6 * S (length fs')))%nat
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
-              with "Hfam Hpl Hss Hh Hnodes [Htk] Hdq Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
+              with "Hfam Hpl Hss Hh Hnodes [Htk Hup] Hdq Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
                     Hcwd Hch Hrun").
     iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |]. iSplitR; [iExact "Hcw" |].
-    iFrame "Htk Hty Hpin Hcsl".
+    iFrame "Htk Hty Hpin Hcsl Hup".
   Qed.
 
   (* =================================================================== *)

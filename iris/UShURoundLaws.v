@@ -397,8 +397,10 @@ Section UShURoundLaws.
     intros Hr Hl HnwJ. rewrite /ush_pre_at /ush_done_at /ush_deed_at.
     iIntros "#Hlw Hd". iSplitL; [| iExact "Hlw"].
     iDestruct "Hd" as "[Hd | #HT]"; last by iRight.
-    iDestruct "Hd" as (cs s v) "(Hd & %Htie & #Hty & #Hpin & #Hcs & %Hnw)".
-    iLeft. iExists cs, s, v. iFrame "Hd Hty Hpin Hcs %". iPureIntro.
+    iDestruct "Hd" as (cs s v) "(Hd & %Htie & #Hty & #Hpin & #Hcs & %Hnw & Hup)".
+    iDestruct (urpos_mono ug r I (I ++ l ++ [wl_nl]) (nlines_app_le I (l ++ [wl_nl]))
+                 with "Hup") as "Hup".
+    iLeft. iExists cs, s, v. iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro.
     exact (upre_tie_of_done cs s0 I l _ Hr Hl Htie).
   Qed.
 
@@ -528,7 +530,7 @@ Section UShURoundLaws.
   Local Definition upfam (v : era_pins) (P : nat) (I : list (bv 8)) (s : dst)
       (p : nat) : iProp Σ :=
     match p with
-    | O => (turn v P ∗ fown r s)%I
+    | O => (turn v P ∗ fown r s ∗ urpos ug r I)%I
     | S p' => (lk_lpr FI (S gen_id) v I (S p') ∗ DONE I)%I
     end.
 
@@ -552,7 +554,7 @@ Section UShURoundLaws.
     - (* '$': the block-first byte files the deed's alternative *)
       assert (Hb0 : b = u_prompt !!! 0%nat)
         by (rewrite EchoLinks.wr_prompt_head in Hb; by injection Hb).
-      subst b. cbn [upfam]. iDestruct "Hc" as "[Htn Hd]".
+      subst b. cbn [upfam]. iDestruct "Hc" as "(Htn & Hd & Hup)".
       pose proof Hwb as (Hpin0 & Hr & Hn & HP).
       assert (Hne : I <> []) by exact (lm_wr_blk_nonnil U ps cs s0 I P Hwb).
       assert (Hhead : lm_cont U (lm_upto U cs s0 (bodies_of I) (nlines I - 1))
@@ -563,7 +565,7 @@ Section UShURoundLaws.
         rewrite Hcont. exact EchoLinks.wr_prompt_head. }
       iApply (union_write_link_blk ug Hcons (S gen_id) v P a (u_prompt !!! 0%nat) ps cs s0 I Φ
                 Hnw Hne Hr ltac:(lia) Hpin0 HP Hok Hterm Hhead
-                with "Hpin Htn Hps Hcs HE Hcw [HΦ Hd]").
+                with "Hpin Htn Hps Hcs HE Hcw [HΦ Hd Hup]").
       iIntros "Hres". iApply "HΦ". cbn [upfam].
       iDestruct "Hres" as "[(Htn' & _ & #Hcs' & _ & _) | #HT]"; last first.
       { iSplitL "";
@@ -582,7 +584,7 @@ Section UShURoundLaws.
         rewrite /f0w /f0cw. iSplitR; [by iPureIntro | iExact "Hcw"].
       + (* the deed, DONE: the filed alternative is the deed's own *)
         rewrite /ush_done_at /ush_deed_at. iLeft. iExists (cs ++ [a]), s, v.
-        iFrame "Hd Hty Hpin Hcs' %". iPureIntro.
+        iFrame "Hd Hty Hpin Hcs' Hup %". iPureIntro.
         exact (udone_tie_of_pend cs s0 I _ a Htie).
     - (* ' ': the record's own step, the deed framed *)
       cbn [upfam]. iDestruct "Hc" as "[Hc Hd]".
@@ -612,7 +614,7 @@ Section UShURoundLaws.
       iApply (uksh_w_prompt_taint N I l vw rb Hl2
                 with "HT Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc0] Hrun Hcont");
         assumption. }
-    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
+    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw & Hup)".
     destruct Htie as (a & Htie).
     (* the console: the block owed at the round's stage, or the taint *)
     rewrite /uWcl.
@@ -637,8 +639,8 @@ Section UShURoundLaws.
                   with "Hlk Hpin Hps Hcs HE Hcw Hty") as "#Hst".
     iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) N
               (upfam v P I s) l vw rb Hl2
-              with "Hst Hro [%] [%] [%] Hcode [$Hstd Htn Hd] Hrun [Hcont]");
-      [ exact Ha0 | exact Ha1 | exact Ha2 | cbn [upfam]; iFrame "Htn Hd" | ].
+              with "Hst Hro [%] [%] [%] Hcode [$Hstd Htn Hd Hup] Hrun [Hcont]");
+      [ exact Ha0 | exact Ha1 | exact Ha2 | cbn [upfam]; iFrame "Htn Hd Hup" | ].
     iIntros (h' ret) "[Hstd Hc] Hrun".
     iApply ("Hcont" $! h' ret with "[$Hstd Hc] Hrun").
     cbn [upfam]. iDestruct "Hc" as "[Hc Hd]". iFrame "Hd".
@@ -783,13 +785,13 @@ Section UShURoundLaws.
         rewrite /ush_deed_at.
         iDestruct "Hdp" as "[Hdp | #HT]"; last first.
         { iApply (ush_deed_taint ug r with "HT"). }
-        iDestruct "Hdp" as (cs s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
+        iDestruct "Hdp" as (cs s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw & Hup)".
         iDestruct (era_pin_agree (fgn_echo gf) (S gen_id) v v' with "Hpin Hpin'") as %<-.
         destruct Hw as [[(_ & _ & Hn & _ & _) _] _].
         pose proof Htie as [Hlen _].
         iDestruct (ucs_lb_prefix_len v cs'' cs ltac:(lia) with "Hcs Hcs'") as %Hpre.
         rewrite /ush_done_at /ush_deed_at. iLeft. iExists cs'', s, v.
-        iFrame "Hd Hty Hpin Hcs %". iPureIntro.
+        iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro.
         apply (udone_tie_of_pre_prefix cs'' cs s0 I _ Htie ltac:(lia) Hpre).
         intros _.
         assert (HlR' : uv_line (lineV U I) = Some lR) by exact HlR.

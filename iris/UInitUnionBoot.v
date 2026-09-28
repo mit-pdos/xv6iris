@@ -153,8 +153,8 @@ Section UnionInitBoot.
       (ug : union_gn) (r : file_names) :
     @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
-    ⊢ app_inv fsc_fs -∗ file_boot (fgn_cl (ugn_file ug)) (S gen_id) r -∗
-      fturn (ugn_file ug) (S gen_id) -∗
+    ⊢ app_inv fsc_fs -∗ union_boot ug (S gen_id) r -∗
+      uturn_i ug (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
     intros Heq Hiface.
@@ -174,9 +174,19 @@ Section UnionInitBoot.
       by (rewrite /riscv_wild Hiface; by cbn [union_ifc ai_wild]).
     assert (Hktaint : ⊢ app_taint -∗ file_taint (fgn_cl (ugn_file ug))).
     { rewrite Hkill. iIntros "#H". iExact "H". }
-    iIntros "#Hinv Hb Hturn".
+    iIntros "#Hinv [Hb Hbp] [Hturn Hti]".
+    (* ---- THE ROUND POSITION (sync SY3-A3bc): the boot's share, founded at
+       the copy's line count the era's record pins, is at most the era's
+       base -- the turn's certificate ---- *)
+    iDestruct "Hti" as (vf ls) "(#Hvf & #Hcp & %Hls & #Hbase)".
+    iAssert (file_taint (fgn_cl (ugn_file ug)) ∨ urpos ug r [])%I with "[Hbp]" as "Hup".
+    { iDestruct "Hbp" as "[#HT | (%vf' & %ls' & #Hvf' & #Hcp' & Hposh)]"; [by iLeft |].
+      iDestruct (file_era_pin_agree with "Hvf Hvf'") as %<-.
+      iDestruct (fcp_pin_agree with "Hcp Hcp'") as %<-.
+      iRight. iExists vf, (length ls). iFrame "Hvf Hposh". iPureIntro.
+      apply prefix_length in Hls. rewrite /nlines bodies_of_nil /=. lia. }
     (* ---- THE DEED, AND THE BOOT STATE IT NAMES ---- *)
-    rewrite /file_boot. iDestruct "Hb" as "[Hcb Hd]".
+    rewrite /file_boot. iDestruct "Hb" as "(Hcb & _ & Hd)".
     iDestruct "Hd" as (s) "[Hd Hty]". rewrite bi.later_or.
     iAssert (∃ s0 : fstate, ▷ boot_at (ugn_file ug) s0 s)%I with "[Hty]" as (s0) "#Hbt".
     { iDestruct "Hty" as "[#Hty | #HT]".
@@ -187,7 +197,7 @@ Section UnionInitBoot.
     { iNext. iApply (file_f0pre_at_of_bw (ugn_file ug) s0 s with "Hbw Hbt"). }
     (* ---- THE ERA'S PIN, out of the (filed) turn ---- *)
     iAssert (∃ v : era_pins, era_pin (fgn_echo (ugn_file ug)) (S gen_id) v)%I as "#Hpine".
-    { rewrite /fturn_core. iDestruct "Hturn" as (v vf) "(#Hp0 & _)".
+    { rewrite /fturn_core. iDestruct "Hturn" as (v vf1) "(#Hp0 & _)".
       iExists v. iExact "Hp0". }
     (* ---- the taint's supply, and the generic slot it buys ---- *)
     iDestruct (file_sup_of_taint_at (ugn_file ug) r Heq) as "#Hsup".
@@ -329,12 +339,12 @@ Section UnionInitBoot.
     (* ---- THE LINEAR PAYLOAD'S TWO WITNESS-PAID PIECES, ONE STEP LATER ---- *)
     iAssert (▷ (UserConsole.cc_rd (union_cc HR GEN ug r s0) 0%nat
                 ∗ UserConsole.cc_wbn (union_cc HR GEN ug r s0) 0%nat))%I
-      with "[Hturn Hd]" as "Hp1".
+      with "[Hturn Hd Hup]" as "Hp1".
     { iNext.
-      iDestruct (union_rres_at_of_boot ug s0 with "Hturn Hpre")
-        as "[Hturn Hres0]".
+      iDestruct (union_rres_at_of_boot ug s0 with "Hturn Hpre [Hvf Hbase]")
+        as "[Hturn Hres0]"; [iExists vf; iFrame "Hvf Hbase" |].
       iDestruct "Hres0" as (v0) "[#Hpin0 #Hres0]".
-      iDestruct (union_Wbf_at_of_boot ug r s0 s with "Hturn Hpre Hd Hbt")
+      iDestruct (union_Wbf_at_of_boot ug r s0 s with "Hturn Hpre Hd Hbt Hup")
         as "[Hdl Hbn]".
       iSplitL "Hdl".
       { rewrite /union_cc /=. rewrite /UShLine.ush_rd_pin_at.

@@ -865,9 +865,12 @@ Section power.
          and with no event, after the crash slot's swap.  The machine's half
          of the history is lent so the client can agree its ledger with it;
          a basic update under a [◇] for [Hobs]'s reasons. *)
-      (Hback : forall (h : list mobs) (gen : nat),
-         ⊢ ▷ riscv_obs_pred -∗ obs_half h -∗ Tn' (S gen) ==∗
-           ◇ (▷ riscv_obs_pred ∗ obs_half h ∗ Tn'' (S gen)))
+      (* ...AT THE HISTORY THE ON-ARM LEFT, [h ++ [ObsPowerOn]], and the
+         era the on-arm founded, [S (obs_boots h)] (sync SY3-A3bc: the
+         client's ledger reads the power-on's line list there) *)
+      (Hback : forall (h : list mobs),
+         ⊢ ▷ riscv_obs_pred -∗ obs_half (h ++ [ObsPowerOn])%list -∗ Tn' (S (obs_boots h)) ==∗
+           ◇ (▷ riscv_obs_pred ∗ obs_half (h ++ [ObsPowerOn])%list ∗ Tn'' (S (obs_boots h))))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -1133,8 +1136,10 @@ Section power.
          client's [Hback] into the turn the boot is handed *)
       iInv "Hoinv" as "HPt2" "Hoclose2".
       iDestruct "Hoauth" as "[Hovar Hohist]".
-      iMod (Hback (h ++ [ObsPowerOn])%list g.(ggen) with "HPt2 Hovar Htn")
+      iEval (rewrite -Hbt) in "Htn".
+      iMod (Hback h with "HPt2 Hovar Htn")
         as ">(HPt2 & Hovar & Htn)".
+      iEval (rewrite Hbt) in "Htn".
       iAssert (obs_auth (h ++ [ObsPowerOn])%list) with "[Hovar Hohist]" as "Hoauth";
         [ rewrite /obs_auth; iFrame "Hovar Hohist" | ].
       iMod ("Hoclose2" with "HPt2") as "_".
@@ -1616,15 +1621,15 @@ Qed.
    ledger at that history in hand; the machine's half pins the history. *)
 Lemma obs_ledger_at_back {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
-    (T T' : iProp Σ)
-    (Hb : forall h : list mobs, ⊢ R h -∗ T ==∗ R h ∗ T')
-    (γobs : gname) (h : list mobs) :
+    (T T' : iProp Σ) (h : list mobs)
+    (Hb : ⊢ R h -∗ T ==∗ R h ∗ T')
+    (γobs : gname) :
   ⊢ ▷ obs_ledger_at R γobs -∗ ghost_var γobs (1/2) h -∗ T ==∗
     ◇ (▷ obs_ledger_at R γobs ∗ ghost_var γobs (1/2) h ∗ T').
 Proof.
   iIntros "HP Hauth HT". iDestruct "HP" as (h') "[>Hfrag >HR]".
   iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
-  iMod (Hb h with "HR HT") as "[HR HT]".
+  iMod (Hb with "HR HT") as "[HR HT]".
   (* placed by position: the ledger holds the history's other half, which
      a bare [iFrame "Hauth"] would match under the later *)
   iModIntro. iModIntro.
@@ -1842,9 +1847,11 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        the trace slot's second step at the same history, turning the
        swap's yield [Tn'] into the boot's [Tn''] (see [wp_power_loop]).  A
        client with nothing to file hands the turn straight back. *)
-    (Hback : forall (γobs : gname) (c : CT) (h : list mobs) (gen : nat),
-       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) h -∗ Tn' c (S gen) ==∗
-         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) h ∗ Tn'' c (S gen)))
+    (Hback : forall (γobs : gname) (c : CT) (h : list mobs),
+       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list -∗
+         Tn' c (S (obs_boots h)) ==∗
+         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list
+            ∗ Tn'' c (S (obs_boots h))))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
        [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
        boot; these two export one OUT of the whole execution.
@@ -2215,7 +2222,7 @@ Proof.
                       destruct on; by repeat iSplitR)
                 γdisk γobs)
            (* no return path: the (empty) turn goes straight back *)
-           (fun _ _ _ _ => back_id _ _ _)
+           (fun _ _ _ => back_id _ _ _)
            (fun _ h => P h)
            ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs γhist c T g' h;
                  iIntros "_ Hauth _ _ HPt";

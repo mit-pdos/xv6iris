@@ -258,21 +258,24 @@ Section union_read_inst.
                    Hddc Hlws Hwinf Hpre2 Hwsj Hlast
                    with "Htags Hsw Hlb2") as "Hty".
       iEval (rewrite Htag /utag) in "Hty".
-      iDestruct "Hty" as "(%Hsh & _ & #Hfl)".
-      iLeft. rewrite /flw. iRight.
-      iExists (ulines_of y.1). iFrame "Hfl". iPureIntro.
-      intros w Hw. rewrite <- HJ in Hw. destruct y as [hy cy].
-      cbn [fst]. rewrite ulines_of_echof.
-      apply (echof_lines_of_consumed (S gen_id) (dl ++ ws) hy cy w).
-      - rewrite /seg_of.
-        destruct Hpref as [z Hz].
-        intros j x Hx. apply (Hidx j x).
-        rewrite /seg_of Hz fmap_app. apply lookup_app_l_Some. exact Hx.
-      - exact (proj1 (proj2 Hrok)).
-      - exact Hboots.
-      - rewrite last_app Hlast. reflexivity.
-      - exact Hsh.
-      - exact Hw. }
+      iDestruct "Hty" as "(%Hsh & _ & #Hfl & %vf & #Hvp & %Hu)".
+      destruct y as [hy cy]. cbn [fst] in *.
+      assert (Hins : ins (open_seg hy) = snd <$> (dl ++ ws)).
+      { apply (consumed_ins_last (S gen_id) (dl ++ ws) hy cy).
+        - rewrite /seg_of.
+          destruct Hpref as [z Hz].
+          intros j x Hx. apply (Hidx j x).
+          rewrite /seg_of Hz fmap_app. apply lookup_app_l_Some. exact Hx.
+        - exact (proj1 (proj2 Hrok)).
+        - exact Hboots.
+        - rewrite last_app Hlast. reflexivity.
+        - exact Hsh. }
+      assert (Hby : obs_boots hy = S gen_id).
+      { apply (Hboots (hy, cy)). apply last_Some_elem_of.
+        rewrite last_app Hlast. reflexivity. }
+      iEval (rewrite Hby) in "Hvp".
+      rewrite (ulast_cyc_io hy Hsh) /ulines_cyc Hins HJ in Hu.
+      iLeft. rewrite /flw. iExists vf. iFrame "Hvp". rewrite -Hu. iExact "Hfl". }
     iDestruct "Hwn" as "[#Hwn | #HT]"; [ | by iRight ].
     iLeft. iFrame "Hdlr". iExists J.
     iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].

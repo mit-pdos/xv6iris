@@ -48,6 +48,7 @@ Require Import AppFile.
 Require Import FileOut.
 Require Import RiscvPtsto.
 Require Import WpUart.
+Require UnionAdm.                 (* [ulines_in]: the round's line witness *)
 Local Open Scope list_scope.
 
 
@@ -695,18 +696,18 @@ Section file_links_line.
   Global Instance fwc_rres_timeless v I : Timeless (fwc_rres v I).
   Proof using . rewrite /fwc_rres. tl_leaf. Qed.
 
-  (* THE TYPED LINES' WITNESS (the PROGRAM STREAM, stretch 9): every
-     [echo ... > f] line of the input the reader has consumed is in a list
-     the LEDGER has a lower bound of -- which is what the child that writes
-     the line to its file owes the claim ([FileWrite.file_wq]'s
-     [(N, ws) ∈ fl_redirs ls], read through the full list's projection).  It
-     is read off the consumed bytes' TAGS ([FileOut.ftag]) by
-     [FileLineWit.echof_lines_of_consumed], and the left arm is the era's
-     head, where no lower bound exists to be had. *)
+  (* THE ROUND'S LINE WITNESS (sync SY3-A3bc, design 4.5 ruling (ii) as
+     amended): the ledger's list as of the consumed input's last complete
+     line -- the era's pinned BASE ([FileOut.fe_base], the list at the
+     era's PowerOn) followed by the lines of the input the reader has
+     consumed.  So its last element is the round's line, every redirect
+     line of the input is in it (the child that writes the line to its file
+     owes the claim that), and its length is the round position.  It is
+     read off the consumed bytes' TAGS ([UnionOut.utag]); at the era's head
+     it is the base itself, which the turn hands /init. *)
   Definition flw (I : list (bv 8)) : iProp Σ :=
-    (⌜echof_lines_in I = []⌝
-     ∨ ∃ ls : list fl_line,
-         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w ∈ fl_redirs ls⌝)%I.
+    (∃ vf : file_era, file_era_pin g (S gen_id) vf
+       ∗ fl_lb (fgn_cl g) (fe_base vf ++ UnionAdm.ulines_in I))%I.
 
   Global Instance flw_persistent I : Persistent (flw I).
   Proof using . rewrite /flw. apply _. Qed.

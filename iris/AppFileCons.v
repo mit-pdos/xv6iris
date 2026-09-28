@@ -89,10 +89,10 @@ Section AppFileCons.
     file_pred c r av -∗
     file_pred c r av ∗ (⌜file_fs_pure av⌝ ∨ file_taint c).
   Proof using .
-    rewrite /file_pred. iIntros "[#HT | (%Hp & Hcs & Hf)]".
+    rewrite /file_pred. iIntros "[#HT | (%Hp & Hcs & Hf & Hsy)]".
     - iSplitR; [ by iLeft | by iRight ].
-    - iSplitL "Hcs Hf"; [ | by iLeft ].
-      iRight. iFrame "Hcs Hf". by iPureIntro.
+    - iSplitL "Hcs Hf Hsy"; [ | by iLeft ].
+      iRight. iFrame "Hcs Hf Hsy". by iPureIntro.
   Qed.
 
   (* ...AND THE WEAKENING EVERY LANDED CONSUMER READS
@@ -248,19 +248,16 @@ Section AppFileCons.
     iDestruct (echo_cons_mknod (ff_echo c) (fn_cons r) av ents nl i Hpre
                  with "Hk He") as "He".
     iApply (file_pred_join c r _ with "He").
-    iDestruct "Hres" as "[#Ht | [%Hp Hf]]"; [ by iLeft | ].
-    iRight. iSplitR.
-    { iPureIntro.
-      exact (FileDeltas.file_fs_pure_create FsImg.ROOTINO fname_console
-               ents nl i cdev av Hpre file_cons_arm_nd Hp). }
-    iApply (f_state_mono c r av (delta_create FsImg.ROOTINO fname_console
-                                   i cdev av)
+    iApply (file_rest_mono c r av (delta_create FsImg.ROOTINO fname_console
+                                     i cdev av)
+              (FileDeltas.file_fs_pure_create FsImg.ROOTINO fname_console
+                 ents nl i cdev av Hpre file_cons_arm_nd)
               (fun s Hok =>
                  FileDeltas.f_ok_create_other FsImg.ROOTINO fname_console
                    ents nl i cdev av s Hpre file_cons_arm_nd
                    (or_intror (fun Hu => FileDeltas.uname_ne_console _ Hu eq_refl))
                    Hok)
-              with "Hf").
+              with "Hres").
   Qed.
 
   (* ---- (g) A CREATE AT ANOTHER (d, nm), AT THE NAMES THE SYSCALL CAN

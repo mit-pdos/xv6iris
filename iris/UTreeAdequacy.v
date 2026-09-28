@@ -183,7 +183,7 @@ Section TreeAdequacy.
       by cbn [app_tree app_ifc app_iface_triv ai_cons].
     - (* the founding: no sync ledger, the turn goes on whole (SY3-A1) *)
       intros c k. exact (app_triv_found c k _).
-    - intros c h k. by apply app_back_id.
+    - intros c h. by apply app_back_id.
     - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
     - (* the merge: the plain transport's (SY3-K2) *)
       intros HRg c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I | intros; exact Logic.I |].

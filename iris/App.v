@@ -548,8 +548,11 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
   (* THE RETURN PATH (SY3-A1 re-cut): the ledger's second step at the
      power-on, at the same history and with no event, after the crash
      slot's swap -- what the swap learned reaches the ledger here *)
-  al_back : forall (c : app_fixed A) (h : list mobs) (k : nat),
-       ⊢ app_R A c h -∗ app_turn' A c k ==∗ app_R A c h ∗ app_turn'' A c k;
+  (* ...at the history the power-on left and the era it founded (sync
+     SY3-A3bc: the ledger's line list there is the era's base) *)
+  al_back : forall (c : app_fixed A) (h : list mobs),
+       ⊢ app_R A c (h ++ [ObsPowerOn])%list -∗ app_turn' A c (S (obs_boots h)) ==∗
+         app_R A c (h ++ [ObsPowerOn])%list ∗ app_turn'' A c (S (obs_boots h));
   (* the era's record predicate, off the boot resource the transport
      mints beside the era's record: a persistent projection *)
   al_boot_ok : forall (c : app_fixed A) (k : nat) (r : app_names A),
@@ -683,9 +686,9 @@ Proof.
                 (app_cons A c) (app_turn A c)
                 (al_pow c) γd γobs)
            (* the return path: the ledger's own second step (SY3-A1) *)
-           (fun γobs c h gen =>
-              obs_ledger_at_back (app_R A c) (al_Rt c) _ _
-                (fun h' => al_back c h' (S gen)) γobs h)
+           (fun γobs c h =>
+              obs_ledger_at_back (app_R A c) (al_Rt c) _ _ (h ++ [ObsPowerOn])%list
+                (al_back c h) γobs)
            Hperm (app_phi A) Hphi Hgen0 Hpow0 Himg).
 Qed.
 
@@ -828,7 +831,7 @@ Section AppTriv.
       cbn [app_triv app_ifc app_iface_triv ai_cons]. reflexivity.
     - (* the founding: the token is [True], the turn goes on whole *)
       intros c k. exact (app_triv_found c k _).
-    - intros c h k. by apply app_back_id.
+    - intros c h. by apply app_back_id.
     - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
     - intros HR c k _ _. exact (app_triv_merge c k).
     - intros HR c k. exact (app_triv_sync_run _ _ _ c k).

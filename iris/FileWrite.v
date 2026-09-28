@@ -317,7 +317,12 @@ Section FileWrite.
         ∗ ⌜off = length (subseq (echo_chunks ws) sel)⌝
         ∗ ⌜EchoDisc.line_ok ws⌝
         ∗ ⌜sel_ok (echo_chunks ws) sel⌝
-        ∗ fl_lb c ls ∗ ⌜(N, ws) ∈ fl_redirs ls⌝)
+        ∗ fl_lb c ls
+        (* THE ROUND'S LINE (sync SY3-A3bc): the lower bound ENDS at the
+           writer's own line, and the writer holds the round position's
+           half at its length -- what a move of the line's file hands the
+           claim's sync part ([AppFile.sync_redir]) *)
+        ∗ ⌜stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N)⌝ ∗ fpos r (length ls))
      ∨ file_taint c)%I.
 
   (* the tainted fire's step, [TreeMove.tree_app_step_taint]'s twin *)
@@ -408,7 +413,8 @@ Section FileWrite.
       { iApply (file_app_step_taint c r i I _ Heq). iExact "HT". }
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       rewrite /file_wq. by iRight. }
-    iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff & %Hline & %Hsel & #Hlb & %Hin)".
+    iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff & %Hline & %Hsel & #Hlb & %Hlast & Hpos)".
+    pose proof (fl_redirs_last ls ws N Hlast) as Hin.
     set (s0 := <[N := (i, subseq (echo_chunks ws) sel)]> s).
     iMod (file_claim_read γfs c r s0 I Heq
             with "Hinv Hd Hka") as "(Hka & Hd & [[%Hok #Hty] | #HT])"; last first.
@@ -446,12 +452,16 @@ Section FileWrite.
       iApply (f_typed_some c s0 ls N ws (sel ++ [jx]) i
                 (f_ok_dom _ s0 N _ Hok Hs0N) Hin Hline Hselok
                 with "Hty Hlb"). }
-    iModIntro. iFrame "Hka". iSplitL "Hd".
+    iDestruct (fpos_quarters with "Hpos") as "[Hq1 Hq2]".
+    iModIntro. iFrame "Hka". iSplitL "Hd Hq1".
     { iApply (file_app_step_park c r i I _ s0 s1 Heq
                 (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7)
                 (cons_absent_write i off bs (abs_view I))
                 (fun jc => cons_present_write jc i off bs (abs_view I))
-                Hstep with "Hd Hty'"). }
+                Hstep with "Hd Hty' [Hq1]").
+      rewrite /sync_redir. iExists ls, ws, N, (sel ++ [jx]), (length ls).
+      iFrame "Hlb Hq1". iPureIntro. split_and!; [exact Hlast | exact Hselok | reflexivity |].
+      rewrite /s0 /s1 !dst_content_insert insert_insert. reflexivity. }
     (* PHASE 2 *)
     iIntros (I') "%Hav Hka'".
     assert (Hokpost : f_ok (abs_view I') s1) by (rewrite Hav; exact (Hstep Hok)).
@@ -462,19 +472,19 @@ Section FileWrite.
                    = length (subseq (echo_chunks ws) sel ++ bs))
         by (by rewrite -Hc).
       rewrite length_app in Hl. lia. }
-    iMod (file_resync γfs c r s0 s1 I' appE
+    iMod (file_resync γfs c r s0 s1 (length ls) I' appE
             ltac:(set_solver) Heq (f_ok_fcontent _ _ Hokpost) Hne
-            with "Hinv Htk [Hka']") as "[Hka' Hout]".
+            with "Hinv Htk Hq2 [Hka']") as "[Hka' Hout]".
     { rewrite /fs_gamma_L /=. iExact "Hka'". }
     iModIntro.
     iSplitL "Hka'"; [ rewrite /fs_gamma_L /=; iExact "Hka'" |].
     rewrite /file_wq.
-    iDestruct "Hout" as "[Hown | [_ #HT]]"; [| by iRight ].
-    iLeft. iExists ls. iFrame "Hown Hlb". iPureIntro. split_and!.
+    iDestruct "Hout" as "[[Hown Hpos] | [_ #HT]]"; [| by iRight ].
+    iLeft. iExists ls. iFrame "Hown Hlb Hpos". iPureIntro. split_and!.
     - rewrite Hsnoc length_app. lia.
     - exact Hline.
     - exact Hselok.
-    - exact Hin.
+    - exact Hlast.
   Qed.
 
   (* =================================================================== *)
@@ -692,7 +702,7 @@ Section FileWrite.
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       iSplitL "Hk"; [ by iApply off_link_of | ].
       iApply (file_cur_taint with "HTf Hu"). }
-    iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff0 & %Hline & %Hsel & #Hlb & %Hin)".
+    iDestruct "Hq" as (ls) "([Hd Htk] & %Hoff0 & %Hline & %Hsel & #Hlb & %Hlast & Hpos)".
     iMod (file_claim_read γfs c r (<[N := (i, subseq (echo_chunks ws) sel)]> s) I Heq
             with "Hinv Hd Hka") as "(Hka & Hd & [[%Hok _] | #HTf])"; last first.
     { (* the claim is tainted: same answer, off the claim's own taint *)
@@ -704,10 +714,10 @@ Section FileWrite.
       iApply (file_cur_taint with "HTf Hu"). }
     destruct (f_ok_pin _ _ N i _ Hok (lookup_insert _ _ _)) as [Hnode _].
     (* the cursor goes back together for the phase lemma *)
-    iAssert (file_wq c r N s i ws sel off) with "[Hd Htk]" as "Hq".
-    { rewrite /file_wq. iLeft. iExists ls. iFrame "Hd Htk Hlb".
+    iAssert (file_wq c r N s i ws sel off) with "[Hd Htk Hpos]" as "Hq".
+    { rewrite /file_wq. iLeft. iExists ls. iFrame "Hd Htk Hlb Hpos".
       iPureIntro. split_and!; [ exact Hoff | exact Hline | exact Hsel
-                              | exact Hin ]. }
+                              | exact Hlast ]. }
     iMod (file_awrite_phases γfs c r N s i ws sel jx off off I bs bs0 nl
             Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".

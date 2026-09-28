@@ -526,13 +526,15 @@ Section UnionInitHead.
   Local Notation gf := (ugn_file ug).
 
   (* THE READER'S RESIDUE AT THE HEAD: the turn's bounds, the boot witness
-     /init just filed, and the empty input's (vacuous) line witness *)
+     /init just filed, and the empty input's line witness -- the era's base
+     itself, which the turn hands /init ([UnionOut.uturn_i]) *)
   Lemma union_rres_at_of_boot (s0 : fstate) :
     FileOut.fturn_core gf (S gen_id) -∗ f0pre_at gf s0 -∗
+    (∃ vf : file_era, file_era_pin gf (S gen_id) vf ∗ fl_lb (fgn_cl gf) (fe_base vf)) -∗
     FileOut.fturn_core gf (S gen_id)
     ∗ ∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v ∗ urresw ug v [].
   Proof using .
-    iIntros "Ht #Hpre". rewrite /FileOut.fturn_core.
+    iIntros "Ht #Hpre #Hbase". rewrite /FileOut.fturn_core.
     iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
     iEval (rewrite /EchoOut.turn) in "Htn".
     iDestruct (mono_nat_lb_own_get with "Htn") as "#Hlb0".
@@ -546,7 +548,11 @@ Section UnionInitHead.
       iFrame "Hlb0 Hps Hcs". iSplitR; [iPureIntro; apply lm_rd_stage_0 |].
       cbn [gWb gk0 union_params]. rewrite /uf0bwk.
       rewrite /FileLinksLine.f0bw. iDestruct "Hbw" as "[_ $]".
-    - iSplit; [rewrite /FileLinksLine.flw; iLeft; iPureIntro; reflexivity |].
+    - iSplit.
+      { rewrite /FileLinksLine.flw. iDestruct "Hbase" as (vb) "[#Hvb #Hlb]".
+        iExists vb. iFrame "Hvb".
+        rewrite (_ : UnionAdm.ulines_in [] = []); [| reflexivity].
+        rewrite app_nil_r. iExact "Hlb". }
       (* the empty input completed no line *)
       iIntros "%Hw". by destruct Hw.
   Qed.
@@ -556,11 +562,12 @@ Section UnionInitHead.
   Lemma union_Wbf_at_of_boot (s0 : fstate) (s : dst) :
     FileOut.fturn_core gf (S gen_id) -∗ f0pre_at gf s0 -∗
     fown r s -∗ UInitFileLeaves.boot_at gf s0 s -∗
+    (file_taint (fgn_cl gf) ∨ urpos ug r []) -∗
     (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v
        ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ uWbf ug r s0 [].
   Proof using .
-    iIntros "Ht Hpre Hd Hb". rewrite /FileOut.fturn_core.
+    iIntros "Ht Hpre Hd Hb Hup". rewrite /FileOut.fturn_core.
     iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
     iAssert (lk_turn (union_link_inst_at ug s0) (S gen_id)) with "[Htn Hdl Hrp Hpre]"
       as "Hturn".
@@ -571,7 +578,8 @@ Section UnionInitHead.
       as "[Hrd Hwb]".
     iFrame "Hrd". rewrite /uWbf. iLeft. iSplitL "Hwb"; [rewrite /uWbl; iExact "Hwb" |].
     iDestruct "Hb" as "[[-> #Hty] | [-> #HT]]".
-    - iApply (ush_done_head ug r s v with "Hpin Hcs Hd Hty").
+    - iDestruct "Hup" as "[#HT | Hup]"; [iApply (ush_deed_taint ug r with "HT") |].
+      iApply (ush_done_head ug r s v with "Hpin Hcs Hd Hty Hup").
     - iApply (ush_deed_taint ug r with "HT").
   Qed.
 End UnionInitHead.

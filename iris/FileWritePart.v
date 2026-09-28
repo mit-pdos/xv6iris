@@ -122,7 +122,8 @@ Section FileWritePart.
       iSplitL "Hk"; [ by iApply off_link_of | ].
       iApply (file_cur_taint with "HTf Hu"). }
     (* ...and the content is a line's worth, so the chunk does NOT straddle *)
-    iDestruct "Hq" as (ls) "(_ & _ & %Hline & %Hsel & _ & %Hin)".
+    iDestruct "Hq" as (ls) "(_ & _ & %Hline & %Hsel & _ & %Hlast & _)".
+    pose proof (fl_redirs_last ls ws N Hlast) as Hin.
     iExFalso. iPureIntro. apply Hns.
     pose proof (f_bytes_typed_short (fl_redirs ls) N (subseq (echo_chunks ws) sel)
                   (ex_intro _ ws (ex_intro _ sel

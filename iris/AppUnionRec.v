@@ -151,7 +151,17 @@ Section UnionApp.
                   design 10.12, lane S5b) *)
                (urdwild c) (urdwild_persistent c) (urdwild_timeless c).
 
-  Definition union_turn (c : union_gn) : nat -> iProp Σ := fturn (ugn_file c).
+  (* THE ERA'S TURN IN ITS FOUR STAGES ([UnionOut.uturn] &c., sync SY3-A3bc) *)
+  Definition union_turn (c : union_gn) : nat -> iProp Σ := uturn c.
+
+  (* THE BOOT RESOURCE: the file application's, and the deed holder's share
+     of the running claim's round position, founded at the length of the
+     copy's line list the era's record pins (or the taint) *)
+  Definition union_boot (c : union_gn) (k : nat) (r : file_names) : iProp Σ :=
+    (file_boot (fgn_cl (ugn_file c)) k r
+     ∗ (file_taint (fgn_cl (ugn_file c))
+        ∨ ∃ (vf : file_era) (ls : list fl_line),
+            file_era_pin (ugn_file c) k vf ∗ fcp_pin vf ls ∗ fposh r (length ls)))%I.
 
   (* ====================================================================== *)
   (*  2.  THE RECORD                                                        *)
@@ -159,16 +169,17 @@ Section UnionApp.
   Definition app_union : xv6_app Σ :=
     MkApp union_gn union_cl_all file_names
           (fun c => file_pred (fgn_cl (ugn_file c)))
-          (fun c k r => file_boot (fgn_cl (ugn_file c)) k r)
+          union_boot
           union_R union_ifc
-          (* the turn, the same at all three stages, and the trivial sync
-             values: no sync ledger yet (sync SY3-A1; SY3-A3 gives the
-             union its own) *)
-          union_turn union_turn union_turn union_turn
-          (* the birth keeps the machine's started counter's name (sync
-             SY3-A3a, [UnionOut.union_born]); the rest trivial until
-             SY3-A3b/c *)
-          app_triv_cls union_born app_triv_ok app_triv_okc app_triv_tk app_triv_hk
+          (* the turn in its four stages (sync SY3-A3bc) *)
+          uturn uturn' uturn'' uturn_i
+          (* the birth's crash-slot part, what it keeps of the machine's
+             names, the era's and the durable copy's record predicates, the
+             token and the hook family (sync SY3-A3bc) *)
+          union_cls union_born
+          (fun _ k r => fn_era r = k) (fun _ r => fn_role r = true)
+          (fun c k => union_tk (fgn_cl (ugn_file c)) k)
+          (fun c k Q => union_hk file_pred (fgn_cl (ugn_file c)) k Q)
           union_phi.
 
   (* ---- the birth step ---- *)
@@ -178,9 +189,9 @@ Section UnionApp.
         app_cls app_union c ∗ app_cl app_union c.
   Proof using .
     cbn [app_union app_fixed app_born app_cls app_cl].
-    iMod (union_birth_all γst) as (ug) "[%Hst Hc]".
+    iMod (union_birth_all γst) as (ug) "(%Hst & Hs & Hc)".
     iModIntro. iExists ug. iSplitR; [iPureIntro; exact Hst |].
-    iFrame "Hc". iApply app_triv_cls_intro.
+    iFrame "Hs Hc".
   Qed.
 
   Lemma union_al_Rt (c : app_fixed app_union) (h : list mobs) :
@@ -328,29 +339,74 @@ Section UnionApp.
     iModIntro. iFrame "Hg Hled". rewrite /union_tag. iExact "Htag".
   Qed.
 
-  (* ---- the transport, with the first process's boot resource: the
-         file application's ---- *)
-  Lemma union_al_xfer (HSt : mono_natG Σ) (c : app_fixed app_union) (k : nat)
-      (γst : gname) (gen : nat) :
+  (* ---- THE POWER-ON TRANSPORT (sync SY3-A3bc): the file application's
+         re-base ([AppFile.file_xfer_boot]) at the turn the on-arm yielded,
+         the copy's line list pinned at the era's record ---- *)
+  Lemma union_al_xfer (HSt : mono_natG Σ) (c : app_fixed app_union) (gen : nat)
+      (γst : gname) :
+    fa_st = HSt -> ff_st (fgn_cl (ugn_file c)) = γst ->
     ⊢ app_xfer_boot_raw HSt (app_pred app_union c) (app_okc app_union c)
-        (app_boot app_union c k)
-        (app_turn app_union c k) (app_turn' app_union c k) γst gen.
+        (app_boot app_union c (S gen))
+        (app_turn app_union c (S gen)) (app_turn' app_union c (S gen)) γst gen.
   Proof using .
-    cbn [app_union app_fixed app_names app_pred app_boot app_turn app_turn']
+    intros <- <-.
+    cbn [app_union app_fixed app_names app_pred app_boot app_turn app_turn' app_okc]
       in c |- *.
-    (* at the identity on the turn, the slot keeping its copy (SY3-A1) *)
-    apply app_xfer_boot_raw_of_clone.
-    rewrite /app_clone_raw. iApply file_xfer_boot.
+    rewrite /app_xfer_boot_raw.
+    iIntros "!>" (r av n ->) "Hsa %Hr Htn Hp".
+    iDestruct "Htn" as "(Hft & (%γ & %vf & #Hreg & Hγ & #Hpin & Hcp & #Hbase) & #Hfloor)".
+    iDestruct "Hfloor" as (kF γF F) "(#HrF & #HlF & _)".
+    iMod (file_xfer_boot (fgn_cl (ugn_file c)) gen r av γ (fe_base vf) kF γF F Hr
+            with "Hsa Hγ Hreg Hbase HrF HlF Hp")
+      as ">(Hsa & Hs & %r' & %ls & %Hr' & Hr'p & Hb & #Hls & Hrest)".
+    iMod (fcp_set vf ls with "Hcp") as "#Hcp".
+    iModIntro. iModIntro. iFrame "Hsa".
+    iDestruct "Hrest" as "[#HT | (Hpos & Htk & _)]".
+    { iSplitL "Hft".
+      { rewrite /uturn'. iFrame "Hft". iExists vf, ls. iFrame "Hpin Hcp Hls". by iLeft. }
+      iExists (fn_with r γ (S gen) true), r'.
+      iSplitR; [iPureIntro; by destruct r |]. iFrame "Hs Hr'p".
+      rewrite /union_boot. iFrame "Hb". by iLeft. }
+    iDestruct "Htk" as (γ' Ls) "(#Hreg' & Hq & #Hcm)".
+    iDestruct (sl_lb_get with "Hq") as "#Hql".
+    iSplitL "Hft Hq".
+    { rewrite /uturn'. iFrame "Hft". iExists vf, ls. iFrame "Hpin Hcp Hls".
+      iRight. iExists γ', Ls. iFrame "Hreg' Hq Hql Hcm". }
+    iExists (fn_with r γ (S gen) true), r'.
+    iSplitR; [iPureIntro; by destruct r |]. iFrame "Hs Hr'p".
+    rewrite /union_boot. iFrame "Hb". iRight. iExists vf, ls. iFrame "Hpin Hcp Hpos".
   Qed.
 
-  (* ---- the plain transport, which the merge is made of: the file
-         application's (SY3-K2, [AppFile.file_xfer]; the old durable copy
-         is dropped, [AppInv.app_merge_raw_of_xfer]) ---- *)
-  Lemma union_al_xfer_plain (c : app_fixed app_union) :
-    ⊢ app_xfer_raw (app_pred app_union c).
+  (* ---- THE MERGE (sync SY3-A3bc): the file application's, the started
+         auth read at the union's copy of the started counter's name ---- *)
+  Lemma union_al_merge `{!riscvFixedGS Σ} (c : app_fixed app_union) (k : nat) :
+    (forall n : nat, start_auth n ⊣⊢ sync_st_auth (fgn_cl (ugn_file c)) n) ->
+    ⊢ app_merge_raw (app_pred app_union c) (app_ok app_union c (S k)) (app_okc app_union c)
+        (app_tk app_union c k) k.
   Proof using .
-    cbn [app_union app_fixed app_pred] in c |- *.
-    exact (file_xfer (fgn_cl (ugn_file c))).
+    intros Hst.
+    cbn [app_union app_fixed app_names app_pred app_ok app_okc app_tk] in c |- *.
+    exact (file_merge (fgn_cl (ugn_file c)) k Hst).
+  Qed.
+
+  (* ---- THE SYNC RUNNER: the hook IS the runner's body ---- *)
+  Lemma union_al_sync_run `{!riscvGS Σ, !fsTopG Σ} (c : app_fixed app_union) (k : nat) :
+    ⊢ app_sync_run_raw (app_pred app_union c) (app_ok app_union c (S k))
+        (app_okc app_union c) (app_tk app_union c k) (app_hk app_union c k).
+  Proof using .
+    cbn [app_union app_fixed app_names app_pred app_ok app_okc app_tk app_hk] in c |- *.
+    rewrite /app_sync_run_raw.
+    iIntros "!>" (Q gt I r r') "%Hr %Hr' %Hrc HQ Hh Hn Hp HT".
+    iMod ("HQ" $! I r r' Hr Hr' Hrc with "Hn Hp HT") as ">(Hn & Hp & HT & HQ)".
+    iModIntro. iFrame "Hh Hn Hp HT HQ".
+  Qed.
+
+  (* ---- the era's record predicate off the boot resource ---- *)
+  Lemma union_al_boot_ok (c : app_fixed app_union) (k : nat) (r : app_names app_union) :
+    app_boot app_union c k r ⊢ ⌜app_ok app_union c k r⌝.
+  Proof using .
+    cbn [app_union app_fixed app_names app_boot app_ok] in c, r |- *.
+    rewrite /union_boot /file_boot. iIntros "((_ & %H & _) & _)". by iPureIntro.
   Qed.
 
   (* ---- the echo shift ---- *)
@@ -367,7 +423,8 @@ Section UnionApp.
     iApply (UnionLinks.union_happ_echo c (HRg := HR) Hc Ht).
   Qed.
 
-  (* ---- era 0's claim at the literal image: the file application's ---- *)
+  (* ---- era 0's durable copy at the literal image, out of the birth's
+         crash-slot part: the file application's ---- *)
   Lemma union_Happ_init (gst : gstate) (sb : fs_sb) (nib : nat)
       (cov : gset Z) :
     fs_boot_image_wf (v_disk (gst.(gdev).(dvirtio))) XV6_DISK_BYTES
@@ -376,14 +433,16 @@ Section UnionApp.
     sb = fsimg_sb ->
     cov = fsimg_cov ->
     forall c : app_fixed app_union,
-      ⊢ |==> ∃ r : app_names app_union,
+      app_cls app_union c ⊢ |==> ∃ r : app_names app_union,
+          ⌜app_okc app_union c r⌝ ∗
           app_pred app_union c r (abs_view (fss_inodes (FsDurImg.img_state
              (fs_blocks (v_disk (gst.(gdev).(dvirtio)))) sb nib))).
   Proof using .
     intros Himg Hdk Hsb Hcov c.
-    cbn [app_union app_fixed app_names app_pred] in c |- *.
-    exact (file_init_img (fgn_cl (ugn_file c)) _ XV6_DISK_BYTES sb nib cov
-             Himg Hdk Hsb Hcov).
+    cbn [app_union app_fixed app_names app_pred app_cls app_okc] in c |- *.
+    rewrite /union_cls. iIntros "(%γ0 & #Hreg & Hh & Hcm & #Hlb)".
+    iApply (file_init_img (fgn_cl (ugn_file c)) _ XV6_DISK_BYTES sb nib cov γ0
+              Himg Hdk Hsb Hcov with "Hreg Hh Hcm Hlb").
   Qed.
 
   (* ---- the conclusion's one ingredient ---- *)
@@ -423,8 +482,12 @@ Section UnionLaws.
         app_iturn app_union c (S gen_id) -∗
         |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).
 
+  (* THE FILE APPLICATION'S STARTED-COUNTER CAMERA IS THE MACHINE'S (sync
+     SY3-A3bc, ruling (i)): [UUnionBootAdequacy] builds the instance so *)
+  Context (Hfa : fa_st = riscv_pre_genGS).
+
   Global Instance union_laws : App.xv6_app_laws (app_union (Σ := Σ)).
-  Proof using Hprog ufdG0.
+  Proof using Hfa Hprog ufdG0.
     split.
     - exact union_al_birth.
     - exact union_al_Rt.
@@ -436,16 +499,19 @@ Section UnionLaws.
       exact (union_al_tx (HF := HF) HR GEN c r i γ Heq Huart).
     - intros HR GEN HF c r i γ Heq Huart.
       exact (union_al_rx (HF := HF) HR GEN c r i γ Heq Huart).
-    - intros c gen γd γsw γreg γst _.
-      exact (union_al_xfer riscv_pre_genGS c (S gen) γst gen).
+    - intros c gen γd γsw γreg γst Hborn.
+      exact (union_al_xfer riscv_pre_genGS c gen γst Hfa Hborn).
     - exact Hprog.
     - exact union_al_echo.
-    - (* the founding: the token is [True], the turn goes on whole *)
-      intros c k. exact (app_triv_found c k _).
-    - intros c h k. by apply app_back_id.
-    - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
-    - intros HR c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I | intros; exact Logic.I |].
-      exact (union_al_xfer_plain c).
-    - intros HR c k. exact (app_triv_sync_run _ _ _ c k).
+    - (* the founding: the token out of the returned turn *)
+      intros c k. cbn [app_union app_turn'' app_tk app_iturn]. iIntros "H".
+      iApply (union_found c k with "H").
+    - intros c h. cbn [app_union app_R app_turn' app_turn'']. rewrite /union_R.
+      iIntros "HR HT". iApply (union_led_back c h with "HR HT").
+    - exact union_al_boot_ok.
+    - intros HR c k Hgen Hborn. apply union_al_merge.
+      intros n. rewrite /start_auth /sync_st_auth Hgen -Hfa.
+      cbn [app_union app_born union_born] in Hborn. rewrite Hborn. reflexivity.
+    - intros HR c k. exact (union_al_sync_run c k).
   Qed.
 End UnionLaws.
