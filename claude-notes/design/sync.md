@@ -517,6 +517,37 @@ the era the return hook set); `union_phi_res` switches to `union_phi_sync`
 at A4, with the cycle's boot relation filed by the return hook and the
 completed sync's `o = Some r` filed at the prompt.
 
+**The round position** (RULED after A3a, 2026-09-27; the gap A3a's
+checker found).  The hook and every redirect step need "the current
+round's line is not older than the last recorded sync's": `(slast Ls).1 ≤
+length ls_cur`, where `ls_cur` is the round's lower bound ending at its
+own line.  Two lower bounds are only comparable, so it is not a ghost
+fact of the list; it is sh's serialisation of rounds, and the resource
+that carries it is the DEED, which passes from round to round.  `file_names`
+gains `fn_pos : gname`, a `ghost_var nat` "lines consumed": half in the
+running claim's sync part with `⌜∀ rec ∈ Ls, rec.1 ≤ n⌝`, half with the deed
+holder (sh's `ush_deed_at`, in every deed state, with `⌜n = length of its
+line lower bound⌝`).  At each round's START sh advances both halves to the
+new lower bound's length (`AppFile.file_pos_advance`, opening `appN`;
+monotone).  A redirect step at index `j` then has `p ≤ n = j + 1` and `p ≠
+j + 1` (the record's line at `p - 1 = j` is a sync line, the writer's a
+redirect, and the two lower bounds agree there), so `p ≤ j`; the hook has `p
+≤ n = length ls'`.  The copy carries no position; at PowerOn the transport
+founds the running half at the copy's `length ls` (its chain puts every
+record's line in `ls`), and the deed holder's half rides `B r'` to `/init`
+and sh, who advance it at their first round.  No new fixed-part gname.
+
+**The copy predicate** (RULED after A3a).  The merge's old copy arrives as
+`▷ ∃ r_o av_o, A r_o av_o`, so nothing says it is a COPY; the union's claim
+cannot tell the roles apart by ghost state alone (a running-shaped guest
+would be fraction-consistent).  `AppDur.app_dur_raw A Okc gt := ∃ r I,
+⌜Okc r⌝ ∗ ghost_map_auth gt ½ I ∗ A r (abs_view I)` gains the durable-copy
+predicate `Okc : N -> Prop` (`App.app_okc`; the union's is `fn_role r =
+true`, the trivial one `True`); the merge's wand receives `⌜Okc r_o⌝` and
+its `r'` satisfies `Okc`; the transport's slot output `r_s` and
+`Happ_init`'s `r` satisfy it.  Generic, small: `AppDur`, the seam's `G`,
+`FsCollectAll`'s builders, `SystemAdequacy`'s slot.
+
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
 persistent seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted

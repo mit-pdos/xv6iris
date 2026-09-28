@@ -474,11 +474,23 @@ unchanged at every landing (the theorem keeps `union_phi` until A4).
   the loan ⊢ the new copy at `Ok`, the token, the loan) and
   `union_hook_closes` (guest and running claim at `Ok`, the token, sh's
   lend ⊢ the same and `Q`) -- then `al_merge`, `al_sync_run`.
-- A3b: `al_xfer` (PowerOn's re-base with `Tn`, producing `Tn'`), `al_back`
-  (the ledger's floor and the cycle's boot relation), `al_found`,
-  `al_boot_ok`, `al_cls` (the birth's slot part: `●{½}_{γs_0} []`, `●
-  ugn_cm 0`, `0 ↪□ γs_0`) and `file_init` taking it; the ledger's registry
-  auth, floor and on-arm allocation/registration/yield.
+- A3b (after A3a; design §4.5 "The round position" and "The copy
+  predicate"): `AppDur.app_dur_raw A Okc gt` with `App.app_okc` (trivial
+  `True`; the union's `fn_role r = true`) through the seam, the builders
+  and the slot; `file_names.fn_pos` with `AppFile.file_pos_advance`;
+  `sync_claim` gains the position half and `⌜∀ rec ∈ Ls, rec.1 ≤ n⌝`, and
+  `UnionSync`'s hook/redirect lemmas take the deed holder's half instead
+  of the pure premise; `file_pred`'s non-taint arm gains `sync_claim`
+  (LAST, so patterns gain one name); the sweep: every opener of
+  `file_pred`/`f_state` (AppFile's step wands, `file_resync`, the escrow
+  laws, FileOpen, FileWrite, UkFileOpen, the transports, `file_init`) --
+  the redirect steps use `sync_claim_redir_step` with the deed's half;
+  sh's `ush_deed_at` gains the position half (`UShURoundDefs`) and every
+  round advances it (`UShURound*`); the union's `app_ok`/`app_tk`/`app_hk`
+  and the laws `al_merge` (from `union_merge_closes`) and `al_sync_run`
+  (from `union_hook_closes`, taking the position from the lend -- at this
+  lane the union's hook is stated but `usync_exec_sup` still passes
+  `None`).  Green with `union_adequacy_closed` unchanged.
 - A3c: the `file_pred` opener sweep (every `f_state` destructure in
   `FileOpen`, `FileWrite`, `UkFileOpen`, …: the sync conjunct LAST so each
   pattern gains one name; the file steps keep the witness by
