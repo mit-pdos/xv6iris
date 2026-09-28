@@ -76,7 +76,7 @@ Require Import FsImg.          (* the image sweeps' vocabulary *)
 Require Import FsCfgBoot.      (* the two boot kits *)
 Require Import FsCfgSnap.      (* [fs_cfg_alloc_snap] -- the era mint *)
 Require Import AppInv.         (* [app_merge]: the application's merge, handed to the mint *)
-Require Import AppDur.         (* [app_guest]: the guest the mint's crash seam is stated at (round C) *)
+Require Import AppDur.         (* [app_dur_laws]: the mint's crash seam and merge, one row (round C; SY3-A3b) *)
 Require FsAbsDefs.             (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import AppCfg.         (* [appcfg]: the application's record, the third field [fileG_of] takes *)
 Require Import TsoCtx.
@@ -1660,9 +1660,10 @@ Section BootAlloc.
     (* the merge and the crash seam at the application's guest, both
        straight through to the mint, which parks the one and puts both on
        fsinit's kit (round C) *)
-    (* ...with the sync runner in the same package (sync K3-3, SY3-A1) *)
-    app_merge (APP := APP) -∗
-    FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (FsImg.sb_logstart sb) -∗
+    (* ...with the sync runner in the same package (sync K3-3, SY3-A1),
+       and the two closed over the guest's durable-copy predicate
+       together, one row (SY3-A3b) *)
+    app_dur_laws (APP := APP) cov (FsImg.sb_logstart sb) -∗
     (* THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2), straight
        through to the mint, which puts it in the log names' free bundle *)
     riscv_sync_tok gen_id -∗
@@ -1881,7 +1882,7 @@ Section BootAlloc.
     pose proof Hbf as Hbf'.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0' & _).
     destruct Hv0' as (v0 & Hv0).
-    iIntros "Hok #Hmerge #Hseamg Hstok Hdursnap H".
+    iIntros "Hok #Hdurl Hstok Hdursnap H".
     iDestruct (power_boot_res_unpack Rb Tn g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hkptb & Hstrans & Hsie & Hspp & Hspie &
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hswlb &
@@ -2293,7 +2294,7 @@ Section BootAlloc.
             (FsCrash.hdr_wset_home _ cov _ Hhwf)
             (FsCrash.hdr_wset_sb _ cov _ Hhwf)
             Hagr Hnibeq Hnib32 Hcovin Hcovmeta
-            with "Hdimg Hbsauth Hbslots Hok Hmerge Hseamg Hstok Hdursnap")
+            with "Hdimg Hbsauth Hbslots Hok Hdurl Hstok Hdursnap")
       as (ICFG FSC) "Hfs".
     (* durable-disk 2b-inode-3 / 2b-inode-4: NEITHER ERA GHOST ARRIVES HERE
        ANY MORE.  The top map's authority is [InodeRegion.ftop_inv] (carried

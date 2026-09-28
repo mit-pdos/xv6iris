@@ -126,7 +126,8 @@ Section UnionAdequacy.
     (* EVERY OBLIGATION GOES IN AS A HOLE ([UInitBootAdequacy]'s measured
        rule) *)
     refine (xv6_app_adequacy Σ g sb nib cov app_union
-              (app_init_of_valid _ _ (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
+              (app_init_of_valid_okc app_union _ (fun _ _ => Logic.I)
+                 (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
               _ Hgen0 Hpow0 Himg n κs t2 g2 Hn).
     (* [Hphi]: a PURE reading of the application's trace ledger *)
     intros Hinv γgen γstart γreg γd γsw γobs γhist c T g' h.

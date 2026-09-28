@@ -139,6 +139,12 @@ Record file_names := MkFileNames {
   fn_sync : gname;
   fn_era  : nat;
   fn_role : bool;
+  (* THE ROUND POSITION (sync design section 4.5 "The round position", lane
+     SY3-A3b): a [ghost_var nat], "lines consumed" -- one half in the
+     running claim's sync part, one with the deed's holder (sh's deed
+     lend), both advanced at each round's start ([fpos_update]).  A
+     durable copy carries none. *)
+  fn_pos  : gname;
 }.
 
 (* THE DEED'S STATE: the model's [fstate] with each file's INUM beside its
@@ -350,6 +356,32 @@ Section FileClaim.
     iModIntro. iFrame "H1 H2".
   Qed.
 
+  (* THE ROUND POSITION'S HALF (sync SY3-A3b), at echo's [ghost_varG nat]
+     -- the one such instance in this section's context; every holder
+     names it through this definition, so no other [ghost_varG nat] in a
+     caller's scope can capture it (the duplicate-class trap) *)
+  Definition fpos (r : file_names) (n : nat) : iProp Σ :=
+    ghost_var (fn_pos r) (1/2) n.
+
+  Global Instance fpos_timeless r n : Timeless (fpos r n).
+  Proof using . rewrite /fpos. apply _. Qed.
+
+  Lemma fpos_agree (r : file_names) (n n' : nat) :
+    fpos r n -∗ fpos r n' -∗ ⌜n = n'⌝.
+  Proof using .
+    rewrite /fpos. iIntros "H1 H2".
+    iDestruct (ghost_var_agree with "H1 H2") as %Heq. by iPureIntro.
+  Qed.
+
+  (* both halves together move to any value *)
+  Lemma fpos_update (r : file_names) (n n' n'' : nat) :
+    fpos r n -∗ fpos r n' ==∗ fpos r n'' ∗ fpos r n''.
+  Proof using .
+    rewrite /fpos. iIntros "H1 H2".
+    iMod (ghost_var_update_halves n'' with "H1 H2") as "[H1 H2]".
+    iModIntro. iFrame "H1 H2".
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  2a.  THE ESCROW                                                   *)
   (*                                                                    *)
@@ -529,21 +561,25 @@ Section FileClaim.
      allocate.  (Lane F-OPEN-5: the ledger is the claim's alone -- no
      half of it is ever outside the claim, which is why [fown] did not
      have to change.)  The SYNC PART's data ([fn_sync], [fn_era],
-     [fn_role]) is the caller's: it names ghosts the caller owns. *)
+     [fn_role]) is the caller's: it names ghosts the caller owns.  The
+     ROUND POSITION is fresh, both halves at [n0] (sync SY3-A3b). *)
   Lemma fnames_alloc (r1 : echo_names) (s : dst) (γs : gname) (k : nat)
-      (b : bool) :
+      (b : bool) (n0 : nat) :
     ⊢ |==> ∃ r : file_names,
         ⌜fn_cons r = r1⌝ ∗ ⌜fn_sync r = γs /\ fn_era r = k /\ fn_role r = b⌝
-        ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s ∗ esc_auth r [].
+        ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s ∗ esc_auth r []
+        ∗ fpos r n0 ∗ fpos r n0.
   Proof using .
     iMod (ghost_var_alloc s) as (gd) "Hd".
     iMod (ghost_var_alloc s) as (gt) "Ht".
     iMod (own_alloc (●ML ([] : list (leibnizO esc_rec)))) as (ge) "He";
       [ apply mono_list_auth_valid |].
-    iModIntro. iExists (MkFileNames r1 gd gt ge γs k b).
-    rewrite /fdeed /ftkt /esc_auth /=.
+    iMod (ghost_var_alloc n0) as (gp) "Hp".
+    iModIntro. iExists (MkFileNames r1 gd gt ge γs k b gp).
+    rewrite /fdeed /ftkt /esc_auth /fpos /=.
     iDestruct "Hd" as "[Hd1 Hd2]". iDestruct "Ht" as "[Ht1 Ht2]".
-    iFrame "Hd1 Hd2 Ht1 Ht2 He". by iPureIntro.
+    iDestruct "Hp" as "[Hp1 Hp2]".
+    iFrame "Hd1 Hd2 Ht1 Ht2 He Hp1 Hp2". by iPureIntro.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1262,8 +1298,8 @@ Section FileClaim.
     { iNext. by iApply file_pred_split. }
     iMod ("Hex" $! (fn_cons r) av with "He") as "[He He']".
     iDestruct "He'" as (rc) "He'".
-    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r))
-      as (r') "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1)".
+    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r) 0)
+      as (r') "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1 & _)".
     iModIntro.
     iAssert (▷ (file_pred c r av ∗ file_pred c r' av))%I
       with "[He He' Hrest Hd1 Ht1 Ha1]" as "[H1 H2]"; last first.
@@ -1310,8 +1346,8 @@ Section FileClaim.
     { iNext. by iApply file_pred_split. }
     iMod ("Hex" $! (fn_cons r) av with "He") as "[He He']".
     iDestruct "He'" as (rc) "[He' Hb]".
-    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r))
-      as (r') "(%Hrc & _ & Hd1 & Hd2 & Ht1 & Ht2 & Ha1)".
+    iMod (fnames_alloc rc (fcontent_of av) (fn_sync r) (fn_era r) (fn_role r) 0)
+      as (r') "(%Hrc & _ & Hd1 & Hd2 & Ht1 & Ht2 & Ha1 & _)".
     iModIntro.
     iAssert (▷ (file_pred c r av ∗ file_pred c r' av
                 ∗ (f_typed c (fcontent_of av) ∨ file_taint c)))%I
@@ -1354,8 +1390,8 @@ Section FileClaim.
     iMod (echo_init c.1 dk D S Hdk Hrec HS) as (rc) "He".
     (* the sync data: placeholders until the birth founds the era-0 copy
        (sync SY3-A3b) *)
-    iMod (fnames_alloc rc ∅ 1%positive 0%nat true)
-      as (r) "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1)".
+    iMod (fnames_alloc rc ∅ 1%positive 0%nat true 0)
+      as (r) "(%Hrc & _ & Hd1 & _ & Ht1 & _ & Ha1 & _)".
     iModIntro. iExists r.
     iApply (file_pred_join with "[He]").
     { rewrite Hrc. iExact "He". }

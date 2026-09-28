@@ -85,7 +85,7 @@ Require Import ProcAvail.
    second lemma there would be a dependency cycle. *)
 Require Import FsBoot.
 Require Import AppInv.         (* [app_inv]/[app_merge]: the application's running invariant and its merge (app-instances.md) *)
-Require Import AppDur.         (* [app_guest]: the guest kit 2's crash seam is stated at (round C) *)
+Require Import AppDur.         (* [app_dur_laws]: kit 2's crash seam and merge, one row (round C; SY3-A3b) *)
 Require Import FsImg.
 Require Import FsImgBridge.
 (* THE COLLECTION'S GEOMETRY (durable-disk C-8).  [FsCollect.col_geom] is
@@ -469,13 +469,11 @@ Section FirstTok.
         (* ...and the application's environment, kit 2's application row:
            what forkret's boot arm projects into [first_done] *)
         fsabs_env ∗
-        (* ...the crash seam at the application's guest and the merge,
-           kit 2's last two rows (round C): what fsinit builds the commit's
-           law from *)
-        FsCrash.fs_crash_seam_at app_guest fsc_cov fsc_logst ∗
-        (* ...and the sync runner with it, one package (sync K3-3,
-           SY3-A1) *)
-        app_merge.
+        (* ...the crash seam at the application's guest and the merge
+           with the sync runner, kit 2's last row (round C; K3-3; one row
+           since SY3-A3b, at the guest's durable-copy predicate): what
+           fsinit builds the commit's law from *)
+        app_dur_laws fsc_cov fsc_logst.
   Proof using .
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
@@ -484,15 +482,14 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hdurl)".
     iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
             sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
             Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
     iSplitR; [iPureIntro; exact Hp |].
     iSplitR; [rewrite /fsabs_env; iExact "Henv" |].
-    iSplitR; [iExact "Hseam" |].
-    iExact "Hmerge".
+    iExact "Hdurl".
   Qed.
 
   (* ================================================================== *)

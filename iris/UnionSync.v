@@ -33,22 +33,25 @@
 (*  what bounds the last record's position by the claim's own lower bound *)
 (*  and tells a redirect line from the record's sync line.                *)
 (*                                                                        *)
-(*  WHAT THE CLOSURE LEMMAS FOUND (section 5): the merge, the PowerOn     *)
-(*  re-base and the birth close as the design states them.  The HOOK and  *)
-(*  a REDIRECT round do not: each needs the last record's position to be  *)
-(*  at most the caller's own line position ([(slast Ls).1 <= length ls']) *)
-(*  -- “the sync being recorded, or the line being written, is not OLDER  *)
-(*  than the last recorded sync”.  That is true of sh's serial rounds but *)
-(*  is no ghost fact: two lower bounds of the line list are merely        *)
-(*  comparable, and a stale lower bound (an older sync line, an older     *)
-(*  redirect) refutes nothing.  Both lemmas are stated over the running   *)
-(*  claim's BODY [sync_body] with that pure premise, and the premise is   *)
-(*  the open design point for A3c/A4.                                     *)
+(*  THE ROUND POSITION (lane SY3-A3b; design 4.5 "The round position").  *)
+(*  The HOOK and a REDIRECT round need the last record's position to be   *)
+(*  at most the caller's own line position -- “the sync being recorded, *)
+(*  or the line being written, is not OLDER than the last recorded sync”. *)
+(*  Two lower bounds of the line list are merely comparable, so that is   *)
+(*  sh's serial order, carried by a resource: the instance's round        *)
+(*  position [fn_pos], a [ghost_var nat] whose one half sits in the       *)
+(*  running claim's sync part above every record's position, the other    *)
+(*  with the deed's holder at its round's line count.  The two lemmas     *)
+(*  take the holder's half, agreement gives the bound.  The copy carries  *)
+(*  no position; the re-base founds a fresh one at the copy's line count. *)
+(*  Its camera is echo's [ghost_varG nat] ([AppFile.fpos]), passed here   *)
+(*  explicitly as [HPos] for [HSt]'s reason: no [echoOutG] in the claim's *)
+(*  sections.                                                             *)
 (* ===================================================================== *)
 From Stdlib Require Import Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own mono_nat ghost_map invariants.
+From iris.base_logic.lib Require Import own mono_nat ghost_map ghost_var invariants.
 From iris.algebra.lib Require Import mono_list.
 Require Import Xv6Cameras.         (* [fsTopG]: the top map's ghost class *)
 Require Import FsNode.             (* [fs_node] *)
@@ -119,6 +122,43 @@ Proof using.
   unfold fl_line in *. revert H. destruct (slast Ls).1; simpl; intros H; lia.
 Qed.
 
+(* THE RECORDS RISE: every record's position is at most the last's *)
+Lemma sync_chain_le_last (ls : list fl_line) (Ls : list srec) :
+  sync_chain ls Ls -> forall rec : srec, rec ∈ Ls -> rec.1 <= (slast Ls).1.
+Proof using.
+  intros [Hc _]. clear -Hc. revert Hc.
+  induction Ls as [| x L IH] using rev_ind; intros Hc rec Hin.
+  - by apply elem_of_nil in Hin.
+  - rewrite slast_snoc.
+    assert (HcL : forall (j : nat) (r r' : srec),
+               (srec0 :: L) !! j = Some r -> (srec0 :: L) !! S j = Some r' ->
+               srec_le ls r r').
+    { intros j r r' H1 H2. apply (Hc j).
+      - change (srec0 :: L ++ [x]) with ((srec0 :: L) ++ [x]).
+        by apply lookup_app_l_Some.
+      - change (srec0 :: L ++ [x]) with ((srec0 :: L) ++ [x]).
+        by apply lookup_app_l_Some. }
+    assert (Hlast : (slast L).1 <= x.1).
+    { assert (H1 : (srec0 :: L ++ [x]) !! length L = Some (slast L)).
+      { change (srec0 :: L ++ [x]) with ((srec0 :: L) ++ [x]).
+        apply lookup_app_l_Some. apply slast_lookup. }
+      assert (H2 : (srec0 :: L ++ [x]) !! S (length L) = Some x).
+      { simpl. rewrite lookup_app_r; [| lia].
+        rewrite Nat.sub_diag. reflexivity. }
+      pose proof (Hc _ _ _ H1 H2) as Hs. destruct Hs as [Hs _]. exact Hs. }
+    apply elem_of_app in Hin as [Hin | Hin].
+    + pose proof (IH HcL rec Hin). lia.
+    + apply elem_of_list_singleton in Hin as ->. lia.
+Qed.
+
+(* a bound on every record bounds the last *)
+Lemma slast_bound (Ls : list srec) (n : nat) :
+  (forall rec : srec, rec ∈ Ls -> rec.1 <= n) -> (slast Ls).1 <= n.
+Proof using.
+  intros H. rewrite /slast. destruct (last Ls) as [x |] eqn:E; cbn; [| lia].
+  apply H. by apply last_Some_elem_of.
+Qed.
+
 (* APPEND: a record above the last, whose sync line is in the list *)
 Lemma sync_chain_snoc (ls : list fl_line) (Ls : list srec) (r : srec) :
   sync_chain ls Ls -> srec_le ls (slast Ls) r ->
@@ -184,10 +224,15 @@ Qed.
 (*  2.  THE INSTANCE'S RECORD MOVES                                       *)
 (* ===================================================================== *)
 
-(* the instance at a new sync list, era and role (the deed, ticket and
-   escrow names kept) *)
+(* the instance at a new sync list, era, role and round position (the
+   deed, ticket and escrow names kept) *)
+Definition fn_with_pos (r : file_names) (γ : gname) (k : nat) (b : bool)
+    (γp : gname) : file_names :=
+  MkFileNames (fn_cons r) (fn_deed r) (fn_tkt r) (fn_esc r) γ k b γp.
+
+(* ...keeping the position's name too *)
 Definition fn_with (r : file_names) (γ : gname) (k : nat) (b : bool) : file_names :=
-  MkFileNames (fn_cons r) (fn_deed r) (fn_tkt r) (fn_esc r) γ k b.
+  fn_with_pos r γ k b (fn_pos r).
 
 (* the running claim's instance as the new durable copy's *)
 Definition to_copy (r : file_names) : file_names := fn_with r (fn_sync r) (fn_era r) true.
@@ -202,6 +247,9 @@ Section sync.
   Context {Σ : gFunctors} `{!fileAppG Σ}.
   (* THE MACHINE'S [mono_natG] (the header): the only one in scope *)
   Context (HSt : mono_natG Σ).
+  (* ...and ECHO'S [ghost_varG nat], the round position's camera
+     ([AppFile.fpos]; the header): the only one in scope *)
+  Context (HPos : ghost_varG Σ nat).
 
   (* ---- the sync list's shares ---- *)
   Definition sl_auth (γ : gname) (q : Qp) (Ls : list srec) : iProp Σ :=
@@ -299,14 +347,30 @@ Section sync.
 
   (* ---- THE SYNC PART OF THE CLAIM ---- *)
 
+  (* ---- the round position's half ([AppFile.fpos] at [HPos]) ---- *)
+  Definition spos (r : file_names) (n : nat) : iProp Σ :=
+    ghost_var (fn_pos r) (1/2) n.
+
+  Global Instance spos_timeless r n : Timeless (spos r n).
+  Proof using . rewrite /spos. apply _. Qed.
+
+  Lemma spos_agree (r : file_names) (n n' : nat) :
+    spos r n -∗ spos r n' -∗ ⌜n = n'⌝.
+  Proof using .
+    rewrite /spos. iIntros "H1 H2".
+    iDestruct (ghost_var_agree with "H1 H2") as %Heq. by iPureIntro.
+  Qed.
+
   (* the role's shares: the durable copy's half, the counter's authority
-     and the started certificate; or the running claim's quarter and the
-     counter's lower bound *)
+     and the started certificate; or the running claim's quarter, the
+     counter's lower bound and THE ROUND POSITION's half, above every
+     record's position (lane SY3-A3b) *)
   Definition sync_role (c : union_gn) (r : file_names) (Ls : list srec) : iProp Σ :=
     if fn_role r
     then (sl_auth (fn_sync r) (1/2) Ls ∗ sync_cm_auth c (fn_era r)
           ∗ sync_st_lb c (fn_era r))%I
-    else (sl_auth (fn_sync r) (1/4) Ls ∗ sync_cm_lb c (fn_era r))%I.
+    else (sl_auth (fn_sync r) (1/4) Ls ∗ sync_cm_lb c (fn_era r)
+          ∗ ∃ n : nat, spos r n ∗ ⌜forall rec : srec, rec ∈ Ls -> rec.1 <= n⌝)%I.
 
   Definition sync_body (c : union_gn) (r : file_names) (av : aview)
       (ls : list fl_line) (Ls : list srec) : iProp Σ :=
@@ -374,14 +438,14 @@ Section sync.
       sync_claim c (to_copy r) av ∗ sync_claim c r av ∗ union_tk c gen
       ∗ sync_st_auth c (gen + 1).
   Proof using .
-    destruct r_o as [oc od ot oe oγ ok ob]; destruct r as [rc rd rt re rγ rk rb].
-    cbn [fn_role fn_era fn_sync to_copy fn_with]. intros -> -> ->.
+    destruct r_o as [oc od ot oe oγ ok ob op]; destruct r as [rc rd rt re rγ rk rb rp].
+    cbn [fn_role fn_era fn_sync to_copy fn_with fn_with_pos fn_pos]. intros -> -> ->.
     iIntros "(%ls_o & %Ls_o & #Hrego & _ & _ & _ & Hro)".
     iIntros "(%ls & %Ls & #Hreg & #Hlb & %Hch & %Hw & Hr)".
     iIntros "(%γ & %Lt & #Hregt & Hqt & #Hcmt) Hst".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
     iDestruct "Hro" as "(Ho & Hcmo & #Hsto)".
-    iDestruct "Hr" as "(Hq & #Hcml)".
+    iDestruct "Hr" as "(Hq & #Hcml & Hpos)".
     iDestruct (mono_nat_lb_own_valid with "Hcmo Hcml") as %[_ Hle1].
     iDestruct (mono_nat_lb_own_valid with "Hst Hsto") as %[_ Hle2].
     assert (ok = S gen) as -> by lia.
@@ -393,9 +457,9 @@ Section sync.
     iSplitL "Ho Hcmo".
     { iExists ls, Ls. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch Hw) "Hreg Hlb Ho Hcmo Hsto". }
-    iSplitL "Hq".
+    iSplitL "Hq Hpos".
     { iExists ls, Ls. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch Hw) "Hreg Hlb Hq Hcml". }
+      iFrame (Hch Hw) "Hreg Hlb Hq Hcml Hpos". }
     iFrame "Hst". iExists γ, Ls. iFrame "Hregt Hqt Hcmt".
   Qed.
 
@@ -410,26 +474,32 @@ Section sync.
      the new list and the counter's lower bound -- the design's [Q].
      THE POSITION PREMISE [(slast Ls).1 <= length ls'] (the header): the
      last record is not younger than sh's sync line.  It is stated over
-     the running claim's BODY, whose list [Ls] it names. *)
+     the running claim's BODY, whose list [Ls] it names.  THE POSITION
+     (lane SY3-A3b): the deed holder's half of the round position at sh's
+     line count [length ls']; against the running claim's half it bounds
+     every record, hence the last. *)
   Lemma union_hook_closes (c : union_gn) (r' r : file_names) (av : aview)
       (gen : nat) (ls : list fl_line) (Ls : list srec) (ls' : list fl_line)
-      (s : fstate) :
+      (s : fstate) (n : nat) :
     fn_role r' = true -> fn_era r' = S gen ->
     fn_role r = false -> fn_era r = S gen ->
     last ls' = Some FileDisc.LSync -> fcont_of av = s ->
-    (slast Ls).1 <= length ls' ->
+    n = length ls' ->
     sync_claim c r' av -∗ sync_body c r av ls Ls -∗ union_tk c gen -∗
-    fl_lb (fgn_cl (ugn_file c)) ls' ==∗
+    fl_lb (fgn_cl (ugn_file c)) ls' -∗ spos r n ==∗
       sync_claim c r' av ∗ sync_claim c r av ∗ union_tk c gen
-      ∗ sl_lb (fn_sync r) (Ls ++ [(length ls', s)]) ∗ sync_cm_lb c (S gen).
+      ∗ sl_lb (fn_sync r) (Ls ++ [(length ls', s)]) ∗ sync_cm_lb c (S gen)
+      ∗ spos r n.
   Proof using .
-    destruct r' as [gc gd gt ge gγ gk gb]; destruct r as [rc rd rt re rγ rk rb].
-    cbn [fn_role fn_era fn_sync]. intros -> -> -> -> Hlast <- Hpos.
+    destruct r' as [gc gd gt ge gγ gk gb gp]; destruct r as [rc rd rt re rγ rk rb rp].
+    cbn [fn_role fn_era fn_sync]. intros -> -> -> -> Hlast <- ->.
     iIntros "(%ls_g & %Ls_g & #Hregg & _ & _ & _ & Hg)".
-    iIntros "(#Hreg & #Hlb & %Hch & %Hw & Hr) (%γ & %Lt & #Hregt & Hqt & #Hcmt) #Hlb'".
+    iIntros "(#Hreg & #Hlb & %Hch & %Hw & Hr) (%γ & %Lt & #Hregt & Hqt & #Hcmt) #Hlb' Hph".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
     iDestruct "Hg" as "(Hg & Hcmg & #Hstg)".
-    iDestruct "Hr" as "(Hq & #Hcml)".
+    iDestruct "Hr" as "(Hq & #Hcml & %m & Hpm & %Hbm)".
+    iDestruct (spos_agree with "Hpm Hph") as %->.
+    pose proof (slast_bound Ls _ Hbm) as Hpos.
     iDestruct (sync_reg_agree with "Hregg Hreg") as %->.
     iDestruct (sync_reg_agree with "Hreg Hregt") as %->.
     iDestruct (sl_auth_agree with "Hg Hq") as %->.
@@ -451,16 +521,21 @@ Section sync.
       exact (uadm_mono ls L (slast Ls) _ HlsL Hw). }
     assert (Hw' : uadm L (slast (Ls ++ [(length ls', fcont_of av)])) (fcont_of av)).
     { rewrite slast_snoc. exact (uadm_self L (length ls', fcont_of av)). }
+    assert (Hbm' : forall rec : srec, rec ∈ Ls ++ [(length ls', fcont_of av)] ->
+                     rec.1 <= length ls').
+    { intros rec Hin. apply elem_of_app in Hin as [Hin | Hin]; [exact (Hbm rec Hin) |].
+      apply elem_of_list_singleton in Hin as ->. cbn. lia. }
     iModIntro.
     iSplitL "Hg Hcmg".
     { iExists L, (Ls ++ [(length ls', fcont_of av)]).
       unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch' Hw') "Hregg HL Hg Hcmg Hstg". }
-    iSplitL "Hq".
+    iSplitL "Hq Hpm".
     { iExists L, (Ls ++ [(length ls', fcont_of av)]).
       unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch' Hw') "Hreg HL Hq Hcml". }
-    iFrame "Hcml Hnew".
+      iFrame (Hch' Hw') "Hreg HL Hq Hcml". iExists (length ls').
+      iFrame "Hpm". iPureIntro. exact Hbm'. }
+    iFrame "Hcml Hnew Hph".
     iExists γ, (Ls ++ [(length ls', fcont_of av)]). iFrame "Hregt Hqt Hcmt".
   Qed.
 
@@ -468,23 +543,34 @@ Section sync.
      writer's line [LEchoF ws N] is the last of its lower bound [ls_w], and
      the round sets [N] to a chunk subset of it.  The witness moves to the
      new view at the SAME records; the line list grows to cover the
-     writer's.  THE POSITION PREMISE [(slast Ls).1 <= length ls_w] (the
-     header): the last record is not younger than the writer's line; with
-     it the line is at or after the record ([sync_chain_redir_pos]: the
-     redirect is not the record's sync line).  Any role: the shares are
-     untouched. *)
+     writer's.  THE POSITION (lane SY3-A3b; the header): the deed
+     holder's half of the round position at the writer's line count
+     [length ls_w], against the running claim's half, puts the last record
+     no later than the writer's line; then the line is at or after the
+     record ([sync_chain_redir_pos]: the redirect is not the record's sync
+     line).  The running claim only (a durable copy never steps); the
+     shares are untouched and the holder's half comes back. *)
   Lemma sync_claim_redir_step (c : union_gn) (r : file_names) (av av' : aview)
       (ls : list fl_line) (Ls : list srec) (ls_w : list fl_line) (j : nat)
-      (ws : list (list (bv 8))) (N : list (bv 8)) (sel : list nat) :
+      (ws : list (list (bv 8))) (N : list (bv 8)) (sel : list nat) (n : nat) :
+    fn_role r = false ->
     ls_w !! j = Some (FileDisc.LEchoF ws N) -> length ls_w = S j ->
     sel_ok (echo_chunks ws) sel ->
-    (slast Ls).1 <= length ls_w ->
+    n = length ls_w ->
     fcont_of av' = <[N := subseq (echo_chunks ws) sel]> (fcont_of av) ->
-    sync_body c r av ls Ls -∗ fl_lb (fgn_cl (ugn_file c)) ls_w -∗
-    ∃ L : list fl_line, sync_body c r av' L Ls.
+    sync_body c r av ls Ls -∗ fl_lb (fgn_cl (ugn_file c)) ls_w -∗ spos r n -∗
+    (∃ L : list fl_line, sync_body c r av' L Ls) ∗ spos r n.
   Proof using .
-    intros Hj Hlen Hsel Hpos Hav'.
-    iIntros "(#Hreg & #Hlb & %Hch & %Hw & Hr) #Hlbw".
+    intros Hrole Hj Hlen Hsel -> Hav'.
+    iIntros "(#Hreg & #Hlb & %Hch & %Hw & Hr) #Hlbw Hph".
+    iAssert (sync_role c r Ls ∗ ⌜(slast Ls).1 <= length ls_w⌝ ∗ spos r (length ls_w))%I
+      with "[Hr Hph]" as "(Hr & %Hpos & Hph)".
+    { rewrite /sync_role Hrole. cbn [fn_role].
+      iDestruct "Hr" as "(Hq & #Hcml & %m & Hpm & %Hbm)".
+      iDestruct (spos_agree with "Hpm Hph") as %->.
+      iSplitL "Hq Hpm".
+      { iFrame "Hq Hcml". iExists (length ls_w). iFrame "Hpm". iPureIntro. exact Hbm. }
+      iSplitR; [iPureIntro; exact (slast_bound Ls _ Hbm) | iExact "Hph"]. }
     iDestruct (fl_lb_lb with "Hlb Hlbw") as %Hcmp.
     iDestruct (fl_lb_join with "Hlb Hlbw") as (L) "[#HL %HL]".
     destruct HL as [HlsL HlswL].
@@ -498,7 +584,8 @@ Section sync.
     assert (Hw' : uadm L (slast Ls) (fcont_of av')).
     { rewrite Hav'. apply (uadm_redir L (slast Ls) (fcont_of av) ws N sel Hin Hsel).
       exact (uadm_mono ls L (slast Ls) _ HlsL Hw). }
-    iExists L. iApply (sync_body_intro c r av' L Ls Hch' Hw' with "Hreg HL Hr").
+    iFrame "Hph". iExists L.
+    iApply (sync_body_intro c r av' L Ls Hch' Hw' with "Hreg HL Hr").
   Qed.
 
   (* POWERON'S RE-BASE (design 4.5 "PowerOn"; [App.al_xfer]'s body): the
@@ -511,22 +598,28 @@ Section sync.
      re-based copy, the running claim, the token, and for the ledger's
      return hook the new list's lower bound, [F ⊑ Ls_c] and the BOOT FACT
      (the view admissible after the floor's last record,
-     [sync_chain_shrink]); the dead era's half is dropped. *)
+     [sync_chain_shrink]); the dead era's half is dropped.  THE ROUND
+     POSITION (lane SY3-A3b): the running claim's is FRESH, founded at the
+     copy's line count [length ls] (the chain puts every record's line in
+     [ls]); its other half goes out beside the ledger's part, for the deed
+     holder. *)
   Lemma sync_claim_rebase (c : union_gn) (r : file_names) (av : aview) (γ : gname)
       (gen : nat) (F : list srec) :
     fn_role r = true ->
     sync_claim c r av -∗ sl_auth γ 1 [] -∗ sync_reg c (S gen) γ -∗
     sl_lb (fn_sync r) F -∗ sync_st_auth c (gen + 1) ==∗
+      ∃ γp : gname,
       sync_claim c (fn_with r γ (S gen) true) av
-      ∗ sync_claim c (fn_with r γ (S gen) false) av
+      ∗ sync_claim c (fn_with_pos r γ (S gen) false γp) av
       ∗ union_tk c gen
       ∗ (∃ (ls : list fl_line) (Ls_c : list srec),
            fl_lb (fgn_cl (ugn_file c)) ls ∗ sl_lb γ Ls_c
-           ∗ ⌜F `prefix_of` Ls_c⌝ ∗ ⌜uadm ls (slast F) (fcont_of av)⌝)
+           ∗ ⌜F `prefix_of` Ls_c⌝ ∗ ⌜uadm ls (slast F) (fcont_of av)⌝
+           ∗ spos (fn_with_pos r γ (S gen) false γp) (length ls))
       ∗ sync_st_auth c (gen + 1).
   Proof using .
-    destruct r as [rc rd rt re rγ rk rb].
-    cbn [fn_role fn_era fn_sync fn_with]. intros ->.
+    destruct r as [rc rd rt re rγ rk rb rp].
+    cbn [fn_role fn_era fn_sync fn_with fn_with_pos fn_pos]. intros ->.
     iIntros "(%ls & %Ls_c & _ & #Hlb & %Hch & %Hw & Hr) Hnew #Hreg #HF Hst".
     unfold sync_role; cbn [fn_role fn_era fn_sync].
     iDestruct "Hr" as "(Ho & Hcm & #Hsto)".
@@ -539,17 +632,25 @@ Section sync.
     (* the counter, and the certificate *)
     iMod (mono_nat_own_update (S gen) with "Hcm") as "[Hcm #Hcml]"; [lia |].
     iDestruct (mono_nat_lb_own_get with "Hst") as "#Hst'".
+    (* the fresh round position, at the copy's line count, above every
+       record *)
+    iMod (ghost_var_alloc (length ls)) as (γp) "[Hp1 Hp2]".
+    assert (Hbm : forall rec : srec, rec ∈ Ls_c -> rec.1 <= length ls).
+    { intros rec Hin. pose proof (sync_chain_le_last ls Ls_c Hch rec Hin).
+      pose proof (sync_chain_pos ls Ls_c Hch). lia. }
     rewrite (_ : (gen + 1)%nat = S gen); [| lia].
-    iModIntro.
+    iModIntro. iExists γp.
     iSplitL "Hh Hcm".
     { iExists ls, Ls_c. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
       iFrame (Hch Hw) "Hreg Hlb Hh Hcm Hst'". }
-    iSplitL "Hq".
+    iSplitL "Hq Hp1".
     { iExists ls, Ls_c. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync].
-      iFrame (Hch Hw) "Hreg Hlb Hq Hcml". }
+      iFrame (Hch Hw) "Hreg Hlb Hq Hcml". iExists (length ls).
+      rewrite /spos /=. iFrame "Hp1". iPureIntro. exact Hbm. }
     iSplitL "Hqt".
     { iExists γ, Ls_c. iFrame "Hreg Hqt Hcml". }
-    iFrame "Hst". iExists ls, Ls_c. iFrame "Hlb Hnlb". iPureIntro. split; [exact HFc |].
+    iFrame "Hst". iExists ls, Ls_c. iFrame "Hlb Hnlb".
+    rewrite /spos /=. iFrame "Hp2". iPureIntro. split; [exact HFc |].
     exact (sync_chain_shrink ls Ls_c F _ Hch HFc Hw).
   Qed.
 
@@ -563,7 +664,7 @@ Section sync.
     sync_reg c 0 γ0 -∗ sl_auth γ0 (1/2) [] -∗ sync_cm_auth c 0 -∗
     fl_lb (fgn_cl (ugn_file c)) ls ==∗ sync_claim c r0 av0.
   Proof using .
-    destruct r0 as [rc rd rt re rγ rk rb].
+    destruct r0 as [rc rd rt re rγ rk rb rp].
     cbn [fn_role fn_era fn_sync]. intros -> -> -> Hav.
     iIntros "#Hreg Hh Hcm #Hlb".
     iMod (mono_nat_lb_own_0 (ugn_st c)) as "#Hst".
@@ -597,21 +698,24 @@ Section sync.
       [apply lookup_empty |].
     iMod (mono_nat_own_alloc (S gen)) as (γcm) "[Hcm #Hcml]".
     iMod (mono_nat_own_alloc (gen + 1)) as (γst) "[Hst #Hstl]".
+    iMod (ghost_var_alloc 0) as (γp) "[Hp _]".
     iDestruct (sl_auth_split3_1 γs [] with "Hs") as "(Hh & Hq & Hqt)".
     rewrite (_ : (gen + 1)%nat = S gen); [| lia].
     iModIntro.
     iExists (MkUnionGn (MkFileGn (ef, γfl) ge) gp γst γreg γcm),
-      (fn_with r0 γs (S gen) true), (fn_with r0 γs (S gen) false), ∅.
-    iSplitR; [iPureIntro; cbn [fn_role fn_era fn_with]; done |].
+      (fn_with r0 γs (S gen) true), (fn_with_pos r0 γs (S gen) false γp), ∅.
+    iSplitR; [iPureIntro; cbn [fn_role fn_era fn_with fn_with_pos]; done |].
     assert (Hw : uadm [] (slast []) (fcont_of ∅)).
     { rewrite fcont_of_empty. exact (uadm_self [] srec0). }
     pose proof (sync_chain_nil []) as Hch.
     iSplitL "Hh Hcm".
-    { iExists [], []. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync fn_with].
+    { iExists [], []. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync fn_with fn_with_pos].
       iFrame (Hch Hw) "Hel Hlb Hh Hcm Hstl". }
-    iSplitL "Hq".
-    { iExists [], []. unfold sync_body, sync_role; cbn [fn_role fn_era fn_sync fn_with].
-      iFrame (Hch Hw) "Hel Hlb Hq Hcml". }
+    iSplitL "Hq Hp".
+    { iExists [], []. unfold sync_body, sync_role;
+        cbn [fn_role fn_era fn_sync fn_with fn_with_pos].
+      iFrame (Hch Hw) "Hel Hlb Hq Hcml". iExists 0. rewrite /spos /=.
+      iFrame "Hp". iPureIntro. intros rec Hin. by apply elem_of_nil in Hin. }
     iFrame "Hst". iExists γs, []. iFrame "Hel Hqt Hcml".
   Qed.
 
@@ -661,11 +765,13 @@ Section union_hk.
 
   (* the design's [Hk c k Q]: both instances at the era [S k], the guest
      half of the top map, the new durable copy and the running claim at
-     one map, the token; everything back, and [Q] *)
+     one map, the token; everything back, and [Q].  The new copy's record
+     is a COPY's (its durable-copy predicate, [App.app_okc], which the
+     runner receives off the merge -- lane SY3-A3b) *)
   Definition union_hk (A : union_gn -> file_names -> aview -> iProp Σ)
       (c : union_gn) (k : nat) (Q : iProp Σ) : iProp Σ :=
     (∀ (gt : gname) (I : gmap Z fs_node) (r r' : file_names),
-       ⌜fn_era r = S k⌝ -∗ ⌜fn_era r' = S k⌝ -∗
+       ⌜fn_era r = S k⌝ -∗ ⌜fn_era r' = S k⌝ -∗ ⌜fn_role r' = true⌝ -∗
        ghost_map_auth gt (1/2) I -∗
        ▷ A c r' (abs_view I) -∗ ▷ A c r (abs_view I) -∗
        union_tk HSt c k ={∅}=∗

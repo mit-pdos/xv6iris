@@ -41,6 +41,21 @@ Open cleanups it left, none blocking:
   `AppDur.app_dur_raw_merge`; every application derives the merge from its
   transport at `SystemAdequacy`'s call of `xv6_boot_era` (`Happ_merge`)).
   Merged at `966c6d815`; whole tree green, audits 13/13/14.
+- SY3-A3b FIRST HALF on branch `sync3-a3b` (not on main): steps 1 (the
+  copy predicate `Okc` through `AppDur`/`AppInv`/`App`/the kit/the slot;
+  kit 2's seam and merge rows are ONE row `app_dur_laws`) and 2's
+  position pieces (`fn_pos`, `fpos`, `fnames_alloc`, `UnionSync`'s
+  position arm and lemmas).  Green, audits 13/13/14.  BLOCKED for the
+  owner: (1) `file_pred c` is over `c : file_fixed` in `AppFile`, below
+  `UnionOut` (`union_gn`) and `UnionSync`, and `sync_claim` needs
+  `union_gn` + the explicit `HSt`/`HPos` cameras, so "the non-taint arm
+  gains `sync_claim`" does not typecheck; (2) sh's round lower bound
+  `flw I` is membership-only (`w ∈ fl_redirs ls`, and nothing for a line
+  with no redirect, e.g. `sync`), not a lower bound ENDING at the
+  round's line, so neither the position's value nor the redirect step's
+  `p ≤ j` follows from it; (3) `file_xfer_boot` with a sync part needs
+  the fresh list's registration (in the ledger, i.e. `Tn`) and the
+  started-auth loan, which `app_xfer_boot_raw` does not pass.
 - The pure model (lane SY3-M, branch `sync3-m` at `855896fb8`, merged by
   A2): `iris/UnionAdm.v` (line list `ulines_of`, records `srec`, `uadm`,
   `srec_le`, the shrink lemmas, `usync_last`, `lm_good_sync`),

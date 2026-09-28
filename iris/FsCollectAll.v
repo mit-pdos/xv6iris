@@ -1819,7 +1819,7 @@ Section CollectAll.
   Lemma fs_collect_dur (E : coPset) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
       (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
-      (T : iProp Σ) (gd : nat) (Ok : app_names -> Prop) :
+      (T : iProp Σ) (gd : nat) (Ok Okc : app_names -> Prop) :
     col_geom sb (FsImg.sb_inodestart sb) icfg_nib (fs_home_set cov ls) ->
     ↑appN ⊆ E ->
     ↑ftopN ⊆ E -> ↑iregN ⊆ E -> ↑bitmapN ⊆ E -> ↑sbN ⊆ E ->
@@ -1828,8 +1828,9 @@ Section CollectAll.
     Ok app_run ->
     (* the merge, the application's one durability obligation at the
        commit (SY3-K2), at the token the committer hands in (K3-3) and at
-       the era its wand's loan is bound at (SY3-A1) *)
-    app_merge_raw app_pred Ok T gd -∗
+       the era its wand's loan is bound at (SY3-A1), and at the guest's
+       durable-copy predicate (SY3-A3b) *)
+    app_merge_raw app_pred Ok Okc T gd -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) icfg_nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -1838,7 +1839,7 @@ Section CollectAll.
     col_auth γfs Lb C (fs_home_set cov ls) -∗
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     T ={E}=∗
-      dur_pair app_guest T gd (col_view C (fs_home_set cov ls))
+      dur_pair (app_guest Okc) T gd (col_view C (fs_home_set cov ls))
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
       ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
@@ -1919,7 +1920,7 @@ Section CollectAll.
        invariant below ---- *)
     iDestruct "Hdur" as (gt) "[Hdur Hguest]".
     iEval (rewrite HSI /snap_guest) in "Hguest".
-    iMod (app_dur_raw_merge app_pred Ok T gd gt I app_run HOk
+    iMod (app_dur_raw_merge app_pred Ok Okc T gd gt I app_run HOk
             with "Hmerge Hguest Hpa HT")
       as "[Hpa Hg]".
     iAssert (∃ kv : ity, ireg_keep γfs ireg_root kv)%I
@@ -1966,7 +1967,7 @@ Section CollectAll.
   Lemma fs_collect_ghost (E : coPset) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
       (sb : fs_sb) (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8)))
-      (T : iProp Σ) (gd : nat) (Ok : app_names -> Prop)
+      (T : iProp Σ) (gd : nat) (Ok Okc : app_names -> Prop)
       (Hk : iProp Σ -> iProp Σ) (Qs : list (iProp Σ))
       (gt_o : gname) (n : nat) :
     col_geom sb (FsImg.sb_inodestart sb) icfg_nib (fs_home_set cov ls) ->
@@ -1978,8 +1979,8 @@ Section CollectAll.
     (* the running record satisfies the era's record predicate (SY3-A1) *)
     Ok app_run ->
     (* the merge, at the token, and the runner of the waiters' hooks *)
-    app_merge_raw app_pred Ok T gd -∗
-    app_sync_run_raw app_pred Ok T Hk -∗
+    app_merge_raw app_pred Ok Okc T gd -∗
+    app_sync_run_raw app_pred Ok Okc T Hk -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) icfg_nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -1988,12 +1989,12 @@ Section CollectAll.
     col_auth γfs Lb C (fs_home_set cov ls) -∗
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     (* the OLD durable guest, the token, the loan, and the hooks *)
-    ▷ app_guest gt_o -∗
+    ▷ app_guest Okc gt_o -∗
     T -∗
     start_auth n -∗
     ([∗ list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : gname,
-         P_dur_at gt (col_view C (fs_home_set cov ls)) ∗ ▷ app_guest gt)
+         P_dur_at gt (col_view C (fs_home_set cov ls)) ∗ ▷ app_guest Okc gt)
       ∗ T
       ∗ start_auth n
       ∗ ([∗ list] Q ∈ Qs, Q)
@@ -2080,18 +2081,18 @@ Section CollectAll.
     (* the merge on the running claim, with the token; its LEFT arm on the
        old guest's claim (the old half is dropped with it) *)
     iMod ("Hmerge" $! app_run _ with "[//] Hpa HT") as "[Hpa Hw]".
-    iDestruct "Hw" as (r') "[%HOk' [Hw _]]".
+    iDestruct "Hw" as (r') "(%HOk' & %HOkc' & [Hw _])".
     iMod ("Hw" $! n with "[//] Hsa [Hold]") as "(Hnew & HT & Hsa)".
     { iNext. iEval (rewrite /app_guest /app_dur_raw) in "Hold".
-      iDestruct "Hold" as (r_o I_o) "[_ Hold]".
-      iExists r_o, (FsAbsDefs.abs_view I_o). iExact "Hold". }
+      iDestruct "Hold" as (r_o I_o) "(%Hro & _ & Hold)".
+      iExists r_o, (FsAbsDefs.abs_view I_o). iFrame "Hold". by iPureIntro. }
     (* every hook fires HERE, at one map: the fresh guest half, the new
        durable claim, the running claim and the token *)
-    iMod (app_sync_run_list app_pred Ok T Hk _ Qs gt I app_run r' HOk HOk'
-            with "Hrun HQs Hguest Hnew Hpa HT")
+    iMod (app_sync_run_list app_pred Ok Okc T Hk _ Qs gt I app_run r' HOk HOk'
+            HOkc' with "Hrun HQs Hguest Hnew Hpa HT")
       as "(Hguest & Hnew & Hpa & HT & HQs)".
-    iPoseProof (app_dur_raw_pack app_pred gt I with "Hguest [Hnew]") as "Hg".
-    { iExists r'. iExact "Hnew". }
+    iPoseProof (app_dur_raw_pack app_pred Okc gt I with "Hguest [Hnew]") as "Hg".
+    { iExists r'. iFrame "Hnew". by iPureIntro. }
     iAssert (∃ kv : ity, ireg_keep γfs ireg_root kv)%I
       with "[Hkeep]" as "Hkeep".
     { iExists kv. rewrite /ireg_keep
@@ -2148,13 +2149,13 @@ Section CollectAll.
 
   Lemma fs_snap_law_build (γ : log_names) (cn : ic_names) (γfs : fs_names)
       (γi : gname) (cov : gset Z) (ls : Z) (nib : nat) (sb : fs_sb)
-      (T : iProp Σ) (gd : nat) (Ok : app_names -> Prop) :
+      (T : iProp Σ) (gd : nat) (Ok Okc : app_names -> Prop) :
     γ = icfg_log ->
     nib = icfg_nib ->
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
     Ok app_run ->
-    FsCrash.fs_crash_seam_at app_guest cov ls -∗
-    app_merge_raw app_pred Ok T gd -∗
+    FsCrash.fs_crash_seam_at (app_guest Okc) cov ls -∗
+    app_merge_raw app_pred Ok Okc T gd -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -2166,7 +2167,7 @@ Section CollectAll.
     iIntros "#Hseam #Hmerge #Hireg #Hbm #Hesc #Hpool #Hpark".
     iApply (snap_law_intro icfg_log γfs cov ls
               ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
-               ∪ ↑icEscN ∪ ↑appN) app_guest T gd with "Hseam").
+               ∪ ↑icEscN ∪ ↑appN) (app_guest Okc) T gd with "Hseam").
     (* [sbN] IS A CHILD OF [logN] (durable-disk lane E-blk1), so
        [solve_ndisj] alone no longer closes this: block 1's park is a
        SIBLING of the byte view's own [fsbN] under one parent, and the fact
@@ -2187,7 +2188,7 @@ Section CollectAll.
     assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
-    iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C T gd Ok Hgeom
+    iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C T gd Ok Okc Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen HOk
             with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht HT")
       as "(Hdur & Hauth & Ht)".
@@ -2224,15 +2225,15 @@ Section CollectAll.
 
   Lemma fs_snap_law_ghost_build (γ : log_names) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z) (nib : nat)
-      (sb : fs_sb) (T : iProp Σ) (gd : nat) (Ok : app_names -> Prop)
+      (sb : fs_sb) (T : iProp Σ) (gd : nat) (Ok Okc : app_names -> Prop)
       (Hk : iProp Σ -> iProp Σ) :
     γ = icfg_log ->
     nib = icfg_nib ->
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
     Ok app_run ->
-    FsCrash.fs_crash_seam_at app_guest cov ls -∗
-    app_merge_raw app_pred Ok T gd -∗
-    app_sync_run_raw app_pred Ok T Hk -∗
+    FsCrash.fs_crash_seam_at (app_guest Okc) cov ls -∗
+    app_merge_raw app_pred Ok Okc T gd -∗
+    app_sync_run_raw app_pred Ok Okc T Hk -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -2244,7 +2245,7 @@ Section CollectAll.
     iIntros "#Hseam #Hmerge #Hrun #Hireg #Hbm #Hesc #Hpool #Hpark".
     iApply (snap_law_ghost_intro icfg_log γfs cov ls
               ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
-               ∪ ↑icEscN ∪ ↑appN) app_guest T gd Hk with "Hseam").
+               ∪ ↑icEscN ∪ ↑appN) (app_guest Okc) T gd Hk with "Hseam").
     (* [fsbN]: as [fs_snap_law_build] *)
     { assert (Hoth : (↑logN : coPset)
                      ## ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑ipoolN
@@ -2264,7 +2265,7 @@ Section CollectAll.
     assert (Hsn : (↑sbN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hpn : (↑ipoolN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
-    iMod (fs_collect_ghost E cn γfs γi cov ls sb Lb C T gd Ok Hk Qs gt_o n Hgeom
+    iMod (fs_collect_ghost E cn γfs γi cov ls sb Lb C T gd Ok Okc Hk Qs gt_o n Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen Hn HOk
             with "Hmerge Hrun Hireg Hbm Hesc Hpool Hpark [Hb] Ht Hold HT Hsa HQs")
       as "(Hdur & HT & Hsa & HQs & Hauth & Ht)".

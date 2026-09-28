@@ -63,7 +63,7 @@ Require Import LogInv.
 Require Import FsCfg.
 Require Import AppCfg.        (* [appcfg]: the application's record, minted beside [fscfg] *)
 Require Import AppInv.        (* [app_inv_alloc]: the application's invariant, founded here; kit 2's application row *)
-Require Import AppDur.        (* [app_guest]: the guest the kit's crash seam is stated at (round C) *)
+Require Import AppDur.        (* [app_dur_laws]: the kit's crash seam and merge, one row (round C; SY3-A3b) *)
 Require FsAbsDefs.            (* [abs_view]: the application's claim is over the founded map's view (Require, not Import: it re-exports FsState) *)
 Require Import FileInvDefs.   (* the off ledger's boot face (off-ledger ruling) *)
 Require Import FsBoot FsCfgBoot.
@@ -875,9 +875,10 @@ Section SnapMint.
     (* ...the merge, parked in the invariant and handed to fsinit on
        the kit, and the crash seam at the application's guest, handed to
        fsinit on the kit (round C) *)
-    (* ...with the SYNC RUNNER (sync K3-3) in the same package (SY3-A1) *)
-    app_merge (APP := APP) -∗
-    FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
+    (* ...with the SYNC RUNNER (sync K3-3) in the same package (SY3-A1),
+       and the two closed over the guest's durable-copy predicate
+       together, one row (SY3-A3b) *)
+    app_dur_laws (APP := APP) cov (sb_logstart (fss_sb S)) -∗
     (* ---- THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2-4.3):
        the application's opaque durability token for this era, a client
        slot of the fixed record.  Its birth is the log names' birth: it
@@ -933,7 +934,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hstok Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hdurl Hstok Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1357,8 +1358,7 @@ Section SnapMint.
       iSplitR; [iExact "Hbinv" |].
       iSplitL "Hxo"; [iExact "Hxo" |].
       iSplitR; [iExact "Henv" |].
-      iSplitR; [iExact "Hseamg" |].
-      iExact "Hmerge". }
+      iExact "Hdurl". }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

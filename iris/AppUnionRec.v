@@ -168,7 +168,7 @@ Section UnionApp.
           (* the birth keeps the machine's started counter's name (sync
              SY3-A3a, [UnionOut.union_born]); the rest trivial until
              SY3-A3b/c *)
-          app_triv_cls union_born app_triv_ok app_triv_tk app_triv_hk
+          app_triv_cls union_born app_triv_ok app_triv_okc app_triv_tk app_triv_hk
           union_phi.
 
   (* ---- the birth step ---- *)
@@ -331,7 +331,7 @@ Section UnionApp.
   (* ---- the transport, with the first process's boot resource: the
          file application's ---- *)
   Lemma union_al_xfer (c : app_fixed app_union) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_union c) (app_boot app_union c k)
+    ⊢ app_xfer_boot_raw (app_pred app_union c) (app_okc app_union c) (app_boot app_union c k)
         (app_turn app_union c k) (app_turn' app_union c k).
   Proof using .
     cbn [app_union app_fixed app_names app_pred app_boot app_turn app_turn']
@@ -441,8 +441,8 @@ Section UnionLaws.
       intros c k. exact (app_triv_found c k _).
     - intros c h k. by apply app_back_id.
     - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
-    - intros HR c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+    - intros HR c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I | intros; exact Logic.I |].
       exact (union_al_xfer_plain c).
-    - intros HR c k. exact (app_triv_sync_run _ _ c k).
+    - intros HR c k. exact (app_triv_sync_run _ _ _ c k).
   Qed.
 End UnionLaws.

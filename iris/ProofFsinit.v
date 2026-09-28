@@ -577,11 +577,14 @@ Section FsinitMain.
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
       by (rewrite Hbnou; exact H1cov).
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseamg #Hmerge #Hgen #Hcinv
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hdurl #Hgen #Hcinv
               Hmirror Hlfree #Hbinv Hfsb Hxo Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
+    (* the era's durable side, one package at the guest's durable-copy
+       predicate (SY3-A3b): the seam at the guest, and the merge package *)
+    iDestruct "Hdurl" as (Okc) "[#Hseamg #Hmerge]".
     (* the arity-free seam initlog and ireclaim take, off the one at the
        application's guest (round C) *)
     iPoseProof (FsCrash.fs_crash_seam_of_at with "Hseamg") as "#Hseam".
@@ -618,7 +621,7 @@ Section FsinitMain.
       as "#Hlawf".
     { iModIntro. iIntros "#Hpark".
       iApply (fs_snap_law_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib sbrec
-                (riscv_sync_tok gen_id) gen_id Ok eq_refl eq_refl Hcgeom' HOk
+                (riscv_sync_tok gen_id) gen_id Ok Okc eq_refl eq_refl Hcgeom' HOk
                 with "Hseamg Hmergeo Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     (* ...AND THE GHOST COMMIT'S HOOKED LAW (sync K3-3), the same assembly
        over the runner beside the merge, at the era's two fixed-record
@@ -629,7 +632,7 @@ Section FsinitMain.
       as "#Hlawg".
     { iModIntro. iIntros "#Hpark".
       iApply (fs_snap_law_ghost_build icfg_log fsc_ic fsc_fs fsc_ireg fsc_cov
-                fsc_logst icfg_nib sbrec (riscv_sync_tok gen_id) gen_id Ok
+                fsc_logst icfg_nib sbrec (riscv_sync_tok gen_id) gen_id Ok Okc
                 (riscv_sync_hook gen_id) eq_refl eq_refl Hcgeom' HOk
                 with "Hseamg Hmergeo Hrun Hireg' Hbm' Hesc Hpoolinv Hpark"). }
     iAssert (fsi_cont (CID0 := CID)

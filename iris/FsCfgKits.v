@@ -66,7 +66,7 @@ Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
 Require Import AppInv.         (* [app_inv]: kit 2's application row (app-instances.md section 2);
                                   [app_merge]: the merge, kit 2's last row (round C; SY3-K2) *)
-Require Import AppDur.         (* [app_guest]: the guest the crash seam is stated at (round C) *)
+Require Import AppDur.         (* [app_dur_laws]: the crash seam at the guest and the merge, kit 2's last row (round C; SY3-A3b) *)
 Require FsCrash.               (* [fs_crash_seam_at]: the seam at the application's guest,
                                   spelled QUALIFIED -- this file does not want FsCrash's exports *)
 Require Import Xv6G.
@@ -330,14 +330,14 @@ Section FsCfgKits.
         composite crash slot, made only where the fixed record is built
         ([SystemAdequacy]), and the merge is the application's own
         closed lemma.  So both ride this kit from the system theorem down
-        to forkret's fsinit arm ([FirstTok.first_fsinit]).  Persistent;
-        LAST, after the application's invariant. *)
-     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-     (* ...the merge AND THE SYNC RUNNER (sync K3-3), one package at the
-        era's record predicate since SY3-A1: fsinit builds the commit's law
-        and the ghost commit's hooked law from it
-        ([FsCollectAll.fs_snap_law_ghost_build]).  Persistent; LAST. *)
-     AppInv.app_merge (APP := APP))%I.
+        to forkret's fsinit arm ([FirstTok.first_fsinit]).  ...WITH THE
+        SYNC RUNNER (sync K3-3), and ONE ROW since SY3-A3b: the guest is
+        stated at the application's durable-copy predicate, which the merge
+        reads of the old copy, and [appcfg] does not carry it, so the seam
+        and the package are closed over it together
+        ([AppDur.app_dur_laws]).  Persistent; LAST, after the
+        application's invariant. *)
+     app_dur_laws (APP := APP) fsc_cov fsc_logst)%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -362,8 +362,7 @@ Section FsCfgKits.
                    (fs_home_set fsc_cov fsc_logst) Pb ∗
       exc_own (fs_exc fsc_fs) Xexc ∗
       AppInv.app_inv (APP := APP) fsc_fs ∗
-      FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-      AppInv.app_merge (APP := APP).
+      app_dur_laws (APP := APP) fsc_cov fsc_logst.
   Proof using . iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -492,11 +491,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hdurl)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv Hseam Hxfer".
+            Henv Hdurl".
   Qed.
 
   (* ...and the same peel for the equally-persistent BITMAP row, so a
@@ -512,11 +511,11 @@ Section FsCfgKits.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           #Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
+           #Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hdurl)".
     iSplitR; [iExact "Hbmres" |].
     rewrite /fs_kit_fsinit_ghost.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem Hbinv Hxo
-            Henv Hseam Hxfer".
+            Henv Hdurl".
   Qed.
 
 End FsCfgKits.

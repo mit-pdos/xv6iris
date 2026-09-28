@@ -592,6 +592,34 @@ merge also needs the old copy's `fn_role r_o = true`, which
 `app_merge_raw`'s `▷ ∃ r_o av_o, A r_o av_o` does not supply (A3b/c:
 guard the slot's instance, or make the union's claim role-blind there).
 
+**As built (A3b, first half: the copy predicate and the round position's
+pieces; branch `sync3-a3b`).**  `AppDur.app_dur_raw A Okc gt := ∃ r I,
+⌜Okc r⌝ ∗ ghost_map_auth gt ½ I ∗ A r (abs_view I)`; `app_guest Okc`.
+`AppInv.app_merge_raw A Ok Okc T gd`: the wand's old copy is `▷ ∃ r_o
+av_o, ⌜Okc r_o⌝ ∗ A r_o av_o` and the new record satisfies BOTH `Ok` and
+`Okc` (the runner still needs its era).  `app_sync_run_raw A Ok Okc T
+Hk` takes `⌜Okc r'⌝` of the new copy (a hook must know which instance is
+the copy; `UnionSync.union_hk` gains `⌜fn_role r' = true⌝`).  `appcfg`
+does not carry `Okc`, so the crash seam at the guest and the merge
+package (`AppInv.app_merge Okc`) are closed over ONE existential `Okc`
+as kit 2's single last row, `AppDur.app_dur_laws cov ls` (was two rows).
+`App.app_okc` (landed applications `app_triv_okc`); the transport
+`app_xfer_boot_raw A Okc B Tn Tn'` takes `⌜Okc r⌝` of the slot's copy and
+returns `⌜Okc r_s⌝`; `Happ_init` yields `⌜Okc r⌝`
+(`App.app_init_of_valid_okc` for a total one); `xv6_slot N A Okc ...`.
+The position: `file_names.fn_pos`, `AppFile.fpos r n` (a half, at echo's
+`ghost_varG nat` -- every holder names it through `fpos`, never a bare
+`ghost_var`, since sh's scope has several `ghost_varG nat`),
+`fnames_alloc … n0` mints both halves; in `UnionSync` (camera an explicit
+`HPos`, as `HSt`) the running arm of `sync_role` carries `∃ n, spos r n ∗
+⌜∀ rec ∈ Ls, rec.1 ≤ n⌝`; `union_hook_closes`/`sync_claim_redir_step`
+take the holder's `spos r n` with `n = length ls'` (resp. `length ls_w`)
+and return it; `sync_claim_rebase` founds a FRESH position (`fn_with_pos
+… γp`) at the copy's `length ls` and hands its other half out.  OPEN
+(the rest of A3b, blocked, see the project file): `file_pred` cannot
+contain `sync_claim` as stated -- it is over `file_fixed`, below
+`UnionOut`/`UnionSync`, and `sync_claim` needs `union_gn` and `HSt`.
+
 **Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
 `al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
 birth's slot part and its gnames; the transport's

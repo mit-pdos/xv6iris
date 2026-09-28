@@ -1466,7 +1466,7 @@ Section EchoApp.
           (* the turn, the same at all three stages: no sync ledger
              (sync SY3-A1) *)
           echo_turn echo_turn echo_turn echo_turn
-          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+          app_triv_cls app_triv_born app_triv_ok app_triv_okc app_triv_tk app_triv_hk
           echo_phi.
 
   (* ---- THE BIRTH STEP ---- *)
@@ -1667,7 +1667,7 @@ Section EchoApp.
   (* ...at the identity on the turn, the slot keeping its copy (sync
      SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
   Lemma echo_Happ_boot (c : app_fixed app_echo) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_boot app_echo c k)
+    ⊢ app_xfer_boot_raw (app_pred app_echo c) (app_okc app_echo c) (app_boot app_echo c k)
         (app_turn app_echo c k) (app_turn' app_echo c k).
   Proof using .
     cbn [app_echo app_fixed app_names app_pred app_boot app_turn app_turn']

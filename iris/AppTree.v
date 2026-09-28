@@ -2564,7 +2564,7 @@ Section AppTreeRecord.
           (fun c _ => tree_turn c)           (* app_turn' *)
           (fun c _ => tree_turn c)           (* app_turn'' *)
           (fun c _ => tree_turn c)           (* app_iturn *)
-          app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+          app_triv_cls app_triv_born app_triv_ok app_triv_okc app_triv_tk app_triv_hk
           (fun _ _ => True).                 (* app_phi *)
 
   (* ---- the obligations of [App.xv6_app_adequacy] that are lemmas ---- *)
@@ -2653,7 +2653,7 @@ Section AppTreeRecord.
   (* ...at the identity on the turn, the slot keeping its copy (sync
      SY3-A1: [SystemAdequacy.app_xfer_boot_raw_of_clone]) *)
   Lemma app_tree_boot (c : app_fixed app_tree) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred app_tree c) (app_boot app_tree c k)
+    ⊢ app_xfer_boot_raw (app_pred app_tree c) (app_okc app_tree c) (app_boot app_tree c k)
         (app_turn app_tree c k) (app_turn' app_tree c k).
   Proof using .
     cbn [app_tree app_pred app_boot app_turn app_turn']. rewrite /tree_boot.

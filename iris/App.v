@@ -227,6 +227,14 @@ Record xv6_app (Σ : gFunctors) := MkApp {
      the sync runner are stated at it.  [app_triv_ok] for an application
      that says nothing. *)
   app_ok    : app_fixed -> nat -> app_names -> Prop;
+  (* THE DURABLE-COPY PREDICATE (sync SY3-A3b, design/sync.md §4.5 "The
+     copy predicate"): what every record the crash slot holds satisfies
+     ([AppDur.app_dur_raw]) -- era 0's, the PowerOn transport's repacked
+     copy, each commit's new copy -- and what the merge's wand reads of the
+     old copy.  For an application whose claim cannot tell a durable copy
+     from a running one by its ghost state (the union's role field).
+     [app_triv_okc] for an application that says nothing. *)
+  app_okc   : app_fixed -> app_names -> Prop;
   (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): the era's
      opaque TOKEN, which the log invariant holds while no commit is in
      flight and the merge pins the running claim against the old copy
@@ -241,7 +249,7 @@ Record xv6_app (Σ : gFunctors) := MkApp {
   (* the conclusion, over the operational state and the run's trace *)
   app_phi   : gstate -> list mobs -> Prop;
 }.
-Arguments MkApp {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
+Arguments MkApp {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
 Arguments app_fixed {Σ} _. Arguments app_cl {Σ} _ _.
 Arguments app_names {Σ} _. Arguments app_pred {Σ} _ _ _ _.
 Arguments app_boot {Σ} _ _ _ _.
@@ -250,7 +258,7 @@ Arguments app_turn {Σ} _ _ _.
 Arguments app_turn' {Σ} _ _ _. Arguments app_turn'' {Σ} _ _ _.
 Arguments app_iturn {Σ} _ _ _.
 Arguments app_cls {Σ} _ _. Arguments app_born {Σ} _ _ _ _ _ _.
-Arguments app_ok {Σ} _ _ _ _.
+Arguments app_ok {Σ} _ _ _ _. Arguments app_okc {Σ} _ _ _.
 Arguments app_tk {Σ} _ _ _. Arguments app_hk {Σ} _ _ _ _.
 
 (* the interface's three components, as projections: every site that named
@@ -296,7 +304,7 @@ Definition app_triv (Σ : gFunctors) : xv6_app Σ :=
         (* no sync ledger: nothing for the crash slot at birth, nothing
            kept of the machine's names, no record predicate, the trivial
            token and hooks (sync SY3-A1) *)
-        app_triv_cls app_triv_born app_triv_ok app_triv_tk app_triv_hk
+        app_triv_cls app_triv_born app_triv_ok app_triv_okc app_triv_tk app_triv_hk
         (fun _ _ => True).
 
 (* A LANDED APPLICATION WITH NOTHING FOR THE CRASH SLOT AT BIRTH (sync
@@ -330,6 +338,19 @@ Lemma app_init_of_valid {Σ} (A : xv6_app Σ) (P : app_fixed A -> iProp Σ) :
   (forall c : app_fixed A, ⊢ P c) ->
   forall c : app_fixed A, app_cls A c ⊢ P c.
 Proof. intros HP c. iIntros "_". iApply HP. Qed.
+
+(* ...at an application whose durable-copy predicate holds of every record
+   (sync SY3-A3b): its era-0 claim, founded without the birth's slot part,
+   satisfies it outright *)
+Lemma app_init_of_valid_okc {Σ} (A : xv6_app Σ) (av : aview) :
+  (forall (c : app_fixed A) (r : app_names A), app_okc A c r) ->
+  (forall c : app_fixed A, ⊢ |==> ∃ r : app_names A, app_pred A c r av) ->
+  forall c : app_fixed A,
+    app_cls A c ⊢ |==> ∃ r : app_names A, ⌜app_okc A c r⌝ ∗ app_pred A c r av.
+Proof.
+  intros Hok HP c. iIntros "_". iMod (HP c) as (r) "Hp". iModIntro.
+  iExists r. iFrame "Hp". iPureIntro. apply Hok.
+Qed.
 
 (* ====================================================================== *)
 (*  WHAT AN APPLICATION OWES (post-qed-redesign §3.2, R4).                 *)
@@ -459,7 +480,7 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
   (* THE POWER-ON TRANSPORT, lent the era's turn and handing on the boot's
      (sync SY3-A1; [SystemAdequacy.app_xfer_boot_raw]) *)
   al_xfer : forall (c : app_fixed A) (k : nat),
-       ⊢ app_xfer_boot_raw (app_pred A c) (app_boot A c k)
+       ⊢ app_xfer_boot_raw (app_pred A c) (app_okc A c) (app_boot A c k)
            (app_turn A c k) (app_turn' A c k);
   al_programs :
        forall (HR : riscvGS Σ) (GEN : GenId)
@@ -543,11 +564,12 @@ Class xv6_app_laws (A : xv6_app Σ) := MkAppLaws {
          (@riscv_swap_name Σ (@riscv_fixedGS Σ HR))
          (@riscv_registry_name Σ (@riscv_fixedGS Σ HR))
          (@riscv_start_name Σ (@riscv_fixedGS Σ HR)) c ->
-       ⊢ app_merge_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k) k;
+       ⊢ app_merge_raw (app_pred A c) (app_ok A c (S k)) (app_okc A c)
+           (app_tk A c k) k;
   (* THE SYNC RUNNER (K3-3): the one place a hook's meaning is used *)
   al_sync_run : forall (HR : riscvGS Σ) (c : app_fixed A) (k : nat),
-       ⊢ app_sync_run_raw (app_pred A c) (app_ok A c (S k)) (app_tk A c k)
-           (app_hk A c k);
+       ⊢ app_sync_run_raw (app_pred A c) (app_ok A c (S k)) (app_okc A c)
+           (app_tk A c k) (app_hk A c k);
 }.
 End AppLaws.
 
@@ -575,7 +597,7 @@ Theorem xv6_app_adequacy Σ
     `{AL : !xv6_app_laws A}
     (* ...founded out of the birth's crash-slot part (sync SY3-A1) *)
     (Happ_init : forall c : app_fixed A,
-       app_cls A c ⊢ |==> ∃ r : app_names A,
+       app_cls A c ⊢ |==> ∃ r : app_names A, ⌜app_okc A c r⌝ ∗
            app_pred A c r (abs_view (fss_inodes (FsDurImg.img_state
               (fs_blocks (v_disk (g.(gdev).(dvirtio)))) sb nib))))
     (* ...and THE FIRST PROCESS'S EXEC BUNDLE (ARM-c): the one thing the
@@ -589,14 +611,14 @@ Theorem xv6_app_adequacy Σ
                    (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-               (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
+               (xv6_slot (app_names A) (app_pred A) (app_okc A) cov (FsImg.sb_logstart sb)
                   γd γsw γreg γstart c)
                (app_tk A c) (app_hk A c)
                γobs T (obs_ledger_at (app_R A c) γobs) γhist
                (app_ifc A c)
                (app_fixed A) c) g' -∗
          ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
-         ▷ xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
+         ▷ xv6_slot (app_names A) (app_pred A) (app_okc A) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
          ▷ obs_ledger_at (app_R A c) γobs -∗
          ◇ ⌜app_phi A g' h⌝)
@@ -616,7 +638,7 @@ Proof.
               (c : app_fixed A) (T : list mobs),
          riscv_fixedGS =
            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-             (xv6_slot (app_names A) (app_pred A) cov (FsImg.sb_logstart sb)
+             (xv6_slot (app_names A) (app_pred A) (app_okc A) cov (FsImg.sb_logstart sb)
                 γd γsw γreg γstart c)
              (app_tk A c) (app_hk A c)
              γobs T (obs_ledger_at (app_R A c) γobs) γhist
@@ -634,7 +656,7 @@ Proof.
       rewrite Heq; reflexivity. }
   exact (xv6_power_adequacy_gen Σ g sb nib cov
            (app_fixed A) (app_cls A) (app_cl A) (app_born A) al_birth
-           (app_names A) (app_pred A) (app_boot A)
+           (app_names A) (app_pred A) (app_boot A) (app_okc A)
            (app_ifc A)
            (app_turn A) (app_turn' A) (app_turn'' A) (app_iturn A)
            (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2), off the
@@ -685,7 +707,8 @@ Section AppTriv.
   (* the transport: a predicate that holds of every view is its own copy,
      and the generic application hands its first process nothing *)
   Lemma app_triv_xfer (c : app_fixed (app_triv Σ)) (k : nat) :
-    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_boot (app_triv Σ) c k)
+    ⊢ app_xfer_boot_raw (app_pred (app_triv Σ) c) (app_okc (app_triv Σ) c)
+        (app_boot (app_triv Σ) c k)
         (app_turn (app_triv Σ) c k) (app_turn' (app_triv Σ) c k).
   Proof using .
     cbn [app_triv app_pred app_boot app_turn app_turn'].
@@ -696,9 +719,9 @@ Section AppTriv.
   Lemma app_triv_merge `{!riscvFixedGS Σ} (c : app_fixed (app_triv Σ))
       (k : nat) :
     ⊢ app_merge_raw (app_pred (app_triv Σ) c) (app_ok (app_triv Σ) c (S k))
-        (app_tk (app_triv Σ) c k) k.
+        (app_okc (app_triv Σ) c) (app_tk (app_triv Σ) c k) k.
   Proof using .
-    apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+    apply app_merge_raw_of_xfer; [intros; exact Logic.I | intros; exact Logic.I |].
     cbn [app_triv app_pred].
     apply app_xfer_raw_triv. intros r av. reflexivity.
   Qed.
@@ -706,10 +729,11 @@ Section AppTriv.
   (* era 0: the claim at any view, at the one instance *)
   Lemma app_triv_init (c : app_fixed (app_triv Σ)) (av : aview) :
     app_cls (app_triv Σ) c ⊢
-      |==> ∃ r : app_names (app_triv Σ), app_pred (app_triv Σ) c r av.
+      |==> ∃ r : app_names (app_triv Σ), ⌜app_okc (app_triv Σ) c r⌝ ∗
+             app_pred (app_triv Σ) c r av.
   Proof using .
-    iIntros "_". iModIntro. cbn [app_triv app_names app_pred].
-    iExists (). iPureIntro. exact Logic.I.
+    iIntros "_". iModIntro. cbn [app_triv app_names app_pred app_okc].
+    iExists (). iSplit; iPureIntro; exact Logic.I.
   Qed.
 
   (* THE FIRST PROCESS'S EXEC BUNDLE: the generic application's predicate
@@ -800,7 +824,7 @@ Section AppTriv.
     - intros c h k. by apply app_back_id.
     - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
     - intros HR c k _ _. exact (app_triv_merge c k).
-    - intros HR c k. exact (app_triv_sync_run _ _ c k).
+    - intros HR c k. exact (app_triv_sync_run _ _ _ c k).
   Qed.
 End AppTriv.
 

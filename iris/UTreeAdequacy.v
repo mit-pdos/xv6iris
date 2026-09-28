@@ -185,9 +185,9 @@ Section TreeAdequacy.
     - intros c h k. by apply app_back_id.
     - intros c k r. iIntros "_". iPureIntro. exact Logic.I.
     - (* the merge: the plain transport's (SY3-K2) *)
-      intros HRg c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I |].
+      intros HRg c k _ _. apply app_merge_raw_of_xfer; [intros; exact Logic.I | intros; exact Logic.I |].
       exact (app_tree_xfer c).
-    - intros HRg c k. exact (app_triv_sync_run _ _ c k).
+    - intros HRg c k. exact (app_triv_sync_run _ _ _ c k).
   Qed.
 
   (* =================================================================== *)
@@ -213,7 +213,8 @@ Section TreeAdequacy.
        elaborator unify each against a record field whose type it is still
        solving. *)
     refine (xv6_app_adequacy Σ g sb nib cov app_tree
-              (app_init_of_valid _ _ (tree_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
+              (app_init_of_valid_okc app_tree _ (fun _ _ => Logic.I)
+                 (tree_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
               _ Hgen0 Hpow0 Himg n κs t2 g2 Hn).
     (* [Hphi]: the conclusion is [True] -- see the header for why it is not
        a placeholder *)
