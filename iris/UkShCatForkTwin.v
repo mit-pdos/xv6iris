@@ -4,12 +4,14 @@
 (*  'Dispatch').                                                           *)
 (*                                                                        *)
 (*  [UkShRedirBody.wp_kshm_body_cat] is the [cd] test's two instructions  *)
-(*  in front of the fork, and its ONE fork call is now a parameter        *)
-(*  ([UkShRedirBody.kshf_fork_law], [wp_kshm_body_cat_with]).  This is    *)
-(*  that walk at the pipe era's fork twin                                 *)
+(*  in front of the fork, and its ONE fork call is a parameter            *)
+(*  ([UkShRedirBody.kshf_fork_law], [wp_kshm_body_ca_with]).  This file   *)
+(*  is that law at the pipe era's fork twin                               *)
 (*  [UkShPipeForkTwin.wp_kshf_fork_pipe], whose credential need not be    *)
-(*  timeless -- the union's widened credential is not.  Nothing of the   *)
-(*  body is copied.                                                       *)
+(*  timeless -- the union's widened credential is not.  The cat body      *)
+(*  walk at it is [UkShShape.ushf_body_law_of_mod]'s [HeadCA] arm         *)
+(*  (design/shape-modules.md); the per-shape wrappers that used to live   *)
+(*  here went with the round's dispatch.                                  *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -73,69 +75,5 @@ Section UkShCatForkTwin.
     exact (UkShPipeForkTwin.wp_kshf_fork_pipe N γp T Wc Wb Pm Hpsok_free).
   Qed.
 
-  Lemma wp_kshm_body_cat_pipe
-      (Dc : nat) (nm : list (bv 8))
-      (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
-      (sz : Z) (l : list fdstate) (n : nat) :
-    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
-    UkSh.ush_regs m ->
-    m !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (sh_buf + Z.of_nat k) ->
-    m !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int (bv_unsigned (f k)) ->
-    (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
-    f (k + len)%nat = ubyte0 ->
-    (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at (FileDisc.LCat nm) f k len ->
-    8344 <= sz ->
-    UserPtTree.pgroundup sz = sz ->
-    usz_ok (sz + 65536) ->
-    (forall n' : nat,
-       ⊢ UkSh.ush_at N γp n' -∗
-         ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
-    (forall I : list (bv 8),
-       ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    UkSh.ush_gen_slot N T -∗
-    UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
-    UCodeShK.shk_code γt -∗
-    UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
-    UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at T Wc UkShRedirBody.ushs_lp_cat Dc -∗
-    UkShDiag.ush_panic_law Wc Wb -∗
-    ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
-    UkShLoop.ushl_dat γd -∗ usz γs sz -∗
-    ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
-    mWP (Loop : expr riscv_lang).
-  Proof using HT Hpay Hpsok_free.
-    exact (UkShRedirBody.wp_kshm_body_cat_with N γp T Wc Wb Pm kshf_fork_law_pipe
-             Dc nm h m f k len sz l n).
-  Qed.
 
-  (* ...as the body law at the cat line *)
-  Lemma ushf_body_law_cat_pipe (sz : Z) :
-    8344 <= sz ->
-    UserPtTree.pgroundup sz = sz ->
-    usz_ok (sz + 65536) ->
-    UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at T Wc UkShRedirBody.ushs_lp_cat 68 -∗
-    UkShDiag.ush_panic_law Wc Wb -∗
-    UkShFork.ushf_body_law N γp T Wc Wb Pm
-      (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
-  Proof using HT Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok.
-    iIntros "#Hkl #Hchl #Hplaw".
-    rewrite /UkShFork.ushf_body_law.
-    iIntros "!>" (lu h m f k len l n)
-      "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
-       #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct Hd as [nm ->].
-    iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
-    iApply (wp_kshm_body_cat_pipe 68 nm h m f k len sz l n ltac:(lia)
-              Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat Hszlo Hszal Hszok
-              Hpm1 Hpmwb
-              with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
-                    Hdat Hsz Hbuf Hrun").
-    - iApply (UkShFork.ushf_code_shp with "Hcode").
-    - exact Hfd0.
-  Qed.
 End UkShCatForkTwin.

@@ -277,6 +277,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   model, the generic families and the generic claim, then the union as a
   listing); §5 the endpoint proposal, superseded by `program-specs.md`.
 
+- **[`shape-modules.md`](design/shape-modules.md)** — PROPOSAL (2026-09-27):
+  the shell round over a LIST of line-shape modules (a record per
+  constructor family: the line predicate, the first-byte class, the child
+  law), the body law folded over the list, one file per shape; the last
+  copy axis user-once left.  Rulings R1-R5 pending.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

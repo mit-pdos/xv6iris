@@ -1,9 +1,10 @@
 # Worklist: user-once — the parser as a refinement, `fd_stream`, the program-generic exec
 
 Design of record: [`../design/user-once.md`](../design/user-once.md)
-(PROPOSAL 2026-09-23; awaiting the owner's ruling).  Nothing built yet.
-Sits UNDER [`app-both.md`](app-both.md): A and C are independent of it, B's
-console instance waits for its M3.
+(proposed 2026-09-23; ruled and built 2026-09-23..27).  STATUS: COMPLETE
+(2026-09-27) -- lanes A, C and B all landed; see the RESUME block at the
+end.  It sat UNDER [`app-both.md`](app-both.md), whose successor is
+[`../design/program-specs.md`](../design/program-specs.md).
 
 ## Rules
 

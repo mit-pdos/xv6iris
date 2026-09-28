@@ -1765,7 +1765,13 @@ UkUnionEntries.v
 UShFileRedir.v
 UShURoundDefs.v
 UkShCatForkTwin.v
-UShURound.v
+UkShShape.v
+UShUModBase.v
+UShUModSync.v
+UShUModSecc.v
+UShUModCat.v
+UShUModRedir.v
+UShUModEcho.v
 UShURoundShapes.v
 UShUPipes.v
 UnionReadInstAt.v

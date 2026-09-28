@@ -1853,7 +1853,7 @@ never a member class.  Lane seccomp S5b.
 
 ## An `_` argument to a lemma in a section without its class binder elaborates at a searched instance, and never finishes (2026-09-26)
 
-`UShURound.usecc_execfail_law` applied `UShPanic.ksh_w1_of_step N _ _ …`
+`UShUModSecc.usecc_execfail_law` (then `UShURound.usecc_execfail_law`) applied `UShPanic.ksh_w1_of_step N _ _ …`
 (sh's one-byte write stub) in a section with no `ghost_varG Σ Z` binder.
 Elaboration took a typeclass-found `ghost_varG` instance with the
 families as evars and sat at a flat 2.5 GB without returning; with the
