@@ -548,6 +548,34 @@ its `r'` satisfies `Okc`; the transport's slot output `r_s` and
 `Happ_init`'s `r` satisfy it.  Generic, small: `AppDur`, the seam's `G`,
 `FsCollectAll`'s builders, `SystemAdequacy`'s slot.
 
+**Three rulings after A3b's first half** (2026-09-27).  (i) THE SYNC
+GHOST STATE BELONGS TO THE FILE APPLICATION, not the union wrapper:
+`file_fixed` becomes a record (`ff_echo`, `ff_fl` -- the line list, today
+`.2` -- `ff_reg`, `ff_cm`, `ff_st`), `union_gn` loses A3a's three fields,
+and `sync_claim`/`union_tk`/`union_hk`/`sync_chain` and the closure
+lemmas move from `UnionSync.v` into `AppFile.v` (or a file `AppFile`
+imports; `UnionAdm` is pure and already below it), stated over
+`file_fixed`; `file_pred`'s non-taint arm then contains `sync_claim c r
+av` DIRECTLY, with no new parameter and no arity change.  The counters'
+and the position's camera instances are NON-INSTANCE fields of
+`fileAppG` (`fa_st : mono_natG Σ`, `fa_pos : ghost_varG Σ nat`, single
+colon, used with explicit `@`, never resolved), and the union's top
+theorem BUILDS its `fileAppG` with `fa_st := riscv_pre_genGS` so the copy's
+`◯ ugn_st k` is at the machine's instance by construction (A1's equation
+`riscvF_genGS = riscv_pre_genGS` is the bridge to the ambient one).  (ii)
+SH'S LINE WITNESS names the round's line: `FileLinksLine.flw I := ∃ ls0,
+fl_lb (ls0 ++ ulines_in I)` -- the ledger's list as of the cycle's last
+newline, which the rx tag already carries; the round position is that
+list's length and its last element is the round's line (membership of
+every redirect line follows).  (iii) THE TRANSPORT takes the started-auth
+loan (`app_xfer_boot_raw A Okc B Tn Tn' γst gen := □ ∀ r av n, ⌜n = gen +
+1⌝ -∗ mono_nat_auth_own γst 1 n -∗ Tn -∗ ▷ A r av ==∗ mono_nat_auth_own
+γst 1 n ∗ Tn' ∗ …`, `Hswap` has it), and the union's `app_turn c (S gen)`
+carries the on-arm's sync yield (`S gen ↪□ γ`, `sl_auth γ 1 []`, the
+floor); so the claim-in-`file_pred` sweep, the union's laws, the ledger's
+on-arm/registry/floor/return hook, the transport, the founding and the
+birth are ONE lane (A3bc): they cannot be landed apart at the transport.
+
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
 persistent seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted

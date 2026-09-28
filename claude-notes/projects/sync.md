@@ -41,7 +41,7 @@ Open cleanups it left, none blocking:
   `AppDur.app_dur_raw_merge`; every application derives the merge from its
   transport at `SystemAdequacy`'s call of `xv6_boot_era` (`Happ_merge`)).
   Merged at `966c6d815`; whole tree green, audits 13/13/14.
-- SY3-A3b FIRST HALF on branch `sync3-a3b` (not on main): steps 1 (the
+- SY3-A3b FIRST HALF ON MAIN (`25bde8083`): steps 1 (the
   copy predicate `Okc` through `AppDur`/`AppInv`/`App`/the kit/the slot;
   kit 2's seam and merge rows are ONE row `app_dur_laws`) and 2's
   position pieces (`fn_pos`, `fpos`, `fnames_alloc`, `UnionSync`'s
@@ -149,7 +149,11 @@ the conclusion, and that filing, is A4's.  A3a DONE on branch
 cameras, the claim, token and hook, the five closure lemmas; merge,
 re-base and birth close; the hook and the redirect step need a POSITION
 premise (the open point, with the cursor candidate, is in the design);
-the old copy's role in the merge is A3b/c's.  A3b, A3c, A4 next.
+the old copy's role in the merge is A3b/c's.  RULED after A3b's first
+half (design §4.5 "Three rulings"): the sync state moves into
+`file_fixed`/`AppFile`, `flw I` names the round's line, the transport
+takes the loan and the turn's sync yield; A3b's second half and A3c are
+ONE lane A3bc, in flight (branch `sync3-a3bc`, `/shared/xv6iris-3k`).
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
@@ -489,33 +493,44 @@ unchanged at every landing (the theorem keeps `union_phi` until A4).
   the loan ⊢ the new copy at `Ok`, the token, the loan) and
   `union_hook_closes` (guest and running claim at `Ok`, the token, sh's
   lend ⊢ the same and `Q`) -- then `al_merge`, `al_sync_run`.
-- A3b (after A3a; design §4.5 "The round position" and "The copy
-  predicate"): `AppDur.app_dur_raw A Okc gt` with `App.app_okc` (trivial
-  `True`; the union's `fn_role r = true`) through the seam, the builders
-  and the slot; `file_names.fn_pos` with `AppFile.file_pos_advance`;
-  `sync_claim` gains the position half and `⌜∀ rec ∈ Ls, rec.1 ≤ n⌝`, and
-  `UnionSync`'s hook/redirect lemmas take the deed holder's half instead
-  of the pure premise; `file_pred`'s non-taint arm gains `sync_claim`
-  (LAST, so patterns gain one name); the sweep: every opener of
-  `file_pred`/`f_state` (AppFile's step wands, `file_resync`, the escrow
-  laws, FileOpen, FileWrite, UkFileOpen, the transports, `file_init`) --
-  the redirect steps use `sync_claim_redir_step` with the deed's half;
-  sh's `ush_deed_at` gains the position half (`UShURoundDefs`) and every
-  round advances it (`UShURound*`); the union's `app_ok`/`app_tk`/`app_hk`
-  and the laws `al_merge` (from `union_merge_closes`) and `al_sync_run`
-  (from `union_hook_closes`, taking the position from the lend -- at this
-  lane the union's hook is stated but `usync_exec_sup` still passes
-  `None`).  Green with `union_adequacy_closed` unchanged.
-- A3c: the `file_pred` opener sweep (every `f_state` destructure in
-  `FileOpen`, `FileWrite`, `UkFileOpen`, …: the sync conjunct LAST so each
-  pattern gains one name; the file steps keep the witness by
-  `uadm_ustep`).
-Risks: R5 (the count `Hswap` lends is the new era's `gen + 1`), R6
-(`file_pred` stays Timeless), R7 (the transport's `▷`: the sync part is
-timeless and comes out of the later; the claim stays under it), R8 (the
-started counter's `mono_natG` instance at the raw gname `ugn_st` must be
-the ambient one -- A1's equation device).
-
+- A3bc (after A3b's first half; design §4.5 "Three rulings", "The round
+  position", "The copy predicate", "PowerOn", "Birth", "The ledger"):
+  1. RELAYERING: `file_fixed` a record with `ff_reg`/`ff_cm`/`ff_st`;
+     `union_gn` loses them; `UnionSync.v`'s definitions and lemmas move
+     into `AppFile.v` over `file_fixed` (delete `UnionSync.v`); `fileAppG`
+     gains the non-instance camera fields `fa_st`, `fa_pos`; the union's
+     `unionΣ`/`fileAppG` instance built with `fa_st := riscv_pre_genGS`
+     (UUnionBootAdequacy); `union_born`: `ff_st (fgn_cl (ugn_file c)) =
+     γst`.
+  2. `file_pred`'s non-taint arm gains `sync_claim c r av` LAST; the
+     opener sweep (AppFile's step wands, `file_resync`, the escrow laws,
+     FileOpen, FileWrite, FileWritePart, UkFileOpen, UShFileRedir, the
+     console files that move `av` -- `AppFileCons`, `UInitConsFile`,
+     `UInitFileLeaves`, `UkFileDev`, `UEchoFile` -- each re-closing the
+     sync part: unchanged when `fcont_of av` is unchanged (a lemma
+     `sync_claim_same`), `sync_claim_redir_step` with the writer's
+     position half at a redirect step, dropped under the taint);
+     `file_pos_advance`.
+  3. `flw I := ∃ ls0, fl_lb (ls0 ++ ulines_in I)` (FileLinksLine; the tag's
+     lb is it); `ush_deed_at` gains `fpos r (length …)` in every state;
+     every round advances it at its start.
+  4. The union's `app_ok`/`app_tk`/`app_hk`/`app_okc`; `al_merge` from
+     `union_merge_closes` (the taint arms: a tainted old copy or running
+     claim yields a tainted new copy, the token returned), `al_sync_run`
+     applies the hook, `al_boot_ok`.
+  5. The ledger: `union_led` gains the registry's auth, the era counter's
+     lb bookkeeping, the floor `(γs_F, F)`; the on-arm allocates and
+     registers `γs` and yields `union_turn c (S gen)` (= the old `fturn`
+     ∗ the sync yield); `al_back` takes the transport's return
+     (`◯⊒_γ Ls_c`, `◯ ugn_cm (S gen)`, pure `Ls_c`) and sets the floor;
+     `union_turn'`/`union_turn''`/`union_iturn` accordingly.
+  6. The transport `app_xfer_boot_raw` with the loan; `file_xfer_boot`
+     re-bases (`sync_claim_rebase`), founds the running position, hands
+     the deed holder's position half and the boot fact in `B r'`;
+     `al_found` mints the token; `al_cls`/`file_init`/`Happ_init` at
+     `sync_claim_birth`; `app_born`.
+  Green with `union_adequacy_closed` unchanged and `usync_exec_sup` at
+  `None`.  Risks R5-R8 as before.
 #### A4 -- sh's sync round and the theorem's witness (after A3)
 
 The hook seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted at
