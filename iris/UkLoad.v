@@ -355,7 +355,6 @@ Section UkLoadPostFetch.
     ud_um pt !! svpn_of va = Some w_ld ->
     uleaf_ok (Load Data) w_ld ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     uM_bytes Mp (uint va) (Z.to_nat kk) dv ->
     ~ uva_text pt (uint va) ->
@@ -401,9 +400,10 @@ Section UkLoadPostFetch.
       (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
                         uv_step_post C R rsE (Step_Execute (r, ib'))) ib).
   Proof using .
-    intros Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hpg Hal Hbw Hntx Hinj
+    intros Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hal Hbw Hntx Hinj
       Hpins2 Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2 Lmie2 Lmdl2 Lmedl2 Lmenv2
       Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2 Lmi2 Hagd2 Htok' Hpure.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     destruct Hkw as (Hvw & Hread_plain).
     pose proof (vmem_width_pos kk Hvw) as Hk.
     pose proof (vmem_width_le8 kk Hvw) as Hk8.
@@ -978,7 +978,6 @@ Section UkLoadObl.
     (u_fault_flavor (Load Data) (ud_tfp pt) (ud_um pt) va ->
      ⊢ (app_taint : iProp Σ)) ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
@@ -1000,7 +999,8 @@ Section UkLoadObl.
          (fun _ : ext_fetch_addr_error => False)).
   Proof using .
     intros Hpre Hpure Hdec Hkw Hred Hg1 Hexp Hrd
-      Hva Hwval Hdisp Hkcf Hcanon Hpg Hal.
+      Hva Hwval Hdisp Hkcf Hcanon Hal.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
@@ -1053,7 +1053,7 @@ Section UkLoadObl.
     - iApply (uk_load_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm lr1 lrd
                 is_unsigned w_ld va wval dv (zero_extend' 32 w) t' usatp pcfg
                 paddr rs1 rs2 fdv cw gn cs pidv
-                Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hpg Hal Hbw Hntx Hinj
+                Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hal Hbw Hntx Hinj
                 Hpins2
                 (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
                 (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1135,7 +1135,6 @@ Section UkLoadObl.
     (u_fault_flavor (Load Data) (ud_tfp pt) (ud_um pt) va ->
      ⊢ (app_taint : iProp Σ)) ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
@@ -1157,7 +1156,8 @@ Section UkLoadObl.
          (fun _ : ext_fetch_addr_error => False)).
   Proof using .
     intros Hpre Hpure Hdec Hkw Hred Hg1 Hexp Hrd
-      Hva Hwval Hdisp Hkcf Hcanon Hpg Hal.
+      Hva Hwval Hdisp Hkcf Hcanon Hal.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
@@ -1215,7 +1215,7 @@ Section UkLoadObl.
     - iApply (uk_load_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm lr1 lrd
                 is_unsigned w_ld va wval dv (zero_extend' 32 h) t' usatp pcfg
                 paddr rs1 rs2 fdv cw gn cs pidv
-                Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hpg Hal Hbw Hntx Hinj
+                Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hal Hbw Hntx Hinj
                 Hpins2
                 (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
                 (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1331,7 +1331,6 @@ Section UkLoad.
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1341,7 +1340,8 @@ Section UkLoad.
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
+    intros Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hal HMb Hwval.
+    pose proof (uinpage_of_aligned va k (proj1 Hkw) Hal) as Hpg.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
@@ -1450,12 +1450,12 @@ Section UkLoad.
     - iDestruct "Hf" as (h) "[[%HisRVC %Hdecrvc] Hbridge]".
       iApply (uk_load_obl_rvc C' pt' Rfd' R Rut' sz π M Mp' m pc h i o k imm rs1 rd
                 is_unsigned va wval _ t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv Hpre Hpure
-                Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hdecrvc Hkw Hred Hg1 Hexp Hrd Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
     - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
       iApply (uk_load_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm rs1 rd
                 is_unsigned va wval _ t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv Hpre Hpure
-                Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
@@ -1478,7 +1478,6 @@ Section UkLoad.
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1488,10 +1487,11 @@ Section UkLoad.
         (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
+    intros Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hal HMb Hwval.
+    pose proof (uinpage_of_aligned va k (proj1 Hkw) Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load_later M m pc fdv cw gn cs pidv is_rvc i o imm rs1 rd is_unsigned k va wval
-              Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval
+              Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hkok Hcanon Hal HMb Hwval
               with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
   Qed.
@@ -1509,7 +1509,6 @@ Section UkLoad.
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1518,13 +1517,14 @@ Section UkLoad.
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
+    intros Hui Hrd Hva Hkok Hcanon Hal HMb Hwval.
+    pose proof (uinpage_aligned8 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv false
               (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) None
               imm rs1 rd false 8 va wval
               uload_width_8 Hui ltac:(intro s; exact I) I eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal HMb
+              Hva Hkok Hcanon Hal HMb
               ltac:(rewrite extend_value_w8; exact Hwval)
               with "Hb Hcont").
   Qed.
@@ -1543,7 +1543,6 @@ Section UkLoad.
            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1552,7 +1551,8 @@ Section UkLoad.
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hrd Hva Hkok Hcanon Hpg Hal HMb Hwval.
+    intros Hui Hrd Hva Hkok Hcanon Hal HMb Hwval.
+    pose proof (uinpage_aligned8 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv true (C_LDSP (uimm, Regidx rd))
               (Some (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
@@ -1563,16 +1563,16 @@ Section UkLoad.
               ltac:(intro s; apply exec_execute_C_LDSP)
               (fun s mb => goodmb_execute_C_LDSP_U Du_r Du_w uimm (Regidx rd) s mb)
               eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal HMb
+              Hva Hkok Hcanon Hal HMb
               ltac:(rewrite extend_value_w8; exact Hwval)
               with "Hb Hcont").
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* lbu rd, imm(rs1) -- the base 1-byte UNSIGNED load (echo's 0x00054783 *)
-  (* / 0xfff7c703).  A 1-byte access is trivially aligned and can never    *)
-  (* cross a page, so both the alignment and the in-page premises are      *)
-  (* discharged HERE -- the call site supplies only the byte.              *)
+  (* / 0xfff7c703).  A 1-byte access is trivially aligned, so the          *)
+  (* alignment premise is discharged HERE -- the call site supplies only   *)
+  (* the byte.                                                             *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_lbu (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) (imm : mword 12) (rs1 rd : mword 5)
@@ -1594,7 +1594,7 @@ Section UkLoad.
               (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) None
               imm rs1 rd true 1 va wval
               uload_width_1 Hui ltac:(intro s; exact I) I eq_refl eq_refl Hrd
-              Hva Hkok Hcanon (uinpage_1 va) (is_aligned_vaddr_1 va)
+              Hva Hkok Hcanon (is_aligned_vaddr_1 va)
               ltac:(intros j Hj;
                     assert (Hj0 : j = 0%nat) by (clear -Hj; lia);
                     subst j; exists bb;
@@ -1617,7 +1617,6 @@ Section UkLoad.
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
@@ -1625,13 +1624,14 @@ Section UkLoad.
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
+    intros Hui Hrd Hva Hkok Hcanon Hal Hbw Hwval.
+    pose proof (uinpage_aligned4 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv false
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) None
               imm rs1 rd false 4 va wval
               uload_width_4 Hui ltac:(intro s; exact I) I eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal
+              Hva Hkok Hcanon Hal
               (uM_bytes_exists M (uint va) 4 wv Hbw)
               ltac:(rewrite (uM_word_w4_val_s M (uint va) wv Hbw); exact Hwval)
               with "Hb Hcont").
@@ -1648,7 +1648,6 @@ Section UkLoad.
     va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = zero_extend' 64 wv ->
@@ -1656,13 +1655,14 @@ Section UkLoad.
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
+    intros Hui Hrd Hva Hkok Hcanon Hal Hbw Hwval.
+    pose proof (uinpage_aligned4 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv false
               (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) None
               imm rs1 rd true 4 va wval
               uload_width_4 Hui ltac:(intro s; exact I) I eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal
+              Hva Hkok Hcanon Hal
               (uM_bytes_exists M (uint va) 4 wv Hbw)
               ltac:(rewrite (uM_word_w4_val_u M (uint va) wv Hbw); exact Hwval)
               with "Hb Hcont").
@@ -1683,7 +1683,6 @@ Section UkLoad.
            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00")))) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     uM_bytes M (uint va) 4 wv ->
     wval = sign_extend' 64 wv ->
@@ -1691,7 +1690,8 @@ Section UkLoad.
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hpg Hal Hbw Hwval.
+    intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hal Hbw Hwval.
+    pose proof (uinpage_aligned4 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv true (C_LW (uimm, Cregidx crs1, Cregidx crd))
               (Some (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
@@ -1705,7 +1705,7 @@ Section UkLoad.
               (fun s mb => goodmb_execute_C_LW_U Du_r Du_w uimm (Cregidx crs1)
                              (Cregidx crd) s mb)
               eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal
+              Hva Hkok Hcanon Hal
               (uM_bytes_exists M (uint va) 4 wv Hbw)
               ltac:(rewrite (uM_word_w4_val_s M (uint va) wv Hbw); exact Hwval)
               with "Hb Hcont").
@@ -1726,14 +1726,14 @@ Section UkLoad.
            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
     uk_load_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     uM_bytes M (uint va) 8 wval ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hpg Hal Hbw.
+    intros Hui Hcr1 Hcrd Hrd Hva Hkok Hcanon Hal Hbw.
+    pose proof (uinpage_aligned8 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_load M m pc fdv cw gn cs pidv true (C_LD (uimm, Cregidx crs1, Cregidx crd))
               (Some (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
@@ -1747,7 +1747,7 @@ Section UkLoad.
               (fun s mb => goodmb_execute_C_LD_U Du_r Du_w uimm (Cregidx crs1)
                              (Cregidx crd) s mb)
               eq_refl eq_refl Hrd
-              Hva Hkok Hcanon Hpg Hal
+              Hva Hkok Hcanon Hal
               (uM_bytes_exists M (uint va) 8 wval Hbw)
               ltac:(rewrite extend_value_w8;
                     symmetry; exact (uM_word_w8 M (uint va) wval Hbw))

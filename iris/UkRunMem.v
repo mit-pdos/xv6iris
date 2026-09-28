@@ -206,7 +206,7 @@ Section UkRunMem.
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sd C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv imm rs1 rs2
               (mword_of_int a) (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcan
-              Hpg Hal8
+              Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
@@ -240,7 +240,7 @@ Section UkRunMem.
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sw C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv imm rs1 rs2
               (mword_of_int a) (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcan
-              Hpg Hal8
+              Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
@@ -275,7 +275,7 @@ Section UkRunMem.
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_csdsp C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm rs2
               (mword_of_int a) (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcan
-              Hpg Hal8
+              Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
@@ -312,7 +312,7 @@ Section UkRunMem.
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_csd C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm cr1 cr2 rs1 rs2
               (mword_of_int a) (m !!! Regidx rs2) Hui He1 He2 Htgt eq_refl Hok Hcan
-              Hpg Hal8
+              Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
@@ -349,7 +349,7 @@ Section UkRunMem.
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_csw C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm cr1 cr2 rs1 rs2
               (mword_of_int a) (m !!! Regidx rs2) Hui He1 He2 Htgt eq_refl Hok Hcan
-              Hpg Hal8
+              Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
@@ -481,7 +481,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_ld C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv imm rs1 rd
               (mword_of_int a) w Hui Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
@@ -517,7 +517,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_cldsp C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm rd
               (mword_of_int a) w Hui Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
@@ -556,7 +556,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_cld C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
               (mword_of_int a) w Hui He1 He2 Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx"). iApply ("Hcont" with "Hw").
@@ -589,7 +589,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lw C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv imm rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx"). iApply ("Hcont" with "Hw").
@@ -622,7 +622,7 @@ Section UkRunMem.
     { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lwu C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv imm rs1 rd
               (mword_of_int a) (zero_extend' 64 wv) wv Hui Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx"). iApply ("Hcont" with "Hw").
@@ -659,7 +659,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoad.wp_uk_clw C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx"). iApply ("Hcont" with "Hw").
@@ -840,7 +840,7 @@ Section UkRunMem.
       reflexivity. }
     iApply (UkLoadText.wp_uk_clw_text_x C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
-              Hok Hcan Hpg Hal4
+              Hok Hcan Hal4
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
@@ -880,7 +880,7 @@ Section UkRunMem.
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) None
               imm rs1 rd false 4 (mword_of_int a) (sign_extend' 64 wv)
               uload_width_4 Hui ltac:(intro s; exact I) I eq_refl Hrd Htgt
-              Hok Hcan Hpg Hal4
+              Hok Hcan Hal4
               (uM_bytes_exists M (uint (mword_of_int a : mword 64)) 4 wv
                  ltac:(rewrite Hua; exact Hmap))
               ltac:(rewrite (uM_word_w4_val_s M (uint (mword_of_int a : mword 64)) wv

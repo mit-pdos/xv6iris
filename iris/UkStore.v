@@ -442,7 +442,6 @@ Section UkStorePostFetch.
     ud_um pt !! svpn_of va = Some w_st ->
     uleaf_ok (Store Data) w_st ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     (forall j : nat, (j < Z.to_nat kk)%nat ->
        exists bb : bv 8, Mp !! (uint va + Z.of_nat j) = Some bb) ->
@@ -493,9 +492,10 @@ Section UkStorePostFetch.
       (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
                         uv_step_post C R rsE (Step_Execute (r, ib'))) ib).
   Proof using .
-    intros Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hntx Hinj Hg1
+    intros Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hal HMb Hntx Hinj Hg1
       Hpins2 Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2 Lmie2 Lmdl2 Lmedl2 Lmenv2
       Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2 Lmi2 Hagd2 Htok' Hpure.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     destruct Hkw as (Hvw & Hwrite_plain).
     pose proof (vmem_width_pos kk Hvw) as Hk.
     pose proof (uvw_le8 kk Hvw) as Hk8.
@@ -1177,7 +1177,6 @@ Section UkStoreObl.
             sbundle_at uslot USYS_exit fx
               (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)) ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_Base w) -∗
@@ -1201,7 +1200,8 @@ Section UkStoreObl.
          (fun _ : ext_fetch_addr_error => False)).
   Proof using .
     intros Hfx Hpre Hpure Hdec Hkw Hred Hg1 Hexp Hva Hwval
-      Hdisp Hkcf Hcanon Hpg Hal.
+      Hdisp Hkcf Hcanon Hal.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
@@ -1253,7 +1253,7 @@ Section UkStoreObl.
     destruct Hdisp as [ (w_st & Hl & Hchk & Hntx & HMb) | Hfault ].
     - iApply (uk_store_post_fetch C pt Rfd R Rut sz π M Mp m pc 4 kk i o imm sr1 sr2 w_st va wval
               (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
-              Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hntx Hinj Hg1
+              Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hal HMb Hntx Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
               (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1352,7 +1352,6 @@ Section UkStoreObl.
             sbundle_at uslot USYS_exit fx
               (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))) : iProp Σ)) ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - kk ->
     is_aligned_vaddr (Virtaddr va) kk = true ->
     gen_cert -∗ uv_amb -∗
     uv_fetch_bridge (uc_dqc C) pt Mp rsA t (F_RVC h) -∗
@@ -1376,7 +1375,8 @@ Section UkStoreObl.
          (fun _ : ext_fetch_addr_error => False)).
   Proof using .
     intros Hfx Hpre Hpure Hdec Hkw Hred Hg1 Hexp Hva Hwval
-      Hdisp Hkcf Hcanon Hpg Hal.
+      Hdisp Hkcf Hcanon Hal.
+    pose proof (uinpage_of_aligned va kk (proj1 Hkw) Hal) as Hpg.
     pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
@@ -1433,7 +1433,7 @@ Section UkStoreObl.
     destruct Hdisp as [ (w_st & Hl & Hchk & Hntx & HMb) | Hfault ].
     - iApply (uk_store_post_fetch C pt Rfd R Rut sz π M Mp m pc 2 kk i o imm sr1 sr2 w_st va wval
               (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2 fdv cw gn cs pidv
-              Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb Hntx Hinj Hg1
+              Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hal HMb Hntx Hinj Hg1
               Hpins2
               (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
               (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
@@ -1543,7 +1543,6 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1551,7 +1550,8 @@ Section UkStore.
     ▷ ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_of_aligned va k (proj1 Hkw) Hal) as Hpg.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb Hcont".
@@ -1690,14 +1690,14 @@ Section UkStore.
                 t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv (True : iProp Σ)
                 (sfam_at Qp sfam_pt) (sexit_pay_at Qp sfam_pt)
                 Hpre Hpure Hdecrvc Hkw Hred Hg1 Hexp
-                Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
     - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
       iApply (uk_store_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
                 t usatp pcfg paddr rs1s rsA fdv cw gn cs pidv (True : iProp Σ)
                 (sfam_at Qp sfam_pt) (sexit_pay_at Qp sfam_pt)
                 Hpre Hpure Hdecbase Hkw Hred Hg1 Hexp
-                Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
@@ -1720,7 +1720,6 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
@@ -1728,10 +1727,11 @@ Section UkStore.
     ukcq Qp π (uM_store M (uint va) k wval) sz fdv cw gn cs pidv m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_of_aligned va k (proj1 Hkw) Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store_later M m pc fdv cw gn cs pidv is_rvc i o imm rs1 rs2 k va wval
-              Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb
+              Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hal HMb
               with "Hb [Hcont]").
     iApply bi.later_intro. iExact "Hcont".
   Qed.
@@ -1789,7 +1789,6 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_denied va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4096 - k ->
     is_aligned_vaddr (Virtaddr va) k = true ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ChildTok.my_pay gn Qp -∗
@@ -1809,7 +1808,8 @@ Section UkStore.
       (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hfx Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hden Hcanon Hpg Hal.
+    intros Hfx Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hden Hcanon Hal.
+    pose proof (uinpage_of_aligned va k (proj1 Hkw) Hal) as Hpg.
     pose proof (Hui pt sz (loop_ok_wf C pt Hlo) Hpm) as Hui0.
     pose proof (ui_al2 _ _ _ _ _ Hui0) as Hal2.
     iIntros "Hb #Hmy Hpay Hrow".
@@ -1897,7 +1897,7 @@ Section UkStore.
                              (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))%I
                 fx Hfx
                 Hpre Hpure Hdecrvc Hkw Hred Hg1 Hexp
-                Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
     - iDestruct "Hf" as (w) "[[%HnRVC %Hdecbase] Hbridge]".
       iApply (uk_store_obl_base C' pt' Rfd' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
@@ -1906,7 +1906,7 @@ Section UkStore.
                              (uvis_of_run m pc M π sz fdv cw gn cs pidv false ProcDefs.secc_all))%I
                 fx Hfx
                 Hpre Hpure Hdecbase Hkw Hred Hg1 Hexp
-                Hva Hwval Hdisp Hkcf Hcanon Hpg Hal
+                Hva Hwval Hdisp Hkcf Hcanon Hal
                 with "Hcert Hamb Hbridge Hk Hany Hrw Hro Hctx Hmm Hres").
   Qed.
 
@@ -1922,20 +1922,20 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hui Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_aligned8 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store M m pc fdv cw gn cs pidv false
               (STORE (imm, Regidx rs2, Regidx rs1, 8)) None
               imm rs1 rs2 8 va wval
               ustore_width_8 Hui ltac:(intro s; exact I) I eq_refl eq_refl
-              Hva Hwval Hsok Hcanon Hpg Hal HMb
+              Hva Hwval Hsok Hcanon Hal HMb
               with "Hb Hcont").
   Qed.
 
@@ -1947,20 +1947,20 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hui Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_aligned4 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store M m pc fdv cw gn cs pidv false
               (STORE (imm, Regidx rs2, Regidx rs1, 4)) None
               imm rs1 rs2 4 va wval
               ustore_width_4 Hui ltac:(intro s; exact I) I eq_refl eq_refl
-              Hva Hwval Hsok Hcanon Hpg Hal HMb
+              Hva Hwval Hsok Hcanon Hal HMb
               with "Hb Hcont").
   Qed.
 
@@ -1983,7 +1983,7 @@ Section UkStore.
               (STORE (imm, Regidx rs2, Regidx rs1, 1)) None
               imm rs1 rs2 1 va wval
               ustore_width_1 Hui ltac:(intro s; exact I) I eq_refl eq_refl
-              Hva Hwval Hsok Hcanon (uinpage_byte va) (is_aligned_vaddr_1 va)
+              Hva Hwval Hsok Hcanon (is_aligned_vaddr_1 va)
               ltac:(intros j Hj;
                     assert (Hj0 : j = 0%nat) by (clear -Hj; lia);
                     subst j; exists bb;
@@ -2020,7 +2020,7 @@ Section UkStore.
               (STORE (imm, Regidx rs2, Regidx rs1, 1)) None
               imm rs1 rs2 1 va wval fx
               Hfx ustore_width_1 Hui ltac:(intro s; exact I) I eq_refl eq_refl
-              Hva Hwval Hden Hcanon (uinpage_byte va) (is_aligned_vaddr_1 va)
+              Hva Hwval Hden Hcanon (is_aligned_vaddr_1 va)
               with "Hb Hmy Hpay Hrow").
   Qed.
 
@@ -2033,14 +2033,14 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok tgt ->
     uva_canon tgt ->
-    Z.rem (uint tgt) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr tgt) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint tgt) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Htgt Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hui Htgt Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_aligned8 tgt Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SDSP (uimm, Regidx rs2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
@@ -2051,7 +2051,7 @@ Section UkStore.
               ltac:(intro s; apply exec_execute_C_SDSP)
               (fun s mb => goodmb_execute_C_SDSP_U Du_r Du_w uimm (Regidx rs2) s mb)
               eq_refl eq_refl
-              Htgt Hwval Hsok Hcanon Hpg Hal HMb
+              Htgt Hwval Hsok Hcanon Hal HMb
               with "Hb Hcont").
   Qed.
 
@@ -2066,14 +2066,14 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4088 ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store8 M (uint va) wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_aligned8 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SD (uimm, Cregidx cr1, Cregidx cr2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
@@ -2088,7 +2088,7 @@ Section UkStore.
               (fun s mb => goodmb_execute_C_SD_U Du_r Du_w uimm (Cregidx cr1)
                              (Cregidx cr2) s mb)
               eq_refl eq_refl
-              Hva Hwval Hsok Hcanon Hpg Hal HMb
+              Hva Hwval Hsok Hcanon Hal HMb
               with "Hb Hcont").
   Qed.
 
@@ -2103,14 +2103,14 @@ Section UkStore.
     wval = m !!! Regidx rs2 ->
     uk_store_ok va ->
     uva_canon va ->
-    Z.rem (uint va) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π (uM_store M (uint va) 4 wval) sz fdv cw gn cs pidv m (add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
-    intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.
+    intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hal HMb.
+    pose proof (uinpage_aligned4 va Hal) as Hpg.
     iIntros "Hb Hcont".
     iApply (wp_uk_store M m pc fdv cw gn cs pidv true (C_SW (uimm, Cregidx cr1, Cregidx cr2))
               (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
@@ -2125,7 +2125,7 @@ Section UkStore.
               (fun s mb => goodmb_execute_C_SW_U Du_r Du_w uimm (Cregidx cr1)
                              (Cregidx cr2) s mb)
               eq_refl eq_refl
-              Hva Hwval Hsok Hcanon Hpg Hal HMb
+              Hva Hwval Hsok Hcanon Hal HMb
               with "Hb Hcont").
   Qed.
 

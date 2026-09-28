@@ -173,7 +173,7 @@ Section UkShRedir.
       reflexivity. }
     iApply (UkLoad.wp_uk_cld C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
               (mword_of_int a) w Hui He1 He2 Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
@@ -215,7 +215,7 @@ Section UkShRedir.
       reflexivity. }
     iApply (UkLoad.wp_uk_clw C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv uimm crs1 crd rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
-              Hok Hcan Hpg Hal8
+              Hok Hcan Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hufd Hcwda Hcha Hw Hcont]").
     iApply (urun_close_upd _ _ _ m rd _ _ _ _ _ _ _ _ _ Hns with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
