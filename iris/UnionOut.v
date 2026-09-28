@@ -219,6 +219,141 @@ Proof using.
   rewrite (ubase_before h B Hsh HB) -Hl. reflexivity.
 Qed.
 
+(* ---- THE FLOOR'S TWO RECORDS, PURELY (sync SY3-A4): the last completed
+        sync of the cycles so far ([UnionOutPure.union_rec_now]), and of
+        the cycles before the open one -- the era's boot record ---- *)
+Definition union_rec_base (h : list mobs) (W : list (fstate * option srec)) : srec :=
+  ulast_before h (snd <$> W) (pred (length W)).
+
+(* the open cycle's own segment moves no record: only its line count,
+   which no later cycle reads *)
+Lemma ulast_from_last (off : nat) (r : srec) (segs : list (list mobs))
+    (seg seg' : list mobs) (os : list (option srec)) :
+  ulast_from off r (segs ++ [seg]) os = ulast_from off r (segs ++ [seg']) os.
+Proof using.
+  revert off r os. induction segs as [| s0 segs IH]; intros off r os.
+  - destruct os as [| o os]; [reflexivity |]. cbn [app ulast_from].
+    by destruct os.
+  - destruct os as [| o os]; [reflexivity |]. cbn [app ulast_from]. apply IH.
+Qed.
+
+Lemma union_rec_now_io (h : list mobs) (e : mobs) (W : list (fstate * option srec)) :
+  trace_shape h true -> is_io e = true -> length W = length (cycles_of h) ->
+  union_rec_now (h ++ [e]) W = union_rec_now h W.
+Proof using.
+  intros Hsh Hio Hl.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  rewrite /union_rec_now /ulast_before H1 H2.
+  rewrite H1 length_app in Hl. cbn [length] in Hl.
+  rewrite !take_ge; [| rewrite length_app /=; lia | rewrite length_app /=; lia].
+  apply ulast_from_last.
+Qed.
+
+Lemma union_rec_now_off (h : list mobs) (W : list (fstate * option srec)) :
+  union_rec_now (h ++ [ObsPowerOff]) W = union_rec_now h W.
+Proof using. by rewrite /union_rec_now /ulast_before cycles_of_off. Qed.
+
+Lemma union_rec_now_on (h : list mobs) (W : list (fstate * option srec)) (s : fstate) :
+  length W = length (cycles_of h) ->
+  union_rec_now (h ++ [ObsPowerOn]) (W ++ [(s, None)]) = union_rec_now h W.
+Proof using.
+  intros Hl. rewrite /union_rec_now fmap_app length_app /= Nat.add_1_r.
+  rewrite -(length_fmap snd W).
+  rewrite (ulast_before_snoc_none (h ++ [ObsPowerOn]) (snd <$> W));
+    [| rewrite cycles_of_on length_app length_fmap /=; lia].
+  apply ulast_before_ext; [| reflexivity].
+  rewrite cycles_of_on take_app_le; [reflexivity | rewrite length_fmap; lia].
+Qed.
+
+Lemma union_rec_base_on (h : list mobs) (W : list (fstate * option srec)) (s : fstate) :
+  length W = length (cycles_of h) ->
+  union_rec_base (h ++ [ObsPowerOn]) (W ++ [(s, None)]) = union_rec_now h W.
+Proof using.
+  intros Hl. rewrite /union_rec_base /union_rec_now length_app /= Nat.add_1_r /=.
+  apply ulast_before_ext.
+  - rewrite cycles_of_on take_app_le; [reflexivity | lia].
+  - rewrite fmap_app take_app_le; [reflexivity | rewrite length_fmap; lia].
+Qed.
+
+Lemma union_rec_base_off (h : list mobs) (W : list (fstate * option srec)) :
+  union_rec_base (h ++ [ObsPowerOff]) W = union_rec_base h W.
+Proof using. by rewrite /union_rec_base /ulast_before cycles_of_off. Qed.
+
+(* a console event, the open cycle's entry replaced (or kept) *)
+Lemma union_rec_base_io (h : list mobs) (e : mobs) (u1 : list (fstate * option srec))
+    (x y : fstate * option srec) :
+  trace_shape h true -> is_io e = true -> S (length u1) = length (cycles_of h) ->
+  union_rec_base (h ++ [e]) (u1 ++ [x]) = union_rec_base h (u1 ++ [y]).
+Proof using.
+  intros Hsh Hio Hl.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  assert (Hcs : length cs = length u1) by (rewrite H1 length_app /= in Hl; lia).
+  rewrite /union_rec_base !length_app /= Nat.add_1_r /=.
+  apply ulast_before_ext.
+  - exact (take_cycles_io h e cs (length u1) H1 H2 ltac:(lia)).
+  - rewrite (take_snd_snoc u1 x (length u1)); [| lia].
+    rewrite (take_snd_snoc u1 y (length u1)); [reflexivity | lia].
+Qed.
+
+Lemma union_W_snoc (h : list mobs) (W : list (fstate * option srec)) :
+  trace_shape h true -> length W = length (cycles_of h) ->
+  exists u1 y, W = u1 ++ [y] /\ S (length u1) = length (cycles_of h).
+Proof using.
+  intros Hsh Hl.
+  destruct (cycles_of_io h [] Hsh (Forall_nil_2 _)) as (cs & H1 & _).
+  assert (Hne : W <> []) by (intros ->; rewrite H1 length_app /= in Hl; lia).
+  destruct (exists_last Hne) as (u1 & y & ->). exists u1, y. split; [reflexivity |].
+  rewrite length_app /= in Hl. lia.
+Qed.
+
+Lemma cycles_len_io (h : list mobs) (e : mobs) :
+  trace_shape h true -> is_io e = true ->
+  length (cycles_of (h ++ [e])) = length (cycles_of h).
+Proof using.
+  intros Hsh Hio.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  by rewrite H1 H2 !length_app.
+Qed.
+
+Lemma union_rec_base_io' (h : list mobs) (e : mobs) (W : list (fstate * option srec)) :
+  trace_shape h true -> is_io e = true -> length W = length (cycles_of h) ->
+  union_rec_base (h ++ [e]) W = union_rec_base h W.
+Proof using.
+  intros Hsh Hio Hl. destruct (union_W_snoc h W Hsh Hl) as (u1 & y & -> & Hl1).
+  exact (union_rec_base_io h e u1 y y Hsh Hio Hl1).
+Qed.
+
+(* THE DRAIN'S NEW RECORD: with no completed sync in the open cycle, the
+   era's boot record; with the round's, the bridge's *)
+Lemma union_rec_now_drain_none (h : list mobs) (e : mobs) (u1 : list (fstate * option srec))
+    (y : fstate * option srec) (s : fstate) :
+  trace_shape h true -> is_io e = true -> S (length u1) = length (cycles_of h) ->
+  union_rec_now (h ++ [e]) (u1 ++ [(s, None)]) = union_rec_base h (u1 ++ [y]).
+Proof using.
+  intros Hsh Hio Hl.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  assert (Hcs : length cs = length u1) by (rewrite H1 length_app /= in Hl; lia).
+  rewrite /union_rec_now /union_rec_base !length_app /= Nat.add_1_r /= fmap_app.
+  rewrite -(length_fmap snd u1).
+  rewrite (ulast_before_snoc_none (h ++ [e]) (snd <$> u1));
+    [| rewrite H2 length_app length_fmap /=; lia].
+  rewrite length_fmap.
+  apply ulast_before_ext.
+  - exact (take_cycles_io h e cs (length u1) H1 H2 ltac:(lia)).
+  - symmetry. apply take_snd_snoc. lia.
+Qed.
+
+Lemma union_rec_now_drain_some (h : list mobs) (u1 : list (fstate * option srec))
+    (s : fstate) (B : list uline) (I : list (bv 8)) (c : fstate) :
+  trace_shape h true -> ulines_of h = B ++ ulast_cyc h ->
+  S (length u1) = length (cycles_of h) ->
+  union_rec_now h (u1 ++ [(s, Some (nlines I, c))]) = (length (B ++ ulines_in I), c).
+Proof using.
+  intros Hsh HB Hl. rewrite /union_rec_now length_app /= Nat.add_1_r fmap_app.
+  rewrite -(length_fmap snd u1).
+  apply (usync_bridge_era h (snd <$> u1) B I c Hsh HB). by rewrite length_fmap.
+Qed.
+
 Section union_out.
   Context {Σ : gFunctors}.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,
@@ -479,9 +614,18 @@ Section union_out.
      arm of the claim *)
   Definition udrain_ret (k : nat) (seg : list mobs) : iProp Σ :=
     (UT
-     ∨ ∃ (s0 : fstate) (vf : file_era),
-         ⌜lm_good_out U s0 seg⌝ ∗ ⌜fstate_ok s0⌝ ∗ f0_typed gf s0
-         ∗ file_era_pin gf k vf ∗ f0_lb gf vf s0)%I.
+     ∨ ∃ (s0 : fstate) (vf : file_era) (o : option srec),
+         ⌜lm_good_sync s0 seg o⌝ ∗ ⌜fstate_ok s0⌝ ∗ f0_typed gf s0
+         ∗ file_era_pin gf k vf ∗ f0_lb gf vf s0
+         (* ...AND THE CYCLE'S LAST COMPLETED SYNC (sync SY3-A4): none, or the
+            round's record -- its position over the era's base and the state
+            before it -- the last entry of a lower bound of the run-long
+            history, read off the payload the round filed *)
+         ∗ (⌜o = None⌝
+            ∨ ∃ (J : list (bv 8)) (c : fstate) (L : list srec),
+                ⌜o = Some (nlines J, c)⌝
+                ∗ sl_lb (ff_hist (fgn_cl gf))
+                    (L ++ [(length (fe_base vf ++ ulines_in J), c)])))%I.
 
   Lemma ucl_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
       (seg : list mobs) :
@@ -496,11 +640,68 @@ Section union_out.
     intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hcl".
     iDestruct (pwclV_drain pg U ucparams UB ∅ uwa uwild uwild_wild upr_wild k h ho CH seg
                  Hsh Hk Hpre Hins Hwire Hne with "Hcl") as "[$ Hd]".
-    iDestruct (gdrain_ret_good with "Hd") as "Hd".
-    rewrite /udrain_ret.
-    iDestruct "Hd" as "[#HT | (%s0 & %Hgo & %Hok & #Hty & #Hw)]"; [by iLeft |].
-    iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
-    iExists s0, vf. iFrame "Hty Hfp Hlb". by iPureIntro.
+    rewrite /udrain_ret /gdrain_ret.
+    iDestruct "Hd" as "[#HT | (%s0 & %csf & %ex & %v & %Is & %Hg & %Hok & #Hty & #Hw
+                             & #Hpin & #Hcsf & %HIs & #Hitems)]"; [by iLeft |].
+    iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
+    destruct Hg as (ps & Hpro & Halts & Hwr).
+    set (csr := lm_alts_pad U ulmG_hooks (ins seg) (csf ++ ex)).
+    assert (Hgs : lm_good_sync s0 seg
+                    (usync_last ps csr s0 (ins seg) (obs_wire Uart0 seg))).
+    { exists ps, csr. split_and!; [exact Hpro | exact Halts | exact Hwr | reflexivity]. }
+    destruct (usync_last ps csr s0 (ins seg) (obs_wire Uart0 seg)) as [r |] eqn:Ho;
+      last first.
+    { iRight. iExists s0, vf, None. iFrame "Hty Hfp Hlb".
+      iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |]. by iLeft. }
+    destruct (usync_last_pad ps (csf ++ ex) s0 (ins seg) (obs_wire Uart0 seg) r Ho)
+      as (i & Hi & Hin & Hat).
+    destruct HIs as (Hex & HlIs & HFI).
+    destruct (lookup_lt_is_Some_2 Is i ltac:(lia)) as [J HJ].
+    iDestruct (big_sepL_lookup with "Hitems") as "(Hpr & _ & %HnJ)"; [exact HJ |].
+    pose proof (Forall_lookup_1 _ _ _ _ HFI HJ) as HJp.
+    rewrite /usync_at in Hat. case_decide as Hd; [| discriminate].
+    injection Hat as <-. destruct Hd as (HlS & HaR & _).
+    assert (Hcsi : forall j, j < length (csf ++ ex) -> csr !!! j = (csf ++ ex) !!! j).
+    { intros j Hj. apply cs_prefix_total; [apply lm_alts_pad_prefix | exact Hj]. }
+    assert (Hbod : forall j, j < S i -> bodies_of (ins seg) !!! j = bodies_of J !!! j).
+    { destruct HJp as [z Hz]. rewrite Hz. destruct (bodies_of_app J z) as [y Hy].
+      intros j Hj. rewrite Hy !list_lookup_total_alt lookup_app_l; [reflexivity |].
+      unfold nlines in HnJ. lia. }
+    iDestruct "Hpr" as "[%Hnot | [#HT | (%cs' & %s0' & %vf' & %L & #Hcs' & %Hlcs & #Hcw
+                                        & #Hfp' & #Hsl)]]".
+    { exfalso. apply Hnot. split.
+      - rewrite /lm_line_at HnJ (_ : (S i - 1)%nat = i); [| lia].
+        rewrite -(Hbod i ltac:(lia)). exact HlS.
+      - rewrite -(Hcsi i Hi). exact HaR. }
+    { by iLeft. }
+    iDestruct (file_era_pin_agree with "Hfp Hfp'") as %<-.
+    iDestruct "Hcw" as (vf'') "[#Hfp'' #Hlb'']".
+    iDestruct (file_era_pin_agree with "Hfp Hfp''") as %<-.
+    iDestruct (f0_lb_agree with "Hlb Hlb''") as %<-.
+    iDestruct (cs_lb_cmp v csf cs' with "Hcsf Hcs'") as %Hcmp.
+    assert (Hcs'e : cs' = take i (csf ++ ex)).
+    { rewrite HnJ in Hlcs. cbn in Hlcs. rewrite Nat.sub_0_r in Hlcs.
+      rewrite length_app in Hi.
+      destruct Hcmp as [Hp | Hp].
+      - pose proof (prefix_length _ _ Hp) as Hl.
+        assert (Hc : cs' = csf) by (symmetry; apply (prefix_length_eq csf cs' Hp); lia).
+        subst cs'. rewrite take_app_le; [| lia].
+        rewrite take_ge; [reflexivity | lia].
+      - destruct Hp as [z ->]. rewrite length_app in Hi.
+        rewrite -app_assoc (take_app_le cs' (z ++ ex) i); [| lia].
+        rewrite take_ge; [reflexivity | lia]. }
+    assert (Hup : lm_upto U csr s0 (bodies_of (ins seg)) i
+                  = lm_upto U cs' s0 (bodies_of J) (nlines J - 1)).
+    { rewrite HnJ (_ : (S i - 1)%nat = i); [| lia].
+      rewrite (lm_upto_bs_ext U csr s0 (bodies_of (ins seg)) (bodies_of J) i
+                 ltac:(intros j Hj; apply Hbod; lia)).
+      apply lm_upto_cs_ext. intros j Hj. rewrite Hcsi; [| lia].
+      rewrite Hcs'e !list_lookup_total_alt lookup_take; [reflexivity | exact Hj]. }
+    iRight. iExists s0, vf, (Some (S i, lm_upto U csr s0 (bodies_of (ins seg)) i)).
+    iFrame "Hty Hfp Hlb". iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iRight. iExists J, (lm_upto U csr s0 (bodies_of (ins seg)) i), L.
+    iSplitR; [iPureIntro; by rewrite HnJ |].
+    rewrite Hup. iExact "Hsl".
   Qed.
 
   (* THE READ: the generic receipt, and at a read that completes a wild
@@ -736,9 +937,20 @@ Section union_out.
   (*  LANDED DECIDER [UnionDecU.lm_disc_ulmG_dec]: no hypothesis, no      *)
   (*  classical axiom.                                                    *)
   (* =================================================================== *)
+  (* THE CONCLUSION'S RESOURCE (sync SY3-A4): each cycle's boot state
+     and its last completed sync ([UnionOutPure.union_phi_sync_body]); the
+     floor, a lower bound of the run-long history whose last record is the
+     last completed sync so far; and the era's record, whose floor's last
+     record is the era's boot record (the cycles before the open one) *)
   Definition union_phi_res (h : list mobs) : iProp Σ :=
-    (∃ s0s : list fstate,
-       ⌜lm_disc U h -> union_phi_body h s0s⌝ ∗ f0_pinned gf h s0s)%I.
+    (∃ W : list (fstate * option srec),
+       ⌜lm_disc U h -> union_phi_sync_body h W⌝ ∗ f0_pinned gf h (fst <$> W)
+       ∗ (∃ F : list srec, sl_lb (ff_hist (fgn_cl gf)) F
+            ∗ ⌜lm_disc U h -> slast F = union_rec_now h W⌝)
+       ∗ (⌜obs_boots h = 0%nat⌝
+          ∨ ∃ vf : file_era, file_era_pin gf (obs_boots h) vf
+              ∗ sl_lb (ff_hist (fgn_cl gf)) (fe_floor vf)
+              ∗ ⌜lm_disc U h -> slast (fe_floor vf) = union_rec_base h W⌝))%I.
 
   Global Instance union_phi_res_timeless h : Timeless (union_phi_res h).
   Proof using . rewrite /union_phi_res. apply _. Qed.
@@ -811,8 +1023,10 @@ Section union_out.
     iSplitL "Hme"; [iExists ∅; iFrame "Hme"; iPureIntro; apply pin_dom_empty |].
     iSplitR.
     { iLeft. iExists []. iSplitR.
-      { iPureIntro. intros _. exact union_phi_body_nil. }
-      iApply f0_pinned_undrained. reflexivity. }
+      { iPureIntro. intros _. exact union_phi_sync_body_nil. }
+      iSplitR; [iApply f0_pinned_undrained; reflexivity |].
+      iSplitR; [iExists []; iFrame "Hlb0"; iPureIntro; intros _; reflexivity |].
+      iLeft. by iPureIntro. }
     iSplitL "Hreg".
     { iExists {[0%nat := γ0]}. iFrame "Hreg". iPureIntro. intros k.
       rewrite dom_singleton_L elem_of_singleton. cbn. lia. }
@@ -898,12 +1112,21 @@ Section union_out.
       iModIntro. iSplitR ""; [| done]. iFrame "Ht Hpm Hfm Hme Hfl Hfloor".
       iSplitL "Hphi".
       { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-        iLeft. iDestruct "Hphi" as (s0s) "[%Hbd _]". iExists s0s. iSplitR.
+        iLeft. iDestruct "Hphi" as (W) "(%Hbd & _ & (%F & #HF & %HFr) & #Hera)".
+        iExists W. iSplitR.
         { iPureIntro. intros Hd.
-          exact (union_phi_body_off h s0s
+          exact (union_phi_sync_body_off h W
                    (Hbd (proj1 (lm_disc_power U h true union_st_ok) Hd))). }
-        iApply f0_pinned_undrained.
-        by rewrite (open_seg_power h ObsPowerOff eq_refl). }
+        iSplitR.
+        { iApply f0_pinned_undrained.
+          by rewrite (open_seg_power h ObsPowerOff eq_refl). }
+        iSplitR.
+        { iExists F. iFrame "HF". iPureIntro. intros Hd. rewrite union_rec_now_off.
+          exact (HFr (proj1 (lm_disc_power U h true union_st_ok) Hd)). }
+        rewrite Hb. iDestruct "Hera" as "[%H0 | (%vf & #Hp & #HflE & %Hr)]";
+          [by iLeft | iRight].
+        iExists vf. iFrame "Hp HflE". iPureIntro. intros Hd. rewrite union_rec_base_off.
+        exact (Hr (proj1 (lm_disc_power U h true union_st_ok) Hd)). }
       iSplitL "Hreg".
       { iDestruct "Hreg" as (R) "[HR %HR]". iExists R. iFrame "HR". by rewrite Hb. }
       rewrite /union_base Hb. iDestruct "Hbase" as "[%H0 | (%vf & #Hp & %Hu)]";
@@ -913,7 +1136,17 @@ Section union_out.
     - assert (Hb : obs_boots (h ++ [ObsPowerOn]) = S (obs_boots h))
         by (rewrite obs_boots_app /=; lia).
       iMod era_full_alloc as (v) "Hfull".
-      iDestruct "Hfloor" as (F) "#HF".
+      (* the floor the era's record pins: the conclusion's, or (tainted)
+         any *)
+      iAssert (∃ F : list srec, sl_lb (ff_hist (fgn_cl gf)) F
+                 ∗ ((∃ W : list (fstate * option srec),
+                       ⌜lm_disc U h -> union_phi_sync_body h W⌝
+                       ∗ ⌜lm_disc U h -> slast F = union_rec_now h W⌝) ∨ UT))%I
+        with "[Hphi]" as (F) "[#HF Hphi]".
+      { iDestruct "Hphi" as "[Hphi | #HT]".
+        - iDestruct "Hphi" as (W) "(%Hbd & _ & (%F & #HF & %HFr) & _)".
+          iExists F. iFrame "HF". iLeft. iExists W. by iSplit; iPureIntro.
+        - iDestruct "Hfloor" as (F) "#HF". iExists F. iFrame "HF". by iRight. }
       iMod (f0_alloc (ulines_of h) F) as (vf) "(%Hbv & %Hfv & Hf0 & Hfla & Hcp)".
       iMod blk_alloc as (w gb) "(Hblk & Hrb & Hcur1)".
       iMod (pin_map_on (fgn_echo gf) h v with "Hpm") as "[Hpm #Hpin]".
@@ -932,13 +1165,23 @@ Section union_out.
       + iFrame "Ht Hpm Hfm Hme Hfl".
         iSplitL "Hphi".
         { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-          iLeft. iDestruct "Hphi" as (s0s) "[%Hbd _]".
-          iExists (s0s ++ [∅]). iSplitR.
+          iLeft. iDestruct "Hphi" as (W) "[%Hbd %HFr]".
+          iExists (W ++ [((union_rec_now h W).2, None)]). iSplitR.
           { iPureIntro. intros Hd.
-            exact (union_phi_body_on h s0s
+            exact (union_phi_sync_body_on h W
                      (Hbd (proj1 (lm_disc_power U h false union_st_ok) Hd))). }
-          iApply f0_pinned_undrained.
-          by rewrite (open_seg_power h ObsPowerOn eq_refl). }
+          iSplitR.
+          { iApply f0_pinned_undrained.
+            by rewrite (open_seg_power h ObsPowerOn eq_refl). }
+          iSplitR.
+          { iExists F. iFrame "HF". iPureIntro. intros Hd.
+            pose proof (proj1 (lm_disc_power U h false union_st_ok) Hd) as Hd0.
+            destruct (Hbd Hd0) as (Hlen & _).
+            rewrite union_rec_now_on; [exact (HFr Hd0) | exact Hlen]. }
+          iRight. iExists vf. rewrite Hb Hfv. iFrame "Hfp HF". iPureIntro. intros Hd.
+          pose proof (proj1 (lm_disc_power U h false union_st_ok) Hd) as Hd0.
+          destruct (Hbd Hd0) as (Hlen & _).
+          rewrite union_rec_base_on; [exact (HFr Hd0) | exact Hlen]. }
         iSplitL "HR".
         { iExists (<[S (obs_boots h) := γ]> R). iFrame "HR". iPureIntro. intros k.
           rewrite dom_insert_L elem_of_union elem_of_singleton HR Hb. lia. }
@@ -950,23 +1193,23 @@ Section union_out.
   Qed.
 
   (* THE OUTPUT STEP, AND THE ERA'S FIRST DRAIN ([FileOut.file_led_tx] at
-     the union): the drain hands the era's boot state, its deed witness
-     and a lower bound pinned to the era's record *)
+     the union): the drain hands the era's boot state, its deed witness, a
+     lower bound pinned to the era's record, and the cycle's last completed
+     sync with the history's lower bound ending at it (sync SY3-A4) -- the
+     floor moves to it, or back to the era's own *)
   Lemma union_led_tx (h : list mobs) (i : uart_id) (b : bv 8) :
     trace_shape h true ->
-    (UT
-     ∨ (match i with
-        | Uart0 => ∃ (s0 : fstate) (vf : file_era),
-                     ⌜lm_good_out U s0 (open_seg h ++ [ObsUartOut Uart0 b])⌝
-                     ∗ f0_typed gf s0 ∗ file_era_pin gf (obs_boots h) vf
-                     ∗ f0_lb gf vf s0
-        | _ => True
-        end)) -∗
+    (match i with
+     | Uart0 => udrain_ret (obs_boots h) (open_seg h ++ [ObsUartOut Uart0 b])
+     | _ => True
+     end) -∗
     union_led h ==∗ union_led (h ++ [ObsUartOut i b]).
   Proof using .
     intros Hsh. iIntros "Hgo (Ht & Hpm & Hfm & Hme & Hfl & Hphi & Hreg & #Hfloor & #Hbase)".
     assert (Hbo : obs_boots (h ++ [ObsUartOut i b]) = obs_boots h)
       by (rewrite obs_boots_app /=; lia).
+    assert (Hsh' : trace_shape (h ++ [ObsUartOut i b]) true)
+      by (eapply trace_shape_snoc; [exact Hsh | by destruct i]).
     iAssert (union_reg (h ++ [ObsUartOut i b]) ∗ union_base (h ++ [ObsUartOut i b]))%I
       with "[Hreg]" as "[Hreg #Hbase']".
     { iSplitL "Hreg".
@@ -986,34 +1229,91 @@ Section union_out.
     iFrame "Ht Hpm Hfm Hme Hreg Hfloor Hbase'".
     iDestruct "Hphi" as "[Hphi | HT]"; last first.
     { iModIntro. iFrame "Hfl". by iRight. }
-    iDestruct "Hphi" as (s0s) "[%Hb #Hpin0]".
+    iDestruct "Hphi" as (W) "(%Hb & #Hpin0 & (%F & #HF & %HFr) & #Hera)".
+    assert (Hdh : lm_disc U (h ++ [ObsUartOut i b]) -> lm_disc U h)
+      by exact (proj1 (lm_disc_out U h i b Hsh)).
     destruct i; last first.
-    { iModIntro. iFrame "Hfl". iLeft. iExists s0s. iSplitR.
+    { iModIntro. iFrame "Hfl". iLeft. iExists W. iSplitR.
       { iPureIntro. intros Hd.
-        apply (union_phi_body_step_io h (ObsUartOut Uart1 b) s0s Hsh eq_refl
-                 eq_refl), Hb.
-        exact (proj1 (lm_disc_out U h Uart1 b Hsh) Hd). }
-      iApply (f0_pinned_io gf h (ObsUartOut Uart1 b) s0s eq_refl eq_refl
-                with "Hpin0"). }
+        apply (union_phi_sync_body_step_io h (ObsUartOut Uart1 b) W Hsh eq_refl
+                 eq_refl), Hb, Hdh, Hd. }
+      iSplitR.
+      { iApply (f0_pinned_io gf h (ObsUartOut Uart1 b) (fst <$> W) eq_refl eq_refl
+                  with "Hpin0"). }
+      iSplitR.
+      { iExists F. iFrame "HF". iPureIntro. intros Hd.
+        destruct (Hb (Hdh Hd)) as (Hlen & _).
+        rewrite union_rec_now_io; [exact (HFr (Hdh Hd)) | exact Hsh | reflexivity
+                                   | exact Hlen]. }
+      rewrite Hbo. iDestruct "Hera" as "[%H0 | (%vf & #Hp & #HflE & %Hr)]";
+        [by iLeft | iRight].
+      iExists vf. iFrame "Hp HflE". iPureIntro. intros Hd.
+      destruct (Hb (Hdh Hd)) as (Hlen & _).
+      rewrite union_rec_base_io'; [exact (Hr (Hdh Hd)) | exact Hsh | reflexivity
+                                   | exact Hlen]. }
+    rewrite /udrain_ret.
     iDestruct "Hgo" as "[#HT | Hgo]".
     { iModIntro. iFrame "Hfl". by iRight. }
-    iDestruct "Hgo" as (s0 vf) "(%Hgo & #Hty & #Hfp & #Hlb)".
-    iDestruct (f0_typed_adm gf (ulines_of h) s0
-                 with "Hfl Hty") as "[Hfl %Hadm]".
-    rewrite ulines_of_echof in Hadm.
+    iDestruct "Hgo" as (s0 vf o) "(%Hgo & _ & #Hty & #Hfp & #Hlb & Ho)".
+    iDestruct "Hera" as "[%H0 | (%vfE & #HpE & #HflE & %HrE)]".
+    { exfalso. exact (trace_shape_boots h true Hsh eq_refl H0). }
+    iDestruct (file_era_pin_agree with "Hfp HpE") as %<-.
+    iDestruct "Hbase'" as "[%H0' | (%vfB & #HpB & %HuB)]".
+    { exfalso. exact (trace_shape_boots _ true Hsh' eq_refl H0'). }
+    rewrite Hbo. iDestruct (file_era_pin_agree with "Hfp HpB") as %<-.
+    (* THE ERA'S BOOT FACT: the boot state is admissible at the era's floor *)
+    iDestruct (f0_bl_bt with "[]") as "[#HT | (%ls & #Hls & %Hadm0)]";
+      [iApply (f0_lb_bl with "Hlb") | iModIntro; iFrame "Hfl"; by iRight |].
+    iDestruct (fl_lb_prefix with "Hfl Hls") as %Hlsp.
+    pose proof (uadm_mono _ _ _ _ Hlsp Hadm0) as Hadm.
     iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
-               exists u1, s0s = u1 ++ [s0]⌝)%I as "%Hlast".
+               exists u1 o0, W = u1 ++ [(s0, o0)]⌝)%I as "%Hlast".
     { destruct (decide (obs_wire Uart0 (open_seg h) = [])) as [Hw | Hw].
       - iPureIntro. intro Hne. by destruct (Hne Hw).
-      - iDestruct (f0_pinned_drained gf h s0s vf s0 Hw with "Hfp Hlb Hpin0")
-          as %Hl. iPureIntro. by intros _. }
+      - iDestruct (f0_pinned_drained gf h (fst <$> W) vf s0 Hw with "Hfp Hlb Hpin0")
+          as %(u1 & Hu1).
+        iPureIntro. intros _.
+        apply fmap_app_inv in Hu1 as (w1 & w2 & -> & Hw2 & ->).
+        destruct w2 as [| [x o0] [| ? ?]]; try discriminate.
+        injection Hw2 as <-. by exists w1, o0. }
+    iAssert (sl_lb (ff_hist (fgn_cl gf)) (fe_floor vf)
+             ∗ (⌜o = None⌝
+                ∨ ∃ (J : list (bv 8)) (c : fstate) (L : list srec),
+                    ⌜o = Some (nlines J, c)⌝
+                    ∗ sl_lb (ff_hist (fgn_cl gf))
+                        (L ++ [(length (fe_base vf ++ ulines_in J), c)])))%I
+      with "[Ho]" as "[_ Ho]"; [by iFrame "HflE Ho" |].
     iModIntro. iFrame "Hfl". iLeft.
-    iExists (removelast s0s ++ [s0]). iSplitR; last first.
-    { iApply (f0_pinned_drain gf h b (removelast s0s) vf s0 with "Hfp Hlb"). }
-    iPureIntro. intros Hd.
-    exact (union_phi_body_drain h b s0s s0 Hsh
-             (proj1 (lm_disc_out U h Uart0 b Hsh) Hd) Hgo Hadm Hlast
-             (Hb (proj1 (lm_disc_out U h Uart0 b Hsh) Hd))).
+    iExists (removelast W ++ [(s0, o)]). iSplitR.
+    { iPureIntro. intros Hd. pose proof (Hdh Hd) as Hd0.
+      apply (union_phi_sync_body_drain h b W s0 o Hsh Hd0 Hgo); [| exact Hlast | exact (Hb Hd0)].
+      pose proof (HrE Hd0) as HrE'. rewrite /union_rec_base in HrE'.
+      rewrite -HrE'. exact Hadm. }
+    iSplitR.
+    { rewrite fmap_app /=.
+      iApply (f0_pinned_drain gf h b (fst <$> removelast W) vf s0 with "Hfp Hlb"). }
+    iSplitL "Ho".
+    { iDestruct "Ho" as "[%Hon | (%J & %c & %L & %HoJ & #HL)]".
+      - iExists (fe_floor vf). iFrame "HflE". iPureIntro. intros Hd.
+        pose proof (Hdh Hd) as Hd0. destruct (Hb Hd0) as (Hlen & _). subst o.
+        destruct (union_W_snoc h W Hsh Hlen) as (u1 & y & -> & Hl1).
+        rewrite epu_removelast_snoc.
+        rewrite (union_rec_now_drain_none h (ObsUartOut Uart0 b) u1 y s0 Hsh eq_refl Hl1).
+        exact (HrE Hd0).
+      - iExists (L ++ [(length (fe_base vf ++ ulines_in J), c)]). iFrame "HL".
+        iPureIntro. intros Hd.
+        pose proof (Hdh Hd) as Hd0. destruct (Hb Hd0) as (Hlen & _). subst o.
+        destruct (union_W_snoc h W Hsh Hlen) as (u1 & y & -> & Hl1).
+        rewrite epu_removelast_snoc slast_snoc.
+        rewrite (union_rec_now_drain_some (h ++ [ObsUartOut Uart0 b]) u1 s0 (fe_base vf)
+                   J c Hsh' HuB); [reflexivity |].
+        rewrite (cycles_len_io h (ObsUartOut Uart0 b) Hsh eq_refl). exact Hl1. }
+    rewrite Hbo. iRight. iExists vf. iFrame "Hfp HflE". iPureIntro. intros Hd.
+    pose proof (Hdh Hd) as Hd0. destruct (Hb Hd0) as (Hlen & _).
+    destruct (union_W_snoc h W Hsh Hlen) as (u1 & y & -> & Hl1).
+    rewrite epu_removelast_snoc.
+    rewrite (union_rec_base_io h (ObsUartOut Uart0 b) u1 (s0, o) y Hsh eq_refl Hl1).
+    exact (HrE Hd0).
   Qed.
 
   (* THE INPUT STEP: the counter decides, and the byte's TAG is handed
@@ -1051,14 +1351,26 @@ Section union_out.
     iAssert (union_phi_res (h ++ [ObsUartIn i b]) ∨ UT)%I
       with "[Hphi]" as "Hphi".
     { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-      iLeft. iDestruct "Hphi" as (s0s) "[%Hb #Hp]".
-      iExists s0s. iSplitR.
-      - iPureIntro. intros Hd.
-        apply (union_phi_body_step_io h (ObsUartIn i b) s0s Hsh
+      iLeft. iDestruct "Hphi" as (W) "(%Hb & #Hp & (%F & #HF & %HFr) & #Hera)".
+      iExists W. iSplitR.
+      { iPureIntro. intros Hd.
+        apply (union_phi_sync_body_step_io h (ObsUartIn i b) W Hsh
                  ltac:(by destruct i) ltac:(by destruct i)), Hb.
-        exact (Hin Hd).
-      - iApply (f0_pinned_io gf h (ObsUartIn i b) s0s ltac:(by destruct i)
+        exact (Hin Hd). }
+      iSplitR.
+      { iApply (f0_pinned_io gf h (ObsUartIn i b) (fst <$> W) ltac:(by destruct i)
                   ltac:(by destruct i) with "Hp"). }
+      iSplitR.
+      { iExists F. iFrame "HF". iPureIntro. intros Hd.
+        destruct (Hb (Hin Hd)) as (Hlen & _).
+        rewrite union_rec_now_io; [exact (HFr (Hin Hd)) | exact Hsh | by destruct i
+                                   | exact Hlen]. }
+      rewrite Hbo. iDestruct "Hera" as "[%H0 | (%vf & #Hpv & #HflE & %Hr)]";
+        [by iLeft | iRight].
+      iExists vf. iFrame "Hpv HflE". iPureIntro. intros Hd.
+      destruct (Hb (Hin Hd)) as (Hlen & _).
+      rewrite union_rec_base_io'; [exact (Hr (Hin Hd)) | exact Hsh | by destruct i
+                                   | exact Hlen]. }
     assert (Hsh' : trace_shape (h ++ [ObsUartIn i b]) true)
       by (eapply trace_shape_snoc; [exact Hsh | reflexivity]).
     rewrite /union_led /utag.
@@ -1077,16 +1389,18 @@ Section union_out.
       iExact "Hbase'".
   Qed.
 
-  (* THE CONCLUSION's read at the end of the run *)
+  (* THE CONCLUSION's read at the end of the run (sync SY3-A4: each cycle
+     with its last completed sync, each later boot admissible at the last
+     completed sync before it) *)
   Lemma union_led_phi (h : list mobs) :
-    union_led h -∗ ⌜union_phi h⌝.
+    union_led h -∗ ⌜union_phi_sync h⌝.
   Proof using .
     iIntros "(Hcnt & _ & _ & _ & _ & [Hphi | HT'] & _)".
-    { iDestruct "Hphi" as (s0s) "[%Hb _]". iPureIntro.
-      exact (union_phi_of_body h s0s Hb). }
+    { iDestruct "Hphi" as (W) "[%Hb _]". iPureIntro.
+      exact (union_phi_sync_of_body h W Hb). }
     rewrite /file_taint /echo_taint.
     iDestruct (mono_nat_lb_own_valid with "Hcnt HT'") as %[_ Hle].
-    iPureIntro. rewrite /union_phi. intros Hd. exfalso.
+    iPureIntro. rewrite /union_phi_sync. intros Hd. exfalso.
     rewrite decide_True in Hle; [| exact Hd]. lia.
   Qed.
   (* THE RETURN PATH (sync SY3-A3bc, [App.al_back]): at the history the

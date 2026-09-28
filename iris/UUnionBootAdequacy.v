@@ -193,7 +193,7 @@ Corollary union_adequacy_unionΣ
     language.nsteps n ([PowerLoopE : language.expr riscv_lang], g)
       κs (t2, g2) ->
     (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ UnionOutPure.union_phi κs.
+    /\ UnionOutPure.union_phi_sync κs.
 Proof.
   assert (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
                    fsimg_sb fsimg_nib fsimg_cov)

@@ -613,6 +613,29 @@ Proof using.
   by rewrite last_snoc.
 Qed.
 
+(* AT A PADDED RESOLUTION the last completed sync is a FILED round's: the
+   pad files each line's exec failure, which is never /sync's run *)
+Lemma usync_last_pad (ps cs : list nat) (s : fstate) (I w : list (bv 8)) (r : srec) :
+  usync_last ps (lm_alts_pad U UK I cs) s I w = Some r ->
+  exists i, i < length cs /\ i < nlines I
+            /\ usync_at ps (lm_alts_pad U UK I cs) s I w i = Some r.
+Proof using.
+  rewrite /usync_last /usyncs. intros Hl.
+  apply last_Some_elem_of in Hl.
+  apply elem_of_list_omap in Hl as (i & Hi & Hu). apply elem_of_seq in Hi.
+  exists i. destruct (decide (i < length cs)) as [Hic | Hic]; [split_and!; [exact Hic | lia | exact Hu] |].
+  exfalso. revert Hu. rewrite /usync_at. case_decide as Hd; [| discriminate].
+  intros _. destruct Hd as (Hls & Ha & _).
+  rewrite /lm_alts_pad list_lookup_total_alt lookup_app_r in Ha; [| lia].
+  rewrite list_lookup_fmap lookup_drop in Ha.
+  replace (length cs + (i - length cs)) with i in Ha by lia.
+  rewrite list_lookup_total_alt in Hls.
+  destruct (bodies_of I !! i) as [b |] eqn:Hb;
+    [| apply lookup_ge_None in Hb; rewrite /nlines in Hi; lia].
+  cbn in Hls, Ha. change (lm_of U b) with (uline_of_u b) in Ha.
+  rewrite Hls in Ha. vm_compute in Ha. discriminate Ha.
+Qed.
+
 (* THE GLOBAL OFFSET: walking the cycles adds each cycle's line count, so
    a record of the cycle at index [n] is offset by the lines of the cycles
    before it *)

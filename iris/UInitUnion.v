@@ -95,7 +95,7 @@ Corollary union_adequacy_closed
     language.nsteps n ([PowerLoopE : language.expr riscv_lang], g)
       κs (t2, g2) ->
     (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ UnionOutPure.union_phi κs.
+    /\ UnionOutPure.union_phi_sync κs.
 Proof.
   exact (union_adequacy_unionΣ (union_Hinit_boot (Σ := unionΣ))
            g Hgen0 Hpow0 Hdisk).

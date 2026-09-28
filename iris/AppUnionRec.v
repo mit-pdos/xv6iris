@@ -74,10 +74,10 @@ Local Notation U := ulmG.
 (* ====================================================================== *)
 (*  1.  THE CONCLUSION                                                     *)
 (*                                                                        *)
-(*  [UnionOutPure.union_phi] VERBATIM; it reads the trace alone.           *)
+(*  [UnionOutPure.union_phi_sync] VERBATIM; it reads the trace alone.      *)
 (* ====================================================================== *)
 Definition union_phi : gstate -> list mobs -> Prop :=
-  fun _ h => UnionOutPure.union_phi h.
+  fun _ h => UnionOutPure.union_phi_sync h.
 
 Section UnionApp.
   Context {Σ : gFunctors}.
@@ -289,18 +289,13 @@ Section UnionApp.
     iIntros "!>" (h b u u' ho H)
       "%Htxp %Hlp %Hsh %Hwi %Hwo %Hbt %Hpo %Hacc Ho Hg Hled".
     iAssert (|==> (if i is Uart0 then ucl c (S gen_id) ho H else emp)
-                  ∗ (file_taint (fgn_cl (ugn_file c))
-                     ∨ (match i with
-                        | Uart0 => ∃ (s0 : fstate) (vf : file_era),
-                                     ⌜lm_good_out U s0
-                                        (open_seg h ++ [ObsUartOut Uart0 b])⌝
-                                     ∗ f0_typed (ugn_file c) s0
-                                     ∗ file_era_pin (ugn_file c) (obs_boots h) vf
-                                     ∗ f0_lb (ugn_file c) vf s0
-                        | _ => True
-                        end)))%I with "[Ho]" as ">[Ho Hgo]".
+                  ∗ (match i with
+                     | Uart0 => udrain_ret c (obs_boots h)
+                                  (open_seg h ++ [ObsUartOut Uart0 b])
+                     | _ => True
+                     end))%I with "[Ho]" as ">[Ho Hgo]".
     { destruct i; last first.
-      { iModIntro. iFrame "Ho". by iRight. }
+      { iModIntro. by iFrame "Ho". }
       assert (Hins : ins (open_seg h ++ [ObsUartOut Uart0 b])
                      = ins (open_seg h))
         by (by rewrite ins_app ins_out app_nil_r).
@@ -320,12 +315,7 @@ Section UnionApp.
                    (open_seg h ++ [ObsUartOut Uart0 b])
                    Hsh Hbt Hpo Hins ltac:(rewrite Hacc; exact Hpre) Hne
                    with "Ho") as "[Ho Hgo]".
-      iModIntro. iFrame "Ho".
-      rewrite /udrain_ret.
-      iDestruct "Hgo" as "[HT | Hgo]"; [by iLeft |].
-      iDestruct "Hgo" as (s0 vf) "(%Hg & %Hfok & #Hty & #Hfp & #Hlb)".
-      iRight. iExists s0, vf. rewrite Hbt. iFrame "Hty Hfp Hlb".
-      by iPureIntro. }
+      iModIntro. iFrame "Ho". rewrite Hbt. iExact "Hgo". }
     iMod (union_led_tx c h i b Hsh with "Hgo Hled") as "Hled".
     iModIntro. iFrame "Ho Hg Hled".
   Qed.
