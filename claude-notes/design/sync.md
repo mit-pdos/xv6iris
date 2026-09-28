@@ -648,6 +648,40 @@ and return it; `sync_claim_rebase` founds a FRESH position (`fn_with_pos
 contain `sync_claim` as stated -- it is over `file_fixed`, below
 `UnionOut`/`UnionSync`, and `sync_claim` needs `union_gn` and `HSt`.
 
+**As built (A3bc, first landing: items 1 and the transport's loan).**
+`file_fixed := {ff_echo; ff_fl; ff_reg; ff_cm; ff_st}`; `fileAppG` gains
+`fa_st : mono_natG Σ` and `fa_pos : ghost_varG Σ nat` as NON-INSTANCE
+fields (every use `@mono_nat_auth_own Σ fa_st …`/`fpos`), with the
+constructor `fileAppG_of HS HSt HPos` (no `subG` instance); `unionΣ`'s is
+`fileAppG_of _ riscv_pre_genGS eo_turn` (`eo_turn` is the camera `fpos`
+was read at before).  `UnionSync.v` is `AppFile` section 3b over
+`file_fixed` (`sync_claim`, `union_tk`, `union_hk`, the closure lemmas;
+the era predicate is `file_ok`); `file_birth γst` stores the started
+gname, `union_born` reads `ff_st`.  `app_xfer_boot_raw HSt A Okc B Tn Tn'
+γst gen` takes and returns `mono_nat_auth_own γst 1 n` at `n = gen + 1`
+(the swap's, at `riscv_pre_genGS`); `Hswap` is told `Born … c` so an
+application reads the loan at its own copy of the gname; `al_xfer c gen
+γd γsw γreg γst : app_born … c -> …` at the era `S gen`.
+
+**OPEN after A3bc's first landing: the round position's advance is not
+monotone in the ghost state.**  `file_pos_advance` moves both halves from
+`n` to `n' := length (ls0' ++ ulines_in I')` and must keep `∀ rec ∈ Ls,
+rec.1 ≤ n'`, i.e. needs `n ≤ n'`.  (a) Between rounds: the holder's `n =
+length (ls0 ++ ulines_in I)` and the new `flw` are two lower bounds with
+independent `ls0`s (the reader replaces the witness by the newest tag's
+list), so only `L ⊑ L' ∨ L' ⊑ L` is known.  (b) At an era's first round
+`n = length ls_c` (the copy's line lower bound, founded by the transport)
+and nothing bounds `ls_c` by the power-on list: only the ledger's full
+authority can, and the transport (which founds the running half) and sh
+never see it.  A fix within the landed pieces: (a) a canonical ERA BASE
+-- the on-arm pins `ls0 := ulines_of h` per era (a discarded `mono_list`
+authority at a new `file_era` gname), the tag carries the pin and the
+pure `ulines_of h = ls0 ++ ulines_in (consumed input)`, and `flw` names
+the pinned `ls0`; (b) the transport PINS the copy's `ls_c` at a gname the
+on-arm lends in `Tn` (so `B r'` and `Tn'` name the same list), and
+`al_back`, holding the line list's authority, files `ls_c ⊑ ls0` into
+`Tn''` for sh's first advance.
+
 **Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
 `al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
 birth's slot part and its gnames; the transport's

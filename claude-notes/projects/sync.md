@@ -56,6 +56,19 @@ Open cleanups it left, none blocking:
   `p ≤ j` follows from it; (3) `file_xfer_boot` with a sync part needs
   the fresh list's registration (in the ledger, i.e. `Tn`) and the
   started-auth loan, which `app_xfer_boot_raw` does not pass.
+- SY3-A3bc PARTIAL on branch `sync3-a3bc` (green, audits 13/13/14; NOT
+  on main): item 1 (`file_fixed` a record `ff_echo`/`ff_fl`/`ff_reg`/
+  `ff_cm`/`ff_st`; `fileAppG`'s non-instance `fa_st`/`fa_pos`, built by
+  hand at `unionΣ` as `fileAppG_of _ riscv_pre_genGS eo_turn`;
+  `UnionSync.v` folded into `AppFile` section 3b; `union_born` reads
+  `ff_st`) and item 6's loan (`app_xfer_boot_raw HSt A Okc B Tn Tn' γst
+  gen`, `Hswap` told `Born`, `al_xfer` at `S gen` with `app_born`).
+  STOPPED at items 2/3 for the owner: `file_pos_advance`'s monotonicity is
+  not suppliable -- (a) `flw`'s `∃ ls0` makes two rounds' lists merely
+  comparable, (b) at an era's first round nothing bounds the founding
+  value `length ls_c` (the copy's line lower bound) by the round's list;
+  only the ledger's authority (on-arm/`al_back`) sees the power-on list.
+  Design §4.5 "OPEN after A3bc's first landing" has the goal and a fix.
 - The pure model (lane SY3-M, branch `sync3-m` at `855896fb8`, merged by
   A2): `iris/UnionAdm.v` (line list `ulines_of`, records `srec`, `uadm`,
   `srec_le`, the shrink lemmas, `usync_last`, `lm_good_sync`),
