@@ -519,3 +519,156 @@ Proof using.
   { intros l. rewrite take_take. f_equal. rewrite length_take. lia. }
   by rewrite Hn (Hn os') Ho.
 Qed.
+
+(* ===================================================================== *)
+(*  5.  THE BRIDGE (lane SY3-A4, step 1): THE RECORD A COMPLETED SYNC     *)
+(*      ROUND'S HOOK APPENDS IS THE MODEL'S                               *)
+(*                                                                        *)
+(*  The hook appends [(length ls', s)] with [ls'] sh's line lower bound   *)
+(*  ending at the sync line ([FileLinksLine.flw I]: the era's base        *)
+(*  followed by the round's input lines) and [s] the deed's state at      *)
+(*  PEND.  The model records [(S i, lm_upto cs s0 bodies i)] at the sync  *)
+(*  line's LOCAL index [i] ([usync_at]) and [ulast_before] offsets it by  *)
+(*  the earlier cycles' lines.  Locally: the round's index is [nlines I - *)
+(*  1], so [S i = nlines I], and /sync's alternative moves no file, so    *)
+(*  the deed's PEND state is the model's state before the round.         *)
+(*  Globally: the offset [ulast_from] adds IS the length of the earlier   *)
+(*  cycles' lines ([ulast_before_snoc_some]), which is the era's base.   *)
+(* ===================================================================== *)
+
+(* /sync RAN moves no file *)
+Lemma ustep_sync_ran (s : fstate) : lm_step U s LSync (UR RSyncRan) = s.
+Proof using. reflexivity. Qed.
+
+(* THE LOCAL BRIDGE: at the round whose line is [sync], resolved to /sync's
+   run ([a]), with the choices before it [cs] and the deed's state [c] the
+   PEND tie's, the model's record at the round's index -- read off any
+   resolution extending [cs ++ [a]] and any input extending [I], at a wire
+   holding the round's whole block -- is [(nlines I, c)] *)
+Lemma usync_at_round (ps cs cs' : list nat) (s0 : fstate) (I I' w : list (bv 8))
+    (a : nat) (c : fstate) :
+  length cs = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
+  lm_line_at U I = LSync -> ualt_dec a = UR RSyncRan ->
+  c = lm_step U (lm_upto U cs s0 (bodies_of I) (nlines I - 1)) (lm_line_at U I) (lm_dec U a) ->
+  (cs ++ [a]) `prefix_of` cs' -> I `prefix_of` I' ->
+  (pro_of ps ++ lm_seq U ps cs' s0 (bodies_of I') (nlines I)) `prefix_of` w ->
+  usync_at ps cs' s0 I' w (nlines I - 1) = Some (nlines I, c).
+Proof using.
+  intros Hlen Hpos Hl Ha -> Hcc HII Hw.
+  set (i := (nlines I - 1)%nat).
+  assert (Hlen' : length (cs ++ [a]) = nlines I) by (rewrite length_app /=; lia).
+  rewrite (usync_at_ext ps (cs ++ [a]) cs' s0 I I' w i Hlen' Hcc HII ltac:(lia)).
+  assert (Hbb : forall j, j < nlines I -> bodies_of I' !!! j = bodies_of I !!! j).
+  { intros j Hj. destruct HII as [k ->]. destruct (bodies_of_app I k) as [z Hz].
+    rewrite Hz. rewrite !list_lookup_total_alt lookup_app_l; [reflexivity |].
+    exact Hj. }
+  assert (Hwire : (pro_of ps ++ lm_seq U ps (cs ++ [a]) s0 (bodies_of I) (S i)) `prefix_of` w).
+  { rewrite (_ : S i = nlines I); [| rewrite /i; lia].
+    rewrite -(lm_seq_bs_ext U ps (cs ++ [a]) s0 (bodies_of I') (bodies_of I) (nlines I) Hbb).
+    rewrite -(lm_seq_cs_ext U ps cs' (cs ++ [a]) s0 (bodies_of I') (nlines I)
+                ltac:(intros j Hj; apply cs_prefix_total; [exact Hcc | lia])).
+    exact Hw. }
+  assert (Hai : (cs ++ [a]) !!! i = a).
+  { rewrite list_lookup_total_alt lookup_app_r; [| rewrite /i; lia].
+    rewrite (_ : i - length cs = 0); [reflexivity | rewrite /i; lia]. }
+  rewrite /usync_at decide_True; last first.
+  { split_and!; [exact Hl | by rewrite Hai | exact Hwire]. }
+  f_equal. f_equal; [rewrite /i; lia |].
+  rewrite Hl (_ : lm_dec U a = UR RSyncRan); [| exact Ha]. rewrite ustep_sync_ran.
+  apply lm_upto_cs_ext. intros j Hj.
+  rewrite !list_lookup_total_alt lookup_app_l; [reflexivity | rewrite /i in Hj; lia].
+Qed.
+
+(* ...AND IT IS THE CYCLE'S LAST COMPLETED SYNC when the wire ends at the
+   round's block: every later round's block is past the wire *)
+Lemma usync_last_round (ps cs : list nat) (s : fstate) (I w : list (bv 8)) (i : nat)
+    (r : srec) :
+  i < nlines I -> usync_at ps cs s I w i = Some r ->
+  length w = length (pro_of ps ++ lm_seq U ps cs s (bodies_of I) (S i)) ->
+  usync_last ps cs s I w = Some r.
+Proof using.
+  intros Hi Hr Hlw.
+  assert (Hlater : forall j, i < j -> usync_at ps cs s I w j = None).
+  { intros j Hj. rewrite /usync_at. case_decide as Hd; [exfalso | reflexivity].
+    destruct Hd as (_ & _ & Hp). apply prefix_length in Hp.
+    rewrite (_ : S j = S i + (j - i)) in Hp; [| lia].
+    assert (Hge : forall q, length (lm_seq U ps cs s (bodies_of I) (S i))
+                            < length (lm_seq U ps cs s (bodies_of I) (S i + S q))).
+    { intros q. induction q as [| q IH].
+      - rewrite Nat.add_1_r (lm_seq_S U ps cs s (bodies_of I) (S i)) length_app.
+        rewrite /lm_blk length_app /=. lia.
+      - rewrite (_ : S i + S (S q) = S (S i + S q)); [| lia].
+        rewrite (lm_seq_S U ps cs s (bodies_of I) (S i + S q)) length_app. lia. }
+    rewrite (_ : j - i = S (j - i - 1)) in Hp; [| lia].
+    specialize (Hge (j - i - 1)).
+    rewrite (length_app (pro_of ps)) in Hp. rewrite (length_app (pro_of ps)) in Hlw. lia. }
+  assert (Hnone : forall n m, i < m -> omap (usync_at ps cs s I w) (seq m n) = []).
+  { intros n. induction n as [| n IH]; intros m Hm; [reflexivity |].
+    cbn [seq omap list_omap]. rewrite (Hlater m Hm). apply IH. lia. }
+  rewrite /usync_last /usyncs.
+  rewrite (_ : nlines I = S i + (nlines I - S i)); [| lia].
+  rewrite seq_app seq_S !omap_app (Hnone (nlines I - S i) (0 + S i)); [| lia].
+  rewrite app_nil_r.
+  cbn [omap list_omap]. rewrite (_ : 0 + i = i); [| lia]. rewrite Hr.
+  by rewrite last_snoc.
+Qed.
+
+(* THE GLOBAL OFFSET: walking the cycles adds each cycle's line count, so
+   a record of the cycle at index [n] is offset by the lines of the cycles
+   before it *)
+Lemma ulast_from_app (off : nat) (r : srec) (segs segs' : list (list mobs))
+    (os os' : list (option srec)) :
+  length os = length segs ->
+  ulast_from off r (segs ++ segs') (os ++ os')
+  = ulast_from (off + length (concat (ulines_cyc <$> segs)))
+      (ulast_from off r segs os) segs' os'.
+Proof using.
+  revert off r os. induction segs as [| seg segs IH]; intros off r os Hl.
+  - destruct os; [| discriminate Hl]. cbn. by rewrite Nat.add_0_r.
+  - destruct os as [| o os]; [discriminate Hl |]. cbn [app ulast_from].
+    rewrite (IH _ _ os ltac:(cbn in Hl; lia)). f_equal.
+    cbn [fmap list_fmap concat]. rewrite length_app /ulines_cyc ulines_in_length. lia.
+Qed.
+
+Lemma ulines_before_length_take (h : list mobs) (n : nat) :
+  length (ulines_before h n) = length (concat (ulines_cyc <$> take n (cycles_of h))).
+Proof using. reflexivity. Qed.
+
+(* the open cycle's record [Some r'], at its GLOBAL position *)
+Lemma ulast_before_snoc_some (h : list mobs) (os : list (option srec)) (r' : srec) :
+  length os < length (cycles_of h) ->
+  ulast_before h (os ++ [Some r']) (S (length os))
+  = (length (ulines_before h (length os)) + r'.1, r'.2).
+Proof using.
+  intros Hlt. rewrite /ulast_before.
+  destruct (lookup_lt_is_Some_2 (cycles_of h) (length os) Hlt) as [seg Hseg].
+  rewrite (take_S_r _ _ _ Hseg).
+  rewrite (ulast_from_app 0 srec0 _ [seg] os [Some r']); [| rewrite length_take; lia].
+  cbn [ulast_from]. rewrite ulines_before_length_take. reflexivity.
+Qed.
+
+(* ...and [None]: the earlier cycles' record stands *)
+Lemma ulast_before_snoc_none (h : list mobs) (os : list (option srec)) :
+  length os < length (cycles_of h) ->
+  ulast_before h (os ++ [None]) (S (length os)) = ulast_before h os (length os).
+Proof using.
+  intros Hlt. rewrite /ulast_before.
+  destruct (lookup_lt_is_Some_2 (cycles_of h) (length os) Hlt) as [seg Hseg].
+  rewrite (take_S_r _ _ _ Hseg).
+  rewrite (ulast_from_app 0 srec0 _ [seg] os [None]); [| rewrite length_take; lia].
+  cbn [ulast_from]. reflexivity.
+Qed.
+
+(* THE BRIDGE, WHOLE: the hook's record over sh's line lower bound [base ++
+   ulines_in I] (the era's base, which is the earlier cycles' lines) is the
+   model's last completed sync once the open cycle's record is the round's *)
+Lemma usync_bridge (h : list mobs) (os : list (option srec)) (base : list uline)
+    (I : list (bv 8)) (c : fstate) :
+  length os < length (cycles_of h) ->
+  base = ulines_before h (length os) ->
+  ulast_before h (os ++ [Some (nlines I, c)]) (S (length os))
+  = (length (base ++ ulines_in I), c).
+Proof using.
+  intros Hlt ->. rewrite (ulast_before_snoc_some h os _ Hlt) length_app ulines_in_length.
+  reflexivity.
+Qed.

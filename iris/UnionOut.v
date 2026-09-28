@@ -183,6 +183,33 @@ Proof using.
   reflexivity.
 Qed.
 
+(* ---- THE ERA'S BASE IS THE EARLIER CYCLES' LINES (sync SY3-A4, the
+        bridge's offset): the base the era's record pins is what
+        [UnionAdm.ulast_before] adds to the open cycle's local record ---- *)
+Lemma ubase_before (h : list mobs) (B : list uline) :
+  trace_shape h true -> ulines_of h = B ++ ulast_cyc h ->
+  B = ulines_before h (pred (length (cycles_of h))).
+Proof using.
+  intros Hsh H. destruct (cycles_of_io h [] Hsh (Forall_nil_2 _)) as (cs & H1 & _).
+  rewrite /ulines_of /ulast_cyc H1 last_snoc fmap_app concat_app /= app_nil_r in H.
+  rewrite -(app_inv_tail _ _ _ H) H1 length_app /= Nat.add_1_r /=.
+  symmetry. exact (ulines_before_cut h cs _ H1).
+Qed.
+
+(* THE BRIDGE AT THE ERA ([UnionAdm.usync_bridge]): with the open cycle's
+   record the sync round's local [(nlines I, c)], the model's last
+   completed sync is [(length (base ++ ulines_in I), c)] -- the record the
+   hook appends over sh's line lower bound [base ++ ulines_in I] *)
+Lemma usync_bridge_era (h : list mobs) (os : list (option srec)) (B : list uline)
+    (I : list (bv 8)) (c : fstate) :
+  trace_shape h true -> ulines_of h = B ++ ulast_cyc h ->
+  S (length os) = length (cycles_of h) ->
+  ulast_before h (os ++ [Some (nlines I, c)]) (S (length os)) = (length (B ++ ulines_in I), c).
+Proof using.
+  intros Hsh HB Hl. apply usync_bridge; [lia |].
+  rewrite (ubase_before h B Hsh HB) -Hl. reflexivity.
+Qed.
+
 Section union_out.
   Context {Σ : gFunctors}.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,

@@ -116,6 +116,29 @@ Definition upend_tie_at (cs : list nat) (sb : fstate) (I : list (bv 8)) (c : fst
 Definition upend_tie (cs : list nat) (sb : fstate) (I : list (bv 8)) (c : fstate) : Prop :=
   exists a : nat, upend_tie_at cs sb I c a.
 
+(* ---- THE BRIDGE AT sh's SYNC ROUND (sync SY3-A4, step 1;
+        [UnionAdm.usync_at_round]).  The PEND tie at the round of a [sync]
+        line resolved to /sync's run: the deed's state IS the model's state
+        before the round (/sync moves no file), and the model's record at
+        the round's index -- read off any resolution extending the round's
+        choices and any input extending the round's, at a wire holding the
+        round's block -- is [(nlines I, c)].  With sh's line lower bound
+        [base ++ ulines_in I] of length [length base + nlines I]
+        ([UnionOut.usync_bridge_era]) the hook's record is the model's. ---- *)
+Lemma upend_sync_record (ps cs cs' : list nat) (s0 : fstate) (I I' w : list (bv 8))
+    (c : fstate) (a : nat) :
+  upend_tie_at cs s0 I c a -> ul I = LSync -> ualt_dec a = UR RSyncRan ->
+  (cs ++ [a]) `prefix_of` cs' -> I `prefix_of` I' ->
+  (pro_of ps ++ lm_seq U ps cs' s0 (bodies_of I') (nlines I)) `prefix_of` w ->
+  c = ust cs s0 I
+  /\ UnionAdm.usync_at ps cs' s0 I' w (nlines I - 1) = Some (nlines I, c).
+Proof using.
+  intros (Hlen & Hpos & _ & _ & _ & Hc) Hl Ha Hcc HII Hw. split.
+  - rewrite Hc Hl (_ : lm_dec U a = UR RSyncRan); [| exact Ha].
+    exact (UnionAdm.ustep_sync_ran _).
+  - exact (UnionAdm.usync_at_round ps cs cs' s0 I I' w a c Hlen Hpos Hl Ha Hc Hcc HII Hw).
+Qed.
+
 (* ---- the identity steps ---- *)
 
 (* THE OUT-OF-MEMORY ALTERNATIVE (sync design section 2): admissible at
