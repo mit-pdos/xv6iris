@@ -45,7 +45,7 @@
 (* nothing.                                                                *)
 (*                                                                        *)
 (* THE OTHER HALF OF THE TRUSTED BASE -- what a reader must READ for the   *)
-(* statement to MEAN what they think -- is [UnionOutPure.union_phi],       *)
+(* statement to MEAN what they think -- is [UnionOutPure.union_phi_sync],  *)
 (* [LineModel.v]'s [lm_disc] and [lm_good_out], and [UnionDisc.v]'s model  *)
 (* [ulmG] over [FileDisc.v] and [PipesDisc.v]: they ARE the specification. *)
 (* ====================================================================== *)

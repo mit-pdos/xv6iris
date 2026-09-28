@@ -9,7 +9,7 @@
 (*  [file_boot] / [file_xfer_boot]); what is the union's own is the       *)
 (*  console half: the ledger [UnionOut.union_led], the tag [utag], the    *)
 (*  claim [ucl] (the file lines' generic claim beside the N-writer open   *)
-(*  round) and the conclusion [UnionOutPure.union_phi].                   *)
+(*  round) and the conclusion [UnionOutPure.union_phi_sync].              *)
 (*                                                                        *)
 (*  [al_programs] is a SECTION HYPOTHESIS here, as at [AppFileRec]; it is *)
 (*  discharged by [UInitUnion.union_Hinit_boot].                          *)

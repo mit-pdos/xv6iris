@@ -798,7 +798,7 @@ Proof using. intros s. split; [reflexivity | vm_compute; reflexivity]. Qed.
 (* ---- THE NEGATIVE DEMO: echo a > a.txt; echo b > a.txt; cat a.txt
         prints a.  Refuted at every well-formed boot state: the claim
         (the top theorem's [lm_good_out], through
-        [UnionOutPure.union_phi]) does not hold of this wire under ANY
+        [UnionOutPure.union_phi_sync]) does not hold of this wire under ANY
         resolution.  The engine: the determinacy theorem pins every
         resolution to the honest one through the typed [cat a.txt], so
         the second redirect printed the bare prompt -- and the only

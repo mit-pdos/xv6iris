@@ -47,7 +47,7 @@ Require Import EchoOut.
 Require Import FileOut.
 Require Import PipeOut.
 Require Import App.                      (* [app_names] / [app_pred] / [app_boot] / [app_turn] *)
-Require Import UnionOutPure.             (* [union_phi] *)
+Require Import UnionOutPure.             (* [union_phi_sync] *)
 Require Import UnionOut.
 Require Import UUnionBootAdequacy.       (* [union_prog_law], [unionΣ] *)
 Require Import AppUnionRec.              (* [app_union]'s projections *)

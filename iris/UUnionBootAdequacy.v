@@ -61,7 +61,7 @@ Require Import EchoOut.            (* [echoOutG] / [echoOutSig] *)
 Require Import FileOut.            (* [fileOutG] / [fileOutSig] *)
 Require Import PipeOut.            (* [pipeOutG] / [pipeOutΣ] *)
 Require Import UnionDisc.
-Require Import UnionOutPure.       (* [union_phi] -- the conclusion, spelled out *)
+Require Import UnionOutPure.       (* [union_phi_sync] -- the conclusion, spelled out *)
 Require Import UnionOut.
 Require Import AppUnionRec.        (* [app_union] and its ten discharged laws *)
 Require UkFileIface.               (* [fifRegΣ]: the file handler's registry *)
@@ -147,7 +147,7 @@ End UnionAdequacy.
 (*                                                                       *)
 (*  A concrete list, so the claim that the ghost state is realisable is   *)
 (*  CHECKED and the statement is not vacuous.  The conclusion mentions no *)
-(*  Iris: [UnionOutPure.union_phi] reads the trace alone, and             *)
+(*  Iris: [UnionOutPure.union_phi_sync] reads the trace alone, and        *)
 (*  [UnionDisc.v] with [LineModel.v] is the whole specification.          *)
 (* ===================================================================== *)
 

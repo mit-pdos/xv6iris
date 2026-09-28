@@ -30,7 +30,7 @@
 (*  THE LEDGER is [FileOut.file_led]'s shape at the union discipline,     *)
 (*  plus the byte ledger's map [PipeOut.pera_map]; its taint counter      *)
 (*  cases on the landed decider [UnionDecU.lm_disc_ulmG_dec] -- no        *)
-(*  classical axiom -- and its conclusion is [UnionOutPure.union_phi].    *)
+(*  classical axiom -- and its conclusion is [UnionOutPure.union_phi_sync]. *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.

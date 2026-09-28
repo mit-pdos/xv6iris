@@ -700,7 +700,7 @@ Qed.
 (*  13.  A LIST FACT THE UNION'S CONCLUSION READS                          *)
 (*                                                                        *)
 (*  The file application's conclusion body went with that application;    *)
-(*  the union's is [UnionOutPure.union_phi_body].                          *)
+(*  the union's is [UnionOutPure.union_phi_sync_body].                     *)
 (* ====================================================================== *)
 
 (* a nonempty list is a snoc *)
