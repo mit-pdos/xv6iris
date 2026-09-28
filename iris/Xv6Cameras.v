@@ -1215,7 +1215,15 @@ Class wchG (Σ : gFunctors) :=
             only the sealed regime, re-establishes the payload for free. *)
          npid_name : gname;
          (* THE PID LEDGER'S NAME (design ni-pid-ledger.md D2). *)
-         wpl_name : gname }.
+         wpl_name : gname;
+         (* THE TICK COUNTER'S MIRROR NAME (design ni-ticks-ledger.md D1): a
+            [mono_nat] at this name counts the clock interrupt's increments
+            of [ticks]; <tickslock>'s payload ties the cell to it modulo
+            2^32 ([TicksInv.ticks_tie]).  No [inG] rides with it: the
+            counter uses the ambient [mono_natG] of [riscvGS] (a second one
+            would be the duplicate-class trap -- see the note at
+            [diskGhostG]). *)
+         wtk_name : gname }.
 Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
   {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG;
      wsg_pre_inG := wsg_inG; wpr_pre_inG := wpr_inG;

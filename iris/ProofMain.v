@@ -1121,6 +1121,11 @@ Section ProofMain.
           (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
         kmap_at tramp_vpn tramp_ppn KP_rx -∗
         ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
+        (* THE TICK COUNTER'S MIRROR, at 0, off [children_boot_rows]
+           (design ni-ticks-ledger.md D1): passed through untouched to
+           [mn_grp_trap], which raises it to the cell's boot value and
+           seals it into <tickslock> beside the cell. *)
+        tick_cnt 0 -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -1131,7 +1136,7 @@ Section ProofMain.
     (* THE ORPHAN VAR IS THE MIDDLE ONE ([WaitInv.children_boot]): the boot
        fupd mints it at [∅] beside the map's authority, and it goes into
        <wait_lock>'s payload with the children half. *)
-    iDestruct "Hchb" as "[Hchres [Horph [Hpreg [Hpled Hchrows]]]]".
+    iDestruct "Hchb" as "[Hchres [Horph [Hpreg [Hpled [Htk Hchrows]]]]]".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
@@ -1405,7 +1410,7 @@ Section ProofMain.
     iModIntro.
     iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
-                    Hkptr Hstvec Hkinv Hcreds Hkptp Htramp Hkstx").
+                    Hkptr Hstvec Hkinv Hcreds Hkptp Htramp Hkstx Htk").
   Qed.
 
   (* =================================================================== *)
@@ -1424,6 +1429,9 @@ Section ProofMain.
     (* the tick counter, so this group can bring tickslock UP: trapinit
        initialises the lock's words and this is the resource it protects. *)
     (∃ t : mword 32, a_ticks ↦₄ t) -∗
+    (* ...and its mirror at 0 ([mn_grp_kvm]'s pass-through): raised to the
+       cell's value here, the payload's tie founded (ni-ticks-ledger.md D2) *)
+    tick_cnt 0 -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     (* IT HANDS OUT THE WRITTEN CELL AND THE GHOST QUARTER, NOT [intr_res],
@@ -1446,7 +1454,7 @@ Section ProofMain.
     (* [cid_word] is a [Definition] over [cpu_id]; naming the delta-expanded
        form once is what lets [rget_tp]'s output be rewritten below. *)
     assert (Hcidz : cid_word_of cpu_id = (zero_reg : mword 64)) by exact Hcid.
-    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hticks Hstvec Hq Hcont".
+    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hticks Htk Hstvec Hq Hcont".
     (* [dev_inv]'s PLIC conjunct ∃-PACKS the second port's names (WpUart.v:
        that is what keeps the bundle at arity 2).  plicinit/plicinithart only
        borrow [plic_frag], so the witness is all they need and this group
@@ -1480,12 +1488,21 @@ Section ProofMain.
     (* a fupd in front of a [mWP (Loop)] goal: the tree's idiom is to peel it
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
+    (* THE MIRROR IS RAISED TO THE CELL'S BOOT VALUE (design
+       ni-ticks-ledger.md D2): the cell arrives at an existential [t0], and
+       the count [bv_unsigned t0] ties to it trivially (it is below 2^32). *)
+    iMod (tick_cnt_raise 0 (Z.to_nat (bv_unsigned t0)) ltac:(lia) with "Htk") as "Htk".
+    assert (Htie0 : ticks_tie t0 (Z.to_nat (bv_unsigned t0))).
+    { rewrite /ticks_tie. pose proof (bv_unsigned_in_range _ t0) as Hr.
+      unfold bv_modulus in Hr.
+      rewrite Z2Nat.id; [| lia]. rewrite Z.mod_small; [reflexivity |].
+      change (2 ^ 32) with (2 ^ Z.of_N 32). exact Hr. }
     (* A6.69: the honest creator deposit (A6.66) wants the running token;
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string ticks_res_at with "Htn2 Hrun Htw2 Htc2 [Hticks]") as "[Hrun Htl0]".
-    { iApply (ticks_res_intro t0 with "Hticks"). }
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string ticks_res_at with "Htn2 Hrun Htw2 Htc2 [Hticks Htk]") as "[Hrun Htl0]".
+    { iApply (ticks_res_intro t0 (Z.to_nat (bv_unsigned t0)) Htie0 with "Hticks Htk"). }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Htl0" as (γtl) "#Htl".
     iModIntro.
@@ -2594,10 +2611,10 @@ Section ProofMain.
                     Hbss Hparks Hpst").
     iIntros (γp γw γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec
-       #Hkinv #Hcreds #Hkptp #Htramp #Hkstx".
+       #Hkinv #Hcreds #Hkptp #Htramp #Hkstx Htk".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
-              with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
+              with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Htk Hstvec Hq").
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* THE READER TOKEN, AT THE CONFIGURATION'S CONSOLE NAMES (app-echo.md,
        "SH-LINE RULING", R3).  The boot supply hands it at [cn], the group

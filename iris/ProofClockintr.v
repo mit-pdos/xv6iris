@@ -55,6 +55,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import TimerCap WpSconfTimer.
 Require Import TicksInv.
+Require Import WaitInv.   (* [tick_cnt_step]: the tick ledger *)
 Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
@@ -515,7 +516,7 @@ Section ProofClockintr.
       assert (Hpc34 : ret_pc (B2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x34))
         by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc34) in "Hpc".
-      iDestruct "HR" as (t) "Hticks".
+      iDestruct "HR" as (t k) "(Hticks & Htk & %Htie)".
       (* ---- +0x34/+0x38: a4 := &ticks ---- *)
       iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.clockintr + 0x34)) a4_idx (mword_of_int 0x8 : mword 20)
                 MA (av - 2)%nat false
@@ -714,7 +715,19 @@ Section ProofClockintr.
         rewrite (callee_saved_lookup HcsW csp_rs1 ltac:(vm_compute; reflexivity)).
         exact HD5sp. }
       (* ===================== release(&tickslock) ===================== *)
-      iDestruct (ticks_res_intro _ with "Hticks") as "HR".
+      (* THE MIRROR STEPS WITH THE CELL (design ni-ticks-ledger.md D2): the
+         word the [c.sw] committed is [t + 1] at 32 bits, so the tie holds
+         at [S k] ([ticks_tie_step], stated on exactly this word). *)
+      assert (Hsv : trunc32 (rget D3 a5_idx)
+                    = trunc32 (sign_extend' 64 (subrange_vec_dec
+                        (add_vec (sign_extend' 64 t)
+                           (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))).
+      { rgne. rewrite /D3 upd_eq. rgne. rewrite /D2 upd_eq. reflexivity. }
+      iEval (rewrite Hsv) in "Hticks".
+      iApply fupd_wp.
+      iMod (tick_cnt_step k with "Htk") as "[Htk _]".
+      iModIntro.
+      iDestruct (ticks_res_intro _ (S k) (ticks_tie_step t k Htie) with "Hticks Htk") as "HR".
       (* clockintr is entered interrupts-OFF at a level that provably does not
          unwind to 0 with an enabled base ([Hout]), so its exit arm is [false]
          and the reserve release owes is ZERO -- [trap_res false + N] IS [N].

@@ -952,7 +952,7 @@ Section SpBodies.
     destruct Hls as (Hs9 & Hs18 & Hs19).
     (* +0x6a lw a5,0(s2) : a5 := ticks.  s2 is the &ticks register now (the
        two loop pointers swapped when the sleep call site was split). *)
-    iDestruct "HR" as (t1) "Hticks".
+    iDestruct "HR" as (t1 k1) "(Hticks & Htk & %Htie)".
     assert (Hlwt : add_vec (rget M (mword_of_int 18 : mword 5))
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = a_ticks).
     { rgne. rewrite Hs18. apply sp_add_vec_0. }
@@ -965,7 +965,7 @@ Section SpBodies.
     { iApply (spi_6a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hticks".
     iEval (rewrite Hlwt) in "Hticks".
-    iDestruct (ticks_res_intro t1 with "Hticks") as "HR".
+    iDestruct (ticks_res_intro t1 k1 Htie with "Hticks Htk") as "HR".
     set (L5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (t1 : mword 32))]> M).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (t1 : mword 32))]> M) with L5.
     assert (Hl5e : add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x6a) : mword 64) 4 = mword_of_int (KernelSyms.sys_pause + 0x6e)) by pcstep.
@@ -1711,7 +1711,7 @@ Section SpBodies.
       assert (Hq36 : add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.sys_pause + 0x36)) by pcstep.
       iEval (rewrite Hq36) in "Hpc".
       (* +0x36 lw s3,-1946(s3) : ticks0 := ticks *)
-      iDestruct "HR" as (t0) "Hticks".
+      iDestruct "HR" as (t0 k0) "(Hticks & Htk & %Htie)".
       assert (Hat0 : add_vec (rget P0 (mword_of_int 19 : mword 5))
                        (sign_extend' 64 (mword_of_int 0x864 : mword 12)) = a_ticks).
       { rgne. rewrite /P0 upd_eq. rewrite /a_ticks. apply bv_eq; vm_compute; reflexivity. }
@@ -1727,7 +1727,7 @@ Section SpBodies.
       change (<[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (sign_extend' 64 (t0 : mword 32))]> P0) with P1.
       assert (Hq3a : add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x36) : mword 64) 4 = mword_of_int (KernelSyms.sys_pause + 0x3a)) by pcstep.
       iEval (rewrite Hq3a) in "Hpc".
-      iDestruct (ticks_res_intro t0 with "Hticks") as "HR".
+      iDestruct (ticks_res_intro t0 k0 Htie with "Hticks Htk") as "HR".
       (* +0x3a auipc s2,0x15 *)
       iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.sys_pause + 0x3a)) (mword_of_int 18 : mword 5)
                 (mword_of_int 0x8 : mword 20) P1 (trap_res true + (av - 8))%nat false

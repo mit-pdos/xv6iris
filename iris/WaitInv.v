@@ -69,7 +69,7 @@ From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra.lib Require Import dfrac_agree mono_list.
-From iris.base_logic.lib Require Import gen_heap ghost_var ghost_map own.
+From iris.base_logic.lib Require Import gen_heap ghost_var ghost_map own mono_nat.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
@@ -1593,6 +1593,49 @@ Section WaitInv.
       exfalso. exact (Hscan k Hk).
   Qed.
 
+  (* THE TICK COUNTER'S MIRROR (NI-LEDGER-REST, design ni-ticks-ledger.md
+     D1): a [mono_nat] at the canonical name [Xv6Cameras.wtk_name], counting
+     the clock interrupt's increments of [ticks].  The authority lives in
+     <tickslock>'s payload ([TicksInv.ticks_res_at], tied to the 32-bit cell
+     modulo 2^32); a lower bound is a persistent receipt, and any two are
+     comparable because the name is pinned.  It lives HERE rather than in
+     [SlotGen] beside the pid ledger because the counter uses the ambient
+     [mono_natG] of [riscvGS], which [SlotGen]'s section does not bind; it
+     is born at 0 in [children_res_alloc] below. *)
+  Definition tick_cnt (n : nat) : iProp Σ := mono_nat_auth_own wtk_name 1 n.
+  Definition tick_lb (n : nat) : iProp Σ := mono_nat_lb_own wtk_name n.
+
+  Global Instance tick_lb_persistent n : Persistent (tick_lb n).
+  Proof using . rewrite /tick_lb. apply _. Qed.
+  Global Instance tick_lb_timeless n : Timeless (tick_lb n).
+  Proof using . rewrite /tick_lb. apply _. Qed.
+  Global Instance tick_cnt_timeless n : Timeless (tick_cnt n).
+  Proof using . rewrite /tick_cnt. apply _. Qed.
+
+  Lemma tick_cnt_lb n : tick_cnt n -∗ tick_cnt n ∗ tick_lb n.
+  Proof using .
+    rewrite /tick_cnt /tick_lb. iIntros "Ha".
+    iDestruct (mono_nat_lb_own_get with "Ha") as "#Hb". iFrame "Ha Hb".
+  Qed.
+
+  Lemma tick_lb_le n m : tick_cnt n -∗ tick_lb m -∗ ⌜(m ≤ n)%nat⌝.
+  Proof using .
+    rewrite /tick_cnt /tick_lb. iIntros "Ha Hb".
+    by iDestruct (mono_nat_lb_own_valid with "Ha Hb") as %[_ ?].
+  Qed.
+
+  Lemma tick_cnt_raise n m : (n ≤ m)%nat -> tick_cnt n ==∗ tick_cnt m.
+  Proof using .
+    rewrite /tick_cnt. iIntros (Hle) "Ha".
+    by iMod (mono_nat_own_update m with "Ha") as "[$ _]".
+  Qed.
+
+  Lemma tick_cnt_step n : tick_cnt n ==∗ tick_cnt (S n) ∗ tick_lb (S n).
+  Proof using .
+    iIntros "Ha". iMod (tick_cnt_raise n (S n) ltac:(lia) with "Ha") as "Ha".
+    iModIntro. iApply (tick_cnt_lb with "Ha").
+  Qed.
+
   (* WHAT THE BOOT FUPD HANDS MAIN, in one row: the authority the wait lock
      goes up over, and the NPROC rows the proc-table assembly deposits into
      the slots' dormant blocks ([SpecProcinit.procs_inv_alloc]).  ONE
@@ -1624,6 +1667,7 @@ Section WaitInv.
     (children_res_boot ∗ orphans_own (∅ : orph_map) ∗
      pid_reg_auth (∅ : gmap Z gname) ∗
      pid_led_auth [] ∗
+     tick_cnt 0 ∗
      [∗ list] i ∈ seq 0 NPROC,
        ∃ γ0 g : gname,
          ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g)%I.
@@ -1906,16 +1950,20 @@ Section WaitInvBoot.
        ni-pid-ledger.md D2): no pid has been handed out *)
     iMod (own_alloc (●ML ([] : list (leibnizO pev)))) as (γpl) "Hpl";
       [ apply mono_list_auth_valid | ].
-    iModIntro. iExists (WchG Σ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl).
+    (* ...and the tick counter's mirror, at 0 (design ni-ticks-ledger.md
+       D1): main raises it to the cell's boot value before sealing *)
+    iMod (mono_nat_own_alloc 0) as (γtk) "[Htk _]".
+    iModIntro. iExists (WchG Σ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl γtk).
     rewrite /children_boot /children_boot_rows /children_res_boot
             /children_own_at /orphans_own
-            /pid_reg_auth /pid_led_auth /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
+            /pid_reg_auth /pid_led_auth /tick_cnt /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
     iSplitR "Hnp"; [| iExact "Hnp"].
     iSplitL "Hip"; [iExact "Hip" |].
     iSplitL "Ha"; [iExists m'; iFrame "Ha"; iPureIntro; exact Hok |].
     iSplitL "Ho"; [iExact "Ho" |].
     iSplitL "Hpr"; [iExact "Hpr" |].
     iSplitL "Hpl"; [iExact "Hpl" |].
+    iSplitL "Htk"; [iExact "Htk" |].
     iDestruct (big_sepL_sep_2 with "Hrows Hsg") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) Hsg]".
     iExists γ0, γ. iFrame "Hrow Hsg".

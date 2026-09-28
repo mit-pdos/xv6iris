@@ -45,6 +45,7 @@ Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CodeSysUptime.
 Require Import TicksInv.
+Require Import Xv6Cameras WaitInv.   (* [wchG], [tick_cnt_lb]: the tick ledger *)
 Require Import SpecAcquire SpecRelease.
 Require Import SpecSysUptime.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -113,15 +114,18 @@ Proof. apply eq_vec_true_iff. reflexivity. Qed.
 Module SysUptimeProof (Acquire : ACQUIRE) (Release : RELEASE) : SYSUPTIME.
 
 Section ProofSysUptime.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
-  Lemma wp_sys_uptime_sconf (γl : gname)
+  (* THE LED TWIN (design ni-ticks-ledger.md D4) is the proof: the payload's
+     mirror hands out a lower bound at the read, and the tie turns it into
+     the returned word.  The landed contract is its corollary below. *)
+  Lemma wp_sys_uptime_led_sconf (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
-    : wp_sys_uptime_sconf_body γl m n eb p av b lks.
+    : wp_sys_uptime_led_sconf_body γl m n eb p av b lks.
   Proof using .
-    cbv beta delta [wp_sys_uptime_sconf_body].
+    cbv beta delta [wp_sys_uptime_led_sconf_body].
     intros pcE ret_tgt Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock Hcont".
@@ -268,7 +272,8 @@ Section ProofSysUptime.
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* the protected resource: the counter cell at an arbitrary value *)
-    iDestruct "HR" as (t) "Hticks".
+    iDestruct "HR" as (t k) "(Hticks & Htk & %Htie)".
+    iDestruct (tick_cnt_lb with "Htk") as "[Htk #Htklb]".
     assert (HMAcsp : MA !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup HcsA csp_rs1 ltac:(vm_compute; reflexivity)). exact HA4csp. }
     (* ===================== a5 := ticks ===================== *)
@@ -373,7 +378,7 @@ Section ProofSysUptime.
       rewrite /B0 upd_ne; [| vm_compute; discriminate].
       exact HMAcsp. }
     (* ===================== release(&tickslock) ===================== *)
-    iDestruct (ticks_res_intro t with "Hticks") as "HR".
+    iDestruct (ticks_res_intro t k Htie with "Hticks Htk") as "HR".
     (* the acquire handed the window index out as [trap_res b + N]; release
        wants it as [trap_res outb + N] with [outb = match n with O => eb
        | S _ => false end].  Those are the same bool -- [cpu_own] forces
@@ -592,7 +597,8 @@ Section ProofSysUptime.
       rewrite /A0 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID10 CID17 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 t with "[%] Hcg Hcnt Hpc").
+    iApply ("Hcont" $! E4 t with "[%] [] Hcg Hcnt Hpc");
+      [| iExists k; iFrame "Htklb"; iPureIntro; exact (ticks_tie_of_int t k Htie)].
     split; [| exact HE4a0].
     unfold callee_saved.
     split; [exact HE4csp|].
@@ -608,6 +614,20 @@ Section ProofSysUptime.
     split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
     split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
     apply Hthr; vm_compute; first [reflexivity | discriminate].
+  Qed.
+
+  (* the landed contract: the led twin with the receipt dropped. *)
+  Lemma wp_sys_uptime_sconf (γl : gname)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+    : wp_sys_uptime_sconf_body γl m n eb p av b lks.
+  Proof using .
+    cbv beta delta [wp_sys_uptime_sconf_body].
+    intros pcE ret_tgt Hn Hav Hfresh.
+    iIntros "Hcg Hcnt Htext Hpc Hlock Hcont".
+    iApply (wp_sys_uptime_led_sconf γl m n eb p av b lks Hn Hav Hfresh
+              with "Hcg Hcnt Htext Hpc Hlock").
+    rewrite /wp_next. iIntros (CID' Hs mf t) "%Hpost _".
+    iApply ("Hcont" $! CID' Hs mf t with "[%]"); exact Hpost.
   Qed.
 
 End ProofSysUptime.
