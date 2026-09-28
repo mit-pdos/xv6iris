@@ -87,6 +87,7 @@ CtxPinMint.v
 PtTreeMorph.v
 PermInv.v
 PageGeom.v
+KallocEv.v
 KptExecMap.v
 RiscvExec.v
 HartCustody.v
