@@ -2427,13 +2427,13 @@ is SG-indexed and takes no `PS` — only `urun` and the `wp_uk_*` leaves do.
 proof.**  `UkInit.init_cons_sup` has exactly ONE producer in the tree,
 `UInitSh.init_exec_sup_of_sh_slot` (`UInitSh.v:1157`), whose Coq-level
 premise is `UInitSh.cons_cred_holds` (`UInitSh.v:532`).  At the tree's
-console record (`UInitTree.tree_cc`) its EIGHTH conjunct
-(`UInitSh.v:562`) reduces, with the two trivial families unfolded, to
+console record (`UInitTree.tree_cc`) its SEVENTH conjunct (the
+`cc_wb` law) reduces, with the two trivial families unfolded, to
 
 > `⊢ tree_turn c -∗ tree_taint c` — the era's UNSPENT LICENCE becomes the
 > taint, **update-free**
 
-and `UInitTreeBoot.tree_cc_wb_conj8_is_turn_to_taint` PROVES that
+and `UInitTreeBoot.tree_cc_wb_law_is_turn_to_taint` PROVES that
 reduction in both directions (closed under the global context), so
 nothing is left to judgement.  The licence is a linear `ghost_map`
 element and the taint is that element PERSISTED

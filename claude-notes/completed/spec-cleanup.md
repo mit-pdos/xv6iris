@@ -979,7 +979,7 @@ byte-identical; echo audit 14, tree audit unmoved.
    (`UInitSh.v:532`) has an EIGHTH conjunct (`UInitSh.v:562`) that at
    `UInitTree.tree_cc` reduces to `⊢ tree_turn c -∗ tree_taint c` — the
    era's unspent licence becoming the taint UPDATE-FREE.
-   `UInitTreeBoot.tree_cc_wb_conj8_is_turn_to_taint` proves that reduction
+   `UInitTreeBoot.tree_cc_wb_law_is_turn_to_taint` proves that reduction
    in both directions and is **closed under the global context**.  It is
    `AppTree.tree_bump_free_is_vacuous` one premise over, so the fix is
    §9.4's ruling verbatim: re-cut that conjunct as an UPDATE (echo: one

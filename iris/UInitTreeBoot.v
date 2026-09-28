@@ -23,7 +23,7 @@
 (*                                                                       *)
 (*           the era's UNSPENT LICENCE becomes the taint, UPDATE-FREE     *)
 (*                                                                       *)
-(*      and [tree_cc_wb_conj8_is_turn_to_taint] below PROVES that         *)
+(*      and [tree_cc_wb_law_is_turn_to_taint] below PROVES that           *)
 (*      reduction, in both directions, so nothing is left to the reader's *)
 (*      judgement.  The licence is a linear [ghost_map] element and the   *)
 (*      taint is that element PERSISTED ([AppTree.tree_taint_mint] is one *)
@@ -44,8 +44,8 @@
 (*      TWO SMALLER ENTRIES ARE OWED BESIDE IT, and both are the same     *)
 (*      record's: [cons_cred_holds]'s FIRST conjunct is                   *)
 (*      sh's read leaf as a CLOSED entailment -- no taint in hand -- and  *)
-(*      the HIT arm of the dance ([UkInit.uki_mknod_hit_leaf],            *)
-(*      UkInit.v:499) wants a credential-free, box-shaped mknod, which    *)
+(*      the HIT arm of the dance ([UkInit.uki_mknod_hit_leaf]) wants a    *)
+(*      credential-free, box-shaped mknod, which                          *)
 (*      the tree's own mknod corollary cannot give (it needs the LIVE     *)
 (*      deed).  [UInitTreeCons.v]'s header prices the second.             *)
 (* ===================================================================== *)
@@ -118,13 +118,13 @@ Section TreeInitBoot.
   (* =================================================================== *)
   (*  2.  THE WALL, REDUCED                                               *)
   (*                                                                     *)
-  (*  [UInitSh.cons_cred_holds]'s eighth conjunct, spelled at             *)
+  (*  [UInitSh.cons_cred_holds]'s seventh conjunct, spelled at            *)
   (*  [UInitTree.tree_cc] and at the tree's taint.  Both directions, so   *)
   (*  the reduction is an equivalence and not a one-way weakening: what   *)
   (*  /init's exec supply asks of the tree claim IS the update-free mint  *)
   (*  the design forbids, and nothing else.                              *)
   (* =================================================================== *)
-  Lemma tree_cc_wb_conj8_is_turn_to_taint (c : tree_fixed) :
+  Lemma tree_cc_wb_law_is_turn_to_taint (c : tree_fixed) :
     (forall (γp : gname) (I l : list (bv 8)), wl_nl ∉ l ->
        ⊢ cc_mid (tree_cc c) γp (I ++ l ++ [wl_nl]) -∗
          cc_wb (tree_cc c) I -∗
