@@ -1083,7 +1083,11 @@ distinct axioms: the 13 of `audit-only` plus `PrimString.length`.  `make audit-a
 audit-union-only`, and CI runs `audit-union-only`.  The file and pipe
 targets below were DELETED by union cut C9h (2026-09-25): THE BASELINE IS
 THREE AUDITS -- `make audit-only` (system) 13, `make audit-tree-only` 13,
-`make audit-union-only` 14.  The paragraphs below describe the pre-union
+`make audit-union-only` 14.  Beside them, not an axiom audit: `make
+intr-cone-check` (`tools/intr_cone.py`, 2026-09-28) walks the Link-level
+functor cone of usertrap's interrupt arm and fails if it implements
+KALLOC/KFREE -- the structural half of the noninterference strong
+instance (`design/ni-strong-instance.md`); needs no build.  The paragraphs below describe the pre-union
 setup and still hold for `audit-only`; mentions of the pipe/file targets
 and of `PipeAssumptions.v`/`FileAssumptions.v` are historical.
 

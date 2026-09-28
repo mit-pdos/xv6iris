@@ -49,9 +49,10 @@ M1's ledgers are fresh ground and go first.
   the permit sweep until NI-LEDGER-REST so it is paid once for all
   ledgers; land now the pure `vmfault_quiet` (lazy flag off ⇒ vmfault's
   kalloc arm is unreachable) and a functor-inventory check.  RULED D
-  (owner, 2026-09-28); `vmfault_quiet` LANDED (`iris/VmfaultQuiet.v`);
-  the inventory check is open; the permit sweep waits for
-  NI-LEDGER-REST.
+  (owner, 2026-09-28); `vmfault_quiet` LANDED (`iris/VmfaultQuiet.v`)
+  and the inventory check LANDED (`tools/intr_cone.py`, `make
+  intr-cone-check`: the interrupt arm's 24-instance cone implements no
+  KALLOC/KFREE); the permit sweep waits for NI-LEDGER-REST.
 - [ ] **NI-DET-ROWS** (M0): `usys_det` and the ecall arm's re-cut, the
   loop's `round_det` discharge — after the post-Qed redesign settles;
   §4 lists the row set to start from.
