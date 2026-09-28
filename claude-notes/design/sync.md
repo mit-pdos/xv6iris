@@ -576,6 +576,20 @@ floor); so the claim-in-`file_pred` sweep, the union's laws, the ledger's
 on-arm/registry/floor/return hook, the transport, the founding and the
 birth are ONE lane (A3bc): they cannot be landed apart at the transport.
 
+**Ratified after A3bc** (2026-09-27): the position's holder share with
+its witness quarter, and the lazy advance (only the redirect round
+advances; other rounds widen the bound).  **The floor's era, RULED for
+A4's first step:** the floor `(kF, γF, F)` in `union_led` carries
+`sync_reg c kF γF ∗ ◯ ugn_cm kF` (both from the transport's `Tn'` at the
+PowerOn that set it) and `⌜kF = the era of that PowerOn⌝`; at the next
+PowerOn (era `S gen`, so `kF = gen`) the transport refutes a mismatched
+floor instead of falling back to `F = []`: the floor's `◯ ugn_cm kF`
+against the copy's `● ugn_cm (fn_era r_o)` gives `gen ≤ fn_era r_o`, the
+copy's `◯ ugn_st (fn_era r_o)` against the loan gives `fn_era r_o ≤ gen`,
+so `fn_era r_o = kF` and the registry pins `γF = fn_sync r_o`; the boot
+fact is then always the strong one, which the model's boot relation
+needs at every cycle.
+
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
 persistent seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted

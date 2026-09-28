@@ -160,8 +160,10 @@ premise (the open point, with the cursor candidate, is in the design);
 the old copy's role in the merge is A3b/c's.  RULED after A3b's first
 half (design §4.5 "Three rulings"): the sync state moves into
 `file_fixed`/`AppFile`, `flw I` names the round's line, the transport
-takes the loan and the turn's sync yield; A3b's second half and A3c are
-ONE lane A3bc, in flight (branch `sync3-a3bc`, `/shared/xv6iris-3k`).
+takes the loan and the turn's sync yield; A3b's second half and A3c were
+ONE lane A3bc, ON MAIN (`162e2700e`; the position's holder share with a
+witness quarter and the lazy advance ratified).  A4 in flight (branch
+`sync3-a4`, `/shared/xv6iris-3k`).
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
@@ -539,26 +541,38 @@ unchanged at every landing (the theorem keeps `union_phi` until A4).
      `sync_claim_birth`; `app_born`.
   Green with `union_adequacy_closed` unchanged and `usync_exec_sup` at
   `None`.  Risks R5-R8 as before.
-#### A4 -- sh's sync round and the theorem's witness (after A3)
+#### A4 -- sh's sync round and the theorem's witness (after A3bc)
 
-The hook seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted at
-the boot era from the record-shape equation (`SystemAdequacy` has `Hfix`)
-and carried in `union_links`; `/sync`'s `Pay := P ∗ hook_opt gen_id oQ` and
-sh's `Cr := Wcu I 3 ∗ hook_opt gen_id oQ` (K4's ruling); `usync_exec_sup`
-at `Some Q` with `Q := ◯⊒_{γs} (Ls ++ [r]) ∗ ◯ ugn_cm gen_id ∗ ⌜r = (length
-ls', fcontent av)⌝`, the hook proved by sh from its lend (the deed, `f_ok`,
-`flw` over the full list); sh files `Q` at the round's prompt
-(`uksh_w_prompt_pend`'s `RSyncRan` arm) into the console claim; the drain
-carries it; `union_led_tx` extends the floor and files `o := Some r` with
-the model's `usync_last` (`lm_good_sync`, an EQUALITY: the bridge from the
-deed's `s` at the hook to the model's `lm_upto` is A4's FIRST lemma, and
-the prompt byte's step must know it completes a sync round's block --
-`uksh_w_prompt_pend`'s `RSyncRan` arm hands the ledger that); the switch
-of `union_phi_res` and the theorem's conclusion to `union_phi_sync`; the ledger and `union_adequacy_closed` SWITCH from the landed
-`union_phi` to `UnionOutPure.union_phi_sync` (its `_step_io`/`_off`/`_on`/
-`_drain` steps; the drain files the forced `Some r` whenever the cycle's
-resolution completed a sync, the next era's first drain meets `uadm` at
-it through the floor); `demo_sync_cut_neg` is the
-theorem's negative witness (a `Corollary` beside `union_adequacy_closed`);
-design §3-§5 "as built"; the state block here; `completed/` gets the
-narrative when the whole effort closes.
+0. THE FLOOR'S ERA (design §4.5 "The floor's era, RULED"): the floor
+   carries its registration and counter bound and its era; the
+   transport (`file_xfer_boot`) refutes a mismatched floor (no `F = []`
+   fallback); `union_led_back` stores them.
+1. THE BRIDGE FIRST: the lemma that ties the hook's record `(length ls',
+   s)` -- `s` the deed's state at the sync round (PEND arm, the identity
+   step), `ls'` sh's `flw I` list ending at the sync line -- to the
+   model's `usync_last ps cs s0 (ins seg) wire` for the cycle's
+   resolution (`UnionAdm.usync_at` records `(S i, lm_upto U cs s0 (bodies_of
+   I) i)` at the LOCAL position, `ulast_from` offsets by earlier cycles):
+   state `record_of_round` and prove `usync_last … = Some (off + S i, S)`
+   with `S = the deed's state` from `upend_tie`, BEFORE touching sh.
+2. The hook seam `□ ∀ Q, Hk c gen_id Q -∗ riscv_sync_hook gen_id Q` minted
+   at the boot era from the record-shape equation and carried in
+   `union_links`; `/sync`'s `Pay := P ∗ hook_opt gen_id oQ` (`UkSyncEntry.
+   sync_image_entry` at `oQ`, the hook inside the lend) and sh's `Cr :=
+   Wcu I 3 ∗ hook_opt gen_id oQ` (K4's ruling); `usync_exec_sup`/
+   `uHchild_sync` at `Some Q` with `Q := UT ∨ (◯⊒_{γs} (Ls ++ [r]) ∗ ◯
+   ugn_cm (S gen_id) ∗ ⌜r = (length ls', s)⌝)`, the hook proved by sh
+   from its lend (`urpos I`'s position, the deed's `s`, `flw I`) through
+   `union_hook_closes`.
+3. sh files `Q` at the round's prompt (`uksh_w_prompt_pend`'s `RSyncRan`
+   arm) into the console claim (persistent); the drain carries it
+   (`udrain_ret` gains the record); `union_led_tx` extends the floor
+   (`F ++ [r]` at `γF`) and files `o := Some r` by the bridge lemma.
+4. THE SWITCH: `union_phi_res` and `union_adequacy_closed`'s conclusion
+   to `UnionOutPure.union_phi_sync` (its `_step_io`/`_off`/`_on`/`_drain`
+   steps; the first drain of an era meets `uadm` at the floor's last
+   record through the transport's boot fact, filed by `al_back`);
+   `demo_sync_cut_neg` as a `Corollary` beside `union_adequacy_closed`
+   (the theorem's negative witness).
+5. Notes: design §3-§5 "as built"; the state block; `completed/sync.md`
+   with the narrative; the cleanups list.
