@@ -322,7 +322,7 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the mask, the terminal round, the universe's slot, the three-arm console
   claim, the dirty-arm ring facts and the per-era read position.
 
-- **[`sync.md`](design/sync.md)** -- `sync` in the union (proposal): why
+- **[`sync.md`](design/sync.md)** -- `sync` in the union, as built (history in `completed/sync.md`): why
   the silent alternative is a TRACE-level hole and how every silent filing
   becomes the round's true alternative, the `sync` line, what `sys_sync`'s
   receipt does and does not say, and the boot relation with a sync floor.

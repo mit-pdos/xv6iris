@@ -137,8 +137,13 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
   every alternative the identity, so the lend `Wcu I 3` goes to /sync
   whole and `usync_ran_pay I oQ` pays PEND at `RSyncRan` (the deed PRE ->
   PEND, the block owed whole; sh files RAN at its `$`, as for `RFRan
-  sel`) at any receipt `Q_opt oQ`, which it does not spend; the round
-  passes `None` (`usync_exec_sup`).  The
+  sel`) at any receipt `Q_opt oQ`, which it does not spend.  AS BUILT
+  (A4): the round passes `Some (usync_q I)` (`usync_exec_sup`): sh's lend
+  `Wcu I 3` splits (`usync_lend`) into `Wcl I 3 ∗ hook_opt gen_id (Some
+  (usync_q I))`, the hook proved from the lend through the seam (§4.5 "As
+  built (A4)"), and `usync_q I := ush_pend_at I ∗ usync_rec I` is the
+  deed PEND with the sync RECORD beside it, which sh files at its `$` as
+  the round's payload.  The
   exec failure (`usync_execfail_law`) and the out-of-memory death
   (`uHoom`) are the record's blocks beside the deed as found.  Dispatched
   at `LSync` by `UkShPipeForkTwin.wp_kshm_body_pipe_nc` in
@@ -588,7 +593,9 @@ against the copy's `● ugn_cm (fn_era r_o)` gives `gen ≤ fn_era r_o`, the
 copy's `◯ ugn_st (fn_era r_o)` against the loan gives `fn_era r_o ≤ gen`,
 so `fn_era r_o = kF` and the registry pins `γF = fn_sync r_o`; the boot
 fact is then always the strong one, which the model's boot relation
-needs at every cycle.
+needs at every cycle.  (SUPERSEDED at A4 step 0 by the owner's re-ruling:
+the floor is a lower bound of a RUN-LONG history with no era at all; see
+"As built (A4)".)
 
 **sh's round**: `usync_exec_sup` at `Some Q` with the hook resource
 `riscv_sync_hook gen_id Q` PROVED by sh from `Hk c gen_id Q` through a
@@ -741,7 +748,104 @@ result is under `◇` (`app_xfer_boot_raw` too).  /init turns `union_boot`
 and `uturn_i` into `urpos []` (pin and `fcp_pin` agreement, `ls_c ⊑
 fe_base`).  OPEN for A4: when the floor's era is not the copy's, the
 transport uses `F = []` (no boot fact from a stale floor); `usync_exec_sup`
-is still at `None`.
+is still at `None`.  (Both CLOSED at A4, below.)
+
+**As built (A4; branch `sync3-a4`).**  Five pieces, each an owner's
+ruling where noted.
+- THE FLOOR (re-ruled at step 0): a RUN-LONG sync history `ff_hist` in
+  `file_fixed` (`mono_list srec`).  The durable copy holds `sl_auth
+  (ff_hist c) 1 Ls` with the SAME content as its era list (the copy arm
+  of `sync_role`); the hook (`union_hook_closes`) appends `(length ls', s)`
+  to both and hands out `sl_lb (ff_hist c) (Ls ++ [r])`; merges and the
+  rebase move the authority; the birth puts it in era 0's copy and `sl_lb
+  []` in the ledger.  The floor is `sl_lb (ff_hist c) F` -- no era, no
+  registration.  The transport (`sync_claim_rebase`, `file_xfer_boot`)
+  derives `F ⊑ Ls_c` from the copy's authority and hands the BOOT FACT
+  `FileOut.f0_bt v s0 := taint ∨ ∃ ls, fl_lb ls ∗ ⌜uadm ls (slast
+  (fe_floor v)) s0⌝` in `union_boot` (`file_boot_at`); `file_era` gains
+  `fe_floor`, pinned at the on-arm (`f0_alloc base F`) and NEVER written
+  at PowerOn (`union_led_back` only certifies `ls_c ⊑ fe_base`); the boot
+  ledger's entry is `f0_bl g v s0 := ◯ML [s0] ∗ f0_bt v s0`, so /init
+  files the fact (`UInitFileLeaves.file_f0bw_of_boot`) and the ledger
+  reads it at the era's first drain.
+- THE BRIDGE (step 1, `UnionAdm` §5): `usync_at_round` (a sync round
+  whose whole block is on the wire is recorded at `(nlines I, c)`),
+  `usync_last_round` (and is the LAST when the wire ends there),
+  `ulast_before_snoc_some`/`_none`, `usync_bridge` and, over the era's
+  base, `UnionOut.usync_bridge_era`: `trace_shape h true -> ulines_of h =
+  B ++ ulast_cyc h -> S (length os) = length (cycles_of h) -> ulast_before
+  h (os ++ [Some (nlines I, c)]) (S (length os)) = (length (B ++ ulines_in
+  I), c)`; sh's side `UShURoundDefs.upend_sync_record`.  The ledger in the
+  end uses `usync_bridge_era` and reads the record straight off
+  `usync_at` (`UnionAdm.usync_last_pad`: at a padded resolution the last
+  completed sync is a FILED round's -- the pad's exec failures are never
+  `RSyncRan`); `usync_last_round`/`upend_sync_record` are unused.
+- THE SEAM AND SH'S ROUND (step 2): the seam is a RECORD EQUATION,
+  `@riscv_sync_hook Σ (@riscv_fixedGS Σ HR) = app_hk A c`, a premise of
+  `App.al_programs` and of `SystemAdequacy`'s `Hinit_boot` (discharged
+  there from the fixed record), in sh's context as `Hhk :
+  riscv_sync_hook = union_hk file_pred (fgn_cl gf)`.  A RUN REGISTRY
+  `ff_run : ghost_map nat (gname * gname)` (era ↦ the running record's
+  position and deed names; `run_reg`, `run_auth` in the copy arm) makes the
+  runner's running record sh's, so the hook the kernel fires is the one
+  sh proves from its lend (`union_hook_file`).  `/sync`'s entry
+  `UkSyncEntry.sync_image_entry … P oQ` deposits `P ∗ hook_opt gen_id
+  oQ`; `usync_exec_sup` is at `Some (usync_q I)` (§3).  `usync_rec I := T ∨
+  ⌜ul I ≠ LSync⌝ ∨ usync_pay I`, `usync_pay I` = the echo pin, `cs_lb v
+  cs` with `length cs = nlines I - 1`, the era pin and `sl_lb (ff_hist)
+  (L ++ [(length (fe_base vf ++ ulines_in I), ust cs s0 I)])`; `uWcf`'s
+  position-0 PEND arm carries it.
+- THE PAYLOAD FAMILY (step 3, option (a)): the generic witness authority
+  gains a per-round payload `GenOut.gpr : nat -> era_pins -> list (bv 8)
+  -> nat -> iProp Σ` (persistent, timeless), `GenLinksLine.gR` in
+  `gen_params`, `LinkRec.lk_rnd` in the record, with laws at code 0, the
+  line's panic and its exec failure (`_0`/`_pan`/`_exf`).  IT IS FILED WITH
+  THE CHOICE: `gcl`'s choice authority is `gcs_auth R k v cs := cs_auth v
+  cs ∗ gstore R k v cs`, the store one `gitem R k v i J (cs !!! i) := R k
+  v J (cs !!! i) ∗ inp_lb v J ∗ ⌜nlines J = S i⌝` per filed round; the
+  open pipeline round's `gpcs := pcs ∗ gstore ∗ gopen`, `gopen` the open
+  round's line with its payload FREE at every alternative (a pipeline's
+  line: `cons_claimV_peclV`/`pblkV_ecl_holds` take it as a hypothesis at
+  the view's lines); the wild arm's `gcs_frozen := cs_frozen ∗ gstore`,
+  the wild line's payload free (`PipeOutW`'s `HWfree`).  The OBLIGATION is
+  at every block-first filing (`gl_blk`, `gcl_step_write_blk`,
+  `gwrite_link_blk`, `peclV_step_write_blk`, the union's
+  `ucl_step_write_blk`), on the credential (`gwc_blk` at byte 0 and
+  `gwc_post` at an empty body carry `GR k v I a`), at the record's
+  opening (`lk_blk_0`, `lk_read_t`, `lk_lcred_blk_open`), on the console
+  device's unfiled arm (`UkConsOut.cons_rnd`), and on the generic
+  diagnostic `UShPanic.ush_diag_law_hold_at_alt` (`∀ v, lk_rnd …`).
+  Every instance is `emp` but the union's `UnionOut.upr k v I a :=
+  ⌜¬ (line = LSync ∧ ualt_dec a = RSyncRan)⌝ ∨ UT ∨ (the record:
+  `cs_lb v cs`, `f0cw`, the era pin, `sl_lb (ff_hist) (L ++ [(length
+  (fe_base vf ++ ulines_in I), lm_upto U cs s0 (bodies_of I) (nlines I -
+  1))])`)`; free lemmas `upr_free`/`_line`/`_wild`/`_pv`; sh's PEND
+  prompt pays it from `usync_rec` (`UShURoundDefs.upr_of_rec`), every
+  other caller from `upr_free` (`ufi_rnd_free`, `ucons_rnd_free`).  THE
+  DRAIN: `gdrain_ret` gives `lm_good_out_pad K s0 seg (csf ++ ex)` (the
+  padded resolution; `ex` the open or wild round's code, at most one),
+  `cs_lb v csf` and the item of every round of `csf ++ ex`;
+  `UnionOut.ucl_drain` turns it into `udrain_ret`: `(s0, vf, o)` with
+  `lm_good_sync s0 seg o` and `o = None` or `o = Some (nlines J, c)`
+  beside `sl_lb (ff_hist) (L ++ [(length (fe_base vf ++ ulines_in J),
+  c)])`.
+- THE SWITCH (step 4): `union_phi_res h := ∃ W, ⌜lm_disc h →
+  union_phi_sync_body h W⌝ ∗ f0_pinned h (fst <$> W) ∗ (∃ F, sl_lb F ∗
+  ⌜lm_disc h → slast F = union_rec_now h W⌝) ∗ (era 0 ∨ ∃ vf, pin ∗
+  sl_lb (fe_floor vf) ∗ ⌜lm_disc h → slast (fe_floor vf) =
+  union_rec_base h W⌝)` (`union_rec_base h W := ulast_before h (snd <$>
+  W) (pred (length W))`, the era's boot record; the pure steps
+  `union_rec_now_io/_off/_on/_drain_none/_drain_some`,
+  `union_rec_base_io/_off/_on` in `UnionOut`).  At EVERY console drain the
+  floor is recomputed from the drained record: `o = None` gives the era's
+  `fe_floor vf`, `o = Some` the payload's `L ++ [r]` (at a byte that
+  completes no sync the record is the previous one, so the floor's last
+  record does not move); the era's first drain meets `uadm` at `slast
+  (fe_floor vf)` through `f0_bt` and `uadm_mono`.  `union_adequacy_closed`
+  concludes `UnionOutPure.union_phi_sync κs`; the landed `union_phi` and
+  its body lemmas are deleted; `UInitUnion.union_sync_cut_neg` refutes the
+  negative demo's trace as a run (`UnionAdmDemo.sa_disc`: it is
+  disciplined).
 
 **Adequacy**: the `App` record gains `al_ok`/`al_boot_ok`, `al_merge`,
 `al_found`, `al_sync_run`, `al_back`, the values `al_tk`/`al_hk`, the
@@ -799,8 +903,8 @@ relation is the landed one (k = 0).
   On the machine the record is minted by `Fs` (it knows σ); the counter
   numbers the fires and the ledger files, at the prompt, the record of
   the latest completed sync.
-- `union_phi_sync` (beside the landed `union_phi`, which the ledger and
-  the theorem state until SY3-A4): `∃ W : list (fstate * option srec)`,
+- `union_phi_sync` (the theorem's conclusion since SY3-A4; the landed
+  `union_phi` is retired): `∃ W : list (fstate * option srec)`,
   cycle 0 boots `∅`,
   cycle `k+1` boots in `uadm (ulines_before h (S k)) (ulast_before h (snd
   <$> W) (S k))` -- the last completed sync of the earlier cycles, at its
@@ -809,6 +913,17 @@ relation is the landed one (k = 0).
 - Demos: `demo_sync_cut` (b after the cut, admitted), `demo_sync_cut_neg`
   (a after the cut, refuted at every `W`), `demo_nosync_cut` (no sync: a
   admitted), `demo_sync_inflight` (sync's prompt not out: a admitted).
+
+**As built (A4).**  The theorem states it: `UInitUnion.union_adequacy_
+closed`'s conclusion is `UnionOutPure.union_phi_sync κs`, and
+`UInitUnion.union_sync_cut_neg` (at the theorem's three hardware
+premises) says the negative demo's trace `h_sa` is the trace of NO
+execution: `sa_disc` proves it disciplined (every prefix decided by
+`vm_compute` through local `Decision` instances for `lm_pro_ok` and
+`lm_disc_pt`; `d4_plain` for its lines, none with a terminal
+alternative), so the theorem's conclusion holds of it, which
+`demo_sync_cut_neg` refutes.  `sa_disc` and `demo_sync_cut_neg` are
+closed under the global context.
 
 ## 6. Honest limits
 
