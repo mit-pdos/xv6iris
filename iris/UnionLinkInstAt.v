@@ -97,7 +97,8 @@ Section union_link_inst_at.
       (f0w_at gf s0) _ _
       (uf0bwk ug) _ _ (S gen_id) (uf0w_at_bwk s0) (uf0w_at_bwk0 s0) (uf0bwk_agree ug)
       (fhead_at gf s0) _ (fhead_at_cur gf s0) (fhead_at_inp gf s0)
-      (fun I => uwild (lm_line_at U I) = true).
+      (fun I => uwild (lm_line_at U I) = true)
+      (upr ug) _ _ (upr_0 ug) (upr_pan ug) (upr_exf ug).
 
   Lemma union_params_at_T (s0 : fstate) : gT (union_params_at s0) = UT.
   Proof using . reflexivity. Qed.
@@ -121,11 +122,11 @@ Section union_link_inst_at.
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
         [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)
-        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE #HR HΦ".
       rewrite /lm_abs /lm_line_at in H0 H6 H8.
       iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0' I0 Φ
                 (not_true_is_false _ H0) H1 H2 H3 H4 H5 H6 H7 H8
-                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
+                with "Hpin Ht Hps Hcs HE [Hw] [] [HΦ]"); [by iApply f0w_at_cw | iExact "HR" |].
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
         [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)

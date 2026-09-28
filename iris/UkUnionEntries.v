@@ -223,6 +223,17 @@ Section UkUnionLend.
   Local Notation LK := (union_links ug).
   #[local] Instance uel_links_pers0 : Persistent LK | 0 := union_links_persistent ug.
 
+  (* the device's payload (sync SY3-A4): free at codes that are not the
+     sync's run *)
+  Lemma ucons_rnd_free (sb : fstate) (v : era_pins) (I : list (bv 8)) (codes : list nat) :
+    Forall (fun c => ualt_dec c <> UR RSyncRan) codes ->
+    ⊢ cons_rnd U (PA sb) v I codes.
+  Proof using .
+    intros Hf. iIntros "!>" (c Hc).
+    change (gR (PA sb) (S gen_id) v I c) with (upr ug (S gen_id) v I c).
+    iApply (upr_free ug). exact (proj1 (Forall_forall _ _) Hf c (proj1 (elem_of_list_In _ _) Hc)).
+  Qed.
+
   (* echo's lend at the console: the block at its first byte, code 0 *)
   Lemma uecho_lend (sb : fstate) (v : era_pins) (I : list (bv 8))
       (ws : list (list (bv 8))) :
@@ -237,7 +248,7 @@ Section UkUnionLend.
     { unfold cons_short. constructor; [exact Hshort | constructor]. }
     rewrite /gwc_blk. iDestruct "Hb" as "[Hb | #HT]"; last first.
     { iApply (cons_dev_atc_taint U (PA sb) LK [0%nat] v I _ Hs with "Hlk HT"). }
-    iDestruct "Hb" as (ps cs s1 pos) "(%Hw & Ht & #Hps & #Hcs & #HI & #HW)".
+    iDestruct "Hb" as (ps cs s1 pos) "(%Hw & Ht & #Hps & #Hcs & #HI & #HW & _)".
     assert (Hbodies : lm_body U s1 cs I <$> [0%nat] = [wl_line (drop 1 ws)]).
     { cbn [fmap list_fmap]. rewrite (ulm_echo_body s1 cs I ws Hfl). reflexivity. }
     rewrite -Hbodies.
@@ -246,8 +257,9 @@ Section UkUnionLend.
               ltac:(intros x Hx; exact Hx)
               ltac:(constructor; [exact (ulm_echo_adm s1 cs I ws Hfl) | constructor])
               ltac:(rewrite Hbodies; exact Hs)
-              with "Hlk Hpin [Ht]").
-    rewrite /cons_cur. iFrame "Ht Hps Hcs HI HW".
+              with "Hlk Hpin [Ht] []").
+    { rewrite /cons_cur. iFrame "Ht Hps Hcs HI HW". }
+    iApply ucons_rnd_free. repeat constructor. intros Hq. vm_compute in Hq. discriminate Hq.
   Qed.
 
   (* cat's lend: the round's cursor at the block's first byte, the round's
@@ -290,7 +302,8 @@ Section UkUnionLend.
                       [ apply (ulm_cons_adm_R sb cs I RCNoOpen Hnp); rewrite Hfl; exact Logic.I
                       | constructor ])
                 ltac:(rewrite Hbodies; exact Hs)
-                with "Hlk Hpin Hc").
+                with "Hlk Hpin Hc []");
+        iApply ucons_rnd_free; repeat constructor; intros Hq; vm_compute in Hq; discriminate Hq.
     - assert (Hbodies : lm_body U sb cs I <$> [ualt_code (UR RCRan)]
                         = [cat_dg_open nm]).
       { cbn [fmap list_fmap]. rewrite (ulm_cat_body_ran_none sb cs I nm Hfl Hst). reflexivity. }
@@ -304,7 +317,8 @@ Section UkUnionLend.
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I
                       | constructor ])
                 ltac:(rewrite Hbodies; exact Hs)
-                with "Hlk Hpin Hc").
+                with "Hlk Hpin Hc []");
+        iApply ucons_rnd_free; repeat constructor; intros Hq; vm_compute in Hq; discriminate Hq.
   Qed.
 
   Lemma ucat_lend_taint (sb : fstate) (v : era_pins) (I : list (bv 8))

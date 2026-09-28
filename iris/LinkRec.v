@@ -104,6 +104,10 @@ Section linkrec.
     lk_pan : list (bv 8) -> nat;
     lk_exf : list (bv 8) -> nat;
     lk_exfb : list (bv 8) -> list (bv 8);
+    (* THE PER-ROUND PAYLOAD (sync SY3-A4, [GenLinksLine.gR]): opening a
+       block at an alternative deposits what filing it obliges; free at the
+       read's own alternative [0], the panic and the exec failure *)
+    lk_rnd : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ;
 
     (* ---- the credential families ---- *)
     lk_ban : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ;
@@ -140,6 +144,10 @@ Section linkrec.
     lk_T_pers : Persistent lk_T;
     lk_T_tl : Timeless lk_T;
     lk_links_pers : Persistent lk_links;
+    lk_rnd_pers : forall k v I a, Persistent (lk_rnd k v I a);
+    lk_rnd_0 : forall k v I, ⊢ lk_rnd k v I 0%nat;
+    lk_rnd_pan : forall k v I, ⊢ lk_rnd k v I (lk_pan I);
+    lk_rnd_exf : forall k v I, ⊢ lk_rnd k v I (lk_exf I);
     lk_pin_pers : forall k v, Persistent (lk_pin k v);
     lk_pin_tl : forall k v, Timeless (lk_pin k v);
     lk_pin_agr : forall k v v', ⊢ lk_pin k v -∗ lk_pin k v' -∗ ⌜v = v'⌝;
@@ -190,7 +198,7 @@ Section linkrec.
     lk_sp_t_sp : forall k v I, ⊢ lk_sp_t k v I -∗ lk_sp k v I;
     lk_open_t_open : forall k v I, ⊢ lk_open_t k v I -∗ lk_open k v I;
     lk_blk_0 : forall k v I a a',
-      ⊢ lk_blk k v I a 0%nat -∗ lk_blk k v I a' 0%nat;
+      ⊢ lk_blk k v I a 0%nat -∗ lk_rnd k v I a' -∗ lk_blk k v I a' 0%nat;
     lk_line_of_post : forall k v I a, lk_apr I a ->
       ⊢ lk_blk k v I a (length (lk_ab I a) - 2)%nat -∗ lk_line k v I;
     lk_line_of_pro : forall k v I, ⊢ lk_pro k v I -∗ lk_line k v I;
@@ -260,6 +268,7 @@ Section linkrec.
     lk_read_t : forall k v I a l,
       wl_nl ∉ l ->
       ⊢ inp_lb v (I ++ l ++ [wl_nl]) -∗ lk_open_t k v I -∗
+      lk_rnd k v (I ++ l ++ [wl_nl]) a -∗
       lk_blk k v (I ++ l ++ [wl_nl]) a 0%nat;
 
     (* ---- the two CONSTANT alternatives, and the panic's banner ---- *)
@@ -324,6 +333,7 @@ Global Arguments LinkRec Σ {_ _}.
 Global Existing Instance lk_T_pers.
 Global Existing Instance lk_T_tl.
 Global Existing Instance lk_links_pers.
+Global Existing Instance lk_rnd_pers.
 Global Existing Instance lk_pin_pers.
 Global Existing Instance lk_pin_tl.
 Global Existing Instance lk_epin_pers.
@@ -446,7 +456,8 @@ Section linkgen.
   Proof using .
     intros Hl. iIntros "#HE' Hc".
     rewrite (lk_lpr_2 L) (lk_lpr_S3 L k v (I ++ l ++ [wl_nl]) 0%nat).
-    iApply (lk_read_t L k v I 0%nat l Hl with "HE' Hc").
+    iApply (lk_read_t L k v I 0%nat l Hl with "HE' Hc []").
+    iApply lk_rnd_0.
   Qed.
 
   (* THE READ THAT COMPLETED A LINE.  The era pin it takes is the ECHO-side
@@ -487,13 +498,14 @@ Section linkgen.
     iApply (lk_line_of_post L k v I a Ha with "Hc").
   Qed.
 
-  (* ---- the block owed opens at ANY alternative ---- *)
+  (* ---- the block owed opens at ANY alternative, its payload deposited ---- *)
   Lemma lk_lcred_blk_open k I a :
+    (∀ v, lk_rnd L k v I a) -∗
     lk_lcred k I 3%nat -∗ ∃ v : era_pins, lk_pin L k v ∗ lk_blk L k v I a 0%nat.
   Proof using .
-    rewrite /lk_lcred. iIntros "Hc". iDestruct "Hc" as (v) "[#Hpin Hc]".
+    rewrite /lk_lcred. iIntros "#HR Hc". iDestruct "Hc" as (v) "[#Hpin Hc]".
     iExists v. iFrame "Hpin". rewrite (lk_lpr_S3 L k v I 0%nat).
-    iApply (lk_blk_0 L k v I 0%nat a with "Hc").
+    iApply (lk_blk_0 L k v I 0%nat a with "Hc HR").
   Qed.
 
   Lemma lk_lcred_blk_lend k I :
@@ -509,7 +521,7 @@ Section linkgen.
   Proof using .
     rewrite /lk_lcred. iIntros "Hc". iDestruct "Hc" as (v) "[#Hpin Hc]".
     iExists v. iFrame "Hpin". rewrite (lk_lpr_S3 L k v I 0%nat) /lk_panic.
-    iApply (lk_blk_0 L k v I 0%nat (lk_pan L I) with "Hc").
+    iApply (lk_blk_0 L k v I 0%nat (lk_pan L I) with "Hc []"). iApply lk_rnd_pan.
   Qed.
 
   (* ---- one byte of the panic line ---- *)
@@ -548,6 +560,15 @@ End linkgen.
 (* a law that needs no premise answers one it is given *)
 Lemma lk_wand_drop {Σ : gFunctors} (P X : iProp Σ) : (⊢ X) -> ⊢ P -∗ X.
 Proof using . intros HX. iIntros "_". iApply HX. Qed.
+
+(* ...and a trailing [emp] premise (the payload at an instance with none) *)
+Lemma lk_wand_emp {Σ : gFunctors} (P X : iProp Σ) : (⊢ P -∗ X) -> ⊢ P -∗ emp -∗ X.
+Proof using . intros HX. iIntros "HP _". iApply (HX with "HP"). Qed.
+Lemma lk_wand_emp2 {Σ : gFunctors} (P Q X : iProp Σ) :
+  (⊢ P -∗ Q -∗ X) -> ⊢ P -∗ Q -∗ emp -∗ X.
+Proof using . intros HX. iIntros "HP HQ _". iApply (HX with "HP HQ"). Qed.
+Lemma lk_emp_valid {Σ : gFunctors} : ⊢ (emp : iProp Σ).
+Proof using . done. Qed.
 
 Section echo_inst.
   Context {Σ : gFunctors} `{!echoOutG Σ}.
@@ -717,6 +738,11 @@ Section echo_inst.
        lk_pan := fun _ => 3%nat;
        lk_exf := fun _ => 1%nat;
        lk_exfb := fun _ => alt_execfail;
+       lk_rnd := fun _ _ _ _ => emp%I;
+       lk_rnd_pers := fun _ _ _ _ => _;
+       lk_rnd_0 := fun _ _ _ => lk_emp_valid;
+       lk_rnd_pan := fun _ _ _ => lk_emp_valid;
+       lk_rnd_exf := fun _ _ _ => lk_emp_valid;
        lk_ban := fun _ v I i => EchoLinks.ewc_ban T v I i;
        lk_owed := fun _ v I => EchoLinks.ewc_owed T v I;
        lk_sp := fun _ v I => EchoLinks.ewc_sp T v I;
@@ -781,7 +807,7 @@ Section echo_inst.
        lk_blk_owed := fun _ v I a => EchoLinksLine.ewc_blk_owed T v I a;
        lk_sp_t_sp := fun _ v I => EchoLinksLine.ewc_sp_t_sp T v I;
        lk_open_t_open := fun _ v I => EchoLinksLine.ewc_open_t_open T v I;
-       lk_blk_0 := fun _ v I a a' => EchoLinksLine.ewc_blk_0 T v I a a';
+       lk_blk_0 := fun _ v I a a' => lk_wand_emp _ _ (EchoLinksLine.ewc_blk_0 T v I a a');
        lk_line_of_post := fun _ v I a Ha => EchoLinksLine.ewc_line_of_post T v I a Ha;
        lk_line_of_pro := fun _ v I => EchoLinksLine.ewc_line_of_pro T v I;
        lk_lend_of_blk0 := ei_lend_of_blk0;
@@ -809,7 +835,8 @@ Section echo_inst.
          EchoLinksLine.echo_prompt_space_t T γ k v I b Φ Hb;
        lk_prompt_dollar_line := fun k v I b Φ Hb =>
          lk_wand_drop _ _ (EchoLinksLine.echo_prompt_dollar_line T γ k v I b Φ Hb);
-       lk_read_t := fun _ v I a l Hl => EchoLinksLine.ewc_read_t T v I a l Hl;
+       lk_read_t := fun _ v I a l Hl =>
+         lk_wand_emp2 _ _ _ (EchoLinksLine.ewc_read_t T v I a l Hl);
 
        lk_ab_pan := fun I => line_alts_of_3 (last_ws I);
        lk_ab_exf := fun I => line_alts_of_1 (last_ws I);

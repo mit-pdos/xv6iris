@@ -579,6 +579,20 @@ Section UkConsOutGen.
     (turn v (pos + i)%nat ∗ ps_lb v ps ∗ cs_lb v (lm_blkcs cs c i)
      ∗ inp_lb v I ∗ W ke s0)%I.
 
+  (* the round's payload at every code the device may file (sync SY3-A4,
+     [GenLinksLine.gl_blk]'s premise) *)
+  Definition cons_rnd (v : era_pins) (I : list (bv 8)) (codes : list nat) : iProp Σ :=
+    (□ ∀ c, ⌜c ∈ codes⌝ -∗ gR Pm ke v I c)%I.
+
+  Global Instance cons_rnd_persistent v I codes : Persistent (cons_rnd v I codes).
+  Proof using . rewrite /cons_rnd. apply _. Qed.
+
+  Lemma cons_rnd_sub v I codes codes' :
+    codes' ⊆ codes -> cons_rnd v I codes -∗ cons_rnd v I codes'.
+  Proof using .
+    iIntros (Hs) "#H". iIntros "!>" (c Hc). iApply "H". iPureIntro. by apply Hs.
+  Qed.
+
   (* THE DEVICE AT A ROUND [(v, I)], owing one of [alts] (the file header
      has the encoding), with the links bundle folded in *)
   Definition cons_dev_at (v : era_pins) (I : list (bv 8))
@@ -590,7 +604,7 @@ Section UkConsOutGen.
                  ⌜¬ gwild Pm I⌝
                  ∗ ⌜alts = lm_body M s0 cs I <$> codes⌝
                  ∗ ⌜Forall (cons_adm M s0 cs I) codes⌝
-                 ∗ cons_cur v ps cs s0 I pos 0 0)
+                 ∗ (cons_cur v ps cs s0 I pos 0 0 ∗ cons_rnd v I codes))
               ∨ (∃ c i : nat,
                    ⌜(0 < i)%nat⌝ ∗ ⌜(i <= length (lm_body M s0 cs I c))%nat⌝
                    ∗ ⌜cons_adm M s0 cs I c⌝
@@ -618,7 +632,7 @@ Section UkConsOutGen.
                  ∗ ⌜codes ⊆ C⌝
                  ∗ ⌜alts = lm_body M s0 cs I <$> codes⌝
                  ∗ ⌜Forall (cons_adm M s0 cs I) codes⌝
-                 ∗ cons_cur v ps cs s0 I pos 0 0)
+                 ∗ (cons_cur v ps cs s0 I pos 0 0 ∗ cons_rnd v I codes))
               ∨ (∃ c i : nat,
                    ⌜c ∈ C⌝ ∗ ⌜(0 < i)%nat⌝ ∗ ⌜(i <= length (lm_body M s0 cs I c))%nat⌝
                    ∗ ⌜cons_adm M s0 cs I c⌝
@@ -695,7 +709,9 @@ Section UkConsOutGen.
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; apply Forall_singleton;
                exact (proj1 (Forall_forall _ _) Hadm c (proj1 (elem_of_list_In _ _) Hc)) |].
-      iExact "Hc".
+      iDestruct "Hc" as "[Hc #Hrn]". iFrame "Hc".
+      iApply (cons_rnd_sub with "Hrn").
+      intros x Hx. apply elem_of_list_singleton in Hx as ->. exact Hc.
     - iRight. subst alts. apply elem_of_list_singleton in Ha as ->.
       iExists c, i.
       iSplit; [iPureIntro; exact Hc |].
@@ -738,7 +754,9 @@ Section UkConsOutGen.
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; apply Forall_singleton;
                exact (proj1 (Forall_forall _ _) Hadm c (proj1 (elem_of_list_In _ _) Hc)) |].
-      iExact "Hc".
+      iDestruct "Hc" as "[Hc #Hrn]". iFrame "Hc".
+      iApply (cons_rnd_sub with "Hrn").
+      intros x Hx. apply elem_of_list_singleton in Hx as ->. exact Hc.
     - iRight. subst alts. apply elem_of_list_singleton in Ha as ->.
       iExists c, i.
       iSplit; [iPureIntro; exact Hi |].
@@ -782,14 +800,15 @@ Section UkConsOutGen.
       rewrite Forall_singleton in Hadm. destruct Hadm as [Hok Hterm].
       pose proof (lookup_lt_Some _ _ _ Hb) as Hlen.
       pose proof (lm_body_lookup_Some M s0 cs I c 0%nat b Hb) as Hb'.
-      iDestruct "Hc" as "(Ht & #Hps & #Hcs & #Hin & #HW)".
+      iDestruct "Hc" as "[(Ht & #Hps & #Hcs & #Hin & #HW) #Hrn]".
       cbn [lm_blkcs]. iEval (rewrite Nat.add_0_r) in "Ht".
       iApply ("Hblk" $! ke v pos c b ps cs s0 I
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin HW Ht Hps Hcs Hin").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin HW Ht Hps Hcs Hin [] [-]").
       { exact Hnw. }
       { exact (lm_wr_blk_nonnil M ps cs s0 I pos Hwb). }
       { exact Hr. } { lia. } { exact Hpin0. } { exact HP. }
       { exact Hok. } { exact Hterm. } { exact Hb'. }
+      { iApply "Hrn". iPureIntro. by apply elem_of_list_singleton. }
       iIntros "[(Ht & _ & #Hcs' & _) | #HT]";
         last by iApply (cons_dev_atc_taint C v I _ Hs' with "Hlk HT").
       iSplitR; [iExact "Hlk" |].
@@ -890,15 +909,17 @@ Section UkConsOutGen.
     Forall (cons_adm M s0 cs I) codes ->
     cons_short (lm_body M s0 cs I <$> codes) ->
     LINKS -∗ PIN ke v -∗ cons_cur v ps cs s0 I pos 0 0 -∗
+    (* ...and the round's payload at the codes (sync SY3-A4) *)
+    cons_rnd v I codes -∗
     cons_dev_at v I (lm_body M s0 cs I <$> codes).
   Proof using .
-    intros Hnw Hw Hadm Hs. iIntros "Hlk Hpin Hc".
+    intros Hnw Hw Hadm Hs. iIntros "Hlk Hpin Hc #Hrn".
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplit; [iPureIntro; exact Hs |].
     iLeft. iExists ps, cs, s0, pos. iSplit; [iPureIntro; exact Hw |].
     iSplitL "Hpin"; [iExact "Hpin" |]. iLeft. iExists codes.
     iSplit; [iPureIntro; exact Hnw |].
     iSplit; [iPureIntro; reflexivity |]. iSplit; [iPureIntro; exact Hadm |].
-    iExact "Hc".
+    iFrame "Hc Hrn".
   Qed.
 
   (* THE DRAINED DEVICE: nothing left to write means the cursor is at the
@@ -910,7 +931,8 @@ Section UkConsOutGen.
     LINKS
     ∗ (T ∨ ∃ (ps cs : list nat) (s0 : lm_st M) (pos c : nat),
              ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜cons_adm M s0 cs I c⌝ ∗ PIN ke v
-             ∗ cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))).
+             ∗ (cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))
+                ∗ (⌜length (lm_body M s0 cs I c) <> 0%nat⌝ ∨ gR Pm ke v I c))).
   Proof using .
     iIntros "(Hlk & _ & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].
     iDestruct "Hd" as "[Hd | HT]"; [| by iLeft]. iRight.
@@ -924,14 +946,16 @@ Section UkConsOutGen.
       iExists ps, cs, s0, pos, c.
       iSplit; [iPureIntro; exact Hw |]. iSplit; [iPureIntro; exact Hadm |].
       iSplitL "Hpin"; [iExact "Hpin" |].
-      rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iExact "Hc".
+      iDestruct "Hc" as "[Hc #Hrn]".
+      rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iFrame "Hc".
+      iRight. iApply "Hrn". iPureIntro. by apply elem_of_list_singleton.
     - injection Hal as Hx.
       apply (f_equal length) in Hx. rewrite length_drop in Hx. cbn [length] in Hx.
       iExists ps, cs, s0, pos, c.
       iSplit; [iPureIntro; exact Hw |]. iSplit; [iPureIntro; exact Hadm |].
       iSplitL "Hpin"; [iExact "Hpin" |].
       replace (length (lm_body M s0 cs I c)) with i by lia.
-      iExact "Hc".
+      iFrame "Hc". iLeft. iPureIntro. lia.
   Qed.
 
   (* THE SAME TWO READERS AT THE CODES: the lend at codes drawn from [C],
@@ -944,16 +968,18 @@ Section UkConsOutGen.
     Forall (cons_adm M s0 cs I) codes ->
     cons_short (lm_body M s0 cs I <$> codes) ->
     LINKS -∗ PIN ke v -∗ cons_cur v ps cs s0 I pos 0 0 -∗
+    (* ...and the round's payload at the codes (sync SY3-A4) *)
+    cons_rnd v I codes -∗
     cons_dev_atc C v I (lm_body M s0 cs I <$> codes).
   Proof using .
-    intros Hnw Hw Hsub Hadm Hs. iIntros "Hlk Hpin Hc".
+    intros Hnw Hw Hsub Hadm Hs. iIntros "Hlk Hpin Hc #Hrn".
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplit; [iPureIntro; exact Hs |].
     iLeft. iExists ps, cs, s0, pos. iSplit; [iPureIntro; exact Hw |].
     iSplitL "Hpin"; [iExact "Hpin" |]. iLeft. iExists codes.
     iSplit; [iPureIntro; exact Hnw |].
     iSplit; [iPureIntro; exact Hsub |].
     iSplit; [iPureIntro; reflexivity |]. iSplit; [iPureIntro; exact Hadm |].
-    iExact "Hc".
+    iFrame "Hc Hrn".
   Qed.
 
   Lemma cons_dev_atc_drained (C : list nat) (v : era_pins) (I : list (bv 8)) :
@@ -961,7 +987,8 @@ Section UkConsOutGen.
     LINKS
     ∗ (T ∨ ∃ (ps cs : list nat) (s0 : lm_st M) (pos c : nat),
              ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜cons_adm M s0 cs I c⌝ ∗ PIN ke v
-             ∗ cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))).
+             ∗ (cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))
+                ∗ (⌜length (lm_body M s0 cs I c) <> 0%nat⌝ ∨ gR Pm ke v I c))).
   Proof using .
     iIntros "(Hlk & _ & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].
     iDestruct "Hd" as "[Hd | HT]"; [| by iLeft]. iRight.
@@ -977,7 +1004,9 @@ Section UkConsOutGen.
       iSplit; [iPureIntro; apply Hsub; by apply elem_of_list_singleton |].
       iSplit; [iPureIntro; exact Hadm |].
       iSplitL "Hpin"; [iExact "Hpin" |].
-      rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iExact "Hc".
+      iDestruct "Hc" as "[Hc #Hrn]".
+      rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iFrame "Hc".
+      iRight. iApply "Hrn". iPureIntro. by apply elem_of_list_singleton.
     - injection Hal as Hx.
       apply (f_equal length) in Hx. rewrite length_drop in Hx. cbn [length] in Hx.
       iExists ps, cs, s0, pos, c.
@@ -985,7 +1014,7 @@ Section UkConsOutGen.
       iSplit; [iPureIntro; exact Hadm |].
       iSplitL "Hpin"; [iExact "Hpin" |].
       replace (length (lm_body M s0 cs I c)) with i by lia.
-      iExact "Hc".
+      iFrame "Hc". iLeft. iPureIntro. lia.
   Qed.
 
   (* the cursor at the body's end IS [gwc_post]: the block written up to
@@ -993,12 +1022,13 @@ Section UkConsOutGen.
   Lemma cons_cur_gwc_post (v : era_pins) (ps cs : list nat) (s0 : lm_st M)
       (I : list (bv 8)) (pos c : nat) :
     lm_wr_blk_t M ps cs s0 I pos ->
-    cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c)) -∗
+    cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))
+    ∗ (⌜length (lm_body M s0 cs I c) <> 0%nat⌝ ∨ gR Pm ke v I c) -∗
     gwc_post M Pm ke v I c.
   Proof using .
     intros Hw. rewrite /cons_cur /gwc_post (lm_body_length M s0 cs I c).
-    iIntros "(Ht & Hps & Hcs & Hin & HW)". iLeft. iExists ps, cs, s0, pos.
-    iSplit; [iPureIntro; exact Hw |]. iFrame "Ht Hps Hcs Hin HW".
+    iIntros "[(Ht & Hps & Hcs & Hin & HW) HR]". iLeft. iExists ps, cs, s0, pos.
+    iSplit; [iPureIntro; exact Hw |]. iFrame "Ht Hps Hcs Hin HW HR".
   Qed.
 
   (* THE CORE AT THIS DEVICE: the write law of any program instance, at a

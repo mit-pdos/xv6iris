@@ -202,16 +202,18 @@ Section peclV_links.
       (lm_of M (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec M a) !! 0%nat = Some b ->
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
     W k s0 -∗
+    (* ...and the round's payload (sync SY3-A4) *)
+    gpr WA k v I0 a -∗
     (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
        ∗ W k s0) ∨ T) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using B Hcons.
     intros Hne Hr Hn Hpin0 HP Hok Hfk Hb.
-    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr HΦ" (o H) "#Hlb Hres".
     rewrite !vchist_at0.
     iMod (peclV_step_write_blk g M G B sd WA k v P a b ps0 cs0 s0 I0 (default [] o) H
             Hne Hr Hn Hpin0 HP Hok Hfk Hb
-            with "Hpin Ht Hpslb Hcslb Hilb HW Hres") as "(Hres & Hret)".
+            with "Hpin Ht Hpslb Hcslb Hilb HW Hgpr Hres") as "(Hres & Hret)".
     iModIntro. iExists o. rewrite vchist_at0. iFrame "Hlb Hres".
     by iApply "HΦ".
   Qed.
@@ -324,6 +326,8 @@ Section peclV_links.
       (sR : lm_st M) (lR : pline') (pre : list (bv 8)) (b : bv 8) (Φ : iProp Σ) :
     pv_line V (lineV M I) = Some lR -> pv_adm V lR = true ->
     line_blocks (pv_fc V sR) lR pre -> b = u_prompt !!! 0%nat ->
+    (* the round's payload is free at the line (sync SY3-A4) *)
+    (forall k a, ⊢ gpr WA k v I a) ->
     pwc_blkV g M PIN W T v I sR k pre false -∗
     (((∃ (ps cs : list nat) (s0 : lm_st M) (P : nat),
          ⌜wr_blkV M ps cs s0 I P /\ lm_upto M cs s0 (bodies_of I) (nlines I - 1)%nat = sR⌝
@@ -332,11 +336,11 @@ Section peclV_links.
       ∨ T) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using B Hcons Hext.
-    intros HlR Ha Hbl Hbv. iIntros "Hpw HΦ" (o H) "#Hlb Hres".
+    intros HlR Ha Hbl Hbv Hfree. iIntros "Hpw HΦ" (o H) "#Hlb Hres".
     rewrite !vchist_at0.
     destruct (decide (pre = [])) as [-> | Hne].
     - iMod (pwc_blkV_file_empty g M G B sd WA V v I sR lR k (default [] o) H b
-              HlR Hbv with "Hpw Hres") as "(Hres & Hret)".
+              HlR Hbv Hfree with "Hpw Hres") as "(Hres & Hret)".
       iModIntro. iExists o. rewrite vchist_at0. iFrame "Hlb Hres".
       iApply "HΦ". iDestruct "Hret" as "[Hx | HT]"; [| by iRight].
       iLeft. iDestruct "Hx" as (ps cs s0 P) "(%Hw & HW & Htn & Hps & Hcs & HE)".
@@ -358,6 +362,7 @@ Section peclV_links.
   Section glinks_of_peclV.
     Context (P : gen_params M).
     Context (HPT : gT P = T) (HPIN : gPIN P = PIN).
+    Context (HPR : gR P = gpr WA).
     Context (HW : forall k s, gW P k s -∗ W k s).
     Context (Hsf : gwa_strict WA \/ gwa_free WA).
     Context (Hhd : forall k v I, gH P k v I -∗
@@ -366,7 +371,7 @@ Section peclV_links.
                    ∗ (W k s0 -∗ gW P k s0)).
 
     Lemma peclV_glinks : ⊢ glinks M P.
-    Proof using B HPIN HPT HW Hcons Hhd Hsf.
+    Proof using B HPIN HPR HPT HW Hcons Hhd Hsf.
       rewrite /glinks /gl_w /gl_blk /gl_pro /gl_head /gl_taint HPT HPIN.
       iSplitR; [| iSplitR; [| iSplitR; [| iSplitR]]].
       - iIntros "!>" (k v P0 b ps0 cs0 s0 I0 Φ)
@@ -376,10 +381,11 @@ Section peclV_links.
         iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
           [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
       - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
-          "_ %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+          "_ %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE #HR HΦ".
         rewrite /lm_abs /lm_line_at in H6 H8.
         iApply (vwrite_link_blk k v P0 a b ps0 cs0 s0 I0 Φ H1 H2 H3 H4 H5 H6 H7 H8
-                  with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply HW |].
+                  with "Hpin Ht Hps Hcs HE [Hw] [] [HΦ]");
+          [by iApply HW | rewrite -HPR; iExact "HR" |].
         iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
           [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
       - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)

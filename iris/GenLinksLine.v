@@ -83,6 +83,17 @@ Record gen_params {Σ : gFunctors} `{!echoOutG Σ} (M : lmodel) := MkGP {
      there is refused ([gl_blk]'s premise).  [fun _ => False] at every
      instance but the union. *)
   gwild : list (bv 8) -> Prop;
+  (* THE PER-ROUND PAYLOAD (sync SY3-A4, [GenOut.gpr]): what filing the
+     alternative [a] after the input [I] obliges the filer to deposit in the
+     claim.  The block credential at its FIRST byte carries it; free at the
+     alternative a read opens with ([0]), the panic and the exec failure.
+     [emp] at every instance but the union's. *)
+  gR : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ;
+  gR_pers : forall k v I a, Persistent (gR k v I a);
+  gR_tl : forall k v I a, Timeless (gR k v I a);
+  gR_0 : forall k v I, ⊢ gR k v I 0;
+  gR_pan : forall k v I, ⊢ gR k v I (lmh_pan gK (lm_line_at M I));
+  gR_exf : forall k v I, ⊢ gR k v I (lmh_exf gK (lm_line_at M I));
 }.
 Global Arguments MkGP {Σ _} M.
 Global Arguments gL {Σ _ M} _.
@@ -109,7 +120,14 @@ Global Arguments gH_tl {Σ _ M} _ _ _ _.
 Global Arguments gH_cur {Σ _ M} _ _ _ _.
 Global Arguments gH_inp {Σ _ M} _ _ _ _.
 Global Arguments gwild {Σ _ M} _ _.
-Global Existing Instances gT_pers gT_tl gPIN_pers gPIN_tl gW_pers gW_tl gWb_pers gWb_tl gH_tl.
+Global Arguments gR {Σ _ M} _ _ _ _ _.
+Global Arguments gR_pers {Σ _ M} _ _ _ _ _.
+Global Arguments gR_tl {Σ _ M} _ _ _ _ _.
+Global Arguments gR_0 {Σ _ M} _ _ _ _.
+Global Arguments gR_pan {Σ _ M} _ _ _ _.
+Global Arguments gR_exf {Σ _ M} _ _ _ _.
+Global Existing Instances gT_pers gT_tl gPIN_pers gPIN_tl gW_pers gW_tl gWb_pers gWb_tl gH_tl
+  gR_pers gR_tl.
 
 Section gen_links_line.
   Context {Σ : gFunctors} `{!echoOutG Σ}.
@@ -126,6 +144,7 @@ Section gen_links_line.
   Local Notation k0 := (gk0 G).
   Local Notation H := (gH G).
   Local Notation WL := (gwild G).
+  Local Notation GR := (gR G).
 
   (* ================================================================== *)
   (*  1.  THE CURSOR AND THE FAMILIES                                    *)
@@ -147,7 +166,9 @@ Section gen_links_line.
     ((∃ (ps cs : list nat) (s0 : lm_st M) (P : nat),
         ⌜lm_wr_blk_t M ps cs s0 I P⌝
         ∗ turn v (P + i) ∗ ps_lb v ps ∗ cs_lb v (lm_blkcs cs a i)
-        ∗ inp_lb v I ∗ W k s0)
+        ∗ inp_lb v I ∗ W k s0
+        (* ...and, at the block's FIRST byte, its payload (sync SY3-A4) *)
+        ∗ (⌜i <> 0⌝ ∨ GR k v I a))
      ∨ T)%I.
 
   Definition gwc_owed (k : nat) (v : era_pins) (I : list (bv 8)) : iProp Σ :=
@@ -186,7 +207,8 @@ Section gen_links_line.
         ⌜lm_wr_blk_t M ps cs s0 I P⌝
         ∗ turn v (P + (length (lm_abs M s0 cs I a) - 2)) ∗ ps_lb v ps
         ∗ cs_lb v (lm_blkcs cs a (length (lm_abs M s0 cs I a) - 2))
-        ∗ inp_lb v I ∗ W k s0)
+        ∗ inp_lb v I ∗ W k s0
+        ∗ (⌜length (lm_abs M s0 cs I a) - 2 <> 0⌝ ∨ GR k v I a))
      ∨ T)%I.
 
   (* THE PER-SHAPE BLOCK ARM: how the line credential looks while a shape's
@@ -260,6 +282,7 @@ Section gen_links_line.
     | |- Timeless (H _ _ _) => apply (gH_tl G)
     | |- Timeless (X _ _ _) => apply X_tl
     | |- Timeless (W _ _) => apply (gW_tl G)
+    | |- Timeless (GR _ _ _ _) => apply (gR_tl G)
     | |- Timeless (Wb _ _) => apply (gWb_tl G)
     | |- Timeless T => apply (gT_tl G)
     | |- Timeless (turn _ _) => apply turn_timeless
@@ -383,7 +406,7 @@ Section gen_links_line.
   Proof using.
     rewrite /gwc_blk /gwc_owed.
     iIntros "[Hc | Hc]"; [| by iRight; iRight].
-    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf)".
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & _)".
     cbn [lm_blkcs]. rewrite Nat.add_0_r.
     iLeft. iExists ps, cs, s0, P. rewrite /gcur. iFrame "Htn Hps Hcs HE Hf".
     iPureIntro. right. exact (proj1 Hw).
@@ -403,8 +426,12 @@ Section gen_links_line.
     iLeft. iExists ps, cs, s0, P. iFrame "Hc". iPureIntro. exact (proj1 Hw).
   Qed.
 
-  Lemma gwc_blk_0 k v I a a' : gwc_blk k v I a 0 -∗ gwc_blk k v I a' 0.
-  Proof using. rewrite /gwc_blk. cbn [lm_blkcs]. iIntros "Hc". iExact "Hc". Qed.
+  Lemma gwc_blk_0 k v I a a' : gwc_blk k v I a 0 -∗ GR k v I a' -∗ gwc_blk k v I a' 0.
+  Proof using.
+    rewrite /gwc_blk. cbn [lm_blkcs]. iIntros "[Hc | Hc] #HR"; [| by iRight].
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & _)".
+    iLeft. iExists ps, cs, s0, P. iFrame "Htn Hps Hcs HE Hf". iSplit; [done |]. by iRight.
+  Qed.
 
   (* the landed post shape is the instance at a state-free alternative *)
   Lemma gwc_post_of_blk k v I a :
@@ -412,9 +439,9 @@ Section gen_links_line.
     gwc_blk k v I a (length (lm_ab M K I a) - 2) -∗ gwc_post k v I a.
   Proof using.
     intros Ha. rewrite /gwc_blk /gwc_post. iIntros "[Hc | Hc]"; [| by iRight].
-    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf)".
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & HR)".
     iLeft. iExists ps, cs, s0, P. rewrite (lm_abs_ab M K s0 cs I a Ha).
-    iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
+    iFrame "Htn Hps Hcs HE Hf HR". by iPureIntro.
   Qed.
 
   Lemma gwc_line_of_post k v I a :
@@ -440,7 +467,7 @@ Section gen_links_line.
   Proof using.
     rewrite /gwc_blk /gwc_lend. cbn [lm_blkcs].
     iIntros "[Hc | Hc]"; [| by iRight].
-    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf)".
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & _)".
     rewrite Nat.add_0_r. iLeft. iExists ps, cs, s0, P.
     rewrite /gcur. by iFrame "Htn Hps Hcs HE Hf".
   Qed.
@@ -450,7 +477,7 @@ Section gen_links_line.
     gwc_blk k v I a (length (lm_ab M K I a) - 1) -∗ gwc_sp_t k v I.
   Proof using.
     intros Ha. rewrite /gwc_blk /gwc_sp_t. iIntros "[Hc | Hc]"; [| by iRight].
-    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf)".
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & _)".
     pose proof (lm_ab_len_ge2 M K I a Ha) as Hlen.
     assert (Hbc : lm_blkcs cs a (length (lm_ab M K I a) - 1) = cs ++ [a]).
     { destruct (length (lm_ab M K I a) - 1) as [| kk] eqn:Hk;
@@ -534,13 +561,14 @@ Section gen_links_line.
   Lemma gwc_read_t k v I a l :
     wl_nl ∉ l ->
     inp_lb v (I ++ l ++ [wl_nl]) -∗ gwc_open_t k v I -∗
+    GR k v (I ++ l ++ [wl_nl]) a -∗
     gwc_blk k v (I ++ l ++ [wl_nl]) a 0.
   Proof using.
-    intros Hl. iIntros "#HE' Hc". rewrite /gwc_open_t /gwc_blk.
+    intros Hl. iIntros "#HE' Hc #HR". rewrite /gwc_open_t /gwc_blk.
     iDestruct "Hc" as "[Hc | Hc]"; [| by iRight].
     iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & _ & Hf)".
     iLeft. iExists ps, cs, s0, P. cbn [lm_blkcs]. rewrite Nat.add_0_r.
-    iFrame "Htn Hps Hcs HE' Hf". iPureIntro.
+    iFrame "Htn Hps Hcs HE' Hf". iSplit; [| by iRight]. iPureIntro.
     exact (lm_wr_open_read_t M ps cs s0 I P l Hw Hl).
   Qed.
 
@@ -551,7 +579,7 @@ Section gen_links_line.
   Proof using.
     rewrite /gwc_blk /gwc_ban.
     iIntros "[Hc | Hc]"; [| by iRight; iRight].
-    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf)".
+    iDestruct "Hc" as (ps cs s0 P) "(%Hw & Htn & Hps & Hcs & HE & Hf & _)".
     assert (Hbc : lm_blkcs cs (lmh_pan K (lm_line_at M I))
                     (length (lm_ab M K I (lmh_pan K (lm_line_at M I))))
                   = cs ++ [lmh_pan K (lm_line_at M I)]).
@@ -633,6 +661,8 @@ Section gen_links_line.
         ⌜lm_abs M s0 cs0 I0 a !! 0 = Some b⌝ -∗
         PIN k v -∗ W k s0 -∗ turn v P -∗
         ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
+        (* ...and the round's payload (sync SY3-A4) *)
+        GR k v I0 a -∗
         (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0) ∨ T)
          -∗ Φ) -∗
         out_link Uart0 k b Φ)%I.
@@ -795,7 +825,7 @@ Section gen_links_line.
     rewrite {1}/gwc_blk. iDestruct "Hc" as "[Hl | #HT]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_blk_taint. }
-    iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
+    iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf & #HR)".
     pose proof (proj1 Hw) as Hwb.
     pose proof Hwb as (Hpin0 & Hr & Hn & HP).
     pose proof (lm_wr_blk_nonnil M ps cs s0 I P Hwb) as Hne.
@@ -803,7 +833,7 @@ Section gen_links_line.
     - (* THE BLOCK-FIRST BYTE files the alternative *)
       cbn [lm_blkcs]. rewrite Nat.add_0_r.
       iApply ("Hblk" $! k v P a b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [] [HΦ]").
       { exact Hnw. }
       { exact Hne. }
       { exact Hr. }
@@ -813,11 +843,12 @@ Section gen_links_line.
       { exact (lmh_free_ok K _ _ _ _ Hfr Hok). }
       { exact (lmh_free_term K _ Hfr). }
       { rewrite /lm_abs -(lm_ab_at M K I a _ Hok Hfr). exact Hb. }
+      { iDestruct "HR" as "[%Hz | $]". by destruct Hz. }
       iIntros "Hres". iApply "HΦ". rewrite /gwc_blk.
       iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
       iLeft. iExists ps, cs, s0, P. cbn [lm_blkcs].
       replace (P + 1) with (S P) by lia.
-      iFrame "Htn' Hps' Hcs' HE' Hf". by iPureIntro.
+      iFrame "Htn' Hps' Hcs' HE' Hf". iSplit; [by iPureIntro |]. by iLeft.
     - (* every byte after it, at the choice list the first one extended *)
       cbn [lm_blkcs].
       iApply ("Hw" $! k v (P + S i') b ps (cs ++ [a]) s0 I Φ
@@ -833,7 +864,7 @@ Section gen_links_line.
       iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
       iLeft. iExists ps, cs, s0, P. cbn [lm_blkcs].
       replace (P + S (S i')) with (S (P + S i')) by lia.
-      iFrame "Htn' Hps' Hcs' HE' Hf". by iPureIntro.
+      iFrame "Htn' Hps' Hcs' HE' Hf". iSplit; [by iPureIntro |]. by iLeft.
   Qed.
 
   (* ---- the shell's prompt: the '$' from the era's head ---- *)
@@ -988,7 +1019,7 @@ Section gen_links_line.
     rewrite {1}/gwc_post. iDestruct "Hc" as "[Hl | #HT]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". rewrite /gwc_sp_t. by iRight. }
-    iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
+    iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf & #HR)".
     pose proof (proj1 Hw) as Hwb.
     pose proof Hwb as (Hpin0 & Hr & Hn & HP).
     pose proof (lm_wr_blk_nonnil M ps cs s0 I P Hwb) as Hne.
@@ -999,10 +1030,11 @@ Section gen_links_line.
     - (* the prompt IS the block's first byte: it files the alternative *)
       cbn [lm_blkcs]. rewrite Nat.add_0_r.
       iApply ("Hblk" $! k v P a b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [] [HΦ]").
       { exact Hnw. } { exact Hne. } { exact Hr. } { rewrite Hn. lia. } { exact Hpin0. }
       { exact HP. } { exact (Hok _). } { exact Hnt. }
       { exact Hby. }
+      { iDestruct "HR" as "[%Hz | $]". by destruct Hz. }
       iIntros "Hres". iApply "HΦ". rewrite /gwc_sp_t.
       iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
       iLeft. iExists ps, (cs ++ [a]), s0, (S P).
@@ -1299,6 +1331,11 @@ Section gen_links_line.
        lk_sp_t_sp := gwc_sp_t_sp;
        lk_open_t_open := gwc_open_t_open;
        lk_blk_0 := gwc_blk_0;
+       lk_rnd := GR;
+       lk_rnd_pers := gR_pers G;
+       lk_rnd_0 := gR_0 G;
+       lk_rnd_pan := gR_pan G;
+       lk_rnd_exf := gR_exf G;
        lk_line_of_post := gwc_line_of_post;
        lk_line_of_pro := gwc_line_of_pro;
        lk_lend_of_blk0 := gwc_lend_of_blk0;

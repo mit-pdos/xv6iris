@@ -434,6 +434,16 @@ Section UShURoundDefs.
   Lemma ufi_wild (I : list (bv 8)) : lk_wild FI I = (uwild (ul I) = true).
   Proof using . reflexivity. Qed.
 
+  (* the record's per-round payload is the union's ([UnionOut.upr]): free at
+     every alternative but the sync's own (sync SY3-A4) *)
+  Lemma ufi_rnd_free (I : list (bv 8)) (a : nat) :
+    ualt_dec a <> UR RSyncRan -> ⊢ ∀ v, lk_rnd FI (S gen_id) v I a.
+  Proof using .
+    intros Ha. iIntros (v).
+    change (lk_rnd FI (S gen_id) v I a) with (upr ug (S gen_id) v I a).
+    iApply (upr_free ug). exact Ha.
+  Qed.
+
   (* THE DEED SAYS ITS LINE IS NOT WILD (or the taint): what the record's
      block-first laws take ([LinkRec.lk_blk_step] &c) *)
   Lemma ush_deed_nw tie sb I :
@@ -487,6 +497,19 @@ Section UShURoundDefs.
   Proof using . rewrite /usync_rec /file_taint /echo_taint. apply _. Qed.
   Global Instance usync_rec_timeless I : Timeless (usync_rec I).
   Proof using . rewrite /usync_rec /file_taint /echo_taint. apply _. Qed.
+
+  (* ...and it is the round's payload at the filing ([UnionOut.upr]) *)
+  Lemma upr_of_rec (v : era_pins) (I : list (bv 8)) (a : nat) :
+    era_pin (fgn_echo gf) (S gen_id) v -∗ f0cw gf (S gen_id) s0 -∗ usync_rec I -∗
+    upr ug (S gen_id) v I a.
+  Proof using .
+    iIntros "#Hpin #Hcw #[HT | [%Hn | Hp]]".
+    - iRight. iLeft. iExact "HT".
+    - iLeft. iPureIntro. intros [Hl _]. exact (Hn Hl).
+    - iDestruct "Hp" as (v' cs vf L) "(#Hpin' & #Hcs & %Hl & #Hfp & #Hsl)".
+      iDestruct (era_pin_agree (fgn_echo gf) (S gen_id) v v' with "Hpin Hpin'") as %<-.
+      iRight. iRight. iExists cs, s0, vf, L. iFrame "Hcs Hcw Hfp Hsl". by iPureIntro.
+  Qed.
 
   (* THE FILE FAMILY AT THE UNION ([UShRound.Wcf]'s positions) *)
   Definition uWcf (I : list (bv 8)) (p : nat) : iProp Σ :=
@@ -644,7 +667,8 @@ Section UShURoundDefs.
     iExists v. iFrame "Hpin". rewrite /gwc_blk. iLeft. iExists ps, cs, s0, P.
     cbn [lm_blkcs]. rewrite Nat.add_0_r.
     rewrite /gcur. iDestruct "Hc" as "(Htn & #Hps & #Hcs & #HE & #Hf)".
-    iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
+    iFrame "Htn Hps Hcs HE Hf". iSplitR; [by iPureIntro |].
+    iRight. iLeft. iPureIntro. intros [_ Hq]. vm_compute in Hq. discriminate Hq.
   Qed.
 
   (* THE FOLD AT POSITION 0: a line credential beside a deed at PRE is a
@@ -700,7 +724,7 @@ Section UShURoundDefs.
       iDestruct "Hblk" as "[Hblk | #HT]"; last first.
       { iLeft. iSplitL "";
           [iApply (uHcltaint I 0%nat v with "Hpin HT") | iApply (ush_deed_taint with "HT")]. }
-      iDestruct "Hblk" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #[Hf %Hs])".
+      iDestruct "Hblk" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #[Hf %Hs] & #HGR)".
       subst sw.
       pose proof Hw as [(_ & _ & Hn & _) _].
       destruct (length (lm_abs U s0 cs I a) - 2)%nat as [| i] eqn:Hi.
@@ -736,7 +760,8 @@ Section UShURoundDefs.
           iSplitR; [by iPureIntro |]. iLeft.
           iExists ps, cs, s0, P. rewrite Hi. cbn [lm_blkcs].
           iFrame "Htn Hps Hcs HE Hf".
-          iSplit; iPureIntro; [exact Hw | reflexivity].
+          iSplit; [iPureIntro; exact Hw |]. iSplit; [iPureIntro; reflexivity |].
+          iLeft. iPureIntro. lia.
         * iApply ("Hdone" $! (cs ++ [a]) with "[%] [%] Hcs Hd Hup");
             [rewrite length_app; cbn [length]; lia | exact Hpre].
   Qed.
@@ -763,7 +788,7 @@ Section UShURoundDefs.
     iDestruct "Hblk" as "[Hblk | #HT]"; last first.
     { iLeft. iSplitL "";
         [iApply (uHcltaint I 0%nat v with "Hpin HT") | iApply (ush_deed_taint with "HT")]. }
-    iDestruct "Hblk" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #[Hf %Hs])".
+    iDestruct "Hblk" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #[Hf %Hs] & #HGR)".
     subst sw.
     pose proof Hw as [(_ & _ & Hn & _) _].
     destruct (length (lm_abs U s0 cs I a) - 2)%nat as [| i] eqn:Hi.
@@ -813,7 +838,8 @@ Section UShURoundDefs.
         iSplitR; [by iPureIntro |]. iLeft.
         iExists ps, cs, s0, P. rewrite Hi. cbn [lm_blkcs].
         iFrame "Htn Hps Hcs HE Hf".
-        iSplit; iPureIntro; [exact Hw | reflexivity].
+        iSplit; [iPureIntro; exact Hw |]. iSplit; [iPureIntro; reflexivity |].
+        iLeft. iPureIntro. lia.
       + rewrite /ush_done_at /ush_deed_at. iLeft. iExists (cs ++ [a]), s, v.
         iFrame "Hd Hty Hpin Hcs Hup %". iPureIntro.
         exact (udone_tie_snoc cs a s0 I _ Hlen Hpos Hc).
@@ -1009,8 +1035,9 @@ Section UShURoundDefs.
   Proof using .
     intros Hnw Hpos. iIntros "#Hlk".
     iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free) FI (PRE I) I uoom
-                  with "[] []") as "#Hx".
+                  with "[] [] []") as "#Hx".
     { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+    { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
     { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
     assert (Hab : lk_ab FI I uoom = alt_oom).
     { change (lk_ab FI I uoom) with (lm_ab U K I uoom). exact (ulm_ab_oom I). }

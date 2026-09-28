@@ -706,7 +706,8 @@ Section pipe_out.
       (fun _ => emp%I) _ pipe_wa_W (fun _ _ => emp%I) pipe_wa_file
       False (fun Hf => match Hf with end)
       True (fun _ => pipe_wa_free)
-      pext _ pext_grow.
+      pext _ pext_grow
+      (fun _ _ _ _ => emp%I) _ _.
 
   (* THE OPEN ROUND: the writer family holds the other half of the round
      ghost, and the block is read off the round's ledger *)
@@ -775,3 +776,91 @@ Section pipe_out.
   Proof using . rewrite /pipe_led. apply _. Qed.
 
 End pipe_out.
+
+(* ====================================================================== *)
+(*  THE OPEN ROUND'S CHOICE AUTHORITY WITH ITS PER-ROUND STORE (sync      *)
+(*  SY3-A4, [GenOut.gstore]): [pcs] beside the store, so the store rides   *)
+(*  the pipeline's open round as it rides the claim ([GenOut.gcs_auth]).   *)
+(* ====================================================================== *)
+Section pipe_store.
+  Context {Σ : gFunctors}.
+  Context `{!echoOutG Σ, !pipeOutG Σ}.
+  Context (R : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ).
+  Context (HRp : forall k v I a, Persistent (R k v I a))
+          (HRt : forall k v I a, Timeless (R k v I a)).
+  #[local] Existing Instances HRp HRt.
+
+  (* THE OPEN ROUND'S PAYLOAD: the round's line was read, and its payload
+     is free at every alternative (a pipeline's round files no payload) *)
+  Definition gopen (k : nat) (v : era_pins) (l : list nat) : iProp Σ :=
+    (∃ J : list (bv 8), inp_lb v J ∗ ⌜nlines J = S (length l)⌝ ∗ □ ∀ a, R k v J a)%I.
+
+  Global Instance gopen_persistent k v l : Persistent (gopen k v l).
+  Proof using HRp. rewrite /gopen. apply _. Qed.
+
+  Global Instance gopen_timeless k v l : Timeless (gopen k v l).
+  Proof using HRt. rewrite /gopen. apply _. Qed.
+
+  Definition gpcs (k : nat) (v : era_pins) (l : list nat) (fz : bool) : iProp Σ :=
+    (pcs v l fz ∗ gstore R k v l ∗ gopen k v l)%I.
+
+  Global Instance gpcs_timeless k v l fz : Timeless (gpcs k v l fz).
+  Proof using HRt. rewrite /gpcs. apply _. Qed.
+
+  Lemma gpcs_lb_prefix k v l l' fz : gpcs k v l fz -∗ cs_lb v l' -∗ ⌜l' `prefix_of` l⌝.
+  Proof using HRp. iIntros "[H _] H'". iApply (pcs_lb_prefix with "H H'"). Qed.
+
+  Lemma gpcs_lb_get k v l fz : gpcs k v l fz -∗ gpcs k v l fz ∗ cs_lb v l.
+  Proof using HRp. iIntros "[H [$ $]]". iApply (pcs_lb_get with "H"). Qed.
+
+  Lemma gpcs_open k v l fz : gpcs k v l fz -∗ gopen k v l.
+  Proof using HRp. iIntros "(_ & _ & $)". Qed.
+
+  Lemma gpcs_store k v l fz : gpcs k v l fz -∗ gstore R k v l.
+  Proof using HRp. iIntros "(_ & $ & _)". Qed.
+
+  Lemma gcs_of_gpcs k v l fz : fz = false -> gpcs k v l fz -∗ gcs_auth R k v l.
+  Proof using HRp. iIntros (Hf) "(H & $ & _)". iApply (pcs_auth with "H"). exact Hf. Qed.
+
+  Lemma gpcs_of_gcs k v l fz :
+    fz = false -> gcs_auth R k v l -∗ gopen k v l -∗ gpcs k v l fz.
+  Proof using HRp.
+    iIntros (Hf) "[H $] $". iApply (pcs_of_auth with "H"). exact Hf.
+  Qed.
+
+  (* THE FILING: the open round's payload, at its alternative, joins the store *)
+  Lemma gpcs_file k v l fz a :
+    fz = false -> gpcs k v l fz ==∗ gcs_auth R k v (l ++ [a]) ∗ cs_lb v (l ++ [a]).
+  Proof using HRp.
+    iIntros (Hf) "Hg". iDestruct (gpcs_open with "Hg") as (J) "(#HJ & %HnJ & #HR)".
+    iDestruct (gcs_of_gpcs with "Hg") as "Hg"; [exact Hf |].
+    iApply (gcs_auth_grow R HRp k v l a J with "Hg [] HJ []"); [iApply "HR" | by iPureIntro].
+  Qed.
+
+  (* THE FROZEN CHOICES WITH THEIR STORE (the union's wild era) *)
+  Definition gcs_frozen (k : nat) (v : era_pins) (l : list nat) : iProp Σ :=
+    (cs_frozen v l ∗ gstore R k v l)%I.
+
+  Global Instance gcs_frozen_persistent k v l : Persistent (gcs_frozen k v l).
+  Proof using HRp. rewrite /gcs_frozen. apply _. Qed.
+
+  Global Instance gcs_frozen_timeless k v l : Timeless (gcs_frozen k v l).
+  Proof using HRt. rewrite /gcs_frozen. apply _. Qed.
+
+  Lemma gcs_frozen_prefix k v l l' : gcs_frozen k v l -∗ cs_lb v l' -∗ ⌜l' `prefix_of` l⌝.
+  Proof using. iIntros "[H _] H'". iApply (cs_frozen_prefix with "H H'"). Qed.
+
+  Lemma gcs_frozen_cs k v l : gcs_frozen k v l -∗ cs_frozen v l.
+  Proof using. iIntros "[$ _]". Qed.
+
+  Lemma gcs_frozen_store k v l : gcs_frozen k v l -∗ gstore R k v l.
+  Proof using. iIntros "[_ $]". Qed.
+
+  Lemma gcs_freeze k v l : gcs_auth R k v l ==∗ gcs_frozen k v l.
+  Proof using. iIntros "[H $]". iApply (cs_freeze with "H"). Qed.
+
+  Lemma gpcs_freeze k v l fz : gpcs k v l fz ==∗ gpcs k v l true ∗ cs_frozen v l.
+  Proof using HRp.
+    iIntros "(H & #Hs & #Ho)". iMod (pcs_freeze with "H") as "[H #Hf]". iModIntro. by iFrame "H Hs Ho Hf".
+  Qed.
+End pipe_store.

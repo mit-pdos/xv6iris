@@ -543,12 +543,14 @@ Section UShURoundLaws.
     era_pin (fgn_echo gf) (S gen_id) v -∗
     ps_lb v ps -∗ cs_lb v cs -∗ inp_lb v I -∗ f0cw gf (S gen_id) s0 -∗
     f_typed (fgn_cl gf) s -∗
+    (* ...and the round's payload (sync SY3-A4) *)
+    upr ug (S gen_id) v I a -∗
     UShPanic.prompt_step (upfam v P I s).
   Proof using Hcons.
     intros Hw Htie Hnw. pose proof Htie as (Hlen & Hpos & Hok & Hterm & Hcont & Hc).
     pose proof (ucont_prompt_nopanic _ _ _ Hcont) as Hnp.
     pose proof Hw as [Hwb Ht].
-    iIntros "#Hlk #Hpin #Hps #Hcs #HE #Hcw #Hty".
+    iIntros "#Hlk #Hpin #Hps #Hcs #HE #Hcw #Hty #HR".
     rewrite /UShPanic.prompt_step. iIntros "!>" (p b Φ) "%Hb %Hp Hc HΦ".
     destruct p as [| [| p]]; [| | exfalso; lia].
     - (* '$': the block-first byte files the deed's alternative *)
@@ -565,7 +567,7 @@ Section UShURoundLaws.
         rewrite Hcont. exact EchoLinks.wr_prompt_head. }
       iApply (union_write_link_blk ug Hcons (S gen_id) v P a (u_prompt !!! 0%nat) ps cs s0 I Φ
                 Hnw Hne Hr ltac:(lia) Hpin0 HP Hok Hterm Hhead
-                with "Hpin Htn Hps Hcs HE Hcw [HΦ Hd Hup]").
+                with "Hpin Htn Hps Hcs HE Hcw HR [HΦ Hd Hup]").
       iIntros "Hres". iApply "HΦ". cbn [upfam].
       iDestruct "Hres" as "[(Htn' & _ & #Hcs' & _ & _) | #HT]"; last first.
       { iSplitL "";
@@ -635,8 +637,9 @@ Section UShURoundLaws.
     iDestruct (ucs_lb_agree_len v cs cs' ltac:(lia) with "Hcs Hcs'") as %<-.
     iAssert (f0cw gf (S gen_id) s0) as "#Hcw".
     { rewrite /f0w. iDestruct "Hf0" as "[_ Hf]". rewrite /f0cw. iExact "Hf". }
+    iPoseProof (upr_of_rec ug s0 v I a with "Hpin Hcw Hsrec") as "#Hupr".
     iPoseProof (upfam_step v ps cs P a I s Hw Htie Hnw
-                  with "Hlk Hpin Hps Hcs HE Hcw Hty") as "#Hst".
+                  with "Hlk Hpin Hps Hcs HE Hcw Hty Hupr") as "#Hst".
     iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) N
               (upfam v P I s) l vw rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd Htn Hd Hup] Hrun [Hcont]");
@@ -699,7 +702,7 @@ Section UShURoundLaws.
               (cstep_okVh_prompt U pview_unionU I sR lR HlR Ha i sw (5 + p)%nat
                  ltac:(lia) Hlt)
               with "[] Hfe Hh [HΦ]").
-    { iApply (pblkU_ecl_holds ug v I sR (uwild_pv _ _ HlR)). }
+    { iApply (pblkU_ecl_holds ug v I sR _ HlR). }
     iIntros "Hfe Hh". iApply "HΦ".
     iExists v, γc, γm, dep, i, sw, sR, lR.
     iSplitR; [iPureIntro; split_and!; assumption |].

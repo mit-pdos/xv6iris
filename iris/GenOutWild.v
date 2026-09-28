@@ -299,6 +299,67 @@ Section gen_out_wild.
     - exact Hinp.
   Qed.
 
+  (* ...at the resolution the frozen stage names, the wild line's code
+     appended (sync SY3-A4) *)
+  Lemma lm_good_out_pad_wild (L : lm_laws M) (K : lm_hooks M) (B : lm_byte_laws M)
+      (ps cs : list nat) (s : lm_st M) (E : list (list mobs * bv 8))
+      (u : list (bv 8)) (seg : list mobs) :
+    Forall (fun a => a < length pro_alts) ps ->
+    lm_alts_pre M s (snd <$> E) cs ->
+    lm_pro_pin M ps cs (snd <$> E) ->
+    lm_E_disc M E ->
+    (snd <$> E) <> [] -> rest_of (snd <$> E) = [] ->
+    length cs = nlines (snd <$> E) - 1 ->
+    lm_wild (lm_line_at M (snd <$> E)) ->
+    obs_wire Uart0 seg `prefix_of` (lm_D M ps cs s E ++ u) ->
+    (snd <$> E) `prefix_of` ins seg ->
+    exists c, lm_good_out_pad M K s seg (cs ++ [c]).
+  Proof using.
+    intros Hpsb Hao Hpin HE Hne Hr Hlen [Hwc _] Hwire Hinp.
+    set (I := snd <$> E) in *.
+    pose proof (nlines_pos_of_rest_nil I Hne Hr) as Hpos.
+    set (u' := if decide (u = []) then [wl_nl] else u).
+    assert (Hu' : u' <> []) by (rewrite /u'; case_decide; done).
+    assert (Huu : u `prefix_of` u').
+    { rewrite /u'. case_decide as Hq; [rewrite Hq; apply prefix_nil | reflexivity]. }
+    destruct (Hwc (lm_upto M cs s (bodies_of I) (nlines I - 1)) u' Hu')
+      as (c & Hok & Hterm & Hcont).
+    set (cs1 := cs ++ [c]).
+    assert (Hcs1 : cs `prefix_of` cs1) by (rewrite /cs1; by eexists).
+    assert (Hag : forall j, j < nlines I - 1 -> cs1 !!! j = cs !!! j).
+    { intros j Hj. rewrite /cs1 !list_lookup_total_alt lookup_app_l; [done | lia]. }
+    assert (Hat : lm_at M cs1 (nlines I - 1) = lm_dec M c).
+    { rewrite /lm_at /cs1 list_lookup_total_alt lookup_app_r; [| lia].
+      rewrite (_ : nlines I - 1 - length cs = 0); [reflexivity | lia]. }
+    assert (Hup : lm_upto M cs1 s (bodies_of I) (nlines I - 1)
+                  = lm_upto M cs s (bodies_of I) (nlines I - 1))
+      by (apply (lm_upto_ext M); [exact Hag | intros; reflexivity]).
+    assert (Hpin1 : lm_pro_pin M ps cs1 I).
+    { intros q Hq. rewrite (nstarted_rest_nil I Hr) in Hq.
+      rewrite (lm_pro_idx_ext M cs1 cs q ltac:(intros j Hj; apply Hag; lia) q
+                 ltac:(lia)).
+      apply Hpin. rewrite (nstarted_rest_nil I Hr). exact Hq. }
+    assert (Hrl : nlines (removelast I) <= length cs)
+      by (rewrite (ll_nlines_removelast I Hr); lia).
+    exists c. apply (lm_good_out_pad_of_stage M K B ps cs1 s E u' seg Hpsb).
+    - apply (lm_alts_pre_mono M s I (ins seg)); [exact Hinp |].
+      apply lm_alts_pre_snoc_w; [exact Hao | lia |].
+      rewrite Hlen. exact Hok.
+    - rewrite /cs1 length_app. cbn [length].
+      change (nlines (removelast I) <= length cs + 1). lia.
+    - left. rewrite /cs1 length_app. cbn [length].
+      change (nlines I <= length cs + 1). lia.
+    - exact HE.
+    - exact Hpin1.
+    - rewrite /lm_pending /lm_pending_at decide_False; [| exact Hne].
+      rewrite decide_True; [| exact Hr].
+      rewrite /lm_cont_at Hat Hup /lm_line_at in Hcont |- *.
+      rewrite (lml_term_nopanic L _ Hterm) app_nil_r Hcont. reflexivity.
+    - rewrite -(lm_D_cs_prefix M ps ps cs cs1 s E ltac:(reflexivity) Hcs1 Hpin Hrl).
+      etrans; [exact Hwire |]. by apply prefix_app.
+    - exact Hinp.
+  Qed.
+
   (* ================================================================== *)
   (*  4.  THE TRANSITION'S FACTS                                         *)
   (* ================================================================== *)

@@ -52,6 +52,8 @@ Section gen_links_gl.
   Section glinks_of_gcl.
     Context (P : gen_params M).
     Context (HPT : gT P = T) (HPIN : gPIN P = PIN).
+    (* the links' payload family is the claim's (sync SY3-A4) *)
+    Context (HPR : gR P = gpr A).
     Context (HW : forall k s, gW P k s -∗ W k s).
     Context (Hsf : gwa_strict A \/ gwa_free A).
     Context (Hhd : forall k v I, gH P k v I -∗
@@ -60,7 +62,7 @@ Section gen_links_gl.
                    ∗ (W k s0 -∗ gW P k s0)).
 
     Lemma gcl_glinks : ⊢ glinks M P.
-    Proof using B HPIN HPT HW Hcons Hhd Hsf.
+    Proof using B HPIN HPR HPT HW Hcons Hhd Hsf.
       rewrite /glinks /gl_w /gl_blk /gl_pro /gl_head /gl_taint HPT HPIN.
       iSplitR; [| iSplitR; [| iSplitR; [| iSplitR]]].
       - iIntros "!>" (k v P0 b ps0 cs0 s0 I0 Φ)
@@ -70,10 +72,11 @@ Section gen_links_gl.
         iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
           [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
       - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
-          "_ %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+          "_ %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE #HR HΦ".
         rewrite /lm_abs /lm_line_at in H6 H8.
         iApply (gwrite_link_blk M G B sd A Hcons k v P0 a b ps0 cs0 s0 I0 Φ H1 H2 H3 H4 H5 H6 H7 H8
-                  with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply HW |].
+                  with "Hpin Ht Hps Hcs HE [Hw] [] [HΦ]");
+          [by iApply HW | rewrite -HPR; iExact "HR" |].
         iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
           [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
       - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)

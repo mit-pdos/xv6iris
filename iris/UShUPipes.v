@@ -255,7 +255,7 @@ Section UShUPipes.
   Lemma ucons_claim : cons_claimV (ugn_pipe ug) ulmG pview_unionU (ucparams ug) ∅ (uwa ug).
   Proof using Hcons.
     exists (ucl ug). split; [exact Hcons |].
-    intros v I sR lR HlR. exact (pblkU_ecl_holds ug v I sR (uwild_pv _ _ HlR)).
+    intros v I sR lR HlR. exact (pblkU_ecl_holds ug v I sR _ HlR).
   Qed.
 
   (* THE NODES' NAMES: a pipe and two one-shot names per node *)
@@ -409,7 +409,7 @@ Section UShUPipes.
     rewrite /uWcl /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr]. rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last by iLeft.
-    iDestruct "Hc" as (ps cs sw P0) "(%Hw & Htn & #Hps & #Hcs & #HE & #HW)".
+    iDestruct "Hc" as (ps cs sw P0) "(%Hw & Htn & #Hps & #Hcs & #HE & #HW & _)".
     cbn [gW union_params_at]. rewrite /f0w_at.
     iDestruct "HW" as "[Hf %Hs]". subst sw.
     iAssert (f0cw gf (S gen_id) s0) as "#Hcw".

@@ -125,6 +125,15 @@ Proof using.
   intros Hl. destruct (uv_line_some l lR Hl) as (p & fs & -> & _). reflexivity.
 Qed.
 
+(* the sync line is neither wild nor a pipeline (sync SY3-A4) *)
+Lemma uwild_nsync (l : uline) : uwild l = true -> l <> LSync.
+Proof using. by intros Hw ->. Qed.
+
+Lemma upv_nsync (l : uline) (lR : pline') : pv_line pview_unionU l = Some lR -> l <> LSync.
+Proof using.
+  intros Hl. destruct (uv_line_some l lR Hl) as (p & fs & -> & _). discriminate.
+Qed.
+
 (* ---- THE ERA'S BASE, PURELY (sync SY3-A3bc): the line list of a history
         is the lines of the cycles before the current one followed by the
         current cycle's own ---- *)
@@ -229,12 +238,67 @@ Section union_out.
     MkGCP U ulmG_laws ulmG_hooks UT _ _
       UPIN _ _ (era_pin_agree (fgn_echo gf)) (f0cw gf) _ _.
 
+  (* THE ROUND'S PAYLOAD (sync SY3-A4, [GenOut.gpr]): nothing, except when
+     the alternative filed is /sync's run at a [sync] line, where it is the
+     completed sync's RECORD -- the choices before the round, the era's
+     boot state and record, and a lower bound of the RUN-LONG sync history
+     ending at [(position of the line + 1, the state before the round)] *)
+  Definition upr (k : nat) (v : era_pins) (I : list (bv 8)) (a : nat) : iProp Σ :=
+    (⌜¬ (lm_line_at U I = LSync /\ ualt_dec a = UR RSyncRan)⌝ ∨ UT
+     ∨ ∃ (cs : list nat) (s0 : fstate) (vf : file_era) (L : list srec),
+         cs_lb v cs ∗ ⌜length cs = (nlines I - 1)%nat⌝ ∗ f0cw gf k s0
+         ∗ file_era_pin gf k vf
+         ∗ sl_lb (ff_hist (fgn_cl gf))
+             (L ++ [(length (fe_base vf ++ ulines_in I),
+                     lm_upto U cs s0 (bodies_of I) (nlines I - 1))]))%I.
+
+  Global Instance upr_persistent k v I a : Persistent (upr k v I a).
+  Proof using . rewrite /upr /file_taint /echo_taint. apply _. Qed.
+  Global Instance upr_timeless k v I a : Timeless (upr k v I a).
+  Proof using . rewrite /upr /file_taint /echo_taint. apply _. Qed.
+
+  (* ...free at every other alternative *)
+  Lemma upr_free (k : nat) (v : era_pins) (I : list (bv 8)) (a : nat) :
+    ualt_dec a <> UR RSyncRan -> ⊢ upr k v I a.
+  Proof using . intros Ha. iLeft. iPureIntro. intros [_ H]. exact (Ha H). Qed.
+
+  Lemma upr_free_line (k : nat) (v : era_pins) (I : list (bv 8)) (a : nat) :
+    lm_line_at U I <> LSync -> ⊢ upr k v I a.
+  Proof using . intros Hl. iLeft. iPureIntro. intros [H _]. exact (Hl H). Qed.
+
+  Lemma upr_0 (k : nat) (v : era_pins) (I : list (bv 8)) : ⊢ upr k v I 0.
+  Proof using . apply upr_free. intros H. vm_compute in H. discriminate H. Qed.
+
+  Lemma upr_pan (k : nat) (v : era_pins) (I : list (bv 8)) :
+    ⊢ upr k v I (lmh_pan ulmG_hooks (lm_line_at U I)).
+  Proof using .
+    destruct (decide (lm_line_at U I = LSync)) as [Hl | Hl]; [| by apply upr_free_line].
+    rewrite Hl. apply upr_free. intros H. vm_compute in H. discriminate H.
+  Qed.
+
+  Lemma upr_exf (k : nat) (v : era_pins) (I : list (bv 8)) :
+    ⊢ upr k v I (lmh_exf ulmG_hooks (lm_line_at U I)).
+  Proof using .
+    destruct (decide (lm_line_at U I = LSync)) as [Hl | Hl]; [| by apply upr_free_line].
+    rewrite Hl. apply upr_free. intros H. vm_compute in H. discriminate H.
+  Qed.
+
+  (* ...and it is free at the wild line and at a pipeline's *)
+  Lemma upr_wild (k : nat) (v : era_pins) (I : list (bv 8)) (a : nat) :
+    uwild (lm_line_at U I) = true -> ⊢ upr k v I a.
+  Proof using . intros Hw. apply upr_free_line. exact (uwild_nsync _ Hw). Qed.
+
+  Lemma upr_pv (k : nat) (v : era_pins) (I : list (bv 8)) (lR : pline') (a : nat) :
+    pv_line pview_unionU (lineV U I) = Some lR -> ⊢ upr k v I a.
+  Proof using . intros Hl. apply upr_free_line. exact (upv_nsync _ _ Hl). Qed.
+
   (* the file's witness authority, the pipeline's byte ledger beside it *)
   Definition uwa : gen_wa U ucparams ∅ :=
     @MkGWA Σ _ U ucparams ∅ (f0wa gf) _ (f0wa_agree_d gf) (f0_typed gf) _
       (f0wa_W gf) (f0boot gf) (f0wa_file gf) True (fun _ => f0wa_agree gf)
       False (fun Hf => match Hf with end)
-      (pext pg) _ (pext_grow pg).
+      (pext pg) _ (pext_grow pg)
+      upr _ _.
 
   Lemma uwa_ext k l : gext uwa k l = pext pg k l.
   Proof using . reflexivity. Qed.
@@ -243,7 +307,7 @@ Section union_out.
      authority [f0wa] of the stage's filed state *)
   Definition popenU (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       : iProp Σ :=
-    popenV pg U UPIN (f0wa gf) ∅ k ho H.
+    popenV pg U UPIN (f0wa gf) ∅ upr k ho H.
 
   (* THE CLAIM: three arms (seccomp design 10.3) -- the taint, the
      disciplined claim under the era's wild flag at 0, and the WILD arm *)
@@ -367,17 +431,19 @@ Section union_out.
     lm_cont U (lm_upto U cs0 s0 (bodies_of I0) (nlines I0 - 1))
       (lm_of U (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec U a) !! 0%nat = Some b ->
     UPIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ f0cw gf k s0 -∗
+    (* ...and the round's payload (sync SY3-A4) *)
+    upr k v I0 a -∗
     ucl k ho H ==∗
       ucl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
           ∗ f0cw gf k s0) ∨ UT).
   Proof using .
     intros Hnw Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
-    iIntros "Hpin Ht Hps Hcs HE HW Hcl".
+    iIntros "Hpin Ht Hps Hcs HE HW HR Hcl".
     iApply (pwclV_step_write_blk pg U ucparams UB ∅ uwa uwild uwild_wild
               k v P a b ps0 cs0 s0 I0 ho H
               Hnw Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
-              with "Hpin Ht Hps Hcs HE HW Hcl").
+              with "Hpin Ht Hps Hcs HE HW HR Hcl").
   Qed.
 
   (* (P) A PROLOGUE ROUND'S CHOICE BYTE: the file's witness is STRICT (a
@@ -428,9 +494,10 @@ Section union_out.
     ucl k ho CH -∗ ucl k ho CH ∗ udrain_ret k seg.
   Proof using .
     intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hcl".
-    iDestruct (pwclV_drain pg U ucparams UB ∅ uwa uwild uwild_wild k h ho CH seg
+    iDestruct (pwclV_drain pg U ucparams UB ∅ uwa uwild uwild_wild upr_wild k h ho CH seg
                  Hsh Hk Hpre Hins Hwire Hne with "Hcl") as "[$ Hd]".
-    rewrite /udrain_ret /gdrain_ret.
+    iDestruct (gdrain_ret_good with "Hd") as "Hd".
+    rewrite /udrain_ret.
     iDestruct "Hd" as "[#HT | (%s0 & %Hgo & %Hok & #Hty & #Hw)]"; [by iLeft |].
     iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
     iExists s0, vf. iFrame "Hty Hfp Hlb". by iPureIntro.
@@ -528,12 +595,12 @@ Section union_out.
   (* THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION, at the round's state, at
      a line that is NOT WILD (a terminal family byte at the [seccomp x]
      line would be admissible there; the family's lines are pipelines) *)
-  Theorem pblkU_ecl_holds (v : era_pins) (I : list (bv 8)) (sR : fstate) :
-    uwild (lineV U I) = false ->
+  Theorem pblkU_ecl_holds (v : era_pins) (I : list (bv 8)) (sR : fstate) (lR : pline') :
+    pv_line pview_unionU (lineV U I) = Some lR ->
     ⊢ eclN ucl (pwc_blkU v I sR) (ptkU v I) (pwitU I sR).
   Proof using .
-    intros Hnw. exact (pwclV_ecl_holds pg U ucparams ∅ uwa uwa_ext uwild uwild_wild
-                         v I sR Hnw).
+    intros HlR. exact (pwclV_ecl_holds pg U ucparams ∅ uwa uwa_ext uwild uwild_wild
+                         v I sR (uwild_pv _ _ HlR) (fun k a => upr_pv k v I lR a HlR)).
   Qed.
 
   (* THE MODEL'S BLOCKS ARE THE CLAIM'S NON-TERMINAL WITNESS, through the
@@ -583,7 +650,8 @@ Section union_out.
   Proof using .
     intros HlR Hbv. iIntros "Hpw Hcl".
     iApply (pwclV_blk_file_empty pg U ucparams UB ∅ uwa uwild uwild_wild pview_unionU
-              v I sR lR k ho H b uwild_pv HlR Hbv with "Hpw Hcl").
+              v I sR lR k ho H b uwild_pv HlR Hbv (fun k a => upr_pv k v I lR a HlR)
+              with "Hpw Hcl").
   Qed.
 
   (* =================================================================== *)
@@ -642,6 +710,7 @@ Section union_out.
       rewrite (_ : lm_pcount U [] [] (gs_state U ∅ (gstage0 U)) [] [] = 0%nat);
         [| reflexivity].
       iFrame "Ht1 Hcs Hps HE Hdl1 Hdll".
+      iSplitR; [iApply gstore_nil |].
       iPureIntro.
       rewrite /gcl_pure.
       cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl

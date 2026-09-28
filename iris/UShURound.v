@@ -832,7 +832,7 @@ Section UShURound.
     rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
-    iDestruct "Hc" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #HW)".
+    iDestruct "Hc" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #HW & _)".
     iAssert (⌜sw = s0⌝)%I as %->.
     { cbn [gW union_params_at]. rewrite /f0w_at. iDestruct "HW" as "[_ %Hs]". done. }
     iDestruct (era_pin_agree (fgn_echo gf) (S gen_id) v v' with "Hpin Hpin'")
@@ -934,8 +934,9 @@ Section UShURound.
     intros Hnw [Hlen Hc] Hpos. iIntros "#Hlk #Hty #Hpin' #Hcs #HX".
     iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                   (ghost_varG0 := offbox_offG) FI (fown r s ∗ X) I uoom
-                  with "[] []") as "#Hx".
+                  with "[] [] []") as "#Hx".
     { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+    { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
     { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
     assert (Hab : lk_ab FI I uoom = alt_oom).
     { change (lk_ab FI I uoom) with (lm_ab U K I uoom). exact (ulm_ab_oom I). }
@@ -1046,8 +1047,9 @@ Section UShURound.
     - (* exec failed: the diagnostic at [RCExec] *)
       iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                     (ghost_varG0 := offbox_offG) FI (fown r s ∗ urpos ug r I) I
-                    (ualt_code (UR RCExec)) with "[] []") as "#Hx".
+                    (ualt_code (UR RCExec)) with "[] [] []") as "#Hx".
       { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+      { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
       { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
       assert (Hab : lk_ab FI I (ualt_code (UR RCExec)) = FileDisc.alt_execcat).
       { change (lk_ab FI I (ualt_code (UR RCExec))) with (lm_ab U K I (ualt_code (UR RCExec))).
@@ -1368,8 +1370,9 @@ Section UShURound.
     assert (Hnp : forall p n, ul I <> LPipe p n) by (rewrite Hul; intros; discriminate).
     iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                   (ghost_varG0 := offbox_offG) FI (PRE I) I (ualt_code (UR RSyncExec))
-                  with "[] []") as "#Hx".
+                  with "[] [] []") as "#Hx".
     { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+    { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
     { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
     assert (Hab : lk_ab FI I (ualt_code (UR RSyncExec)) = FileDisc.alt_execsync).
     { change (lk_ab FI I (ualt_code (UR RSyncExec)))
@@ -1846,8 +1849,9 @@ Section UShURound.
       iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG) FI
                     (fposq r (length ls) ∗ UShFileRedir.redir_K' gf r file s (length ls) ty)
-                    I (ualt_code (UR RFExec)) with "[] []") as "#Hx".
+                    I (ualt_code (UR RFExec)) with "[] [] []") as "#Hx".
       { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+      { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
       { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
       iEval (rewrite Hax) in "Hx".
       iApply (uexecfail_law_at_conv with "Hx []").
@@ -1874,8 +1878,9 @@ Section UShURound.
         iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG)
                       FI (fown r s ∗ urpos ug r I) I (ualt_code (UR RFOpenU))
-                      with "[] Hlk'") as "#Hx".
+                      with "[] [] Hlk'") as "#Hx".
         { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+        { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
         iEval (rewrite Hau alt_openfailN_nlen) in "Hx".
         iDestruct ("Hx" $! N l with "[%] [Hc Hd Hup]") as (Pf) "(H0 & #Hs & #He)";
           [exact Hfd | iFrame "Hc Hd Hup" |].
@@ -1890,8 +1895,9 @@ Section UShURound.
                       (ghost_varG0 := offbox_offG)
                       FI (fown r (<[file := (i, [])]> s) ∗ urpos ug r I) I
                       (ualt_code (UR RFOpenM))
-                      with "[] Hlk'") as "#Hx".
+                      with "[] [] Hlk'") as "#Hx".
         { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+        { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
         iEval (rewrite Ham alt_openfailN_nlen) in "Hx".
         iDestruct ("Hx" $! N l with "[%] [Hc Hd Hup]") as (Pf) "(H0 & #Hs & #He)";
           [exact Hfd | iFrame "Hc Hd Hup" |].
@@ -1902,8 +1908,9 @@ Section UShURound.
                   with "Hp' Hblk Hd Hup Hty0 Hpin' Hcs").
       + iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG)
-                      FI emp%I I (ualt_code (UR RFOpenU)) with "[] Hlk'") as "#Hx".
+                      FI emp%I I (ualt_code (UR RFOpenU)) with "[] [] Hlk'") as "#Hx".
         { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+        { iApply ufi_rnd_free. intros Hq. vm_compute in Hq. discriminate Hq. }
         iEval (rewrite Hau alt_openfailN_nlen) in "Hx".
         iDestruct ("Hx" $! N l with "[%] [Hc]") as (Pf) "(H0 & #Hs & _)";
           [exact Hfd | iFrame "Hc" |].

@@ -123,6 +123,14 @@ Record gen_wa {Σ : gFunctors} `{!echoOutG Σ} (M : lmodel) (G : gen_cparams M)
   gext : nat -> list (bv 8) -> iProp Σ;
   gext_tl : forall k l, Timeless (gext k l);
   gext_grow : forall k l b, gext k l ==∗ gext k (l ++ [b]);
+  (* THE PER-ROUND PAYLOAD (sync SY3-A4): what filing the alternative [a]
+     at era [k], pin [v], after the input [I] (through the round's line)
+     obliges the filer to deposit -- persistent, returned by the drain
+     beside the choice.  [emp] at every instance but the union's, where it
+     is a completed sync's record *)
+  gpr : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ;
+  gpr_pers : forall k v I a, Persistent (gpr k v I a);
+  gpr_tl : forall k v I a, Timeless (gpr k v I a);
 }.
 Global Arguments MkGWA {Σ _ M G sd}.
 Global Arguments gwa {Σ _ M G sd} _ _ _.
@@ -140,7 +148,79 @@ Global Arguments gwa_file_free {Σ _ M G sd} _ _ _.
 Global Arguments gext {Σ _ M G sd} _ _ _.
 Global Arguments gext_tl {Σ _ M G sd} _ _ _.
 Global Arguments gext_grow {Σ _ M G sd} _ _ _ _.
-#[export] Existing Instances gwa_tl gwa_ty_pers gext_tl.
+Global Arguments gpr {Σ _ M G sd} _ _ _ _ _.
+Global Arguments gpr_pers {Σ _ M G sd} _ _ _ _ _.
+Global Arguments gpr_tl {Σ _ M G sd} _ _ _ _ _.
+#[export] Existing Instances gwa_tl gwa_ty_pers gext_tl gpr_pers gpr_tl.
+
+(* ====================================================================== *)
+(*  THE PER-ROUND STORE (sync SY3-A4): beside the choice list, each filed  *)
+(*  round's input through its line and its payload.  Paired with the      *)
+(*  choice list's authority ([gcs_auth]), so it rides every arm the       *)
+(*  authority does and grows exactly where it does.                       *)
+(* ====================================================================== *)
+Section gen_store.
+  Context {Σ : gFunctors} `{!echoOutG Σ}.
+  Context (R : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ).
+  Context (HRp : forall k v I a, Persistent (R k v I a))
+          (HRt : forall k v I a, Timeless (R k v I a)).
+  #[local] Existing Instances HRp HRt.
+
+  Definition gitem (k : nat) (v : era_pins) (i : nat) (I : list (bv 8)) (a : nat)
+      : iProp Σ :=
+    (R k v I a ∗ inp_lb v I ∗ ⌜nlines I = S i⌝)%I.
+
+  Definition gstore (k : nat) (v : era_pins) (cs : list nat) : iProp Σ :=
+    (∃ Is : list (list (bv 8)), ⌜length Is = length cs⌝
+       ∗ [∗ list] i ↦ J ∈ Is, gitem k v i J (cs !!! i))%I.
+
+  Global Instance gstore_persistent k v cs : Persistent (gstore k v cs).
+  Proof using HRp. rewrite /gstore /gitem. apply _. Qed.
+  Global Instance gstore_timeless k v cs : Timeless (gstore k v cs).
+  Proof using HRt. rewrite /gstore /gitem. apply _. Qed.
+
+  Lemma gstore_nil k v : ⊢ gstore k v [].
+  Proof using. iExists []. by iSplit. Qed.
+
+  Lemma gstore_snoc k v cs I a :
+    gstore k v cs -∗ R k v I a -∗ inp_lb v I -∗ ⌜nlines I = S (length cs)⌝ -∗
+    gstore k v (cs ++ [a]).
+  Proof using HRp.
+    iIntros "(%Is & %Hl & #Hs) #HR #HI %Hn". iExists (Is ++ [I]).
+    iSplit; [iPureIntro; rewrite !length_app /=; lia |].
+    rewrite big_sepL_app /=. iSplitL.
+    - iApply (big_sepL_mono with "Hs"). intros i J HJ. cbn beta.
+      apply lookup_lt_Some in HJ.
+      rewrite (_ : (cs ++ [a]) !!! i = cs !!! i); [by iIntros "$" |].
+      rewrite !list_lookup_total_alt lookup_app_l; [done | lia].
+    - rewrite Nat.add_0_r Hl. rewrite /gitem.
+      rewrite (_ : (cs ++ [a]) !!! length cs = a); last first.
+      { rewrite list_lookup_total_alt lookup_app_r; [| lia]. by rewrite Nat.sub_diag. }
+      iFrame "HR HI". done.
+  Qed.
+
+  (* THE CHOICE LIST'S AUTHORITY, WITH ITS STORE *)
+  Definition gcs_auth (k : nat) (v : era_pins) (cs : list nat) : iProp Σ :=
+    (cs_auth v cs ∗ gstore k v cs)%I.
+
+  Global Instance gcs_auth_timeless k v cs : Timeless (gcs_auth k v cs).
+  Proof using HRt. rewrite /gcs_auth /cs_auth. apply _. Qed.
+
+  Lemma gcs_lb_prefix k v l l' : gcs_auth k v l -∗ cs_lb v l' -∗ ⌜l' `prefix_of` l⌝.
+  Proof using. iIntros "[H _] H'". iApply (cs_lb_prefix with "H H'"). Qed.
+
+  Lemma gcs_lb_get k v l : gcs_auth k v l -∗ gcs_auth k v l ∗ cs_lb v l.
+  Proof using. iIntros "[H $]". iApply (cs_lb_get with "H"). Qed.
+
+  Lemma gcs_auth_grow k v l a I :
+    gcs_auth k v l -∗ R k v I a -∗ inp_lb v I -∗ ⌜nlines I = S (length l)⌝ ==∗
+    gcs_auth k v (l ++ [a]) ∗ cs_lb v (l ++ [a]).
+  Proof using HRp.
+    iIntros "[H #Hs] #HR #HI %Hn".
+    iMod (cs_auth_grow v l a with "H") as "[H #Hlb]".
+    iModIntro. iFrame "H Hlb". iApply (gstore_snoc with "Hs HR HI"). by iPureIntro.
+  Qed.
+End gen_store.
 
 (* the reader's range condition grows by the alternative a block files
    (the file's former law, once) *)
@@ -298,7 +378,7 @@ Section gen_out.
         ∗ gext A k (lm_stream so)
         ∗ turn_auth v (lm_pcount M (gs_ps M so) (gs_cs M so)
                          (gs_state M sd so) (gs_E M so) (gs_w M so))
-        ∗ cs_auth v (gs_cs M so)
+        ∗ gcs_auth (gpr A) k v (gs_cs M so)
         ∗ ps_auth v (gs_ps M so)
         ∗ Elist_auth v (gs_E M so)
         ∗ dl_cnt v (1/2) (length (LogEntryDefs.ch_dl H))
@@ -524,7 +604,7 @@ Section gen_out.
     destruct Hpure as (Hacc & Hwpre & Hidx & Hbyte & Hpsb & Hpin & Hcsb' & Hdsc
                        & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (cs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -631,6 +711,8 @@ Section gen_out.
       (lm_of M (bodies_of I0 !!! (nlines I0 - 1))) (lm_dec M a) !! 0 = Some b ->
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
     gcW G k s0 -∗
+    (* ...and the round's PAYLOAD (sync SY3-A4) *)
+    gpr A k v I0 a -∗
     gcl k ho H ==∗
       gcl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
@@ -639,7 +721,7 @@ Section gen_out.
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Halt Hterm Hhead.
     pose proof (nlines_pos_of_rest_nil I0 Hne0 Hr0) as Hpos0.
     pose proof (ll_nlines_removelast I0 Hr0) as Hrl0.
-    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl".
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr Hcl".
     iDestruct "Hcl" as "[#HT | Hp]".
     { iModIntro. iSplitR; [rewrite /gcl; by iLeft | by iRight]. }
     iDestruct "Hp" as (v2 so)
@@ -652,7 +734,7 @@ Section gen_out.
     destruct Hpure as (Hacc & Hwpre & Hidx & Hbyte & Hpsb & Hpin & Hcsb' & Hdsc
                        & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (cs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -739,7 +821,8 @@ Section gen_out.
             (lm_pcount M (gs_ps M so) (gs_cs M so) (gs_state M sd so)
                (gs_E M so) (gs_w M so))
             (S P) ltac:(lia) with "Ht Hta") as "[Ht Hta]".
-    iMod (cs_auth_grow v (gs_cs M so) a with "Hcs") as "[Hcs #Hcslb2]".
+    iMod (gcs_auth_grow (gpr A) (gpr_pers A) k v (gs_cs M so) a I0
+            with "Hcs Hgpr Hilb []") as "[Hcs #Hcslb2]"; [iPureIntro; lia |].
     iDestruct (ps_lb_get with "Hps") as "[Hps #Hpslb2]".
     iMod (gext_grow A k _ b with "Hext") as "Hext".
     iModIntro. iSplitR "Ht".
@@ -841,7 +924,7 @@ Section gen_out.
     destruct Hpure as (Hacc & Hwpre & Hidx & Hbyte & Hpsb & Hpinf & Hcsb' & Hdsc
                        & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (cs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -1288,7 +1371,7 @@ Section gen_out.
         iFrame "Hwa". iRight. iExists s1.
         iSplitR; [by iPureIntro | iExact "Hlb"].
       - iFrame "Hwa". iLeft. by iPureIntro. }
-    iDestruct (cs_lb_get with "Hcs") as "[Hcs #Hcslb]".
+    iDestruct (gcs_lb_get with "Hcs") as "[Hcs #Hcslb]".
     iDestruct (gop_cs_lb_weaken v (gs_cs M so) csq
                  ltac:(rewrite /csq; apply prefix_take) with "Hcslb") as "#Hcslbq".
     iDestruct (ps_lb_get with "Hps") as "[Hps #Hpslb]".
@@ -1792,9 +1875,27 @@ Section gen_out.
      (which carries the era's pin, and how the ledger recognises a later
      drain of the SAME era).  The state IS filed, because the wire is not
      empty: a stage that has not filed has written nothing. *)
+  (* THE DRAIN'S RECEIPT: the cycle's boot state and its good output, AT
+     THE RESOLUTION THE STAGE NAMES (the filed choices [csf], padded), and
+     -- sync SY3-A4 -- every filed round's input (a prefix of the cycle's)
+     and payload *)
   Definition gdrain_ret (k : nat) (seg : list mobs) : iProp Σ :=
+    (T ∨ ∃ (s0 : lm_st M) (csf ex : list nat) (v : era_pins) (Is : list (list (bv 8))),
+          ⌜lm_good_out_pad M (gcK G) s0 seg (csf ++ ex)⌝ ∗ ⌜lm_st_ok M s0⌝ ∗ gwa_ty A s0
+          ∗ gcW G k s0 ∗ PIN k v ∗ cs_lb v csf
+          ∗ ⌜(length ex <= 1)%nat /\ length Is = length (csf ++ ex)
+             /\ Forall (fun I => I `prefix_of` ins seg) Is⌝
+          ∗ [∗ list] i ↦ J ∈ Is, gitem (gpr A) k v i J ((csf ++ ex) !!! i))%I.
+
+  Lemma gdrain_ret_good (k : nat) (seg : list mobs) :
+    gdrain_ret k seg -∗
     (T ∨ ∃ s0 : lm_st M,
-          ⌜lm_good_out M s0 seg⌝ ∗ ⌜lm_st_ok M s0⌝ ∗ gwa_ty A s0 ∗ gcW G k s0)%I.
+          ⌜lm_good_out M s0 seg⌝ ∗ ⌜lm_st_ok M s0⌝ ∗ gwa_ty A s0 ∗ gcW G k s0).
+  Proof using.
+    iIntros "[#HT | (%s0 & %csf & %ex & %v & %Is & %Hg & %Hok & #Hty & #HW & _)]"; [by iLeft |].
+    iRight. iExists s0. iFrame "Hty HW". iPureIntro.
+    split; [exact (lm_good_out_of_pad M (gcK G) s0 seg _ Hg) | exact Hok].
+  Qed.
 
   Lemma gcl_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
       (seg : list mobs) :
@@ -1825,13 +1926,21 @@ Section gen_out.
       iEval (rewrite Hsome) in "Hwa".
       iDestruct (gwa_W A _ (gs_state M sd so) with "Hwa") as "(Hwa & #HW & #Hty)".
       iEval (rewrite -Hsome) in "Hwa".
+      iDestruct (gcs_lb_get with "Hcs") as "[Hcs #Hcsf]".
+      iDestruct "Hcs" as "[Hcs #Hst]".
+      iDestruct "Hst" as (Is) "[%HIs #Hitems]".
+      iAssert (⌜forall i I, Is !! i = Some I ->
+                 I `prefix_of` (snd <$> LogEntryDefs.ch_dl CH)⌝)%I as %HIdl.
+      { iIntros (i I HI).
+        iDestruct (big_sepL_lookup with "Hitems") as "(_ & Hin & _)"; [exact HI |].
+        iApply (inp_lb_le with "Hdll Hin"). }
       iSplitL "Hwa Hext Hta Hcs Hps HE Hdl Hdll".
       { iRight. iExists v, so.
-        iFrame "Hpin Hwa Hext Hta Hcs Hps HE Hdl Hdll". by iPureIntro. }
-      iRight. iExists (gs_state M sd so).
-      iFrame "Hty HW".
-      iSplitR; [| by iPureIntro].
-      iPureIntro.
+        iFrame "Hpin Hwa Hext Hta Hps HE Hdl Hdll". iSplitL "Hcs".
+        { iFrame "Hcs". iExists Is. by iFrame "Hitems". }
+        by iPureIntro. }
+      iRight. iExists (gs_state M sd so), (gs_cs M so), [], v, Is.
+      rewrite app_nil_r. iFrame "Hty HW Hpin Hcsf Hitems".
       assert (Hbytes : (snd <$> gs_E M so) `prefix_of` ins seg).
       { destruct Hpre3 as [HEnil | Hbo].
         - rewrite HEnil fmap_nil. apply prefix_nil.
@@ -1842,17 +1951,21 @@ Section gen_out.
           etrans; [apply prefix_take |].
           rewrite Hins. apply ins_prefix_of, open_seg_prefix_boots;
             [exact Hpre | by rewrite Hbo | exact Hsh]. }
-      apply (lm_good_out_of_stage M (gcK G) B (gs_ps M so) (gs_cs M so)
+      iSplitR; [| iSplitR; [by iPureIntro |]]; iPureIntro.
+      * apply (lm_good_out_pad_of_stage M (gcK G) B (gs_ps M so) (gs_cs M so)
                (gs_state M sd so) (gs_E M so) (gs_w M so) seg Hpsb).
-      + apply (lm_alts_pre_mono M _ (snd <$> gs_E M so)); [exact Hbytes | exact Hcsb'].
-      + pose proof (gcl_pure_rd_stage M sd _ ho so CH Hall) as (_ & _ & _ & Hb).
-        exact Hb.
-      + destruct (lm_cs_len_ok_inv M so Hcsl) as [[[Hw _] _] | [_ Hq]];
-          [by right | left; lia].
-      + exact Hbyte.
-      + exact Hpinf.
-      + exact Hwp.
-      + rewrite -Hacc. exact Hwire.
-      + exact Hbytes.
+        + apply (lm_alts_pre_mono M _ (snd <$> gs_E M so)); [exact Hbytes | exact Hcsb'].
+        + pose proof (gcl_pure_rd_stage M sd _ ho so CH Hall) as (_ & _ & _ & Hb).
+          exact Hb.
+        + destruct (lm_cs_len_ok_inv M so Hcsl) as [[[Hw _] _] | [_ Hq]];
+            [by right | left; lia].
+        + exact Hbyte.
+        + exact Hpinf.
+        + exact Hwp.
+        + rewrite -Hacc. exact Hwire.
+        + exact Hbytes.
+      * split; [cbn [length]; lia |]. split; [exact HIs |]. apply Forall_lookup_2. intros i I HI.
+        etrans; [exact (HIdl i I HI) |].
+        etrans; [exact (gcl_pure_dl_E M sd _ ho so CH Hall) | exact Hbytes].
   Qed.
 End gen_out.

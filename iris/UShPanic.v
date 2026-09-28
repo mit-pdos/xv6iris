@@ -831,8 +831,8 @@ Section UShPanicGen.
   Proof using .
     iIntros "#Hlk". rewrite /UkShDiag.ush_execfail_law_at.
     iIntros "!>" (N l) "%Hfd2 Hc". destruct Hfd2 as [rb Hl2].
-    iDestruct (lk_lcred_blk_open L (S gen_id) I (lk_exf L I) with "Hc")
-      as (v) "[#Hpin Hc]".
+    iDestruct (lk_lcred_blk_open L (S gen_id) I (lk_exf L I) with "[] Hc")
+      as (v) "[#Hpin Hc]"; [iIntros (v'); iApply lk_rnd_exf |].
     iExists (fun p : nat => lk_blk L (S gen_id) v I (lk_exf L I) p).
     iSplitL "Hc"; [ iExact "Hc" | ].
     iSplit.
@@ -862,8 +862,8 @@ Section UShPanicGen.
     iIntros "#Hlk". rewrite /UkShDiag.ush_execfail_law_at.
     iIntros "!>" (N l) "%Hfd2 [Hc Hh]". destruct Hfd2 as [rb Hl2].
     iDestruct (Hnw with "Hh") as "[#Hnw Hh]".
-    iDestruct (lk_lcred_blk_open L (S gen_id) I (lk_exf L I) with "Hc")
-      as (v) "[#Hpin Hc]".
+    iDestruct (lk_lcred_blk_open L (S gen_id) I (lk_exf L I) with "[] Hc")
+      as (v) "[#Hpin Hc]"; [iIntros (v'); iApply lk_rnd_exf |].
     iExists (fun p : nat =>
                lk_blk L (S gen_id) v I (lk_exf L I) p ∗ Hold I)%I.
     iSplitL; [ iFrame "Hc Hh" | ].
@@ -897,6 +897,8 @@ Section UShPanicGen.
   Lemma ush_diag_law_hold_at_alt (Hold : iProp Σ) (I : list (bv 8))
       (a : nat) :
     (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
+    (* ...and the round's payload at the alternative (sync SY3-A4) *)
+    (∀ v, lk_rnd L (S gen_id) v I a) -∗
     lk_links L -∗
     UkShDiag.ush_execfail_law_at (lk_ab L I a)
       (length (lk_ab L I a) - 2)%nat
@@ -904,9 +906,9 @@ Section UShPanicGen.
       (∃ v : era_pins,
          lk_pin L (S gen_id) v ∗ lk_post L (S gen_id) v I a ∗ Hold).
   Proof using .
-    iIntros "#Hnw #Hlk". rewrite /UkShDiag.ush_execfail_law_at.
+    iIntros "#Hnw #Hrnd #Hlk". rewrite /UkShDiag.ush_execfail_law_at.
     iIntros "!>" (N l) "%Hfd2 [Hc Hh]". destruct Hfd2 as [rb Hl2].
-    iDestruct (lk_lcred_blk_open L (S gen_id) I a with "Hc")
+    iDestruct (lk_lcred_blk_open L (S gen_id) I a with "Hrnd Hc")
       as (v) "[#Hpin Hc]".
     iExists (fun p : nat => lk_blk L (S gen_id) v I a p ∗ Hold)%I.
     iSplitL; [ iFrame "Hc Hh" | ].

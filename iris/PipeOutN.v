@@ -295,6 +295,9 @@ Section pipes_open_v.
   Context (g : pipe_gn) (M : lmodel).
   Context (PIN : nat -> era_pins -> iProp Σ) (X : nat -> option (lm_st M) -> iProp Σ).
   Context (sd : lm_st M).
+  (* the per-round payload family the choice authority's store holds (sync
+     SY3-A4, [GenOut.gpr]) *)
+  Context (R : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ).
 
   Definition popenV (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       : iProp Σ :=
@@ -304,7 +307,7 @@ Section pipes_open_v.
        ∗ cur_half w (1/2) r gb tm ∗ rblk_auth gb pre
        ∗ turn_auth v (lm_pcount M (gs_ps M so) (gs_cs M so)
                         (gs_state M sd so) (gs_E M so) (gs_w M so))
-       ∗ pcs v (gs_cs M so) tm
+       ∗ gpcs R k v (gs_cs M so) tm
        ∗ ps_auth v (gs_ps M so)
        ∗ Elist_auth v (gs_E M so)
        ∗ dl_cnt v (1/2) (length (LogEntryDefs.ch_dl H))
@@ -410,7 +413,7 @@ Section pipes_out_v.
   Local Notation PIN := (gcPIN G).
   Local Notation K := (gcK G).
   Local Notation st so := (gs_state M sd so).
-  Local Notation POV := (popenV g M (gcPIN G) (gwa WA) sd).
+  Local Notation POV := (popenV g M (gcPIN G) (gwa WA) sd (gpr WA)).
   Local Notation PWV := (pwc_blkV g M (gcPIN G) (gcW G) (gcT G)).
 
   (* THE CLAIM *)
@@ -443,6 +446,8 @@ Section pipes_out_v.
     ((lm_term M (lm_dec M a) = false /\ nodollar b)
      \/ lm_term M (lm_dec M a) = true) ->
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ gcW G k s0 -∗
+    (* ...and the round's payload, free at every alternative (sync SY3-A4) *)
+    □ (∀ a', gpr WA k v I0 a') -∗
     peclV k ho H ==∗
       peclV k ho (ConsLog.cons_step H (ConsLog.EvOut b))
       ∗ ((∃ (w : pipe_era) (gb : gname),
@@ -456,7 +461,7 @@ Section pipes_out_v.
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Halt Hpan Hhead Hfarm.
     pose proof (nlines_pos_of_rest_nil I0 Hne0 Hr0) as Hpos0.
     pose proof (ll_nlines_removelast I0 Hr0) as Hrl0.
-    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl".
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hfree Hcl".
     iDestruct "Hcl" as "[Hcl | Hp]"; last first.
     { (* AN OPEN ROUND has already written a byte: the turn refutes it *)
       iDestruct "Hp" as (v2 w so r gb pre tm)
@@ -466,7 +471,7 @@ Section pipes_out_v.
       assert (Hst' : st so = s0) by exact Hst.
       clear Hst. subst s0.
       iDestruct (turn_agree with "Ht Hta") as %HP.
-      iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+      iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
       iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
       iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
       assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -499,7 +504,7 @@ Section pipes_out_v.
     destruct Hpure as (Hacc & Hwpre & Hidx & Hbyte & Hpsb & Hpin & Hcsb' & Hdsc
                        & Hpre1 & Hpre2 & Hpre3 & Hnofk & Hf0n & Hfok0).
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (cs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -541,13 +546,15 @@ Section pipes_out_v.
             (lm_term M (lm_dec M a)) with "Hcur") as "Hcur".
     iDestruct (cur_split w (nlines I0 - 1)%nat gb2 (lm_term M (lm_dec M a))
                  with "Hcur") as "[Hcur1 Hcur2]".
-    iDestruct (pcs_of_auth v (gs_cs M so) false eq_refl with "Hcs") as "Hcs".
-    iAssert (|==> pcs v (gs_cs M so) (lm_term M (lm_dec M a))
+    iDestruct (gpcs_of_gcs (gpr WA) (gpr_pers WA) k v (gs_cs M so) false eq_refl
+                 with "Hcs [Hfree]") as "Hcs".
+    { iExists I0. iFrame "Hilb Hfree". iPureIntro. lia. }
+    iAssert (|==> gpcs (gpr WA) k v (gs_cs M so) (lm_term M (lm_dec M a))
                   ∗ (⌜lm_term M (lm_dec M a) = false⌝
                      ∨ cs_frozen_at v (nlines I0 - 1)%nat))%I
       with "[Hcs]" as ">[Hcs #Hfz]".
     { destruct (lm_term M (lm_dec M a)) eqn:Hfk2.
-      - iMod (pcs_freeze v (gs_cs M so) false with "Hcs") as "[Hcs #Hf]".
+      - iMod (gpcs_freeze (gpr WA) (gpr_pers WA) k v (gs_cs M so) false with "Hcs") as "[Hcs #Hf]".
         iModIntro. iFrame "Hcs". iRight.
         iApply (cs_frozen_at_of v (gs_cs M so) (nlines I0 - 1)%nat with "Hf").
         exact Hq.
@@ -660,7 +667,7 @@ Section pipes_out_v.
     assert (Hst' : st so = s0) by exact Hst.
     clear Hst. subst s0.
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -704,14 +711,14 @@ Section pipes_out_v.
     { apply (prefix_length_eq cs0 (gs_cs M so) Hcsp). rewrite Hcseq Hqq Hreq2. lia. }
     subst cs0.
     (* THE TERMINAL FIRE: a coverage-ending byte sets the flag and freezes *)
-    iAssert (|==> pcs v (gs_cs M so) (tmi || lm_term M (lm_dec M a))
+    iAssert (|==> gpcs (gpr WA) k v (gs_cs M so) (tmi || lm_term M (lm_dec M a))
                   ∗ cur_half w (1/2) r gb (tmi || lm_term M (lm_dec M a))
                   ∗ cur_half w (1/2) r gb (tmi || lm_term M (lm_dec M a))
                   ∗ (⌜lm_term M (lm_dec M a) = false⌝ ∨ cs_frozen_at v r))%I
       with "[Hcs Hcur Hcw]" as ">(Hcs & Hcur & Hcw & #Hfz)".
     { destruct (lm_term M (lm_dec M a)) eqn:Hfk2.
       - rewrite (orb_true_r tmi).
-        iMod (pcs_freeze v (gs_cs M so) tmi with "Hcs") as "[Hcs #Hf]".
+        iMod (gpcs_freeze (gpr WA) (gpr_pers WA) k v (gs_cs M so) tmi with "Hcs") as "[Hcs #Hf]".
         iMod (cur_half_update w r gb tmi r gb tmi r gb true
                 with "Hcur Hcw") as "[Hcur Hcw]".
         iModIntro. iFrame "Hcs Hcur Hcw". iRight.
@@ -834,7 +841,7 @@ Section pipes_out_v.
     assert (Hst' : st so = s0) by exact Hst.
     clear Hst. subst s0.
     iDestruct (turn_agree with "Ht Hta") as %HP.
-    iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+    iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
     iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
     iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
     assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -880,8 +887,8 @@ Section pipes_out_v.
     iMod (turn_update v (P + length pre0)%nat _ (S (P + length pre0)) ltac:(lia)
             with "Ht Hta") as "[Ht Hta]".
     iMod (blk_auth_grow w (lm_stream M sd so) b with "Hblk") as "[Hblk _]".
-    iDestruct (pcs_auth v (gs_cs M so) false eq_refl with "Hcs") as "Hcs".
-    iMod (cs_auth_grow v (gs_cs M so) a with "Hcs") as "[Hcs #Hcslb2]".
+    iMod (gpcs_file (gpr WA) (gpr_pers WA) k v (gs_cs M so) false a eq_refl
+            with "Hcs") as "[Hcs #Hcslb2]".
     iDestruct (cur_join w r gb false with "Hcur Hcw") as "Hcur".
     assert (Hbod : bodies_of (snd <$> gs_E M so) !!! r = bodies_of I0 !!! r)
       by (by rewrite HIeq).
@@ -999,8 +1006,11 @@ Section pipes_out_v.
      first byte opens the round, every further byte (any writer's)
      appends to its ledger *)
   Theorem pblkV_ecl_holds (v : era_pins) (I : list (bv 8)) (sR : lm_st M) :
+    (* the round's payload is free at the line (sync SY3-A4) *)
+    (forall k a, ⊢ gpr WA k v I a) ->
     ⊢ eclN peclV (PWV v I sR) (ptkV T v I) (pwitV M I sR).
   Proof using Hext.
+    intros Hfree.
     rewrite /eclN. iModIntro.
     iIntros (k ho H pre b tm tm' Htmt Hwit) "Hpw Hcl".
     destruct Hwit as (a & Hok & Hpan & Hterm & Hpref & Hnd).
@@ -1022,8 +1032,9 @@ Section pipes_out_v.
       { destruct tm'; [by right |]. left. split; [exact Hterm |].
         exact (proj1 (Forall_singleton _ _) (Hnd eq_refl)). }
       iMod (peclV_blkN_open_gen k v P a b ps cs s0 I ho H Hne Hr ltac:(lia) Hpp HP
-              Hok Hpan Hb0 Hfarm with "Hpin [Htn] Hps Hcs HE HW Hcl") as "(Hcl & Hret)".
+              Hok Hpan Hb0 Hfarm with "Hpin [Htn] Hps Hcs HE HW [] Hcl") as "(Hcl & Hret)".
       { cbn [length] in *. rewrite Nat.add_0_r. iExact "Htn". }
+      { iModIntro. iIntros (a'). iApply Hfree. }
       iModIntro. iFrame "Hcl".
       iDestruct "Hret" as "[Hx | #HT]"; last first.
       { iSplitR; [rewrite /pwc_blkV; by iRight | iRight; rewrite /ptkV; by iRight]. }
@@ -1153,7 +1164,8 @@ Section pipes_out_n.
       (fun _ => emp%I) _ pipesN_wa_W (fun _ _ => emp%I) pipesN_wa_file
       False (fun Hf => match Hf with end)
       True (fun _ => pipesN_wa_free)
-      (pext g) _ (pext_grow g).
+      (pext g) _ (pext_grow g)
+      (fun _ _ _ _ => emp%I) _ _.
 
   Local Notation GP := pipesN_cparams.
   Local Notation GA := pipesN_wa.
@@ -1161,7 +1173,7 @@ Section pipes_out_n.
   (* THE OPEN ROUND: [popenV] at the model, the witness [emp] *)
   Definition popenN (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       : iProp Σ :=
-    popenV g PM (era_pin γ) (fun _ _ => emp%I) tt k ho H.
+    popenV g PM (era_pin γ) (fun _ _ => emp%I) tt (fun _ _ _ _ => emp%I) k ho H.
 
   (* THE CLAIM: [peclV] at the model *)
   Definition pecl' (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
@@ -1279,11 +1291,14 @@ Section pipes_claim_v.
   Lemma cons_claimV_peclV (g : pipe_gn) (M : lmodel) (V : pview M) (G : gen_cparams M)
       (sd : lm_st M) (WA : gen_wa M G sd) :
     (forall k l, gext WA k l = pext g k l) ->
+    (* the payload is free at the view's lines (sync SY3-A4) *)
+    (forall v I lR k a, pv_line V (lineV M I) = Some lR -> ⊢ gpr WA k v I a) ->
     @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g M G sd WA ->
     cons_claimV g M V G sd WA.
   Proof using .
-    intros Hext Hc. exists (peclV g M G sd WA). split; [exact Hc |].
-    intros v I sR lR _. exact (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    intros Hext Hfree Hc. exists (peclV g M G sd WA). split; [exact Hc |].
+    intros v I sR lR HlR. apply (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    intros k a. exact (Hfree v I lR k a HlR).
   Qed.
 End pipes_claim_v.
 

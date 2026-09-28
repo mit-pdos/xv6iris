@@ -169,7 +169,9 @@ Section union_link_inst.
       (f0w gf) _ _
       uf0bwk _ _ (S gen_id) uf0w_bwk uf0w_bwk0 uf0bwk_agree
       (fhead gf) _ ufhead_cur ufhead_inp
-      (fun I => uwild (lm_line_at U I) = true).
+      (fun I => uwild (lm_line_at U I) = true)
+      (* the round's payload: the claim's (sync SY3-A4) *)
+      (upr ug) _ _ (upr_0 ug) (upr_pan ug) (upr_exf ug).
 
   (* =================================================================== *)
   (*  2.  THE LINKS ENTAIL THE INTERFACE                                  *)
@@ -211,11 +213,11 @@ Section union_link_inst.
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
         [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
-        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE #HR HΦ".
       rewrite /lm_abs /lm_line_at in H0 H6 H8.
       iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0 I0 Φ
                 (not_true_is_false _ H0) H1 H2 H3 H4 H5 H6 H7 H8
-                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply uf0w_cw |].
+                with "Hpin Ht Hps Hcs HE [Hw] [] [HΦ]"); [by iApply uf0w_cw | iExact "HR" |].
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
         [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)

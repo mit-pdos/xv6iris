@@ -95,7 +95,7 @@ Section pipes_writes_v.
       assert (Hst' : gs_state M sd so = s0) by exact Hst.
       clear Hst. subst s0.
       iDestruct (turn_agree with "Ht Hta") as %HP.
-      iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+      iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
       iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
       iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
       assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -128,16 +128,18 @@ Section pipes_writes_v.
     lm_cont M (lm_upto M cs0 s0 (bodies_of I0) (nlines I0 - 1))
       (lm_of M (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec M a) !! 0%nat = Some b ->
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ gcW G k s0 -∗
+    (* ...and the round's payload (sync SY3-A4) *)
+    gpr WA k v I0 a -∗
     PCV k ho H ==∗
       PCV k ho (ConsLog.cons_step H (ConsLog.EvOut b))
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0 ∗ gcW G k s0) ∨ T).
   Proof using B.
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
-    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl". rewrite !peclV_gen.
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr Hcl". rewrite !peclV_gen.
     iDestruct "Hcl" as "[Hc | Hp]".
     - iMod (gcl_step_write_blk M G B sd WA k v P a b ps0 cs0 s0 I0 ho H
               Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
-              with "Hpin Ht Hpslb Hcslb Hilb HW Hc") as "[Hc Hr]".
+              with "Hpin Ht Hpslb Hcslb Hilb HW Hgpr Hc") as "[Hc Hr]".
       iModIntro. iSplitL "Hc"; [by iLeft |].
       iDestruct "Hr" as "[(Ht & Hps & Hcs & Hi & HW2) | HT]";
         [iLeft; by iFrame | by iRight].
@@ -148,7 +150,7 @@ Section pipes_writes_v.
       assert (Hst' : gs_state M sd so = s0) by exact Hst.
       clear Hst. subst s0.
       iDestruct (turn_agree with "Ht Hta") as %HP.
-      iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+      iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
       iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
       iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
       assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).
@@ -205,7 +207,7 @@ Section pipes_writes_v.
       assert (Hst' : gs_state M sd so = s0) by exact Hst.
       clear Hst. subst s0.
       iDestruct (turn_agree with "Ht Hta") as %HP.
-      iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
+      iDestruct (gpcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
       iDestruct (ps_lb_prefix with "Hps Hpslb") as %Hpsp.
       iDestruct (inp_lb_le with "Hdll Hilb") as %HI0dl.
       assert (HI0 : I0 `prefix_of` (snd <$> gs_E M so)).

@@ -192,7 +192,9 @@ Section file_link_gen.
       (f0w g) _ _
       f0bwk _ _ (S gen_id) f0w_bwk f0w_bwk0 f0bwk_agree
       (fhead g) _ fhead_cur fhead_inp
-      (fun _ => False).
+      (fun _ => False)
+      (fun _ _ _ _ => emp%I) _ _
+      (fun _ _ _ => lk_emp_valid) (fun _ _ _ => lk_emp_valid) (fun _ _ _ => lk_emp_valid).
 
   (* =================================================================== *)
   (*  2.  THE LINKS ENTAIL THE INTERFACE                                  *)
@@ -225,7 +227,7 @@ Section file_link_gen.
   Lemma file_links_gl : file_links g -∗ glinks file_lm file_params.
   Proof using .
     iIntros "%Hc".
-    iApply (gcl_glinks file_lm (file_cparams g) file_lm_byte_laws ∅ (file_wa g) Hc file_params eq_refl eq_refl f0w_cw
+    iApply (gcl_glinks file_lm (file_cparams g) file_lm_byte_laws ∅ (file_wa g) Hc file_params eq_refl eq_refl eq_refl f0w_cw
               (or_introl I) fhead_boot).
   Qed.
   (* =================================================================== *)
@@ -345,7 +347,9 @@ Section file_link_gen.
       (f0w_at s0) _ _
       f0bwk _ _ (S gen_id) (f0w_at_bwk s0) (f0w_at_bwk0 s0) f0bwk_agree
       (fhead_at s0) _ (fhead_at_cur s0) (fhead_at_inp s0)
-      (fun _ => False).
+      (fun _ => False)
+      (fun _ _ _ _ => emp%I) _ _
+      (fun _ _ _ => lk_emp_valid) (fun _ _ _ => lk_emp_valid) (fun _ _ _ => lk_emp_valid).
 
   Lemma f0w_at_cw (s0 : fstate) (k : nat) (s : fstate) :
     f0w_at s0 k s -∗ f0cw g k s.

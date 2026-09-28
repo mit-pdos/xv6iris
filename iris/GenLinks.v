@@ -132,17 +132,17 @@ Section gen_links.
     lm_cont M (lm_upto M cs0 s0 (bodies_of I0) (nlines I0 - 1))
       (lm_of M (bodies_of I0 !!! (nlines I0 - 1))) (lm_dec M a) !! 0 = Some b ->
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
-    W k s0 -∗
+    W k s0 -∗ gpr A k v I0 a -∗
     (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
        ∗ W k s0) ∨ T) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using B Hcons.
     intros Hne Hr Hn Hpin0 HP Hok Hfk Hb.
-    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW #Hgpr HΦ" (o H) "#Hlb Hres".
     rewrite !gchist_at0.
     iMod (gcl_step_write_blk M G B sd A k v P a b ps0 cs0 s0 I0 (default [] o) H
             Hne Hr Hn Hpin0 HP Hok Hfk Hb
-            with "Hpin Ht Hpslb Hcslb Hilb HW Hres")
+            with "Hpin Ht Hpslb Hcslb Hilb HW Hgpr Hres")
       as "(Hres & Hret)".
     iModIntro. iExists o. rewrite gchist_at0. iFrame "Hlb Hres".
     by iApply "HΦ".

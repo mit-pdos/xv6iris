@@ -467,7 +467,8 @@ Section file_out.
     @MkGWA Σ _ file_lm file_cparams ∅ f0wa _ f0wa_agree_d f0_typed _ f0wa_W
       f0boot f0wa_file True (fun _ => f0wa_agree)
       False (fun Hf => match Hf with end)
-      (fun _ _ => emp%I) _ file_gext_grow.
+      (fun _ _ => emp%I) _ file_gext_grow
+      (fun _ _ _ _ => emp%I) _ _.
 
   Definition fecl (k : nat) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) : iProp Σ :=
