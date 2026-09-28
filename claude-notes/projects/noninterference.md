@@ -53,8 +53,13 @@ M1's ledgers are fresh ground and go first.
   [`design/ni-zombie-ledger.md`](../design/ni-zombie-ledger.md) — exits
   (with the status) and reaps under `<wait_lock>`'s payload at a `wchG`
   name, kwait's led twin; NO tie, since nothing under the wait lock
-  knows the zombie slots (D3); rulings R1-R3 open.  Then the
-  per-process key history `uhist`.
+  knows the zombie slots (D3).  ZOMBIE LANDED 2026-09-28 (2107981b4;
+  as-landed record in the design note §5).  M1'S FOUR LEDGERS ARE IN
+  (allocator, pid, ticks, zombie), all as receipts beside the landed
+  contracts with no consumer yet; what remains of M1 is the per-process
+  key history `uhist : mono_list uvis` beside `proc_priv`, and the
+  first consumers (the dispatcher's rows reading the receipts), which
+  is M0's territory.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT

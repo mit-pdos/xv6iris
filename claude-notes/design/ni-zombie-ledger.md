@@ -1,6 +1,7 @@
 # The zombie ledger (NI-LEDGER-REST, third item)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
+STATUS: LANDED 2026-09-28 (rulings R1-R3 as recommended, owner, 2026-09-28;
+2107981b4; §5 below is the as-landed record).  The
 last of M1's four ledgers
 ([`../projects/noninterference.md`](../projects/noninterference.md) §6),
 after the allocator's, the pid's and the ticks'.  It differs from the
@@ -126,3 +127,38 @@ parent learns.
   +proof, no strength).
 - **R3 no fork event** in this ledger (recommended: `PAlloc parent pid`
   is the fork) vs `ZFork` for a single family history.
+
+## 5. As landed (2026-09-28, 2107981b4)
+
+- **Files** (10, +308 / -44 plus the pure file): `ZombEv.v` (as D1,
+  with `status_of_dom : dom (status_of h) = zombies_of h`);
+  `Xv6Cameras.v` (`wzl_inG`, `wzl_name`, `wchΣ`); `UserChildren.v` — the
+  ghost (`zomb_led_auth/lb`, the four lemmas, `zomb_receipt`,
+  `zomb_exit`, `zomb_reap`) lives HERE in a `Section ZombLedger`, not in
+  `WaitInv`, because `WaitInv` re-exports `UserChildren` and
+  `wait_ans_led` must name the receipt; `wait_ans_led … act` (the reap
+  arm led by `∃ h, zomb_receipt h (ZReap act rv)`), `wait_ans_led_post`
+  (drop) and `wait_ans_led_of` (build from `wait_ans` and `⌜rv = -1⌝ ∨
+  receipt`; the −1 case of the reap arm is refuted because 2^32 − 1 >
+  PIDMAX); `WaitInv.v` (`children_boot_rows` gains `zomb_led_auth []`,
+  `wait_res_at`'s body gains the trailing `∃ h, zomb_led_auth h`, the
+  morph instance untouched, `wait_res_alloc` takes the empty authority —
+  its statement changed, one caller, main); `SpecKwait.v`
+  (`wp_kwait_led_sconf_body` with `wait_ans_led … pj`, `pj := proc_addr
+  j` the `cpu_own` proc word; `Parameter wp_kwait_led_sconf`);
+  `ProofKwait.v` (`kw_pay` carries the conjunct existentially so the six
+  acquires change minimally; the reap appends and keeps `#Hzr`; the
+  internal lemmas stay on `wait_ans_gen` and take a new premise `kw_zr
+  pme rv := ⌜rv = -1⌝ ∨ ∃ h, zomb_receipt h (ZReap pme rv)`; the led
+  form is the proof, the landed one its corollary); `ProofKexit.v` (the
+  append at the ZOMBIE store, `xs := xstate_of sv`, the escrow's own
+  status argument; receipt dropped); `ProofKforkB5.v` (frame);
+  `ProofMain.v` (the boot destruct; `wait_res_alloc`'s new argument).
+- **Gate.**  1001 files (the camera changed), 0 errors; audits 13/13/14.
+  The untouched readers of `wait_ans` / `wp_kwait_sconf` (`ProofSysWait`,
+  `ProofSyscall`, `ProofUsertrapSys`) compiled as they were.
+- **What a consumer does next.**  `ProofSysWait`'s arm can switch to
+  `wp_kwait_led_sconf` and read the reaped pid and, through `status_of`,
+  the status off the receipt; the dispatcher's wait row then carries
+  `ZReap parent rv` to the U tier.  Nobody does yet.
+

@@ -311,7 +311,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   (2026-09-28): the last M1 ledger — a process's exit (with its status)
   and its reap as events under the wait lock's payload at a `wchG`
   name, kwait's led twin; deliberately untied, because no resource under
-  the wait lock knows which slots are zombies.  Rulings R1-R3 pending.
+  the wait lock knows which slots are zombies.  LANDED the same day;
+  §5 is the as-landed record.  With it M1's four ledgers are in.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general
