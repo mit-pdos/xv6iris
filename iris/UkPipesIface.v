@@ -558,7 +558,8 @@ Section PipesDevU.
     iApply (pns_read_atU pn gp L U c l fd wb n K Hlt Hl Hn with "Hinv Hstd Hr").
     iSplit; [ | iSplit ].
     - iIntros (cb) "[%Hne %Hchk] Hstd Hr".
-      iInv "Hinv" as (s0) ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro)" "Hclose".
+      iInv "Hinv" as ">Hpbody" "Hclose".
+      iDestruct "Hpbody" as (s0) "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Hoe & Hro)".
       iDestruct (rcur_agree with "Hbr Hr") as %Hrp.
       iDestruct "Hoe" as "[Hp | (%w0 & #Hs0 & %Hw0 & Hrpe)]".
       { iDestruct (eof_pending_shot with "Hp Heof") as %[]. }
@@ -1184,7 +1185,8 @@ Section UkPipesIface.
   Proof using TERM dep.
     iIntros "#Hinv [Hd | Hd]".
     - iDestruct "Hd" as (c) "([%HS _] & Hw & #Hlb)".
-      iInv "Hinv" as (s0) ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)" "Hclose".
+      iInv "Hinv" as ">Hpbody" "Hclose".
+      iDestruct "Hpbody" as (s0) "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)".
       iDestruct (wcur_agree with "Hbw Hw") as %Hlen.
       iMod ("Hclose" with "[Hf Hh Hbw Hbr Heof Hro]") as "_".
       { iNext. iExists s0. iFrame "Hf Hh Hbw Hbr Heof Hro". by iPureIntro. }
@@ -1194,7 +1196,8 @@ Section UkPipesIface.
         pose proof (pns_drop_nil_le L c (eq_sym HS)) as Hcl. lia. }
       iLeft. rewrite -Hc. iFrame "Hw Hlb".
     - iDestruct "Hd" as (c) "(Hw & #Hsh)".
-      iInv "Hinv" as (s0) ">(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)" "Hclose".
+      iInv "Hinv" as ">Hpbody" "Hclose".
+      iDestruct "Hpbody" as (s0) "(Hf & Hh & Hbw & Hbr & %Hpre & %Hrle & Heof & Hro)".
       iDestruct (wcur_agree with "Hbw Hw") as %Hlen.
       assert (Hws : ps_ws s0 = take c L).
       { destruct Hpre as [tl Htl]. rewrite -Hlen Htl take_app_length. reflexivity. }

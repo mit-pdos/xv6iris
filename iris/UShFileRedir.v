@@ -433,9 +433,14 @@ Section UShFileRedir.
         iLeft. iExists ty. iSplitR.
         { iPureIntro. rewrite Hrv Hfd1. reflexivity. }
         iSplitL "Hstd".
-        { iEval (rewrite Ha1') in "Hstd".
-          iEval (vm_compute om_readable) in "Hstd".
-          iEval (vm_compute om_writable) in "Hstd".
+        { (* the two mode bits as equations, not [iEval (vm_compute ..)]:
+             a reduction in a hypothesis leaves its conversion to the
+             kernel, which paid 8 s for it at [Qed] *)
+          assert (Hrd : om_readable (mword_of_int 1537 : mword 64) = false)
+            by (vm_compute; reflexivity).
+          assert (Hwr : om_writable (mword_of_int 1537 : mword 64) = true)
+            by (vm_compute; reflexivity).
+          iEval (rewrite Ha1' Hrd Hwr) in "Hstd".
           iExact "Hstd". }
         rewrite /redir_K. iExact "HK".
   Qed.

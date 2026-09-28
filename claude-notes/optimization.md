@@ -611,6 +611,13 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
   the shape by syntactic rewrites instead: `rewrite b_eq (line_eq : lm_of M b =
   _) in H`, then apply a lemma stated at the model's own field (`uok … (LEchoF
   ws N) a -> …`). All three dropped under a second.
+  The proofmode twin is `iEval (vm_compute f) in "H"`: `UShFileRedir`'s two
+  mode bits cost 8 s at `Qed`; state them as `f lit = b` by `vm_compute;
+  reflexivity` and `iEval (rewrite …)` instead.
+- **`iInv "Hinv" as (s0) ">(…)"` strips the later AFTER the `∃`**, so the
+  `Timeless` search walks every conjunct of the opened body (~0.8 s a site
+  on the pipe invariant). `iInv "Hinv" as ">Hpbody" "Hclose". iDestruct
+  "Hpbody" as (s0) "(…)"` hits the body's own instance and is ~0.06 s.
 - **`vm_compute; reflexivity` on a computed `gmap` state is ~12 s + ~9 s of
   `Qed`** even when tiny: close it with `vm_cast_no_check (eq_refl <the
   literal>)` (`sc1_step1`, `s0b_good`, `demo_sync_cut`).
