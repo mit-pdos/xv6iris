@@ -151,7 +151,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep seccomp:Secc
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-ucode check-ucode \
-        audit audit-only audit-tree audit-tree-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
+        audit audit-only audit-tree audit-tree-only audit-union audit-union-only audit-all audit-all-only intr-cone-check vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         hwtest hwtest-gen hwtest-gen-all hwtest-probe cva6test-sim cva6test-gen \
         vtest-runs vtest-passes vtest-table \
         clean clean-proofs distclean model-gen
@@ -388,6 +388,15 @@ audit-union: proofs
 
 audit-union-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob UnionAssumptions.v
+
+# THE INTERRUPT ARM'S FUNCTOR CONE (tools/intr_cone.py; design/ni-strong-instance.md
+# R4): walks the Link-level instantiation cone of usertrap's device/timer
+# arm's two callees, Devintr and Yield, and fails if any module in it
+# implements KALLOC or KFREE.  The structural half of the strong instance
+# ("a quiet round runs no allocator"): a check of the proof tree's shape,
+# not a theorem in the logic.  Needs no build -- it reads the .v sources.
+intr-cone-check:
+	$(PYTHON) tools/intr_cone.py
 
 # BOTH audits -- the system theorem and THE APPLICATION's (the union) -- and
 # the reason this target exists rather than a habit of typing
