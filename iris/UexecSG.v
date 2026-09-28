@@ -597,8 +597,16 @@ Ltac f_equiv_wide :=
   end;
   try reflexivity.
 
+(* [f_contractive] only at a [▷]: tried FIRST at every node, as Iris's own
+   [solve_contractive] does, its failing instance search was ~75 % of the
+   walk (UexecRet's [uslot_F] 15 s -> 3 s, ParkCap's token 7 s -> 2 s).  It
+   stays the last resort for any other contractive head. *)
 Ltac solve_contractive_wide :=
-  solve_proper_core ltac:(fun _ => first [f_contractive | f_equiv | f_equiv_wide]).
+  solve_proper_core ltac:(fun _ =>
+    lazymatch goal with
+    | |- dist _ (bi_later _) _ => f_contractive
+    | _ => first [f_equiv | f_equiv_wide | f_contractive]
+    end).
 
 (* ===================================================================== *)
 (* THE FAMILY-FREE READER, derived: “a bundle for [n] at this key, at     *)

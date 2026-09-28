@@ -854,7 +854,7 @@ Section ProofUvmcopy.
     (* ================================================================ *)
     (*  THE +0x24 JOIN: the back edge and the exit test.                 *)
     (* ================================================================ *)
-    iAssert (∀ (CIDt : CpuId) (mt : regfile) (Pk : uptd),
+    pose (TAILP := (∀ (CIDt : CpuId) (mt : regfile) (Pk : uptd),
         ⌜ mt !!! Regidx csp_rs1 = spr
           /\ mt !!! Regidx Rs1 = iv
           /\ mt !!! Regidx Rs4 = (mword_of_int 4096 : mword 64)
@@ -874,8 +874,9 @@ Section ProofUvmcopy.
           (umem_write Mnew 0%Z (4096 * S j)%nat
              (fun a => Mold !!! Z.of_nat a)) -∗
         uc_exit mm Pold Pnew szold sznew Mold Mnew vpn0 n K eb p spr ilvl b lks -∗
-        mWP (Loop : expr riscv_lang))%I with "[]" as "TAIL".
-    { iIntros (CIDt mt Pk).
+        mWP (Loop : expr riscv_lang))%I : iProp Σ).
+    iAssert TAILP with "[]" as "TAIL".
+    { rewrite /TAILP. iIntros (CIDt mt Pk).
       iIntros "(%Htsp & %Hts1 & %Hts4 & %Hts5 & %Hts6 & %Hts7 & %Htthr
                 & %Htext2 & %Htout & %Htfacts) Hcg Hcnt Hpc Hpo Hpt Hexit".
       (* --- +0x24 c.add s1,s1,s4 : i += PGSIZE --- *)

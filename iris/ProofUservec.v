@@ -1599,11 +1599,19 @@ Section UservecAllPt.
                        Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184
                        Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256
                        Htf264 Htf272 Htf280 Htail0") as "Htf0'".
+    (* NAME THE SAVED WORDS: the 36-word list the walk stored rides into the
+       residue's index, and from there into every row of usertrap's post
+       for the rest of the proof -- spelled out it cost ~4 s at Qed and ~6 s
+       of tactic time (the post's [iIntros] alone 2.5-5 s). *)
+    match goal with
+    | |- context [tf_page (ud_tfp pt) (?w :: ?L)] =>
+        remember (w :: L) as wsv eqn:Hwsv
+    end.
     (* hand the page and the CSRs back before the residue goes to usertrap *)
     iAssert hart_csrs with "[Hsscr Hmdlc Hmsec Hssec]" as "Hcsrs0'".
     { iFrame "Hmdlc Hmsec Hssec". iExists _. iExact "Hsscr". }
     iDestruct ("Hclose0" with "[%] Htf0' Hcsrs0' Hctx") as "Hures'".
-    { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok0k). }
+    { subst wsv. refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok0k). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW, then the two borrows close ----
        The exit switch just did the one thing that converts the views: it
        wrote the KERNEL root into satp, which turned the user table from the
@@ -1643,6 +1651,7 @@ Section UservecAllPt.
          agreement the round crosses by, restricted to two indices, hence
          definitional; the image is the frame's own [M] on both sides *)
       iIntros (n). iSpecialize ("Hxin" $! n).
+      subst wsv.
       match goal with
       | |- environments.envs_entails _
              (SpecUsertrap.ut_sys_in _ _ _ _ ?UU _ _ _ _) =>
@@ -1674,6 +1683,7 @@ Section UservecAllPt.
          which the walk gives on the nose: the words uservec stored ARE
          [g]'s registers, and both frames name [ret_pc sepc_v] as the epc.
          The record's other four projections are the same record's. *)
+      subst wsv.
       match goal with
       | |- environments.envs_entails _ (SpecUsertrap.ut_fork_in _ _ ?TF ?UU _) =>
           assert (Hlf : length TF = TFWORDS)
@@ -1694,6 +1704,7 @@ Section UservecAllPt.
     { (* THE PAYMENT ACROSS THE SAVE WALK.  The row reads the number and
          argument 0 only, both of which [TfUser.tf_ueq] carries, and the
          generation is the same record's. *)
+      subst wsv.
       match goal with
       | |- environments.envs_entails _ (SpecUsertrap.ut_pay_in _ _ ?TF ?UU) =>
           assert (Hueqe : TfUser.tf_ueq (tf_of g (ret_pc sepc_v)) TF)
@@ -1861,7 +1872,7 @@ Section UservecAllPt.
         assert (Hu36 : TfUser.tf_ueq (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V UU)))
                               (tf_of g (ret_pc sepc_v)))
     end.
-    { cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
+    { subst wsv. cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
       split; [ reflexivity | ].
       intros i Hi.
       do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]). lia. }
@@ -1880,6 +1891,7 @@ Section UservecAllPt.
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2 Hcreds2 [Hxo2] [Hfo2] [Hwo2]
                     [%] [Hko2] [Hso2]").
+    all: subst wsv.
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is

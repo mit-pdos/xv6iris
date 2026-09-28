@@ -1058,8 +1058,9 @@ Section ProofScheduler.
     assert (HP_s6i : add_vec (add_vec (mycpu_a5 cid_word) (A16 !!! Regidx Rs6))
                              (sign_extend' 64 (mword_of_int 172 : mword 12))
                      = a_cpu_int cid_word).
-    { rewrite /A16 upd_ne; [| vm_compute; discriminate].
-      rewrite /A15 upd_ne; [| vm_compute; discriminate]. exact HA15s6. }
+    (* stop at [A15]: peeling [A15] too left [exact] to convert
+       [A15 !!! Rs6] with [A14 !!! Rs6] through the insert (1.8 s + Qed) *)
+    { rewrite /A16 upd_ne; [| vm_compute; discriminate]. exact HA15s6. }
     assert (HP_s7 : neq_vec (add_vec zero_reg (A16 !!! Regidx Rs7)) zero_reg = true).
     { rewrite /A16 upd_eq. vm_compute. reflexivity. }
     assert (HP_s8 : trunc32 (A16 !!! Regidx Rs8) = RUNNING).

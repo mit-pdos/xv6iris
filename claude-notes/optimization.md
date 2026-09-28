@@ -618,6 +618,43 @@ lever. Do not expect a spelled-out Sail term to be why a `Qed` is slow.
   `Timeless` search walks every conjunct of the opened body (~0.8 s a site
   on the pipe invariant). `iInv "Hinv" as ">Hpbody" "Hclose". iDestruct
   "Hpbody" as (s0) "(…)"` hits the body's own instance and is ~0.06 s.
+- **A whole-image sweep over `fsimg_P` decodes a 1024-byte block PER RECORD**
+  (`fs_dinode` re-reads its inode block for each of 16 inodes, each dir scan
+  and each indirect read re-decode theirs; one decode ≈ 0.09 s). HOIST the
+  metadata blocks: `FsImgCheck.fsimg_Ph` answers them from a literal decoded
+  once, `fsimg_Ph_eq : fsimg_Ph = fsimg_P` (one VM check + funext, which the
+  audits already carry) hands the sweep back — `rewrite <- fsimg_Ph_eq. vm_eq.`
+  `fsimg_wf_ok` 65 s → 2 s, `fsimg_links_eq` 16 s → 0.1 s, the region sweeps
+  5 s → 0.04 s. Which blocks the literal holds is only a cost choice.
+- **`elf_read` on a dumped ELF indexes a 285k-element list by a unary `nat`**,
+  so headers near the END (the section table) walk the list per byte: 9-13 s.
+  `ElfKernel.elf_read_hex_eq` (`elf_read (pstring_hex_bytes s) = elf_read_hex
+  s`, bytes straight out of the string) plus `pstring_hex_bytes_length`, after
+  unfolding the readers OUTERMOST FIRST (`unfold a, b` never revisits `a`
+  inside `b`'s body — the order bug leaves reads on the list silently). Convert
+  EVERY header reader in a file: the list's parse is paid once per file by the
+  first lemma that uses it, so converting some just moves the bill.
+- **`solve_contractive` tries `f_contractive` FIRST at every node**, and its
+  failing instance search is ~75 % of the walk. Dispatch on shape:
+  `lazymatch goal with |- dist _ (bi_later _) _ => f_contractive | _ =>
+  f_equiv end` (`UexecSG.solve_contractive_wide` now does): ParkCap 7 s →
+  2 s, UexecRet 15 s → 3 s. Walking a definition named twice (UexecRet's
+  `uexec_ret_F` in `ukb_F`) is the other half: give it a `Proper` instance.
+- **`by (rewrite …; //)` / `done` tries the context's hypotheses**, and unifying
+  the goal with one that names a computed constant normalises it (TreeImg:
+  3.8 s against `img_root_ents`). End such a `rewrite` with `reflexivity`.
+- **`replace x with y at 1`** goes through the occurrence machinery (3-4 s on
+  a trivial goal, RefParseBridge); a plain `rewrite <- (_ : y = x)` does not.
+- **`rewrite !big_sepL_cons big_sepL_nil` over a proofmode goal** is a setoid
+  rewrite of the whole goal per cons; on a concrete list `iEval (cbn
+  [big_opL])` computes the same shape (UkShArgs 3.3 s → 0).
+- **Name what rides Δ.** A `seq 0 4096` in a page hypothesis is a 4096-deep
+  unary numeral carried by every later step (`pose (NPG := 4096%nat)` +
+  `change`, ProofVirtioDiskInit 8 → 5 s); a join's spelled-out statement or
+  an `iInduction` hypothesis carrying the loop body is the same
+  (`pose (P := …%I); iAssert P`, ProofCopyinstr / Uvmcopy / Iget / Piperead).
+  Bisect such proofs on `Set Debug "hconstr"`'s term size, which does not move
+  with VM load, rather than on time.
 - **`vm_compute; reflexivity` on a computed `gmap` state is ~12 s + ~9 s of
   `Qed`** even when tiny: close it with `vm_cast_no_check (eq_refl <the
   literal>)` (`sc1_step1`, `s0b_good`, `demo_sync_cut`).

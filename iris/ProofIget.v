@@ -1015,7 +1015,10 @@ Section ProofIget.
     (*  neither a [CpuId] nor the six stack cells ride the universal.      *)
     (* ================================================================= *)
     iDestruct "HRres" as (M ci) "(Hhalf & Hstamps & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
-    iAssert (∀ (fuel j : nat) (Mr : regfile),
+    (* the scan body, named and parameterised by [fuel]: spelled out, the
+       induction hypothesis carries its whole statement in Δ through every
+       step of the round *)
+    pose (SCB := (λ fuel : nat, ∀ (j : nat) (Mr : regfile),
       ⌜(NINODE - j <= fuel)%nat⌝ -∗
       ⌜(j < NINODE)%nat⌝ -∗
       ⌜ Mr !!! Regidx Rs1 = ientry j
@@ -1048,7 +1051,8 @@ Section ProofIget.
          exit the scan takes, so it can no longer sit inside [TAILC]. *)
       iname fsc_ireg fsc_fs icfg_ist inum l -∗
       TAILC -∗
-      mWP (Loop : expr riscv_lang))%I with "[]" as "Hloop".
+      mWP (Loop : expr riscv_lang))%I : nat -> iProp Σ).
+    iAssert (∀ fuel : nat, SCB fuel)%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (j Mr) "%Hfuel %Hj %Hreg %Hscan %Hemp Hcg Hpc Hcnt Hpay Htok Hhalf Hstamps Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2".
         exfalso. unfold NINODE in Hj, Hfuel. lia. }

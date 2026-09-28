@@ -526,7 +526,11 @@ Section ProofFileread.
        the console arm it opens [ConsoleInv.cons_acc] and comes back inside
        what the caller asked to be told, on every other arm it comes
        straight back, and every exit pays it into [fileread_extra]. *)
+    (* the exit continuation, named: spelled out, [Hcont]'s ~2 KB statement
+       rides in Δ at every step of every arm *)
+    lazymatch goal with |- context [ bi_wand ?W (wp_triv _ _) ] => set (EXITK := W) end.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv #Hfoff Hau HP Hcont".
+
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)

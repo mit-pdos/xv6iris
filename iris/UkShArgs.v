@@ -2948,7 +2948,9 @@ Section UkShArgs.
                    ltac:(cbn [length]; lia)
                    with "[A0 A1 A2 A3 A4 B0 B1 B2 B3 B4 B5 B6 B7] Hloc")
         as "Hstk".
-      { rewrite !big_sepL_cons big_sepL_nil.
+      { (* reduced, not rewritten: 13 [big_sepL_cons] rewrites over the
+           proofmode goal cost 3.3 s *)
+        iEval (cbn [big_opL]).
         iSplitL "A0"; [ iExact "A0" | ].
         iSplitL "A1"; [ iExact "A1" | ].
         iSplitL "A2"; [ iExact "A2" | ].

@@ -42,11 +42,11 @@
    exists to catch: find the disagreeing address (compute both sides'
    lookup) and fix the dumper.  *)
 
-From Stdlib Require Import ZArith List.
+From Stdlib Require Import ZArith List Lia FunctionalExtensionality.
 From Stdlib.Strings Require Import PString.
 From stdpp Require Import gmap.
 From stdpp.bitvector Require Import definitions.
-From xv6iris Require Import ElfFile PStringBytes.
+From xv6iris Require Import RiscvModelBytes ElfFile PStringBytes.
 From Kernel Require Import KernelElfRaw KernelInstrs KernelData.
 
 Local Open Scope Z_scope.
@@ -96,35 +96,82 @@ Qed.
 (*  Well-formedness                                                       *)
 (* ====================================================================== *)
 
+(* THE READER, AT THE HEX STRING.  [elf_read] indexes the 285200-element
+   list by a unary [nat] -- every byte of a header near the END of the file
+   walks the list from its head, so [kernel_elf_sections_wf] (the section
+   headers sit at ~280k) measured 9 s.  [elf_read_hex] reads the same bytes
+   straight out of the string ([PrimString.get] is O(1)), and
+   [elf_read_hex_eq] is the bridge every header reading below rewrites
+   through.  (Leave one of them on the list and IT pays the ~13 s: the VM
+   builds the header parse once per file and the first reader pays.) *)
+Definition elf_read_hex (s : PrimString.string) (o : Z) (n : nat) : option Z :=
+  if (0 <=? o)%Z && match n with O => true | S k => (o + Z.of_nat k <? pstring_hex_length s)%Z end
+  then Some (assemble_bytes (map (fun j => pstring_hex_byte s (o + Z.of_nat j)%Z) (seq 0 n)))
+  else None.
+
+Lemma elf_read_hex_eq (s : PrimString.string) :
+  elf_read (pstring_hex_bytes s) = elf_read_hex s.
+Proof.
+  apply functional_extensionality; intros o.
+  apply functional_extensionality; intros n.
+  pose proof (pstring_hex_bytes_length s) as Hlen.
+  unfold elf_read, elf_read_hex, elf_avail.
+  destruct (0 <=? o)%Z eqn:Ho; [| reflexivity]. apply Z.leb_le in Ho. cbn [andb].
+  destruct n as [| k]; [reflexivity |]. cbn beta iota.
+  destruct (o + Z.of_nat k <? pstring_hex_length s)%Z eqn:Hk.
+  - apply Z.ltb_lt in Hk.
+    rewrite pstring_hex_bytes_lookup; [| lia].
+    f_equal. unfold elf_le_at. f_equal. apply map_ext_in. intros j Hj.
+    apply in_seq in Hj.
+    apply list_lookup_total_correct.
+    rewrite pstring_hex_bytes_lookup; [| lia].
+    assert (Ej : Z.of_nat (Z.to_nat o + j)%nat = (o + Z.of_nat j)%Z) by lia.
+    rewrite Ej. reflexivity.
+  - apply Z.ltb_ge in Hk.
+    (* NOT [lookup_ge_None_2] / an explicit [pstring_hex_bytes_lookup]
+       instance: neither matches the [!!] [elf_avail] elaborates to *)
+    lazymatch goal with |- context [match ?x with Some _ => _ | None => _ end] =>
+      destruct x as [b |] eqn:El end; [| reflexivity].
+    exfalso. apply lookup_lt_Some in El. lia.
+Qed.
+
+Local Ltac elf_hex_eq :=
+  (* outermost first: [unfold a, b] does NOT revisit [a] inside [b]'s body *)
+  unfold elf_wf, elf_sections_wf, elf_entry, elf_segments, elf_rodata_end,
+    elf_mem_base, elf_mem_end, elf_loads, phdr_wf, elf_phdrs, elf_shdrs,
+    elf_parse_ehdr, elf_parse_phdr, elf_parse_shdr,
+    elf_read_u8, elf_read_u16, elf_read_u32, elf_read_u64, kernel_elf;
+  rewrite ?pstring_hex_bytes_length, elf_read_hex_eq; vm_eq.
+
 Lemma kernel_elf_wf : elf_wf kernel_elf = true.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 Lemma kernel_elf_sections_wf : elf_sections_wf kernel_elf = true.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 (* ====================================================================== *)
 (*  Geometry: the ELF's own numbers are the dump's constants              *)
 (* ====================================================================== *)
 
 Lemma kernel_elf_entry : elf_entry kernel_elf = Some KernelData.kernelEntry.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 Lemma kernel_elf_segments :
   elf_segments kernel_elf = Some KernelData.kernel_segments.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 Lemma kernel_elf_base : elf_mem_base kernel_elf = Some KernelData.kernelMemBase.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 Lemma kernel_elf_end : elf_mem_end kernel_elf = Some KernelData.kernelMemEnd.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 (* The read-only / writable split lives in the SECTION table -- the single
    RWX PT_LOAD cannot express it -- so this is the one geometry constant
    that depends on [elf_sections_wf] rather than [elf_wf]. *)
 Lemma kernel_elf_rodata_end :
   elf_rodata_end kernel_elf = Some KernelData.kernelRodataEnd.
-Proof. vm_eq. Qed.
+Proof. elf_hex_eq. Qed.
 
 (* ====================================================================== *)
 (*  THE image theorem: the dump is exactly the ELF's file-backed image    *)

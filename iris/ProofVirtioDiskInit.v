@@ -2013,7 +2013,11 @@ Section ProofVirtioDiskInit.
     assert (HE7s2 : E7 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hk3s2).
     assert (Hcb : nth_byte (autocast (T := mword) (subrange_vec_dec (mword_of_int 0 : mword 64)
                      (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = byte_zero) by bvc.
-    iEval (rewrite /page_own /byte_any) in "Hpdpg".
+    (* the page length as a local definition: a [nat] literal is 4096 [S]
+       nodes, and each unfolded page in Δ was paying them at every step
+       (this proof's Qed 8.1 s -> 4.8 s) *)
+    pose (NPG := 4096%nat).
+    iEval (rewrite /page_own /byte_any) in "Hpdpg". change 4096%nat with NPG.
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
@@ -2023,7 +2027,7 @@ Section ProofVirtioDiskInit.
     { iApply (big_sepL_impl with "Hpdpg"). iIntros "!>" (k j _) "H". rewrite HE7a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms1) "Hcg Hpc Hbpd %Hms1cs".
-    iEval (rewrite Hcb HE7a0) in "Hbpd".
+    iEval (rewrite Hcb HE7a0) in "Hbpd". change 4096%nat with NPG.
     assert (Hr0f4 : ret_pc (E7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x0f4)).
     { rewrite /E7 upd_eq. unfold ret_pc. bvc. }
     iEval (rewrite Hr0f4) in "Hpc".
@@ -2095,7 +2099,7 @@ Section ProofVirtioDiskInit.
     assert (HF6sp : F6 !!! Regidx csp_rs1 = spr) by (peel; exact Hms1sp).
     assert (HF6s1 : F6 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HF2s1).
     assert (HF6s2 : F6 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms1s2).
-    iEval (rewrite /page_own /byte_any) in "Hpavpg".
+    iEval (rewrite /page_own /byte_any) in "Hpavpg". change 4096%nat with NPG.
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
@@ -2105,7 +2109,7 @@ Section ProofVirtioDiskInit.
     { iApply (big_sepL_impl with "Hpavpg"). iIntros "!>" (k j _) "H". rewrite HF6a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms2) "Hcg Hpc Hbpav %Hms2cs".
-    iEval (rewrite Hcb HF6a0) in "Hbpav".
+    iEval (rewrite Hcb HF6a0) in "Hbpav". change 4096%nat with NPG.
     assert (Hr106 : ret_pc (F6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x106)).
     { rewrite /F6 upd_eq. unfold ret_pc. bvc. }
     iEval (rewrite Hr106) in "Hpc".
@@ -2160,7 +2164,7 @@ Section ProofVirtioDiskInit.
     assert (HG4sp : G4 !!! Regidx csp_rs1 = spr) by (peel; exact Hms2sp).
     assert (HG4s1 : G4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hms2s1).
     assert (HG4s2 : G4 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms2s2).
-    iEval (rewrite /page_own /byte_any) in "Hpupg".
+    iEval (rewrite /page_own /byte_any) in "Hpupg". change 4096%nat with NPG.
     (* memset's contract is context-indexed and so is [page_own] (KallocInv
        is converted): the buffer goes in and comes back at the ambient
        context -- no crossing, no shim. *)
@@ -2170,7 +2174,7 @@ Section ProofVirtioDiskInit.
     { iApply (big_sepL_impl with "Hpupg"). iIntros "!>" (k j _) "H". rewrite HG4a0. iExact "H". }
     iApply wp_next_off_intro.
     iIntros (ms3) "Hcg Hpc Hbpu %Hms3cs".
-    iEval (rewrite Hcb HG4a0) in "Hbpu".
+    iEval (rewrite Hcb HG4a0) in "Hbpu". change 4096%nat with NPG.
     assert (Hr110 : ret_pc (G4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.virtio_disk_init + 0x110)).
     { rewrite /G4 upd_eq. unfold ret_pc. bvc. }
     iEval (rewrite Hr110) in "Hpc".
@@ -2573,6 +2577,8 @@ Section ProofVirtioDiskInit.
        the whole used page go to the device, and the ring entries come back. *)
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (vdi_avail_split pav with "Hbpav") as "[Hidx [Hringc Hbpavr]]".
+    (* the page's remainder, named like [NPG] *)
+    pose (NPR := 4076%nat). change 4076%nat with NPR.
     iDestruct (vdi_dma_disj pd pav pu with "Hidx Hbpu") as %Hdmadisj.
     iDestruct (vdi_ring_disj pd pav pu with "Hringc Hbpu") as %Hringdisj.
     (* decision 4: the ring cells split into the lease's sealed halves and

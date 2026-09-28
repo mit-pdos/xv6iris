@@ -512,7 +512,10 @@ Proof using.
   assert (Hlo : S (S p) < e) by (destruct Hq as (_ & _ & _ & _ & H1 & _); lia).
   assert (He : e < len) by (destruct Hq as (_ & _ & _ & _ & _ & H2 & _); lia).
   destruct (ushq_pipe_right_byte len f p e (S (S p)) Hq (conj (Nat.le_refl _) Hlo)) as [ Hws _ ].
-  replace e with (S (S p) + (e - S (S p))) at 1 by lia.
+  (* a plain [rewrite <-]: [replace .. at 1] went through the occurrence
+     machinery and cost 3-4 s on this one-occurrence goal *)
+  assert (Ee : S (S p) + (e - S (S p)) = e) by lia.
+  rewrite <- Ee.
   apply ushp_tokens_cons'.
   - exact (ushp_skipws_stop _ _ _ Hws).
   - exact (ushq_toklen_right len f p e Hq).

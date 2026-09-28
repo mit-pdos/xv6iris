@@ -2416,7 +2416,9 @@ Section ProofPipewrite.
       (* THE LOOP (iLöb at the body, +0x8c)                                 *)
       (* ================================================================= *)
       iAssert (pw_loop CID γa γf γs j γl γp w q m av true lks pid U n sp0 pi addr Q Qe) with "[]" as "LOOP".
-      { iLöb as "IH". rewrite /pw_loop.
+      { (* unfold the CONCLUSION only: a bare [rewrite /pw_loop] also unfolds
+           [IH], whose ~2 KB statement then rides in Δ through the round *)
+        iLöb as "IH". iEval (rewrite /pw_loop).
         iIntros (CIDlp Hslp i M Pc) "%Hi %Hext %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ HW HEX".
         pose proof Hregs as Hregs2.
         destruct Hregs2 as (Hsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 &

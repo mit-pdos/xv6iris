@@ -611,6 +611,7 @@ Proof. reflexivity. Qed.
 Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
+
 Section TrappedMachine.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -2053,14 +2054,47 @@ Section UexecRet.
            (uvis_M W) (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          mWP (Loop : expr riscv_lang))%I.
 
+  (* THE CONTRACTIVENESS, IN LAYERS: [uexec_ret_F] (named twice in [ukb_F])
+     and its two big arms are non-expansive by their own instances and
+     [ukb_F] by [ukb_F_ne], so no layer is walked twice.  One
+     [solve_contractive_wide] over the whole unfolded tower took 15 s. *)
+  Local Instance uexec_fork_F_ne n : Proper (dist n ==> eq ==> eq ==> dist n) uexec_fork_F.
+  Proof using .
+    intros X Y HXY W ? <- f ? <-.
+    rewrite /uexec_fork_F /uexec_fork_parent_F /ufork_ans.
+    solve_proper_core ltac:(fun _ => first [f_equiv | f_equiv_wide]).
+  Qed.
+  Local Instance uexec_ret_cont_gen_ne n :
+    Proper (dist n ==> eq ==> eq ==> eq ==> eq ==> dist n) uexec_ret_cont_gen.
+  Proof using .
+    intros X Y HXY k ? <- f ? <- W ? <- CH ? <-.
+    rewrite /uexec_ret_cont_gen /uwait_ans /uwait_ans_pid.
+    solve_proper_core ltac:(fun _ => first [f_equiv | f_equiv_wide]).
+  Qed.
+  Local Instance uexec_ret_F_ne n : Proper (dist n ==> eq ==> eq ==> dist n) uexec_ret_F.
+  Proof using .
+    intros X Y HXY sc ? <- W ? <-.
+    rewrite /uexec_ret_F /uexec_kill_arm_F /ukill_cred_at /uexec_ret_cont_F
+            /uexec_wait_F /uwait_ans_pid_m /uwait_ans_at_m.
+    solve_proper_core ltac:(fun _ => first [f_equiv | f_equiv_wide]).
+  Qed.
+  Local Lemma ukb_F_ne (n : nat) (X Y : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : CtxIdDefs.CurCtx}
+      C pt Rfd Rut sz π fdv cw g cs pidv lz secc :
+    X ≡{n}≡ Y ->
+    ukb_F X C pt Rfd Rut sz π fdv cw g cs pidv lz secc
+    ≡{n}≡ ukb_F Y C pt Rfd Rut sz π fdv cw g cs pidv lz secc.
+  Proof using .
+    intros HXY. rewrite /ukb_F.
+    solve_proper_core ltac:(fun _ => first [f_equiv | f_equiv_wide]).
+  Qed.
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof using .
-    rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F /uexec_kill_arm_F
-            /ukill_cred_at /uexec_fork_F
-            /uexec_fork_parent_F /ufork_ans /uexec_ret_cont_F
-            /uexec_wait_F /uwait_ans /uwait_ans_pid
-            /uwait_ans_pid_m /uwait_ans_at_m /uexec_ret_cont_gen.
-    solve_contractive_wide.
+    rewrite /uslot_F /uvb_F /ukont_F.
+    solve_proper_core ltac:(fun _ =>
+      lazymatch goal with
+      | |- dist _ (bi_later _) _ => f_contractive
+      | _ => first [apply ukb_F_ne; assumption | f_equiv | f_equiv_wide]
+      end).
   Qed.
 
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.

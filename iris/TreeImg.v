@@ -142,7 +142,7 @@ Qed.
 
 Lemma fsimg_live_nlink_ok :
   fs_region_live_nlink fsimg_P fsimg_sb fsimg_nib = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 Lemma fsimg_live_nlink (z : Z) :
   0 <= z < 208 ->
@@ -243,10 +243,12 @@ Proof.
   apply elem_of_map_to_list in H1. apply elem_of_map_to_list in H2.
   apply elem_of_list_lookup_1 in H1 as [i1 Hi1].
   apply elem_of_list_lookup_1 in H2 as [i2 Hi2].
+  (* [reflexivity], not [//]: [done]'s assumption pass unified the goal
+     with [Hf1] by normalising [img_root_ents] (3.8 s) *)
   assert (Hf1 : (map_to_list (hide_dots img_root_ents)).*2 !! i1 = Some j)
-    by (rewrite list_lookup_fmap Hi1 //).
+    by (rewrite list_lookup_fmap Hi1; reflexivity).
   assert (Hf2 : (map_to_list (hide_dots img_root_ents)).*2 !! i2 = Some j)
-    by (rewrite list_lookup_fmap Hi2 //).
+    by (rewrite list_lookup_fmap Hi2; reflexivity).
   assert (Hij : i1 = i2)
     by exact (proj1 (NoDup_alt _) Hnd i1 i2 j Hf1 Hf2).
   revert Hi1. rewrite Hij. intros Hi1. rewrite Hi1 in Hi2.

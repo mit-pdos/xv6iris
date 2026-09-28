@@ -70,7 +70,7 @@
     this file exists to catch: find the disagreeing byte and fix the
     dumper (or mkfs).                                                      *)
 
-From Stdlib Require Import ZArith Lia List.
+From Stdlib Require Import ZArith Lia List FunctionalExtensionality.
 From stdpp Require Import gmap list.
 From stdpp.bitvector Require Import definitions.
 Require Import SailStdpp.Values.   (* [mword_of_int]: [FsTree.DOT]'s spelling *)
@@ -143,6 +143,68 @@ Lemma fsimg_sb_logstart : sb_logstart fsimg_sb = 2.
 Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
+(*  1b.  THE METADATA BLOCKS, DECODED ONCE                                 *)
+(*                                                                        *)
+(*  [fsimg_P] decodes a whole 1024-byte block out of the hex string at    *)
+(*  EVERY call, and the sweeps below call it per RECORD: [fs_dinode]      *)
+(*  re-reads its inode block for each of the sixteen inodes in it, each   *)
+(*  directory scan re-reads its data block, each file its indirect block. *)
+(*  So [fsimg_wf_ok] measured 65 s and [fsimg_links_eq] 16 s.  [fsimg_Ph] *)
+(*  answers the superblock, the log header, the thirteen inode blocks,    *)
+(*  the bitmap and every directory data and indirect block from a         *)
+(*  literal decoded ONCE, and [fsimg_Ph_eq] (one VM check of that         *)
+(*  literal against [fsimg_P], plus extensionality) hands every sweep     *)
+(*  back to the statement at [fsimg_P] (2 s and 0.1 s).  WHICH blocks the *)
+(*  literal holds is a cost choice only: a block it misses falls through  *)
+(*  to [fsimg_P], and [fsimg_hot_ok] checks every block it holds.         *)
+(* ====================================================================== *)
+
+Definition fsimg_ino_blks : list (list (bv 8)) :=
+  Eval vm_compute in List.map (fun k => fsimg_P (33 + Z.of_nat k)) (seq 0 13).
+
+(* the inode blocks' reader, used only to COMPUTE the list below fast *)
+Definition fsimg_Pi (b : Z) : list (bv 8) :=
+  if (33 <=? b) && (b <? 46) then nth (Z.to_nat (b - 33)) fsimg_ino_blks []
+  else fsimg_P b.
+
+Definition fsimg_hot_blks : list Z := Eval vm_compute in
+  [1; 2; 46] ++
+  List.concat (List.map (fun i =>
+     let dn := fs_dinode fsimg_Pi fsimg_sb (Z.of_nat i) in
+     let ty := bv_unsigned (di_type dn) in
+     if ty =? T_DIR_z
+     then List.filter (fun a => negb (a =? 0)) (List.map bv_unsigned (take 12 (di_addrs dn)))
+     else if ty =? T_FILE_z
+     then List.filter (fun a => negb (a =? 0)) [bv_unsigned (nth 12 (di_addrs dn) (bv_0 32))]
+     else []) (seq 0 208)).
+
+Definition fsimg_hot : list (Z * list (bv 8)) :=
+  Eval vm_compute in
+    List.combine (List.map (fun k => 33 + Z.of_nat k) (seq 0 13)) fsimg_ino_blks
+    ++ List.map (fun b => (b, fsimg_P b)) fsimg_hot_blks.
+
+Definition fsimg_Ph (b : Z) : list (bv 8) :=
+  match List.find (fun bl => bl.1 =? b) fsimg_hot with
+  | Some bl => bl.2
+  | None => fsimg_P b
+  end.
+
+Lemma fsimg_hot_ok :
+  forallb (fun bl => bool_decide (fsimg_P bl.1 = bl.2)) fsimg_hot = true.
+Proof. vm_eq. Qed.
+
+Lemma fsimg_Ph_eq : fsimg_Ph = fsimg_P.
+Proof.
+  apply functional_extensionality. intros b. unfold fsimg_Ph.
+  destruct (List.find (fun bl => bl.1 =? b) fsimg_hot) as [bl |] eqn:E;
+    [| reflexivity].
+  apply find_some in E as [Hin Hb]. apply Z.eqb_eq in Hb.
+  pose proof fsimg_hot_ok as H. rewrite forallb_forall in H.
+  specialize (H bl Hin). apply bool_decide_eq_true_1 in H.
+  rewrite <- Hb. symmetry. exact H.
+Qed.
+
+(* ====================================================================== *)
 (*  2.  THE IMAGE IS WELL FORMED                                           *)
 (* ====================================================================== *)
 
@@ -153,7 +215,7 @@ Proof. reflexivity. Qed.
    and what W6/W7's [dir_first] readings cannot pin; measured cost of the
    added sweep, [Qed]'s re-check included, ~+20 s of this file's ~210 s). *)
 Lemma fsimg_wf_ok : fsimg_wf fsimg_P fsimg_sb = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* THE HEADLINE READING of the above: the tree this image denotes has a
    root directory whose [".."] is itself. *)
@@ -274,7 +336,7 @@ Proof. exact (fsimg_wf_root_link fsimg_P fsimg_sb fsimg_wf_ok). Qed.
     each inum pays one [fs_tick_count].  Measured cost is recorded in the
     worklist (same ballpark as W9's own ~20 s including [Qed]).           *)
 Lemma fsimg_links_eq : fs_links_eq fsimg_P fsimg_sb = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* ---- CONJUNCT (15): NO LIVE NON-DOT ROOT RECORD NAMES THE ROOT ------- *)
 
@@ -288,7 +350,7 @@ Proof. vm_eq. Qed.
     root's 64 records, the same records W6/W8 already read; it is the only
     sweep in this file that touches exactly one directory. *)
 Lemma fsimg_root_no_self : fs_root_no_self fsimg_P fsimg_sb = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* ---- W4 reindexed, cited: no inode names one block twice ------------- *)
 
@@ -328,7 +390,7 @@ Qed.
    would be circular) and L4 is about arbitrary bytes.  Same thirteen
    inode blocks as [fsimg_region_free]; measured together below. *)
 Lemma fsimg_region_nlink : fs_region_nlink fsimg_P fsimg_sb 13 = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* ---- CONJUNCT (14): EVERY FREE RECORD IS BARE ------------------------ *)
 
@@ -341,7 +403,7 @@ Proof. vm_eq. Qed.
     hence [inode_local] at every free inum of the region.  Same thirteen
     inode blocks as the two sweeps above, and it forces no file contents. *)
 Lemma fsimg_region_bare : fs_region_bare fsimg_P fsimg_sb 13 = true.
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* THE ONE REGION-WIDE HYPOTHESIS [FsCfgBoot.fs_cfg_alloc] takes beside
    [fsimg_wf_ok]: the tail's type plus L3/L4 over the whole region. *)
@@ -375,7 +437,7 @@ Qed.
    up is free.  ONE sweep of the thirteen inode blocks. *)
 Lemma fsimg_live_set :
   fs_live_set fsimg_P fsimg_sb = list_to_set (Z.of_nat <$> seq 1 23).
-Proof. vm_eq. Qed.
+Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 
 (* ...and the membership law the split actually uses, off the computed set
    and [FsImg.fs_live_set_elem_of]: the live inums are exactly [1 .. 23],

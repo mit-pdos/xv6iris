@@ -2098,7 +2098,10 @@ Section ProofPiperead.
       (* ============ the BOUNDED copy loop at +0x92 (fuel induction) ====== *)
       (* [Mc] is the ROUND'S image: each round's copyout writes user memory, so
          the borrowed table is carried at whatever image the round reached. *)
-      iAssert (∀ (fuel i : nat) (cur : mword 64) (M3 : regfile) (P' : uptd)
+      (* the loop body, named and parameterised by [fuel]: spelled out, the
+         induction hypothesis carried its ~6 KB statement in Δ through every
+         step of the round *)
+      pose (CLB := (λ fuel : nat, ∀ (i : nat) (cur : mword 64) (M3 : regfile) (P' : uptd)
                  (Mc : gmap Z (bv 8)) (acc : list (bv 8)) (chb : bv 8),
           ⌜(Nn - i <= fuel)%nat⌝ -∗ ⌜(i < Nn)%nat⌝ -∗
           ⌜ M3 !!! Regidx csp_rs1 = spr
@@ -2147,7 +2150,8 @@ Section ProofPiperead.
              proc_ptm P'' (uint (pv_sz (us_V U))) M'' -∗
              proc_priv_core pj pid (upd_usM (us_upt U P'') M'')) -∗
           chaddr ↦ₘ[KT1] chb -∗
-          mWP (Loop : expr riscv_lang))%I with "[]" as "CLOOP".
+          mWP (Loop : expr riscv_lang))%I : nat -> iProp Σ).
+      iAssert (∀ fuel : nat, CLB fuel)%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (i cur M3 P' Mc acc chb) "%Hfu %Hi %Hrg3 %Hex3 %Hcur %Hwr3 %Hlacc %Hmc HWX Hcg Hpc Hown Hpay Hlocked Hres Href HR Hszc Hptc Hpt Hpback Hch".
           exfalso. lia. }

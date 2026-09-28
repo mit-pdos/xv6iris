@@ -3171,7 +3171,9 @@ Definition fd_seg1 : list mobs :=
 Lemma demo_f1 : good_out_f ∅ fd_seg1.
 Proof using.
   exists [3%nat; 0%nat], fd_cs1.
-  apply (bool_decide_unpack _). vm_compute. exact I.
+  (* the cast, as at [demo_f1_file] below: [vm_compute. exact I.] ran the
+     segment through the model twice, 3.7 s + 3.6 s *)
+  apply (bool_decide_unpack _). vm_cast_no_check I.
 Qed.
 
 Lemma demo_f1_file :

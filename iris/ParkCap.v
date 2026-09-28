@@ -410,7 +410,13 @@ Section ParkCap.
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
   Proof using .
     rewrite /park_token_F /park_cap /park_chan /park_pkg.
-    solve_contractive.
+    (* [solve_contractive] with [f_contractive] tried only at a [▷]: tried
+       first at every node, its failing instance search made this 7-10 s *)
+    solve_proper_core ltac:(fun _ =>
+      lazymatch goal with
+      | |- dist _ (bi_later _) _ => f_contractive
+      | _ => first [f_equiv | f_contractive]
+      end).
   Qed.
 
   Definition park_token (γs : list gname) : iProp Σ := fixpoint (park_token_F γs).

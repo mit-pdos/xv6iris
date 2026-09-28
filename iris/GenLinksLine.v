@@ -726,8 +726,16 @@ Section gen_links_line.
   Proof using. rewrite /gl_taint. apply _. Qed.
   Global Instance gl_taint_at_persistent k : Persistent (gl_taint_at k).
   Proof using. rewrite /gl_taint_at. apply _. Qed.
+  (* the five instances by name, for the reason above: [apply _] against
+     the conjunction took 3.6 s *)
   Global Instance glinks_persistent : Persistent glinks.
-  Proof using. rewrite /glinks. apply _. Qed.
+  Proof using.
+    rewrite /glinks.
+    apply bi.sep_persistent; [exact gl_w_persistent |].
+    apply bi.sep_persistent; [exact gl_blk_persistent |].
+    apply bi.sep_persistent; [exact gl_pro_persistent |].
+    apply bi.sep_persistent; [exact gl_head_persistent | exact gl_taint_persistent].
+  Qed.
 
   (* the tier's own links resource, which entails the interface *)
   Context (LINKS : iProp Σ) (LINKS_pers : Persistent LINKS)

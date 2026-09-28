@@ -1157,7 +1157,9 @@ Section ProofCopyinstr.
     (*  Both the walkaddr HIT and the vmfault HIT land here, exactly as  *)
     (*  in copyin -- which is what the psz bump made copyinstr into.     *)
     (* ================================================================ *)
-    iAssert (∀ (CIDc : CpuId) (mc : regfile) (pa0 : mword 64) (Pd : uptd)
+    (* the join's statement, named so the arms' Δ carries a variable rather
+       than its forty lines at every step *)
+    pose (CHUNKP := (∀ (CIDc : CpuId) (mc : regfile) (pa0 : mword 64) (Pd : uptd)
                (fpg : nat -> bv 8),
         ⌜b = false \/ pcur = zero_reg -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
         ⌜uptd_ext_sz szv Pc Pd⌝ -∗
@@ -1188,14 +1190,15 @@ Section ProofCopyinstr.
            proc_ptm Pd (uint szv) M) -∗
         ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
         EXIT -∗
-        mWP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
-    { iIntros (CIDc mc pa0 Pd fpg) "%Hanchorc %Hextd %Hva0b %Hpgm %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
+        mWP (Loop : expr riscv_lang))%I : iProp Σ).
+    iAssert CHUNKP with "[]" as "CHUNK".
+    { rewrite /CHUNKP. iIntros (CIDc mc pa0 Pd fpg) "%Hanchorc %Hextd %Hva0b %Hpgm %Hza0 %Hzsp %Hz1 %Hz2 %Hz3
                             %Hz4 %Hz5 %Hz6 %Hz7 %Hz8 %Hz9 %Hz10 %Hz11
                             Hcg Hcnt Hpc Hpg Hback Hdst HEXIT".
         (* ============================================================ *)
         (*  THE +0x96 JOIN: the chunk, over its length [n].              *)
         (* ============================================================ *)
-      iAssert (∀ (CIDb : CpuId) (mb : regfile) (n : nat),
+      pose (BODYP := (∀ (CIDb : CpuId) (mb : regfile) (n : nat),
           ⌜b = false \/ pcur = zero_reg -> (CIDb : CPU) = (CIDc : CPU)⌝ -∗
           ⌜(1 <= n)%nat⌝ -∗ ⌜(n <= rem)%nat⌝ -∗ ⌜(off + n <= 4096)%nat⌝ -∗
           (* WHICH of the two the chunk is.  Without it the back edge cannot
@@ -1218,9 +1221,9 @@ Section ProofCopyinstr.
           ⌜mb !!! Regidx Rs11 = v11⌝ -∗
           sie_cap_gpr KT1 (CID:=CIDb) mb (K - 12)%nat b pcur -∗
           pc_is (CID:=CIDb) (mword_of_int (KernelSyms.copyinstr + 0x96) : mword 64) -∗
-          mWP (Loop : expr riscv_lang))%I
-        with "[Hdst Hpg Hback Hcnt HEXIT]" as "BODY".
-      { iIntros (CIDb mb n) "%Hanchorb %Hn1 %Hnrem %Hnoff %Hnshape %Hba3 %Hba0 %Hbsp %Hbs1 %Hbs2 %Hbs3
+          mWP (Loop : expr riscv_lang))%I : iProp Σ).
+      iAssert BODYP with "[Hdst Hpg Hback Hcnt HEXIT]" as "BODY".
+      { rewrite /BODYP. iIntros (CIDb mb n) "%Hanchorb %Hn1 %Hnrem %Hnoff %Hnshape %Hba3 %Hba0 %Hbsp %Hbs1 %Hbs2 %Hbs3
                         %Hbs4 %Hbs5 %Hbs6 %Hbs7 %Hbs8 %Hbs9 %Hbs10 %Hbs11 Hcg Hpc".
         assert (Hn64 : (Z.of_nat n < 18446744073709551616)%Z).
         { apply (Z.le_lt_trans _ (Z.of_nat rem)); [apply Nat2Z.inj_le; lia | exact Hrem64]. }
