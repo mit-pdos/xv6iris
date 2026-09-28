@@ -129,6 +129,7 @@ Require UkSync.                   (* [sync_pay] *)
 Require LinkUserinit.            (* [UG.uexec_wp_gen]: the generic user WP *)
 Require Import CtxIdDefs.
 Require Import UShUModBase.       (* the pure preamble, shared with the shape modules *)
+Require Import UShUModX.          (* the whole-lend child laws' shared prologue *)
 Require Import UkShShape.
 Local Open Scope Z_scope.
 Import Defs.
@@ -348,88 +349,29 @@ Section UShUModSecc.
         (ghost_varG0 := offbox_offG) T Wcu usecc_lp 68.
   Proof using Hwild Hrdw Hkill Hcons.
     iIntros "#Hdep #Hslot".
-    iPoseProof "Hslot" as "(#Hinv & _ & #Hgen)".
-    rewrite /UkShFork.ushf_child_law_at.
-    iIntros "!>" (N' h m dw dv sa len ws gb sz ld n I)
-      "%Hpeq %Hs1 %Hline %Hlws %Hfok %Hsa %Hs64 %Hs38 %Hszlo %Hszal %Hszok
-       %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hwsp Hsy Hstd Hcwd Hch _ HM Hcr
-       Hrun".
-    iDestruct (UserChildren.uch_any_of with "Hch") as "Hch".
-    destruct Hline as (wsx & -> & Hlat).
-    pose proof (proj1 Hlat) as Hsok.
-    (* ---- the line, off the fork's words ---- *)
-    assert (Hul : ul I = LSecc wsx).
-    { rewrite ul_lastbody.
-      destruct (FileDisc.fline_ok_secc_words (UkSh.ush_lastbody I) wsx Hfok) as [_ Hb].
-      { rewrite -(last_ws_lastbody I). symmetry. exact Hlws. }
-      rewrite Hb. exact (uline_of_u_secc wsx Hsok). }
-    assert (Hw : uwild (ul I) = true) by (rewrite Hul; reflexivity).
-    (* the taint's continuation, at a payload the caller supplies *)
-    iAssert (□ (□ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
-               □ (∀ W : UexecSlot.uvis,
-                    T -∗ ChildTok.my_pay (UexecSlot.uvis_gen W) (ukn_pay N') -∗
-                    UexecRet.uslot (SG := uexecSG_xv6) W)))%I as "#Hgenw".
-    { iIntros "!> #Hkq !>". iIntros (W) "#HT' #Hmy". rewrite Hpeq.
-      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W with "HT' Hmy Hkq"). }
-    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcr") as "[Hcr | #Hsh]".
-    { (* the clean arm: its deed refutes the wild line, or is the taint *)
-      rewrite uWcf_S3. iDestruct "Hcr" as "[Hc [Hpre _]]".
-      iAssert (∃ v0 : era_pins, era_pin (fgn_echo gf) (S gen_id) v0)%I
-        as (v0) "#Hpin0".
-      { rewrite /uWcl /lk_lcred.
-        iDestruct "Hc" as (v0) "[#Hp _]". iExists v0.
-        cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hp". }
-      rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last first.
-      { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
-                  (ghost_varG0 := offbox_offG) N' T h m
-                  (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
-                  with "[] HT Hrun").
-        iApply "Hgenw". iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
-        iApply (uWcu_taint' I 0%nat v0 with "Hpin0"). iApply uHktaint'. iExact "Hk". }
-      iDestruct "Hpre" as (cs s v') "(_ & _ & _ & _ & _ & %Hnw & _)".
-      rewrite Hw in Hnw. discriminate Hnw. }
-    (* ---- the wild arm ---- *)
-    iAssert (□ (∀ s : Z, UkShFork.ushf_wq Wcu I))%I as "#HQ".
-    { iIntros "!>" (_). rewrite /UkShFork.ushf_wq.
-      iApply (uWcu_wild ug r s0 PT PD I 0%nat with "Hsh"). }
-    iPoseProof ("Hgenw" with "[]") as "#Hgenw'".
-    { iIntros "!> _". iApply ("HQ" $! 0). }
-    rewrite /UkSh.ush_std /UserFd.ustd_ok.
-    iDestruct "Hstd" as (vw) "[[%Hvok | #HT] Hstd]"; last first.
-    { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
-                (ghost_varG0 := offbox_offG) N' T h m
-                (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
-                with "Hgenw' HT Hrun"). }
-    (* ---- THE WALK, at 8 more steps of budget than it needs ---- *)
-    assert (Hbud : (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
-                   = (60 + (8 + (UkShDiag.ush_Dg + (n + 8))))%nat) by lia.
-    rewrite Hbud.
-    iApply (UkShEcho.wp_kshm_child_x_v_holds (PS := uprogSG_free)
-              (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
-              (fun k H => H) ucat_rows (FileDisc.uline_ws (LSecc wsx))
-              FileDisc.alt_execsecc
-              (fun _ : Z => UkShFork.ushf_wq Wcu I)
-              (useccomp_shape ug I) (useccomp_shape ug I)
-              N' (ukn_const_of_eq N' _ Hpeq (fun _ _ => eq_refl))
-              h m dw dv sa len gb sz ld vw (n + 8)%nat
-              Hpeq Hs1 (usecc_xline wsx gb len Hlat) (usecc_execfail_bytes wsx)
-              Hsa Hs64 Hs38 Hszlo Hszal Hszok Hrows (proj2 (proj2 Hrows))
-              with "Hcode [] [] [] [] Hpcode Hpro Hjt Hstr Hwsp Hsy Hstd Hcwd
-                    Hch HM [] Hrun").
-    - iApply (usecc_exec_sup I wsx vw Hsok Hvok with "Hdep Hslot Hsh").
-    - (* the parse ran out of memory: "out of memory" through the era's
-         licence, the shape unmoved *)
-      pose proof (ukn_const_of_eq N' _ Hpeq (fun _ _ => eq_refl)) as Hcst.
-      iApply (UkShEcho.ushp_oom_of_diag (PS := uprogSG_free)
-                (ghost_varG0 := offbox_offG) N' (useccomp_shape ug I) (useccomp_shape ug I) ld
-                (18 + (8 + (UkShDiag.ush_Dg + (n + 8))))%nat ltac:(lia)
-                (proj2 (proj2 Hrows)) with "[] [] Hcode []").
-      + iApply usecc_execfail_law.
-      + iIntros "!> _". rewrite Hpeq. iApply ("HQ" $! (-1)%Z).
-      + iApply (UkSh.ush_jtab_ro with "Hjt").
-    - iApply usecc_execfail_law.
-    - iIntros "!> _". iApply ("HQ" $! 0%Z).
-    - iExact "Hsh".
+    iApply (ushf_child_law_of_x ug r s0 Hkill PT PD usecc_lp
+              (fun l => exists wsx, l = LSecc wsx) FsSeccPin.era0_secc_pins
+              with "[] Hslot").
+    - intros ws g len (wsx & -> & H). exists (LSecc wsx). eauto.
+    - intros l g len [wsx ->]. exact (usecc_xline wsx g len).
+    - intros l b [wsx ->] Hok Hf Hw.
+      destruct (FileDisc.fline_ok_secc_words b wsx Hf Hw) as [_ ->].
+      exact (uline_of_u_secc wsx Hok).
+    - iIntros "!>" (I l [wsx ->] Hok Hul _) "_ Hcr".
+      iDestruct (uWcu_3 ug r s0 PT PD I with "Hcr") as "[Hcr | #Hsh]".
+      { (* the clean arm: its deed refutes the wild line, or is the taint *)
+        rewrite uWcf_S3. iDestruct "Hcr" as "[_ [Hpre _]]".
+        rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; [| by iLeft].
+        iDestruct "Hpre" as (cs s v') "(_ & _ & _ & _ & _ & %Hnw & _)".
+        rewrite Hul in Hnw. discriminate Hnw. }
+      (* the wild arm: the shape is the walk's [Cr] and [Cd] *)
+      iRight. iExists (useccomp_shape ug I), (useccomp_shape ug I), FileDisc.alt_execsecc.
+      iSplitR; [iPureIntro; exact (usecc_execfail_bytes wsx) |].
+      iSplitR; [iExact "Hsh" |].
+      iSplitR; [iIntros "!>" (vw Hvok);
+                iApply (usecc_exec_sup I wsx vw Hok Hvok with "Hdep Hslot Hsh") |].
+      iSplitR; [iApply usecc_execfail_law |]. iSplitR; [iApply usecc_execfail_law |].
+      iIntros "!> H". rewrite /UkShFork.ushf_wq. iApply (uWcu_wild ug r s0 PT PD I 0%nat with "H").
   Qed.
 
   (* THE BODY LAW at the seccomp line, from its child law: the generic
