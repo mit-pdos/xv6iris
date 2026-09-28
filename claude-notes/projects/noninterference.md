@@ -22,25 +22,28 @@ claim files around the engine, so M0's re-cut of `uexec_ret_F` WAITS for
 that to settle (or goes to upstream with it — relay if they want it);
 M1's ledgers are fresh ground and go first.
 
-- [ ] **NI-LEDGER-KALLOC** (M1's first ledger; kernel).  The allocator's ghost ledger on the FREE POOL pattern
+- [x] **NI-LEDGER-KALLOC** (M1's first ledger; kernel) — LANDED 2026-09-28
+  (b5e67a96b, bed7ee0dd; as-landed record in
+  [`design/ni-kalloc-ledger.md`](../design/ni-kalloc-ledger.md) §7: the
+  ledger inside `kmem_avail_auth`, no landed contract moved, led-form
+  contracts beside the landed ones, no consumer yet).  Original brief:
+  the allocator's ghost ledger on the FREE POOL pattern
   (`bitmap_inv`, per §2/§7): an abstract free set in the allocator's
   invariant; `kalloc` fails iff it is empty; each `kalloc`/`kfree`
   appends an actor-labelled `Alloc`/`Free` event.  Deliverables: the
   event vocabulary + ledger file; `SpecKalloc`'s rows deterministic in
   the ledger; callers served by the invariant (not per-caller
-  fragments).  DESIGN PASS DONE 2026-09-28:
-  [`design/ni-kalloc-ledger.md`](../design/ni-kalloc-ledger.md) — the
-  ledger inside `kmem_avail_auth` (no landed contract moves), the actor
-  is `cpu_own`'s `c->proc`, events `KAlloc | KNull | KFree`, a second
-  led-form contract per function with the landed one as corollary; work
-  order W1-W4, rulings R1-R5 open for the owner.
+  fragments).  Rulings R1-R5 taken as recommended (owner, 2026-09-28).
 - [ ] **NI-LEDGER-REST** (M1 remainder): `nextpid` — coordinate with
   the landed TRAP-ROWS `upid`/`ukn_pid` work, the U tier already sees
   pid numbers — then `ticks`, the zombie set; then the per-process key
   history `uhist : mono_list uvis` beside `proc_priv`.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
-  appends no events — provable in-logic once NI-LEDGER-KALLOC lands;
-  the campaign's first theorem.
+  appends no events — provable in-logic now that NI-LEDGER-KALLOC has
+  landed; the campaign's first theorem.  Device recommended in
+  `design/ni-kalloc-ledger.md` D6: a per-actor event counter whose
+  exclusive fragment rides in the hart bundle at the proc field, moved
+  only by `cpu_own_set_proc`; needs its own design pass before a brief.
 - [ ] **NI-DET-ROWS** (M0): `usys_det` and the ecall arm's re-cut, the
   loop's `round_det` discharge — after the post-Qed redesign settles;
   §4 lists the row set to start from.

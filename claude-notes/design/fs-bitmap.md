@@ -389,3 +389,12 @@ The inner scan is the only induction: invariant "every bit in `[0, bi)` is in
 machinery half parked in the `bio_held`/`bio_locked` handle from `bread`.
 `ByteBuf.bb_byte_acc` is the single-byte accessor; `bb_word4_acc` is the
 word-granular twin bmap uses.
+
+**The pattern's second instance (2026-09-28).**  The page allocator's
+event ledger ([`ni-kalloc-ledger.md`](ni-kalloc-ledger.md)) is the FREE
+POOL one layer down: `kalloc`'s failure is a function of a ghost history
+the way `balloc`'s is of `used`.  The differences are recorded there
+(§2 D4/D5): the pool lives in a spin-lock payload rather than an `inv`,
+so there are no masks and the lower bound is minted at release; and the
+pool is a COUNT tied to an actor-labelled event list, not a set, so
+placement stays out of it.

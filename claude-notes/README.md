@@ -276,12 +276,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   class, the child law), the body law folded over the list, one file per
   shape; the last copy axis user-once left.  Stage 1b deferred until the
   sync lane settles.
-- **[`ni-kalloc-ledger.md`](design/ni-kalloc-ledger.md)** — DESIGN PASS
-  (2026-09-28) for the noninterference campaign's first lane: the
-  allocator's actor-labelled event ledger (`KAlloc | KNull | KFree` at
-  the hart's `c->proc`) inside `kmem_avail_auth`, `kalloc` null iff the
-  history's pool is empty, exported by a led-form contract beside the
-  landed one; no landed contract moves.  Rulings R1-R5 pending.
+- **[`ni-kalloc-ledger.md`](design/ni-kalloc-ledger.md)** — LANDED
+  (2026-09-28), the noninterference campaign's first lane: the
+  allocator's actor-labelled event ledger (`KallocEv.kev`: `KAlloc |
+  KNull | KFree` at the hart's `c->proc`) inside `kmem_avail_auth`,
+  `kalloc` null iff the history's pool is empty, exported by the led-form
+  contracts `wp_kalloc_led_sconf` / `wp_kfree_led_sconf` beside the
+  landed ones, which are their corollaries; no landed contract moved, no
+  call site touched.  §7 is the as-landed record.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

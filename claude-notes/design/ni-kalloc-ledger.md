@@ -1,11 +1,11 @@
 # The allocator's event ledger (NI-LEDGER-KALLOC)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
-first lane of [`../projects/noninterference.md`](../projects/noninterference.md)
+STATUS: LANDED 2026-09-28 (rulings R1-R5 taken as recommended, owner,
+2026-09-28; W1 b5e67a96b, W2+W3 bed7ee0dd; §7 below is the as-landed
+record).  The first lane of
+[`../projects/noninterference.md`](../projects/noninterference.md)
 (§2 "the oracle is the event history", §7 "the FREE POOL shape to copy").
-No proof work has started; §6 lists the rulings this needs.  The campaign
-banner says it resumes on the owner's word: this note IS the word's
-input, not its output.
+§§0-6 are the design pass as ruled; where the landing differs, §7 wins.
 
 ## 0. The position, in one paragraph
 
@@ -244,3 +244,48 @@ Expected total: ~350 lines in, nothing out, no consumer touched.
 - The boot birth at `replicate n (KFree 0)` is honest only because the
   one caller passes `0`; if a future birth passes `n > 0` the "events" are
   fictitious.  Worth a comment, not a guard.
+
+## 7. As landed (2026-09-28)
+
+- **Files.**  New `iris/KallocEv.v` (pure; after `PageGeom.v` in
+  `_CoqProject`); changed `Xv6Cameras.v` (the oneshot camera is the
+  product `prodR (optionUR (csumR (exclR unitO) (agreeR unitO)))
+  (optionUR (agreeR gnameO))`, `kallocG` gains `inG Σ (mono_listR
+  (leibnizO kev))`), `KallocInv.v`, `SpecKalloc.v`, `SpecKfree.v`,
+  `ProofKalloc.v`, `ProofKfree.v`.  Nothing else: 6 files changed, +332
+  / -52, plus the 152-line pure file.  Not one of the twenty-two call
+  sites, nor `FsCfgSnap`'s birth, nor `SpecKinit`, moved.
+- **Names.**  `kalloc_ledname γk γe` (persistent, `kalloc_ledname_agree`);
+  `led_auth γe h` / `led_lb γe h` with `led_auth_lb`, `led_lb_prefix`,
+  `led_lb_lb`, `led_auth_grow`; `led_receipt γk h e := ∃ γe, kalloc_ledname
+  γk γe ∗ led_lb γe (h ++ [e])`; `kmem_ledger γk npages := ∃ γe h,
+  kalloc_ledname γk γe ∗ led_auth γe h ∗ ⌜(npages + allocs h = frees
+  h)%nat⌝` (the `%nat` because `KallocInv` opens `Z_scope`);
+  `kmem_avail_auth γk n := (ghost_var … ∨ kalloc_sealed …) ∗ kmem_ledger
+  γk n`.  The ghost steps `kmem_avail_dec γk on act npages`,
+  `kmem_avail_null γk on act` (new: the null arm's append),
+  `kmem_avail_inc γk on act npages`, `kmem_res_push γk fl p oldhead pages
+  on act` (the actor LAST, so the one call site changed by one term).
+  Posts `kalloc_post_led γk on act r := ∃ h, led_receipt γk h (kev_of act
+  r) ∗ ⌜r = nullp <-> pool_empty h⌝ ∗ kalloc_post γk on r` and
+  `kfree_post_led γk on act := ∃ h, led_receipt γk h (KFree act) ∗
+  kalloc_avail γk (avail_inc on)`, with `kalloc_post_led_post` /
+  `kfree_post_led_avail` the drops.  Contracts `wp_kalloc_led_sconf_body`
+  / `wp_kfree_led_sconf_body` (the landed bodies with the post line
+  swapped; the actor is the body's own `p` / `pcur`, the `cpu_own` proc
+  word), `Parameter wp_kalloc_led_sconf` / `wp_kfree_led_sconf` in
+  `KALLOC` / `KFREE`; the functors prove the led forms and derive the
+  landed ones in ten lines each.
+- **Birth.**  `kalloc_avail_alloc n` (statement unchanged) allocates the
+  list at `replicate n (KFree nullp)`; the one caller passes `0`.
+- **Gate.**  A clean whole-tree build (every `.vo` wiped first, because a
+  first gate had run beside a surviving child of a killed one): 1755
+  files, 0 errors, 16 minutes at `-j32`; audits system 13, tree 13,
+  union 14.  `ProofKinit` and `FsCfgKits`, which spell
+  `kmem_avail_auth`, compiled untouched, which is the additivity check.
+- **What a consumer does next.**  A call site that wants the receipt
+  switches from `X.wp_kalloc_sconf` to `X.wp_kalloc_led_sconf` (same
+  arguments) and destructs `kalloc_post_led` as `(%h & #Hrcpt & %Hdet &
+  Hpost)`; `Hpost` is the old post verbatim.  Nobody does yet: the first
+  consumer is NI-STRONG-INSTANCE (D6), then M2's export.
+
