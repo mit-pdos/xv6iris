@@ -143,7 +143,7 @@ Section AppFileCons.
            file_pred c r v ∗ cons_key (fn_cons r)
            ∗ (⌜cons_absent v⌝ ∨ file_taint c)).
   Proof using .
-    iDestruct (echo_cons_abs_law c.1 (fn_cons r)) as "#Hl".
+    iDestruct (echo_cons_abs_law (ff_echo c) (fn_cons r)) as "#Hl".
     iIntros "!>" (v) "Hk Hp".
     iDestruct (file_pred_cons c r v with "Hp") as "[He Hback]".
     iDestruct ("Hl" $! v with "Hk He") as "(He & Hk & Hc)".
@@ -157,7 +157,7 @@ Section AppFileCons.
            □ (∀ v : aview, file_pred c r v -∗
                 file_pred c r v ∗ (⌜cons_absent v⌝ ∨ file_taint c))).
   Proof using .
-    iDestruct (echo_cons_never_law c.1 (fn_cons r)) as "#Hl".
+    iDestruct (echo_cons_never_law (ff_echo c) (fn_cons r)) as "#Hl".
     iIntros "!> #Hn". iDestruct ("Hl" with "Hn") as "#Hl'".
     iIntros "!>" (v) "Hp".
     iDestruct (file_pred_cons c r v with "Hp") as "[He Hback]".
@@ -173,7 +173,7 @@ Section AppFileCons.
   Proof using .
     iIntros "Hk Hp".
     iDestruct (file_pred_cons c r av with "Hp") as "[He Hback]".
-    iMod (echo_cons_seal_step c.1 (fn_cons r) av with "Hk He") as "[He Hc]".
+    iMod (echo_cons_seal_step (ff_echo c) (fn_cons r) av with "Hk He") as "[He Hc]".
     iModIntro. iSplitL "He Hback"; [ iApply ("Hback" with "He") | ].
     rewrite /file_taint. iExact "Hc".
   Qed.
@@ -186,7 +186,7 @@ Section AppFileCons.
   Proof using .
     intros Hpr. iIntros "Hp".
     iDestruct (file_pred_cons c r av with "Hp") as "[He Hback]".
-    iMod (echo_cons_shoot c.1 (fn_cons r) av i Hpr with "He") as "[He Hc]".
+    iMod (echo_cons_shoot (ff_echo c) (fn_cons r) av i Hpr with "He") as "[He Hc]".
     iModIntro. iSplitL "He Hback"; [ iApply ("Hback" with "He") | ].
     rewrite /file_taint. iExact "Hc".
   Qed.
@@ -245,7 +245,7 @@ Section AppFileCons.
   Proof using .
     intros Hpre. iIntros "Hk Hp".
     iDestruct (file_pred_split c r av with "Hp") as "[He Hres]".
-    iDestruct (echo_cons_mknod c.1 (fn_cons r) av ents nl i Hpre
+    iDestruct (echo_cons_mknod (ff_echo c) (fn_cons r) av ents nl i Hpre
                  with "Hk He") as "He".
     iApply (file_pred_join c r _ with "He").
     iDestruct "Hres" as "[#Ht | [%Hp Hf]]"; [ by iLeft | ].
@@ -434,7 +434,7 @@ Section AppFileCons.
     iIntros "#[Hf | HT]"; last first.
     { iIntros "!>" (v) "Hp". iFrame "Hp". by iRight. }
     destruct jo as [j |]; iEval (rewrite /cons_flag) in "Hf"; cbn [cons_fact].
-    - iDestruct (echo_cons_law c.1 (fn_cons r) j with "Hf") as "#Hl".
+    - iDestruct (echo_cons_law (ff_echo c) (fn_cons r) j with "Hf") as "#Hl".
       iIntros "!>" (v) "Hp".
       iDestruct (file_pred_cons c r v with "Hp") as "[He Hback]".
       iDestruct ("Hl" $! v with "He") as "[He Hc]".

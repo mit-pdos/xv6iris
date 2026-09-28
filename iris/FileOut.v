@@ -104,7 +104,7 @@ Record file_gn := MkFileGn {
   fgn_era : gname;        (* ghost_map nat file_era: the era's BOOT STATE *)
 }.
 
-Definition fgn_echo (g : file_gn) : echo_fixed := fst (fgn_cl g).
+Definition fgn_echo (g : file_gn) : echo_fixed := ff_echo (fgn_cl g).
 
 Record file_era := MkFEra {
   fe_f0 : gname;   (* mono_list fstate: the era's BOOT STATE, filed by <init>
@@ -727,11 +727,14 @@ Section file_birth.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,
             !fileOutG Σ}.
 
-  Lemma file_birth_all : ⊢ |==> ∃ g : file_gn, file_cl_all g.
+  (* handed the machine's started counter's name, which the fixed part
+     keeps ([AppFile.file_birth]) *)
+  Lemma file_birth_all (γst : gname) :
+    ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g.
   Proof using .
-    iMod file_birth as (c) "Hc".
+    iMod (file_birth γst) as (c) "[%Hst Hc]".
     iMod (ghost_map_alloc (∅ : gmap nat file_era)) as (ge) "[Hm _]".
     iModIntro. iExists (MkFileGn c ge). rewrite /file_cl_all /=.
-    iFrame "Hc Hm".
+    iSplitR; [done |]. iFrame "Hc Hm".
   Qed.
 End file_birth.

@@ -170,6 +170,17 @@ Definition unionΣ : gFunctors :=
    ; UkCatFIface.cifRegΣ   (* the producer's registry                      *)
    ].
 
+(* THE FILE APPLICATION'S CAMERAS AT [unionΣ], BUILT BY HAND (sync
+   SY3-A3bc, design 4.5 ruling (i)): [AppFile.fileAppG]'s two non-instance
+   fields are chosen here, once.  [fa_st] is the MACHINE's [mono_natG]
+   ([RiscvAdequacy.riscv_pre_genGS]), so the durable copy's certificate
+   [◯ ff_st k] is at the instance the started counter lives at (A1's
+   [Hgenfix]: [riscvF_genGS = riscv_pre_genGS]); [fa_pos] is echo's
+   [ghost_varG nat] ([EchoOut.eo_turn]) -- the instance [AppFile.fpos] was
+   read at before the field existed. *)
+Global Instance union_fileAppG : fileAppG unionΣ :=
+  fileAppG_of (Σ := unionΣ) _ riscv_pre_genGS eo_turn.
+
 Corollary union_adequacy_unionΣ
     (Hprog : union_prog_law (Σ := unionΣ))
     (g : gstate)
