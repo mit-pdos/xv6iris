@@ -54,6 +54,7 @@ DEVIATIONS from Rocq.
   the file that reuses `indBytes` as the `addrs` field encoder.
 -/
 import Xv6.BlockWords
+import MachCSL.ByteWord2
 
 namespace Xv6
 
@@ -92,11 +93,6 @@ theorem getElem?_append_lt {α : Type _} (l r : List α) (n i : Nat) (h : l.leng
 
 /-! ## The encoding -/
 
-/-- One 16-bit field, little-endian (the `MachCSL.wordToBytes4` pattern at
-two bytes instead of four; Rocq's `half_bytes`). -/
-def halfBytes (w : BitVec 16) : List (BitVec 8) :=
-  [nthByte (n := 2) w 0, nthByte (n := 2) w 1]
-
 /-- The 64 bytes of one on-disk inode (Rocq's `dinode_bytes`). -/
 def dinodeBytes (d : Dinode) : List (BitVec 8) :=
   halfBytes d.diType ++ halfBytes d.diMajor ++ halfBytes d.diMinor ++
@@ -119,8 +115,6 @@ theorem diblkBytes_cons (d : Dinode) (ds : List Dinode) :
     diblkBytes (d :: ds) = dinodeBytes d ++ diblkBytes ds := rfl
 
 /-! ## One record: length, and the six field readings -/
-
-theorem halfBytes_length (w : BitVec 16) : (halfBytes w).length = 2 := rfl
 
 theorem halfBytes_lookup (w : BitVec 16) (j : Nat) (hj : j < 2) :
     (halfBytes w)[j]? = some (nthByte (n := 2) w j) := by

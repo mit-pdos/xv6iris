@@ -26,7 +26,7 @@ cells at `sp₀-72`, `sp₀-64`, `sp₀-56`; the cell at `sp₀-80` is unused.
    list-based).  Rocq's `fst_pa_*` / `fst_aligned8_aligned2*` /
    `fst_nth_byte*` / `fst_bytes_w4` / `fst_bytes_w2` are the address and
    alignment arithmetic inside these (`MachCSL.ByteWord4`,
-   `DinodeSlot.wordPointsTo_of_bytes2`, `fstat_half_any`).
+   `MachCSL.wordPointsTo_of_bytes2`, `fstat_half_any`).
 2. The frame is `fstatFrame` (the four eager cells, the two lazy ones and
    the unused bottom cell) + the three buffer cells; no MachCSL frame
    covers this layout, so the two rules are proved here, by copy of

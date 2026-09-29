@@ -120,6 +120,7 @@ import MachCSL.LockBornHook
 import MachCSL.LockPayIff
 import MachCSL.WpStoreOrd
 import MachCSL.BigSepLib
+import MachCSL.ByteWord2
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeDivRem
 import MachCSL.WpStoreFree4
