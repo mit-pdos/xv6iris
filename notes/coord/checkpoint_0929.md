@@ -18,6 +18,7 @@ Next after these: Union* (UnionOut/Links/LinkInst/ReadInst; needs U1-F + UShLine
 Pending user decision: Zkr CSR 0x747/0x757 (Sail one-line currentlyEnabled(Ext_Zkr) clause in regen
 script, vs backend &&-fix) — the last hypothesis (hZkr) on the USER-free final theorem.
 
-New lanes Sept 29: P-echo (lane-pecho; UkEchoTree/UEcho*; also drop HS/HP args from UkConsOut/UkReadCons/UkWriteLeaf), R-sh (lane-rsh; UShLine… UShExecPin).
+New lanes Sept 29: P-echo LANDED 38812aaaa (UkTreeEntry echo entries wait on ExecEntry+UShEcho), R-sh (lane-rsh; UShLine… UShExecPin).
 Still to start in U3: R-prog, R-pipes, R-round, I-init (after H-file/H-pipe, U1-F, R-sh); then Union* (U1-P rest), U4 top.
 land.sh: `postpush` mode redoes the main-tree ff + seed after a manual push; fetch/push retry (GitHub ssh auth flaky Sept 29).
+Union* lane (lane-u1punion) started Sept 29 after U1-F.
