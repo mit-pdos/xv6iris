@@ -17,17 +17,12 @@ the union discipline: a disciplined history never ends in ^D, so
 
 1. **Scope: the reached declarations** (UnionReadInstAt 17/18).  Not ported
    (unreached): `union_read_inst_at_disc`.
-2. **`UShLine` is not ported yet** (lane R-sh).  What this file reads of it is
-   taken in Rocq's exact shape:
-   * `ush_dirty_law` (a `Definition … : Prop`) is restated verbatim as
-     `ushDirtyLawStmt L γ` (same body; replace by R-sh's `ushDirtyLaw` when it
-     lands), and `union_dirty_law` proves it at the indexed record;
-   * `ush_rd_x_at`, `ush_mid_at` (definitions) are the parameters `ushRdXAt`,
-     `ushMidAt` of `union_read_leaf_holds_at`, and the lemma
-     `ush_read_recv_leaf_holds_at` is its parameter `hleaf`, stated over them
-     in the shape of R-sh's in-flight `UshLineRead.ushReadRecvLeafHoldsAt UL`
-     (so the discharge is `hleaf := ushReadRecvLeafHoldsAt UL`, `ushRdXAt` /
-     `ushMidAt` := R-sh's defs, and `ushDirtyLawStmt` := `ushDirtyLaw`).
+2. **UShLine is R-sh's port** (`Xv6/UshLineDefs.lean`, `Xv6/UshLineRead.lean`):
+   `ush_dirty_law` is `ushDirtyLaw` (`union_dirty_law` proves it at the
+   indexed record), `ush_rd_x_at` / `ush_mid_at` are `ushRdXAt` / `ushMidAt`,
+   and `ush_read_recv_leaf_holds_at` is `ushReadRecvLeafHoldsAt UL` (the
+   engine `UL : UK_LEAVES` is DU2's parameter, so `union_read_leaf_holds_at`
+   takes it first).
    `UkSh`'s pieces are landed (`Xv6/UshMainDefs.lean`): `ush_read_recv_leaf_at`
    is `ushReadRecvLeafAt N X …` with Rocq's section variables `γp`/`T`/`Pm`
    the `UshCtx` fields (pinned by `hT`/`hPm`, R-sh's form), `ush_tag_law(_at)`
@@ -50,6 +45,7 @@ import Xv6.UnionReadInst
 import Xv6.UnionLinkInstAt
 import Xv6.UshMainDefs
 import Xv6.UshMainLine
+import Xv6.UshLineRead
 import Xv6.UexecExecInst
 import Xv6.AppInv
 
@@ -141,18 +137,6 @@ section UnionReadLeafAt
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg] [Appcfg GF]
 
-/-- Rocq `UShLine.ush_dirty_law`, restated verbatim (deviation 2): a marked
-ring at a lease holder's own position hands back the dirty credential and
-where a byte the call took came from; the era answers that with its taint. -/
-def ushDirtyLawStmt (L : LinkRec hlc GF) (γ : EchoGn) : Prop :=
-  ∀ (I : List (BitVec 8)) (v : EraPins) (sl : List (List Obs × BitVec 8)) (p : Nat)
-    (h : List Obs) (b : BitVec 8),
-    consChain sl → I.length ≤ p → sl[p]? = some (h, b) → obsEndsIn .uart0 h b →
-    obsBoots h = genId (hlc := hlc) (GF := GF) + 1 →
-    ⊢ consStoredLb fscCons sl -∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗
-      eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v -∗ inpLb v I -∗ L.lkRres v I -∗
-      rposAuth v I.length -∗ consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) -∗ L.lkT
-
 /-- The record's pin names the era (Rocq `union_pin_refl_at`). -/
 theorem union_pin_refl_at (ug : UnionGn) (s0 : Fstate) (v : EraPins) :
     ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
@@ -187,7 +171,7 @@ theorem union_dirty_law (ug : UnionGn)
     (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate)
     (hstw : ⊢ appSup (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
     (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug) :
-    ushDirtyLawStmt (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) (fgnEcho ug.ugnFile) := by
+    ushDirtyLaw (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) (fgnEcho ug.ugnFile) := by
   intro I v sl p h b hch hp hsl hend hbt
   show ⊢ consStoredLb fscCons sl -∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗
     eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ inpLb v I -∗
@@ -294,40 +278,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- SH'S READ LEAF AT THE INDEXED RECORD (Rocq `union_read_leaf_holds_at`):
-`UShLine.ush_read_recv_leaf_holds_at` at the union's read record, its
-marked-arm law discharged by `union_dirty_law`.  The UShLine pieces are
-parameters (deviation 2), in the shape of R-sh's Lean port
-(`UshLineRead.ushReadRecvLeafHoldsAt`, its engine `UL` applied: the shell
-context `X` with `X.T`/`X.Pm` pinned, `SG := uexecSGXv6`, any `PS`). -/
-theorem union_read_leaf_holds_at (ug : UnionGn)
+`UShLine.ush_read_recv_leaf_holds_at` (`UshLineRead.ushReadRecvLeafHoldsAt`,
+at the engine `UL`) at the union's read record, its marked-arm law
+discharged by `union_dirty_law`. -/
+theorem union_read_leaf_holds_at (UL : UK_LEAVES) (ug : UnionGn)
     (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate)
-    (ushRdXAt : (EraPins → List (BitVec 8) → IProp GF) → EchoGn → (List (BitVec 8) → IProp GF) →
-      Nat → IProp GF)
-    (ushMidAt : (EraPins → List (BitVec 8) → IProp GF) → EchoGn → GName → List (BitVec 8) →
-      IProp GF)
-    (hleaf : ∀ {L : LinkRec hlc GF} (R : ReadRec L) (γ : EchoGn) (Wb : List (BitVec 8) → IProp GF)
-      (N : UkNames GF) (X : UshCtx GF) (l : List FdState),
-      X.T = L.lkT → X.Pm = ushMidAt L.lkRres γ X.γp →
-      N.pay = uconsPay (hlc := hlc) fscCons X.γp L.lkT (ushRdXAt L.lkRres γ Wb) →
-      (⊢ L.lkT -∗ appRdcred (hlc := hlc) (GF := GF)) →
-      ushDirtyLawStmt L γ →
-      (∀ v : EraPins, ⊢ eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v -∗
-        L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v) →
-      (⊢ L.lkLinks) →
-      ⊢ ushReadRecvLeafAt (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) N X R.rkDisc fscCons l)
     (Wb : List (BitVec 8) → IProp GF) (N : UkNames GF) (X : UshCtx GF) (l : List FdState)
     (hT : X.T = (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT)
-    (hPm : X.Pm = ushMidAt (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres
+    (hPm : X.Pm = ushMidAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres
       (fgnEcho ug.ugnFile) X.γp)
     (hpeq : N.pay = uconsPay (hlc := hlc) fscCons X.γp
       (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT
-      (ushRdXAt (unionLinkInstAt ug s0).lkRres (fgnEcho ug.ugnFile) Wb))
+      (ushRdXAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres (fgnEcho ug.ugnFile) Wb))
     (hstw : ⊢ appSup (GF := GF) -∗ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT)
     (htsw : ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT -∗ appRdcred (hlc := hlc) (GF := GF))
     (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug)
     (hlk : ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLinks) :
     ⊢ ushReadRecvLeafAt (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) N X (lmDiscInput ulmG) fscCons l :=
-  hleaf (unionReadInstAt ug htag s0) (fgnEcho ug.ugnFile) Wb N X l hT hPm hpeq htsw
+  ushReadRecvLeafHoldsAt UL (unionReadInstAt ug htag s0) (fgnEcho ug.ugnFile) Wb N X l hT hPm hpeq htsw
     (union_dirty_law ug htag s0 hstw hrdw) (fun v => union_pin_refl_at ug s0 v) hlk
 
 end UnionReadLeafHolds
