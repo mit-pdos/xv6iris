@@ -57,8 +57,8 @@ userret).
    `sstateen0` are `↦ᵣ□` in `hwConfig` (as Rocq); `medeleg`/`menvcfg` are
    held at `C.dqc` (the kernel's `confCells` owns them at `1`, and `loopOk`
    pins `dqc = 1`; Rocq has `medeleg ↦ᵣ□` because its `hart_csrs` also
-   claimed it, which Lean's does not), `mcounteren` exclusively at the
-   kernel's value `2` (Rocq's persistent `TimerCap.sstc_enabled`).
+   claimed it, which Lean's does not), `mcounteren` exclusively at SOME value
+   with `TM` set (Rocq's persistent `TimerCap.sstc_enabled`).
 5. **The TLB fact** is `utlbOk` (below), the user-leaf generalisation of
    MachCSL's kernel-leaf `tlbOk`: every resident slot caches, up to `A`/`D`,
    a leaf the user tree's walk reaches.  userret's `sfence.vma` leaves the
@@ -195,12 +195,45 @@ def uRegs (cpu : CPU) (hs : HartState) (ms sc stv sep va va' : BitVec 64) (g : R
 
 /-- **The configuration cells the user tier reads but never writes, held
 exclusively** (deviation 1; the frozen ones are `hwConfig`): the cells the
-kernel wrote during boot and never after -- `mcounteren` at the kernel's
-value, the timer compares the clock tick reads, and `mepc` (carried for the
-kernel's `kConf`). -/
+kernel wrote during boot and never after -- `mcounteren` with `TM` set (the
+rest of it is power-on garbage: `timerinit` ORs `TM` in, Rocq
+`TimerCap.sstc_enabled`), the timer compares the clock tick reads (`mtimecmp`
+at its power-on value, never written), and `mepc` (carried for the kernel's
+`kConf`). -/
 def userHwCells (cpu : CPU) : IProp GF := iprop%
-  Register.mcounteren ↦ᵣ[cpu] 2#32 ∗ Register.mtimecmp ↦ᵣ[cpu] 0xFFFFFFFFFFFFFFFF#64 ∗
+  ∃ (mc : BitVec 32) (mtc : BitVec 64), ⌜BitVec.extractLsb' 1 1 mc = 1#1⌝ ∗
+  Register.mcounteren ↦ᵣ[cpu] mc ∗ Register.mtimecmp ↦ᵣ[cpu] mtc ∗
   ∃ mepc stc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc ∗ Register.stimecmp ↦ᵣ[cpu] stc
+
+/-- **The PMP cells of a user machine** (Rocq `strans_inv`'s `∃ pcfg paddr,
+⌜pmp_ent0_ok pcfg paddr⌝`): xv6's entry 0, the other entries whatever
+`start()` left (`MachCSL.pmpEnt0Ok`). -/
+def userPmp (cpu : CPU) : IProp GF := iprop%
+  ∃ (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64), ⌜pmpEnt0Ok cfg paddr⌝ ∗
+  Register.pmpcfg_n ↦ᵣ[cpu] cfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] paddr
+
+theorem userHwCells_intro (cpu : CPU) (mc : BitVec 32) (mtc mepc stc : BitVec 64)
+    (htm : BitVec.extractLsb' 1 1 mc = 1#1) :
+    Register.mcounteren ↦ᵣ[cpu] mc ∗ Register.mtimecmp ↦ᵣ[cpu] mtc ∗ Register.mepc ↦ᵣ[cpu] mepc ∗
+      Register.stimecmp ↦ᵣ[cpu] stc ⊢ userHwCells (GF := GF) cpu := by
+  iintro ⟨H1, H2, H3, H4⟩
+  unfold userHwCells
+  iexists mc, mtc
+  isplitr
+  · ipureintro; exact htm
+  iframe H1 H2
+  iexists mepc, stc
+  iframe H3 H4
+
+theorem userPmp_intro (cpu : CPU) (cfg : Vector (BitVec 8) 64) (paddr : Vector (BitVec 64) 64)
+    (h0 : pmpEnt0Ok cfg paddr) :
+    Register.pmpcfg_n ↦ᵣ[cpu] cfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] paddr ⊢ userPmp (GF := GF) cpu := by
+  iintro ⟨H1, H2⟩
+  unfold userPmp
+  iexists cfg, paddr
+  isplitr
+  · ipureintro; exact h0
+  iframe H1 H2
 
 /-- **Rocq `user_cfg`**: the loop-constant config cells at the fraction
 `C.dqc` (never written during user execution), and the frozen cells
@@ -215,8 +248,7 @@ user root, the PMP cells, the TLB sound for the tree) and the address space
 (the tree owned, representing the table's leaves; every user page's bytes at
 the view `M`), with the table's pure facts. -/
 def userPtInv [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗
-  Register.pmpcfg_n ↦ᵣ[cpu] xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] xv6Pmpaddr ∗
+  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
   ⌜uptWf P⌝ ∗
   ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗

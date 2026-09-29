@@ -340,12 +340,12 @@ theorem ustTrapped_trapS {s : UWSt} (h : UstLand C P t0 mm0 s) (sc stv sep : Bit
 /-- The entry state is a user landing (`uf_open`'s facts). -/
 theorem ustUserAt_s0 (v : UfVals) (mm : BMap) (hu : UfUser v) (hwf : UbMemWf P t0 mm)
     (htlb : utlbOk t0 v.tlb) : UstUserAt C P t0 mm (ustS0 C P v mm) :=
-  ⟨hwf, ufCfg_file C P v, rfl, hu.1, hu.2.1, hu.2.2, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
+  ⟨hwf, ufCfg_file C P v hu.2.2.2, rfl, hu.1, hu.2.1, hu.2.2.1, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
 
 /-- The entry state of an ACTIVE hart is an active user machine. -/
 theorem ustLand_s0 (v : UfVals) (mm : BMap) (hu : UfUser v) (ha : v.hs = .HART_ACTIVE ())
     (hwf : UbMemWf P t0 mm) (htlb : utlbOk t0 v.tlb) : UstLand C P t0 mm (ustS0 C P v mm) :=
-  ⟨hwf, ufCfg_file C P v, rfl, hu.2.1, ha, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
+  ⟨hwf, ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, ha, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
 
 /-- The decoder's reference registers, off a user file (for
 `uc_runRW_of_runRead`). -/

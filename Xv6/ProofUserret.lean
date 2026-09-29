@@ -42,18 +42,18 @@ theorem userret_a0_get (cpu : CPU) (regs : RegMap) (v : BitVec 64) (h : regs 10#
 set_option maxHeartbeats 4000000 in
 /-- **The run under the user table**, from `+0xac` to the user machine:
 `li`, the three load runs, the exit, over any file. -/
-theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitVec 64)
-    (hsm : smFacts ms false) (hspp : BitVec.extractLsb' 8 1 ms = 0#1) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
+theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitVec 64) (lf : SLeft)
+    (hsm : smFacts ms false) (hlf : lf.ok) (hspp : BitVec.extractLsb' 8 1 ms = 0#1) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
     (hv : pageValid (pageAddr P.tfp)) (R : RegMap) (ws : List (BitVec 64)) (epc : BitVec 64) :
-    kernelText ∗ kmapStatic ∗ urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc) P (urPc 0xac#64) R ∗
+    kernelText ∗ kmapStatic ∗ urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
     tfPageAt P.tfp ws ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User
-          { sConfOf KTier.kpt P.root ms mdl mepc stc with
-            mstatus := sretMs (sConfOf KTier.kpt P.root ms mdl mepc stc).mstatus } -∗
+          { sConfOf KTier.kpt P.root ms mdl mepc stc lf with
+            mstatus := sretMs (sConfOf KTier.kpt P.root ms mdl mepc stc lf).mstatus } -∗
         clockCells cpu -∗ pcIs cpu (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ uptSlot cpu P -∗ ctxTok cpu curCtx -∗
         gprFile cpu (tfResumeGpr0 ws) -∗ Register.sepc ↦ᵣ[cpu] epc -∗ tfPageAt P.tfp ws -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc P rfl hsm hmdl
+  have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
   iintro ⟨#Htext, #HS, Hst, Hpage, Hsepc, HΦ⟩
   iapply (userret_li cpu _ P hc R)
   iframe Htext HS Hst
@@ -100,7 +100,7 @@ theorem userret_proof : USERRET :=
   icases kctx_image _ _ $$ Hk with ⟨⟨#Htext, _, #HS⟩, Hk⟩
   icases kctx_cases _ _ $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, _, Hcpu, Htok, Hclock, #Hro⟩
   icases kConf_cases cpu KTier.kpt root false true false $$ HConf with
-    ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+    ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   obtain ⟨hspie', hspp'⟩ := hsr rfl
   simp only [ite_true, Bool.false_eq_true, ite_false] at hspie' hspp'
   unfold transSlot
@@ -112,20 +112,20 @@ theorem userret_proof : USERRET :=
   icases Hppt with ⟨%hwfP, Hfr, Hum⟩
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   -- the switch
-  iapply (userret_entry cpu root P ms mdl mepc stc hsm hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0))
+  iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0))
   iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF
   isplitl [Hfr]
   · unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
   inext
   iintro Hst
   -- the run under the user table
-  iapply (userret_user_run cpu P ms mdl mepc stc hsm hspp' hmdl hv (tpPin cpu regs) ws sep)
+  iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep)
   iframe Htext HS Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged
-  ihave HU := userret_user_state cpu P M ms mdl mepc stc (sep &&& 0xFFFFFFFFFFFFFFFE#64) sep sc tv hmdl
-    (tfResumeGpr0 ws) hwfP $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum]
+  ihave HU := userret_user_state cpu P M ms mdl mepc stc (sep &&& 0xFFFFFFFFFFFFFFFE#64) sep sc tv lf hmdl
+    (tfResumeGpr0 ws) hwfP hlf $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum]
   · iframe
   icases HU with ⟨HU, Hpt, Hcfg⟩
   iapply HΦ $$ %(userretUcfg mdl hmdl) %(sretMs ms)

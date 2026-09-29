@@ -74,15 +74,15 @@ theorem wpLoop_k_memX [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc i _ _ fun hpc _ => by
   have hsp' := fun v => KCtx.withRegs_sp k (R' v) (hsp v)
-  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc iprop(instr pc is_rvc i ∗ P ∗
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf iprop(instr pc is_rvc i ∗ P ∗
         ▷ wpNext k.sie k.proc cpu (fun cpu' =>
           iprop(∀ v : X, kctxL lent cpu' (k.withRegs (R' v)) -∗ pcIs cpu' npc -∗ Q cpu' v -∗
             wpLoop cpu'))) := by
-    intro cpu' ms mdl mepc stc hpin hwf hkt hsm hsr hmdl
-    have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc k.sie hsm
+    intro cpu' ms mdl mepc stc lf hpin hwf hkt hsm hsr hmdl hlf
+    have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc lf k.sie hsm hlf
     rw [hkt] at hok
     unfold normalStep
     iintro ⟨#HI, HP, HΦ⟩ HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok #Hro Htc
@@ -117,7 +117,7 @@ theorem wpLoop_k_memX [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
-    ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+    ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     iapply HΦ' $$ %v [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
     iapply (kctx_intro' cpu' (k.withRegs (R' v)) ((KCtx.wf_withRegs k (R' v)).mpr hwf))
     simp only [KCtx.withRegs_regs, KCtx.withRegs_sie, KCtx.withRegs_spie, KCtx.withRegs_spp, KCtx.withRegs_avail,

@@ -49,20 +49,19 @@ def uptSlot [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF := iprop%
 /-- `userPtInv` is the slot, the translation cells and the user pages. -/
 theorem userPtInv_uptSlot [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
     userPtInv (GF := GF) cpu P M ⊣⊢
-      Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗
-      Register.pmpcfg_n ↦ᵣ[cpu] xv6Pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] xv6Pmpaddr ∗
+      Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
       ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M := by
   unfold userPtInv uptSlot
   constructor
-  · iintro ⟨Hs, Hc, Ha, %hwf, %t, %ht, Ho, Htlb, Hum⟩
-    iframe Hs Hc Ha Hum
+  · iintro ⟨Hs, Hp, %hwf, %t, %ht, Ho, Htlb, Hum⟩
+    iframe Hs Hp Hum
     isplit
     · ipureintro; exact hwf
     iexists t
     iframe Ho Htlb
     ipureintro; exact ht
-  · iintro ⟨Hs, Hc, Ha, %hwf, ⟨%t, %ht, Ho, Htlb⟩, Hum⟩
-    iframe Hs Hc Ha
+  · iintro ⟨Hs, Hp, %hwf, ⟨%t, %ht, Ho, Htlb⟩, Hum⟩
+    iframe Hs Hp
     isplit
     · ipureintro; exact hwf
     iexists t

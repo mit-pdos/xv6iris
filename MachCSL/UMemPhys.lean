@@ -234,7 +234,7 @@ theorem uma_check_pma (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa
 theorem uma_pmp (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64) (w : Nat)
     (hram : inRam pa w) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) :
     runRW D orc s (pmpCheck (.Physaddr pa) w acc .User) = some (none, s, orc) :=
-  utr_pmpCheck_xv6_U D orc s pa w hp.pins.dpmpc hp.pins.dpmpa hp.pins.pmpc hp.pins.pmpa acc hacc
+  utr_pmpCheck_xv6_U D orc s pa w hp.pins.dpmpc hp.pins.dpmpa hp.pins.pmp0 acc hacc
     (pmpOk_of_inRam hram)
 
 /-- The PMP-first check (the SC-failure arm's): both pass. -/

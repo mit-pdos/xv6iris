@@ -44,8 +44,8 @@ theorem uft_pins_land {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s : UWSt}
     (h : UstLand C P t0 mm0 s) : UftPins ufFoot s :=
   ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.priv,
    ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide),
-    ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.cfg.hw _ _ rfl, h.cfg.menvcfg, h.cfg.pmpcfg,
-    h.cfg.pmpaddr, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl⟩⟩
+    ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.cfg.hw _ _ rfl, h.cfg.menvcfg,
+    h.cfg.lok.2, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl⟩⟩
 
 /-- A fetch fault is a user exception (delegated to S). -/
 theorem userExc_of_uftExc (e : ExceptionType) (h : uftExc e) : userExc e = true := by

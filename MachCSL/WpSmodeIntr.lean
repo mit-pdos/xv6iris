@@ -70,10 +70,10 @@ theorem sretFacts_pinned (ms : BitVec 64) (spie spp : Bool) (h : sretFacts ms fa
   rw [h5, h8]
   cases spie <;> cases spp <;> decide
 
-theorem sConfOf_setMs (tier : KTier) (root : BitVec 44) (ms ms' mdl mepc stc : BitVec 64) :
-    { (sConfOf tier root ms mdl mepc stc) with mstatus := ms' } = sConfOf tier root ms' mdl mepc stc := rfl
-@[simp] theorem sConfOf_mstatus (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) :
-    (sConfOf tier root ms mdl mepc stc).mstatus = ms := rfl
+theorem sConfOf_setMs (tier : KTier) (root : BitVec 44) (ms ms' mdl mepc stc : BitVec 64) (lf : SLeft) :
+    { (sConfOf tier root ms mdl mepc stc lf) with mstatus := ms' } = sConfOf tier root ms' mdl mepc stc lf := rfl
+@[simp] theorem sConfOf_mstatus (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
+    (sConfOf tier root ms mdl mepc stc lf).mstatus = ms := rfl
 
 /-! ## The contexts across the flips -/
 
@@ -157,10 +157,10 @@ theorem wp_s_csrci_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
           sieArm cpu' k.sie k.proc -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ fun hpc _ => by
-  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc iprop(
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf iprop(
         instr pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx 0#5, csrop.CSRRC)) ∗
         ▷ wpNext k.sie k.proc cpu (fun cpu' =>
           iprop(∀ spie : Bool, ∀ spp : Bool, ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
@@ -170,7 +170,7 @@ theorem wp_s_csrci_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     unfold normalStep
     iintro ⟨#HI, HΦ⟩ HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok #Hro Htc
     simp only [hkt]
-    have hexec := (execSpecF_csrci_sstatus_x0 (GF := GF) cpu' (sConfOf curTier k.root ms mdl mepc stc) k.sie
+    have hexec := (execSpecF_csrci_sstatus_x0 (GF := GF) cpu' (sConfOf curTier k.root ms mdl mepc stc lf) k.sie
       hok.phys pc (pc + instrLen is_rvc) (tpPin cpu' k.regs)).frameL (transTok cpu' curTier k.root)
     iapply (wpLoop_s_instr cpu' _ _ curTier k.root k.sie hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
     iframe HI HmConf Hclock Hpc HF
@@ -186,7 +186,7 @@ theorem wp_s_csrci_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
     simp only [sConfOf_setMs, sConfOf_mstatus]
     ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
-      mdl mepc stc ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl⟩ $$ HmConf
+      mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
     have hpure : k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp := fun hs => by
       rw [hs] at hsr; exact sretFacts_pinned ms k.spie k.spp hsr
     iapply HΦ' $$ %(spieOf ms) %(sppOf ms) %hpure [HConf HF Hstack Htrans Hcpu Htok Hclock] Hpc Harm
@@ -238,10 +238,10 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     ⊢ wpLoop cpu :=
   instr_pure_elim pc is_rvc _ _ _ fun hpc _ => by
   obtain ⟨hrd0, hrdsp, hrdtp⟩ := hrd
-  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc iprop(
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf iprop(
         instr pc is_rvc (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) ∗
         ▷ wpNext k.sie k.proc cpu (fun cpu' =>
           iprop(∀ spie : Bool, ∀ spp : Bool, ∀ v : BitVec 64,
@@ -252,7 +252,7 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     unfold normalStep
     iintro ⟨#HI, HΦ⟩ HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok #Hro Htc
     simp only [hkt]
-    have hexec := (execSpecF_csrrci_sstatus_flip (GF := GF) cpu' (sConfOf curTier k.root ms mdl mepc stc) k.sie
+    have hexec := (execSpecF_csrrci_sstatus_flip (GF := GF) cpu' (sConfOf curTier k.root ms mdl mepc stc lf) k.sie
       hok.phys pc (pc + instrLen is_rvc) rd hrd0 (tpPin cpu' k.regs)).frameL (transTok cpu' curTier k.root)
     iapply (wpLoop_s_instr cpu' _ _ curTier k.root k.sie hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
     iframe HI HmConf Hclock Hpc HF
@@ -268,7 +268,7 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
     simp only [sConfOf_setMs, sConfOf_mstatus]
     ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
-      mdl mepc stc ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl⟩ $$ HmConf
+      mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
     have hpure : (k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp) ∧ sstatusAt k.sie (lower_mstatus ms) :=
       ⟨fun hs => by rw [hs] at hsr; exact sretFacts_pinned ms k.spie k.spp hsr,
        by unfold sstatusAt; rw [lower_mstatus_sie]; exact hsm.1⟩
@@ -323,13 +323,13 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HarmOn, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
-  have hexec := (execSpecF_csrsi_sstatus_x0 (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) false hok.phys
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  have hexec := (execSpecF_csrsi_sstatus_x0 (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false hok.phys
     pc (pc + instrLen is_rvc) (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
@@ -346,8 +346,8 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
   simp only [sConfOf_setMs, sConfOf_mstatus]
-  ihave HConf := kConf_intro cpu curTier k.root true k.spie k.spp (ms ||| 2#64) mdl mepc stc
-    ⟨smFacts_set ms false hsm, sretFacts_on _ _ _, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root true k.spie k.spp (ms ||| 2#64) mdl mepc stc lf
+    ⟨smFacts_set ms false hsm, sretFacts_on _ _ _, hmdl, hlf⟩ $$ HmConf
   have hn0 : k.noff = 0 := (hwf'.2.2.1 rfl).1
   ihave Hcpu := cpuOwn_zero cpu false false true k.noff k.intena true k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu
   iapply HΦ' $$ [HConf HF Hstack Htrans HarmOn Hcpu Htok Hclock] Hpc

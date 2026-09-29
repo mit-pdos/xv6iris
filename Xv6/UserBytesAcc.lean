@@ -57,8 +57,7 @@ theorem ubOwn_eq (ξ : CtxId) (D D' : List PAddr) (mm : BMap) (h : D = D') :
 
 /-- **Rocq `upt_regs`**: the translation registers `userPtInv` owns. -/
 def ubPtRegs (cpu : CPU) (P : UPtd) (tlb : Tlb) : IProp GF := iprop%
-  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ Register.pmpcfg_n ↦ᵣ[cpu] xv6Pmpcfg ∗
-  Register.pmpaddr_n ↦ᵣ[cpu] xv6Pmpaddr ∗ Register.tlb ↦ᵣ[cpu] tlb
+  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗ Register.tlb ↦ᵣ[cpu] tlb
 
 set_option maxRecDepth 10000 in
 /-- **Rocq `user_pt_inv_bytes`** (the opening half): `userPtInv` is the
@@ -70,7 +69,7 @@ theorem ub_userPtInv_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bit
         ubPtRegs cpu P tlb ∗ (ubFrame curCtx (ubUAddrs P t)).B mm := by
   iintro #HS H
   unfold userPtInv
-  icases H with ⟨Hs, Hc, Ha, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, Hum⟩
+  icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, Hum⟩
   ihave HT := ubTree_own_fwd 2 t hrep.2.2.1 $$ HS Ho
   icases ubData_own_fwd P hwf M $$ HS Hum with ⟨%hl, HD⟩
   ihave HA := (ubOwnA_app curCtx (ubTreeBytes 2 t) (ubDataBytes P.um M)).2 $$ [HT HD]
@@ -111,10 +110,10 @@ theorem ub_userPtInv_close [CurCtx] (cpu : CPU) (P : UPtd) (t t' : PTree) (mm mm
   ihave HD := ubOwn_ownA curCtx _ mm' (ubView_bytes P t' mm' hwf') $$ HD
   ihave HD := ubData_own_bwd P hwf.wf _ (ubView_length P.um mm') $$ HS HD
   unfold ubPtRegs
-  icases Hr with ⟨Hs, Hc, Ha, Htlb⟩
+  icases Hr with ⟨Hs, Hp, Htlb⟩
   unfold userPtAny userPtInv
   iexists ubView P.um mm'
-  iframe Hs Hc Ha HD
+  iframe Hs Hp HD
   isplitr
   · ipureintro; exact hwf.wf
   iexists t'

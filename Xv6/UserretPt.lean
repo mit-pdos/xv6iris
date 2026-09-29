@@ -188,10 +188,11 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
 `userret_to_user_state`, at the named state the slot takes): the per-step
 cells, the installed user table over the pages, the loop's config cells. -/
 theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8))
-    (ms mdl mepc stc pc epc sc tv : BitVec 64) (hmm : MIE_S &&& ~~~mdl = 0#64) (g : RegMap) (hwf : uptWf P) :
+    (ms mdl mepc stc pc epc sc tv : BitVec 64) (lf : SLeft) (hmm : MIE_S &&& ~~~mdl = 0#64) (g : RegMap) (hwf : uptWf P)
+    (hlf : lf.ok) :
     confCells cpu (DFrac.own 1) Privilege.User
-        { sConfOf KTier.kpt P.root ms mdl mepc stc with
-          mstatus := sretMs (sConfOf KTier.kpt P.root ms mdl mepc stc).mstatus } ∗
+        { sConfOf KTier.kpt P.root ms mdl mepc stc lf with
+          mstatus := sretMs (sConfOf KTier.kpt P.root ms mdl mepc stc lf).mstatus } ∗
       clockCells cpu ∗ pcIs cpu pc ∗ gprFile cpu g ∗
       Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
       Register.stvec ↦ᵣ[cpu] TRAMPOLINE ∗ uptSlot cpu P ∗ umPages P M
@@ -201,17 +202,19 @@ theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   conf_cases HmConf
   unfold pcIs
   icases Hpc with ⟨HPC, HnextPC⟩
-  unfold uRegs userPtInvX userCfg userHwCells userretUcfg
+  unfold uRegs userPtInvX userCfg userretUcfg
   simp only [sConfOf] at *
   simp only [MIE_S, MEDELEG_S, MENVCFG_S]
   iframe Hhart_state Hcur_privilege Hmstatus Hscause Hstval Hsepc HPC HnextPC Hclock HF
   isplitl [Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum]
   · iapply (userPtInv_uptSlot cpu P M).2
-    iframe Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum
+    iframe Hsatp Hslot Hum
+    isplitl [Hpmpcfg_n Hpmpaddr_n]
+    · iapply (userPmp_intro cpu _ _ hlf.2); iframe Hpmpcfg_n Hpmpaddr_n
     ipureintro; exact hwf
-  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hmcounteren Hmtimecmp
-  iexists mepc, stc
-  iframe Hmepc Hstimecmp
+  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg
+  iapply (userHwCells_intro cpu _ _ mepc stc hlf.1)
+  iframe Hmcounteren Hmtimecmp Hmepc Hstimecmp
 
 /-! ## The phases -/
 

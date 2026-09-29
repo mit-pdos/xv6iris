@@ -68,7 +68,7 @@ theorem wpLoop_k_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, _, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold cpuOwn
   icases Hcpu with ⟨Hcells, Hlocks, Hcsrs⟩
   icases hacc $$ Hcells with ⟨HP, Hclose⟩
@@ -76,7 +76,7 @@ theorem wpLoop_k_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
   iframe HI HmConf Hclock Hpc HF HP
   isplitl [Htrans Htok]
@@ -92,7 +92,7 @@ theorem wpLoop_k_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   icases HT with ⟨Htrans, Htok⟩
   ihave Hcells := Hclose $$ HQ
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Hcells Hlocks Hcsrs Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withProc p') (KCtx.wf_withProc k p' hwf))
   unfold cpuOwn

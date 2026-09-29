@@ -54,14 +54,14 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   have hsp' : ∀ v, (k.withRegs (R' v)).sp = k.sp := fun v => KCtx.withRegs_sp k (R' v) (hsp v)
   iintro ⟨HI, Hk, Hpc, HP, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold cpuOwn
   icases Hcpu with ⟨Hcells, Hlocks, Hcsrs⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc npc is_rvc i _ _ (hexec _ hok rfl))
   iframe HI HmConf Hclock Hpc HF Hlocks HP
   isplitl [Htrans Htok]
@@ -76,7 +76,7 @@ theorem wpLoop_k_lock [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ %v [HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock] Hpc HQ
   iapply (kctx_intro' cpu _ (hwf' v))
   unfold cpuOwn

@@ -38,20 +38,20 @@ theorem wp_s_ld_sp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
           stackOwn k.sp k.avail -∗ wpLoop cpu'))
     ⊢ wpLoop cpu :=
   instr_pure_elim pc _ _ _ _ fun hpc _ => by
-  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc iprop(
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf iprop(
         instr pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx 2#5, false, 8)) ∗
         wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq v ∗ stackOwn v av ∗
         ▷ wpNext k.sie k.proc cpu (fun cpu' =>
           iprop(kctxL lent cpu' (k.setSp v av) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
             wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 dq v -∗
             stackOwn k.sp k.avail -∗ wpLoop cpu'))) := by
-    intro cpu' ms mdl mepc stc hpin hwf hkt hsm hsr hmdl
-    have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc k.sie hsm
+    intro cpu' ms mdl mepc stc lf hpin hwf hkt hsm hsr hmdl hlf
+    have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc lf k.sie hsm hlf
     rw [hkt] at hok
-    have hexec := execSpecF_ld (GF := GF) cpu' (DFrac.own 1) dq (sConfOf curTier k.root ms mdl mepc stc)
+    have hexec := execSpecF_ld (GF := GF) cpu' (DFrac.own 1) dq (sConfOf curTier k.root ms mdl mepc stc lf)
       k.sie k.root hok pc (pc + instrLen is_rvc) imm 2#5 rs1 (by decide) (tpPin cpu' k.regs) v
     rw [KCtx.rget_hart cpu cpu' k rs1 hrs1] at hexec
     unfold normalStep
@@ -73,7 +73,7 @@ theorem wp_s_ld_sp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     icases HT with ⟨Htrans, Htok⟩
     icases HQ with ⟨HF, Hw⟩
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
-    ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+    ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     ihave Hstack := (show stackOwn (GF := GF) k.sp (trapRes k.sie + k.avail) ⊢ stackOwn k.sp k.avail by
       rw [hsie, trapRes_off]) $$ Hstack
     iapply HΦ' $$ [HConf HF Hnew Htrans Harm Hcpu Htok Hclock] Hpc Hw Hstack

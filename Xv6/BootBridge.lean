@@ -86,21 +86,22 @@ theorem bootKCtx_wf (R : RegMap) (n : Nat) : (bootKCtx R n).wf := by
     Nat.le_refl 0, by decide⟩
 
 /-- `start`'s configuration IS the S-mode configuration at the Bare tier. -/
-theorem startConf_sConfOf (t : BitVec 64) :
-    startConf t = sConfOf .bare 0#44 0xA00000080#64 0x2222#64 mainAddr (t + 1000000#64) := rfl
+theorem startConf_sConfOf (t : BitVec 64) (lf : SLeft) :
+    startConf t lf = sConfOf .bare 0#44 0xA00000080#64 0x2222#64 mainAddr (t + 1000000#64) lf := rfl
 
 /-- **The configuration `start` leaves is `kConf` at the Bare tier,
 interrupts off** (Rocq `sconf_intro` + `boot_csrs_reset`'s five facts, here
 all by computation on `start`'s constants). -/
-theorem kConf_boot {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (cpu : CPU) (t : BitVec 64) :
-    sConf (GF := GF) cpu (DFrac.own 1) (startConf t) ⊢ kConf cpu .bare 0#44 false false false := by
+theorem kConf_boot {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (cpu : CPU) (t : BitVec 64)
+    (lf : SLeft) (hlf : lf.ok) :
+    sConf (GF := GF) cpu (DFrac.own 1) (startConf t lf) ⊢ kConf cpu .bare 0#44 false false false := by
   unfold kConf
   rw [startConf_sConfOf]
   iintro H
-  iexists 0xA00000080#64, 0x2222#64, mainAddr, (t + 1000000#64)
+  iexists 0xA00000080#64, 0x2222#64, mainAddr, (t + 1000000#64), lf
   isplitl []
   · ipureintro
-    exact ⟨by unfold smFacts; decide, by unfold sretFacts; decide, by decide⟩
+    exact ⟨by unfold smFacts; decide, by unfold sretFacts; decide, by decide, hlf⟩
   · iexact H
 
 /-- `start` writes `tp = sext32(mhartid)`, which is the hart id itself. -/
@@ -204,11 +205,12 @@ theorem bootGprFile (cpu : CPU) (f : RegFile) (v1 v2 v4 v8 v10 v11 v14 v15 : Bit
 /-- **THE BOOT BRIDGE** (Rocq `boot_bridge`): the boot path's post-state
 cells, with the `.bss` / reset-file / adequacy inputs the path does not
 produce, are hart `cpu`'s kernel context at `main`'s entry. -/
-theorem bootBridge [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (t : BitVec 64) (R : RegMap)
+theorem bootBridge [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (t : BitVec 64) (lf : SLeft)
+    (hlf : lf.ok) (R : RegMap)
     (n : Nat) (hct : curTier = KTier.bare) (htp : R 4#5 = hartId cpu)
     (hrw : ∀ i, i < n → kmapClass (vpnOf (R 2#5 - 8#64 * BitVec.ofNat 64 (i + 1))).toNat = some .rw) :
     kmapStatic (GF := GF) ∗ KernelImage.ro ∗
-      sConf cpu (DFrac.own 1) (startConf t) ∗ gprFile cpu R ∗
+      sConf cpu (DFrac.own 1) (startConf t lf) ∗ gprFile cpu R ∗
       ([∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (R 2#5 - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w) ∗
       (∃ v : BitVec 64, Register.stvec ↦ᵣ[cpu] v) ∗
@@ -225,7 +227,7 @@ theorem bootBridge [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (t : BitVe
   iapply kctx_intro' cpu (bootKCtx R n) (bootKCtx_wf R n)
   simp only [bootKCtx, KCtx.sp, hR, trapRes_off]
   isplitl [Hconf]
-  · iapply kConf_boot cpu t $$ Hconf
+  · iapply kConf_boot cpu t lf hlf $$ Hconf
   isplitl [Hgpr]
   · iexact Hgpr
   isplitl [Hstk]

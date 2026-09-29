@@ -30,8 +30,9 @@ frames below the hart's boot stack pointer `sp₀ = bootSp s0 hartid`
 (16-aligned, in RAM), is safe to run provided the continuation is safe in
 supervisor mode at `main`, for every time `t` the clock read, with
 
-    configuration `startConf t`   (mstatus.MPP = U, MPIE = 1; mepc = main;
-                                   traps delegated; PMP open; stimecmp = t + 10⁶)
+    configuration `startConf t lf` (mstatus.MPP = U, MPIE = 1; mepc = main;
+                                   traps delegated; stimecmp = t + 10⁶; the
+                                   leftovers `lf`: mcounteren.TM, PMP entry 0)
     ra = start + 0x6a   sp = sp₀ - 16   s0 = sp₀   tp = a5 = sext32(hartid)
     a0 = 4096 * (hartid + 1)   a1 = hartid + 1   a4 = 1000000
 
@@ -55,8 +56,8 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   pwordPointsTo (bootSp s0 hartid - 8#64) 8 (DFrac.own 1) f8 ∗
   pwordPointsTo (bootSp s0 hartid - 32#64) 8 (DFrac.own 1) g0 ∗
   pwordPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) g8 ∗
-  (∀ t : BitVec 64,
-   sConf cpu (DFrac.own 1) (startConf t) -∗
+  (∀ (t : BitVec 64) (lf : SLeft), ⌜lf.ok⌝ -∗
+   sConf cpu (DFrac.own 1) (startConf t lf) -∗
    Register.mhartid ↦ᵣ[cpu] hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗

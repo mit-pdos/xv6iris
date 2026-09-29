@@ -419,11 +419,11 @@ at the user root, interrupts off, no machine interrupt pending, the kernel's
 def urConfOk (c : MConf) (P : UPtd) : Prop :=
   SConfKpt (GF := GF) c P.root false ∧ c.mie &&& ~~~c.mideleg = 0#64 ∧ c.menvcfg = menvcfgS
 
-theorem urConfOk_sConfOf (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (P : UPtd) (hr : root = P.root)
-    (hsm : smFacts ms false) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) :
-    urConfOk GF (sConfOf KTier.kpt root ms mdl mepc stc) P := by
+theorem urConfOk_sConfOf (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) (P : UPtd) (hr : root = P.root)
+    (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) :
+    urConfOk GF (sConfOf KTier.kpt root ms mdl mepc stc lf) P := by
   subst hr
-  exact ⟨SConfAt_sConfOf KTier.kpt P.root ms mdl mepc stc false hsm, hmdl, rfl⟩
+  exact ⟨SConfAt_sConfOf KTier.kpt P.root ms mdl mepc stc lf false hsm hlf, hmdl, rfl⟩
 
 end
 

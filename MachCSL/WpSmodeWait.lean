@@ -342,10 +342,10 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     ⊢ wpLoop cpu := by
   iintro ⟨#HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
-  have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc k.sie hsm
+  have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc lf k.sie hsm hlf
   rw [hsie] at hok
   ihave HT := transTok_intro cpu k.tier k.root $$ [Htrans Htok]
   case' _ => iframe Htrans Htok
@@ -353,7 +353,7 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   icases HI with ⟨%r, %hr, %hwf', #HB, %hdec⟩
   cases r with
   | F_Base w =>
-    iapply (wpLoop_s_wfi_cycle cpu (sConfOf k.tier k.root ms mdl mepc stc) k.tier k.root hok hmdl pc w
+    iapply (wpLoop_s_wfi_cycle cpu (sConfOf k.tier k.root ms mdl mepc stc lf) k.tier k.root hok hmdl pc w
       (instrBytes pc (FetchResult.F_Base w))
       (fetchSpecS_instrBytes_base cpu (DFrac.own 1) _ false k.tier k.root hok pc w)
       (hdec.2 cpu (DFrac.own 1) _ rfl))
@@ -362,7 +362,7 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     inext
     iintro HmConf Hclock Hpc HT _
     icases transTok_cases cpu k.tier k.root $$ HT with ⟨Htrans, Htok⟩
-    ihave HConf := kConf_intro cpu k.tier k.root k.sie k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+    ihave HConf := kConf_intro cpu k.tier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     ihave Hk := kctx_intro' cpu k hwf $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock]
     case' _ =>
       unfold transSlot

@@ -215,18 +215,18 @@ user table installed at `+0x8e` with `t1` = the kernel `satp` of the shared
 table `tk`, the four instructions install the kernel table and jump to `t0`,
 `ra` = userret, the user table parked. -/
 theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (BitVec 64))
-    (ms mdl mepc stc : BitVec 64) (hsm : smFacts ms false) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
+    (ms mdl mepc stc : BitVec 64) (lf : SLeft) (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
     (ht1 : R.get 6#5 = satpOf KTier.kpt tk.base) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗ kptOn tk Mk ∗
-    urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc) P (urPc 0x8e#64) R ∗
-    ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc) -∗
+    urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0x8e#64) R ∗
+    ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) -∗
         clockCells cpu -∗ pcIs cpu (jumpPc (R.get 5#5)) -∗ kptSlot cpu tk.base -∗ ctxTok cpu curCtx -∗
         uptFrame P -∗ gprFile cpu (R.set 1#5 userretVa) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have hc0 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc) P :=
-    urConfOk_sConfOf P.root ms mdl mepc stc P rfl hsm hmdl
-  have hok1 : SConfKpt (GF := GF) (sConfOf KTier.kpt tk.base ms mdl mepc stc) tk.base false :=
-    SConfAt_sConfOf KTier.kpt tk.base ms mdl mepc stc false hsm
+  have hc0 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P :=
+    urConfOk_sConfOf P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
+  have hok1 : SConfKpt (GF := GF) (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) tk.base false :=
+    SConfAt_sConfOf KTier.kpt tk.base ms mdl mepc stc lf false hsm hlf
   iintro ⟨#Htext, #HS, #Hcl, #Hk, Hst, HΦ⟩
   -- step 0: sfence.vma under the user table
   iapply (uservec_usfence cpu _ P hc0 (urPc 0x8e#64) (urPc 0x92#64) (by decide) (by decide) R)
@@ -236,7 +236,7 @@ theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF 
   iintro Hst
   -- step 1: csrw satp, t1 -- the kernel root installed
   iapply (uservec_ucsrw_satp cpu _ P hc0 tk.base (urPc 0x92#64) (urPc 0x96#64) (by decide) (by decide) R ht1
-    (sConfOf KTier.kpt tk.base ms mdl mepc stc) rfl)
+    (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) rfl)
   ihave HI := uvi_csrw_satp $$ Htext
   iframe HI HS Hst
   inext
@@ -244,14 +244,14 @@ theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF 
   ihave Hwin := pt2Win_enterK cpu tk Mk P $$ [Hslot]
   · iframe Hslot; iexact Hk
   -- step 2: sfence.vma under the window
-  iapply (uservec_wstep cpu (sConfOf KTier.kpt tk.base ms mdl mepc stc) tk.base P hok1 hmdl rfl
+  iapply (uservec_wstep cpu (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) tk.base P hok1 hmdl rfl
     (urPc 0x96#64) (urPc 0x9a#64) (by decide) (by decide) R)
   ihave HI := uvi_sfence2 $$ Htext
   iframe HI Hcl HS HmConf Hclock Hpc Hwin Htok HF
   inext
   iintro HmConf Hclock Hpc Hkpt Hfr Htok HF
   -- step 3: c.jalr t0 under the kernel table
-  iapply (uservec_kjalr cpu (sConfOf KTier.kpt tk.base ms mdl mepc stc) tk.base hok1 hmdl rfl (urPc 0x9a#64)
+  iapply (uservec_kjalr cpu (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) tk.base hok1 hmdl rfl (urPc 0x9a#64)
     (by decide) R)
   ihave HI := uvi_jalr $$ Htext
   ihave Htt : transTok cpu KTier.kpt tk.base $$ [Hkpt Htok]

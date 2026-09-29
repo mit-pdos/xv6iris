@@ -46,9 +46,9 @@ theorem KCtx.wf_toKpt (k : KCtx) (r : BitVec 44) (h : k.wf) : (k.toKpt r).wf :=
   ⟨h.1, h.2.1, fun hs => ⟨(h.2.2.1 hs).1, (h.2.2.1 hs).2.1, (h.2.2.1 hs).2.2.1, rfl⟩, h.2.2.2.1, h.2.2.2.2⟩
 
 /-- The configuration after the satp write: the same at the Kpt tier. -/
-theorem sConfOf_setSatp (tier : KTier) (root root' : BitVec 44) (ms mdl mepc stc : BitVec 64) :
-    ({ sConfOf tier root ms mdl mepc stc with satp := satpOf KTier.kpt root' } : MConf) =
-      sConfOf KTier.kpt root' ms mdl mepc stc := rfl
+theorem sConfOf_setSatp (tier : KTier) (root root' : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
+    ({ sConfOf tier root ms mdl mepc stc lf with satp := satpOf KTier.kpt root' } : MConf) =
+      sConfOf KTier.kpt root' ms mdl mepc stc lf := rfl
 
 /-- The installed table does not look at the tier. -/
 theorem kptOn_toKpt (X : CurCtx) (t : PTree) (M : RegMapF (BitVec 64)) :
@@ -70,14 +70,14 @@ theorem wp_s_csrw_satp_kpt (X : CurCtx) [KernelGeom] [KernelImage GF] {lent : Bo
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, Htlb, #Hkpt, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   have hct : curTier = KTier.bare := hkt.symm.trans hbare
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
-  have hexec := (execSpecF_csrw_satp_sv39 (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) false hok.phys
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  have hexec := (execSpecF_csrw_satp_sv39 (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false hok.phys
     pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs) root hv).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
@@ -94,7 +94,7 @@ theorem wp_s_csrw_satp_kpt (X : CurCtx) [KernelGeom] [KernelImage GF] {lent : Bo
   icases HT with ⟨Htrans, Htok⟩
   simp only [hct, transSlotAt] at *
   rw [sConfOf_setSatp]
-  ihave HConf := kConf_intro cpu KTier.kpt root false k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu KTier.kpt root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   -- the bundle at the Kpt tier
   ihave Hstack := stackOwn_toKpt X _ _ $$ Hstack
   ihave Hcpu := cpuOwn_toKpt X _ _ _ _ _ _ _ $$ Hcpu

@@ -184,10 +184,7 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
   have e4 := hres .mie _ rfl
   have e5 := hres .mideleg _ rfl
   have e9 := hres .menvcfg _ rfl
-  have e10 := hres .mcounteren _ rfl
-  have e11 := hres .mtimecmp _ rfl
-  have e13 := hres .pmpcfg_n _ rfl
-  have e14 := hres .pmpaddr_n _ rfl
+  have e13 : pmpAllOff (f .pmpcfg_n) := by rw [hres .pmpcfg_n _ rfl]; exact pmpAllOff_bootPmpcfg
   have h1 := hres .misa _ rfl
   have h2 := hres .mseccfg _ rfl
   have h3 := hres .pma_regions _ rfl
@@ -197,7 +194,7 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
   have h11 := hres .mstateen0 _ rfl
   have h12 := hres .sstateen0 _ rfl
   simp only [bootConfRegs, hwRegs, List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
-    Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9, e10, e11, e13, e14,
+    Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9,
     h1, h2, h3, h4, h5, h6, h11, h12]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14,
     M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, -⟩
@@ -205,7 +202,7 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
     $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13] with #Hhw
   · iframe
   imodintro
-  iexists ⟨f .medeleg, f .mepc, f .satp, f .stimecmp⟩
+  iexists ⟨f .medeleg, f .mepc, f .satp, f .stimecmp, f .mcounteren, f .mtimecmp, f .pmpcfg_n, f .pmpaddr_n, e13⟩
   unfold mConf confCells
   simp only [bootConfOf_mstatus, bootConfOf_mie, bootConfOf_mideleg, bootConfOf_medeleg, bootConfOf_mepc,
     bootConfOf_satp, bootConfOf_menvcfg, bootConfOf_mcounteren, bootConfOf_mtimecmp, bootConfOf_stimecmp,

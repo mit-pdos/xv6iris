@@ -14,6 +14,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WpGpr
 import Xv6.SpecEntry
 import MachCSL.PmpXv6Defs
+import MachCSL.SConfDefs
 
 namespace Xv6
 
@@ -26,9 +27,11 @@ def mainAddr : BitVec 64 := KA.«main»
 /-- The configuration at the `mret`, `t` being the time `timerinit` read:
 `mstatus` with `MPIE = 1`, `MPP = U`, `MIE = 0`; `mepc = main`; all
 exceptions and the supervisor interrupts delegated; `sie = STIE | SEIE`;
-PMP entry 0 = TOR over all of memory, RWX; `menvcfg = ADUE | STCE`;
-`mcounteren = TM`; `stimecmp = t + 1000000`. -/
-def startConf (t : BitVec 64) : MConf where
+`menvcfg = ADUE | STCE`; `stimecmp = t + 1000000`; and the leftovers `lf`
+(`MachCSL.SLeft`): `mcounteren` with `TM` set (`timerinit` ORs it into the
+power-on value), `mtimecmp` at its power-on value, the PMP tables with
+entry 0 = TOR over all of memory, RWX (`start()` writes entry 0 only). -/
+def startConf (t : BitVec 64) (lf : SLeft) : MConf where
   mstatus := 0xA00000080#64
   mie := 0x220#64
   mideleg := 0x2222#64
@@ -36,11 +39,11 @@ def startConf (t : BitVec 64) : MConf where
   mepc := mainAddr
   satp := 0#64
   menvcfg := 0xA000000000000000#64
-  mcounteren := 2#32
-  mtimecmp := 0xFFFFFFFFFFFFFFFF#64
+  mcounteren := lf.mcen
+  mtimecmp := lf.mtc
   stimecmp := t + 1000000#64
-  pmpcfg := xv6Pmpcfg
-  pmpaddr := xv6Pmpaddr
+  pmpcfg := lf.pmpcfg
+  pmpaddr := lf.pmpaddr
 
 /-- **WP of `start` up to and including the `mret`.**  Hart `cpu` at `start`
 in machine mode with the reset configuration, its hart id in `mhartid`, the
@@ -64,8 +67,8 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   gpr cpu 8#5 (DFrac.own 1) v8 ∗ gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
   pwordPointsTo (sp₀ - 16#64) 8 (DFrac.own 1) f0 ∗ pwordPointsTo (sp₀ - 8#64) 8 (DFrac.own 1) f8 ∗
   pwordPointsTo (sp₀ - 32#64) 8 (DFrac.own 1) g0 ∗ pwordPointsTo (sp₀ - 24#64) 8 (DFrac.own 1) g8 ∗
-  (∀ t : BitVec 64,
-   sConf cpu (DFrac.own 1) (startConf t) -∗
+  (∀ (t : BitVec 64) (lf : SLeft), ⌜lf.ok⌝ -∗
+   sConf cpu (DFrac.own 1) (startConf t lf) -∗
    Register.mhartid ↦ᵣ[cpu]{dq} hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗

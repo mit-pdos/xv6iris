@@ -363,14 +363,14 @@ theorem wp_s_csrr_sstatus_full [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
   have htp := tpPin_set cpu k.regs rd (lower_mstatus ms) hrd.2.2
-  have hexec := ((execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) (sConfOf curTier k.root ms mdl mepc stc) false
+  have hexec := ((execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) (sConfOf curTier k.root ms mdl mepc stc lf) false
     hok.phys pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root))
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
@@ -386,7 +386,7 @@ theorem wp_s_csrr_sstatus_full [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   have hv := sstatusFull_of_lower ms false k.spie k.spp hsm hsr
   have hsp := KCtx.setReg_sp k rd (lower_mstatus ms) hrd.2.1
   iapply HΦ' $$ %(lower_mstatus ms) %hv [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
@@ -520,13 +520,13 @@ theorem wp_s_csrw_sstatus_off [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
-  have hexec := ((execSpecF_csrw_sstatus_off (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) false
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  have hexec := ((execSpecF_csrw_sstatus_off (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false
     hok.phys pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root))
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
@@ -544,9 +544,9 @@ theorem wp_s_csrw_sstatus_off [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
   have hr : (tpPin cpu k.regs).get rs1 = k.rget cpu rs1 := rfl
   simp only [sConfOf_setMs, sConfOf_mstatus, hr]
-  ihave HConf := kConf_intro cpu curTier k.root false spie' spp' (sstatusWrite ms (k.rget cpu rs1)) mdl mepc stc
+  ihave HConf := kConf_intro cpu curTier k.root false spie' spp' (sstatusWrite ms (k.rget cpu rs1)) mdl mepc stc lf
     ⟨smFacts_sstatusWrite ms (k.rget cpu rs1) false spie' spp' hsm hv,
-      sretFacts_sstatusWrite ms (k.rget cpu rs1) false spie' spp' hsm hv, hmdl⟩ $$ HmConf
+      sretFacts_sstatusWrite ms (k.rget cpu rs1) false spie' spp' hsm hv, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withSpie spie' spp') (KCtx.wf_withSpie k _ _ hwf))
   simp only [KCtx.withSpie_regs, KCtx.withSpie_sie, KCtx.withSpie_spie, KCtx.withSpie_spp,

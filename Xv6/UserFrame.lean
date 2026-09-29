@@ -145,6 +145,7 @@ structure UfVals where
   tlb : Tlb
   stc : BitVec 64
   ctr : HwCounters
+  lf : SLeft
 
 /-- Some register file (the reference file's value off the footprint). -/
 noncomputable def ufBaseFile : RegFile := fun r => by cases r <;> exact default
@@ -165,32 +166,35 @@ noncomputable def ufFile (C : UCfg) (P : UPtd) (v : UfVals) : RegFile := fun r =
   | .x27 => v.g 27#5 | .x28 => v.g 28#5 | .x29 => v.g 29#5 | .x30 => v.g 30#5 | .x31 => v.g 31#5
   | .stvec => C.stvec | .medeleg => C.medeleg | .mie => C.mie | .mideleg => C.mideleg
   | .menvcfg => MENVCFG_S
-  | .mcounteren => 2#32 | .mtimecmp => 0xFFFFFFFFFFFFFFFF#64 | .stimecmp => v.stc
-  | .satp => satpOf .kpt P.root | .pmpcfg_n => xv6Pmpcfg | .pmpaddr_n => xv6Pmpaddr
+  | .mcounteren => v.lf.mcen | .mtimecmp => v.lf.mtc | .stimecmp => v.stc
+  | .satp => satpOf .kpt P.root | .pmpcfg_n => v.lf.pmpcfg | .pmpaddr_n => v.lf.pmpaddr
   | .misa => 0x800000000014112D#64 | .mseccfg => 0#64 | .pma_regions => bootPMA
   | .htif_tohost_base => none | .elp => 0#1 | .senvcfg => 0#64 | .scounteren => v.ctr.scen
   | .mcountinhibit => v.ctr.mci | .minstretcfg => v.ctr.mic | .mcyclecfg => v.ctr.mcc | .mstateen0 => 0#64
   | .sstateen0 => 0#32 | .mhpmcounter => v.ctr.hpm
   | r => ufBaseFile r
 
+/-- The leftover cells of a file (`MachCSL.SLeft`: `mcounteren`, `mtimecmp`,
+the PMP tables). -/
+def ufLeft (f : RegFile) : SLeft := ⟨f .mcounteren, f .mtimecmp, f .pmpcfg_n, f .pmpaddr_n⟩
+
 /-- **Rocq `u_pins_cfg` + `u_pins_hw` + `u_pins_pt`**: the loop-constant
 configuration a user file carries (the walker never writes these: they are
-off `ufRwList`). -/
+off `ufRwList`).  The cells `start()` leaves at power-on leftovers are not
+pinned: only what the kernel knows of them (`SLeft.ok`: `mcounteren.TM`,
+xv6's PMP entry 0). -/
 structure UfCfg (C : UCfg) (P : UPtd) (f : RegFile) : Prop where
   stvec : f .stvec = C.stvec
   medeleg : f .medeleg = C.medeleg
   mie : f .mie = C.mie
   mideleg : f .mideleg = C.mideleg
   menvcfg : f .menvcfg = MENVCFG_S
-  mcounteren : f .mcounteren = 2#32
-  mtimecmp : f .mtimecmp = 0xFFFFFFFFFFFFFFFF#64
   satp : f .satp = satpOf .kpt P.root
-  pmpcfg : f .pmpcfg_n = xv6Pmpcfg
-  pmpaddr : f .pmpaddr_n = xv6Pmpaddr
+  lok : (ufLeft f).ok
   hw : ∀ r v, hwVal r = some v → f r = v
 
-theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) : UfCfg C P (ufFile C P v) := by
-  refine ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, ?_⟩
+theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) (hv : v.lf.ok) : UfCfg C P (ufFile C P v) := by
+  refine ⟨rfl, rfl, rfl, rfl, rfl, rfl, hv, ?_⟩
   intro r x h
   cases r <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
 
@@ -198,10 +202,12 @@ theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) : UfCfg C P (ufFile C P v)
 theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     (h : ∀ r ∈ ufRoList, f' r = f r) : UfCfg C P f' := by
   have e : ∀ r, r ∈ ufRoList → f' r = f r := h
+  have hl : ufLeft f' = ufLeft f := by
+    unfold ufLeft
+    rw [e .mcounteren (by decide), e .mtimecmp (by decide), e .pmpcfg_n (by decide), e .pmpaddr_n (by decide)]
   refine ⟨(e _ (by decide)).trans hc.stvec, (e _ (by decide)).trans hc.medeleg, (e _ (by decide)).trans hc.mie,
-    (e _ (by decide)).trans hc.mideleg, (e _ (by decide)).trans hc.menvcfg, (e _ (by decide)).trans hc.mcounteren,
-    (e _ (by decide)).trans hc.mtimecmp, (e _ (by decide)).trans hc.satp, (e _ (by decide)).trans hc.pmpcfg,
-    (e _ (by decide)).trans hc.pmpaddr, ?_⟩
+    (e _ (by decide)).trans hc.mideleg, (e _ (by decide)).trans hc.menvcfg,
+    (e _ (by decide)).trans hc.satp, hl ▸ hc.lok, ?_⟩
   intro r x hx
   have hm : r ∈ ufRoList := by
     have : r ∈ hwRegs := by cases r <;> simp_all [hwVal, hwRegs]
@@ -217,9 +223,10 @@ theorem ufFile_gpr (C : UCfg) (P : UPtd) (v : UfVals) (i : BitVec 5) (hi : i ≠
   · exact absurd rfl hi
   all_goals rfl
 
-/-- **The user-state facts** `userInv` carries about its values. -/
+/-- **The user-state facts** `userInv` carries about its values (and what
+the kernel knows of the leftover cells, `SLeft.ok`). -/
 def UfUser (v : UfVals) : Prop :=
-  userHartOk v.hs ∧ userMstatusOk v.ms ∧ ∀ u, v.hs = .HART_ACTIVE u → v.va' = v.va
+  userHartOk v.hs ∧ userMstatusOk v.ms ∧ (∀ u, v.hs = .HART_ACTIVE u → v.va' = v.va) ∧ v.lf.ok
 
 /-! ## §3 The bundles, as frame pieces -/
 
@@ -339,13 +346,14 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
   unfold uRegs clockCells
   icases Hregs with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip⟩, Hg⟩
   unfold userCfg userHwCells
-  icases Hcfg with ⟨Hstvec, Hmie, Hmdl, Hmedl, Hmenv, Hmcen, Hmtc, %mepc, %stc, Hmepc, Hstc⟩
-  unfold ubPtRegs
-  icases Hr with ⟨Hsatp, Hpcfg, Hpaddr, Htlb⟩
+  icases Hcfg with ⟨Hstvec, Hmie, Hmdl, Hmedl, Hmenv, %mc, %mtc, %htm, Hmcen, Hmtc, %mepc, %stc, Hmepc, Hstc⟩
+  unfold ubPtRegs userPmp
+  icases Hr with ⟨Hsatp, ⟨%cfg, %paddr, %h0, Hpcfg, Hpaddr⟩, Htlb⟩
   icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm, #Hscen⟩
-  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, ctr⟩ : UfVals), t, mm
+  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, ctr, ⟨mc, mtc, cfg, paddr⟩⟩ : UfVals),
+    t, mm
   isplitr
-  · ipureintro; exact ⟨hok, hms, hact⟩
+  · ipureintro; exact ⟨hok, hms, hact, htm, h0⟩
   isplitr
   · ipureintro; exact hwf
   isplitr
@@ -372,7 +380,7 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
     · iapply (uf_ownRo_cells cpu C.dqc (ufFile C pt _)).2
       dsimp only [ufFile]
       iframe
-    · iapply uf_hw_cells cpu C.dqc (ufFile C pt _) (ufCfg_file C pt _).hw
+    · iapply uf_hw_cells cpu C.dqc (ufFile C pt _) (ufCfg_file C pt _ ⟨htm, h0⟩).hw
       iframe Hhw
       dsimp only [ufFile]
       iframe Hmci Hmic Hmcc Hhpm
@@ -400,12 +408,24 @@ theorem uf_close_inv [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
   icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.mcounteren, hc.mtimecmp, hc.satp, hc.pmpcfg,
-    hc.pmpaddr, hpriv]
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv]
   ihave Hpt := ub_userPtInv_close cpu pt t t' mm mm' (f .tlb) hwf hs htlb $$ HS [Hsatp Hpcfg Hpaddr Htlb] HB
-  · unfold ubPtRegs; iframe
-  unfold userInv uRegs clockCells userCfg userHwCells ufAside
+  · unfold ubPtRegs userPmp
+    iframe Hsatp Htlb
+    iexists f .pmpcfg_n, f .pmpaddr_n
+    iframe Hpcfg Hpaddr
+    ipureintro; exact hc.lok.2
+  unfold ufAside
   icases Ha with ⟨%mepc, Hmepc⟩
+  ihave Hhwc : userHwCells (GF := GF) cpu $$ [Hmcen Hmtc Hmepc Hstc]
+  · unfold userHwCells
+    iexists f .mcounteren, f .mtimecmp
+    isplitr
+    · ipureintro; exact hc.lok.1
+    iframe Hmcen Hmtc
+    iexists mepc, f .stimecmp
+    iframe Hmepc Hstc
+  unfold userInv uRegs clockCells userCfg
   iexists f .hart_state, f .mstatus, f .scause, f .stval, f .sepc, f .PC, f .nextPC, uxaXget f
   isplitr
   · ipureintro; exact hok
@@ -434,12 +454,24 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
   icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.mcounteren, hc.mtimecmp, hc.satp, hc.pmpcfg,
-    hc.pmpaddr, hpriv, hhs, hpc, hnpc]
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc]
   ihave Hpt := ub_userPtInv_close cpu pt t t' mm mm' (f .tlb) hwf hs htlb $$ HS [Hsatp Hpcfg Hpaddr Htlb] HB
-  · unfold ubPtRegs; iframe
-  unfold userTrapFrame pcIs clockCells userCfg userHwCells ufAside
+  · unfold ubPtRegs userPmp
+    iframe Hsatp Htlb
+    iexists f .pmpcfg_n, f .pmpaddr_n
+    iframe Hpcfg Hpaddr
+    ipureintro; exact hc.lok.2
+  unfold ufAside
   icases Ha with ⟨%mepc, Hmepc⟩
+  ihave Hhwc : userHwCells (GF := GF) cpu $$ [Hmcen Hmtc Hmepc Hstc]
+  · unfold userHwCells
+    iexists f .mcounteren, f .mtimecmp
+    isplitr
+    · ipureintro; exact hc.lok.1
+    iframe Hmcen Hmtc
+    iexists mepc, f .stimecmp
+    iframe Hmepc Hstc
+  unfold userTrapFrame pcIs clockCells userCfg
   iexists f .mstatus, f .scause, f .stval, f .sepc, uxaXget f
   isplitr
   · ipureintro; exact hms

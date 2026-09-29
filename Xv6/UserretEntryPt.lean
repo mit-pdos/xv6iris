@@ -137,19 +137,19 @@ set_option maxHeartbeats 2000000 in
 configuration at root `kroot`, the kernel slot, the parked user table and
 `a0` = the user `satp`, the four instructions at `+0x9c .. +0xa8` install
 the user table, landing at `+0xac` with the same file. -/
-theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms mdl mepc stc : BitVec 64)
-    (hsm : smFacts ms false) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
+theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms mdl mepc stc : BitVec 64) (lf : SLeft)
+    (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
     (ha0 : R.get 10#5 = satpOf KTier.kpt P.root) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt kroot ms mdl mepc stc) ∗
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt kroot ms mdl mepc stc lf) ∗
     clockCells cpu ∗ pcIs cpu (urPc 0x9c#64) ∗ kptSlot cpu kroot ∗ ctxTok cpu curCtx ∗ gprFile cpu R ∗
     uptFrame P ∗
-    ▷ (urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc) P (urPc 0xac#64) R -∗ wpLoop cpu)
+    ▷ (urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have hok0 : SConfKpt (GF := GF) (sConfOf KTier.kpt kroot ms mdl mepc stc) kroot false :=
-    SConfAt_sConfOf KTier.kpt kroot ms mdl mepc stc false hsm
-  have hc1 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc) P :=
-    urConfOk_sConfOf P.root ms mdl mepc stc P rfl hsm hmdl
+  have hok0 : SConfKpt (GF := GF) (sConfOf KTier.kpt kroot ms mdl mepc stc lf) kroot false :=
+    SConfAt_sConfOf KTier.kpt kroot ms mdl mepc stc lf false hsm hlf
+  have hc1 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P :=
+    urConfOk_sConfOf P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
   iintro ⟨#Htext, #HS, #Hcl, HmConf, Hclock, Hpc, Hkpt, Htok, HR, Hfr, HΦ⟩
   ihave Htt : transTok cpu KTier.kpt kroot $$ [Hkpt Htok]
   · rw [userret_transTok_kpt]; iframe
@@ -171,7 +171,7 @@ theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms md
   inext
   iintro HmConf Hclock Hpc ⟨Htt, HR, _⟩
   -- step 2: csrw satp, a0 -- the user root installed
-  iapply (userret_kstep cpu _ (sConfOf KTier.kpt P.root ms mdl mepc stc) kroot hok0 hmdl rfl (urPc 0xa4#64)
+  iapply (userret_kstep cpu _ (sConfOf KTier.kpt P.root ms mdl mepc stc lf) kroot hok0 hmdl rfl (urPc 0xa4#64)
     (urPc 0xa8#64) (by decide) (by decide)
     urCsrw (gprFile cpu R) iprop((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu R)
     ((execSpecF_csrw_satp_sv39 cpu _ false hok0.phys _ _ 10#5 R P.root ha0).frameL _))

@@ -697,42 +697,42 @@ every hart the pinning allows, which is why the step is proved for every
 after the trap plus what the schema kept aside resumes the client's `I` at
 `pc` (through the handler's contract). -/
 def trapCont [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc : BitVec 64)
-    (ms mdl mepc stc : BitVec 64) (I : IProp GF) : IProp GF := iprop%
+    (ms mdl mepc stc : BitVec 64) (lf : SLeft) (I : IProp GF) : IProp GF := iprop%
   ∀ (sc h : BitVec 64) (E : CtxId → IProp GF), ⌜k.sie = true ∧ sCauseOk sc ∧ stvecDirect h⌝ -∗
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc)) -∗
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc lf)) -∗
     clockCells cpu -∗ pcIs cpu h -∗ transTok cpu k.tier k.root -∗ gprFile cpu (tpPin cpu k.regs) -∗
     stackOwn k.sp (trapRes k.sie + k.avail) -∗ cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks -∗
     trapCsrsAt cpu pc sc 0#64 -∗ Register.stvec ↦ᵣ[cpu] h -∗ envAt E curCtx -∗ cpuClaim cpu k.proc -∗
     □ ihs ⟨E, cpu, h⟩ -∗ I -∗ wpLoop cpu
 
 /-- The obligation of a schema's step at hart `cpu'`, at the configuration
-`sConfOf k.tier k.root ms mdl mepc stc`: from the client's `I` and the
+`sConfOf k.tier k.root ms mdl mepc stc`: lf from the client's `I` and the
 opened context, with the trap continuation at hand, the loop. -/
 def normalStep [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu' : CPU) (k : KCtx) (pc : BitVec 64)
-    (ms mdl mepc stc : BitVec 64) (I : IProp GF) : IProp GF := iprop%
-  I -∗ confCells cpu' (DFrac.own 1) Privilege.Supervisor (sConfOf k.tier k.root ms mdl mepc stc) -∗
+    (ms mdl mepc stc : BitVec 64) (lf : SLeft) (I : IProp GF) : IProp GF := iprop%
+  I -∗ confCells cpu' (DFrac.own 1) Privilege.Supervisor (sConfOf k.tier k.root ms mdl mepc stc lf) -∗
   clockCells cpu' -∗ pcIs cpu' pc -∗ gprFile cpu' (tpPin cpu' k.regs) -∗ stackOwn k.sp (trapRes k.sie + k.avail) -∗
   transSlotAt cpu' k.tier k.root -∗ sieArm cpu' k.sie k.proc -∗ cpuOwn cpu' lent k.sie k.noff k.intena k.proc k.locks -∗
-  ctxToken cpu' -∗ KernelImage.ro -∗ ▷ trapCont (lent := lent) cpu' k pc ms mdl mepc stc I -∗ wpLoop cpu'
+  ctxToken cpu' -∗ KernelImage.ro -∗ ▷ trapCont (lent := lent) cpu' k pc ms mdl mepc stc lf I -∗ wpLoop cpu'
 
 set_option maxHeartbeats 4000000 in
 /-- The engine, hart-generic: from any hart the pinning allows. -/
 theorem wpLoop_k_absorb_gen [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc : BitVec 64)
     (hpc : pc.toNat % 2 = 0) (I : IProp GF)
-    (hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+    (hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc I) :
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf I) :
     ⊢@{IProp GF} ∀ cpu' : CPU, ⌜k.sie = false ∨ k.proc = 0#64 → cpu' = cpu⌝ -∗ I -∗ kctxL lent cpu' k -∗ pcIs cpu' pc -∗
       wpLoop cpu' := by
   iloeb as IH
   iintro %cpu' %hpin HI Hk Hpc
   icases kctx_cases cpu' k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu' _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu' _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   unfold normalStep at hnormal
-  iapply (hnormal cpu' ms mdl mepc stc hpin hwf hkt hsm hsr hmdl) $$ HI HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok Hro
+  iapply (hnormal cpu' ms mdl mepc stc lf hpin hwf hkt hsm hsr hmdl hlf) $$ HI HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok Hro
   inext
   unfold trapCont
   iintro %sc %h %E %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv #Henv Hclaim #HS HI
@@ -749,7 +749,7 @@ theorem wpLoop_k_absorb_gen [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CP
     simp only [intenaCell_lent]
     icases Hcpu with ⟨⟨_, _, %⟨_, hs'⟩⟩, _, _⟩
     exact absurd (hs.symm.trans hs') (by decide)
-  ihave Hk := kctx_trapped_intro cpu' k hwf hs ms mdl mepc stc hsm hmdl $$ [HmConf HF Hstack Htr Hcpu Htok Hclock Hro]
+  ihave Hk := kctx_trapped_intro cpu' k hwf hs ms mdl mepc stc lf hsm hmdl hlf $$ [HmConf HF Hstack Htr Hcpu Htok Hclock Hro]
   case' _ => (iframe HmConf HF Hstack Htr Hcpu Htok Hclock; iexact Hro)
   iapply (kctx_trap_resume cpu' k E pc sc h I hwf hs hpc hsc)
   iframe Hk Hpc Hcsrs Hstv Hclaim HI
@@ -769,10 +769,10 @@ theorem wpLoop_k_absorb_gen [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CP
 /-- The engine at this hart. -/
 theorem wpLoop_k_absorb [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc : BitVec 64)
     (hpc : pc.toNat % 2 = 0) (I : IProp GF)
-    (hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+    (hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc I) :
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf I) :
     I ∗ kctxL lent cpu k ∗ pcIs cpu pc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨HI, Hk, Hpc⟩
   iapply (wpLoop_k_absorb_gen (lent := lent) cpu k pc hpc I hnormal) $$ %cpu %(fun _ => rfl) HI Hk Hpc
@@ -810,8 +810,8 @@ runs the cycle with the trap branch, and leaves the normal continuation
 (`HmConf Hclock Hpc HT HF Hstack Harm Hcpu HΦ'` in scope, `HΦ'` the client's
 continuation at this hart, `HConf` the configuration rebuilt). -/
 macro "schema_step_intro" : tactic =>
-  `(tactic| (intro cpu' ms mdl mepc stc hpin hwf hkt hsm hsr hmdl
-             have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc k.sie hsm
+  `(tactic| (intro cpu' ms mdl mepc stc lf hpin hwf hkt hsm hsr hmdl hlf
+             have hok := SConfAt_sConfOf (GF := GF) k.tier k.root ms mdl mepc stc lf k.sie hsm hlf
              rw [hkt] at hok))
 
 set_option hygiene false in
@@ -833,7 +833,7 @@ macro "schema_step_run" hexec:term : tactic =>
              unfold transTok
              icases HT with ⟨Htrans, Htok⟩
              ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
-             ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf))
+             ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf))
 
 set_option hygiene false in
 macro "schema_step" hexec:term : tactic =>
@@ -865,10 +865,10 @@ theorem wpLoop_k_setReg [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : 
   instr_pure_elim pc is_rvc i _ _ fun hpc _ => by
   obtain ⟨hrd0, hrdsp, hrdtp⟩ := hrd
   have hsp := fun cpu' => KCtx.setReg_sp k rd (v cpu') hrdsp
-  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64),
+  have hnormal : ∀ (cpu' : CPU) (ms mdl mepc stc : BitVec 64) (lf : SLeft),
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → k.wf → k.tier = curTier → smFacts ms k.sie →
-      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 →
-      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc iprop(instr pc is_rvc i ∗ ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+      sretFacts ms k.sie k.spie k.spp → 0x220#64 &&& ~~~mdl = 0#64 → lf.ok →
+      ⊢@{IProp GF} normalStep (lent := lent) cpu' k pc ms mdl mepc stc lf iprop(instr pc is_rvc i ∗ ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL lent cpu' (k.setReg rd (v cpu')) -∗ pcIs cpu' (npc cpu') -∗ wpLoop cpu'))) := by
     schema_step ((hexec cpu' _ hpin hok rfl).frameL (transTok cpu' curTier k.root))
     have htp := tpPin_set cpu' k.regs rd (v cpu') hrdtp

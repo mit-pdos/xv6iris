@@ -368,18 +368,17 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   iexact Hmtime
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw pmpaddr0, rs1` with `rs1 = 0x3fffffffffffff` from the reset PMP tables. -/
+/-- `csrw pmpaddr0, rs1` with `rs1 = 0x3fffffffffffff` from ANY all-off PMP
+configuration and ANY address table (Rocq `wp_start`'s `pmp_all_off`). -/
 theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 : BitVec 5)
-    (hrs1 : rs1 ≠ 0#5)
-    (hcfg : c.pmpcfg = bootPmpcfg) (haddr : c.pmpaddr = bootPmpaddr) :
-    execSpec (GF := GF) cpu (DFrac.own 1) c { c with pmpaddr := xv6Pmpaddr }
+    (hrs1 : rs1 ≠ 0#5) (hcfg : pmpAllOff c.pmpcfg) :
+    execSpec (GF := GF) cpu (DFrac.own 1) c { c with pmpaddr := pmpaddrStart c.pmpaddr }
       (instruction.CSRReg (0x3B0#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
       (gpr cpu rs1 (DFrac.own 1) 0x3fffffffffffff#64)
       (gpr cpu rs1 (DFrac.own 1) 0x3fffffffffffff#64) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, Hrs1, HΦ⟩
   mconf_cases HmConf
-  simp only [hcfg, haddr]
   unfold execute
   swp_run 30
   iapply swp_bind
@@ -392,7 +391,7 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_pmpaddr0
+  iapply swp_write_CSR_pmpaddr0 cpu _ c.pmpcfg c.pmpaddr hcfg
   iframe
   inext
   iintro %x Hpmpcfg_n Hpmpaddr_n %hx
@@ -400,7 +399,7 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine
-    { c with pmpcfg := bootPmpcfg, pmpaddr := xv6Pmpaddr }
+    { c with pmpaddr := pmpaddrStart c.pmpaddr }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
@@ -409,18 +408,17 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw pmpcfg0, rs1` with `rs1 = 0xf` from the reset PMP configuration. -/
+/-- `csrw pmpcfg0, rs1` with `rs1 = 0xf` from ANY all-off PMP configuration
+(Rocq `wp_start`'s `pmp_all_off`): `pmpcfgStart` (Rocq `st_pmpcfg1`). -/
 theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 : BitVec 5)
-    (hrs1 : rs1 ≠ 0#5)
-    (hcfg : c.pmpcfg = bootPmpcfg) :
-    execSpec (GF := GF) cpu (DFrac.own 1) c { c with pmpcfg := xv6Pmpcfg }
+    (hrs1 : rs1 ≠ 0#5) (hcfg : pmpAllOff c.pmpcfg) :
+    execSpec (GF := GF) cpu (DFrac.own 1) c { c with pmpcfg := pmpcfgStart c.pmpcfg }
       (instruction.CSRReg (0x3A0#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
       (gpr cpu rs1 (DFrac.own 1) 0xf#64)
       (gpr cpu rs1 (DFrac.own 1) 0xf#64) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, Hrs1, HΦ⟩
   mconf_cases HmConf
-  simp only [hcfg]
   unfold execute
   swp_run 30
   iapply swp_bind
@@ -433,7 +431,7 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_pmpcfg0
+  iapply swp_write_CSR_pmpcfg0 cpu c.pmpcfg hcfg
   iframe
   inext
   iintro %x %r Hpmpcfg_n %hxr
@@ -442,7 +440,7 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hr
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
-  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with pmpcfg := xv6Pmpcfg }
+  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with pmpcfg := pmpcfgStart c.pmpcfg }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
@@ -650,24 +648,23 @@ theorem wp_m_csrw_stimecmp (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c)
   iframe
   try (inext; iintro HmConf Hclock Hpc Hrs1; iapply HΦ $$ HmConf Hclock Hpc Hrs1)
 
-/-- `csrw pmpaddr0, rs1` with `rs1 = 0x3fffffffffffff` from the reset PMP tables. -/
+/-- `csrw pmpaddr0, rs1` with `rs1 = 0x3fffffffffffff` from any all-off PMP
+configuration and any address table. -/
 theorem wp_m_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
-    (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5)
-    (hcfg : c.pmpcfg = bootPmpcfg) (haddr : c.pmpaddr = bootPmpaddr) :
+    (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (hcfg : pmpAllOff c.pmpcfg) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x3B0#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) ∗
     mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) 0x3fffffffffffff#64 ∗
-    ▷ (mConf cpu (DFrac.own 1) { c with pmpaddr := xv6Pmpaddr } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu (DFrac.own 1) { c with pmpaddr := pmpaddrStart c.pmpaddr } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rs1 (DFrac.own 1) 0x3fffffffffffff#64 -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_pmpaddr0 cpu c pc _ rs1 hrs1 hcfg haddr)
+  wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_pmpaddr0 cpu c pc _ rs1 hrs1 hcfg)
 
-/-- `csrw pmpcfg0, rs1` with `rs1 = 0xf` from the reset PMP configuration. -/
+/-- `csrw pmpcfg0, rs1` with `rs1 = 0xf` from any all-off PMP configuration. -/
 theorem wp_m_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
-    (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5)
-    (hcfg : c.pmpcfg = bootPmpcfg) :
+    (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (hcfg : pmpAllOff c.pmpcfg) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x3A0#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) ∗
     mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) 0xf#64 ∗
-    ▷ (mConf cpu (DFrac.own 1) { c with pmpcfg := xv6Pmpcfg } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu (DFrac.own 1) { c with pmpcfg := pmpcfgStart c.pmpcfg } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rs1 (DFrac.own 1) 0xf#64 -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_pmpcfg0 cpu c pc _ rs1 hrs1 hcfg)

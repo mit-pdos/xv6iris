@@ -149,7 +149,7 @@ theorem ume_pmpCheckRWX_pf (c : cbop_zicbop) : pmpCheckRWX 15#8 (umoPf c) = pure
 /-- **PMP at User grants a prefetch of RAM** (Rocq `exec_pmpCheck_user_grant_ca`). -/
 theorem ume_pmpCheck_pf (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (width : Nat)
     (hc : D.Dr .pmpcfg_n = true) (ha : D.Dr .pmpaddr_n = true)
-    (hcfg : s.file .pmpcfg_n = xv6Pmpcfg) (haddr : s.file .pmpaddr_n = xv6Pmpaddr)
+    (h0 : pmpEnt0Ok (s.file .pmpcfg_n) (s.file .pmpaddr_n))
     (c : cbop_zicbop) (hram : pmpOk addr width) :
     runRW D orc s (pmpCheck (.Physaddr addr) width (umoPf c) .User) = some (none, s, orc) := by
   unfold pmpCheck
@@ -157,8 +157,8 @@ theorem ume_pmpCheck_pf (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (
   simp only [forIn, forIn', IntRange.forIn'_eq]
   rw [IntRange.loop_unfold]
   sail_norm
-  simp only [runRW_bind, utr_readReg D _ _ _ hc, Option.bind_some, hcfg,
-    utr_pmpReadAddrReg0 D _ _ hc ha hcfg haddr, utr_pmpMatchAddr0 addr width hram, runRW_pure]
+  simp only [runRW_bind, utr_readReg D _ _ _ hc, Option.bind_some, h0.cfgInt,
+    utr_pmpReadAddrReg0 D _ _ hc ha h0, utr_pmpMatchAddr0 addr width hram, runRW_pure]
   sail_norm
   simp only [ume_pmpCheckRWX_pf c]
   sail_norm
@@ -171,7 +171,7 @@ set_option maxRecDepth 100000 in
 theorem ume_pf_phys_check (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (hram : inRam pa 64) (hal : pa.toNat % 64 = 0) (c : cbop_zicbop) :
     ∃ r, runRW D orc s (phys_access_check (umoPf c) .PBMT_PMA .User (.Physaddr pa) 64 false) = some (r, s, orc) := by
-  have hpmp := ume_pmpCheck_pf D orc s pa 64 hp.pins.dpmpc hp.pins.dpmpa hp.pins.pmpc hp.pins.pmpa c
+  have hpmp := ume_pmpCheck_pf D orc s pa 64 hp.pins.dpmpc hp.pins.dpmpa hp.pins.pmp0 c
     (pmpOk_of_inRam hram)
   have hreg := ume_matching_pma_ram pa 64 hram (by decide) (by decide)
   have halign := is_aligned_paddr_of pa 64 (by decide) hal

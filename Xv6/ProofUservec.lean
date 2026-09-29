@@ -67,18 +67,18 @@ installed, the file `g`) to the jump target with the kernel table: the
 phases, the saved trapframe folded to `uservecTf ws g`, the file to
 `uservecRegs g ws`. -/
 theorem uservec_run [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (BitVec 64))
-    (ms mdl mepc stc : BitVec 64) (hsm : smFacts ms false) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
+    (ms mdl mepc stc : BitVec 64) (lf : SLeft) (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
     (hv : pageValid (pageAddr P.tfp)) (g : RegMap) (s0 : BitVec 64) (ws : List (BitVec 64))
     (ht1 : tfW ws 0 = satpOf KTier.kpt tk.base) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗ kptOn tk Mk ∗
-    urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc) P (urPc 0x0#64) g ∗ Register.sscratch ↦ᵣ[cpu] s0 ∗
+    urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0x0#64) g ∗ Register.sscratch ↦ᵣ[cpu] s0 ∗
     tfPageAt P.tfp ws ∗
-    ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc) -∗
+    ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) -∗
         clockCells cpu -∗ pcIs cpu (jumpPc (tfW ws 2)) -∗ kptSlot cpu tk.base -∗ ctxTok cpu curCtx -∗
         uptFrame P -∗ gprFile cpu (uservecRegs g ws) -∗ Register.sscratch ↦ᵣ[cpu] g 10#5 -∗
         tfPageAt P.tfp (uservecTf ws g) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc P rfl hsm hmdl
+  have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
   have ha0 : (g.set 10#5 TRAPFRAME) 10#5 = TRAPFRAME := RegMap.set_same _ _ _
   iintro ⟨#Htext, #HS, #Hcl, #Hk, Hst, Hss, Hpage, HΦ⟩
   iapply (uservec_entry cpu _ P hc g s0)
@@ -109,7 +109,7 @@ theorem uservec_run [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (
   inext
   iintro Hst Hpage
   have hw : ∀ j, j < 5 → tfW (uservecTf ws g) j = tfW ws j := uservecTf_lo ws g
-  iapply (uservec_exit cpu P tk Mk ms mdl mepc stc hsm hmdl
+  iapply (uservec_exit cpu P tk Mk ms mdl mepc stc lf hsm hlf hmdl
     ((((((g.set 10#5 TRAPFRAME).set 5#5 (g 10#5)).set 2#5 (tfW (uservecTf ws g) 1)).set 4#5
       (tfW (uservecTf ws g) 4)).set 5#5 (tfW (uservecTf ws g) 2)).set 6#5 (tfW (uservecTf ws g) 0))
     (by rw [RegMap.get_ne _ 6#5 (by decide), RegMap.set_same, hw 0 (by decide)]; exact ht1))
@@ -144,7 +144,7 @@ theorem uservec_proof : USERVEC :=
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   iintro ⟨#Hhw, Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, HΦ⟩
   icases uservec_frame_open cpu C P Rut sz M ms sc tv sep g hdq hmie hmed $$ [Hhw Hfr] with
-    ⟨%mepc, %stc, %Mp, %⟨⟨hsm, hsr⟩, hM⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR⟩
+    ⟨%mepc, %stc, %lf, %Mp, %⟨⟨hsm, hsr⟩, hM, hlf⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR⟩
   · isplitl []
     · iexact Hhw
     · iexact Hfr
@@ -156,7 +156,7 @@ theorem uservec_proof : USERVEC :=
   icases Hon with ⟨%tk, %Mk, #Hk, %htk⟩
   subst htk
   rw [hstv, show stvecBase TRAMPOLINE = urPc 0x0#64 from by decide]
-  iapply (uservec_run cpu P tk Mk ms C.mideleg mepc stc hsm hmdl hv g s0 ws hk0)
+  iapply (uservec_run cpu P tk Mk ms C.mideleg mepc stc lf hsm hlf hmdl hv g s0 ws hk0)
   iframe Htext HS Hcl Hk Hss Hpage
   isplitl [HmConf Hclock Hpc Hslot Htok HF]
   · unfold urSt; iframe
@@ -191,7 +191,7 @@ theorem uservec_proof : USERVEC :=
   · rw [htp, hsp]
     iframe HF Hstack Htok Hclock
     isplitl [HmConf]
-    · iapply (kConf_intro cpu KTier.kpt tk.base false true false ms C.mideleg mepc stc ⟨hsm, hsr, hmdl⟩)
+    · iapply (kConf_intro cpu KTier.kpt tk.base false true false ms C.mideleg mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩)
       iexact HmConf
     isplitl [Hkpt]
     · unfold transSlot

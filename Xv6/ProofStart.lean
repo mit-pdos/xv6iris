@@ -84,15 +84,15 @@ macro "st_step" rule:term : tactic =>
 
 /-- The configuration after `csrw mstatus` (`MPP := S`), from the power-on
 garbage `z`. -/
-def startConf1 (z : BootGarb) : MConf := { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr }
+def startConf1 (z : BootGarb) : MConf := { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr }
 
 /-- The configuration before the call to `timerinit`: only `stimecmp` still
 holds power-on garbage (`timerinit` writes it). -/
-def startConf8 (stc : BitVec 64) : MConf :=
-  { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := stc, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr }
+def startConf8 (z : BootGarb) : MConf :=
+  { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := pmpcfgStart z.pmpcfg, pmpaddr := pmpaddrStart z.pmpaddr }
 
 
-theorem startConf8_menvcfg (stc : BitVec 64) : (startConf8 stc).menvcfg = 0x2000000000000000#64 := rfl
+theorem startConf8_menvcfg (z : BootGarb) : (startConf8 z).menvcfg = 0x2000000000000000#64 := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- `start`, first segment: the prologue and `mstatus.MPP := S`
@@ -173,15 +173,15 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (cpu : CPU) (z : BootGarb) (v14 v15 : BitVec 64) :
     mConf cpu (DFrac.own 1) (startConf1 z) ∗ clockCells cpu ∗ kernelText ∗ pcIs cpu (startAddr + 0x20#64) ∗
     gpr cpu 14#5 (DFrac.own 1) v14 ∗ gpr cpu 15#5 (DFrac.own 1) v15 ∗
-    (mConf cpu (DFrac.own 1) (startConf8 z.stimecmp) -∗ clockCells cpu -∗ pcIs cpu (startAddr + 0x66#64) -∗
+    (mConf cpu (DFrac.own 1) (startConf8 z) -∗ clockCells cpu -∗ pcIs cpu (startAddr + 0x66#64) -∗
      gpr cpu 14#5 (DFrac.own 1) 0x2000000000000000#64 -∗ gpr cpu 15#5 (DFrac.own 1) 0x2000000000000000#64 -∗
      wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨HmConf, Hclock, #Htext, Hpc, Hx14, Hx15, HΦ⟩
   simp only [startConf1]
   st_norm
-  have ok1 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok1 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 80000078: auipc a5,0x1
   st_step wp_m_auipc cpu (DFrac.own 1) _ ok1 _ false 1#20 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -194,8 +194,8 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   st_step wp_m_csrw_mepc cpu _ ok1 _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok2 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := KA.«main», satp := z.satp, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok2 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := KA.«main», satp := z.satp, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 80000084: li a5,0
   st_step wp_m_li cpu (DFrac.own 1) _ ok2 _ true (BitVec.signExtend 12 0#6) 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -205,8 +205,8 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
     (by decide : BitVec.extractLsb' 34 2 0xA00000800#64 = 2#2)
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok2b : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok2b : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := z.medeleg, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 8000008a: lui a5,0x10
   st_step wp_m_lui cpu (DFrac.own 1) _ ok2b _ true (BitVec.signExtend 20 16#6) 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -219,14 +219,14 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   st_step wp_m_csrw_medeleg cpu _ ok2b _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok3 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok3 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 80000092: csrw mideleg,a5
   st_step wp_m_csrw_mideleg cpu _ ok3 _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok4 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok4 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 80000096: csrr a5,sie
   st_step wp_m_csrr_sie cpu (DFrac.own 1) _ ok4 _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -239,8 +239,8 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   st_step wp_m_csrw_sie cpu _ ok4 _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok5 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := bootPmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok5 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 800000a2: li a5,-1
   st_step wp_m_li cpu (DFrac.own 1) _ ok5 _ true (BitVec.signExtend 12 63#6) 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -250,21 +250,21 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   iintro HmConf Hclock Hpc Hx15
   st_norm
   -- 800000a6: csrw pmpaddr0,a5
-  st_step wp_m_csrw_pmpaddr0 cpu _ ok5 _ false 15#5 (by decide) rfl rfl
+  st_step wp_m_csrw_pmpaddr0 cpu _ ok5 _ false 15#5 (by decide) z.pmpOff
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok6 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := bootPmpcfg, pmpaddr := xv6Pmpaddr } :=
-    MConf.ok_off_any _ start_mok_ms rfl
+  have ok6 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := z.pmpcfg, pmpaddr := pmpaddrStart z.pmpaddr } :=
+    MConf.ok_allOff _ start_mok_ms z.pmpOff
   -- 800000aa: li a5,15
   st_step wp_m_li cpu (DFrac.own 1) _ ok6 _ true (BitVec.signExtend 12 15#6) 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
   st_norm
   -- 800000ac: csrw pmpcfg0,a5
-  st_step wp_m_csrw_pmpcfg0 cpu _ ok6 _ false 15#5 (by decide) rfl
+  st_step wp_m_csrw_pmpcfg0 cpu _ ok6 _ false 15#5 (by decide) z.pmpOff
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok7 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr } :=
-    MConf.ok_xv6 _ start_mok_ms rfl rfl
+  have ok7 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := pmpcfgStart z.pmpcfg, pmpaddr := pmpaddrStart z.pmpaddr } :=
+    MConf.ok_ent0 _ start_mok_ms (pmpEnt0Ok_start _ _)
   -- 800000b0: csrr a5,menvcfg
   st_step wp_m_csrr_menvcfg cpu (DFrac.own 1) _ ok7 _ false 15#5 (by decide) _
   iintro HmConf Hclock Hpc Hx15
@@ -285,8 +285,8 @@ theorem start_seg2 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
   st_step wp_m_csrw_menvcfg cpu _ ok7 _ false 15#5 (by decide) _ xv6_menvcfg_cbie1 xv6_menvcfg_pmm1
   iintro HmConf Hclock Hpc Hx15
   st_norm
-  have ok8 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := 0#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := z.stimecmp, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr } :=
-    MConf.ok_xv6 _ start_mok_ms rfl rfl
+  have ok8 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0x2000000000000000#64, mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, stimecmp := z.stimecmp, pmpcfg := pmpcfgStart z.pmpcfg, pmpaddr := pmpaddrStart z.pmpaddr } :=
+    MConf.ok_ent0 _ start_mok_ms (pmpEnt0Ok_start _ _)
   simp only [startConf8]
   iapply HΦ $$ HmConf Hclock Hpc Hx14 Hx15
 
@@ -307,14 +307,14 @@ theorem StartProof (T : TIMERINIT) : START where
     iframe
     iframe #
     iintro HmConf Hclock Hpc Hx14 Hx15
-    have ok8 : MConf.ok (GF := GF) (startConf8 z.stimecmp) := MConf.ok_xv6 _ start_mok_ms rfl rfl
+    have ok8 : MConf.ok (GF := GF) (startConf8 z) := MConf.ok_ent0 _ start_mok_ms (pmpEnt0Ok_start _ _)
     st_norm
     -- 800000be: jal timerinit
     st_step wp_m_jal cpu (DFrac.own 1) _ ok8 (KA.«start» + 0x66#64) false 2096990#21 1#5 (by decide) _
     iintro HmConf Hclock Hpc Hx1
     st_norm
     -- the call: timerinit's contract
-    have hT := T.wp_timerinit cpu (startConf8 z.stimecmp)
+    have hT := T.wp_timerinit cpu (startConf8 z)
       ok8 (by rw [startConf8_menvcfg]; simp only [BitVec.reduceOr]; exact xv6_menvcfg_cbie2)
       (by rw [startConf8_menvcfg]; simp only [BitVec.reduceOr]; exact xv6_menvcfg_pmm2)
       (by rw [startConf8_menvcfg]; simp only [BitVec.reduceOr, menvcfgWrite_stce]; exact xv6_menvcfg_stce)
@@ -328,9 +328,8 @@ theorem StartProof (T : TIMERINIT) : START where
     st_norm
     iintro %t HmConf Hclock Htok Hpc Hx1 Hx2 Hx8 Hx14 Hx15 Hg0 Hg8
     st_norm
-    have ok9 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0xA000000000000000#64, mcounteren := 2#32, mtimecmp := 0xFFFFFFFFFFFFFFFF#64, stimecmp := t + 1000000#64, pmpcfg := xv6Pmpcfg, pmpaddr := xv6Pmpaddr } :=
-      MConf.ok_xv6 _ ⟨(by decide : BitVec.extractLsb' 3 1 0xA00000800#64 = 0#1),
-        (by decide : BitVec.extractLsb' 17 1 0xA00000800#64 = 0#1)⟩ rfl rfl
+    have ok9 : MConf.ok (GF := GF) { mstatus := 0xA00000800#64, mie := 0x220#64, mideleg := 0x2222#64, medeleg := 0xb3ff#64, mepc := KA.«main», satp := 0#64, menvcfg := 0xA000000000000000#64, mcounteren := Functions.legalize_mcounteren z.mcounteren (BitVec.setWidth 64 z.mcounteren ||| 2#64), mtimecmp := z.mtimecmp, stimecmp := t + 1000000#64, pmpcfg := pmpcfgStart z.pmpcfg, pmpaddr := pmpaddrStart z.pmpaddr } :=
+      MConf.ok_ent0 _ start_mok_ms (pmpEnt0Ok_start _ _)
     -- 800000c2: csrr a5,mhartid
     st_step wp_m_csrr_mhartid cpu (DFrac.own 1) dq _ ok9 _ false 15#5 (by decide) _ hartid
     iintro HmConf Hclock Hpc Hx15 Hmhartid
@@ -358,6 +357,8 @@ theorem StartProof (T : TIMERINIT) : START where
     inext
     iintro HS Hclock Hpc
     st_norm
-    iapply HΦ $$ %_ HS Hmhartid Hclock Htok Hpc Hx1 Hx2 Hx4 Hx8 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
+    iapply HΦ $$ %_ %⟨Functions.legalize_mcounteren z.mcounteren (BitVec.setWidth 64 z.mcounteren ||| 2#64),
+      z.mtimecmp, pmpcfgStart z.pmpcfg, pmpaddrStart z.pmpaddr⟩
+      %⟨legalize_mcounteren_TM z.mcounteren, pmpEnt0Ok_start _ _⟩ HS Hmhartid Hclock Htok Hpc Hx1 Hx2 Hx4 Hx8 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
 
 end Xv6

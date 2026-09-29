@@ -38,7 +38,10 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- The registers the walk reads, in the footprint, at xv6's values (a fact
 of the register file, so it survives every walk step that writes no
-register: the byte map and the reservation bit are not part of it). -/
+register: the byte map and the reservation bit are not part of it).  The
+PMP tables are pinned at entry 0 only (`pmpEnt0Ok`, Rocq `pmp_ent0_ok`):
+the other entries hold whatever `start()` left, and the check never reads
+them. -/
 structure UwkPins (D : UFoot) (f : RegFile) : Prop where
   dmisa : D.Dr .misa = true
   dmenv : D.Dr .menvcfg = true
@@ -48,8 +51,7 @@ structure UwkPins (D : UFoot) (f : RegFile) : Prop where
   dhtif : D.Dr .htif_tohost_base = true
   misa : f .misa = 0x800000000014112D#64
   menv : f .menvcfg = menvcfgS
-  pmpc : f .pmpcfg_n = xv6Pmpcfg
-  pmpa : f .pmpaddr_n = xv6Pmpaddr
+  pmp0 : pmpEnt0Ok (f .pmpcfg_n) (f .pmpaddr_n)
   pma : f .pma_regions = bootPMA
   htif : f .htif_tohost_base = none
 
@@ -57,7 +59,7 @@ set_option hygiene false in
 /-- Put the pins in the context (the stepper reads them from there). -/
 macro "uwk_pins" hp:term:max : tactic => `(tactic| (
   have hpc := $hp
-  obtain ⟨hDmisa, hDmenv, hDpmpc, hDpmpa, hDpma, hDhtif, hmisa, hmenv, hpmpc, hpmpa, hpma, hhtif⟩ := hpc))
+  obtain ⟨hDmisa, hDmenv, hDpmpc, hDpmpa, hDpma, hDhtif, hmisa, hmenv, hpmp0, hpma, hhtif⟩ := hpc))
 
 /-! ## §1 The entry word's class -/
 
@@ -176,6 +178,7 @@ set_option hygiene false in
 /-- The address facts a physical access to an owned entry needs. -/
 macro "uwk_addr" pa:term:max hok:term:max : tactic => `(tactic| (
   have hrange := uwk_pmpRange $pa 8 (pmpOk_of_inRam ($hok).1)
+  have hpok := pmpOk_of_inRam ($hok).1
   have hmpma := matching_pma_ram $pa 8 ($hok).1 (by decide) (by decide)
   have hclint := within_clint_ram $pa 8 ($hok).1
   have halign := is_aligned_paddr_of $pa 8 (by decide) ($hok).2))
@@ -189,7 +192,7 @@ theorem uwk_read_pte (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
     runRW D orc s (read_pte (.Physaddr pa) 8) = some (.Ok w, s, orc) := by
   uwk_pins hp
   uwk_addr pa hok
-  uwk_run -bv
+  uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
   simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, uwk_upd_full]
 
 set_option maxHeartbeats 4000000 in
@@ -201,7 +204,7 @@ theorem uwk_read_pte_excl (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.
     runRW D orc s (read_pte_exclusive (.Physaddr pa) 8) = some (.Ok w, { s with rv := true }, orc) := by
   uwk_pins hp
   uwk_addr pa hok
-  uwk_run -bv
+  uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
   simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, uwk_upd_full]
 
 set_option maxHeartbeats 4000000 in
@@ -215,7 +218,7 @@ theorem uwk_write_pte_cond (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
       some (.Ok true, { s with mm := bmWrite s.mm pa 8 w', rv := false }, orc) := by
   uwk_pins hp
   uwk_addr pa hok
-  uwk_run -bv
+  uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
   simp only [bits_of_physaddr, addInt_eq, Int.cast_ofNat_Int, Int.zero_mul, uwk_add_ofInt0,
     Sail.BitVec.extractLsb, BitVec.setWidth_eq, uwk_extract_full]
 

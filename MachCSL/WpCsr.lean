@@ -13,6 +13,7 @@ import MachCSL.PlatformFacts
 import MachCSL.WpGpr
 import MachCSL.PmpXv6Defs
 import MachCSL.ModelFacts
+import MachCSL.WpPmp
 
 namespace MachCSL
 
@@ -458,31 +459,78 @@ theorem swp_write_CSR_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : Bit
   · swp_run 60
     iapply HΦ $$ %_ Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
 
-set_option maxHeartbeats 4000000 in
-/-- `csrw pmpaddr0` from the reset tables (entry 0 unlocked, entry 1 not TOR). -/
-theorem swp_write_CSR_pmpaddr0 (cpu : CPU) (dq : DFrac) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] bootPmpaddr ∗
-    ▷ (∀ x, Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu] x -∗
-        ⌜x = xv6Pmpaddr⌝ -∗ Φ (.Ok x[0]!))
-    ⊢ swp cpu (write_CSR 0x3B0#12 0x3fffffffffffff#64) Φ := by
-  iintro ⟨Hpmpcfg_n, Hpmpaddr_n, HΦ⟩
-  swp_run 120
-  iapply HΦ $$ %_ Hpmpcfg_n Hpmpaddr_n []
-  ipureintro
-  decide
+/-- A disabled entry is not locked, and so not TOR-locked. -/
+theorem pmpTORLocked_of_off {e : BitVec 8} (h : pmpEntryOff e) : pmpTORLocked e = false := by
+  have h2 := h.2
+  unfold pmpLocked at h2
+  unfold pmpTORLocked
+  simp [h2]
+
+/-- A disabled entry's lock bit, in the normaliser's form. -/
+theorem pmpEntryOff_L' {e : BitVec 8} (h : pmpEntryOff e) : BitVec.extractLsb' 7 1 e = 0#1 := by
+  have hx : ∀ x : BitVec 1, (x == 1#1) = false → x = 0#1 := by decide
+  exact hx _ h.2
 
 set_option maxHeartbeats 4000000 in
+/-- `csrw pmpaddr0` over ANY all-off configuration table and ANY address
+table (Rocq `wp_start`'s `pmp_all_off pmpcfg0` premise; entry 0 unlocked,
+entry 1 not TOR-locked): entry 0 takes the value, the rest is kept
+(`pmpaddrStart`, Rocq `st_pmpaddr1`). -/
+theorem swp_write_CSR_pmpaddr0 (cpu : CPU) (dq : DFrac) (cfg : Vector (BitVec 8) 64)
+    (paddr : Vector (BitVec 64) 64) (hoff : pmpAllOff cfg) (Φ : Result (BitVec 64) Unit → IProp GF) :
+    Register.pmpcfg_n ↦ᵣ[cpu]{dq} cfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] paddr ∗
+    ▷ (∀ x, Register.pmpcfg_n ↦ᵣ[cpu]{dq} cfg -∗ Register.pmpaddr_n ↦ᵣ[cpu] x -∗
+        ⌜x = pmpaddrStart paddr⌝ -∗ Φ (.Ok x[0]!))
+    ⊢ swp cpu (write_CSR 0x3B0#12 0x3fffffffffffff#64) Φ := by
+  iintro ⟨Hpmpcfg_n, Hpmpaddr_n, HΦ⟩
+  have h0 : pmpLocked cfg[0]! = false := (hoff 0).2
+  have e1 : BitVec.extractLsb' 3 2 cfg[0]! = 0#2 := pmpEntryOff_A' (hoff 0)
+  have e2 : _get_Pmpcfg_ent_A cfg[0]! = 0#2 := pmpEntryOff_A (hoff 0)
+  swp_run 120
+  have h1N : ∀ j : Nat, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j)
+  have h1I : ∀ j : Int, pmpTORLocked cfg[j]! = false := fun j => pmpTORLocked_of_off (hoff j.toNat)
+  simp only [h0, h1N, h1I]
+  iapply HΦ $$ %_ Hpmpcfg_n Hpmpaddr_n []
+  ipureintro
+  rfl
+
+attribute [local sail_facts] vectorUpdate_get_same vectorUpdate_get_ne vectorUpdate_getInt_same
+  vectorUpdate_getInt_ne vector_set!_get_ne vector_set!_getInt_ne in
+set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-/-- `csrw pmpcfg0, 0xf` from the reset table. -/
-theorem swp_write_CSR_pmpcfg0 (cpu : CPU) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.pmpcfg_n ↦ᵣ[cpu] bootPmpcfg ∗
-    ▷ (∀ x r, Register.pmpcfg_n ↦ᵣ[cpu] x -∗ ⌜x = xv6Pmpcfg ∧ r = 0xf#64⌝ -∗ Φ (.Ok r))
+/-- `csrw pmpcfg0, 0xf` over ANY all-off table (Rocq `wp_start`'s
+`pmp_all_off pmpcfg0`): the eight entries of `pmpcfg0` take the legalised
+bytes (`pmpcfgStart`, Rocq `st_pmpcfg1`), the rest is kept. -/
+theorem swp_write_CSR_pmpcfg0 (cpu : CPU) (cfg : Vector (BitVec 8) 64) (hoff : pmpAllOff cfg)
+    (Φ : Result (BitVec 64) Unit → IProp GF) :
+    Register.pmpcfg_n ↦ᵣ[cpu] cfg ∗
+    ▷ (∀ x r, Register.pmpcfg_n ↦ᵣ[cpu] x -∗ ⌜x = pmpcfgStart cfg ∧ r = 0xf#64⌝ -∗ Φ (.Ok r))
     ⊢ swp cpu (write_CSR 0x3A0#12 0xf#64) Φ := by
   iintro ⟨Hpmpcfg_n, HΦ⟩
+  have lN : ∀ j : Nat, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j)
+  have lI : ∀ j : Int, BitVec.extractLsb' 7 1 cfg[j]! = 0#1 := fun j => pmpEntryOff_L' (hoff j.toNat)
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
+  swp_run 200
+  try simp only [lN, lI]
   swp_run 200
   iapply HΦ $$ %_ %_ Hpmpcfg_n []
   ipureintro
-  exact ⟨by decide, by decide⟩
+  exact ⟨rfl, by decide⟩
 
 /-! ### `read_CSR` -/
 
@@ -694,34 +742,6 @@ theorem swp_csrw_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : BitVec 6
     try (unfold wX_bits wX; swp_run 40)
     iapply HΦ $$ %_ Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
 
-set_option maxHeartbeats 4000000 in
-theorem swp_csrw_pmpaddr0 (cpu : CPU) (dq : DFrac) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu] bootPmpaddr ∗
-    ▷ (∀ x, Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu] x -∗ ⌜x = xv6Pmpaddr⌝ -∗
-        Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x3B0#12 0x3fffffffffffff#64) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hpmpcfg_n, Hpmpaddr_n, HΦ⟩
-  csrw_run
-  iapply HΦ $$ %_ Hcur_privilege Hpmpcfg_n Hpmpaddr_n []
-  ipureintro
-  decide
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-theorem swp_csrw_pmpcfg0 (cpu : CPU) (dq : DFrac) (Φ : ExecutionResult → IProp GF) :
-    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
-    Register.pmpcfg_n ↦ᵣ[cpu] bootPmpcfg ∗
-    ▷ (∀ x, Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine -∗
-        Register.pmpcfg_n ↦ᵣ[cpu] x -∗ ⌜x = xv6Pmpcfg⌝ -∗ Φ (ExecutionResult.Retire_Success ()))
-    ⊢ swp cpu (csrw 0x3A0#12 0xf#64) Φ := by
-  iintro ⟨#Hhw, Hcur_privilege, Hpmpcfg_n, HΦ⟩
-  csrw_run
-  iapply HΦ $$ %_ Hcur_privilege Hpmpcfg_n []
-  ipureintro
-  decide
-
 /-- The `csrr` path: the checks, the read, the `rd` write (`rd ≠ 0`). -/
 macro "csrr_run" hrd:ident h:ident : tactic =>
   `(tactic| (unfold csrr doCSR; swp_run 300; iapply swp_bind; iapply swp_wX_bits (hrd := $hrd); iframe; inext;
@@ -815,5 +835,13 @@ theorem xv6_menvcfg_pmm2 : BitVec.extractLsb' 32 2 0xA000000000000000#64 = 0#2 :
 theorem xv6_menvcfg_stce : BitVec.extractLsb' 63 1 0xA000000000000000#64 = 1#1 := by decide
 /-- `w_mcounteren(r_mcounteren() | 2)` from 0. -/
 theorem legalize_mcounteren_xv6 : legalize_mcounteren 0#32 2#64 = 2#32 := by decide
+
+/-- `w_mcounteren(r_mcounteren() | 2)` from ANY old value sets `TM` (Rocq
+`TimerCap.sstc_enabled`): the rest of the register is power-on garbage. -/
+theorem legalize_mcounteren_TM (c : BitVec 32) :
+    BitVec.extractLsb' 1 1 (legalize_mcounteren c (BitVec.setWidth 64 c ||| 2#64)) = 1#1 := by
+  simp only [legalize_mcounteren, Mk_Counteren, sys_mcounteren_writable_bits, Sail.BitVec.extractLsb,
+    BitVec.extractLsb]
+  bv_decide
 
 end MachCSL

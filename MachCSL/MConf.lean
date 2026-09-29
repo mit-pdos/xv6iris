@@ -67,19 +67,32 @@ def bootConf : MConf where
 
 /-- The configuration cells the boot program leaves at their POWER-ON
 values (Rocq: `wp_entry_boot` / `wp_start` take them at ANY value -- the
-boot program (`MachCSL.bootProg`) never writes them, `MachCSL.bootProg_keeps`,
-and `start()` overwrites every one before reading it). -/
+boot program (`MachCSL.bootProg`) never writes them, `MachCSL.bootProg_keeps`).
+`start()` overwrites `medeleg`, `mepc`, `satp` and `stimecmp` before reading
+them; it never writes `mtimecmp`, ORs `TM` into `mcounteren`, and writes only
+entry 0 of the PMP address table and the first eight entries of the
+configuration table (`pmpcfgStart`/`pmpaddrStart`), so those leftovers reach
+the kernel (`SLeft`).  Of the PMP configuration only `pmpAllOff` is known:
+the privileged spec's `reset_pmp` clears A and L of every entry
+(`MachCSL.bootFin_reset_pmp`, Rocq `pmp_all_off`). -/
 structure BootGarb where
   medeleg : BitVec 64
   mepc : BitVec 64
   satp : BitVec 64
   stimecmp : BitVec 64
+  mcounteren : BitVec 32
+  mtimecmp : BitVec 64
+  pmpcfg : Vector (BitVec 8) 64
+  pmpaddr : Vector (BitVec 64) 64
+  pmpOff : pmpAllOff pmpcfg
 
 /-- The configuration a booted hart is in: the values the boot program
 establishes (`bootConf`'s), and the power-on garbage `z` in the cells it
 does not touch. -/
 def bootConfOf (z : BootGarb) : MConf :=
-  { bootConf with medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, stimecmp := z.stimecmp }
+  { bootConf with
+    medeleg := z.medeleg, mepc := z.mepc, satp := z.satp, stimecmp := z.stimecmp,
+    mcounteren := z.mcounteren, mtimecmp := z.mtimecmp, pmpcfg := z.pmpcfg, pmpaddr := z.pmpaddr }
 
 @[sail_facts] theorem bootConfOf_mstatus (z : BootGarb) : (bootConfOf z).mstatus = 0xA00000000#64 := rfl
 @[sail_facts] theorem bootConfOf_mie (z : BootGarb) : (bootConfOf z).mie = 0#64 := rfl
@@ -88,12 +101,11 @@ def bootConfOf (z : BootGarb) : MConf :=
 @[sail_facts] theorem bootConfOf_mepc (z : BootGarb) : (bootConfOf z).mepc = z.mepc := rfl
 @[sail_facts] theorem bootConfOf_satp (z : BootGarb) : (bootConfOf z).satp = z.satp := rfl
 @[sail_facts] theorem bootConfOf_menvcfg (z : BootGarb) : (bootConfOf z).menvcfg = 0#64 := rfl
-@[sail_facts] theorem bootConfOf_mcounteren (z : BootGarb) : (bootConfOf z).mcounteren = 0#32 := rfl
-@[sail_facts] theorem bootConfOf_mtimecmp (z : BootGarb) :
-    (bootConfOf z).mtimecmp = 0xFFFFFFFFFFFFFFFF#64 := rfl
+@[sail_facts] theorem bootConfOf_mcounteren (z : BootGarb) : (bootConfOf z).mcounteren = z.mcounteren := rfl
+@[sail_facts] theorem bootConfOf_mtimecmp (z : BootGarb) : (bootConfOf z).mtimecmp = z.mtimecmp := rfl
 @[sail_facts] theorem bootConfOf_stimecmp (z : BootGarb) : (bootConfOf z).stimecmp = z.stimecmp := rfl
-@[sail_facts] theorem bootConfOf_pmpcfg (z : BootGarb) : (bootConfOf z).pmpcfg = bootPmpcfg := rfl
-@[sail_facts] theorem bootConfOf_pmpaddr (z : BootGarb) : (bootConfOf z).pmpaddr = bootPmpaddr := rfl
+@[sail_facts] theorem bootConfOf_pmpcfg (z : BootGarb) : (bootConfOf z).pmpcfg = z.pmpcfg := rfl
+@[sail_facts] theorem bootConfOf_pmpaddr (z : BootGarb) : (bootConfOf z).pmpaddr = z.pmpaddr := rfl
 
 /-- The configuration cells of hart `cpu`, at fraction `dq`, in privilege
 `p`, with the mutable CSRs at the values of `c`. -/
@@ -313,8 +325,10 @@ theorem bootConf_ok : MConf.ok (GF := GF) bootConf := by
   intro cpu dq addr width acc Φ _ _
   exact swp_pmpCheck_off cpu dq addr width acc Φ
 
-theorem bootConfOf_ok (z : BootGarb) : MConf.ok (GF := GF) (bootConfOf z) :=
-  MConf.ok_same bootConf_ok rfl rfl rfl
+theorem bootConfOf_ok (z : BootGarb) : MConf.ok (GF := GF) (bootConfOf z) := by
+  refine ⟨(bootConf_ok (GF := GF)).1, ?_⟩
+  intro cpu dq addr width acc Φ _ _
+  exact swp_pmpCheck_allOff cpu dq addr width acc Φ z.pmpcfg z.pmpaddr z.pmpOff
 
 /-! ### Decoding -/
 

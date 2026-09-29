@@ -133,7 +133,7 @@ theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile)
   have hrw : ∀ i, i < bootStackSlots →
       kmapClass (vpnOf (bootChainR f cpu 2#5 - 8#64 * BitVec.ofNat 64 (i + 1))).toNat = some .rw :=
     fun i hi => bootStack_rw cpu i hi
-  have hbr := fun t => bootBridge (GF := GF) cpu t (bootChainR f cpu) bootStackSlots hX
+  have hbr := fun t lf hlf => bootBridge (GF := GF) cpu t lf hlf (bootChainR f cpu) bootStackSlots hX
     (bootChainR_tp f cpu) hrw
   simp only [bootChainR_sp] at hbr
   iintro #Ht #Hd Hres Htok Hcont
@@ -151,7 +151,7 @@ theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile)
     · iexact Hb
   iapply hb
   iframe Hm Hh Hck Htok Ht Hw Hpc H1 H2 H4 H8 H10 H11 H14 H15 H16 H8' H32 H24
-  iintro %t Hconf _Hh Hck Htok _Hw Hpc H1 H2 H4 H8 H10 H11 H14 H15 _H16 _H8 H32 H24
+  iintro %t %lf %hlf Hconf _Hh Hck Htok _Hw Hpc H1 H2 H4 H8 H10 H11 H14 H15 _H16 _H8 H32 H24
   ihave Hgf := bootGprFile cpu f (startAddr + 0x6a#64) (spOf cpu - 16#64)
     (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu))) (spOf cpu)
     (4096#64 * (hartId cpu + 1#64)) (hartId cpu + 1#64) 1000000#64
@@ -160,7 +160,7 @@ theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile)
   · iframe H1 H2 H4 H8 H10 H11 H14 H15 Hgpr
   ihave Hstk := bootStack_rejoin (spOf cpu) _ _ $$ [H24 H32 Hr]
   · iframe H24 H32 Hr
-  ihave Hkc := hbr t $$ [Hconf Hgf Hstk Hstv Hp Hn Hi Hl Hcsr Htok Hck]
+  ihave Hkc := hbr t lf hlf $$ [Hconf Hgf Hstk Hstv Hp Hn Hi Hl Hcsr Htok Hck]
   · isplitl []
     · iexact Hk
     isplitl []

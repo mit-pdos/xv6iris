@@ -126,7 +126,7 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, Hcsrs, Hclaim, Hres, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
@@ -135,10 +135,10 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   rw [hspie] at hspie'
   rw [hspp] at hspp'
   simp only [ite_true] at hspie' hspp'
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
   unfold trapCsrsAt
   icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
-  have hexec := (execSpecF_sret (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) hok.phys hspie' hspp'
+  have hexec := (execSpecF_sret (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) hok.phys hspie' hspp'
     pc (pc + instrLen is_rvc) epc (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF Hsepc
@@ -155,8 +155,8 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   icases HT with ⟨Htrans, Htok⟩
   icases HQ with ⟨HF, Hsepc⟩
   simp only [sConfOf_setMs, sConfOf_mstatus]
-  ihave HConf := kConf_intro cpu curTier k.root true spie spp (sretMs ms) mdl mepc stc
-    ⟨smFacts_sret ms hsm hspie', sretFacts_on _ _ _, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root true spie spp (sretMs ms) mdl mepc stc lf
+    ⟨smFacts_sret ms hsm hspie', sretFacts_on _ _ _, hmdl, hlf⟩ $$ HmConf
   have hn0 : k.noff = 0 := (hwf'.2.2.1 rfl).1
   ihave Hcpu := cpuOwn_zero cpu false false true k.noff k.intena true k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu
   -- the arm, from the trap CSRs, the claim and the handler

@@ -58,11 +58,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- **Rocq `userret_to_user_state`**: the machine `sret` left, with the
 installed user table, is `userInv`. -/
 theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
-    (M : Nat → List (BitVec 8)) (ms mepc stc pc epc sc tv : BitVec 64) (g : RegMap)
+    (M : Nat → List (BitVec 8)) (ms mepc stc pc epc sc tv : BitVec 64) (lf : SLeft) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S)
-    (hms : userMstatusOk (sretMs ms)) :
+    (hms : userMstatusOk (sretMs ms)) (hlf : lf.ok) :
     confCells cpu (DFrac.own 1) Privilege.User
-        { sConfOf KTier.kpt P.root ms C.mideleg mepc stc with mstatus := sretMs ms } ∗
+        { sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf with mstatus := sretMs ms } ∗
       clockCells cpu ∗ pcIs cpu pc ∗ gprFile cpu g ∗
       Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
       Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P
@@ -79,7 +79,7 @@ theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
   · ipureintro; exact hms
   isplit
   · ipureintro; intro _ _; rfl
-  unfold uRegs userPtAny userCfg userHwCells
+  unfold uRegs userPtAny userCfg
   simp only [sConfOf] at *
   rw [hdq, hmie, hmed]
   simp only [MIE_S, MEDELEG_S, MENVCFG_S]
@@ -87,11 +87,13 @@ theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
   isplitl [Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum]
   · iexists M
     iapply (userPtInv_uptSlot cpu P M).2
-    iframe Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum
+    iframe Hsatp Hslot Hum
+    isplitl [Hpmpcfg_n Hpmpaddr_n]
+    · iapply (userPmp_intro cpu _ _ hlf.2); iframe Hpmpcfg_n Hpmpaddr_n
     ipureintro; exact hwf
-  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hmcounteren Hmtimecmp
-  iexists mepc, stc
-  iframe Hmepc Hstimecmp
+  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg
+  iapply (userHwCells_intro cpu _ _ mepc stc hlf.1)
+  iframe Hmcounteren Hmtimecmp Hmepc Hstimecmp
 
 /-- **The trap frame, opened** (uservec's entry): the kernel's supervisor
 configuration cells over the user root, interrupts off with `SPIE = 1`,
@@ -99,22 +101,24 @@ configuration cells over the user root, interrupts off with `SPIE = 1`,
 theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
     hwConfig cpu ∗ userTrapFrame (GF := GF) cpu C P Rut ⊢
-      ∃ (ms mepc stc sc tv sep : BitVec 64) (g : RegMap) (M : Nat → List (BitVec 8)),
-        ⌜smFacts ms false ∧ sretFacts ms false true false⌝ ∗
-        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) ∗
+      ∃ (ms mepc stc sc tv sep : BitVec 64) (g : RegMap) (M : Nat → List (BitVec 8)) (lf : SLeft),
+        ⌜smFacts ms false ∧ sretFacts ms false true false ∧ lf.ok⌝ ∗
+        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P := by
   unfold userTrapFrame userPtAny userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨#Hhw, %ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR⟩
-  icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
-  iexists ms, mepc, stc, sc, stv, sep, g, M
+  icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
+  unfold userPmp
+  icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
+  iexists ms, mepc, stc, sc, stv, sep, g, M, ⟨mc, mtc, cfg, paddr⟩
   iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR
   isplit
-  · ipureintro; exact trapMstatusOk_smFacts ms hms
+  · ipureintro; exact ⟨(trapMstatusOk_smFacts ms hms).1, (trapMstatusOk_smFacts ms hms).2, htm, h0⟩
   isplit
   · unfold confCells sConfOf
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
@@ -145,20 +149,20 @@ given the token), re-entering the kernel through `stvecHandlerWp`. -/
 theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hacc : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt'))
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S)
-    (M : Nat → List (BitVec 8)) (ms mepc stc pc epc sc tv : BitVec 64) (g : RegMap)
-    (hsm : smFacts ms false) (hspie : BitVec.extractLsb' 5 1 ms = 1#1) (hspp : BitVec.extractLsb' 8 1 ms = 0#1)
+    (M : Nat → List (BitVec 8)) (ms mepc stc pc epc sc tv : BitVec 64) (lf : SLeft) (g : RegMap)
+    (hsm : smFacts ms false) (hlf : lf.ok) (hspie : BitVec.extractLsb' 5 1 ms = 1#1) (hspp : BitVec.extractLsb' 8 1 ms = 0#1)
     (hmdl : 0x220#64 &&& ~~~C.mideleg = 0#64)
     (hlt : pc.toNat < 2 ^ 38) (hlt2 : (pc + 2#64).toNat < 2 ^ 38)
     (hvpn : vpnOf pc = trampVpn) (hvpn2 : vpnOf (pc + 2#64) = trampVpn) :
     instrX (GF := GF) pc (paOf trampPpn pc) false (instruction.SRET ()) ∗
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) ∗
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
     clockCells cpu ∗ pcIs cpu pc ∗ uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx ∗ gprFile cpu g ∗
     Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
     Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ umPages P M ∗ (ctxToken cpu -∗ Rut P) ∗
     wireInv ∗ ▷ stvecHandlerWp cpu C P Rut
     ⊢ wpLoop cpu := by
-  have hok : SConfKpt (GF := GF) (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) P.root false :=
-    SConfAt_sConfOf KTier.kpt P.root ms C.mideleg mepc stc false hsm
+  have hok : SConfKpt (GF := GF) (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) P.root false :=
+    SConfAt_sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf false hsm hlf
   have hpa2 : paOf trampPpn (pc + 2#64) = paOf trampPpn pc + 2#64 := by
     have h1 : vpnOf (pc + 2#64) = vpnOf pc := by rw [hvpn, hvpn2]
     revert h1
@@ -166,8 +170,8 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     bv_decide
   iintro ⟨#HI, HmConf, Hclock, Hpc, Hslot, #HS, Htok, HF, Hsepc, Hsc, Hstv, Hstvec, %hwf, Hum, HR, #Hwire, Hh⟩
   icases confCells_hw cpu _ _ _ $$ HmConf with ⟨HmConf, #Hhw⟩
-  iapply (wpLoop_sT_instr cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc)
-    { sConfOf KTier.kpt P.root ms C.mideleg mepc stc with mstatus := sretMs ms } hok.phys hmdl rfl
+  iapply (wpLoop_sT_instr cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf)
+    { sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf with mstatus := sretMs ms } hok.phys hmdl rfl
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false (instruction.SRET ())
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
     iprop(gprFile cpu g ∗ Register.sepc ↦ᵣ[cpu] epc)
@@ -183,8 +187,8 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
   inext
   iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, Hsepc⟩
   ihave HRut := HR $$ Htok
-  ihave HU := userInv_of_sret cpu C P Rut M ms mepc stc (epc &&& 0xFFFFFFFFFFFFFFFE#64) epc sc tv g hdq hmie hmed
-    (userMstatusOk_sretMs ms hsm hspie) $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut]
+  ihave HU := userInv_of_sret cpu C P Rut M ms mepc stc (epc &&& 0xFFFFFFFFFFFFFFFE#64) epc sc tv lf g hdq hmie hmed
+    (userMstatusOk_sretMs ms hsm hspie) hlf $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut]
   · iframe HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut
     ipureintro; exact hwf
   iapply (U.wp_user_exec_closed cpu C P Rut hacc) $$ Hhw HS Hwire HU

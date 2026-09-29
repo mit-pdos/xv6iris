@@ -102,12 +102,20 @@ theorem wpLoop_s_instr_clk [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (r
 
 /-! ## The execute stages -/
 
+/-- `mcounteren.TM`, in the form the counter check reads it. -/
+theorem mcounteren_TM_bit {m : BitVec 32} (h : BitVec.extractLsb' 1 1 m = 1#1) : m[1]! = true := by
+  have h2 : m.getLsbD 1 = true := by
+    have := congrArg (fun x : BitVec 1 => x.getLsbD 0) h
+    simpa [BitVec.getLsbD_extractLsb'] using this
+  rw [getElem!_pos m 1 (by decide)]
+  simpa [← BitVec.getLsbD_eq_getElem] using h2
+
 set_option maxHeartbeats 4000000 in
 /-- `rdtime rd` (`csrrs rd, time, x0`) in supervisor mode with
 `mcounteren.TM` set: the `mtime` cell's value into `rd`, nothing else
 moved. -/
 theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (hcnt : c.mcounteren = 2#32)
+    (hcnt : BitVec.extractLsb' 1 1 c.mcounteren = 1#1)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) (t : BitVec 64) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
@@ -118,7 +126,7 @@ theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  simp only [hcnt]
+  have hTM := mcounteren_TM_bit hcnt
   unfold execute
   swp_run 300
   iapply swp_bind
@@ -127,7 +135,6 @@ theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   inext
   iintro HF
   swp_run 10
-  simp only [← hcnt]
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [HF Hmtime]
   iframe HF Hmtime
@@ -138,7 +145,7 @@ set_option maxHeartbeats 4000000 in
 register's value, the CLINT refreshes `mip` (at some value), the file and
 `mtime` are untouched. -/
 theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (hcnt : c.mcounteren = 2#32) (hmenv : c.menvcfg = menvcfgS)
+    (hcnt : BitVec.extractLsb' 1 1 c.mcounteren = 1#1) (hmenv : c.menvcfg = menvcfgS)
     (pc npc₀ : BitVec 64) (rs1 : BitVec 5) (R : RegMap) (mt ip : BitVec 64) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
       { c with stimecmp := RegMap.get R rs1 }
@@ -151,7 +158,8 @@ theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCon
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hstce : BitVec.extractLsb' 63 1 c.menvcfg = 1#1 := by rw [hmenv]; decide
-  simp only [hcnt, hmenv]
+  have hTM := mcounteren_TM_bit hcnt
+  simp only [hmenv]
   unfold execute
   swp_run 30
   iapply swp_bind
@@ -170,7 +178,7 @@ theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCon
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro _ _ _
-    { c with stimecmp := RegMap.get R rs1, mcounteren := 2#32, menvcfg := menvcfgS } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    { c with stimecmp := RegMap.get R rs1, menvcfg := menvcfgS } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
   case' _ => (iframe; iexact Hhw)
@@ -198,7 +206,7 @@ theorem execSpecClkPP.frameL {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf
 /-- `rdtime rd` as a clock-lending stage: the result is the `mtime` cell's
 value, which the caller cannot name, so the post is existential. -/
 theorem execSpecClk_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (hcnt : c.mcounteren = 2#32)
+    (hcnt : BitVec.extractLsb' 1 1 c.mcounteren = 1#1)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
     execSpecClkPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
@@ -218,7 +226,7 @@ theorem execSpecClk_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfP
 
 /-- `csrw stimecmp, rs1` as a clock-lending stage. -/
 theorem execSpecClk_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (hcnt : c.mcounteren = 2#32) (hmenv : c.menvcfg = menvcfgS)
+    (hcnt : BitVec.extractLsb' 1 1 c.mcounteren = 1#1) (hmenv : c.menvcfg = menvcfgS)
     (pc npc₀ : BitVec 64) (rs1 : BitVec 5) (R : RegMap) :
     execSpecClkPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
       { c with stimecmp := RegMap.get R rs1 }
@@ -238,17 +246,17 @@ theorem execSpecClk_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SC
 
 /-! ## The rules -/
 
-@[simp] theorem sConfOf_mcounteren (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) :
-    (sConfOf tier root ms mdl mepc stc).mcounteren = 2#32 := rfl
+@[simp] theorem sConfOf_mcounteren (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
+    (sConfOf tier root ms mdl mepc stc lf).mcounteren = lf.mcen := rfl
 
-@[simp] theorem sConfOf_menvcfg (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) :
-    (sConfOf tier root ms mdl mepc stc).menvcfg = menvcfgS := rfl
+@[simp] theorem sConfOf_menvcfg (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
+    (sConfOf tier root ms mdl mepc stc lf).menvcfg = menvcfgS := rfl
 
 /-- The configuration after a `stimecmp` write: the same, at the new
 timer compare. -/
-theorem sConfOf_setStc (tier : KTier) (root : BitVec 44) (ms mdl mepc stc v : BitVec 64) :
-    ({ sConfOf tier root ms mdl mepc stc with stimecmp := v } : MConf) =
-      sConfOf tier root ms mdl mepc v := rfl
+theorem sConfOf_setStc (tier : KTier) (root : BitVec 44) (ms mdl mepc stc v : BitVec 64) (lf : SLeft) :
+    ({ sConfOf tier root ms mdl mepc stc lf with stimecmp := v } : MConf) =
+      sConfOf tier root ms mdl mepc v lf := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- **`rdtime rd`** (`csrrs rd, time, x0`) with interrupts off: the value
@@ -266,14 +274,14 @@ theorem wp_s_rdtime [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
-  have hexec := (execSpecClk_csrr_time (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) false
-    hok.phys rfl pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  have hexec := (execSpecClk_csrr_time (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false
+    hok.phys hlf.1 pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr_clk cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
   isplitl [Htrans Htok]
@@ -289,7 +297,7 @@ theorem wp_s_rdtime [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc ⟨hsm, hsr, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   have htp := tpPin_set cpu k.regs rd t hrd.2.2
   have hsp := KCtx.setReg_sp k rd t hrd.2.1
   iapply HΦ' $$ %t [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
@@ -320,14 +328,14 @@ theorem wp_s_csrw_stimecmp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %⟨hsm, hsr, hmdl⟩, HmConf⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ HConf with ⟨%ms, %mdl, %mepc, %stc, %lf, %⟨hsm, hsr, hmdl, hlf⟩, HmConf⟩
   unfold transSlot
   icases Htrans with ⟨%hkt, Htrans⟩
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
-  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc false hsm
-  have hexec := (execSpecClk_csrw_stimecmp (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc) false
-    hok.phys rfl rfl pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
+  have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  have hexec := (execSpecClk_csrw_stimecmp (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false
+    hok.phys hlf.1 rfl pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
   simp only [sConfOf_setStc] at hexec
   iapply (wpLoop_s_instr_clk cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
   iframe HI HmConf Hclock Hpc HF
@@ -344,7 +352,7 @@ theorem wp_s_csrw_stimecmp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc
-    ((tpPin cpu k.regs).get rs1) ⟨hsm, hsr, hmdl⟩ $$ HmConf
+    ((tpPin cpu k.regs).get rs1) lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
   iapply (kctx_intro' cpu k hwf)
   simp only [hkt, hsie, trapRes_off]

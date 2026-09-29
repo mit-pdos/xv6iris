@@ -404,34 +404,35 @@ theorem sretFacts_trapMs (ms : BitVec 64) (h : smFacts ms true) : sretFacts (tra
 
 -- `sConfOf` (the S-mode configuration record) lives in `MachCSL.SConfDefs`.
 
-theorem trapConf_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) :
-    trapConf (sConfOf tier root ms mdl mepc stc) = sConfOf tier root (trapMs ms) mdl mepc stc := rfl
+theorem trapConf_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : BitVec 64) (lf : SLeft) :
+    trapConf (sConfOf tier root ms mdl mepc stc lf) = sConfOf tier root (trapMs ms) mdl mepc stc lf := rfl
 
 /-- The kernel's S-mode configuration cells of hart `cpu`, at tier `tier` (root
 `root`) with interrupts at `sie` (and, while off, `SPIE`/`SPP` at `spie`/`spp`).  `mie` masked by the complement of
 `mideleg` is zero: no machine-level interrupt is ever pending in S-mode,
 so the interrupt question is decided by `sie` alone. -/
 def kConf (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool) : IProp GF := iprop%
-  ∃ ms mdl mepc stc : BitVec 64,
-    ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc)
+  ∃ (ms mdl mepc stc : BitVec 64) (lf : SLeft),
+    ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64 ∧ lf.ok⌝ ∗
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc lf)
 
 theorem kConf_cases (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool) :
     kConf (GF := GF) cpu tier root sie spie spp ⊢
-      ∃ ms mdl mepc stc : BitVec 64,
-        ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64⌝ ∗
-        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc) := by
+      ∃ (ms mdl mepc stc : BitVec 64) (lf : SLeft),
+        ⌜smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64 ∧ lf.ok⌝ ∗
+        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc lf) := by
   unfold kConf
   iintro H
   iexact H
 
 theorem kConf_intro (cpu : CPU) (tier : KTier) (root : BitVec 44) (sie spie spp : Bool)
-    (ms mdl mepc stc : BitVec 64) (h : smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64) :
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc) ⊢
+    (ms mdl mepc stc : BitVec 64) (lf : SLeft)
+    (h : smFacts ms sie ∧ sretFacts ms sie spie spp ∧ 0x220#64 &&& ~~~mdl = 0#64 ∧ lf.ok) :
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf tier root ms mdl mepc stc lf) ⊢
       kConf (GF := GF) cpu tier root sie spie spp := by
   unfold kConf
   iintro H
-  iexists ms, mdl, mepc, stc
+  iexists ms, mdl, mepc, stc, lf
   iframe
   ipureintro
   exact h
@@ -1037,14 +1038,14 @@ theorem kctx_hw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU)
     kctxL (GF := GF) lent cpu k ⊢ kctxL lent cpu k ∗ hwConfig cpu := by
   iintro H
   icases kctx_cases cpu k $$ H with ⟨%hwf, Hc, H⟩
-  icases kConf_cases cpu _ _ _ _ _ $$ Hc with ⟨%ms, %mdl, %mepc, %stc, %hf, Hc⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ Hc with ⟨%ms, %mdl, %mepc, %stc, %lf, %hf, Hc⟩
   icases confCells_hw cpu _ _ _ $$ Hc with ⟨Hc, #Hhw⟩
   isplitl [Hc H]
   · iapply kctx_intro cpu k
     iframe H
     isplitr
     · ipureintro; exact hwf
-    iapply kConf_intro cpu _ _ _ _ _ ms mdl mepc stc hf $$ Hc
+    iapply kConf_intro cpu _ _ _ _ _ ms mdl mepc stc lf hf $$ Hc
   · iexact Hhw
 
 /-- `kctx_intro` with the well-formedness as a Lean hypothesis. -/
@@ -1153,8 +1154,8 @@ theorem sieArm_off [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (p : BitVe
 /-- The handler's context, from the cells a trap from `k` (interrupts on)
 leaves: the trapped configuration and the rest of `k`'s bundle. -/
 theorem kctx_trapped_intro [X : CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (hwf : k.wf)
-    (hs : k.sie = true) (ms mdl mepc stc : BitVec 64) (hsm : smFacts ms k.sie) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) :
-    confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc)) ∗
+    (hs : k.sie = true) (ms mdl mepc stc : BitVec 64) (lf : SLeft) (hsm : smFacts ms k.sie) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (hlf : lf.ok) :
+    confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc lf)) ∗
     gprFile cpu (tpPin cpu k.regs) ∗ stackOwn k.sp (trapRes k.sie + k.avail) ∗ transSlot cpu k.tier k.root ∗
     cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks ∗ ctxToken cpu ∗ clockCells cpu ∗ KernelImage.ro
     ⊢ kctx (GF := GF) cpu k.trapped := by
@@ -1170,8 +1171,8 @@ theorem kctx_trapped_intro [X : CurCtx] [KernelGeom] [KernelImage GF] {lent : Bo
     exact absurd (hs.symm.trans hs') (by decide)
   ihave Hcpu := cpuOwn_zero cpu false k.sie false k.noff k.intena false k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu
   rw [trapConf_sConfOf]
-  ihave HConf := kConf_intro cpu k.tier k.root false true true (trapMs ms) mdl mepc stc
-    ⟨smFacts_trapMs ms true hsm, sretFacts_trapMs ms hsm, hmdl⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu k.tier k.root false true true (trapMs ms) mdl mepc stc lf
+    ⟨smFacts_trapMs ms true hsm, sretFacts_trapMs ms hsm, hmdl, hlf⟩ $$ HmConf
   iapply (kctx_intro' cpu k.trapped (KCtx.wf_trapped k hwf))
   simp only [KCtx.trapped_regs, KCtx.trapped_sie, KCtx.trapped_spie, KCtx.trapped_spp, KCtx.trapped_avail,
     KCtx.trapped_noff, KCtx.trapped_intena, KCtx.trapped_locks, KCtx.trapped_tier, KCtx.trapped_root,

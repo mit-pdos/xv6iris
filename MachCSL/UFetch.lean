@@ -40,6 +40,7 @@ import MachCSL.UFetchWalk
 import MachCSL.UWalk
 import MachCSL.UCycle
 import MachCSL.BvEnumSatp
+import MachCSL.WpTrap
 
 namespace MachCSL
 
@@ -114,10 +115,25 @@ theorem uft_Ziccif {D : UFoot} {s : UWSt} (hp : UwkPins D s.file) (o : UOrc) :
 /-! ## §1 The physical read of an instruction (Rocq `UserFetchCert` §1, the
 read node driven by the ifetch leaf) -/
 
+/-- The PMP check under xv6's entry 0, as a fetch-walk (`utr_pmpCheck_ent0`). -/
+theorem uft_pmpCheck_ent0 (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (width : Nat)
+    (hc : D.Dr .pmpcfg_n = true) (ha : D.Dr .pmpaddr_n = true)
+    (h0 : pmpEnt0Ok (s.file .pmpcfg_n) (s.file .pmpaddr_n))
+    (acc : MemoryAccessType mem_payload) (hrwx : pmpCheckRWX 15#8 acc = (Pure.pure true : SailM Bool)) (p : Privilege)
+    (hram : pmpOk addr width) :
+    uftRun D orc s (pmpCheck (.Physaddr addr) width acc p) = some (none, s, orc) :=
+  uftRun_of_runRW (D := D) _ orc s _ (utr_pmpCheck_ent0 D orc s addr width hc ha h0 acc hrwx p hram)
+
 set_option hygiene false in
 macro "uft_phys" hp:term:max n:num hram:term:max hal:term:max : tactic => `(tactic| (
   uwk_pins $hp
   have hrange := uwk_pmpRange _ $n (pmpOk_of_inRam $hram)
+  have hpok := pmpOk_of_inRam $hram
+  -- the PMP check under entry 0, as a fetch-walk fact (`bv_decide` meets
+  -- `Privilege` here: its encoding comes from `MachCSL.WpTrap`)
+  have hpchk : ∀ (a : BitVec 64) (w : Nat) (p : Privilege), pmpOk a w →
+      uftRun _ orc s (pmpCheck (.Physaddr a) w (.InstructionFetch ()) p) = some (none, s, orc) :=
+    fun a w p hok => uft_pmpCheck_ent0 _ orc s a w hDpmpc hDpmpa hpmp0 _ utr_pmpCheckRWX_fetch p hok
   have hmpma := matching_pma_ram _ $n $hram (by decide) (by decide)
   have hclint := within_clint_ram _ $n $hram
   have halign := is_aligned_paddr_of _ $n (by decide) $hal

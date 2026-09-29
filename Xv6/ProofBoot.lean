@@ -31,7 +31,7 @@ theorem BootProof (E : ENTRY) (S : START) : BOOT where
     iapply hS
     iframe
     iframe #
-    iintro %t HS Hmhartid Hclock Htok Hpc Hx1 Hx2 Hx4 Hx8 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
-    iapply HΦ $$ %t HS Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx4 Hx8 Hx10 Hx11 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
+    iintro %t %lf %hlf HS Hmhartid Hclock Htok Hpc Hx1 Hx2 Hx4 Hx8 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
+    iapply HΦ $$ %t %lf %hlf HS Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx4 Hx8 Hx10 Hx11 Hx14 Hx15 Hf0 Hf8 Hg0 Hg8
 
 end Xv6

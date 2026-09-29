@@ -316,20 +316,19 @@ theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 1
 
 theorem utr_pmpReadAddrReg0 (D : UFoot) (orc : UOrc) (s : UWSt)
     (hc : D.Dr .pmpcfg_n = true) (ha : D.Dr .pmpaddr_n = true)
-    (hcfg : s.file .pmpcfg_n = xv6Pmpcfg) (haddr : s.file .pmpaddr_n = xv6Pmpaddr) :
+    (h0 : pmpEnt0Ok (s.file .pmpcfg_n) (s.file .pmpaddr_n)) :
     runRW D orc s (pmpReadAddrReg 0) = some (0x3fffffffffffff#64, s, orc) := by
   unfold pmpReadAddrReg
-  simp only [runRW_bind, utr_readReg D _ _ _ hc, utr_readReg D _ _ _ ha, Option.bind_some, hcfg, haddr,
+  simp only [runRW_bind, utr_readReg D _ _ _ hc, utr_readReg D _ _ _ ha, Option.bind_some, h0.1, h0.2,
     runRW_pure]
   rfl
 
 /-- Entry 0 (TOR over `[0, 2^56)`) matches every access `pmpOk` covers. -/
 theorem utr_pmpMatchAddr0 (addr : BitVec 64) (width : Nat) (hram : pmpOk addr width) :
-    pmpMatchAddr (.Physaddr addr) (to_bits (l := 64) width) (xv6Pmpcfg[(0 : Int)]!) 0x3fffffffffffff#64 0#64 =
+    pmpMatchAddr (.Physaddr addr) (to_bits (l := 64) width) 0x0f#8 0x3fffffffffffff#64 0#64 =
       pure pmpAddrMatch.PMP_Match := by
   have hrange := pmpRangeMatch_xv6' addr width hram
   unfold pmpMatchAddr
-  rw [xv6Pmpcfg_getInt0]
   sail_norm
   rw [show pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A 15#8) = PmpAddrMatchType.TOR from rfl]
   dsimp only
@@ -341,24 +340,42 @@ theorem utr_pmpCheckRWX (acc : MemoryAccessType mem_payload) (h : utrAcc acc = t
   rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at h <;> rfl
 
-/-- **PMP at User** (Rocq `exec/goodmb_pmpCheck_user_grant_load/_store`, all
-user access kinds at once): under xv6's tables the check passes. -/
-theorem utr_pmpCheck_xv6_U (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (width : Nat)
+/-- **PMP under xv6's entry 0, at any privilege** (Rocq
+`exec/goodmb_pmpCheck_user_grant_*`, `exec_pmpCheck_supervisor_grant_wpte`):
+entry 0 (`pmpEnt0Ok`, any other entries) matches on the loop's first
+iteration and its R/W/X bits grant the access, so the check passes. -/
+theorem utr_pmpCheck_ent0 (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (width : Nat)
     (hc : D.Dr .pmpcfg_n = true) (ha : D.Dr .pmpaddr_n = true)
-    (hcfg : s.file .pmpcfg_n = xv6Pmpcfg) (haddr : s.file .pmpaddr_n = xv6Pmpaddr)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hram : pmpOk addr width) :
-    runRW D orc s (pmpCheck (.Physaddr addr) width acc .User) = some (none, s, orc) := by
+    (h0 : pmpEnt0Ok (s.file .pmpcfg_n) (s.file .pmpaddr_n))
+    (acc : MemoryAccessType mem_payload) (hrwx : pmpCheckRWX 15#8 acc = pure true) (p : Privilege)
+    (hram : pmpOk addr width) :
+    runRW D orc s (pmpCheck (.Physaddr addr) width acc p) = some (none, s, orc) := by
   unfold pmpCheck
   sail_norm
   simp only [forIn, forIn', IntRange.forIn'_eq]
   rw [IntRange.loop_unfold]
   sail_norm
-  simp only [runRW_bind, utr_readReg D _ _ _ hc, Option.bind_some, hcfg,
-    utr_pmpReadAddrReg0 D _ _ hc ha hcfg haddr, utr_pmpMatchAddr0 addr width hram, runRW_pure]
+  simp only [runRW_bind, utr_readReg D _ _ _ hc, Option.bind_some, h0.cfgInt,
+    utr_pmpReadAddrReg0 D _ _ hc ha h0, utr_pmpMatchAddr0 addr width hram, runRW_pure]
   sail_norm
-  simp only [utr_pmpCheckRWX acc hacc]
+  simp only [hrwx]
   sail_norm
   simp only [runRW_pure, Option.bind_some]
+
+/-- **PMP at User** (Rocq `exec/goodmb_pmpCheck_user_grant_load/_store`, all
+user access kinds at once): under xv6's entry 0 (`pmpEnt0Ok`, any other
+entries) the check passes. -/
+theorem utr_pmpCheck_xv6_U (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (width : Nat)
+    (hc : D.Dr .pmpcfg_n = true) (ha : D.Dr .pmpaddr_n = true)
+    (h0 : pmpEnt0Ok (s.file .pmpcfg_n) (s.file .pmpaddr_n))
+    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hram : pmpOk addr width) :
+    runRW D orc s (pmpCheck (.Physaddr addr) width acc .User) = some (none, s, orc) :=
+  utr_pmpCheck_ent0 D orc s addr width hc ha h0 acc (utr_pmpCheckRWX acc hacc) .User hram
+
+/-- Entry 0's R/W/X bits grant the page walk's entry reads and write-backs. -/
+theorem utr_pmpCheckRWX_pteLoad : pmpCheckRWX 15#8 (.Load .PageTableEntry) = pure true := rfl
+theorem utr_pmpCheckRWX_pteStore : pmpCheckRWX 15#8 (.Store .PageTableEntry) = pure true := rfl
+theorem utr_pmpCheckRWX_fetch : pmpCheckRWX 15#8 (.InstructionFetch ()) = pure true := rfl
 
 /-! ## §6 PMA (Rocq `UserMemPt` §3) -/
 

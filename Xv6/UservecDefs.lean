@@ -250,22 +250,24 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
     (M : ElfMem) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
     hwConfig cpu ∗ userTrapFrameAtm (GF := GF) cpu C P Rut sz M ms sc tv sep g ⊢
-      ∃ (mepc stc : BitVec 64) (Mp : Nat → List (BitVec 8)),
-        ⌜(smFacts ms false ∧ sretFacts ms false true false) ∧ umemLazy P sz Mp = M⌝ ∗
-        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) ∗
+      ∃ (mepc stc : BitVec 64) (lf : SLeft) (Mp : Nat → List (BitVec 8)),
+        ⌜(smFacts ms false ∧ sretFacts ms false true false) ∧ umemLazy P sz Mp = M ∧ lf.ok⌝ ∗
+        confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P Mp ∗ Rut P := by
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR⟩
-  icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
-  iexists mepc, stc, Mp
+  icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
+  unfold userPmp
+  icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
+  iexists mepc, stc, ⟨mc, mtc, cfg, paddr⟩, Mp
   iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR
   isplit
-  · ipureintro; exact ⟨trapMstatusOk_smFacts ms hms, hM⟩
+  · ipureintro; exact ⟨trapMstatusOk_smFacts ms hms, hM, htm, h0⟩
   isplit
   · unfold confCells sConfOf
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
