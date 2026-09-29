@@ -178,9 +178,12 @@ Section ProofSysOpenEntryCCont.
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
-      (∀ (mf : regfile) (ns' : nat),
+      (∀ (mf : regfile) (ns' : nat) (k' : nat),
          ⌜callee_saved m mf⌝ -∗
          ⌜ns' = ns⌝ -∗
+         (* the block at a raised count: a failing arm's fileclose lends
+            its counter to pipeclose (permit sweep L1b) *)
+         ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
          sie_cap_gpr KT1 mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
          trap_csrs_ext KT1 eb -∗
@@ -194,7 +197,7 @@ Section ProofSysOpenEntryCCont.
          iref_slots ns' -∗
          open_arms_create omo (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
-           P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts U
+           P Pmiss Phiarm Phiun Phiok Phiex Phio Phit sts (upd_usV U (upd_ev (us_V U) k'))
            (mf !!! Regidx Ra0 : mword 64) -∗
          mWP (Loop : expr riscv_lang))%I.
 
@@ -638,10 +641,14 @@ Section ProofSysOpenEntryC.
                                            Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf ns1 with "[%] [%] Hcg Hown Htce Hcce Hpc
+      (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+      iSpecialize ("Hcont" $! mf ns1 (pv_ev (us_V U))).
+      iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+      iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds Hfrag Hcf Hoc Htc]").
       { exact Hcsf. }
       { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
+      { lia. }
       { rewrite /open_arms_create. iFrame "Hfds". iLeft.
         iSplitR; [iPureIntro; exact Ha0f |]. iFrame "Hpriv Hfrag".
         iApply (cre_fail_to_open _ _ _ Mim pvv _ _ _ _ _ _ _ _ _ _ _ _ _ Hpof
@@ -754,18 +761,19 @@ Section ProofSysOpenEntryC.
                     (socr_ft (bview plen bp) P Phiarm Phiok Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
-        iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
+        iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_fresh omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
-                Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
+                Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)
                 (fn_nlink (era_node dn bm data)) Hpof with "HR Hpost") as "Hpost".
         iModIntro.
-        iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
-        { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
+        { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
+        { exact Hk2. } }
       iApply (Join.so_join_au (CID0 := CID8) omo gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
@@ -845,18 +853,19 @@ Section ProofSysOpenEntryC.
                     (socr_ft_ex (bview plen bp) P Phiarm Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
-        iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
+        iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply fupd_wp.
         iMod (socr_arms_exists omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss
-                Phiarm Phiun Phiok Phiex Phio Phit U sts _ (bview plen bp) (bv_unsigned inum)
+                Phiarm Phiun Phiok Phiex Phio Phit (upd_usV U (upd_ev (us_V U) k2)) sts _ (bview plen bp) (bv_unsigned inum)
                 (abs_row (era_node dn bm data)) Hpof Hnd with "HR Hpost") as "Hpost".
         iModIntro.
-        iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
-        { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. } }
+        { cbn in Hns1. unfold sys_open_slots, create_slots in *. lia. }
+        { exact Hk2. } }
       iApply (Join.so_join_au (CID0 := CID8) omo gfl gf gs jx gl pd pav pu
                 gil gisl kk qi ss gy loy tly inum dn bm om lo ns1 u1 pidv dqb dqs
                 U sts m P1 sp0 K eb b lks w4 w5 w6 w24 bp1

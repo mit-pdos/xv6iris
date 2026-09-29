@@ -71,6 +71,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPipeclose.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Import Defs.
@@ -177,8 +178,8 @@ Section ProofPipeclose.
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
-      (b : bool) (lks : gset string) (Φ : iProp Σ)
-    : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks Φ.
+      (b : bool) (lks : gset string) (Φ : iProp Σ) (k : nat)
+    : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks Φ k.
   Proof using .
     cbv beta delta [wp_pipeclose_sconf_body].
     intros pcE pi ret_tgt Hw Hav Hpos Hklk Hkfl Hno.
@@ -188,7 +189,11 @@ Section ProofPipeclose.
        every hart rather than pinned at the ambient one. *)
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero, tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hcpay #Hkmem Havail #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hcpay #Hkmem Havail Hlend #Hpinv Hcont".
+    (* the lend (permit sweep L1b): kfree does not take it yet, so it is
+       framed through the continuation once, here *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     iDestruct (sie_b_agree m n av eb b pme lks with "Hcg Hown") as %Houtb.
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }

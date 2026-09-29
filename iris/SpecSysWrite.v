@@ -346,14 +346,17 @@ Definition wp_sys_write_sconf_body
      nose.  The page table may still have GROWN: a copyin can fault a page
      in on the way to reading the source bytes, which is exactly what [P']
      and [uptd_ext] are for. *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): filewrite lends the block's counter to a copy, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (us_upt U P') -∗
+      proc_priv γf pj pidv (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back *)

@@ -375,16 +375,19 @@ Definition wp_sys_pipe_sconf_body
      copyout fails, [d] is its own prefix (<= 4); if only the second does,
      [d] is [4] plus its prefix.  A caller reads its own untouched bytes
      back with [UserPtTree.umem_wr_lookup_out]. *)
-    ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(d <= 8)%nat⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): sys_pipe lends the block's counter to copyout and fileclose, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts
+      sys_pipe_post γf p pid (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) v d bs)) sts
         d bs (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       iref_slot -∗
       (* the environment back; the page count has moved if either close was

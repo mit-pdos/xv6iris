@@ -828,11 +828,14 @@ Section ProofSysWrite.
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
-                with "[%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] []").
+                (pv_ev (us_V U))
+                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] []").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { exact Hmfa0. }
-      { rewrite us_upt_id. iExact "Hpriv". }
+      (* permit sweep L1b: nothing lent on this arm *)
+      { lia. }
+      { rewrite upd_ev_id upd_usV_id us_upt_id. iExact "Hpriv". }
       { iApply (filewrite_fs_env_out with "Henv"). }
       { (* ARGFD ANSWERED NONE: the key is [FdClosed], so nothing is armed
            and the post is the landed blanket's first disjunct. *)
@@ -990,8 +993,8 @@ Section ProofSysWrite.
         rewrite HS4a1.
         iApply (sys_write_in_of _ _ _ (us_V U) v sts fd fv stf (sys_rw_count v2)
                   (us_M U) v1 Q Qe Hsome Hstq with "Hswin"). }
-      iIntros (CID25 Hs25 mf rv P')
-        "%Hcsf %Hupt %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
+      iIntros (CID25 Hs25 mf rv P' kev)
+        "%Hcsf %Hupt %Hrva %Hkev Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -1003,10 +1006,11 @@ Section ProofSysWrite.
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
-      iDestruct (proc_priv_join γf pj pidv (us_upt U P') with "[Hcore] [Howe]")
+      iDestruct (proc_priv_join γf pj pidv (us_upt (upd_usV U (upd_ev (us_V U) kev)) P')
+                   with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
-      { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }
+      { cbn [upd_upt upd_ev pv_ofile pv_fdg]. iExact "Howe". }
       assert (Hpc40 : ret_pc (S4 !!! Regidx Rra)
                       = mword_of_int (KernelSyms.sys_write + 0x40))
         by (rewrite HS4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1038,12 +1042,13 @@ Section ProofSysWrite.
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P'
-                with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv
+      iApply ("Hcont" $! mg rv P' kev
+                with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv
                       [Harms]").
       { exact Hcsg. }
       { exact Hupt. }
       { exact Hmga0. }
+      { exact Hkev. }
       { (* the callee's arms ARE this contract's, at the same key: sys_write
            relays filewrite's return value untouched. *)
         rewrite -HS4a1.

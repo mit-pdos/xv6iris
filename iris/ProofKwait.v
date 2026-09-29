@@ -2102,7 +2102,9 @@ Section ProofKwait.
       iEval (rewrite Hp50) in "Hpc".
       (* the caller's own address space, opened for copyout *)
       iDestruct (proc_priv_sz_bound γf pme pid U with "Hpriv") as %Hszb.
-      iDestruct (proc_priv_copy γf pme pid U with "Hpriv") as "(Hsz & Hpg & Hpt & Hback)".
+      iDestruct (proc_priv_copy_ev γf pme pid U with "Hpriv") as "(Hsz & Hpg & Hpt & Hev & Hback)".
+      (* the lend (permit sweep L1b): the block's counter, borrowed for copyout *)
+      iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
       (* +0x50 ld a1,72(s2) : a1 := p->sz -- copyout's NEW [psz] argument.
          The two cells are read here and nowhere else: the contract itself no
          longer mentions [p_sz] / [p_pagetable] (SpecCopyout.v's header), so
@@ -2222,15 +2224,16 @@ Section ProofKwait.
       iApply (Copyout.wp_copyout_sconf_mem KT0 γa F6 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U)) 4%nat
                 (fun i => nth_byte xs i) (DfracOwn (1/2))
                 (trap_res eb + (K - 10))%nat 2%nat eb pme false
-                ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
+                ({["proc"]} ∪ ({["wait_lock"]} ∪ lks)) (pv_ev (us_V U))
                 ltac:(pose proof (kw_K52 K HK); lia) HF6a0 HF6a1
                 ltac:(rewrite HF6a4; apply bv_eq; vm_compute; reflexivity)
                 kw_len4 Hszb kw_ilvl2
-                with "Hcg Hown Htext Hpc Hpt Henv [Hbytes]").
+                with "Hcg Hown Htext Hpc Hpt Henv Hlend [Hbytes]").
       all: try lkbelow.
       { iEval (rewrite HF6a3). iExact "Hbytes". }
       iApply wp_next_off_intro.
-      iIntros (mco P' Mco) "Hcg Hown Hpc Hpt Hbytes %Hcsco %Hext %Hwrote".
+      iIntros (mco P' Mco) "Hcg Hown (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbytes %Hcsco %Hext %Hwrote".
+      iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       assert (Hp5c : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KW + 0x5c))
         by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5c) in "Hpc".
@@ -2256,8 +2259,8 @@ Section ProofKwait.
           apply (f_equal bv_unsigned) in Hz0. vm_compute in Hz0. discriminate. }
       destruct Hex as (d & Hdle & Hdfull & HMco).
       subst Mco.
-      iDestruct ("Hback" $! P' (umem_wr (us_M U) addr d (fun i => nth_byte xs i))
-                   with "[%] Hsz Hpg Hpt") as "Hpriv"; [exact Hext |].
+      iDestruct ("Hback" $! P' (umem_wr (us_M U) addr d (fun i => nth_byte xs i)) kc2
+                   with "[%] Hsz Hpg Hpt Hev") as "Hpriv"; [exact Hext |].
       assert (Hcosp : mco !!! Regidx csp_rs1 = spr)
         by (rewrite (callee_saved_lookup Hcsco csp_rs1 ltac:(vm_compute; reflexivity)); exact HF6sp).
       assert (Hcos1 : mco !!! Regidx Rs1 = proc_addr k)
@@ -2299,7 +2302,7 @@ Section ProofKwait.
         { iApply (kw_pay_res with "Hcols"). }
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs (pv_ev (us_V U))
+        iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs kc2
                   with "[%] [%] [%] [%] [%] [%] [] [] Hcg Hown Hpc [%] Hpriv Hmyrow").
         { exact Hcsf. }
         { rewrite Ha0. apply bv_eq; vm_compute; reflexivity. }
@@ -2316,8 +2319,8 @@ Section ProofKwait.
         { iApply wait_ans_gen_neg. iApply wait_why_notnull.
           apply bool_decide_eq_false_2. exact Hane. }
         { iLeft. by iPureIntro. }
-        (* no lend on this -1 exit: the count is the block's own *)
-        { lia. }
+        (* this -1 exit: the count copyout handed back *)
+        { exact Hkc2. }
       + (* ===== copyout succeeded: fall through to the reaping tail ===== *)
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KW + 0x5c))
                   (mword_of_int 56 : mword 13) Ra0 mco (trap_res eb + (K - 10))%nat false
@@ -2343,7 +2346,7 @@ Section ProofKwait.
         iDestruct (act_lend_of_cnt with "Hcnt") as "Hlend".
         iApply (kw_reap γs γa γp γw γk mm mco pme k K eb pidc kl xs ch ps γrow cs lks
                   (pv_gen (us_V U)) (bool_decide (addr = (zero_reg : mword 64)))
-                  (pv_ev (us_V U))
+                  kc2
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs Hbelow Hchild Hpmenz
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                         Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
@@ -2364,7 +2367,7 @@ Section ProofKwait.
         (* ...AND THE WHOLE WORD LANDED, off copyout's own answer *)
         { intros _ _; exact (Hdfull Hr0). }
         { iRight. iExact "Hzr". }
-        { exact Hkl2. }
+        { lia. }
   Qed.
 
   (* ================================================================== *)

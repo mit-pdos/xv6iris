@@ -109,13 +109,17 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG 
     (* THE IMAGE DOES NOT MOVE: the whole cone below argstr only READS user
        memory, and the pages copyinstr faults in were already in the block's
        lazy view (SpecFetchstr.v).  Only the DESCRIPTOR grows. *)
-    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
+    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): fetchstr lends the block's
+         counter to copyinstr, which may step it, so the block comes back
+         at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (us_upt U P') -∗
+      proc_priv γf p pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜fetchstr_got (us_M U) v maxn buf_new

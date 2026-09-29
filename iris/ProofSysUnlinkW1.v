@@ -279,6 +279,28 @@ Section ProofSysUnlinkW1.
                         Phient Phitgt Phiex Phimiss (us_M U) v0)) -∗
        mWP (Loop : expr riscv_lang))%I.
 
+  (* THE CLOSER AT A LATER EVENT COUNT (permit sweep L1b): argstr hands the
+     block back at a raised count [k], and the walk below runs at that
+     record; the caller's closer, which takes any count at least the
+     entry's, serves it verbatim. *)
+  Lemma su_closer_ev_next `{GEN : GenId} `{CIDs : CpuId} `{XI : CurCtx}
+      (bn : bool) (pn : mword 64)
+      (gf : gname) (pj : mword 64) (pid : mword 32) (U : ustate) (k : nat)
+      (m : regfile) (rt : mword 64) (K : nat) (eb b : bool)
+      (lks : gset string) (dqb dqs dqbs : dfrac)
+      (ARMS : mword 64 -> iProp Σ) :
+    (pv_ev (us_V U) <= k)%nat ->
+    wp_next (CID0 := CIDs) bn pn (fun (CIDx : CpuId) =>
+      sys_unlink_closer (CID := CIDx) gf pj pid U m rt K eb b lks dqb dqs dqbs ARMS) -∗
+    wp_next (CID0 := CIDs) bn pn (fun (CIDx : CpuId) =>
+      sys_unlink_closer (CID := CIDx) gf pj pid (upd_usV U (upd_ev (us_V U) k))
+        m rt K eb b lks dqb dqs dqbs ARMS).
+  Proof using .
+    iIntros (Hk) "H". iIntros (CIDx Hs mf P' k') "%Hcs %Hext %Hk'".
+    iApply ("H" $! CIDx Hs mf P' k' with "[%] [%] [%]");
+      [exact Hcs | exact Hext | cbn in Hk'; lia].
+  Qed.
+
   Lemma su_w1_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
@@ -337,12 +359,15 @@ Section ProofSysUnlinkW1.
     unlink_au_at (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) (us_M U) v0
                  P Pmiss Phient Phitgt Phiex Phimiss -∗
     (* ---- THE SEAM: the fall-through, at +0x30 with [dp] resolved ---- *)
-    (∀ (CIDs : CpuId) (Ms : regfile) (P1 : uptd)
+    (* ...AT THE RECORD argstr HANDED BACK (permit sweep L1b): the block's
+       event count only rose ([ev_after]) *)
+    (∀ (U1 : ustate) (CIDs : CpuId) (Ms : regfile) (P1 : uptd)
        (n1 : nat) (Sb1 : gset Z) (w1 : bool) (dpv : mword 64)
        (nf bp1 bnm0 bd0 be0 : nat -> bv 8)
        (w4 w5 w6 w27 w30 : mword 64) (pl : list (bv 8)) (iL : Z),
+       ⌜ev_after U U1⌝ -∗
        su_w1_seam_au (CIDs := CIDs)
-          gf jx dqb dqs dqbs pid U
+          gf jx dqb dqs dqbs pid U1
           m K eb b lks Ms P1 n1 Sb1 w1 dpv nf bp1 bnm0 bd0 be0 w4 w5 w6 w27
           w30 pl iL v0 P Pmiss Phient Phitgt Phiex Phimiss) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
@@ -560,7 +585,9 @@ Section ProofSysUnlinkW1.
               su_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbP]").
     { iEval (rewrite HM6a1). iExact "HbP". }
-    iIntros (CID9 Hq9 mas P1 bp1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbP %Hfsr1 %Hfgot1".
+    iIntros (CID9 Hq9 mas P1 bp1 kA) "%Hcsas %Hupt1 %HkA Hcg Hown Hpc Hpriv HbP %Hfsr1 %Hfgot1".
+    (* the walk runs at the record argstr handed back (permit sweep L1b) *)
+    set (U1 := upd_usV U (upd_ev (us_V U) kA)).
     iEval (rewrite HM6a1) in "HbP".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x16)) by (rewrite HM6ra; pcw).
@@ -617,7 +644,7 @@ Section ProofSysUnlinkW1.
       (* THE PROCESS BLOCK, OPENED for the walk. *)
       (* three-way now: [FirstTok.first_tok] parks beside the reference and
          is handed straight back at the rejoins below. *)
-      iDestruct (bi.equiv_entails_1_1 _ _ (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1))
+      iDestruct (bi.equiv_entails_1_1 _ _ (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U1 P1))
                  with "Hpriv")
         as "[Hpnc [Href Hftok]]".
       (* the lazy bit's claim, read off the block before the regrouping
@@ -651,7 +678,7 @@ Section ProofSysUnlinkW1.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (BeginOp.wp_begin_op_sconf (CID := CID12) gs jx gl fsc_bio icfg_log fsc_fs fsc_cov
                 fsc_logst icfg_dev pid (DfracOwn (1/4)) N0 (K - 30)%nat eb b lks
-                (us_upt U P1) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
+                (us_upt U1 P1) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
                 with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -751,7 +778,7 @@ Section ProofSysUnlinkW1.
  pk1 bp1 bnm0
                 MAXOPBLOCKS Sb0 P Pmiss pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N3 (K - 30)%nat eb b lks
-                (us_upt U P1) ltac:(exact Knp) HdevR Hnib0 Hgeom
+                (us_upt U1 P1) ltac:(exact Knp) HdevR Hnib0 Hgeom
                 Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                 (proj2 (su_len_range pk1 Hpk1))
                 ltac:(exact (su_walk_need_closes _)) Hj Hgl
@@ -833,7 +860,7 @@ Section ProofSysUnlinkW1.
         iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
+        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U1 P1)
                      with "[Hpnc Href Hftok]") as "Hpriv";
           [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         (* the path buffer, rejoined and renamed *)
@@ -845,13 +872,14 @@ Section ProofSysUnlinkW1.
         iDestruct (cpu_own_transport CID17 CID19 0 eb (proc_addr jx) b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         rewrite Hnp in HN4regs.
-        iApply ("Hseamk" $! CID19 N4 P1 n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
+        iApply ("Hseamk" $! U1 CID19 N4 P1 n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
                   u4 u5 u6 u27 u30 (bview pk1 bp1) iL
-                  with "[%] [%] [%] [%] [%] [%] [%]
+                  with "[%] [%] [%] [%] [%] [%] [%] [%]
                   Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
                   Hir1 Hhelddp [%] HP Hcent Hctgt Hcex Hcmiss
                   HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                   HbPj H27 HbE H30 [Hcont]").
+        { exists kA. split; [exact HkA | reflexivity]. }
         { exact Hal. }
         { exact HN4regs. }
         { exact (eq_trans HN4a0 Hnp). }
@@ -862,7 +890,7 @@ Section ProofSysUnlinkW1.
         { exists es1, e1. exact Hnpn. }
         { iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID19)
                        ltac:(wp_next_chain) with "Hcont") as "Hcont".
-          iExact "Hcont". }
+          iApply (su_closer_ev_next with "Hcont"). exact HkA. }
       + (* ---------- ARM B: nameiparent returned 0 ---------- *)
         iDestruct "Hres1" as "(%Hnpz & Hir2 & Hdead)".
         iApply (wp_cbeqz_taken_s_sconf (CID := CID18)
@@ -897,7 +925,7 @@ Section ProofSysUnlinkW1.
         iApply (Tails.su_tail_b (CID0 := CID19) gs jx gl pd pav pu
  n1 pid (DfracOwn (1/4))
                   m N4 sp0 K eb b lks u4 u5 u6 u27 u30 bd0 bnf bpf be0
-                  (us_upt U P1) ltac:(exact Keo) K30 Kpop Hgeom Hj Hgl Hlkempty
+                  (us_upt U1 P1) ltac:(exact Keo) K30 Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN4sp HN4thr HN4s2 HN4s3 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf3 Hf4
@@ -913,16 +941,17 @@ Section ProofSysUnlinkW1.
         iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U P1)
+        iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (us_upt U1 P1)
                      with "[Hpnc Href Hftok]") as "Hpriv";
           [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         iEval (rewrite -su_slots2) in "Hir2".
         iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf P1 kA with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hbsl Hsbb Hsbi Hsbs Hir2 Hpriv
                   [Hdead Hcent Hctgt Hcex Hcmiss]").
         { exact Hcsf. }
         { exact Hupt1. }
+        { exact HkA. }
         (* THE HONEST FOLD, arms (ii) and (iii-d).  [np_dead_to_mknod] IS
            the split: a death strictly inside the parent prefix is
            [npar_walk_dead_era]; a death at the parent's OWN level (namex's
@@ -965,11 +994,12 @@ Section ProofSysUnlinkW1.
       iDestruct (cpu_own_transport CID9 CIDy 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown [] [] Hpc
+      iApply ("Hcont" $! mf P1 kA with "[%] [%] [%] Hcg Hown [] [] Hpc
                 Hbsl Hsbb Hsbi Hsbs Hir Hpriv
                 [Hwalk Hcent Hctgt Hcex Hcmiss]").
       { exact Hcsf. }
       { exact Hupt1. }
+      { exact HkA. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       (* ARM (i): argstr failed ABOVE begin_op, so nothing fs-visible has

@@ -2238,11 +2238,13 @@ Section ProofSysUnlinkW5D.
                  Htre6 with "Hcce") as "Hcce".
     iDestruct ("Hpre" with "Hpidq") as "Hpriv".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
+    iApply ("Hcont" $! mf P1 (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
               Hbsl Hsbb Hsbi Hsbs [Hisl Hisl2] Hpriv
               [HP Hcex Hcmiss Hent Htgt]").
     { exact Hcsf. }
     { exact Hupt1. }
+    (* no lend past argstr: the walk's own count (permit sweep L1b) *)
+    { lia. }
     { rewrite su_slots2. change 2%nat with (1 + 1)%nat.
       rewrite iref_slots_op. rewrite /iref_slot. iFrame. }
     (* ===== ret 0, the DIR arm.  [unl_pre]'s dots-only conjunct is the

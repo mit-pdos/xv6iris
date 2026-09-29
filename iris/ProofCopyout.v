@@ -142,6 +142,7 @@ Require Import SpecWalkaddr SpecVmfault SpecWalk SpecMemmove.
 Require Import SpecCopyout.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -177,7 +178,7 @@ Module CopyoutProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT)
   : COPYOUT.
 
 Section ProofCopyout.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
@@ -1980,18 +1981,35 @@ Section ProofCopyout.
   (* ------------------------------------------------------------------ *)
   (* THE WHOLE FUNCTION.  [COPYOUT] is the only contract there is now.    *)
   (* ------------------------------------------------------------------ *)
+  (* THE LEND, FRAMED THROUGH (permit sweep L1b): the copy's callees
+     (vmfault) do not take it yet, so it is handed back at entry's count.
+     [SlotGen.act_lend_cont_frame] for a continuation with three binders. *)
+  Lemma act_lend_cont_frame3 {R1 R2 R3 : Type}
+      (b0 : bool) (p0 p' : mword 64) (k : nat)
+      (A B C : CpuId -> R1 -> R2 -> R3 -> iProp Σ) :
+    wp_next b0 p0 (fun CID => ∀ (x : R1) (y : R2) (z : R3), A CID x y z -∗ B CID x y z -∗
+       (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p' k') -∗ C CID x y z) -∗
+    act_lend p' k -∗
+    wp_next b0 p0 (fun CID => ∀ (x : R1) (y : R2) (z : R3), A CID x y z -∗ B CID x y z -∗ C CID x y z).
+  Proof using .
+    iIntros "H Hl" (CID0 Hs x y z) "HA HB".
+    iApply ("H" $! CID0 Hs x y z with "HA HB"). iExists k. iFrame "Hl". done.
+  Qed.
+
   Lemma wp_copyout_sconf_mem
       (γa : gname) (mm : regfile)
       (P : uptd) (Mu : gmap Z (bv 8)) (szv : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (dqsrc : dfrac)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_mem_body ktb γa mm P Mu szv len src_bytes dqsrc K lvl eb p b lks.
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) (k : nat)
+    : wp_copyout_sconf_mem_body ktb γa mm P Mu szv len src_bytes dqsrc K lvl eb p b lks k.
   Proof using .
     cbv beta delta [wp_copyout_sconf_mem_body].
     intros pcE dstva src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hlend Hsrc Hcont".
+    iDestruct (act_lend_cont_frame3 with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     destruct (Nat.eq_dec len 0%nat) as [Hlen0 | Hlenpos].
     { (* ===== len = 0: return 0 at +0x9a, no frame ===== *)
       iApply (wp_cbeqz_taken_s_sconf pcE

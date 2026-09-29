@@ -784,11 +784,15 @@ Definition wp_sys_mknod_frame
   (* THE IMAGE DOES NOT MOVE (the landed row, [SpecSysMknod]'s note):
      sys_mknod only READS user memory (argstr), so the binders are
      [(mf, ns', P')] and the block returns at [us_upt U P'] -- no [M']. *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext_sz] is argstr's own report, relayed. *)
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): argstr lends the block's
+         counter to copyinstr, which may step it, so the block comes back
+         at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -810,7 +814,7 @@ Definition wp_sys_mknod_frame
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (us_upt U P') -∗
+      proc_priv γf pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       (* the armed post on the returned a0 (implies [sys_mknod_ret]) *)
       ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗

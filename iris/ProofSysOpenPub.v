@@ -449,10 +449,14 @@ Section ProofSysOpenPub.
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine nsj 1 with "Hisl Hiru") as "Hisl".
     replace (nsj + 1)%nat with (S nsj) by lia.
-    iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce Hpc
+    (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+    iSpecialize ("Hcont" $! mf (S nsj) (pv_ev (us_V U))).
+    iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+    iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
               Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrags Hpub Harm]").
     { exact Hcsf. }
     { reflexivity. }
+    { lia. }
     (* THE ARM: the success side of [open_arms_plain], at the caller's own
        wand and the descriptor this walk installed. *)
     rewrite /open_arms_plain. iFrame "Hfds". iRight.

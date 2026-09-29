@@ -75,6 +75,7 @@ Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import SlotGen.   (* [act_lend_borrow]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import CtxIdDefs.
@@ -619,11 +620,13 @@ Section ProofFileclose.
       iDestruct (cpu_claim_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
                    with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mf with
-                "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit Hiru [Henv] Hcpost Hpbare").
+      iApply ("Hcont" $! mf (pv_ev (us_V Upr)) with
+                "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hunit Hiru [Henv] Hcpost [Hpbare]").
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { exact Hcsf. }
+      { lia. }
       { by iApply fileclose_env_out_of_env. }
+      { rewrite upd_ev_id upd_usV_id. iExact "Hpbare". }
     - (* ===============================================================
          [--f->ref == 0]: the LAST reference.
          =============================================================== *)
@@ -1171,16 +1174,22 @@ Section ProofFileclose.
            plain instructions have moved us. *)
         iDestruct (cpu_own_transport CIDr2 CIDp4 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        (* the lend (permit sweep L1b): the bare block's counter, borrowed
+           for pipeclose (its kfree) *)
+        iDestruct (proc_priv_bare_ev_acc with "Hpbare") as "[Hev Hpback]".
+        iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
         iApply (Pipeclose.wp_pipeclose_sconf (CID := CIDp4)  (fcn_procs fn) (fp_lock pn)
                   (fp_pipe pn) (fc_wbool Cf) (fsc_kalloc) (fsc_kpages)
                   (mword_of_int KernelSyms.kmem)
                   (mword_of_int (KernelSyms.kmem + 24)) on
                   P3 n eb p (K - 8)%nat b
-                  lks Φc Hw1 Hav22 Hn2 eq_refl eq_refl
+                  lks Φc (pv_ev (us_V Upr)) Hw1 Hav22 Hn2 eq_refl eq_refl
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hispipe Hpref Hcpay Hkmem Hav Hprocs").
+                  with "Hcg Hcnt Htext Hpc Hispipe Hpref Hcpay Hkmem Hav Hlend Hprocs").
         all: try lkbelow.
-        iIntros (CIDp5 Hsp5 mp) "Hcg Hcnt Hpc %Hpcs Hav Hcpost".
+        iIntros (CIDp5 Hsp5 mp) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc %Hpcs Hav Hcpost".
+        iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
+        iDestruct ("Hpback" $! kc2 with "Hev") as "Hpbare".
         (* pipeclose ALWAYS clears its flag word, so the post is the FIRED
            one; a fired post is [fileclose_cpost] at any [last]. *)
         iDestruct (fileclose_cpost_of_fired q st Φc bdr (fc_wbool Cf) (fp_pipe pn)
@@ -1255,10 +1264,11 @@ Section ProofFileclose.
         iDestruct (cpu_claim_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
                      with "Hextm") as "Hextm".
         iSpecialize ("Hcont" $! CIDp7 with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mf with
-                  "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hiru [Hav] Hcpost Hpbare").
+        iApply ("Hcont" $! mf kc2 with
+                  "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hfd Hiru [Hav] Hcpost Hpbare").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { exact Hcsf. }
+        { exact Hkc2. }
         { rewrite Hstp /fileclose_env_out.
           rewrite /fileclose_pipe_out. iExact "Hav". }
       + (* ============ not a pipe: the inode test at +0x5a ============ *)
@@ -1670,10 +1680,11 @@ Section ProofFileclose.
              free-slot construction above spent.  It used to be dropped here
              -- SpecFileclose.v recorded that as a leak of one unit of the
              IrefSlots supply per inode file closed; it has a home now. *)
-          iApply ("Hcont" $! mf with
-                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hislot [Hbsl] Hcpost Hpbare").
+          iApply ("Hcont" $! mf (pv_ev (us_V Upr)) with
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hfd Hislot [Hbsl] Hcpost [Hpbare]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
+          { lia. }
           (* THE WHOLE FS POSTCONDITION IS THE THREE SLOTS.  The bitmap said
              [used' ⊆ used] here; it is an invariant now and says nothing,
              and the two superblock cells are persistent.  (iput's
@@ -1684,6 +1695,7 @@ Section ProofFileclose.
               [ destruct (fdstate_ok_inode _ _ _ _ _ _ Hok Ht) as (? & ? & ->)
               | destruct (fdstate_ok_device _ _ _ _ _ _ Hok Ht) as (? & ? & ->) ];
               rewrite /fileclose_fs_out; iExact "Hbsl". }
+          { rewrite upd_ev_id upd_usV_id. iExact "Hpbare". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b
@@ -1757,10 +1769,11 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
                        with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDz3 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with
-                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hcore] [Henv] Hcpost Hpbare").
+          iApply ("Hcont" $! mf (pv_ev (us_V Upr)) with
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] [%] Hfd [Hcore] [Henv] Hcpost [Hpbare]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
+          { lia. }
           (* AN UNTYPED FILE'S PAYLOAD IS ITS IREF UNIT.  [file_core]'s else
              arm is where a slot that holds no inode reference keeps the one
              the entry is provisioned for, so closing an untyped file repays
@@ -1773,6 +1786,7 @@ Section ProofFileclose.
               [| intro Hc; apply Hnone; by right].
             iExact "Hcore". }
           { by iApply fileclose_env_out_of_env. }
+          { rewrite upd_ev_id upd_usV_id. iExact "Hpbare". }
   Qed.
 
 End ProofFileclose.

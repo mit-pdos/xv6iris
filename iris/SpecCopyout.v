@@ -73,6 +73,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
@@ -179,11 +180,11 @@ Definition copyout_wrote (P : uptd) (M : gmap Z (bv 8)) (dstva : mword 64)
       /\ exists d : nat, (d < len)%nat /\ M' = umem_wr M dstva d src_bytes
            /\ ~ uva_wmapped P (uint (add_vec_int dstva (Z.of_nat d)))).
 
-Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
     (src_bytes : nat -> bv 8) (dqsrc : dfrac)
-    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   let dstva := mm !!! Regidx (mword_of_int 12) in
   let src := mm !!! Regidx (mword_of_int 13) in
@@ -202,11 +203,15 @@ Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   pc_is pcE -∗
   proc_ptm P (uint szv) M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L1b): the caller's event counter, for the
+     kalloc a lazy fault inside the copy makes *)
+  act_lend p k -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     proc_ptm P' (uint szv) M' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
@@ -219,10 +224,10 @@ Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type COPYOUT.
   Parameter wp_copyout_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (dqsrc : dfrac)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes dqsrc K lvl eb p b lks.
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) (k : nat),
+      wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes dqsrc K lvl eb p b lks k.
 End COPYOUT.

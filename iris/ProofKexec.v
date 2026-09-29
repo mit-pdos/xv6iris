@@ -244,10 +244,13 @@ Section KexecAUTail.
               Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
-    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid) "Hst2a6 Hcont".
+    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid U2) "%HU2 Hst2a6 Hcont".
+    (* the pointer vector's copyout took the block's counter (permit sweep
+       L1b): phase D runs at the record it came back at *)
+    destruct HU2 as (k2 & Hk2 & ->).
     iApply (PD.kxd_phaseD (CID0 := CIDd) Q QF jp gf
  plen pfun na avf alen aslen afun
-              pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
+              pidv (upd_usV U (upd_ev (us_V U) k2)) eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef Pd Mid sz1 c
               HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
@@ -360,9 +363,12 @@ Section KexecAUTail.
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
-      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2) "Hst272 Hcont".
+      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2 U2) "%HU2 Hst272 Hcont".
+      (* the argv loop's copyouts took the block's counter (permit sweep
+         L1b): the tail runs at the record it came back at *)
+      destruct HU2 as (k2 & Hk2 & ->).
       iApply (kxc_d_tail (CID0 := CID2) Q QF jp gf
- plen pfun na avf alen aslen afun pidv Uc eb
+ plen pfun na avf alen aslen afun pidv (upd_usV Uc (upd_ev (us_V Uc) k2)) eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P2 Mim2 sz1 c2
                 (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2

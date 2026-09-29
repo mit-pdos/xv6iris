@@ -199,14 +199,17 @@ Definition wp_sys_close_sconf_body
      its continuation hart-generically (WpNext.wp_next's guard is vacuous at
      [true], so consuming it here is free).  *)
   wp_next true p (fun (CID : CpuId) =>
-    ∀ mf : regfile,
+    ∀ (mf : regfile) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): fileclose lends the block's counter to pipeclose, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_close_post γf p pid U sts v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      sys_close_post γf p pid (upd_usV U (upd_ev (us_V U) k')) sts v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* ...and the close payment's answer: the link fired (this was the
          end's last close), or the payment back *)
       fileclose_cpost_any (sys_fd_st v (pv_ofile (us_V U)) sts) Φc -∗

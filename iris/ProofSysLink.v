@@ -981,7 +981,7 @@ Section ProofSysLinkBody.
               sl_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbO]").
     { iEval (rewrite HM6a1). iExact "HbO". }
-    iIntros (CID9 Hq9 mas P1 bo1) "%Hcsas %Hupt1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
+    iIntros (CID9 Hq9 mas P1 bo1 k1) "%Hcsas %Hupt1 %Hk1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
     iEval (rewrite HM6a1) in "HbO".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x16)) by (rewrite HM6ra; pcw).
@@ -1114,15 +1114,25 @@ Section ProofSysLinkBody.
       iDestruct (sl_bytes_name (pa_stk sp0 22) 128 with "HbW") as (bw0) "HbW".
       sl_own_transport CID9 CID15 eb pj b.
       iApply (Argstr.wp_argstr_sconf (CID := CID15) fsc_kalloc γf N3 (K - 38)%nat 0%nat
-                eb pj 1%nat v1 pid (us_upt U P1) 128%nat bw0 b lks
+                eb pj 1%nat v1 pid (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1) 128%nat bw0 b lks
                 sl_arg1_lt HN3a0 Harg1 sl_noff0 ltac:(exact Kar) HN3a2
                 sl_maxpath_lt (Hlb "kmem"%string)
                 with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbW]").
       { iEval (rewrite HN3a1). iExact "HbW". }
-      iIntros (CID16 Hq16 mas2 P2 bw1)
-        "%Hcsas2 %Hupt2 Hcg Hown Hpc Hpriv HbW %Hfsr2 _".
+      iIntros (CID16 Hq16 mas2 P2 bw1 k2)
+        "%Hcsas2 %Hupt2 %Hk2 Hcg Hown Hpc Hpriv HbW %Hfsr2 _".
       iEval (rewrite HN3a1) in "HbW".
-      iEval (rewrite sl_us_upt_idem) in "Hpriv".
+      (* the two fetches lent the block's counter in turn (permit sweep
+         L1b): the rest of the call runs at the record at the count the
+         second one handed back *)
+      pose (Ue := upd_usV U (upd_ev (us_V U) k2)).
+      assert (HUe : us_upt (upd_usV (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1)
+                      (upd_ev (us_V (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1)) k2)) P2
+                    = us_upt Ue P2)
+        by (rewrite /Ue; destruct U as [[] ?]; reflexivity).
+      iEval (rewrite HUe) in "Hpriv".
+      assert (Hkev : (pv_ev (us_V U) <= k2)%nat).
+      { cbn [us_upt upd_usV us_V upd_upt upd_ev pv_ev] in Hk2. lia. }
       assert (Hpc2a : ret_pc (N3 !!! Regidx Rra : mword 64)
                       = mword_of_int (SL + 0x2a)) by (rewrite HN3ra; pcw).
       iEval (rewrite Hpc2a) in "Hpc".
@@ -1172,7 +1182,7 @@ Section ProofSysLinkBody.
            out until whichever arm rebuilds the block. *)
         (* three-way now: [FirstTok.first_tok] parks beside the reference and
            every rebuilding arm below hands it straight back. *)
-        iDestruct (bi.equiv_entails_1_1 _ _ (proc_priv_split_cwd γf pj pid (us_upt U P2))
+        iDestruct (bi.equiv_entails_1_1 _ _ (proc_priv_split_cwd γf pj pid (us_upt Ue P2))
                  with "Hpriv")
           as "[Hpnc [Href Hftok]]".
         (* the lazy bit's claim, read off the block before the regrouping
@@ -1229,7 +1239,7 @@ Section ProofSysLinkBody.
         sl_own_transport CID16 CID20 eb pj b.
         iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl fsc_bio icfg_log fsc_fs fsc_cov
                   fsc_logst icfg_dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
-                  (us_upt U P2) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
+                  (us_upt Ue P2) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -1287,7 +1297,7 @@ Section ProofSysLinkBody.
  γf
  pk1 bo1 MAXOPBLOCKS Sb0
                   pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-                  Q2 (K - 38)%nat eb b lks (us_upt U P2)
+                  Q2 (K - 38)%nat eb b lks (us_upt Ue P2)
                   ltac:(exact Kna) HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl
@@ -1406,7 +1416,7 @@ Section ProofSysLinkBody.
  gil gisl
                     kk (qq/2)%Qp gsh losh tlsh PlainK inum pid (DfracOwn (1/4)) dqs
                     R0 (K - 38)%nat eb b lks
-                    (us_upt U P2) ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
+                    (us_upt Ue P2) ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                           Hireg Hslkk [//] Hflsh Hclaimssl Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
@@ -1515,7 +1525,7 @@ Section ProofSysLinkBody.
  kk (qq/2)%Qp (qq/2)%Qp gsh losh tlsh
                        inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                        m R2 sp0 K eb b lks u4 bn0 bw1 bo2
-                       (us_upt U P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
+                       (us_upt Ue P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                        Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
                        Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
@@ -1538,16 +1548,17 @@ Section ProofSysLinkBody.
              iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
              iCombine "Hpidq Hofiles" as "Hpnc".
              iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-             iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+             iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                           with "[Hpnc Href Hftok]") as "Hpriv";
                [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
              iDestruct (iref_slots_combine 1 1 with "Hir1 Hir1b") as "Hir2c".
              iDestruct (iref_slots_combine 2 1 with "Hir2c Hislot") as "Hir".
-             iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+             iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                        Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                        [Hltgt Hlent Huntgtc]").
              { exact Hcsf. }
              { exact Hupt. }
+             { exact Hkev. }
              { left. rewrite Ha0f. reflexivity. }
              (* ARM C fired nothing: the whole bundle comes home. *)
              { iApply (link_arms_none _ _ _ _ _ Ha0f).
@@ -1678,7 +1689,7 @@ Section ProofSysLinkBody.
  kk (qq/2)%Qp (qq/2)%Qp gsh losh tlsh
                           inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                           m R5 sp0 K eb b lks u4 bn0 bw1 bo2
-                          (us_upt U P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
+                          (us_upt Ue P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
                           Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
@@ -1701,16 +1712,17 @@ Section ProofSysLinkBody.
                 iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                 iCombine "Hpidq Hofiles" as "Hpnc".
                 iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                              with "[Hpnc Href Hftok]") as "Hpriv";
                   [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                 iDestruct (iref_slots_combine 1 1 with "Hir1 Hir1b") as "Hir2c".
                 iDestruct (iref_slots_combine 2 1 with "Hir2c Hislot") as "Hir".
-                iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce
+                iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce
                           Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                           [Hltgt Hlent Huntgtc]").
                 { exact Hcsf. }
                 { exact Hupt. }
+                { exact Hkev. }
                 { left. rewrite Ha0f. reflexivity. }
                 (* ARM D (NLINK_MAX) fired nothing either. *)
                 { iApply (link_arms_none _ _ _ _ _ Ha0f).
@@ -1866,7 +1878,7 @@ Section ProofSysLinkBody.
                           pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
-                          (us_upt U P2) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
+                          (us_upt Ue P2) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
                           Hiblk Hiblog Hinb
                           ltac:(exact (sl_setnl_type_stable dn _))
                           ltac:(rewrite /sl_incnl sl_setnl_type; exact Htynz)
@@ -2093,7 +2105,7 @@ Section ProofSysLinkBody.
                           gisl kk (qq/2)%Qp gsh losh tlsh icfg_dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
-                          (us_upt U P2) ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
+                          (us_upt Ue P2) ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hpidq Hprocs [//] Hflsh Hclaimssl Hdep Hoffd Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
@@ -2189,7 +2201,7 @@ Section ProofSysLinkBody.
 
                           pk2 bw1 bn0 c1 (Sb1 ∪ {[IBLOCK inum icfg_ist]})
                           pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-                          T2 (K - 38)%nat eb b lks (us_upt U P2)
+                          T2 (K - 38)%nat eb b lks (us_upt Ue P2)
                           ltac:(exact Knp) HdevR Hnib0
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
@@ -2332,7 +2344,7 @@ Section ProofSysLinkBody.
  kd (qd/2)%Qp gyd lod tld PlainK dinum pid
                              (DfracOwn (1/4)) dqs
                              U0 (K - 38)%nat eb b lks
-                             (us_upt U P2) ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
+                             (us_upt Ue P2) ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
                              HU0a0 (Hlb "bcache"%string)
                              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 [//] Hfld Hclaimssl Hshrd Hrud Hsbi Hpidq Hprocs
@@ -2469,7 +2481,7 @@ Section ProofSysLinkBody.
                                kd (qd/2)%Qp (qd/2)%Qp gyd lod tld dinum dnd bmd
                                n2 Sb2 e0 _ pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
-                               (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
+                               (us_upt Ue P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -2498,15 +2510,16 @@ Section ProofSysLinkBody.
                      iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                      iCombine "Hpidq Hofiles" as "Hpnc".
                      iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                     iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                     iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                                   with "[Hpnc Href Hftok]") as "Hpriv";
                        [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                      iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots") as "Hir".
-                     iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce
+                     iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce
                                Hcce Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                                [Htgtr Huntgt Hlent]").
                      { exact Hcsf. }
                      { exact Hupt. }
+                     { exact Hkev. }
                      { left. rewrite Ha0f. reflexivity. }
                      (* ARM E2 is a route to [bad:]: the DO-THEN-UNDO pair. *)
                      { iApply (link_arms_undone _ _ _ _ _ _ Ha0f
@@ -2734,7 +2747,7 @@ Section ProofSysLinkBody.
                              pid (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                              dqs dqb dqbs (DfracOwn (1/2))
                              U6 (K - 38)%nat eb b lks
-                             (us_upt U P2) ltac:(exact Kdl) Htyd
+                             (us_upt Ue P2) ltac:(exact Kdl) Htyd
                              ltac:(exact (proj1 (proj2 Hdiok)))
                              ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 Hdiok))))))
                              ltac:(
@@ -2884,7 +2897,7 @@ Section ProofSysLinkBody.
                                  n3 Sb3 (bool_decide (fsc_bmapstart ∈ Sb3)) false e0
                                  _ pid (DfracOwn (1/4)) dqb dqs
                                  m mdl sp0 K eb b lks bn1 bw2 bo2
-                                 (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
+                                 (us_upt Ue P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                  Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                  Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -2915,15 +2928,16 @@ Section ProofSysLinkBody.
                        iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                        iCombine "Hpidq Hofiles" as "Hpnc".
                        iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                       iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                       iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                                     with "[Hpnc Href Hftok]") as "Hpriv";
                          [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                        iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots") as "Hir".
-                       iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce
+                       iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce
                                  Hcce Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                                  [Htgtr Huntgt Hlent]").
                        { exact Hcsf. }
                        { exact Hupt. }
+                       { exact Hkev. }
                        { left. rewrite Ha0f. reflexivity. }
                        (* ARM F, dirlink refused: the pair. *)
                        { iApply (link_arms_undone _ _ _ _ _ _ Ha0f
@@ -3338,7 +3352,7 @@ Section ProofSysLinkBody.
                                       (bool_decide (fsc_bmapstart ∈ Sb3)) true false e0
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W1 (K - 38)%nat eb b lks
-                                      (us_upt U P2) ltac:(exact Kiup) Hkd
+                                      (us_upt Ue P2) ltac:(exact Kiup) Hkd
                                       ltac:(exact (proj1 (bool_decide_eq_true _)))
                                       ltac:(intros _; exact Hmiblk)
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
@@ -3438,7 +3452,7 @@ Section ProofSysLinkBody.
                                       kk (qq/2 + qq/2)%Qp inum n4
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W3 (K - 38)%nat eb b lks
-                                      (us_upt U P2) ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
+                                      (us_upt Ue P2) ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -3486,7 +3500,7 @@ Section ProofSysLinkBody.
                             iApply (EndOp.wp_end_op_sconf (CID := CID68) gs j gl fsc_uart fsc_disk
                                       fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n5 pid
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
-                                      (us_upt U P2) ltac:(exact Keo) Hgeom Hj Hgl
+                                      (us_upt Ue P2) ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
@@ -3632,18 +3646,19 @@ Section ProofSysLinkBody.
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                            iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                            iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                                          with "[Hpnc Href Hftok]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                             iDestruct (iref_slots_combine 1 1
                                          with "Hir1c Hislotd") as "Hir2e".
                             iDestruct (iref_slots_combine 2 1
                                          with "Hir2e Hisloti") as "Hir".
-                            iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown
+                            iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown
                                       [] [] Hpc Hbsl Hsbb Hsbi Hsbs Hir
                                       Hpriv [%] [Htgtr Hentr Huntgtc]").
                             { exact Hcsf. }
                             { exact Hupt. }
+                            { exact Hkev. }
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
                             { right. rewrite Ha0f HW7a5. reflexivity. }
@@ -3816,7 +3831,7 @@ Section ProofSysLinkBody.
                                       n3 Sb3 (bool_decide (fsc_bmapstart ∈ Sb3)) false e0
                                       _ pid (DfracOwn (1/4)) dqb dqs
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
-                                      (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
+                                      (us_upt Ue P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                       Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -3852,16 +3867,17 @@ Section ProofSysLinkBody.
                             iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                            iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                            iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                                          with "[Hpnc Href Hftok]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                             iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots")
                               as "Hir".
-                            iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown
+                            iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown
                                       Htce Hcce Hpc Hbsl Hsbb Hsbi Hsbs Hir
                                       Hpriv [%] [Htgtr Huntgt Hlent]").
                             { exact Hcsf. }
                             { exact Hupt. }
+                            { exact Hkev. }
                             { left. rewrite Ha0f. reflexivity. }
                             (* ARM F-0, the empty append: the pair. *)
                             { iApply (link_arms_undone _ _ _ _ _ _ Ha0f
@@ -3911,7 +3927,7 @@ Section ProofSysLinkBody.
                              (di_type (sl_incnl dn)) c2 Sb2
                              _ pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
-                             (us_upt U P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
+                             (us_upt Ue P2) Funtgt ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
                              ltac:(exact Keo) K38 Kpop Hkk Hgeom
                              Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
                              Hcovb Hmem2'
@@ -3934,15 +3950,16 @@ Section ProofSysLinkBody.
                    iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
                    iCombine "Hpidq Hofiles" as "Hpnc".
                    iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-                   iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+                   iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                                 with "[Hpnc Href Hftok]") as "Hpriv";
                      [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                    iDestruct (iref_slots_combine 2 1 with "Hir2d Hislot") as "Hir".
-                   iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce
+                   iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce
                              Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                              [Htgtr Huntgt Hlent]").
                    { exact Hcsf. }
                    { exact Hupt. }
+                   { exact Hkev. }
                    { left. rewrite Ha0f. reflexivity. }
                    (* ARM E, no parent: the pair. *)
                    { iApply (link_arms_undone _ _ _ _ _ _ Ha0f
@@ -3969,7 +3986,7 @@ Section ProofSysLinkBody.
           iApply (Tails.sl_tail_b (CID0 := CID26) gs j gl pd pav pu
  n1 pid (DfracOwn (1/4)) m Q3 sp0 K eb
  b lks u4 bn0 bw1 bo2
-                    (us_upt U P2) ltac:(exact Keo) K38 Kpop Hgeom Hj Hgl Hlkempty
+                    (us_upt Ue P2) ltac:(exact Keo) K38 Kpop Hgeom Hj Hgl Hlkempty
                     ltac:(reflexivity)
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
@@ -3988,15 +4005,16 @@ Section ProofSysLinkBody.
           iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
           iCombine "Hpidq Hofiles" as "Hpnc".
           iEval (rewrite -(proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-          iDestruct (proc_priv_split_cwd γf pj pid (us_upt U P2)
+          iDestruct (proc_priv_split_cwd γf pj pid (us_upt Ue P2)
                        with "[Hpnc Href Hftok]") as "Hpriv";
             [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
           iDestruct (iref_slots_combine 1 2 with "Hir1 Hir2b") as "Hir".
-          iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+          iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                     Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]
                     [Hltgt Hlent Huntgtc]").
           { exact Hcsf. }
           { exact Hupt. }
+          { exact Hkev. }
           { left. rewrite Ha0f. reflexivity. }
           (* ARM B: namei(old) missed before the mint -- nothing fired. *)
           { iApply (link_arms_none _ _ _ _ _ Ha0f).
@@ -4024,10 +4042,11 @@ Section ProofSysLinkBody.
         iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         sl_own_transport CID16 CIDy eb pj b.
         iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+        iApply ("Hcont" $! mf P2 k2 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
         { exact Hcsf. }
         { exact Hupt. }
+        { exact Hkev. }
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { rewrite Ha0f HN4a5. left. reflexivity. }
@@ -4061,10 +4080,11 @@ Section ProofSysLinkBody.
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       sl_own_transport CID9 CIDy eb pj b.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+      iApply ("Hcont" $! mf P1 k1 with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbb Hsbi Hsbs Hir Hpriv [%] [Hltgt Hlent Huntgtc]").
       { exact Hcsf. }
       { exact Hupt1. }
+      { exact Hk1. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite Ha0f HM7a5. left. reflexivity. }

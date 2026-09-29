@@ -1774,15 +1774,18 @@ Section ProofSysOpenTails.
     (pa_stk sp0 23) ↦₈[KT1] w23 -∗
     (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile),
+      ∀ (mf : regfile) (k' : nat),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
+        (* the block at a raised count: fileclose lends its counter to
+           pipeclose (permit sweep L1b) *)
+        ⌜(pv_ev (us_V Upr) <= k')%nat⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr jx) pidv Upr -∗
+        proc_priv_bare (proc_addr jx) pidv (upd_usV Upr (upd_ev (us_V Upr) k')) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
@@ -1865,7 +1868,7 @@ Section ProofSysOpenTails.
                     Hfcpay").
     (* the close post is [emp] at the untyped descriptor this arm closes,
        and nothing downstream is owed it. *)
-    iIntros (CID3 Hq3 mfc) "Hcg Hown Htce Hcce Hpc %Hcsfc Hfd Hiru Hfout Hcpost Hpid".
+    iIntros (CID3 Hq3 mfc kev) "Hcg Hown Htce Hcce Hpc %Hcsfc %Hkev Hfd Hiru Hfout Hcpost Hpid".
     iClear "Hcpost".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x12c)) by (rewrite HM2ra; pcw).
@@ -1918,7 +1921,7 @@ Section ProofSysOpenTails.
               gil gisl
               kk qi s gy loy tly inum dn bm u pidv dq dqb dqs m P1 sp0 K eb b lks
               (m !!! Regidx Rs3 : mword 64) w6 w23 w24 bp
-              Upr HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+              (upd_usV Upr (upd_ev (us_V Upr) kev)) HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HP1sp HP1thr
               HP1s1 HP1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1932,10 +1935,11 @@ Section ProofSysOpenTails.
        Hislot".
     iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
     iDestruct (so_iref_two with "Hiru Hislot") as "Hislot".
-    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+    iApply ("Hcont" $! mf kev with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbsl Hislot Hfd Hfout").
     { exact Hcsf. }
     { exact Ha0f. }
+    { exact Hkev. }
   Qed.
 
 

@@ -106,6 +106,7 @@ Require Import SpecEitherCopyout SpecEitherCopyin.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SlotGen.   (* [act_lend_borrow]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
@@ -752,7 +753,9 @@ Section ProofEitherCopyout.
       iEval (rewrite Hpp1e) in "Hpc".
       (* the ONE borrow out of [proc_priv] *)
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
-      iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_copy_ev with "Hres") as "(Hszc & Hptc & Hpt & Hev & Hpback)".
+      (* the lend (permit sweep L1b): the block's counter, borrowed for the copy *)
+      iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
       (* THE BLOCK'S OWN IMAGE GOES DOWN AND A NAMED MOVE OF IT COMES BACK:
          copyout is called at its memory-indexed contract, so what it did to
          the process's memory is the window equation [copyout_wrote]. *)
@@ -903,11 +906,12 @@ Section ProofEitherCopyout.
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyout.wp_copyout_sconf_mem kts γa U5 (pv_upt (us_V U)) (us_M U)
                 (pv_sz (us_V U)) len src_bytes (DfracOwn 1)
-                (av - 6)%nat lvl eb p b
-                _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
-                with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
+                (av - 6)%nat lvl eb p b _ (pv_ev (us_V U))
+                HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
+                with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hsrc").
       all: try lkbelow.
-      iIntros (CID21 Hs21 mr P' Mo) "Hcg Hcpu Hpc Hpt Hsrc %Hcsr %Hext %Hwrote".
+      iIntros (CID21 Hs21 mr P' Mo) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hsrc %Hcsr %Hext %Hwrote".
+      iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       (* the window equation, with the prefix length named: on the 0 arm the
          whole buffer crossed, on the -1 arm some prefix of it did. *)
       rewrite HU5a2 in Hwrote.
@@ -924,8 +928,8 @@ Section ProofEitherCopyout.
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a3) in "Hsrc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct ("Hpback" $! P' (umem_wr (us_M U) dst dwr src_bytes)
-                   with "Hxe Hszc Hptc Hpt") as "Hres".
+      iDestruct ("Hpback" $! P' (umem_wr (us_M U) dst dwr src_bytes) kc2
+                   with "Hxe Hszc Hptc Hpt Hev") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -958,9 +962,10 @@ Section ProofEitherCopyout.
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hres]").
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
-      iExists P', dwr.
+      iExists P', dwr, kc2.
       iSplitR; [iPureIntro; exact Hext|].
-      iSplitR; [iPureIntro; exact Hran|]. iExact "Hres".
+      iSplitR; [iPureIntro; exact Hran|].
+      iSplitR; [iPureIntro; exact Hkc2|]. iExact "Hres".
     - (* ================= user_dst == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
         by (rewrite HAs1; exact Hflag).
@@ -1503,7 +1508,9 @@ Section ProofEitherCopyin.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
-      iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_copy_ev with "Hres") as "(Hszc & Hptc & Hpt & Hev & Hpback)".
+      (* the lend (permit sweep L1b): the block's counter, borrowed for the copy *)
+      iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
       (* THE BLOCK'S OWN IMAGE GOES DOWN AND COMES BACK UNMOVED: copyin is
          called at its memory-indexed contract, which is same-[M] on both
          arms (the pages it faults in were already in the lazy view). *)
@@ -1655,11 +1662,12 @@ Section ProofEitherCopyin.
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyin.wp_copyin_sconf_mem ktb γa U5 (pv_upt (us_V U)) (us_M U)
                 (pv_sz (us_V U)) len dst_olds
-                (av - 6)%nat lvl eb p b
-                _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
-                with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
+                (av - 6)%nat lvl eb p b _ (pv_ev (us_V U))
+                HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
+                with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hdst").
       all: try lkbelow.
-      iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hdst %Hcsr %Hext %Hgot".
+      iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hdst %Hcsr %Hext %Hgot".
+      iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       rewrite HU5a3 in Hgot.
       (* THE CONTENT SEAM (RULING A).  The memory-indexed contract names the
          bytes it read, and this contract now RELAYS them: the return value
@@ -1689,7 +1697,7 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a2) in "Hdst".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hres".
+      iDestruct ("Hpback" $! P' (us_M U) kc2 with "Hxe Hszc Hptc Hpt Hev") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1724,7 +1732,9 @@ Section ProofEitherCopyin.
       rewrite /either_copyin_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
-      { iExists P'. iSplitR; [iPureIntro; exact Hext|]. iExact "Hres". }
+      { iExists P', kc2. iSplitR; [iPureIntro; exact Hext|].
+        iSplitR; [iPureIntro; exact Hkc2|].
+        iExact "Hres". }
       iExists dst_new. iSplitR; [iPureIntro; exact Hgot0|]. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)

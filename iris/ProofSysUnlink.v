@@ -141,8 +141,10 @@ Section ProofSysUnlink.
                     Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
                     Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv Hau []
                     Hcont").
-    iIntros (CIDa Ms P1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30
-             pl iL).
+    (* the walk runs at the record argstr handed back: its event count only
+       rose (permit sweep L1b), and W2..W5 are stated at any record *)
+    iIntros (U1 CIDa Ms P1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30
+             pl iL) "_".
     iIntros "%Hal %Hregs1 %Hma01 %Hupt1 %Hn1 %Hw1 %Hdpvnz
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv Hir
              Hheld %Hname1 HP Hcent Hctgt Hcex Hcmiss
@@ -152,7 +154,7 @@ Section ProofSysUnlink.
        dirlookup ---- *)
     iApply (W2.su_w2_au gf gs jx gl pd pav pu
  dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
+              pid U1 P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
               m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
               pl iL v0 P Pmiss Phient Phitgt Phiex Phimiss
               HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -180,7 +182,7 @@ Section ProofSysUnlink.
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
     iApply (W3.su_w3_au gf gs jx gl pd pav pu
  dqb dqs dqbs
-              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs loyd tlyd
+              pid U1 P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs loyd tlyd
               dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
               m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks t
               pl v0 P Pmiss Phient Phitgt Phiex Phimiss
@@ -217,7 +219,7 @@ Section ProofSysUnlink.
     - destruct Hisd as (Htyzi & Hdots & Hdead).
       iApply (W5D.su_w5_dir_au gf gs jx gl pd pav pu
 
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                dqb dqs dqbs pid U1 P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
                 gili gisli gyi si qsi loyi tlyi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
@@ -242,7 +244,7 @@ Section ProofSysUnlink.
       { exact Hname3. }
     - iApply (W5F.su_w5_file_au gf gs jx gl pd pav pu
 
-                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                dqb dqs dqbs pid U1 P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs loyd tlyd dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
                 gili gisli gyi si qsi loyi tlyi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t

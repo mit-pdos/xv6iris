@@ -5515,7 +5515,7 @@ Section SyscallArms.
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
                     Hkalloc Hire Hpriv Hmp Hau").
-    iIntros (CIDy Hsy mf P' M') "%Hcs %Hext Hcg Hcpu Htcx' Hccx' Hpc
+    iIntros (CIDy Hsy mf P' M' kev) "%Hcs %Hext %Hkev Hcg Hcpu Htcx' Hccx' Hpc
                               _ _ Hbs Hka' Hire' Harms".
     rewrite /sys_exec_arms.
     iDestruct "Harms" as (Uk) "[Hpriv Harm]".
@@ -6042,7 +6042,7 @@ Section SyscallArms.
               Hv1 Hv2 eq_refl eq_refl eq_refl Htbw
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs
                     Hfse Hcaps Htbl Hswin").
-    iIntros (CIDy Hsy mf r P') "%Hcs %Hextz %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
+    iIntros (CIDy Hsy mf r P' kev) "%Hcs %Hextz %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* THE ANSWER'S RANGE, off the contract's own blanket and BEFORE the
        arms are spent (lane NIL-RET): row 16 states it at the process's
        key, as row 5 does, and [SpecSysWrite.sys_write_ret]'s two
@@ -6087,7 +6087,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+              (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
@@ -6211,8 +6211,8 @@ Section SyscallArms.
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Huinv Hera Hsrin Hnil").
-    iIntros (CIDy Hsy mf r P' dw bsw)
-      "%Hcs %Hextz %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
+    iIntros (CIDy Hsy mf r P' dw bsw kev)
+      "%Hcs %Hextz %Hdwle %Htie %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* WHAT THE PROCESS GETS BACK: the arm's own payout, at the descriptor
        key the DEPOSIT was made at.  The landed blanket ([sys_read_ret])
        stays behind -- it reads [pv_ofile V], a kernel array -- and nothing
@@ -6255,11 +6255,11 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
+              (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
                       by (apply list_lookup_total_correct, Hv1);
-                    apply (sysc_mem_ok_read (us_V U) (upd_upt (us_V U) P') (us_M U)
+                    apply (sysc_mem_ok_read (us_V U) (upd_upt (upd_ev (us_V U) kev) P') (us_M U)
                              (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 5) dw bsw
                              Hnum ltac:(lia)
                              ltac:(assert (Hv2t : pv_tf (us_V U) !!! tf_arg_idx 2
@@ -6360,8 +6360,8 @@ Section SyscallArms.
               pid U v0 v1 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
-    iIntros (CIDy Hsy mf r P' dw bsw)
-      "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw kev)
+      "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -6389,11 +6389,11 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
+              (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') (umem_wr (us_M U) v1 dw bsw)) sts sts gn cs cs ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
                       by (apply list_lookup_total_correct, Hv1);
-                    apply (sysc_mem_ok_fstat (us_V U) (upd_upt (us_V U) P') (us_M U)
+                    apply (sysc_mem_ok_fstat (us_V U) (upd_upt (upd_ev (us_V U) kev) P') (us_M U)
                              (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 8) dw bsw
                              Hnum ltac:(lia) ltac:(lia));
                     rewrite Hv1t; reflexivity)
@@ -6496,14 +6496,14 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv [Hxin]").
     { iApply (sysc_dep_chdir U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
-    iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
+    iIntros (CIDy Hsy mf P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
     (* THE SPLIT.  Its premise is the contract's own instantiation: the arms
        are stated at [cw := pv_cwi (us_V U)] and the block they return is
        [us_upt U P'], whose inum is that one. *)
     iDestruct (chdir_arms_split (fs_gamma_L fsc_fs) fsc_fs γf (proc_addr j)
                  pid (pv_cwi (us_V U)) (cf_P fdep) (cf_Pmiss fdep) (cf_Fo fdep)
-                 (us_upt U P') (mf !!! Regidx (mword_of_int 10 : mword 5))
+                 (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') (mf !!! Regidx (mword_of_int 10 : mword 5))
                  ltac:(reflexivity) with "Harms") as (Ucd) "(%Hdisj & Hpv & Hrc)".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -6543,11 +6543,11 @@ Section SyscallArms.
       (V') "(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcw' & %Htfw' & %Hupte' & %Hszv' & %Hlzv' & %Hscv' & Hpriv & Hrcpt)".
     { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
       destruct Hdisj as [[Hr ->] | [Hr (ipv & z & ->)]].
-      - iExists (upd_upt (us_V U) P'). iFrame "Hpv Hrc". iPureIntro.
+      - iExists (upd_upt (upd_ev (us_V U) kev) P'). iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
                      | right; reflexivity | reflexivity | exact Hue
                      | reflexivity | reflexivity | reflexivity].
-      - iExists (upd_cwi (upd_cwd (upd_upt (us_V U) P') ipv) z).
+      - iExists (upd_cwi (upd_cwd (upd_upt (upd_ev (us_V U) kev) P') ipv) z).
         iFrame "Hpv Hrc". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | reflexivity
                      | left; rewrite Hr; reflexivity
@@ -6687,8 +6687,8 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv [Hxin]").
     { iApply (sysc_dep_unlink U sts gn cs pid fdep v0
                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin"). }
-    iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
+    iIntros (CIDy Hsy mf P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -6715,7 +6715,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+              (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
@@ -6816,8 +6816,8 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv [Hxin]").
     { iApply (sysc_dep_link U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
-    iIntros (CIDy Hsy mf P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv Harms".
+    iIntros (CIDy Hsy mf P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -6844,7 +6844,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+              (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
@@ -6947,7 +6947,7 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hftable Hpanic Hpriv
                     Hufrag Hiru Hpenv Hfenv Hdepc").
-    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu _ _ Hpc Hpost Hcpost Hpe' Hfe' Hiru".
+    iIntros (CIDy Hsy mf kev) "%Hcs %Hkev Hcg Hcpu _ _ Hpc Hpost Hcpost Hpe' Hfe' Hiru".
     iEval (rewrite Hfdk) in "Hcpost".
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
@@ -6993,7 +6993,8 @@ Section SyscallArms.
         iDestruct (proc_priv_ofile_len with "Hpv") as %Hoflen.
         iDestruct (fd_frags_len with "Hfr") as %Hstslen.
         iDestruct (proc_priv_states_agree with "Hpv Hfr") as %Hag.
-        iExists (us_V U), sts. iFrame "Hpv Hfr". iPureIntro.
+        (* the record at the count fileclose handed back (permit sweep L1b) *)
+        iExists (upd_ev (us_V U) kev), sts. iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
                     | reflexivity | apply uptd_ext_sz_refl | reflexivity
                     | reflexivity | reflexivity |].
@@ -7016,7 +7017,7 @@ Section SyscallArms.
           destruct (decide (fv = (zero_reg : mword 64))) as [Hz0 | Hz0];
             [| discriminate Hnone].
           exact (Hne (proj1 (Hag fd fv st Hfv Hst) Hz0)).
-      - iExists (upd_ofile (us_V U) fd (zero_reg : mword 64)),
+      - iExists (upd_ofile (upd_ev (us_V U) kev) fd (zero_reg : mword 64)),
                 (<[fd := FdClosed]> sts).
         iFrame "Hpv Hfr". iPureIntro.
         split_and!; [reflexivity | reflexivity | reflexivity | reflexivity | reflexivity
@@ -7165,7 +7166,7 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
                     Hpriv Hufrag Hfd0 Hfd1 Hiru Hpenv Hfenv").
-    iIntros (CIDy Hsy mf P' dw bsw) "%Hcs %Huptz %Hdwle Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    iIntros (CIDy Hsy mf P' dw bsw kev) "%Hcs %Huptz %Hdwle %Hkev Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
     (* [Huptz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -7237,7 +7238,7 @@ Section SyscallArms.
         "[(%Hr & Hpv & Hb)
           | (%fd0 & %fd1 & %l & %k0 & %k1 & %γq &
              (%Hr & %Hfl & %Hne & %Hcl0 & %Hcl1 & %Hd8 & %Hbytes) & Hpv & Hb & Hqf)]".
-      - iExists (upd_upt (us_V U) P'), sts.
+      - iExists (upd_upt (upd_ev (us_V U) kev) P'), sts.
         (* pipealloc or a descriptor scan failed: -1 came back, so the pipe
            row's guard is refuted and there is no fragment to hand on *)
         iSplitR.
@@ -7275,14 +7276,14 @@ Section SyscallArms.
            its state is the READ END, and the array/state agreement says a
            null cell is a closed state. *)
         iDestruct (proc_priv_states_agree γf (proc_addr j) pid
-                     (upd_usV (upd_usM (us_upt U P') M')
+                     (upd_usV (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')
                         (upd_ofile (upd_ofile
-                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           (us_V (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')) fd0 (fnode k0))
                            fd1 (fnode k1)))
                      (<[fd1 := FdOpen false true (FdPipe γq)]>
                         (<[fd0 := FdOpen true false (FdPipe γq)]> sts))
                      with "Hpv Hb") as %Hag0.
-        cbn [us_V pv_ofile upd_ofile upd_upt upd_usV upd_usM us_upt] in Hag0.
+        cbn [us_V pv_ofile upd_ofile upd_upt upd_ev upd_usV upd_usM us_upt] in Hag0.
         assert (Hk0nz : fnode k0 <> (zero_reg : mword 64)).
         { intros Hz.
           pose proof (proj1 (Hag0 fd0 (fnode k0) (FdOpen true false (FdPipe γq))
@@ -7298,9 +7299,9 @@ Section SyscallArms.
         pose proof (fd_frees_head_lt _ fd1 l Hfl1) as Hfd1lt'.
         rewrite length_insert in Hfd1lt'.
         iDestruct (proc_priv_frags_least γf (proc_addr j) pid
-                     (upd_usV (upd_usM (us_upt U P') M')
+                     (upd_usV (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')
                         (upd_ofile (upd_ofile
-                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           (us_V (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')) fd0 (fnode k0))
                            fd1 (fnode k1)))
                      sts
                      (<[fd1 := FdOpen false true (FdPipe γq)]>
@@ -7309,7 +7310,7 @@ Section SyscallArms.
                      ltac:(rewrite <- Hoflen; exact Hfd0lt) Hcl0
                      (fd_frees_below (pv_ofile (us_V U)) fd0 (fd1 :: l) Hfl)
                      ltac:(intros jj Hjj;
-                           cbn [us_V pv_ofile upd_ofile upd_upt upd_usV
+                           cbn [us_V pv_ofile upd_ofile upd_upt upd_ev upd_usV
                                 upd_usM us_upt upd_usV us_V];
                            rewrite list_lookup_insert_ne; [| lia];
                            apply list_lookup_insert_ne; lia)
@@ -7318,9 +7319,9 @@ Section SyscallArms.
                            apply list_lookup_insert_ne; lia)
                      with "Hpv Hb") as %Hleast0.
         iDestruct (proc_priv_frags_least γf (proc_addr j) pid
-                     (upd_usV (upd_usM (us_upt U P') M')
+                     (upd_usV (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')
                         (upd_ofile (upd_ofile
-                           (us_V (upd_usM (us_upt U P') M')) fd0 (fnode k0))
+                           (us_V (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') M')) fd0 (fnode k0))
                            fd1 (fnode k1)))
                      (<[fd0 := FdOpen true false (FdPipe γq)]> sts)
                      (<[fd1 := FdOpen false true (FdPipe γq)]>
@@ -7330,12 +7331,12 @@ Section SyscallArms.
                      ltac:(rewrite list_lookup_insert_ne; [exact Hcl1 | lia])
                      (fd_frees_below _ fd1 l Hfl1)
                      ltac:(intros jj Hjj;
-                           cbn [us_V pv_ofile upd_ofile upd_upt upd_usV
+                           cbn [us_V pv_ofile upd_ofile upd_upt upd_ev upd_usV
                                 upd_usM us_upt upd_usV us_V];
                            apply list_lookup_insert_ne; lia)
                      ltac:(intros jj Hjj; apply list_lookup_insert_ne; lia)
                      with "Hpv Hb") as %Hleast1.
-        iExists (upd_ofile (upd_ofile (upd_upt (us_V U) P') fd0 (fnode k0)) fd1 (fnode k1)),
+        iExists (upd_ofile (upd_ofile (upd_upt (upd_ev (us_V U) kev) P') fd0 (fnode k0)) fd1 (fnode k1)),
                 (<[fd1 := FdOpen false true (FdPipe γq)]>
                    (<[fd0 := FdOpen true false (FdPipe γq)]> sts)).
         (* THE PIPE ROW: the two descriptors the arm installed are the two
@@ -7526,8 +7527,8 @@ Section SyscallArms.
                     [Hxin]").
     { iApply (sysc_dep_mkdir U sts gn cs pid fdep v0
                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin"). }
-    iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 Harms".
+    iIntros (CIDy Hsy mf ns' P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -7559,7 +7560,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+              (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
@@ -7667,8 +7668,8 @@ Section SyscallArms.
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv [Hxin]").
     { iApply (sysc_dep_mknod U sts gn cs pid fdep v0 v1 v2
                 ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin"). }
-    iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
+    iIntros (CIDy Hsy mf ns' P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -7700,7 +7701,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+              (us_upt (upd_usV U (upd_ev (us_V U) kev)) P') sts sts gn cs cs ∅ av m mf fdep Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
                  descriptor row is the identity, at its own number *)
@@ -7812,9 +7813,12 @@ Section SyscallArms.
        reads the landed [sys_open_post] back off the arms
        ([SpecSysOpen.open_arms_landed]). *)
     iAssert (wp_next true (proc_addr j) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+      ∀ (mf : regfile) (ns' : nat) (P' : uptd) (k' : nat),
         ⌜callee_saved M mf⌝ -∗
         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+        (* the event count sys_open's failing close handed back (permit
+           sweep L1b) *)
+        ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
         sie_cap_gpr KT1 mf (av - 4)%nat true (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) true ∅ -∗
         trap_csrs_ext KT1 true -∗
@@ -7835,13 +7839,13 @@ Section SyscallArms.
         (∃ (UW' : ustate) (sts' : list fdstate),
            ⌜(mf !!! Regidx (mword_of_int 10 : mword 5)
                = (mword_of_int (-1) : mword 64)
-             /\ UW' = us_upt U P' /\ sts' = sts)
+             /\ UW' = us_upt (upd_usV U (upd_ev (us_V U) k')) P' /\ sts' = sts)
             \/ (exists (fd : nat) (l : list nat) (k : nat) (rb wb : bool)
                        (t : fdtype),
                   mf !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int (Z.of_nat fd) : mword 64)
-                  /\ fd_frees (pv_ofile (us_V (us_upt U P'))) = fd :: l
-                  /\ UW' = us_ofile (us_upt U P') fd (fnode k)
+                  /\ fd_frees (pv_ofile (us_V (us_upt (upd_usV U (upd_ev (us_V U) k')) P'))) = fd :: l
+                  /\ UW' = us_ofile (us_upt (upd_usV U (upd_ev (us_V U) k')) P') fd (fnode k)
                   /\ sts !! fd = Some FdClosed
                   /\ sts' = <[fd := FdOpen rb wb t]> sts
                   (* ...AND IT IS NOT A PIPE END (design/pipe.md, "The
@@ -7855,7 +7859,7 @@ Section SyscallArms.
                      kit went with the parked discipline. *)
                   /\ fdst_nopipe (FdOpen rb wb t))⌝
            ∗ proc_priv γf (proc_addr j) pid UW'
-           ∗ fd_frags (pv_fdg (us_V (us_upt U P'))) sts'
+           ∗ fd_frags (pv_fdg (us_V (us_upt (upd_usV U (upd_ev (us_V U) k')) P'))) sts'
            ∗ fd_slot
            ∗ open_receipt (of_om fdep) (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
                (us_M U) v0 v1
@@ -7884,15 +7888,15 @@ Section SyscallArms.
                       Hfd0 Hpriv Hufrag [Hxin]").
       { iApply (sysc_dep_open U sts gn cs pid fdep v0 v1
                   ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 with "Hxin"). }
-      iIntros (CIDy Hsy mf ns' P')
-        "%Hcs %Hextz Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
+      iIntros (CIDy Hsy mf ns' P' k')
+        "%Hcs %Hextz %Hk' Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
       iSpecialize ("Hcont'" $! CIDy with "[//]").
-      iApply ("Hcont'" $! mf ns' P' with "[//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
+      iApply ("Hcont'" $! mf ns' P' k' with "[//] [//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
                 Hsbn Hisp Hsbs Hbmp [//] Hir [Harms]").
       iApply (open_arms_split with "Harms"). }
     iApply "Hk".
-    iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
+    iIntros (CIDy Hsy mf ns' P' kev)
+      "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -7948,7 +7952,7 @@ Section SyscallArms.
       destruct Hdisj as
         [(Hr & -> & ->)
         | (fd & ll & kf & rb & wb & tp & Hr & Hfrees & -> & Hcl & -> & Hnp)].
-      - iExists (upd_upt (us_V U) P'), sts. iFrame "Hpv Hb Hrc". iPureIntro.
+      - iExists (upd_upt (upd_ev (us_V U) kev) P'), sts. iFrame "Hpv Hb Hrc". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity | reflexivity |].
         (* the failure arm installs nothing: the row's right disjunct *)
         by right.
@@ -7961,7 +7965,7 @@ Section SyscallArms.
         pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd ll Hfrees)
           as Hfdlt.
         iDestruct (proc_priv_frags_least γf (proc_addr j) pid
-                     (MkUstate (upd_ofile (upd_upt (us_V U) P') fd (fnode kf))
+                     (MkUstate (upd_ofile (upd_upt (upd_ev (us_V U) kev) P') fd (fnode kf))
                                (us_M U))
                      sts
                      (<[fd := FdOpen rb wb tp]> sts)
@@ -7969,11 +7973,11 @@ Section SyscallArms.
                      ltac:(rewrite <- Hoflen; exact Hfdlt) Hcl
                      (fd_frees_below (pv_ofile (us_V U)) fd ll Hfrees)
                      ltac:(intros jj Hjj;
-                           cbn [us_V pv_ofile upd_ofile upd_upt];
+                           cbn [us_V pv_ofile upd_ofile upd_upt upd_ev];
                            apply list_lookup_insert_ne; lia)
                      ltac:(intros jj Hjj; apply list_lookup_insert_ne; lia)
                      with "Hpv Hb") as %Hleast.
-        iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)),
+        iExists (upd_ofile (upd_upt (upd_ev (us_V U) kev) P') fd (fnode kf)),
                 (<[fd := FdOpen rb wb tp]> sts).
         iFrame "Hpv Hb Hrc". iPureIntro.
         split_and!; [exact Htfpe | reflexivity | reflexivity | reflexivity | reflexivity | reflexivity | exact Hextz | reflexivity | reflexivity | reflexivity |].

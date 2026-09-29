@@ -154,10 +154,13 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
      back at the caller's own [us_M U]; only the DESCRIPTOR grows.
      (image campaign, tier 3: the loop calls
      [SpecCopyin.wp_copyin_sconf_mem].) *)
-  ∀ (mf : regfile) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the copy loop lends the block's counter to copyin, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
@@ -174,7 +177,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       pipe_wpost (pv_upt (us_V U)) (pn_queue γp) (us_M U) addr Q Qe
         (kill_shot (pv_gen (us_V U)) ∗ app_taint)%I (Z.to_nat n)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      proc_priv_core pj pid (us_upt U P') -∗
+      proc_priv_core pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

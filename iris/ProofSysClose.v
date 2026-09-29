@@ -629,9 +629,9 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID CID12 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpay] [Hpenv] Hfenv Hiru");
-        [exact Hcsf| | |].
-      { rewrite /sys_close_post. iLeft. iFrame "Hpriv Hfrag". iPureIntro.
+      iApply ("Hcont" $! mf (pv_ev (us_V U)) with "[%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpay] [Hpenv] Hfenv Hiru");
+        [exact Hcsf| lia | | |].
+      { rewrite upd_ev_id upd_usV_id /sys_close_post. iLeft. iFrame "Hpriv Hfrag". iPureIntro.
         split; [exact Hmfa0 | exact Hnone]. }
       (* THE CLOSE PAYMENT CAME BACK UNSPENT: argfd answered NONE, so the key
          is [FdClosed] and both the payment and its answer are [emp]. *)
@@ -781,7 +781,7 @@ Section ProofSysClose.
          block needs: the store below empties [p->ofile[fd]] and the
          fileclose after it wants the quarter (SpecSysClose.v's note on why
          the quarter cannot come from the CALLER). *)
-      iDestruct (proc_priv_bare_ofile γf p pid U fd fv Hlk with "Hpriv")
+      iDestruct (proc_priv_bare_ofile_ev γf p pid U fd fv Hlk with "Hpriv")
         as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
       iDestruct "Href" as (k q stf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
@@ -884,7 +884,7 @@ Section ProofSysClose.
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv Hcpay").
       all: try lkbelow.
-      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hiru Hout Hcpost Hpbare".
+      iIntros (CID21 Hs21 R kev) "Hcg Hcpu Hextc Hextm Hpc %HcsR %Hkev Hfdslot Hiru Hout Hcpost Hpbare".
       iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
@@ -925,7 +925,7 @@ Section ProofSysClose.
       iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
         as "[Hst Hfr]".
       iDestruct ("Hfrback" with "Hfr []") as "Hfrag"; [iApply foff_row_closed |].
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]")
+      iDestruct ("Hback" $! (zero_reg : mword 64) kev with "Hpbare [Hcell Hfdslot Hst]")
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }
       (* rejoin frame slot 3 *)
@@ -976,8 +976,8 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID21 CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpost] Hpenv Hfenv Hiru");
-        [exact Hcsf| |].
+      iApply ("Hcont" $! mf kev with "[%] [%] Hcg Hcpu Hextc Hextm Hpc [Hpriv Hfrag] [Hcpost] Hpenv Hfenv Hiru");
+        [exact Hcsf| exact Hkev | |].
       { rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv Hfrag". iPureIntro.
         split; [exact Hmfa0 | exact Hsome]. }
       (* THE PAYMENT'S ANSWER, at the caller's own key: fileclose answered at

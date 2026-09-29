@@ -91,6 +91,7 @@ Require Import SpecFetchaddr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SlotGen.   (* [act_lend_borrow]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
@@ -628,7 +629,7 @@ Section ProofFetchaddr.
        image: it writes no user memory and the page it may fault in was
        already in the lazy view, so [us_M U] comes back on the nose and the
        block re-closes at it. *)
-    iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+    iDestruct (proc_priv_copy_ev with "Hpriv") as "(Hszc & Hptc & Hpt & Hev & Hpback)".
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz (and it STAYS there: it is
        copyin's new [psz] argument, xv6 4f2fc8b) ---- *)
     assert (Hszaddr : add_vec (A !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
@@ -725,12 +726,13 @@ Section ProofFetchaddr.
       iIntros (CID15 Hk15 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
-      iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
+      iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
       iDestruct (cpu_own_transport CID10 CID15 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
+      iApply ("Hcont" $! mf (pv_upt (us_V U)) (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
+      { lia. }
       iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
     - (* ======= addr < sz: on to the second test ======= *)
       assert (Hlt : (uint addr < uint (pv_sz (us_V U)))%Z).
@@ -847,12 +849,13 @@ Section ProofFetchaddr.
         iIntros (CID17 Hk17 mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
-        iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
+        iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID10 CID17 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" $! mf (pv_upt (us_V U)) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
+        iApply ("Hcont" $! mf (pv_upt (us_V U)) (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
+        { lia. }
         iLeft. iFrame "Hip". iPureIntro. split; [exact Hfa0 | exact Hbad].
       + (* ------- the whole doubleword is in range: call copyin ------- *)
         assert (Hok : fetch_ok addr (pv_sz (us_V U))).
@@ -997,13 +1000,16 @@ Section ProofFetchaddr.
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        (* the lend (permit sweep L1b): the block's counter, borrowed *)
+        iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
         iApply (Copyin.wp_copyin_sconf_mem KT1 γa A7 (pv_upt (us_V U)) (us_M U)
                   (pv_sz (us_V U)) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
-                  _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
-                  with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
+                  _ (pv_ev (us_V U)) HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
+                  with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hbuf").
         all: try lkbelow.
-        iIntros (CID20 Hk20 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+        iIntros (CID20 Hk20 mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+        iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
         rewrite HA7a3 in Hret.
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))
           by (rewrite HA7ra; apply bv_eq; vm_compute; reflexivity).
@@ -1011,7 +1017,7 @@ Section ProofFetchaddr.
         iEval (rewrite HA7a2) in "Hbuf".
         iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "[%Hnbw Hip]".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-        iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hpriv".
+        iDestruct ("Hpback" $! P' (us_M U) kc2 with "Hxe Hszc Hptc Hpt Hev") as "Hpriv".
         (* the frame and the callee-saved set survived copyin *)
         assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 4)
           by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HA7sp).
@@ -1101,9 +1107,10 @@ Section ProofFetchaddr.
         iIntros (CID23 Hk23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID20 CID23 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
+        iApply ("Hcont" $! mf P' kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
         { exact Hext. }
+        { exact Hkc2. }
         iRight. iSplitR.
         { iPureIntro. split; [| exact Hok]. rewrite Hfa0. exact Hrvcase. }
         iExists wnew. iFrame "Hip". iPureIntro.

@@ -541,18 +541,24 @@ Definition wp_filestat_sconf_body
      strictly stronger contract than filestat has ever had (the old post
      said nothing at all about the destination) and is left to whoever wants
      it. *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8)
+      (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
       ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): filestat lends the block's
+         counter to copyout, which may step it, so the block comes back at
+         a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
       proc_priv_core pj pidv
-        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+           (umem_wr (us_M U) addr d bs)) -∗
       filestat_env_out fn st -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).

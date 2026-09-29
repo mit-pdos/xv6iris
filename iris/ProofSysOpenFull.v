@@ -559,7 +559,10 @@ Section ProofSysOpenFullBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
+    iIntros (CID13 Hq13 mas P' bf kA) "%Hcsas %Huptz %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
+    (* argstr lent the block's counter (permit sweep L1b): the rest of the
+       run is at the record it came back at *)
+    set (UA := upd_usV U (upd_ev (us_V U) kA)).
     (* argstr now reports [uptd_ext_sz]; this contract is stated at the
        bare [uptd_ext] (it is not on the dispatcher's permission path), so
        the extra content is dropped here. *)
@@ -658,11 +661,15 @@ Section ProofSysOpenFullBody.
       iDestruct (cpu_own_transport CID16 CIDy 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+      (* this arm closes nothing: the count argstr handed back (permit
+         sweep L1b) *)
+      iSpecialize ("Hcont" $! mf ns P' kA).
+      iApply ("Hcont" with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl
                 Hsbn Hsbi Hsbs Hsbb [%] Hisl
                 [Hpriv Hfds Hfrag Hwp Hac Hdl Hoc Htc Hclegs]").
       { exact Hcsf. }
       { exact Huptz. }
+      { exact HkA. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { reflexivity. }
@@ -738,13 +745,13 @@ Section ProofSysOpenFullBody.
     assert (HR3thr : so_thr m R3).
     { intros c Hc N2 N8b N9 N18 N19. rewrite /R3 upd_ne; [| regne].
       exact (HR2thr c Hc N2 N8b N9 N18 N19). }
-    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (us_upt U P') with "Hpriv")
+    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (us_upt UA P') with "Hpriv")
       as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID13 CID18 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID18) gs j gl fsc_bio icfg_log fsc_fs fsc_cov
               fsc_logst icfg_dev pid (DfracOwn (1/4)) R3 (K - 24)%nat eb b lks
-              (us_upt U P') HKbo Hj Hgl (Hlb "log"%string)
+              (us_upt UA P') HKbo Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -826,19 +833,21 @@ Section ProofSysOpenFullBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0_au_create omo gf
  ns dqb dqs dqbs dqn (proc_addr j) pid (us_M U) v vom
-                         (us_upt U P') sts P Pmiss Farm Fun Fok Fex Fo Ft m K eb b lks))
+                         (us_upt UA P') sts P Pmiss Farm Fun Fok Fex Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
-      iEval (rewrite /so_cont0_au_create). iIntros (mf ns2) "%Hcsf %Hns2".
+      iEval (rewrite /so_cont0_au_create). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
       iIntros "Hcg Hown Htce Hcce Hpc Hsbn Hsbi Hsbs Hsbb Hbsl Hisl
                Hpost".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       (* THE IMAGE DOES NOT MOVE (SpecSysOpen's own note), so the frame's
          fourth binder is the one it came in at. *)
-      iApply ("Hcont" $! mf ns2 P' with "[%] [%] Hcg Hown Htce Hcce Hpc
+      iApply ("Hcont" $! mf ns2 P' k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                 Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hisl Hpost").
       { exact Hcsf. }
       { exact Huptz. }
+      (* the count composes: argstr's, then the failing close's *)
+      { rewrite /UA in Hk2. cbn [us_V upd_usV us_upt upd_upt upd_ev pv_ev] in Hk2. lia. }
       { exact Hns2. } }
     (* ===== +0x36 c.beqz a5, +0x38 -- the O_CREATE SPLIT ===== *)
     (* THE MIRROR IMAGE of the plain walk's entry.  [om_create vom = true]
@@ -881,7 +890,7 @@ Section ProofSysOpenFullBody.
     iApply (EntryC.so_entry_c_au (CID0 := CID22) omo gfl gf gs j gl pd pav
               pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-              pid dqb dqs dqbs dqn (us_upt U P') sts m S2 sp0 K eb b lks
+              pid dqb dqs dqbs dqn (us_upt UA P') sts m S2 sp0 K eb b lks
               u4 u5 u6 u24
               (us_M U) v vom P Pmiss Farm Fun Fok Fex Fo Ft
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0

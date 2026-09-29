@@ -1400,6 +1400,25 @@ Section ProcInv.
     iFrame "Hb Hc Hft Hgq Hxs". iPureIntro; exact Hlz.
   Qed.
 
+  (* ...WITH THE CLOSER TAKING THE BARE BLOCK BACK AT ANY EVENT COUNT
+     (permit sweep L1b).  A callee that takes the bare block may lend its
+     counter on (fileclose -> pipeclose), so it comes back at a raised
+     count; the rest of the core names no count and rides along.  The same
+     at the block's altitude is [proc_priv_bare_acc_ev], and with one
+     descriptor slot out, [proc_priv_bare_ofile_ev]. *)
+  Lemma proc_priv_core_bare_ev_acc (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_core pa pid U -∗
+    proc_priv_bare pa pid U ∗
+    (∀ k : nat, proc_priv_bare pa pid (upd_usV U (upd_ev (us_V U) k)) -∗
+       proc_priv_core pa pid (upd_usV U (upd_ev (us_V U) k))).
+  Proof using .
+    rewrite proc_priv_core_bare. iIntros "[Hb [%Hlz [Hc [Hft [Hgq Hxs]]]]]".
+    iSplitL "Hb"; [iExact "Hb"|]. iIntros (k) "Hb".
+    rewrite proc_priv_core_bare.
+    destruct U as [[f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13] M].
+    iFrame "Hb Hc Hft Hgq Hxs". iPureIntro; exact Hlz.
+  Qed.
+
   (* THE EVENT COUNT ONLY ROSE (permit sweep, design ni-strong-instance.md
      §7): [U'] is [U] with its [pv_ev] moved to a count at least [U]'s and
      nothing else touched.  What a block-holder's post says of a block that
@@ -1585,6 +1604,20 @@ Section ProcInv.
     iIntros "[[Hb [%Hlz [Hc [Hft [Hgq Hxs]]]]] Ho]".
     iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb".
     iFrame "Hb Hc Hft Hgq Hxs Ho". iPureIntro; exact Hlz.
+  Qed.
+
+  (* ...AND AT ANY EVENT COUNT (permit sweep L1b); see
+     [proc_priv_core_bare_ev_acc]. *)
+  Lemma proc_priv_bare_acc_ev (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) :
+    proc_priv γf pa pid U -∗
+    proc_priv_bare pa pid U ∗
+    (∀ k : nat, proc_priv_bare pa pid (upd_usV U (upd_ev (us_V U) k)) -∗
+       proc_priv γf pa pid (upd_usV U (upd_ev (us_V U) k))).
+  Proof using .
+    iIntros "[Hc Ho]".
+    iDestruct (proc_priv_core_bare_ev_acc with "Hc") as "[$ Hback]".
+    iIntros (k) "Hb". iSplitR "Ho"; [iApply ("Hback" with "Hb") | iExact "Ho"].
   Qed.
 
   (* THE cwd-DEFICIT BLOCK IS THE BARE BLOCK PLUS THE FD TABLE.  Both sides
@@ -2964,6 +2997,75 @@ Section ProcInv.
                (Z.le_refl _) (Hlzq Hf)).
   Qed.
 
+  (* ...AND THE COPY INSTANCE WITH THE EVENT COUNTER LENT OUT BESIDE IT
+     (permit sweep L1b, design ni-strong-instance.md §7).  For a caller
+     that holds the block and hands its image to a copy (copyin, copyout,
+     copyinstr), which takes the counter as its lend and may step it: the
+     block is rebuilt at the grown descriptor, the image the copy left and
+     whatever count came back -- [us_upt] of the block AT that count.
+     [proc_priv_copy_ev] below is the same at the block's altitude. *)
+  Lemma proc_priv_core_copy_ev (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_core pa pid U -∗
+    p_sz pa ↦₈ pv_sz (us_V U) ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) ∗
+    proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
+    act_cnt pa (pv_ev (us_V U)) ∗
+    (∀ (P' : uptd) (M' : gmap Z (bv 8)) (k' : nat),
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+       p_sz pa ↦₈ pv_sz (us_V U) -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
+       proc_ptm P' (uint (pv_sz (us_V U))) M' -∗
+       act_cnt pa k' -∗
+       proc_priv_core pa pid (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') M')).
+  Proof using .
+    iIntros "Hpv".
+    iDestruct (proc_priv_core_lazy with "Hpv") as "%Hlzq".
+    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hcwd & Hft & Hgq & Hxs & Hev & Hgh)".
+    rewrite /proc_fields /proc_ptm_at.
+    iDestruct "Hf" as "(Hsz & Hcwd' & %Hnl & Hnm & Hsecc)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Hsz Hpg Hptt Hev".
+    iIntros (P' M' k') "%Hext Hsz Hpg Hptt Hev".
+    destruct (uptd_ext_sz_ext _ _ _ Hext) as (Hroot & Htf & Hum).
+    rewrite /proc_priv_core /proc_fields /proc_ptm_at.
+    cbn [us_upt upd_usM upd_usV upd_ev upd_upt us_V us_M pv_sz pv_upt pv_tf
+         pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc pv_ev].
+    rewrite Hroot Htf.
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact (um_below_ext_sz _ _ _ Hbel Hext)|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd' Hnm Hsecc".
+    { iFrame "Hsz Hcwd' Hnm Hsecc". iPureIntro. exact Hnl. }
+    iFrame "Hpg Htfc Hptt Htfp".
+    iSplitR.
+    { iPureIntro. intro Hf.
+      exact (lazy_free_mono (ud_um (pv_upt (us_V U))) (ud_um P')
+               (uint (pv_sz (us_V U))) (uint (pv_sz (us_V U)))
+               Hum (Z.le_refl _) (Hlzq Hf)). }
+    iFrame "Hcwd Hft Hgq Hxs Hev Hgh".
+  Qed.
+
+  Lemma proc_priv_copy_ev (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗
+    p_sz pa ↦₈ pv_sz (us_V U) ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) ∗
+    proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
+    act_cnt pa (pv_ev (us_V U)) ∗
+    (∀ (P' : uptd) (M' : gmap Z (bv 8)) (k' : nat),
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+       p_sz pa ↦₈ pv_sz (us_V U) -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
+       proc_ptm P' (uint (pv_sz (us_V U))) M' -∗
+       act_cnt pa k' -∗
+       proc_priv γf pa pid (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') M')).
+  Proof using .
+    iIntros "[Hc Ho]".
+    iDestruct (proc_priv_core_copy_ev with "Hc") as "($ & $ & $ & $ & Hback)".
+    iIntros (P' M' k') "%Hext Hsz Hpg Hptt Hev".
+    iSplitR "Ho"; [iApply ("Hback" with "[%] Hsz Hpg Hptt Hev"); exact Hext|].
+    destruct U as [[f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13] M]. iExact "Ho".
+  Qed.
+
   (* =================================================================== *)
   (* THE ADDRESS-SPACE SWAP -- exec, and only exec.                       *)
   (* =================================================================== *)
@@ -3190,6 +3292,28 @@ Section ProcInv.
       cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
       iFrame "Hb Hc". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
+  Qed.
+
+  (* ...AND AT ANY EVENT COUNT (permit sweep L1b): fileclose lends the bare
+     block's counter to pipeclose, so the block comes back at a raised count
+     and the descriptor array is rebuilt around it. *)
+  Lemma proc_priv_bare_ofile_ev (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) (fd : nat) (v : mword 64) :
+    pv_ofile (us_V U) !! fd = Some v ->
+    proc_priv γf pa pid U -∗
+    proc_priv_bare pa pid U ∗ ofile_slot γf (pv_fdg (us_V U)) pa fd v ∗
+    (∀ (v' : mword 64) (k : nat),
+       proc_priv_bare pa pid (upd_usV U (upd_ev (us_V U) k)) -∗
+       ofile_slot γf (pv_fdg (us_V U)) pa fd v' -∗
+       proc_priv γf pa pid (us_ofile (upd_usV U (upd_ev (us_V U) k)) fd v')).
+  Proof using .
+    iIntros (Hfd) "[Hcore [%Hlen Ho]]".
+    iDestruct (proc_priv_core_bare_ev_acc with "Hcore") as "[$ Hcback]".
+    iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
+    iIntros (v' k) "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    rewrite /proc_priv /proc_ofiles.
+    iSplitR "Ho"; [iApply ("Hcback" with "Hb") |].
+    iSplit; [iPureIntro; cbn; rewrite length_insert; exact Hlen | iExact "Ho"].
   Qed.
 
   (* ---- the two ends of a LOAN, at the block's altitude ----

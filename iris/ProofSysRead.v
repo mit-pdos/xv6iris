@@ -807,14 +807,16 @@ Section ProofSysRead.
          is empty: [d := 0], any [bs] closes [umem_wr _ _ 0 _ = M] on the
          nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
-                0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] [HP]").
+                0%nat (fun _ => bv_0 8) (pv_ev (us_V U))
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hufrag Hkenv [Henv] [HP]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { apply Z.le_max_l. }
       { right. reflexivity. }
       { exact Hmfa0. }
-      { rewrite us_upt_id. cbn [umem_wr]. rewrite upd_usM_id. iExact "Hpriv". }
+      (* permit sweep L1b: nothing lent on this arm *)
+      { lia. }
+      { rewrite upd_ev_id upd_usV_id us_upt_id. cbn [umem_wr]. rewrite upd_usM_id. iExact "Hpriv". }
       { iApply (fileread_fs_env_out with "Henv"). }
       (* argfd answered NONE: the key is [FdClosed] and the arm is the landed
          blanket and nothing more. *)
@@ -973,8 +975,8 @@ Section ProofSysRead.
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin HP").
       all: try lkbelow.
-      iIntros (CID25 Hs25 mf rv P' dw bsw)
-        "%Hcsf %Hupt %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
+      iIntros (CID25 Hs25 mf rv P' dw bsw kev)
+        "%Hcsf %Hupt %Hdwle %Htie %Hrva %Hkev Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -991,12 +993,12 @@ Section ProofSysRead.
          proof that this is [v1]. *)
       iEval (rewrite HS4a1) in "Hcore".
       iDestruct (proc_priv_join γf pj pidv
-                   (upd_usM (us_upt U P')
+                   (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P')
                       (umem_wr (us_M U) v1 dw bsw))
                    with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
-      { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }
+      { cbn [upd_upt upd_ev pv_ofile pv_fdg]. iExact "Howe". }
       assert (Hpc40 : ret_pc (S4 !!! Regidx Rra)
                       = mword_of_int (KernelSyms.sys_read + 0x40))
         by (rewrite HS4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1028,13 +1030,14 @@ Section ProofSysRead.
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P' dw bsw
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv [Harms]").
+      iApply ("Hcont" $! mg rv P' dw bsw kev
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hufrag Hkenv Henv [Harms]").
       { exact Hcsg. }
       { exact Hupt. }
       { exact Hdwle. }
       { exact Htie. }
       { exact Hmga0. }
+      { exact Hkev. }
       (* THE ARMED OUTPUT: the callee's arms ARE this caller's, because
          sys_read relays fileread's return value untouched -- one match in
          the tree, not two. *)

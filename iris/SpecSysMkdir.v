@@ -526,11 +526,15 @@ Definition wp_sys_mkdir_sconf_body
      already in the block's view, as lazy pages reading 0, so vmfault does
      not move it either.  Only the DESCRIPTOR grows, and the block comes
      back at the image it was handed. *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext_sz] is argstr's own report, relayed. *)
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): argstr lends the block's
+         counter to copyinstr, which may step it, so the block comes back
+         at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -554,7 +558,7 @@ Definition wp_sys_mkdir_sconf_body
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (us_upt U P') -∗
+      proc_priv γf pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       (* ...and the legs' receipts, keyed on that answer *)
       mkdir_arms (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U))
