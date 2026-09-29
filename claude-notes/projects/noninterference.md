@@ -83,8 +83,8 @@ M1's ledgers are fresh ground and go first.
   contracts for free, so the sweep is ~22 block-less contracts in three
   rings; ring one and the block-holders' posts above it are in).  L1b
   LANDED 2026-09-29 (b69bd0fab; §7.3: the copy ring and the whole file layer
-  above it, 84 files).  Next: L2 the inner VM ring, L3 the allocator
-  and the appends, then T.  DESIGN PASS 2026-09-28,
+  above it, 84 files).  L2 LANDED 2026-09-29 (78f9234b8; §7.4).  Next: L3
+  the allocator and the appends, then T.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
   a free consequence of the ledger — absence is ownership, and kalloc's
   premises do not distinguish a quiet round from a syscall, so the

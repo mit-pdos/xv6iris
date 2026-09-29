@@ -365,3 +365,20 @@ arm, `uvmdealloc`, `proc_pagetable`, `uvmfree`, the four `uvmunmap`s,
 requiring the lend, the token-free led forms deleted, the boot chains
 at `p = 0`; T the rows and the theorem.
 
+### 7.4 L2 as landed (2026-09-29, 78f9234b8)
+
+The inner VM ring (32 files, +707 / -451): `vmfault`, `uvmdealloc`,
+`proc_pagetable` (both forms), `uvmfree`, the four `uvmunmap`s and
+`mappages` take the lend; the fault arm lends the block's counter to
+vmfault and closes at `upd_ev` (`wp_usertrap` unchanged — its post
+quantifies the record and `uround_ok` does not name `pv_ev`); the boot
+chain `kvmmap`/`kvmmake`/`proc_mapstacks`/`kvminit` takes `p = zero_reg`
+from main; kexec's phase B outputs at `ev_after`.  Clean gate from
+scratch 1759/0; audits 13/13/14.  What remains: L3 — `walk` (the
+allocating form), `freewalk`, `uvmcreate`, `kalloc`/`kfree`'s led forms
+and the four ledger appends REQUIRING the permit and stepping it, the
+token-free `wp_kalloc_sconf`/`wp_kfree_sconf` deleted (every site holds
+a lend or runs at `p = 0`: `kinit`, `freerange`, `virtio_disk_init` take
+the boot premise), `wp_ap_pidsec`, freeproc's and kwait's appends, and
+kexit's exit append from its own block; then T.
+
