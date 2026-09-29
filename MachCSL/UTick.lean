@@ -107,7 +107,7 @@ theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMis
   generalize hs1 : s.setR .mip _ = s1
   have ha1 : ucClockAgree s s1 := hs1 ▸ ucClockAgree_setR _ _ _ (Or.inr (Or.inr rfl))
   rw [uc_currentlyEnabled_Sstc (hmS s1 ha1)]
-  simp only [Bool.true_and, ucRW_readReg D _ _ _ _ hT.rd_menvcfg]
+  simp only [↓reduceIte, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_menvcfg]
   split
   · simp only [ucRW_readReg D _ _ _ _ hT.rd_mip, ucRW_readReg D _ _ _ _ hT.rd_stimecmp,
       ucRW_readReg D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
@@ -128,7 +128,7 @@ theorem uc_tickClock (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D 
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
     ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
   simp only [tick_clock, should_inc_mcycle, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_priv,
-    ucRW_readReg D _ _ _ _ hT.rd_mcountinhibit, ucRW_readReg D _ _ _ _ hT.rd_mcyclecfg]
+    ucRW_readReg D _ _ _ _ hT.rd_mcountinhibit]
   have rest : ∀ (t : UWSt), ucClockAgree s t →
       ∃ s' orc', runRW D orc t (do
         writeReg mtime (BitVec.addInt (← readReg mtime) 1)
@@ -139,10 +139,15 @@ theorem uc_tickClock (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D 
       (ucClockAgree_trans ht (ucClockAgree_setR _ _ _ (Or.inr (Or.inl rfl)))))
     exact ⟨s', o', e, ucClockAgree_trans ht (ucClockAgree_trans
       (ucClockAgree_setR _ _ _ (Or.inr (Or.inl rfl))) ha)⟩
+  -- `mcyclecfg` is read only under `mcountinhibit.CY = 0`
   split
-  · simp only [ucRW_readReg D _ _ _ _ hT.rd_mcycle, ucRW_writeReg D _ _ _ _ _ hT.wr_mcycle]
-    exact rest _ (ucClockAgree_setR _ _ _ (Or.inl rfl))
-  · try simp only [pure_bind]
+  · simp only [bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_mcyclecfg]
+    split
+    · simp only [ucRW_readReg D _ _ _ _ hT.rd_mcycle, ucRW_writeReg D _ _ _ _ _ hT.wr_mcycle]
+      exact rest _ (ucClockAgree_setR _ _ _ (Or.inl rfl))
+    · try simp only [pure_bind]
+      exact rest s (ucClockAgree_refl s)
+  · simp only [pure_bind, Bool.false_eq_true, ↓reduceIte]
     exact rest s (ucClockAgree_refl s)
 
 end MachCSL

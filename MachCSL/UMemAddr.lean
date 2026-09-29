@@ -51,6 +51,20 @@ theorem uma_pmm_applicable (acc : MemoryAccessType mem_payload) (h : umaDAcc acc
   rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [umaDAcc] at h <;> rfl
 
+/-- `uma_pmm_applicable`, one conjunct per gate of the short-circuit chain. -/
+theorem uma_pmm_applicable_sc (acc : MemoryAccessType mem_payload) (h : umaDAcc acc = true) (ms : BitVec 64)
+    (hmxr : BitVec.extractLsb' 19 1 ms = 0#1) :
+    (acc != MemoryAccessType.InstructionFetch ()) = true ∧
+      (acc != MemoryAccessType.Load mem_payload.PageTableEntry) = true ∧
+      (acc != MemoryAccessType.Store mem_payload.PageTableEntry) = true ∧
+      (_get_Mstatus_MXR ms == 0#1 && Functions.xlen == 64) = true := by
+  have hall := uma_pmm_applicable acc h ms hmxr
+  simp only [Bool.and_eq_true] at hall
+  obtain ⟨h1, h2, h3, -, -⟩ := hall
+  refine ⟨h1, h2, h3, ?_⟩
+  rw [show _get_Mstatus_MXR ms = BitVec.extractLsb' 19 1 ms from rfl, hmxr]
+  rfl
+
 /-- Pointer masking with `PMLEN = 0` is the identity. -/
 theorem uma_pm_transform_VA0 (va : BitVec 64) : pm_transform_VA (.Virtaddr va) 0 = .Virtaddr va := by
   simp only [pm_transform_VA, sign_extend, Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb,
@@ -69,6 +83,7 @@ theorem uma_transform_effective_address_U (D : UFoot) (orc : UOrc) (s : UWSt) (h
   obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩⟩ := hp
   have htm := utr_translationMode_U D orc s hms hsatp hsxl hmode
   have hpmm := uma_pmm_applicable acc hacc _ hmxr
+  obtain ⟨hpm1, hpm2, hpm3, hpm4⟩ := uma_pmm_applicable_sc acc hacc _ hmxr
   uwk_pins hw
   uwk_run [htm, hcp, utr_effPriv _ _ _ hmprv]
   rw [uma_pm_transform_VA0]

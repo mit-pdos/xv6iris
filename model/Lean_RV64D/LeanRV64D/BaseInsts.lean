@@ -252,7 +252,10 @@ def jump_to (target : (BitVec 64)) : SailM ExecutionResult := SailME.run do
   | .some e => SailME.throw ((Ext_ControlAddr_Check_Failure e) : ExecutionResult)
   | none => (pure ())
   assert ((BitVec.access target 0) == 0#1) "extensions/I/base_insts.sail:59.25-59.26"
-  if (((bit_to_bool (BitVec.access target 1)) && (not (← (currentlyEnabled Ext_Zca)))) : Bool)
+  if ((← do
+       if ((bit_to_bool (BitVec.access target 1)) : Bool)
+       then (pure (not (← (currentlyEnabled Ext_Zca))))
+       else (pure false)) : Bool)
   then (memory_exception (Virtaddr target) (E_Fetch_Addr_Align ()))
   else
     (do

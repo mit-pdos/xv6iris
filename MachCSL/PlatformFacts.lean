@@ -291,4 +291,26 @@ theorem bit0_clear_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) :
     rw [BitVec.getElem_eq_testBit_toNat]; simp [Nat.testBit_zero]; omega
   simp [h0]
 
+/-- Bit 1 of a 4-aligned `PC` is clear (the fetch's `Zca` alignment gate). -/
+theorem bit1_clear_of_mod4 (pc : BitVec 64) (h : pc.toNat % 4 = 0) :
+    (BitVec.ofBool pc[1]! != 0#1) = false := by
+  have h1 : pc[1] = false := by
+    rw [BitVec.getElem_eq_testBit_toNat]
+    have : pc.toNat / 2 % 2 = 0 := by omega
+    first
+      | simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.one_and_eq_mod_two, this]
+      | (rw [Nat.testBit_succ, Nat.testBit_zero]; simp [this])
+  simp [h1]
+
+/-- Bit 1 of a `PC` that is 2 mod 4 is set. -/
+theorem bit1_set_of_mod4 (pc : BitVec 64) (h : pc.toNat % 4 = 2) :
+    (BitVec.ofBool pc[1]! != 0#1) = true := by
+  have h1 : pc[1] = true := by
+    rw [BitVec.getElem_eq_testBit_toNat]
+    have : pc.toNat / 2 % 2 = 1 := by omega
+    first
+      | simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.one_and_eq_mod_two, this]
+      | (rw [Nat.testBit_succ, Nat.testBit_zero]; simp [this])
+  simp [h1]
+
 end MachCSL

@@ -331,8 +331,17 @@ def update_and_write_pte (sv_width : Nat) (vpn : (BitVec (sv_width - 12))) (pteA
   | none => (pure (Ok (none, ext_ptw)))
   | .some _ =>
     (do
-      if ((((← (currentlyEnabled Ext_Svadu)) && ((_get_MEnvcfg_ADUE (← readReg menvcfg)) == 1#1)) || ((not
-               (← (currentlyEnabled Ext_Svadu))) && (not (← (currentlyEnabled Ext_Svade))))) : Bool)
+      if ((← do
+           if ((← do
+                if ((← (currentlyEnabled Ext_Svadu)) : Bool)
+                then (pure ((_get_MEnvcfg_ADUE (← readReg menvcfg)) == 1#1))
+                else (pure false)) : Bool)
+           then (pure true)
+           else
+             (do
+               if ((not (← (currentlyEnabled Ext_Svadu))) : Bool)
+               then (pure (not (← (currentlyEnabled Ext_Svade))))
+               else (pure false))) : Bool)
       then
         (do
           let pte_width :=

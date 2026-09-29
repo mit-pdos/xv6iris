@@ -41,6 +41,7 @@ theorem swp_fetch_s4_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok'.2.1
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_clear_of_mod4 pc (by omega)
   have hlt := inRam_lt38 pc 4 hram
   have hid := paOf_id pc (inRam_lt pc 4 hram)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
@@ -86,6 +87,7 @@ theorem swp_fetch_s2_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok'.2.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc (by omega)
   have h2 : (pc + 2#64).toNat = pc.toNat + 2 := by
     simp only [inRam, ramBase, ramEnd] at hram; bv_omega
   have hram2 : inRam pc 2 := by simp only [inRam, ramBase, ramEnd] at *; omega
@@ -159,6 +161,7 @@ theorem swp_fetch_s2_rvc_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok'.2.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc (by omega)
   have hal2 : pc.toNat % 2 = 0 := by omega
   have hlt := inRam_lt38 pc 2 hram
   have hid := paOf_id pc (inRam_lt pc 2 hram)
@@ -479,7 +482,7 @@ macro "cycle_trap" w:ident : tactic =>
                cases sie
                · rw [h1] at h2; simp at h2
                · rfl
-             simp only [hd]
+             try simp only [hd]
              swp_run 40
              icases HΦ with ⟨-, HTrap⟩
              unfold trapBranch
@@ -528,6 +531,15 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
   conf_cases HmConf
   unfold try_step
   swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
+  swp_run 40
+  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
+    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -536,7 +548,7 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
   iintro %ipw HmConf Hmip
   rcases hd : dispatchS c ipw with _ | ⟨i, p⟩
   · icases HΦ with ⟨HΦ, -⟩
-    simp only [hd]
+    try simp only [hd]
     swp_run 40
     iapply swp_bind
     iapply (hfetch _)
@@ -591,6 +603,15 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
   conf_cases HmConf
   unfold try_step
   swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
+  swp_run 40
+  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
+    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -599,7 +620,7 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
   iintro %ipw HmConf Hmip
   rcases hd : dispatchS c ipw with _ | ⟨i, p⟩
   · icases HΦ with ⟨HΦ, -⟩
-    simp only [hd]
+    try simp only [hd]
     swp_run 40
     iapply swp_bind
     iapply (hfetch _)

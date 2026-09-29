@@ -5,27 +5,19 @@ default class and the counter class, and the check at User for every number
 
 * `uxr_tab_*` (one kernel evaluation per access type over the 4096 numbers,
   the default ones and the 64 counter-class ones (`UExecCsrCnt`) skipped, at a
-  SYMBOLIC file `f`): the SHORT-CIRCUIT check chain at User (`uxrResultSc`)
-  answers `CSR_Illegal` for every other number except the three of `uxrExc`.
-  The table does not pin the counter enables, so these walks provably never
-  read them.
+  SYMBOLIC file `f`): the check chain at User (`check_CSR_result`) answers
+  `CSR_Illegal` for every other number except the three of `uxrExc`.  The
+  table does not pin the counter enables, so these walks provably never read
+  them.
 * `0x001`–`0x003` (`fflags`/`frm`/`fcsr`): the F gate reads `mstatus.FS`,
   symbolic; `uxr_ccr_fs` composes the check (`false` under `FS = 0`, Rocq
   `exec_currentlyEnabled_F_off`) with the closed rest.
-* `0x747`/`0x757` (`mseccfg`/`mseccfgh`): the short-circuit chain refuses them
-  at the privilege gate like every machine-level number.  The MODEL fails
-  there (`uxr_ccr_zkr`): the Lean backend evaluates `currentlyEnabled Ext_Zkr`
-  although the privilege gate already refused, and the generated
-  `currentlyEnabled` has no `Ext_Zkr` clause (the Sail clause lives in
-  `zkr_control.sail`), so it hits its `assert false` fall-through.  A user
-  `csrr` of `mseccfg` therefore makes the hart's Sail step an ERROR (no
-  `hartStep`), and the elimination theorem does not apply (the discarded
-  operand is not total): the facts for the model's `execute` keep
-  `csr ≠ 0x747 ∧ csr ≠ 0x757`.  Rocq is immune (`and_boolM` short-circuits
-  at the privilege gate).  Model patch needed (see the report).
+* `0x747`/`0x757` (`mseccfg`/`mseccfgh`) are refused at the privilege gate
+  like every machine-level number (Sail's `&` short-circuits, so the missing
+  `currentlyEnabled Ext_Zkr` clause behind it is never reached).
 
-`uxr_ccr_spec`: for every non-default number outside `uxrExc` (`0x747`/`0x757`
-included), `uxrResultSc c User acc` walks, at the table, to `CSR_Illegal`.
+`uxr_ccr_spec`: for every non-default number outside `uxrExc`, the check
+`check_CSR_result c User acc` walks, at the table, to `CSR_Illegal`.
 -/
 import MachCSL.UExecCsrCnt
 
@@ -40,10 +32,10 @@ open LeanRV64D LeanRV64D.Functions
 def uxrExc (n : Nat) : Bool :=
   Nat.beq n 0x001 || Nat.beq n 0x002 || Nat.beq n 0x003
 
-/-- The short-circuit check at User answers `CSR_Illegal` (a closed-number
-walk at the table). -/
+/-- The check at User answers `CSR_Illegal` (a closed-number walk at the
+table). -/
 def uxrIll (f : RegFile) (acc : CSRAccessType) (n : Nat) : Bool :=
-  match runRead (uxrPin f) (uxrResultSc (BitVec.ofNat 12 n) Privilege.User acc) with
+  match runRead (uxrPin f) (check_CSR_result (BitVec.ofNat 12 n) Privilege.User acc) with
   | some (.CSR_Illegal (), _) => true
   | _ => false
 
@@ -95,12 +87,12 @@ theorem uxr_tab (f : RegFile) (acc : CSRAccessType) (n : Nat) (hn : n < 4096) :
   have := hq (n / 1024) (h4 _ (by omega)) (n % 1024) (Nat.mod_lt _ (by decide))
   rwa [Nat.mod_add_div] at this
 
-/-- A non-default, non-counter number outside `uxrExc`: the short-circuit
-check at the table is `CSR_Illegal`. -/
+/-- A non-default, non-counter number outside `uxrExc`: the check at the
+table is `CSR_Illegal`. -/
 theorem uxr_ccr_spec (f : RegFile) (c : BitVec 12) (acc : CSRAccessType)
     (hd : uxrDflt c = false) (he : uxrExc c.toNat = false) (hl : uxrCntB c = false)
     (hh : uxrCntHB c = false) :
-    ∃ b, runRead (uxrPin f) (uxrResultSc c Privilege.User acc) =
+    ∃ b, runRead (uxrPin f) (check_CSR_result c Privilege.User acc) =
       some (CSRCheckResult.CSR_Illegal (), b) := by
   have ht : uxrIll f acc c.toNat = true := by
     have := uxr_tab f acc c.toNat c.isLt

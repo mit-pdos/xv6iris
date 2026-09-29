@@ -89,8 +89,12 @@ theorem umo_get_pmlen {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU :
     runRW D orc s (get_pmlen acc .User) = some (0, s, orc) := by
   have hp := umo_get_pmm hD.ctl orc s hU
   have hms := hD.ms
+  have ha : ∃ b, runRW D orc s (is_pmm_applicable acc .User) = some (b, s, orc) := by
+    unfold is_pmm_applicable
+    repeat' split
+    all_goals exact ⟨_, by uwk_run⟩
+  obtain ⟨b, ha⟩ := ha
   unfold get_pmlen
-  uwk_walk ha : runRW D orc s (is_pmm_applicable acc .User)
   rw [runRW_bind, ha]
   simp only [Option.bind_some]
   split

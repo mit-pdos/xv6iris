@@ -88,6 +88,26 @@ theorem uft_upd_full32 (x : BitVec 32) :
 theorem uft_bit0_clear (pc : BitVec 64) (h : pc.toNat % 2 = 0) : (Sail.BitVec.access pc 0 != 0#1) = false :=
   bit0_clear_of_even pc h
 
+/-- Bit 1 of a 4-aligned PC is clear (the fetch's `Zca` alignment gate). -/
+theorem uft_bit1_clear (pc : BitVec 64) (h : pc.toNat % 4 = 0) : (Sail.BitVec.access pc 1 != 0#1) = false := by
+  have h1 : pc[1] = false := by
+    rw [BitVec.getElem_eq_testBit_toNat]
+    have : pc.toNat / 2 % 2 = 0 := by omega
+    first
+      | simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.one_and_eq_mod_two, this]
+      | (rw [Nat.testBit_succ, Nat.testBit_zero]; simp [this])
+  simp [Sail.BitVec.access, h1]
+
+/-- Bit 1 of a PC at 2 mod 4 is set. -/
+theorem uft_bit1_set (pc : BitVec 64) (h : pc.toNat % 4 = 2) : (Sail.BitVec.access pc 1 != 0#1) = true := by
+  have h1 : pc[1] = true := by
+    rw [BitVec.getElem_eq_testBit_toNat]
+    have : pc.toNat / 2 % 2 = 1 := by omega
+    first
+      | simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.one_and_eq_mod_two, this]
+      | (rw [Nat.testBit_succ, Nat.testBit_zero]; simp [this])
+  simp [Sail.BitVec.access, h1]
+
 theorem uft_bit0_set (pc : BitVec 64) (h : pc.toNat % 2 = 1) : (Sail.BitVec.access pc 0 != 0#1) = true := by
   have h0 : pc[0] = true := by
     rw [BitVec.getElem_eq_testBit_toNat]; simp [Nat.testBit_zero]; omega
@@ -214,6 +234,7 @@ theorem uft_fetch4_err (D : UFoot) (orc : UOrc) (s s1 : UWSt) (hP : UftPins D s)
     uftRun D orc s (fetch ()) = some (.F_Error (e, pc), s1, orc) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_clear pc (by omega)
   have hva := is_aligned_vaddr_of pc 4 hal
   uft_run -bv
 
@@ -227,6 +248,7 @@ theorem uft_fetch4_base (D : UFoot) (orc orc' : UOrc) (s s1 : UWSt) (hP : UftPin
     uftRun D orc s (fetch ()) = some (.F_Base w, s1, orc') := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_clear pc (by omega)
   have hva := is_aligned_vaddr_of pc 4 hal
   uft_run -bv
 
@@ -241,6 +263,7 @@ theorem uft_fetch4_rvc (D : UFoot) (orc orc' : UOrc) (s s1 : UWSt) (hP : UftPins
     uftRun D orc s (fetch ()) = some (.F_RVC (Sail.BitVec.extractLsb w 15 0), s1, orc') := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_clear pc (by omega)
   have hva := is_aligned_vaddr_of pc 4 hal
   uft_run -bv
 
@@ -254,6 +277,7 @@ theorem uft_fetch2_err1 (D : UFoot) (orc : UOrc) (s s1 : UWSt) (hP : UftPins D s
     uftRun D orc s (fetch ()) = some (.F_Error (e, pc), s1, orc) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_set pc (by omega)
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   uft_run -bv
 
@@ -267,6 +291,7 @@ theorem uft_fetch2_rvc (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (hP : UftPins
     uftRun D orc s (fetch ()) = some (.F_RVC lo, s1, orc1) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_set pc (by omega)
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   uft_run -bv
 
@@ -282,6 +307,7 @@ theorem uft_fetch2_err2 (D : UFoot) (orc orc1 : UOrc) (s s1 s2 : UWSt) (hP : Uft
     uftRun D orc s (fetch ()) = some (.F_Error (e, BitVec.addInt pc 2), s2, orc1) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_set pc (by omega)
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   uft_run -bv
 
@@ -297,6 +323,7 @@ theorem uft_fetch2_base (D : UFoot) (orc orc1 orc2 : UOrc) (s s1 s2 : UWSt) (hP 
     uftRun D orc s (fetch ()) = some (.F_Base (hi ++ lo), s2, orc2) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
+  have hb1 := uft_bit1_set pc (by omega)
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   uft_run -bv
 

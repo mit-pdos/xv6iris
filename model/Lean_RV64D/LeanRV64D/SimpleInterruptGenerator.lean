@@ -261,7 +261,10 @@ def sig_store (addr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : Sa
                   if (((_get_Minterrupts_MSI data) == 1#1) : Bool)
                   then writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 3 3 value)
                   else (pure ())
-                  if ((((_get_Minterrupts_SSI data) == 1#1) && (← (currentlyEnabled Ext_S))) : Bool)
+                  if ((← do
+                       if (((_get_Minterrupts_SSI data) == 1#1) : Bool)
+                       then (currentlyEnabled Ext_S)
+                       else (pure false)) : Bool)
                   then writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 1 1 value)
                   else (pure ())
                   (csr_name_write_callback "mip" (← (read_mip IncludePlatformInterrupts)))

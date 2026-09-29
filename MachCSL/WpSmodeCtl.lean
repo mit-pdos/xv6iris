@@ -56,14 +56,18 @@ theorem execSpecF_jal (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 6
   unfold execute
   have hb0 := ofBool_bit0_beq_of_even _ htgt
   swp_run 60
-  iapply swp_bind
-  iapply swp_wX_file (hrd := hrd)
-  iframe
-  inext
-  iintro HF
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    iapply swp_bind
+    iapply swp_wX_file (hrd := hrd)
+    iframe
+    inext
+    iintro HF
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
 /-- `j off` = `jal x0, off`. -/
@@ -77,10 +81,14 @@ theorem execSpecF_j (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
   unfold execute
   have hb0 := ofBool_bit0_beq_of_even _ htgt
   swp_run 60
-  unfold wX_bits wX
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    unfold wX_bits wX
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
 /-- `jalr x0, 0(rs1)` (`ret`, `c.jr`): jump to `rs1` with bit 0 cleared. -/
@@ -102,10 +110,14 @@ theorem execSpecF_ret (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : S
   iframe
   iintro HF
   swp_run 100
-  unfold wX_bits wX
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    unfold wX_bits wX
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option hygiene false in
 /-- The branch script, one operator at a time. -/
@@ -133,8 +145,12 @@ macro "btype_proof" op:term : tactic =>
       iintro HF
       try simp only [hc]
       swp_run 60
-      conf_intro HmConf
-      iapply HΦ $$ HmConf HPC HnextPC HF))
+      -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
+      (try split)
+      all_goals
+        swp_run 60
+        conf_intro HmConf
+        iapply HΦ $$ HmConf HPC HnextPC HF))
 
 set_option maxHeartbeats 4000000 in
 theorem execSpecF_beq (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)
@@ -212,8 +228,12 @@ macro "btype0_proof" op:term : tactic =>
       iintro HF
       try simp only [hc]
       swp_run 60
-      conf_intro HmConf
-      iapply HΦ $$ HmConf HPC HnextPC HF))
+      -- a taken branch: the jump's `Zca` gate branches on the target's bit 1
+      (try split)
+      all_goals
+        swp_run 60
+        conf_intro HmConf
+        iapply HΦ $$ HmConf HPC HnextPC HF))
 
 set_option maxHeartbeats 4000000 in
 theorem execSpecF_beq0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (imm : BitVec 13)

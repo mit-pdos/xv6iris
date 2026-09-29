@@ -11666,11 +11666,17 @@ def legalize_hpmevent (v : (BitVec 64)) : SailM (BitVec 64) := do
                   then (pure (_get_HpmEvent_MINH v))
                   else (pure 0#1)))
               (← do
-                if (((← (currentlyEnabled Ext_Sscofpmf)) && (← (currentlyEnabled Ext_S))) : Bool)
+                if ((← do
+                     if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                     then (currentlyEnabled Ext_S)
+                     else (pure false)) : Bool)
                 then (pure (_get_HpmEvent_SINH v))
                 else (pure 0#1)))
             (← do
-              if (((← (currentlyEnabled Ext_Sscofpmf)) && (← (currentlyEnabled Ext_U))) : Bool)
+              if ((← do
+                   if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                   then (currentlyEnabled Ext_U)
+                   else (pure false)) : Bool)
               then (pure (_get_HpmEvent_UINH v))
               else (pure 0#1))) 0#1) 0#1) (_get_HpmEvent_event v)))
 

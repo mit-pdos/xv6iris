@@ -26,9 +26,25 @@
 # PTE A/D-bit update and the AK_ifetch/AK_ttw tagging of fetches and
 # page-table walks at the concurrency interface.
 #
-# Requires: `sail` with `sail_lean_backend` on PATH.  The opam switch that
-# has them is `lean-xv6`: run as
-#   opam exec --switch=lean-xv6 -- tools/regen_sail_model.sh
+# Requires: `sail` 0.20.2 with `sail_lean_backend` on PATH, built from
+# rems-project/sail 5745ea9e ("Lean: use more generic term for initial
+# state", the sources of the opam switch `lean-xv6`) PLUS the short-circuit
+# fix "Lean: make boolean & and | short-circuit with effectful operands"
+# (/shared/sail-upstream, branch lean-short-circuit, d0ef9371; it
+# cherry-picks cleanly onto 5745ea9e).  Without the fix the backend hoists an
+# effectful right operand of `&`/`|` out of the condition and ALWAYS runs it
+# (e.g. `check_CSR` reaches `currentlyEnabled Ext_Zkr`, an `assert false`, on
+# a user access to mseccfg); Sail and Rocq short-circuit, and the proofs
+# assume the short-circuit form.  Do NOT use the unpatched opam `sail`.
+# Build the patched sail in a clone and put it first on PATH:
+#   git clone /shared/sail-upstream sail-sc && cd sail-sc
+#   git checkout -b lean-sc-pin 5745ea9e && git cherry-pick d0ef9371
+#   opam exec --switch=lean-xv6 -- dune build --release
+#   opam exec --switch=lean-xv6 -- dune install --prefix "$PWD/_inst"
+# then (opam env first, so that the patched sail wins on PATH):
+#   eval "$(opam env --switch=lean-xv6 --set-switch)"
+#   PATH=/path/to/sail-sc/_inst/bin:$PATH tools/regen_sail_model.sh
+# `sail --version` then prints "Sail 0.20.2 (lean-sc-pin @ ...)".
 # ======================================================================
 set -euo pipefail
 
@@ -75,6 +91,10 @@ else
   SAIL_REQUIRED_VER="0.20.2"
 fi
 SAIL_HAVE_VER="$(sail --version | sed -E 's/^Sail ([0-9.]+).*/\1/')"
+if ! sail --version | grep -q 'lean-sc-pin\|lean-short-circuit'; then
+  echo "WARNING: '$(sail --version)' does not look like the short-circuit-patched sail;" >&2
+  echo "         see this script's header (the model must short-circuit & and |)." >&2
+fi
 if [ "$SAIL_REQUIRED_VER" != "$SAIL_HAVE_VER" ]; then
   echo "note: model asks for sail $SAIL_REQUIRED_VER, this is sail $SAIL_HAVE_VER;"
   echo "      generating with --require-version $SAIL_HAVE_VER."

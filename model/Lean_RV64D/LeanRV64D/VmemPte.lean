@@ -262,21 +262,68 @@ def pte_is_non_leaf (pte_flags : (BitVec 8)) : Bool :=
           pte_flags) == 0#1)))
 
 def pte_is_invalid (pte_flags : (BitVec 8)) (pte_ext : (BitVec 10)) : SailM Bool := do
-  (pure (((_get_PTE_Flags_V pte_flags) == 0#1) || ((((_get_PTE_Flags_R pte_flags) == 0#1) && (((_get_PTE_Flags_W
-                pte_flags) == 1#1) && (((_get_PTE_Flags_X pte_flags) == 0#1) && ((_get_MEnvcfg_SSE
-                  (← readReg menvcfg)) == 0#1)))) || ((((_get_PTE_Flags_R pte_flags) == 0#1) && (((_get_PTE_Flags_W
-                  pte_flags) == 1#1) && ((_get_PTE_Flags_X pte_flags) == 1#1))) || (((not
-                (page_based_mem_type_forwards_matches (_get_PTE_Ext_PBMT pte_ext))) && (← (currentlyEnabled
-                  Ext_Svpbmt))) || (pte_reserved_bits_must_be_zero && (((pte_is_non_leaf pte_flags) && (((_get_PTE_Flags_A
-                        pte_flags) == 1#1) || (((_get_PTE_Flags_D pte_flags) == 1#1) || (((_get_PTE_Flags_U
-                            pte_flags) == 1#1) || (pte_ext != (zeros (n := 10))))))) || ((((_get_PTE_Ext_N
-                        pte_ext) != (zeros (n := 1))) && (not (← (currentlyEnabled Ext_Svnapot)))) || ((((_get_PTE_Ext_PBMT
-                          pte_ext) != (zeros (n := 2))) && (((_get_MEnvcfg_PBMTE
-                            (← readReg menvcfg)) == 0#1) || (not
-                          (page_based_mem_type_forwards_matches (_get_PTE_Ext_PBMT pte_ext))))) || ((((_get_PTE_Ext_RSW_60t59b
-                            pte_ext) != (zeros (n := 2))) && (not
-                          (← (currentlyEnabled Ext_Svrsw60t59b)))) || ((_get_PTE_Ext_reserved
-                          pte_ext) != (zeros (n := 5)))))))))))))
+  if (((_get_PTE_Flags_V pte_flags) == 0#1) : Bool)
+  then (pure true)
+  else
+    (do
+      if ((← do
+           if (((_get_PTE_Flags_R pte_flags) == 0#1) : Bool)
+           then
+             (do
+               if (((_get_PTE_Flags_W pte_flags) == 1#1) : Bool)
+               then
+                 (do
+                   if (((_get_PTE_Flags_X pte_flags) == 0#1) : Bool)
+                   then (pure ((_get_MEnvcfg_SSE (← readReg menvcfg)) == 0#1))
+                   else (pure false))
+               else (pure false))
+           else (pure false)) : Bool)
+      then (pure true)
+      else
+        (do
+          if ((((_get_PTE_Flags_R pte_flags) == 0#1) && (((_get_PTE_Flags_W pte_flags) == 1#1) && ((_get_PTE_Flags_X
+                     pte_flags) == 1#1))) : Bool)
+          then (pure true)
+          else
+            (do
+              if ((← do
+                   if ((not (page_based_mem_type_forwards_matches (_get_PTE_Ext_PBMT pte_ext))) : Bool)
+                   then (currentlyEnabled Ext_Svpbmt)
+                   else (pure false)) : Bool)
+              then (pure true)
+              else
+                (do
+                  if (pte_reserved_bits_must_be_zero : Bool)
+                  then
+                    (do
+                      if (((pte_is_non_leaf pte_flags) && (((_get_PTE_Flags_A pte_flags) == 1#1) || (((_get_PTE_Flags_D
+                                   pte_flags) == 1#1) || (((_get_PTE_Flags_U pte_flags) == 1#1) || (pte_ext != (zeros
+                                     (n := 10))))))) : Bool)
+                      then (pure true)
+                      else
+                        (do
+                          if ((← do
+                               if (((_get_PTE_Ext_N pte_ext) != (zeros (n := 1))) : Bool)
+                               then (pure (not (← (currentlyEnabled Ext_Svnapot))))
+                               else (pure false)) : Bool)
+                          then (pure true)
+                          else
+                            (do
+                              if ((← do
+                                   if (((_get_PTE_Ext_PBMT pte_ext) != (zeros (n := 2))) : Bool)
+                                   then
+                                     (pure (((_get_MEnvcfg_PBMTE (← readReg menvcfg)) == 0#1) || (not
+                                           (page_based_mem_type_forwards_matches
+                                             (_get_PTE_Ext_PBMT pte_ext)))))
+                                   else (pure false)) : Bool)
+                              then (pure true)
+                              else
+                                (pure ((← do
+                                      if (((_get_PTE_Ext_RSW_60t59b pte_ext) != (zeros (n := 2))) : Bool)
+                                      then (pure (not (← (currentlyEnabled Ext_Svrsw60t59b))))
+                                      else (pure false)) || ((_get_PTE_Ext_reserved pte_ext) != (zeros
+                                        (n := 5))))))))
+                  else (pure false)))))
 
 /-- Type quantifiers: k_ex673388_ : Bool, k_ex673387_ : Bool -/
 def check_PTE_permission (access : (MemoryAccessType mem_payload)) (priv : Privilege) (mxr : Bool) (do_sum : Bool) (pte_flags : (BitVec 8)) (_ext : (BitVec 10)) (_ext_ptw : Unit) : SailM PTE_Check := do

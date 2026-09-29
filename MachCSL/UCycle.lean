@@ -195,11 +195,17 @@ and the step body is picked by the hart state. -/
 theorem uc_prelude (hD : UcFoot D) (orc : UOrc) (s : UWSt) :
     runRW D orc s ucPrelude = some (s.file .hart_state, ucPreS s, orc) := by
   simp only [ucPrelude, should_inc_minstret, bind_assoc, pure_bind,
-    ucRW_readReg D _ _ _ _ hD.rd_priv, ucRW_readReg D _ _ _ _ hD.rd_mcountinhibit,
-    ucRW_readReg D _ _ _ _ hD.rd_minstretcfg, ucRW_writeReg D _ _ _ _ _ hD.wr_mi,
-    ucRW_readReg_pure D _ _ _ hD.rd_hs]
-  rw [UWSt.setR_file_other _ _ _ _ (by decide)]
-  rfl
+    ucRW_readReg D _ _ _ _ hD.rd_priv, ucRW_readReg D _ _ _ _ hD.rd_mcountinhibit]
+  unfold ucPreS ucMiFlag
+  -- `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  cases (_get_Counterin_IR (s.file .mcountinhibit) == 0#1)
+  · simp only [Bool.false_eq_true, ↓reduceIte, pure_bind, Bool.false_and,
+      ucRW_writeReg D _ _ _ _ _ hD.wr_mi, ucRW_readReg_pure D _ _ _ hD.rd_hs]
+    rw [UWSt.setR_file_other _ _ _ _ (by decide)]
+  · simp only [↓reduceIte, bind_assoc, pure_bind, Bool.true_and,
+      ucRW_readReg D _ _ _ _ hD.rd_minstretcfg, ucRW_writeReg D _ _ _ _ _ hD.wr_mi,
+      ucRW_readReg_pure D _ _ _ hD.rd_hs]
+    rw [UWSt.setR_file_other _ _ _ _ (by decide)]
 
 theorem ucPreS_file_other (s : UWSt) (r : Register) (h : r ≠ .minstret_increment) :
     (ucPreS s).file r = s.file r :=
@@ -262,15 +268,17 @@ theorem uc_epilogue_active (hD : UcFoot D) (orc : UOrc) (s : UWSt) (r : Bool)
     (h : s.file .hart_state = .HART_ACTIVE ()) :
     runRW D orc s (ucEpilogue r) = some (false, ucEpi r s, orc) := by
   simp only [ucEpilogue, ucRW_readReg D _ _ _ _ hD.rd_hs, h]
-  simp only [uc_tickPc hD, ucRW_readReg D _ _ _ _ hD.rd_mi, get_config_rvfi,
-    Bool.false_eq_true, if_false]
-  rw [ucTickS_file_other _ _ (by decide)]
+  simp only [uc_tickPc hD, get_config_rvfi, Bool.false_eq_true, if_false]
   unfold ucEpi
-  cases hb : (r && s.file .minstret_increment)
-  · simp only [Bool.false_eq_true, if_false]; rfl
-  · simp only [if_true, ucRW_readReg D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
+  cases r
+  · simp only [Bool.false_and, Bool.false_eq_true, if_false, pure_bind]; rfl
+  · simp only [if_true, Bool.true_and, ucRW_readReg D _ _ _ _ hD.rd_mi]
     rw [ucTickS_file_other _ _ (by decide)]
-    rfl
+    cases hb : s.file .minstret_increment
+    · simp only [Bool.false_eq_true, if_false]; rfl
+    · simp only [if_true, ucRW_readReg D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
+      rw [ucTickS_file_other _ _ (by decide)]
+      rfl
 
 /-- An arm that lands ACTIVE finishes with the epilogue's tick. -/
 theorem uc_finish_of_arm (hD : UcFoot D) (st : Step) (orc orc2 : UOrc) (s s2 : UWSt)

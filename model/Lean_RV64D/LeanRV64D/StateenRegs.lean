@@ -557,7 +557,10 @@ def legalize_mstateen0 (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) :
             then (pure (_get_Mstateen0_SRMCFG v))
             else (pure 0#1)))
         (← do
-          if (((hartSupports Ext_Zfinx) && ((_get_Misa_F (← readReg misa)) == 0#1)) : Bool)
+          if ((← do
+               if ((hartSupports Ext_Zfinx) : Bool)
+               then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
+               else (pure false)) : Bool)
           then (pure (_get_Mstateen0_FCSR v))
           else (pure 0#1))) 0#1))
 
@@ -596,7 +599,10 @@ def legalize_hstateen0 (h : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) :
             then (pure (_get_Hstateen0_ENVCFG v))
             else (pure 0#1)))
         (← do
-          if (((hartSupports Ext_Zfinx) && ((_get_Misa_F (← readReg misa)) == 0#1)) : Bool)
+          if ((← do
+               if ((hartSupports Ext_Zfinx) : Bool)
+               then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
+               else (pure false)) : Bool)
           then (pure (_get_Hstateen0_FCSR v))
           else (pure 0#1))) 0#1))
 
@@ -632,7 +638,10 @@ def legalize_sstateen0 (s : (BitVec 32)) (v : (BitVec 32)) : SailM (BitVec 32) :
     (pure (_update_Sstateen0_C
         (_update_Sstateen0_FCSR s
           (← do
-            if (((hartSupports Ext_Zfinx) && ((_get_Misa_F (← readReg misa)) == 0#1)) : Bool)
+            if ((← do
+                 if ((hartSupports Ext_Zfinx) : Bool)
+                 then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
+                 else (pure false)) : Bool)
             then (pure (_get_Sstateen0_FCSR v))
             else (pure 0#1))) 0#1))
   (pure (Mk_Sstateen0 (legalized &&& (Sail.BitVec.extractLsb mask 31 0))))

@@ -176,8 +176,9 @@ theorem uma_within_mmio_readable_ram (D : UFoot) (orc : UOrc) (s : UWSt) (pa : B
   unfold within_mmio_readable
   sail_norm
   simp only [within_clint_ram pa n hram, uma_within_sig, within_htif_readable, within_htif_writable,
+    Bool.false_eq_true, ↓reduceIte, pure_bind,
     runRW_bind, runRW_pure, Option.bind_some, utr_readReg D orc s _ hD, hh]
-  rfl
+  all_goals rfl
 
 /-- **RAM is not MMIO-writable.** -/
 theorem uma_within_mmio_writable_ram (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (n : Nat)
@@ -186,8 +187,9 @@ theorem uma_within_mmio_writable_ram (D : UFoot) (orc : UOrc) (s : UWSt) (pa : B
   unfold within_mmio_writable
   sail_norm
   simp only [within_clint_ram pa n hram, uma_within_sig, within_htif_writable,
+    Bool.false_eq_true, ↓reduceIte, pure_bind,
     runRW_bind, runRW_pure, Option.bind_some, utr_readReg D orc s _ hD, hh]
-  rfl
+  all_goals rfl
 
 /-! ## §3 The physical configuration -/
 

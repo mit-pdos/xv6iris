@@ -3,10 +3,20 @@
 Collected from the USER lane reports (Sept 26 2026). Each item names the lane that owns it.
 
 ## Model faithfulness (audit running)
-- The Lean backend evaluates effectful `&&`/`||` operands eagerly (Sail/Rocq short-circuit). Consequences
-  found by U1-X3: `is_CSR_accessible` reaches `currentlyEnabled Ext_Zkr` for CSRs 0x747/0x757, and the
-  generated `currentlyEnabled` has no `Ext_Zkr` clause → `assert false` (no Sail step); extra reads of
-  mstateen1..3/sstateen1..3. `uxr_execute_CSRReg/Imm` exclude 0x747/0x757 (`hz`) until resolved.
+- RESOLVED (Sept 29 2026, lane ZKR-SC). The Lean backend used to evaluate effectful `&&`/`||` operands
+  eagerly (Sail/Rocq short-circuit): `is_CSR_accessible` reached `currentlyEnabled Ext_Zkr` for CSRs
+  0x747/0x757 (no clause → `assert false`, no Sail step), and the stateen chain read mstateen1..3/
+  sstateen1..3. The model is now regenerated with the patched backend (sail 5745ea9e + the
+  short-circuit commit d0ef9371 of /shared/sail-upstream `lean-short-circuit`; see
+  tools/regen_sail_model.sh's header): `e1 & e2` with effectful `e2` is `if e1 then e2 else false`
+  (`|` dually); 300 hunks over 17 model files, nothing else changed. Consequences: the AND-ELIM
+  workaround (SailRO/SailROModel/SailROCsr/SailStut/SailAndElim/UExecCsrSc/UCycleSc/UserClassifySc,
+  `URunSc`, `UstExecOkSc`/`UstExecTotalSc`) is deleted; the CSR facts are plain `runRW` walks of
+  the model's `check_CSR_result`, for every csr number (no `hz`); `UclCsrZkr`/`hZkr` is gone:
+  `userProof : USER`, `xv6FsAdequacy_closed` has only the initial-state hypotheses. Remaining
+  model-faithfulness caveat: the generated `currentlyEnabled` still has no `Ext_Zkr` clause (the Zkr
+  module is not compiled); no proved path reaches it now that `&` short-circuits (a user access is
+  refused at the privilege gate; the kernel never touches mseccfg). An M-mode access would still fail.
 
 ## U3 assembly
 - `uwkTreeMem (bmWrite mm addr 8 v) (t.setLeaf 2 vpn v)` (the byte map still holds the tree after an

@@ -14,9 +14,8 @@ the 64 numbers `csr[11:5] ∈ {0b1100000, 0b1100100}`:
   of `mcounteren` AND of `scounteren` (S is enabled; `uxrCen`), for a READ
   (the numbers are read-only, so a write access fails `check_CSR_access`
   first);
-* `uxrCntHi i` = `0xC80 + i` (the RV32-only high halves): the chain still
-  READS the enables (the backend hoists the `(← counter_enabled …)`), but the
-  `xlen == 32` conjunct refuses: always `CSR_Illegal`.
+* `uxrCntHi i` = `0xC80 + i` (the RV32-only high halves): the `xlen == 32`
+  conjunct refuses before the enables are read: always `CSR_Illegal`.
 
 Everything is composed from per-literal PROGRAM equations (`is_CSR_accessible`,
 `stateen_allows_CSR_access`, `check_CSR_priv` at the 64 literals, each one
@@ -127,14 +126,14 @@ theorem uxr_access_hi (i : BitVec 5) (acc : CSRAccessType) :
 /-- `is_CSR_accessible` of a low counter (Rocq §3b's readable clauses). -/
 theorem uxr_isAcc_lo (i : BitVec 5) :
     is_CSR_accessible (uxrCntLo i) .User .CSRRead =
-      (do let a ← currentlyEnabled (uxrCntExt i); let b ← counter_enabled i.toNat .User; pure (a && b)) := by
+      (do if (← currentlyEnabled (uxrCntExt i)) then counter_enabled i.toNat .User else pure false) := by
   uxr_cnt_cases i <;> kernel_rfl
 
-/-- `is_CSR_accessible` of a high counter: the enables are read, `xlen == 32`
-refuses. -/
+/-- `is_CSR_accessible` of a high counter: `xlen == 32` refuses (the enables
+are not read). -/
 theorem uxr_isAcc_hi (i : BitVec 5) :
     is_CSR_accessible (uxrCntHi i) .User .CSRRead =
-      (do let a ← currentlyEnabled (uxrCntExt i); let _ ← counter_enabled i.toNat .User; pure (a && false)) := by
+      (do if (← currentlyEnabled (uxrCntExt i)) then pure false else pure false) := by
   uxr_cnt_cases i <;> kernel_rfl
 
 /-- No stateen gate covers a counter (Rocq: every guard is an address
@@ -176,63 +175,63 @@ theorem uxr_counter_enabled (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (k : N
   unfold counter_enabled feature_enabled_for_priv_bool feature_enabled_for_priv
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .mcounteren (hD _ (by decide)))]
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .scounteren (hD _ (by decide)))]
-  simp only [bind_assoc]
-  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_cE_S hD hc orc)]
-  have hn : Functions.not true = false := rfl
-  simp only [hn, Bool.false_or, uxrCen]
+  simp only [bind_assoc, uxrCen]
   generalize (BitVec.access (s.file .mcounteren) k == 1#1) = a
   generalize (BitVec.access (s.file .scounteren) k == 1#1) = b
-  cases a <;> cases b <;> rfl
+  cases a
+  · rfl
+  · simp only [↓reduceIte, bind_assoc, Bool.true_and]
+    rw [runRW_bind_some D _ _ orc orc s s _ (uxr_cE_S hD hc orc)]
+    cases b <;> rfl
 
-/-- The short-circuit check at a low counter: the access gate, then the
-enables (Rocq `exec_check_CSR_U`'s readable branch). -/
-theorem uxr_checkSc_lo (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
-    runRW D orc s (uxrCheckSc (uxrCntLo i) .User acc) =
+/-- The check at a low counter: the access gate, then the enables (Rocq
+`exec_check_CSR_U`'s readable branch). -/
+theorem uxr_check_lo (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
+    runRW D orc s (check_CSR (uxrCntLo i) .User acc) =
       some ((acc == .CSRRead) && uxrCen s.file i.toNat, s, orc) := by
-  unfold uxrCheckSc
+  unfold check_CSR
   rw [uxr_priv_lo, uxr_access_lo]
-  simp only [pure_bind, Bool.true_and]
+  simp only [pure_bind, ↓reduceIte]
   cases acc
   case CSRWrite => rfl
   case CSRReadWrite => rfl
   case CSRRead =>
     have hr : (CSRAccessType.CSRRead == CSRAccessType.CSRRead) = true := rfl
-    simp only [hr, if_true, Bool.true_and, uxr_isAcc_lo, bind_assoc]
+    simp only [hr, ↓reduceIte, Bool.true_and, uxr_isAcc_lo, bind_assoc]
     rw [runRW_bind_some D _ _ orc orc s s _ (uxr_cE_cnt hD hc orc i)]
+    simp only [↓reduceIte]
     rw [runRW_bind_some D _ _ orc orc s s _ (uxr_counter_enabled hD hc orc _)]
-    simp only [pure_bind, Bool.true_and]
     cases uxrCen s.file i.toNat
     · rfl
-    · simp only [↓reduceIte, uxr_stateen_lo, pure_bind]; rfl
+    · simp only [↓reduceIte, uxr_stateen_lo]; rfl
 
-/-- The short-circuit check at a high counter: `false`. -/
-theorem uxr_checkSc_hi (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
-    runRW D orc s (uxrCheckSc (uxrCntHi i) .User acc) = some (false, s, orc) := by
-  unfold uxrCheckSc
+/-- The check at a high counter: `false`. -/
+theorem uxr_check_hi (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
+    runRW D orc s (check_CSR (uxrCntHi i) .User acc) = some (false, s, orc) := by
+  unfold check_CSR
   rw [uxr_priv_hi, uxr_access_hi]
-  simp only [pure_bind, Bool.true_and]
+  simp only [pure_bind, ↓reduceIte]
   cases acc
   case CSRWrite => rfl
   case CSRReadWrite => rfl
   case CSRRead =>
     have hr : (CSRAccessType.CSRRead == CSRAccessType.CSRRead) = true := rfl
-    simp only [hr, if_true, uxr_isAcc_hi, bind_assoc]
+    simp only [hr, ↓reduceIte, uxr_isAcc_hi, bind_assoc]
     rw [runRW_bind_some D _ _ orc orc s s _ (uxr_cE_cnt hD hc orc i)]
-    rw [runRW_bind_some D _ _ orc orc s s _ (uxr_counter_enabled hD hc orc _)]
     rfl
 
-/-- **The short-circuit check at a counter number** (every access type):
-the verdict `uxrRes`. -/
-theorem uxr_resultSc_lo (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
-    runRW D orc s (uxrResultSc (uxrCntLo i) .User acc) = some (uxrRes s.file (uxrCntLo i) acc, s, orc) := by
-  unfold uxrResultSc
-  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_checkSc_lo hD hc orc i acc), uxrRes_lo]
+/-- **The check at a counter number** (every access type): the verdict
+`uxrRes`. -/
+theorem uxr_result_lo (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
+    runRW D orc s (check_CSR_result (uxrCntLo i) .User acc) = some (uxrRes s.file (uxrCntLo i) acc, s, orc) := by
+  unfold check_CSR_result
+  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_check_lo hD hc orc i acc), uxrRes_lo]
   cases (acc == .CSRRead) && uxrCen s.file i.toNat <;> rfl
 
-theorem uxr_resultSc_hi (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
-    runRW D orc s (uxrResultSc (uxrCntHi i) .User acc) = some (uxrRes s.file (uxrCntHi i) acc, s, orc) := by
-  unfold uxrResultSc
-  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_checkSc_hi hD hc orc i acc), uxrRes_hi]
+theorem uxr_result_hi (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) (acc : CSRAccessType) :
+    runRW D orc s (check_CSR_result (uxrCntHi i) .User acc) = some (uxrRes s.file (uxrCntHi i) acc, s, orc) := by
+  unfold check_CSR_result
+  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_check_hi hD hc orc i acc), uxrRes_hi]
   rfl
 
 /-! ## The retiring read -/
@@ -276,30 +275,26 @@ theorem uxr_readCSR_cnt (hD : UxrFoot D) (orc : UOrc) (i : BitVec 5) :
 (Rocq `exec_doCSR_U`'s retiring branch): the counter into `rd`. -/
 theorem uxr_doCSR_ok (hD : UxrFoot D) (hA : UxaFoot D) (hc : UxrCfg s) (i j : BitVec 5) (v : BitVec 64)
     (op : csrop)
-    (hccr : URunSc D s (check_CSR_result (uxrCntLo i) Privilege.User .CSRRead)
-      (fun orc => some (CSRCheckResult.CSR_Check_OK (), s, orc))) :
-    URunSc D s (doCSR (uxrCntLo i) v (regidx.Regidx j) op .CSRRead)
-      (fun orc => some (RETIRE_SUCCESS, uxaWr s j (uxrCntVal s.file i), orc)) := by
+    (hccr : ∀ orc, runRW D orc s (check_CSR_result (uxrCntLo i) Privilege.User .CSRRead) =
+      some (CSRCheckResult.CSR_Check_OK (), s, orc)) (orc : UOrc) :
+    runRW D orc s (doCSR (uxrCntLo i) v (regidx.Regidx j) op .CSRRead) =
+      some (RETIRE_SUCCESS, uxaWr s j (uxrCntVal s.file i), orc) := by
   have hread := fun orc => uxr_readCSR_cnt (s := s) hD orc i
   unfold doCSR
-  refine URunSc.bind (x := Privilege.User) (s' := s) (g := fun o => o)
-    (res := fun orc => some (RETIRE_SUCCESS, uxaWr s j (uxrCntVal s.file i), orc))
-    (URunSc.of_runRW fun orc => ?_) ?_
-  · rw [uxr_readReg orc .cur_privilege (hD _ (by decide)), hc.priv]
-  · refine URunSc.bind (x := CSRCheckResult.CSR_Check_OK ()) (s' := s) (g := fun o => o)
-      (res := fun orc => some (RETIRE_SUCCESS, uxaWr s j (uxrCntVal s.file i), orc)) hccr
-      (URunSc.of_runRW fun orc => ?_)
-    have hp : D.Dr .cur_privilege = true := hD _ (by decide)
-    have hpr := hc.priv
-    have hw := uxa_wX hA
-    have hext : ext_check_CSR (uxrCntLo i) .User .CSRRead = true := rfl
-    dsimp only
-    generalize uxrCntVal s.file i = w at hread ⊢
-    revert hread hext
-    uxr_cnt_cases i
-    all_goals
-      intro hread hext
-      uwk_run [hread, hw]
+  rw [runRW_bind_some D _ _ orc orc s s Privilege.User
+      (by rw [uxr_readReg orc .cur_privilege (hD _ (by decide)), hc.priv]),
+    runRW_bind_some D _ _ orc orc s s _ (hccr orc)]
+  have hp : D.Dr .cur_privilege = true := hD _ (by decide)
+  have hpr := hc.priv
+  have hw := uxa_wX hA
+  have hext : ext_check_CSR (uxrCntLo i) .User .CSRRead = true := rfl
+  dsimp only
+  generalize uxrCntVal s.file i = w at hread ⊢
+  revert hread hext
+  uxr_cnt_cases i
+  all_goals
+    intro hread hext
+    uwk_run [hread, hw]
 
 end
 

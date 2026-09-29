@@ -2568,39 +2568,132 @@ def currentlyEnabled (merge_var : extension) : SailM Bool := do
   | .Ext_Zvks => (pure (hartSupports Ext_Zvks))
   | .Ext_Zvksc => (pure (hartSupports Ext_Zvksc))
   | .Ext_Zvksg => (pure (hartSupports Ext_Zvksg))
-  | .Ext_Ssnpm => (pure ((hartSupports Ext_Ssnpm) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sstvala => (pure ((hartSupports Ext_Sstvala) && (← (currentlyEnabled Ext_S))))
+  | .Ext_Ssnpm =>
+    (do
+      if ((hartSupports Ext_Ssnpm) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sstvala =>
+    (do
+      if ((hartSupports Ext_Sstvala) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
   | .Ext_Smmpm => (pure (hartSupports Ext_Smmpm))
   | .Ext_Smnpm => (pure (hartSupports Ext_Smnpm))
-  | .Ext_Sspm => (pure ((hartSupports Ext_Sspm) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Supm => (pure ((hartSupports Ext_Supm) && (← (currentlyEnabled Ext_U))))
+  | .Ext_Sspm =>
+    (do
+      if ((hartSupports Ext_Sspm) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Supm =>
+    (do
+      if ((hartSupports Ext_Supm) : Bool)
+      then (currentlyEnabled Ext_U)
+      else (pure false))
   | .Ext_Sstc => (pure (hartSupports Ext_Sstc))
   | .Ext_U =>
-    (pure ((hartSupports Ext_U) && (((_get_Misa_U (← readReg misa)) == 1#1) && (← (currentlyEnabled
-              Ext_Zicsr)))))
+    (do
+      if ((hartSupports Ext_U) : Bool)
+      then
+        (do
+          if (((_get_Misa_U (← readReg misa)) == 1#1) : Bool)
+          then (currentlyEnabled Ext_Zicsr)
+          else (pure false))
+      else (pure false))
   | .Ext_S =>
-    (pure ((hartSupports Ext_S) && (((_get_Misa_S (← readReg misa)) == 1#1) && (← (currentlyEnabled
-              Ext_Zicsr)))))
-  | .Ext_Ssu64xl => (pure ((hartSupports Ext_Ssu64xl) && (← (currentlyEnabled Ext_S))))
+    (do
+      if ((hartSupports Ext_S) : Bool)
+      then
+        (do
+          if (((_get_Misa_S (← readReg misa)) == 1#1) : Bool)
+          then (currentlyEnabled Ext_Zicsr)
+          else (pure false))
+      else (pure false))
+  | .Ext_Ssu64xl =>
+    (do
+      if ((hartSupports Ext_Ssu64xl) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
   | .Ext_Svbare => (currentlyEnabled Ext_S)
-  | .Ext_Sv32 => (pure ((hartSupports Ext_Sv32) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sv39 => (pure ((hartSupports Ext_Sv39) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sv48 => (pure ((hartSupports Ext_Sv48) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sv57 => (pure ((hartSupports Ext_Sv57) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sstvecd => (pure ((hartSupports Ext_Sstvecd) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Sscounterenw => (pure ((hartSupports Ext_Sscounterenw) && (← (currentlyEnabled Ext_S))))
-  | .Ext_Smstateen => (pure ((hartSupports Ext_Smstateen) && (← (currentlyEnabled Ext_Zicsr))))
-  | .Ext_Ssstateen => (pure ((hartSupports Ext_Ssstateen) && (← (currentlyEnabled Ext_Zicsr))))
+  | .Ext_Sv32 =>
+    (do
+      if ((hartSupports Ext_Sv32) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sv39 =>
+    (do
+      if ((hartSupports Ext_Sv39) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sv48 =>
+    (do
+      if ((hartSupports Ext_Sv48) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sv57 =>
+    (do
+      if ((hartSupports Ext_Sv57) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sstvecd =>
+    (do
+      if ((hartSupports Ext_Sstvecd) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Sscounterenw =>
+    (do
+      if ((hartSupports Ext_Sscounterenw) : Bool)
+      then (currentlyEnabled Ext_S)
+      else (pure false))
+  | .Ext_Smstateen =>
+    (do
+      if ((hartSupports Ext_Smstateen) : Bool)
+      then (currentlyEnabled Ext_Zicsr)
+      else (pure false))
+  | .Ext_Ssstateen =>
+    (do
+      if ((hartSupports Ext_Ssstateen) : Bool)
+      then (currentlyEnabled Ext_Zicsr)
+      else (pure false))
   | .Ext_F =>
-    (pure ((hartSupports Ext_F) && (((_get_Misa_F (← readReg misa)) == 1#1) && (((_get_Mstatus_FS
-                (← readReg mstatus)) != 0b00#2) && (← (currentlyEnabled Ext_Zicsr))))))
+    (do
+      if ((hartSupports Ext_F) : Bool)
+      then
+        (do
+          if (((_get_Misa_F (← readReg misa)) == 1#1) : Bool)
+          then
+            (do
+              if (((_get_Mstatus_FS (← readReg mstatus)) != 0b00#2) : Bool)
+              then (currentlyEnabled Ext_Zicsr)
+              else (pure false))
+          else (pure false))
+      else (pure false))
   | .Ext_D =>
-    (pure ((hartSupports Ext_D) && (((_get_Misa_D (← readReg misa)) == 1#1) && (((_get_Mstatus_FS
-                (← readReg mstatus)) != 0b00#2) && ((flen ≥b 64) && (← (currentlyEnabled
-                  Ext_Zicsr)))))))
+    (do
+      if ((hartSupports Ext_D) : Bool)
+      then
+        (do
+          if (((_get_Misa_D (← readReg misa)) == 1#1) : Bool)
+          then
+            (do
+              if (((_get_Mstatus_FS (← readReg mstatus)) != 0b00#2) : Bool)
+              then
+                (do
+                  if ((flen ≥b 64) : Bool)
+                  then (currentlyEnabled Ext_Zicsr)
+                  else (pure false))
+              else (pure false))
+          else (pure false))
+      else (pure false))
   | .Ext_Zfinx =>
-    (pure ((hartSupports Ext_Zfinx) && ((← (currentlyEnabled Ext_Zicsr)) && (← (is_zfinx_enabled_by_stateen
-              ())))))
+    (do
+      if ((hartSupports Ext_Zfinx) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zicsr)) : Bool)
+          then (is_zfinx_enabled_by_stateen ())
+          else (pure false))
+      else (pure false))
   | .Ext_Zvl32b => (pure (hartSupports Ext_Zvl32b))
   | .Ext_Zvl64b => (pure (hartSupports Ext_Zvl64b))
   | .Ext_Zvl128b => (pure (hartSupports Ext_Zvl128b))
@@ -2608,89 +2701,277 @@ def currentlyEnabled (merge_var : extension) : SailM Bool := do
   | .Ext_Zvl512b => (pure (hartSupports Ext_Zvl512b))
   | .Ext_Zvl1024b => (pure (hartSupports Ext_Zvl1024b))
   | .Ext_Zve32x =>
-    (pure ((hartSupports Ext_Zve32x) && ((← (currentlyEnabled Ext_Zvl32b)) && (((_get_Mstatus_VS
-                (← readReg mstatus)) != 0b00#2) && (← (currentlyEnabled Ext_Zicsr))))))
+    (do
+      if ((hartSupports Ext_Zve32x) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zvl32b)) : Bool)
+          then
+            (do
+              if (((_get_Mstatus_VS (← readReg mstatus)) != 0b00#2) : Bool)
+              then (currentlyEnabled Ext_Zicsr)
+              else (pure false))
+          else (pure false))
+      else (pure false))
   | .Ext_Zve32f =>
-    (pure ((hartSupports Ext_Zve32f) && ((← (currentlyEnabled Ext_Zve32x)) && (← (currentlyEnabled
-              Ext_F)))))
+    (do
+      if ((hartSupports Ext_Zve32f) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zve32x)) : Bool)
+          then (currentlyEnabled Ext_F)
+          else (pure false))
+      else (pure false))
   | .Ext_Zve64x =>
-    (pure ((hartSupports Ext_Zve64x) && ((← (currentlyEnabled Ext_Zvl64b)) && (← (currentlyEnabled
-              Ext_Zve32x)))))
+    (do
+      if ((hartSupports Ext_Zve64x) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zvl64b)) : Bool)
+          then (currentlyEnabled Ext_Zve32x)
+          else (pure false))
+      else (pure false))
   | .Ext_Zve64f =>
-    (pure ((hartSupports Ext_Zve64f) && ((← (currentlyEnabled Ext_Zve64x)) && (← (currentlyEnabled
-              Ext_Zve32f)))))
+    (do
+      if ((hartSupports Ext_Zve64f) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zve64x)) : Bool)
+          then (currentlyEnabled Ext_Zve32f)
+          else (pure false))
+      else (pure false))
   | .Ext_Zve64d =>
-    (pure ((hartSupports Ext_Zve64d) && ((← (currentlyEnabled Ext_Zve64f)) && (← (currentlyEnabled
-              Ext_D)))))
+    (do
+      if ((hartSupports Ext_Zve64d) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zve64f)) : Bool)
+          then (currentlyEnabled Ext_D)
+          else (pure false))
+      else (pure false))
   | .Ext_V =>
-    (pure ((hartSupports Ext_V) && (((_get_Misa_V (← readReg misa)) == 1#1) && ((← (currentlyEnabled
-                Ext_Zvl128b)) && (← (currentlyEnabled Ext_Zve64d))))))
+    (do
+      if ((hartSupports Ext_V) : Bool)
+      then
+        (do
+          if (((_get_Misa_V (← readReg misa)) == 1#1) : Bool)
+          then
+            (do
+              if ((← (currentlyEnabled Ext_Zvl128b)) : Bool)
+              then (currentlyEnabled Ext_Zve64d)
+              else (pure false))
+          else (pure false))
+      else (pure false))
   | .Ext_Zvfh =>
-    (pure ((hartSupports Ext_Zvfh) && ((← (currentlyEnabled Ext_Zve32f)) && (← (currentlyEnabled
-              Ext_Zfhmin)))))
+    (do
+      if ((hartSupports Ext_Zvfh) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zve32f)) : Bool)
+          then (currentlyEnabled Ext_Zfhmin)
+          else (pure false))
+      else (pure false))
   | .Ext_Zvfhmin =>
-    (pure (((hartSupports Ext_Zvfhmin) && (← (currentlyEnabled Ext_Zve32f))) || (← (currentlyEnabled
-            Ext_Zvfh))))
-  | .Ext_Smcntrpmf => (pure ((hartSupports Ext_Smcntrpmf) && (← (currentlyEnabled Ext_Zicntr))))
+    (do
+      if ((← do
+           if ((hartSupports Ext_Zvfhmin) : Bool)
+           then (currentlyEnabled Ext_Zve32f)
+           else (pure false)) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_Zvfh))
+  | .Ext_Smcntrpmf =>
+    (do
+      if ((hartSupports Ext_Smcntrpmf) : Bool)
+      then (currentlyEnabled Ext_Zicntr)
+      else (pure false))
   | .Ext_Zicfilp =>
-    (pure ((← (currentlyEnabled Ext_Zicsr)) && ((hartSupports Ext_Zicfilp) && (← (get_xLPE
-              (← readReg cur_privilege))))))
-  | .Ext_Svnapot => (pure ((hartSupports Ext_Svnapot) && (← (currentlyEnabled Ext_Sv39))))
-  | .Ext_Svpbmt => (pure ((hartSupports Ext_Svpbmt) && (← (currentlyEnabled Ext_Sv39))))
-  | .Ext_Svrsw60t59b => (pure ((hartSupports Ext_Svrsw60t59b) && (← (currentlyEnabled Ext_Sv39))))
+    (do
+      if ((← (currentlyEnabled Ext_Zicsr)) : Bool)
+      then
+        (do
+          if ((hartSupports Ext_Zicfilp) : Bool)
+          then (get_xLPE (← readReg cur_privilege))
+          else (pure false))
+      else (pure false))
+  | .Ext_Svnapot =>
+    (do
+      if ((hartSupports Ext_Svnapot) : Bool)
+      then (currentlyEnabled Ext_Sv39)
+      else (pure false))
+  | .Ext_Svpbmt =>
+    (do
+      if ((hartSupports Ext_Svpbmt) : Bool)
+      then (currentlyEnabled Ext_Sv39)
+      else (pure false))
+  | .Ext_Svrsw60t59b =>
+    (do
+      if ((hartSupports Ext_Svrsw60t59b) : Bool)
+      then (currentlyEnabled Ext_Sv39)
+      else (pure false))
   | .Ext_Svvptc =>
-    (pure ((hartSupports Ext_Svvptc) && ((← (currentlyEnabled Ext_Sv32)) || (← (currentlyEnabled
-              Ext_Sv39)))))
+    (do
+      if ((hartSupports Ext_Svvptc) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Sv32)) : Bool)
+          then (pure true)
+          else (currentlyEnabled Ext_Sv39))
+      else (pure false))
   | .Ext_Svade => (pure (hartSupports Ext_Svade))
   | .Ext_Svadu => (pure (hartSupports Ext_Svadu))
   | .Ext_Ssccptr =>
-    (pure ((hartSupports Ext_Ssccptr) && ((← (currentlyEnabled Ext_Sv32)) || (← (currentlyEnabled
-              Ext_Sv39)))))
+    (do
+      if ((hartSupports Ext_Ssccptr) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Sv32)) : Bool)
+          then (pure true)
+          else (currentlyEnabled Ext_Sv39))
+      else (pure false))
   | .Ext_Zicbop => (pure (hartSupports Ext_Zicbop))
   | .Ext_Zihintntl => (pure (hartSupports Ext_Zihintntl))
   | .Ext_Zihintpause => (pure (hartSupports Ext_Zihintpause))
-  | .Ext_C => (pure ((hartSupports Ext_C) && ((_get_Misa_C (← readReg misa)) == 1#1)))
+  | .Ext_C =>
+    (do
+      if ((hartSupports Ext_C) : Bool)
+      then (pure ((_get_Misa_C (← readReg misa)) == 1#1))
+      else (pure false))
   | .Ext_Zca =>
-    (pure ((hartSupports Ext_Zca) && ((← (currentlyEnabled Ext_C)) || (not (hartSupports Ext_C)))))
-  | .Ext_A => (pure ((hartSupports Ext_A) && ((_get_Misa_A (← readReg misa)) == 1#1)))
-  | .Ext_Zaamo => (pure ((hartSupports Ext_Zaamo) || (← (currentlyEnabled Ext_A))))
-  | .Ext_Zabha => (pure ((hartSupports Ext_Zabha) && (← (currentlyEnabled Ext_Zaamo))))
-  | .Ext_Zacas => (pure ((hartSupports Ext_Zacas) && (← (currentlyEnabled Ext_Zaamo))))
+    (do
+      if ((hartSupports Ext_Zca) : Bool)
+      then (pure ((← (currentlyEnabled Ext_C)) || (not (hartSupports Ext_C))))
+      else (pure false))
+  | .Ext_A =>
+    (do
+      if ((hartSupports Ext_A) : Bool)
+      then (pure ((_get_Misa_A (← readReg misa)) == 1#1))
+      else (pure false))
+  | .Ext_Zaamo =>
+    (do
+      if ((hartSupports Ext_Zaamo) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_A))
+  | .Ext_Zabha =>
+    (do
+      if ((hartSupports Ext_Zabha) : Bool)
+      then (currentlyEnabled Ext_Zaamo)
+      else (pure false))
+  | .Ext_Zacas =>
+    (do
+      if ((hartSupports Ext_Zacas) : Bool)
+      then (currentlyEnabled Ext_Zaamo)
+      else (pure false))
   | .Ext_Ziccamoa => (pure (hartSupports Ext_Ziccamoa))
   | .Ext_Ziccamoc => (pure (hartSupports Ext_Ziccamoc))
-  | .Ext_Zalrsc => (pure ((hartSupports Ext_Zalrsc) || (← (currentlyEnabled Ext_A))))
-  | .Ext_Za64rs => (pure ((hartSupports Ext_Za64rs) && (← (currentlyEnabled Ext_Zalrsc))))
-  | .Ext_Za128rs => (pure ((hartSupports Ext_Za128rs) && (← (currentlyEnabled Ext_Zalrsc))))
+  | .Ext_Zalrsc =>
+    (do
+      if ((hartSupports Ext_Zalrsc) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_A))
+  | .Ext_Za64rs =>
+    (do
+      if ((hartSupports Ext_Za64rs) : Bool)
+      then (currentlyEnabled Ext_Zalrsc)
+      else (pure false))
+  | .Ext_Za128rs =>
+    (do
+      if ((hartSupports Ext_Za128rs) : Bool)
+      then (currentlyEnabled Ext_Zalrsc)
+      else (pure false))
   | .Ext_Ziccrse => (pure (hartSupports Ext_Ziccrse))
-  | .Ext_M => (pure ((hartSupports Ext_M) && ((_get_Misa_M (← readReg misa)) == 1#1)))
-  | .Ext_Zmmul => (pure ((hartSupports Ext_Zmmul) || (← (currentlyEnabled Ext_M))))
-  | .Ext_B => (pure ((hartSupports Ext_B) && ((_get_Misa_B (← readReg misa)) == 1#1)))
-  | .Ext_Zba => (pure ((hartSupports Ext_Zba) || (← (currentlyEnabled Ext_B))))
-  | .Ext_Zbb => (pure ((hartSupports Ext_Zbb) || (← (currentlyEnabled Ext_B))))
+  | .Ext_M =>
+    (do
+      if ((hartSupports Ext_M) : Bool)
+      then (pure ((_get_Misa_M (← readReg misa)) == 1#1))
+      else (pure false))
+  | .Ext_Zmmul =>
+    (do
+      if ((hartSupports Ext_Zmmul) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_M))
+  | .Ext_B =>
+    (do
+      if ((hartSupports Ext_B) : Bool)
+      then (pure ((_get_Misa_B (← readReg misa)) == 1#1))
+      else (pure false))
+  | .Ext_Zba =>
+    (do
+      if ((hartSupports Ext_Zba) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_B))
+  | .Ext_Zbb =>
+    (do
+      if ((hartSupports Ext_Zbb) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_B))
   | .Ext_Zbkb => (pure (hartSupports Ext_Zbkb))
   | .Ext_Zbc => (pure (hartSupports Ext_Zbc))
   | .Ext_Zbkc => (pure (hartSupports Ext_Zbkc))
-  | .Ext_Zbs => (pure ((hartSupports Ext_Zbs) || (← (currentlyEnabled Ext_B))))
-  | .Ext_Zcb => (pure ((hartSupports Ext_Zcb) && (← (currentlyEnabled Ext_Zca))))
+  | .Ext_Zbs =>
+    (do
+      if ((hartSupports Ext_Zbs) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_B))
+  | .Ext_Zcb =>
+    (do
+      if ((hartSupports Ext_Zcb) : Bool)
+      then (currentlyEnabled Ext_Zca)
+      else (pure false))
   | .Ext_H =>
-    (pure ((hartSupports Ext_H) && (((_get_Misa_H (← readReg misa)) == 1#1) && (← (virtual_memory_supported
-              ())))))
+    (do
+      if ((hartSupports Ext_H) : Bool)
+      then
+        (do
+          if (((_get_Misa_H (← readReg misa)) == 1#1) : Bool)
+          then (virtual_memory_supported ())
+          else (pure false))
+      else (pure false))
   | .Ext_Zicsr => (pure (hartSupports Ext_Zicsr))
   | .Ext_Svinval => (pure (hartSupports Ext_Svinval))
-  | .Ext_Zihpm => (pure ((hartSupports Ext_Zihpm) && (← (currentlyEnabled Ext_Zicsr))))
-  | .Ext_Sscofpmf => (pure ((hartSupports Ext_Sscofpmf) && (← (currentlyEnabled Ext_Zihpm))))
+  | .Ext_Zihpm =>
+    (do
+      if ((hartSupports Ext_Zihpm) : Bool)
+      then (currentlyEnabled Ext_Zicsr)
+      else (pure false))
+  | .Ext_Sscofpmf =>
+    (do
+      if ((hartSupports Ext_Sscofpmf) : Bool)
+      then (currentlyEnabled Ext_Zihpm)
+      else (pure false))
   | .Ext_Zawrs => (pure (hartSupports Ext_Zawrs))
   | .Ext_Zicfiss =>
-    (pure ((hartSupports Ext_Zicfiss) && ((← (currentlyEnabled Ext_Zicsr)) && ((← (currentlyEnabled
-                Ext_Zimop)) && (← (currentlyEnabled Ext_Zaamo))))))
+    (do
+      if ((hartSupports Ext_Zicfiss) : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zicsr)) : Bool)
+          then
+            (do
+              if ((← (currentlyEnabled Ext_Zimop)) : Bool)
+              then (currentlyEnabled Ext_Zaamo)
+              else (pure false))
+          else (pure false))
+      else (pure false))
   | .Ext_Zicond => (pure (hartSupports Ext_Zicond))
-  | .Ext_Zicntr => (pure ((hartSupports Ext_Zicntr) && (← (currentlyEnabled Ext_Zicsr))))
+  | .Ext_Zicntr =>
+    (do
+      if ((hartSupports Ext_Zicntr) : Bool)
+      then (currentlyEnabled Ext_Zicsr)
+      else (pure false))
   | .Ext_Zicbom => (pure (hartSupports Ext_Zicbom))
   | .Ext_Zicboz => (pure (hartSupports Ext_Zicboz))
   | .Ext_Zifencei => (pure (hartSupports Ext_Zifencei))
-  | .Ext_Ssqosid => (pure ((hartSupports Ext_Ssqosid) && (← (currentlyEnabled Ext_Zicsr))))
+  | .Ext_Ssqosid =>
+    (do
+      if ((hartSupports Ext_Ssqosid) : Bool)
+      then (currentlyEnabled Ext_Zicsr)
+      else (pure false))
   | .Ext_Zimop => (pure (hartSupports Ext_Zimop))
-  | .Ext_Zcmop => (pure ((hartSupports Ext_Zcmop) && (← (currentlyEnabled Ext_Zca))))
+  | .Ext_Zcmop =>
+    (do
+      if ((hartSupports Ext_Zcmop) : Bool)
+      then (currentlyEnabled Ext_Zca)
+      else (pure false))
   | _ =>
     (do
       assert false "Pattern match failure at mops/Zcmop/zcmop_insts.sail:9.0-9.97"
@@ -2740,13 +3021,23 @@ def get_xLPE (p : Privilege) : SailM Bool := do
 termination_by (let _ := p
 2).toNat
 def is_hstateen_accessible (_ : Unit) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_H)) && ((← (currentlyEnabled Ext_Smstateen)) || (← (currentlyEnabled
-            Ext_Ssstateen)))))
+  if ((← (currentlyEnabled Ext_H)) : Bool)
+  then
+    (do
+      if ((← (currentlyEnabled Ext_Smstateen)) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_Ssstateen))
+  else (pure false)
 termination_by (let () := ()
 5).toNat
 def is_sstateen_accessible (_ : Unit) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_S)) && ((← (currentlyEnabled Ext_Smstateen)) || (← (currentlyEnabled
-            Ext_Ssstateen)))))
+  if ((← (currentlyEnabled Ext_S)) : Bool)
+  then
+    (do
+      if ((← (currentlyEnabled Ext_Smstateen)) : Bool)
+      then (pure true)
+      else (currentlyEnabled Ext_Ssstateen))
+  else (pure false)
 termination_by (let () := ()
 2).toNat
 def is_zfinx_enabled_by_stateen (_ : Unit) : SailM Bool := do
@@ -2754,8 +3045,17 @@ def is_zfinx_enabled_by_stateen (_ : Unit) : SailM Bool := do
 termination_by (let () := ()
 8).toNat
 def virtual_memory_supported (_ : Unit) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_Sv32)) || ((← (currentlyEnabled Ext_Sv39)) || ((← (currentlyEnabled
-              Ext_Sv48)) || (← (currentlyEnabled Ext_Sv57))))))
+  if ((← (currentlyEnabled Ext_Sv32)) : Bool)
+  then (pure true)
+  else
+    (do
+      if ((← (currentlyEnabled Ext_Sv39)) : Bool)
+      then (pure true)
+      else
+        (do
+          if ((← (currentlyEnabled Ext_Sv48)) : Bool)
+          then (pure true)
+          else (currentlyEnabled Ext_Sv57)))
 termination_by (let _ := ()
 3).toNat
 end
@@ -2813,11 +3113,21 @@ def legalize_menvcfg (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := 
 
 def legalize_mseccfg (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let sseed_read_only_zero ← do
-    (pure ((false : Bool) || ((not (← (currentlyEnabled Ext_S))) || (not
-            (← (currentlyEnabled Ext_Zkr))))))
+    if ((false : Bool) : Bool)
+    then (pure true)
+    else
+      (do
+        if ((not (← (currentlyEnabled Ext_S))) : Bool)
+        then (pure true)
+        else (pure (not (← (currentlyEnabled Ext_Zkr)))))
   let useed_read_only_zero ← do
-    (pure ((false : Bool) || ((not (← (currentlyEnabled Ext_U))) || (not
-            (← (currentlyEnabled Ext_Zkr))))))
+    if ((false : Bool) : Bool)
+    then (pure true)
+    else
+      (do
+        if ((not (← (currentlyEnabled Ext_U))) : Bool)
+        then (pure true)
+        else (pure (not (← (currentlyEnabled Ext_Zkr)))))
   let v := (Mk_Seccfg v)
   (pure (_update_Seccfg_USEED
       (_update_Seccfg_SSEED
@@ -2880,14 +3190,23 @@ def amocas_odd_register_reserved_behavior : AmocasOddRegisterReservedBehavior :=
 def amo_encoding_valid (width : Nat) (op : amoop) (typ_2 : regidx) (typ_3 : regidx) : SailM Bool := do
   let .Regidx rs2 : regidx := typ_2
   let .Regidx rd : regidx := typ_3
-  (pure ((← do
-        if ((op == AMOCAS) : Bool)
-        then (currentlyEnabled Ext_Zacas)
-        else (currentlyEnabled Ext_Zaamo)) && (← do
-        if ((width <b 4) : Bool)
-        then (currentlyEnabled Ext_Zabha)
-        else
-          (pure ((width ≤b xlen_bytes) || (((op == AMOCAS) && (width ≤b (xlen_bytes *i 2))) && (← do
+  if ((← do
+       if ((op == AMOCAS) : Bool)
+       then (currentlyEnabled Ext_Zacas)
+       else (currentlyEnabled Ext_Zaamo)) : Bool)
+  then
+    (do
+      if ((width <b 4) : Bool)
+      then (currentlyEnabled Ext_Zabha)
+      else
+        (do
+          if ((width ≤b xlen_bytes) : Bool)
+          then (pure true)
+          else
+            (do
+              if (((op == AMOCAS) && (width ≤b (xlen_bytes *i 2))) : Bool)
+              then
+                (do
                   if ((((BitVec.access rs2 0) == 1#1) || ((BitVec.access rd 0) == 1#1)) : Bool)
                   then
                     (do
@@ -2899,7 +3218,9 @@ def amo_encoding_valid (width : Nat) (op : amoop) (typ_2 : regidx) (typ_3 : regi
                               (HAppend.hAppend ", rd = "
                                 (HAppend.hAppend (Int.repr (BitVec.toNatInt rd)) ").")))))
                       | .AMOCAS_Illegal => (pure false))
-                  else (pure true))))))))
+                  else (pure true))
+              else (pure false))))
+  else (pure false)
 
 def encdec_amoop_forwards (arg_ : amoop) : (BitVec 5) :=
   match arg_ with
@@ -3012,14 +3333,17 @@ def width_enc_wide_forwards (arg_ : Nat) : (BitVec 3) :=
   | _ => 0b100#3
 
 def zicfiss_xSSE (priv : Privilege) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_S)) && (← do
-        match priv with
-        | .Machine => (pure false)
-        | .Supervisor => (pure (bool_bit_backwards (_get_MEnvcfg_SSE (← readReg menvcfg))))
-        | .VirtualSupervisor =>
-          (internal_error "extensions/cfi/zicfiss_regs.sail" 27 "Hypervisor extension not supported")
-        | .User => (pure (bool_bit_backwards (_get_SEnvcfg_SSE (← (read_senvcfg ())))))
-        | .VirtualUser => (pure (bool_bit_backwards (_get_SEnvcfg_SSE (← (read_senvcfg ()))))))))
+  if ((← (currentlyEnabled Ext_S)) : Bool)
+  then
+    (do
+      match priv with
+      | .Machine => (pure false)
+      | .Supervisor => (pure (bool_bit_backwards (_get_MEnvcfg_SSE (← readReg menvcfg))))
+      | .VirtualSupervisor =>
+        (internal_error "extensions/cfi/zicfiss_regs.sail" 27 "Hypervisor extension not supported")
+      | .User => (pure (bool_bit_backwards (_get_SEnvcfg_SSE (← (read_senvcfg ())))))
+      | .VirtualUser => (pure (bool_bit_backwards (_get_SEnvcfg_SSE (← (read_senvcfg ()))))))
+  else (pure false)
 
 def ra : regidx := (Regidx (zero_extend (m := 5) 0b01#2))
 
@@ -3235,7 +3559,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .MUL (rs2, rs1, rd, mul_op) =>
     (do
-      if (((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_M)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zmmul)) : Bool)
       then
         (pure (0b0000001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ ((← (encdec_mul_op_forwards
                       mul_op)) +++ ((encdec_reg_forwards rd) +++ 0b0110011#7))))))
@@ -3265,7 +3592,14 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .MULW (rs2, rs1, rd) =>
     (do
-      if (((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_M)) : Bool)
+               then (pure true)
+               else (currentlyEnabled Ext_Zmmul))
+           else (pure false)) : Bool)
       then
         (pure (0b0000001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0111011#7))))))
@@ -3275,7 +3609,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .DIVW (rs2, rs1, rd, is_unsigned) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_M))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_M)
+           else (pure false)) : Bool)
       then
         (pure (0b0000001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b10#2 +++ ((bool_bit_forwards
                       is_unsigned) +++ ((encdec_reg_forwards rd) +++ 0b0111011#7)))))))
@@ -3285,7 +3622,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .REMW (rs2, rs1, rd, is_unsigned) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_M))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_M)
+           else (pure false)) : Bool)
       then
         (pure (0b0000001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b11#2 +++ ((bool_bit_forwards
                       is_unsigned) +++ ((encdec_reg_forwards rd) +++ 0b0111011#7)))))))
@@ -3338,7 +3678,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBA_RTYPE (rs2, rs1, rd, shamt) =>
     (do
-      if (((shamt != 0b00#2) && (← (currentlyEnabled Ext_Zba))) : Bool)
+      if ((← do
+           if ((shamt != 0b00#2) : Bool)
+           then (currentlyEnabled Ext_Zba)
+           else (pure false)) : Bool)
       then
         (pure (0b0010000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ ((shamt : (BitVec 2)) +++ (0#1 +++ ((encdec_reg_forwards
                         rd) +++ 0b0110011#7)))))))
@@ -3348,7 +3691,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RORIW (shamt, rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then
         (pure (0b0110000#7 +++ ((shamt : (BitVec 5)) +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0011011#7))))))
@@ -3358,8 +3704,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .RORI (shamt, rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && ((xlen == 64) || ((BitVec.access
-                 shamt 5) == 0#1))) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))) : Bool)
       then
         (pure (0b011000#6 +++ ((shamt : (BitVec 6)) +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0010011#7))))))
@@ -3369,7 +3717,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPEW (rs2, rs1, rd, .ROLW) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then
         (pure (0b0110000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0111011#7))))))
@@ -3379,7 +3730,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPEW (rs2, rs1, rd, .RORW) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then
         (pure (0b0110000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0111011#7))))))
@@ -3389,7 +3743,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPE (rs2, rs1, rd, .ANDN) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then
         (pure (0b0100000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b111#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3399,7 +3756,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPE (rs2, rs1, rd, .ORN) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then
         (pure (0b0100000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b110#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3409,7 +3769,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPE (rs2, rs1, rd, .XNOR) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then
         (pure (0b0100000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b100#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3459,7 +3822,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPE (rs2, rs1, rd, .ROL) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then
         (pure (0b0110000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3469,7 +3835,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .ZBB_RTYPE (rs2, rs1, rd, .ROR) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then
         (pure (0b0110000#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3515,13 +3884,19 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
               throw Error.Exit)))
   | .REV8 (rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 32)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 32)) : Bool)
       then
         (pure (0b011010011000#12 +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                     rd) +++ 0b0010011#7)))))
       else
         (do
-          if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+          if (((← do
+                 if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+                 then (pure true)
+                 else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
           then
             (pure (0b011010111000#12 +++ ((encdec_reg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
                         rd) +++ 0b0010011#7)))))
@@ -3601,7 +3976,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .CLMUL (rs2, rs1, rd) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbc)) || (← (currentlyEnabled Ext_Zbkc))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbc)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkc)) : Bool)
       then
         (pure (0b0000101#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3611,7 +3989,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .CLMULH (rs2, rs1, rd) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbc)) || (← (currentlyEnabled Ext_Zbkc))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbc)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkc)) : Bool)
       then
         (pure (0b0000101#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b011#3 +++ ((encdec_reg_forwards
                       rd) +++ 0b0110011#7))))))
@@ -3767,8 +4148,14 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SSPUSH rs2 =>
     (do
-      if ((((rs2 == ra) || (rs2 == t0)) && ((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if (((rs2 == ra) || (rs2 == t0)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then
         (pure (0b1100111#7 +++ ((encdec_reg_forwards rs2) +++ (0b00000#5 +++ (0b100#3 +++ (0b00000#5 +++ 0b1110011#7))))))
       else
@@ -3777,8 +4164,14 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SSPOPCHK rs1 =>
     (do
-      if ((((rs1 == ra) || (rs1 == t0)) && ((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if (((rs1 == ra) || (rs1 == t0)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then
         (pure (0b110011011100#12 +++ ((encdec_reg_forwards rs1) +++ (0b100#3 +++ (0b00000#5 +++ 0b1110011#7)))))
       else
@@ -3787,7 +4180,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SSRDP rd =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE (← readReg cur_privilege)))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then (zicfiss_xSSE (← readReg cur_privilege))
+           else (pure false)) : Bool)
       then
         (pure (0b110011011100#12 +++ (0b00000#5 +++ (0b100#3 +++ ((encdec_reg_forwards rd) +++ 0b1110011#7)))))
       else
@@ -3796,7 +4192,10 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
           throw Error.Exit))
   | .SSAMOSWAP (aq, rl, rs2, rs1, width, rd) =>
     (do
-      if ((((width == 4) || ((xlen == 64) && (width == 8))) && (← (currentlyEnabled Ext_Zicfiss))) : Bool)
+      if ((← do
+           if (((width == 4) || ((xlen == 64) && (width == 8))) : Bool)
+           then (currentlyEnabled Ext_Zicfiss)
+           else (pure false)) : Bool)
       then
         (pure (0b01001#5 +++ ((bool_bit_forwards aq) +++ ((bool_bit_forwards rl) +++ ((encdec_reg_forwards
                     rs2) +++ ((encdec_reg_forwards rs1) +++ (0#1 +++ ((width_enc_forwards width) +++ ((encdec_reg_forwards

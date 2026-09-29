@@ -14,10 +14,10 @@ The arms: `ume_load` (UserMemLoad), `ume_store` (UserMemStore),
 `UserMemPf`).  The compressed memory forms are the contract's redirects
 (`ucl_row_mem16`).
 With lane U3-A's classification, `ume_execTotal` is the user loop's
-execute contract `UstExecTotalSc C P` from U3-A's `UclCsrZkr` alone.
+execute contract `UstExecTotal C P`, with no hypothesis.
 -/
 import Xv6.UserMemAmoArm
-import Xv6.UserClassifySc
+import Xv6.UserClassify
 import Xv6.UserMemPf
 
 namespace Xv6
@@ -54,9 +54,9 @@ theorem ume_memArms : UclMemArms C P where
   amo := ume_amo
   zicbop := ume_zicbop
 
-/-- **The user loop's execute contract** (lane U3-A's `ucl_execTotalSc` with
+/-- **The user loop's execute contract** (lane U3-A's `ucl_execTotal` with
 the memory contract discharged). -/
-theorem ume_execTotal (hZkr : UclCsrZkr C P) : UstExecTotalSc C P :=
-  ucl_execTotalSc hZkr ume_memArms
+theorem ume_execTotal : UstExecTotal C P :=
+  ucl_execTotal ume_memArms
 
 end Xv6

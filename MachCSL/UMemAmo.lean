@@ -60,12 +60,9 @@ over the `UTlb`/`UWalk` facts):
    `swp_sail_mem_write_excl_ctx` wants `acq = false`).  The same holds for
    `LR.aq`/`LR.aqrl`.  The facts here are stated for every `aq`, so they
    close as soon as the walker (URunRW) carries the acquire flag.
-2. The model's `AMOCAS` test `(op == AMOCAS) && (loaded != X(rd))` is
-   compiled with the `X(rd)` read hoisted out of the `&&` (the eager
-   `&&` operand evaluation U1-X3 found), so EVERY AMO reads `rd` (the pair
-   `rd`/`rd+1` at width 16) after the load.  A GPR read has no effect and
-   `rd` is in the footprint, so no outcome changes; Sail reads it only for
-   `AMOCAS`.
+2. The model's `AMOCAS` test `(op == AMOCAS) & (loaded != X(rd))`
+   short-circuits (as Sail and Rocq do): only `AMOCAS` reads `rd` (the
+   pair `rd`/`rd+1` at width 16) after the load.
 3. A failing `AMOCAS` performs the exclusive read and no write, so the
    walker's reservation bit stays set (`umo_amocas_fail`'s post-state is
    `umoRv s1`): a later `SC` can pay with it.  That is what the concurrency

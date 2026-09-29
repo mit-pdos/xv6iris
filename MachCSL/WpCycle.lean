@@ -211,6 +211,13 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   mconf_cases HmConf
   unfold try_step
   swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
+  swp_run 40
   mconf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_conf (hok := hok.1)
@@ -265,6 +272,13 @@ theorem wpLoop_m_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   iapply swp_wpHart
   mconf_cases HmConf
   unfold try_step
+  swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
   swp_run 40
   mconf_intro HmConf
   iapply swp_bind

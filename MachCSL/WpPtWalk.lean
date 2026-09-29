@@ -209,10 +209,12 @@ def KPerm.allows : KPerm → MemoryAccessType mem_payload → Bool
   | _, _ => false
 
 set_option maxHeartbeats 4000000 in
-/-- A kernel leaf is a valid entry, at any `A`/`D`. -/
+/-- A kernel leaf is a valid entry, at any `A`/`D`.  No Sail step: its flags
+refuse every register-reading conjunct (`R = 1`, no PBMT/N/RSW bits), so no
+later is available. -/
 theorem swp_pte_is_invalid_kLeaf (cpu : CPU) (dq : DFrac) (c : MConf)
     (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) (Φ : Bool → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
+    confCells cpu dq Privilege.Supervisor c ∗ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
     ⊢ swp cpu (pte_is_invalid (Mk_PTE_Flags (BitVec.extractLsb' 0 8 (kLeaf ppn perm a d)))
         0#10) Φ := by
   iintro ⟨HmConf, HΦ⟩
@@ -227,10 +229,10 @@ theorem swp_pte_is_invalid_kLeaf (cpu : CPU) (dq : DFrac) (c : MConf)
     iapply HΦ $$ HmConf
 
 set_option maxHeartbeats 4000000 in
-/-- A pointer entry is a valid entry. -/
+/-- A pointer entry is a valid entry (no Sail step, as for a leaf). -/
 theorem swp_pte_is_invalid_kPtr (cpu : CPU) (dq : DFrac) (c : MConf)
     (ppn : BitVec 44) (Φ : Bool → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
+    confCells cpu dq Privilege.Supervisor c ∗ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
     ⊢ swp cpu (pte_is_invalid (Mk_PTE_Flags ptrFlags) 0#10) Φ := by
   iintro ⟨HmConf, HΦ⟩
   conf_cases HmConf
@@ -282,7 +284,6 @@ theorem swp_check_leaf_pte_kLeaf (cpu : CPU) (dq : DFrac) (c : MConf) (vpn : Bit
   iapply swp_bind
   iapply (swp_pte_is_invalid_kLeaf cpu dq c ppn perm a d)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   iapply swp_bind
@@ -394,7 +395,6 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kPtr cpu dq c b1)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   -- level 1
@@ -419,7 +419,6 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kPtr cpu dq c b0)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   -- level 0
@@ -445,7 +444,6 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kLeaf cpu dq c ppn perm a' d')
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   iapply swp_bind

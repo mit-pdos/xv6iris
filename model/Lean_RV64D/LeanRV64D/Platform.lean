@@ -381,7 +381,10 @@ def clint_dispatch (mip_was_written : Bool) : SailM Unit := do
   let old_mip ← do readReg mip
   writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 7 7
     (bool_to_bit (zopz0zIzJ_u (← readReg mtimecmp) (← readReg mtime))))
-  if (((← (currentlyEnabled Ext_Sstc)) && ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1)) : Bool)
+  if ((← do
+       if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+       then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
+       else (pure false)) : Bool)
   then
     writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 5 5
       (bool_to_bit (zopz0zIzJ_u (← readReg stimecmp) (← readReg mtime))))
@@ -534,12 +537,14 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                             (pure (Err (paddr, (E_SAMO_Access_Fault ())))))))))))
 
 def should_inc_mcycle (priv : Privilege) : SailM Bool := do
-  (pure (((_get_Counterin_CY (← readReg mcountinhibit)) == 0#1) && ((counter_priv_filter_bit
-          (← readReg mcyclecfg) priv) == 0#1)))
+  if (((_get_Counterin_CY (← readReg mcountinhibit)) == 0#1) : Bool)
+  then (pure ((counter_priv_filter_bit (← readReg mcyclecfg) priv) == 0#1))
+  else (pure false)
 
 def should_inc_minstret (priv : Privilege) : SailM Bool := do
-  (pure (((_get_Counterin_IR (← readReg mcountinhibit)) == 0#1) && ((counter_priv_filter_bit
-          (← readReg minstretcfg) priv) == 0#1)))
+  if (((_get_Counterin_IR (← readReg mcountinhibit)) == 0#1) : Bool)
+  then (pure ((counter_priv_filter_bit (← readReg minstretcfg) priv) == 0#1))
+  else (pure false)
 
 def tick_clock (_ : Unit) : SailM Unit := do
   if ((← (should_inc_mcycle (← readReg cur_privilege))) : Bool)
@@ -662,9 +667,17 @@ def htif_store (addr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : S
               writeReg htif_tohost (Sail.BitVec.updateSubrange (← readReg htif_tohost) 63 32 data))
           else
             SailME.throw ((Err (addr, (E_SAMO_Access_Fault ()))) : (Result Bool (physaddr × ExceptionType)))))
-  if (((((← readReg htif_cmd_write) == 1#1) && (← do
-           (pure ((BitVec.toNatInt (← readReg htif_payload_writes)) >b 0)))) || (← do
-         (pure ((BitVec.toNatInt (← readReg htif_payload_writes)) >b 2)))) : Bool)
+  if ((← do
+       if ((← do
+            if (((← readReg htif_cmd_write) == 1#1) : Bool)
+            then
+              (do
+                (pure ((BitVec.toNatInt (← readReg htif_payload_writes)) >b 0)))
+            else (pure false)) : Bool)
+       then (pure true)
+       else
+         (do
+           (pure ((BitVec.toNatInt (← readReg htif_payload_writes)) >b 2)))) : Bool)
   then
     (do
       let cmd ← do (pure (Mk_htif_cmd (← readReg htif_tohost)))
@@ -706,16 +719,28 @@ def within_mmio_readable (addr : physaddr) (width : Nat) : SailM Bool := do
   if ((get_config_rvfi ()) : Bool)
   then (pure false)
   else
-    (pure ((← (within_clint addr width)) || ((← (within_sig addr width)) || ((← (within_htif_readable
-                addr width)) && (1 ≤b width)))))
+    (do
+      if ((← (within_clint addr width)) : Bool)
+      then (pure true)
+      else
+        (do
+          if ((← (within_sig addr width)) : Bool)
+          then (pure true)
+          else (pure ((← (within_htif_readable addr width)) && (1 ≤b width)))))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_mmio_writable (addr : physaddr) (width : Nat) : SailM Bool := do
   if ((get_config_rvfi ()) : Bool)
   then (pure false)
   else
-    (pure ((← (within_clint addr width)) || ((← (within_sig addr width)) || ((← (within_htif_writable
-                addr width)) && (width ≤b 8)))))
+    (do
+      if ((← (within_clint addr width)) : Bool)
+      then (pure true)
+      else
+        (do
+          if ((← (within_sig addr width)) : Bool)
+          then (pure true)
+          else (pure ((← (within_htif_writable addr width)) && (width ≤b 8)))))
 
 /-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
 def mmio_read (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) (physaddr × ExceptionType)) := do

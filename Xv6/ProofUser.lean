@@ -8,24 +8,18 @@ two classification facts; this file discharges both:
 * the fetch, `UstFetchSpec cpu C pt` (U2-F): `ustFetchSpec_holds` at the
   landing's leaf validity -- `uptWf`'s `upt_map_wf` pin, read off the landed
   machine's `UbMemWf` (`ume_leavesValid`), so NO table hypothesis;
-* the execute, `UstExecTotalSc C pt` (U3-A up to discarded reads, the memory
-  arms by U2-M4): `ume_execTotal`, from `UclCsrZkr C pt` alone.
+* the execute, `UstExecTotal C pt` (U3-A, the memory arms by U2-M4):
+  `ume_execTotal`, with no hypothesis.
 
 The residue accessor `hacc` is `wpUserExecClosedBody`'s own premise (as in
 Rocq, `Rut_ctx`).
 
-## THE ONE HYPOTHESIS: `hZkr` (model faithfulness, open user decision)
-
-`userProof (hZkr : ∀ C P, UclCsrZkr C P) : USER`.  `UclCsrZkr C P` is the
-CSR rows for `mseccfg`/`mseccfgh` (0x747/0x757) only.  It is FALSE in the
-current generated model: the Lean backend evaluates `is_CSR_accessible`'s
-`&&` eagerly (Sail/Rocq short-circuit), so these two numbers reach
-`currentlyEnabled Ext_Zkr`, and the generated `currentlyEnabled` has no
-`Ext_Zkr` clause (`assert false`, no Sail step).  Once the model is fixed
-(Sail's missing `currentlyEnabled(Ext_Zkr)` clause in the regen script, or
-the `&&`-short-circuit backend fix), `UclCsrZkr` becomes provable (as U1-X3's
-rows for every other number are) and `hZkr` disappears.  Rocq has no such
-hypothesis (its model short-circuits).
+No hypothesis: `userProof : USER`.  (Until the Sail Lean backend was fixed
+to short-circuit `&`/`|` with effectful operands, the generated model reached
+`currentlyEnabled Ext_Zkr` -- which has no clause, `assert false` -- on a user
+access to `mseccfg`/`mseccfgh`, and this theorem carried a hypothesis `hZkr`
+for those two CSR rows.  The model is now regenerated with the fix,
+`tools/regen_sail_model.sh`; see notes/coord/user_residuals.md.)
 -/
 import Xv6.SpecUser
 import Xv6.UserStep
@@ -46,11 +40,10 @@ theorem userProof_fetch (cpu : CPU) (C : UCfg) (pt : UPtd) : UstFetchSpec (GF :=
 
 end proof
 
-/-- **Rocq `UserProof : USER`** (`wp_user_exec_closed`), under the one model
-hypothesis `hZkr` (see the module doc). -/
-theorem userProof (hZkr : ∀ (C : UCfg) (P : UPtd), UclCsrZkr C P) : USER where
+/-- **Rocq `UserProof : USER`** (`wp_user_exec_closed`). -/
+theorem userProof : USER where
   wp_user_exec_closed cpu C pt Rut := fun hacc =>
-    ust_body cpu C pt Rut (userProof_fetch cpu C pt) (ume_execTotal (hZkr C pt)) hacc
+    ust_body cpu C pt Rut (userProof_fetch cpu C pt) ume_execTotal hacc
 
 end Xv6
 

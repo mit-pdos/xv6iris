@@ -15,9 +15,9 @@ UserStepLand), built from the landed per-family walks at the user footprint
   dispatched with the causes named by `MachCSL.UclCtl`): retire, `nextPC`
   and a GPR written; ECALL/EBREAK/C.EBREAK trap at User with a user cause and
   no payload; the privileged ones illegal; WRS waits;
-* CSRReg/CSRImm -- not here: their rows are stated up to discarded reads
-  (`Xv6/UserClassifySc`, U1-X3's `uxr_execute_CSRReg/Imm`), the backend's
-  eager `&&` in `check_CSR` reading cells off the user footprint;
+* `ucl_row_csr` -- CSRReg/CSRImm (U1-X3's `uxr_execute_CSRReg/Imm`, every
+  csr number): `Illegal_Instruction` with nothing changed, or -- an enabled
+  counter read -- `Retire_Success` with `rd` written;
 * `ucl_row_cfgRefused` -- ZICBOM/ZICBOZ/SSAMOSWAP (`MachCSL.UclCbo`):
   `Illegal_Instruction`, nothing written.
 -/
@@ -100,5 +100,27 @@ theorem ucl_row_cfgRefused {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i
   case SSAMOSWAP p =>
     obtain ⟨aq, rl, rs2, rs1, width, rd⟩ := p
     exact ucl_row_illegal hL len _ fun orc => ucl_ssamoswap ufFoot_uxc orc _ hU aq rl rs2 rs1 width rd
+
+/-- **A CSR outcome is an admissible row** (U1-X3's `UxrDone`: illegal, or a
+retiring counter read into `rd`). -/
+theorem ucl_row_csrDone {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : instruction) (rd : regidx)
+    (h : UxrDone ufFoot (ucNpcS s len) (execute i) rd) : UstExecOk C P t0 mm0 s i len := by
+  rcases h with h | ⟨w, h⟩
+  · exact ucl_row_illegal hL len i h
+  · exact ucl_execOk_direct fun orc =>
+      ⟨_, _, _, h orc, ucl_resOk_retire (ucl_land_wr (ucl_land_npc hL len) _ w)⟩
+
+/-- **The CSR row** (U1-X3's `uxr_execute_CSRReg`/`uxr_execute_CSRImm`),
+every csr number. -/
+theorem ucl_row_csr {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : instruction)
+    (h : uclCsrU i = true) : UstExecOk C P t0 mm0 s i len := by
+  have hc := ucl_uxrCfg (ucl_land_npc hL len)
+  cases i <;> first | exact absurd h Bool.false_ne_true | skip
+  case CSRReg p =>
+    obtain ⟨csr, rs1, rd, op⟩ := p
+    exact ucl_row_csrDone hL len _ rd (uxr_execute_CSRReg ufFoot_uxa ufFoot_uxr hc csr rs1 rd op)
+  case CSRImm p =>
+    obtain ⟨csr, imm, rd, op⟩ := p
+    exact ucl_row_csrDone hL len _ rd (uxr_execute_CSRImm ufFoot_uxa ufFoot_uxr hc csr imm rd op)
 
 end Xv6

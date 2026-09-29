@@ -113,6 +113,19 @@ def uwkPerm (acc : MemoryAccessType mem_payload) (mxr : Bool) (w : BitVec 64) : 
 theorem uwk_bit_to_bool (x : BitVec 1) : bit_to_bool x = (x == 1#1) := by
   revert x; decide
 
+open Lean Elab Tactic Meta in
+/-- Case-split the goal's first `if` (pre-order) whose condition is closed
+under binders, rewriting it away in both branches (the condition stays as a
+hypothesis).  `uwk_run` walks a symbolic branch only when a hypothesis
+decides it; the short-circuit chains branch on an entry's symbolic bits. -/
+elab "uwk_split" : tactic => withMainContext do
+  let tgt ← instantiateMVars (← getMainTarget)
+  let some e := tgt.find? (fun e => e.isAppOfArity ``ite 5 && !(e.getArg! 1).hasLooseBVars)
+    | throwError "uwk_split: no closed `if` in the goal"
+  let cStx ← Term.exprToSyntax (e.getArg! 1)
+  evalTactic (← `(tactic| (by_cases hsplit : $cStx <;> first | rw [if_pos hsplit] | rw [if_neg hsplit])))
+
+set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **Rocq `pte_valid`/`pte_invalid` as one equation**: `pte_is_invalid`
@@ -120,13 +133,20 @@ answers `uwkInv`. -/
 theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (w : BitVec 64) :
     runRW D orc s (pte_is_invalid (uwkFl w) (uwkExt w)) = some (uwkInv w, s, orc) := by
   uwk_pins hp
-  uwk_run -bv
-  simp only [Option.some.injEq, Prod.mk.injEq, and_true, uwkInv, uwk_pbmt_matches, pte_is_non_leaf,
-    Functions.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and]
-  simp only [_get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,
-    _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved,
-    Mk_PTE_Flags, Sail.BitVec.extractLsb]
-  bv_decide
+  have hres : pte_reserved_bits_must_be_zero = true := by decide
+  unfold pte_is_invalid
+  simp only [hres, ↓reduceIte]
+  -- the short-circuit chain branches on the entry's (symbolic) bits: walk
+  -- to each branch, split it, walk on
+  repeat' (first | uwk_run -bv | uwk_split)
+  all_goals
+    simp only [Option.some.injEq, Prod.mk.injEq, and_true, uwkInv, uwk_pbmt_matches, pte_is_non_leaf,
+      Functions.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and] at *
+    simp only [_get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,
+      _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved,
+      _get_PTE_Ext_N, _get_PTE_Ext_RSW_60t59b, _get_MEnvcfg_SSE, _get_MEnvcfg_PBMTE, menvcfgS, zeros, BitVec.zero,
+      Mk_PTE_Flags, Sail.BitVec.extractLsb] at *
+    bv_decide
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

@@ -52,9 +52,12 @@ theorem swp_tick_clock_cells_SU (cpu : CPU) (dq : DFrac) (p : Privilege)
       swp_run 60
       (try split)
       all_goals
-        swp_run 40
-        conf_intro HmConf
-        iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+        swp_run 60
+        (try split)
+        all_goals
+          swp_run 40
+          conf_intro HmConf
+          iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
 set_option hygiene false in
 /-- The retire stage of a cycle landing in privilege `p'` (`hp'`). -/
@@ -113,6 +116,15 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   conf_cases HmConf
   unfold try_step
   swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
+  swp_run 40
+  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
+    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -120,7 +132,7 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   inext
   iintro %ipw HmConf Hmip
   have hd := dispatchS_off c ipw (by simpa using hok.2.1.1)
-  simp only [hd]
+  try simp only [hd]
   swp_run 40
   iapply swp_bind
   iapply (hfetch _)
@@ -171,6 +183,15 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   conf_cases HmConf
   unfold try_step
   swp_run 40
+  -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
+  iapply swp_bind
+  iapply (swp_gate_hwAny cpu Register.minstretcfg rfl _ ?hm)
+  case hm => exact ⟨_, _, rfl⟩
+  iframe Hhw
+  iintro %mig
+  swp_run 40
+  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
+    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -178,7 +199,7 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   inext
   iintro %ipw HmConf Hmip
   have hd := dispatchS_off c ipw (by simpa using hok.2.1.1)
-  simp only [hd]
+  try simp only [hd]
   swp_run 40
   iapply swp_bind
   iapply (hfetch _)

@@ -84,9 +84,12 @@ theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfPhys (GF :=
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hid := sstatus_clear_sie_id c.mstatus hsm
   unfold execute
-  swp_run 30
+  dsimp only
+  try unfold execute_CSRImm
   try unfold doCSR
+  -- keep `write_CSR` opaque (the short-circuit check is walked in few steps)
   generalize hW : write_CSR 0x100#12 = W
+  swp_run 30
   swp_run 300
   subst hW
   iapply swp_bind
@@ -122,9 +125,12 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
   unfold execute
-  swp_run 30
+  dsimp only
+  try unfold execute_CSRImm
   try unfold doCSR
+  -- keep `write_CSR` opaque (the short-circuit check is walked in few steps)
   generalize hW : write_CSR 0x100#12 = W
+  swp_run 30
   swp_run 300
   subst hW
   iapply swp_bind
@@ -162,9 +168,12 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
   unfold execute
-  swp_run 30
+  dsimp only
+  try unfold execute_CSRImm
   try unfold doCSR
+  -- keep `write_CSR` opaque (the short-circuit check is walked in few steps)
   generalize hW : write_CSR 0x100#12 = W
+  swp_run 30
   swp_run 300
   subst hW
   iapply swp_bind
@@ -199,9 +208,12 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   have hst := sstatus_set_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
   unfold execute
-  swp_run 30
+  dsimp only
+  try unfold execute_CSRImm
   try unfold doCSR
+  -- keep `write_CSR` opaque (the short-circuit check is walked in few steps)
   generalize hW : write_CSR 0x100#12 = W
+  swp_run 30
   swp_run 300
   subst hW
   iapply swp_bind

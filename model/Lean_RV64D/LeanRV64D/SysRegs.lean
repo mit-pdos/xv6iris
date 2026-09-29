@@ -627,8 +627,14 @@ def ext_veto_disable_C (_ : Unit) : Bool :=
 
 def legalize_misa (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let v := (Mk_Misa v)
-  if (((not sys_enable_writable_misa) || (((_get_Misa_C v) == 0#1) && (((BitVec.access
-               (← readReg nextPC) 1) == 1#1) || (ext_veto_disable_C ())))) : Bool)
+  if ((← do
+       if ((not sys_enable_writable_misa) : Bool)
+       then (pure true)
+       else
+         (do
+           if (((_get_Misa_C v) == 0#1) : Bool)
+           then (pure (((BitVec.access (← readReg nextPC) 1) == 1#1) || (ext_veto_disable_C ())))
+           else (pure false))) : Bool)
   then (pure m)
   else
     (pure (_update_Misa_V
@@ -1577,7 +1583,10 @@ def feature_enabled_for_priv (p : Privilege) (machine_enable_bit : (BitVec 1)) (
     else (pure FEATURE_ILLEGAL))
   | .User =>
     (do
-      if (((machine_enable_bit == 1#1) && ((not (← (currentlyEnabled Ext_S))) || (supervisor_enable_bit == 1#1))) : Bool)
+      if ((← do
+           if ((machine_enable_bit == 1#1) : Bool)
+           then (pure ((not (← (currentlyEnabled Ext_S))) || (supervisor_enable_bit == 1#1)))
+           else (pure false)) : Bool)
       then (pure FEATURE_ENABLED)
       else (pure FEATURE_ILLEGAL))
   | .VirtualSupervisor =>

@@ -1427,7 +1427,6 @@ import Xv6.UserClassifyLand
 import Xv6.UserClassifyReg
 import Xv6.UserClassifyMem
 import Xv6.UserClassify
-import Xv6.UserClassifySc
 import Xv6.UkCatDefs
 import Xv6.SpecCatCat
 import Xv6.SpecCatMain

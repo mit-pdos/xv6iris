@@ -16,11 +16,9 @@ over `menvcfg.CBIE` / `senvcfg.CBIE`.  xv6 runs user code with
 too, `Ext_S` being on) -- before `rs1` is read or any address formed.  The
 walks read only `drefU`'s configuration registers, so they are closed by the
 kernel at the pinned reference state and moved to any state by lane U1-X2's
-read-only transfer `uxc_cfg_walk`.  The eager `&&` of the Lean backend (see
-`notes/coord/user_residuals.md`) evaluates `currentlyEnabled Ext_S` inside
-`feature_enabled_for_priv`'s conjunction even when the `menvcfg` bit is 0;
-the generated `currentlyEnabled` has an `Ext_S` clause, so that is a
-harmless extra read (no assertion).
+read-only transfer `uxc_cfg_walk`.  `feature_enabled_for_priv`'s conjunction
+short-circuits, so with the `menvcfg` bit 0 it does not consult
+`currentlyEnabled Ext_S`.
 
 **`prefetch.*` retire, whatever the translation says** (`umo_zicbop_tfault`,
 `umo_zicbop_ok`): the model forms the cache-block address

@@ -146,7 +146,6 @@ import MachCSL.UWait
 import MachCSL.UTick
 import MachCSL.UCycleSwp
 import MachCSL.UCycleExec
-import MachCSL.UCycleSc
 import MachCSL.ArchReset
 import MachCSL.BootRun
 import MachCSL.BootPeel
@@ -160,12 +159,6 @@ import LeanRV64D
 import MachCSL.UByteFrame
 import MachCSL.UFrameDf
 import MachCSL.URunRWMono
-import MachCSL.SailRO
-import MachCSL.SailROModel
-import MachCSL.SailROCsr
-import MachCSL.SailStut
-import MachCSL.SailAndElim
-import MachCSL.UExecCsrSc
 import MachCSL.UExecCsrCnt
 import MachCSL.UExecCsr
 import MachCSL.UWalkRun

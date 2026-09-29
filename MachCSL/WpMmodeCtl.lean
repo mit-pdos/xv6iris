@@ -43,10 +43,14 @@ theorem execSpec_jalr_x0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVe
   inext
   iintro Hrs1
   swp_run 100
-  unfold wX_bits wX
-  swp_run 10
-  mconf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC Hrs1
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    unfold wX_bits wX
+    swp_run 10
+    mconf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 /-- `jalr x0, 0(rs1)`: jump to `rs1` with bit 0 cleared (`ret`, `c.jr`). -/
 theorem wp_m_jalr_x0 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)

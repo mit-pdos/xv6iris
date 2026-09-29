@@ -66,6 +66,7 @@ theorem swp_fetch_s4X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok.2.1
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_clear_of_mod4 pc (by omega)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
@@ -105,6 +106,7 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok.2.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc (by omega)
   have h2 : (pa + 2#64).toNat = pa.toNat + 2 := by
     simp only [inRam, ramBase, ramEnd] at hram; bv_omega
   have hram2 : inRam pa 2 := by simp only [inRam, ramBase, ramEnd] at *; omega
@@ -164,6 +166,7 @@ theorem swp_fetch_s2_rvcX (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys 
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hok.2.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc (by omega)
   conf_cases HmConf
   unfold fetch
   swp_run 80

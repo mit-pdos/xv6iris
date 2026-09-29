@@ -59,7 +59,7 @@ bitvector pattern; also in `WpPmp`). -/
     is_CSR_accessible 0x14D#12 p a = is_stimecmp_accessible p := rfl
 @[sail_facts] theorem is_CSR_accessible_time (p : Privilege) (a : CSRAccessType) :
     is_CSR_accessible 0xC01#12 p a =
-      (do let z ← currentlyEnabled extension.Ext_Zicntr; let c ← counter_enabled 1 p; pure (z && c)) := rfl
+      (do if (← currentlyEnabled extension.Ext_Zicntr) then counter_enabled 1 p else pure false) := rfl
 @[sail_facts] theorem is_CSR_accessible_pmpcfg0 (p : Privilege) (a : CSRAccessType) :
     is_CSR_accessible 0x3A0#12 p a = Pure.pure true := rfl
 @[sail_facts] theorem is_CSR_accessible_pmpaddr0 (p : Privilege) (a : CSRAccessType) :

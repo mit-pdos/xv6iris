@@ -3,7 +3,7 @@
 the pair convention, `u_exec_pins`, the `finish_*` closers of
 `UserTotalU.v`).
 
-The execute classification `UstExecTotalSc` (UserStepLand) asks, per
+The execute classification `UstExecTotal` (UserStepLand) asks, per
 instruction, for `UstExecOk C P t0 mm0 s i len`: from the `nextPC := PC + len`
 state `ucNpcS s len` of an ACTIVE user machine `s` (`UstLand`), every
 oracle's walk of `uxaExecAs i` over the user footprint `ufFoot` lands in
@@ -27,7 +27,6 @@ oracle's walk of `uxaExecAs i` over the user footprint `ufFoot` lands in
 import Xv6.UserStepLand
 import MachCSL.UclCtl
 import MachCSL.UExecCsr
-import MachCSL.SailAndElim
 
 namespace Xv6
 

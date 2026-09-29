@@ -250,6 +250,29 @@ theorem swp_readReg_hwAny_bind (cpu : CPU) {X : Type} (r : Register) (h : hwAny 
   iintro -
   iapply HΦ
 
+/-- **A short-circuit gate `c & f(r)` over an existential counter cell**
+(`should_inc_minstret` after its `mcountinhibit` read: `minstretcfg` is read
+only when `mcountinhibit.IR = 0`): the answer is arbitrary.  The closed gate
+takes no step, so the continuation gets no later. -/
+theorem swp_gate_hwAny (cpu : CPU) (r : Register) (h : hwAny r = true) (m : SailM Bool)
+    (hm : ∃ (c : Bool) (f : RegisterType r → Bool),
+      m = if c = true then (readReg r >>= fun x => pure (f x)) else pure false)
+    (Φ : Bool → IProp GF) :
+    hwConfig cpu ∗ (∀ b : Bool, Φ b) ⊢ swp cpu m Φ := by
+  obtain ⟨c, f, rfl⟩ := hm
+  iintro ⟨#Hhw, HΦ⟩
+  cases c
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    iapply swp_ret
+    iapply HΦ
+  · simp only [↓reduceIte]
+    iapply (swp_readReg_hwAny_bind cpu r h)
+    iframe Hhw
+    inext
+    iintro %v
+    iapply swp_ret
+    iapply HΦ
+
 /-- Write a frozen register its own value (the trap's `reset_elp`). -/
 theorem swp_writeReg_hw_bind (cpu : CPU) {X : Type} (r : Register) (v : RegisterType r)
     (h : hwVal r = some v) (f : PUnit → SailM X) (Φ : X → IProp GF) :

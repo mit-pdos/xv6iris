@@ -139,7 +139,10 @@ def ucEpilogue (retired : Bool) : SailM Bool := do
   | .HART_ACTIVE () =>
     (do
       (tick_pc ())
-      if ((retired && (← readReg minstret_increment)) : Bool)
+      if ((← do
+           if (retired : Bool)
+           then readReg minstret_increment
+           else (pure false)) : Bool)
       then writeReg minstret (BitVec.addInt (← readReg minstret) 1)
       else (pure ())
       if ((get_config_rvfi ()) : Bool)

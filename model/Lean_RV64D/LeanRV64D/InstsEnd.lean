@@ -2136,9 +2136,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                             mapping105_))) with
                                                                                                                                                         | (rs2, rs1, mul_op, rd) =>
                                                                                                                                                           (do
-                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                     Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                     Ext_Zmmul))) : Bool)
+                                                                                                                                                            if ((← do
+                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                        Ext_M)) : Bool)
+                                                                                                                                                                 then
+                                                                                                                                                                   (pure true)
+                                                                                                                                                                 else
+                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                     Ext_Zmmul)) : Bool)
                                                                                                                                                             then
                                                                                                                                                               (pure (some
                                                                                                                                                                   (MUL
@@ -2365,9 +2370,19 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                         mapping116_))) with
                                                                                                                                                                     | (rs2, rs1, rd) =>
                                                                                                                                                                       (do
-                                                                                                                                                                        if (((xlen == 64) && ((← (currentlyEnabled
-                                                                                                                                                                                   Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                                   Ext_Zmmul)))) : Bool)
+                                                                                                                                                                        if ((← do
+                                                                                                                                                                             if ((xlen == 64) : Bool)
+                                                                                                                                                                             then
+                                                                                                                                                                               (do
+                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                        Ext_M)) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                     Ext_Zmmul))
+                                                                                                                                                                             else
+                                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                                         then
                                                                                                                                                                           (pure (some
                                                                                                                                                                               (MULW
@@ -2446,8 +2461,13 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                             mapping120_))) with
                                                                                                                                                                         | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                                           (do
-                                                                                                                                                                            if (((xlen == 64) && (← (currentlyEnabled
-                                                                                                                                                                                     Ext_M))) : Bool)
+                                                                                                                                                                            if ((← do
+                                                                                                                                                                                 if ((xlen == 64) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                     Ext_M)
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                                             then
                                                                                                                                                                               (pure (some
                                                                                                                                                                                   (DIVW
@@ -2526,8 +2546,13 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                 mapping124_))) with
                                                                                                                                                                             | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                                               (do
-                                                                                                                                                                                if (((xlen == 64) && (← (currentlyEnabled
-                                                                                                                                                                                         Ext_M))) : Bool)
+                                                                                                                                                                                if ((← do
+                                                                                                                                                                                     if ((xlen == 64) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                         Ext_M)
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                 then
                                                                                                                                                                                   (pure (some
                                                                                                                                                                                       (REMW
@@ -2801,8 +2826,13 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                 mapping135_))) with
                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                               (do
-                                                                                                                                                                                                if (((shamt != 0b00#2) && (← (currentlyEnabled
-                                                                                                                                                                                                         Ext_Zba))) : Bool)
+                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                     if ((shamt != 0b00#2) : Bool)
+                                                                                                                                                                                                     then
+                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                         Ext_Zba)
+                                                                                                                                                                                                     else
+                                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                                 then
                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                       (ZBA_RTYPE
@@ -2862,9 +2892,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                     mapping137_))) with
                                                                                                                                                                                                 | (rs1, rd) =>
                                                                                                                                                                                                   (do
-                                                                                                                                                                                                    if ((((← (currentlyEnabled
-                                                                                                                                                                                                               Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                               Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                    if (((← do
+                                                                                                                                                                                                           if ((← (currentlyEnabled
+                                                                                                                                                                                                                  Ext_Zbb)) : Bool)
+                                                                                                                                                                                                           then
+                                                                                                                                                                                                             (pure true)
+                                                                                                                                                                                                           else
+                                                                                                                                                                                                             (currentlyEnabled
+                                                                                                                                                                                                               Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                     then
                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                           (RORIW
@@ -2924,9 +2959,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                         mapping139_))) with
                                                                                                                                                                                                     | (rs1, rd) =>
                                                                                                                                                                                                       (do
-                                                                                                                                                                                                        if ((((← (currentlyEnabled
-                                                                                                                                                                                                                   Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                   Ext_Zbkb))) && ((xlen == 64) || ((BitVec.access
+                                                                                                                                                                                                        if (((← do
+                                                                                                                                                                                                               if ((← (currentlyEnabled
+                                                                                                                                                                                                                      Ext_Zbb)) : Bool)
+                                                                                                                                                                                                               then
+                                                                                                                                                                                                                 (pure true)
+                                                                                                                                                                                                               else
+                                                                                                                                                                                                                 (currentlyEnabled
+                                                                                                                                                                                                                   Ext_Zbkb)) && ((xlen == 64) || ((BitVec.access
                                                                                                                                                                                                                    shamt
                                                                                                                                                                                                                    5) == 0#1))) : Bool)
                                                                                                                                                                                                         then
@@ -2995,9 +3035,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                             mapping142_))) with
                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                           (do
-                                                                                                                                                                                                            if ((((← (currentlyEnabled
-                                                                                                                                                                                                                       Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                       Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                            if (((← do
+                                                                                                                                                                                                                   if ((← (currentlyEnabled
+                                                                                                                                                                                                                          Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                   then
+                                                                                                                                                                                                                     (pure true)
+                                                                                                                                                                                                                   else
+                                                                                                                                                                                                                     (currentlyEnabled
+                                                                                                                                                                                                                       Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                             then
                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                   (ZBB_RTYPEW
@@ -3064,9 +3109,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                 mapping145_))) with
                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                if ((((← (currentlyEnabled
-                                                                                                                                                                                                                           Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                           Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                                if (((← do
+                                                                                                                                                                                                                       if ((← (currentlyEnabled
+                                                                                                                                                                                                                              Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                       then
+                                                                                                                                                                                                                         (pure true)
+                                                                                                                                                                                                                       else
+                                                                                                                                                                                                                         (currentlyEnabled
+                                                                                                                                                                                                                           Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                                 then
                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                       (ZBB_RTYPEW
@@ -3133,9 +3183,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                     mapping148_))) with
                                                                                                                                                                                                                 | (rs2, rs1, rd) =>
                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                                                                             Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                             Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                                                Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                             Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                     then
                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                           (ZBB_RTYPE
@@ -3202,9 +3257,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                         mapping151_))) with
                                                                                                                                                                                                                     | (rs2, rs1, rd) =>
                                                                                                                                                                                                                       (do
-                                                                                                                                                                                                                        if (((← (currentlyEnabled
-                                                                                                                                                                                                                                 Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                 Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                        if ((← do
+                                                                                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                                                                                    Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                               (pure true)
+                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                               (currentlyEnabled
+                                                                                                                                                                                                                                 Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                         then
                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                               (ZBB_RTYPE
@@ -3271,9 +3331,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                             mapping154_))) with
                                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                     Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                     Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                        Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                                                                     Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                             then
                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                   (ZBB_RTYPE
@@ -3612,9 +3677,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                 mapping169_))) with
                                                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                         Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                         Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                            Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                     then
+                                                                                                                                                                                                                                                       (pure true)
+                                                                                                                                                                                                                                                     else
+                                                                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                                                                         Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                                                 then
                                                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                                                       (ZBB_RTYPE
@@ -3681,9 +3751,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                     mapping172_))) with
                                                                                                                                                                                                                                                 | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                             Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                             Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                                                             Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                           (ZBB_RTYPE
@@ -3962,9 +4037,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                         mapping182_))) with
                                                                                                                                                                                                                                                                     | (rs1, rd) =>
                                                                                                                                                                                                                                                                       (do
-                                                                                                                                                                                                                                                                        if ((((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                   Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                   Ext_Zbkb))) && (xlen == 32)) : Bool)
+                                                                                                                                                                                                                                                                        if (((← do
+                                                                                                                                                                                                                                                                               if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                      Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                                               then
+                                                                                                                                                                                                                                                                                 (pure true)
+                                                                                                                                                                                                                                                                               else
+                                                                                                                                                                                                                                                                                 (currentlyEnabled
+                                                                                                                                                                                                                                                                                   Ext_Zbkb)) && (xlen == 32)) : Bool)
                                                                                                                                                                                                                                                                         then
                                                                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                                                                               (REV8
@@ -4019,9 +4099,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                             mapping184_))) with
                                                                                                                                                                                                                                                                         | (rs1, rd) =>
                                                                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                                                                            if ((((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                       Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                       Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                                                                                            if (((← do
+                                                                                                                                                                                                                                                                                   if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                          Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                                                   then
+                                                                                                                                                                                                                                                                                     (pure true)
+                                                                                                                                                                                                                                                                                   else
+                                                                                                                                                                                                                                                                                     (currentlyEnabled
+                                                                                                                                                                                                                                                                                       Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                   (REV8
@@ -4480,9 +4565,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                             mapping201_))) with
                                                                                                                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                     Ext_Zbc)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                     Ext_Zbkc))) : Bool)
+                                                                                                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                        Ext_Zbc)) : Bool)
+                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                     Ext_Zbkc)) : Bool)
                                                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                                                   (CLMUL
@@ -4549,9 +4639,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                                 mapping204_))) with
                                                                                                                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                         Ext_Zbc)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                         Ext_Zbkc))) : Bool)
+                                                                                                                                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                            Ext_Zbc)) : Bool)
+                                                                                                                                                                                                                                                                                                                     then
+                                                                                                                                                                                                                                                                                                                       (pure true)
+                                                                                                                                                                                                                                                                                                                     else
+                                                                                                                                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                         Ext_Zbkc)) : Bool)
                                                                                                                                                                                                                                                                                                                 then
                                                                                                                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                                                                                                                       (CLMULH
@@ -5441,9 +5536,19 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                                                                                     let rs2 ← do
                                                                                                                                                                                                                                                                                                                                                                       (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                         mapping236_)
-                                                                                                                                                                                                                                                                                                                                                                    if ((((rs2 == ra) || (rs2 == t0)) && ((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                               Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                               (← readReg cur_privilege))))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                                                                                                                                         if (((rs2 == ra) || (rs2 == t0)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                                                                                                                                           (do
+                                                                                                                                                                                                                                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                    Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                                                                                                                                                                               (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                 (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                                                                                                                                                                               (pure false))
+                                                                                                                                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                                                                                                                                           (SSPUSH
@@ -5482,9 +5587,19 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                                                                                         let rs1 ← do
                                                                                                                                                                                                                                                                                                                                                                           (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                             mapping237_)
-                                                                                                                                                                                                                                                                                                                                                                        if ((((rs1 == ra) || (rs1 == t0)) && ((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                   Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                                   (← readReg cur_privilege))))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                        if ((← do
+                                                                                                                                                                                                                                                                                                                                                                             if (((rs1 == ra) || (rs1 == t0)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                                                                                                                                                                               (do
+                                                                                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                                                                                   (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                                                                                   (pure false))
+                                                                                                                                                                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                         then
                                                                                                                                                                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                                                                                                                                                                               (SSPOPCHK
@@ -5523,9 +5638,14 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                                                                                             let rd ← do
                                                                                                                                                                                                                                                                                                                                                                               (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                                 mapping238_)
-                                                                                                                                                                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                     Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege)))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                                                                                   (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                                                                                                                   (SSRDP
@@ -5628,8 +5748,13 @@ noncomputable def encdec_backwards (arg_ : (BitVec 32)) : SailM instruction := d
                                                                                                                                                                                                                                                                                                                                                                                     mapping244_))) with
                                                                                                                                                                                                                                                                                                                                                                                 | (aq, rl, rs2, rs1, width, rd) =>
                                                                                                                                                                                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                                                                                                                                                                                    if ((((width == 4) || ((xlen == 64) && (width == 8))) && (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                             Ext_Zicfiss))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                                                                                                                                                         if (((width == 4) || ((xlen == 64) && (width == 8))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                             Ext_Zicfiss)
+                                                                                                                                                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                                                                                                                                                           (SSAMOSWAP
@@ -6130,7 +6255,10 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .MUL (rs2, rs1, rd, mul_op) =>
     (do
-      if (((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_M)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zmmul)) : Bool)
       then (pure true)
       else (pure false))
   | .DIV (rs2, rs1, rd, is_unsigned) =>
@@ -6145,17 +6273,30 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .MULW (rs2, rs1, rd) =>
     (do
-      if (((xlen == 64) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled Ext_Zmmul)))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_M)) : Bool)
+               then (pure true)
+               else (currentlyEnabled Ext_Zmmul))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .DIVW (rs2, rs1, rd, is_unsigned) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_M))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_M)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .REMW (rs2, rs1, rd, is_unsigned) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_M))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_M)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .SLLIUW (shamt, rs1, rd) =>
@@ -6183,43 +6324,66 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .ZBA_RTYPE (rs2, rs1, rd, shamt) =>
     (do
-      if (((shamt != 0b00#2) && (← (currentlyEnabled Ext_Zba))) : Bool)
+      if ((← do
+           if ((shamt != 0b00#2) : Bool)
+           then (currentlyEnabled Ext_Zba)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .RORIW (shamt, rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then (pure true)
       else (pure false))
   | .RORI (shamt, rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && ((xlen == 64) || ((BitVec.access
-                 shamt 5) == 0#1))) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && ((xlen == 64) || ((BitVec.access shamt 5) == 0#1))) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPEW (rs2, rs1, rd, .ROLW) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPEW (rs2, rs1, rd, .RORW) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .ANDN) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .ORN) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .XNOR) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .MAX) =>
@@ -6244,12 +6408,18 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .ROL) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_RTYPE (rs2, rs1, rd, .ROR) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkb)) : Bool)
       then (pure true)
       else (pure false))
   | .ZBB_EXTOP (rs1, rd, .SEXTB) =>
@@ -6273,11 +6443,17 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
           else (pure false)))
   | .REV8 (rs1, rd) =>
     (do
-      if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 32)) : Bool)
+      if (((← do
+             if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+             then (pure true)
+             else (currentlyEnabled Ext_Zbkb)) && (xlen == 32)) : Bool)
       then (pure true)
       else
         (do
-          if ((((← (currentlyEnabled Ext_Zbb)) || (← (currentlyEnabled Ext_Zbkb))) && (xlen == 64)) : Bool)
+          if (((← do
+                 if ((← (currentlyEnabled Ext_Zbb)) : Bool)
+                 then (pure true)
+                 else (currentlyEnabled Ext_Zbkb)) && (xlen == 64)) : Bool)
           then (pure true)
           else (pure false)))
   | .ORCB (rs1, rd) =>
@@ -6317,12 +6493,18 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .CLMUL (rs2, rs1, rd) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbc)) || (← (currentlyEnabled Ext_Zbkc))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbc)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkc)) : Bool)
       then (pure true)
       else (pure false))
   | .CLMULH (rs2, rs1, rd) =>
     (do
-      if (((← (currentlyEnabled Ext_Zbc)) || (← (currentlyEnabled Ext_Zbkc))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zbc)) : Bool)
+           then (pure true)
+           else (currentlyEnabled Ext_Zbkc)) : Bool)
       then (pure true)
       else (pure false))
   | .CLMULR (rs2, rs1, rd) =>
@@ -6402,24 +6584,42 @@ noncomputable def encdec_forwards_matches (arg_ : instruction) : SailM Bool := d
       else (pure false))
   | .SSPUSH rs2 =>
     (do
-      if ((((rs2 == ra) || (rs2 == t0)) && ((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if (((rs2 == ra) || (rs2 == t0)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .SSPOPCHK rs1 =>
     (do
-      if ((((rs1 == ra) || (rs1 == t0)) && ((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if (((rs1 == ra) || (rs1 == t0)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .SSRDP rd =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && (← (zicfiss_xSSE (← readReg cur_privilege)))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then (zicfiss_xSSE (← readReg cur_privilege))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .SSAMOSWAP (aq, rl, rs2, rs1, width, rd) =>
     (do
-      if ((((width == 4) || ((xlen == 64) && (width == 8))) && (← (currentlyEnabled Ext_Zicfiss))) : Bool)
+      if ((← do
+           if (((width == 4) || ((xlen == 64) && (width == 8))) : Bool)
+           then (currentlyEnabled Ext_Zicfiss)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .ZICOND_RTYPE (rs2, rs1, rd, op) =>
@@ -8253,9 +8453,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                             mapping105_))) with
                                                                                                                                                         | (rs2, rs1, mul_op, rd) =>
                                                                                                                                                           (do
-                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                     Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                     Ext_Zmmul))) : Bool)
+                                                                                                                                                            if ((← do
+                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                        Ext_M)) : Bool)
+                                                                                                                                                                 then
+                                                                                                                                                                   (pure true)
+                                                                                                                                                                 else
+                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                     Ext_Zmmul)) : Bool)
                                                                                                                                                             then
                                                                                                                                                               (pure (some
                                                                                                                                                                   true))
@@ -8479,9 +8684,19 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                         mapping116_))) with
                                                                                                                                                                     | (rs2, rs1, rd) =>
                                                                                                                                                                       (do
-                                                                                                                                                                        if (((xlen == 64) && ((← (currentlyEnabled
-                                                                                                                                                                                   Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                                   Ext_Zmmul)))) : Bool)
+                                                                                                                                                                        if ((← do
+                                                                                                                                                                             if ((xlen == 64) : Bool)
+                                                                                                                                                                             then
+                                                                                                                                                                               (do
+                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                        Ext_M)) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                     Ext_Zmmul))
+                                                                                                                                                                             else
+                                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                                         then
                                                                                                                                                                           (pure (some
                                                                                                                                                                               true))
@@ -8559,8 +8774,13 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                             mapping120_))) with
                                                                                                                                                                         | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                                           (do
-                                                                                                                                                                            if (((xlen == 64) && (← (currentlyEnabled
-                                                                                                                                                                                     Ext_M))) : Bool)
+                                                                                                                                                                            if ((← do
+                                                                                                                                                                                 if ((xlen == 64) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                     Ext_M)
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                                             then
                                                                                                                                                                               (pure (some
                                                                                                                                                                                   true))
@@ -8638,8 +8858,13 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                 mapping124_))) with
                                                                                                                                                                             | (rs2, rs1, is_unsigned, rd) =>
                                                                                                                                                                               (do
-                                                                                                                                                                                if (((xlen == 64) && (← (currentlyEnabled
-                                                                                                                                                                                         Ext_M))) : Bool)
+                                                                                                                                                                                if ((← do
+                                                                                                                                                                                     if ((xlen == 64) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                         Ext_M)
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                 then
                                                                                                                                                                                   (pure (some
                                                                                                                                                                                       true))
@@ -8904,8 +9129,13 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                 mapping135_))) with
                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                               (do
-                                                                                                                                                                                                if (((shamt != 0b00#2) && (← (currentlyEnabled
-                                                                                                                                                                                                         Ext_Zba))) : Bool)
+                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                     if ((shamt != 0b00#2) : Bool)
+                                                                                                                                                                                                     then
+                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                         Ext_Zba)
+                                                                                                                                                                                                     else
+                                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                                 then
                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                       true))
@@ -8959,9 +9189,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                     mapping137_))) with
                                                                                                                                                                                                 | (rs1, rd) =>
                                                                                                                                                                                                   (do
-                                                                                                                                                                                                    if ((((← (currentlyEnabled
-                                                                                                                                                                                                               Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                               Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                    if (((← do
+                                                                                                                                                                                                           if ((← (currentlyEnabled
+                                                                                                                                                                                                                  Ext_Zbb)) : Bool)
+                                                                                                                                                                                                           then
+                                                                                                                                                                                                             (pure true)
+                                                                                                                                                                                                           else
+                                                                                                                                                                                                             (currentlyEnabled
+                                                                                                                                                                                                               Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                     then
                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                           true))
@@ -9020,9 +9255,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                         mapping139_))) with
                                                                                                                                                                                                     | (rs1, rd) =>
                                                                                                                                                                                                       (do
-                                                                                                                                                                                                        if ((((← (currentlyEnabled
-                                                                                                                                                                                                                   Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                   Ext_Zbkb))) && ((xlen == 64) || ((BitVec.access
+                                                                                                                                                                                                        if (((← do
+                                                                                                                                                                                                               if ((← (currentlyEnabled
+                                                                                                                                                                                                                      Ext_Zbb)) : Bool)
+                                                                                                                                                                                                               then
+                                                                                                                                                                                                                 (pure true)
+                                                                                                                                                                                                               else
+                                                                                                                                                                                                                 (currentlyEnabled
+                                                                                                                                                                                                                   Ext_Zbkb)) && ((xlen == 64) || ((BitVec.access
                                                                                                                                                                                                                    shamt
                                                                                                                                                                                                                    5) == 0#1))) : Bool)
                                                                                                                                                                                                         then
@@ -9090,9 +9330,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                             mapping142_))) with
                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                           (do
-                                                                                                                                                                                                            if ((((← (currentlyEnabled
-                                                                                                                                                                                                                       Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                       Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                            if (((← do
+                                                                                                                                                                                                                   if ((← (currentlyEnabled
+                                                                                                                                                                                                                          Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                   then
+                                                                                                                                                                                                                     (pure true)
+                                                                                                                                                                                                                   else
+                                                                                                                                                                                                                     (currentlyEnabled
+                                                                                                                                                                                                                       Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                             then
                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                   true))
@@ -9158,9 +9403,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                 mapping145_))) with
                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                if ((((← (currentlyEnabled
-                                                                                                                                                                                                                           Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                           Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                                if (((← do
+                                                                                                                                                                                                                       if ((← (currentlyEnabled
+                                                                                                                                                                                                                              Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                       then
+                                                                                                                                                                                                                         (pure true)
+                                                                                                                                                                                                                       else
+                                                                                                                                                                                                                         (currentlyEnabled
+                                                                                                                                                                                                                           Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                                 then
                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                       true))
@@ -9226,9 +9476,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                     mapping148_))) with
                                                                                                                                                                                                                 | (rs2, rs1, rd) =>
                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                                                                             Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                             Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                                                Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                             Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                     then
                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                           true))
@@ -9294,9 +9549,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                         mapping151_))) with
                                                                                                                                                                                                                     | (rs2, rs1, rd) =>
                                                                                                                                                                                                                       (do
-                                                                                                                                                                                                                        if (((← (currentlyEnabled
-                                                                                                                                                                                                                                 Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                 Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                        if ((← do
+                                                                                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                                                                                    Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                               (pure true)
+                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                               (currentlyEnabled
+                                                                                                                                                                                                                                 Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                         then
                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                               true))
@@ -9362,9 +9622,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                             mapping154_))) with
                                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                     Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                     Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                        Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                                                                     Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                             then
                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                   true))
@@ -9698,9 +9963,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                 mapping169_))) with
                                                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                         Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                         Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                            Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                     then
+                                                                                                                                                                                                                                                       (pure true)
+                                                                                                                                                                                                                                                     else
+                                                                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                                                                         Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                                                 then
                                                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                                                       true))
@@ -9766,9 +10036,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                     mapping172_))) with
                                                                                                                                                                                                                                                 | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                             Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                             Ext_Zbkb))) : Bool)
+                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                                                             Ext_Zbkb)) : Bool)
                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                           true))
@@ -10042,9 +10317,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                         mapping182_))) with
                                                                                                                                                                                                                                                                     | (rs1, rd) =>
                                                                                                                                                                                                                                                                       (do
-                                                                                                                                                                                                                                                                        if ((((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                   Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                   Ext_Zbkb))) && (xlen == 32)) : Bool)
+                                                                                                                                                                                                                                                                        if (((← do
+                                                                                                                                                                                                                                                                               if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                      Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                                               then
+                                                                                                                                                                                                                                                                                 (pure true)
+                                                                                                                                                                                                                                                                               else
+                                                                                                                                                                                                                                                                                 (currentlyEnabled
+                                                                                                                                                                                                                                                                                   Ext_Zbkb)) && (xlen == 32)) : Bool)
                                                                                                                                                                                                                                                                         then
                                                                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                                                                               true))
@@ -10098,9 +10378,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                             mapping184_))) with
                                                                                                                                                                                                                                                                         | (rs1, rd) =>
                                                                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                                                                            if ((((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                       Ext_Zbb)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                       Ext_Zbkb))) && (xlen == 64)) : Bool)
+                                                                                                                                                                                                                                                                            if (((← do
+                                                                                                                                                                                                                                                                                   if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                          Ext_Zbb)) : Bool)
+                                                                                                                                                                                                                                                                                   then
+                                                                                                                                                                                                                                                                                     (pure true)
+                                                                                                                                                                                                                                                                                   else
+                                                                                                                                                                                                                                                                                     (currentlyEnabled
+                                                                                                                                                                                                                                                                                       Ext_Zbkb)) && (xlen == 64)) : Bool)
                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                   true))
@@ -10551,9 +10836,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                             mapping201_))) with
                                                                                                                                                                                                                                                                                                         | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                                                                           (do
-                                                                                                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                     Ext_Zbc)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                     Ext_Zbkc))) : Bool)
+                                                                                                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                        Ext_Zbc)) : Bool)
+                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                   (pure true)
+                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                     Ext_Zbkc)) : Bool)
                                                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                                                   true))
@@ -10619,9 +10909,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                                 mapping204_))) with
                                                                                                                                                                                                                                                                                                             | (rs2, rs1, rd) =>
                                                                                                                                                                                                                                                                                                               (do
-                                                                                                                                                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                         Ext_Zbc)) || (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                         Ext_Zbkc))) : Bool)
+                                                                                                                                                                                                                                                                                                                if ((← do
+                                                                                                                                                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                            Ext_Zbc)) : Bool)
+                                                                                                                                                                                                                                                                                                                     then
+                                                                                                                                                                                                                                                                                                                       (pure true)
+                                                                                                                                                                                                                                                                                                                     else
+                                                                                                                                                                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                         Ext_Zbkc)) : Bool)
                                                                                                                                                                                                                                                                                                                 then
                                                                                                                                                                                                                                                                                                                   (pure (some
                                                                                                                                                                                                                                                                                                                       true))
@@ -11470,9 +11765,19 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                                                                                     let rs2 ← do
                                                                                                                                                                                                                                                                                                                                                                       (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                         mapping236_)
-                                                                                                                                                                                                                                                                                                                                                                    if ((((rs2 == ra) || (rs2 == t0)) && ((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                               Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                               (← readReg cur_privilege))))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                                                                                                                                         if (((rs2 == ra) || (rs2 == t0)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                                                                                                                                           (do
+                                                                                                                                                                                                                                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                    Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                                                                                                                                                                               (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                 (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                                                                                                                                                                               (pure false))
+                                                                                                                                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                                                                                                                                           true))
@@ -11510,9 +11815,19 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                                                                                         let rs1 ← do
                                                                                                                                                                                                                                                                                                                                                                           (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                             mapping237_)
-                                                                                                                                                                                                                                                                                                                                                                        if ((((rs1 == ra) || (rs1 == t0)) && ((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                   Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                                   (← readReg cur_privilege))))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                        if ((← do
+                                                                                                                                                                                                                                                                                                                                                                             if (((rs1 == ra) || (rs1 == t0)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                             then
+                                                                                                                                                                                                                                                                                                                                                                               (do
+                                                                                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                                                                                   (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                                                                                   (pure false))
+                                                                                                                                                                                                                                                                                                                                                                             else
+                                                                                                                                                                                                                                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                         then
                                                                                                                                                                                                                                                                                                                                                                           (pure (some
                                                                                                                                                                                                                                                                                                                                                                               true))
@@ -11550,9 +11865,14 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                                                                                             let rd ← do
                                                                                                                                                                                                                                                                                                                                                                               (encdec_reg_backwards
                                                                                                                                                                                                                                                                                                                                                                                 mapping238_)
-                                                                                                                                                                                                                                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                     Ext_Zicfiss)) && (← (zicfiss_xSSE
-                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege)))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                            if ((← do
+                                                                                                                                                                                                                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                 then
+                                                                                                                                                                                                                                                                                                                                                                                   (zicfiss_xSSE
+                                                                                                                                                                                                                                                                                                                                                                                     (← readReg cur_privilege))
+                                                                                                                                                                                                                                                                                                                                                                                 else
+                                                                                                                                                                                                                                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                             then
                                                                                                                                                                                                                                                                                                                                                                               (pure (some
                                                                                                                                                                                                                                                                                                                                                                                   true))
@@ -11654,8 +11974,13 @@ noncomputable def encdec_backwards_matches (arg_ : (BitVec 32)) : SailM Bool := 
                                                                                                                                                                                                                                                                                                                                                                                     mapping244_))) with
                                                                                                                                                                                                                                                                                                                                                                                 | (aq, rl, rs2, rs1, width, rd) =>
                                                                                                                                                                                                                                                                                                                                                                                   (do
-                                                                                                                                                                                                                                                                                                                                                                                    if ((((width == 4) || ((xlen == 64) && (width == 8))) && (← (currentlyEnabled
-                                                                                                                                                                                                                                                                                                                                                                                             Ext_Zicfiss))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                    if ((← do
+                                                                                                                                                                                                                                                                                                                                                                                         if (((width == 4) || ((xlen == 64) && (width == 8))) : Bool)
+                                                                                                                                                                                                                                                                                                                                                                                         then
+                                                                                                                                                                                                                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                                                                                                                                                                                                                             Ext_Zicfiss)
+                                                                                                                                                                                                                                                                                                                                                                                         else
+                                                                                                                                                                                                                                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                                                                                                                                                                                                                                     then
                                                                                                                                                                                                                                                                                                                                                                                       (pure (some
                                                                                                                                                                                                                                                                                                                                                                                           true))
@@ -12028,7 +12353,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
   match arg_ with
   | .C_NTL op =>
     (do
-      if (((← (currentlyEnabled Ext_Zihintntl)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zihintntl)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure (0b100#3 +++ (1#1 +++ (0b00000#5 +++ ((encdec_ntl_forwards op) +++ 0b10#2)))))
       else
         (do
@@ -12046,7 +12374,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADDI4SPN (rd, nzimm) =>
     (do
-      if (((nzimm != 0b00000000#8) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((nzimm != 0b00000000#8) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b000#3 +++ ((Sail.BitVec.extractLsb nzimm 3 2) +++ ((Sail.BitVec.extractLsb nzimm 7
                   4) +++ ((Sail.BitVec.extractLsb nzimm 0 0) +++ ((Sail.BitVec.extractLsb nzimm 1 1) +++ ((encdec_creg_forwards
@@ -12067,7 +12398,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_LD (uimm, rs1, rd) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b011#3 +++ ((Sail.BitVec.extractLsb uimm 2 0) +++ ((encdec_creg_forwards rs1) +++ ((Sail.BitVec.extractLsb
                     uimm 4 3) +++ ((encdec_creg_forwards rd) +++ 0b00#2))))))
@@ -12087,7 +12421,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SD (uimm, rs1, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b111#3 +++ ((Sail.BitVec.extractLsb uimm 2 0) +++ ((encdec_creg_forwards rs1) +++ ((Sail.BitVec.extractLsb
                     uimm 4 3) +++ ((encdec_creg_forwards rs2) +++ 0b00#2))))))
@@ -12097,7 +12434,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADDI (imm, rsd) =>
     (do
-      if (((bne rsd zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rsd zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b000#3 +++ ((Sail.BitVec.extractLsb imm 5 5) +++ ((encdec_reg_forwards rsd) +++ ((Sail.BitVec.extractLsb
                     imm 4 0) +++ 0b01#2)))))
@@ -12107,7 +12447,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_JAL imm =>
     (do
-      if (((xlen == 32) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 32) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b001#3 +++ ((Sail.BitVec.extractLsb imm 10 10) +++ ((Sail.BitVec.extractLsb imm 3 3) +++ ((Sail.BitVec.extractLsb
                     imm 8 7) +++ ((Sail.BitVec.extractLsb imm 9 9) +++ ((Sail.BitVec.extractLsb imm
@@ -12119,7 +12462,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADDIW (imm, rsd) =>
     (do
-      if (((bne rsd zreg) && ((xlen == 64) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rsd zreg) : Bool)
+           then
+             (do
+               if ((xlen == 64) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then
         (pure (0b001#3 +++ ((Sail.BitVec.extractLsb imm 5 5) +++ ((encdec_reg_forwards rsd) +++ ((Sail.BitVec.extractLsb
                     imm 4 0) +++ 0b01#2)))))
@@ -12139,7 +12489,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADDI16SP nzimm =>
     (do
-      if (((nzimm != 0b000000#6) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((nzimm != 0b000000#6) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b011#3 +++ ((Sail.BitVec.extractLsb nzimm 5 5) +++ (0b00010#5 +++ ((Sail.BitVec.extractLsb
                     nzimm 0 0) +++ ((Sail.BitVec.extractLsb nzimm 2 2) +++ ((Sail.BitVec.extractLsb
@@ -12150,7 +12503,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_LUI (imm, rd) =>
     (do
-      if (((bne rd sp) && ((imm != 0b000000#6) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rd sp) : Bool)
+           then
+             (do
+               if ((imm != 0b000000#6) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then
         (pure (0b011#3 +++ ((Sail.BitVec.extractLsb imm 5 5) +++ ((encdec_reg_forwards rd) +++ ((Sail.BitVec.extractLsb
                     imm 4 0) +++ 0b01#2)))))
@@ -12160,7 +12520,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SRLI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ ((Sail.BitVec.extractLsb shamt 5 5) +++ (0b00#2 +++ ((encdec_creg_forwards
                     rsd) +++ ((Sail.BitVec.extractLsb shamt 4 0) +++ 0b01#2))))))
@@ -12170,7 +12533,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SRAI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ ((Sail.BitVec.extractLsb shamt 5 5) +++ (0b01#2 +++ ((encdec_creg_forwards
                     rsd) +++ ((Sail.BitVec.extractLsb shamt 4 0) +++ 0b01#2))))))
@@ -12230,7 +12596,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SUBW (rsd, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (1#1 +++ (0b11#2 +++ ((encdec_creg_forwards rsd) +++ (0b00#2 +++ ((encdec_creg_forwards
                         rs2) +++ 0b01#2)))))))
@@ -12240,7 +12609,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADDW (rsd, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (1#1 +++ (0b11#2 +++ ((encdec_creg_forwards rsd) +++ (0b01#2 +++ ((encdec_creg_forwards
                         rs2) +++ 0b01#2)))))))
@@ -12284,7 +12656,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SLLI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b000#3 +++ ((Sail.BitVec.extractLsb shamt 5 5) +++ ((encdec_reg_forwards rsd) +++ ((Sail.BitVec.extractLsb
                     shamt 4 0) +++ 0b10#2)))))
@@ -12294,7 +12669,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_LWSP (uimm, rd) =>
     (do
-      if (((bne rd zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rd zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b010#3 +++ ((Sail.BitVec.extractLsb uimm 3 3) +++ ((encdec_reg_forwards rd) +++ ((Sail.BitVec.extractLsb
                     uimm 2 0) +++ ((Sail.BitVec.extractLsb uimm 5 4) +++ 0b10#2))))))
@@ -12304,7 +12682,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_LDSP (uimm, rd) =>
     (do
-      if (((bne rd zreg) && ((xlen == 64) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rd zreg) : Bool)
+           then
+             (do
+               if ((xlen == 64) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then
         (pure (0b011#3 +++ ((Sail.BitVec.extractLsb uimm 2 2) +++ ((encdec_reg_forwards rd) +++ ((Sail.BitVec.extractLsb
                     uimm 1 0) +++ ((Sail.BitVec.extractLsb uimm 5 3) +++ 0b10#2))))))
@@ -12324,7 +12709,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SDSP (uimm, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b111#3 +++ ((Sail.BitVec.extractLsb uimm 2 0) +++ ((Sail.BitVec.extractLsb uimm 5 3) +++ ((encdec_reg_forwards
                     rs2) +++ 0b10#2)))))
@@ -12334,7 +12722,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_JR rs1 =>
     (do
-      if (((bne rs1 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs1 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure (0b100#3 +++ (0#1 +++ ((encdec_reg_forwards rs1) +++ (0b00000#5 +++ 0b10#2)))))
       else
         (do
@@ -12342,7 +12733,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_JALR rs1 =>
     (do
-      if (((bne rs1 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs1 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure (0b100#3 +++ (1#1 +++ ((encdec_reg_forwards rs1) +++ (0b00000#5 +++ 0b10#2)))))
       else
         (do
@@ -12350,7 +12744,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_MV (rd, rs2) =>
     (do
-      if (((bne rs2 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs2 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0#1 +++ ((encdec_reg_forwards rd) +++ ((encdec_reg_forwards rs2) +++ 0b10#2)))))
       else
@@ -12367,7 +12764,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ADD (rsd, rs2) =>
     (do
-      if (((bne rs2 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs2 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (1#1 +++ ((encdec_reg_forwards rsd) +++ ((encdec_reg_forwards rs2) +++ 0b10#2)))))
       else
@@ -12441,7 +12841,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SEXT_B rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b001#3 +++ 0b01#2))))))
       else
@@ -12450,7 +12853,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ZEXT_H rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b010#3 +++ 0b01#2))))))
       else
@@ -12459,7 +12865,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SEXT_H rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b011#3 +++ 0b01#2))))))
       else
@@ -12468,7 +12877,10 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_ZEXT_W rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && ((← (currentlyEnabled Ext_Zba)) && (xlen == 64))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (pure ((← (currentlyEnabled Ext_Zba)) && (xlen == 64)))
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b100#3 +++ 0b01#2))))))
       else
@@ -12486,8 +12898,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_MUL (rsdc, rsc2) =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled
-                 Ext_Zmmul)))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_M)) : Bool)
+               then (pure true)
+               else (currentlyEnabled Ext_Zmmul))
+           else (pure false)) : Bool)
       then
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b10#2 +++ ((encdec_creg_forwards
                       rsc2) +++ 0b01#2))))))
@@ -12497,8 +12915,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SSPUSH () =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && ((← (currentlyEnabled Ext_Zcmop)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zcmop)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure (0b011#3 +++ (0#1 +++ (0#1 +++ (0b000#3 +++ (1#1 +++ (0b00000#5 +++ 0b01#2)))))))
       else
         (do
@@ -12506,8 +12930,14 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
           throw Error.Exit))
   | .C_SSPOPCHK () =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && ((← (currentlyEnabled Ext_Zcmop)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zcmop)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure (0b011#3 +++ (0#1 +++ (0#1 +++ (0b010#3 +++ (1#1 +++ (0b00000#5 +++ 0b01#2)))))))
       else
         (do
@@ -12538,7 +12968,10 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
       (do
         let mapping0_ : (BitVec 5) := (Sail.BitVec.extractLsb v__1162 6 2)
         let op ← do (encdec_ntl_backwards mapping0_)
-        if (((← (currentlyEnabled Ext_Zihintntl)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+        if ((← do
+             if ((← (currentlyEnabled Ext_Zihintntl)) : Bool)
+             then (currentlyEnabled Ext_Zca)
+             else (pure false)) : Bool)
         then (pure (some (C_NTL op)))
         else (pure none))
     else (pure none)) with
@@ -12575,7 +13008,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                 let rd := (encdec_creg_backwards mapping1_)
                 if ((← do
                      let nzimm := (((nzimm_7_4_ +++ nzimm_3_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
-                     (pure ((nzimm != 0b00000000#8) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                     if ((nzimm != 0b00000000#8) : Bool)
+                     then (currentlyEnabled Ext_Zca)
+                     else (pure false)) : Bool)
                 then
                   (pure (some
                       (let nzimm := (((nzimm_7_4_ +++ nzimm_3_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
@@ -12632,7 +13067,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                       (do
                         if ((← do
                              let uimm := (uimm_4_3_ +++ uimm_2_0_)
-                             (pure ((xlen == 64) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                             if ((xlen == 64) : Bool)
+                             then (currentlyEnabled Ext_Zca)
+                             else (pure false)) : Bool)
                         then
                           (pure (some
                               (let uimm := (uimm_4_3_ +++ uimm_2_0_)
@@ -12690,7 +13127,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                               (do
                                 if ((← do
                                      let uimm := (uimm_4_3_ +++ uimm_2_0_)
-                                     (pure ((xlen == 64) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                                     if ((xlen == 64) : Bool)
+                                     then (currentlyEnabled Ext_Zca)
+                                     else (pure false)) : Bool)
                                 then
                                   (pure (some
                                       (let uimm := (uimm_4_3_ +++ uimm_2_0_)
@@ -12715,7 +13154,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                 let rsd ← do (encdec_reg_backwards mapping10_)
                                 if ((← do
                                      let imm := (imm_5_5_ +++ imm_4_0_)
-                                     (pure ((bne rsd zreg) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                                     if ((bne rsd zreg) : Bool)
+                                     then (currentlyEnabled Ext_Zca)
+                                     else (pure false)) : Bool)
                                 then
                                   (pure (some
                                       (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -12746,8 +13187,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                          (Sail.BitVec.extractLsb v__1134 12 12)
                                        let imm :=
                                          (((((((imm_10_10_ +++ imm_9_9_) +++ imm_8_7_) +++ imm_6_6_) +++ imm_5_5_) +++ imm_4_4_) +++ imm_3_3_) +++ imm_2_0_)
-                                       (pure ((xlen == 32) && (← (currentlyEnabled Ext_Zca))))) && (((Sail.BitVec.extractLsb
-                                           v__1134 15 13) == (0b001#3 : (BitVec 3))) && ((Sail.BitVec.extractLsb
+                                       if ((xlen == 32) : Bool)
+                                       then (currentlyEnabled Ext_Zca)
+                                       else (pure false)) && (((Sail.BitVec.extractLsb v__1134 15 13) == (0b001#3 : (BitVec 3))) && ((Sail.BitVec.extractLsb
                                            v__1134 1 0) == (0b01#2 : (BitVec 2))))) : Bool)
                                 then
                                   (let imm_9_9_ : (BitVec 1) := (Sail.BitVec.extractLsb v__1134 8 8)
@@ -12782,8 +13224,13 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                         let rsd ← do (encdec_reg_backwards mapping11_)
                                         if ((← do
                                              let imm := (imm_5_5_ +++ imm_4_0_)
-                                             (pure ((bne rsd zreg) && ((xlen == 64) && (← (currentlyEnabled
-                                                       Ext_Zca)))))) : Bool)
+                                             if ((bne rsd zreg) : Bool)
+                                             then
+                                               (do
+                                                 if ((xlen == 64) : Bool)
+                                                 then (currentlyEnabled Ext_Zca)
+                                                 else (pure false))
+                                             else (pure false)) : Bool)
                                         then
                                           (pure (some
                                               (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -12836,8 +13283,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                  (Sail.BitVec.extractLsb v__1124 6 6)
                                                let nzimm :=
                                                  ((((nzimm_5_5_ +++ nzimm_4_3_) +++ nzimm_2_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
-                                               (pure ((nzimm != 0b000000#6) && (← (currentlyEnabled
-                                                       Ext_Zca))))) && (((Sail.BitVec.extractLsb
+                                               if ((nzimm != 0b000000#6) : Bool)
+                                               then (currentlyEnabled Ext_Zca)
+                                               else (pure false)) && (((Sail.BitVec.extractLsb
                                                    v__1124 15 13) == (0b011#3 : (BitVec 3))) && (((Sail.BitVec.extractLsb
                                                      v__1124 11 7) == (0b00010#5 : (BitVec 5))) && ((Sail.BitVec.extractLsb
                                                      v__1124 1 0) == (0b01#2 : (BitVec 2)))))) : Bool)
@@ -12874,8 +13322,13 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                 let rd ← do (encdec_reg_backwards mapping13_)
                                                 if ((← do
                                                      let imm := (imm_5_5_ +++ imm_4_0_)
-                                                     (pure ((bne rd sp) && ((imm != 0b000000#6) && (← (currentlyEnabled
-                                                               Ext_Zca)))))) : Bool)
+                                                     if ((bne rd sp) : Bool)
+                                                     then
+                                                       (do
+                                                         if ((imm != 0b000000#6) : Bool)
+                                                         then (currentlyEnabled Ext_Zca)
+                                                         else (pure false))
+                                                     else (pure false)) : Bool)
                                                 then
                                                   (pure (some
                                                       (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -12904,8 +13357,9 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                 let rsd := (encdec_creg_backwards mapping14_)
                                                 if ((← do
                                                      let shamt := (shamt_5_5_ +++ shamt_4_0_)
-                                                     (pure (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled
-                                                             Ext_Zca))))) : Bool)
+                                                     if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+                                                     then (currentlyEnabled Ext_Zca)
+                                                     else (pure false)) : Bool)
                                                 then
                                                   (pure (some
                                                       (let shamt := (shamt_5_5_ +++ shamt_4_0_)
@@ -12934,9 +13388,10 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                     let rsd := (encdec_creg_backwards mapping15_)
                                                     if ((← do
                                                          let shamt := (shamt_5_5_ +++ shamt_4_0_)
-                                                         (pure (((xlen == 64) || ((BitVec.access
-                                                                   shamt 5) == 0#1)) && (← (currentlyEnabled
-                                                                 Ext_Zca))))) : Bool)
+                                                         if (((xlen == 64) || ((BitVec.access shamt
+                                                                  5) == 0#1)) : Bool)
+                                                         then (currentlyEnabled Ext_Zca)
+                                                         else (pure false)) : Bool)
                                                     then
                                                       (pure (some
                                                           (let shamt := (shamt_5_5_ +++ shamt_4_0_)
@@ -13143,8 +13598,13 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                               mapping26_)) with
                                                                             | (rsd, rs2) =>
                                                                               (do
-                                                                                if (((xlen == 64) && (← (currentlyEnabled
-                                                                                         Ext_Zca))) : Bool)
+                                                                                if ((← do
+                                                                                     if ((xlen == 64) : Bool)
+                                                                                     then
+                                                                                       (currentlyEnabled
+                                                                                         Ext_Zca)
+                                                                                     else
+                                                                                       (pure false)) : Bool)
                                                                                 then
                                                                                   (pure (some
                                                                                       (C_SUBW
@@ -13182,8 +13642,13 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                   mapping28_)) with
                                                                                 | (rsd, rs2) =>
                                                                                   (do
-                                                                                    if (((xlen == 64) && (← (currentlyEnabled
-                                                                                             Ext_Zca))) : Bool)
+                                                                                    if ((← do
+                                                                                         if ((xlen == 64) : Bool)
+                                                                                         then
+                                                                                           (currentlyEnabled
+                                                                                             Ext_Zca)
+                                                                                         else
+                                                                                           (pure false)) : Bool)
                                                                                     then
                                                                                       (pure (some
                                                                                           (C_ADDW
@@ -13423,10 +13888,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                             if ((← do
                                                                                                  let shamt :=
                                                                                                    (shamt_5_5_ +++ shamt_4_0_)
-                                                                                                 (pure (((xlen == 64) || ((BitVec.access
-                                                                                                           shamt
-                                                                                                           5) == 0#1)) && (← (currentlyEnabled
-                                                                                                         Ext_Zca))))) : Bool)
+                                                                                                 if (((xlen == 64) || ((BitVec.access
+                                                                                                          shamt
+                                                                                                          5) == 0#1)) : Bool)
+                                                                                                 then
+                                                                                                   (currentlyEnabled
+                                                                                                     Ext_Zca)
+                                                                                                 else
+                                                                                                   (pure false)) : Bool)
                                                                                             then
                                                                                               (pure (some
                                                                                                   (let shamt :=
@@ -13485,10 +13954,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                 if ((← do
                                                                                                      let uimm :=
                                                                                                        ((uimm_5_4_ +++ uimm_3_3_) +++ uimm_2_0_)
-                                                                                                     (pure ((bne
-                                                                                                           rd
-                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                             Ext_Zca))))) : Bool)
+                                                                                                     if ((bne
+                                                                                                          rd
+                                                                                                          zreg) : Bool)
+                                                                                                     then
+                                                                                                       (currentlyEnabled
+                                                                                                         Ext_Zca)
+                                                                                                     else
+                                                                                                       (pure false)) : Bool)
                                                                                                 then
                                                                                                   (pure (some
                                                                                                       (let uimm :=
@@ -13547,10 +14020,19 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                     if ((← do
                                                                                                          let uimm :=
                                                                                                            ((uimm_5_3_ +++ uimm_2_2_) +++ uimm_1_0_)
-                                                                                                         (pure ((bne
-                                                                                                               rd
-                                                                                                               zreg) && ((xlen == 64) && (← (currentlyEnabled
-                                                                                                                   Ext_Zca)))))) : Bool)
+                                                                                                         if ((bne
+                                                                                                              rd
+                                                                                                              zreg) : Bool)
+                                                                                                         then
+                                                                                                           (do
+                                                                                                             if ((xlen == 64) : Bool)
+                                                                                                             then
+                                                                                                               (currentlyEnabled
+                                                                                                                 Ext_Zca)
+                                                                                                             else
+                                                                                                               (pure false))
+                                                                                                         else
+                                                                                                           (pure false)) : Bool)
                                                                                                     then
                                                                                                       (pure (some
                                                                                                           (let uimm :=
@@ -13659,8 +14141,12 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                             if ((← do
                                                                                                                  let uimm :=
                                                                                                                    (uimm_5_3_ +++ uimm_2_0_)
-                                                                                                                 (pure ((xlen == 64) && (← (currentlyEnabled
-                                                                                                                         Ext_Zca))))) : Bool)
+                                                                                                                 if ((xlen == 64) : Bool)
+                                                                                                                 then
+                                                                                                                   (currentlyEnabled
+                                                                                                                     Ext_Zca)
+                                                                                                                 else
+                                                                                                                   (pure false)) : Bool)
                                                                                                             then
                                                                                                               (pure (some
                                                                                                                   (let uimm :=
@@ -13701,10 +14187,15 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                 let rs1 ← do
                                                                                                                   (encdec_reg_backwards
                                                                                                                     mapping36_)
-                                                                                                                if (((bne
-                                                                                                                       rs1
-                                                                                                                       zreg) && (← (currentlyEnabled
-                                                                                                                         Ext_Zca))) : Bool)
+                                                                                                                if ((← do
+                                                                                                                     if ((bne
+                                                                                                                          rs1
+                                                                                                                          zreg) : Bool)
+                                                                                                                     then
+                                                                                                                       (currentlyEnabled
+                                                                                                                         Ext_Zca)
+                                                                                                                     else
+                                                                                                                       (pure false)) : Bool)
                                                                                                                 then
                                                                                                                   (pure (some
                                                                                                                       (C_JR
@@ -13743,10 +14234,15 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                     let rs1 ← do
                                                                                                                       (encdec_reg_backwards
                                                                                                                         mapping37_)
-                                                                                                                    if (((bne
-                                                                                                                           rs1
-                                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                                             Ext_Zca))) : Bool)
+                                                                                                                    if ((← do
+                                                                                                                         if ((bne
+                                                                                                                              rs1
+                                                                                                                              zreg) : Bool)
+                                                                                                                         then
+                                                                                                                           (currentlyEnabled
+                                                                                                                             Ext_Zca)
+                                                                                                                         else
+                                                                                                                           (pure false)) : Bool)
                                                                                                                     then
                                                                                                                       (pure (some
                                                                                                                           (C_JALR
@@ -13798,10 +14294,15 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                             mapping39_))) with
                                                                                                                         | (rd, rs2) =>
                                                                                                                           (do
-                                                                                                                            if (((bne
-                                                                                                                                   rs2
-                                                                                                                                   zreg) && (← (currentlyEnabled
-                                                                                                                                     Ext_Zca))) : Bool)
+                                                                                                                            if ((← do
+                                                                                                                                 if ((bne
+                                                                                                                                      rs2
+                                                                                                                                      zreg) : Bool)
+                                                                                                                                 then
+                                                                                                                                   (currentlyEnabled
+                                                                                                                                     Ext_Zca)
+                                                                                                                                 else
+                                                                                                                                   (pure false)) : Bool)
                                                                                                                             then
                                                                                                                               (pure (some
                                                                                                                                   (C_MV
@@ -13861,10 +14362,15 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                     mapping41_))) with
                                                                                                                                 | (rsd, rs2) =>
                                                                                                                                   (do
-                                                                                                                                    if (((bne
-                                                                                                                                           rs2
-                                                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                                                             Ext_Zca))) : Bool)
+                                                                                                                                    if ((← do
+                                                                                                                                         if ((bne
+                                                                                                                                              rs2
+                                                                                                                                              zreg) : Bool)
+                                                                                                                                         then
+                                                                                                                                           (currentlyEnabled
+                                                                                                                                             Ext_Zca)
+                                                                                                                                         else
+                                                                                                                                           (pure false)) : Bool)
                                                                                                                                     then
                                                                                                                                       (pure (some
                                                                                                                                           (C_ADD
@@ -14262,9 +14768,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                         let rsdc :=
                                                                                                                                                           (encdec_creg_backwards
                                                                                                                                                             mapping53_)
-                                                                                                                                                        if (((← (currentlyEnabled
-                                                                                                                                                                 Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                 Ext_Zbb))) : Bool)
+                                                                                                                                                        if ((← do
+                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                    Ext_Zcb)) : Bool)
+                                                                                                                                                             then
+                                                                                                                                                               (currentlyEnabled
+                                                                                                                                                                 Ext_Zbb)
+                                                                                                                                                             else
+                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                         then
                                                                                                                                                           (pure (some
                                                                                                                                                               (C_SEXT_B
@@ -14303,9 +14814,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                             let rsdc :=
                                                                                                                                                               (encdec_creg_backwards
                                                                                                                                                                 mapping54_)
-                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                     Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                     Ext_Zbb))) : Bool)
+                                                                                                                                                            if ((← do
+                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                        Ext_Zcb)) : Bool)
+                                                                                                                                                                 then
+                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                     Ext_Zbb)
+                                                                                                                                                                 else
+                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                             then
                                                                                                                                                               (pure (some
                                                                                                                                                                   (C_ZEXT_H
@@ -14344,9 +14860,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                                 let rsdc :=
                                                                                                                                                                   (encdec_creg_backwards
                                                                                                                                                                     mapping55_)
-                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                         Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                         Ext_Zbb))) : Bool)
+                                                                                                                                                                if ((← do
+                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                            Ext_Zcb)) : Bool)
+                                                                                                                                                                     then
+                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                         Ext_Zbb)
+                                                                                                                                                                     else
+                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                 then
                                                                                                                                                                   (pure (some
                                                                                                                                                                       (C_SEXT_H
@@ -14385,9 +14906,14 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                                     let rsdc :=
                                                                                                                                                                       (encdec_creg_backwards
                                                                                                                                                                         mapping56_)
-                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                             Ext_Zcb)) && ((← (currentlyEnabled
-                                                                                                                                                                               Ext_Zba)) && (xlen == 64))) : Bool)
+                                                                                                                                                                    if ((← do
+                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                Ext_Zcb)) : Bool)
+                                                                                                                                                                         then
+                                                                                                                                                                           (pure ((← (currentlyEnabled
+                                                                                                                                                                                   Ext_Zba)) && (xlen == 64)))
+                                                                                                                                                                         else
+                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                     then
                                                                                                                                                                       (pure (some
                                                                                                                                                                           (C_ZEXT_W
@@ -14482,10 +15008,20 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                                               mapping59_)) with
                                                                                                                                                                             | (rsdc, rsc2) =>
                                                                                                                                                                               (do
-                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                         Ext_Zcb)) && ((← (currentlyEnabled
-                                                                                                                                                                                           Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                                           Ext_Zmmul)))) : Bool)
+                                                                                                                                                                                if ((← do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zcb)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (do
+                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                Ext_M)) : Bool)
+                                                                                                                                                                                         then
+                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                         else
+                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                             Ext_Zmmul))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                 then
                                                                                                                                                                                   (pure (some
                                                                                                                                                                                       (C_MUL
@@ -14500,19 +15036,39 @@ noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instr
                                                                                                                                                                         (do
                                                                                                                                                                           let v__946 :=
                                                                                                                                                                             head_exp_
-                                                                                                                                                                          if ((((← (currentlyEnabled
-                                                                                                                                                                                     Ext_Zicfiss)) && ((← (currentlyEnabled
-                                                                                                                                                                                       Ext_Zcmop)) && (← (zicfiss_xSSE
-                                                                                                                                                                                       (← readReg cur_privilege))))) && (v__946 == (0x6081#16 : (BitVec 16)))) : Bool)
+                                                                                                                                                                          if (((← do
+                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zcmop)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (zicfiss_xSSE
+                                                                                                                                                                                         (← readReg cur_privilege))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false))
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (pure false)) && (v__946 == (0x6081#16 : (BitVec 16)))) : Bool)
                                                                                                                                                                           then
                                                                                                                                                                             (pure (C_SSPUSH
                                                                                                                                                                                 ()))
                                                                                                                                                                           else
                                                                                                                                                                             (do
-                                                                                                                                                                              if ((((← (currentlyEnabled
-                                                                                                                                                                                         Ext_Zicfiss)) && ((← (currentlyEnabled
-                                                                                                                                                                                           Ext_Zcmop)) && (← (zicfiss_xSSE
-                                                                                                                                                                                           (← readReg cur_privilege))))) && (v__946 == (0x6281#16 : (BitVec 16)))) : Bool)
+                                                                                                                                                                              if (((← do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (do
+                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                Ext_Zcmop)) : Bool)
+                                                                                                                                                                                         then
+                                                                                                                                                                                           (zicfiss_xSSE
+                                                                                                                                                                                             (← readReg cur_privilege))
+                                                                                                                                                                                         else
+                                                                                                                                                                                           (pure false))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) && (v__946 == (0x6281#16 : (BitVec 16)))) : Bool)
                                                                                                                                                                               then
                                                                                                                                                                                 (pure (C_SSPOPCHK
                                                                                                                                                                                     ()))
@@ -14542,7 +15098,10 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
   match arg_ with
   | .C_NTL op =>
     (do
-      if (((← (currentlyEnabled Ext_Zihintntl)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zihintntl)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_NOP imm =>
@@ -14552,7 +15111,10 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_ADDI4SPN (rd, nzimm) =>
     (do
-      if (((nzimm != 0b00000000#8) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((nzimm != 0b00000000#8) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LW (uimm, rs1, rd) =>
@@ -14562,7 +15124,10 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_LD (uimm, rs1, rd) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SW (uimm, rs1, rs2) =>
@@ -14572,22 +15137,38 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_SD (uimm, rs1, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ADDI (imm, rsd) =>
     (do
-      if (((bne rsd zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rsd zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_JAL imm =>
     (do
-      if (((xlen == 32) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 32) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ADDIW (imm, rsd) =>
     (do
-      if (((bne rsd zreg) && ((xlen == 64) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rsd zreg) : Bool)
+           then
+             (do
+               if ((xlen == 64) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LI (imm, rd) =>
@@ -14597,22 +15178,38 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_ADDI16SP nzimm =>
     (do
-      if (((nzimm != 0b000000#6) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((nzimm != 0b000000#6) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LUI (imm, rd) =>
     (do
-      if (((bne rd sp) && ((imm != 0b000000#6) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rd sp) : Bool)
+           then
+             (do
+               if ((imm != 0b000000#6) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SRLI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SRAI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ANDI (imm, rsd) =>
@@ -14642,12 +15239,18 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_SUBW (rsd, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ADDW (rsd, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_J imm =>
@@ -14667,17 +15270,30 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_SLLI (shamt, rsd) =>
     (do
-      if ((((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LWSP (uimm, rd) =>
     (do
-      if (((bne rd zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rd zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LDSP (uimm, rd) =>
     (do
-      if (((bne rd zreg) && ((xlen == 64) && (← (currentlyEnabled Ext_Zca)))) : Bool)
+      if ((← do
+           if ((bne rd zreg) : Bool)
+           then
+             (do
+               if ((xlen == 64) : Bool)
+               then (currentlyEnabled Ext_Zca)
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SWSP (uimm, rs2) =>
@@ -14687,22 +15303,34 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_SDSP (uimm, rs2) =>
     (do
-      if (((xlen == 64) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((xlen == 64) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_JR rs1 =>
     (do
-      if (((bne rs1 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs1 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_JALR rs1 =>
     (do
-      if (((bne rs1 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs1 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_MV (rd, rs2) =>
     (do
-      if (((bne rs2 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs2 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_EBREAK () =>
@@ -14712,7 +15340,10 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_ADD (rsd, rs2) =>
     (do
-      if (((bne rs2 zreg) && (← (currentlyEnabled Ext_Zca))) : Bool)
+      if ((← do
+           if ((bne rs2 zreg) : Bool)
+           then (currentlyEnabled Ext_Zca)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_LBU (uimm, rdc, rsc1) =>
@@ -14747,22 +15378,34 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_SEXT_B rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ZEXT_H rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SEXT_H rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && (← (currentlyEnabled Ext_Zbb))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (currentlyEnabled Ext_Zbb)
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_ZEXT_W rsdc =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && ((← (currentlyEnabled Ext_Zba)) && (xlen == 64))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then (pure ((← (currentlyEnabled Ext_Zba)) && (xlen == 64)))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_NOT rsdc =>
@@ -14772,20 +15415,38 @@ noncomputable def encdec_compressed_forwards_matches (arg_ : instruction) : Sail
       else (pure false))
   | .C_MUL (rsdc, rsc2) =>
     (do
-      if (((← (currentlyEnabled Ext_Zcb)) && ((← (currentlyEnabled Ext_M)) || (← (currentlyEnabled
-                 Ext_Zmmul)))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zcb)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_M)) : Bool)
+               then (pure true)
+               else (currentlyEnabled Ext_Zmmul))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SSPUSH () =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && ((← (currentlyEnabled Ext_Zcmop)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zcmop)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .C_SSPOPCHK () =>
     (do
-      if (((← (currentlyEnabled Ext_Zicfiss)) && ((← (currentlyEnabled Ext_Zcmop)) && (← (zicfiss_xSSE
-                 (← readReg cur_privilege))))) : Bool)
+      if ((← do
+           if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+           then
+             (do
+               if ((← (currentlyEnabled Ext_Zcmop)) : Bool)
+               then (zicfiss_xSSE (← readReg cur_privilege))
+               else (pure false))
+           else (pure false)) : Bool)
       then (pure true)
       else (pure false))
   | .ZCMOP mop =>
@@ -14807,7 +15468,10 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
       (do
         let mapping0_ : (BitVec 5) := (Sail.BitVec.extractLsb v__1389 6 2)
         let op ← do (encdec_ntl_backwards mapping0_)
-        if (((← (currentlyEnabled Ext_Zihintntl)) && (← (currentlyEnabled Ext_Zca))) : Bool)
+        if ((← do
+             if ((← (currentlyEnabled Ext_Zihintntl)) : Bool)
+             then (currentlyEnabled Ext_Zca)
+             else (pure false)) : Bool)
         then (pure (some true))
         else (pure none))
     else (pure none)) with
@@ -14844,7 +15508,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                 let rd := (encdec_creg_backwards mapping1_)
                 if ((← do
                      let nzimm := (((nzimm_7_4_ +++ nzimm_3_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
-                     (pure ((nzimm != 0b00000000#8) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                     if ((nzimm != 0b00000000#8) : Bool)
+                     then (currentlyEnabled Ext_Zca)
+                     else (pure false)) : Bool)
                 then
                   (pure (some
                       (let nzimm := (((nzimm_7_4_ +++ nzimm_3_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
@@ -14901,7 +15567,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                       (do
                         if ((← do
                              let uimm := (uimm_4_3_ +++ uimm_2_0_)
-                             (pure ((xlen == 64) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                             if ((xlen == 64) : Bool)
+                             then (currentlyEnabled Ext_Zca)
+                             else (pure false)) : Bool)
                         then
                           (pure (some
                               (let uimm := (uimm_4_3_ +++ uimm_2_0_)
@@ -14959,7 +15627,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                               (do
                                 if ((← do
                                      let uimm := (uimm_4_3_ +++ uimm_2_0_)
-                                     (pure ((xlen == 64) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                                     if ((xlen == 64) : Bool)
+                                     then (currentlyEnabled Ext_Zca)
+                                     else (pure false)) : Bool)
                                 then
                                   (pure (some
                                       (let uimm := (uimm_4_3_ +++ uimm_2_0_)
@@ -14984,7 +15654,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                 let rsd ← do (encdec_reg_backwards mapping10_)
                                 if ((← do
                                      let imm := (imm_5_5_ +++ imm_4_0_)
-                                     (pure ((bne rsd zreg) && (← (currentlyEnabled Ext_Zca))))) : Bool)
+                                     if ((bne rsd zreg) : Bool)
+                                     then (currentlyEnabled Ext_Zca)
+                                     else (pure false)) : Bool)
                                 then
                                   (pure (some
                                       (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -15015,8 +15687,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                          (Sail.BitVec.extractLsb v__1361 12 12)
                                        let imm :=
                                          (((((((imm_10_10_ +++ imm_9_9_) +++ imm_8_7_) +++ imm_6_6_) +++ imm_5_5_) +++ imm_4_4_) +++ imm_3_3_) +++ imm_2_0_)
-                                       (pure ((xlen == 32) && (← (currentlyEnabled Ext_Zca))))) && (((Sail.BitVec.extractLsb
-                                           v__1361 15 13) == (0b001#3 : (BitVec 3))) && ((Sail.BitVec.extractLsb
+                                       if ((xlen == 32) : Bool)
+                                       then (currentlyEnabled Ext_Zca)
+                                       else (pure false)) && (((Sail.BitVec.extractLsb v__1361 15 13) == (0b001#3 : (BitVec 3))) && ((Sail.BitVec.extractLsb
                                            v__1361 1 0) == (0b01#2 : (BitVec 2))))) : Bool)
                                 then
                                   (let imm_9_9_ : (BitVec 1) := (Sail.BitVec.extractLsb v__1361 8 8)
@@ -15051,8 +15724,13 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                         let rsd ← do (encdec_reg_backwards mapping11_)
                                         if ((← do
                                              let imm := (imm_5_5_ +++ imm_4_0_)
-                                             (pure ((bne rsd zreg) && ((xlen == 64) && (← (currentlyEnabled
-                                                       Ext_Zca)))))) : Bool)
+                                             if ((bne rsd zreg) : Bool)
+                                             then
+                                               (do
+                                                 if ((xlen == 64) : Bool)
+                                                 then (currentlyEnabled Ext_Zca)
+                                                 else (pure false))
+                                             else (pure false)) : Bool)
                                         then
                                           (pure (some
                                               (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -15105,8 +15783,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                  (Sail.BitVec.extractLsb v__1351 6 6)
                                                let nzimm :=
                                                  ((((nzimm_5_5_ +++ nzimm_4_3_) +++ nzimm_2_2_) +++ nzimm_1_1_) +++ nzimm_0_0_)
-                                               (pure ((nzimm != 0b000000#6) && (← (currentlyEnabled
-                                                       Ext_Zca))))) && (((Sail.BitVec.extractLsb
+                                               if ((nzimm != 0b000000#6) : Bool)
+                                               then (currentlyEnabled Ext_Zca)
+                                               else (pure false)) && (((Sail.BitVec.extractLsb
                                                    v__1351 15 13) == (0b011#3 : (BitVec 3))) && (((Sail.BitVec.extractLsb
                                                      v__1351 11 7) == (0b00010#5 : (BitVec 5))) && ((Sail.BitVec.extractLsb
                                                      v__1351 1 0) == (0b01#2 : (BitVec 2)))))) : Bool)
@@ -15143,8 +15822,13 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                 let rd ← do (encdec_reg_backwards mapping13_)
                                                 if ((← do
                                                      let imm := (imm_5_5_ +++ imm_4_0_)
-                                                     (pure ((bne rd sp) && ((imm != 0b000000#6) && (← (currentlyEnabled
-                                                               Ext_Zca)))))) : Bool)
+                                                     if ((bne rd sp) : Bool)
+                                                     then
+                                                       (do
+                                                         if ((imm != 0b000000#6) : Bool)
+                                                         then (currentlyEnabled Ext_Zca)
+                                                         else (pure false))
+                                                     else (pure false)) : Bool)
                                                 then
                                                   (pure (some
                                                       (let imm := (imm_5_5_ +++ imm_4_0_)
@@ -15173,8 +15857,9 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                 let rsd := (encdec_creg_backwards mapping14_)
                                                 if ((← do
                                                      let shamt := (shamt_5_5_ +++ shamt_4_0_)
-                                                     (pure (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) && (← (currentlyEnabled
-                                                             Ext_Zca))))) : Bool)
+                                                     if (((xlen == 64) || ((BitVec.access shamt 5) == 0#1)) : Bool)
+                                                     then (currentlyEnabled Ext_Zca)
+                                                     else (pure false)) : Bool)
                                                 then
                                                   (pure (some
                                                       (let shamt := (shamt_5_5_ +++ shamt_4_0_)
@@ -15203,9 +15888,10 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                     let rsd := (encdec_creg_backwards mapping15_)
                                                     if ((← do
                                                          let shamt := (shamt_5_5_ +++ shamt_4_0_)
-                                                         (pure (((xlen == 64) || ((BitVec.access
-                                                                   shamt 5) == 0#1)) && (← (currentlyEnabled
-                                                                 Ext_Zca))))) : Bool)
+                                                         if (((xlen == 64) || ((BitVec.access shamt
+                                                                  5) == 0#1)) : Bool)
+                                                         then (currentlyEnabled Ext_Zca)
+                                                         else (pure false)) : Bool)
                                                     then
                                                       (pure (some
                                                           (let shamt := (shamt_5_5_ +++ shamt_4_0_)
@@ -15406,8 +16092,13 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                               mapping26_)) with
                                                                             | (rsd, rs2) =>
                                                                               (do
-                                                                                if (((xlen == 64) && (← (currentlyEnabled
-                                                                                         Ext_Zca))) : Bool)
+                                                                                if ((← do
+                                                                                     if ((xlen == 64) : Bool)
+                                                                                     then
+                                                                                       (currentlyEnabled
+                                                                                         Ext_Zca)
+                                                                                     else
+                                                                                       (pure false)) : Bool)
                                                                                 then
                                                                                   (pure (some true))
                                                                                 else (pure none)))
@@ -15443,8 +16134,13 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                   mapping28_)) with
                                                                                 | (rsd, rs2) =>
                                                                                   (do
-                                                                                    if (((xlen == 64) && (← (currentlyEnabled
-                                                                                             Ext_Zca))) : Bool)
+                                                                                    if ((← do
+                                                                                         if ((xlen == 64) : Bool)
+                                                                                         then
+                                                                                           (currentlyEnabled
+                                                                                             Ext_Zca)
+                                                                                         else
+                                                                                           (pure false)) : Bool)
                                                                                     then
                                                                                       (pure (some
                                                                                           true))
@@ -15681,10 +16377,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                             if ((← do
                                                                                                  let shamt :=
                                                                                                    (shamt_5_5_ +++ shamt_4_0_)
-                                                                                                 (pure (((xlen == 64) || ((BitVec.access
-                                                                                                           shamt
-                                                                                                           5) == 0#1)) && (← (currentlyEnabled
-                                                                                                         Ext_Zca))))) : Bool)
+                                                                                                 if (((xlen == 64) || ((BitVec.access
+                                                                                                          shamt
+                                                                                                          5) == 0#1)) : Bool)
+                                                                                                 then
+                                                                                                   (currentlyEnabled
+                                                                                                     Ext_Zca)
+                                                                                                 else
+                                                                                                   (pure false)) : Bool)
                                                                                             then
                                                                                               (pure (some
                                                                                                   (let shamt :=
@@ -15742,10 +16442,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                 if ((← do
                                                                                                      let uimm :=
                                                                                                        ((uimm_5_4_ +++ uimm_3_3_) +++ uimm_2_0_)
-                                                                                                     (pure ((bne
-                                                                                                           rd
-                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                             Ext_Zca))))) : Bool)
+                                                                                                     if ((bne
+                                                                                                          rd
+                                                                                                          zreg) : Bool)
+                                                                                                     then
+                                                                                                       (currentlyEnabled
+                                                                                                         Ext_Zca)
+                                                                                                     else
+                                                                                                       (pure false)) : Bool)
                                                                                                 then
                                                                                                   (pure (some
                                                                                                       (let uimm :=
@@ -15803,10 +16507,19 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                     if ((← do
                                                                                                          let uimm :=
                                                                                                            ((uimm_5_3_ +++ uimm_2_2_) +++ uimm_1_0_)
-                                                                                                         (pure ((bne
-                                                                                                               rd
-                                                                                                               zreg) && ((xlen == 64) && (← (currentlyEnabled
-                                                                                                                   Ext_Zca)))))) : Bool)
+                                                                                                         if ((bne
+                                                                                                              rd
+                                                                                                              zreg) : Bool)
+                                                                                                         then
+                                                                                                           (do
+                                                                                                             if ((xlen == 64) : Bool)
+                                                                                                             then
+                                                                                                               (currentlyEnabled
+                                                                                                                 Ext_Zca)
+                                                                                                             else
+                                                                                                               (pure false))
+                                                                                                         else
+                                                                                                           (pure false)) : Bool)
                                                                                                     then
                                                                                                       (pure (some
                                                                                                           (let uimm :=
@@ -15913,8 +16626,12 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                             if ((← do
                                                                                                                  let uimm :=
                                                                                                                    (uimm_5_3_ +++ uimm_2_0_)
-                                                                                                                 (pure ((xlen == 64) && (← (currentlyEnabled
-                                                                                                                         Ext_Zca))))) : Bool)
+                                                                                                                 if ((xlen == 64) : Bool)
+                                                                                                                 then
+                                                                                                                   (currentlyEnabled
+                                                                                                                     Ext_Zca)
+                                                                                                                 else
+                                                                                                                   (pure false)) : Bool)
                                                                                                             then
                                                                                                               (pure (some
                                                                                                                   (let uimm :=
@@ -15954,10 +16671,15 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                 let rs1 ← do
                                                                                                                   (encdec_reg_backwards
                                                                                                                     mapping36_)
-                                                                                                                if (((bne
-                                                                                                                       rs1
-                                                                                                                       zreg) && (← (currentlyEnabled
-                                                                                                                         Ext_Zca))) : Bool)
+                                                                                                                if ((← do
+                                                                                                                     if ((bne
+                                                                                                                          rs1
+                                                                                                                          zreg) : Bool)
+                                                                                                                     then
+                                                                                                                       (currentlyEnabled
+                                                                                                                         Ext_Zca)
+                                                                                                                     else
+                                                                                                                       (pure false)) : Bool)
                                                                                                                 then
                                                                                                                   (pure (some
                                                                                                                       true))
@@ -15995,10 +16717,15 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                     let rs1 ← do
                                                                                                                       (encdec_reg_backwards
                                                                                                                         mapping37_)
-                                                                                                                    if (((bne
-                                                                                                                           rs1
-                                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                                             Ext_Zca))) : Bool)
+                                                                                                                    if ((← do
+                                                                                                                         if ((bne
+                                                                                                                              rs1
+                                                                                                                              zreg) : Bool)
+                                                                                                                         then
+                                                                                                                           (currentlyEnabled
+                                                                                                                             Ext_Zca)
+                                                                                                                         else
+                                                                                                                           (pure false)) : Bool)
                                                                                                                     then
                                                                                                                       (pure (some
                                                                                                                           true))
@@ -16049,10 +16776,15 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                             mapping39_))) with
                                                                                                                         | (rd, rs2) =>
                                                                                                                           (do
-                                                                                                                            if (((bne
-                                                                                                                                   rs2
-                                                                                                                                   zreg) && (← (currentlyEnabled
-                                                                                                                                     Ext_Zca))) : Bool)
+                                                                                                                            if ((← do
+                                                                                                                                 if ((bne
+                                                                                                                                      rs2
+                                                                                                                                      zreg) : Bool)
+                                                                                                                                 then
+                                                                                                                                   (currentlyEnabled
+                                                                                                                                     Ext_Zca)
+                                                                                                                                 else
+                                                                                                                                   (pure false)) : Bool)
                                                                                                                             then
                                                                                                                               (pure (some
                                                                                                                                   true))
@@ -16110,10 +16842,15 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                     mapping41_))) with
                                                                                                                                 | (rsd, rs2) =>
                                                                                                                                   (do
-                                                                                                                                    if (((bne
-                                                                                                                                           rs2
-                                                                                                                                           zreg) && (← (currentlyEnabled
-                                                                                                                                             Ext_Zca))) : Bool)
+                                                                                                                                    if ((← do
+                                                                                                                                         if ((bne
+                                                                                                                                              rs2
+                                                                                                                                              zreg) : Bool)
+                                                                                                                                         then
+                                                                                                                                           (currentlyEnabled
+                                                                                                                                             Ext_Zca)
+                                                                                                                                         else
+                                                                                                                                           (pure false)) : Bool)
                                                                                                                                     then
                                                                                                                                       (pure (some
                                                                                                                                           true))
@@ -16489,9 +17226,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                         let rsdc :=
                                                                                                                                                           (encdec_creg_backwards
                                                                                                                                                             mapping53_)
-                                                                                                                                                        if (((← (currentlyEnabled
-                                                                                                                                                                 Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                 Ext_Zbb))) : Bool)
+                                                                                                                                                        if ((← do
+                                                                                                                                                             if ((← (currentlyEnabled
+                                                                                                                                                                    Ext_Zcb)) : Bool)
+                                                                                                                                                             then
+                                                                                                                                                               (currentlyEnabled
+                                                                                                                                                                 Ext_Zbb)
+                                                                                                                                                             else
+                                                                                                                                                               (pure false)) : Bool)
                                                                                                                                                         then
                                                                                                                                                           (pure (some
                                                                                                                                                               true))
@@ -16529,9 +17271,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                             let rsdc :=
                                                                                                                                                               (encdec_creg_backwards
                                                                                                                                                                 mapping54_)
-                                                                                                                                                            if (((← (currentlyEnabled
-                                                                                                                                                                     Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                     Ext_Zbb))) : Bool)
+                                                                                                                                                            if ((← do
+                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                        Ext_Zcb)) : Bool)
+                                                                                                                                                                 then
+                                                                                                                                                                   (currentlyEnabled
+                                                                                                                                                                     Ext_Zbb)
+                                                                                                                                                                 else
+                                                                                                                                                                   (pure false)) : Bool)
                                                                                                                                                             then
                                                                                                                                                               (pure (some
                                                                                                                                                                   true))
@@ -16569,9 +17316,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                                 let rsdc :=
                                                                                                                                                                   (encdec_creg_backwards
                                                                                                                                                                     mapping55_)
-                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                         Ext_Zcb)) && (← (currentlyEnabled
-                                                                                                                                                                         Ext_Zbb))) : Bool)
+                                                                                                                                                                if ((← do
+                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                            Ext_Zcb)) : Bool)
+                                                                                                                                                                     then
+                                                                                                                                                                       (currentlyEnabled
+                                                                                                                                                                         Ext_Zbb)
+                                                                                                                                                                     else
+                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                 then
                                                                                                                                                                   (pure (some
                                                                                                                                                                       true))
@@ -16609,9 +17361,14 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                                     let rsdc :=
                                                                                                                                                                       (encdec_creg_backwards
                                                                                                                                                                         mapping56_)
-                                                                                                                                                                    if (((← (currentlyEnabled
-                                                                                                                                                                             Ext_Zcb)) && ((← (currentlyEnabled
-                                                                                                                                                                               Ext_Zba)) && (xlen == 64))) : Bool)
+                                                                                                                                                                    if ((← do
+                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                Ext_Zcb)) : Bool)
+                                                                                                                                                                         then
+                                                                                                                                                                           (pure ((← (currentlyEnabled
+                                                                                                                                                                                   Ext_Zba)) && (xlen == 64)))
+                                                                                                                                                                         else
+                                                                                                                                                                           (pure false)) : Bool)
                                                                                                                                                                     then
                                                                                                                                                                       (pure (some
                                                                                                                                                                           true))
@@ -16704,10 +17461,20 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                                               mapping59_)) with
                                                                                                                                                                             | (rsdc, rsc2) =>
                                                                                                                                                                               (do
-                                                                                                                                                                                if (((← (currentlyEnabled
-                                                                                                                                                                                         Ext_Zcb)) && ((← (currentlyEnabled
-                                                                                                                                                                                           Ext_M)) || (← (currentlyEnabled
-                                                                                                                                                                                           Ext_Zmmul)))) : Bool)
+                                                                                                                                                                                if ((← do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zcb)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (do
+                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                Ext_M)) : Bool)
+                                                                                                                                                                                         then
+                                                                                                                                                                                           (pure true)
+                                                                                                                                                                                         else
+                                                                                                                                                                                           (currentlyEnabled
+                                                                                                                                                                                             Ext_Zmmul))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) : Bool)
                                                                                                                                                                                 then
                                                                                                                                                                                   (pure (some
                                                                                                                                                                                       true))
@@ -16721,18 +17488,38 @@ noncomputable def encdec_compressed_backwards_matches (arg_ : (BitVec 16)) : Sai
                                                                                                                                                                         (do
                                                                                                                                                                           let v__1173 :=
                                                                                                                                                                             head_exp_
-                                                                                                                                                                          if ((((← (currentlyEnabled
-                                                                                                                                                                                     Ext_Zicfiss)) && ((← (currentlyEnabled
-                                                                                                                                                                                       Ext_Zcmop)) && (← (zicfiss_xSSE
-                                                                                                                                                                                       (← readReg cur_privilege))))) && (v__1173 == (0x6081#16 : (BitVec 16)))) : Bool)
+                                                                                                                                                                          if (((← do
+                                                                                                                                                                                 if ((← (currentlyEnabled
+                                                                                                                                                                                        Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                 then
+                                                                                                                                                                                   (do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zcmop)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (zicfiss_xSSE
+                                                                                                                                                                                         (← readReg cur_privilege))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false))
+                                                                                                                                                                                 else
+                                                                                                                                                                                   (pure false)) && (v__1173 == (0x6081#16 : (BitVec 16)))) : Bool)
                                                                                                                                                                           then
                                                                                                                                                                             (pure true)
                                                                                                                                                                           else
                                                                                                                                                                             (do
-                                                                                                                                                                              if ((((← (currentlyEnabled
-                                                                                                                                                                                         Ext_Zicfiss)) && ((← (currentlyEnabled
-                                                                                                                                                                                           Ext_Zcmop)) && (← (zicfiss_xSSE
-                                                                                                                                                                                           (← readReg cur_privilege))))) && (v__1173 == (0x6281#16 : (BitVec 16)))) : Bool)
+                                                                                                                                                                              if (((← do
+                                                                                                                                                                                     if ((← (currentlyEnabled
+                                                                                                                                                                                            Ext_Zicfiss)) : Bool)
+                                                                                                                                                                                     then
+                                                                                                                                                                                       (do
+                                                                                                                                                                                         if ((← (currentlyEnabled
+                                                                                                                                                                                                Ext_Zcmop)) : Bool)
+                                                                                                                                                                                         then
+                                                                                                                                                                                           (zicfiss_xSSE
+                                                                                                                                                                                             (← readReg cur_privilege))
+                                                                                                                                                                                         else
+                                                                                                                                                                                           (pure false))
+                                                                                                                                                                                     else
+                                                                                                                                                                                       (pure false)) && (v__1173 == (0x6281#16 : (BitVec 16)))) : Bool)
                                                                                                                                                                               then
                                                                                                                                                                                 (pure true)
                                                                                                                                                                               else
@@ -17063,7 +17850,10 @@ def execute_SSAMOSWAP (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (wid
       else (pure ()))
   | .User =>
     (do
-      if (((not (← (currentlyEnabled Ext_S))) || ((_get_SEnvcfg_SSE (← (read_senvcfg ()))) == 0#1)) : Bool)
+      if ((← do
+           if ((not (← (currentlyEnabled Ext_S))) : Bool)
+           then (pure true)
+           else (pure ((_get_SEnvcfg_SSE (← (read_senvcfg ()))) == 0#1))) : Bool)
       then SailME.throw ((Illegal_Instruction ()) : ExecutionResult)
       else (pure ()))
   | .VirtualSupervisor =>
@@ -17134,7 +17924,10 @@ def execute_SRET (_ : Unit) : SailM ExecutionResult := do
     match (← readReg cur_privilege) with
     | .User => (pure true)
     | .Supervisor =>
-      (pure ((not (← (currentlyEnabled Ext_S))) || ((_get_Mstatus_TSR (← readReg mstatus)) == 1#1)))
+      (do
+        if ((not (← (currentlyEnabled Ext_S))) : Bool)
+        then (pure true)
+        else (pure ((_get_Mstatus_TSR (← readReg mstatus)) == 1#1)))
     | .Machine => (pure (not (← (currentlyEnabled Ext_S))))
     | .VirtualUser =>
       (internal_error "extensions/I/base_insts.sail" 607 "Hypervisor extension not supported")
@@ -17937,10 +18730,14 @@ def execute_AMO (op : amoop) (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regid
       then rs2_val
       else loaded)
     | .AMOCAS => rs2_val
-  if (((op == AMOCAS) && (loaded != (← do
-           if ((width ≤b xlen_bytes) : Bool)
-           then (pure (trunc (m := (width *i 8)) (← (rX_bits rd))))
-           else (pure (trunc (m := (width *i 8)) (← (rX_pair_bits rd))))))) : Bool)
+  if ((← do
+       if ((op == AMOCAS) : Bool)
+       then
+         (pure (loaded != (← do
+               if ((width ≤b xlen_bytes) : Bool)
+               then (pure (trunc (m := (width *i 8)) (← (rX_bits rd))))
+               else (pure (trunc (m := (width *i 8)) (← (rX_pair_bits rd)))))))
+       else (pure false)) : Bool)
   then
     (do
       if ((width ≤b xlen_bytes) : Bool)

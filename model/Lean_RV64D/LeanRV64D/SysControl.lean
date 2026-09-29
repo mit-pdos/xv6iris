@@ -250,30 +250,52 @@ def check_CSR_access (csr : (BitVec 12)) (access_type : CSRAccessType) : Bool :=
   (not (((access_type == CSRWrite) || (access_type == CSRReadWrite)) && ((csrAccess csr) == 0b11#2)))
 
 def is_ssp_accessible (priv : Privilege) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_Zicfiss)) && (← do
-        match priv with
-        | .Machine => (pure true)
-        | .Supervisor => (pure ((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1))
-        | .User =>
-          (pure (((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1) && (((_get_SEnvcfg_SSE
-                    (← (read_senvcfg ()))) == 1#1) || (not (← (currentlyEnabled Ext_S))))))
-        | .VirtualSupervisor => (pure ((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1))
-        | .VirtualUser =>
-          (pure (((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1) && ((_get_SEnvcfg_SSE
-                  (← (read_senvcfg ()))) == 1#1))))))
+  if ((← (currentlyEnabled Ext_Zicfiss)) : Bool)
+  then
+    (do
+      match priv with
+      | .Machine => (pure true)
+      | .Supervisor => (pure ((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1))
+      | .User =>
+        (do
+          if (((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1) : Bool)
+          then
+            (do
+              if (((_get_SEnvcfg_SSE (← (read_senvcfg ()))) == 1#1) : Bool)
+              then (pure true)
+              else (pure (not (← (currentlyEnabled Ext_S)))))
+          else (pure false))
+      | .VirtualSupervisor => (pure ((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1))
+      | .VirtualUser =>
+        (do
+          if (((_get_MEnvcfg_SSE (← readReg menvcfg)) == 1#1) : Bool)
+          then (pure ((_get_SEnvcfg_SSE (← (read_senvcfg ()))) == 1#1))
+          else (pure false)))
+  else (pure false)
 
 def is_stimecmp_accessible (priv : Privilege) : SailM Bool := do
-  (pure ((← (currentlyEnabled Ext_S)) && ((← (currentlyEnabled Ext_Sstc)) && (← do
+  if ((← (currentlyEnabled Ext_S)) : Bool)
+  then
+    (do
+      if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+      then
+        (do
           match priv with
           | .Machine => (pure true)
           | .Supervisor =>
-            (pure (((_get_Counteren_TM (← readReg mcounteren)) == 1#1) && ((_get_MEnvcfg_STCE
-                    (← readReg menvcfg)) == 1#1)))
+            (do
+              if (((_get_Counteren_TM (← readReg mcounteren)) == 1#1) : Bool)
+              then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
+              else (pure false))
           | .User => (pure false)
           | .VirtualSupervisor =>
-            (pure (((_get_Counteren_TM (← readReg mcounteren)) == 1#1) && ((_get_MEnvcfg_STCE
-                    (← readReg menvcfg)) == 1#1)))
-          | .VirtualUser => (pure false)))))
+            (do
+              if (((_get_Counteren_TM (← readReg mcounteren)) == 1#1) : Bool)
+              then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
+              else (pure false))
+          | .VirtualUser => (pure false))
+      else (pure false))
+  else (pure false)
 
 def satp_accessible (priv : Privilege) : SailM Bool := do
   match priv with
@@ -290,11 +312,23 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
   | (0x300, g__26, g__27) => (pure true)
   | (0x310, g__28, g__29) => (pure (mstatush_is_defined && (xlen == 32)))
   | (0x747, g__30, g__31) =>
-    (pure (mseccfg_csrs_are_defined && ((← (currentlyEnabled Ext_Zkr)) || ((hartSupports
-              Ext_Zicfilp) || (← (currentlyEnabled Ext_Smmpm))))))
+    (do
+      if (mseccfg_csrs_are_defined : Bool)
+      then
+        (do
+          if ((← (currentlyEnabled Ext_Zkr)) : Bool)
+          then (pure true)
+          else
+            (do
+              if ((hartSupports Ext_Zicfilp) : Bool)
+              then (pure true)
+              else (currentlyEnabled Ext_Smmpm)))
+      else (pure false))
   | (0x757, g__32, g__33) =>
-    (pure (mseccfg_csrs_are_defined && (((← (currentlyEnabled Ext_Zkr)) || (hartSupports
-              Ext_Zicfilp)) && (xlen == 32))))
+    (do
+      if (mseccfg_csrs_are_defined : Bool)
+      then (pure (((← (currentlyEnabled Ext_Zkr)) || (hartSupports Ext_Zicfilp)) && (xlen == 32)))
+      else (pure false))
   | (0x30A, g__34, g__35) => (pure ((← (currentlyEnabled Ext_U)) && xenvcfg_csrs_are_defined))
   | (0x31A, g__36, g__37) =>
     (pure ((← (currentlyEnabled Ext_U)) && ((xlen == 32) && xenvcfg_csrs_are_defined)))
@@ -319,7 +353,10 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
   | (0x344, g__74, g__75) => (pure true)
   | (0x302, g__76, g__77) => (currentlyEnabled Ext_S)
   | (0x312, g__78, g__79) =>
-    (pure (delegh_csrs_are_defined && ((← (currentlyEnabled Ext_S)) && (xlen == 32))))
+    (do
+      if (delegh_csrs_are_defined : Bool)
+      then (pure ((← (currentlyEnabled Ext_S)) && (xlen == 32)))
+      else (pure false))
   | (0x303, g__80, g__81) => (currentlyEnabled Ext_S)
   | (0x144, g__82, g__83) => (currentlyEnabled Ext_S)
   | (0x104, g__84, g__85) => (currentlyEnabled Ext_S)
@@ -361,14 +398,20 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                         (do
                           match (v__1394, g__94, g__95) with
                           | (0x001, g__96, g__97) =>
-                            (pure ((← (currentlyEnabled Ext_F)) || (← (currentlyEnabled
-                                    Ext_Zfinx))))
+                            (do
+                              if ((← (currentlyEnabled Ext_F)) : Bool)
+                              then (pure true)
+                              else (currentlyEnabled Ext_Zfinx))
                           | (0x002, g__98, g__99) =>
-                            (pure ((← (currentlyEnabled Ext_F)) || (← (currentlyEnabled
-                                    Ext_Zfinx))))
+                            (do
+                              if ((← (currentlyEnabled Ext_F)) : Bool)
+                              then (pure true)
+                              else (currentlyEnabled Ext_Zfinx))
                           | (0x003, g__100, g__101) =>
-                            (pure ((← (currentlyEnabled Ext_F)) || (← (currentlyEnabled
-                                    Ext_Zfinx))))
+                            (do
+                              if ((← (currentlyEnabled Ext_F)) : Bool)
+                              then (pure true)
+                              else (currentlyEnabled Ext_Zfinx))
                           | (0x008, g__102, g__103) => (currentlyEnabled Ext_Zve32x)
                           | (0x009, g__104, g__105) => (currentlyEnabled Ext_Zve32x)
                           | (0x00A, g__106, g__107) => (currentlyEnabled Ext_Zve32x)
@@ -399,13 +442,25 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                           | (0x60E, g__144, g__145) => (is_hstateen_accessible ())
                           | (0x60F, g__146, g__147) => (is_hstateen_accessible ())
                           | (0x61C, g__148, g__149) =>
-                            (pure ((xlen == 32) && (← (is_hstateen_accessible ()))))
+                            (do
+                              if ((xlen == 32) : Bool)
+                              then (is_hstateen_accessible ())
+                              else (pure false))
                           | (0x61D, g__150, g__151) =>
-                            (pure ((xlen == 32) && (← (is_hstateen_accessible ()))))
+                            (do
+                              if ((xlen == 32) : Bool)
+                              then (is_hstateen_accessible ())
+                              else (pure false))
                           | (0x61E, g__152, g__153) =>
-                            (pure ((xlen == 32) && (← (is_hstateen_accessible ()))))
+                            (do
+                              if ((xlen == 32) : Bool)
+                              then (is_hstateen_accessible ())
+                              else (pure false))
                           | (0x61F, g__154, g__155) =>
-                            (pure ((xlen == 32) && (← (is_hstateen_accessible ()))))
+                            (do
+                              if ((xlen == 32) : Bool)
+                              then (is_hstateen_accessible ())
+                              else (pure false))
                           | (0x10C, g__156, g__157) => (is_sstateen_accessible ())
                           | (0x10D, g__158, g__159) => (is_sstateen_accessible ())
                           | (0x10E, g__160, g__161) => (is_sstateen_accessible ())
@@ -439,8 +494,9 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                                             (do
                                               let index : (BitVec 5) :=
                                                 (Sail.BitVec.extractLsb v__1394 4 0)
-                                              (pure ((← (currentlyEnabled Ext_Zihpm)) && (← (counter_enabled
-                                                      (BitVec.toNatInt index) g__165)))))
+                                              if ((← (currentlyEnabled Ext_Zihpm)) : Bool)
+                                              then (counter_enabled (BitVec.toNatInt index) g__165)
+                                              else (pure false))
                                           else
                                             (do
                                               if ((((Sail.BitVec.extractLsb v__1394 11 5) == (0b1100100#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -450,8 +506,15 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                                                 (do
                                                   let index : (BitVec 5) :=
                                                     (Sail.BitVec.extractLsb v__1394 4 0)
-                                                  (pure ((← (currentlyEnabled Ext_Zihpm)) && ((xlen == 32) && (← (counter_enabled
-                                                            (BitVec.toNatInt index) g__165))))))
+                                                  if ((← (currentlyEnabled Ext_Zihpm)) : Bool)
+                                                  then
+                                                    (do
+                                                      if ((xlen == 32) : Bool)
+                                                      then
+                                                        (counter_enabled (BitVec.toNatInt index)
+                                                          g__165)
+                                                      else (pure false))
+                                                  else (pure false))
                                               else
                                                 (do
                                                   if ((((Sail.BitVec.extractLsb v__1394 11 5) == (0b0111001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -463,8 +526,10 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                                                     (do
                                                       match (v__1394, g__165, g__166) with
                                                       | (0xDA0, g__167, g__168) =>
-                                                        (pure ((← (currentlyEnabled Ext_Sscofpmf)) && (← (currentlyEnabled
-                                                                Ext_S))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                                                          then (currentlyEnabled Ext_S)
+                                                          else (pure false))
                                                       | (0x14D, g__165, g__169) =>
                                                         (is_stimecmp_accessible g__165)
                                                       | (0x15D, g__165, g__170) =>
@@ -472,23 +537,47 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                                                       | (0x011, g__165, g__171) =>
                                                         (is_ssp_accessible g__165)
                                                       | (0xC00, g__165, g__172) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && (← (counter_enabled
-                                                                0 g__165))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then (counter_enabled 0 g__165)
+                                                          else (pure false))
                                                       | (0xC01, g__165, g__173) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && (← (counter_enabled
-                                                                1 g__165))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then (counter_enabled 1 g__165)
+                                                          else (pure false))
                                                       | (0xC02, g__165, g__174) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && (← (counter_enabled
-                                                                2 g__165))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then (counter_enabled 2 g__165)
+                                                          else (pure false))
                                                       | (0xC80, g__165, g__175) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && ((xlen == 32) && (← (counter_enabled
-                                                                  0 g__165)))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then
+                                                            (do
+                                                              if ((xlen == 32) : Bool)
+                                                              then (counter_enabled 0 g__165)
+                                                              else (pure false))
+                                                          else (pure false))
                                                       | (0xC81, g__165, g__176) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && ((xlen == 32) && (← (counter_enabled
-                                                                  1 g__165)))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then
+                                                            (do
+                                                              if ((xlen == 32) : Bool)
+                                                              then (counter_enabled 1 g__165)
+                                                              else (pure false))
+                                                          else (pure false))
                                                       | (0xC82, g__165, g__177) =>
-                                                        (pure ((← (currentlyEnabled Ext_Zicntr)) && ((xlen == 32) && (← (counter_enabled
-                                                                  2 g__165)))))
+                                                        (do
+                                                          if ((← (currentlyEnabled Ext_Zicntr)) : Bool)
+                                                          then
+                                                            (do
+                                                              if ((xlen == 32) : Bool)
+                                                              then (counter_enabled 2 g__165)
+                                                              else (pure false))
+                                                          else (pure false))
                                                       | (0xB00, g__178, g__179) =>
                                                         (currentlyEnabled Ext_Zicntr)
                                                       | (0xB02, g__180, g__181) =>
@@ -504,8 +593,17 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                                                       | _ => (pure false))))))))))))))
 
 def check_CSR (csr : (BitVec 12)) (p : Privilege) (access_type : CSRAccessType) : SailM Bool := do
-  (pure ((← (check_CSR_priv csr p)) && ((check_CSR_access csr access_type) && ((← (is_CSR_accessible
-              csr p access_type)) && (← (stateen_allows_CSR_access csr p access_type))))))
+  if ((← (check_CSR_priv csr p)) : Bool)
+  then
+    (do
+      if ((check_CSR_access csr access_type) : Bool)
+      then
+        (do
+          if ((← (is_CSR_accessible csr p access_type)) : Bool)
+          then (stateen_allows_CSR_access csr p access_type)
+          else (pure false))
+      else (pure false))
+  else (pure false)
 
 def is_CSR_exception_virtual (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessType) : SailM Bool := do
   let merge_var := (arg0, arg1, arg2)
@@ -528,8 +626,10 @@ def check_CSR_result (csr : (BitVec 12)) (p : Privilege) (access_type : CSRAcces
   then (pure (CSR_Check_OK ()))
   else
     (do
-      if ((((p == VirtualSupervisor) || (p == VirtualUser)) && (← (is_CSR_exception_virtual csr p
-               access_type))) : Bool)
+      if ((← do
+           if (((p == VirtualSupervisor) || (p == VirtualUser)) : Bool)
+           then (is_CSR_exception_virtual csr p access_type)
+           else (pure false)) : Bool)
       then (pure (CSR_Virtual ()))
       else (pure (CSR_Illegal ())))
 
@@ -578,9 +678,15 @@ def getPendingSet (priv : Privilege) : SailM (Option ((BitVec 64) × Privilege))
     (pure (mip_bits &&& ((← readReg mie) &&& (Complement.complement mideleg_bits))))
   let pending_s ← do (pure (mip_bits &&& ((← readReg mie) &&& mideleg_bits)))
   let mIE ← do
-    (pure (((priv == Machine) && ((_get_Mstatus_MIE (← readReg mstatus)) == 1#1)) || ((priv == Supervisor) || (priv == User))))
+    (pure ((← do
+          if ((priv == Machine) : Bool)
+          then (pure ((_get_Mstatus_MIE (← readReg mstatus)) == 1#1))
+          else (pure false)) || ((priv == Supervisor) || (priv == User))))
   let sIE ← do
-    (pure (((priv == Supervisor) && ((_get_Mstatus_SIE (← readReg mstatus)) == 1#1)) || (priv == User)))
+    (pure ((← do
+          if ((priv == Supervisor) : Bool)
+          then (pure ((_get_Mstatus_SIE (← readReg mstatus)) == 1#1))
+          else (pure false)) || (priv == User)))
   if ((mIE && (pending_m != (zeros (n := 64)))) : Bool)
   then (pure (some (pending_m, Machine)))
   else

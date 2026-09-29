@@ -43,14 +43,18 @@ theorem execSpecF_jalr (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (hok : 
   iframe
   iintro HF
   swp_run 100
-  iapply swp_bind
-  iapply swp_wX_file (hrd := hrd)
-  iframe
-  inext
-  iintro HF
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC HF
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    iapply swp_bind
+    iapply swp_wX_file (hrd := hrd)
+    iframe
+    inext
+    iintro HF
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC HF
 
 /-- `jalr rd, 0(rs1)` in the kernel context (`rd ∉ {x0, sp, tp}`): the link
 in `rd`, the pc at the register value with bit 0 cleared. -/

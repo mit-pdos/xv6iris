@@ -69,7 +69,10 @@ theorem swp_tick_clock_m (cpu : CPU) (dq : DFrac) (mcycle mtime mip : BitVec 64)
     (try split)
     all_goals
       swp_run 60
-      iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
+      (try split)
+      all_goals
+        swp_run 60
+        iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
 
 /-! ### Aligned RAM reads in machine mode -/
 

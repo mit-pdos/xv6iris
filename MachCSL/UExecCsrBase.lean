@@ -4,16 +4,12 @@ runs under and the read-only bridge (lane U1-X3, brief
 `notes/briefs/user_layer.md` G10; Rocq `UserCsr.v` §1).
 
 **What a CSR instruction at User reads.**  `doCSR` reads `cur_privilege`,
-then `check_CSR_result`.  The Lean backend evaluates every `(← …)` of a
-condition up front (Rocq's `and_boolM` short-circuits; Lean's `&&` over
-lifted actions does not), so at User the MODEL runs, for every csr number,
-`check_CSR_priv`, `is_CSR_accessible`, `stateen_allows_CSR_access` at User,
-and then `is_CSR_exception_virtual`, i.e. the same three at Supervisor.  The
-CSR facts walk the SHORT-CIRCUIT chain instead (`UExecCsrSc`: Sail's own
-evaluation order), related to the model's by the elimination theorem
-(`SailStut`, `MachCSL/SailAndElim.lean`: the discarded operands are
-read-only and total).  The registers the short-circuit chain reads
-(measured: dropping any one makes some csr's walk fail) are `uxrReads`:
+then `check_CSR_result`: `check_CSR_priv`, `check_CSR_access`,
+`is_CSR_accessible`, `stateen_allows_CSR_access` at User, each only if the
+previous ones passed (Sail's `&` short-circuits, and so does the generated
+model), and `is_CSR_exception_virtual` never (User is not a virtual
+privilege).  The registers the chain reads (measured: dropping any one makes
+some csr's walk fail) are `uxrReads`:
 
 * `cur_privilege` (User, the user frame);
 * `misa`, `senvcfg`, `mstateen0`, `sstateen0` (FROZEN: the `hwConfig` cells,
@@ -27,10 +23,9 @@ read-only and total).  The registers the short-circuit chain reads
   (`UExecCsrCnt`), and the counters a retiring read returns (`mcycle`,
   `mtime`, `minstret`, `mhpmcounter`).
 
-The eager chain also read `mstateen1..3`/`sstateen1..3` (the stateen check of
-`sstateen1..3`/`hstateen1..3`, whose outcome the privilege gate discards) --
-cells in no owner's frame (a D52 footprint gap).  The short-circuit chain
-never reads them, so they are not in the footprint.
+The stateen check of `sstateen1..3`/`hstateen1..3` (reading
+`mstateen1..3`/`sstateen1..3`, cells in no owner's frame) is behind the
+privilege gate, so it is never run at User and they are not in the footprint.
 
 `uxrPin f` is that table (the data cells at the file `f`'s values);
 every CSR fact takes the two premises `UxrFoot D` (the footprint reads them)

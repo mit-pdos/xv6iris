@@ -430,7 +430,6 @@ theorem swp_pt_walk_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kPtr cpu dq c b1)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   -- level 1
@@ -448,7 +447,6 @@ theorem swp_pt_walk_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kPtr cpu dq c b0)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   -- level 0
@@ -470,7 +468,6 @@ theorem swp_pt_walk_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   iapply swp_bind
   iapply (swp_pte_is_invalid_kLeaf cpu dq c ppn perm a d)
   iframe HmConf
-  inext
   iintro HmConf
   swp_run 40
   iapply swp_bind

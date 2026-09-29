@@ -342,11 +342,7 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
   iapply swp_rX_file
   iframe
   iintro HF
-  swp_run 60
-  iapply swp_bind
-  iapply swp_rX_file
-  iframe
-  iintro HF
+  -- (the `AMOCAS` compare operand `rd` is read only for `AMOCAS`)
   swp_run 100
   iapply swp_bind
   conf_intro HmConf

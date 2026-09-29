@@ -204,14 +204,18 @@ theorem execSpec_jal (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64
   unfold execute
   have hb0 := ofBool_bit0_beq_of_even _ htgt
   swp_run 60
-  iapply swp_bind
-  iapply swp_wX_bits (hrd := hrd)
-  iframe
-  inext
-  iintro Hrd
-  swp_run 10
-  conf_intro HmConf
-  iapply HΦ $$ HmConf HPC HnextPC Hrd
+  -- the jump's `Zca` gate branches on the target's bit 1 (both arms jump)
+  split
+  all_goals
+    swp_run 40
+    iapply swp_bind
+    iapply swp_wX_bits (hrd := hrd)
+    iframe
+    inext
+    iintro Hrd
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
 /-- `ld rd, imm(rd)` (`rd ≠ 0`) from an 8-aligned RAM address. -/

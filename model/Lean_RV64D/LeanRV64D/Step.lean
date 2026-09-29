@@ -277,9 +277,16 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
           let is_illegal ← do
-            (pure (((bne (← readReg cur_privilege) Machine) && ((_get_Mstatus_TW
-                      (← readReg mstatus)) == 1#1)) || (((← readReg cur_privilege) == User) && (← (currentlyEnabled
-                      Ext_S)))))
+            if ((← do
+                 if ((bne (← readReg cur_privilege) Machine) : Bool)
+                 then (pure ((_get_Mstatus_TW (← readReg mstatus)) == 1#1))
+                 else (pure false)) : Bool)
+            then (pure true)
+            else
+              (do
+                if (((← readReg cur_privilege) == User) : Bool)
+                then (currentlyEnabled Ext_S)
+                else (pure false))
           if (is_illegal : Bool)
           then (pure (Step_Execute ((Illegal_Instruction ()), instbits)))
           else (pure (Step_Execute ((Retire_Success ()), instbits))))
@@ -304,7 +311,10 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          if ((((← readReg cur_privilege) == Machine) || ((_get_Mstatus_TW (← readReg mstatus)) == 0#1)) : Bool)
+          if ((← do
+               if (((← readReg cur_privilege) == Machine) : Bool)
+               then (pure true)
+               else (pure ((_get_Mstatus_TW (← readReg mstatus)) == 0#1))) : Bool)
           then (pure (Step_Execute ((Retire_Success ()), instbits)))
           else (pure (Step_Execute ((Illegal_Instruction ()), instbits))))
       | (_, _, false) =>
@@ -464,7 +474,10 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
           then true
           else false)
         | _ => false
-      if ((retired && (← readReg minstret_increment)) : Bool)
+      if ((← do
+           if (retired : Bool)
+           then readReg minstret_increment
+           else (pure false)) : Bool)
       then writeReg minstret (BitVec.addInt (← readReg minstret) 1)
       else (pure ())
       if ((get_config_rvfi ()) : Bool)

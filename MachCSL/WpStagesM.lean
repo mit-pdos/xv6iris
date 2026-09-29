@@ -59,9 +59,12 @@ theorem swp_tick_clock_cells (cpu : CPU) (dq : DFrac) (p : Privilege)
         swp_run 60
         (try split)
         all_goals
-          swp_run 40
-          conf_intro HmConf
-          iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+          swp_run 60
+          (try split)
+          all_goals
+            swp_run 40
+            conf_intro HmConf
+            iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
 theorem swp_tick_clock_conf (cpu : CPU) (dq : DFrac) (c : MConf) (mcycle mtime mip : BitVec 64)
     (Φ : Unit → IProp GF) :
@@ -221,6 +224,7 @@ theorem swp_fetch_m4_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   obtain ⟨hMIE, hMPRV⟩ := hok.1
   have hva := is_aligned_vaddr_of pc 4 hal
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_clear_of_mod4 pc hal
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
   all_goals
     simp only [fetched4, hc, Bool.false_eq_true, ite_false, ite_true]
@@ -255,6 +259,7 @@ theorem swp_fetch_m2_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (
   obtain ⟨hMIE, hMPRV⟩ := hok.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc hal
   have h2 : (pc + 2#64).toNat = pc.toNat + 2 := by
     simp only [inRam, ramBase, ramEnd] at hram; bv_omega
   have hram2 : inRam pc 2 := by simp only [inRam, ramBase, ramEnd] at *; omega
@@ -312,6 +317,7 @@ theorem swp_fetch_m2_rvc_conf (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.
   obtain ⟨hMIE, hMPRV⟩ := hok.1
   have hva := not_is_aligned_vaddr_of pc 4 (by omega) (by omega)
   have hb0 := bit0_clear_of_even pc (by omega)
+  have hb1 := bit1_set_of_mod4 pc hal
   have hal2 : pc.toNat % 2 = 0 := by omega
   unfold fetch
   swp_run 80

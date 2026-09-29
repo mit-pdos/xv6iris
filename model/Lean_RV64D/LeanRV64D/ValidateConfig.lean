@@ -307,19 +307,25 @@ def check_mmu_config (_ : Unit) : SailM Bool := do
     if ((true : Bool) : Bool)
     then
       (do
-        (pure (valid && (← (require_virtual_memory "Ssccptr")))))
+        if (valid : Bool)
+        then (require_virtual_memory "Ssccptr")
+        else (pure false))
     else (pure valid) ) : SailM Bool )
   let valid ← (( do
     if ((true : Bool) : Bool)
     then
       (do
-        (pure (valid && (← (require_virtual_memory "Svade")))))
+        if (valid : Bool)
+        then (require_virtual_memory "Svade")
+        else (pure false))
     else (pure valid) ) : SailM Bool )
   let valid ← (( do
     if ((true : Bool) : Bool)
     then
       (do
-        (pure (valid && (← (require_virtual_memory "Svadu")))))
+        if (valid : Bool)
+        then (require_virtual_memory "Svadu")
+        else (pure false))
     else (pure valid) ) : SailM Bool )
   let valid : Bool :=
     if ((true : Bool) : Bool)
@@ -332,7 +338,9 @@ def check_mmu_config (_ : Unit) : SailM Bool := do
   if ((true : Bool) : Bool)
   then
     (do
-      (pure (valid && (← (require_virtual_memory "Svvptc")))))
+      if (valid : Bool)
+      then (require_virtual_memory "Svvptc")
+      else (pure false))
   else (pure valid)
 
 def check_vlen_elen (_ : Unit) : Bool :=
@@ -832,15 +840,21 @@ def check_mem_layout (_ : Unit) : SailM Bool := do
             check_opts false))
       let clint_supported : Bool := true
       let clint_ok ← do
-        (pure ((not clint_supported) || (← (within_configured_pma_memory "CLINT (platform.clint)"
-                (some IOMemory) (← (to_bits_checked (l := 64) (33554432 : Int)))
-                (← (to_bits_checked (l := 64) (786432 : Int)))))))
+        if ((not clint_supported) : Bool)
+        then (pure true)
+        else
+          (within_configured_pma_memory "CLINT (platform.clint)" (some IOMemory)
+            (← (to_bits_checked (l := 64) (33554432 : Int)))
+            (← (to_bits_checked (l := 64) (786432 : Int))))
       let sig_supported : Bool := false
       let sig_ok ← do
-        (pure ((not sig_supported) || (← (within_configured_pma_memory
-                "simple interrupt generator (platform.simple_interrupt_generator)" (some IOMemory)
-                (← (to_bits_checked (l := 64) (201326592 : Int)))
-                (zero_extend (m := 64) plat_sig_size)))))
+        if ((not sig_supported) : Bool)
+        then (pure true)
+        else
+          (within_configured_pma_memory
+            "simple interrupt generator (platform.simple_interrupt_generator)" (some IOMemory)
+            (← (to_bits_checked (l := 64) (201326592 : Int)))
+            (zero_extend (m := 64) plat_sig_size))
       (pure (pmas_ok && (clint_ok && sig_ok))))
 
 def check_pmp (_ : Unit) : Bool :=
@@ -1279,9 +1293,31 @@ def check_version_constraints (_ : Unit) : Bool :=
   else valid
 
 def config_is_valid (_ : Unit) : SailM Bool := do
-  (pure ((check_privs ()) && ((check_tvecs ()) && ((check_mstatus_fields ()) && ((check_physaddr_bits
-              ()) && ((← (check_mmu_config ())) && ((← (check_mem_layout ())) && ((← (check_mmio_devices
-                      ())) && ((check_vlen_elen ()) && ((check_vext_config ()) && ((check_pmp ()) && ((check_misc_extension_dependencies
-                            ()) && ((check_extension_param_constraints ()) && ((check_version_constraints
-                                ()) && (check_stateen_config ())))))))))))))))
+  if ((check_privs ()) : Bool)
+  then
+    (do
+      if ((check_tvecs ()) : Bool)
+      then
+        (do
+          if ((check_mstatus_fields ()) : Bool)
+          then
+            (do
+              if ((check_physaddr_bits ()) : Bool)
+              then
+                (do
+                  if ((← (check_mmu_config ())) : Bool)
+                  then
+                    (do
+                      if ((← (check_mem_layout ())) : Bool)
+                      then
+                        (pure ((← (check_mmio_devices ())) && ((check_vlen_elen ()) && ((check_vext_config
+                                  ()) && ((check_pmp ()) && ((check_misc_extension_dependencies ()) && ((check_extension_param_constraints
+                                        ()) && ((check_version_constraints ()) && (check_stateen_config
+                                          ())))))))))
+                      else (pure false))
+                  else (pure false))
+              else (pure false))
+          else (pure false))
+      else (pure false))
+  else (pure false)
 
