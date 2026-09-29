@@ -347,3 +347,21 @@ inner VM ring (`vmfault`, `uvmdealloc`, `proc_pagetable`, `uvmfree`,
 `uvmunmap`, `mappages`); L3 `walk`, `freewalk`, `uvmcreate`, `kalloc`,
 `kfree` and the appends; T.
 
+### 7.3 L1b as landed (2026-09-29, b69bd0fab)
+
+The copy ring and every block-holding chain above it: 84 files, +1958
+/ -1094 (31 Spec, 51 Proof, `ProcInv`, `FsSyscalls`).  Two findings:
+(i) `readi`/`writei` lend only on their USER arm (the kernel arm copies
+through no user page), so the name-lookup chain — `dirlookup`,
+`dirlink`, unlink's walk, kexec's reads — needed nothing; (ii) the
+posts cascade as one component through the file layer up to the
+sixteen syscall entries, all of which now expose the raised count, and
+the dispatcher (`SpecSyscall`, ∀-general) absorbs it internally.  Boot
+untouched.  Clean gate from scratch 1759/0; audits 13/13/14.  What
+remains of the sweep: L2 the inner VM ring (`vmfault` and the fault
+arm, `uvmdealloc`, `proc_pagetable`, `uvmfree`, the four `uvmunmap`s,
+`mappages`) — every caller of it is lend-aware now; L3 `walk`,
+`freewalk`, `uvmcreate`, `kalloc`/`kfree` and the four ledger appends
+requiring the lend, the token-free led forms deleted, the boot chains
+at `p = 0`; T the rows and the theorem.
+
