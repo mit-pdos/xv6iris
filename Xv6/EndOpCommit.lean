@@ -181,7 +181,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     -- output, already read: the next durable epoch at the law's guest `G`,
     -- with the seam at that same `G`
     logMirrorHalf (hlc := hlc) Mc ∗ fsCrashSeamAt (hlc := hlc) G V.cov ls ∗
-    durPair G (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
+    durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
     (∀ c' : CPU, eoPost k pidv dqp c')
@@ -225,7 +225,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iintro Hk Hpc
   iapply (eo_wh WH Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev n W L pidv dqp
       (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd Mc (logHdrBno ls) bs') ∗
-        fsReceiptAny (hlc := hlc) (fsRestrict (dvOfD L) (fsHomeList V.cov ls))))
+        eraSyncTok (hlc := hlc) (GF := GF)))
       k.proc (by k_norm_g) k.sie (by k_norm_g)
       hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt ⟨hnW, hnL⟩ hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk $Hauth $Hhdr $Hu1
@@ -270,8 +270,9 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   ihave Hrows := eo_rows_pack γfs ls W Lw true $$ [Hdone Hdirt]
   case' _ => iframe Hdone Hdirt
   -- THE COMMIT'S PICTURE: the mirror half back at the header image just laid
-  -- down (the receipt is dropped: the clear's copy is the one that is banked)
-  icases HQ1 with ⟨Hmir, -⟩
+  -- down, and the era's sync token out of the pair's merge (sync K3-3), still
+  -- under the write's later: the next step strips it
+  icases HQ1 with ⟨Hmir, Hstok⟩
   have hM1 := eo_install_hdrs W Lw Mc V.cov ls n bs1 hnW hhome hbs1.2.2
   -- THE INSTALL fupds, one per entry, out of one generator
   ihave #Hgen := eo_install_gen V.cov ls n W Lw (lmUpd Mc (logHdrBno ls) bs1) hnW hnL hnodup
@@ -353,7 +354,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
       (PartialMap.insert L (logHdrBno ls) bs1) pidv dqp
       (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd
           (lmInstall (lmUpd Mc (logHdrBno ls) bs1) (W.map (fun w => w.toNat)) Lw n)
-          (logHdrBno ls) bs') ∗ fsBank (hlc := hlc) (GF := GF)))
+          (logHdrBno ls) bs')))
       k.proc (by k_norm_g) k.sie (by k_norm_g)
       hj ?vproc ?vK ?vnoff ?vtier hgeom hdev hcl hdt ⟨rfl, by omega⟩ hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk0 $Hauth $Hhdr
@@ -440,9 +441,8 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   k_step_e (wp_s_j cpu _ (KA.«end_op» + 0x120#64) true 2096930#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  -- the clear's receipt: the mirror half at the clean picture, and the
-  -- commit's durability copy (persistent), banked by the tail
-  icases HQ3 with ⟨Hmir3, #Hnb⟩
+  -- the clear's receipt: the mirror half at the clean picture
+  icases HQ3 with Hmir3
   have hM3hdr : lmHdr (lmUpd (lmInstall (lmUpd Mc (logHdrBno ls) bs1)
       (W.map (fun w => w.toNat)) Lw n) (logHdrBno ls) bs2) ls = (0, []) := by
     unfold lmHdr; rw [lmUpd_view_eq]; exact hbs2.2.2
@@ -451,7 +451,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
       (dirtyClear D (W.map (fun w => w.toNat))) Lw n pidv dqp _ s9 (BitVec.ofNat 64 n)
       hK hwf hnoff hlocks htier hintena (by omega) ?htR _ hM3hdr
       (eo_final_tie W Lw Mc L V.cov ls n bs1 bs2 hnW hnodup hhome hrow hLw))
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hmir3 $Hnb $Hfr $HfrJ $Hpid $Hnext]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hmir3 $Hstok $Hfr $HfrJ $Hpid $Hnext]
   case htR =>
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, KCtx.withSpie_regs] <;>

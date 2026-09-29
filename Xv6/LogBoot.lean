@@ -96,7 +96,10 @@ theorem logCtx_mk (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     isLock γ.lk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart) ∗
     swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
+    snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+      (eraSyncHook (hlc := hlc) (GF := GF)) ∗
+    crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF)
     ⊢ logCtx γ γb γfs cov logstart dev := by
   unfold logCtx; iintro H; iexact H
 
@@ -214,13 +217,16 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
 /-! ## The lock's resource, at genesis -/
 
 /-- `Xv6.logFreeTok`, taken apart: the "log" spinlock's free token (what
-`initlog` seals the lock with, `MachCSL.kctx_newlockAt`) and the four
-genesis authorities `Xv6.logResAt_boot` puts into the lock's resource. -/
+`initlog` seals the lock with, `MachCSL.kctx_newlockAt`), the four genesis
+authorities `Xv6.logResAt_boot` puts into the lock's resource, and -- also
+into it (sync K3-2/K3-3) -- the helping slot's empty authority and the era's
+sync token. -/
 theorem logFreeTok_split (γ : LogNames) :
     logFreeTok (GF := GF) γ ⊢ lockFreeTok γ.lk ∗
       ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
-        logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) := by
-  unfold logFreeTok; iintro H; iexact H
+        logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
+      (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (hlc := hlc) (GF := GF) := by
+  unfold logFreeTok; iintro ⟨H1, H2, H3, H4, H5, H6, H7⟩; iframe H1 H2 H3 H4 H5 H6 H7
 
 /-- **`Xv6.logResAt` AT GENESIS** (Rocq's boot `log_res` pack).  `out = 0`,
 `cmt = false`, the ledger, the registry and the transactions all empty, the
@@ -234,12 +240,13 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordPointsTo lNcommit 4 (DFrac.own 1) nc ∗
     ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
       logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
-    -- THE GENESIS BANK (Rocq's, off the header CLEAR that ends recovery)
-    logFlushedBank (hlc := hlc) γ 1 ∗
+    -- THE HELPING SLOT, EMPTY, and THE ERA'S SYNC TOKEN (sync K3-3/K3-4),
+    -- off `Xv6.logFreeTok`
+    (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
     logStateAt γb γfs cov logstart 0 [] (opPending (∅ : RegMapF OpEntry)) curCtx
     ⊢ logResAt (GF := GF) γ γb γfs cov logstart curCtx := by
   unfold logResAt
-  iintro ⟨Hout, Hcmt, Hnc, ⟨Hops, Hep, Hreg, Htx⟩, #Hbank, Hbatch⟩
+  iintro ⟨Hout, Hcmt, Hnc, ⟨Hops, Hep, Hreg, Htx⟩, Hhelp, Hstok, Hbatch⟩
   ihave Hout := (show wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx lOut 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hout
   ihave Hcmt := (show wordPointsTo (GF := GF) lCmt 4 (DFrac.own 1) 0#32 ⊢
@@ -264,41 +271,46 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · iexact Hnc
   isplitl [Hops]
   · iexact Hops
-  isplitr [Hep Hreg Htx Hbatch]
+  isplitr [Hep Hreg Htx Hbatch Hhelp Hstok]
   · ipureintro; rw [hlistO]; rfl
-  isplitr [Hep Hreg Htx Hbatch]
+  isplitr [Hep Hreg Htx Hbatch Hhelp Hstok]
   · ipureintro
     refine ⟨fun i e h => absurd ((hempO i).symm.trans h) (by simp), by omega, by simp⟩
-  isplitr [Hep Hreg Htx Hbatch]
+  isplitr [Hep Hreg Htx Hbatch Hhelp Hstok]
   · ipureintro; intro i _; exact hempO i
   isplitl [Hep]
   · iexact Hep
-  isplitr [Hreg Htx Hbatch]
+  isplitr [Hreg Htx Hbatch Hhelp Hstok]
   · ipureintro; omega
   isplitl [Hreg]
   · iexact Hreg
-  isplitr [Htx Hbatch]
+  isplitr [Htx Hbatch Hhelp Hstok]
   · ipureintro; intro i _; exact hempX i
-  isplitr [Htx Hbatch]
+  isplitr [Htx Hbatch Hhelp Hstok]
   · ipureintro; intro i e h; exact absurd ((hempO i).symm.trans h) (by simp)
-  isplitr [Htx Hbatch]
+  isplitr [Htx Hbatch Hhelp Hstok]
   · ipureintro; intro i p h; exact absurd ((hempX i).symm.trans h) (by simp)
   isplitl [Htx]
   · iexact Htx
-  isplitr [Hbatch]
+  isplitr [Hbatch Hhelp Hstok]
   · ipureintro; intro i _; exact hempT i
-  isplitr [Hbatch]
+  isplitr [Hbatch Hhelp Hstok]
   · ipureintro; rw [hlistO, hlistT]; rfl
-  isplitr [Hbatch]
-  · iexact Hbank
+  isplitl [Hhelp]
+  · iapply logHelp_empty $$ Hhelp
   isimp only [Bool.false_eq_true, if_false]
   iexists 0, ([] : List Nat)
-  isplitr [Hbatch]
+  isplitr [Hbatch Hstok]
   · ipureintro; rw [opSum_empty]; unfold LOGBLOCKS; omega
-  isplitr [Hbatch]
+  isplitr [Hbatch Hstok]
   · ipureintro; intro i e h; exact absurd ((hempO i).symm.trans h) (by simp)
-  isplitr [Hbatch]
+  isplitr [Hbatch Hstok]
   · ipureintro; intro i p h; exact absurd ((hempX i).symm.trans h) (by simp)
+  -- genesis is quiescent, and recovery left the batch empty (sync K1)
+  isplitr [Hbatch Hstok]
+  · ipureintro; intro _; rfl
+  -- the era's sync token, sealed in at genesis (sync K3-3)
+  iframe Hstok
   iexact Hbatch
 
 end

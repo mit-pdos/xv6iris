@@ -59,7 +59,7 @@ theorem fileAopen_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q :
       with ⟨Hbody, Hclose⟩
     unfold appBody
     simp only [hap]
-    icases Hbody with ⟨%I', >Hh, Hp, >%hdom, #Hx⟩
+    icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
     ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
     subst hI
     ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ fdq r q s ∗
@@ -70,7 +70,7 @@ theorem fileAopen_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q :
     imod Hclose $$ [Hh Hp]
     · inext
       iexists I
-      iframe Hh Hp Hx
+      iframe Hh Hp
       ipureintro; exact hdom
     imodintro
     iframe Hka Hd

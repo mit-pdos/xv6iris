@@ -134,7 +134,7 @@ theorem fileClaim_read (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
     with ⟨Hbody, Hclose⟩
   unfold appBody
   simp only [hap]
-  icases Hbody with ⟨%I', >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
   ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ fdq r q s ∗
@@ -150,7 +150,7 @@ theorem fileClaim_read (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hdom
   imodintro
   iframe Hka Hd
@@ -179,7 +179,7 @@ theorem fileClaim_read_esc (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     with ⟨Hbody, Hclose⟩
   unfold appBody
   simp only [hap]
-  icases Hbody with ⟨%I', >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
   ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ escTok (hlc := hlc) g ∗
@@ -196,7 +196,7 @@ theorem fileClaim_read_esc (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hdom
   imodintro
   iframe Hka Htok
@@ -225,7 +225,7 @@ theorem fileEscrow_read_at (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (
     with ⟨Hbody, Hclose⟩
   unfold appBody
   simp only [hap]
-  icases Hbody with ⟨%I', >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
   ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗
@@ -237,7 +237,7 @@ theorem fileEscrow_read_at (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hdom
   imodintro
   iframe Hka
@@ -308,7 +308,7 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     with ⟨Hbody, Hclose⟩
   unfold appBody
   simp only [hap]
-  icases Hbody with ⟨%I', >Hh, >Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, >Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
   ihave ⟨Hp, Hres⟩ : iprop(filePred (hlc := hlc) c r (absView I) ∗
@@ -359,7 +359,7 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hdom
   imodintro
   iframe Hka Hres

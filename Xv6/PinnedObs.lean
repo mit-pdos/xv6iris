@@ -194,7 +194,7 @@ theorem pobs_aopen (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persi
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I', >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %heq := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst heq
   ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp]
@@ -204,7 +204,7 @@ theorem pobs_aopen (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persi
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hdom
   imodintro
   iframe Hka Hc
@@ -235,7 +235,7 @@ theorem pobs_hop (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persist
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
     unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom, #Hx⟩
+    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
     ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp]
     · inext
       iapply Hcl $$ Hp
@@ -244,7 +244,7 @@ theorem pobs_hop (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persist
     imod Hclose $$ [Hh Hp]
     · inext
       iexists I
-      iframe Hh Hp Hx
+      iframe Hh Hp
       ipureintro; exact hdom
     imodintro
     iframe HF
@@ -418,7 +418,7 @@ theorem pobs_hop_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF)
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
     unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom, #Hx⟩
+    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
     ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ K ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp HK]
     · inext
       iapply Hcl $$ HK Hp
@@ -427,7 +427,7 @@ theorem pobs_hop_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF)
     imod Hclose $$ [Hh Hp]
     · inext
       iexists I
-      iframe Hh Hp Hx
+      iframe Hh Hp
       ipureintro; exact hdom
     imodintro
     iframe HF
@@ -566,7 +566,7 @@ theorem pobs_hop_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [P
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
     unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom, #Hx⟩
+    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
     ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ K ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp HK]
     · inext
       iapply Hcl $$ HK Hp
@@ -575,7 +575,7 @@ theorem pobs_hop_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [P
     imod Hclose $$ [Hh Hp]
     · inext
       iexists I
-      iframe Hh Hp Hx
+      iframe Hh Hp
       ipureintro; exact hdom
     imodintro
     iframe HF

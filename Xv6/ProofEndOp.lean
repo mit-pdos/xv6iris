@@ -65,10 +65,13 @@ checkout at a name and is CHAINED by value through the four value-carrying
 sequential permits: every slot fill (`fsLogfillV_seqPermit`), the COMMIT
 write (`fsCommitL_seqPermit`, consuming the epoch: the durable state jumps to
 `L|home`), every install (`fsInstallV_seqPermit`) and the preserving CLEAR
-(`fsClearKeep_seqPermit`), whose copy (`fsBank`) the tail deposits in the
-bank WITH the epoch bump (`logFlushedBank_mk`).  The empty-log path banks the
-copy it already had (`logFlushedBank_recycle`).  Row (b) at the deposit is
-computed off the chain (`Xv6.eo_final_tie`).
+(`fsClearKeep_seqPermit`).  THE ERA'S SYNC TOKEN (Rocq sync K3-3) leaves
+`logResAt` with the batch, goes into the pair's merge, and comes back out of
+the commit write (or, on the empty-log path, off the pair's right arm) for
+the tail to re-deposit; the tail runs THE FLIP (K3-4: every Pending hook of
+the helping slot fired at a ghost commit, `Xv6.logGhostCommit_loop`) before
+it clears `committing`.  Row (b) at the deposit is computed off the chain
+(`Xv6.eo_final_tie`).
 
 STAGES (few-seconds rule): `Xv6/EndOpCalls.lean` (call sites, epilogue, the
 non-committer's arm), `Xv6/EndOpTail.lean`, `Xv6/EndOpCommit.lean`,
@@ -218,17 +221,17 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   -- ===== the lock's payload =====
   icases eo_res_elim γ γb γfs V.cov ls curCtx $$ Hpay
     with ⟨%out, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-      Hout, Hnc, Hops, Hep, Hreg, Htx, #Hbank,
+      Hout, Hnc, Hops, Hep, Hreg, Htx,
       %hlen, %hbud, %hout3, %hfresho, %hE, %hfreshl, %hlive, %hcap, %hfresht, %hTlen, Harm⟩
   isimp only [wordAtN_cur] at Hout
   ihave %hpos := eo_out_pos γ om u $$ Hops Hopb
   have hout1 : 1 ≤ out := by omega
-  icases Harm with ⟨⟨Hcmt, Hbatch⟩ | ⟨Hcmt, %hout0⟩⟩
+  icases Harm with ⟨⟨Hcmt, Hhelp, Hbatch⟩ | ⟨Hcmt, -, %hout0⟩⟩
   rotate_left 1
   exact absurd hout0 (by omega)
   isimp only [wordAtN_cur] at Hcmt
-  icases eoBatch_elim γ γb γfs V.cov ls om E X curCtx $$ Hbatch
-    with ⟨%n, %LB, %hsum, %hsets, %hregLB, Hst⟩
+  icases eoBatch_elim γ γb γfs V.cov ls om E X out curCtx $$ Hbatch
+    with ⟨%n, %LB, %hsum, %hsets, %hregLB, %hquiet, Hstok, Hst⟩
   have hpins : ∀ (R' : RegMap) (v1 v2 v3 v4 : BitVec 64),
       eoPins k R' logAddr (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) →
       eoPins k ((((R'.set 15#5 v1).set 15#5 v2).set 18#5 v3).set 15#5 v4) logAddr v3
@@ -336,11 +339,13 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     icases eoOpen_elim γb γfs V.cov ls n W L D eoNullLw 0 $$ Hopen
       with ⟨HlhN, Hblk, Hjunk, HauthL, HauthD, Hcov, Hhdr, Hdone, Hrest, Hpool⟩
     iapply wpLoop_fupd
-    imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx
+    imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx Hstok
       with ⟨⟨%G, #HseamG, Hepoch⟩, HauthL, Htx⟩
     imodintro
-    ihave Hepoch := (show snapLawOut (hlc := hlc) G L (fsHomeList V.cov ls) ⊢
-        durPair G (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) from by
+    ihave Hepoch := (show snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) L
+          (fsHomeList V.cov ls) ⊢
+        durPair G (eraSyncTok (hlc := hlc) (GF := GF))
+          (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) from by
       unfold snapLawOut; exact .rfl) $$ Hepoch
     ihave Hopen := eoOpen_intro γb γfs V.cov ls n W L D eoNullLw 0
       $$ [HlhN Hblk Hjunk HauthL HauthD Hcov Hhdr Hdone Hrest Hpool]
@@ -353,10 +358,11 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       (PartialMap.delete T ti) nxo nxt nxl (by omega) (fun i e hi => hbud i e (hsub' i e hi))
       (by omega) rfl hfresho' hE hfreshl (fun i e hi => hlive i e (hsub' i e hi)) hcap
       hfresht' hTlen'
-      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx]
+      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp]
     case' _ =>
       iframe Hout Hcmt Hnc Hops Hep Hreg Htx
-      iexact Hbank
+      -- the helping slot at the committing arm (`Xv6.logHelp_cells`)
+      iapply logHelp_cells γ nc 1 0 false true (fun _ => Or.inl rfl) $$ Hhelp
     -- +0x36 mv a0,s1 ; +0x38 jal release
     -- +0x36 mv a0,s1 ; +0x38 jal release
     k_step (wp_s_add cpu _ (KA.«end_op» + 0x36#64) true 10#5 0#5 9#5 (by decide))
@@ -502,14 +508,13 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
         with [KCtx.rget_zero, MachCSL.signExtend_ofNat32 0 (by omega), eo_bgtz 0 (by omega),
           decide_eq_false (by omega)]
       iintro Hk Hpc
-      -- THE EMPTY-LOG PATH BANKS THE COPY IT ALREADY HAD (Rocq
-      -- `log_flushed_bank_recycle`): no disk write happened, and the tail
-      -- still bumps the counter
-      ihave #Hnb := logFlushedBank_recycle γ E $$ Hbank
+      -- THE TOKEN COMES BACK OUT OF THE PAIR'S RIGHT ARM (Rocq sync K3-3): no
+      -- header write, so the merge is never applied
+      ihave Hstok := durPair_tok G _ _ $$ Hepoch
       iapply (eo_tail AC RE WK Γ cpu k s0 p0 γ γb γfs V.cov ls dev L D eoNullLw 0 pidv dqp _
           logAddr (BitVec.ofNat 64 0) hK hwf hnoff hlocks htier hintena
           (by unfold LOGBLOCKS; omega) ?hRt M0 hM0hdr hM0tie)
-        $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hmir $Hnb $Hfr $Hjk $Hpid $Hnext]
+        $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hmir $Hstok $Hfr $Hjk $Hpid $Hnext]
       case hRt =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
@@ -532,18 +537,21 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [eoK_sie, KCtx.rget_zero, eo_bnez_out (out - 1) (by omega) (by omega)]
     iintro Hk Hpc
-    ihave Hbatch := eoBatch_intro γ γb γfs V.cov ls (PartialMap.delete om oi) E X curCtx n LB
-      (opPending om) (by omega) (fun i e hi => hsets i e (hsub' i e hi)) hregLB $$ Hst
+    ihave Hbatch := eoBatch_intro γ γb γfs V.cov ls (PartialMap.delete om oi) E X (out - 1)
+      curCtx n LB (opPending om) (by omega) (fun i e hi => hsets i e (hsub' i e hi)) hregLB
+      (fun h => absurd h (by omega)) $$ [Hstok Hst]
+    · iframe Hstok Hst
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
     ihave Hpay := eo_res_intro_f γ γb γfs V.cov ls curCtx (out - 1) nc
       (PartialMap.delete om oi) E X (PartialMap.delete T ti) nxo nxt nxl
       hlen' (fun i e hi => hbud i e (hsub' i e hi)) (by omega) hfresho' hE hfreshl
       (fun i e hi => hlive i e (hsub' i e hi)) hcap hfresht' hTlen'
-      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch]
     case' _ =>
       iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-      iexact Hbank
+      -- the helping slot at `out - 1 ≠ 0` (`Xv6.logHelp_cells`)
+      iapply logHelp_cells γ nc out (out - 1) false false (fun _ => Or.inr (by omega)) $$ Hhelp
     iapply (eo_fast RE WK Γ cpu k s0 p0 γ γb γfs V.cov ls dev pidv dqp _ logAddr
         (BitVec.ofNat 64 (out - 1)) hK hwf hnoff hlocks htier hintena
         (hpins R1 _ _ _ _ hR1))

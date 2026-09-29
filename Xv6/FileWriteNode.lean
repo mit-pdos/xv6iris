@@ -93,7 +93,7 @@ theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFix
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
@@ -103,7 +103,7 @@ theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFix
   · inext
     dsimp only
     iexists I
-    iframe Hh Hx
+    iframe Hh
     isplitl [Hp]
     · iexact Hp
     · ipureintro; exact hdom

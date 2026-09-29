@@ -190,10 +190,13 @@ exception and the collection reads the whole cache map off the byte view. -/
 theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32) (L : BlockMap) :
     logCtx (GF := GF) γ γb γfs cov ls dev ⊢ fsCacheAuth γfs L -∗ logTxAuth γ ∅ -∗
+      -- the era's token, checked out of `logResAt` with the batch (sync K3-3):
+      -- the law puts it into the pair
+      eraSyncTok (hlc := hlc) (GF := GF) -∗
       |={⊤}=> ((∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov ls ∗
-          snapLawOut (hlc := hlc) G L (fsHomeList cov ls)) ∗
+          snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) L (fsHomeList cov ls)) ∗
         fsCacheAuth γfs L ∗ logTxAuth γ ∅) := by
-  iintro #Hctx HcL Ht
+  iintro #Hctx HcL Ht HT
   ihave #Hlaw := logCtx_snapLaw γ γb γfs cov ls dev $$ Hctx
   ihave #Hseal := logCtx_seal γ γb γfs cov ls dev $$ Hctx
   ihave #Hrow := logCtx_bytes γ γb γfs cov ls dev $$ Hctx
@@ -214,7 +217,7 @@ theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   ihave %hsub := ghost_map_lookup_big C $$ HcL HC
   have hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov ls b := by
     intro b; rw [hok.dom b, mem_fsHomeList]
-  imod snapLaw_run γ γfs cov ls Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht
+  imod snapLaw_run γ γfs cov ls _ Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht HT
     with ⟨⟨%G, #Hseam, Hout⟩, Ha, Ht⟩
   imod Hclose $$ [Ha HC Hxa] with -
   · inext
@@ -250,13 +253,13 @@ theorem eo_commit_fam (G : GName → IProp GF) (cov : Std.ExtTreeSet Nat compare
         (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) Mc -∗
-      durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       ∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
         ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
         diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
           (some (1024 * logHdrBno ls, bs'))
           iprop(logMirrorHalf (hlc := hlc) (lmUpd Mc (logHdrBno ls) bs') ∗
-            fsReceiptAny (hlc := hlc) (fsRestrict (dvOfD L) (fsHomeList cov ls))) := by
+            eraSyncTok (hlc := hlc) (GF := GF)) := by
   iintro #Hs #Hr #Hsw Hm He %bs' %hl %_ %hd
   have hin : ∀ b, b ∈ W.map (fun w => w.toNat) → b ∈ cov ∧ logRegion ls b = false := by
     intro b hb
@@ -273,7 +276,7 @@ theorem eo_commit_fam (G : GName → IProp GF) (cov : Std.ExtTreeSet Nat compare
     have hi : i < n := by have := (List.getElem?_eq_some_iff.1 hw).1; omega
     rw [hMcslot i hi]
     exact hLw i w hw
-  iapply fsCommitL_seqPermit G cov ls Mc Mc.view L n (W.map (fun w : BitVec 32 => w.toNat)) bs'
+  iapply fsCommitL_seqPermit G _ cov ls Mc Mc.view L n (W.map (fun w : BitVec 32 => w.toNat)) bs'
     hl hd (by omega) hnodup hin hinsb hMchdr (fun _ _ => rfl) (fun b hb hn => hrow b hb hn) hslot
     $$ Hs Hr Hsw Hm He
 
@@ -305,9 +308,8 @@ theorem eo_install_gen (cov : Std.ExtTreeSet Nat compare) (ls n : Nat)
     (eo_mapW_of W i w hw) (hhome w hwm).1 (hhome w hwm).2 (hM1 i (by omega)) $$ Hs Hr Hsw HR
 
 /-- THE PRESERVING CLEAR's family (Rocq `eo_commit`'s second `write_head`,
-through `fs_clear_keep_seq_permit`): the on-disk log is emptied, the mirror
-goes back to its clean picture, and the copy the clear takes is the commit's
-own durable state. -/
+through `fs_clear_keep_seq_permit`): the on-disk log is emptied and the mirror
+goes back to its clean picture. -/
 theorem eo_clear_fam (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (Ws : List Nat)
     (M2 : LogMirror) (hnL : n ≤ LOGBLOCKS) (hM2 : lmHdr M2 ls = (n, Ws))
     (hcaught : ∀ j b, Ws[j]? = some b → M2.view b = M2.view (logSlotBno ls j)) :
@@ -320,8 +322,7 @@ theorem eo_clear_fam (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (Ws : List 
         ⌜hdrDec bs' = (0, ([] : List (BitVec 32)).map (fun w => w.toNat))⌝ -∗
         diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
           (some (1024 * logHdrBno ls, bs'))
-          iprop(logMirrorHalf (hlc := hlc) (lmUpd M2 (logHdrBno ls) bs') ∗
-            fsBank (hlc := hlc) (GF := GF)) := by
+          iprop(logMirrorHalf (hlc := hlc) (lmUpd M2 (logHdrBno ls) bs')) := by
   iintro #Hs #Hr #Hsw Hm %bs' %hl %hn0 %_
   iapply fsClearKeep_seqPermit cov ls M2 M2.view n Ws bs' hl hn0 hnL hM2 (fun _ _ => rfl)
     hcaught $$ Hs Hr Hsw Hm

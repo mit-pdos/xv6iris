@@ -119,7 +119,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
@@ -131,7 +131,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
     · inext
       dsimp only
       iexists I'
-      iframe Hh Hx
+      iframe Hh
       isplitl []
       · ileft; iexact Ht
       · ipureintro; exact hdom
@@ -168,7 +168,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   · inext
     dsimp only
     iexists I'
-    iframe Hh Hx
+    iframe Hh
     isplitl
     · unfold filePred fState fCore fEscLive fEscWrap
       iexact Hnew
@@ -195,7 +195,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
   imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0)).timeless $$ Hp with Hp
   unfold filePred
@@ -204,7 +204,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
     · inext
       dsimp only
       iexists I0
-      iframe Hka Hx
+      iframe Hka
       isplitl []
       · ileft; iexact Ht
       · ipureintro; exact hdom
@@ -238,7 +238,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   · inext
     dsimp only
     iexists I0
-    iframe Hka Hx
+    iframe Hka
     isplitl
     · iright
       isplitr
@@ -274,7 +274,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom, #Hx⟩
+  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
   imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0)).timeless $$ Hp with Hp
   unfold filePred
@@ -283,7 +283,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
     · inext
       dsimp only
       iexists I0
-      iframe Hka Hx
+      iframe Hka
       isplitl []
       · ileft; iexact Ht
       · ipureintro; exact hdom
@@ -317,7 +317,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   · inext
     dsimp only
     iexists I0
-    iframe Hka Hx
+    iframe Hka
     isplitl
     · unfold filePred fState fCore fEscLive fEscWrap
       iexact Hnew

@@ -1,8 +1,11 @@
 /-
 `end_op`'s stage 2 (a split of `Xv6/ProofEndOp.lean`): the tail at `+0x42`
--- re-acquire, the epoch bump WITH THE BANK, the deposit, release.
+-- re-acquire, THE FLIP (sync K3-4: the helping slot's Pending hooks fired at
+a ghost commit), the epoch bump, the deposit (with the era's sync token back
+home, K3-3), release.
 -/
 import Xv6.EndOpCalls
+import Xv6.LogGhostCommit
 
 namespace Xv6
 
@@ -37,6 +40,34 @@ theorem eo_word_ex (a : BitVec 64) (v : BitVec 32) :
       ∃ u : BitVec 32, wordPointsTo a 4 (DFrac.own 1) u := by
   iintro H; iexists v; iexact H
 
+/-- THE TAIL'S QUIESCENT LOAN (Rocq `log_state_quiet_acc`, over the batch the
+committer holds checked out at `n = 0`): the empty transaction authority, the
+cache authority and the mirror half with its two rows, returned unchanged. -/
+theorem eoOpen_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (L : BlockMap) (D : RegMapF Bool)
+    (Lw : Nat → List (BitVec 8)) (t : Nat) (M : LogMirror)
+    (hMhdr : lmHdr M ls = (0, [])) (hMtie : logMirrorTieBody M L cov ls []) :
+    eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf (hlc := hlc) M ∗
+      logTxAuth γ (∅ : RegMapF Unit) ⊢
+      logQuiet (hlc := hlc) γ γfs cov ls L M ∗
+      (logQuiet (hlc := hlc) γ γfs cov ls L M -∗
+        eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ∗ logMirrorHalf (hlc := hlc) M ∗
+        logTxAuth γ (∅ : RegMapF Unit)) := by
+  iintro ⟨Hopen, Hmir, Htx⟩
+  icases eoOpen_elim γb γfs cov ls 0 [] L D Lw t $$ Hopen
+    with ⟨HlhN, Hblk, Hjunk, HauthL, HauthD, Hcov, Hhdr, Hdone, Hrest, Hpool⟩
+  isplitl [HauthL Hmir Htx]
+  · iapply (logQuiet_unfold γ γfs cov ls L M).2
+    iframe HauthL Hmir Htx
+    isplitr
+    · ipureintro; exact hMhdr
+    · ipureintro; exact hMtie
+  iintro Hq
+  icases (logQuiet_unfold γ γfs cov ls L M).1 $$ Hq with ⟨Htx, HauthL, Hmir, -, -⟩
+  iframe Hmir Htx
+  iapply eoOpen_intro γb γfs cov ls 0 [] L D Lw t
+  iframe HlhN Hblk Hjunk HauthL HauthD Hcov Hhdr Hdone Hrest Hpool
+
 set_option maxHeartbeats 40000000 in
 theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -54,9 +85,10 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     logCtx γ γb γfs cov ls dev ∗
     eoOpen γb γfs cov ls 0 [] L D Lw t ∗
-    -- the era's mirror half at the clean picture, and THE COMMIT'S DURABILITY
-    -- COPY (Rocq `eo_tail`'s `fs_bank`), banked below with the epoch bump
-    logMirrorHalf (hlc := hlc) M ∗ fsBank (hlc := hlc) (GF := GF) ∗
+    -- the era's mirror half at the clean picture, and THE ERA'S SYNC TOKEN,
+    -- back from the commit (the header write's merge, or the empty-log path's
+    -- right arm; sync K3-3), re-deposited below
+    logMirrorHalf (hlc := hlc) M ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameJ (k.regs 2#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -67,7 +99,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   have hKi : 72 ≤ k.avail - 8 := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, Hopen, Hmir, #Hnewbank, Hfr, Hjk, Hpid, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, Hopen, Hmir, Hstok, Hfr, Hjk, Hpid, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   -- +0x42 auipc s1,0x1e ; +0x46 addi s1,s1,1488 ; +0x4a mv a0,s1 ; +0x4c jal acquire
@@ -120,19 +152,19 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   -- the lock's payload, opened: the committing flag must be SET (we set it)
   icases eo_res_elim γ γb γfs cov ls curCtx $$ Hpay
     with ⟨%out, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-      Hout, Hnc, Hops, Hep, Hreg, Htx, #Hbank,
+      Hout, Hnc, Hops, Hep, Hreg, Htx,
       %hlen, %hbud, %hout3, %hfresho, %hE, %hfreshl, %hlive, %hcap, %hfresht, %hTlen, Harm⟩
   isimp only [wordAtN_cur] at Hout
   isimp only [wordAtN_cur] at Hnc
-  icases Harm with ⟨⟨Hcmt, Hbatch⟩ | ⟨Hcmt, %hout0⟩⟩
+  icases Harm with ⟨⟨Hcmt, -, Hbatch⟩ | ⟨Hcmt, Hhelp, %hout0⟩⟩
   · -- IMPOSSIBLE: the batch is in our hand, so the payload cannot hold one
     ihave Hauth := (show eoOpen (GF := GF) γb γfs cov ls 0 [] L D Lw t ⊢
         fsCacheAuth γfs L from by
       unfold eoOpen
       iintro ⟨-, -, -, H4, -, -, -, -, -, -⟩
       iexact H4) $$ Hopen
-    icases eoBatch_elim γ γb γfs cov ls om E X curCtx $$ Hbatch
-      with ⟨%n2, %LB2, -, -, -, Hst⟩
+    icases eoBatch_elim γ γb γfs cov ls om E X out curCtx $$ Hbatch
+      with ⟨%n2, %LB2, -, -, -, -, -, Hst⟩
     icases eo_state_cache γb γfs cov ls n2 LB2 (opPending om) curCtx $$ Hst with ⟨%L2, Hauth2⟩
     ihave %hF := eo_cache_excl γfs L L2 $$ Hauth Hauth2
     exact hF.elim
@@ -143,6 +175,24 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   have hsum0 : opSum om = 0 := by rw [opSum_eq, hom0]; rfl
   have hempty : ∀ (i : Nat) (e : OpEntry), PartialMap.get? om i ≠ some e :=
     eo_map_empty om hlen
+  -- ================ THE FLIP (Rocq sync K3-4, `eo_tail`) ================
+  -- `committing` is STILL set and "log" is re-held, so no waiter can deposit
+  -- or wake in between: this is the instant every Pending hook of the helping
+  -- slot fires.  The batch is checked out at `n = 0` and, with `out = 0`, the
+  -- transaction map is empty, so the batch lends the quiescent loan; the
+  -- slot's Pending hooks come out; the ghost commit fires them all at a fresh
+  -- durable pair with the era's token and hands back each `Q`, which the
+  -- re-deposit below feeds to the extract's wand -- the slot re-closes at the
+  -- NEW `ncommit`.
+  have hT0 : T = ∅ := eo_tx_empty T om hTlen hlen
+  subst hT0
+  icases eoOpen_quietAcc γ γb γfs cov ls L D Lw t M hMhdr hMtie $$ [Hopen Hmir Htx]
+    with ⟨Hq, Hqclose⟩
+  · iframe Hopen Hmir Htx
+  icases logHelp_extract γ nc 0 true $$ Hhelp with ⟨%Qs, Hhooks, Hflip⟩
+  iapply logGhostCommit_loop cpu Qs γ γb γfs cov ls dev L M $$ Hctx Hq Hstok Hhooks
+  iintro Hq Hstok HQs
+  icases Hqclose $$ Hq with ⟨Hopen, Hmir, Htx⟩
   -- +0x50 sw zero,32(s1)
   k_step (wp_s_sw cpu _ (KA.«end_op» + 0x50#64) false 32#12 9#5 0#5 (by decide) (1#32 : BitVec 32))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -164,28 +214,29 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   iapply wpLoop_bupd
   imod logEpochBump γ E $$ Hep with Hep
   imodintro
-  -- ...AND THE BANK MOVES WITH IT (Rocq `log_flushed_bank_mk`): the counter
-  -- has just reached `E + 1` and the copy the commit took off the clear is
-  -- the state THAT batch made durable
-  icases logFlushedBank_mk γ (E + 1) $$ Hep Hnewbank with ⟨Hep, #Hbank2⟩
-  -- the batch goes back, at n = 0
+  -- THE FLIP LANDS (sync K3-4): each hook's `Q` goes into its escrow, every
+  -- entry is Done, and the slot re-closes at the cells this re-deposit writes
+  iapply wpLoop_fupd
+  imod Hflip $$ %ncv %0 %false HQs with Hhelp
+  imodintro
+  -- the batch goes back, at n = 0, with the era's token HOME again (K3-3)
   ihave Hst := eoOpen_to_batch γb γfs cov ls L D Lw t ht (opPending om) M hMhdr hMtie
     $$ Hmir Hopen
-  ihave Hbatch := eoBatch_intro γ γb γfs cov ls om (E + 1) X curCtx 0 ([] : List Nat)
+  ihave Hbatch := eoBatch_intro γ γb γfs cov ls om (E + 1) X 0 curCtx 0 ([] : List Nat)
     (opPending om) (by rw [hsum0]; unfold LOGBLOCKS; omega)
     (fun i e hi => absurd hi (hempty i e))
-    (fun i p hp hE1 => absurd (hcap i p hp) (by omega)) $$ Hst
+    (fun i p hp hE1 => absurd (hcap i p hp) (by omega)) (fun _ => rfl) $$ [Hstok Hst]
+  · iframe Hstok Hst
   isimp only [← wordAtN_cur] at Hout
   isimp only [← wordAtN_cur] at Hcmt
   isimp only [← wordAtN_cur] at Hnc
-  ihave Hpay := eo_res_intro_f γ γb γfs cov ls curCtx 0 ncv om (E + 1) X T nxo nxt nxl
+  ihave Hpay := eo_res_intro_f γ γb γfs cov ls curCtx 0 ncv om (E + 1) X ∅ nxo nxt nxl
     hlen hbud (by omega) hfresho (by omega) hfreshl
     (fun i e hi => absurd hi (hempty i e))
     (fun i p hp => le_trans (hcap i p hp) (by omega)) hfresht hTlen
-    $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+    $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch]
   case' _ =>
-    iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-    iexact Hbank2
+    iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch
   -- +0x5a mv a0,s1 ; +0x5c jal wakeup
   k_step (wp_s_add cpu _ (KA.«end_op» + 0x5a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

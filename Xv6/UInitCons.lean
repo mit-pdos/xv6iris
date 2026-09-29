@@ -440,14 +440,14 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
           imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
             with ⟨Hbody, Hclose⟩
           unfold appBody
-          icases Hbody with ⟨%I0, >Hh, >Hp, >%hdom, #Hx⟩
+          icases Hbody with ⟨%I0, >Hh, >Hp, >%hdom⟩
           ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I' I0 $$ Hka Hh
           subst hI
           imod Hshoot $$ %(absView I') %i %hpr Hp with ⟨Hp, Hm⟩
           imod Hclose $$ [Hh Hp]
           · inext
             iexists I'
-            iframe Hh Hp Hx
+            iframe Hh Hp
             ipureintro; exact hdom
           imodintro
           iframe Hka
@@ -510,7 +510,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
       imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
         with ⟨Hbody, Hclose⟩
       unfold appBody
-      icases Hbody with ⟨%I0, >Hh, Hp, >%hdom, #Hx⟩
+      icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
       ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I0 $$ Hka Hh
       subst hI
       ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ (⌜Pure (absView I)⌝ ∨ T))) $$ [Hp]
@@ -525,7 +525,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
       imod Hclose $$ [Hh Hp]
       · inext
         iexists I
-        iframe Hh Hp Hx
+        iframe Hh Hp
         ipureintro; exact hdom
       imodintro
       iframe Hka
@@ -560,7 +560,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
       imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
         with ⟨Hbody, Hclose⟩
       unfold appBody
-      icases Hbody with ⟨%I0, >Hh, Hp, >%hdom, #Hx⟩
+      icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
       ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I0 $$ Hka Hh
       subst hI
       ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ K ∗ (⌜Pv (absView I)⌝ ∨ T))) $$ [Hp HK0]
@@ -571,7 +571,7 @@ theorem init_cons_mknod_bundle (γfs : FsNames) (Pure : Aview → Prop) (Made : 
       imod Hclose $$ [Hh Hp]
       · inext
         iexists I
-        iframe Hh Hp Hx
+        iframe Hh Hp
         ipureintro; exact hdom
       imodintro
       iframe Hka

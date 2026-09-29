@@ -47,7 +47,7 @@ def eoLoopInv (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     eoOpen γb γfs cov ls n W L D Lw t -∗
-    logMirrorHalf (hlc := hlc) Mc -∗ durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+    logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
     (∀ c' : CPU, eoPost k pidv dqp c') -∗
@@ -71,7 +71,7 @@ theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
-        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
         (∀ c' : CPU, eoPost k pidv dqp c') -∗
@@ -95,7 +95,7 @@ theorem eoLoopInv_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
-        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
         (∀ c' : CPU, eoPost k pidv dqp c') -∗
@@ -295,7 +295,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw t ∗
-    logMirrorHalf (hlc := hlc) Mc ∗ durPair G (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
+    logMirrorHalf (hlc := hlc) Mc ∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
     (∀ c' : CPU, eoPost k pidv dqp c') ∗
@@ -650,8 +650,8 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   -- the chained picture, one fill further
   obtain ⟨hMchdr', hMcslot', hrow', hres⟩ :=
     eo_fill_facts W Lw Mc L V.cov ls t bsD htL hMchdr hMcslot hrow
-  ihave Hepoch := (show durPair (GF := GF) G (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ⊢
-      durPair G (fsRestrict (dvOfD (PartialMap.insert L (logSlotBno ls t) bsD))
+  ihave Hepoch := (show durPair (GF := GF) G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ⊢
+      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD (PartialMap.insert L (logSlotBno ls t) bsD))
         (fsHomeList V.cov ls)) from by rw [hres]) $$ Hepoch
   -- ===== +0xf8  addiw s2,s2,1 ; addi s5,s5,4 ; lw a5,44(s4) ; blt s2,a5
   k_step_e (wp_s_addiw cpu _ (KA.«end_op» + 0xf8#64) true 1#12 18#5 18#5 (by decide))
