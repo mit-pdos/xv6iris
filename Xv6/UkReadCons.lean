@@ -30,10 +30,11 @@ Unreached (not ported): `wp_uk_ecall_read_cons` (the plain-ledger form).
    `consStoredLb` / `consSwallow` (union_residuals: reuse, don't redefine);
    `riscv_rx_tag` is `MachFixedGS.rxTag`; `S gen_id` is `genId + 1`;
    `Z.of_nat dd = bv_unsigned r` is `dd = r.toNat`.
-2. **The leaf and the post rows are parameters**: the read leaf is
-   `UK_SYS_IO.readRecvAt` (Rocq `UkRunSys.wp_uk_ecall_read_recv_at`), and
-   the receipt table's `proc_pt_wf` / `lazy_free` and the resume image's
-   bridge are `UK_POST_ROWS.rd` (`UkReadRows` deviation 3).
+2. **The leaf and the post rows**: the read leaf is
+   `(ukSysIO_holds UL).readRecvAt` (Rocq `UkRunSys.wp_uk_ecall_read_recv_at`,
+   at the engine `UL`), and the receipt table's `proc_pt_wf` / `lazy_free`
+   and the resume image's bridge are `ukPostRows_holds.rd` (`UkReadRows`
+   deviation 3).
 3. **The walk is proved over the class, the post read at the instance**
    (`readCons_walk` generic in `SG`, taking the post's reading `helim` as a
    hypothesis; `readCons_ans` is that reading at `uexecSGXv6`): stating
@@ -48,6 +49,7 @@ Unreached (not ported): `wp_uk_ecall_read_cons` (the plain-ledger form).
    bridge `imgAgrees M' Mv` at the lazy bit `false`.
 -/
 import Xv6.UkReadRows
+import Xv6.UkSysIOHolds
 
 namespace Xv6
 
@@ -168,7 +170,7 @@ theorem readCons_extra (gn : GName) (pt : UPtd) (st : FdState) (wr : Bool) (n : 
 
 /-- **THE POST'S READING AT THE CONSOLE** (deviation 3): row 5's post at
 the console family, with the leaf's pure rows, is the content answer. -/
-theorem readCons_ans (HP : UK_POST_ROWS) (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
+theorem readCons_ans (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (m : RegMap) (k cap : Nat) (l : List FdState) (fd : Nat)
     (wr : Bool) (W : Uvis) (r : BitVec 64) (g : Nat → BitVec 8) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
     (cs' : ExtTreeSet GName compare)
@@ -198,7 +200,7 @@ theorem readCons_ans (HP : UK_POST_ROWS) (N : UkNames GF) (Rd : Nat → Nat → 
     have hN : NSTD ≤ NOFILE := NSTD_le_NOFILE
     refine hlive.1 rfl (by omega) wr (by omega) (by omega) ?_
     rw [hz0]; simpa [CONSOLE] using hfdw
-  refine (HP.rd _ (readConsFam N.pay Rd Rin) W r M' fdv' cw' cs').trans ?_
+  refine (ukPostRows_holds.rd _ (readConsFam N.pay Rd Rin) W r M' fdv' cw' cs').trans ?_
   iintro ⟨%hret, %P, %Pr, %Mv, %hMv, %hag, %hpm, %hpmr, %hwf, %hlzf, H⟩
   unfold xkA at hret ⊢
   rw [harg0, harg1, harg2] at *
@@ -282,7 +284,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-- THE READ WALK AT A LEDGER SLOT, over the class (deviation 3): the leaf
 at the caller's deposit, the post read by `helim` into the caller's
 answer `Ans`. -/
-theorem readCons_walk (HIO : UK_SYS_IO) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a k cap : Nat)
+theorem readCons_walk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a k cap : Nat)
     (f : Nat → BitVec 8) (avail : Nat) (l v : List FdState) (fdep : UexecSG.sfam GF)
     (Ans : BitVec 64 → (Nat → BitVec 8) → IProp GF)
     (hn : UkSysP.usysno m = USYS_read) (ha1 : (m.get 11#5).toNat = a) (ha2 : (m.get 12#5).toNat = cap)
@@ -307,7 +309,7 @@ theorem readCons_walk (HIO : UK_SYS_IO) (N : UkNames GF) (h : CPU) (m : RegMap) 
     rw [← argZ_setWidth]; exact uread_count_is_cap _ cap ha2 hcap31
   subst ha1
   iintro #Hi Hrun Hstd Hbuf Hsb Hcont
-  iapply HIO.readRecvAt N h m pc (cap : Int) k f avail fdep l v hn hcw (by simpa using hcapk) hal
+  iapply (ukSysIO_holds UL).readRecvAt N h m pc (cap : Int) k f avail fdep l v hn hcw (by simpa using hcapk) hal
     $$ Hi Hrun Hsb Hstd Hbuf
   iintro %h' %r %d %g %W %M' %fdv' %cw' %cs' %hd %hgf %hlin %himg %hnf %h0 %h1 %h2 %htk %hlz %hlive
     Hstd Hpost Hrun Hbuf
@@ -330,7 +332,7 @@ local notation "SGX" => uexecSGXv6 (hlc := hlc)
 at a named table view (read moves no descriptor) -- the payment is the
 ring's and one atomic update on the console history's input queue, and the
 answer is `ureadConsAns`. -/
-theorem wp_uk_ecall_read_cons_at (HIO : UK_SYS_IO) (HP : UK_POST_ROWS) (N : UkNames GF) (h : CPU) (m : RegMap)
+theorem wp_uk_ecall_read_cons_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (a k cap : Nat) (f : Nat → BitVec 8) (avail : Nat) (l v : List FdState) (fd : Nat)
     (wr : Bool) (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (hn : UkSysP.usysno m = USYS_read)
@@ -349,10 +351,10 @@ theorem wp_uk_ecall_read_cons_at (HIO : UK_SYS_IO) (HP : UK_POST_ROWS) (N : UkNa
       wpLoop h := by
   iintro #Hi Hrun Hstd Hbuf Hacc Hlink Hcont
   ihave Hsb := udepwf_std_read_cons (hlc := hlc) N m pc l fd wr Rd Rin h0 hfdlt hl0 $$ Hacc Hlink
-  iapply readCons_walk (hlc := hlc) (SG := SGX) HIO N h m pc a k cap f avail l v (readConsFam N.pay Rd Rin)
+  iapply readCons_walk (hlc := hlc) (SG := SGX) UL N h m pc a k cap f avail l v (readConsFam N.pay Rd Rin)
     (fun r g => ureadConsAns (hlc := hlc) fscCons Rd Rin r cap g) hn ha1 ha2 hcapk hcap31 hal
     (fun W r g M' fdv' cw' cs' hlin himg hnf h0' h1' h2' htk hlz hlive =>
-      readCons_ans (hlc := hlc) HP N Rd Rin m k cap l fd wr W r g M' fdv' cw' cs' h0 hfdlt hl0 ha2 hcapk hcap31
+      readCons_ans (hlc := hlc) N Rd Rin m k cap l fd wr W r g M' fdv' cw' cs' h0 hfdlt hl0 ha2 hcapk hcap31
         hlin himg hnf h0' h1' h2' htk hlz hlive)
     $$ Hi Hrun Hstd Hbuf Hsb Hcont
 

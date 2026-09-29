@@ -18,12 +18,11 @@ CONE (re-walked on the pinned globs: 10/14 reached): `uarg_bytes_eq`,
 Unreached (not ported): the equation-free corollaries `echo_image_entry_env`,
 `cat_image_entry_env`, `cat_image_entry_env_name`, `grep_image_entry_env`.
 
-## Ported: `uargBytes_eq`, `echo_word_bytes`, `cat_argv_words`, `cat_name_tail`
+## Ported: `uargBytes_eq`, `echo_word_bytes`, `echo_argv_tail` (over
+`UEchoOut.echoOutArgv`, lane P-echo), `cat_argv_words`, `cat_name_tail`
 
 ## DEFERRED (their inputs are not in Lean yet)
 
-* `echo_argv_tail`: needs `UEchoOut.echo_out_argv` / `out_argv_at` (not
-  ported).  Its proof is `echo_word_bytes` at every index, as in Rocq.
 * `tree_echo_union_comm_bool`, `tree_echo_data_of_elf_image`: need
   `UkEcho.echo_data_sub` / `EchoData.echo_data` and
   `UShKernel.uimg_sub_union_l` (not ported).
@@ -46,6 +45,7 @@ Unreached (not ported): the equation-free corollaries `echo_image_entry_env`,
 -/
 import Xv6.UkTree
 import Xv6.EchoDisc
+import Xv6.UEchoOut
 
 namespace Xv6
 
@@ -76,6 +76,24 @@ theorem echo_word_bytes (ws : List Bytes) (i : Nat) (w : Bytes) (g : UArg) (hi :
   have hline := wlLine_word (ws.drop 1) (i - 1) w j hd hj
   unfold outCur at hbj
   rw [← hline, getElem!_def, hbj]
+
+/-- **Rocq `echo_argv_tail`**: echo's reading of its argument vector
+(`UEchoOut.echoOutArgv`) spells the line's words from argv[1] on. -/
+theorem echo_argv_tail (ws : List Bytes) (args : List UArg) (h : echoOutArgv ws args) :
+    (args.drop 1).map uargBytes = ws.drop 1 := by
+  obtain ⟨hlen, hargs⟩ := h
+  apply List.ext_getElem?
+  intro i
+  rw [List.getElem?_map, List.getElem?_drop, List.getElem?_drop]
+  rcases Nat.lt_or_ge (1 + i) args.length with hlt | hge
+  · have hg : args[1 + i]? = some args[1 + i] := List.getElem?_eq_getElem hlt
+    have hw : ws[1 + i]? = some ws[1 + i] := List.getElem?_eq_getElem (by omega)
+    rw [hg, hw]
+    simp only [Option.map_some, Option.some.injEq]
+    obtain ⟨hgl, hgb⟩ := hargs (1 + i) _ (by omega) hg
+    exact echo_word_bytes ws (1 + i) _ _ (by omega) hw hgl hgb
+  · rw [List.getElem?_eq_none (by omega), List.getElem?_eq_none (by omega)]
+    rfl
 
 /-- **Rocq `cat_argv_words`**: the key's reading of EVERY argument, through
 the node's determinacy, is the line's word at that index (deviation 1). -/

@@ -35,8 +35,8 @@ CONE (re-walked on the pinned globs: 12/21 reached): `a0_idx`..`a2_idx`
    `sbundleAt_write_intro_at` takes the image `E` and the whole guarded
    input; `spostAt_write_elim_at` returns the view the post fired at.
 3. **The post's table rows** (`UkReadRows` deviation 3): `uwrite_post_cons`
-   and `uwrite_no_short` take `HP : UK_POST_ROWS` (Rocq's `proc_pt_wf` /
-   `lazy_free` on row 16's table, dropped by the Lean kernel);
+   and `uwrite_no_short` read Rocq's `proc_pt_wf` / `lazy_free` on row 16's
+   table through `ukPostRows_holds` (no longer a parameter);
    `spostAt_write_elim_at` is at Lean's post as it stands.
 4. The deposit is `UshSysP.udepwfStd` (Rocq `UkRun.udepwf_std`) at `SGX`.
 5. `uwrite_no_short`'s answer is `r = BitVec.ofNat 64 nb` (Rocq
@@ -211,7 +211,7 @@ local notation "SGX" => uexecSGXv6 (hlc := hlc)
 /-- **Rocq `uwrite_post_cons`**: the device arm of `filewriteExtra` is keyed
 on `CONSOLE`, so this is where the major stops being free (deviation 3: the
 table rows through `HP`). -/
-theorem uwrite_post_cons (HP : UK_POST_ROWS) (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
+theorem uwrite_post_cons (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
     (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare)
     (l : List FdState) (i : Nat) (rb : Bool)
     (h0 : (BitVec.setWidth 32 (tfW W.tf (tfArgIdx 0))).toInt = (i : Int)) (hi : i < NSTD)
@@ -220,7 +220,7 @@ theorem uwrite_post_cons (HP : UK_POST_ROWS) (Q : Nat → IProp GF) (Xp : Int �
       ∃ P : UPtd, ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗
         ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
         writeConsArms P (tfW W.tf (tfArgIdx 1)) Q (argZ (tfW W.tf (tfArgIdx 2))) r := by
-  refine (HP.wr _ (xfamWr Q Xp) W r M' fdv' cw' cs').trans ?_
+  refine (ukPostRows_holds.wr _ (xfamWr Q Xp) W r M' fdv' cw' cs').trans ?_
   iintro ⟨-, %P, %Mv, %hpm, %hwf, %hlz, -, H⟩
   iexists P
   isplitr
@@ -241,7 +241,7 @@ theorem uwrite_post_cons (HP : UK_POST_ROWS) (Q : Nat → IProp GF) (Xp : Int �
 /-- **Rocq `uwrite_no_short`**: THE SHORT ARM IS REFUTABLE -- a console
 write of a run the caller owns returns the FULL count and the caller's own
 cursor at it. -/
-theorem uwrite_no_short (HP : UK_POST_ROWS) (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
+theorem uwrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis)
     (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare)
     (l : List FdState) (i : Nat) (rb : Bool) (nb : Nat)
     (h0 : (BitVec.setWidth 32 (tfW W.tf (tfArgIdx 0))).toInt = (i : Int)) (hi : i < NSTD)
@@ -252,7 +252,7 @@ theorem uwrite_no_short (HP : UK_POST_ROWS) (Q : Nat → IProp GF) (Xp : Int →
       uvaRmapped P (tfW W.tf (tfArgIdx 1) + BitVec.ofNat 64 j).toNat) :
     @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) 16 (xfamWr Q Xp) W r M' fdv' cw' cs' ⊢
       ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb := by
-  refine (uwrite_post_cons (hlc := hlc) HP Q Xp W r M' fdv' cw' cs' l i rb h0 hi htake hli).trans ?_
+  refine (uwrite_post_cons (hlc := hlc) Q Xp W r M' fdv' cw' cs' l i rb h0 hi htake hli).trans ?_
   iintro ⟨%P, %hpm, %hwf, %hlf, H⟩
   rw [hcnt]
   unfold writeConsArms

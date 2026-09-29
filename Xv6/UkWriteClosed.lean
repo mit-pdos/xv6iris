@@ -23,13 +23,14 @@ left it unported for want of `udepwf_std` and the write leaf).
 ## Deviations from Rocq
 
 1. `UkReadRows` deviations 1, 2; `kwc_fam` is typed `Xfam GF`.
-2. The write leaves are parameters: `UK_SYS_IO.writeChainBufAt` (init),
+2. The write leaves: `(ukSysIO_holds UL).writeChainBufAt` (init),
    `USH_SYS_P` via `UshMainStubs.wp_ksh_write_chain_at` (sh); the stub
    laws take the engine `UL : UK_LEAVES` (DU2).
 3. `uwrite_sup_closed`'s input is at every page view (the image guard,
    `UkWriteLeaf` deviation 2): the closed arm is `emp` at each.
 -/
 import Xv6.UkWriteLeaf
+import Xv6.UkSysIOHolds
 import Xv6.UshMainStubs
 import Xv6.UkInitStubs
 
@@ -65,7 +66,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-- **Rocq `UkInit.wp_kinit_write_chain_at`**: init's write stub with the
 deposit at a named family and the post handed back, at a named table
 view, the source a data-half run at `dq`. -/
-theorem wp_kinit_write_chain_at (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames GF) (h : CPU) (m : RegMap)
+theorem wp_kinit_write_chain_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (avail : Nat) (fdep : UexecSG.sfam GF) (l v : List FdState) (dq : DFrac) (nb : Nat) (fb : Nat → BitVec 8) :
     ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«write») avail -∗
       UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
@@ -89,7 +90,7 @@ theorem wp_kinit_write_chain_at (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames 
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
-  iapply HIO.writeChainBufAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) _ avail fdep l v dq nb fb
+  iapply (ukSysIO_holds UL).writeChainBufAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) _ avail fdep l v dq nb fb
     (by rw [kinit_usysno]; decide) (by rw [hpc]; decide) $$ Hi Hrun Hsb Hstd [Hbuf]
   · rw [e _ (by decide)]; iexact Hbuf
   rw [hpc]
@@ -147,7 +148,7 @@ theorem kshW_of_dep (UL : UK_LEAVES) (HSS : USH_SYS_P) (N : UkNames GF) (fdw ua 
   iapply Hcont $$ %h' %ret Hstd Hrun
 
 /-- `kinit_w1_of_closed`'s walk, over the class, at any deposit. -/
-theorem kinitW1_of_dep (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8)
+theorem kinitW1_of_dep (UL : UK_LEAVES) (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8)
     (l v : List FdState) (fdep : UexecSG.sfam GF)
     (Hdep : ∀ m : RegMap, m.get 10#5 = fdw →
       ⊢ UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
@@ -155,7 +156,7 @@ theorem kinitW1_of_dep (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames GF) (fdw 
     ⊢ kinitW1 (hlc := hlc) N fdw b (ustdAt N.fd l v) (ustdAt N.fd l v) := by
   unfold kinitW1
   iintro %h %m %avail %ha0 %ha2 #Hcode Hbuf Hstd Hrun Hcont
-  iapply wp_kinit_write_chain_at (hlc := hlc) UL HIO N h m avail fdep l v (DFrac.own 1) 1 (fun _ => b)
+  iapply wp_kinit_write_chain_at (hlc := hlc) UL N h m avail fdep l v (DFrac.own 1) 1 (fun _ => b)
     $$ Hcode Hrun [] Hstd [Hbuf]
   · iapply Hdep m ha0
   · iapply ubyte_to_run $$ Hbuf
@@ -205,20 +206,20 @@ theorem ksh_w_of_closed_at (UL : UK_LEAVES) (HSS : USH_SYS_P) (N : UkNames GF) (
 
 /-- **Rocq `kinit_w1_of_closed`**: init's per-byte `write(fdw, &c, 1)` at a
 ledger whose slot `i` is closed; the byte comes back with the ledger. -/
-theorem kinit_w1_of_closed (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8)
+theorem kinit_w1_of_closed (UL : UK_LEAVES) (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8)
     (l v : List FdState) (i : Nat) (hfd : (BitVec.setWidth 32 fdw).toInt = (i : Int)) (hi : i < NSTD)
     (hli : l[i]? = some .closed) :
     ⊢ kinitW1 (hlc := hlc) N fdw b (ustdAt N.fd l v) (ustdAt N.fd l v) :=
-  kinitW1_of_dep UL HIO N fdw b l v (kwcFam N) fun m ha0 =>
+  kinitW1_of_dep UL N fdw b l v (kwcFam N) fun m ha0 =>
     uwrite_sup_closed (hlc := hlc) N (fun _ => iprop(True)) (ukWr m 17#5 (BitVec.ofInt 64 16))
       (BitVec.ofNat 64 (User.Init.Sym.«write» + 2)) l i (a0_after_a7 m fdw i ha0 hfd) hi hli
 
 /-- **Rocq `kinit_w1_of_closed_l0`**: init's banner write to fd 1 at its head
 ledger. -/
-theorem kinit_w1_of_closed_l0 (UL : UK_LEAVES) (HIO : UK_SYS_IO) (N : UkNames GF) (b : BitVec 8)
+theorem kinit_w1_of_closed_l0 (UL : UK_LEAVES) (N : UkNames GF) (b : BitVec 8)
     (v : List FdState) :
     ⊢ kinitW1 (hlc := hlc) N (BitVec.ofNat 64 1) b (ustdAt N.fd ufdL0 v) (ustdAt N.fd ufdL0 v) :=
-  kinit_w1_of_closed UL HIO N (BitVec.ofNat 64 1) b ufdL0 v 1 (by decide) (by decide) rfl
+  kinit_w1_of_closed UL N (BitVec.ofNat 64 1) b ufdL0 v 1 (by decide) (by decide) rfl
 
 end UkWriteClosed
 

@@ -280,8 +280,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 local notation "SGX" => uexecSGXv6 (hlc := hlc)
 
 /-- **Rocq `spost_at_read_elim`** at Rocq's full reading (through
-`UK_POST_ROWS.rd`, deviation 3). -/
-theorem spostAt_read_elimR (HP : UK_POST_ROWS) (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
+`ukPostRows_holds.rd`, deviation 3). -/
+theorem spostAt_read_elimR (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
     (v0 v1 v2 : BitVec 64) (sts : List FdState) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
     (cw' : Nat) (cs' : ExtTreeSet GName compare) (h0 : tfW W.tf (tfArgIdx 0) = v0)
     (h1 : tfW W.tf (tfArgIdx 1) = v1) (h2 : tfW W.tf (tfArgIdx 2) = v2) (hfd : W.fd = sts) :
@@ -294,7 +294,7 @@ theorem spostAt_read_elimR (HP : UK_POST_ROWS) (X : Uvis → IProp GF) (f : Xfam
         filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey v0 sts) (argZ v2) f.rF f.rRd f.rRin
           f.rPq f.rPqe r Mv v1 := by
   subst h0 h1 h2 hfd
-  exact HP.rd X f W r M' fdv' cw' cs'
+  exact ukPostRows_holds.rd X f W r M' fdv' cw' cs'
 
 end PostElim
 

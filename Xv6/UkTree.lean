@@ -112,6 +112,20 @@ theorem mapRange_getElem? {A : Type} (f : Nat → A) (n j : Nat) (hj : j < n) :
 def ukBytesOf (bs : Bytes) (f : Nat → BitVec 8) : Prop :=
   ∀ j : Nat, j < bs.length → bs[j]? = some (f j)
 
+/-- **Rocq `uarg_bytes_of`** (stated in Rocq's `UkCatTree` and `UkEchoTree`
+alike; once here). -/
+theorem uargBytes_of (g : UArg) : ukBytesOf (uargBytes g) g.bytes := by
+  intro j hj
+  rw [uargBytes_length] at hj
+  exact mapRange_getElem? _ _ _ hj
+
+/-- **Rocq `bytes_of_one`** (likewise). -/
+theorem ukBytesOf_one (b : BitVec 8) : ukBytesOf [b] (fun _ => b) := by
+  intro j hj
+  simp only [List.length_cons, List.length_nil] at hj
+  match j, hj with
+  | 0, _ => rfl
+
 /-! ## §0' The discrete OFE on trees (deviation 6) -/
 
 /-- Rocq `leibnizO proc`. -/

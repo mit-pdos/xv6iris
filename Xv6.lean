@@ -1779,3 +1779,6 @@ import Xv6.FileWritePure
 import Xv6.FileWriteNode
 import Xv6.FsAbsWritePart
 import Xv6.FileWritePart
+import Xv6.UEchoOut
+import Xv6.UkEchoTree
+import Xv6.UEchoFile

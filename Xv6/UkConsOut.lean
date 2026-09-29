@@ -35,11 +35,10 @@ CONE (re-walked on the pinned globs: 36/59 reached; the notations `a0_idx`..
    (`HfpConsOutP`), so its concrete `hfpConsShort`/`hfpConsAdm`/`hfpConsCur`
    are these definitions word for word.
 2. **The instance is `uexecSGXv6`** (`UkReadRows` deviation 1, notation
-   `SGX`); the syscall leaves are `UK_SYS_IO` (`UkIoSysP`, UkRunSys not
-   ported): `cons_leaf` and `cons_write` take `HS : UK_SYS_IO`;
-   `cons_write` also takes `HP : UK_POST_ROWS` (the kernel's dropped
-   row-16 table facts, `UkReadRows` deviation 3, spent by
-   `uwrite_no_short`).
+   `SGX`); the syscall leaves are `ukSysIO_holds UL` (`UkSysIOHolds`):
+   `cons_leaf` and `cons_write` take the engine `UL : UK_LEAVES` (DU2);
+   the row-16 table facts (`UkReadRows` deviation 3, spent by
+   `uwrite_no_short`) are `ukPostRows_holds`.
 3. **Section contexts are explicit arguments** in Rocq's order (the stub
    law `Hstub`, the device `D` with `D_short`/`D_sub`/`D_step`; the model
    `M`, its `GenParams` `Pm`, `LINKS` with `LINKS_w`/`LINKS_blk`/
@@ -55,6 +54,7 @@ CONE (re-walked on the pinned globs: 36/59 reached; the notations `a0_idx`..
    (Rocq: `M !! uint …`), and `usrcAt_wat` states the image row.
 -/
 import Xv6.UkWriteLeaf
+import Xv6.UkSysIOHolds
 import Xv6.UkTree
 import Xv6.GenLinksLine
 
@@ -252,7 +252,7 @@ theorem usrcAt_wat (N : UkNames GF) (M : ElfMem) (pm : Nat → Option UPerm) (sz
 
 /-- **Rocq `cons_leaf`**: THE WRITE LEAF AT A SOURCE -- the data half's or
 the text half's, as the program's reading of its run selects. -/
-theorem consLeaf (HS : UK_SYS_IO) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat)
+theorem consLeaf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat)
     (fdep : Xfam GF) (l : List FdState) (tx : Bool) (dq : DFrac) (nb : Nat) (f : Nat → BitVec 8)
     (hn : UkSysP.usysno m = 16) (hal : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) (SG := SGX) N h m pc avail -∗
@@ -270,9 +270,9 @@ theorem consLeaf (HS : UK_SYS_IO) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
       wpLoop h := by
   cases tx
   · rw [ukco_usrcAt_data]
-    exact HS.writeChainBuf (hlc := hlc) (GF := GF) N h m pc avail fdep l dq nb f hn hal
+    exact (ukSysIO_holds UL).writeChainBuf (hlc := hlc) (GF := GF) N h m pc avail fdep l dq nb f hn hal
   · rw [ukco_usrcAt_tx]
-    exact HS.writeChainTxt (hlc := hlc) (GF := GF) N h m pc avail fdep l nb f hn hal
+    exact (ukSysIO_holds UL).writeChainTxt (hlc := hlc) (GF := GF) N h m pc avail fdep l nb f hn hal
 
 end src
 
@@ -339,7 +339,7 @@ theorem ukco_ua (m : RegMap) (ua n : Nat) (ha1 : m.get 11#5 = BitVec.ofNat 64 ua
 
 /-- **Rocq `cons_write`**: THE WRITE LAW (`UkHandler.ei_write`) at the
 console, over an abstract device `D` with its three laws. -/
-theorem consWrite (HS : UK_SYS_IO) (HP : UK_POST_ROWS) (N : UkNames GF) (P : Uprog GF) [HPc : Persistent P.code]
+theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persistent P.code]
     (Hstub : ⊢ stubLaw (hlc := hlc) (SG := SGX) N P.code 16 P.write)
     (D : List (List (BitVec 8)) → IProp GF)
     (D_short : ∀ alts, ⊢ D alts -∗ ⌜consShort alts⌝)
@@ -411,10 +411,10 @@ theorem consWrite (HS : UK_SYS_IO) (HP : UK_POST_ROWS) (N : UkNames GF) (P : Upr
   ihave Hs1 : usrcAt N tx (dqHalf dq)
       ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5).toNat bs.length f $$ [Hs1]
   · rw [e1]; iexact Hs1
-  iapply consLeaf (hlc := hlc) HS N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (P.write + 2))
+  iapply consLeaf (hlc := hlc) UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (P.write + 2))
     avail _ l tx (dqHalf dq) bs.length f hsys hal $$ Hi Hrun Hdep Hstd Hs1
   iintro %h' %ret %Wv %cw' %cs' %hka0 %hka1 %hka2 %htk %hlz %hnf Hstd Hs1 Hpost Hrun
-  icases uwrite_no_short (hlc := hlc) HP _ N.pay Wv ret Wv.M Wv.fd cw' cs' l fd rb bs.length
+  icases uwrite_no_short (hlc := hlc) _ N.pay Wv ret Wv.M Wv.fd cw' cs' l fd rb bs.length
       (by rw [hka0]; exact hi0) hfd htk hl (by rw [hka2, e2, ha2, hcz]) hlz
       (by rw [hka1]; exact hnf) $$ Hpost with ⟨%hret, Hd, Hs2⟩
   rw [hpc]
@@ -744,7 +744,7 @@ local notation "SGX" => uexecSGXv6 (hlc := hlc)
 
 /-- **Rocq `cons_write_gl_atc`**: THE CORE AT THE CODE-REMEMBERING DEVICE --
 the write law of any program instance at a round. -/
-theorem consWrite_gl_atc (HS : UK_SYS_IO) (HP : UK_POST_ROWS) (M : LModel) (Pm : GenParams hlc GF M)
+theorem consWrite_gl_atc (UL : UK_LEAVES) (M : LModel) (Pm : GenParams hlc GF M)
     (LINKS : IProp GF) [LINKS_pers : Persistent LINKS]
     (LINKS_w : ⊢ LINKS -∗ glW Pm) (LINKS_blk : ⊢ LINKS -∗ glBlk Pm)
     (LINKS_taint : ⊢ LINKS -∗ glTaintAt Pm (genId (hlc := hlc) (GF := GF) + 1))
@@ -757,7 +757,7 @@ theorem consWrite_gl_atc (HS : UK_SYS_IO) (HP : UK_POST_ROWS) (M : LModel) (Pm :
     ⊢ ustd N.fd l -∗ consDevAtc M Pm LINKS C v I alts -∗
       (ustd N.fd l -∗ consDevAtc M Pm LINKS C v I [a.drop bs.length] -∗ K (bs.length : Int)) -∗
       wrObl (hlc := hlc) (SG := SGX) N P (fd : Int) bs K :=
-  consWrite (hlc := hlc) HS HP N P Hstub (consDevAtc M Pm LINKS C v I)
+  consWrite (hlc := hlc) UL N P Hstub (consDevAtc M Pm LINKS C v I)
     (consDevAtc_short M Pm LINKS C v I) (consDevAtc_sub M Pm LINKS C v I)
     (consDevAtc_step M Pm LINKS LINKS_w LINKS_blk LINKS_taint C v I) l fd rb alts a bs K hfd hl ha hpre
 

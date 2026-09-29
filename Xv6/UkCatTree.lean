@@ -42,20 +42,10 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
-/-! ## §0' the three `bytes_of` facts -/
+/-! ## §0' the `bytes_of` fact of a prefix -/
 
-/-- **Rocq `uarg_bytes_of`**. -/
-theorem uargBytes_of (g : UArg) : ukBytesOf (uargBytes g) g.bytes := by
-  intro j hj
-  rw [uargBytes_length] at hj
-  exact mapRange_getElem? _ _ _ hj
-
-/-- **Rocq `bytes_of_one`**. -/
-theorem ukBytesOf_one (b : BitVec 8) : ukBytesOf [b] (fun _ => b) := by
-  intro j hj
-  simp only [List.length_cons, List.length_nil] at hj
-  match j, hj with
-  | 0, _ => rfl
+-- `uargBytes_of` / `ukBytesOf_one` (Rocq `uarg_bytes_of` / `bytes_of_one`,
+-- stated in both UkCatTree.v and UkEchoTree.v) live in `UkTree`.
 
 /-- **Rocq `bytes_of_prefix`**. -/
 theorem ukBytesOf_prefix (g : Nat → BitVec 8) (nb : Nat) : ukBytesOf ((List.range nb).map g) g := by
