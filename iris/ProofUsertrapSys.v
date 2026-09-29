@@ -411,7 +411,7 @@ Section UtSysBlock.
          more of [ut_own]'s conjuncts than that accessor hands out --
          [SpecSyscall.v]'s header on why the five families ride through
          [syscall()] on this same channel rather than inside [Hsy]. *)
-      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hch & Hsy)".
+      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hch & Hsy & Huh)".
       (* WHO <INIT> IS, JOINED ONCE FOR THE DISPATCHER (lane TRAP-ROWS-3/4,
          T4(b)).  The residue carries the <initproc> cell at [un_dqi N],
          which [ut_caps] pins to [DfracDiscarded]; the ghost half of
@@ -853,7 +853,7 @@ Section UtSysBlock.
          carried (lane TRAP-ROWS-3/4, T4(b)) *)
       iDestruct "Hip" as "[Hip _]".
       iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) stsR csR
-                    with "Hbs Hip Hfd Hir Hpv Hufr Hch Hsy") as "Hown".
+                    with "Hbs Hip Hfd Hir Hpv Hufr Hch Hsy Huh") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
                        ltac:(vm_compute; reflexivity)); exact HS4sp).

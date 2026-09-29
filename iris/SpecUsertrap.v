@@ -128,6 +128,7 @@ Require Import UexecRet.   (* [tf_ueq_resume_gpr0] / [tf_ueq_resume_pc] -- the e
 Require Import ChildTok.   (* [child_tok] -- fork's answer to the parent *)
 Require Import UexecSG.        (* [uexecSG]: [sbundle] / [spost] / [skey_eq] *)
 Require Import UexecApply.     (* [uslot_key_cong] -- the slot across the re-key *)
+Require Import UhistDefs.      (* [uhist_auth] / [uhist_wf] -- the residue's key history *)
 Require Import UexecExecInst.  (* the class INSTANCE: the process's exec bundle *)
 Require Import SpecSysRead.    (* [sys_rw_count] -- the read's count, for [ut_live_out] *)
 Require Import Xv6Cameras.
@@ -1943,6 +1944,18 @@ Module Type USERTRAP_RES.
       (∀ sts' : list fdstate,
          FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
          usertrap_res_bare pt ksp U sts' cs pid).
+
+  (* THE KEY HISTORY, borrowed out of the bare residue (design/ni-uhist.md
+     D4): the per-process list of rounds at the residue's own name, every
+     round of it lawful ([UhistDefs.uhist_wf]), handed back at any lawful
+     list.  The trap loop appends one round per trip.  Concrete:
+     [UsertrapRes.ut_res_bare_uhist_acc]. *)
+  Parameter usertrap_res_bare_uhist_acc :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32),
+      usertrap_res_bare pt ksp U sts cs pid -∗
+      ∃ (γ : gname) (h : list uround), uhist_auth γ h ∗ ⌜uhist_wf h⌝ ∗
+        (∀ h' : list uround, uhist_auth γ h' -∗ ⌜uhist_wf h'⌝ -∗
+           usertrap_res_bare pt ksp U sts cs pid).
 
   Parameter usertrap_res_bare_norm :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32),

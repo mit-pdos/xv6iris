@@ -284,6 +284,7 @@ UmodeRegs.v
 UexecRet.v
 UexecRound.v
 UexecApply.v
+UhistDefs.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v

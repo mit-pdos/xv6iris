@@ -1040,6 +1040,16 @@ Definition uchΣ : gFunctors := #[ ghost_varΣ (gset gname) ].
 Global Instance subG_uchΣ {Σ} : subG uchΣ Σ -> uchG Σ.
 Proof. solve_inG. Qed.
 
+(* the ENCODED per-process ledger camera: a mono-list of encodings, so a
+   ledger over a type defined above this file (the U tier's key record)
+   needs no camera of its own.  Its user is the per-process key history
+   ([UsertrapRes.uhist_auth], over [UhistDefs.uround]); its [gname] is
+   [UsertrapRes.un_uh]. *)
+Class uledG (Σ : gFunctors) := UledG { uled_inG :: inG Σ (mono_listR (leibnizO positive)) }.
+Definition uledΣ : gFunctors := #[ GFunctor (mono_listR (leibnizO positive)) ].
+Global Instance subG_uledΣ {Σ} : subG uledΣ Σ -> uledG Σ.
+Proof. solve_inG. Qed.
+
 (* ===================================================================== *)
 (*  14c. THE PROCESS SLOT'S GENERATION  (theory: ChildTok.v)             *)
 (* ===================================================================== *)

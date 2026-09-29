@@ -25,6 +25,7 @@ Require Import UserPerm.   (* [lazy_free] -- the residue's fill row *)
 Require Import ProcInv.   (* [us_tf] / [us_upt] -- the residue index's updaters *)
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
+Require Import UhistDefs.   (* [uround] / [uhist_auth] -- the residue's key history *)
 Require Import ParkCap.
 Require Import SyscParkEnv.   (* [sysc_park_extra] (L8: the resumer's syscall environment) *)
 Require Import SpecSyscall.
@@ -156,6 +157,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
        FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
        usertrap_res_bare pt ksp U sts' cs pid).
   Proof. exact (ut_res_bare_fd_open (SY.syscall_env) pt ksp U sts cs pid). Qed.
+
+  Lemma usertrap_res_bare_uhist_acc
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    usertrap_res_bare pt ksp U sts cs pid -∗
+    ∃ (γ : gname) (h : list uround), uhist_auth γ h ∗ ⌜uhist_wf h⌝ ∗
+      (∀ h' : list uround, uhist_auth γ h' -∗ ⌜uhist_wf h'⌝ -∗
+         usertrap_res_bare pt ksp U sts cs pid).
+  Proof. exact (ut_res_bare_uhist_acc (SY.syscall_env) pt ksp U sts cs pid). Qed.
 
     Lemma usertrap_res_bare_norm
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :

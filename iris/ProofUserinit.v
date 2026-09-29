@@ -73,6 +73,7 @@
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.algebra.lib Require Import mono_list.
 From iris.algebra Require Import excl auth gmap frac numbers.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
@@ -117,6 +118,7 @@ Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intr
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
+Require Import UhistDefs.   (* [uhist_auth] -- the incarnation's key history, born here *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
 Require Import SpecDevintr.           (* [uart1_caps] -- [park_world]'s second-port row *)
 Require Import FsReady.               (* [fs_geom_ok] *)
@@ -883,10 +885,14 @@ Section ProofUserinit.
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                          _ & _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
+    (* THE INCARNATION'S KEY HISTORY, born empty at its park
+       (design/ni-uhist.md D2), at the ENCODED ledger camera *)
+    iMod (own_alloc (●ML ([] : list (leibnizO positive)))) as (γuh) "Huh";
+      [apply mono_list_auth_valid |].
     pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
- ks pid).
+ ks pid γuh).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
     iAssert (SpecPrintk.printk_env (FsCfg.fsc_printk) (FsCfg.fsc_uart) (FsCfg.fsc_disk)) as "#Hpke".
@@ -927,8 +933,8 @@ Section ProofUserinit.
       iSplitR; [iExact "Hpav"|].
       iSplitR; [iExact "Htl"|].
       iExact "Hcready". }
-    iAssert (park_own N) with "[Hbsl]" as "Hown".
-    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    iAssert (park_own N) with "[Hbsl Huh]" as "Hown".
+    { rewrite /park_own. iFrame "Hbsl". iSplitR; [iExact "Hip1" | iExact "Huh"]. }
     iDestruct (kstack_free_at with "Hks Hkfree") as "Hstack".
     (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
        and from here on a resource every process hands its children. *)

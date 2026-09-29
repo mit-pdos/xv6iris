@@ -43,6 +43,8 @@ From iris.algebra Require Import dfrac.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
+From iris.algebra.lib Require Import mono_list.
+Require Import UhistDefs.   (* [uround] / [uhist_wf] -- the per-process key history *)
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
@@ -514,7 +516,15 @@ Section UsertrapRes.
        userinit's allocproc is the first allocation in the boot order --
        so [ut_caps]'s row is [WaitInv.init_gen (un_ip N) 1] and there is
        nothing left for a record to choose. *)
+    (* THE PER-PROCESS KEY HISTORY'S NAME (design/ni-uhist.md D2): minted
+       beside the incarnation's other names at its park (kfork's child,
+       userinit's first process), carried by [park_own], and read by the
+       residue's [uhist_own].  Last, so no existing projection moves. *)
+    un_uh  : gname;
   }.
+
+  (* THE KEY HISTORY'S GHOST ([UhistDefs.uhist_auth] / [uhist_own]) is
+     defined beside its entries, where [SpecUsertrap]'s accessor can name it. *)
 
   (* the running process's [struct proc] address, and the fileclose
      environment index -- DERIVED, see the note above. *)
@@ -856,7 +866,10 @@ Section UsertrapRes.
         [wp_uservec_pt] instead -- completed/user-wp-slot.md SS4c, refutation
         R-a: a keyed row cannot live here, because the residue's index moves
         inside the round while [ut_own_priv]'s closer is ∀-general in it. *)
-     Rsys (un_f N) (un_pj N) (un_fn N pid))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N pid) ∗
+     (* THE KEY HISTORY (design/ni-uhist.md D3), beside the block for the
+        fragments' reason; no index of the residue moves with it *)
+     uhist_own (un_uh N))%I.
 
   Definition ut_env (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
@@ -892,9 +905,9 @@ Section UsertrapRes.
        ch_frag (pv_chg (us_V U')) (un_pj N) cs' -∗
        Rsys (un_f N) (un_pj N) (un_fn N pid) -∗ ut_own Rsys N U' sts' cs' pid).
   Proof using .
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy & Huh)".
     iFrame "Hpv Hfr Hch Hsy". iIntros (U' sts' cs') "Hpv Hfr Hch Hsy".
-    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
+    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy Huh".
   Qed.
 
   (* [ut_own]'s SEVEN raw conjuncts, straight back into [ut_own N] -- the
@@ -915,11 +928,12 @@ Section UsertrapRes.
     fd_frags (pv_fdg (us_V U)) sts -∗
     ch_frag (pv_chg (us_V U)) (un_pj N) cs -∗
     Rsys (un_f N) (un_pj N) (un_fn N pid) -∗
+    uhist_own (un_uh N) -∗
     ut_own Rsys N U sts cs pid.
   Proof using .
     rewrite /ut_own.
-    iIntros "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
+    iIntros "Hb Hip Hfd Hir Hpv Hfr Hch Hsy Huh".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy Huh".
   Qed.
 
   (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /
@@ -1201,7 +1215,9 @@ Section UsertrapRes.
      from the park: [bslots] is a plain ghost fragment. *)
   Definition park_own (N : ut_names) : iProp Σ :=
     (bslots 3 ∗
-     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
+     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
+     (* the incarnation's key history, born empty at its park *)
+     uhist_auth (un_uh N) [])%I.
 
   Definition ut_own_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
@@ -1215,7 +1231,9 @@ Section UsertrapRes.
      fd_frags (pv_fdg V) sts ∗
      (* ...and the children row beside them, at the named set -- same note *)
      ch_frag (pv_chg V) (un_pj N) cs ∗
-     Rsys (un_f N) (un_pj N) (un_fn N pid))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N pid) ∗
+     (* ...and the key history, [ut_own]'s last row *)
+     uhist_own (un_uh N))%I.
 
   Definition ut_env_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) : iProp Σ :=
@@ -1229,8 +1247,8 @@ Section UsertrapRes.
     ut_own Rsys N U sts cs pid.
   Proof using .
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy) Hpt".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy & Huh) Hpt".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hpt Hsy Huh".
   Qed.
 
   Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
@@ -1239,8 +1257,8 @@ Section UsertrapRes.
     proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U).
   Proof using .
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hfr & Hch & Hsy)".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hfr & Hch & Hsy & Huh)".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hpt Hsy Huh".
   Qed.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
@@ -1257,9 +1275,9 @@ Section UsertrapRes.
        ch_frag (pv_chg V') (un_pj N) cs' -∗
        Rsys (un_f N) (un_pj N) (un_fn N pid) -∗ ut_own_nopt Rsys N V' sts' cs' pid).
   Proof using .
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy & Huh)".
     iFrame "Hpv Hfr Hch Hsy". iIntros (V' sts' cs') "Hpv Hfr Hch Hsy".
-    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
+    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy Huh".
   Qed.
 
   (* the descriptor's derived footprint field is invisible to the reduced
@@ -1335,6 +1353,51 @@ Section UsertrapRes.
     iSplitR; [iExact "Htfk" |].
     iSplitR; [iExact "Htc" |].
     iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
+  Qed.
+
+  (* THE KEY HISTORY, BORROWED OUT OF THE REDUCED ENVIRONMENT and handed
+     back at any lawful history (design/ni-uhist.md D4/D5). *)
+  Lemma ut_own_nopt_uhist (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (N : ut_names) (V : pprivate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_own_nopt Rsys N V sts cs pid -∗
+    ∃ h : list uround, uhist_auth (un_uh N) h ∗ ⌜uhist_wf h⌝ ∗
+      (∀ h', uhist_auth (un_uh N) h' -∗ ⌜uhist_wf h'⌝ -∗ ut_own_nopt Rsys N V sts cs pid).
+  Proof using .
+    rewrite /ut_own_nopt.
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy & Huh)".
+    iDestruct "Huh" as (h) "[Huh %Hwf]".
+    iExists h. iFrame "Huh". iSplitR; [iPureIntro; exact Hwf |].
+    iIntros (h') "Huh %Hwf'".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
+    iExists h'. iFrame "Huh". iPureIntro. exact Hwf'.
+  Qed.
+
+  (* ...and the same out of the bare residue: the name is the residue's own
+     [un_uh N], existential in it, so the accessor names it only through
+     the closer, which re-packs the same [N] and [av]
+     ([ut_res_bare_sstc]'s shape, with a closer). *)
+  Lemma ut_res_bare_uhist_acc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+    ut_res_bare Rsys pt ksp U sts cs pid -∗
+    ∃ (γ : gname) (h : list uround), uhist_auth γ h ∗ ⌜uhist_wf h⌝ ∗
+      (∀ h', uhist_auth γ h' -∗ ⌜uhist_wf h'⌝ -∗ ut_res_bare Rsys pt ksp U sts cs pid).
+  Proof using .
+    iIntros "H".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (#Hcaps & Hown))".
+    iDestruct (ut_own_nopt_uhist with "Hown") as (h) "(Huh & %Hh & Hback)".
+    iExists (un_uh N), h. iFrame "Huh". iSplitR; [iPureIntro; exact Hh |].
+    iIntros (h') "Huh %Hh'".
+    iDestruct ("Hback" with "Huh [%]") as "Hown"; [exact Hh' |].
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    rewrite /ut_env_nopt. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
   (* THE TRAPFRAME BOUND ON [p->sz], READ OFF THE BARE RESIDUE.
@@ -2357,7 +2420,7 @@ Proof.
   iDestruct "Hpark" as "(%Hdq & _)".
   iDestruct "Hglob" as "(_ & _ & _ & _ & _ & _ & _ & _ & Hipx)".
   iDestruct "Hipx" as (ip) "#Hip2".
-  iDestruct "Hown" as "(Hbs & Hip0)".
+  iDestruct "Hown" as "(Hbs & Hip0 & Huh)".
   iDestruct (ctx_word_pointsto_agree ξp Xc with "Hip0 Hip2") as %Hip.
   rewrite /ut_res_bare.
   iExists N, av.
@@ -2376,7 +2439,10 @@ Proof.
   iSplitL "Hiref"; [iExact "Hiref" |].
   iSplitL "Hpriv"; [iExact "Hpriv" |].
   iSplitL "Hfrag"; [iExact "Hfrag" |].
-  iSplitL "Hch"; [iExact "Hch" | iExact "Hsys"].
+  iSplitL "Hch"; [iExact "Hch" |].
+  iSplitL "Hsys"; [iExact "Hsys" |].
+  (* the history, born empty at the park *)
+  iApply (uhist_own_nil with "Huh").
 Qed.
 
 Local Lemma ut_res_bare_park_graveyard_note : True.

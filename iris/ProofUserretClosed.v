@@ -104,6 +104,7 @@ Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import UhistDefs.   (* [uhist_grow] / [round_ok_keys_of_record] -- the loop's append *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 
@@ -697,6 +698,25 @@ Section UserretClosed.
        closer -- is what the loop parks.  [sts2] is where the round actually
        left the descriptor states, so this is the view the process resumes
        at, not the one it trapped at. *)
+    (* ---- THE KEY HISTORY GROWS BY THIS ROUND (design/ni-uhist.md D5).
+           The residue is whole here and is spent just below, so the append
+           happens now, at a COPY of the round relation re-spelled exactly
+           as STEPS A/B re-spell [Hround'] (the originals stay for them).
+           The lower bound the grow hands back is dropped (ruling R3). ---- *)
+    pose proof Hround' as Hround_k.
+    unfold uv_round in Hround_k.
+    rewrite Hpi0 in Hround_k.
+    rewrite Hsz0 in Hround_k.
+    rewrite Hcw0 in Hround_k.
+    rewrite Hlz0k in Hround_k.
+    rewrite Hsc0k in Hround_k.
+    iDestruct (UV.usertrap_res_bare_uhist_acc pt' ksp U2 sts2 with "Hures'")
+      as (γuh hs) "(Huh & %Hhwf & Hhback)".
+    iMod (uhist_grow γuh hs (sc, W, uvis_of U2 sts2 (uvis_gen W) cs2 (uvis_pid W))
+            with "Huh") as "[Huh _]".
+    iDestruct ("Hhback" $! _ with "Huh [%]") as "Hures'".
+    { apply uhist_wf_snoc; [exact Hhwf |].
+      exact (round_ok_keys_of_record _ _ _ _ _ _ _ Hround_k). }
     iDestruct (UV.usertrap_res_bare_fd_open pt' ksp U2 sts2 with "Hures'")
       as "(Hfrag2 & Hctx2 & Hclose2)".
     iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) (pv_fdg (us_V U2))
@@ -939,6 +959,7 @@ Section Res.
   Definition usertrap_res_ptm_open := UV.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UV.usertrap_res_bare_norm.
   Definition usertrap_res_bare_fd_open := UV.usertrap_res_bare_fd_open.
+  Definition usertrap_res_bare_uhist_acc := UV.usertrap_res_bare_uhist_acc.
   Definition usertrap_res_bare_fd_tf_open := UV.usertrap_res_bare_fd_tf_open.
   Definition usertrap_res_csrs_open := UV.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UV.usertrap_res_sstc.

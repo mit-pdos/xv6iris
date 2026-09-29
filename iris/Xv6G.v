@@ -102,6 +102,9 @@ Class xv6G (Σ : gFunctors) := Xv6G {
   (* the U-tier's children ghost ([UserChildren.uch_auth] / [uch]); its
      [gname] is [UkRun.ukn_ch].  See [Xv6Cameras.uchG]. *)
   xv6_uch        :: uchG Σ;
+  (* the ENCODED per-process ledger ([UsertrapRes.uhist_auth]); its [gname]
+     is [UsertrapRes.un_uh].  See [Xv6Cameras.uledG]. *)
+  xv6_uled       :: uledG Σ;
   (* the process slot's generation, as a saved predicate carrying its slot,
      its pid and its exit payload ([ChildTok.gen_own] and the four pieces
      above it); its [gname] is minted per incarnation by allocproc and
@@ -147,7 +150,7 @@ Class xv6G (Σ : gFunctors) := Xv6G {
    [xv6G xv6Σ]" even when every constituent is present. *)
 Definition xv6GΣ : gFunctors :=
   #[ sieΣ; lockΣ; kallocΣ; bioΣ; diskGhostΣ; uartGhostΣ; fsLogΣ; logΣ;
-     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ; uchΣ; ctokΣ;
+     fsCrashΣ; iregΣ; fsTopΣ; fsLinkΣ; icacheΣ; pipeΣ; cinvΣ; uioΣ; uchΣ; uledΣ; ctokΣ;
      flivΣ; bioboxΣ; icboxΣ;
      offboxΣ ].
 

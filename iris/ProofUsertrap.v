@@ -82,6 +82,7 @@ Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes UtResFits ParkCap.
+Require Import UhistDefs.   (* [uround] / [uhist_auth] -- the residue's key history *)
 Require Import UexecSG.   (* [uexecSG]: [sfam] -- the deposit's families *)
 Require Import UexecRet.  (* [upay_at] -- the payment the trap route carries *)
 Require Import UsysMemOk.   (* [uecall_scause] -- the dispatch branch fact *)
@@ -1379,6 +1380,14 @@ Lemma usertrap_res_bare_fd_open
      FdSlots.fd_frags (pv_fdg (us_V U)) sts' -∗ own_context cur_ctx -∗
      usertrap_res_bare pt ksp U sts' cs pid).
 Proof. exact (ut_res_bare_fd_open SY.syscall_env pt ksp U sts cs pid). Qed.
+
+Lemma usertrap_res_bare_uhist_acc
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :
+  usertrap_res_bare pt ksp U sts cs pid -∗
+  ∃ (γ : gname) (h : list uround), uhist_auth γ h ∗ ⌜uhist_wf h⌝ ∗
+    (∀ h' : list uround, uhist_auth γ h' -∗ ⌜uhist_wf h'⌝ -∗
+       usertrap_res_bare pt ksp U sts cs pid).
+Proof. exact (ut_res_bare_uhist_acc SY.syscall_env pt ksp U sts cs pid). Qed.
 
 Lemma usertrap_res_bare_norm
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{!ufdG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (sts : list fdstate) (cs : gset gname) (pid : mword 32) :

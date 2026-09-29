@@ -52,6 +52,7 @@
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
+From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -86,6 +87,7 @@ Require Import SpecForkretPark.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
+Require Import UhistDefs.   (* [uhist_auth] -- the incarnation's key history, born here *)
 Require Import SpecUsertrap.  (* [usertrap_res]'s instances: was reaching
                                  here through UsertrapRes.v's own import *)
 Require Import UexecSlot. (* [uvis] *)
@@ -347,10 +349,14 @@ Section ProofKforkB5.
        world carries the cell and the sealed identity together, and the
        child's record is keyed at exactly those two (lane TRAP-ROWS-3/4,
        T4(b)). *)
+    (* THE INCARNATION'S KEY HISTORY, born empty at its park
+       (design/ni-uhist.md D2), at the ENCODED ledger camera *)
+    iMod (own_alloc (●ML ([] : list (leibnizO positive)))) as (γuh) "Huh";
+      [apply mono_list_auth_valid |].
     pose (N := MkUtNames γft γf γw γs j γl pd pav pu
                  γtl
                  iv1 DfracDiscarded
- ks pid_c).
+ ks pid_c γuh).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
     iAssert (park_env N) as "#Henv".
@@ -372,8 +378,8 @@ Section ProofKforkB5.
       iSplitR; [iExact "Hgeom"|].
       iSplitR; [iExact "Hworld"|].
       iExact "Hig1". }
-    iAssert (park_own N) with "[Hbsl]" as "Hown_park".
-    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    iAssert (park_own N) with "[Hbsl Huh]" as "Hown_park".
+    { rewrite /park_own. iFrame "Hbsl". iSplitR; [iExact "Hip1" | iExact "Huh"]. }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
     (* THE CHILD'S TABLE, NAMED AT THE PARK -- and it is the PARENT's.  The
        copy loop ([ProofKforkB3]'s [fd_st_move] at the parent's own entry,

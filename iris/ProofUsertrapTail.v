@@ -67,6 +67,7 @@ Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecUsertrap UsertrapRes.
+Require Import UhistDefs.   (* [uhist_own] -- the residue's key history *)
 Require Import UsysMemOk.     (* [usys_num] / [uecall_scause] -- the row's guard *)
 Require Import SpecSysRead.   (* [sys_rw_count] -- the read's count *)
 Require Import UexecRet.      (* [uslot] -- the resume slot the row is stated at *)
@@ -135,7 +136,8 @@ Section ProofUsertrapTail.
      proc_priv_unmarked (un_f N) (un_pj N) pid U ∗
      fd_frags (pv_fdg (us_V U)) sts ∗
      ch_frag (pv_chg (us_V U)) (un_pj N) cs ∗
-     Rsys (un_f N) (un_pj N) (un_fn N pid))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N pid) ∗
+     uhist_own (un_uh N))%I.
 
   Lemma ut_own_unmark (N : ut_names) (U : ustate) (sts : list fdstate)
       (cs : gset gname) (pid : mword 32) :
@@ -148,7 +150,7 @@ Section ProofUsertrapTail.
        bare [iFrame] searches that goal once per conjunct (2.6s + 1.7s).
        Every row is in hand, so the goal's own order closes it. *)
     iSplit.
-    - iIntros "(A & B & C & D & [E Ht] & F & G & H)".
+    - iIntros "(A & B & C & D & [E Ht] & F & G & H & I)".
       iSplitR "Ht"; [| iExact "Ht"].
       iSplitL "A"; [iExact "A" |].
       iSplitL "B"; [iExact "B" |].
@@ -156,15 +158,17 @@ Section ProofUsertrapTail.
       iSplitL "D"; [iExact "D" |].
       iSplitL "E"; [iExact "E" |].
       iSplitL "F"; [iExact "F" |].
-      iSplitL "G"; [iExact "G" | iExact "H"].
-    - iIntros "[(A & B & C & D & E & F & G & H) Ht]".
+      iSplitL "G"; [iExact "G" |].
+      iSplitL "H"; [iExact "H" | iExact "I"].
+    - iIntros "[(A & B & C & D & E & F & G & H & I) Ht]".
       iSplitL "A"; [iExact "A" |].
       iSplitL "B"; [iExact "B" |].
       iSplitL "C"; [iExact "C" |].
       iSplitL "D"; [iExact "D" |].
       iSplitL "E Ht"; [iSplitL "E"; [iExact "E" | iExact "Ht"] |].
       iSplitL "F"; [iExact "F" |].
-      iSplitL "G"; [iExact "G" | iExact "H"].
+      iSplitL "G"; [iExact "G" |].
+      iSplitL "H"; [iExact "H" | iExact "I"].
   Qed.
 
   Definition ut_hold_nm (N : ut_names) (U : ustate) (b : bool)
@@ -196,9 +200,9 @@ Section ProofUsertrapTail.
        ch_frag (pv_chg (us_V U')) (un_pj N) cs' -∗
        Rsys (un_f N) (un_pj N) (un_fn N pid) -∗ ut_own_nm N U' sts' cs' pid).
   Proof using .
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hch & Hsy & Huh)".
     iFrame "Hpv Hfr Hch Hsy". iIntros (U' sts' cs') "Hpv Hfr Hch Hsy".
-    rewrite /ut_own_nm. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy".
+    rewrite /ut_own_nm. iFrame "Hb Hip Hfd Hir Hpv Hfr Hch Hsy Huh".
   Qed.
 
   (* the quarter of [p->pid] and the registration eighth, out of the
