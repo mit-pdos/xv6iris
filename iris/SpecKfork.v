@@ -227,7 +227,14 @@ Definition kfork_post
        the success path and does not run at all on the two failure paths,
        and [ProcInv.cwd_ref] hides the fraction, so the block is stated at
        the very same [Vp] either way. *)
-    proc_priv γf pme pid_p Up ∗
+    (* ...AT A LATER EVENT COUNT (permit sweep, design
+       ni-strong-instance.md §7): allocproc, uvmcopy and the failure path's
+       freeproc take the PARENT's counter -- the forking process is the
+       actor of every allocation and release made on the child's behalf --
+       so the block comes back at a count at least the one it went in at,
+       and otherwise verbatim. *)
+    (∃ k' : nat, ⌜(pv_ev (us_V Up) <= k')%nat⌝ ∗
+       proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) k'))) ∗
     (* ...AND ITS DESCRIPTOR STATES, AT THE VERY LIST THEY WENT IN AT.
        kfork reads every slot of [p->ofile] and writes none, so this is
        verbatim like the block beside it -- and naming it is what lets the

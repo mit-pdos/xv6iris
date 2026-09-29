@@ -628,7 +628,7 @@ Section ProofKwait.
       (* the only write kwait can make is copyout's four-byte [xstate] at
          [addr], the status word [xw]; see SpecKwait.v's header *)
       ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
-        (cs' : gset gname),
+        (cs' : gset gname) (k' : nat),
         ⌜ callee_saved mm mf ⌝ -∗
         ⌜ mf !!! Regidx Ra0 = sign_extend' 64 rv ⌝ -∗
         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -643,8 +643,12 @@ Section ProofKwait.
         sie_cap_gpr KT1 mf K eb pme -∗
         cpu_own 0 eb pme eb lks -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
+        (* the reaper's event count only rose (permit sweep L1b): freeproc
+           took its counter *)
+        ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
         proc_priv γf pme pid
-          (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
+          (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+             (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
         ch_frag γrow pme cs' -∗
         mWP (Loop : expr riscv_lang)))%I.
 
@@ -1334,7 +1338,7 @@ Section ProofKwait.
       (pidc kl xsw : mword 32) (ch : mword 64) (ps : list (mword 64)) (γrow : gname) (cs : gset gname) (lks : gset string)
       (* the failing arm's two readings, which this arm does not take and
          only carries ([UserChildren.wait_ans], lane TRAP-ROWS T4) *)
-      (gnr : gname) (nullst : bool) :
+      (gnr : gname) (nullst : bool) (kev : nat) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
     (K_kwait <= K)%nat ->
@@ -1367,6 +1371,9 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x60)) -∗
     kalloc_env γa None -∗
+    (* the reaper's event counter, lent to freeproc (permit sweep L1b): the
+       reaper is the actor of the slot's release *)
+    act_lend pme kev -∗
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     (* the child's lock, contents out, at ZOMBIE *)
     is_lock γk (proc_addr k) "proc"%string (proc_lock_pay γs γk (proc_addr k)) -∗
@@ -1430,6 +1437,7 @@ Section ProofKwait.
         (∃ h, zomb_receipt h (ZReap pme pidc)) -∗
         sie_cap_gpr KT1 mf K eb pme -∗
         cpu_own 0 eb pme eb lks -∗
+        (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k') -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
         slot_gen pme (DfracOwn (1/4)) gnr -∗
         ch_frag γrow pme cs' -∗
@@ -1447,7 +1455,7 @@ Section ProofKwait.
                                "nextpid").
     { apply locks_below_union_singleton; [vm_compute; lia |].
       lkbelow. }
-    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hplk #Hlkk Htokk Hstate Hpsg Hchan
+    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv Hlend #Hplk #Hlkk Htokk Hstate Hpsg Hchan
              Hkilled Hxstate Hpidq Hkrow Hdorm Hpark #Hmk #Hlk Htok Hsgq Hcols Hmyrow Hframe Hcont".
     (* ---- +0x60 sd x0,56(s1) : pp->parent = 0, out of wait_lock's table ---- *)
     iDestruct "Hcols" as (gz mz oz) "(Hps & Hch & Ho & Hci & (%hz & Hzl))".
@@ -1621,14 +1629,14 @@ Section ProofKwait.
     iApply (Freeproc.wp_freeproc_sconf γp γa R1 k γk Vc (pv_gen Vc) pidc ZOMBIE ch
               (Some (pv_upt Vc)) (Some (ud_tfp (pv_upt Vc), pv_tf Vc))
               (trap_res eb + (K - 10))%nat eb pme 2%nat
-              ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
+              ({["proc"]} ∪ ({["wait_lock"]} ∪ lks)) kev
               ltac:(pose proof (kw_K44 K HK); lia) Hk kw_ilvl2 HR1a0 Hfresh_nextpid
-              with "Hcg Hown Htext Hpc Hplk [Htokk Hstate Hpsg Hchan Hpub] Hrest Hrow Hsg Hpr [Hxb] Hpt Htf Henv").
+              with "Hcg Hown Htext Hpc Hplk [Htokk Hstate Hpsg Hchan Hpub] Hrest Hrow Hsg Hpr [Hxb] Hpt Htf Henv Hlend").
     all: try lkbelow.
     { rewrite /proc_held. iFrame "Htokk Hstate Hpsg Hchan Hpub". }
     { iExists xsw. iExact "Hxb". }
     iApply wp_next_off_intro.
-    iIntros (mfp) "Hcg Hown Hpc %Hcsfp Hheld Hdorm".
+    iIntros (mfp) "Hcg Hown Hlend Hpc %Hcsfp Hheld Hdorm".
     assert (Hp6a : ret_pc (R1 !!! Regidx Rra) = mword_of_int (KW + 0x6a))
       by (rewrite HR1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp6a) in "Hpc".
@@ -1798,7 +1806,7 @@ Section ProofKwait.
     (* ---- fall through into the epilogue ---- *)
     iApply (kw_epilogue mm mr pme (sign_extend' 64 pidc) K 0%nat eb eb lks
               ltac:(pose proof (kw_K10K K HK); lia) Hmrsp Hmrs3 Hmrcs with "Hcg Hown Htext Hpc Hframe").
-    iApply (kw_next_reanchor CIDp CIDr2 eb pme with "[Hcont Hmyrow Hesc Hsgq]"); [wp_next_chain |].
+    iApply (kw_next_reanchor CIDp CIDr2 eb pme with "[Hcont Hmyrow Hesc Hsgq Hlend]"); [wp_next_chain |].
     iIntros (CIDx Hsx mf) "%Hcsf %Ha0f Hcgf Hownf Hpcf".
     iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx |].
     (* THE ANSWER, at the generation this walk reaped: the row lost it, its
@@ -1806,7 +1814,7 @@ Section ProofKwait.
        no other child of the caller carries the pid the caller is about to
        read out of a0. *)
     iApply ("Hcont" $! mf (cs ∖ {[pv_gen Vc]})
-              with "[%] [%] [Hesc] [] Hcgf Hownf Hpcf Hsgq Hmyrow").
+              with "[%] [%] [Hesc] [] Hcgf Hownf Hlend Hpcf Hsgq Hmyrow").
     { exact Hcsf. }
     { exact Ha0f. }
     { iRight. iExists (pv_gen Vc).
@@ -1882,7 +1890,7 @@ Section ProofKwait.
       (* the only write is copyout's four-byte [xstate] at [addr], the
          status word [xw]; see SpecKwait.v's header *)
       ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
-        (cs' : gset gname),
+        (cs' : gset gname) (k' : nat),
         ⌜ callee_saved mm mf ⌝ -∗
         ⌜ mf !!! Regidx Ra0 = sign_extend' 64 rv ⌝ -∗
         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -1897,8 +1905,12 @@ Section ProofKwait.
         sie_cap_gpr KT1 mf K eb pme -∗
         cpu_own 0 eb pme eb lks -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
+        (* the reaper's event count only rose (permit sweep L1b): freeproc
+           took its counter *)
+        ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
         proc_priv γf pme pid
-          (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
+          (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+             (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
         ch_frag γrow pme cs' -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
@@ -1953,15 +1965,20 @@ Section ProofKwait.
          (lane TRAP-ROWS-3, T4(b)): it is what tells the tail whether the
          address it is reaping at is <init>'s.  It comes back at the tail's
          own continuation, where the block is closed again. *)
-      iDestruct (proc_priv_slot_gen with "Hpriv") as "(Hsgq & _ & Hsgback)".
+      (* ...AND THE BLOCK'S EVENT COUNTER BESIDE IT, lent to the reaping
+         tail's freeproc (permit sweep L1b) *)
+      iDestruct (proc_priv_slot_gen_ev_acc with "Hpriv") as "(Hsgq & _ & Hcnt & Hsgback)".
+      iDestruct (act_lend_of_cnt with "Hcnt") as "Hlend".
       iApply (kw_reap γs γa γp γw γk mm F0 pme k K eb pidc kl xs ch ps γrow cs lks
                 (pv_gen (us_V U)) (bool_decide (addr = (zero_reg : mword 64)))
+                (pv_ev (us_V U))
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs Hbelow Hchild Hpmenz
-                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
+                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                       Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                       [Hcont Hsgback]").
-      iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown Hpc Hsgq Hmyrow".
-      iDestruct ("Hsgback" with "Hsgq") as "Hpriv".
+      iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+      iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
+      iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       (* THE WINDOW IS EMPTY AND THE ANSWER IS THE REAP's: a null status
          pointer copies nothing ([d = 0]), and the word the answer's escrow
@@ -1975,8 +1992,8 @@ Section ProofKwait.
         rewrite (rget_ne (CID := CIDf) F0 Rs7
                    ltac:(vm_compute; discriminate)) HF0s7 in Hz'.
         exact (proj1 (eq_vec_true_iff _ _) Hz'). }
-      iApply ("Hcont" $! mf (pv_upt (us_V U)) pidc 0%nat xs cs'
-                with "[%] [%] [%] [%] [%] [%] Hans [Hzr] Hcg Hown Hpc [Hpriv] Hmyrow").
+      iApply ("Hcont" $! mf (pv_upt (us_V U)) pidc 0%nat xs cs' kl2
+                with "[%] [%] [%] [%] [%] [%] Hans [Hzr] Hcg Hown Hpc [%] [Hpriv] Hmyrow").
       { exact Hcsf. }
       { exact Ha0. }
       { apply uptd_ext_sz_refl. }
@@ -1984,7 +2001,8 @@ Section ProofKwait.
       { intros _; reflexivity. }
       { intros Hne; exfalso; exact (Hne Haz). }
       { iRight. iExact "Hzr". }
-      { cbn [umem_wr]. rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+      { exact Hkl2. }
+      { cbn [umem_wr]. iExact "Hpriv". }
     - (* ===== addr != 0: copyout(p->pagetable, addr, &pp->xstate, 4) ===== *)
       (* the branch's own reading of the C's [addr != 0] test, named here
          because BOTH copyout arms below owe it to the contract *)
@@ -2281,8 +2299,8 @@ Section ProofKwait.
         { iApply (kw_pay_res with "Hcols"). }
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs
-                  with "[%] [%] [%] [%] [%] [%] [] [] Hcg Hown Hpc Hpriv Hmyrow").
+        iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs (pv_ev (us_V U))
+                  with "[%] [%] [%] [%] [%] [%] [] [] Hcg Hown Hpc [%] Hpriv Hmyrow").
         { exact Hcsf. }
         { rewrite Ha0. apply bv_eq; vm_compute; reflexivity. }
         { exact Hext. }
@@ -2298,6 +2316,8 @@ Section ProofKwait.
         { iApply wait_ans_gen_neg. iApply wait_why_notnull.
           apply bool_decide_eq_false_2. exact Hane. }
         { iLeft. by iPureIntro. }
+        (* no lend on this -1 exit: the count is the block's own *)
+        { lia. }
       + (* ===== copyout succeeded: fall through to the reaping tail ===== *)
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KW + 0x5c))
                   (mword_of_int 56 : mword 13) Ra0 mco (trap_res eb + (K - 10))%nat false
@@ -2319,20 +2339,23 @@ Section ProofKwait.
                      ltac:(vm_compute; discriminate)) Hrm in Hblt.
           vm_compute in Hblt. discriminate. }
         (* ...and the same lend on the copy-out arm *)
-        iDestruct (proc_priv_slot_gen with "Hpriv") as "(Hsgq & _ & Hsgback)".
+        iDestruct (proc_priv_slot_gen_ev_acc with "Hpriv") as "(Hsgq & _ & Hcnt & Hsgback)".
+        iDestruct (act_lend_of_cnt with "Hcnt") as "Hlend".
         iApply (kw_reap γs γa γp γw γk mm mco pme k K eb pidc kl xs ch ps γrow cs lks
                   (pv_gen (us_V U)) (bool_decide (addr = (zero_reg : mword 64)))
+                  (pv_ev (us_V U))
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs Hbelow Hchild Hpmenz
-                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hplk Hlkk Htokk Hstate Hpsg Hchan
+                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                         Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                         [Hcont Hsgback]").
-        iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown Hpc Hsgq Hmyrow".
-        iDestruct ("Hsgback" with "Hsgq") as "Hpriv".
+        iIntros (CIDz) "%Hsz". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+        iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
+        iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         (* the bytes this arm placed ARE the word the answer's escrow is
            keyed at: copyout was handed [p->xstate]'s own bytes. *)
-        iApply ("Hcont" $! mf P' pidc d xs cs'
-                  with "[%] [%] [%] [%] [%] [%] Hans [Hzr] Hcg Hown Hpc Hpriv Hmyrow").
+        iApply ("Hcont" $! mf P' pidc d xs cs' kl2
+                  with "[%] [%] [%] [%] [%] [%] Hans [Hzr] Hcg Hown Hpc [%] Hpriv Hmyrow").
         { exact Hcsf. }
         { exact Ha0. }
         { exact Hext. }
@@ -2341,6 +2364,7 @@ Section ProofKwait.
         (* ...AND THE WHOLE WORD LANDED, off copyout's own answer *)
         { intros _ _; exact (Hdfull Hr0). }
         { iRight. iExact "Hzr". }
+        { exact Hkl2. }
   Qed.
 
   (* ================================================================== *)
@@ -2917,8 +2941,8 @@ Section ProofKwait.
     iIntros (CIDx Hsx mf) "%Hcsx %Ha0x Hcgx Hownx Hpcx".
     iSpecialize ("Hqfn" $! CIDx with "[%]"); [exact Hsx |].
     iApply ("Hqfn" $! mf (pv_upt (us_V U)) (mword_of_int (-1) : mword 32) 0%nat
-              (mword_of_int 0 : mword 32) cs
-              with "[%] [%] [%] [%] [%] [%] [] [] Hcgx Hownx Hpcx [Hpriv] Hmyrow").
+              (mword_of_int 0 : mword 32) cs (pv_ev (us_V U))
+              with "[%] [%] [%] [%] [%] [%] [] [] Hcgx Hownx Hpcx [%] [Hpriv] Hmyrow").
     { exact Hcsx. }
     { rewrite Ha0x. apply bv_eq; vm_compute; reflexivity. }
     { apply uptd_ext_sz_refl. }
@@ -2932,7 +2956,9 @@ Section ProofKwait.
        THE REASON IS THE CALLER'S, carried in above (lane TRAP-ROWS, T4). *)
     { iApply (wait_ans_gen_neg with "Hwhy"). }
     { iLeft. by iPureIntro. }
-    { cbn [umem_wr]. rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+    (* no lend on this -1 exit (permit sweep L1b) *)
+    { lia. }
+    { cbn [umem_wr]. rewrite upd_ev_id upd_usV_id us_upt_id upd_usM_id. iExact "Hpriv". }
   Qed.
 
   (* ================================================================== *)
@@ -4080,8 +4106,8 @@ Section ProofKwaitMain.
     iAssert (kw_exit_fn CID19 γf m pj adr av eb pid U (pv_chg (us_V U)) cs lks)
       with "[Hcont]" as "Hqfn".
     { rewrite /kw_exit_fn.
-      iIntros (CIDx Hsx mf P' rv d xw cs')
-        "%Hcsx %Ha0x %Hextx %Hdx %Hnullx %Hfullx Hansx Hzrx Hcgx Hownx Hpcx Hprivx Hrowx".
+      iIntros (CIDx Hsx mf P' rv d xw cs' k')
+        "%Hcsx %Ha0x %Hextx %Hdx %Hnullx %Hfullx Hansx Hzrx Hcgx Hownx Hpcx %Hkx Hprivx Hrowx".
       iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain |].
       (* THE STEP ACROSS, taken once (lane TRAP-ROWS-3/4, T4(b)) *)
       iDestruct (wait_ans_of_gen with "Hgpme Hipis Hansx") as "Hansx".
@@ -4090,13 +4116,14 @@ Section ProofKwaitMain.
       (* the answer's status-pointer reading is the caller's own word
          (lane TRAP-ROWS, T4) *)
       iEval (rewrite Hadr) in "Hansx".
-      iApply ("Hcont" $! mf P' rv d xw cs'
-                with "[%] [%] [%] [%] [%] Hansx Hcgx Hownx Hpcx [Hprivx] Hrowx").
+      iApply ("Hcont" $! mf P' rv d xw cs' k'
+                with "[%] [%] [%] [%] [%] Hansx Hcgx Hownx Hpcx [%] [Hprivx] Hrowx").
       { split; [exact Hcsx | exact Ha0x]. }
       { exact Hextx. }
       { exact Hdx. }
       { intros Hc. apply Hnullx. rewrite Hadr. exact Hc. }
       { intros Hne Hrne. apply Hfullx; [ rewrite Hadr; exact Hne | exact Hrne ]. }
+      { exact Hkx. }
       { rewrite Hadr. iExact "Hprivx". } }
     (* ==================== THE OUTER LOOP (iLöb) ==================== *)
     iAssert (kw_round CID γf γw j m pj adr av eb pid U (pv_chg (us_V U)) cs lks)
@@ -4133,8 +4160,8 @@ Section ProofKwaitMain.
     iApply (wp_kwait_led_sconf γa γp γf γw γs j γl m av eb b pid U lks cs
               Hj Hgl Hav Heb Hbelow
               with "Hcg Hown Htext Hpc Hpinv Hlk Henv Hplk Hpriv Hmyrow Hipis").
-    rewrite /wp_next. iIntros (CID' Hs mf P' rv d xw cs') "%Hr %Hext %Hd %Hnull %Hfull Hans".
-    iApply ("Hcont" $! CID' Hs mf P' rv d xw cs' with "[%] [%] [%] [%] [%] [Hans]");
+    rewrite /wp_next. iIntros (CID' Hs mf P' rv d xw cs' k') "%Hr %Hext %Hd %Hnull %Hfull Hans".
+    iApply ("Hcont" $! CID' Hs mf P' rv d xw cs' k' with "[%] [%] [%] [%] [%] [Hans]");
       [ exact Hr | exact Hext | exact Hd | exact Hnull | exact Hfull | ].
     iApply (wait_ans_led_post with "Hans").
   Qed.

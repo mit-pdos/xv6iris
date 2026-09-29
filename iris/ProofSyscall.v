@@ -4349,7 +4349,7 @@ Section SyscallArms.
     iApply (SysSbrk.wp_sys_sbrk_sconf fsc_kalloc γf M (av - 4)%nat true pj pid U v0 v1 true lks
               Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
-    iIntros (CIDy Hsy mf P' szv' lz' M') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy mf P' szv' lz' M' k') "%Hcs %Hok %Hk' Hcg Hcpu Hpc Hpriv".
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U)))
       by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0) lz'
                   (us_M U) M' Hok).
@@ -4358,9 +4358,9 @@ Section SyscallArms.
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2
                     = page_base (ud_tfp (pv_upt
-                        (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')))).
+                        (upd_ev (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz') k')))).
     { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
-      cbn [pv_upt upd_lazy upd_sz upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
+      cbn [pv_upt upd_ev upd_lazy upd_sz upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
     assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
               mf !!! Regidx r = m !!! Regidx r).
@@ -4381,11 +4381,11 @@ Section SyscallArms.
        ([sysc_priv_mem_dom], a pure read that does not spend the block). *)
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
               (upd_usM (upd_usV U
-                          (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M')
+                          (upd_ev (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz') k')) M')
               sts sts gn cs cs lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(apply (sysc_mem_ok_sbrk (us_V U)
-                             (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')
+                             (upd_ev (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz') k')
                              (us_M U) M' Hnum);
                     [ exact (sysc_sbrk_ok_of_ok (us_V U) v0 v1 P' szv'
                                (mf !!! Regidx Ra0) lz' (us_M U) M' HMdom Hok)
@@ -4488,8 +4488,8 @@ Section SyscallArms.
     iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γp γf γw' γs j γl M (av - 4)%nat true true lks pid U v0 cs
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hnextpid Hpriv Hrow Hipis").
-    iIntros (CIDy Hsy mf P' rv dw xw cs')
-      "%Hcs %Hext %Hdwle %Hnullw %Hfullw Hans Hcg Hcpu Hpc Hpriv Hrow".
+    iIntros (CIDy Hsy mf P' rv dw xw cs' kev)
+      "%Hcs %Hext %Hdwle %Hnullw %Hfullw Hans Hcg Hcpu Hpc %Hkev Hpriv Hrow".
     destruct Hcs as [Hcs Ha0w].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
     { destruct (uptd_ext_sz_ext (pv_sz (us_V U)) (pv_upt (us_V U)) P' Hext) as (_ & Htf & _).
@@ -4512,11 +4512,12 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw (fun i => nth_byte xw i))) sts sts gn cs cs' lks av m mf fdep
+              (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P')
+                 (umem_wr (us_M U) v0 dw (fun i => nth_byte xw i))) sts sts gn cs cs' lks av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
                       by (apply list_lookup_total_correct, Hv0);
-                    apply (sysc_mem_ok_wait (us_V U) (upd_upt (us_V U) P') (us_M U)
+                    apply (sysc_mem_ok_wait (us_V U) (upd_upt (upd_ev (us_V U) kev) P') (us_M U)
                              (umem_wr (us_M U) v0 dw (fun i => nth_byte xw i)) (Z.of_nat 3) dw
                              (fun i => nth_byte xw i)
                              Hnum ltac:(lia) ltac:(lia)
@@ -5270,7 +5271,7 @@ Section SyscallArms.
     (* THE PARENT'S DESCRIPTOR STATES COME BACK AT THE VERY LIST THEY WENT
        IN AT: fork reads [p->ofile] and writes none of it, and what the CHILD
        got is that same list ([SpecKfork]'s post says so). *)
-    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hufrag Hka Hrv".
+    iIntros (CIDy Hsy mf kev) "%Hcs Hcg Hcpu Hpc %Hkev Hpriv Hufrag Hka Hrv".
     (* THE RETURN VALUE'S TWO ARMS, and on the pid arm the CHILD TOKEN --
        kfork's split, relayed here.  The pure half is what the dispatcher's
        own fork clause says; the token is what this arm hands the trap
@@ -5334,7 +5335,10 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U sts sts gn cs cs' ∅ av m mf fdep
+    (* fork leaves the caller's record but for its event count (permit
+       sweep L1b): allocproc/uvmcopy/freeproc took the caller's counter *)
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
+              (upd_usV U (upd_ev (us_V U) kev)) sts sts gn cs cs' ∅ av m mf fdep
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
                  (sysc_num_ne12 _ _ Hnum eq_refl))
               (* this entry never receives the fragment bundle, so its
@@ -5551,11 +5555,14 @@ Section SyscallArms.
     { iDestruct "Harm" as "[[(%Hr & %HV & %HM) Hfail] | Hok]".
       - (* FAILED *)
         cbn [us_V us_M] in HV, HM.
+        (* the failed exec's block is the caller's at a later event count
+           (permit sweep L1b) *)
+        destruct HV as (kx & _ & HV).
         iDestruct (sys_exec_post_fail_refund with "Hfail") as "Hrf".
         iSplitR.
         { iPureIntro. split_and!.
           - rewrite (f_equal (fun x => ud_tfp (pv_upt x)) HV).
-            cbn [pv_upt upd_upt pv_fdg]. exact Htf.
+            cbn [pv_upt upd_upt upd_ev pv_fdg]. exact Htf.
           - exact (f_equal pv_fdg HV).
           - exact (f_equal pv_chg HV).
           - exact (f_equal pv_gen HV).
@@ -5565,7 +5572,7 @@ Section SyscallArms.
         { rewrite /sysc_exec_out. iIntros "_". iLeft. iPureIntro.
           rewrite /sysc_exec_failed.
           cbn [us_V us_M us_tf upd_usV upd_tf pv_tf pv_upt pv_sz].
-          rewrite Hr HV HM. cbn [pv_tf pv_upt pv_sz upd_upt].
+          rewrite Hr HV HM. cbn [pv_tf pv_upt pv_sz upd_upt upd_ev].
           split_and!;
             [ reflexivity | reflexivity
             | exact (perm_of_uptd_ext_sz _ _ _ Hext) | reflexivity

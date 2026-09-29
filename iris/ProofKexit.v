@@ -558,7 +558,7 @@ Section KexitLoop.
     iIntros (Hfd) "(Hn & Hrest)".
     iDestruct (proc_priv_nocwd_lazy with "Hn") as %Hlz.
     rewrite (proc_priv_nocwd_bare γf pa pid U Hlz).
-    iDestruct "Hn" as "[Hb [Hev [%Hlen Ho]]]".
+    iDestruct "Hn" as "[Hb [%Hlen Ho]]".
     iFrame "Hb".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
@@ -573,7 +573,7 @@ Section KexitLoop.
     cbn [us_ofile upd_usV us_V upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd
          pv_name pv_fdg pv_lazy pv_secc].
     iSplitL "Hb"; [ iExact "Hb" | ].
-    iFrame "Hev Ho". iPureIntro. rewrite length_insert. exact Hlen.
+    iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 
   Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}

@@ -327,7 +327,11 @@ Section KexecCSetup.
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M' : regfile) (P' : uptd) (Mo : gmap Z (bv 8)) (sz1 : mword 64),
+      ∀ (M' : regfile) (P' : uptd) (Mo : gmap Z (bv 8)) (sz1 : mword 64)
+          (U' : ustate),
+        (* the block may come back at a later event count (permit sweep
+           L1b): uvmalloc takes its counter *)
+        ⌜ev_after U U'⌝ -∗
         (* THE TWO FACTS ABOUT [sz1] THE REST OF PHASE C RUNS ON, PUBLISHED
            HERE BECAUSE THIS IS WHERE THEY ARE DISCOVERED.  The stack top is
            [PGROUNDUP(szv) + 8192], so it is at least 8192 -- which is what
@@ -338,19 +342,19 @@ Section KexecCSetup.
            fresh variable phase D would then have nothing to tie down. *)
         ⌜(8192 <= uint sz1)%Z⌝ -∗
         ( kxc_at_21a jp gf
-                     plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                     plen pfun na avf alen aslen afun pidv U' eb dqb dqs dqa dqpv dqas
                      M' K sp0 ra0 s00 s10 s20 pv av
-                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0
+                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U')) sz1 (m !!! Regidx Rs11) 0
           ∨ kxc_at_272 jp gf
-                       plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                       plen pfun na avf alen aslen afun pidv U' eb dqb dqs dqa dqpv dqas
                        M' K sp0 ra0 s00 s10 s20 pv av
-                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0 ) -∗
+                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P' Mo (pv_sz (us_V U')) sz1 (m !!! Regidx Rs11) 0 ) -∗
         (* THE EXIT, HANDED BACK.  A [wp_next] continuation is LINEAR, so a
            block that owns a failure path cannot also leave its successor
            one: the caller supplies exactly one and whichever path runs
            receives it.  durable-notes' "CHAINING TWO HALVES" shape. *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U' m (ret_pc ra0) K
                eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         mWP (Loop : expr riscv_lang)) -∗
@@ -884,8 +888,10 @@ Section KexecCSetup.
       by (rewrite HYa1; exact Hcov_pground).
     iDestruct (proc_pt_to_ptm_cov P (Y !!! Regidx Ra1) Mi HPwf HcovY
                  with "Hpt") as "Hpt".
+    (* the block's event counter, lent to uvmalloc (permit sweep L1b) *)
+    iDestruct (proc_priv_ev_lend with "Hpriv") as "[Hlend Hpback]".
     iApply (Uvmalloc.wp_uvmalloc_mem_sconf fsc_kalloc Y P Mi 4 (K - 68)%nat eb
-              (proc_addr jp) eb ∅ ltac:(lia) HYtp HYa0 HYa3
+              (proc_addr jp) eb ∅ (pv_ev (us_V U)) ltac:(lia) HYtp HYa0 HYa3
               ltac:(lia) uvm_perm_ok_22
               ltac:(rewrite HYa1 uint_unsigned; exact Hmaxpground)
               ltac:(right; rewrite HYa1; exact Hcov_pground)
@@ -895,10 +901,16 @@ Section KexecCSetup.
                              ltac:(rewrite Nat2Z.inj_succ; lia)
                              ltac:(lia))
                     )
-              with "Hcg Hcnt Htext Hpc Hpt Hka").
+              with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
     all: try lkbelow.
 
-    iIntros (CID16 Hs16 Mu) "Hcg Hcnt Hpc %Hcsu Hpost".
+    iIntros (CID16 Hs16 Mu) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsu Hpost".
+    iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
+    iDestruct (KexecOkQ.kexec_closer_after_next Uv with "Hcont") as "Hcont";
+      [exact HUv|].
+    destruct HUv as (kev & Hkev & HUve). subst Uv.
+    set (Uev := upd_usV U (upd_ev (us_V U) kev)).
+    assert (HUev : ev_after U Uev) by (exists kev; split; [exact Hkev | reflexivity]).
     assert (Hpc1d2 : ret_pc (Y !!! Regidx Rra) = mword_of_int (KXC + 0x1d2))
       by (rewrite HYra; pcw).
     iEval (rewrite Hpc1d2) in "Hpc".
@@ -1000,7 +1012,7 @@ Section KexecCSetup.
       iDestruct (wp_next_retarget CID0 CID18 true (proc_addr jp) _ Hcr18
                    with "Hcont") as "Hcont".
     iApply (TC.kxc_bad_1d6 Q QF jp gf
-                plen pfun na avf alen aslen afun pidv U
+                plen pfun na avf alen aslen afun pidv Uev
                 dqb dqs dqa dqpv dqas m U0 K eb ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv) w13
                 (* the cause (S5): uvmalloc could not add the guard+stack pages *)
                 (ex_intro _ KexecOkQ.KfNoMem Hqfnm)
@@ -1719,7 +1731,9 @@ Section KexecCSetup.
         iSpecialize ("Hout" $! CID32c with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID32c true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hout" $! V6 Pfinal (umem_grow Mi (uint sz1)) sz1 with "[%] [-Hcont] Hcont").
+        iApply ("Hout" $! V6 Pfinal (umem_grow Mi (uint sz1)) sz1 Uev
+                  with "[%] [%] [-Hcont] Hcont").
+        { exact HUev. }
         { rewrite uint_unsigned Hszu.
           pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hlo _]. lia. }
         iRight.
@@ -1880,7 +1894,9 @@ Section KexecCSetup.
         iSpecialize ("Hout" $! CID30 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID30 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hout" $! W7 Pfinal (umem_grow Mi (uint sz1)) sz1 with "[%] [-Hcont] Hcont").
+        iApply ("Hout" $! W7 Pfinal (umem_grow Mi (uint sz1)) sz1 Uev
+                  with "[%] [%] [-Hcont] Hcont").
+        { exact HUev. }
         { rewrite uint_unsigned Hszu.
           pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hlo _]. lia. }
         iLeft.

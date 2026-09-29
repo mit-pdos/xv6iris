@@ -1630,6 +1630,8 @@ Section ProofMain.
     fsc_uart = γd ->
     fsc_disk = γv ->
     fs_geom_ok ->
+    (* main has no current proc: userinit's boot lend (permit sweep L1a) *)
+    p0 = (zero_reg : mword 64) ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     (* ---- THE PARK ROWS, forwarded to userinit at +0x9e (forkret-park.md
@@ -1792,7 +1794,7 @@ Section ProofMain.
     mWP (Loop : expr riscv_lang).
   Proof using ufdG0.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
-           Huartq Hdiskq Hgeomok.
+           Huartq Hdiskq Hgeomok Hp0.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hwire Hbundle Hrdtok #Htramp #Hccaps #Hu1caps #Hcready #Htl #Hwaitlk
              #Hpenv #Hkmem #Hcert #Hcinv #Hseam Hfolauth Hoffa Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
@@ -2212,7 +2214,7 @@ Section ProofMain.
     iApply (Userinit.wp_userinit_sconf γp γs γft γf γw γtl pd pav pu F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
-              ltac:(lia) Hnb8 Hdevq Hnibq
+              ltac:(lia) Hnb8 Hdevq Hnibq Hp0
               with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
                     Hfirst Hpersist Hfsinit
                     Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Hbundle Hrdtok Htramp Hkenv
@@ -2630,7 +2632,7 @@ Section ProofMain.
     iApply (mn_grp_fs γp γs γv γd γw γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Pb Rspent
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
-              Huartq Hdiskq Hgeomok
+              Huartq Hdiskq Hgeomok Hp0
               with "Hcg Htext Hkdata Hdev Hwire Hbundle Hrdtok Htramp Hccaps Hu1caps Hcready Htl Hwaitlock
                     Hpenvc Hkmem Hcert Hcinv Hseamc Hfolat Hoffa Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail

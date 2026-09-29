@@ -354,7 +354,10 @@ Section SysExecAU.
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ U' : ustate,
        proc_priv γf pj pid U' ∗
-       ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V /\ us_M U' = M⌝
+       ((⌜r = (mword_of_int (-1) : mword 64) /\
+           (* the event count only rose (permit sweep) *)
+           (exists k' : nat, (pv_ev V <= k')%nat /\ us_V U' = upd_ev V k') /\
+           us_M U' = M⌝
          ∗ sys_exec_post_fail Fs Γ γfs cw secc Q P Pmiss Fo M pv av sts cs pid)
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),

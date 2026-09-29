@@ -191,6 +191,60 @@ Section KforkPrologue.
     iFrame "Hc".
   Qed.
 
+  (* ...AND WITH THE PARENT'S EVENT COUNTER LENT OUT BESIDE THE FIVE
+     PIECES (permit sweep L1b): uvmcopy takes it, and the block closes at
+     whatever count comes back. *)
+  Lemma kfk_priv_open_ev (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗
+    ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝ ∗
+    ⌜um_below (pv_sz (us_V U)) (ud_um (pv_upt (us_V U)))⌝ ∗
+    p_sz pa ↦₈ pv_sz (us_V U) ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) ∗
+    proc_ptm (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) ∗
+    tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
+    act_cnt pa (pv_ev (us_V U)) ∗
+    (∀ (P' : uptd) (szv : mword 64) (ws' : list (mword 64))
+       (M' : gmap Z (bv 8)) (k : nat),
+       ⌜ud_root P' = ud_root (pv_upt (us_V U))⌝ -∗
+       ⌜ud_tfp P' = ud_tfp (pv_upt (us_V U))⌝ -∗
+       ⌜uint szv <= uvm_maxsz⌝ -∗
+       ⌜um_below szv (ud_um P')⌝ -∗
+       ⌜pv_lazy (us_V U) = false -> lazy_free (ud_um P') (uint szv)⌝ -∗
+       p_sz pa ↦₈ szv -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
+       proc_ptm P' (uint szv) M' -∗
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) -∗
+       tf_page (ud_tfp (pv_upt (us_V U))) ws' -∗
+       act_cnt pa k -∗
+       proc_priv γf pa pid
+         (upd_usM (upd_usV U (upd_ev (upd_pt (upd_sz (us_V U) szv) P' ws') k)) M')).
+  Proof using .
+    iIntros "Hpv".
+    iDestruct (proc_priv_sz_maxsz with "Hpv") as "#Hszb".
+    iDestruct (proc_priv_um_below with "Hpv") as "#Hbel".
+    iDestruct "Hpv" as "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hc & Hft & Hgq & Hxs & Hev & Hgh) Ho]".
+    rewrite /proc_fields /proc_ptm_at.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iSplitR; [done|]. iSplitR; [done|].
+    iFrame "Hsz Hpg Hptt Htfc Htfp Hev".
+    iIntros (P' szv ws' M' k) "%Hroot %Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Hptt Htfc Htfp Hev".
+    rewrite /proc_priv /proc_priv_core /proc_fields /proc_ptm_at.
+    cbn [upd_ev upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg
+         pv_cwi pv_gen pv_chg pv_lazy pv_secc pv_ev].
+    rewrite Hroot Htf.
+    iSplitR "Ho"; [|iFrame "Ho"].
+    iSplitR; [iPureIntro; exact Hszb'|].
+    iSplitR; [iPureIntro; exact Hbel'|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro. exact Hnl. }
+    iFrame "Hpg Htfc Hptt Htfp".
+    iSplitR; [iPureIntro; exact Hlz' |].
+    iFrame "Hc Hft Hgq Hxs Hev Hgh".
+  Qed.
+
   (* the same, on the DEFICIT block: the CHILD is still in the construction
      window here -- allocproc left [np->cwd] at 0 -- so uvmcopy's
      destination side opens a [proc_priv_nocwd].  Neither this nor its
@@ -275,7 +329,10 @@ Section KforkPrologue.
  (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (Q : Z -> iProp Σ) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Uc' : ustate)
-        (tfsrc tfdst : mword 44),
+        (tfsrc tfdst : mword 44) (kp : nat),
+        (* the parent's event count (permit sweep L1b): allocproc and
+           uvmcopy took its counter *)
+        ⌜ (pv_ev (us_V Up) <= kp)%nat ⌝ -∗
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ Mt !!! Regidx Rs3 = npa ⌝ -∗
         ⌜ Mt !!! Regidx Rs5 = pme ⌝ -∗
@@ -338,7 +395,7 @@ Section KforkPrologue.
            been spilled, and [ProofKfork.kfk_tail_succ] reloads all three. *)
         kfk_frame_at sp0 ra0 s00 s10 s50
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
-        proc_priv γf pme pid_p Up -∗
+        proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) kp)) -∗
         (* ...and its descriptor states, which travel beside the block on
            every arm: kfork reads them and hands them back
            ([SpecKfork.kfork_post]). *)
@@ -426,7 +483,9 @@ Section KforkPrologue.
   Definition kfk_pro_exit2
  (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-        (pid_c : mword 32) (ch : mword 64) (Uc : ustate),
+        (pid_c : mword 32) (ch : mword 64) (Uc : ustate) (kp : nat),
+        (* the parent's event count (permit sweep L1b) *)
+        ⌜ (pv_ev (us_V Up) <= kp)%nat ⌝ -∗
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ Mt !!! Regidx Rs3 = npa ⌝ -∗
         ⌜ Mt !!! Regidx Rs5 = pme ⌝ -∗
@@ -454,7 +513,7 @@ Section KforkPrologue.
            this path they were never written. *)
         (∃ w4 w5 : mword 64,
            kfk_frame_at sp0 ra0 s00 s10 s50 w4 (m !!! Regidx Rs3) w5) -∗
-        proc_priv γf pme pid_p Up -∗
+        proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) kp)) -∗
         (* ...and its descriptor states, which travel beside the block on
            every arm: kfork reads them and hands them back
            ([SpecKfork.kfork_post]). *)
@@ -506,7 +565,10 @@ Section KforkPrologue.
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit1
  (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Up : ustate) (stsP : list fdstate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
-    (∀ (Mt : regfile),
+    (∀ (Mt : regfile) (kp : nat),
+        (* the parent's event count (permit sweep L1b): allocproc took its
+           counter *)
+        ⌜ (pv_ev (us_V Up) <= kp)%nat ⌝ -∗
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
@@ -520,7 +582,7 @@ Section KforkPrologue.
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x112) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
-        proc_priv γf pme pid_p Up -∗
+        proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) kp)) -∗
         (* ...and its descriptor states, which travel beside the block on
            every arm: kfork reads them and hands them back
            ([SpecKfork.kfork_post]). *)
@@ -838,11 +900,17 @@ Section KforkPrologue.
        registration -- which is what makes the found arm report
        [bv_unsigned pid <> 1]. *)
     iDestruct (procs_avail_at_None false with "Hpav") as "#Hpavf".
+    (* the PARENT's event counter, lent to allocproc (permit sweep L1b):
+       the actor of the child's allocations is the forking process *)
+    iDestruct (proc_priv_ev_lend with "Hpv") as "[Hlend Hpvb]".
     iApply (Allocproc.wp_allocproc_core fsc_kalloc fsc_kpages γp γf γs M5 lvl K1 eb pme on None false b lks Q
+              (pv_ev (us_V Up))
               ltac:(lia) ltac:(lia) Hbelow
-              with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpavf").
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpavf Hlend").
     all: try lkbelow.
-    iIntros (CID11 Hs11 mf6) "%HcsB Hpc Hpost".
+    iIntros (CID11 Hs11 mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
+    iDestruct ("Hpvb" $! kl with "[%] Hlend") as (Up1) "[%HUp1 Hpv]"; [exact Hkl|].
+    destruct HUp1 as (k1 & Hk1 & ->).
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -892,7 +960,8 @@ Section KforkPrologue.
         iSplitL "Hb5"; [iExists u5; iExact "Hb5"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 k1 with "[%] [%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
+      + exact Hk1.
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iLeft. iExact "Henv'".
@@ -964,8 +1033,10 @@ Section KforkPrologue.
          each close below owes its own back. *)
       iDestruct (proc_priv_lazy with "Hpv") as "%HlzP".
       iDestruct (proc_priv_nocwd_lazy with "Hcpriv") as "%HlzC".
-      iDestruct (kfk_priv_open with "Hpv") as
-        "(%HszbP & %HbelP & HPsz & HPpg & HPpt & HPtf & HPtfpg & HPwand)".
+      iDestruct (kfk_priv_open_ev with "Hpv") as
+        "(%HszbP & %HbelP & HPsz & HPpg & HPpt & HPtf & HPtfpg & HPcnt & HPwand)".
+      (* the parent's counter, lent to uvmcopy (permit sweep L1b) *)
+      iDestruct (act_lend_borrow with "HPcnt") as "[Hlend Hlb]".
       iDestruct (kfk_priv_open_nocwd with "Hcpriv") as
         "(%HszbC & %HbelC & HCsz & HCpg & HCpt & HCtf & HCtfpg & HCwand)".
       (* +0x01e ld a2,72(s5) -- a2 := p->sz *)
@@ -1178,14 +1249,16 @@ Section KforkPrologue.
       iApply (Uvmcopy.wp_uvmcopy_mem_sconf fsc_kalloc N5p (pv_upt (us_V Up)) (pv_upt Vc)
                 (uint (pv_sz (us_V Up))) (uint (pv_sz (us_V Up))) (us_M Up) MC0
                 (trap_res b + K1)%nat eb pme (S lvl) false
-                ({["proc"]} ∪ lks)
+                ({["proc"]} ∪ lks) _
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
                 ltac:(rewrite HN5pa2 (uvm_np_live (pv_sz (us_V Up)));
                       intros a Ha; unfold uva_live; lia)
-                with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb").
+                with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb Hlend").
       all: try lkbelow.
-      iIntros (CID19 Hs19 mf9) "Hcg Hcpu Hpc %HcsD HPpt Hpost9".
+      iIntros (CID19 Hs19 mf9) "Hcg Hcpu (%kl2 & %Hkl2 & Hlend) Hpc %HcsD HPpt Hpost9".
+      iDestruct ("Hlb" $! kl2 with "[%] Hlend") as (k2) "[%Hk2 HPcnt]"; [exact Hkl2|].
+      assert (Hk2' : (pv_ev (us_V Up) <= k2)%nat) by (cbn in Hk2; lia).
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))
         by (rewrite HN5pra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
@@ -1230,8 +1303,8 @@ Section KforkPrologue.
         iEval (rewrite HCIDeq7c) in "Hheld".
         iEval (rewrite HCIDeq7c) in "Harmpay".
         (* close both proc_privs back up UNCHANGED *)
-        iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
-                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
+        iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up) k2
+                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg HPcnt") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
         (* the parent's table did not move, so its own claim comes back *)
         { exact HlzP. }
@@ -1247,7 +1320,10 @@ Section KforkPrologue.
         { reflexivity. } { reflexivity. } { exact HszbC. } { exact HbelC. }
         (* nothing moved on this arm, so the child's own claim comes back *)
         { exact HlzC. }
-        iEval (rewrite (kfk_priv_close_id (us_V Up))) in "HPpriv".
+        (* the parent's block, back at [Up]'s record but for the count
+           (permit sweep L1b) *)
+        iAssert (proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) k2)))
+          with "[HPpriv]" as "HPpriv"; [iExact "HPpriv"|].
         iEval (rewrite (kfk_priv_close_id_lz Vc)) in "HCpriv".
         (* [rget] is indexed by the AMBIENT [CpuId], so a fact stated with
            [rget] here does not rewrite into a hypothesis the store leaf
@@ -1265,8 +1341,9 @@ Section KforkPrologue.
           iExists u8; iExact "Hb8". }
         iSpecialize ("Hcont7c" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! CID20 with "[%]"); [wp_next_chain|].
-        iSpecialize ("Hcont7c" $! mf9 npa j γl2 pid_c ch (MkUstate Vc MCo)
-                  with "[%] [%] [%] [%] [%] [%]").
+        iSpecialize ("Hcont7c" $! mf9 npa j γl2 pid_c ch (MkUstate Vc MCo) k2
+                  with "[%] [%] [%] [%] [%] [%] [%]").
+        { exact Hk2'. }
         { exact HDsp. } { exact HDs4. } { exact HDs5. } { exact HDa0. }
         { intros r Hr Ncsp N8 N9 N20 N21. apply HDthr; assumption. }
         { split_and!; [reflexivity | exact HjN | exact Hgamma | exact HVcof | exact HVccwd]. }
@@ -1509,8 +1586,8 @@ Section KforkPrologue.
         assert (HbelC' : um_below (pv_sz (us_V Up)) (ud_um P')).
         { apply (kfk_um_below_child (pv_sz (us_V Up)) (svpn_of (mword_of_int 0 : mword 64))
                    (pv_upt (us_V Up)) (pv_upt Vc) P' HCempty HbelP Hout Hin'). }
-        iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up)
-                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg") as "HPpriv".
+        iDestruct ("HPwand" $! (pv_upt (us_V Up)) (pv_sz (us_V Up)) (pv_tf (us_V Up)) (us_M Up) k2
+                     with "[%] [%] [%] [%] [%] HPsz HPpg HPpt HPtf HPtfpg HPcnt") as "HPpriv".
         { reflexivity. } { reflexivity. } { exact HszbP. } { exact HbelP. }
         (* the parent's table did not move, so its own claim comes back *)
         { exact HlzP. }
@@ -1564,7 +1641,10 @@ Section KforkPrologue.
                    (pv_upt (us_V Up)) (pv_upt Vc) P'
                    KforkChild.svpn_of_zero HbelP
                    (HlzP Hlzp) Hin'). }
-        iEval (rewrite (kfk_priv_close_id (us_V Up))) in "HPpriv".
+        (* the parent's block, back at [Up]'s record but for the count
+           (permit sweep L1b) *)
+        iAssert (proc_priv γf pme pid_p (upd_usV Up (upd_ev (us_V Up) k2)))
+          with "[HPpriv]" as "HPpriv"; [iExact "HPpriv"|].
         (* same [rget]/[!!!] normalisation as the failure arm above *)
         assert (Hslot6' : mf6 !!! Regidx Rs3 = m !!! Regidx Rs3)
           by (apply HBthr; vm_compute; first [reflexivity | discriminate]).
@@ -1587,10 +1667,11 @@ Section KforkPrologue.
                   (MkUstate (upd_lazy (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc))
                                (pv_lazy (us_V Up)))
                             (us_M Up))
-                  (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc))
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
+                  (ud_tfp (pv_upt (us_V Up))) (ud_tfp (pv_upt Vc)) k2
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv Hpfrag HCpriv
                         Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb
                         Hmk Hheld Hhart Hfdsp Hirsp Hbslp Hkstk [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
+        * exact Hk2'.
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.
@@ -1634,7 +1715,8 @@ Section KforkPrologue.
         iSplitL "Hb5"; [iExists u5; iExact "Hb5"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 k1 with "[%] [%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv Hpfrag [Henv'] HR").
+      + exact Hk1.
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + destruct Hwit as (n & Hn1 & Hn2). iRight. iExists n. iSplitR; [iPureIntro; split; assumption|]. iExact "Henv'".

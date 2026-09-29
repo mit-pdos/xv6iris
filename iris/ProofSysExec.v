@@ -667,7 +667,7 @@ Section SysExecWhole.
         rewrite /sys_exec_arms.
         iExists (us_upt U P').
         iSplitL "Hpriv"; [iExact "Hpriv" |]. iLeft.
-        iSplitR; [iPureIntro; split_and!; [exact Ha0 | reflexivity | reflexivity] |].
+        iSplitR; [iPureIntro; split_and!; [exact Ha0 | apply ev_rose_refl | reflexivity] |].
         rewrite /sys_exec_post_fail. iLeft. iExact "Hau". } }
     (* ---- the path is in: run the rest of the function ---- *)
     iDestruct "Hft" as "((%Hsp & %Hs0 & %Hthr2 & %Hext & %Hplen & %Hpcstr &
@@ -754,7 +754,7 @@ Section SysExecWhole.
              loop built *)
           iLeft.
           iSplitR; [iPureIntro; split_and!;
-                    [exact Hrm1 | rewrite Hrm2; reflexivity | rewrite Hrm3; reflexivity] |].
+                    [exact Hrm1 | exact Hrm2 | rewrite Hrm3; reflexivity] |].
           rewrite /sys_exec_post_fail. iRight.
           iExists (bview plen pfun), i3, al3, af3.
           iSplitR; [iPureIntro; exact Hpof |].
@@ -785,7 +785,7 @@ Section SysExecWhole.
         rewrite /sys_exec_arms.
         iExists (us_upt U P3).
         iSplitL "Hpriv"; [iExact "Hpriv" |]. iLeft.
-        iSplitR; [iPureIntro; split_and!; [exact Ha0 | reflexivity | reflexivity] |].
+        iSplitR; [iPureIntro; split_and!; [exact Ha0 | apply ev_rose_refl | reflexivity] |].
         rewrite /sys_exec_post_fail. iLeft. iExact "Hau". }
   Qed.
 End SysExecWhole.

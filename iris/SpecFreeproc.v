@@ -76,6 +76,7 @@ Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1a *)
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -322,7 +323,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string) :=
+      (ilvl : nat) (lks : gset string) (k : nat) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -382,10 +383,12 @@ Section SpecFreeproc.
     fp_pt pa (pv_sz V) opt -∗
     fp_tf pa otf -∗
     kalloc_env γa None -∗
+    act_lend pme k -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr KT1 mr K false pme -∗
       cpu_own ilvl eb pme false lks -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
@@ -404,7 +407,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string) :=
+      (ilvl : nat) (lks : gset string) (k : nat) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -464,10 +467,12 @@ Section SpecFreeproc.
     fp_pt pa (pv_sz V) opt -∗
     fp_tf pa otf -∗
     kalloc_env γa None -∗
+    act_lend pme k -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr KT1 mr K false pme -∗
       cpu_own ilvl eb pme false lks -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       (∃ h, pid_receipt h (PFree pme pid)) -∗
@@ -488,14 +493,14 @@ Module Type FREEPROC.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+      (ilvl : nat) (lks : gset string) (k : nat),
+      wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks k.
   Parameter wp_freeproc_led_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string),
-      wp_freeproc_led_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+      (ilvl : nat) (lks : gset string) (k : nat),
+      wp_freeproc_led_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks k.
 End FREEPROC.

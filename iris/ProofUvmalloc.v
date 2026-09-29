@@ -68,6 +68,7 @@ Require Import CodeUvmalloc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKalloc SpecMemsetPage SpecMappages SpecKfree SpecUvmdealloc.
 Require Import SpecUvmalloc.
+Require Import SlotGen.   (* [act_lend_cont_frame] *)
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -321,7 +322,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
   : UVMALLOC.
 
 Section ProofUvmalloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
@@ -1818,8 +1819,8 @@ Section ProofUvmalloc.
   Lemma wp_uvmalloc_mem_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (Mv : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
-      (p : mword 64) (b : bool) (lks : gset string)
-    : wp_uvmalloc_mem_sconf_body γa mm P Mv xperm K eb p b lks.
+      (p : mword 64) (b : bool) (lks : gset string) (k : nat)
+    : wp_uvmalloc_mem_sconf_body γa mm P Mv xperm K eb p b lks k.
   Proof using .
     cbv beta delta [wp_uvmalloc_mem_sconf_body].
     intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow.
@@ -1827,7 +1828,11 @@ Section ProofUvmalloc.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
     assert (HKback : ((K - 10) + 10)%nat = K) by (clear -HK; lia).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hlend Hcont".
+    (* the lend (permit sweep L1a): no callee takes it yet, so it is framed
+       through the continuation once, here *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     iDestruct (proc_ptm_dom P (uint oldsz) Mv with "Hpt") as %HMdom.
     (* everything live at [oldsz] is already recorded, so growing TO
        [oldsz] is the identity -- what the two do-nothing arms need *)

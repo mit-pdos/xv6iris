@@ -420,15 +420,20 @@ Section KexecB2Body.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+    (* the block's event counter, lent to the frees (permit sweep L1b) *)
+    iDestruct (proc_priv_ev_lend with "Hpriv") as "[Hlend Hpback]".
     iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc T3 P (K - 68)%nat eb
-              (proc_addr jp) 0%nat eb lks
+              (proc_addr jp) 0%nat eb lks (pv_ev (us_V U))
               ltac:(lia) kxc_lvl0 HT3a0
               ltac:(rewrite HT3a1 uint_unsigned;
                     exact (proc_pt_covered_maxsz P szf Hwf Hcov))
               ltac:(rewrite HT3a1; exact Hbelow)
-              with "Hcg Hcnt Htext Hpc Hpt Hka").
+              with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
     all: try lkbelow.
-    iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc %Hcspf".
+    iIntros (CID4 Hsq4 mr) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcspf".
+    iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uev) "[%HUev Hpriv]"; [exact Hkl|].
+    iDestruct (KexecOkQ.kexec_closer_after_next Uev with "Hcont") as "Hcont";
+      [exact HUev|].
     assert (Hpc328 : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KXB + 0x328))
       by (rewrite HT3ra; pcw).
     iEval (rewrite Hpc328) in "Hpc".
@@ -667,7 +672,8 @@ Section KexecB2Body.
     iApply (A.kxc_bad64 Q QF gs jp gl pd pav pu
               gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
-              plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
+              plen pfun na avf alen aslen afun pidv Uev
+              dqb dqs dqa dqpv dqas
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
               Hqf HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr

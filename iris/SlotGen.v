@@ -66,6 +66,7 @@ Require Import ProcGeom.
    bundle. *)
 Require Import Xv6Cameras.
 Require Import PidEv.   (* [pev]: the pid ledger's events *)
+Require Import RiscvLang WpNext.   (* [act_lend_cont_frame]: the lend framed through a callee *)
 Local Open Scope Z_scope.
 
 (* AN EIGHTH.  [Qp_scope]'s numerals stop at 4 (stdpp's [Qp.notations]
@@ -302,6 +303,60 @@ Section SlotGen.
 
   Lemma act_cnt_step pa k : act_cnt pa k ==∗ act_cnt pa (S k).
   Proof using . apply act_cnt_update. Qed.
+
+  (* THE LEND (design ni-strong-instance.md §7).  What a contract on the
+     permit cone takes from its caller, keyed by the running proc word
+     [p] ([CpuOwn.cpu_own]'s): the actor's counter, OR the fact that there
+     is no actor.  The actor's permit as a callee takes it: the boot's hart
+     runs at [c->proc = 0] and lends nothing ([act_lend_zero]); a process
+     lends its block's counter ([act_lend_of_cnt]) and takes it back at the
+     returned count ([act_lend_back], at [p <> 0]). *)
+  Definition act_lend (p : mword 64) (k : nat) : iProp Σ :=
+    (⌜p = (zero_reg : mword 64)⌝ ∨ act_cnt p k)%I.
+
+  Lemma act_lend_zero k : ⊢ act_lend (zero_reg : mword 64) k.
+  Proof using . iLeft. done. Qed.
+
+  Lemma act_lend_of_cnt p k : act_cnt p k -∗ act_lend p k.
+  Proof using . iIntros "H". iRight. iExact "H". Qed.
+
+  Lemma act_lend_back p k : p <> (zero_reg : mword 64) -> act_lend p k -∗ act_cnt p k.
+  Proof using . iIntros (Hp) "[%Hz | H]"; [done | iExact "H"]. Qed.
+
+  (* THE BORROW A BLOCK-HOLDER MAKES, with no fact about [p] needed: at
+     [p = 0] it lends the left disjunct and KEEPS its counter; otherwise it
+     lends the counter and takes it back at the returned count
+     ([act_lend_back]).  Either way the counter comes home at a count at
+     least the one it left at. *)
+  Lemma act_lend_borrow p k :
+    act_cnt p k -∗ act_lend p k ∗
+      (∀ k' : nat, ⌜(k <= k')%nat⌝ -∗ act_lend p k' -∗
+         ∃ k'' : nat, ⌜(k <= k'')%nat⌝ ∗ act_cnt p k'').
+  Proof using .
+    iIntros "Hc". destruct (decide (p = (zero_reg : mword 64))) as [Hz | Hnz].
+    - iSplitR; [iLeft; done|]. iIntros (k' Hk') "_". iExists k. iFrame "Hc". done.
+    - iSplitL "Hc"; [iRight; iExact "Hc"|]. iIntros (k' Hk') "Hl".
+      iExists k'. iSplit; [done|]. iApply (act_lend_back with "Hl"). exact Hnz.
+  Qed.
+
+  (* THE LEND, FRAMED THROUGH.  A contract on the cone takes [act_lend p k]
+     and hands back [∃ k', ⌜k <= k'⌝ ∗ act_lend p k'] as the THIRD premise
+     of its continuation; a body whose callees do not take the lend yet
+     frames it here, once, at entry, and is then left with the
+     continuation it had before the premise existed (the lend comes back
+     at [k' := k]).  Stated over the continuation's first two premises and
+     its tail as higher-order patterns, so one lemma serves every shape. *)
+  Lemma act_lend_cont_frame `{GEN : GenId} `{CID0 : CpuId} {R : Type}
+      (b : bool) (p p' : mword 64) (k : nat)
+      (A B C : CpuId -> R -> iProp Σ) :
+    wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗
+       (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p' k') -∗ C CID mr) -∗
+    act_lend p' k -∗
+    wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗ C CID mr).
+  Proof using .
+    iIntros "H Hl" (CID Hs mr) "HA HB".
+    iApply ("H" $! CID Hs mr with "HA HB"). iExists k. iFrame "Hl". done.
+  Qed.
 
   (* ...AND THE ONE-WAY DISCARD, WHICH <INIT> ALONE TAKES (lane
      TRAP-ROWS-3/4, T4(b)).  userinit has no parent to hold the three

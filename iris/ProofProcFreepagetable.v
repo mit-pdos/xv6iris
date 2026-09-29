@@ -61,6 +61,7 @@ Require Import CodeProcFreepagetable.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import SpecUvmunmap SpecUvmfree.
 Require Import SpecProcFreepagetable.
+Require Import SlotGen.   (* [act_lend_cont_frame] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
@@ -174,7 +175,7 @@ Module ProcFreepagetableProof (UvmunmapFixed : UVMUNMAP_FIXED) (Uvmfree : UVMFRE
   : PROC_FREEPAGETABLE.
 
 Section ProofProcFreepagetable.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -230,14 +231,18 @@ Section ProofProcFreepagetable.
   Lemma wp_proc_freepagetable_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat)
+    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks k.
   Proof using .
     cbv beta delta [wp_proc_freepagetable_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hlend Hcont".
+    (* the lend (permit sweep L1a): no callee takes it yet, so it is framed
+       through the continuation once, here *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
 
     (* the three callee stack budgets, discharged once (never inline) *)
     assert (HKuu : (22 <= K - 4)%nat) by lia.
@@ -945,16 +950,16 @@ Section ProofProcFreepagetable.
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : Z) (M : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat)
+    : wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks k.
   Proof using .
     cbv beta delta [wp_proc_freepagetable_mem_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
-    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hlend Hcont".
     iDestruct (proc_ptm_pt P szv M with "Hpt") as "Hpt".
-    iApply (wp_proc_freepagetable_sconf γa mm P K eb p ilvl b lks
+    iApply (wp_proc_freepagetable_sconf γa mm P K eb p ilvl b lks k
               HK Hilvl Hroot Hbnd Hbelow Hlkbelow
-              with "Hcg Hcpu Htext Hpc Hpt Henv Hcont").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hcont").
   Qed.
 
 End ProofProcFreepagetable.

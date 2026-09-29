@@ -1139,7 +1139,7 @@ Proof.
      drops it (lane LAZY-FLAG): it is pure, so holding it is free. *)
   iDestruct (proc_priv_nocwd_lazy with "Hpnc") as %Hlzq.
   iEval (rewrite (proc_priv_nocwd_bare _ _ _ _ Hlzq)) in "Hpnc".
-  iDestruct "Hpnc" as "[Hpbare [Hev Hofiles]]".
+  iDestruct "Hpnc" as "[Hpbare Hofiles]".
   (* ---- +0x1e: c.li a0,1 -- ROOTDEV ---- *)
   iApply (wp_cli_s_sconf (mword_of_int (FR + 0x1e)) Ra0
             (mword_of_int 1 : mword 6)
@@ -1493,9 +1493,9 @@ Proof.
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
-  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hev Hkq Hxb Hgh]" as "Hpriv".
+  iAssert (proc_priv γf p pid U) with "[Hpbare Hcwd Hofiles Hkq Hxb Hgh]" as "Hpriv".
   { rewrite /proc_priv proc_priv_core_bare.
-    iFrame "Hpbare Hcwd Hftok Hofiles Hev Hxb Hgh".
+    iFrame "Hpbare Hcwd Hftok Hofiles Hxb Hgh".
     (* the lazy bit's claim, back in the block: it came off it above
        ([Hlzq]) and nothing on this walk moved the table (lane LAZY-FLAG) *)
     iSplitR; [iPureIntro; exact Hlzq |].
@@ -1601,18 +1601,18 @@ Proof.
   (* kexec keeps the descriptor block, hence the fd-state ghost name it is
      keyed on -- [KexecDefs.kexec_ok] states it. *)
   assert (Hfgk : pv_fdg V' = pv_fdg (us_V U)).
-  { destruct Hkok as [ (_ & HV') | Hs ].
+  { destruct Hkok as [ (_ & (? & _ & HV')) | Hs ].
     - exact (f_equal pv_fdg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & Hfg & _). exact Hfg. }
   (* ...and the cwd's inum, which exec inherits ([KexecDefs.kexec_ok]) *)
   assert (Hcwik : pv_cwi V' = pv_cwi (us_V U)).
-  { destruct Hkok as [ (_ & HV') | Hs ].
+  { destruct Hkok as [ (_ & (? & _ & HV')) | Hs ].
     - exact (f_equal pv_cwi HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hcwi & _). exact Hcwi. }
   (* ...and the children row's name: exec keeps the incarnation, so the
      row it is filed under is the same one ([KexecDefs.kexec_ok]) *)
   assert (Hchgk : pv_chg V' = pv_chg (us_V U)).
-  { destruct Hkok as [ (_ & HV') | Hs ].
+  { destruct Hkok as [ (_ & (? & _ & HV')) | Hs ].
     - exact (f_equal pv_chg HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hchg & _).
       exact Hchg. }
@@ -1620,7 +1620,7 @@ Proof.
      same incarnation of the same slot ([KexecDefs.kexec_ok]).  The tail
      hands it to the closer's pin. *)
   assert (Hgenk : pv_gen V' = pv_gen (us_V U)).
-  { destruct Hkok as [ (_ & HV') | Hs ].
+  { destruct Hkok as [ (_ & (? & _ & HV')) | Hs ].
     - exact (f_equal pv_gen HV').
     - destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hgen & _).
       exact Hgen. }

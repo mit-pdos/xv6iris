@@ -140,7 +140,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
      [xstate] at [v0], the syscall's own argument 0, and only when
      [v0 <> 0].  See SpecKwait.v's header. *)
     ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
-      (cs' : gset gname),
+      (cs' : gset gname) (k' : nat),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -166,8 +166,12 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
+      (* ...AT A LATER EVENT COUNT (permit sweep): the reap's freeproc takes
+         the caller's counter, kwait's own row relayed *)
+      ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
       proc_priv γf pj pid
-        (upd_usM (us_upt U P') (umem_wr (us_M U) v0 d (fun i => nth_byte xw i))) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+           (umem_wr (us_M U) v0 d (fun i => nth_byte xw i))) -∗
       (* the row, back at what the reap left it -- kwait's, verbatim *)
       ch_frag (pv_chg (us_V U)) pj cs' -∗
       mWP (Loop : expr riscv_lang)) -∗

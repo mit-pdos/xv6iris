@@ -275,7 +275,7 @@ Section ProofUserinit.
     : wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
-    intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
+    intros pcE ret_tgt HK Hnb Hdev Hnib Hpj0 Hbelow.
     destruct (uin_kb K HK) as (Kap & Knm & Krl & K4 & Kpop).
     (* the four inode-cache rows are PERSISTENT and are relayed unchanged to
        namei's root corner at +0x20 (fs-cfg-boot.md stage (e)); nothing else
@@ -428,10 +428,12 @@ Section ProofUserinit.
     iAssert (□ (app_taint -∗ (fun _ : Z => True)%I (-1)))%I as "#HKu".
     { iModIntro. iIntros "_". done. }
     iApply (AP.wp_allocproc_sconf fsc_kalloc fsc_kpages γp γf γs R3 0%nat (K - 4)%nat b pj
-              on (Some (S np)) true b lks (fun _ : Z => True)%I
+              on (Some (S np)) true b lks (fun _ : Z => True)%I 0%nat
               Kap ltac:(lia) Hnb Hbelow
-              with "HKu Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav").
-    iIntros (CID7 Hq7 mr1) "%Hcsap Hpc Hpost".
+              with "HKu Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav []").
+    { (* the boot lends nothing (permit sweep L1a) *)
+      rewrite Hpj0. iApply SlotGen.act_lend_zero. }
+    iIntros (CID7 Hq7 mr1) "%Hcsap Hpc _ Hpost".
     assert (Hpc0e : ret_pc (R3 !!! Regidx Rra : mword 64)
                     = mword_of_int (UI + 0x0e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc0e) in "Hpc".

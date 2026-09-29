@@ -59,7 +59,7 @@ Qed.
 Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC) : HOLDINGSLEEP.
 
 Section ProofHoldingsleep.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)

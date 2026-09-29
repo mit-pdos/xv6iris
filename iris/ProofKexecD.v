@@ -741,7 +741,8 @@ Section KexecDCommit.
   Lemma kxd_kexec_ok (Q : mword 64 -> Prop)
       (QF : KexecOkQ.kxf_cause -> Prop)
       (V : pprivate) (na : nat) (alen : nat -> nat)
-      (P : uptd) (entry sz1 : mword 64) (ns : list (bv 8)) (r : mword 64) :
+      (P : uptd) (entry sz1 : mword 64) (ns : list (bv 8)) (r : mword 64)
+      (kev : nat) :
     Q entry ->
     r = (mword_of_int (Z.of_nat na) : mword 64) ->
     (na < MAXARG)%nat ->
@@ -752,15 +753,17 @@ Section KexecDCommit.
        <= uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64))%Z ->
     (uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)
        <= uint sz1)%Z ->
+    (* ...at whatever event count the commit's own frees left the new block
+       (permit sweep L1b): the success arm does not name [pv_ev] *)
     kexec_ok_qf Q QF V
-      (upd_exec V sz1 P
+      (upd_ev (upd_exec V sz1 P
          (<[kxc_tf_sp_idx
             := (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)]>
             (<[tf_epc_idx := entry]>
                (<[tf_arg_idx 1
                   := (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)]>
                   (pv_tf V))))
-         ns)
+         ns) kev)
       r entry (mword_of_int (kxc_sp_final (uint sz1) alen na)) sz1 na alen.
   Proof using .
     intros HQ Hr Hna Hstk Htfp Hns Hlo Hhi. right.
@@ -1568,6 +1571,8 @@ Section KexecDCommit.
     iEval (rewrite -HPtfp) in "Hptf".
     iEval (rewrite -HPtfp) in "Htfp".
     iDestruct ("Hprivback" with "Hpsz Hppt Hptf Hpt Htfp") as "Hpriv".
+    (* the swap's record, named now: the frees below take its counter *)
+    iDestruct (kxd_priv_exec with "Hpriv") as "Hpriv".
     assert (Hpp2fa : add_vec_int (mword_of_int (KXD + 0x2f6) : mword 64) 4
                      = mword_of_int (KXD + 0x2fa)) by pcw.
     iEval (rewrite Hpp2fa) in "Hpc".
@@ -1633,13 +1638,18 @@ Section KexecDCommit.
     (* proc_freepagetable is at the ∃-weakened tier ([proc_pt_any]): it
        consumes the table, so naming its image buys nothing. *)
     iDestruct (proc_ptm_pt with "Hptold") as "Hptold".
+    (* the NEW block's event counter, lent to the frees of the old space
+       (permit sweep L1b) *)
+    iDestruct (proc_priv_ev_lend with "Hpriv") as "[Hlend Hpback]".
     iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc F6 (pv_upt (us_V U)) (K - 68)%nat eb
-              (proc_addr jp) 0%nat eb ∅
+              (proc_addr jp) 0%nat eb ∅ _
               ltac:(lia) ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
               HF6a0 ltac:(rewrite HF6a1; exact Hszmax)
               ltac:(rewrite HF6a1; exact Hbelold) (locks_below_empty _)
-              with "Hcg Hcnt Htext Hpc Hptold Hka").
-    iIntros (CID16 Hs16 mr2) "Hcg Hcnt Hpc %Hcsf".
+              with "Hcg Hcnt Htext Hpc Hptold Hka Hlend").
+    iIntros (CID16 Hs16 mr2) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsf".
+    iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
+    destruct HUv as (kev & Hkev & ->).
     assert (Hpc300 : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KXD + 0x300))
       by (rewrite HF6ra; pcw).
     iEval (rewrite Hpc300) in "Hpc".
@@ -1876,7 +1886,6 @@ Section KexecDCommit.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID15 CIDe eb (proc_addr jp)
                  ltac:(wp_next_chain) with "Hclmc") as "Hclmc".
-    iDestruct (kxd_priv_exec with "Hpriv") as "Hpriv".
     (* the final [sp] is inside the image's top page, which is [kxc_stack_ok]'s
        lower half and [kxd_sp_final_le_top]'s upper one. *)
     assert (Hspfin_range : (0 <= kxc_sp_final (uint sz1) alen c
@@ -1892,7 +1901,7 @@ Section KexecDCommit.
       change (bv_modulus 64) with 18446744073709551616%Z. exact Hspfin_range. }
     iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
     iSpecialize ("Hcont" $! mf
-              (upd_usM (us_exec U sz1 P
+              (upd_usV (upd_usM (us_exec U sz1 P
                  (<[kxc_tf_sp_idx
                     := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
                     (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
@@ -1900,12 +1909,20 @@ Section KexecDCommit.
                           := (mword_of_int (kxc_sp_final (uint sz1) alen c)
                               : mword 64)]> (pv_tf (us_V U)))))
                  (h <$> seq 0 PNAMELEN)) Mi)
+                 (upd_ev (us_V (upd_usM (us_exec U sz1 P
+                 (<[kxc_tf_sp_idx
+                    := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
+                    (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
+                       (<[tf_arg_idx 1
+                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
+                              : mword 64)]> (pv_tf (us_V U)))))
+                 (h <$> seq 0 PNAMELEN)) Mi)) kev))
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
     iApply ("Hcont" with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
-    - apply kxd_kexec_ok; try assumption.
+    - apply (kxd_kexec_ok _ _ _ _ _ _ _ _ _ _ kev); try assumption.
       (* the widened hole, at the state this block just built -- the four
          projections the premise guards on hold by [reflexivity] here,
          which is the whole point of naming them. *)

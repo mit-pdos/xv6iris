@@ -91,6 +91,7 @@ Require Import CodeUvmcopy.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk SpecKalloc SpecMemmove SpecMappages SpecKfree SpecUvmunmap.
 Require Import SpecUvmcopy.
+Require Import SlotGen.   (* [act_lend_cont_frame] *)
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -360,7 +361,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
   : UVMCOPY.
 
 Section ProofUvmcopy.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
@@ -1878,9 +1879,9 @@ Section ProofUvmcopy.
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
+      (ilvl : nat) (b : bool) (lks : gset string) (kev : nat)
     : wp_uvmcopy_mem_sconf_body γa mm Pold Pnew szold sznew Mold Mnew
-        K eb p ilvl b lks.
+        K eb p ilvl b lks kev.
   Proof using .
     cbv beta delta [wp_uvmcopy_mem_sconf_body].
     intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hrootn Hszb Hfresh
@@ -1890,7 +1891,11 @@ Section ProofUvmcopy.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
     assert (HKback : ((K - 10) + 10)%nat = K) by (clear -HK; lia).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hlend Hcont".
+    (* the lend (permit sweep L1a): no callee takes it yet, so it is framed
+       through the continuation once, here *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     rewrite uint_unsigned in Hszb. rewrite uvm_maxsz_val in Hszb.
     destruct (eq_vec (mm !!! Regidx Ra2) zero_reg) eqn:Hz0.
     { (* ============ sz == 0: return 0 with NO FRAME ================== *)

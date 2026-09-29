@@ -414,10 +414,21 @@ Definition kxc_tf (ws ws' : list (mword 64)) (entry spv : mword 64) : Prop :=
 (* [V] is the private block on entry, [V'] the one on exit and [r] the
    returned a0.  Two arms, and the failure arm is an EQUALITY on the whole
    block -- see the header. *)
+(* the failure arm's count row at the block's OWN record: nothing was lent,
+   or the lend came back at the count it left at (permit sweep) *)
+Lemma ev_rose_refl (V : pprivate) :
+  exists k' : nat, (pv_ev V <= k')%nat /\ V = upd_ev V k'.
+Proof. exists (pv_ev V). split; [lia | symmetry; apply upd_ev_id]. Qed.
+
 Definition kexec_ok (V V' : pprivate) (r : mword 64)
     (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
   (* FAILED: nothing moved.  Eight [bad:] entries, all before the commit. *)
-  (r = (mword_of_int (-1) : mword 64) /\ V' = V)
+  (r = (mword_of_int (-1) : mword 64) /\
+   (* ...AND THE EVENT COUNT ONLY ROSE (permit sweep, design
+      ni-strong-instance.md §7): a failed exec may have freed the pages it
+      had built, each an actor-labelled event, so the block comes back at
+      its own record with [pv_ev] at least where it was. *)
+   exists k' : nat, (pv_ev V <= k')%nat /\ V' = upd_ev V k')
   \/
   (* SUCCEEDED: a new address space, a new size, the three trapframe words,
      an existential name at the right length, and [argc] in a0.  The

@@ -88,6 +88,7 @@ Require Import KallocInv.
 (* the proc table's two regimes -- the counted premise that refutes the
    empty-table arm, and the marker the found slot is minted with *)
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1a *)
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -452,7 +453,7 @@ Definition wp_allocproc_sconf_body
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* 4 slots for this frame, 44 for freeproc's -- the deepest callee now
@@ -490,10 +491,12 @@ Definition wp_allocproc_sconf_body
   (* the proc table's regime, threaded exactly as [kalloc_env] is, and at
      its boot-era index (lane TRAP-ROWS-4, B1b) *)
   procs_avail_at op tk -∗
+  act_lend pme k -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       allocproc_post γa γk γf γs lvl eb pme on op tk b lks mr K Q
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
@@ -506,7 +509,7 @@ Definition wp_allocproc_sconf_led_body
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (48 <= K)%nat ->
@@ -521,10 +524,12 @@ Definition wp_allocproc_sconf_led_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   kalloc_env_at γa γk on -∗
   procs_avail_at op tk -∗
+  act_lend pme k -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
@@ -540,7 +545,7 @@ Definition wp_allocproc_core_body
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (48 <= K)%nat ->
@@ -569,10 +574,12 @@ Definition wp_allocproc_core_body
   (* the proc table's regime, threaded exactly as [kalloc_env] is, and at
      its boot-era index (lane TRAP-ROWS-4, B1b) *)
   procs_avail_at op tk -∗
+  act_lend pme k -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       allocproc_post γa γk γf γs lvl eb pme on op tk b lks mr K Q
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
@@ -585,7 +592,7 @@ Definition wp_allocproc_core_led_body
     (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) :=
+    (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (48 <= K)%nat ->
@@ -599,10 +606,12 @@ Definition wp_allocproc_core_led_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   kalloc_env_at γa γk on -∗
   procs_avail_at op tk -∗
+  act_lend pme k -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
@@ -613,14 +622,14 @@ Module Type ALLOCPROC_GEN.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
-      wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat),
+      wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q k.
   Parameter wp_allocproc_core_led :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
-      wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat),
+      wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q k.
 End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
@@ -628,12 +637,12 @@ Module Type ALLOCPROC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
-      wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat),
+      wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q k.
   Parameter wp_allocproc_sconf_led :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ),
-      wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (k : nat),
+      wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q k.
 End ALLOCPROC.

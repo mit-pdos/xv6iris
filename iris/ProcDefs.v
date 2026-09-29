@@ -620,7 +620,27 @@ Section ProcDefs.
      p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
      proc_fields pa (DfracOwn 1) (us_V U) ∗
      proc_ptm_at pa (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
-     tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)))%I.
+     tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) ∗
+     (* THE SLOT'S EVENT COUNTER ([SlotGen.act_cnt], design
+        ni-strong-instance.md §7, G'): the permit an actor-labelled ledger
+        append consumes, at the record's [pv_ev].  In the BARE block so that
+        every contract taking the block -- bare, core or whole -- carries it
+        without a separate conjunct; lent out by [proc_priv_bare_ev_acc]. *)
+     act_cnt pa (pv_ev (us_V U)))%I.
+
+  (* the counter, lent out of the bare block and taken back at any count *)
+  Lemma proc_priv_bare_ev_acc (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_bare pa pid U -∗ act_cnt pa (pv_ev (us_V U)) ∗
+      (∀ k, act_cnt pa k -∗ proc_priv_bare pa pid (upd_usV U (upd_ev (us_V U) k))).
+  Proof using .
+    destruct U as [[f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13] M].
+    rewrite /proc_priv_bare.
+    cbn [upd_usV upd_ev us_V us_M pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd
+         pv_name pv_cwi pv_gen pv_chg pv_lazy pv_secc pv_ev].
+    iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hev)".
+    iFrame "Hev". iIntros (k) "Hev".
+    iFrame. iPureIntro; split_and!; assumption.
+  Qed.
 
   (* the one field the chain actually reads, borrowed out of it.  Callees do
      their own borrowing now, so this is used INSIDE acquiresleep and
@@ -630,7 +650,7 @@ Section ProcDefs.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_bare pa pid U).
   Proof using .
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hev)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -651,12 +671,12 @@ Section ProcDefs.
     (∀ v' : mword 64,
        p_cwd pa ↦₈ v' -∗ proc_priv_bare pa pid (us_cwd U v')).
   Proof using .
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hev)".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
     cbn [us_cwd upd_usV us_V us_M upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_ev].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm Hsecc".
     { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }

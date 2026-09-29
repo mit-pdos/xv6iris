@@ -1168,7 +1168,11 @@ Section KexecAU.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) : iProp Σ :=
-    ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
+    ((⌜r = (mword_of_int (-1) : mword 64) /\
+        (* the block's event count only rose (permit sweep): the failed
+           exec lent it to the frees of the half-built image *)
+        (exists k' : nat, (pv_ev (us_V U) <= k')%nat /\ us_V U' = upd_ev (us_V U) k') /\
+        us_M U' = us_M U⌝
       ∗ exec_post_fail Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv)
      ∨ exec_post_ok Fs Γ Q P Fo pl na alen afun sts gn cs pidv U U' r)%I.
 
