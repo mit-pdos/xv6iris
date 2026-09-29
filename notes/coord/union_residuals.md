@@ -272,3 +272,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   image_entry_pay_mono.
 - Perf pattern: run walks generic in the class, read the post at the instance in a separate lemma; never let
   the kernel evaluate a literal ELF (state size lemmas over an arbitrary file).
+
+## gaps lane (landed Sept 29) — still open
+- Program entries EchoImageEntryEnvC / CatImageEntryEnvC / GrepImageEntryEnvC (single statements in
+  UkTreeEntryStmt): need UShEcho/UShCat/UShGrep key geometry (R-prog) + grep's start walk.
+- `hlic : ⊢ uKillCred -∗ consLicence` in the union entries: `consLicence_of_taint` given the interface slot
+  equations (U4 / union top).
+- Deviation: udepwfK carries ⌜uszOk sz⌝ (BitVec lazyFree size); udepwfK_std one-way.
+- open_recv_img (non-_at), open_recv_dimg unported (check reach if needed).

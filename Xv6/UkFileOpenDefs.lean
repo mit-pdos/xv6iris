@@ -35,9 +35,9 @@ CONE (re-walked on the pinned globs: 19/31 reached).  Ported:
   `fileOpenRecv_file`, `fileOpenMiss_au`, `fileOpenMiss_recv`,
   `fileOpenCreate_recv`), stated at the fs tier's full class context;
   DISCHARGED by `HfpFileOpenHolds.hfpFileOpen_holds`.
-* `UkFileOpenSysP` (run-sys lane): `UkRunSys.wp_uk_ecall_open_recv_gimg`
-  only -- NOT LANDED (the landed `wp_uk_ecall_open` has neither the image
-  view, the cwd, nor the post).  The read leaves are the landed
+* `UkFileOpenSysP`: `UkRunSys.wp_uk_ecall_open_recv_gimg` only, a record
+  over the engine; DISCHARGED by `UkFileOpenSysP.ofLanded UL` (lane gaps,
+  `UkRunSysOpenImg`).  The read leaves are the landed
   `wp_uk_ecall_read_at` (engine `UL : UK_LEAVES`), `udepwf_st_read_file_held`,
   `spostAt_read_elimR` (see `UkFileOpenRead`).
 
@@ -257,15 +257,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **The kernel open leaf UkFileOpen calls, a parameter** (run-sys lane;
-Rocq's statement at the xv6 deposit instance; not landed). -/
+/-- **The kernel open leaf UkFileOpen calls** (Rocq's statement at the xv6
+deposit instance), a record over the engine: `UkFileOpenSysP.ofLanded UL`
+is the landed `UkRunSysOpenImg.wp_uk_ecall_open_recv_gimg`. -/
 structure UkFileOpenSysP : Prop where
   /-- Rocq `UkRunSys.wp_uk_ecall_open_recv_gimg` (the ledger's two arms are
   `UConsOpen.ukOpenFdArm`, Rocq's inline disjunction) -/
   openRecvGimg : ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (l : List FdState) (avail : Nat)
       (fdep : Xfam GF) (c : Nat) (Img : ElfMem),
     UkSysP.usysno m = USYS_open → (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ HfpSysP.uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd c -∗ udepwfAt (hlc := hlc) N m pc USYS_open fdep c -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
@@ -277,6 +278,12 @@ structure UkFileOpenSysP : Prop where
         UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) USYS_open fdep W r M' fdv' cw' cs' -∗
         ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
+
+/-- **`UkFileOpenSysP` at the landed leaf** (Rocq
+`UkRunSys.wp_uk_ecall_open_recv_gimg`, lane gaps). -/
+theorem UkFileOpenSysP.ofLanded (UL : UK_LEAVES) : UkFileOpenSysP (hlc := hlc) (GF := GF) where
+  openRecvGimg N h m pc l avail fdep c Img hn hal :=
+    wp_uk_ecall_open_recv_gimg UL N h m pc l avail fdep c Img hn hal
 
 namespace UkFileOpen
 

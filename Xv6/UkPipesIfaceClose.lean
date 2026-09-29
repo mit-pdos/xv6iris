@@ -19,7 +19,7 @@ CONE (reached): `pns_close_row`, `pns_fds_after_close`, `pns_close`,
 
 1. The laws are stated at the context `C : PnsCtx` / `CK : PnsCtxOk C`
    (UkPipesIfaceCtx); the console row's close is lane hfp-F1's
-   `UkFileDev.file_close_std` at `UkFileDevSysP.ofLanded UL hub`.
+   `UkFileDev.file_close_std` at `UkFileDevSysP.ofLanded UL`.
 2. `dom fdm ∖ {[fd]}` is `fun z => fdDom fdm z ∧ z ≠ fd`; `delete fd fdm` is
    `fdDelete fdm fd`; `<[k := FdClosed]> l` is `l.set k .closed`.
 -/
@@ -53,10 +53,10 @@ theorem pns_close_row (CK : PnsCtxOk C) (vs : RegMapF Pdev) (d : Nat) (kd : Pdev
   match kd, hrow with
   | .PDCon _ _, ⟨_, rb, hrow⟩ =>
     simp only [Int.toNat_natCast] at hrow
-    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL CK.hub) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ k l _ K hlt hrow (by simp) trivial $$ Hstd HK
+    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ k l _ K hlt hrow (by simp) trivial $$ Hstd HK
   | .PDMute, ⟨_, rb, hrow⟩ =>
     simp only [Int.toNat_natCast] at hrow
-    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL CK.hub) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ k l _ K hlt hrow (by simp) trivial $$ Hstd HK
+    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ k l _ K hlt hrow (by simp) trivial $$ Hstd HK
   | .PDWr pn gp, ⟨_, rb, hrow⟩ =>
     simp only [Int.toNat_natCast] at hrow
     simp only [pnsPkInv]
@@ -78,7 +78,7 @@ theorem pns_close_row (CK : PnsCtxOk C) (vs : RegMapF Pdev) (d : Nat) (kd : Pdev
     have hk1 : k = 1 := by unfold copyOut at hk; omega
     subst hk1
     simp only [pnsSinkTy] at hlk
-    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL CK.hub) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ 1 l _ K hlt hlk (by simp) trivial $$ Hstd HK
+    iapply UkFileDev.file_close_std (UkFileDevSysP.ofLanded CK.UL) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ 1 l _ K hlt hlk (by simp) trivial $$ Hstd HK
   | .PDCopy (pin, gin) F (.CSPipe pn gp), .inr ⟨hk, rb, hlk⟩ =>
     have hk1 : k = 1 := by unfold copyOut at hk; omega
     subst hk1

@@ -27,12 +27,13 @@ Unreached (not ported): the equation-free corollaries `echo_image_entry_env`,
   `UkEcho.echo_data_sub` / `EchoData.echo_data` and
   `UShKernel.uimg_sub_union_l` (not ported).
 * `echo_image_entry_env_c`, `cat_image_entry_env_c`,
-  `grep_image_entry_env_c`: need `ExecEntry.image_entry` /
-  `image_entry_of_at` (U1-T's seccomp-key residual), `UShEcho`/`UShCat`/
-  `UShGrep`'s key geometry and `*_args_det_holds` (wave U3), `UkRun.
-  urun_nopipe` (K4, UkRun deviation 2) and the program lanes'
-  `wp_kecho_start_env` / `wp_kcat_start_env` / `wp_kgrep_start_env` (which
-  this lane's UkTree/UkHandler now unblock).
+  `grep_image_entry_env_c`: STATED ONCE in `UkTreeEntryStmt`
+  (`EchoImageEntryEnvC` / `CatImageEntryEnvC` / `GrepImageEntryEnvC`, the
+  hypotheses every consumer takes; lane gaps).  ExecEntry, `urun_nopipe`,
+  `wp_kecho_start_env` and `wp_kcat_start_env` are landed (grep's start
+  walk is not); the proofs still need
+  `UShEcho`/`UShCat`/`UShGrep`'s key geometry (`*_args_det_holds`,
+  `*_kexec_pages`, `*_kexec_entry_rows`, ...), which is unported.
 
 ## Deviations from Rocq
 

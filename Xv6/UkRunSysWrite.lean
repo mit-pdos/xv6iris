@@ -26,6 +26,14 @@ through the page table the key's projection admits (`usrcOk`).
    the break's bound `uszOk` off the bundle (`UkRunSysDefs.urun_ecallS`),
    which Rocq's `lazy_free_uw_addr` gets from its `Z` addresses;
    `uheap_ubytes_w` is `UserHeap.uheap_ubytes_at`'s middle conjunct.
+5. **`udepwfK`'s quantifier carries `⌜uszOk sz⌝`** (lane gaps; Rocq's
+   `udepwf_K` has none): a deposit that reads a DATA source row
+   (`usrcOk_ubytesq`, deviation 4) inside the quantifier -- UkFileDev's
+   `file_write` -- needs the break's bound there, and the walks that spend
+   the deposit (`wp_uk_ecall_write_at`, `UkRunSysRead.wp_uk_ecall_read_at`)
+   have it off the bundle (`urun_ecallS`).  So `udepwf_K_std` is one
+   direction (`udepwfStd ⊢ udepwfK`, the premise ignored), not Rocq's
+   `⊣⊢`.
 -/
 import Xv6.UkRunSysDefs
 
@@ -99,15 +107,22 @@ def udepwfK (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : sfa
   iprop(⌜sexitPay fdep = N.pay⌝ ∗
     ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    ⌜K fdv⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
+    ⌜K fdv⌝ -∗ ⌜uszOk sz⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
-/-- **Rocq `udepwf_K_std`**. -/
+/-- **Rocq `udepwf_K_std`** (deviation 5: one direction). -/
 theorem udepwfK_std (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : sfam GF)
     (l : List FdState) :
-    udepwfStd (hlc := hlc) N m pc n fdep l ⊣⊢ udepwfK N m pc n fdep (fun fdv => fdv.take NSTD = l) := .rfl
+    udepwfStd (hlc := hlc) N m pc n fdep l ⊢ udepwfK N m pc n fdep (fun fdv => fdv.take NSTD = l) := by
+  unfold udepwfStd udepwfK
+  iintro ⟨%hfp, H⟩
+  isplitr
+  · ipureintro; exact hfp
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake %_ Hmy Hheap Hufd
+  iapply H $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake Hmy Hheap Hufd
 
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
 /-- **Rocq `uheap_text_bytes`**: a text run is the image's, on fetchable
 pages, below MAXVA. -/
 theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
@@ -129,6 +144,7 @@ theorem uheap_text_bytes (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
     · subst hjn; exact hhi
     · exact hlo j (by omega)
 
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
 /-- **Rocq `usrc_ok_utext`**. -/
 theorem usrcOk_utext (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (ua : BitVec 64)
     (nb : Nat) (f : Nat → BitVec 8) :
@@ -187,7 +203,7 @@ theorem wp_uk_ecall_write_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Re
   ihave %htake := hag fdv $$ Hufd HD
   unfold udepwfK
   icases Hsb with ⟨%hfp, Hsb⟩
-  icases Hsb $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake Hmy Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
+  icases Hsb $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake %hszok Hmy Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
   imodintro
   inext
   iapply uexecRet_retF 16 _ gn N.pay fdep rfl
@@ -227,7 +243,7 @@ theorem wp_uk_ecall_write_chain_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hcont
-  ihave Hsb := (udepwfK_std N m pc 16 fdep l).1 $$ Hsb
+  ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
   iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v) iprop(emp) (fun fdv => fdv.take NSTD = l)
     0 (fun _ => 0#8) hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
     (fun M pm sz _ => by iintro _ _; ipureintro; exact ⟨fun j hj => absurd hj (Nat.not_lt_zero _),
@@ -255,7 +271,7 @@ theorem wp_uk_ecall_write_chain_txt_at (UL : UK_LEAVES) (N : UkNames GF) (h : CP
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd #Hbs Hcont
-  ihave Hsb := (udepwfK_std N m pc 16 fdep l).1 $$ Hsb
+  ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
   iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v)
     ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) (fun fdv => fdv.take NSTD = l)
     nb f hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
@@ -287,6 +303,7 @@ theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
   ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
   iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
 
+omit [CtokG GF] [UexecSG GF] [UprogSG GF] in
 /-- **Rocq `usrc_ok_ubytesq`**: a DATA run the program owns is the image's
 and readable-mapped (writable pages, no lazy page). -/
 theorem usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
@@ -324,7 +341,7 @@ theorem wp_uk_ecall_write_chain_buf_at (UL : UK_LEAVES) (N : UkNames GF) (h : CP
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hbs Hcont
-  ihave Hsb := (udepwfK_std N m pc 16 fdep l).1 $$ Hsb
+  ihave Hsb := udepwfK_std N m pc 16 fdep l $$ Hsb
   iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v) (ubytesq N.d dq (m.get 11#5).toNat nb f)
     (fun fdv => fdv.take NSTD = l) nb f hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
     (fun M pm sz hsz => usrcOk_ubytesq N.t N.d N.s M pm sz dq (m.get 11#5) nb f hsz) $$ Hi Hrun Hsb Hstd Hbs

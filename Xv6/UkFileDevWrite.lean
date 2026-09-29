@@ -77,7 +77,7 @@ theorem fdev_udepwf_std_write_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64
     (rb : Bool) (i : Nat) (γo : GName) (Q : Nat → IProp GF) (n : Int) (hfd : fd < NSTD)
     (hl : l[fd]? = some (.open rb true (.inode i γo .held)))
     (h0 : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hcnt : argZ (m.get 12#5) = n) :
-    ⊢ (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat), uheap N.t N.d N.s M pm sz -∗
+    ⊢ (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat), ⌜uszOk sz⌝ -∗ uheap N.t N.d N.s M pm sz -∗
         uheap N.t N.d N.s M pm sz ∗
         (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees M Mv⌝ -∗ ∀ Pt : UPtd, ⌜wrTb pm sz false Pt⌝ -∗
           awriteChainAdv (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE i γo Mv (m.get 11#5) Pt n Q 0 (wchunks n))) -∗
@@ -86,8 +86,8 @@ theorem fdev_udepwf_std_write_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64
   iintro Hch
   isplitr
   · ipureintro; rfl
-  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake #Hmpay Hheap Hufd
-  ihave H := Hch $$ %M %pm %sz Hheap
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake %hsz #Hmpay Hheap Hufd
+  ihave H := Hch $$ %M %pm %sz %hsz Hheap
   icases H with ⟨Hheap, Hch⟩
   isplitl [Hheap]
   · iexact Hheap
@@ -227,11 +227,11 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
     (writeFileFam (fun k => iprop(efcur (hlc := hlc) c r nm sf i γo ws sel jx k ∗ usrcAt N tx dq2 ua bs.length f)) N.pay)
     (ustd N.fd l) (usrcAt N tx dq1 ua bs.length f) (fun fdv => fdv.take NSTD = l) bs.length f hnum hal4
     (fun fdv => ustd_agree N.fd fdv l)
-    (fun M pmv sz => fdev_src_ok SYSD N tx dq1 ua bs.length f _ hua M pmv sz) $$ Hi Hrun [Hq Hs2] Hstd Hs1
+    (fun M pmv sz hsz => fdev_src_ok N tx dq1 ua bs.length f _ hua M pmv sz hsz) $$ Hi Hrun [Hq Hs2] Hstd Hs1
   · -- THE DEPOSIT: the chain at the key's image, the piece riding it to the stop
     iapply fdev_udepwf_std_write_held N _ _ l fd rb i γo _ (bs.length : Int) hfd hl hi0 hcnt
-    iintro %M %pm %sz Hheap
-    ihave %hsrc := fdev_src_ok SYSD N tx dq2 ua bs.length f _ hua M pm sz $$ Hheap Hs2
+    iintro %M %pm %sz %hsz Hheap
+    ihave %hsrc := fdev_src_ok N tx dq2 ua bs.length f _ hua M pm sz hsz $$ Hheap Hs2
     isplitl [Hheap]
     · iexact Hheap
     iintro %Mv %hag %Pt %htb

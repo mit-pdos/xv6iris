@@ -72,7 +72,7 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   ihave %htake := hag fdv $$ Hufd HD
   unfold udepwfK
   icases Hsb with ⟨%hfp, Hsb⟩
-  icases Hsb $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake Hmy Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
+  icases Hsb $$ %M %pm %sz %fdv %cw %gn %cs %pidv %htake %hszok Hmy Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
   ihave %hbnd := uheap_ubytes_at N.t N.d N.s M pm sz (DFrac.own 1) (m.get 11#5).toNat k f $$ Hheap Hbuf
   imodintro
   inext
@@ -174,7 +174,7 @@ theorem wp_uk_ecall_read_recv_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m 
         wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hstd Hbuf Hcont
-  ihave Hsb := (udepwfK_std N m pc USYS_read fdep l).1 $$ Hsb
+  ihave Hsb := udepwfK_std N m pc USYS_read fdep l $$ Hsb
   iapply wp_uk_ecall_read_at UL N h m pc cnt k f avail fdep (ustdAt N.fd l v) (fun fdv => fdv.take NSTD = l)
     hn hcnt hck hal4 (fun fdv => ustdAt_agree N.fd fdv l v) $$ Hi Hrun Hsb Hstd Hbuf Hcont
 

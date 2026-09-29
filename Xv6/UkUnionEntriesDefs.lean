@@ -20,19 +20,24 @@ not reached (Lean's `ukCode` is persistent by instance).
 
 ## Deviations from Rocq
 
-1. **`UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c` are a
-   PARAMETER** (`UkTreeEntryP`): landed `UkTreeEntry` defers them (their
-   inputs -- `UShEcho`/`UShCat`'s key geometry, `*_args_det_holds` -- are
-   the program lanes'; lane U3 / program tier).  Stated in Rocq's shape with
-   echo's instance `echoProg` (landed UkEchoTree) and node image
-   `hfpEchoNodeImg` (HfpProgP's temporary home of `echo_node_img`).
+1. **`UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c` are
+   hypotheses** (`UkTreeEntryP`, typed by their ONE statement
+   `UkTreeEntryStmt.EchoImageEntryEnvC` / `CatImageEntryEnvC`): not proved
+   yet (`UShEcho`/`UShCat`'s key geometry, `*_args_det_holds`, are the
+   program lanes', unported).
 2. **THE IMAGE IS A PAGE VIEW** (ExecEntry deviation 1): Rocq's key image
    `M : gmap Z (bv 8)` is the key's `ElfMem` in the argv facts, and the entry
    is concluded at any page view `Mv` agreeing with it (`imgAgrees M Mv`).
-3. **The free handler's four deposit laws** (Rocq `UexecExecMint`'s
-   `udepw_law_of_sup_write/_read/_close`, `udepw_law_of_sup 15`, not ported:
-   UexecExecMint deviation 2) are a parameter `UdepwLawsP` at the
-   application's credentials `uKillCred` / `appSup`; the five stub laws are
+3. **The free handler's four deposit laws** are Rocq `UexecExecMint`'s
+   `udepw_law_of_sup_write/_read/_close`, `udepw_law_of_sup 15` (the
+   landed `UexecExecMintW.udepwLaw_of_sup*`, lane gaps) at the
+   application's credentials `uKillCred` / `appSup` (`ueLaws`).  Lean's
+   supply is three credentials (UexecExecMintW deviation 1): the write and
+   read laws also spend the console licence, which Rocq reads off the taint
+   by the closed `WpUart.cons_licence_of_taint`; here that reading is the
+   premise `hlic : ⊢ uKillCred -∗ consLicence` (Rocq's lemma, which
+   `AppIface.consLicence_of_taint` proves at a record whose kill/console
+   slots are an interface's).  The five stub laws are
    UkStub's (`echo_stub_*`, `cat_stub_*` at `UL`); the syscall rows
    `UK_SYS_P` / `UK_SYS_FH` are the landed `ukSysP_holds UL` /
    `ukSysFH_holds UL` (H-io's console leaves take `UL` directly).
@@ -42,10 +47,9 @@ not reached (Lean's `ukCode` is persistent by instance).
 6. **UkFileDev's parameters** (`FifDevP`) are built at the entries
    (`ueDevP`) from U1-F's `hfpFileOpen_holds` (at the fs tier's class
    context, which the entries therefore carry, as Rocq's section does) and
-   the landed `UkFileDevSysP.ofLanded UL hub`; two remain parameters:
-   `SYSO : UkFileOpenSysP` (Rocq `wp_uk_ecall_open_recv_gimg`, not landed;
-   run-sys) and `hub : UsrcOkUbytesqP` (Rocq `usrc_ok_ubytesq` at any break;
-   run-sys, see UkFileDevSysHolds).
+   the landed leaves `UkFileOpenSysP.ofLanded UL` /
+   `UkFileDevSysP.ofLanded UL` (lane gaps: nothing of UkRunSys is a
+   parameter any more).
 5. Rocq `sb "cat"` is `fdWCat`; `UkShEcho.echo_alen` / `echo_off` are
    `ushEchoAlen` / `ushEchoOff`; `wl_line ws !!! k` is `(wlLine ws)[k]!`.
 -/
@@ -62,6 +66,8 @@ import Xv6.UkSysFHHolds
 import Xv6.UkFileEntries
 import Xv6.HfpFileOpenHolds
 import Xv6.UkFileDevSysHolds
+import Xv6.UexecExecMintW
+import Xv6.UkTreeEntryStmt
 import Xv6.User.EchoElfRaw
 import Xv6.User.CatElfRaw
 
@@ -114,55 +120,67 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-! ## §1 the parameters (deviations 1, 3) -/
 
 /-- **Rocq `UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c`,
-a parameter** (deviations 1, 2). -/
+hypotheses** (deviations 1, 2) at their ONE statement (`UkTreeEntryStmt`). -/
 structure UkTreeEntryP : Prop where
   /-- Rocq `echo_image_entry_env_c` -/
-  echo_image_entry_env_c : ∀ (ws : List (List (BitVec 8))) (M : ElfMem) (Mv : Nat → List (BitVec 8))
-      (s0 t : Nat) (g : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-      (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-      (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') Dp)
-      (E : Penv) (ds : ExtTreeSet Nat compare),
-    lineOk ws → hfpEchoNodeImg ws M s0 t g → ushEchoArgvBytes ws g → imgAgrees M Mv →
-    sts.length = NOFILE → Conforms E (echoTree ws) → SafeFds (fdDom E.fd) (echoTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay
-        (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)))
+  echo_image_entry_env_c : EchoImageEntryEnvC (hlc := hlc) (GF := GF)
   /-- Rocq `cat_image_entry_env_c` -/
-  cat_image_entry_env_c : ∀ (ws : List (List (BitVec 8))) (Mn : ElfMem) (Mv : Nat → List (BitVec 8))
-      (sv t : Nat) (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-      (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-      (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') Dp)
-      (E : Penv) (ds : ExtTreeSet Nat compare),
-    execOk ws → hfpEchoNodeImg ws Mn sv t gn → ushEchoArgvBytes ws gn → imgAgrees Mn Mv →
-    sts.length = NOFILE → Conforms E (catTree ws) → SafeFds (fdDom E.fd) (catTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay
-        (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)))
+  cat_image_entry_env_c : CatImageEntryEnvC (hlc := hlc) (GF := GF)
 
-/-- **Rocq `UexecExecMint.udepw_law_of_sup_write` / `_read` / `_close` /
-`udepw_law_of_sup 15`, a parameter** (deviation 3), at the application's
-credentials. -/
-structure UdepwLawsP : Prop where
-  lawW : ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 16
-  lawR : ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 5
-  lawC : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 21
-  lawO : ⊢ appSup (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 15
+/-- **Rocq `udepw_law_of_sup_write`** at the application's credentials, the
+licence read off the taint by `hlic` (deviation 3). -/
+theorem ue_lawW (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) :
+    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 16 := by
+  iintro #Hs #Hk
+  ihave #Hl := hlic $$ Hk
+  iapply udepwLaw_of_sup_write PS
+  imodintro
+  isplitr
+  · iexact Hs
+  isplitr
+  · iexact Hk
+  · iexact Hl
+
+/-- **Rocq `udepw_law_of_sup_read`** (deviation 3). -/
+theorem ue_lawR (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) :
+    ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 5 := by
+  iintro #Hs #Hk
+  ihave #Hl := hlic $$ Hk
+  iapply udepwLaw_of_sup_read PS
+  imodintro
+  isplitr
+  · iexact Hs
+  isplitr
+  · iexact Hk
+  · iexact Hl
+
+/-- **Rocq `udepw_law_of_sup_close`**. -/
+theorem ue_lawC : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 21 := by
+  iintro #Hk
+  iapply udepwLaw_of_sup_close PS
+  imodintro
+  iexact Hk
+
+/-- **Rocq `udepw_law_of_sup 15`**. -/
+theorem ue_lawO : ⊢ appSup (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 15 := by
+  iintro #Hs
+  iapply udepwLaw_of_sup PS 15 (Or.inl rfl)
+  imodintro
+  iexact Hs
 
 /-- The free handler's hypotheses at echo's instance (deviation 3). -/
-theorem ueEchoHyps (UL : UK_LEAVES) (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (N : UkNames GF) :
+theorem ueEchoHyps (UL : UK_LEAVES)
+    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) (N : UkNames GF) :
     FhHyps (hlc := hlc) N (echoProg N) (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)) :=
   ⟨echo_stub_read UL N, echo_stub_write UL N, echo_stub_open UL N, echo_stub_close UL N, echo_stub_exit UL N,
-    LW.lawW, LW.lawR, LW.lawC, LW.lawO⟩
+    ue_lawW hlic, ue_lawR hlic, ue_lawC, ue_lawO⟩
 
 /-- The free handler's hypotheses at cat's instance (deviation 3). -/
-theorem ueCatHyps (UL : UK_LEAVES) (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (N : UkNames GF) :
+theorem ueCatHyps (UL : UK_LEAVES)
+    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) (N : UkNames GF) :
     FhHyps (hlc := hlc) N (catProg N) (uKillCred (hlc := hlc) (GF := GF)) (appSup (GF := GF)) :=
   ⟨cat_stub_read UL N, cat_stub_write UL N, cat_stub_open UL N, cat_stub_close UL N, cat_stub_exit UL N,
-    LW.lawW, LW.lawR, LW.lawC, LW.lawO⟩
+    ue_lawW hlic, ue_lawR hlic, ue_lawC, ue_lawO⟩
 
 /-- **Rocq `ue_echo_code_persistent`** (a theorem, passed explicitly). -/
 theorem ue_echo_code_persistent (N : UkNames GF) : Persistent (echoProg N).code := by
@@ -202,7 +220,7 @@ theorem ucat_image_entry_env_c (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (nm :
     (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
     (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') Dp)
     (E : Penv) (ds : ExtTreeSet Nat compare)
-    (hok : execOk ws) (himg : hfpEchoNodeImg ws Mn sv t gn) (hbytes : ushEchoArgvBytes ws gn)
+    (hok : execOk ws) (himg : echoNodeImg ws Mn sv t gn) (hbytes : ushEchoArgvBytes ws gn)
     (hMv : imgAgrees Mn Mv) (hfdl : sts.length = NOFILE) (hws2 : ws.length = 2)
     (halen : ushEchoAlen ws 1 = nm.length)
     (hfname : ∀ j, j < nm.length → (wlLine ws)[ushEchoOff ws 1 + j]! = nm[j]!)
@@ -216,7 +234,7 @@ theorem ucat_image_entry_env_c (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (nm :
   have htail : catTree ws = catTree [fdWCat, nm] :=
     catTree_tail _ _ (by rw [cat_name_tail ws nm hws2 halen hfname]; rfl)
   rw [← htail] at hc hs
-  exact TE.cat_image_entry_env_c ws Mn Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok himg hbytes hMv hfdl hc hs hdp
+  exact TE.cat_image_entry_env_c ws Mn Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok hMv himg hbytes hfdl hc hs hdp
 
 end Params
 
@@ -230,19 +248,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [WchG GF] [FileG GF] [CurCtx]
 
-/-- **Rocq `UkRunSys.usrc_ok_ubytesq` at any break, a parameter** (deviation
-6; UkFileDevSysHolds' `hub`). -/
-def UsrcOkUbytesqP : Prop :=
-  ∀ (γt γd γs : GName) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
-    (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8),
-    ⊢ uheap (GF := GF) γt γd γs M pmv sz -∗ ubytesq γd dq ua.toNat nb f -∗ ⌜usrcOk M pmv sz ua nb f⌝
-
 /-- UkFileDev's parameters at the entries: U1-F's FileOpen lemmas
-(`hfpFileOpen_holds`), the open leaf `SYSO`, the landed write/close leaves
-(`UkFileDevSysP.ofLanded`). -/
-theorem ueDevP (UL : UK_LEAVES) (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF)) (hub : UsrcOkUbytesqP (GF := GF)) :
-    FifDevP (hlc := hlc) (GF := GF) :=
-  ⟨hfpFileOpen_holds, SYSO, UkFileDevSysP.ofLanded UL hub⟩
+(`hfpFileOpen_holds`), the landed open leaf and write/close leaves
+(`UkFileOpenSysP.ofLanded`, `UkFileDevSysP.ofLanded`). -/
+theorem ueDevP (UL : UK_LEAVES) : FifDevP (hlc := hlc) (GF := GF) :=
+  ⟨hfpFileOpen_holds, UkFileOpenSysP.ofLanded UL, UkFileDevSysP.ofLanded UL⟩
 
 end DevP
 

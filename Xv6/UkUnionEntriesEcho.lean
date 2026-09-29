@@ -13,8 +13,8 @@ CONE (this file): `uecho_cons_image_entry`.
 ## Deviations from Rocq
 
 1. The parameters of `UkUnionEntriesDefs` (deviations 1-6 there): `TE`
-   (UkTreeEntry's entries), `LW` (the four deposit laws), `SYSO` / `hub`
-   (UkFileDev's remaining parameters), and
+   (UkTreeEntry's entries), `hlic` (Rocq `WpUart.cons_licence_of_taint`,
+   what the four deposit laws read the console licence with), and
    `hcons` (Rocq's `Hcons`, at U1-P's `ucl`).
 2. What Rocq reads off `union_params_at`'s BODY is read off U1-P's
    `unionParamsAt` (UkUnionEntriesLend deviation 1): the era pin is Rocq's
@@ -43,8 +43,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-- **Rocq `uecho_cons_image_entry`**: echo at the console, at the union's
 record (deviations 1-3). -/
 theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
-    (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF))
-    (hub : UsrcOkUbytesqP (GF := GF))
+    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (ws : List (List (BitVec 8))) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
@@ -52,7 +51,7 @@ theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL :
     (v : EraPins) (sb : Fstate) (I0 : List (BitVec 8)) (r : FileAppNames) (q : Qp) (s : Dst)
     (rb : Bool) (jo : Option Nat) (Q : Int → IProp GF) (F : IProp GF)
     (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r) (hline : lineOk ws)
-    (himg : hfpEchoNodeImg ws M s0 t gb) (hbytes : ushEchoArgvBytes ws gb) (hMv : imgAgrees M Mv)
+    (himg : echoNodeImg ws M s0 t gb) (hbytes : ushEchoArgvBytes ws gb) (hMv : imgAgrees M Mv)
     (hfdl : sts.length = NOFILE) (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.device CONSOLE)))
     (hfl : lmLineAt ulmG I0 = Uline.LEcho ws) (hshort : ((wlLine (ws.drop 1)).length : Int) < 2 ^ 31) :
@@ -83,13 +82,13 @@ theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL :
   imodintro
   let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx ug r N' (echoProg N') γreg w0 q s sb
   let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') [0] := fun N' hpq =>
-    (X N').fileIface (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N')
-      (ueEchoHyps UL LW N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
+    (X N').fileIface (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N')
+      (ueEchoHyps UL hlic N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
       (union_links_gl_taint_at ug sb) hw0
   ihave He := TE.echo_image_entry_env_c ws M Mv s0 t gb sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
       (gwcBlk (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (genId (hlc := hlc) (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F))
-    [0] I E {0} hline himg hbytes hMv hfdl (echo_conforms ws _ hne) (echoTree_safe _ _) ue_dp0 $$ [] Hnpw Hdep
+    [0] I E {0} hline hMv himg hbytes hfdl (echo_conforms ws _ hne) (echoTree_safe _ _) ue_dp0 $$ [] Hnpw Hdep
   · iintro !> %N' %hpq Hstd Hcwd ⟨Hpool, Hb, Hdq, HF⟩
     have hQp : ∀ x, Q x ⊢ N'.pay x := fun x => by rw [hpq]
     ihave Hk : (X N').fifExitK $$ [HF]
@@ -99,8 +98,8 @@ theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL :
       subst ha0
       iapply hQp
       iapply HQ $$ Hpost Hdq HF
-    iapply (X N').fif_env_res_g_rec (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL)
-      (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N') (ueEchoHyps UL LW N') heq (union_links_gl_w_at ug sb)
+    iapply (X N').fif_env_res_g_rec (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL)
+      (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N') (ueEchoHyps UL hlic N') heq (union_links_gl_w_at ug sb)
       (union_links_gl_blk_at ug sb) (union_links_gl_taint_at ug sb) hw0 E (sts.take NSTD) rfl
       (fun fd d h => (ue_fd1 hEfd fd d h).2)
       (fun fd d h => by

@@ -43,11 +43,12 @@ reached -- `fdev_signed_small`, `fdev_m1`, `fdev_cint_lt`,
   `wp_uk_ecall_open_recv_gimg`, NOT landed -- run-sys).  The read law takes
   the landed engine `UL : UK_LEAVES` (`wp_uk_ecall_read_at`).
 * `UkFileDevSysP` (run-sys lane): `UkRunSys.wp_uk_ecall_write_at`,
-  `wp_uk_ecall_close`, `wp_uk_ecall_close_std` (see deviation 3),
-  `usrc_ok_ubytesq`, `usrc_ok_utext`.  `UkFileDevSysHolds.UkFileDevSysP.
-  ofLanded UL hub` builds it from the landed leaves; `hub` (the data-source
-  row at ANY break) stays: the landed `usrcOk_ubytesq` needs `uszOk sz`,
-  which `udepwfK`'s quantifier does not expose at `file_write`'s deposit.
+  `wp_uk_ecall_close`, `wp_uk_ecall_close_std` (see deviation 3).
+  `UkFileDevSysHolds.UkFileDevSysP.ofLanded UL` builds it from the landed
+  leaves.  The source rows `usrc_ok_ubytesq` / `usrc_ok_utext` are the
+  landed `UkRunSysWrite` lemmas, used directly (`fdev_src_ok`); the data
+  row takes the break's bound `uszOk sz`, which `udepwfK`'s quantifier now
+  carries (UkRunSysWrite deviation 5, lane gaps).
 * `FdevStubs` (Rocq's section hypotheses `Hsr Hsw Hso Hsc`): the program's
   four stub laws.
 
@@ -219,7 +220,7 @@ structure UkFileDevSysP : Prop where
       (D S : IProp GF) (K : List FdState → Prop) (nb : Nat) (f : Nat → BitVec 8),
     UkSysP.usysno m = 16 → (pc + 4#64) &&& 1#64 = 0#64 →
     (∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝) →
-    (∀ (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat),
+    (∀ (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pmv sz -∗ S -∗ ⌜usrcOk M pmv sz (m.get 11#5) nb f⌝) →
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
       udepwfK (hlc := hlc) N m pc 16 fdep K -∗ D -∗ S -∗
@@ -247,15 +248,6 @@ structure UkFileDevSysP : Prop where
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ ustd N.fd (l.set fd .closed) -∗
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
-  /-- Rocq `UkRunSys.usrc_ok_ubytesq` -/
-  usrcOkUbytesq : ∀ (γt γd γs : GName) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
-      (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8),
-    ⊢ uheap (GF := GF) γt γd γs M pmv sz -∗ ubytesq γd dq ua.toNat nb f -∗ ⌜usrcOk M pmv sz ua nb f⌝
-  /-- Rocq `UkRunSys.usrc_ok_utext` -/
-  usrcOkUtext : ∀ (γt γd γs : GName) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat) (ua : BitVec 64)
-      (nb : Nat) (f : Nat → BitVec 8),
-    ⊢ uheap (GF := GF) γt γd γs M pmv sz -∗ ([∗list] j ∈ List.range nb, utext γt (ua.toNat + j) (f j)) -∗
-      ⌜usrcOk M pmv sz ua nb f⌝
 
 namespace UkFileDev
 
@@ -365,10 +357,11 @@ theorem fdev_src_op (N : UkNames GF) (tx : Bool) (dq1 dq2 : DFrac) (ua n : Nat) 
     exact fdev_ubytesq_op N.d dq1 dq2 ua n f
 
 /-- **Rocq `fdev_src_ok`**: the source's two rows at the key's image, off
-either piece (Rocq `UkRunSys.usrc_ok_utext` / `usrc_ok_ubytesq`, parameters). -/
-theorem fdev_src_ok (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF)) (N : UkNames GF) (tx : Bool) (dq : DFrac)
+either piece (Rocq `UkRunSys.usrc_ok_utext` / `usrc_ok_ubytesq`, landed; the
+data row at the break's bound, UkRunSysWrite deviation 5). -/
+theorem fdev_src_ok (N : UkNames GF) (tx : Bool) (dq : DFrac)
     (ua n : Nat) (f : Nat → BitVec 8) (v : BitVec 64) (hua : v.toNat = ua) (M : ElfMem)
-    (pmv : Nat → Option UPerm) (sz : Nat) :
+    (pmv : Nat → Option UPerm) (sz : Nat) (hsz : uszOk sz) :
     ⊢ uheap N.t N.d N.s M pmv sz -∗ usrcAt N tx dq ua n f -∗ ⌜usrcOk M pmv sz v n f⌝ := by
   unfold usrcAt
   subst hua
@@ -376,11 +369,11 @@ theorem fdev_src_ok (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF)) (N : UkNames 
   | true =>
     simp only [↓reduceIte]
     iintro Hh Hs
-    iapply SYSD.usrcOkUtext N.t N.d N.s M pmv sz v n f $$ Hh Hs
+    iapply usrcOk_utext N.t N.d N.s M pmv sz v n f $$ Hh Hs
   | false =>
     simp only [Bool.false_eq_true, ↓reduceIte]
     iintro Hh Hs
-    iapply SYSD.usrcOkUbytesq N.t N.d N.s M pmv sz dq v n f $$ Hh Hs
+    iapply usrcOk_ubytesq N.t N.d N.s M pmv sz dq v n f hsz $$ Hh Hs
 
 end UkFileDev
 

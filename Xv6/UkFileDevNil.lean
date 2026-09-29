@@ -55,7 +55,7 @@ theorem fdev_udepwf_K_nowr (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (K : L
   unfold udepwfK
   isplitr
   · ipureintro; rfl
-  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hK #_ Hheap Hufd
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hK %_ #_ Hheap Hufd
   isplitl [Hheap]
   · iexact Hheap
   isplitl [Hufd]
@@ -91,13 +91,13 @@ theorem file_write_nil (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc :=
   iapply SYSD.writeAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) (BitVec.ofNat 64 (Pr.write + 2)) avail
     (writeFileFam (fun _ => iprop(emp)) N.pay) (ustd N.fd l) (usrcAt N tx dq ua 0 f)
     (fun fdv => fdv.take NSTD = l) 0 f hnum hal4 (fun fdv => ustd_agree N.fd fdv l)
-    (fun M pmv sz => by
+    (fun M pmv sz _ => by
       iintro _ _
       ipureintro
       exact ⟨fun j hj => absurd hj (by omega), fun _ j _ _ _ hj => absurd hj (by omega)⟩) $$ Hi Hrun [] Hstd Hsrc
   · -- THE DEPOSIT: the chain at no chunk is its own stop
     iapply fdev_udepwf_std_write_held N _ _ l fd rb i γo (fun _ => iprop(emp)) 0 hfd hl hi0 hcnt
-    iintro %M %pm %sz Hheap
+    iintro %M %pm %sz %_ Hheap
     isplitl [Hheap]
     · iexact Hheap
     iintro %Mv %_ %Pt %_
@@ -146,7 +146,7 @@ theorem file_write_nil_at (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc
     (writeFileFam (fun _ => iprop(emp)) N.pay) D (usrcAt N tx dq ua 0 f)
     (fun fdv => fdStOfKey ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 10#5) fdv = .open rb false t) 0 f hnum hal4
     (fun fdv => hag _ fdv hi0)
-    (fun M pmv sz => by
+    (fun M pmv sz _ => by
       iintro _ _
       ipureintro
       exact ⟨fun j hj => absurd hj (by omega), fun _ j _ _ _ hj => absurd hj (by omega)⟩) $$ Hi Hrun [] Hd Hsrc

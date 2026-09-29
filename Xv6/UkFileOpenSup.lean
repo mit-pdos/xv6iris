@@ -50,11 +50,11 @@ def redirK (omo : OffMode) (c : FileFixed) (r : FileAppNames) (Nf : Fname) (s : 
 
 /-- **Rocq `uimg_view_sub`**, keeping the heap. -/
 theorem uimgView_sub_keep (N : UkNames GF) (Img M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) :
-    ⊢ HfpSysP.uimgView N Img -∗ uheap N.t N.d N.s M pm sz -∗
+    ⊢ uimgView N Img -∗ uheap N.t N.d N.s M pm sz -∗
       uheap N.t N.d N.s M pm sz ∗ ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → M a = some b⌝ := by
-  have h1 : iprop(HfpSysP.uimgView N Img ∗ uheap N.t N.d N.s M pm sz) ⊢
+  have h1 : iprop(uimgView N Img ∗ uheap N.t N.d N.s M pm sz) ⊢
       iprop(⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → M a = some b⌝) := by
-    unfold HfpSysP.uimgView
+    unfold uimgView
     iintro ⟨#Hv, Hh⟩
     iapply Hv $$ %M %pm %sz Hh
   have h2 := (persistent_entails_left h1).trans (sep_mono_left sep_elim_right)
@@ -74,7 +74,7 @@ theorem fileOpenSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : File
     (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl) (ha0 : (m.get 10#5).toNat = pv)
     (hcr : omCreate (m.get 11#5) = false) (htr : omTrunc (m.get 11#5) = false) (hel : pathElems pl = [Nf])
     (hst : umStartOf cw pl = ROOTINO) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ HfpSysP.uimgView N Img -∗ fdq r q1 s -∗ fdq r q2 s -∗
+    ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fdq r q1 s -∗ fdq r q2 s -∗
       udepwfAt (hlc := hlc) N m pc USYS_open (fileOpenFam omo c r q1 q2 i bs Nf s N.pay) cw := by
   unfold udepwfAt
   iintro #Hinv #Hro Hd1 Hd2
@@ -103,7 +103,7 @@ theorem fileMissSup_v (N : UkNames GF) (c : FileFixed) (r : FileAppNames) (q : Q
     (hNf : uname Nf) (hs : s[Nf]? = none) (heq : fileAppIs (hlc := hlc) (GF := GF) c r)
     (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl) (ha0 : (m.get 10#5).toNat = pv)
     (hcr : omCreate (m.get 11#5) = false) (hel : pathElems pl = [Nf]) (hst : umStartOf cw pl = ROOTINO) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ HfpSysP.uimgView N Img -∗ fdq r q s -∗
+    ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fdq r q s -∗
       udepwfAt (hlc := hlc) N m pc USYS_open (fileMissFam c r q s N.pay) cw := by
   unfold udepwfAt
   iintro #Hinv #Hro Hd
@@ -131,7 +131,7 @@ theorem fileCreateSup_v (N : UkNames GF) (omo : OffMode) (c : FileFixed) (r : Fi
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (hnp : npElems pl = [])
     (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf) (hin : (Nf, ws) ∈ ls)
     (hok : lineOk ws) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ HfpSysP.uimgView N Img -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
+    ⊢ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
       escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g -∗
       udepwfAt (hlc := hlc) N m pc USYS_open (fileCreateFam omo c r jo Nf n s g N.pay) cw := by
   unfold udepwfAt

@@ -6,7 +6,7 @@ The laws of §2e read the round (`PnsRound`), the process (`PnsProc`), and
 the other lanes' leaves: the engine `UL : UK_LEAVES` (DU2), lane hfp-P1's
 pipe leaves (`PnsCtxOk.DK`, UkPipeDevXv6's `pipeDevK_xv6` at the engine), H-io's kernel rows (discharged:
 `ukSysIO_holds CK.UL`, `ukPostRows_holds`) and lane hfp-F1's standard-slot laws (`UkFileDev`, at
-`UkFileDevSysP.ofLanded UL hub`).  They are bundled once here (`PnsCtx`, data; `PnsCtxOk`,
+`UkFileDevSysP.ofLanded UL`).  They are bundled once here (`PnsCtx`, data; `PnsCtxOk`,
 hypotheses), with the two moves every law makes on the descriptor resource:
 OPEN it at a registered device (`pns_fds_open`: the row the device's kind
 demands, the ledger, the rest) and CLOSE it back (`pns_fds_back`).
@@ -51,8 +51,6 @@ structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG 
   OK : PnsRoundOk C.R
   QK : PnsProcOk C.Q
   UL : UK_LEAVES
-  /-- the data-source row lane hfp-F1's `UkFileDevSysP.ofLanded` takes -/
-  hub : PnsUbytesqHub (GF := GF)
   /-- Rocq `Hsup` -/
   hsup : ⊢ □ (C.R.T -∗ C.Q.Sup)
   /-- Rocq `HPc` -/

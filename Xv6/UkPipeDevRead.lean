@@ -73,7 +73,7 @@ theorem pdev_ecall_read (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF)
   · unfold udepwfK
     isplitr
     · ipureintro; exact DK.rpFam_exit N.pay Rp Rpe
-    iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake _ Hheap Hufd
+    iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake %_ _ Hheap Hufd
     iframe Hheap Hufd
     have hst : fdStOfKey (xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 0)
         (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd = .open true wb (.pipe γp) := by

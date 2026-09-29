@@ -16,9 +16,9 @@ record take ONE argument.  The program's four stub laws are UkFileDev's
 1. A bundle of the port's parameters (Rocq has none: they are proved):
    `HfpFileOpenP` (U1-F's FileOpen lemmas; `hfpFileOpen_holds` builds it at
    the fs tier's class context), `UkFileOpenSysP` (Rocq
-   `wp_uk_ecall_open_recv_gimg`, not landed) and `UkFileDevSysP` (built by
-   `UkFileDevSysP.ofLanded UL hub`, `hub` = Rocq `usrc_ok_ubytesq` at any
-   break), each owned as listed in `UkFileDevDefs`' header.
+   `wp_uk_ecall_open_recv_gimg`; `UkFileOpenSysP.ofLanded UL`) and
+   `UkFileDevSysP` (`UkFileDevSysP.ofLanded UL`), each owned as listed in
+   `UkFileDevDefs`' header.
 -/
 import Xv6.UkFileIfaceDefs
 import Xv6.UkFileDevClose

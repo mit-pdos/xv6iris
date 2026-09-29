@@ -206,6 +206,17 @@ theorem consLicenceAt_of_wild (Ai : AppIface GF) (k : Nat)
   rw [hw, hc]
   exact Ai.wild_lic k
 
+/-- **Rocq `WpUart.cons_licence_of_taint`**: the TAINT buys the licence, off
+the interface's `lic`, at a record whose two slots are the interface's
+(deviation 5, as `consLicenceAt_of_wild`; lane gaps). -/
+theorem consLicence_of_taint (Ai : AppIface GF)
+    (hk : MachFixedGS.killCred (hlc := hlc) (GF := GF) = Ai.kill)
+    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
+    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ consLicence (hlc := hlc) (GF := GF) := by
+  unfold consLicence
+  rw [hk, hc]
+  exact Ai.lic
+
 end AppIfaceWild
 
 /-! ## The application record (Rocq `App.xv6_app`) -/

@@ -1875,3 +1875,6 @@ import Xv6.UnionLinkInst
 import Xv6.UnionLinkInstAt
 import Xv6.UnionReadInst
 import Xv6.UnionReadInstAt
+import Xv6.UkRunSysOpenImg
+import Xv6.UshEchoImg
+import Xv6.UkTreeEntryStmt

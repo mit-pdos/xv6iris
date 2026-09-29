@@ -49,11 +49,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Icache
 variable (X : PseCtx hlc GF)
 
 /-- **Rocq `pse_echo_image_entry`**: ECHO AT THE HEAD. -/
-theorem pse_echo_image_entry (HE : PseEchoImageEntryEnvC (hlc := hlc) (GF := GF))
+theorem pse_echo_image_entry (HE : EchoImageEntryEnvC (hlc := hlc) (GF := GF))
     (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (rb : Bool)
     (Q : Int → IProp GF) (pn : PNames) (gp : PipeNames)
-    (hQc : ∀ x y : Int, Q x = Q y) (hok : lineOk ws) (hag : imgAgrees Me Mv) (hnode : hfpEchoNodeImg ws Me s0 t gb)
+    (hQc : ∀ x y : Int, Q x = Q y) (hok : lineOk ws) (hag : imgAgrees Me Mv) (hnode : echoNodeImg ws Me s0 t gb)
     (hab : ushEchoArgvBytes ws gb) (hfdl : sts.length = NOFILE)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.pipe gp))) (hLw : X.R.L = wlLine (ws.drop 1)) :
     ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
@@ -88,12 +88,12 @@ theorem pse_echo_image_entry (HE : PseEchoImageEntryEnvC (hlc := hlc) (GF := GF)
   iframe Hpool HPay
 
 /-- **Rocq `pse_copy_image_entry`**: A COPY STAGE (the middle cat, the last cat): one proof, the sink a parameter. -/
-theorem pse_copy_image_entry (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF))
+theorem pse_copy_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (sk : Csink) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords .FCat)) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
+    (hnode : echoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (pnsSinkTy sk)))
@@ -131,13 +131,13 @@ theorem pse_copy_image_entry (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF))
 
 /-- **Rocq `pse_mid_image_entry`**: THE MIDDLE CAT -- the sink the next
 pipe's write end, fd 2 owing `cat_dg_write` among its alternatives. -/
-theorem pse_mid_image_entry (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF))
+theorem pse_mid_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (pin : PNames) (gin : PipeNames) (pn : PNames)
     (gp : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords .FCat)) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
+    (hnode : echoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))
@@ -150,12 +150,12 @@ theorem pse_mid_image_entry (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF))
     hag hnode hab hfdl hl0 hl1 hl2 hnil (fun _ => hdg)
 
 /-- **Rocq `pse_last_image_entry_m`**: THE LAST CAT, fd 2 MUTE: the sink the console writer `wL`, the registry's device 0 `PDMute`. -/
-theorem pse_last_image_entry_m (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF))
+theorem pse_last_image_entry_m (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (wL : Wid) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords .FCat)) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
+    (hnode : echoNodeImg (filtWords .FCat) Me sv t gn) (hab : ushEchoArgvBytes (filtWords .FCat) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.device CONSOLE)))
@@ -191,12 +191,12 @@ theorem pse_last_image_entry_m (HE : PseCatImageEntryEnvC (hlc := hlc) (GF := GF
   iframe Hpool HPay
 
 /-- **Rocq `pse_grep_image_entry`**: A GREP STAGE (a middle grep, or any grep whose fd 2 is a lent console writer): the sink a parameter. -/
-theorem pse_grep_image_entry (HE : PseGrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (sk : Csink) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords (.FGrep wp))) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
+    (hnode : echoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (pnsSinkTy sk)))
@@ -233,13 +233,13 @@ theorem pse_grep_image_entry (HE : PseGrepImageEntryEnvC (hlc := hlc) (GF := GF)
   iframe Hpool HPay
 
 /-- **Rocq `pse_grep_mid_image_entry`**: THE MIDDLE GREP. -/
-theorem pse_grep_mid_image_entry (HE : PseGrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_mid_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (pin : PNames) (gin : PipeNames) (pn : PNames)
     (gp : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords (.FGrep wp))) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
+    (hnode : echoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))
@@ -252,12 +252,12 @@ theorem pse_grep_mid_image_entry (HE : PseGrepImageEntryEnvC (hlc := hlc) (GF :=
     hok hag hnode hab hfdl hl0 hl1 hl2 hLg hnil
 
 /-- **Rocq `pse_grep_last_image_entry`**: THE LAST GREP, fd 2 MUTE: the sink the content writer `wL`. -/
-theorem pse_grep_last_image_entry (HE : PseGrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_last_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (wL : Wid) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords (.FGrep wp))) (hag : imgAgrees Me Mv)
-    (hnode : hfpEchoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
+    (hnode : echoNodeImg (filtWords (.FGrep wp)) Me sv t gn) (hab : ushEchoArgvBytes (filtWords (.FGrep wp)) gn)
     (hfdl : sts.length = NOFILE)
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.device CONSOLE)))

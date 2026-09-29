@@ -67,7 +67,7 @@ theorem wp_uk_ecall_open_read_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU) 
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = false) (htr : omTrunc (m.get 11#5) = false)
     (hel : pathElems pl = [Nf]) (hst : umStartOf cw pl = ROOTINO) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ HfpSysP.uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fdq r q1 s -∗ fdq r q2 s -∗
       (∀ (h' : CPU) (rv : BitVec 64),
         ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fdq r q1 s ∗ fdq r q2 s) ∨
@@ -136,7 +136,7 @@ theorem wp_uk_ecall_open_miss_deed_v (N : UkNames GF) (h : CPU) (m : RegMap) (pc
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = false)
     (hel : pathElems pl = [Nf]) (hst : umStartOf cw pl = ROOTINO) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ HfpSysP.uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fdq r q s -∗
       (∀ (h' : CPU) (rv : BitVec 64),
         ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fdq r q s) ∨ (ukOpenTaintFd N.fd l rv ∗ fileTaint (hlc := hlc) c)) -∗
@@ -186,7 +186,7 @@ theorem wp_uk_ecall_open_create_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
     (hnp : npElems pl = []) (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hin : (Nf, ws) ∈ ls) (hok : lineOk ws) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ HfpSysP.uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
       fown r s -∗
       (∀ (h' : CPU) (rv : BitVec 64),
@@ -251,7 +251,7 @@ theorem wp_uk_ecall_open_create_deed_d (N : UkNames GF) (omo : OffMode) (h : CPU
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
     (hnp : npElems pl = []) (hst : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hin : (Nf, ws) ∈ ls) (hok : lineOk ws)
-    (R : IProp GF) (hdata : R ⊢ HfpSysP.uimgView N Img) :
+    (R : IProp GF) (hdata : R ⊢ uimgView N Img) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ R -∗ urun (hlc := hlc) N h m pc avail -∗
       ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
       fown r s -∗

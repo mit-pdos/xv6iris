@@ -69,8 +69,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-- **Rocq `ucat_image_entry`**: cat at the union's record (deviations
 1-3). -/
 theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
-    (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF))
-    (hub : UsrcOkUbytesqP (GF := GF))
+    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (nm : List (BitVec 8)) (ws : List (List (BitVec 8))) (Mn : ElfMem) (Mv : Nat → List (BitVec 8))
@@ -81,7 +80,7 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
     (hwb : lmWrBlkT ulmG ps0 cs0 sq I0 P) (hu : uname nm) (hfl : lmLineAt ulmG I0 = Uline.LCat nm)
     (htie : ulmState sq cs0 I0 = dstContent s)
     (hshort : ∀ (i : Nat) (bs : List (BitVec 8)), s[nm]? = some (i, bs) → (bs.length : Int) < 2 ^ 31)
-    (hok : execOk ws) (himg : hfpEchoNodeImg ws Mn sv t gn) (hbytes : ushEchoArgvBytes ws gn)
+    (hok : execOk ws) (himg : echoNodeImg ws Mn sv t gn) (hbytes : ushEchoArgvBytes ws gn)
     (hMv : imgAgrees Mn Mv) (hfdl : sts.length = NOFILE) (hws2 : ws.length = 2)
     (halen : ushEchoAlen ws 1 = nm.length)
     (hfname : ∀ j, j < nm.length → (wlLine ws)[ushEchoOff ws 1 + j]! = nm[j]!)
@@ -129,9 +128,9 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
   imodintro
   let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx ug r N' (catProg N') γreg w0 q s sq
   let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') [0] := fun N' hpq =>
-    (X N').fileIface (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc)
+    (X N').fileIface (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc)
       (HPc := ue_cat_code_persistent N')
-      (ueCatHyps UL LW N') heq (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
+      (ueCatHyps UL hlic N') heq (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
       (union_links_gl_taint_at ug sq) hw0
   ihave He := ucat_image_entry_env_c TE nm ws Mn Mv sv t gn sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
@@ -147,8 +146,8 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
       iintro !> %a %ha Hpost Hdq HF
       iapply hQp
       iapply HQ $$ %a %ha Hpost Hdq HF
-    iapply (X N').fif_env_res_g_rec (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL)
-      (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_cat_code_persistent N') (ueCatHyps UL LW N') heq
+    iapply (X N').fif_env_res_g_rec (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL)
+      (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_cat_code_persistent N') (ueCatHyps UL hlic N') heq
       (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq) (union_links_gl_taint_at ug sq) hw0
       E (sts.take NSTD) rfl hd0 hrow hbnd
       (fun _ _ _ _ h => by cases h)

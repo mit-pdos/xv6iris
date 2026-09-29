@@ -59,11 +59,17 @@ theorem getElem!_getD8 (bs : List (BitVec 8)) (k : Nat) : bs[k]! = bs.getD k 0#8
     | (rw [List.getElem!_eq_getElem?_getD]; rfl)
     | (simp only [getElem!_def]; cases bs[k]? <;> rfl)
 
-/-- `udepwf_st` IS `udepwf_K` at the key's state (H-io spells the body out). -/
+/-- `udepwf_st` IS `udepwf_K` at the key's state (H-io spells the body out;
+`udepwfK`'s break bound is ignored, UkRunSysWrite deviation 5). -/
 theorem udepwfSt_toK (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF)
     (st : FdState) :
     udepwfSt (hlc := hlc) N m pc n fdep st ⊢ udepwfK (hlc := hlc) N m pc n fdep (fun fdv => fdStOfKey (m.get 10#5) fdv = st) := by
-  unfold udepwfSt udepwfK; exact .rfl
+  unfold udepwfSt udepwfK
+  iintro ⟨%hfp, H⟩
+  isplitr
+  · ipureintro; exact hfp
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hst %_ Hmy Hheap Hufd
+  iapply H $$ %M %pm %sz %fdv %cw %gn %cs %pidv %hst Hmy Hheap Hufd
 
 /-- **Rocq `wp_uk_read_deed_learns_held_at`**: read at a HELD descriptor on
 the deed's inum -- at most `cnt` bytes, and either exactly the deed's next

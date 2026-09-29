@@ -63,8 +63,8 @@ instance fdev_upathAt_persistent (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : 
 /-- **Rocq `fdev_path_view`**: the path at a persistent reading is a boxed
 view of its image, at a name of any length, off either half. -/
 theorem fdev_path_view (N : UkNames GF) (tx : Bool) (pv n : Nat) (f : Nat → BitVec 8) :
-    upathAt N tx pv n f ⊢ HfpSysP.uimgView N (strImg pv n f) := by
-  unfold upathAt HfpSysP.uimgView
+    upathAt N tx pv n f ⊢ uimgView N (strImg pv n f) := by
+  unfold upathAt uimgView
   cases tx with
   | true =>
     simp only [↓reduceIte]

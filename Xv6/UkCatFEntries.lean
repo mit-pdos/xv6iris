@@ -26,20 +26,19 @@ reached, not ported: `T` (a local notation), `cfe_cat_code_persistent`
    device laws are `CifDevP.ofOwners` (UkCatFIfaceBridge) at every instance
    `N'`: lane hfp-F1's file device and the pipe device at `pipeDevK_xv6 UL`.
    The landed row records are instantiated (`ukSysP_holds UL`,
-   `ukSysFH_holds UL`); what the owners still take stays a field: `FO`
-   (lane hfp-F1's `HfpFileOpenP`, discharged by `hfpFileOpen_holds` at the
-   fs tier's classes), `SYSO` (`wp_uk_ecall_open_recv_gimg`, not landed),
-   `hub` (`usrc_ok_ubytesq` at any break, `UkFileDevSysP.ofLanded`'s row;
-   lane runsys).  The free handler's four minting laws
+   `ukSysFH_holds UL`, and the file device's kernel leaves
+   `UkFileOpenSysP.ofLanded UL` / `UkFileDevSysP.ofLanded UL`, lane gaps);
+   what the owners still take stays a field: `FO` (lane hfp-F1's
+   `HfpFileOpenP`, discharged by `hfpFileOpen_holds` at the fs tier's
+   classes).  The free handler's four minting laws
    (UkFreeHandler `FhHyps.lawW/R/C/O`) are fields (Rocq: `udepw_law_of_sup_*`
    at the section's `app_sup`, UkFreeHandler deviation 2).
-2. **`UkTreeEntry.cat_image_entry_env_c` is a parameter** (`CatImageEntryEnvC`,
-   Rocq's statement): the landed UkTreeEntry defers it (its inputs --
-   `UShCat`'s key geometry, `cat_args_det_holds`, `wp_kcat_start_env` -- are
-   not in Lean).  Owner: lane htree / the program-entry lane.
+2. **`UkTreeEntry.cat_image_entry_env_c` is a hypothesis** at its ONE
+   statement `UkTreeEntryStmt.CatImageEntryEnvC` (not proved yet: `UShCat`'s
+   key geometry, `cat_args_det_holds`, are unported).
 3. **Two images** (ExecArgs deviation 1): Rocq's `Mn : gmap Z (bv 8)` is the
    key's image `Me : ElfMem` for `echo_node_img` (HfpProgP's
-   `hfpEchoNodeImg`) and the caller's page view `Mv` for `image_entry`, with
+   `echoNodeImg`) and the caller's page view `Mv` for `image_entry`, with
    `imgAgrees Me Mv`.  `sv t : Nat`; `mword_of_int (t + 8)` is
    `BitVec.ofNat 64 (t + 8)`; `UkShEcho.echo_argv_bytes` is
    `ushEchoArgvBytes`; `ElfUser.cat_elf` is `User.Cat.elf`;
@@ -59,6 +58,7 @@ import Xv6.ExecEntry
 import Xv6.UexecRet
 import Xv6.HfpProgP
 import Xv6.ElfUser
+import Xv6.UkTreeEntryStmt
 
 namespace Xv6
 
@@ -119,15 +119,8 @@ structure CfeCtx where
   hTKc : ⊢ □ (R.G.gcT -∗ Kc)
   hTSup : ⊢ □ (R.G.gcT -∗ Sup)
   /-- the file device's own parameters (deviation 1, lane hfp-F1): its open
-  claims (discharged by `hfpFileOpen_holds` at the fs tier's classes) and its
-  open leaves -/
+  claims (discharged by `hfpFileOpen_holds` at the fs tier's classes) -/
   FO : HfpFileOpenP (hlc := hlc) (GF := GF)
-  SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF)
-  /-- Rocq `UkRunSys.usrc_ok_ubytesq` at ANY break (`UkFileDevSysP.ofLanded`'s
-  `hub`; the landed `usrcOk_ubytesq` needs `uszOk sz`, lane runsys) -/
-  hub : ∀ (γt γd γs : GName) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
-      (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8),
-    ⊢ uheap (GF := GF) γt γd γs M pmv sz -∗ ubytesq γd dq ua.toNat nb f -∗ ⌜usrcOk M pmv sz ua nb f⌝
 
 /-- Rocq `cfe_cat_code_persistent`. -/
 theorem cfe_code_persistent (N' : UkNames GF) : Persistent (catProg N').code := by
@@ -137,13 +130,13 @@ namespace CfeCtx
 variable (C : CfeCtx (hlc := hlc) (GF := GF))
 
 include C in
-/-- `UkFileDevSysP` at the landed leaves, its data-source row `C.hub`. -/
+/-- `UkFileDevSysP` at the landed leaves. -/
 theorem sysd : UkFileDevSysP (hlc := hlc) (GF := GF) :=
-  UkFileDevSysP.ofLanded C.UL C.hub
+  UkFileDevSysP.ofLanded C.UL
 
 /-- The device laws at the instance `N'` (`CifDevP.ofOwners`). -/
 def dev (N' : UkNames GF) : CifDevP N' (catProg N') :=
-  CifDevP.ofOwners C.FO C.SYSO C.sysd C.UL (pipeDevK_xv6 C.UL) N' (catProg N')
+  CifDevP.ofOwners C.FO (UkFileOpenSysP.ofLanded C.UL) C.sysd C.UL (pipeDevK_xv6 C.UL) N' (catProg N')
     ⟨cat_stub_read C.UL N', cat_stub_write C.UL N', cat_stub_open C.UL N', cat_stub_close C.UL N'⟩
 
 /-- `UkCatFIface`'s section context at the entry's instance. -/
@@ -192,22 +185,6 @@ abbrev lend (qf : Qp) (sf : Dst) (pn : PNames) (gp : PipeNames) (w : Wid)
 
 end CfeCtx
 
-/-- **Rocq `UkTreeEntry.cat_image_entry_env_c`** (deviations 2, 3): cat's
-entry, its tree paid by an environment through an interface the caller
-supplies at the record the entry mints. -/
-def CatImageEntryEnvC : Prop :=
-  ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
-    (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') Dp)
-    (E : Penv) (ds : ExtTreeSet Nat compare),
-    execOk ws → imgAgrees Me Mv → hfpEchoNodeImg ws Me sv t gn → ushEchoArgvBytes ws gn →
-    sts.length = NOFILE → Conforms E (catTree ws) → SafeFds (fdDom E.fd) (catTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) sts -∗ udep (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) -∗
-      imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)))
-
 /-- **Rocq `pse_catf_image_entry_gen`**: THE ENTRY, at either state of the
 file `f` -- any name of the class (cut W3). -/
 theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
@@ -217,7 +194,7 @@ theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
     (Q : Int → IProp GF) (pn : PNames) (gp : PipeNames) (w : Wid) (A X ds xs : List (List (BitVec 8)))
     (qf : Qp) (sf : Dst) (rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hf : uname f) (hok : execOk (prodWords (.PrCatF f)))
-    (hag : imgAgrees Me Mv) (hnode : hfpEchoNodeImg (prodWords (.PrCatF f)) Me sv t gn)
+    (hag : imgAgrees Me Mv) (hnode : echoNodeImg (prodWords (.PrCatF f)) Me sv t gn)
     (hab : ushEchoArgvBytes (prodWords (.PrCatF f)) gn)
     (hfdl : sts.length = NOFILE) (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))

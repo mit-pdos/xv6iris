@@ -198,7 +198,7 @@ theorem pns_nil_ro (CK : PnsCtxOk C) (fdm : Fdmap) (l : List FdState) (vs : RegM
         (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗
       wrObl (hlc := hlc) C.Q.N C.Q.P (fd : Int) [] K := by
   iintro Hstd Hrest Hd HK
-  iapply UkFileDev.file_write_nil_std_ro (UkFileDevSysP.ofLanded CK.UL CK.hub) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ fd l true (.pipe gp) K hlt hrow $$ Hstd
+  iapply UkFileDev.file_write_nil_std_ro (UkFileDevSysP.ofLanded CK.UL) C.Q.N C.Q.P ⟨CK.QK.FH.sr, CK.QK.FH.sw, CK.QK.FH.so, CK.QK.FH.sc⟩ fd l true (.pipe gp) K hlt hrow $$ Hstd
   isplit
   · iintro Hstd
     icases HK with ⟨HK, -⟩

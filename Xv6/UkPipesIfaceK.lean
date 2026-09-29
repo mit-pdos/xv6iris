@@ -6,8 +6,8 @@ pinned `1900b8a43`).
 The laws of `UkPipesIface` call lane hfp-F1's two standard-slot laws of
 `UkFileDev` -- `file_close_std` (a console row's close) and
 `file_write_nil_std_ro` (a zero-length write at a read-only row) -- at
-`UkFileDevSysP.ofLanded UL hub`; `hub` is the one kernel row left
-(`PnsUbytesqHub`, below).
+`UkFileDevSysP.ofLanded UL` (the data-source row `PnsUbytesqHub` this file
+used to state is gone: `udepwfK` carries the break's bound, lane gaps).
 
 `pns_cons_nil` (Rocq `UkPipeIface.pif_cons_nil`, verbatim) is H-io's console
 leaf `consLeaf` with the deposit `uwrite_chain_sup_ret` and the post
@@ -41,15 +41,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Icache
   [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-
-/-- **Rocq `UkRunSys.usrc_ok_ubytesq` at ANY break**: the data source row
-lane hfp-F1's `UkFileDevSysP.ofLanded` still takes (the landed
-`usrcOk_ubytesq` needs `uszOk sz`, which `udepwfK`'s quantifier does not
-expose at the write deposit; owner: the runsys lane). -/
-def PnsUbytesqHub : Prop :=
-  ∀ (γt γd γs : GName) (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
-    (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8),
-    ⊢ uheap (GF := GF) γt γd γs M pmv sz -∗ ubytesq γd dq ua.toNat nb f -∗ ⌜usrcOk M pmv sz ua nb f⌝
 
 /-- **Rocq `pns_cons_nil`** (= `UkPipeIface.pif_cons_nil`): a ZERO-LENGTH
 write at a console row, at any device resource. -/

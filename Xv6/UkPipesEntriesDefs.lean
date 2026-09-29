@@ -12,23 +12,18 @@ them).  The entries are `UkPipesEntries`.
 ## Deviations from Rocq
 
 1. **The section context is the record `PseCtx`**: the round (`R`, `OK`),
-   the engine (`UL`), lane hfp-F1's standard-slot
-   laws (their row `hub`, `PnsUbytesqHub`), the free handler's supply `Sup` with Rocq's `Hsup`, and its four
+   the engine (`UL`), the free handler's supply `Sup` with Rocq's `Hsup`, and its four
    minting laws (UkFreeHandler deviation 2) -- everything `UkPipesIface`'s
    `PnsCtx`/`PnsCtxOk` take but the program instance and the registry,
    which the entry fixes (`pctx`/`pok`).  The five stub laws are built from
    `UkStub.<p>_stub_*` at the engine (as Rocq passes `cat_stub_read N'` …).
-2. **The program entries are parameters** (`PseEchoImageEntryEnvC`,
-   `PseCatImageEntryEnvC`, `PseGrepImageEntryEnvC`: Rocq
-   `UkTreeEntry.echo_/cat_/grep_image_entry_env_c`, Rocq's statements):
-   the landed UkTreeEntry defers them (their inputs -- UShEcho/UShCat/
-   UShGrep's key geometry, `*_args_det_holds`, `wp_k*_start_env` -- are not
-   in Lean).  Owner: lane htree / the program-entry lane.  (Lane hfp-C's
-   `UkCatFEntries.CatImageEntryEnvC` is the same statement as
-   `PseCatImageEntryEnvC`; the two fold into the owner's lemma.)
+2. **The program entries are hypotheses** at their ONE statement,
+   `UkTreeEntryStmt.EchoImageEntryEnvC` / `CatImageEntryEnvC` /
+   `GrepImageEntryEnvC` (Rocq `UkTreeEntry.echo_/cat_/grep_image_entry_env_c`;
+   not proved yet: UShEcho/UShCat/UShGrep's key geometry is unported).
 3. **Two images** (ExecArgs deviation 1, as hfp-C): Rocq's `M : gmap Z
    (bv 8)` is the key's image `Me : ElfMem` for `echo_node_img` (HfpProgP's
-   `hfpEchoNodeImg`) and the caller's page view `Mv` for `image_entry`,
+   `echoNodeImg`) and the caller's page view `Mv` for `image_entry`,
    with `imgAgrees Me Mv`; `s0 t : Nat`; `mword_of_int (t + 8)` is
    `BitVec.ofNat 64 (t + 8)`; `ElfUser.<p>_elf` is `User.<P>.elf`;
    `echo_prog` is HfpProgP's `echoProg`, `grep_prog N'` is
@@ -47,6 +42,7 @@ import Xv6.HfpProgP
 import Xv6.UkEchoTree
 import Xv6.ElfUser
 import Xv6.UshEchoPure
+import Xv6.UkTreeEntryStmt
 
 namespace Xv6
 
@@ -131,7 +127,6 @@ structure PseCtx (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF]
   OK : PnsRoundOk R
   /-- the stubs' engine (DU2) -/
   UL : UK_LEAVES
-  hub : PnsUbytesqHub (GF := GF)
   /-- the free handler's supply, Rocq `Hsup`, and its minting laws -/
   Sup : IProp GF
   sup_pers : Persistent Sup
@@ -158,7 +153,6 @@ theorem pok (N' : UkNames GF) (P : Uprog GF) (γreg : GName) (kds : List (Nat ×
   OK := X.OK
   QK := ⟨hkds, ⟨sr, sw, so, sc, se, X.lawW, X.lawR, X.lawC, X.lawO⟩, X.sup_pers⟩
   UL := X.UL
-  hub := X.hub
   hsup := X.hsup
   hpc := hpc
 
@@ -209,52 +203,6 @@ def pseIfaceEcho (γreg : GName) (kds : List (Nat × Pdev)) (hkds : (kds.map Pro
   (X.pctx N' (echoProg N') γreg kds).pipesIface (X.echoCtxOk γreg kds hkds N')
 
 end PseCtx
-
-/-! ## The program entries (deviation 2) -/
-
-/-- **Rocq `UkTreeEntry.echo_image_entry_env_c`**: echo's entry, its tree
-paid by an environment through an interface the caller supplies at the
-record the entry mints. -/
-def PseEchoImageEntryEnvC : Prop :=
-  ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat)
-    (g : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') Dp)
-    (E : Penv) (ds : ExtTreeSet Nat compare),
-    lineOk ws → imgAgrees Me Mv → hfpEchoNodeImg ws Me s0 t g → ushEchoArgvBytes ws g →
-    sts.length = NOFILE → Conforms E (echoTree ws) → SafeFds (fdDom E.fd) (echoTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
-
-/-- **Rocq `UkTreeEntry.cat_image_entry_env_c`**. -/
-def PseCatImageEntryEnvC : Prop :=
-  ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
-    (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') Dp)
-    (E : Penv) (ds : ExtTreeSet Nat compare),
-    execOk ws → imgAgrees Me Mv → hfpEchoNodeImg ws Me sv t gn → ushEchoArgvBytes ws gn →
-    sts.length = NOFILE → Conforms E (catTree ws) → SafeFds (fdDom E.fd) (catTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
-
-/-- **Rocq `UkTreeEntry.grep_image_entry_env_c`**. -/
-def PseGrepImageEntryEnvC : Prop :=
-  ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
-    (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (grepProg N'.t) Dp)
-    (E : Penv) (ds : ExtTreeSet Nat compare),
-    execOk ws → imgAgrees Me Mv → hfpEchoNodeImg ws Me sv t gn → ushEchoArgvBytes ws gn →
-    sts.length = NOFILE → Conforms E (grepTree ws) → dpIn Dp ds →
-    ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
-          ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
 
 end PseInst
 
