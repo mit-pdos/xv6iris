@@ -19,7 +19,8 @@ means changing this file** (build the new switch, export it, replace the file, r
 | ocaml-base-compiler | 5.3.0 | opam default repository |
 | coq / rocq-prover | 9.0.1 / 9.0.0 (`coq` is the compatibility package; the binaries are `rocq` and `coqc`) | rocq-released |
 | rocq-stdpp, rocq-stdpp-bitvector | dev.2026-09-17.0.d510b616 (stdpp master) | git rocq-iris/stdpp @ `d510b616` |
-| rocq-iris | dev.2026-09-24.0.8e490959 (Iris master) | git rocq-iris/iris @ `8e4909593a` |
+| rocq-iris | dev.2026-09-24.0.8e490959+transfinite.ad972179 (Iris master `8e4909593a` + the 4 commits of Iris branch `robbert/transfinite` + 1 local fix) | pinned git commit `ad972179` of the patched branch (`transfinite` branch only; see "The transfinite pins") |
+| rocq-iris-transfinite | dev.2026-09-29.0.9efb894e (the Transfinite Iris core: ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, program logic) | pinned git commit `9efb894e` of github.com/dongjaelee1/transfinite-iris (`transfinite` branch only) |
 | rocq-elpi, elpi | 3.5.1, 3.7.3 (Iris master needs rocq-elpi) | release tarballs |
 | rocq-sail-stdpp | 0.20.3 | git rems-project/coq-sail @ `e7b914cd` |
 | coq-lsp | 0.2.5+9.0 (`pet`, `fcc`: editor and agent tooling; harmless if unused) | release tarball |
@@ -27,6 +28,23 @@ means changing this file** (build the new switch, export it, replace the file, r
 91 packages in all; the rest are their OCaml dependencies. Linux only as exported
 (`conf-linux-libc-dev` is in the list). Not included, on purpose: the Sail compiler (only
 `make model-gen` needs it, in its own switch — README "Regenerating the Sail model") and z3.
+
+## The transfinite pins (branch `transfinite`)
+
+On the `transfinite` branch the export differs from `main`'s in exactly two packages: `rocq-iris`
+is the SAME upstream commit with Iris's unmerged branch `robbert/transfinite` applied (it changes
+the BI interface so that a transfinite `uPred` can be a `bi`: `later_exist_false` and `later_sep_1`
+become conditional on `SIdxFinite`, `Timeless P := <only0> P ⊢ P`), and `rocq-iris-transfinite`
+is the Transfinite Iris core built on it. Both are pinned by commit. Until the two repositories
+are reachable from CI the pins in this file are `git+file://` paths of the development machine
+(`/work/iris-upstream#ad972179…`, `/work/transfinite-iris#9efb894e…`): replace them by the hosted
+URLs (github.com/dongjaelee1/transfinite-iris for the core; a fork of Iris carrying the patched
+branch) before this export can be imported elsewhere. The day upstream merges `robbert/transfinite`,
+`rocq-iris` goes back to a stock pin and only `rocq-iris-transfinite` remains.
+
+Reproducing the switch here: `/work/opam/build-logs/build-transfinite.sh` (import `main`'s export,
+re-pin `rocq-iris`) and `build-transfinite-stage2.sh` (pin the core), root `/work/opam`, switch
+`transfinite`; build the tree with `OPAMROOT=/work/opam make SWITCH=transfinite`.
 
 ## Installing it (a new machine, or moving a shared switch to a new toolchain)
 
@@ -69,6 +87,12 @@ until the new tree is green.
    of this file is the toolchain changelog.
 
 ## History
+
+- 2026-09-29 (branch `transfinite`): `rocq-iris` re-pinned to the patched upstream commit
+  (`8e490959` + `robbert/transfinite` + 1 fix, version `…+transfinite.ad972179`); `rocq-iris-transfinite`
+  added (the Transfinite Iris core with its program logic). Everything else identical to `main`'s
+  export. The reason: xv6iris moves onto the transfinite base logic (first at the finite index
+  `natSI`, then at the ordinals) for the liveness work; `local-plan/transfinite-integration.md`.
 
 - 2026-09-26: Rocq 9.0.1 kept; coq-iris 4.4.0 → rocq-iris master `8e490959`; coq-stdpp 1.12.0 →
   rocq-stdpp master `d510b616`; coq-sail-stdpp 0.20.1 → rocq-sail-stdpp 0.20.3; rocq-elpi added
