@@ -365,7 +365,7 @@ Lemma ifin_nsteps (ip : ipol) (fuel : nat) (tick : bool) (gen : nat)
     @language.nsteps riscv_lang N (ts, g) [] (ts, g')
     /\ thread_live g' gen /\ is_ok img st' g'.
 Proof.
-  intros Hin n. apply elem_of_list_split in Hin as (t1 & t2 & Hts).
+  intros Hin n. apply list_elem_of_split in Hin as (t1 & t2 & Hts).
   induction n as [|n IH]; intros st st' g Hlive Hst Hf.
   - cbn [ifin] in Hf. destruct (flag_set st.(i_s)); [|discriminate Hf].
     revert Hf; intros [= <-].
@@ -430,10 +430,10 @@ Proof.
   (* the pool hands the hart over at [Ret tt]; one boundary takes it to the
      uniform point, and moves neither view *)
   pose proof (loop_in_pool 0 hart_primary) as Hlp.
-  apply elem_of_list_split in Hlp as (t1 & t2 & Hts).
+  apply list_elem_of_split in Hlp as (t1 & t2 & Hts).
   assert (Hpool : HartE 0 hart_primary (riscv_step tick)
                     ∈ t1 ++ HartE 0 hart_primary (riscv_step tick) :: t2)
-    by (apply elem_of_app; right; apply elem_of_list_here).
+    by (apply elem_of_app; right; apply list_elem_of_here).
   destruct (boundary_prim tick 0 hart_primary
               (test_gstate hart text rs disk_init)
               (exec_start hart text rs disk_init) tt Hlive0 Hok0)

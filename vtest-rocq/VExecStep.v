@@ -1359,7 +1359,7 @@ Lemma dev_prim_nsteps (ts : list mexpr) (e : mexpr) (g g' : gstate)
   @language.nsteps riscv_lang 1 (ts, g) kappa (ts, g').
 Proof.
   intros Hin Hps.
-  apply elem_of_list_split in Hin as (t1 & t2 & ->).
+  apply list_elem_of_split in Hin as (t1 & t2 & ->).
   assert (Hst : @language.step riscv_lang (t1 ++ e :: t2, g) kappa
                                           (t1 ++ e :: t2, g')).
   { eapply language.step_atomic; [reflexivity| |exact Hps].
@@ -1956,15 +1956,15 @@ Lemma power_fork_split (gen : nat) :
 Proof.
   unfold power_fork.
   assert (Hin : LoopE gen hart_primary ∈ (LoopE gen <$> finite.enum CPU)).
-  { apply elem_of_list_fmap. exists hart_primary.
+  { apply list_elem_of_fmap. exists hart_primary.
     split; [reflexivity|apply finite.elem_of_enum]. }
-  apply elem_of_list_split in Hin as (u1 & u2 & Heq).
+  apply list_elem_of_split in Hin as (u1 & u2 & Heq).
   exists u1, (u2 ++ (UartLoopE gen <$> finite.enum uart_id)
                  ++ [DiskLoopE gen; PlicLoopE gen]).
   split; [rewrite Heq, <- app_assoc; reflexivity|].
   split; [|split].
   - intros q. apply elem_of_app; right. apply elem_of_app; right.
-    apply elem_of_app; left. apply elem_of_list_fmap. exists q.
+    apply elem_of_app; left. apply list_elem_of_fmap. exists q.
     split; [reflexivity|apply finite.elem_of_enum].
   - apply elem_of_app; right. apply elem_of_app; right.
     apply elem_of_app; right. apply elem_of_cons; by left.
@@ -2051,7 +2051,7 @@ Proof.
     destruct (IH Hf) as [Hu Himg]. split; [|exact Himg].
     intros m0 Hm0. apply elem_of_app in Hm0 as [Hm0|Hm0].
     + exact (Hu m0 Hm0).
-    + apply elem_of_list_singleton in Hm0 as ->. exact Hm.
+    + apply list_elem_of_singleton in Hm0 as ->. exact Hm.
 Qed.
 
 Lemma tso_read_none (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
@@ -2071,7 +2071,7 @@ Proof.
     as [bs|] eqn:Hm; [discriminate|intros _].
   apply mapM_None_1 in Hm.
   apply Exists_exists in Hm as (j & Hj & Hnone).
-  apply elem_of_list_In, elem_of_seq in Hj.
+  apply list_elem_of_In, elem_of_seq in Hj.
   exists j. split; [lia|exact Hnone].
 Qed.
 

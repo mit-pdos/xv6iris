@@ -56,6 +56,7 @@ function. None of these change a statement.
 
 ## Checking that a migration changed no statement
 
-`tools/integrity/integrity.py check --base <migrated old tree> --tree <new tree>` lists every
-declaration whose declaring sentence differs (`STATEMENT`). On 2026-09-29 the whole tree's diff
-against the migrated upstream tree was three declarations plus the regenerated model; keep it so.
+Compare, for every declaration present under the same name before and after, the text of its
+declaring sentence (keyword to the sentence's final `.`, whitespace collapsed, comments and strings
+blanked). On 2026-09-29 the whole tree's diff against the migrated upstream tree came down to three
+declarations plus the regenerated model; keep it so.
