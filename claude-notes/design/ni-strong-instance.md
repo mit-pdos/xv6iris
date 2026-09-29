@@ -241,3 +241,55 @@ of the ledger.
 - **R4 land now**: `vmfault_quiet` (pure, ~30 lines, `SpecVmfault`-side
   or a new `VmfaultQuiet.v`) and the functor inventory check
   (recommended, both) — or neither until P.
+
+## 7. The permit sweep, as planned (2026-09-29; owner: "go ahead")
+
+Re-read against the tree after M1 closed.  Three changes from §3:
+
+- **The permit is a COUNTER, exclusive, per slot, with no authority and
+  no tie.**  §3 tied `act_permit pa k` to a per-actor count in the
+  allocator ledger.  With four ledgers that tie would need a shared
+  authority opened under three different locks.  It is not needed for
+  the theorem: what the rows state is the DELTA (`ev' = ev` on the quiet
+  arms), and what the theorem needs is that every labelled append
+  consumes the actor's counter.  So `act_cnt pa k := own wact_name
+  {[pa := to_dfrac_agree (DfracOwn 1) k]}` (the `slot_gen` camera shape,
+  `gmapUR addr (dfrac_agreeR natO)` at a new `wchG` name), stepped by its
+  holder, born at 0 for the 64 slots in `children_boot_rows`, parked in
+  the dormant block, carried by `proc_priv_core` as `act_cnt pa (pv_ev
+  V)` — `pv_ev : nat` a new last field of `pprivate` (precedent
+  `pv_lazy`; 29 `MkPPriv` spellings), so the kernel-tier row relation
+  can name it.  The count's meaning ("appends made with this permit")
+  is by construction, like the labels.
+- **The lend** `act_lend (p : mword 64) (k : nat) := ⌜p = zero_reg⌝ ∨
+  act_cnt p k`, in and out of every contract on the cone; kalloc's and
+  kfree's led forms take it and step it; the pid and zombie appends
+  (allocproc, freeproc, kexit, kwait) take it too, so one permit covers
+  every actor-labelled event.  The boot chains pass the left disjunct.
+- **TOP-DOWN layering keeps the tree green at every landing.**  A
+  callee cannot gain the premise before its callers supply it, but a
+  caller can gain it and merely frame it through callees that do not
+  take it yet.  So the order is: **G** the ground (this addendum's
+  ghost, field and block homes; additive); **L1** usertrap's three
+  allocating arms lend the block's counter (through
+  `ProcInv.proc_priv_ev_acc`) to `syscall`, `vmfault` and `kexit`;
+  **L2** the dispatcher and the sixteen `sys_*` entries; **L3** the
+  process/VM layer (kfork, kexec, kexit, kwait, growproc, allocproc,
+  freeproc, proc_pagetable/freepagetable, uvm*, freewalk, mappages,
+  walk, vmfault); **L4** the copy layer; **L5** the fs/file layer;
+  **L6** kalloc/kfree and the four ledger appends REQUIRE it, the
+  token-free led forms are deleted, the landed `wp_kalloc_sconf` /
+  `wp_kfree_sconf` survive only with the premise `p = zero_reg` for the
+  seven boot contracts; **T** the theorem: `uround_ok` and `ut_round`
+  gain `ev ev'` with `ev' = ev` on the non-ecall rows (discharged by
+  framing, by `vmfault_quiet` at lazy = false, and by kexit's own
+  append being the one exception the statement names), and
+  `ut_round_quiet` as the in-logic strong instance.  Each layer is one
+  Opus task plus the gate and audits; L2-L5 are mechanical threading.
+- **The statement's exception.**  A quiet process that is KILLED exits
+  in its own context and appends `ZExit A`.  The strong instance is
+  therefore stated for a quiet process that is not killed, or with the
+  exit counted as the killer's; `kkill` has no event yet.  The plan
+  states the former and leaves the `Kill` event to M3's no-kill
+  corollary.
+

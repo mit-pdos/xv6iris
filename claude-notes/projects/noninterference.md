@@ -75,7 +75,10 @@ M1's ledgers are fresh ground and go first.
   (`design/ni-strong-instance.md` §3, 69+7 contracts), now sizeable
   against the full vocabulary; (3) M2's export.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
-  appends no events.  DESIGN PASS 2026-09-28,
+  appends no events.  PERMIT SWEEP OPENED 2026-09-29 (owner's word;
+  plan in `design/ni-strong-instance.md` §7: an exclusive per-slot
+  counter `act_cnt`, `pv_ev` in the record, top-down layers G, L1-L6,
+  T; G in flight).  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
   a free consequence of the ledger — absence is ownership, and kalloc's
   premises do not distinguish a quiet round from a syscall, so the
