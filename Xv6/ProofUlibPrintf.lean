@@ -120,7 +120,7 @@ theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base 
     (by ulib_regs; rw [h2]; bv_omega)) $$ Hc Hstk Hrun
   iintro Hrun
   -- +0x3d6  ret
-  iapply (ulibS_retTo L _ (ulibPrintf_i3d6 L.toUlibRun base) _ _ (ulibRetPc (m 1#5)) (by ulib_regs))
+  iapply (ulibS_retTo L _ (ulibPrintf_i3d6 L.toUlibRun base) _ _ (retPc (m 1#5)) (by ulib_regs))
     $$ Hc Hrun
   iintro Hrun
   iapply Hk $$ %_ %?cs HR Hrun

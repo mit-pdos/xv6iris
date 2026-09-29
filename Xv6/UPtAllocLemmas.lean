@@ -274,20 +274,20 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 
 theorem uLeaf_valid (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
-    (uLeaf ppn perm).getLsbD 0 = true ∧ (uLeaf ppn perm) &&& 0xE#64 ≠ 0#64 := by
-  refine ⟨by unfold uLeaf; bv_decide, ?_⟩
-  have he : (uLeaf ppn perm) &&& 0xE#64 = (perm &&& 0xE#64) ||| ((BitVec.setWidth 64 ppn <<< 10) &&& 0xE#64) := by
-    unfold uLeaf; bv_decide
+    (leafOf ppn perm).getLsbD 0 = true ∧ (leafOf ppn perm) &&& 0xE#64 ≠ 0#64 := by
+  refine ⟨by unfold leafOf; bv_decide, ?_⟩
+  have he : (leafOf ppn perm) &&& 0xE#64 = (perm &&& 0xE#64) ||| ((BitVec.setWidth 64 ppn <<< 10) &&& 0xE#64) := by
+    unfold leafOf; bv_decide
   have hz : (BitVec.setWidth 64 ppn <<< 10) &&& 0xE#64 = 0#64 := by bv_decide
   rw [he, hz, BitVec.or_zero]
   exact hr
 
 theorem uLeaf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (uLeaf ppn perm) := (Xv6.isLeafPte_iff _).mpr (uLeaf_valid ppn perm hr)
+    isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (uLeaf_valid ppn perm hr)
 
 theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3FF#64 = 0#64) :
-    ptePpn (uLeaf ppn perm) = ppn := by
-  unfold ptePpn uLeaf
+    ptePpn (leafOf ppn perm) = ppn := by
+  unfold ptePpn leafOf
   revert hm
   bv_decide
 
@@ -295,10 +295,10 @@ theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3F
 leaf that maps it. -/
 theorem pte2pa_uLeaf (r : BitVec 64) (perm : BitVec 64) (h : pageValid r)
     (hm : perm &&& ~~~0x3FF#64 = 0#64) :
-    pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) perm) = r := by
+    pte2pa (leafOf (BitVec.extractLsb' 12 44 r) perm) = r := by
   obtain ⟨h1, -, h3⟩ := h
   unfold physTop at h3
-  unfold pte2pa uLeaf
+  unfold pte2pa leafOf
   revert h1 h3 hm
   bv_decide
 
@@ -311,7 +311,7 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 6
     (hrw : perm &&& 6#64 ≠ 4#64)
     (hfresh : ∀ k w, get? P.um k = some w → pte2pa w ≠ r) :
     uptWf (P.insertLeaf vpn r perm) := by
-  refine uptWf_insert P vpn (uLeaf (BitVec.extractLsb' 12 44 r) perm) hwf hlt
+  refine uptWf_insert P vpn (leafOf (BitVec.extractLsb' 12 44 r) perm) hwf hlt
     (uLeaf_isLeafPte _ _ hrwx) (by rw [pte2pa_uLeaf r perm hr hm]; exact hr)
     (uLeafPins_uLeaf _ _ (by revert hm hg; bv_decide)) (uwkInv_uLeaf _ _ hm hrwx hrw) ?_
   intro k w hw _hk hq
@@ -458,7 +458,7 @@ theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r p
     iprop(umPages (GF := GF) P M ∗ byteBuf r (DFrac.own 1) (List.replicate 4096 0#8)) ⊢
       umPages (P.insertLeaf vpn r perm) (viewZero M vpn) := by
   have hu : (P.insertLeaf vpn r perm).um
-      = insert P.um vpn (uLeaf (BitVec.extractLsb' 12 44 r) perm) := rfl
+      = insert P.um vpn (leafOf (BitVec.extractLsb' 12 44 r) perm) := rfl
   unfold umPages
   rw [hu]
   refine Entails.trans ?_ (BigSepM.bigSepM_insert
@@ -511,7 +511,7 @@ structure UaInv (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn
   tfp : Pi.tfp = P.tfp
   out : ∀ x, (∀ j, j < i → x ≠ vpn0 + j) → get? Pi.um x = get? P.um x ∧ Mi x = M x
   inn : ∀ j, j < i → (∃ r : BitVec 64, pageValid r ∧
-          get? Pi.um (vpn0 + j) = some (uLeaf (BitVec.extractLsb' 12 44 r) perm)) ∧
+          get? Pi.um (vpn0 + j) = some (leafOf (BitVec.extractLsb' 12 44 r) perm)) ∧
         Mi (vpn0 + j) = List.replicate 4096 0#8
 
 theorem uaInv_zero (P : UPtd) (M : Nat → List (BitVec 8)) (perm : BitVec 64) (vpn0 : Nat) :

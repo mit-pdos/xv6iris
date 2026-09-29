@@ -35,7 +35,7 @@ def uvmallocOk (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (oldsz newsz xperm
     Iris.Std.PartialMap.get? P'.um k = Iris.Std.PartialMap.get? P.um k ∧ M' k = M k) ∧
   (∀ i, i < uvmaNp oldsz newsz →
     (∃ r : BitVec 64, pageValid r ∧
-      Iris.Std.PartialMap.get? P'.um (uvmaVpn0 oldsz + i) = some (uLeaf (BitVec.extractLsb' 12 44 r) (xperm ||| PTE_R ||| PTE_U))) ∧
+      Iris.Std.PartialMap.get? P'.um (uvmaVpn0 oldsz + i) = some (leafOf (BitVec.extractLsb' 12 44 r) (xperm ||| PTE_R ||| PTE_U))) ∧
     M' (uvmaVpn0 oldsz + i) = List.replicate 4096 0#8)
 
 def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

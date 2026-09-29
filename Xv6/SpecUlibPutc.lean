@@ -48,7 +48,7 @@ def ulibPutcWb (L : UlibRun GF) (base fd : BitVec 64) (b : BitVec 8) (Ci Co : IP
     Ci ∗ L.ubyte ua b -∗
     L.urun m (ulibWriteAt base) av -∗
     (∀ ret : BitVec 64, Co ∗ L.ubyte ua b -∗
-      L.urun ((m.set 17#5 16#64).set 10#5 ret) (ulibRetPc (m 1#5)) av -∗ L.goal) -∗
+      L.urun ((m.set 17#5 16#64).set 10#5 ret) (retPc (m 1#5)) av -∗ L.goal) -∗
     L.goal)
 
 /-- **WP of `putc` at `base`** (Rocq `wp_kcat_putc`). -/
@@ -60,7 +60,7 @@ def wp_ulibPutc_body (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat)
     Ci -∗
     L.urun m base (4 + n) -∗
     (∀ m' : RegMap, ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (4 + n) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (4 + n) -∗ L.goal) -∗
     L.goal
 
 end

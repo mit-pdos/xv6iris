@@ -60,7 +60,7 @@ The view is the MAPPED one; Rocq's `us_M` is the lazy view.  They agree under
   write).
 * `kexec_pg_unsigned`, `kexec_pg_of_word`, `kexec_pg_vpn_at`,
   `kxb_page_index`, `kxb_low10`, `kxb_perm_leaf_flags`: the page key is
-  `b / 4096` at `Nat`; the leaf-word rows are stated on `uLeaf` directly.
+  `b / 4096` at `Nat`; the leaf-word rows are stated on `leafOf` directly.
 * `phdrs_nonneg`, `elf_wf_phdrs_nonneg`, `pgroundup_nonneg`,
   `kexec_sz_after_nonneg`, the `elf_wf` premise of `kexec_sz_after_mem_end`:
   vacuous at `Nat` (ElfFile deviation 2).
@@ -1214,15 +1214,15 @@ theorem kxbPermBelow_intro {szv : BitVec 64} {P : UPtd} (hb : umBelow szv P) :
 /-! ### (a) the leaf words, projected -/
 
 theorem uLeaf_getLsbD (ppn : BitVec 44) (perm : BitVec 64) (k : Nat) (hk : k < 10) :
-    (uLeaf ppn perm).getLsbD k = (perm ||| 1#64).getLsbD k := by
-  simp only [uLeaf, BitVec.getLsbD_or, BitVec.getLsbD_shiftLeft]
+    (leafOf ppn perm).getLsbD k = (perm ||| 1#64).getLsbD k := by
+  simp only [leafOf, BitVec.getLsbD_or, BitVec.getLsbD_shiftLeft]
   have : k < 10 := hk
   simp [this]
 
 /-- THE SEGMENT LEAF (Rocq `kxb_perm_leaf_bits`): `flags2perm` then uvmalloc's
 `PTE_R|PTE_U` project to the header's own X / W pair. -/
 theorem kxbPermLeaf_bits (ppn : BitVec 44) (fl : BitVec 64) :
-    permLeaf (uLeaf ppn (flags2permRet fl ||| PTE_R ||| PTE_U)) = some ⟨fl.getLsbD 0, fl.getLsbD 1⟩ := by
+    permLeaf (leafOf ppn (flags2permRet fl ||| PTE_R ||| PTE_U)) = some ⟨fl.getLsbD 0, fl.getLsbD 1⟩ := by
   simp only [permLeaf, upermBits, pteBit, uLeaf_getLsbD _ _ 4 (by omega), uLeaf_getLsbD _ _ 1 (by omega),
     uLeaf_getLsbD _ _ 3 (by omega), uLeaf_getLsbD _ _ 2 (by omega)]
   unfold flags2permRet PTE_R PTE_U
@@ -1230,14 +1230,14 @@ theorem kxbPermLeaf_bits (ppn : BitVec 44) (fl : BitVec 64) :
 
 /-- ...at the header's own flags word (`lw` of `p_flags`, zero-extended). -/
 theorem kxbPermLeaf_seg (ppn : BitVec 44) (p : ElfPhdr) :
-    permLeaf (uLeaf ppn (flags2permRet (BitVec.ofNat 64 p.flags) ||| PTE_R ||| PTE_U)) =
+    permLeaf (leafOf ppn (flags2permRet (BitVec.ofNat 64 p.flags) ||| PTE_R ||| PTE_U)) =
       some (kexecSegPerm p) := by
   rw [kxbPermLeaf_bits, BitVec.getLsbD_ofNat, BitVec.getLsbD_ofNat]
   rfl
 
 /-- THE STACK LEAF (Rocq `kxb_perm_leaf_rw`): allocated at `PTE_W`. -/
 theorem kxbPermLeaf_rw (ppn : BitVec 44) :
-    permLeaf (uLeaf ppn (PTE_W ||| PTE_R ||| PTE_U)) = some upermRw := by
+    permLeaf (leafOf ppn (PTE_W ||| PTE_R ||| PTE_U)) = some upermRw := by
   simp only [permLeaf, upermBits, pteBit, uLeaf_getLsbD _ _ 4 (by omega), uLeaf_getLsbD _ _ 1 (by omega),
     uLeaf_getLsbD _ _ 3 (by omega), uLeaf_getLsbD _ _ 2 (by omega)]
   decide

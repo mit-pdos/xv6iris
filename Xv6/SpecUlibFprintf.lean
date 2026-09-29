@@ -44,7 +44,7 @@ def wp_ulibFprintf_gen_body (L : UlibRunP GF) (base : BitVec 64) (a : Nat) (m : 
       L.goal) -∗
     L.urun m (ulibFprintfAt base) (10 + (12 + (4 + n))) -∗
     (∀ m' : RegMap, ⌜ulibCalleeSaved m m'⌝ -∗ R -∗
-      L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
     L.goal
 
 /-- **Rocq `wp_kcat_fprintf`** at `base`: no directive. -/
@@ -62,7 +62,7 @@ def wp_ulibFprintf_body (L : UlibRunP GF) (base : BitVec 64) (a len : Nat) (f : 
     Ci -∗
     L.urun m (ulibFprintfAt base) (10 + (12 + (4 + n))) -∗
     (∀ m' : RegMap, ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
     L.goal
 
 /-- **Rocq `wp_kcat_fprintf_s`** at `base`: one `%s`, its argument the
@@ -92,7 +92,7 @@ def wp_ulibFprintfS_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (f
     Ci -∗
     L.urun m (ulibFprintfAt base) (10 + (12 + (4 + n))) -∗
     (∀ m' : RegMap, ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
     L.goal
 
 /-- **`wp_ulibFprintfS`, the string at ANY fraction `sdq`, handed back**
@@ -124,7 +124,7 @@ def wp_ulibFprintfSG_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (
     Ci -∗
     L.urun m (ulibFprintfAt base) (10 + (12 + (4 + n))) -∗
     (∀ m' : RegMap, ulibStr L sdq sa slen sf -∗ ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
     L.goal
 
 end

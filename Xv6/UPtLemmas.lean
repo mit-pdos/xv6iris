@@ -1,6 +1,6 @@
 /-
 Pure and resource-level lemmas about the user address space of
-`Xv6/UPtDefs.lean`: the leaf word `uLeaf` and the `A`/`D` slack `pteAD`,
+`Xv6/UPtDefs.lean`: the leaf word `leafOf` and the `A`/`D` slack `pteAD`,
 the representation predicate `ptRep` (walks are the leaves), the leaf map
 `UPtd.leaves` and the run deletions `delRunL`, the well-formedness
 `uptWf` / `umBelow`, and the openings of `umPages`, `ptOwnRep` and
@@ -24,39 +24,37 @@ set_option linter.unusedSectionVars false
 /-! ## The leaf word -/
 
 /-- The user leaf IS what `mappages` writes (`Xv6/PtOwn.lean`). -/
-theorem uLeaf_eq_leafOf (ppn : BitVec 44) (perm : BitVec 64) : uLeaf ppn perm = leafOf ppn perm := rfl
-
-theorem uLeaf_ne_zero (ppn : BitVec 44) (perm : BitVec 64) : uLeaf ppn perm ≠ 0#64 :=
+theorem uLeaf_ne_zero (ppn : BitVec 44) (perm : BitVec 64) : leafOf ppn perm ≠ 0#64 :=
   leafOf_ne_zero ppn perm
 
 /-- `PTE2PA` of a user leaf, when `perm` is flag bits only. -/
 theorem pte2pa_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hp : perm &&& ~~~0x3FF#64 = 0#64) :
-    pte2pa (uLeaf ppn perm) = pageAddr ppn := by
-  unfold pte2pa uLeaf pageAddr pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend
+    pte2pa (leafOf ppn perm) = pageAddr ppn := by
+  unfold pte2pa leafOf pageAddr pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend
   revert hp; bv_decide
 
 /-- The page number of a user leaf. -/
 theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hp : perm &&& ~~~0x3FF#64 = 0#64) :
-    ptePpn (uLeaf ppn perm) = ppn := by
-  unfold ptePpn uLeaf
+    ptePpn (leafOf ppn perm) = ppn := by
+  unfold ptePpn leafOf
   revert hp; bv_decide
 
 /-- With one of `R`/`W`/`X` the leaf is a leaf the walk stops at. -/
 theorem isLeafPte_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (uLeaf ppn perm) := by
+    isLeafPte (leafOf ppn perm) := by
   refine ⟨?_, ?_⟩
-  · show uLeaf ppn perm &&& PTE_V ≠ 0#64
-    unfold uLeaf PTE_V; bv_decide
-  · have he : uLeaf ppn perm &&& 0xE#64 = perm &&& 0xE#64 := by unfold uLeaf; bv_decide
+  · show leafOf ppn perm &&& PTE_V ≠ 0#64
+    unfold leafOf PTE_V; bv_decide
+  · have he : leafOf ppn perm &&& 0xE#64 = perm &&& 0xE#64 := by unfold leafOf; bv_decide
     rw [he]; exact h
 
 /-- With `U` the leaf is a user leaf. -/
 theorem pteVU_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& PTE_U ≠ 0#64) :
-    pteVU (uLeaf ppn perm) := by
+    pteVU (leafOf ppn perm) := by
   refine ⟨?_, ?_⟩
-  · show uLeaf ppn perm &&& PTE_V ≠ 0#64
-    unfold uLeaf PTE_V; bv_decide
-  · have he : uLeaf ppn perm &&& PTE_U = perm &&& PTE_U := by unfold uLeaf PTE_U; bv_decide
+  · show leafOf ppn perm &&& PTE_V ≠ 0#64
+    unfold leafOf PTE_V; bv_decide
+  · have he : leafOf ppn perm &&& PTE_U = perm &&& PTE_U := by unfold leafOf PTE_U; bv_decide
     rw [he]; exact h
 
 /-- `perm` with its `A` (bit 6) and `D` (bit 7) bits set to `a`/`d`. -/
@@ -66,8 +64,8 @@ def permAD (perm : BitVec 64) (a d : BitVec 1) : BitVec 64 :=
 /-- The hardware's `A`/`D` write-back on a user leaf is the leaf at the
 adjusted permission. -/
 theorem uLeaf_setAD (ppn : BitVec 44) (perm : BitVec 64) (a d : BitVec 1) :
-    pteSetAD (uLeaf ppn perm) a d = uLeaf ppn (permAD perm a d) := by
-  simp only [uLeaf, permAD, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
+    pteSetAD (leafOf ppn perm) a d = leafOf ppn (permAD perm a d) := by
+  simp only [leafOf, permAD, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
     Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
   bv_decide
 

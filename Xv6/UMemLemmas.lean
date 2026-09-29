@@ -476,14 +476,14 @@ theorem pteAD_U (w v : BitVec 64) (h : pteAD w v) : v &&& PTE_U = w &&& PTE_U :=
 theorem tfLeaf_not_vu (tfp : BitVec 44) : ¬ pteVU (tfLeaf tfp) := by
   intro h
   refine h.2 ?_
-  simp only [tfLeaf, uLeaf, PTE_U, PTE_R, PTE_W]
+  simp only [tfLeaf, leafOf, PTE_U, PTE_R, PTE_W]
   bv_decide
 
 /-- The trampoline mapping has no `U`. -/
 theorem trampLeaf_not_vu : ¬ pteVU trampLeaf := by
   intro h
   refine h.2 ?_
-  simp only [trampLeaf, uLeaf, PTE_U, PTE_R, PTE_X, trampPpn]
+  simp only [trampLeaf, leafOf, PTE_U, PTE_R, PTE_X, trampPpn]
   bv_decide
 
 theorem tfVpn_ne_trampVpn : trampVpn.toNat ≠ tfVpn.toNat := by decide
@@ -745,7 +745,7 @@ theorem umemWrite_chain {P P1 P2 : UPtd} (M : Nat → List (BitVec 8)) (va : Nat
   rw [viewFaulted_umemWrite _ _ _ hm, viewFaulted_trans M h1 h2, umemWrite_append]
 
 theorem insertLeaf_get (P : UPtd) (vpn : Nat) (r perm : BitVec 64) :
-    get? (P.insertLeaf vpn r perm).um vpn = some (uLeaf (BitVec.extractLsb' 12 44 r) perm) := by
+    get? (P.insertLeaf vpn r perm).um vpn = some (leafOf (BitVec.extractLsb' 12 44 r) perm) := by
   simp only [UPtd.insertLeaf]
   exact LawfulPartialMap.get?_insert_eq rfl
 

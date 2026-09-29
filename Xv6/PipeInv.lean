@@ -160,11 +160,7 @@ and window transport to each byte. -/
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-/-- The four bytes of a 32-bit word, little-endian. -/
-def word4Bytes (w : BitVec 32) : List (BitVec 8) :=
-  [nthByte (n := 4) w 0, nthByte (n := 4) w 1, nthByte (n := 4) w 2, nthByte (n := 4) w 3]
-
-@[simp] theorem word4Bytes_length (w : BitVec 32) : (word4Bytes w).length = 4 := rfl
+@[simp] theorem word4Bytes_length (w : BitVec 32) : (wordToBytes4 w).length = 4 := rfl
 
 theorem p4_align4_extract {a : BitVec 64} (hal : a.toNat % 4 = 0) :
     BitVec.extractLsb' 0 2 a = 0#2 := by
@@ -201,7 +197,7 @@ theorem p4_toNat_addN4 (a : BitVec 64) (j : Nat) (hj : j < 4) (hlt : a.toNat + j
 
 /-- **A 4-aligned word forgets to its four bytes.** -/
 theorem word4_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 32) (hal : a.toNat % 4 = 0) :
-    wordPointsTo (GF := GF) a 4 dq w ⊢ byteBuf a dq (word4Bytes w) := by
+    wordPointsTo (GF := GF) a 4 dq w ⊢ byteBuf a dq (wordToBytes4 w) := by
   have hz : a + BitVec.ofNat 64 0 = a := by simp
   unfold wordPointsTo
   iintro ⟨%ppn, #Hcl, %hf, Hb⟩
@@ -214,7 +210,7 @@ theorem word4_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 32) (hal : a.toN
   ihave H3 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 3) 3 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb3
   ihave H0 := wordPointsTo_intro a 1 dq (nthByte (n := 4) w 0) ppn
     ⟨hf.1, hf.2.1, by unfold inRam at hf ⊢; omega, by omega⟩ $$ Hcl
-  unfold byteBuf word4Bytes
+  unfold byteBuf wordToBytes4
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, hz]
   isplitl [Hb0]
   · iapply H0
@@ -316,17 +312,17 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
   ihave Hnw := word4_to_bytes (aPnwrite pi) (DFrac.own 1) nw (by rw [e_nw]; exact hal4 540 (by decide)) $$ Hnw
   ihave Hro := word4_to_bytes (aPopen pi false) (DFrac.own 1) ro (by rw [e_ro]; exact hal4 544 (by decide)) $$ Hro
   ihave Hwo := word4_to_bytes (aPopen pi true) (DFrac.own 1) wo (by rw [e_wo]; exact hal4 548 (by decide)) $$ Hwo
-  ihave P5 := byteBuf_bytesFree (aPnread pi) (word4Bytes nr) $$ Hnr
-  ihave P6 := byteBuf_bytesFree (aPnwrite pi) (word4Bytes nw) $$ Hnw
-  ihave P7 := byteBuf_bytesFree (aPopen pi false) (word4Bytes ro) $$ Hro
-  ihave P8 := byteBuf_bytesFree (aPopen pi true) (word4Bytes wo) $$ Hwo
+  ihave P5 := byteBuf_bytesFree (aPnread pi) (wordToBytes4 nr) $$ Hnr
+  ihave P6 := byteBuf_bytesFree (aPnwrite pi) (wordToBytes4 nw) $$ Hnw
+  ihave P7 := byteBuf_bytesFree (aPopen pi false) (wordToBytes4 ro) $$ Hro
+  ihave P8 := byteBuf_bytesFree (aPopen pi true) (wordToBytes4 wo) $$ Hwo
   -- P9: slack2
   ihave P9 := byteBuf_bytesFree (pi + BitVec.ofNat 64 pipeSizeof) b2 $$ Hslack2
   -- rehome the field pieces to `pi + off`
-  ihave P5 := bytesFree_cong (aPnread pi) (pi + BitVec.ofNat 64 536) (word4Bytes nr) (by rw [e_nr]) $$ P5
-  ihave P6 := bytesFree_cong (aPnwrite pi) (pi + BitVec.ofNat 64 540) (word4Bytes nw) (by rw [e_nw]) $$ P6
-  ihave P7 := bytesFree_cong (aPopen pi false) (pi + BitVec.ofNat 64 544) (word4Bytes ro) (by rw [e_ro]) $$ P7
-  ihave P8 := bytesFree_cong (aPopen pi true) (pi + BitVec.ofNat 64 548) (word4Bytes wo) (by rw [e_wo]) $$ P8
+  ihave P5 := bytesFree_cong (aPnread pi) (pi + BitVec.ofNat 64 536) (wordToBytes4 nr) (by rw [e_nr]) $$ P5
+  ihave P6 := bytesFree_cong (aPnwrite pi) (pi + BitVec.ofNat 64 540) (wordToBytes4 nw) (by rw [e_nw]) $$ P6
+  ihave P7 := bytesFree_cong (aPopen pi false) (pi + BitVec.ofNat 64 544) (wordToBytes4 ro) (by rw [e_ro]) $$ P7
+  ihave P8 := bytesFree_cong (aPopen pi true) (pi + BitVec.ofNat 64 548) (wordToBytes4 wo) (by rw [e_wo]) $$ P8
   ihave P1 := bytesFree_cong (pi + 4#64) (pi + BitVec.ofNat 64 4) b1 (by rfl) $$ P1
   ihave P2 := bytesFree_cong (pipeLockName pi) (pi + BitVec.ofNat 64 8) (wordToBytes vname) (by rw [e_nm]) $$ P2
   ihave P3 := bytesFree_cong (pi + 16#64) (pi + BitVec.ofNat 64 16) (List.replicate 8 0#8) (by rfl) $$ P3
@@ -335,7 +331,7 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
   -- assemble
   unfold pageFree
   iexists (((((((((List.replicate 4 0#8 ++ b1) ++ wordToBytes vname) ++ List.replicate 8 0#8) ++ bs)
-    ++ word4Bytes nr) ++ word4Bytes nw) ++ word4Bytes ro) ++ word4Bytes wo) ++ b2)
+    ++ wordToBytes4 nr) ++ wordToBytes4 nw) ++ wordToBytes4 ro) ++ wordToBytes4 wo) ++ b2)
   isplit
   · ipureintro
     simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
@@ -345,19 +341,19 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
     simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
       hb1, hbslen, PIPESIZE])
   isplitr [P9]
-  · iapply bytesFree_snoc_at pi _ (word4Bytes wo) 548 (by
+  · iapply bytesFree_snoc_at pi _ (wordToBytes4 wo) 548 (by
       simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
         hb1, hbslen, PIPESIZE])
     isplitr [P8]
-    · iapply bytesFree_snoc_at pi _ (word4Bytes ro) 544 (by
+    · iapply bytesFree_snoc_at pi _ (wordToBytes4 ro) 544 (by
         simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
           hb1, hbslen, PIPESIZE])
       isplitr [P7]
-      · iapply bytesFree_snoc_at pi _ (word4Bytes nw) 540 (by
+      · iapply bytesFree_snoc_at pi _ (wordToBytes4 nw) 540 (by
           simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
             hb1, hbslen, PIPESIZE])
         isplitr [P6]
-        · iapply bytesFree_snoc_at pi _ (word4Bytes nr) 536 (by
+        · iapply bytesFree_snoc_at pi _ (wordToBytes4 nr) 536 (by
             simp only [List.length_append, List.length_replicate, word4Bytes_length, wordToBytes_length,
               hb1, hbslen, PIPESIZE])
           isplitr [P5]

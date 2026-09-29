@@ -62,7 +62,7 @@ theorem ulibUkS_urun_bnd (m : RegMap) (pc : BitVec 64) (av : Nat) (dq : DFrac) (
 include UL in
 theorem ulibUkS_wp_lbuq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
     (rs1 rd : BitVec 5) (dq : DFrac) (a : Nat) (b : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ ulibUkSbq N tx dq a b -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
       (ulibUkSbq N tx dq a b -∗ ulibUkRun (hlc := hlc) N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗

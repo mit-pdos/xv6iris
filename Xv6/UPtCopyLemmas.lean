@@ -25,9 +25,6 @@ set_option linter.unusedSectionVars false
 
 /-! ## The leaf a copy writes -/
 
-/-- `mappages`' leaf and the user table's leaf are the same word. -/
-theorem uLeaf_eq_leafOf : uLeaf = leafOf := rfl
-
 /-- `PTE_FLAGS` keeps only the ten flag bits (`mappages`' `hmask`). -/
 theorem pteFlags_mask (w : BitVec 64) : pteFlags w &&& ~~~0x3FF#64 = 0#64 := by
   simp only [pteFlags]; bv_decide
@@ -62,11 +59,11 @@ writes into the child is `leafOf ppn (PTE_FLAGS *pte)`, where `*pte` is the
 parent's leaf as the hardware left it; the child's canonical leaf is the one
 at the parent's canonical flags. -/
 theorem pteAD_leafOf (ppn : BitVec 44) {w v : BitVec 64} (h : pteAD w v) :
-    pteAD (uLeaf ppn (pteFlags w)) (leafOf ppn (pteFlags v)) := by
+    pteAD (leafOf ppn (pteFlags w)) (leafOf ppn (pteFlags v)) := by
   obtain ⟨a, d, he⟩ := h
   subst he
   refine ⟨a, d, ?_⟩
-  simp only [uLeaf, leafOf, pteFlags, pteSetAD, Sail.BitVec.updateSubrange,
+  simp only [leafOf, pteFlags, pteSetAD, Sail.BitVec.updateSubrange,
     Sail.BitVec.updateSubrange', _update_PTE_Flags_A, _update_PTE_Flags_D,
     Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
@@ -300,7 +297,7 @@ def ucInv (Pold Pnew P : UPtd) (i : Nat) : Prop :=
   (∀ k, ¬ k < i → get? P.um k = get? Pnew.um k) ∧
   (∀ j, j < i → match get? Pold.um j with
      | none => get? P.um j = none
-     | some w => ∃ ppn : BitVec 44, get? P.um j = some (uLeaf ppn (pteFlags w)))
+     | some w => ∃ ppn : BitVec 44, get? P.um j = some (leafOf ppn (pteFlags w)))
 
 theorem ucInv_zero (Pold Pnew : UPtd) : ucInv Pold Pnew Pnew 0 :=
   ⟨rfl, rfl, fun _ _ => rfl, fun _ h => absurd h (by omega)⟩
@@ -312,7 +309,7 @@ theorem ucInv_step {Pold Pnew P P' : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
     (hother : ∀ k, k ≠ i → get? P'.um k = get? P.um k)
     (hhere : match get? Pold.um i with
       | none => get? P'.um i = none
-      | some w => ∃ ppn : BitVec 44, get? P'.um i = some (uLeaf ppn (pteFlags w))) :
+      | some w => ∃ ppn : BitVec 44, get? P'.um i = some (leafOf ppn (pteFlags w))) :
     ucInv Pold Pnew P' (i + 1) := by
   obtain ⟨hr, ht, hout, hin⟩ := h
   refine ⟨hroot.trans hr, htfp.trans ht, ?_, ?_⟩

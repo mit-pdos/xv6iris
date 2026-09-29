@@ -116,7 +116,7 @@ set_option maxHeartbeats 1000000 in
 /-- The trapframe's leaf: the class, and no User access. -/
 theorem uftLeafOk_tf (tfp : BitVec 44) : UftLeafOk (tfLeaf tfp) ∧ uwkU (tfLeaf tfp) = false := by
   refine ⟨⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
-    simp only [tfLeaf, uLeaf, PTE_R, PTE_W, uwkInv, uwkU, uwkG, uwk_bit_to_bool, pte_is_non_leaf,
+    simp only [tfLeaf, leafOf, PTE_R, PTE_W, uwkInv, uwkU, uwkG, uwk_bit_to_bool, pte_is_non_leaf,
       _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,
       _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Flags_G, _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved,
       _get_PTE_Ext_N, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags, Sail.BitVec.extractLsb,
@@ -127,7 +127,7 @@ set_option maxHeartbeats 1000000 in
 /-- The trampoline's leaf: the class, and no User access. -/
 theorem uftLeafOk_tramp : UftLeafOk trampLeaf ∧ uwkU trampLeaf = false := by
   refine ⟨⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
-    simp only [trampLeaf, trampPpn, uLeaf, PTE_R, PTE_X, uwkInv, uwkU, uwkG, uwk_bit_to_bool, pte_is_non_leaf,
+    simp only [trampLeaf, trampPpn, leafOf, PTE_R, PTE_X, uwkInv, uwkU, uwkG, uwk_bit_to_bool, pte_is_non_leaf,
       _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,
       _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Flags_G, _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved,
       _get_PTE_Ext_N, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags, Sail.BitVec.extractLsb,

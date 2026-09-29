@@ -27,7 +27,7 @@ def uvmcopyOk (Pold Pnew Pnew' : UPtd) (Mold Mnew Mnew' : Nat → List (BitVec 8
   (∀ i, i < n →
     match Iris.Std.PartialMap.get? Pold.um i with
     | none => Iris.Std.PartialMap.get? Pnew'.um i = none
-    | some w => (∃ ppn' : BitVec 44, Iris.Std.PartialMap.get? Pnew'.um i = some (uLeaf ppn' (pteFlags w))) ∧
+    | some w => (∃ ppn' : BitVec 44, Iris.Std.PartialMap.get? Pnew'.um i = some (leafOf ppn' (pteFlags w))) ∧
         Mnew' i = Mold i)
 
 def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

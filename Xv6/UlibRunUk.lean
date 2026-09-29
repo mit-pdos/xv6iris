@@ -27,7 +27,7 @@ every run already carries (at the hart's index), under a fresh name.
 
 The rest of the instance is field by field: the leaves are UkRunLeaf's /
 UkRunBr's at `ukWr = RegMap.set` (the stand-in never writes x0) and
-`ulibRget = RegMap.get`; the memory leaves are UkRunMem's, restated at the
+`RegMap.get = RegMap.get`; the memory leaves are UkRunMem's, restated at the
 MODEL's address `m.get rs1 + signExtend imm = a` (the stand-in's form; UkRunMem
 states the non-wrapping number `(m.get rs1).toNat + imm.toInt = a`, which is
 stronger) -- `ulibUk_load`/`ulibUk_store`/`ulibUk_loadText`, UkRunMem's proofs
@@ -51,11 +51,11 @@ set_option linter.unusedSectionVars false
 
 /-! ## §1 Pure bridges -/
 
-theorem ulibRget_eq (m : RegMap) (r : BitVec 5) : ulibRget m r = m.get r := rfl
+theorem ulibRget_eq (m : RegMap) (r : BitVec 5) : RegMap.get m r = m.get r := rfl
 
 theorem ulibLen_eq (r : Bool) : ulibLen r = instrLen r := by cases r <;> rfl
 
-theorem ulibRetPc_eq (v : BitVec 64) : ulibRetPc v = retPc v := rfl
+theorem ulibRetPc_eq (v : BitVec 64) : retPc v = retPc v := rfl
 
 theorem ulibUk_getSp (m : RegMap) : m.get spIdx = m 2#5 := RegMap.get_ne m 2#5 (by decide)
 
@@ -399,7 +399,7 @@ theorem ulibUk_store (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p
 
 /-- The model's address from the stand-in's `a = (…).toNat`. -/
 theorem ulibUk_va (m : RegMap) (rs1 : BitVec 5) (imm : BitVec 12) (a : Nat)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a := by
   rw [ha, ulibRget_eq, Xv6.ofNat_toNat_pc]
 
@@ -467,7 +467,7 @@ include UL
 theorem ulibUk_wp_itype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
     (rs1 rd : BitVec 5) (op : iop) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ uinstrIs N.t pc rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukItypeVal op (ulibRget m rs1) imm)) (pc + ulibLen rvc) av -∗
+      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukItypeVal op (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
         ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_itype UL N h m pc rvc imm rs1 rd op av h2
@@ -477,7 +477,7 @@ theorem ulibUk_wp_itype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
 theorem ulibUk_wp_rtype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs2 rs1 rd : BitVec 5) (op : rop)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ uinstrIs N.t pc rvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukRtypeVal op (ulibRget m rs1) (ulibRget m rs2))) (pc + ulibLen rvc) av -∗
+      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2))) (pc + ulibLen rvc) av -∗
         ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_rtype UL N h m pc rvc rs2 rs1 rd op av h2
@@ -487,7 +487,7 @@ theorem ulibUk_wp_rtype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (r
 theorem ulibUk_wp_addiw (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ uinstrIs N.t pc rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukAddiwVal (ulibRget m rs1) imm)) (pc + ulibLen rvc) av -∗
+      (ulibUkRun (hlc := hlc) N γ (m.set rd (ukAddiwVal (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗
         ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_addiw UL N h m pc rvc imm rs1 rd av h2
@@ -496,9 +496,9 @@ theorem ulibUk_wp_addiw (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
 
 theorem ulibUk_wp_btype (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 13)
     (rs2 rs1 : BitVec 5) (op : bop)
-    (hal : ukBtaken op (ulibRget m rs1) (ulibRget m rs2) = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
+    (hal : ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) = true → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) :
     ⊢ uinstrIs N.t pc rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m (if ukBtaken op (ulibRget m rs1) (ulibRget m rs2) then pc + BitVec.signExtend 64 imm
+      (ulibUkRun (hlc := hlc) N γ m (if ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) then pc + BitVec.signExtend 64 imm
         else pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗ ulibUkGoal (hlc := hlc) γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_btype UL N h m pc rvc imm rs2 rs1 op av hal
@@ -527,7 +527,7 @@ theorem ulibUk_wp_j (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm :
 
 theorem ulibUk_wp_ret (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs1 : BitVec 5) (h0 : rs1 ≠ 0#5) :
     ⊢ uinstrIs N.t pc rvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)) -∗ ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ulibUkRun (hlc := hlc) N γ m (ulibRetPc (m rs1)) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
+      (ulibUkRun (hlc := hlc) N γ m (retPc (m rs1)) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
       ulibUkGoal (hlc := hlc) γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_ret UL N h m pc rvc rs1 av
@@ -561,7 +561,7 @@ theorem ulibUk_wp_sp_up (m : RegMap) (pc : BitVec 64) (rvc : Bool) (imm : BitVec
 
 theorem ulibUk_wp_ldq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
     (dq : DFrac) (a : Nat) (w : BitVec 64) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗ uwordq N.d dq a w -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
       (uwordq N.d dq a w -∗ ulibUkRun (hlc := hlc) N γ (m.set rd w) (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
@@ -574,7 +574,7 @@ theorem ulibUk_wp_ldq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm
 
 theorem ulibUk_wp_lbuq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
     (dq : DFrac) (a : Nat) (b : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ ubyteq N.d dq a b -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
       (ubyteq N.d dq a b -∗ ulibUkRun (hlc := hlc) N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗
@@ -594,7 +594,7 @@ theorem ulibUk_wp_lbuq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (im
 
 theorem ulibUk_wp_lbu_text (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
     (rs1 rd : BitVec 5) (a : Nat) (b : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ utext N.t a b -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
       (ulibUkRun (hlc := hlc) N γ (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
@@ -610,10 +610,10 @@ theorem ulibUk_wp_lbu_text (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool)
   iexact Hb
 
 theorem ulibUk_wp_sd (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs2 rs1 : BitVec 5)
-    (a : Nat) (v0 : BitVec 64) (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (a : Nat) (v0 : BitVec 64) (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ uinstrIs N.t pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) -∗ uword N.d a v0 -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (uword N.d a (ulibRget m rs2) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
+      (uword N.d a (RegMap.get m rs2) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗ ulibUkGoal (hlc := hlc) γ) -∗
       ulibUkGoal (hlc := hlc) γ := by
   refine ulibUk_lift2 N γ fun h => ?_
   have H := ulibUk_store UL N h m pc rvc imm rs1 rs2 8 a v0 av (Or.inr (Or.inr (Or.inr rfl)))
@@ -622,10 +622,10 @@ theorem ulibUk_wp_sd (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm 
   exact H
 
 theorem ulibUk_wp_sb (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs2 rs1 : BitVec 5)
-    (a : Nat) (b0 : BitVec 8) (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (a : Nat) (b0 : BitVec 8) (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ uinstrIs N.t pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗ ubyte N.d a b0 -∗
       ulibUkRun (hlc := hlc) N γ m pc av -∗
-      (ubyte N.d a ((ulibRget m rs2).extractLsb' 0 8) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗
+      (ubyte N.d a ((RegMap.get m rs2).extractLsb' 0 8) -∗ ulibUkRun (hlc := hlc) N γ m (pc + ulibLen rvc) av -∗
         ulibUkGoal (hlc := hlc) γ) -∗
       ulibUkGoal (hlc := hlc) γ := by
   refine ulibUk_lift2 N γ fun h => ?_
@@ -638,7 +638,7 @@ theorem ulibUk_wp_sb (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm 
   · inext
     iintro Hb
     iapply Hc
-    iapply (ulibUk_byteF N.d (DFrac.own 1) a (nthByte (n := 8) (m.get rs2)) ((ulibRget m rs2).extractLsb' 0 8)
+    iapply (ulibUk_byteF N.d (DFrac.own 1) a (nthByte (n := 8) (m.get rs2)) ((RegMap.get m rs2).extractLsb' 0 8)
       rfl).2
     iexact Hb
 

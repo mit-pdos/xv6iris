@@ -76,42 +76,42 @@ structure UlibRunP (GF : BundledGFunctors) extends UlibRun GF where
   wp_rtype : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs2 rs1 rd : BitVec 5) (op : rop),
     rd ≠ 0#5 → rd ≠ 2#5 →
     ⊢ uinstrIs pc rvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)) -∗ urun m pc av -∗
-      (urun (m.set rd (ukRtypeVal op (ulibRget m rs1) (ulibRget m rs2))) (pc + ulibLen rvc) av -∗ goal) -∗
+      (urun (m.set rd (ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2))) (pc + ulibLen rvc) av -∗ goal) -∗
       goal
   /-- `sltiu/…` (`seqz`; Rocq `wp_uk_alu1`). -/
   wp_itype : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
       (op : iop), rd ≠ 0#5 → rd ≠ 2#5 →
     ⊢ uinstrIs pc rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)) -∗ urun m pc av -∗
-      (urun (m.set rd (ukItypeVal op (ulibRget m rs1) imm)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
+      (urun (m.set rd (ukItypeVal op (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
   /-- `addiw` (`sext.w`, `c.addiw`; Rocq `wp_uk_addiw`). -/
   wp_addiw : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5),
     rd ≠ 0#5 → rd ≠ 2#5 →
     ⊢ uinstrIs pc rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)) -∗ urun m pc av -∗
-      (urun (m.set rd (ukAddiwVal (ulibRget m rs1) imm)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
+      (urun (m.set rd (ukAddiwVal (RegMap.get m rs1) imm)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
   /-- Every branch (Rocq `wp_uk_btype0`, `wp_uk_btype_gen`). -/
   wp_btype : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 13) (rs2 rs1 : BitVec 5)
       (op : bop),
-    (ukBtaken op (ulibRget m rs1) (ulibRget m rs2) = true →
+    (ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) = true →
       (pc + BitVec.signExtend 64 imm).getLsbD 0 = false) →
     ⊢ uinstrIs pc rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)) -∗ urun m pc av -∗
-      (urun m (if ukBtaken op (ulibRget m rs1) (ulibRget m rs2) then pc + BitVec.signExtend 64 imm
+      (urun m (if ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) then pc + BitVec.signExtend 64 imm
         else pc + ulibLen rvc) av -∗ goal) -∗ goal
   /-- `lbu` from the text (Rocq `wp_uk_lbu_text`). -/
   wp_lbu_text : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
       (a : Nat) (b : BitVec 8), rd ≠ 0#5 → rd ≠ 2#5 →
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat →
     ⊢ uinstrIs pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ utextB a b -∗ urun m pc av -∗
       (urun (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
   /-- `lbu` from the data (Rocq `wp_uk_lbu`). -/
   wp_lbuq : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
       (dq : DFrac) (a : Nat) (b : BitVec 8), rd ≠ 0#5 → rd ≠ 2#5 →
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat →
     ⊢ uinstrIs pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)) -∗ ubyteq dq a b -∗ urun m pc av -∗
       (ubyteq dq a b -∗ urun (m.set rd (b.zeroExtend 64)) (pc + ulibLen rvc) av -∗ goal) -∗ goal
   /-- `ld` at a fraction (Rocq `wp_uk_ld` at `uwordq`). -/
   wp_ldq : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12) (rs1 rd : BitVec 5)
       (dq : DFrac) (a : Nat) (w : BitVec 64), rd ≠ 0#5 → rd ≠ 2#5 →
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
     ⊢ uinstrIs pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗ uwordq dq a w -∗ urun m pc av -∗
       (uwordq dq a w -∗ urun (m.set rd w) (pc + ulibLen rvc) av -∗ goal) -∗ goal
 

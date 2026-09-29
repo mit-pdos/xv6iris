@@ -1051,9 +1051,9 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           exact hsp2 h
         have hviewi : UPtCopy.ucView Mold Mnew n i = Mold i := by
           unfold UPtCopy.ucView; rw [if_pos hi]
-        have hleafpa : pte2pa (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = R3 10#5 :=
+        have hleafpa : pte2pa (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = R3 10#5 :=
           UPtCopy.pte2pa_leafOf _ _ hmemal hmemlt (UPtCopy.pteFlags_mask w)
-        have hleafppn : ptePpn (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = BitVec.extractLsb' 12 44 (R3 10#5) :=
+        have hleafppn : ptePpn (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = BitVec.extractLsb' 12 44 (R3 10#5) :=
           UPtCopy.ptePpn_leafOf _ _ (UPtCopy.pteFlags_mask w)
         rcases harm with ⟨h0, hcount⟩ | ⟨hm1, hlt1, -⟩
         · -- the page is mapped: the child grows by it
@@ -1068,13 +1068,13 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
                 (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))))
               (insert P.leaves (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat
-                (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w))) :=
+                (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w))) :=
             UPtCopy.ptRep_setLeaf_insert _ _ _
               (UPtCopy.ptRep_fill _ fresh hrepc hfrnd hfrpg) hcomp2
               (by rw [hvpni]; exact hPleaves) (UPtCopy.pteAD_leafOf _ hAD)
               (UPtCopy.leafOf_isLeafPte _ _ hflagsrwx)
           rw [hvpni] at hrep2
-          have hwf2 : uptWf { P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
+          have hwf2 : uptWf { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
             refine uptWf_insert P i _ hwfc (by rw [Xv6.tfVpn_toNat]; omega)
               (UPtCopy.leafOf_isLeafPte _ _ (uc_pteFlags_rwx_self hleafw)) ?_ ?_ ?_ ?_
             · rw [hleafpa]; exact hpv
@@ -1087,20 +1087,20 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
                 (by rw [hleafpa]; exact hpv) hq
           have hb2 : ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
-                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))).base = ({ P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).root := by
+                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))).base = ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).root := by
             rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbasec
           have hr2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
-                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))) ({ P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves := by
+                (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))) ({ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves := by
             rw [UPtCopy.leaves_insert P i _ hne_tf hne_tr]; exact hrep2
           ihave Hpagesc := UPtCopy.umPages_insert P (UPtCopy.ucView Mold Mnew n) i
-            (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) hPum $$ [Hdst Hpagesc]
+            (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) hPum $$ [Hdst Hpagesc]
           case' _ =>
             rw [hleafpa, hviewi]
             isplitl []
             · ipureintro; exact hlen
             · iframe
-          ihave Hchild := UPtCopy.procPtAt_intro { P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } (UPtCopy.ucView Mold Mnew n) _ hwf2 hb2 hr2
+          ihave Hchild := UPtCopy.procPtAt_intro { P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } (UPtCopy.ucView Mold Mnew n) _ hwf2 hb2 hr2
             $$ [Htreec Hpagesc]
           case' _ => iframe
           ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
@@ -1112,7 +1112,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = cur := fun h =>
             (hp26 h).trans (hpin25 h)
           ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
-          iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hav Hold Hchild
+          iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hav Hold Hchild
           ipureintro
           refine ⟨ucKept_trans hkept3 (ucKept_trans hkept4 hkept5), Or.inl ⟨rfl, ?_⟩⟩
           refine UPtCopy.ucInv_step hinv hi hfree rfl rfl

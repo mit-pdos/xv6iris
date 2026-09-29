@@ -19,7 +19,7 @@ conventions already in force for the kernel:
   `c.addi4spn`, `c.li` and `c.addi16sp` are all the one `ITYPE … ADDI`
   leaf family, `c.sdsp`/`c.ldsp` are `STORE`/`LOAD`, and `c.jr` is `JALR`;
 * the register file is MachCSL's `RegMap` (`BitVec 5 → BitVec 64`; `x0` is
-  never looked up: `ulibRget` reads it as 0), and heap addresses are `Nat`.
+  never looked up: `RegMap.get` reads it as 0), and heap addresses are `Nat`.
 
 The hart (`h : CpuId` in Rocq's `urun`) is hidden inside `urun`: every
 Rocq leaf re-quantifies it (`∀ h'`), and nothing in the ulib cone names it;
@@ -52,14 +52,8 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 /-! ## Registers and pure helpers -/
 
-/-- A register read: `x0` is zero (Rocq `regfile` lookups at `zreg`). -/
-def ulibRget (m : RegMap) (r : BitVec 5) : BitVec 64 := if r = 0#5 then 0#64 else m r
-
 /-- The fall-through distance of an instruction. -/
 def ulibLen (rvc : Bool) : BitVec 64 := if rvc then 2#64 else 4#64
-
-/-- The return target of `jalr x0, 0(rs1)` (Rocq `ret_pc`). -/
-def ulibRetPc (v : BitVec 64) : BitVec 64 := v &&& ~~~1#64
 
 /-- **Rocq `ucallee_saved`** (UmodeAbi): `sp`, `gp`, `tp`, `s0`–`s11` keep
 their entry values. -/
@@ -148,7 +142,7 @@ structure UlibRun (GF : BundledGFunctors) where
   wp_addi : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
       (rs1 rd : BitVec 5), rd ≠ 0#5 → rd ≠ 2#5 →
     ⊢ uinstrIs pc rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, .ADDI)) -∗ urun m pc av -∗
-      (urun (m.set rd (ulibRget m rs1 + BitVec.signExtend 64 imm)) (pc + ulibLen rvc) av -∗ goal) -∗
+      (urun (m.set rd (RegMap.get m rs1 + BitVec.signExtend 64 imm)) (pc + ulibLen rvc) av -∗ goal) -∗
       goal
   /-- `addi sp, sp, -8k`: the push (Rocq `wp_uk_caddi_sp_dn`). -/
   wp_addi_sp_dn : ∀ (m : RegMap) (pc : BitVec 64) (rvc : Bool) (imm : BitVec 12) (k n : Nat),
@@ -167,21 +161,21 @@ structure UlibRun (GF : BundledGFunctors) where
   /-- `sd rs2, imm(rs1)` (Rocq `wp_uk_csdsp`/`wp_uk_sd`). -/
   wp_sd : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
       (rs2 rs1 : BitVec 5) (a : Nat) (v0 : BitVec 64),
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
     ⊢ uinstrIs pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)) -∗ uword a v0 -∗ urun m pc av -∗
-      (uword a (ulibRget m rs2) -∗ urun m (pc + ulibLen rvc) av -∗ goal) -∗
+      (uword a (RegMap.get m rs2) -∗ urun m (pc + ulibLen rvc) av -∗ goal) -∗
       goal
   /-- `sb rs2, imm(rs1)` (Rocq `wp_uk_sb`). -/
   wp_sb : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
       (rs2 rs1 : BitVec 5) (a : Nat) (b0 : BitVec 8),
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat →
     ⊢ uinstrIs pc rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗ ubyte a b0 -∗ urun m pc av -∗
-      (ubyte a ((ulibRget m rs2).extractLsb' 0 8) -∗ urun m (pc + ulibLen rvc) av -∗ goal) -∗
+      (ubyte a ((RegMap.get m rs2).extractLsb' 0 8) -∗ urun m (pc + ulibLen rvc) av -∗ goal) -∗
       goal
   /-- `ld rd, imm(rs1)` (Rocq `wp_uk_cldsp`/`wp_uk_ld`). -/
   wp_ld : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 12)
       (rs1 rd : BitVec 5) (a : Nat) (w : BitVec 64), rd ≠ 0#5 → rd ≠ 2#5 →
-    a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
+    a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat → a % 8 = 0 →
     ⊢ uinstrIs pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗ uword a w -∗ urun m pc av -∗
       (uword a w -∗ urun (m.set rd w) (pc + ulibLen rvc) av -∗ goal) -∗
       goal
@@ -195,7 +189,7 @@ structure UlibRun (GF : BundledGFunctors) where
   wp_ret : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs1 : BitVec 5),
     rs1 ≠ 0#5 →
     ⊢ uinstrIs pc rvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)) -∗ urun m pc av -∗
-      (urun m (ulibRetPc (m rs1)) av -∗ goal) -∗
+      (urun m (retPc (m rs1)) av -∗ goal) -∗
       goal
 
 attribute [instance] UlibRun.uinstrIs_persistent UlibRun.utext_persistent

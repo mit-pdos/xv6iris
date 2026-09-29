@@ -46,8 +46,8 @@ theorem ulibPc_even (b : BitVec 64) (hb : b.toNat % 2 = 0) (t : Nat) (ht : t % 2
   omega
 
 /-- A 2-aligned return address survives `jalr`'s mask. -/
-theorem ulibRetPc_even (v : BitVec 64) (h : v.getLsbD 0 = false) : ulibRetPc v = v := by
-  unfold ulibRetPc
+theorem ulibRetPc_even (v : BitVec 64) (h : v.getLsbD 0 = false) : retPc v = v := by
+  unfold retPc
   apply BitVec.eq_of_getLsbD_eq
   intro i hi
   simp only [BitVec.getLsbD_and, BitVec.getLsbD_not, hi, decide_true, Bool.true_and]
@@ -58,7 +58,7 @@ theorem ulibRetPc_even (v : BitVec 64) (h : v.getLsbD 0 = false) : ulibRetPc v =
     simp [this]
 
 theorem ulibRetPc_at (b : BitVec 64) (hb : b.toNat % 2 = 0) (t : Nat) (ht : t % 2 = 0) :
-    ulibRetPc (b + BitVec.ofNat 64 t) = b + BitVec.ofNat 64 t :=
+    retPc (b + BitVec.ofNat 64 t) = b + BitVec.ofNat 64 t :=
   ulibRetPc_even _ (ulibPc_even b hb t ht)
 
 /-! ## The step lemmas -/
@@ -71,7 +71,7 @@ theorem ulibS_addi {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.urun (m.set rd (ulibRget m rs1 + BitVec.signExtend 64 imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
+      (L.urun (m.set rd (RegMap.get m rs1 + BitVec.signExtend 64 imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
       L.goal := by
   iintro #HC Hrun Hk
   ihave #Hi := hc $$ HC
@@ -84,7 +84,7 @@ theorem ulibS_itype {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.urun (m.set rd (ukItypeVal op (ulibRget m rs1) imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
+      (L.urun (m.set rd (ukItypeVal op (RegMap.get m rs1) imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
       L.goal := by
   iintro #HC Hrun Hk
   ihave #Hi := hc $$ HC
@@ -97,7 +97,7 @@ theorem ulibS_rtype {b : BitVec 64} {x : Nat} {rvc : Bool} {rs2 rs1 rd : BitVec 
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.urun (m.set rd (ukRtypeVal op (ulibRget m rs1) (ulibRget m rs2))) (b + BitVec.ofNat 64 y) av -∗
+      (L.urun (m.set rd (ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2))) (b + BitVec.ofNat 64 y) av -∗
         L.goal) -∗
       L.goal := by
   iintro #HC Hrun Hk
@@ -111,7 +111,7 @@ theorem ulibS_addiw {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.urun (m.set rd (ukAddiwVal (ulibRget m rs1) imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
+      (L.urun (m.set rd (ukAddiwVal (RegMap.get m rs1) imm)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
       L.goal := by
   iintro #HC Hrun Hk
   ihave #Hi := hc $$ HC
@@ -124,7 +124,7 @@ theorem ulibS_brT {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)))
     (t : Nat) (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t)
     (hb : b.toNat % 2 = 0) (ht2 : t % 2 = 0) (m : RegMap) (av : Nat)
-    (htk : ukBtaken op (ulibRget m rs1) (ulibRget m rs2) = true) :
+    (htk : ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) = true) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun m (b + BitVec.ofNat 64 t) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hrun Hk
@@ -138,7 +138,7 @@ theorem ulibS_brT {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 
 theorem ulibS_brN {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 rs1 : BitVec 5} {op : bop}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.BTYPE (imm, .Regidx rs2, .Regidx rs1, op)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
-    (htk : ukBtaken op (ulibRget m rs1) (ulibRget m rs2) = false) :
+    (htk : ukBtaken op (RegMap.get m rs1) (RegMap.get m rs2) = false) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hrun Hk
@@ -184,7 +184,7 @@ theorem ulibS_ret {b : BitVec 64} {x : Nat}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)))
     (m : RegMap) (av : Nat) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.urun m (ulibRetPc (m 1#5)) av -∗ L.goal) -∗ L.goal := by
+      (L.urun m (retPc (m 1#5)) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hrun Hk
   ihave #Hi := hc $$ HC
   iapply (L.wp_ret m _ av true 1#5 (by decide)) $$ Hi Hrun
@@ -194,9 +194,9 @@ theorem ulibS_ret {b : BitVec 64} {x : Nat}
 theorem ulibS_sd {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs2 rs1 : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (a : Nat) (v0 : BitVec 64)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ C -∗ L.uword a v0 -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.uword a (ulibRget m rs2) -∗ L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
+      (L.uword a (RegMap.get m rs2) -∗ L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hw Hrun Hk
   ihave #Hi := hc $$ HC
   iapply (L.wp_sd m _ av rvc imm rs2 rs1 a v0 ha hal) $$ Hi Hw Hrun
@@ -207,9 +207,9 @@ theorem ulibS_sd {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs2 r
 theorem ulibS_sdE {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs2 rs1 : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (a : Nat)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ C -∗ (∃ v0, L.uword a v0) -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
-      (L.uword a (ulibRget m rs2) -∗ L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
+      (L.uword a (RegMap.get m rs2) -∗ L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC ⟨%v0, Hw⟩ Hrun Hk
   iapply (ulibS_sd L C hc y hy m av a v0 ha hal) $$ HC Hw Hrun Hk
 
@@ -218,7 +218,7 @@ theorem ulibS_ld {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 r
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (a : Nat) (w : BitVec 64)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ C -∗ L.uword a w -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.uword a w -∗ L.urun (m.set rd w) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hw Hrun Hk
@@ -232,7 +232,7 @@ theorem ulibS_ldq {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (dq : DFrac) (a : Nat)
     (w : BitVec 64) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0) :
     ⊢ C -∗ L.uwordq dq a w -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.uwordq dq a w -∗ L.urun (m.set rd w) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hw Hrun Hk
@@ -245,7 +245,7 @@ theorem ulibS_ldq {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 
 theorem ulibS_lbuT {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 rd : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (a : Nat) (c : BitVec 8)
-    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ C -∗ L.utextB a c -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set rd (c.zeroExtend 64)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   iintro #HC #Hc Hrun Hk
@@ -259,7 +259,7 @@ theorem ulibS_lbuq {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, true, 1)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (dq : DFrac) (a : Nat)
     (c : BitVec 8) (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) :
     ⊢ C -∗ L.ubyteq dq a c -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.ubyteq dq a c -∗ L.urun (m.set rd (c.zeroExtend 64)) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗
       L.goal := by
@@ -303,7 +303,7 @@ register map stays small) -/
 theorem ulibS_addiV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 rd : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, .ADDI)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
-    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : ulibRget m rs1 + BitVec.signExtend 64 imm = v) :
+    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : RegMap.get m rs1 + BitVec.signExtend 64 imm = v) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set rd v) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   subst hv; exact ulibS_addi L C hc y hy m av h0 h2
@@ -311,7 +311,7 @@ theorem ulibS_addiV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs
 theorem ulibS_itypeV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 rd : BitVec 5} {op : iop}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
-    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : ukItypeVal op (ulibRget m rs1) imm = v) :
+    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : ukItypeVal op (RegMap.get m rs1) imm = v) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set rd v) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   subst hv; exact ulibS_itype L C hc y hy m av h0 h2
@@ -320,7 +320,7 @@ theorem ulibS_rtypeV {b : BitVec 64} {x : Nat} {rvc : Bool} {rs2 rs1 rd : BitVec
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.RTYPE (.Regidx rs2, .Regidx rs1, .Regidx rd, op)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
     (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64)
-    (hv : ukRtypeVal op (ulibRget m rs1) (ulibRget m rs2) = v) :
+    (hv : ukRtypeVal op (RegMap.get m rs1) (RegMap.get m rs2) = v) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set rd v) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   subst hv; exact ulibS_rtype L C hc y hy m av h0 h2
@@ -328,7 +328,7 @@ theorem ulibS_rtypeV {b : BitVec 64} {x : Nat} {rvc : Bool} {rs2 rs1 rd : BitVec
 theorem ulibS_addiwV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 rd : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat)
-    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : ukAddiwVal (ulibRget m rs1) imm = v) :
+    (h0 : rd ≠ 0#5) (h2 : rd ≠ 2#5) (v : BitVec 64) (hv : ukAddiwVal (RegMap.get m rs1) imm = v) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set rd v) (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   subst hv; exact ulibS_addiw L C hc y hy m av h0 h2
@@ -336,8 +336,8 @@ theorem ulibS_addiwV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {r
 theorem ulibS_sdV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs2 rs1 : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 8)))
     (y : Nat) (hy : x + (if rvc then 2 else 4) = y) (m : RegMap) (av : Nat) (a : Nat)
-    (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0)
-    (v : BitVec 64) (hv : ulibRget m rs2 = v) :
+    (ha : a = (RegMap.get m rs1 + BitVec.signExtend 64 imm).toNat) (hal : a % 8 = 0)
+    (v : BitVec 64) (hv : RegMap.get m rs2 = v) :
     ⊢ C -∗ (∃ v0, L.uword a v0) -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.uword a v -∗ L.urun m (b + BitVec.ofNat 64 y) av -∗ L.goal) -∗ L.goal := by
   subst hv; exact ulibS_sdE L C hc y hy m av a ha hal
@@ -345,7 +345,7 @@ theorem ulibS_sdV {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs2 
 /-- `ret`, at a named target. -/
 theorem ulibS_retTo {b : BitVec 64} {x : Nat}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)))
-    (m : RegMap) (av : Nat) (t : BitVec 64) (ht : ulibRetPc (m 1#5) = t) :
+    (m : RegMap) (av : Nat) (t : BitVec 64) (ht : retPc (m 1#5) = t) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗ (L.urun m t av -∗ L.goal) -∗ L.goal := by
   subst ht; exact ulibS_ret L C hc m av
 
@@ -358,7 +358,7 @@ namespace Xv6
 /-- Register-file reads through a chain of literal writes, and the literal
 immediates: the one normalizer the walks use on their side conditions. -/
 macro "ulib_regs" : tactic =>
-  `(tactic| simp (config := { decide := true }) only [ulibRget, MachCSL.RegMap.set_apply, if_true, if_false,
+  `(tactic| simp (config := { decide := true }) only [MachCSL.RegMap.get, MachCSL.RegMap.set_apply, if_true, if_false,
     BitVec.reduceSignExtend, ukRtypeVal, ukBtaken, BitVec.zero_add, BitVec.add_zero])
 
 end Xv6

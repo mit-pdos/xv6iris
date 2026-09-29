@@ -33,22 +33,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Kernel
 
 /-! ## Four bytes as a word (the inverse of `word4_to_bytes`) -/
 
-/-- The doubleword of four bytes, little-endian (the first byte lowest). -/
-def bytes4ToWord (bs : List (BitVec 8)) : BitVec 32 :=
-  bs.foldr (fun b acc => acc <<< 8 ||| BitVec.setWidth 32 b) 0#32
-
 private theorem list4 {α : Type _} (l : List α) (h : l.length = 4) :
     ∃ a0 a1 a2 a3, l = [a0, a1, a2, a3] := by
   match l, h with
   | [a0, a1, a2, a3], _ => exact ⟨_, _, _, _, rfl⟩
 
 private theorem nthByte_bytes4 (b0 b1 b2 b3 : BitVec 8) :
-    nthByte (n := 4) (bytes4ToWord [b0, b1, b2, b3]) 0 = b0 ∧
-    nthByte (n := 4) (bytes4ToWord [b0, b1, b2, b3]) 1 = b1 ∧
-    nthByte (n := 4) (bytes4ToWord [b0, b1, b2, b3]) 2 = b2 ∧
-    nthByte (n := 4) (bytes4ToWord [b0, b1, b2, b3]) 3 = b3 := by
+    nthByte (n := 4) (bytesToWord4 [b0, b1, b2, b3]) 0 = b0 ∧
+    nthByte (n := 4) (bytesToWord4 [b0, b1, b2, b3]) 1 = b1 ∧
+    nthByte (n := 4) (bytesToWord4 [b0, b1, b2, b3]) 2 = b2 ∧
+    nthByte (n := 4) (bytesToWord4 [b0, b1, b2, b3]) 3 = b3 := by
   refine ⟨?_, ?_, ?_, ?_⟩ <;>
-    (simp only [bytes4ToWord, nthByte, List.foldr_cons, List.foldr_nil]; bv_decide)
+    (simp only [bytesToWord4, nthByte, List.foldr_cons, List.foldr_nil]; bv_decide)
 
 /-- The four one-byte windows of a 4-aligned address are one 4-byte window. -/
 private theorem inRam4_of_ends (p : BitVec 64) (hlo : inRam p 1)
@@ -88,7 +84,7 @@ private theorem p4_byte4_to (a : BitVec 64) (dq : DFrac) (ppn : BitVec 44)
 
 /-- Four bytes at a 4-aligned address are the word they spell. -/
 theorem word4_of_bytes_val (a : BitVec 64) (dq : DFrac) (b0 b1 b2 b3 : BitVec 8) (hal : a.toNat % 4 = 0) :
-    byteBuf (GF := GF) a dq [b0, b1, b2, b3] ⊢ wordPointsTo a 4 dq (bytes4ToWord [b0, b1, b2, b3]) := by
+    byteBuf (GF := GF) a dq [b0, b1, b2, b3] ⊢ wordPointsTo a 4 dq (bytesToWord4 [b0, b1, b2, b3]) := by
   obtain ⟨e0, e1, e2, e3⟩ := nthByte_bytes4 b0 b1 b2 b3
   have hz : a + BitVec.ofNat 64 0 = a := by simp
   unfold byteBuf
@@ -100,7 +96,7 @@ theorem word4_of_bytes_val (a : BitVec 64) (dq : DFrac) (b0 b1 b2 b3 : BitVec 8)
   ihave ⟨%hr3, Hc3⟩ := p4_byte4_to a dq ppn b3 3 (by omega) hal $$ Hcl H3
   have hram : inRam (paOf ppn a) 4 :=
     inRam4_of_ends _ hf0.2.2.1 hr3 (paOf_toNat_lt ppn a)
-  ihave Hw := wordPointsTo_intro a 4 dq (bytes4ToWord [b0, b1, b2, b3]) ppn
+  ihave Hw := wordPointsTo_intro a 4 dq (bytesToWord4 [b0, b1, b2, b3]) ppn
     ⟨hf0.1, hf0.2.1, hram, hal⟩ $$ Hcl
   iapply Hw
   unfold bytesPointsTo ctxBytes
@@ -119,7 +115,7 @@ theorem word4_of_bytes (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (hl :
     byteBuf (GF := GF) a dq bs ⊢ ∃ w : BitVec 32, wordPointsTo a 4 dq w := by
   obtain ⟨b0, b1, b2, b3, rfl⟩ := list4 bs hl
   iintro H
-  iexists (bytes4ToWord [b0, b1, b2, b3])
+  iexists (bytesToWord4 [b0, b1, b2, b3])
   iapply word4_of_bytes_val a dq b0 b1 b2 b3 hal $$ H
 
 private theorem pv_align8 {pi : BitVec 64} (h : pageValid pi) : pi.toNat % 8 = 0 := by

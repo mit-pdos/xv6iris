@@ -27,8 +27,8 @@ def kforkChild (V : ProcPriv) : ProcPriv := { V with tf := V.tf.set (tfArgIdx 0)
 
 /-- A copied leaf reads the parent leaf's permission (the flags are copied). -/
 theorem permLeaf_uLeaf_pteFlags (ppn : BitVec 44) (w : BitVec 64) :
-    permLeaf (uLeaf ppn (pteFlags w)) = permLeaf w := by
-  unfold permLeaf upermBits pteBit uLeaf pteFlags
+    permLeaf (leafOf ppn (pteFlags w)) = permLeaf w := by
+  unfold permLeaf upermBits pteBit leafOf pteFlags
   have h1 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 1 = w.getLsbD 1 := by
     simp [BitVec.getLsbD_or, BitVec.getLsbD_and, BitVec.getLsbD_shiftLeft]
   have h2 : ((BitVec.setWidth 64 ppn <<< 10) ||| w &&& 0x3FF#64 ||| 1#64).getLsbD 2 = w.getLsbD 2 := by

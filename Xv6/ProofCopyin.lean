@@ -416,7 +416,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         rw [hVF, UMemL.umemRead_viewZero _ _ _ _ hdisj]
       have hext2 : P.extSz psz (P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R)) :=
         UMemL.extSz_trans hext1 (UMemL.extSz_insertLeaf psz P1 _ r hnone (by omega))
-      have hpa2 : pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = r := by
+      have hpa2 : pte2pa (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = r := by
         rw [Xv6.UPt.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
         exact Xv6.Kvm.pageAddr_of_valid r hval
       -- fix HP's index and view, and the buffer content, on the goal
@@ -427,7 +427,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans (hpinB h)) $$ HΦ
       iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
-        %(uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc HP Hdst
+        %(leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc HP Hdst
       ipureintro
       refine ⟨?_, hext2, UMemL.ext_insertLeaf P1 _ r _ hnone, Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ?_, ?_, hlt38⟩⟩
       · simp only [ciKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

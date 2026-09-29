@@ -957,10 +957,10 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
       have hrepset : ptRep ((t.fill 2 (vpnOf (R2 18#5)) fresh).1.setLeaf 2 (vpnOf (R2 18#5))
           (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm))
           (insert Pi.leaves (A / 4096 + i)
-            (uLeaf (BitVec.extractLsb' 12 44 (R1 10#5)) perm)) := by
+            (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm)) := by
         have := ptRep_setLeaf (t.fill 2 (vpnOf (R2 18#5)) fresh).1 Pi.leaves (vpnOf (R2 18#5))
           (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm)
-          (uLeaf (BitVec.extractLsb' 12 44 (R1 10#5)) perm)
+          (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm)
           hrepfill hcomp (leafOf_valid _ _ hrwx) (pteAD_refl _)
         rwa [hvpni] at this
       have hrepMap : ptRep (t.mapRun (vpnOf (R2 18#5))
@@ -968,7 +968,7 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
           (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).leaves := by
         rw [htree_eq]
         exact ptRep_congr _ _ _ (fun x => leaves_insert_comm Pi (A / 4096 + i)
-          (uLeaf (BitVec.extractLsb' 12 44 (R1 10#5)) perm) hltf x) hrepset
+          (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm) hltf x) hrepset
       have hbaseMap : (t.mapRun (vpnOf (R2 18#5))
           (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1.base
           = (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).root := by

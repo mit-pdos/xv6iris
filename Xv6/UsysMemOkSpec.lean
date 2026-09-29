@@ -133,15 +133,15 @@ theorem syscMemOk_usys_sbrk (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
 /-- What `UPtd.extSz` gains: `vmfault`'s read/write user leaf reads
 `upermRw`. -/
 theorem permLeaf_vmfault (r : BitVec 64) :
-    permLeaf (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = some upermRw := by
-  have h4 : (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 4 = true := by
-    unfold uLeaf PTE_W PTE_U PTE_R; bv_decide
-  have h1 : (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 1 = true := by
-    unfold uLeaf PTE_W PTE_U PTE_R; bv_decide
-  have h3 : (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 3 = false := by
-    unfold uLeaf PTE_W PTE_U PTE_R; bv_decide
-  have h2 : (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 2 = true := by
-    unfold uLeaf PTE_W PTE_U PTE_R; bv_decide
+    permLeaf (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = some upermRw := by
+  have h4 : (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 4 = true := by
+    unfold leafOf PTE_W PTE_U PTE_R; bv_decide
+  have h1 : (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 1 = true := by
+    unfold leafOf PTE_W PTE_U PTE_R; bv_decide
+  have h3 : (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 3 = false := by
+    unfold leafOf PTE_W PTE_U PTE_R; bv_decide
+  have h2 : (leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)).getLsbD 2 = true := by
+    unfold leafOf PTE_W PTE_U PTE_R; bv_decide
   unfold permLeaf upermBits pteBit upermRw
   rw [h4, h1, h3, h2]; rfl
 

@@ -154,10 +154,6 @@ macro_rules
 
 /-! ## Addresses -/
 
-def kfork_myprocAddr : BitVec 64 := KA.«myproc»
-def kfork_allocprocAddr : BitVec 64 := KA.«allocproc»
-def kfork_uvmcopyAddr : BitVec 64 := KA.«uvmcopy»
-def kfork_freeprocAddr : BitVec 64 := KA.«freeproc»
 def kfork_filedupAddr : BitVec 64 := KA.«filedup»
 def kfork_idupAddr : BitVec 64 := KA.«idup»
 

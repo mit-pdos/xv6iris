@@ -246,13 +246,11 @@ theorem pageValid_pa_bound (p : BitVec 64) (h : pageValid p) : p.toNat + 4096 < 
 theorem trampLeaf_eq : trampLeaf = leafOf trampPpn 10#64 := by
   unfold trampLeaf
   rw [perm_rx]
-  rfl
 
 /-- The trapframe's leaf is what `mappages` writes at `PTE_R|PTE_W`. -/
 theorem tfLeaf_eq (tfp : BitVec 44) : tfLeaf tfp = leafOf tfp 6#64 := by
   unfold tfLeaf
   rw [perm_rw]
-  rfl
 
 theorem get_insert_empty_ne (k k' : Nat) (v : BitVec 64) (h : k' ≠ k) :
     get? (insert (∅ : RegMapF (BitVec 64)) k v) k' = none := by

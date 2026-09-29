@@ -33,7 +33,7 @@ variable {GF : BundledGFunctors}
 the call's registers, the return address named. -/
 theorem ulibPutc_callAt {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRun GF) (base : BitVec 64) (hb : base.toNat % 2 = 0)
     (M : RegMap) (n : Nat) (fd : BitVec 64) (c : BitVec 8) (Ci Co : IProp GF)
-    (h10 : M 10#5 = fd) (h11 : (M 11#5).extractLsb' 0 8 = c) (r : BitVec 64) (hr : ulibRetPc (M 1#5) = r) :
+    (h10 : M 10#5 = fd) (h11 : (M 11#5).extractLsb' 0 8 = c) (r : BitVec 64) (hr : retPc (M 1#5) = r) :
     ⊢ ulibPutcWb L base fd c Ci Co -∗ ulibPutcCode L base -∗ Ci -∗ L.urun M base (4 + n) -∗
       (∀ m' : RegMap, ⌜ulibCalleeSaved M m'⌝ -∗ Co -∗ L.urun m' r (4 + n) -∗ L.goal) -∗ L.goal := by
   subst h10 h11 hr
@@ -53,7 +53,7 @@ theorem ulibVprintf_epi (L : UlibRunP GF) (base : BitVec 64) (m0 m : RegMap) (n 
     (hlo : 96 ≤ (m0 2#5).toNat) :
     ⊢ ulibVprintfCode L.toUlibRun base -∗ ulibVpFrame L (m0 2#5).toNat m0 -∗
       L.urun m (base + 0x2e2#64) (4 + n) -∗
-      (∀ m' : RegMap, ⌜ulibCalleeSaved m0 m'⌝ -∗ L.urun m' (ulibRetPc (m0 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
+      (∀ m' : RegMap, ⌜ulibCalleeSaved m0 m'⌝ -∗ L.urun m' (retPc (m0 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
       L.goal := by
   unfold ulibVpFrame
   iintro #Hc ⟨W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11, W12⟩ Hrun Hk
@@ -106,7 +106,7 @@ theorem ulibVprintf_epi (L : UlibRunP GF) (base : BitVec 64) (m0 m : RegMap) (n 
     (by ulib_regs; rw [hsp]; bv_omega)) $$ Hc Hstk Hrun
   iintro Hrun
   -- +0x2f8  ret
-  iapply (ulibS_retTo L _ (ulibVprintf_i2f8 L.toUlibRun base) _ _ (ulibRetPc (m0 1#5)) (by ulib_regs))
+  iapply (ulibS_retTo L _ (ulibVprintf_i2f8 L.toUlibRun base) _ _ (retPc (m0 1#5)) (by ulib_regs))
     $$ Hc Hrun
   iintro Hrun
   iapply Hk $$ %_ %?cs Hrun
@@ -212,7 +212,7 @@ theorem ulibVprintf_loop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
         ulibVprintfCode L.toUlibRun base -∗ ulibTextStr L a len f -∗ Ci -∗
         ulibVpFrame L (m0 2#5).toNat m0 -∗ L.urun m (base + 0x112#64) (4 + n) -∗
         (∀ m' : RegMap, ⌜ulibCalleeSaved m0 m'⌝ -∗ Co -∗
-          L.urun m' (ulibRetPc (m0 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
+          L.urun m' (retPc (m0 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
         L.goal
   | 0, i, m, Ci, Co, hi, hk, hinv, hs1 => by
     rw [ulibPaySeq_succ]

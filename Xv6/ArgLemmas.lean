@@ -74,12 +74,12 @@ theorem word8_join4 (a : BitVec 64) (lo hi : BitVec 32) (hal : a.toNat % 8 = 0) 
   iintro ⟨Hlo, Hhi⟩
   ihave Hlo := word4_to_bytes a (DFrac.own 1) lo (align4_of_8 a hal) $$ Hlo
   ihave Hhi := word4_to_bytes (a + 4#64) (DFrac.own 1) hi (align4_add4 a hal) $$ Hhi
-  ihave Hhi := (show byteBuf (GF := GF) (a + 4#64) (DFrac.own 1) (word4Bytes hi) ⊢
-      byteBuf (a + BitVec.ofNat 64 (word4Bytes lo).length) (DFrac.own 1) (word4Bytes hi) from by
+  ihave Hhi := (show byteBuf (GF := GF) (a + 4#64) (DFrac.own 1) (wordToBytes4 hi) ⊢
+      byteBuf (a + BitVec.ofNat 64 (wordToBytes4 lo).length) (DFrac.own 1) (wordToBytes4 hi) from by
     rw [word4Bytes_length]) $$ Hhi
-  ihave H := (byteBuf_append a (DFrac.own 1) (word4Bytes lo) (word4Bytes hi)).2 $$ [Hlo Hhi]
+  ihave H := (byteBuf_append a (DFrac.own 1) (wordToBytes4 lo) (wordToBytes4 hi)).2 $$ [Hlo Hhi]
   · iframe
-  iexists bytesToWord (word4Bytes lo ++ word4Bytes hi)
+  iexists bytesToWord (wordToBytes4 lo ++ wordToBytes4 hi)
   iapply wordPointsTo_of_bytes a (DFrac.own 1) _ (by simp [word4Bytes_length]) hal $$ H
 
 /-! ## argraw's jump table -/
@@ -137,7 +137,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
       wordPointsTo (BitVec.ofNat 64 (a + 1)) 1 DFrac.discard b1 ∗
       wordPointsTo (BitVec.ofNat 64 (a + 2)) 1 DFrac.discard b2 ∗
       wordPointsTo (BitVec.ofNat 64 (a + 3)) 1 DFrac.discard b3 ⊢
-      wordPointsTo (BitVec.ofNat 64 a) 4 DFrac.discard (bytes4ToWord [b0, b1, b2, b3]) := by
+      wordPointsTo (BitVec.ofNat 64 a) 4 DFrac.discard (bytesToWord4 [b0, b1, b2, b3]) := by
     intro a b0 b1 b2 b3 hal hlo hhi
     iintro ⟨H0, H1, H2, H3⟩
     iapply word4_of_bytes_val (BitVec.ofNat 64 a) DFrac.discard b0 b1 b2 b3
@@ -157,7 +157,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1922 (KernelSyms.«etext» + 0x782) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1923 (KernelSyms.«etext» + 0x783) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x780)) 4 DFrac.discard
-        (bytes4ToWord [0xde#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0xde#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 0)) 4 DFrac.discard (argrawEntry 0) from by
       unfold argrawTbl argrawEntry; simp only [Nat.mul_zero, BitVec.add_zero]; rfl)
     iapply hfour (KernelSyms.«etext» + 0x780) _ _ _ _ (by decide) (by decide) (by decide)
@@ -168,7 +168,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1926 (KernelSyms.«etext» + 0x786) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1927 (KernelSyms.«etext» + 0x787) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x784)) 4 DFrac.discard
-        (bytes4ToWord [0xec#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0xec#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 1)) 4 DFrac.discard (argrawEntry 1) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x784) _ _ _ _ (by decide) (by decide) (by decide)
@@ -179,7 +179,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1930 (KernelSyms.«etext» + 0x78a) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1931 (KernelSyms.«etext» + 0x78b) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x788)) 4 DFrac.discard
-        (bytes4ToWord [0xf2#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0xf2#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 2)) 4 DFrac.discard (argrawEntry 2) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x788) _ _ _ _ (by decide) (by decide) (by decide)
@@ -190,7 +190,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1934 (KernelSyms.«etext» + 0x78e) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1935 (KernelSyms.«etext» + 0x78f) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x78c)) 4 DFrac.discard
-        (bytes4ToWord [0xf8#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0xf8#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 3)) 4 DFrac.discard (argrawEntry 3) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x78c) _ _ _ _ (by decide) (by decide) (by decide)
@@ -201,7 +201,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1938 (KernelSyms.«etext» + 0x792) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1939 (KernelSyms.«etext» + 0x793) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x790)) 4 DFrac.discard
-        (bytes4ToWord [0xfe#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0xfe#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 4)) 4 DFrac.discard (argrawEntry 4) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x790) _ _ _ _ (by decide) (by decide) (by decide)
@@ -212,7 +212,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     ihave #B2 := hb 1942 (KernelSyms.«etext» + 0x796) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1943 (KernelSyms.«etext» + 0x797) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x794)) 4 DFrac.discard
-        (bytes4ToWord [0x04#8, 0xb1#8, 0xff#8, 0xff#8]) ⊢
+        (bytesToWord4 [0x04#8, 0xb1#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 5)) 4 DFrac.discard (argrawEntry 5) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x794) _ _ _ _ (by decide) (by decide) (by decide)

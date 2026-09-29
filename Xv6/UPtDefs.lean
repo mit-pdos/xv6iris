@@ -42,9 +42,6 @@ def PTE_U : BitVec 64 := 16#64
 def pteFlags (w : BitVec 64) : BitVec 64 := w &&& 0x3FF#64
 /-- `PTE2PA`. -/
 def pte2pa (w : BitVec 64) : BitVec 64 := (w >>> 10) <<< 12
-/-- What `mappages` stores: `PA2PTE(pa) | perm | PTE_V`. -/
-def uLeaf (ppn : BitVec 44) (perm : BitVec 64) : BitVec 64 :=
-  (BitVec.setWidth 64 ppn <<< 10) ||| perm ||| 1#64
 /-- `V ∧ U`. -/
 def pteVU (w : BitVec 64) : Prop := w &&& PTE_V ≠ 0#64 ∧ w &&& PTE_U ≠ 0#64
 /-- A leaf the hardware walk stops at: valid with some of `R`/`W`/`X`. -/
@@ -80,8 +77,8 @@ structure UPtd where
   um : RegMapF (BitVec 64)
 
 /-- The leaf of the trapframe mapping (`R|W`) and of the trampoline (`R|X`). -/
-def tfLeaf (tfp : BitVec 44) : BitVec 64 := uLeaf tfp (PTE_R ||| PTE_W)
-def trampLeaf : BitVec 64 := uLeaf trampPpn (PTE_R ||| PTE_X)
+def tfLeaf (tfp : BitVec 44) : BitVec 64 := leafOf tfp (PTE_R ||| PTE_W)
+def trampLeaf : BitVec 64 := leafOf trampPpn (PTE_R ||| PTE_X)
 
 /-- All leaves of the table: the user leaves plus the two fixed ones. -/
 def UPtd.leaves (P : UPtd) : RegMapF (BitVec 64) :=
@@ -123,8 +120,8 @@ theorem uLeafPins_setAD (w : BitVec 64) (a d : BitVec 1) (h : uLeafPins w) : uLe
 
 /-- `mappages`' leaf is pinned when its permission word is. -/
 theorem uLeafPins_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& ~~~0x3DF#64 = 0#64) :
-    uLeafPins (uLeaf ppn perm) := by
-  unfold uLeafPins uLeaf; revert h; bv_decide
+    uLeafPins (leafOf ppn perm) := by
+  unfold uLeafPins leafOf; revert h; bv_decide
 
 /-- Clearing `U` keeps the pins. -/
 theorem uLeafPins_andNotU (w : BitVec 64) (h : uLeafPins w) : uLeafPins (w &&& ~~~PTE_U) := by
@@ -140,9 +137,9 @@ open LeanRV64D LeanRV64D.Functions
 /-- `mappages`' leaf is valid (Rocq `pte_valid`) when its permission word is
 a leaf's (`R`/`W`/`X`) and not `W` without `R`. -/
 theorem uwkInv_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3FF#64 = 0#64)
-    (hrwx : perm &&& 0xE#64 ≠ 0#64) (hrw : perm &&& 6#64 ≠ 4#64) : uwkInv (uLeaf ppn perm) = false := by
+    (hrwx : perm &&& 0xE#64 ≠ 0#64) (hrw : perm &&& 6#64 ≠ 4#64) : uwkInv (leafOf ppn perm) = false := by
   revert hm hrwx hrw
-  simp only [uwkInv, uLeaf, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
+  simp only [uwkInv, leafOf, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
     _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT,
     _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags,
     Sail.BitVec.extractLsb, BitVec.extractLsb]
@@ -159,9 +156,9 @@ theorem uwkInv_andNotU (w : BitVec 64) (h : uwkInv w = false) : uwkInv (w &&& ~~
 
 /-- A copy of a valid leaf's flags on another page (`uvmcopy`) is valid. -/
 theorem uwkInv_uLeaf_pteFlags (ppn : BitVec 44) (w : BitVec 64) (h : uwkInv w = false) :
-    uwkInv (uLeaf ppn (pteFlags w)) = false := by
+    uwkInv (leafOf ppn (pteFlags w)) = false := by
   revert h
-  simp only [uwkInv, uLeaf, pteFlags, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R,
+  simp only [uwkInv, leafOf, pteFlags, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R,
     _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U,
     _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length,
     Mk_PTE_Flags, Sail.BitVec.extractLsb, BitVec.extractLsb]
@@ -223,7 +220,7 @@ def lazyFree (um : RegMapF (BitVec 64)) (sz : BitVec 64) : Prop :=
 
 /-- `P` with `vpn` mapped to the page at `r` with `perm` (`mappages`' leaf). -/
 def UPtd.insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 64) : UPtd :=
-  { P with um := Iris.Std.PartialMap.insert P.um vpn (uLeaf (BitVec.extractLsb' 12 44 r) perm) }
+  { P with um := Iris.Std.PartialMap.insert P.um vpn (leafOf (BitVec.extractLsb' 12 44 r) perm) }
 
 /-- A leaf map with the `n` keys from `vpn0` removed. -/
 def delRunL (L : RegMapF (BitVec 64)) (vpn0 n : Nat) : RegMapF (BitVec 64) :=
@@ -272,7 +269,7 @@ def UPtd.extSz (sz : BitVec 64) (P P' : UPtd) : Prop :=
   (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →
     k * 4096 < sz.toNat) ∧
   (∀ k w, Iris.Std.PartialMap.get? P.um k = none → Iris.Std.PartialMap.get? P'.um k = some w →
-    ∃ r : BitVec 64, w = uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R))
+    ∃ r : BitVec 64, w = leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R))
 
 /-- **The addresses a copyin can read** (Rocq `UserPtTree.uva_rmapped`, lane
 TRAP-ROWS T1): the table has a user leaf at the address's page and that

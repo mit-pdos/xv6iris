@@ -50,11 +50,6 @@ theorem um_none_of_leaves_none (P : UPtd) (vpn : BitVec 27) (hlt : vpn.toNat < 6
     Iris.Std.PartialMap.get? P.um vpn.toNat = none := by
   rw [← leaves_get_of_lt P _ (lt_tfVpn_of_leaves_none P vpn hlt h)]; exact h
 
-/-- `uLeaf` (the user-table spelling) and `leafOf` (what `mappages`'
-contract writes) are the same word. -/
-theorem uLeaf_eq_leafOf (ppn : BitVec 44) (perm : BitVec 64) : uLeaf ppn perm = leafOf ppn perm :=
-  rfl
-
 /-! ## The walk of a represented table -/
 
 /-- A walk that reads a nonzero entry reached level 0: an incomplete walk
@@ -217,27 +212,27 @@ theorem ptePpn_andNotU (w : BitVec 64) : ptePpn (w &&& ~~~PTE_U) = ptePpn w := b
 /-- `vmfault`'s permission word. -/
 theorem vmfaultPerm_eq : (PTE_W ||| PTE_U ||| PTE_R : BitVec 64) = 0x16#64 := by decide
 
-theorem uLeaf_isLeafPte (ppn : BitVec 44) : isLeafPte (uLeaf ppn 0x16#64) := by
-  unfold isLeafPte uLeaf PTE_V
+theorem uLeaf_isLeafPte (ppn : BitVec 44) : isLeafPte (leafOf ppn 0x16#64) := by
+  unfold isLeafPte leafOf PTE_V
   constructor <;> (intro h; revert h; bv_decide)
 
 theorem uLeaf_valid (ppn : BitVec 44) :
-    (uLeaf ppn 0x16#64).getLsbD 0 = true ∧ (uLeaf ppn 0x16#64) &&& 0xE#64 ≠ 0#64 :=
+    (leafOf ppn 0x16#64).getLsbD 0 = true ∧ (leafOf ppn 0x16#64) &&& 0xE#64 ≠ 0#64 :=
   (Xv6.isLeafPte_iff _).mp (uLeaf_isLeafPte ppn)
 
-theorem uLeaf_ad (ppn : BitVec 44) : (uLeaf ppn 0x16#64) &&& 0xC0#64 = 0#64 := by
-  unfold uLeaf; bv_decide
+theorem uLeaf_ad (ppn : BitVec 44) : (leafOf ppn 0x16#64) &&& 0xC0#64 = 0#64 := by
+  unfold leafOf; bv_decide
 
-theorem ptePpn_uLeaf (ppn : BitVec 44) : ptePpn (uLeaf ppn 0x16#64) = ppn := by
-  unfold ptePpn uLeaf; bv_decide
+theorem ptePpn_uLeaf (ppn : BitVec 44) : ptePpn (leafOf ppn 0x16#64) = ppn := by
+  unfold ptePpn leafOf; bv_decide
 
 /-- A valid page is the page of its own page number, read back through the
 leaf that maps it. -/
 theorem pte2pa_uLeaf (r : BitVec 64) (h : pageValid r) :
-    pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) 0x16#64) = r := by
+    pte2pa (leafOf (BitVec.extractLsb' 12 44 r) 0x16#64) = r := by
   obtain ⟨h1, -, h3⟩ := h
   unfold physTop at h3
-  unfold pte2pa uLeaf
+  unfold pte2pa leafOf
   revert h1 h3
   bv_decide
 
@@ -261,7 +256,7 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (hwf : uptWf P)
     (hfresh : ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → pte2pa w ≠ r) :
     uptWf (P.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R)) := by
   rw [vmfaultPerm_eq]
-  refine uptWf_insert P vpn (uLeaf (BitVec.extractLsb' 12 44 r) 0x16#64) hwf hlt
+  refine uptWf_insert P vpn (leafOf (BitVec.extractLsb' 12 44 r) 0x16#64) hwf hlt
     (uLeaf_isLeafPte _) (by rw [pte2pa_uLeaf r hr]; exact hr) (uLeafPins_uLeaf _ _ (by decide))
     (uwkInv_uLeaf _ _ (by decide) (by decide) (by decide)) ?_
   intro k w hw _hk hq
@@ -391,7 +386,7 @@ theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r :
     iprop(umPages (GF := GF) P M ∗ byteBuf r (DFrac.own 1) (List.replicate 4096 0#8)) ⊢
       umPages (P.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R)) (viewZero M vpn) := by
   have hu : (P.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R)).um
-      = Iris.Std.PartialMap.insert P.um vpn (uLeaf (BitVec.extractLsb' 12 44 r) 0x16#64) := by
+      = Iris.Std.PartialMap.insert P.um vpn (leafOf (BitVec.extractLsb' 12 44 r) 0x16#64) := by
     rw [vmfaultPerm_eq]; rfl
   unfold umPages
   rw [hu]

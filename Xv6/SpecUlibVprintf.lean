@@ -57,7 +57,7 @@ def wp_ulibVprintf_body (L : UlibRunP GF) (base : BitVec 64) (a len : Nat) (f : 
     Ci -∗
     L.urun m (ulibVprintfAt base) (12 + (4 + n)) -∗
     (∀ m' : RegMap, ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
     L.goal
 
 /-- **WP of `vprintf` at `base`, one `%s`** (Rocq `wp_kcat_vprintf_s`). -/
@@ -89,7 +89,7 @@ def wp_ulibVprintfS_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (f
     Ci -∗
     L.urun m (ulibVprintfAt base) (12 + (4 + n)) -∗
     (∀ m' : RegMap, L.uwordq dq apz (BitVec.ofNat 64 sa) -∗ ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
     L.goal
 
 /-- **`wp_ulibVprintfS`, the string at ANY fraction `sdq`, handed back**
@@ -127,7 +127,7 @@ def wp_ulibVprintfSG_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (
     L.urun m (ulibVprintfAt base) (12 + (4 + n)) -∗
     (∀ m' : RegMap, L.uwordq dq apz (BitVec.ofNat 64 sa) -∗ ulibStr L sdq sa slen sf -∗
       ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
-      L.urun m' (ulibRetPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
+      L.urun m' (retPc (m 1#5)) (12 + (4 + n)) -∗ L.goal) -∗
     L.goal
 
 end
