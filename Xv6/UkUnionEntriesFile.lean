@@ -24,14 +24,14 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-open HfpFileClaimsP HfpPipeP
+open HfpFileClaimsP
 
 set_option linter.unusedSectionVars false
 
 section UEFile
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
-  [PS : UprogSG GF]
+  [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [WchG GF] [FileG GF] [CurCtx]
@@ -41,24 +41,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
     (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF))
     (hub : UsrcOkUbytesqP (GF := GF))
-    (UP : UnionP hlc GF FileGn) (ULW : UnionLaws UP) (ug : UnionGn FileGn)
+    (ug : UnionGn)
     (sb : Fstate) (nm : Fname) (ws : Wordline) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat)
     (gb : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (r : FileAppNames) (s : Dst) (Wq : IProp GF) (i : Nat) (γo : GName) (rb : Bool) (Q : Int → IProp GF)
-    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.file.fgnCl r) (hline : lineOk ws)
+    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r) (hline : lineOk ws)
     (himg : hfpEchoNodeImg ws M s0 t gb) (hbytes : ushEchoArgvBytes ws gb) (hMv : imgAgrees M Mv)
     (hfdl : sts.length = NOFILE) (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.inode i γo .held)))
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO) (hi5 : i ≠ GREP_INO)
     (hi6 : i ≠ SECC_INO) :
-    ⊢ □ (efExit (hlc := hlc) ug.file.fgnCl r nm s Wq i γo ws -∗ Q (-1)) -∗
-      □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.file.fgnCl) -∗
-      □ (fileTaint (hlc := hlc) ug.file.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
-      □ (fileTaint (hlc := hlc) ug.file.fgnCl -∗ Q (-1)) -∗
+    ⊢ □ (efExit (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws -∗ Q (-1)) -∗
+      □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
+      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
+      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Q (-1)) -∗
       appInv (hlc := hlc) fscFs -∗
       urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
       imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (efPay (hlc := hlc) ug.file.fgnCl r nm s Wq i γo ws)
+        (efPay (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws)
         (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc))) := by
   have hne := efe_drop1_ne ws hline
   have hnn := efe_words_nn ws hline
@@ -75,19 +75,19 @@ theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) w0 with ⟨%γreg, Hpool⟩
   imodintro
-  let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx UP ug r N' (echoProg N') γreg w0 1 s sb
+  let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx ug r N' (echoProg N') γreg w0 1 s sb
   let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') [0] := fun N' hpq =>
     (X N').fileIface (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc)
       (HPc := ue_echo_code_persistent N')
-      (ueEchoHyps UL LW N') heq (ULW.union_links_gl_w_at ug sb) (ULW.union_links_gl_blk_at ug sb)
-      (ULW.union_links_gl_taint_at ug sb) hw0
+      (ueEchoHyps UL LW N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
+      (union_links_gl_taint_at ug sb) hw0
   ihave He := TE.echo_image_entry_env_c ws M Mv s0 t gb sts cw cs pidv Q
-    iprop(fifPoolOwn γreg (fun _ => False) w0 ∗ efPay (hlc := hlc) ug.file.fgnCl r nm s Wq i γo ws)
+    iprop(fifPoolOwn γreg (fun _ => False) w0 ∗ efPay (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws)
     [0] I E {0} hline himg hbytes hMv hfdl (echo_file_conforms ws _ hne hnn) (echoTree_safe _ _) ue_dp0
     $$ [] Hnpw Hdep
   · iintro !> %N' %hpq Hstd Hcwd ⟨Hpool, Hpay⟩
-    ihave ⟨HWq, Hc⟩ := (show efPay (hlc := hlc) ug.file.fgnCl r nm s Wq i γo ws ⊢
-      iprop(Wq ∗ efq (hlc := hlc) ug.file.fgnCl r nm s i γo ws []) from .rfl) $$ Hpay
+    ihave ⟨HWq, Hc⟩ := (show efPay (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws ⊢
+      iprop(Wq ∗ efq (hlc := hlc) ug.ugnFile.fgnCl r nm s i γo ws []) from .rfl) $$ Hpay
     have hQp : ∀ x, Q x ⊢ N'.pay x := fun x => by rw [hpq]
     ihave Hk : (X N').fifExitK $$ [HWq]
     · iapply (X N').fif_exit_k_redir_g nm i γo ws Wq rfl rfl $$ [] HWq
@@ -96,7 +96,7 @@ theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_
       iapply HQ $$ Hx
     iapply (X N').fif_env_res_g_rec (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL)
       (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N') (ueEchoHyps UL LW N') heq
-      (ULW.union_links_gl_w_at ug sb) (ULW.union_links_gl_blk_at ug sb) (ULW.union_links_gl_taint_at ug sb) hw0
+      (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb) (union_links_gl_taint_at ug sb) hw0
       E (sts.take NSTD) rfl
       (fun fd d h => (ue_fd1 hEfd fd d h).2)
       (fun fd d h => by
@@ -128,7 +128,7 @@ theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_
       · ipureintro; rfl
       isplitr
       · ipureintro; exact hwok
-      iapply efany_of (hlc := hlc) ug.file.fgnCl r nm s i γo ws 0 [] (by simp) $$ Hc
+      iapply efany_of (hlc := hlc) ug.ugnFile.fgnCl r nm s i γo ws 0 [] (by simp) $$ Hc
   iapply imageEntry_use _ _ _ _ _ _ _ _ _ _ _ na alen afun W' h1 h2 h3 h4 h5 h6 h7 $$ He Hmp
   iframe Hpool HPay
 

@@ -6,15 +6,15 @@ cat's positional entry** (Rocq `UkUnionEntries.v` §2's section context and
 The three entries (`UkUnionEntriesEcho`, `UkUnionEntriesCat`,
 `UkUnionEntriesFile`) mint the file interface (`UkFileIfaceRec.fileIface`)
 at the union's record: its console is the union's claim at the boot state
-(`UP.unionParamsAt ug sb`, links `unionLinks UP ug`), its program echo's or
+(`unionParamsAt (hlc := hlc) (GF := GF) ug sb`, links `unionLinks (hlc := hlc) (GF := GF) ug`), its program echo's or
 cat's.  This file states what the entries share: the file interface's
 context at the union (`ueCtx`), the free handler's hypotheses at echo's and
 cat's stubs (`ueEchoHyps` / `ueCatHyps`), and the two entries of
 `UkTreeEntry` the entries spend.
 
 CONE (this file): `ucat_image_entry_env_c`.  The section's `Local
-Notation`s `gf`, `c`, `UT`, `PA`, `LK` are `ug.file`, `ug.file.fgnCl`,
-`fileTaint (hlc := hlc) ug.file.fgnCl`, `UP.unionParamsAt ug`, `unionLinks UP ug`; the
+Notation`s `gf`, `c`, `UT`, `PA`, `LK` are `ug.ugnFile`, `ug.ugnFile.fgnCl`,
+`fileTaint (hlc := hlc) ug.ugnFile.fgnCl`, `unionParamsAt (hlc := hlc) (GF := GF) ug`, `unionLinks (hlc := hlc) (GF := GF) ug`; the
 local instances `ue_echo_code_persistent` / `ue_cat_code_persistent` are
 not reached (Lean's `ukCode` is persistent by instance).
 
@@ -36,9 +36,9 @@ not reached (Lean's `ukCode` is persistent by instance).
    UkStub's (`echo_stub_*`, `cat_stub_*` at `UL`); the syscall rows
    `UK_SYS_P` / `UK_SYS_FH` are the landed `ukSysP_holds UL` /
    `ukSysFH_holds UL` (H-io's console leaves take `UL` directly).
-4. The union's claim (`UnionP`, `UnionLaws`, Rocq UnionOut /
-   UnionLinkInstAt) is the shared parameter `HfpPipeP` (U1-F / U1-P, not
-   ported); Rocq's section hypothesis `Hcons` is the premise `hcons`.
+4. The union's claim is U1-P's (`UnionOut.ucl`, `UnionLinkInstAt`'s
+   `unionParamsAt` and three laws); Rocq's section hypothesis `Hcons` is the
+   premise `hcons`.
 6. **UkFileDev's parameters** (`FifDevP`) are built at the entries
    (`ueDevP`) from U1-F's `hfpFileOpen_holds` (at the fs tier's class
    context, which the entries therefore carry, as Rocq's section does) and
@@ -69,7 +69,7 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-open HfpFileClaimsP HfpPipeP
+open HfpFileClaimsP
 
 set_option linter.unusedSectionVars false
 
@@ -107,7 +107,7 @@ theorem ue_fd1 {E : Penv} (hE : E.fd = fun x => if x = 1 then some 0 else none) 
 section Params
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
-  [PS : UprogSG GF]
+  [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -176,10 +176,10 @@ theorem ue_cat_code_persistent (N : UkNames GF) : Persistent (catProg N).code :=
 
 /-- The file interface's section context at the union's record: device 0
 alone protected, the console the union's claim at the boot state `sb`. -/
-noncomputable abbrev ueCtx (UP : UnionP hlc GF FileGn) (ug : UnionGn FileGn)
+noncomputable abbrev ueCtx (ug : UnionGn)
     (r : FileAppNames) (N : UkNames GF) (P : Uprog GF) (γreg : GName) (w0 : Nat → Fdev) (q : Qp) (s : Dst)
     (sb : Fstate) : FifCtx hlc GF where
-  g := ug.file
+  g := ug.ugnFile
   r := r
   N := N
   P := P
@@ -189,8 +189,8 @@ noncomputable abbrev ueCtx (UP : UnionP hlc GF FileGn) (ug : UnionGn FileGn)
   qf := q
   sf := s
   M := ulmG
-  Pm := UP.unionParamsAt ug sb
-  LINKS := unionLinks UP ug
+  Pm := unionParamsAt (hlc := hlc) (GF := GF) ug sb
+  LINKS := unionLinks (hlc := hlc) (GF := GF) ug
 
 /-! ## §3 cat's entry at the line's name, positionally -/
 

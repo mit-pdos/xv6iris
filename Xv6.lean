@@ -1868,3 +1868,10 @@ import Xv6.UshGeom
 import Xv6.UshConsK
 import Xv6.UshExecPinPure
 import Xv6.UshExecPin
+import Xv6.UnionOut
+import Xv6.UnionOutLed
+import Xv6.UnionLinks
+import Xv6.UnionLinkInst
+import Xv6.UnionLinkInstAt
+import Xv6.UnionReadInst
+import Xv6.UnionReadInstAt

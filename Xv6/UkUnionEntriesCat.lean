@@ -27,7 +27,7 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
-open HfpFileClaimsP HfpPipeP Ualt
+open HfpFileClaimsP Ualt
 
 set_option linter.unusedSectionVars false
 
@@ -61,7 +61,7 @@ theorem ucat_conforms (nm : List (BitVec 8)) (files : Bytes → Option Bytes) (c
 section UCat
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
-  [PS : UprogSG GF]
+  [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [WchG GF] [FileG GF] [CurCtx]
@@ -71,13 +71,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
     (LW : UdepwLawsP (hlc := hlc) (GF := GF)) (SYSO : UkFileOpenSysP (hlc := hlc) (GF := GF))
     (hub : UsrcOkUbytesqP (GF := GF))
-    (UP : UnionP hlc GF FileGn) (ULW : UnionLaws UP) (ug : UnionGn FileGn)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = UP.ucl ug)
+    (ug : UnionGn)
+    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (nm : List (BitVec 8)) (ws : List (List (BitVec 8))) (Mn : ElfMem) (Mv : Nat → List (BitVec 8))
     (sv t : Nat) (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (v : EraPins) (ps0 cs0 : List Nat) (sq : Fstate) (I0 : List (BitVec 8)) (P : Nat)
     (r : FileAppNames) (q : Qp) (s : Dst) (rb rb2 : Bool) (jo : Option Nat) (Q : Int → IProp GF) (F : IProp GF)
-    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.file.fgnCl r)
+    (hQc : ∀ x y, Q x = Q y) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
     (hwb : lmWrBlkT ulmG ps0 cs0 sq I0 P) (hu : uname nm) (hfl : lmLineAt ulmG I0 = Uline.LCat nm)
     (htie : ulmState sq cs0 I0 = dstContent s)
     (hshort : ∀ (i : Nat) (bs : List (BitVec 8)), s[nm]? = some (i, bs) → (bs.length : Int) < 2 ^ 31)
@@ -87,20 +87,18 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
     (hfname : ∀ j, j < nm.length → (wlLine ws)[ushEchoOff ws 1 + j]! = nm[j]!)
     (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.device CONSOLE)))
-    (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
-    (hwild : ¬ (UP.unionParamsAt ug sq).gwild I0)
-    (hPT : (UP.unionParamsAt ug sq).gT = fileTaint (hlc := hlc) ug.file.fgnCl) :
-    ⊢ □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.file.fgnCl) -∗
-      □ (fileTaint (hlc := hlc) ug.file.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
+    (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE))) :
+    ⊢ □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
+      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
       □ (∀ a : Nat, ⌜a ∈ [ualtCode (UR .RCRan), ualtCode (UR .RCNoOpen)]⌝ -∗
-          gwcPost (UP.unionParamsAt ug sq) (genId (hlc := hlc) (GF := GF) + 1) v I0 a -∗ fdq r q s -∗ F -∗
+          gwcPost (unionParamsAt (hlc := hlc) (GF := GF) ug sq) (genId (hlc := hlc) (GF := GF) + 1) v I0 a -∗ fdq r q s -∗ F -∗
           Q (-1)) -∗
-      □ (fileTaint (hlc := hlc) ug.file.fgnCl -∗ Q (-1)) -∗
-      fileConsCred (hlc := hlc) ug.file.fgnCl r jo -∗ appInv (hlc := hlc) fscFs -∗
-      (UP.unionParamsAt ug sq).gPIN (genId (hlc := hlc) (GF := GF) + 1) v -∗
+      □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Q (-1)) -∗
+      fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo -∗ appInv (hlc := hlc) fscFs -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
       urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        iprop(consCur (UP.unionParamsAt ug sq) v ps0 cs0 sq I0 P 0 0 ∗ fdq r q s ∗ F)
+        iprop(consCur (unionParamsAt (hlc := hlc) (GF := GF) ug sq) v ps0 cs0 sq I0 P 0 0 ∗ fdq r q s ∗ F)
         (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc))) := by
   let files := filesOf (dstContent s)
   let content : Option (List (BitVec 8)) := Prod.snd <$> s[nm]?
@@ -123,21 +121,21 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
   have hrd : fifWr [0] w0 = false := rfl
   let E := catEnv0 (ucatAlts nm content) files [nm]
   iintro #Hbr #Hkc #HQ #HQt #Hmade #Hinv #Hpin #Hnpw #Hdep
-  ihave #Hlk := union_links_holds UP ug hcons
+  ihave #Hlk := unionLinks_holds ug hcons
   unfold imageEntry
   iintro !> %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp HPay
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) w0 with ⟨%γreg, Hpool⟩
   imodintro
-  let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx UP ug r N' (catProg N') γreg w0 q s sq
+  let X : UkNames GF → FifCtx hlc GF := fun N' => ueCtx ug r N' (catProg N') γreg w0 q s sq
   let I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') [0] := fun N' hpq =>
     (X N').fileIface (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc)
       (HPc := ue_cat_code_persistent N')
-      (ueCatHyps UL LW N') heq (ULW.union_links_gl_w_at ug sq) (ULW.union_links_gl_blk_at ug sq)
-      (ULW.union_links_gl_taint_at ug sq) hw0
+      (ueCatHyps UL LW N') heq (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
+      (union_links_gl_taint_at ug sq) hw0
   ihave He := ucat_image_entry_env_c TE nm ws Mn Mv sv t gn sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
-      (consCur (UP.unionParamsAt ug sq) v ps0 cs0 sq I0 P 0 0 ∗ fdq r q s ∗ F))
+      (consCur (unionParamsAt (hlc := hlc) (GF := GF) ug sq) v ps0 cs0 sq I0 P 0 0 ∗ fdq r q s ∗ F))
     [0] I E {0} hok himg hbytes hMv hfdl hws2 halen hfname (ucat_conforms nm files content hfiles)
     (catTree_safe _ _) ue_dp0 $$ [] Hnpw Hdep
   · iintro !> %N' %hpq Hstd Hcwd ⟨Hpool, Hc, Hdq, HF⟩
@@ -145,13 +143,13 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
       files [nm] rfl hl1 hl2
     have hQp : ∀ x, Q x ⊢ N'.pay x := fun x => by rw [hpq]
     ihave Hk : (X N').fifExitK $$ [HF]
-    · iapply (X N').fif_exit_k_cons_g C v I0 F hPT rfl rfl $$ [] HF
+    · iapply (X N').fif_exit_k_cons_g C v I0 F (unionParamsAt_gT ug sq) rfl rfl $$ [] HF
       iintro !> %a %ha Hpost Hdq HF
       iapply hQp
       iapply HQ $$ %a %ha Hpost Hdq HF
     iapply (X N').fif_env_res_g_rec (ueDevP UL SYSO hub) UL (ukSysP_holds UL) (ukSysFH_holds UL)
       (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_cat_code_persistent N') (ueCatHyps UL LW N') heq
-      (ULW.union_links_gl_w_at ug sq) (ULW.union_links_gl_blk_at ug sq) (ULW.union_links_gl_taint_at ug sq) hw0
+      (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq) (union_links_gl_taint_at ug sq) hw0
       E (sts.take NSTD) rfl hd0 hrow hbnd
       (fun _ _ _ _ h => by cases h)
       (fun p hp => by
@@ -183,7 +181,7 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
       unfold FifCtx.fifDev FifCtx.fifOut
       iexists v, I0, C
       iframe Htk
-      iapply ucat_lend UP ug sq v ps0 cs0 I0 P nm content hwb hfl hst hs hwild $$ Hlk Hpin Hc
+      iapply ucat_lend ug sq v ps0 cs0 I0 P nm content hwb hfl hst hs $$ Hlk Hpin Hc
   iapply imageEntry_use _ _ _ _ _ _ _ _ _ _ _ na alen afun W' h1 h2 h3 h4 h5 h6 h7 $$ He Hmp
   iframe Hpool HPay
 
