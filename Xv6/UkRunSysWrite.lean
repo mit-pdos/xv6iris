@@ -22,11 +22,10 @@ through the page table the key's projection admits (`usrcOk`).
    `UserHeap.lazy_free_ux_addr` is `ukText_rmapped` here (a fetchable page
    of the projection is a real user leaf; the lazy fill is never
    executable, so the lazy-free premise is not needed for text).
-4. NOT PORTED (reached in Rocq, but no Lean parameter record or walk takes
-   them): `wp_uk_ecall_write_chain_buf(_at)`, `usrc_ok_ubytesq`,
-   `uheap_ubytes_wat`, `uheap_ubytes_w` (the DATA-source write; they need
-   Rocq's `lazy_free_uw_addr`, whose `sz` bound Lean's `urun` does not
-   expose at the leaf).
+4. The DATA-source write (`usrc_ok_ubytesq`, `write_chain_buf(_at)`) reads
+   the break's bound `uszOk` off the bundle (`UkRunSysDefs.urun_ecallS`),
+   which Rocq's `lazy_free_uw_addr` gets from its `Z` addresses;
+   `uheap_ubytes_w` is `UserHeap.uheap_ubytes_at`'s middle conjunct.
 -/
 import Xv6.UkRunSysDefs
 
@@ -69,6 +68,25 @@ theorem ukText_rmapped (P : UPtd) (sz a : Nat) (hwf : uptWf P) (hx : uxAddr (per
       have e : (w &&& 16#64).getLsbD 4 = w.getLsbD 4 := by simp
       rw [h0, h4] at e
       exact absurd e (by decide)
+
+/-- **Rocq `uheap_ubytes_wat`**: a run the program owns at the word `ua`'s
+address is in the image at the WORD'S sums (the run does not wrap). -/
+theorem uheap_ubytes_wat {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+    (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
+    (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8) :
+    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ ubytesq γd dq ua.toNat nb f -∗
+      ⌜∀ j, j < nb → M (ua + BitVec.ofNat 64 j).toNat = some (f j)⌝ := by
+  iintro Hh Hbs
+  ihave %hrun := uheap_ubytes_at γt γd γs M pm sz dq ua.toNat nb f $$ Hh Hbs
+  ipureintro
+  intro j hj
+  obtain ⟨hM, -, hc⟩ := hrun j hj
+  have hcap : uCap = 2 ^ 38 := rfl
+  have e : (ua + BitVec.ofNat 64 j).toNat = ua.toNat + j := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat]
+    have : j < 2 ^ 64 := by omega
+    rw [Nat.mod_eq_of_lt this, Nat.mod_eq_of_lt (by omega)]
+  rw [e]; exact hM
 
 section UkRunSysWrite
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -151,7 +169,7 @@ theorem wp_uk_ecall_write_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Re
     (avail : Nat) (fdep : sfam GF) (D S : IProp GF) (K : List FdState → Prop) (nb : Nat) (f : Nat → BitVec 8)
     (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64)
     (hag : ∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝)
-    (hsrc : ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat),
+    (hsrc : ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pm sz -∗ S -∗ ⌜usrcOk M pm sz (m.get 11#5) nb f⌝) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepwfK N m pc 16 fdep K -∗ D -∗
       S -∗
@@ -163,9 +181,9 @@ theorem wp_uk_ecall_write_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Re
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb HD HS Hcont
-  iapply urun_ecall UL N h m pc avail $$ Hi Hrun
-  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 Hheap Hstk Hufd Hcwda Hids #Hmy #Hdep #Hrows
-  ihave %hnf := hsrc M pm sz $$ Hheap HS
+  iapply urun_ecallS UL N h m pc avail $$ Hi Hrun
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 %hszok Hheap Hstk Hufd Hcwda Hids #Hmy #Hdep #Hrows
+  ihave %hnf := hsrc M pm sz hszok $$ Hheap HS
   ihave %htake := hag fdv $$ Hufd HD
   unfold udepwfK
   icases Hsb with ⟨%hfp, Hsb⟩
@@ -212,7 +230,7 @@ theorem wp_uk_ecall_write_chain_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
   ihave Hsb := (udepwfK_std N m pc 16 fdep l).1 $$ Hsb
   iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v) iprop(emp) (fun fdv => fdv.take NSTD = l)
     0 (fun _ => 0#8) hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
-    (fun M pm sz => by iintro _ _; ipureintro; exact ⟨fun j hj => absurd hj (Nat.not_lt_zero _),
+    (fun M pm sz _ => by iintro _ _; ipureintro; exact ⟨fun j hj => absurd hj (Nat.not_lt_zero _),
       fun _ j _ _ _ hj => absurd hj (Nat.not_lt_zero _)⟩) $$ Hi Hrun Hsb Hstd []
   · iempintro
   iintro %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %_ %_ Hstd _ Hpost Hrun
@@ -241,7 +259,7 @@ theorem wp_uk_ecall_write_chain_txt_at (UL : UK_LEAVES) (N : UkNames GF) (h : CP
   iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v)
     ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) (fun fdv => fdv.take NSTD = l)
     nb f hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
-    (fun M pm sz => usrcOk_utext N.t N.d N.s M pm sz (m.get 11#5) nb f) $$ Hi Hrun Hsb Hstd Hbs
+    (fun M pm sz _ => usrcOk_utext N.t N.d N.s M pm sz (m.get 11#5) nb f) $$ Hi Hrun Hsb Hstd Hbs
   iintro %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
   iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc.2 Hstd Hbs' Hpost Hrun
 
@@ -265,6 +283,73 @@ theorem wp_uk_ecall_write_chain_txt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
   iintro #Hi Hrun Hsb Hstd #Hbs Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
   iapply wp_uk_ecall_write_chain_txt_at UL N h m pc avail fdep l v nb f hn hal4 $$ Hi Hrun Hsb Hstd Hbs
+  iintro %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
+  ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
+  iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
+
+/-- **Rocq `usrc_ok_ubytesq`**: a DATA run the program owns is the image's
+and readable-mapped (writable pages, no lazy page). -/
+theorem usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
+    (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8) (hszok : uszOk sz) :
+    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ ubytesq γd dq ua.toNat nb f -∗ ⌜usrcOk M pm sz ua nb f⌝ := by
+  iintro Hh Hbs
+  ihave %hb := uheap_ubytes_at γt γd γs M pm sz dq ua.toNat nb f $$ Hh Hbs
+  ipureintro
+  have hlin : ∀ j, j < nb → (ua + BitVec.ofNat 64 j).toNat = ua.toNat + j := by
+    intro j hj
+    have := (hb j hj).2.2
+    unfold uCap at this
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : j < 2 ^ 64),
+      Nat.mod_eq_of_lt (by omega)]
+  refine ⟨fun j hj => by rw [hlin j hj]; exact (hb j hj).1, fun P j hwf hpm hlf hj => ?_⟩
+  rw [hlin j hj]
+  obtain ⟨vpn, w, i, hk, hvu, -, hi, he⟩ :=
+    ukData_wmapped P sz _ hwf hlf hszok (by rw [hpm]; exact (hb j hj).2.1)
+  exact ⟨vpn, w, i, hk, hvu, hi, he⟩
+
+/-- **Rocq `wp_uk_ecall_write_chain_buf_at`**: the chain write whose source is
+a DATA run the caller owns at `dq`, at a named table view. -/
+theorem wp_uk_ecall_write_chain_buf_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
+    (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l v : List FdState) (dq : DFrac) (nb : Nat)
+    (f : Nat → BitVec 8) (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+      (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
+        ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
+        ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
+        ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
+          j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
+        ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      wpLoop h := by
+  iintro #Hi Hrun Hsb Hstd Hbs Hcont
+  ihave Hsb := (udepwfK_std N m pc 16 fdep l).1 $$ Hsb
+  iapply wp_uk_ecall_write_at UL N h m pc avail fdep (ustdAt N.fd l v) (ubytesq N.d dq (m.get 11#5).toNat nb f)
+    (fun fdv => fdv.take NSTD = l) nb f hn hal4 (fun fdv => ustdAt_agree N.fd fdv l v)
+    (fun M pm sz hsz => usrcOk_ubytesq N.t N.d N.s M pm sz dq (m.get 11#5) nb f hsz) $$ Hi Hrun Hsb Hstd Hbs
+  iintro %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
+  iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc.2 Hstd Hbs' Hpost Hrun
+
+/-- **Rocq `wp_uk_ecall_write_chain_buf`**: ...at a ledger whose view nobody
+reads. -/
+theorem wp_uk_ecall_write_chain_buf (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
+    (pc : BitVec 64) (avail : Nat) (fdep : sfam GF) (l : List FdState) (dq : DFrac) (nb : Nat)
+    (f : Nat → BitVec 8) (hn : usysno m = 16) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+      udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+      (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
+        ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
+        ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
+        ⌜∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
+          j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)⌝ -∗
+        ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
+        spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      wpLoop h := by
+  iintro #Hi Hrun Hsb Hstd Hbs Hcont
+  icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
+  iapply wp_uk_ecall_write_chain_buf_at UL N h m pc avail fdep l v dq nb f hn hal4 $$ Hi Hrun Hsb Hstd Hbs
   iintro %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun
   ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
   iapply Hcont $$ %h' %r %W %cw' %cs' %ha0 %ha1 %ha2 %htk %hlz %hsrc Hstd Hbs' Hpost Hrun

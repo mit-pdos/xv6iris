@@ -8,6 +8,8 @@ FAILURE row `wp_uk_ecall_exec` is still unported (only the cwd/refund forms
 `UkRunExecRef.wp_uk_ecall_exec_at_cwd_refR(_ids)` are), so per the program
 brief it is taken at Rocq's exact shape, in the namespace `UshRunSysP` (so it
 cannot clash with the eventual port), bundled in `USH_RUN_SYS_P`.
+**DISCHARGED** (lane runsys): `UshRunSysPHolds.ushRunSysP_holds UL :
+USH_RUN_SYS_P`, over the port `UkRunSysExec.wp_uk_ecall_exec`.
 
 ## Deviations from Rocq (beyond `UkSysP`'s, which apply verbatim)
 
@@ -48,7 +50,7 @@ end
 end UshRunSysP
 
 /-- **The ecall leaf sh's runner takes beyond the landed UkRunSys rows**
-(see the header): exec's failure row, a parameter until it is ported. -/
+(see the header): exec's failure row (discharged, `ushRunSysP_holds`). -/
 structure USH_RUN_SYS_P : Prop where
   exec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

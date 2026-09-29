@@ -40,7 +40,7 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
     □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M'
   unfold xpostRead
   rw [hkey, show usysRdcount W.tf = argZ (xkA W 2) from rfl]
-  iintro ⟨%hret, %P, %Pr, %Mv, %h1, %h2, %h3, Hc⟩
+  iintro ⟨%hret, %P, %Pr, %Mv, %h1, %h1b, %h2, %h3, %h4, %h5, Hc⟩
   icases filereadExtraCore_m1_why W.gen Pr f.rF f.rRd f.rRin f.rPq f.rPqe rb (argZ (xkA W 2)) r Mv (xkA W 1)
     hnb hr $$ Hc with ⟨#Hwhy, Hc⟩
   isplitr
@@ -51,7 +51,7 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
   iexists P, Pr, Mv
   iframe Hc
   ipureintro
-  exact ⟨h1, h2, h3⟩
+  exact ⟨h1, h1b, h2, h3, h4, h5⟩
 
 end
 

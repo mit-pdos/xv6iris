@@ -443,8 +443,19 @@ def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List 
       ∃ (a b : Nat) (γp : PipeNames), a ≠ b ∧ fdLeastClosed sts a ∧
         fdLeastClosed (sts.set a (.open true false (.pipe γp))) b ∧
         sts' = (sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))
-    else sts' = sts)
+    -- ...OR IT FAILED, AT -1 (Rocq lane PIPE-NEG1: "nonzero" decides no
+    -- sign, and sh's next instruction is `bltz a0`; restored by lane runsys)
+    else r = -1#64 ∧ sts' = sts)
   else sts' = sts
+
+/-- **Rocq `usys_fd_ok_pipe_neg1`**: a pipe that did not answer 0 answered
+-1 and moved nothing. -/
+theorem usysFdOk_pipe_neg1 (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List FdState)
+    (h : usysFdOk USYS_pipe tf r sts sts') (hr : r.toNat ≠ 0) : r = -1#64 ∧ sts' = sts := by
+  unfold usysFdOk at h
+  simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, if_false, if_true] at h
+  rw [if_neg hr] at h
+  exact h
 
 /-- Rocq `usys_fd_ok_quiet`. -/
 theorem usysFdOk_quiet {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
@@ -505,7 +516,7 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   · rw [if_pos hp] at H
     split at H
     · obtain ⟨_, _, _, -, -, -, rfl⟩ := H; simp
-    · subst H; rfl
+    · rw [H.2]
   rw [if_neg hp] at H
   subst H; rfl
 

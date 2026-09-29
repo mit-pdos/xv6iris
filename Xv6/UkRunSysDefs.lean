@@ -81,9 +81,37 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **THE ECALL HEAD** every syscall leaf runs: open the run, trap through
+/-- **THE ECALL HEAD, with the break's bound**: open the run, trap through
 the engine, and meet the return obligation at the trap-out key -- under a
-basic update (the deposit mint) and a later (the trap). -/
+basic update (the deposit mint) and a later (the trap); the body also reads
+the bundle's `uszOk` (what the window leaves spend on `lazyFree`). -/
+theorem urun_ecallS (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) :
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+      (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
+          (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
+        ⌜m 0#5 = 0#64⌝ -∗ ⌜uszOk sz⌝ -∗ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗
+        ufdAuth N.fd fdv -∗ ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗
+        udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
+        |==> ▷ uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
+      wpLoop h := by
+  iintro #Hi Hrun Hbody
+  unfold urun
+  icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
+  ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
+  have hwf : uptWf pt := hlo.2.2.2.2
+  ihave %hbd := uvb_img_bound (xi := xi) h C pt Rfd Rut sz pm fdv cw gn cs pidv false seccAll M m pc hwf $$ Hb
+  iapply wpLoop_bupd
+  imod Hbody $$ %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 %hbd.1 Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows with Hret
+  imodintro
+  let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
+  let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
+  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have H := UL.wp_uk_ecall S K M m pc hS hui
+  unfold ukUvb at H
+  iapply H $$ Hb Hmy Hret
+
+/-- **THE ECALL HEAD** every syscall leaf runs (the break's bound dropped). -/
 theorem urun_ecall (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
       (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
@@ -94,19 +122,9 @@ theorem urun_ecall (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc 
         |==> ▷ uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)) -∗
       wpLoop h := by
   iintro #Hi Hrun Hbody
-  unfold urun
-  icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
-  ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
-  iapply wpLoop_bupd
-  imod Hbody $$ %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows with Hret
-  imodintro
-  let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
-  let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
-  have H := UL.wp_uk_ecall S K M m pc hS hui
-  unfold ukUvb at H
-  iapply H $$ Hb Hmy Hret
+  iapply urun_ecallS UL N h m pc avail $$ Hi Hrun
+  iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 %_ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
+  iapply Hbody $$ %M %pm %sz %fdv %cw %gn %cs %pidv %hx0 Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
 
 /-- **THE RETURNING ARM** at a number the full mask passes and that is none
 of exit / fork / wait: the deposit (at the program's own payload, R1), the
@@ -258,5 +276,42 @@ theorem fdLowestClosed_take_none : ∀ (l : List FdState) (k : Nat), fdLowestClo
     simp only [fdLowestClosed, Option.map_eq_none_iff] at h
     simp only [List.take_succ_cons, fdLowestClosed, Option.map_eq_none_iff]
     exact fdLowestClosed_take_none l k h
+
+/-- **Rocq `UserHeap.lazy_free_uw_addr`**: a WRITABLE page of the projection,
+under a table with no lazy page, is a real writable user leaf. -/
+theorem ukData_wmapped (P : UPtd) (sz a : Nat) (hwf : uptWf P) (hlf : lazyFree P.um (BitVec.ofNat 64 sz))
+    (hsz : uszOk sz) (hw : uwAddr (permOf P.um sz) a) : uvaWmapped P a := by
+  unfold uwAddr uwB permOf at hw
+  have hszn : (BitVec.ofNat 64 sz).toNat = sz := by
+    rw [BitVec.toNat_ofNat]; unfold uszOk pgRoundUpN at hsz; exact Nat.mod_eq_of_lt (by omega)
+  cases hk : Iris.Std.PartialMap.get? P.um (a / 4096) with
+  | none =>
+    simp only [hk] at hw
+    by_cases hlt : a / 4096 * 4096 < pgRoundUpN sz
+    · have := hlf (a / 4096) (by rw [hszn]; exact hlt)
+      rw [hk] at this; cases this
+    · simp [hlt] at hw
+  | some w =>
+    simp only [hk] at hw
+    have hv := (hwf.1 _ _ hk).2.1.1
+    unfold permLeaf at hw
+    cases h4 : pteBit w 4
+    · simp [h4] at hw
+    · cases h2 : pteBit w 2
+      · exfalso; revert hw; split <;> simp [upermBits, h2]
+      · refine ⟨a / 4096, w, a % 4096, hk, ⟨hv, ?_⟩, ?_, Nat.mod_lt _ (by decide),
+          (Nat.div_add_mod' a 4096).symm⟩
+        · unfold pteBit at h4
+          unfold PTE_U
+          intro h0
+          have e : (w &&& 16#64).getLsbD 4 = w.getLsbD 4 := by simp
+          rw [h0, h4] at e
+          exact absurd e (by decide)
+        · unfold pteBit at h2
+          unfold PTE_W
+          intro h0
+          have e : (w &&& 4#64).getLsbD 2 = w.getLsbD 2 := by simp
+          rw [h0, h2] at e
+          exact absurd e (by decide)
 
 end Xv6

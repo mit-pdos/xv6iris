@@ -95,7 +95,7 @@ theorem usysFdOkPipeFail (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : Lis
   unfold usysFdOk at h
   simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, if_false, if_true] at h
   rw [if_neg hr] at h
-  exact h
+  exact h.2
 
 /-! ## 2.  THE KEY -/
 

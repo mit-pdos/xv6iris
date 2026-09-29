@@ -124,7 +124,8 @@ theorem syscDepRead_holds : SyscDepRead (hlc := hlc) (GF := GF) := by
   iframe H
   isplitl []
   · ipureintro; trivial
-  iintro %r %P' %M1 %d %⟨hext, -, hret⟩ ⟨-, Hc⟩
+  iintro %r %P' %M1 %d %⟨hext, -, hret, hwf, hlz0, hlz1⟩ ⟨-, Hc⟩
+  have hsz : BitVec.ofNat 64 V.sz.toNat = V.sz := by simp
   iapply Hw
   isplitl []
   · ipureintro; exact hret
@@ -133,8 +134,14 @@ theorem syscDepRead_holds : SyscDepRead (hlc := hlc) (GF := GF) := by
   isplitl []
   · ipureintro; rfl
   isplitl []
+  · ipureintro; exact fun hl => imgAgrees_umemLazy P' V.sz M1 (hlz1 hl)
+  isplitl []
   · ipureintro; exact permOf_extSz hext
+  isplitl []
   · ipureintro; rfl
+  isplitl []
+  · ipureintro; exact hwf
+  · ipureintro; rw [hsz]; exact hlz0
 
 /-- **`SyscDepWrite`** at the instance: the input at the writer's image
 (`imgAgrees_writerImg`), and the receipt at the unmoved image. -/
@@ -148,7 +155,8 @@ theorem syscDepWrite_holds : SyscDepWrite (hlc := hlc) (GF := GF) := by
   · iapply H
     ipureintro
     exact imgAgrees_writerImg V.upt V.sz.toNat M
-  · iintro %r %hret Hx
+  · iintro %r %⟨hret, hwf, hlz0⟩ Hx
+    have hsz : BitVec.ofNat 64 V.sz.toNat = V.sz := by simp
     iapply Hw
     isplitl []
     · ipureintro; exact hret
@@ -156,6 +164,10 @@ theorem syscDepWrite_holds : SyscDepWrite (hlc := hlc) (GF := GF) := by
     iframe Hx
     isplitl []
     · ipureintro; rfl
+    isplitl []
+    · ipureintro; exact hwf
+    isplitl []
+    · ipureintro; rw [hsz]; exact hlz0
     · ipureintro; exact imgAgrees_writerImg V.upt V.sz.toNat M
 
 /-- **`SyscDepPipe`** at the instance (Rocq `sysc_out_pipe`): the receipt

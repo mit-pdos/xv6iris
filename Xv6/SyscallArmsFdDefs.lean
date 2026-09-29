@@ -322,7 +322,8 @@ def SyscDepRead : Prop :=
           F Rd Rin Rp Rpe P ∗ P ∗
         (∀ (r : BitVec 64) (P' : UPtd) (M1 : Nat → List (BitVec 8)) (d : Nat),
           ⌜V.upt.extSz V.sz P' ∧ umemWrote V.upt M (tfW V.tf (tfArgIdx 1)) d P' M1 ∧
-            filereadRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
+            filereadRet (argZ (tfW V.tf (tfArgIdx 2))) r ∧ uptWf V.upt ∧
+            (V.pvLazy = false → lazyFree V.upt.um V.sz) ∧ (V.pvLazy = false → lazyFree P'.um V.sz)⌝ -∗
           filereadExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
             (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P r M1 (tfW V.tf (tfArgIdx 1)) -∗
           UexecSG.spostAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) r
@@ -340,7 +341,8 @@ def SyscDepWrite : Prop :=
         filewriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
           (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
           (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe ∗
-        (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
+        (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r ∧ uptWf V.upt ∧
+            (V.pvLazy = false → lazyFree V.upt.um V.sz)⌝ -∗
           filewriteExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
             (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe r -∗
           UexecSG.spostAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) r
@@ -551,6 +553,7 @@ theorem syscPipe_fd_fail (V : ProcPriv) (sts : List FdState) (hnum : syscNum V =
   unfold syscFdOk usysFdOk
   rw [hnum, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide),
     if_neg (by decide)]
+  exact ⟨by decide, rfl⟩
 
 /-- pipe's two least free descriptors, as the state list sees them. -/
 theorem syscPipe_least (V : ProcPriv) (sts : List FdState) (ha : syscFdAgree V.ofile sts)

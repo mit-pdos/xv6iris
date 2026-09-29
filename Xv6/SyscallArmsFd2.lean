@@ -71,6 +71,7 @@ theorem syscall_arm_read (SR : SYSREAD)
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   icases syscFd_agree γ (procAddr j) pid V M sts $$ [Hpriv Hfr] with ⟨%ha, Hpriv, Hfr⟩
   · iframe
+  icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %hfacts0⟩
   ihave Hin := (show filereadIn (hlc := hlc) (GF := GF) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
       (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P ⊢
       sysReadIn (hlc := hlc) V (tfW V.tf (tfArgIdx 0)) sts (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P from by
@@ -127,7 +128,7 @@ theorem syscall_arm_read (SR : SYSREAD)
     · exact h
   rw [sysFdSt_key ha] at *
   subst hgn
-  ihave Hsp := Hout $$ %(R2 10#5) %P' %M1 %d %⟨hext, hw, hfr⟩ Hx
+  ihave Hsp := Hout $$ %(R2 10#5) %P' %M1 %d %⟨hext, hw, hfr, hfacts0.2.2.2, hfacts0.2.2.1, hfacts.2.2.1⟩ Hx
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     { V with upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2' hrows 5 hn5
@@ -230,7 +231,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
     · exact h
   rw [sysFdSt_key ha] at *
   subst hgn
-  ihave Hsp := Hout $$ %(R2 10#5) %hfr Hx
+  ihave Hsp := Hout $$ %(R2 10#5) %⟨hfr, hfacts.2.2.2, hfacts.2.2.1⟩ Hx
   unfold filewriteFsOut
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f

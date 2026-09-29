@@ -55,8 +55,13 @@ Rocq's header, point for point:
    ⌜permOf P.um W.sz = W.perm⌝` (the resume table: Lean's receipts read a
    PAGE VIEW, which Rocq's gmap image needs no table for); row 16's
    `filewriteExtra` takes the table, `∃ P Mv, ⌜permOf P.um W.sz = W.perm⌝ ∗
-   ⌜imgAgrees W.M Mv⌝ ∗ …`.  `proc_pt_wf`/`lazy_free` are dropped (no Lean
-   reader).
+   ⌜imgAgrees W.M Mv⌝ ∗ …`.  Rocq's `proc_pt_wf` / `lazy_free` rows are
+   CARRIED (restored by lane runsys for H-io's reader): row 5 at the receipt
+   table `Pr` (`uptWf Pr`, `W.lazy = false → lazyFree Pr.um W.sz`), and the
+   resume table's `lazy_free` read as the image bridge it buys
+   (`W.lazy = false → imgAgrees M' Mv`); row 16 at its table (`uptWf P`,
+   `W.lazy = false → lazyFree P.um W.sz`).  The dispatcher supplies them off
+   the block (`ProcPrivAcc.procPrivFd_facts`).
 3. **THE SUPPLY IS `appSup ∗ uKillCred ∗ consLicence`.**  Rocq's is
    `app_sup ∗ app_taint`, with the console licence read off the taint
    (`WpUart.cons_licence_of_taint`, the application interface's `ai_lic`).
@@ -142,6 +147,24 @@ theorem sysFdSt_ofKey (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdStat
 image `E` on every byte `E` defines. -/
 def imgAgrees (E : ElfMem) (Mv : Nat → List (BitVec 8)) : Prop :=
   ∀ (a : Nat) (b : BitVec 8), E a = some b → umemByte Mv a = b
+
+/-- A table with no lazy page: its lazy image agrees with the page view on
+every byte it defines (the resume row of post 5). -/
+theorem imgAgrees_umemLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) (h : lazyFree P.um sz) :
+    imgAgrees (umemLazy P sz.toNat M) M := by
+  intro a b hab
+  unfold umemLazy at hab
+  unfold umemByte
+  by_cases hm : (Iris.Std.PartialMap.get? P.um (a / 4096)).isSome
+  · rw [if_pos hm] at hab; rw [hab]; rfl
+  · rw [if_neg hm] at hab
+    by_cases hlt : a < pgRoundUpN sz.toNat
+    · exfalso
+      apply hm
+      apply h (a / 4096)
+      unfold pgRoundUpN at hlt ⊢
+      omega
+    · rw [if_neg hlt] at hab; cases hab
 
 /-- The dispatcher's view for open/mknod/exec agrees with its own key. -/
 theorem imgAgrees_viewLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) :
@@ -416,7 +439,9 @@ def xpostRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd :
     IProp GF :=
   iprop(⌜filereadRet (argZ (xkA W 2)) r⌝ ∗
     ∃ (P Pr : UPtd) (Mv : Nat → List (BitVec 8)),
-      ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗
+      ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜W.lazy = false → imgAgrees M' Mv⌝ ∗
+      ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗ ⌜uptWf Pr⌝ ∗
+      ⌜W.lazy = false → lazyFree Pr.um (BitVec.ofNat 64 W.sz)⌝ ∗
       filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin
         Rp Rpe r Mv (xkA W 1))
 
@@ -441,7 +466,8 @@ def xpostWrite (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Uv
     IProp GF :=
   iprop(⌜filewriteRet (argZ (xkA W 2)) r⌝ ∗
     ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
-      ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
+      ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗ ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
+      ⌜imgAgrees W.M Mv⌝ ∗
       filewriteExtra (hlc := hlc) W.gen P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
         Q Qe r)
 
@@ -577,7 +603,7 @@ theorem xv6Spost_cong (X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W W' : Uv
   have e1 : xkA W 1 = xkA W' 1 := h1
   have e2 : xkA W 2 = xkA W' 2 := h2
   unfold xv6Spost xpostRead xpostChdir xpostOpen xpostWrite xpostMknod xpostUnlink xpostMkdir xpostPipe
-  simp only [hM, e0, e1, e2, hfd, hcw, hg, hpi, hsz]
+  simp only [hM, e0, e1, e2, hfd, hcw, hg, hpi, hsz, hlz]
   exact .rfl
 
 /-- **Rocq `xv6_sbundle_mono`**: the family occurs only as the CONCLUSION of
