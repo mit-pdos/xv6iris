@@ -115,7 +115,7 @@ Proof.
   intros Hi Ho Hf. unfold virtio_status_writes, virtio_status_of.
   rewrite (proj2 (Z.eqb_neq _ _) Hi), (proj2 (Z.eqb_neq _ _) Ho),
           (proj2 (Z.eqb_neq _ _) Hf).
-  cbn [orb]. apply lookup_singleton.
+  cbn [orb]. apply lookup_singleton_eq.
 Qed.
 
 (* ...and it does not wait for the CACHE TO DRAIN the way a write does, only
