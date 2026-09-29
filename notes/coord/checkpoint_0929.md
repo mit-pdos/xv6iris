@@ -11,7 +11,7 @@ Relaunched Sept 29 (new session 354a8854, stanford profile) — old agentId -> l
   UkReadPipe/UkWriteLeaf/UkReadCons, UK_SYS_IO, xpostRead/Write pt rows + UK_POST_ROWS, pipe_read_end
 - H-file+H-pipe (a0b34ea2a188b69a0) -> lane-hfp (+ -c -f1 -f2 -p1 -p2 -r)
 - sh-run: LANDED 0efc05af3 (residual: wp_uk_ecall_exec, see union_residuals.md)
-- U1-F file claims (a7a8a2894bc4e68b7) -> lane-u1ffile (+ subs)
+- U1-F file claims: LANDED 91556290f (follow-ups in union_residuals.md)
 - BootReset phase 3: LANDED 5d020b1eb (trusted reset table retired; SLeft leftover record)
 Already landed before the cut-off: andelim (781099a29), UPIN, U4 (e91bd4112), U2-R, UkFork.
 Next after these: Union* (UnionOut/Links/LinkInst/ReadInst; needs U1-F + UShLine from U3 shell rounds).
@@ -20,3 +20,4 @@ script, vs backend &&-fix) — the last hypothesis (hZkr) on the USER-free final
 
 New lanes Sept 29: P-echo (lane-pecho; UkEchoTree/UEcho*; also drop HS/HP args from UkConsOut/UkReadCons/UkWriteLeaf), R-sh (lane-rsh; UShLine… UShExecPin).
 Still to start in U3: R-prog, R-pipes, R-round, I-init (after H-file/H-pipe, U1-F, R-sh); then Union* (U1-P rest), U4 top.
+land.sh: `postpush` mode redoes the main-tree ff + seed after a manual push; fetch/push retry (GitHub ssh auth flaky Sept 29).
