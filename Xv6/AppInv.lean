@@ -377,7 +377,7 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
       (⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
-        ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
+        |==> ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ (γfs.top ↪◯MAP[i] n) -∗
       |={E}=> ((γfs.top ↪●MAP{DFrac.own (1 : Qp).half} (PartialMap.insert I i n')) ∗
         (γfs.top ↪◯MAP[i] n')) := by
@@ -396,7 +396,7 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
     · iexact Hh
   imod ghost_map_update n' $$ Hk Hf with ⟨Hk, Hf⟩
   icases (topAuth_halves (GF := GF) γfs.top (PartialMap.insert I i n')).1 $$ Hk with ⟨Hk, Hh⟩
-  ihave Hp := Hstep $$ %hi Hp
+  imod Hstep $$ %hi Hp with Hp
   imod Hclose $$ [Hh Hp]
   · inext
     iexists (PartialMap.insert I i n')
@@ -418,6 +418,7 @@ theorem appTopUpdate_same [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   iapply (appTopUpdate E γfs I i n n' hE) $$ Hinv [] Hk Hf
   iintro %hi Hp
   rw [absView_insert_same I i n n' hi habs]
+  imodintro
   iexact Hp
 
 /-- `_step`: the caller pays, with a plain wand -- it lifts under the later
@@ -433,6 +434,7 @@ theorem appTopUpdate_step [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   iintro #Hinv Hstep Hk Hf
   iapply (appTopUpdate E γfs I i n n' hE) $$ Hinv [Hstep] Hk Hf
   iintro %_ Hp
+  imodintro
   inext
   iapply Hstep $$ Hp
 
@@ -446,19 +448,23 @@ insert the mover performs, with the abstract delta as its READING, so the
 fire can hand it to `appTopUpdate` verbatim; and UNDER THE LATER, because
 that is where the mover applies it -- a plain wand lifts to this for free
 (section 6, ruling 5).  A generic discharger pays it out of the SUPPLY
-(`appStep_acc`), whose conclusion it reads straight under the later. -/
+(`appStep_acc`), whose conclusion it reads straight under the later.
+The step is a BASIC UPDATE (`▷ P -∗ |==> ▷ P'`, Rocq's `==∗`): an
+application may spend or mint ghost state as it moves -- the file
+application's escrow fire spends a one-shot token (`AppFile.file_app_step_escrow`).
+`appTopUpdate` runs it inside the open invariant. -/
 def appStep [Appcfg GF] (i : Nat) (I : RegMapF FsNode) (av' : Aview) : IProp GF :=
   iprop(∀ n' : FsNode,
     ⌜absView (PartialMap.insert I i n') = av'⌝ -∗
     ▷ appPred appRun (absView I) -∗
-    ▷ appPred appRun (absView (PartialMap.insert I i n')))
+    |==> ▷ appPred appRun (absView (PartialMap.insert I i n')))
 
 /-- the fire's reading: at the node it chose (Rocq's `app_step_at`) -/
 theorem appStep_at [Appcfg GF] (i : Nat) (I : RegMapF FsNode) (av' : Aview) (n' : FsNode)
     (heq : absView (PartialMap.insert I i n') = av') :
     ⊢@{IProp GF} appStep i I av' -∗
       ▷ appPred appRun (absView I) -∗
-      ▷ appPred appRun (absView (PartialMap.insert I i n')) := by
+      |==> ▷ appPred appRun (absView (PartialMap.insert I i n')) := by
   iintro Hstep Hp
   unfold appStep
   iapply Hstep $$ %n' %heq Hp
@@ -473,6 +479,7 @@ theorem appStep_id [Appcfg GF] (i : Nat) (I : RegMapF FsNode) :
   unfold appStep
   iintro %n' %heq Hp
   rw [heq]
+  imodintro
   iexact Hp
 
 /-- THE TRANSPORT, READ OFF THE INVARIANT (Rocq's `app_xfer_acc`):
@@ -541,6 +548,7 @@ theorem appStep_acc [Appcfg GF] (i : Nat) (I : RegMapF FsNode) (av' : Aview) :
   iintro #Hs
   unfold appStep
   iintro %n' %_ _
+  imodintro
   inext
   unfold appSup appSupRaw
   iapply Hs

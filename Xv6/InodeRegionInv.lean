@@ -842,8 +842,11 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
   unfold ftopBody
   icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
   unfold topFrag fsGammaL
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai (Hstep $$ %I) Ha Hf
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
     with ⟨Ha, Hf⟩
+  · iintro %hi Hp
+    imodintro
+    iapply Hstep $$ %I %hi Hp
   imod Hclose $$ [Ha Hla Hpark]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark
@@ -889,8 +892,11 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
   icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   unfold topFrag fsGammaL
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai (Hstep $$ %I) Ha Hf
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
     with ⟨Ha, Hf⟩
+  · iintro %hi Hp
+    imodintro
+    iapply Hstep $$ %I %hi Hp
   imod Hclose $$ [Ha Hla Hpark]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark

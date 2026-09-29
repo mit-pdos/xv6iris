@@ -247,3 +247,10 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `USH_RUN_SYS_P` has one field left: Rocq `UkRunSys.wp_uk_ecall_exec` (failure row; only the
   cwd/refund forms `wp_uk_ecall_exec_at_cwd_refR(_ids)` exist in Lean). Port it into UkRunSys, then
   delete `USH_RUN_SYS_P` so `shRuncmd_linked` depends on `UL` alone.
+
+## U1-F file claims (landed Sept 29) — follow-ups
+- lane-hfp's HfpFileClaimsP must move onto U1-F's names (fnCons/…, fgnCl/fgnEra, Option Nat inums) and
+  discharge its parameter record from these files (no duplicate Wordline/Fwline/Dst/FileAppNames/FileGn).
+- New camera classes for xv6GF/unionGF (U4): FileAppG (deed ghost_var, line list, escrow list), FileOutG
+  (era map, boot-state mono_list).
+- AppInv: appStep/appTopUpdate regained Rocq's `==∗` (app_step); header deviation list not yet updated.
