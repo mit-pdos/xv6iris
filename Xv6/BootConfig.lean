@@ -4,22 +4,23 @@
 
 What the power thread hands a boot client for hart `cpu` is ONE resource over
 the hart's whole register file, `MachCSL.regCellsNoPins (E.regName cpu) f`
-(`MachCSL.powerBootRes`), together with the pure fact `resetRegs cpu f`
-(`MachCSL.bootFacts`).  What the boot path's contract (`Xv6.wp_boot_body`)
+(`MachCSL.powerBootRes`), together with the pure fact `resetRegsRun cpu f`
+(Rocq `reset_regs`, derived from `MachCSL.bootFacts`' run clause by
+`MachCSL.bootFacts_resetRegsRun`).  What the boot path's contract (`Xv6.wp_boot_body`)
 asks for is NAMED cells: `mBoot cpu 1` (the configuration cells at the reset
 values), `pcIs cpu KA.«_entry»`, `mhartid`, the clock cells and a handful of
 GPRs.  This file is that conversion, and it has three halves:
 
-* §0 `entry_sym_addr`: the reset vector (`MachCSL.resetVal`'s literal
-  `0x80000000`) IS `KA.«_entry»` (Rocq `entry_sym_addr`/`boot_pc_entry`).
+* §0 `entry_sym_addr`: the reset vector (the literal `0x80000000` the
+  spec's `reset` writes, `MachCSL.resetValRun`) IS `KA.«_entry»` (Rocq `entry_sym_addr`/`boot_pc_entry`).
 * §1 `regCellsEx` / `regCellsEx_take` / `regCellsEx_takeList`: the file's
   cells as a map with an explicit list of registers already TAKEN, and the
   one generic step that takes another (Rocq `boot_reg_split`, which takes
   the named cells apart off a decidable `NoDup`).  A taken register's
   freshness is a `decide` on a short list.
 * §2 `bootConfRegs` / `mBoot_of_cells`: the configuration cells at the
-  values `resetRegs` pins (and, for the four the boot program never writes,
-  at the file's own values) are exactly `mBoot cpu 1`, the frozen ones
+  values the boot run derives (`resetRegsRun`; the cells the boot program
+  never writes at the file's own values) are exactly `mBoot cpu 1`, the frozen ones
   persisted into `MachCSL.hwConfig` (Rocq `hw_config_intro`/
   `mmode_config_intro`).
 
@@ -55,8 +56,8 @@ set_option linter.unusedSectionVars false
 
 /-! ## §0 The `_entry` address bridge -/
 
-/-- The reset vector is `_entry` (Rocq `entry_sym_addr`): `MachCSL.resetVal`
-pins `PC`/`nextPC` to the LITERAL `0x80000000`, because the machine layer
+/-- The reset vector is `_entry` (Rocq `entry_sym_addr`): the boot run
+lands `PC`/`nextPC` at the LITERAL `0x80000000` (`MachCSL.resetValRun`), because the machine layer
 sits below the kernel's symbol table. -/
 theorem entry_sym_addr : KA.«_entry» = 0x80000000#64 := by decide
 
@@ -169,30 +170,32 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **The reset configuration cells ARE `mBoot`** (Rocq `hw_config_intro` +
 `mmode_config_intro`): every register `MachCSL.confCells` names is pinned by
-`resetRegs` to `bootConf`'s value -- except the four the boot program leaves at
-their power-on garbage (`medeleg`, `mepc`, `satp`, `stimecmp`), which `mBoot`
-takes at the file's own values (`MachCSL.BootGarb`) -- and the frozen ones are
+`resetRegsRun` (the boot run's derived facts) to `bootConf`'s value -- except
+the ones the boot program leaves at their power-on garbage (`medeleg`, `mepc`,
+`satp`, `stimecmp`, `mcounteren`, `mtimecmp`, `pmpaddr`, and `pmpcfg` known
+only `pmpAllOff`), which `mBoot` takes at the file's own values
+(`MachCSL.BootGarb`) -- and the frozen ones are
 persisted into `MachCSL.hwConfig` (the counter cells `mcountinhibit`,
 `minstretcfg`, `mcyclecfg`, `mhpmcounter`, `scounteren` at the file's own values, which the
 boot program leaves arbitrary: `MachCSL.HwCounters`). -/
-theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
+theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     ([∗list] r ∈ bootConfRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
       |==> mBoot cpu (DFrac.own 1) := by
-  have e1 := hres .cur_privilege _ rfl
-  have e2 := hres .hart_state _ rfl
-  have e3 := hres .mstatus _ rfl
-  have e4 := hres .mie _ rfl
-  have e5 := hres .mideleg _ rfl
-  have e9 := hres .menvcfg _ rfl
-  have e13 : pmpAllOff (f .pmpcfg_n) := by rw [hres .pmpcfg_n _ rfl]; exact pmpAllOff_bootPmpcfg
-  have h1 := hres .misa _ rfl
-  have h2 := hres .mseccfg _ rfl
-  have h3 := hres .pma_regions _ rfl
-  have h4 := hres .htif_tohost_base _ rfl
-  have h5 := hres .elp _ rfl
-  have h6 := hres .senvcfg _ rfl
-  have h11 := hres .mstateen0 _ rfl
-  have h12 := hres .sstateen0 _ rfl
+  have e1 := hres.1 .cur_privilege _ rfl
+  have e2 := hres.1 .hart_state _ rfl
+  have e3 := hres.1 .mstatus _ rfl
+  have e4 := hres.1 .mie _ rfl
+  have e5 := hres.1 .mideleg _ rfl
+  have e9 := hres.1 .menvcfg _ rfl
+  have e13 : pmpAllOff (f .pmpcfg_n) := hres.2
+  have h1 := hres.1 .misa _ rfl
+  have h2 := hres.1 .mseccfg _ rfl
+  have h3 := hres.1 .pma_regions _ rfl
+  have h4 := hres.1 .htif_tohost_base _ rfl
+  have h5 := hres.1 .elp _ rfl
+  have h6 := hres.1 .senvcfg _ rfl
+  have h11 := hres.1 .mstateen0 _ rfl
+  have h12 := hres.1 .sstateen0 _ rfl
   simp only [bootConfRegs, hwRegs, List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
     Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9,
     h1, h2, h3, h4, h5, h6, h11, h12]

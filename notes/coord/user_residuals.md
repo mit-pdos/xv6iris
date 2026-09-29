@@ -65,6 +65,9 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
   clash on import. Shared home pattern: MachCSL/BvEnumSatp.lean.
 
 ## BootReset phase 3 (after U2-M4 and the K lanes land) — retire `resetVal`
+**DONE (Sept 29 2026, branch bootreset-p3):** C1 user CSR arm generic; C2 `SLeft` in sConfOf/kConf, entry-0
+PMP check, generic csrw pmp rules, UfCfg -> SLeft; C3 Lang switch (`bootFacts` = run, `bootLand` witness,
+`resetVal`/`resetRegs`/`resetWith`/`hwVal_reset` deleted). Plan kept below for reference.
 Phase 2 (landed) made RegFile = BootRegs, the M-mode PMP stage generic over `pmpAllOff`, mBoot generic in
 medeleg/mepc/satp/stimecmp, counter cells existential in hwConfig. Blocker: `start()` does NOT overwrite
 mcounteren (garbage | 2), mtimecmp, pmpcfg 8..63 / pmpaddr 1..63, scounteren — yet sConfOf/startConf/

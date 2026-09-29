@@ -27,6 +27,7 @@ ambient `MachGS` with that era and generation and discharges each hart's
 import MachCSL.WpDev
 import MachCSL.KMap
 import MachCSL.WireInv
+import MachCSL.BootReset
 
 namespace MachCSL
 

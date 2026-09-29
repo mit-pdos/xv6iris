@@ -33,8 +33,8 @@ DEVIATIONS from Rocq (none process-layer):
    to thread (the Lean reservation fragment rides `ctxTok`).
 3. **Rocq §3 (`boot_hart_res`, the per-hart bundle) is not stated HERE**
    (it is the shared allocation's, wave 8-5).  It is no longer blocked on
-   the reset table: `MachCSL.resetVal` now pins `mstateen0 = 0` and
-   `sstateen0 = 0` (as Rocq's `reset_regs` does), so the remainder
+   the reset facts: the boot run derives `mstateen0 = 0` and
+   `sstateen0 = 0` (`MachCSL.resetValRun`, as Rocq's `reset_regs` does), so the remainder
    `regCellsEx … bootEntryTaken` yields both cells at `0`, exactly the
    `hartCsrs` row `Xv6.bootBridge` takes.
 4. `wp_boot_body`'s eight GPRs come out at the reset file's values `f .xN`
@@ -58,7 +58,7 @@ set_option linter.unusedSectionVars false
 
 /-- **Hart `cpu`'s boot stack pointer**, as `_entry` computes it
 (`sp = &stack0 + 4096 * (mhartid + 1)`, Rocq `sp_of`): `mhartid` is the hart
-index at reset (`MachCSL.resetVal`), and the GOT slot holds `&stack0`. -/
+index at reset (`MachCSL.resetValRun`), and the GOT slot holds `&stack0`. -/
 def spOf (cpu : CPU) : BitVec 64 := bootSp KA.«stack0» (hartId cpu)
 
 theorem spOf_toNat (cpu : CPU) : (spOf cpu).toNat = 0x8000a380 + 4096 * (cpu.val + 1) := by
@@ -134,7 +134,7 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The part of `Xv6.bootEntryPre` past the configuration cells. -/
-theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
+theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     ([∗list] r ∈ [Register.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .PC,
         .nextPC, .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15],
         regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
@@ -143,9 +143,9 @@ theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) 
       Register.x8 ↦ᵣ[cpu] f .x8 ∗ Register.x10 ↦ᵣ[cpu] f .x10 ∗
       Register.x11 ↦ᵣ[cpu] f .x11 ∗ Register.x14 ↦ᵣ[cpu] f .x14 ∗
       Register.x15 ↦ᵣ[cpu] f .x15 := by
-  have eh := hres .mhartid _ rfl
-  have ep := hres .PC _ rfl
-  have en := hres .nextPC _ rfl
+  have eh := hres.1 .mhartid _ rfl
+  have ep := hres.1 .PC _ rfl
+  have en := hres.1 .nextPC _ rfl
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, eh, ep, en]
   unfold clockCells pcIs hartId
   rw [entry_sym_addr]
@@ -156,10 +156,10 @@ theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) 
 
 /-- **THE REGISTER SIDE OF THE BOOT PATH, out of the reset file** (Rocq
 `boot_entry_pre`): the cells `MachCSL.wp_power` hands hart `cpu`'s boot client
-(the whole file less the wire pins), at a file the machine pins by
-`resetRegs`, are `Xv6.wp_boot_body`'s configuration, hart id, clock, program
+(the whole file less the wire pins), at a file satisfying the boot run's
+facts `resetRegsRun`, are `Xv6.wp_boot_body`'s configuration, hart id, clock, program
 counter and GPR inputs, plus the rest of the file. -/
-theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
+theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f ⊢ |==>
       (mBoot cpu (DFrac.own 1) ∗
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
@@ -221,7 +221,7 @@ theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → I
       Register.x14 ↦ᵣ[cpu] σ.regs cpu .x14 ∗ Register.x15 ↦ᵣ[cpu] σ.regs cpu .x15 ∗
       regCellsEx (E.regName cpu) (σ.regs cpu) bootEntryTaken) :=
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  bootEntryPre cpu (σ.regs cpu) (hbf.2.2.2.1 cpu)
+  bootEntryPre cpu (σ.regs cpu) (bootFacts_resetRegsRun hbf cpu)
 
 end
 

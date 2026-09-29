@@ -13,7 +13,8 @@ its own value, by the trap's `reset_elp`), the environment/state-enable pins
 a U-mode CSR access reads (`senvcfg`, `mstateen0`, `sstateen0`), and the
 counter configuration (`scounteren`, and the four cells the cycle reads:
 `mcountinhibit`, `minstretcfg`, `mcyclecfg`, `mhpmcounter`).  The pinned
-values (`hwVal`) are the reset values `MachCSL.resetVal` pins.  The counter
+values (`hwVal`) are the values a run of the boot program derives
+(`MachCSL.resetValRun`).  The counter
 cells are EXISTENTIAL (`HwCounters`, Rocq `counter_caps` +
 `HartMCycle.mcycle_inc_flag`): the boot program never writes them
 (`MachCSL.bootProg_keeps`), so they hold power-on garbage, and the rules are
@@ -80,11 +81,6 @@ def hwRegs : List Register :=
    .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
 
 theorem hwRegs_nodup : hwRegs.Nodup := by decide
-
-/-- Every `hwVal` value is the reset value. -/
-theorem hwVal_reset (cpu : CPU) (r : Register) (v : RegisterType r) (h : hwVal r = some v) :
-    resetVal cpu r = some v := by
-  cases r <;> simp only [hwVal, reduceCtorEq] at h <;> (first | (subst h; rfl) | (rw [← Option.some.inj h]; rfl))
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 

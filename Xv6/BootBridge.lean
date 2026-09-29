@@ -44,8 +44,8 @@ DEVIATIONS from Rocq:
    (Rocq's `main_hart_raw`): Lean's `kctx` does not hold them at
    `sie = false`, so they stay with the caller, beside the bridge.
 4. `mstateen0 ↦ 0`/`sstateen0 ↦ 0` are premises exactly as in Rocq, and
-   the reset machine discharges them: `MachCSL.resetVal` pins both (Rocq
-   `reset_regs` likewise), so the per-hart bundle (`boot_hart_res`) can
+   the reset machine discharges them: the boot run derives both
+   (`MachCSL.resetValRun`, Rocq `reset_regs` likewise), so the per-hart bundle (`boot_hart_res`) can
    supply them.
 
 Imports only definitional files.

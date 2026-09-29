@@ -32,7 +32,7 @@ hart has a thread of control, out of the owned half of the boot image
 * §4 THE PER-HART BUNDLE (Rocq `boot_hart_res`): `bootHartRes f c`,
   what hart `c`'s chain consumes beside its running token: `bootEntryPre`'s
   output, the other 23 GPRs, `stvec`, `hartCsrs` (`mstateen0 = 0`,
-  `sstateen0 = 0` now pinned by `MachCSL.resetVal` -- BootHart deviation 3
+  `sstateen0 = 0` derived by the boot run, `MachCSL.resetValRun` -- BootHart deviation 3
   and BootBridge deviation 4 are resolved), `mainHartRaw`'s rows at the
   reset `tlb`, the empty held-lock set, the GOT row and `bootHartBss`.
   `bootHartRes_intro` builds it from `regCellsNoPins`; `bootHartRes_ofEra`
@@ -493,7 +493,7 @@ def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
 cells (less the wire pins), the empty held-lock set, the GOT row and the
 hart's carved `.bss` share.  The update persists the frozen
 configuration cells (`BootConfig.mBoot_of_cells`). -/
-theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegs c f) :
+theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegsRun c f) :
     regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) c) f ∗ lockSet c [] ∗
       bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes f c := by
   iintro ⟨H, Hl, #Hg, Hb⟩
@@ -563,7 +563,7 @@ theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IP
     regCellsNoPins (GF := GF) (E.regName c) (σ.regs c) ∗ lockSetAt E c [] ∗
       bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes (σ.regs c) c :=
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-  bootHartRes_intro (σ.regs c) c (hbf.2.2.2.1 c)
+  bootHartRes_intro (σ.regs c) c (bootFacts_resetRegsRun hbf c)
 
 /-- **All eight harts' `.bss` shares at `Hboot`'s era**: `bootCarve_harts`
 with the `viewLb … 0` receipts read off `powerBootRes`'s token row (which is

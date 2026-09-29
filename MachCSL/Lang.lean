@@ -249,70 +249,28 @@ instance (g : GState) (gen : Nat) : Decidable (threadLive g gen) := by
 
 /-! ## What a booted machine looks like -/
 
-/-- The reset value of register `r` on hart `cpu`, for the registers reset
-pins: machine mode, the platform's `misa`, every configuration register at
-its reset value, the PC at the platform's reset vector, and `mhartid` the
-hart's own number -- exactly the cells `MConf.confCells` at `bootConf`,
-`pcIs` and the hart-id cell are stated over.  `none` for every other
-register (the bookkeeping registers of `clockCells` are unconstrained).
-(The Rocq prototype anchors this on a run of the platform's boot program from
-arbitrary garbage; the explicit list here is the same fact set.) -/
-def resetVal (cpu : CPU) : (r : Register) → Option (RegisterType r)
-  | .cur_privilege => some Privilege.Machine
-  | .hart_state => some (HartState.HART_ACTIVE ())
-  | .misa => some 0x800000000014112D#64
-  | .mstatus => some 0xA00000000#64
-  | .mie => some 0#64
-  | .mideleg => some 0#64
-  | .medeleg => some 0#64
-  | .mepc => some 0#64
-  | .satp => some 0#64
-  | .menvcfg => some 0#64
-  | .mcounteren => some 0#32
-  | .scounteren => some 0#32
-  | .mtimecmp => some 0xFFFFFFFFFFFFFFFF#64
-  | .stimecmp => some 0xFFFFFFFFFFFFFFFF#64
-  | .pmpcfg_n => some bootPmpcfg
-  | .pmpaddr_n => some bootPmpaddr
-  | .sig_meip => some 0#1
-  | .sig_seip => some 0#1
-  | .mseccfg => some 0#64
-  | .elp => some 0#1
-  | .senvcfg => some 0#64
-  | .mcountinhibit => some 0#32
-  | .mstateen0 => some 0#64
-  | .sstateen0 => some 0#32
-  | .minstretcfg => some 0#64
-  | .mcyclecfg => some 0#64
-  | .pma_regions => some bootPMA
-  | .htif_tohost_base => some none
-  | .PC => some 0x80000000#64
-  | .nextPC => some 0x80000000#64
-  | .mhartid => some (BitVec.ofNat 64 cpu.val)
-  | _ => none
+/-- The hart id the platform wires to hart `cpu` (Rocq
+`boot_w64 (Z.of_nat (fin_to_nat c))`). -/
+abbrev bootHid (cpu : CPU) : BitVec 64 := BitVec.ofNat 64 cpu.val
 
-/-- The register file of hart `cpu` is reset: every pinned register holds its
-reset value. -/
-def resetRegs (cpu : CPU) (f : RegFile) : Prop :=
-  ∀ (r : Register) (v : RegisterType r), resetVal cpu r = some v → f r = v
-
-/-- Reset the pinned registers of a file, keeping the others (a witness that
-a reset file exists, built from any file at all). -/
-def resetWith (cpu : CPU) (f₀ : RegFile) : RegFile :=
-  fun r => (resetVal cpu r).getD (f₀ r)
-
-theorem resetRegs_resetWith (cpu : CPU) (f₀ : RegFile) : resetRegs cpu (resetWith cpu f₀) := by
-  intro r v h
-  simp [resetWith, h]
+/-- The register file hart `cpu` lands in when the platform's boot program
+(`MachCSL.bootProg`, Rocq `ArchReset.boot_prog`) runs from the power-on file
+`f₀`: the run's output (it always completes, `MachCSL.bootRun_bootProg_some`;
+the `getD` default is never taken). -/
+def bootLand (cpu : CPU) (f₀ : RegFile) : RegFile :=
+  ((bootRun (bootProg (bootHid cpu) bootPMA) f₀).map (·.2)).getD f₀
 
 /-- A booted machine, with no reference to the one it replaces: memory is the
 boot image (the language constant `bootImage`, Rocq `boot_facts`' memory
-clauses) and every hart is reset.  This is the fact set the power thread
-hands the boot client (`wp_power`'s `Hboot`). -/
+clauses) and every hart's register file IS the output of a run of the boot
+program from SOME power-on file (Rocq `boot_facts`' register clause: anchored
+on a run, not on a table of values -- `MachCSL.resetRegsRun_of_run` derives
+Rocq's `reset_regs` from it).  This is the fact set the power thread hands
+the boot client (`wp_power`'s `Hboot`). -/
 def bootFacts (σ : MState) : Prop :=
   σ.mem = imgFlat bootImage ∧ σ.log = [] ∧
   (∀ cpu, σ.tv cpu = 0 ∧ σ.itv cpu = 0 ∧ σ.hr cpu = HRead.zero ∧ σ.resv cpu = none) ∧
-  (∀ cpu, resetRegs cpu (σ.regs cpu)) ∧
+  (∀ cpu, ∃ f₀ : RegFile, bootRun (bootProg (bootHid cpu) bootPMA) f₀ = some ((), σ.regs cpu)) ∧
   ∀ d, σ.devrt d = DevRt.init
 
 /-- The state a `PowerOn` hands over: same generation (`PowerOff` already
@@ -321,16 +279,13 @@ was (the disk keeps its durable image). -/
 def bootShape (g g' : GState) : Prop :=
   g'.gen = g.gen ∧ g'.pow = true ∧ bootFacts g'.m ∧ g'.m.devs = g.m.devs.reset
 
-/-- A booted state exists (so the power-on arm is always enabled): reset every
-hart's file, reload the image, reset the devices. -/
+/-- A booted state (so the power-on arm is always enabled,
+`MachCSL.bootShape_bootWitness`): run the boot program on every hart's
+current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
-  { m := ⟨fun cpu => resetWith cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
+  { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
           fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init⟩,
     gen := g.gen, pow := true }
-
-theorem bootShape_bootWitness (g : GState) : bootShape g (bootWitness g) :=
-  ⟨rfl, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => resetRegs_resetWith cpu _,
-    fun _ => rfl⟩, rfl⟩
 
 /-- All harts. -/
 def cpus : List CPU := List.finRange NCPU

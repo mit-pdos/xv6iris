@@ -34,9 +34,10 @@ discharges it from `Hdisk` at the literal image).  (The former `Hknot`
 premise is gone: MachCSL's installed handler ∃-packs its environment, as
 Rocq's `intr_res` does, so no instance field has to equal a family that
 reads it.)  Nothing about the kernel image (D47: it is the
-language constant `MachCSL.bootImage`).  Trusted, not in the statement:
-MachCSL's reset table (`resetVal`/`bootFacts`/`bootShape`, the language's
-PowerOn) until BootReset (wave 9) -- Rocq's `SystemAssumptions` note.
+language constant `MachCSL.bootImage`).  The language's PowerOn
+(`MachCSL.bootFacts`/`bootShape`) states the register side as a RUN of the
+boot program from arbitrary power-on garbage, as Rocq's `boot_facts` does:
+no table of reset values is trusted (`MachCSL.BootReset`).
 
 ## DEVIATIONS from Rocq
 

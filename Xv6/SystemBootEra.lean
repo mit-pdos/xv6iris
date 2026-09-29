@@ -63,9 +63,9 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
    `cpus = startedPrimary :: cpus.tail` (Rocq `cpu_enum_cons` et al.), and
    the device loops take their permits as Lean-level entailments
    (`xv6Era_run`'s `hperm`) where Rocq `iDestruct`s `Hperm` inline.
-5. The era's disk image is block-granular and the reset table trusted
-   (DiskBoot deviation 1; MachCSL's `resetVal`/`bootFacts`, wave 9); no SIE
-   ghost (D27).
+5. The era's disk image is block-granular (DiskBoot deviation 1); the
+   register side of `MachCSL.bootFacts` is a run of the boot program, as in
+   Rocq (no reset table); no SIE ghost (D27).
 
 Imports only the boot-chain/allocation files and the device invariants.
 -/

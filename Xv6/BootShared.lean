@@ -227,7 +227,7 @@ theorem bootShared_harts (σ : MState) (hbf : bootFacts σ) :
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
   iintro %k %c %_ ⟨Ht1, Hr1, Hl1, Hb1⟩
-  imod bootHartRes_intro (GF := GF) (σ.regs c) c (hbf.2.2.2.1 c) $$ [Hr1 Hl1 Hb1] with HB
+  imod bootHartRes_intro (GF := GF) (σ.regs c) c (bootFacts_resetRegsRun hbf c) $$ [Hr1 Hl1 Hb1] with HB
   · iframe Hr1 Hl1 Hg Hb1
   imodintro
   iframe Ht1 HB

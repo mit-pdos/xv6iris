@@ -73,5 +73,6 @@ hypotheses `hZkr`, `g.gen = 0`, `g.pow = false`, `diskOf g.m.devs = fsImgDisk`.
 (the Lean backend's eager `&&` reaches `currentlyEnabled Ext_Zkr`, whose clause is missing because the Zkr
 module isn't compiled). It disappears under either fix: Sail's one-line Zkr clause in regen_sail_model.sh,
 or the backend's short-circuit fix (upstream patch prepared in /shared/sail-upstream). User decision pending.
-Still trusted (BootReset phase 3 pending): `MachCSL.resetVal` register reset table (a definition, so not in
-the axiom list).
+BootReset phase 3 (Sept 29 2026): the `MachCSL.resetVal` register reset table is GONE. `bootFacts`' register
+clause is a run of `bootProg` from arbitrary power-on garbage (Rocq `boot_facts`); axioms of the three
+theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide certificates; 958 -> 962 lines).
