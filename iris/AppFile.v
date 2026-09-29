@@ -339,7 +339,7 @@ Section FileClaim.
     iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (g) "Hl";
       [ apply mono_list_auth_valid |].
     iMod (ghost_map_alloc_empty (K := nat) (V := gname)) as (greg) "Hreg".
-    iMod (@mono_nat_own_alloc Σ fa_st 0) as (gcm) "[Hcm _]".
+    iMod (@mono_nat_own_alloc _ Σ fa_st 0) as (gcm) "[Hcm _]".
     iMod (own_alloc (●ML ([] : list (leibnizO UnionAdm.srec)))) as (gh) "Hh";
       [ apply mono_list_auth_valid |].
     iMod (ghost_map_alloc_empty (K := nat) (V := gname * gname)) as (grun) "Hrun".
@@ -1793,8 +1793,8 @@ Section sync.
     iMod (ghost_map_alloc_empty (K := nat) (V := gname)) as (γreg) "Hreg".
     iMod (ghost_map_insert_persist (S gen) γs with "Hreg") as "[_ #Hel]";
       [apply lookup_empty |].
-    iMod (@mono_nat_own_alloc Σ fa_st (S gen)) as (γcm) "[Hcm #Hcml]".
-    iMod (@mono_nat_own_alloc Σ fa_st (gen + 1)) as (γst) "[Hst #Hstl]".
+    iMod (@mono_nat_own_alloc _ Σ fa_st (S gen)) as (γcm) "[Hcm #Hcml]".
+    iMod (@mono_nat_own_alloc _ Σ fa_st (gen + 1)) as (γst) "[Hst #Hstl]".
     iMod (fpos_alloc 0) as (γp) "(Hp & _ & _)".
     iMod (own_alloc (●ML ([] : list (leibnizO srec)))) as (γh) "Hhi";
       [apply mono_list_auth_valid |].
@@ -1841,8 +1841,8 @@ Section sync.
       [apply lookup_empty |].
     iMod (ghost_map_insert_persist (S gen) γ with "Hreg") as "[_ #Hel]";
       [by rewrite lookup_insert_ne |].
-    iMod (@mono_nat_own_alloc Σ fa_st 0) as (γcm) "[Hcm _]".
-    iMod (@mono_nat_own_alloc Σ fa_st (gen + 1)) as (γst) "[Hst _]".
+    iMod (@mono_nat_own_alloc _ Σ fa_st 0) as (γcm) "[Hcm _]".
+    iMod (@mono_nat_own_alloc _ Σ fa_st (gen + 1)) as (γst) "[Hst _]".
     iMod (own_alloc (●ML ([] : list (leibnizO srec)))) as (γh) "Hhi";
       [apply mono_list_auth_valid |].
     iMod (ghost_map_alloc_empty (K := nat) (V := gname * gname)) as (γrun) "Hrun".

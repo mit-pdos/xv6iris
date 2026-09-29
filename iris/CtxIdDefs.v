@@ -21,7 +21,6 @@
 (* ====================================================================== *)
 From stdpp Require Import base countable.
 From transfinite.base_logic.lib Require Import own.   (* [gname] *)
-From xv6iris Require Import StepIndex.
 
 (* TWO GNAMES, BOTH THE CONTEXT'S OWN ([TsoCtxTwin2.CtxId] is the same
    record): the BOUND authority (one monotone nat -- clean facts'
@@ -31,6 +30,7 @@ From xv6iris Require Import StepIndex.
    the identity can, with no global roster: the corrected construction's
    cornerstone. *)
 Record CtxId := MkCtxId { ctx_bound_name : gname; ctx_dirty_name : gname }.
+From xv6iris Require Import StepIndex.
 Add Printing Constructor CtxId.
 
 Global Instance ctx_id_eq_dec : EqDecision CtxId.

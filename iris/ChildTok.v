@@ -60,8 +60,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.algebra Require Import dfrac excl agree csum.  (* [exclR] -- the taken token's camera; [csumR]/[agreeR] -- the kill flag's one-shot *)
-From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From transfinite.base_logic.lib Require Import own saved_prop.
 Require Import SailStdpp.Base SailStdpp.Values.
 Local Open Scope Z_scope.

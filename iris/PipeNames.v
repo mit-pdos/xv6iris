@@ -8,7 +8,6 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import base gmap list bitvector.definitions.
 From transfinite.base_logic.lib Require Import own.   (* [gname] *)
-From xv6iris Require Import StepIndex.
 
 (* THE ABSTRACT STATE OF A PIPE: every byte ever written, in order; the
    read pointer -- [ws !! rp] is the next byte a read delivers -- and the
@@ -19,6 +18,7 @@ From xv6iris Require Import StepIndex.
    like writing a byte ([pst_close]), paid by the closer. *)
 Record pipe_st := MkPipeSt
   { ps_ws : list (bv 8); ps_rp : nat; ps_ro : bool; ps_wo : bool }.
+From xv6iris Require Import StepIndex.
 
 Global Instance pipe_st_eq_dec : EqDecision pipe_st.
 Proof. solve_decision. Defined.

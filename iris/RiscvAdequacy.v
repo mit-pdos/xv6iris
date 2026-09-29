@@ -151,7 +151,7 @@ Definition riscvΣ : gFunctors :=
      GFunctor (mono_listR (leibnizO mobs));
      uartGhostΣ;
      diskGhostΣ;
-     @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+     @ghost_mapΣ _ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
      GFunctor kptbR;

@@ -65,8 +65,8 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap gset
-From xv6iris Require Import StepIndex.
      gset gmultiset numbers updates local_updates.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 Require Import PipeNames.   (* [pipe_st]: the byte queue's abstract state, plain data *)
 Require Import KallocEv.    (* [kev]: the allocator ledger's events, plain data *)
