@@ -39,3 +39,5 @@ LinkUkLeaves LANDED (ukLeaves_holds : UK_LEAVES; icache stamp in userPtInvX, min
 Cleanup lanes (Sept 29): A cone re-audit (worktree), B duplicate merges (worktree), C Rocq drift survey (read-only -> notes/rocq_drift.md).
 USER INSTRUCTION (Sept 29): after cleanup, update the Lean proofs to match the LATEST Rocq (main is actively developed; moved past 1900b8a43). Use lane C's drift report as the plan.
 Cleanup A (97b85e825) and B (4f75d1ac5) LANDED. Drift wave 1 (themes A+B+SY1) started: see notes/coord/drift_prompt.txt, notes/rocq_drift.md.
+Drift wave 1 agents (session 354a8854): D1-fetch a64627531deb8d04f, D1-img a9890302dd730ad08, D1-spec a7ebbc664d939d42e
+(all worktree lanes). Then: C (sync line), D+E+F (durability, final shape), then I+J (NI ledgers/permit sweep) unless user says skip.
