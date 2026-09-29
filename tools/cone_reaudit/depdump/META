@@ -1,0 +1,6 @@
+version = "dev"
+description = "dep dump"
+requires = "rocq-runtime.vernac"
+directory = "."
+archive(native) = "depdump.cmxs"
+plugin(native) = "depdump.cmxs"
