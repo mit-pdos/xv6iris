@@ -23,7 +23,7 @@ fragment live) to the two new rows' registration, keeping `Rp`.
    `nth_byte (trunc32 (mword_of_int a)) i`).
 3. The failure arm's `r = -1` is Lean's `usysFdOk` pipe row, which this lane
    restored to Rocq's shape (lane PIPE-NEG1, `usysFdOk_pipe_neg1`).
-4. The slot absorbs the registrar's fancy update through `uslot_fupd` (the
+4. The slot absorbs the registrar's fancy update through `UexecRet.uslot_fupd` (the
    `fupd` twin of `UexecRet.uslot_bupd`); Rocq runs `fupd_wp` inside `ukc`.
 -/
 import Xv6.UkRunSysWin
@@ -74,18 +74,6 @@ section UkRunSysPipe
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-
-/-- **A SLOT ABSORBS A FANCY UPDATE** (it ends in a WP; the `fupd` twin of
-`UexecRet.uslot_bupd`). -/
-theorem uslot_fupd (W : Uvis) : (|={⊤}=> uslot (hlc := hlc) (GF := GF) W) ⊢ uslot W := by
-  refine BI.Entails.trans ?_ (uslot_unfold W).mpr
-  refine BI.Entails.trans (fupd_mono (uslot_unfold W).mp) ?_
-  unfold uslotF
-  iintro H %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
-  iapply wpLoop_fupd
-  imod H
-  imodintro
-  iapply H $$ %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
 
 /-- The run's rows ARE its pipe row (`urunRows_nopipe`, backwards). -/
 theorem urunRows_of_nopipe (N : UkNames GF) (fdv : List FdState) :

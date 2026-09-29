@@ -25,9 +25,9 @@ CONE (re-walked on the pinned glob, 4/4 reached): `secc_rows_tab_le`,
 1. **The wild credential's licence is a premise** `hlic : ∀ k, wild k ⊢
    consLicenceAt k` (UexecSeccMint deviation 4: Rocq reads
    `riscvF_app_iface`; Lean's machine record carries the slot, not the law).
-   So `secc_cons_pay_of_wild` is `seccConsPay_of_lic` (NEW: the licence in
-   place of the interface record's two slot equations; the proof is
-   `seccConsRdOfWild`/`seccConsWrOfWild`'s at `Hlic`), and
+   So `secc_cons_pay_of_wild` is `UexecSeccMint.seccConsPayOfLic` (NEW: the
+   licence in place of the interface record's two slot equations; the
+   `…OfWild` forms are derived from it), and
    `secc_univ_of_mint` takes the payer (`useccompMintOfCons`) in place of
    the two credentials.  `seccLic_of_iface` recovers the premise from an
    `AppIface` (the landed deviation-4 form); the union discharges it from
@@ -124,33 +124,6 @@ theorem seccRows_tabLe (fdv v : List FdState) (hle : tabLe fdv v) :
     seccRows (hlc := hlc) (GF := GF) v ⊢ seccRows fdv :=
   seccRows_below fdv v hle.1 fun k st hk => (hle.2 k st hk).imp id And.left
 
-/-- **Rocq `secc_cons_pay_of_wild`** (deviation 1): the era's licence and the
-reader-side credential pay the console rows. -/
-theorem seccConsPay_of_lic :
-    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      seccConsPay (hlc := hlc) (GF := GF) := by
-  iintro #Hlic #Hrw
-  unfold seccConsPay
-  imodintro
-  isplit
-  · iintro %wb %mj %n %P
-    unfold filereadIn
-    iintro HP
-    dsimp only
-    split
-    · isplitl [HP]
-      · iapply (consAcc_cred fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ True)))
-        · unfold consDirtyCred; imodintro; iapply appRdcred_of_rdwild $$ Hrw
-        · iintro %cur %dc
-          imodintro
-          iframe HP
-      · iapply (consReadPay_trivAt (hlc := hlc) (GF := GF) _) $$ Hlic
-    · iexact HP
-  · iintro %rb %mj %n %pmv %sz %lz %M %ua
-    unfold filewriteIn
-    iapply seccConsOutChain _ M ua n.toNat 0 $$ Hlic
-
 /-- **Rocq `secc_univ_of_mint`** (deviation 1): THE UNIVERSE AT THE KEY'S
 TABLE, out of the minter. -/
 theorem seccUniv_of_mint (sts : List FdState) :
@@ -228,7 +201,7 @@ theorem seccImageEntry_holds (UL : UK_LEAVES) (GS : SECC_START)
   -- the credentials: the console payer
   icases HPay with ⟨#Hw, #Hrw, #Hrows⟩
   ihave #Hlic := hlic (genId (hlc := hlc) (GF := GF) + 1) $$ Hw
-  ihave #Hc := seccConsPay_of_lic (hlc := hlc) (GF := GF) $$ Hlic Hrw
+  ihave #Hc := seccConsPayOfLic (hlc := hlc) (GF := GF) $$ Hlic Hrw
   ihave #Hnpw' : urunNopipe (hlc := hlc) W'.fd $$ []
   · rw [hfd]; iexact Hnpw
   -- the slot at the whole table's view

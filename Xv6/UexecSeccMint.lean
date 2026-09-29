@@ -236,17 +236,6 @@ theorem seccSbundle (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
 
 /-! ## 6.  THE RETURN -/
 
-/-- a slot's body is a WP, so it absorbs an update (Rocq `uslot_fupd`) -/
-theorem uslotFupd (W : Uvis) : (|={⊤}=> uslot (hlc := hlc) (GF := GF) W) ⊢ uslot W := by
-  refine BI.Entails.trans ?_ (uslot_unfold W).mpr
-  refine BI.Entails.trans (fupd_mono (uslot_unfold W).mp) ?_
-  unfold uslotF
-  iintro H %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
-  iapply wpLoop_fupd
-  imod H
-  imodintro
-  iapply H $$ %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
-
 /-- pipe's post, read at the instance (Rocq UexecExecInst
 `spost_at_pipe_elim`, deviation 3) -/
 theorem spostAt_pipe_elim_xv6 (X : Uvis → IProp GF) (n : Int) (hn : n = USYS_pipe) (f : Xfam GF)
@@ -300,7 +289,7 @@ theorem seccRetCont (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
       icases H with ⟨%a, %b, %γp, %hsh, Hf⟩
       obtain ⟨_, _, _, hfd'⟩ := hsh
       subst hfd'
-      iapply uslotFupd
+      iapply uslot_fupd
       imod (inv_alloc seccN ⊤ iprop(∃ s : PipeSt, pipeQfrag (GF := GF) γp.pnQueue s)) $$ [Hf] with #Hw
       · inext
         iexists pst0
@@ -491,17 +480,15 @@ theorem useccompMintOfCons :
 
 /-! ## 8.  THE ERA CREDENTIAL PAYS THE CONSOLE ROWS -/
 
-/-- READ at a console row (Rocq `secc_cons_rd_of_wild`, deviation 4) -/
-theorem seccConsRdOfWild (Ai : AppIface GF)
-    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+/-- READ at a console row, out of the era's licence (the body of Rocq
+`secc_cons_rd_of_wild` after its `consLicenceAt_of_wild` step) -/
+theorem seccConsRdOfLic :
+    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
       MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       □ (∀ (wb : Bool) (mj : Nat) (n : Int) (P : IProp GF),
         filereadIn (hlc := hlc) (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
           (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P) := by
-  iintro #Hw #Hrw
-  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
+  iintro #Hlic #Hrw
   imodintro
   iintro %wb %mj %n %P
   unfold filereadIn
@@ -516,6 +503,19 @@ theorem seccConsRdOfWild (Ai : AppIface GF)
         iframe HP
     · iapply (consReadPay_trivAt (hlc := hlc) (GF := GF) _) $$ Hlic
   · iexact HP
+
+/-- READ at a console row (Rocq `secc_cons_rd_of_wild`, deviation 4) -/
+theorem seccConsRdOfWild (Ai : AppIface GF)
+    (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
+    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
+    MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
+      □ (∀ (wb : Bool) (mj : Nat) (n : Int) (P : IProp GF),
+        filereadIn (hlc := hlc) (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
+          (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P) := by
+  iintro #Hw #Hrw
+  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
+  iapply seccConsRdOfLic $$ Hlic Hrw
 
 /-- WRITE at a console row: the output chain at the trivial cursor (Rocq
 `secc_cons_out_chain`) -/
@@ -533,6 +533,19 @@ theorem seccConsOutChain (k : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64
     iapply outLink_of_licenceAt k b _ $$ Hlic
     iapply ih (j + 1) $$ Hlic
 
+/-- WRITE at a console row, out of the era's licence -/
+theorem seccConsWrOfLic :
+    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+      □ (∀ (rb : Bool) (mj : Nat) (n : Int) (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool)
+          (M : Nat → List (BitVec 8)) (ua : BitVec 64),
+        filewriteIn (hlc := hlc) pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
+          (fun _ _ => iprop(True))) := by
+  iintro #Hlic
+  imodintro
+  iintro %rb %mj %n %pmv %sz %lz %M %ua
+  unfold filewriteIn
+  iapply seccConsOutChain _ M ua n.toNat 0 $$ Hlic
+
 /-- Rocq `secc_cons_wr_of_wild` (deviation 4) -/
 theorem seccConsWrOfWild (Ai : AppIface GF)
     (hw : MachFixedGS.wild (hlc := hlc) (GF := GF) = Ai.wild)
@@ -544,10 +557,22 @@ theorem seccConsWrOfWild (Ai : AppIface GF)
           (fun _ _ => iprop(True))) := by
   iintro #Hw
   ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
+  iapply seccConsWrOfLic $$ Hlic
+
+/-- **Rocq `secc_cons_pay_of_wild`, at the licence** (UkSeccEntry deviation 1:
+the era's licence in place of the interface record's two slot equations) -/
+theorem seccConsPayOfLic :
+    consLicenceAt (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+      MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
+      seccConsPay (hlc := hlc) (GF := GF) := by
+  iintro #Hlic #Hrw
+  ihave #Hr := seccConsRdOfLic $$ Hlic Hrw
+  ihave #Hwr := seccConsWrOfLic $$ Hlic
+  unfold seccConsPay
   imodintro
-  iintro %rb %mj %n %pmv %sz %lz %M %ua
-  unfold filewriteIn
-  iapply seccConsOutChain _ M ua n.toNat 0 $$ Hlic
+  isplit
+  · iexact Hr
+  · iexact Hwr
 
 /-- Rocq `secc_cons_pay_of_wild` (deviation 4) -/
 theorem seccConsPayOfWild (Ai : AppIface GF)
@@ -557,13 +582,8 @@ theorem seccConsPayOfWild (Ai : AppIface GF)
       MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       seccConsPay (hlc := hlc) (GF := GF) := by
   iintro #Hw #Hrw
-  ihave #Hr := seccConsRdOfWild Ai hw hc $$ Hw Hrw
-  ihave #Hwr := seccConsWrOfWild Ai hw hc $$ Hw
-  unfold seccConsPay
-  imodintro
-  isplit
-  · iexact Hr
-  · iexact Hwr
+  ihave #Hlic := consLicenceAt_of_wild Ai (genId (hlc := hlc) (GF := GF) + 1) hw hc $$ Hw
+  iapply seccConsPayOfLic $$ Hlic Hrw
 
 /-! ## 9.  THE MINTER -/
 

@@ -942,6 +942,17 @@ theorem uslot_bupd (W : Uvis) : (|==> uslot (GF := GF) W) ⊢ uslot W := by
   imodintro
   iapply H $$ %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
 
+/-- **Rocq `uslot_fupd`**: A SLOT ABSORBS A FANCY UPDATE (it ends in a WP). -/
+theorem uslot_fupd (W : Uvis) : (|={⊤}=> uslot (GF := GF) W) ⊢ uslot W := by
+  refine BI.Entails.trans ?_ (uslot_unfold W).mpr
+  refine BI.Entails.trans (fupd_mono (uslot_unfold W).mp) ?_
+  unfold uslotF
+  iintro H %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
+  iapply wpLoop_fupd
+  imod H
+  imodintro
+  iapply H $$ %h %xi %C %pt %Rfd %Rut %hR %hlo %hpm %hlz Hb
+
 /-- **Rocq `uslot_of_urun_eq`**: THE RE-KEY THE RUN KEY BUYS -- a slot captured
 at `Wk` is a slot at the record `(V, M)` resumes with, at the descriptor view,
 generation, children and pid the re-keying party names. -/
