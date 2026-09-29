@@ -415,10 +415,10 @@ Proof.
   intros H. apply set_eq. intros a. split; [|set_solver].
   intros Ha. rewrite <- H. unfold others_resv in Ha. unfold all_resv.
   apply elem_of_union_list in Ha as (X & HX & Hin).
-  apply elem_of_list_fmap in HX as (c & -> & Hc).
+  apply list_elem_of_fmap in HX as (c & -> & Hc).
   destruct (decide (c = cpu)) as [->|Hne]; [set_solver|].
   apply elem_of_union_list. exists (resv_dom gr c). split; [|exact Hin].
-  apply elem_of_list_fmap. exists c. split; [reflexivity|exact Hc].
+  apply list_elem_of_fmap. exists c. split; [reflexivity|exact Hc].
 Qed.
 
 (* every hart of a [gs_ok] state satisfies the SINGLE-hart invariant
@@ -630,13 +630,13 @@ Proof.
   - cbn [crun] in Hrun.
     destruct (cinstr pol fuel tick c cs) as [cs1|] eqn:Hci; [|discriminate Hrun].
     assert (Hc : HartE gen c (riscv_step tick) ∈ ts)
-      by (apply (Hin c pol); apply elem_of_list_here).
-    apply elem_of_list_split in Hc as (t1 & t2 & Hts).
+      by (apply (Hin c pol); apply list_elem_of_here).
+    apply list_elem_of_split in Hc as (t1 & t2 & Hts).
     destruct (cinstr_nsteps pol fuel tick gen c t1 t2 cs cs1 g Hlive Hgs Hcs Hci)
       as (N1 & g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
     rewrite <- Hts in Hn1.
     destruct (IH cs1 cs' g1
-                (fun c' pol' Hc' => Hin c' pol' (elem_of_list_further _ _ _ Hc'))
+                (fun c' pol' Hc' => Hin c' pol' (list_elem_of_further _ _ _ Hc'))
                 Hlv1 Hgs1 Hcs1 Hrun) as (N2 & g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
     exists (N1 + N2)%nat, g2.
     split; [exact (nsteps_trans_nil _ _ _ _ _ Hn1 Hn2)|auto].
@@ -680,7 +680,7 @@ Qed.
 Lemma loop_in_pool (gen : nat) (c : CPU) : LoopE gen c ∈ power_fork gen.
 Proof.
   unfold power_fork. apply elem_of_app. left.
-  apply elem_of_list_fmap. exists c. split; [reflexivity|apply finite.elem_of_enum].
+  apply list_elem_of_fmap. exists c. split; [reflexivity|apply finite.elem_of_enum].
 Qed.
 
 (* the two ends of an instruction are not the same node, which is what
@@ -771,14 +771,14 @@ Lemma pool_boot2 (tick : bool) (gen : nat) (c0 c1 : CPU) (ts : list mexpr)
     /\ HartE gen c1 (riscv_step tick) ∈ ts'.
 Proof.
   intros Hne Hacq Hlive Hgs Hcs H0 H1.
-  apply elem_of_list_split in H0 as (t1 & t2 & Hts). subst ts.
+  apply list_elem_of_split in H0 as (t1 & t2 & Hts). subst ts.
   destruct (boot_one tick gen c0 t1 t2 cs g Hacq Hlive Hgs Hcs)
     as (g1 & Hn1 & Hlv1 & Hgs1 & Hcs1).
   assert (H1' : HartE gen c1 (Interface.Ret tt)
                   ∈ t1 ++ HartE gen c0 (riscv_step tick) :: t2).
   { apply (elem_of_replace _ (HartE gen c0 (Interface.Ret tt)));
       [exact H1|intros Heq; congruence]. }
-  apply elem_of_list_split in H1' as (u1 & u2 & Hts1).
+  apply list_elem_of_split in H1' as (u1 & u2 & Hts1).
   destruct (boot_one tick gen c1 u1 u2 cs g1 Hacq Hlv1 Hgs1 Hcs1)
     as (g2 & Hn2 & Hlv2 & Hgs2 & Hcs2).
   rewrite Hts1 in Hn1.
@@ -787,9 +787,9 @@ Proof.
   split; [assumption|]. split; [assumption|]. split; [assumption|].
   split.
   - apply (elem_of_replace _ (HartE gen c1 (Interface.Ret tt))).
-    + rewrite <- Hts1. apply elem_of_app. right. apply elem_of_list_here.
+    + rewrite <- Hts1. apply elem_of_app. right. apply list_elem_of_here.
     + pose proof (riscv_step_ne_ret tick tt) as Hrs. intros Heq. congruence.
-  - apply elem_of_app. right. apply elem_of_list_here.
+  - apply elem_of_app. right. apply list_elem_of_here.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -948,7 +948,7 @@ Proof. discriminate. Qed.
 Lemma csch_in (bs : list (bool * bool)) (c : CPU) (pol : rpol) :
   (c, pol) ∈ csch bs -> c = chart0 \/ c = chart1.
 Proof.
-  intros H. apply elem_of_list_fmap in H as (b & Heq & _).
+  intros H. apply list_elem_of_fmap in H as (b & Heq & _).
   unfold citem_of in Heq. destruct b as [hb sb]; cbn [fst snd] in Heq.
   injection Heq as Hc _. subst c. destruct hb; [right|left]; reflexivity.
 Qed.
