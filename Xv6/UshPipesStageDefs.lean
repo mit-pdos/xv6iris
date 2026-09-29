@@ -37,10 +37,11 @@ and the pure lemmas.  The family writer's diagnostic law is
 `a0_idx` are `UshPipesDefs.PdRound`'s projections (`D.T`, …, `pdep D`,
 `D.FAM`, `pnsKit D.toPns`, `D.QcK`) and the register literal `10#5`.
 
-Dropped (unreached): the local instances `stg_T_pers0`, `stg_T_tl0`,
-`stg_exf_pers0`, `stg_kit_pers0` (Lean's instances `GenCparams.gcT_*`,
+Dropped: the local instances `stg_T_pers0`, `stg_T_tl0`, `stg_exf_pers0`
+(reached, by instance resolution the glob walk cannot see, notes/cone_reaudit.md),
+`stg_kit_pers0` (unreached) -- Lean's instances `GenCparams.gcT_*`,
 `ushExecfailLawAt_persistent`, `pnsKit_persistent` are found by
-resolution), `prod_stage_law_persistent` is ported in `UshPipesStageLaw`.
+resolution instead; `prod_stage_law_persistent` is ported in `UshPipesStageLaw`.
 
 ## Deviations from Rocq
 

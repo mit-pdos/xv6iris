@@ -12,9 +12,9 @@ DEVIATIONS from Rocq:
 1. Rocq's section `Context`s `(M G B sd A)` are explicit arguments, as in
    `GenOut.lean` (its deviation 1).
 2. THE KERNEL PREMISES (K1)/(K2)/(K3) (`GenOutHistSeal.lean` DEVIATION 1):
-   the landed `consEvOk` lacks them, so `gcl_open` takes `hK1`/`hK2` and
-   `gcl_close` takes `hK3`, in Rocq's exact shape; once `consEvOk` carries
-   them they are its projections.
+   `gcl_open` takes `hK1`/`hK2` and `gcl_close` takes `hK3`, in Rocq's
+   exact shape.  `consEvOk` carries them (krelax af31d1908), so they are
+   redundant with `hev`: callers pass its projections.
 3. The pure/ghost split of `GenOutRead.lean`: the echo step's whole pure
    argument (Rocq's inline asserts of `gcl_step_echo`) is the pure lemma
    `gclPure_step_echo`; the drain's witness read-back at a filed state is

@@ -16,10 +16,10 @@ text.  Rocq's `secc_mask_masked` -- THE ONE PLACE THE BINARY'S LITERAL ENTERS
 the seccomp proof: row 23 ANDs it into the full mask, and the result clears
 all six numbers of `UexecSecc.secc_B` -- is `seccLit_mask_clears` below.
 
-Deviation (pending K3): Lean has no `UexecSecc` yet (`secc_all`, `secc_B`,
-`secc_masked` arrive with K3, union brief DU7), so `seccLit_mask_clears`
-states the six bits directly at `secc_all = allOnes 64`; once `seccMasked`
-lands, Rocq's `secc_mask_masked` is a one-line corollary.  Cleanup:
+Deviation: `seccLit_mask_clears` states the six bits directly at
+`secc_all = allOnes 64` (this file predates K3's `UexecSeccMasked`); Rocq's
+`secc_mask_masked` itself is `UkSeccDefs.seccMask_masked`, over
+`UexecSeccMasked.seccMasked`.  Cleanup:
 Rocq's `secc_lit*` are the generic kit (`seccLit`/`seccLitOk` name it).
 -/
 import Xv6.UserLit

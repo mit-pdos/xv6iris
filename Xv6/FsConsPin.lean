@@ -20,10 +20,12 @@ corresponding COMMIT carries.
 2. `delta_unarm_lookup_ne` / `delta_trunc_lookup_ne` are NOT restated: they
    are `FsAbsDelta.deltaUnarm_lookup_same` / `deltaTrunc_other` (same
    statements, landed with the deltas).
-3. CONE TRIM (unreached): `fname_console_ne_*`, `cons_absent_apath`,
-   `cons_inum*`, `era0_boot_cons_absent`, the arm lemmas (`*_arm`), the
-   create-other lemmas, the fresh-unarm lemmas and the trunc lemmas other
-   than `delta_trunc_nonfile` / `delta_trunc_aents`.
+3. CONE TRIM (unreached): `fname_console_ne_*`, `era0_boot_cons_absent`,
+   the arm lemmas (`*_arm`), the create-other lemmas, the fresh-unarm lemmas
+   and the trunc lemmas other than `delta_trunc_nonfile` /
+   `delta_trunc_aents`.  (`cons_absent_apath` and `cons_inum*`, first
+   trimmed with them, are reached through the instance `union_laws_at`,
+   which the glob walk cannot see: they are in `FsConsPinSeal.lean`, U4.)
 -/
 import Xv6.FsShPin
 import Xv6.FsEchoPin

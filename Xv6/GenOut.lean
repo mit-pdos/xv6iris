@@ -37,6 +37,14 @@ Rocq's header, abridged:
    helpers (`lm_d4_nomerge_snoc`, `lm_disc_seg'_pt_last`,
    `lm_next_input_of_complete`), `gcl_step_byte`, `gdrain_ret`/`gcl_drain`.
    (The union's claim is `UnionOut`'s, which reuses only these steps.)
+   (U4 correction: the glob walk cannot see typeclass resolution; `gcl_close`,
+   `gcl_open`, `gcl_arm`, `gcl_step_echo`, `gdrain_ret`/`gcl_drain` (in
+   `GenOutSeal.lean`) and the pure `lm_stream_echo`, `lm_d4_nomerge_snoc`,
+   `lm_disc_seg'_pt_last`, `lm_next_input_of_complete` (in
+   `GenOutSealPure.lean`) ARE reached, through the instance `union_laws_at`,
+   and are ported in `GenOutSeal.lean`/`GenOutSealPure.lean`.  The kernel-term
+   re-audit, notes/cone_reaudit.md, finds `gcl_sup` and `gcl_step_byte`
+   unreached.)
 3. `gop_lta_prefix` is `ll_lta_prefix`, `gop_prefix_of_removelast` is
    `ll_prefix_of_removelast` (`Xv6/LineModelLinks.lean`), and
    `gop_prefix_removelast` / `gop_prefix_snoc_lookup` are stated here once

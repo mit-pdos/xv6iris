@@ -17,7 +17,8 @@ DEVIATIONS from Rocq:
    `ugnPipe ug`); `gf` is `ug.ugnFile`.
 2. THE KERNEL PREMISES (`GenOutHistSeal.lean` DEVIATION 1): `ucl_close`
    takes `hK3` and `ucl_open` takes `hK1`/`hK2`, in Rocq's exact shape;
-   once `consEvOk` carries them they are its projections.
+   `consEvOk` carries them (krelax af31d1908) and the caller
+   (`UnionLinksSeal.union_happ_echo`) passes its projections.
 -/
 import Xv6.UnionOut
 import Xv6.PipeOutWSeal

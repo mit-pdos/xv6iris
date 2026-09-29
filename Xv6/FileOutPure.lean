@@ -21,6 +21,10 @@ pointer (`ralt_at_ge`, `ralt_panic_ge/def`, `pro_idx_f_ext_panic/ge`,
 `alts_pad_panic/pro_idx`), `good_out_f_step`, the first-drain facts
 (`in_pres_first`, `disc_f_first_out`, `echof_lines_*_cut`,
 `efl_of_first_out`), `fop_snoc_inv`, `sessf_nonnil`, `fop_lta_prefix`.
+(U4 correction: the glob walk cannot see typeclass resolution; `in_pres_first`, `echof_lines_before_cut`,
+`echof_lines_of_cut` and `fop_snoc_inv` ARE reached, through the instance
+`union_laws_at`, and are ported in `FileOutPureSeal.lean`.  The kernel-term
+re-audit, notes/cone_reaudit.md, finds the rest unreached.)
 The line model (`LineModel`/`LineModelLinks`/`GenOutPure`) states the
 generic versions the union reads.
 -/

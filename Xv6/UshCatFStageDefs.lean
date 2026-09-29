@@ -21,9 +21,10 @@ notations as projections (`T fcR nc wsN FAM pkitR` are `D.T`, `D.fcR`,
 `D.nc`, `D.wsN`, `D.FAM`, `pnsKit D.toPns`; `QcR Rd k` is `S.QcK k` at the
 round's own loan `D.Rd`; `a0_idx` is `10#5`).
 
-## Dropped (unreached)
+## Dropped
 
-`cfs_T_pers0`, `cfs_T_tl0`, `cfs_kit_pers0` (instances: Lean's are
+`cfs_T_pers0`, `cfs_T_tl0` (reached by instance resolution, which the glob
+walk cannot see; notes/cone_reaudit.md), `cfs_kit_pers0` (unreached) -- instances: Lean's are
 `GenCparams.gcT_persistent`/`_timeless`, `pnsKit_persistent`), `WITN` (a
 local notation, spelled `D.WITN`).
 

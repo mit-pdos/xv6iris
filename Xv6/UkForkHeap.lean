@@ -38,9 +38,11 @@ Rocq's header, point for point:
 3. `Forkable` is a `Prop` class with one field (`Forkable.fork`), an
    entailment rather than Rocq's wand-valued `Class … : Prop := forkable :
    ∀ …, P -∗ …`; the instances are theorems registered as instances.
-4. NOT PORTED (unreached from `union_adequacy_closed`): the instances
-   `forkable_ubyte`, `forkable_utext`, `forkable_ubyteq_map`,
-   `forkable_utext_all`, `forkable_ustr` (the full-ownership string).
+4. NOT PORTED: the instances `forkable_ubyte`, `forkable_utext`,
+   `forkable_utext_all`, `forkable_ustr` (the full-ownership string), all
+   unreached, and `forkable_ubyteq_map` (reached by instance resolution from
+   `UkInitMain.forkable_init_img`, which the glob walk cannot see; Lean's
+   `UkInitDefs.forkable_initImg` is proved without it).
 -/
 import Xv6.UserHeap
 

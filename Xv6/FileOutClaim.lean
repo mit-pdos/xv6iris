@@ -24,10 +24,12 @@ Rocq's header, abridged:
 
 1. **Scope: the reached declarations only** (FileOut 45/95), plus the
    `Persistent`/`Timeless` instances of the reached predicates.  Not ported
-   (unreached from `union_adequacy_closed`; the union's claim and ledger are
-   `UnionOut`'s): `ftag`, `f0_map_step`/`f0_map_on`, the `efl_of`/
+   (unreached; the union's claim and ledger are `UnionOut`'s): `ftag`.  The
+   rest of the first trim -- `f0_map_step`/`f0_map_on`, the `efl_of`/
    `echof_lines_of` motion lemmas, `f0_pinned_undrained`/`_io`/`_drained`/
-   `_drain`, `f0_typed_adm`, `fl_auth_grow_pre`, `file_birth_all`.
+   `_drain`, `f0_typed_adm`, `fl_auth_grow_pre`, `file_birth_all` -- IS
+   reached, through the instance `union_laws_at` (the glob walk cannot see typeclass resolution), and is
+   ported in `FileOutSeal.lean` (U4).
 2. The laws that are FIELDS of `GenCparams`/`GenWa` (`f0wa_agree`,
    `f0wa_agree_d`, `f0wa_W`, `f0wa_file`, `file_gext_grow`) keep Rocq's
    curried `⊢ A -∗ B -∗ C` form (`GenLinksLine` deviation 6).

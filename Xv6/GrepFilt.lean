@@ -21,7 +21,8 @@
    `lastpart_suffix`, `gout_nil`, `grep_out_mono`, `gout_len`,
    `grep_out_len`, `grep_out_line_pass`, the demos (§4, §6), `flt_grep_out`,
    and the exit-reachability layer (`gx_st*`, `grep_exit`,
-   `grep_filt_exits`).
+   `grep_filt_exits`).  (`grep_out_mono` is in fact reached, but only
+   through the DU9 decider `UnionDecU`: notes/cone_reaudit.md.)
 -/
 import Xv6.GrepTree
 import Xv6.ProgTreePipes

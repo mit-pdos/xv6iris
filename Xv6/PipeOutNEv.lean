@@ -14,10 +14,14 @@ receipt exactly as `GenOut.gcl_step_read` does, the echo is refuted.
 
 ## DEVIATIONS from Rocq
 
-1. Scope: the reached declarations only.  Not ported (unreached):
-   `gcl_pure_o_arm/close/open/no_echo`, `lm_out_pure_o_move`,
-   `lm_pending_filed`, `lm_good_out_of_stage_open`, `popenV_close/open/arm/
-   drain`, `peclV_close/open/sup/arm/drain/step_echo/step_byte`, `peclE`.
+1. Scope: the reached declarations only.  First trimmed as unreached by the
+   glob walk, which cannot see typeclass resolution, and in fact reached
+   through the instance `union_laws_at` (U4): `gcl_pure_o_arm/close/open/
+   no_echo`, `lm_out_pure_o_move`, `lm_pending_filed`,
+   `lm_good_out_of_stage_open` (ported in `PipeOutNEvSealPure.lean`) and
+   `popenV_close/open/arm/drain`, `peclV_close/open/arm/drain/step_echo/
+   step_byte` (ported in `PipeOutNEvSeal.lean`).  Not ported, and unreached
+   by the kernel-term re-audit (notes/cone_reaudit.md): `peclV_sup`, `peclE`.
 2. `peclV_gen` is `Iff.rfl`-level (the claim's definition), stated as a
    `⊣⊢` for Rocq's name; `cs_lb_weakenV` is `GenOut.gopCsLb_weaken`
    restated under Rocq's name.

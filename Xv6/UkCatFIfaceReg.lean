@@ -17,8 +17,9 @@ CONE (UkCatFIface.v, reached, this file): `cfdev` (+ `UDIn`/`UDProd`),
 `cif_ok_closed_fresh`, `cif_ok_ledger`, `cif_ok_open_std`, `cif_not_shared`,
 `cif_ok_close`, `cif_ok_close_shared`, `cif_dst_some`, `cif_dst_none`,
 `cif_om_create`, `cif_tok`, `cif_tok_agree`, `cif_tok_halves`,
-`cif_pool_own_take`, `cif_pool_give`, `cif_toks_agree`.  Not reached: the
-schemes, `subG_cifRegΣ`, `cif_reg_inG`.
+`cif_pool_own_take`, `cif_pool_give`, `cif_toks_agree`.  Not ported: the
+schemes; `subG_cifRegΣ`, `cif_reg_inG` (reached only by instance
+resolution: Rocq's Σ plumbing, which the class slot in `unionGF` subsumes).
 
 ## Deviations from Rocq
 

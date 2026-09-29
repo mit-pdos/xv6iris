@@ -32,9 +32,9 @@ HOLES the caller funds (Rocq's program-specs cut 3):
    `ulibFprintf_link`) over the stand-in run interface `UlibRunP`, whose
    `goal` is ONE fixed proposition; the real leaves re-quantify the hart
    (`∀ h', urun N h' … -∗ wpLoop h'`), so `UlibRunP` has no instance at
-   `urun`/`wpLoop` as it stands (`UlibRunP.ofUkRun` does not exist).  cat's
-   walks therefore take fprintf at the Rocq shape; the link discharges it
-   from `ulibFprintf_link` once the run interface carries the hart.  For the
+   `urun`/`wpLoop` directly.  cat's walks therefore take fprintf at the
+   Rocq shape; `CatPrintfLink.catFprintf_link` discharges it from the one
+   proof through the printf bridge (`UlibRunUk`/`UlibUkProg`).  For the
    same reason `kcatPaySeq`/`kcatWb` are Rocq's own (over `urun`), not
    `UlibPrintfDefs.ulibPaySeq` (which is them at a `UlibRun`).
 3. The hole's return register file is `UkStub.stubRet m NUM ret` (Rocq

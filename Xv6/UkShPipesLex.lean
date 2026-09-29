@@ -14,7 +14,8 @@ pipeline's line (`ushqLinesWs`) is one.
 2. CONE TRIM (union_cone.md §2, DU8 trim; the reach re-run with the DU8
    re-point's bridges as roots: 23/52): not ported, as unreached:
    `ushq_barw_of_pipe`, `_lt`, `_bar`, `_sym_ok`, the `*_barw` gettoken
-   readings, `ushq_bars_ind`, `ushq_bars_of_pipe`, `ushq_ws_ok_of_line_ok`,
+   readings, `ushq_bars_ind` (reached, through `ushq_bars_good`, but
+   `UshPipesPure.ushqBars_good` is proved without it), `ushq_bars_of_pipe`, `ushq_ws_ok_of_line_ok`,
    `ushq_rtoks`, the `ushq_tail_is_*`/`ushq_lines_is_one` readings,
    `ushq_word_*`, `ushq_tail_word`/`_lt`/`_sym`/`_bars`, `ushq_lines_bars`,
    and the demo (§5).  `ushq_tail_is`/`ushq_lines_is` (the one-word-per-stage

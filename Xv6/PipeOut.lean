@@ -44,12 +44,14 @@ resolution's `mono_list nat` is `DiskG.mlPosG` (slot 86), as at `EchoOut`.
 
 1. **Scope: the reached declarations only**, plus the `Persistent` /
    `Timeless` instances of each reached predicate (union_cone.md §1.2; glob
-   walks do not see instance resolution).  Not ported (unreached):
-   `postage`, `pstream`, `cs_nofork`, the pure stage account
-   (`ps_round_p`, `ps_opens_p`, `ps_len_ok_p`, `pein_pure`,
-   `ch_arm_era_p`, `pout_pure_o`, `pblk_open`, `pcl_pure_o`), `blk_alloc`,
-   `pera_map_step`/`pera_map_on`, `pipe_cparams`/`pipe_wa*`, `popen`,
-   `pecl`, `ptag`, `pturn`, `pipe_led`.
+   walks do not see instance resolution).  Not ported (unreached; confirmed
+   by the kernel-term re-audit, notes/cone_reaudit.md): `postage`, `pstream`,
+   `cs_nofork`, the pure stage account (`ps_round_p`, `ps_opens_p`,
+   `ps_len_ok_p`, `pein_pure`, `ch_arm_era_p`, `pout_pure_o`, `pblk_open`,
+   `pcl_pure_o`), `pipe_cparams`/`pipe_wa*`, `popen`, `pecl`, `ptag`,
+   `pturn`, `pipe_led`.  `blk_alloc` and `pera_map_step`/`pera_map_on`,
+   first trimmed with them, ARE reached (through the instance
+   `union_laws_at`) and are ported in `PipeOutSeal.lean` (U4).
 2. `pipeOutΣ` / `subG_pipeOutΣ`: subsumed by `BundledGFunctors` (the class
    is the capacity; the slots are U4's).
 3. Rocq's `echo_fixed` (AppEcho) IS `EchoOut.echo_gn`, so `pgnCl : EchoGn`.

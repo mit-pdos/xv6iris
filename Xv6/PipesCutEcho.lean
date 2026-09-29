@@ -13,9 +13,9 @@ facts the second one needs:
 * `pcut_fs_stage`: stage `k`'s token list, its words exec'able, its argv in
   the cut.
 
-STILL LEFT (6, none reads UkShEcho; portable now that `UkShLineDefs.ushLineAt`
-has landed): `pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`,
-`pipes_lpg_of_at`, `pipes_lpcg_of_at`.
+The file's last six (`pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`,
+`pipes_lpcg_bytes`, `pipes_lpg_of_at`, `pipes_lpcg_of_at`) are in
+`Xv6/PipesCutMain.lean`.
 
 Deviations from Rocq: `UkSh.ush_line_at` is `ushLineAt` (UkShLineDefs);
 `Forall P l` is `∀ x ∈ l, P x`; `l !! k` is `l[k]?`; `pcut_fs_stage`'s two

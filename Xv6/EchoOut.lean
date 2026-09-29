@@ -49,9 +49,12 @@ The FIFTH, `ghost_mapG nat era_pins`, is new: it is the one field of
    whole).  Not ported (no declaration reached): `ostage` and the pure stage
    account (`eout_pure`, `cs_len_ok`, `ps_len_ok`, `pcount`, `proc_before`,
    `ein_pure`, `dl_ok`, `ecl_pure`, …), the merged claim `ecl` and its moves,
-   `eturn`, `etag`, `era_full`, the licences, the links, `pin_map_step` /
-   `pin_map_on` (the union's own power-on step mints its pins,
-   `UnionOut`).
+   `eturn`, `etag`, the licences, the links.  (U4 correction: the glob walk cannot see typeclass resolution;
+   `era_full`/`era_full_alloc`, `pin_map_step`/`pin_map_on` and
+   `io_singleton` ARE reached, through the instance `union_laws_at`, and
+   are ported in `EchoOutSealEra.lean`; the pure console-history lemmas it
+   reaches are in `EchoOutSealPure.lean`.  The kernel-term re-audit,
+   notes/cone_reaudit.md, finds the rest of this list unreached.)
 2. **The pure-line-model-dependent reached declarations are in
    `Xv6/EchoOutLine.lean`** (`ch_E`, `lines_bytes_nil`, `nstarted_rest_nil`,
    `ein_read_byte`): they read `EchoOutPure.echoed` / `LineWords`, which the

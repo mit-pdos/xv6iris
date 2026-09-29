@@ -34,7 +34,9 @@ xv6GF/unionGF slots, U4).
 1. **Scope: the reached declarations only** (union_cone.md §1.4: FileOut
    45/95), plus the `Persistent`/`Timeless` instances of each reached
    predicate and `f0_typed_none` (one line, the head's empty witness).  Not
-   ported (unreached): `rd_stage_f`/`rd_stage_f_lm`, `f0_alloc`.
+   ported (unreached): `rd_stage_f`/`rd_stage_f_lm`.  `f0_alloc` is reached,
+   through the instance `union_laws_at` (the glob walk cannot see typeclass resolution), and is ported in
+   `FileOutSeal.lean` (U4).
 2. `fileOutΣ` / `subG_fileOutΣ`: subsumed by `BundledGFunctors` (the class
    is the capacity; the slots are U4's).
 3. Rocq's section parameter `g : file_gn` is an explicit first argument of

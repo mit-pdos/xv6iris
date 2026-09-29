@@ -24,8 +24,9 @@ Rocq's header, abridged (the reasons are the content):
 ## DEVIATIONS from Rocq
 
 1. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`.
-2. Scope: the transports (`f_state_copy`, `f_state_typed_at`, `file_xfer`,
-   `file_xfer_boot`) are unreached and not ported.
+2. Scope: the transports `f_state_copy`, `f_state_typed_at` and
+   `file_xfer_boot` are reached only through the instance `union_laws_at`, which the glob walk could not see: they are ported in `AppFileSeal.lean`
+   (U4).  `file_xfer` is unreached (kernel-term re-audit, notes/cone_reaudit.md).
 -/
 import Xv6.AppFileClaim
 

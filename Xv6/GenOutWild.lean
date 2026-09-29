@@ -26,6 +26,11 @@ Deviations from Rocq:
    `GenOutPure.lean`.
 3. CONE TRIM (12 of 16 reached): not ported `lm_alts_pre_snoc_w`,
    `lm_good_out_wild`, the local `st` abbreviation, `lm_placed_wild_undisc`.
+   (U4 correction: the glob walk cannot see typeclass resolution;
+   `lm_alts_pre_snoc_w` and `lm_good_out_wild` ARE reached, through the
+   instance `union_laws_at`, and are ported in `GenOutWildSeal.lean`.  The
+   kernel-term re-audit, notes/cone_reaudit.md, finds `lm_placed_wild_undisc`
+   unreached.)
 -/
 import Xv6.GenOutHist
 import Xv6.ConsoleTags

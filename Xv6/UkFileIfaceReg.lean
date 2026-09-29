@@ -27,8 +27,9 @@ registries' shared shape, stated once): `fif_pool` = `HfpReg.pool`,
 `pool_update`/`reg_alloc`/`tok_agree`/`tok_halves`/`pool_own_take`/
 `pool_give`/`toks_agree`.  `fifRegΣ` is U4's `unionGF` slot for
 `FifRegG` (deviation 4); the section notations `c`, `γfd`, `a0_idx`..`a7_idx`,
-`fcons_atc` are written out.  Not reached: the schemes, `fif_reg_inG`,
-`subG_fifRegΣ`.
+`fcons_atc` are written out.  Not ported: the schemes; `fif_reg_inG`,
+`subG_fifRegΣ` (reached only by instance resolution: Rocq's Σ plumbing,
+which the class slot in `unionGF` subsumes).
 
 ## Deviations from Rocq
 

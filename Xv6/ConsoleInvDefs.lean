@@ -90,11 +90,11 @@ Deviations from Rocq:
     cone, so it is restated as `consWord_persist` (cleanup candidate: hoist
     one copy to `MachCSL/WordPointsTo.lean`).
 11. (seccomp S2k, K3.)  `consResCur` carries Rocq's era clause
-    `consEra (st ++ pd) cn.era` and, of relax-d2 (lane K2), ONLY the
-    reader-position bound `nrd ≤ cur` -- the marked arm's placement needs
-    it (a holder's popped byte sits at the cursor, which the token's own
-    count never exceeds).  Rocq's `cons_dlcnt`/`ndl ≤ nrd` half is still
-    unported (it predates this lane's scope).  `cons_placed`/`cons_era`
+    `consEra (st ++ pd) cn.era` and relax-d2's reader-position bound
+    `nrd ≤ cur` -- the marked arm's placement needs it (a holder's popped
+    byte sits at the cursor, which the token's own count never exceeds).
+    The other half, Rocq's `cons_dlcnt`/`ndl ≤ nrd`, came with krelax
+    (af31d1908): `consDlcnt cn ndl ∗ ⌜ndl ≤ nrd⌝`.  `cons_placed`/`cons_era`
     live in `ConsoleTags` (pure), `cons_swallow_placed` here.
 -/
 import MachCSL.CtxBox

@@ -15,15 +15,17 @@ WHAT IS HERE NOW: the two boolean sweeps every L3/L4 proof is
 (`notIn_of_forallb`, `mapForall_of_forallb`) and the root's one hop at a
 directory row (`astep_root_of_row`).
 
-PENDING (blocked on row U1-T, which ports the image pins; union_cone.md §3
-lists these MISSING): `sys_names` needs `FsImgCheck`'s pinned names
+PORTED ELSEWHERE: the declarations once PENDING here on the image pins are
+in `Xv6/FileNamePins.lean` (`sys_names`, `name_laws`, `txt_laws`,
+`txt_sys_ok`/`txtSysOk`, `txt_img_ok`/`txtImgOk`, `nl_ne_sys`,
+`nl_ne_console`, `era0AstepRoot`, `era0ClassAbsent`,
+`era0RecoveryClassAbsent`).  Their original blockers: `sys_names` needs `FsImgCheck`'s pinned names
 (`fname_init/sh/echo/cat/sync/grep`) and `FsConsPin.fname_console`;
 `name_laws`/`txt_laws`/`txt_sys_ok`/`txt_img_ok`/`nl_ne_sys`/
 `nl_ne_console` need `sys_names` and `TreeImg.img_root_ents`;
 `era0_astep_root`/`era0_class_absent`/`era0_recovery_class_absent` need
 `FsInitPin` (`era0_D`, `era0_root_row`, `fsimg_root_dir`) and
-`FsInitPinBoot.era0_recovery_D`.  They go here, with Rocq's statements,
-when those land.  (UNamePath reads L1/L2 off the class directly, so it does
+`FsInitPinBoot.era0_recovery_D`.  (UNamePath reads L1/L2 off the class directly, so it does
 not wait on them: UNamePath deviation 1.)
 
 Deviations from Rocq:

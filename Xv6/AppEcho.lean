@@ -43,9 +43,10 @@ What is here (Rocq's header, abridged -- the reasons are the content):
 4. Rocq's curried `A -∗ B -∗ C` step lemmas are stated `A ∗ B ⊢ C`
    (`EchoOut.lean` deviation 6); the `⊢ □ (…)` laws keep Rocq's shape.
 5. Scope: the reached declarations plus the `Persistent`/`Timeless`
-   instances of the reached predicates.  Not ported (unreached):
-   `echo_birth`, `echo_R*`, `echo_tag*`, `echo_fs_pure_acc`, the
-   arm/unarm/create-other/present lemmas, `echo_xfer*`, `echo_sup_of_taint`,
+   instances of the reached predicates.  `echo_birth` and `echo_xfer_boot`
+   are reached only through the instance `union_laws_at`, which the glob walk could not see: they are ported in `AppEchoSeal.lean` (U4).  Not
+   ported, and unreached by the kernel-term re-audit (notes/cone_reaudit.md): `echo_R*`, `echo_tag*`, `echo_fs_pure_acc`, the
+   arm/unarm/create-other/present lemmas, the other `echo_xfer*`, `echo_sup_of_taint`,
    `echo_taint_of_sup`, `echo_init_img`, `echo_phi` and the echo
    application record `app_echo` with its laws (the union uses the FILE
    application, `AppFile`).

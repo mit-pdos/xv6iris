@@ -26,8 +26,9 @@ payload is applied at (`shPayKey`).
 
 ## Dropped
 
-* UNREACHED: `sh_rdcount_le`, `sh_prompt_law_persistent`,
-  `sh_image_entry_at`.
+* UNREACHED: `sh_rdcount_le`, `sh_image_entry_at`.
+* `sh_prompt_law_persistent` (reached by instance resolution, which the
+  glob walk cannot see): `UshPromptLaw.shPromptLaw_persistent`.
 * `sh_prompt_law`: owned by sibling lane rsh-p (`Xv6/UshPromptLaw.lean`,
   `shPromptLaw`); `UshKernelSlot` takes its body unfolded.
 * `sh_union_comm_bool` (reached only through `shk_img_sub_of_elf`'s DATA

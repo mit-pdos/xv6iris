@@ -68,6 +68,11 @@ Deviations from Rocq:
    `wf_lta`, `epu_take_S`, `lta_of_take_eq`, `epu_prompt_of_dollar`,
    `disc_seg'_open_seg`, `disc_seg'_pt_last`, `u_prologue_pos`,
    `sess_nonnil`, `in_pres_lookup_ins`, `in_pres_mono`, `flush_lost_*`.
+   (U4 correction: the glob walk cannot see typeclass resolution; `echo_of_other`, `epu_filter_all`,
+   `in_pres_lookup_ins`, `in_pres_mono`, `lines_bytes_0/S/last/snoc_nl/
+   snoc_other` and `prefix_app_cancel` ARE reached, through the instance
+   `union_laws_at`, and are ported in `EchoOutPureSeal.lean`.  The
+   kernel-term re-audit, notes/cone_reaudit.md, finds the rest unreached.)
    The line model (`LineModel`/`LineModelLinks`/`GenOutPure`) restates the
    stage machine generically.
 -/

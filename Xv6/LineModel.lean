@@ -38,9 +38,17 @@ Deviations from Rocq:
    `lm_seq_prefix_det`, `lm_sess_prefix_det`, `lm_pro_pin_of_ok`,
    `lm_seq_bs_app`, `lm_sess_snoc_nl/other`, `lm_sess_step`, `lm_sess_mono`,
    `lm_seq_cs_ext`, `lm_sess_cs_ext`, `lm_d4_noterm`,
-   `lm_expected_rel_out_mono`.  (The determinacy argument
-   `lm_sess_prefix_det` is not reached at the pin: the union's claim reads
-   the transcript through the stage families of `LineModelLinks`.)
+   `lm_expected_rel_out_mono`.
+   (U4 correction: the glob walk cannot see typeclass resolution;
+   `lm_seq_0/S/cons(_assoc)/cs_ext/bs_ext/bs_app/prefix_det`,
+   `lm_sess_nil/cs_ext/snoc_nl/snoc_other/step/mono/prefix_det`,
+   `lm_pro_idx_add/mono`, `lm_upto_drop/bs_ext/st_ok`,
+   `lm_cont_at_drop/0/bs0`, `lm_blk_drop`, `lm_cont_all(_out/_panic)`,
+   `lm_alts_ok_at/len/nil/prefix`, `lm_disc_input_at` and `lm_cont_pair_det`
+   ARE reached, through the instance `union_laws_at`, and are ported in
+   `LineModelSeal.lean`.  The kernel-term re-audit, notes/cone_reaudit.md,
+   finds `lm_alts_ok_nostate`, `lm_pro_pin_of_ok`, `lm_d4_noterm` and
+   `lm_expected_rel_out_mono` unreached.)
 -/
 import Xv6.LineBytes
 import MachCSL.ObsTrace

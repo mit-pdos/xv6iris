@@ -4,9 +4,11 @@ main, start and panic at one engine `UL`, the syscall rows `HS`/`HSS`, and
 sh's fprintf contract `HF` (DU10: one function per Spec/Proof file; Rocq's
 `UkSh`/`UkShDiag` sections close them together).
 
-Parameters: `UL : UK_LEAVES` (DU2); `HS : UK_SYS_P`, `HSS : USH_SYS_P`
-(UkRunSys not ported); `HF : USH_FPRINTF` (Rocq `wp_kshd_fprintf_s_chain`;
-printf-once's `%s` takes a data string only, panic prints a text literal).
+Parameters: `UL : UK_LEAVES` (DU2); `HS : UK_SYS_P`, `HSS : USH_SYS_P`;
+`HF : USH_FPRINTF` (Rocq `wp_kshd_fprintf_s_chain`).  All three are
+discharged downstream (`UkSysPHolds.ukSysP_holds`, `ushSysP_holds`,
+`LinkShFprintf.ushFprintf_holds`), composed in
+`LinkUInitUnion.shStart_ofLeaves`.
 (The former `hex` premise -- memset's NULL arm's exit deposit -- is retired:
 `wp_uk_sb_denied` self-mints it, U1-R.)
 -/

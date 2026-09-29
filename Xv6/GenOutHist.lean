@@ -32,6 +32,10 @@ Deviations from Rocq:
    `gin_pure_0`, `lm_dl_ok_0`, `lm_dl_ok_echo`, `gcl_pure_arm`,
    `gcl_pure_close`, `lm_out_pure_move`, `gcl_pure_open`, `gcl_pure_byte`,
    `lm_out_pure_nil_stage`.
+   (U4 correction: the glob walk cannot see typeclass resolution; all of these
+   except `lm_out_pure_nil_stage` ARE reached, through the instance
+   `union_laws_at`, and are ported in `GenOutHistSeal.lean`.  The kernel-term
+   re-audit, notes/cone_reaudit.md, finds `lm_out_pure_nil_stage` unreached.)
 -/
 import Xv6.GenOutPure
 import Xv6.EchoOutLine

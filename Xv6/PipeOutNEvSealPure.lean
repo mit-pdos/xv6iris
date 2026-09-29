@@ -13,10 +13,11 @@ as in Rocq), `lm_out_pure_o_move` → `lmOut_pure_o_move`,
 `lmGoodOut_of_stage_open` (takes `K`, `B`).  Rocq's `K` in this file is a
 `Local Notation` (`gcK G`), nothing to port.
 
-DEVIATION (as `GenOutHistSeal.lean` DEVIATION 1): the landed `consEvOk` lacks
-the pin's `EvOpen` clauses (K1)/(K2) and `EvClose` clause (K3);
-`gclPureO_open` / `gclPureO_close` take them as explicit hypotheses of the
-exact Rocq shape (`hK1`, `hK2`, `hK3`).  `lm_alts_pre_snoc` is
+DEVIATION (as `GenOutHistSeal.lean` DEVIATION 1): `gclPureO_open` /
+`gclPureO_close` take the pin's `EvOpen` clauses (K1)/(K2) and `EvClose`
+clause (K3) as explicit hypotheses of the exact Rocq shape (`hK1`, `hK2`,
+`hK3`); `consEvOk` carries them (krelax af31d1908), and callers pass its
+projections.  `lm_alts_pre_snoc` is
 `GenOutWildSeal.lmAltsPre_snoc_w` (Rocq's pure copy of it).
 -/
 import Xv6.PipeOutNPure

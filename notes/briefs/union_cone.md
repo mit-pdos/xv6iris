@@ -1,5 +1,10 @@
 # Union cone audit (U0-X): the real cone of `union_adequacy_closed`
 
+> **SUPERSEDED for reachability (Sept 29 2026):** this glob walk cannot see typeclass/instance
+> resolution (U4 found ~300 declarations reached only through `union_laws_at`).  The kernel-term
+> re-audit, `notes/cone_reaudit.md` (walker `tools/cone_reaudit/`), is the reference for what is
+> reached; the name table (§3) and the DU8 analysis (§2) stay valid.
+
 Read-only audit, 2026-09-26. Rocq `/shared/xv6rocq` @ `1900b8a43` (DU1 pin; tree clean). Lean
 `lean-v2` @ `184d4fb1f`, plus the untracked files the U0 agents were writing during the audit (marked
 "in flight" where they matter). No Lean file or git state was touched.

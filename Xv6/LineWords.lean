@@ -38,6 +38,14 @@ Deviations from Rocq (spelling only; every statement is Rocq's):
    family except `done_of_app_rest`, `wl_raw_line_not_prefix_nonl`,
    `wl_prefix_nonl_of_line`, `wl_join_prefix_det`, `wl_cut_prefix_of`,
    `fn_byte_ne_nl`, and the unreached `Decision` instances.
+   (U4 correction: the glob walk cannot see typeclass resolution;
+   `wl_app_inv_head`, `wl_prefix_app_cancel`, `wl_reshape`, `wl_cut_done_of`,
+   `bodies_of_done`, `nlines_done`, `done_of_nil/prefix/rest_nil`,
+   `wl_cut_prefix_of`, `wl_prefix_nonl_of_line` and
+   `wl_raw_line_not_prefix_nonl` ARE reached, through the instance
+   `union_laws_at`, and are ported in `LineWordsSeal.lean`.  The kernel-term
+   re-audit, notes/cone_reaudit.md, finds the rest unreached, except the
+   `Decision` instances (DU9, deviation 3).)
 -/
 
 namespace Xv6

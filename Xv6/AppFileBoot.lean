@@ -17,7 +17,8 @@ and §7 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
 
 1. Stated at Lean's era-0 vocabulary (`dk : Nat → BitVec 8`, `D :
    BlockMap`, `cov : ExtTreeSet Nat compare`), as `AppEcho.echoInit`.
-2. Scope: `file_xfer_boot` is unreached and not ported.
+2. Scope: `file_xfer_boot` is reached only through the instance `union_laws_at`, which the glob walk could not see;
+   it is ported in `AppFileSeal.lean` (U4), not here.
 3. `escRecs_nil` (the empty ledger's invariant; Rocq `rewrite /esc_recs //`)
    is a one-line helper.
 -/

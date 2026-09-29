@@ -16,8 +16,8 @@ Ported (Rocq → Lean, camelCase as `LineModel.lean`):
 `lmAltsOk_take`, `lm_disc_seg'_in` → `lmDiscSeg'_in`, `lm_disc_in` →
 `lmDisc_in`, `lm_good_out_nil` → `lmGoodOut_nil`.
 
-Not ported (not in the U4 gap list): `lm_phi_step_io`, `lm_phi_step_cons`,
-`lm_phi_step_power`.
+Not ported (unreached; kernel-term re-audit, notes/cone_reaudit.md):
+`lm_phi_step_io`, `lm_phi_step_cons`, `lm_phi_step_power`.
 
 Deviations: spelling only (`Forall P (cycles_of h)` is `lmDisc`'s
 `∀ seg ∈ cyclesOf h`; `ObsUartIn Uart0 b` is `.dev (.uartIn .uart0 b)`;

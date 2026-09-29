@@ -15,14 +15,13 @@ is the only fprintf lemma the reached diagnostic walks call
 
 DU4 DEVIATION: sh's own putc/vprintf/fprintf walks (Rocq `UkShDiag.v`
 §2-§5, ~7k lines) are not ported; this contract is a parameter
-`USH_FPRINTF`.  Its discharge from printf-once (`UlibUkProg.wp_ulibUkFprintfS`
-at sh's image, as `SeccPrintfLink` does for seccomp) is BLOCKED on one
-gap: the one proof's `%s` argument is a DATA-half string at `DFrac.discard`
-(`ulibStr`), while sh's panic prints a TEXT-half literal (`tx = true`,
-`UshDiagPanic`) and the unreached cd arm a data string at a fraction; the
-per-byte families also differ in shape (`kshW1`'s quantified buffer vs
-`ulibUkPaySeq`, bridgeable by `ulibUkWb_ulib`).  Widening `ulibFprintfS`'s
-argument to either half closes it.
+`USH_FPRINTF`.  It is DISCHARGED from printf-once:
+`LinkShFprintf.ushFprintf_holds UL : USH_FPRINTF`, through
+`UlibUkProgS.wp_ulibUkFprintfSX` at sh's image (`ulibUkSh`, relocation
+`UlibPrintfRelocSh`), as `SeccPrintfLink` does for seccomp.  (The `%s`
+argument there is `ulibUkSstr N tx dq`, a string in either half at any
+fraction, handed back; the per-byte families `kshW1` become the image's
+`ulibUkPaySeq` chains by `LinkShFprintf.kshW1_ulibUk`/`ushPaySeq_of_fam`.)
 
 Other deviations: `UshDiagDefs` deviations 1, 5, 6; `a` is a `Nat` (Rocq's
 `0 <= a` dropped); `S q` is `q + 1`.

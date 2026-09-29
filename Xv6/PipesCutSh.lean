@@ -8,13 +8,11 @@ Ported here (9 of the 22 residual declarations): `prod_ws_ok`,
 `wl_rebase_toks`, `ushq_rtoks_ws_ge`, `nulfold_stage`, `tail_ws_stage`,
 `pcut_fs` (definition).
 
-STILL LEFT (13), each blocked on an unported sh-lane definition:
-`line_bytes_pipe_split_fs`, `tail_filts`, `lines_of_pipe_fs` (FileDisc line
-bytes vs the `ushq_lines_ws` shape, portable but not attempted),
-`pcut_fs_echo_bytes` (`UkShEcho.echo_argv_bytes`, sh-exec lane),
-`pcut_fs_stage`, `pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`,
-`pipes_lpg_of_at`, `pipes_lpcg_of_at` (`UkSh.ush_line_at` at a pipe line
-with the lane's own line predicates, sh-main lane).
+The rest of the file (once blocked here on the sh lanes) is ported:
+`line_bytes_pipe_split_fs`, `tail_filts`, `lines_of_pipe_fs`,
+`pcut_fs_echo_bytes`, `pcut_fs_stage` in `Xv6/PipesCutEcho.lean`;
+`pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`,
+`pipes_lpg_of_at`, `pipes_lpcg_of_at` in `Xv6/PipesCutMain.lean`.
 
 Deviations from Rocq: `UkShMain.ushp_nulfold_miss` is `ushpNulfold_miss`
 here (via `ushpNulfold_zeroAt`/`ushZeroAt_miss`); `concat` is

@@ -4,14 +4,16 @@
 `grep_image_entry_env_c`, pinned `1900b8a43`; lane gaps).
 
 The landed `UkTreeEntry` ports the pure argv bridges; the three entries
-themselves are NOT PROVED YET: their proofs read the programs' key geometry
-out of `UShEcho` (`echo_args_det_holds`, `echo_kexec_pages`,
+themselves are proved in `UkTreeEntryEcho.echoImageEntryEnvC_of_leaves`,
+`UkTreeEntryCat.catImageEntryEnvC_holds` and
+`UkTreeEntryGrep.grepImageEntryEnvC_of_leaves` (all at the engine `UL`).
+Their proofs read the programs' key geometry out of `UShEcho` (`echo_args_det_holds`, `echo_kexec_pages`,
 `echo_kexec_entry_rows`, `echo_room_of_det`), `UShCat` (`cat_args_det_holds`,
 `cat_kexec_pages`, `cat_kexec_entry_rows`, `cat_kexec_bufrow`,
 `cat_kexec_argnz`, `cat_key_args_holds`, `cat_room_of_det_x`,
-`cat_entry_run`) and `UShGrep`, none of which is ported (program lanes).
-Until they are, every consumer takes the entry as a hypothesis -- and this
-file is the ONE statement of each (the H-file / H-pipe entries used to state
+`cat_entry_run`) and `UShGrep` (program lanes, since landed).  Consumers
+that take an entry as a hypothesis read it from this file, the ONE statement
+of each (the H-file / H-pipe entries used to state
 cat's twice, `UkCatFEntries.CatImageEntryEnvC` and
 `UkPipesEntriesDefs.PseCatImageEntryEnvC`, and `UkUnionEntriesDefs`'
 `UkTreeEntryP` a third time): `EchoImageEntryEnvC`, `CatImageEntryEnvC`,

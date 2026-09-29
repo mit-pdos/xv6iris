@@ -15,13 +15,11 @@ open installed at slot 0.  The rows are stated over an abstract `st` so the
 program tier (`UkInit`, `UkInitMain`) and the application tier (`UInitCons`)
 can both name them; the ledger is `take NSTD fdt0`, THREE slots.
 
-## Not ported yet (waits for K3, the UserFd whole-table view)
+## The ledger-at-a-view half: `Xv6/UInitFdHead.lean`
 
-The ledger-at-a-view half of the file is stated over Rocq's seccomp-S4
-`UserFd` view (`ustd_ok`, `ustd_at`, `ualloc_v`, `tab_le`, `ush_view_ok`,
-and the `ufdcell`/`utab` camera behind them), which changes `UserFd.ustd`
-itself and is K3's (union brief row K3, "UserFd whole-table view").  The
-reached declarations that wait for it: `ufd_alloc0_v`, `ufd_headL`,
+The half of the file stated over Rocq's seccomp-S4 `UserFd` view
+(`ustd_ok`, `ustd_at`, `ualloc_v`, `tab_le`, `ush_view_ok`; K3) is ported
+there (camelCase: `ufdHeadL`, `ufdRow`, …): `ufd_alloc0_v`, `ufd_headL`,
 `ufd_head1`, `ufd_head`, `ufd_headL_at`, `ufd_headL_closed`,
 `ufd_headL_taint`, `ufd_head1_l1`, `ufd_head1_closed`, `ufd_head1_taint`,
 `ufd_head_l3`, `ufd_head1_to_l1`, `ufd_head_of_l3`, `ufd_head_closed`,

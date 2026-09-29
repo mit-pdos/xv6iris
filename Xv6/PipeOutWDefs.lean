@@ -33,10 +33,13 @@ transition).
    declarations that use them.
 2. `mono_nat_auth_own γ 1 n` is `MonoNat.auth_own γ (DFrac.own 1) (.ofNat n)`
    (EchoOut deviation 5); `list_basics.last` is `getLast?`.
-3. Scope: the reached declarations.  Not ported (unreached): `pwclV_close`,
-   `pwclV_arm`, `pwclV_open`, `pwclV_step_echo`, `pwclV_step_byte`,
-   `pwclV_drain`, `rd_wild_dec` (the read decides `rdWild` classically, DU9),
-   and the `Persistent`/`Timeless` instances are all kept.
+3. Scope: the reached declarations.  `pwclV_close`, `pwclV_open`,
+   `pwclV_step_byte`, `pwclV_drain` (first trimmed as unreached; reached
+   through the instance `union_laws_at`, which the glob walk cannot see) are
+   ported in `PipeOutWSeal.lean` (U4).  Not ported: `pwclV_arm`,
+   `pwclV_step_echo` (unreached, kernel-term re-audit notes/cone_reaudit.md),
+   `rd_wild_dec` (the read decides `rdWild` classically, DU9).  The
+   `Persistent`/`Timeless` instances are all kept.
 -/
 import Xv6.PipeOutNFam
 import Xv6.GenOutWild

@@ -15,11 +15,12 @@ ledger's era map beside the file's, and its conclusion `UnionOutPure.union_phi`.
    only purpose is to keep `Classical` out of the audit; Lean's audited
    baseline already has `Classical.choice`).
 2. **Scope**: the reached declarations of §6 (`union_phi_res`, `union_led`,
-   `union_cl_all`, `union_led_phi`) and their `Timeless` instances.  Not
-   ported (unreached from `union_adequacy_closed`): `union_era_split`,
-   `union_led_init`, `union_led_pow`, `union_led_tx`, `union_led_rx`,
-   `union_birth_all` -- and so none of FileOut's ledger motion lemmas they
-   read (FileOutClaim deviation 1).
+   `union_cl_all`, `union_led_phi`) and their `Timeless` instances.
+   `union_era_split`, `union_led_init`, `union_led_pow`, `union_led_tx`,
+   `union_led_rx`, `union_birth_all` (and FileOut's ledger motion lemmas
+   they read) were first trimmed as unreached by the glob walk, which cannot
+   see typeclass resolution; they ARE reached, through the instance
+   `union_laws_at`, and are ported in `UnionOutSeal.lean` (U4).
 3. `mono_nat_auth_own γ 1 n` is `MonoNat.auth_own γ (DFrac.own 1) (.ofNat n)`
    (EchoOut deviation 5); `ghost_map_auth γ 1 ∅` is `γ ↪●MAP ∅`.  Rocq's
    section parameter `ug` is an explicit first argument (UnionOut deviation 2).

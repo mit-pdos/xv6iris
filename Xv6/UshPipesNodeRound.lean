@@ -40,9 +40,10 @@ QcR QtopR PLAW wdoneR wfinR lrepR rrepR sufR a0_idx take_pos_ne` (the
 `fs_ne`, `HL1`, `lfilt_in`, `fok_round`, `Hfire`, `termw_nil`,
 `wfin_done`, `halves_wfin`, `wsub_cons`, `wlast_pos`, `wst_all`.
 
-Dropped (unreached): the local instances `nd_T_pers0`, `nd_T_tl0` (Lean's
-`GenCparams` instances are found by resolution), `rd_final_pers0`
-(PipeProtoRead's `rdFinal_persistent`).
+Dropped: the local instances `nd_T_pers0`, `rd_final_pers0` (reached by
+instance resolution, which the glob walk cannot see; notes/cone_reaudit.md) and
+`nd_T_tl0` (unreached).  Lean's `GenCparams` instances and PipeProtoRead's
+`rdFinal_persistent` are found by resolution instead.
 
 ## Deviations from Rocq
 

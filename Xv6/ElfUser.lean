@@ -9,8 +9,11 @@ Rocq's header, in short (every clause kept): the dumper's reasoning is what
 the proofs call "the program", so a dumper bug would be invisible to them;
 this file reads the LITERAL file `user/_<p>` (`Xv6/User/<P>ElfRaw.lean`,
 byte for byte, DWARF included) through the general semantics and checks the
-dump's constants against it.  NOTHING IMPORTS THIS FILE, and nothing
-should.  The user shapes exercise what the kernel's single RWX PT_LOAD never
+dump's constants against it.  (Rocq's header adds "nothing imports this
+file"; that is stale at the pin, where `UInitSh`/`UShCat`/`UShGrep` read the
+`<p>_elf_image` facts, and here too: the exec proofs read `User.<P>.elf_image`
+-- `UInitShPure`, `UshCat`, `UshGrep`, … -- through `ElfLoadable` and the
+program files.)  The user shapes exercise what the kernel's single RWX PT_LOAD never
 reaches: TWO PT_LOADs (R-X text at 0, RW- above), so the image functions are
 genuine `segsUnion` folds; the text segment has `filesz = memsz` (its zero
 map is empty); `echo`/`cat`/`grep`/`seccomp` have a PURE-BSS writable segment

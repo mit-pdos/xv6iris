@@ -23,10 +23,10 @@ The stubs are walked ONCE by `UkStub.stubLaw` (instantiated at init's text:
    `wp_kinit_dup_cons_at` / `wp_kinit_dup_closed_at` verbatim, over the
    view-level rows `UK_SYS_P.dupAt` / `dupClosedAt`; the unreached
    pre-seccomp-S4 `wp_kinit_dup_cons` / `wp_kinit_dup_closed` are not ported.
-3. **NOT PORTED**: `wp_kinit_write_chain_at` (reached from UInitBanner and
-   UkWriteClosed only, not from the walk): it needs `UkRun.udepwf_std`
-   (K3) and UkRunSys's `wp_uk_ecall_write_chain_at`, whose post names the
-   key's page-table facts.  `nth_byte0_moi` (its only use is putc's spill,
+3. **NOT HERE**: `wp_kinit_write_chain_at` (reached from UInitBanner and
+   UkWriteClosed) is ported in `Xv6/UkWriteClosed.lean`, over
+   `UkRun.udepwfStd` and UkRunSys's `wp_uk_ecall_write_chain_at`.
+   `nth_byte0_moi` (its only use is putc's spill,
    which P-printf proved).  The unreached `wp_kinit_dup_cons`,
    `wp_kinit_dup_closed` (deviation 2).
 4. `Hpsok_free` (Rocq's section hypothesis) is the explicit premise

@@ -14,10 +14,12 @@ holds is the record equation itself, as a pure persistent fact
 ## DEVIATIONS from Rocq
 
 1. **Scope: the reached declarations** (UnionLinks 24/34), plus the
-   `Persistent` instances of the bundle's projections.  Not ported
-   (unreached from `union_adequacy_closed`): `union_read_link_wild`,
-   `uread_wild_dec` (DU9: nothing decides it), `union_close_link`,
-   `union_byte_link`, `union_cons_run`, `union_happ_echo`.
+   `Persistent` instances of the bundle's projections.  `union_close_link`,
+   `union_byte_link`, `union_cons_run`, `union_happ_echo` ARE reached (only
+   through the instance `union_laws_at`'s `al_echo`, which the glob walk
+   could not see) and are ported in `UnionLinksSeal.lean` (U4).  Not ported,
+   and unreached by the kernel-term re-audit (notes/cone_reaudit.md):
+   `union_read_link_wild`, `uread_wild_dec` (DU9: nothing decides it).
 2. Rocq's section parameter `Hcons : riscv_cons_res = ucl ug` is an
    explicit hypothesis `hcons : MachFixedGS.consRes = ucl ug` of each link
    (the `FileLinks`/`PipeBothN.blkNFire` form); `ug` is an explicit first

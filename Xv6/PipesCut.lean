@@ -26,9 +26,8 @@ consumer).  Pure.
    (`UkSh.ush_line_at`, `UkShMain.ushp_nulfold_miss`,
    `UkShParseCmd.ushp_ext`/`ushp_nulfold`, `UkShPipesCmd.ushq_nulfold*`,
    `UkShPipeLex.ushq_bar`, `UkShPipesLex.ushq_*`, `UkShEcho.echo_*`,
-   `UmodeAbi.ubyte0`), none of which is ported yet (L5 / DU8's N-stage
-   re-point).  They belong with the wave that ports `UkShPipes*`/
-   `UShUPipes`, after DU8 settles which of the `ushq_*` lexer facts survive.
+   `UmodeAbi.ubyte0`), so they live in the files that import the shell's
+   ports: `PipesCutSh.lean`, `PipesCutEcho.lean`, `PipesCutMain.lean`.
 3. Spelling as `FileDiscLine`: `l !!! j` is `l[j]!`, `Forall` is `∀ ∈`.
 -/
 import Xv6.FileDiscLine

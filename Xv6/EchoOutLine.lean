@@ -17,8 +17,10 @@ does not wait on, or import, the pure layer.
 
 ## DEVIATIONS from Rocq
 
-1. Only these four are here; the rest of `EchoOut.v`'s pure layer is
-   unreached (`Xv6/EchoOut.lean` deviation 1).
+1. Only these four are here.  The rest of `EchoOut.v`'s pure layer that the
+   union reaches (through the instance `union_laws_at`, invisible to the
+   glob walk) is in `EchoOutSealPure.lean` (U4); the remainder is unreached
+   (`Xv6/EchoOut.lean` deviation 1).
 2. `ein_read_byte`'s first hypothesis (`dl ++ ws` is a prefix of the log's
    echoed list) is kept for the statement's shape although the proof does
    not use it (as in Rocq).

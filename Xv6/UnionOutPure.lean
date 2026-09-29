@@ -19,11 +19,12 @@ Deviations from Rocq:
    `cyclesOf`, `S k` is `k + 1`.
 2. CONE TRIM (glob walk from `union_adequacy_closed` re-run at the pin: 4 of
    19 declarations reached -- `U`, `union_phi`, `union_phi_body`,
-   `union_phi_of_body`).  Not ported, as unreached: section 1 (`um_sess_nonnil`,
-   `um_disc_open_seg`, `lm_disc_first_out`; `GenOutHist` states the generic
-   first-drain facts the claim reads), the notations `UB`/`UK`,
+   `union_phi_of_body`).  The glob walk cannot see typeclass resolution:
+   section 1 (`um_sess_nonnil`, `um_disc_open_seg`, `lm_disc_first_out`),
    `union_phi_body_nil`, `union_st_ok`, `efl_of_first_out_u` and the
-   `union_phi_body_step_io/off/on/last_adm/out/drain` steps.
+   `union_phi_body_step_io/off/on/last_adm/out/drain` steps ARE reached
+   (through the instance `union_laws_at`) and are ported in
+   `UnionOutPureSeal.lean` (U4).  The notations `UB`/`UK` are written out.
 -/
 import Xv6.UnionDisc
 

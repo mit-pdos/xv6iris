@@ -29,10 +29,8 @@ Deviations from Rocq:
 2. `mword_of_int 0 : mword 8` is `0#8`; `bv_unsigned` is `.toNat`.
 3. The section `UName` (`Context nm Hu`) is spelled as explicit arguments
    `(nm) (hu : uname nm)` on every lemma.
-4. PENDING: `cat_words_head` (`[fd_w_cat; nm] !!! 0 = FsImgCheck.fname_cat`)
-   is not ported yet: `fname_cat` (Rocq `FsImgCheck`'s pinned binary names)
-   has no Lean counterpart (union_cone.md §3: MISSING, row U1-T).  It is
-   `rfl` once the name lands.
+4. `cat_words_head` (`[fd_w_cat; nm] !!! 0 = FsImgCheck.fname_cat`) is in
+   `Xv6/UNamePathCat.lean`, over `FsImgNames.fnameCat`.
 -/
 import Xv6.ExecWords
 import Xv6.ArgPath

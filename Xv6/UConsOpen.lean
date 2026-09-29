@@ -10,7 +10,13 @@ is not the caller's (the path literal, the working directory, the claim
 laws, the families, the two key-level rows, the receipt readings) lives
 here and the two programs are two instantiations.
 
-## Not ported yet (the reached declarations that wait)
+## The rest of the file: `Xv6/UConsOpenSup.lean`, `Xv6/UConsOpenAny.lean`
+
+Everything listed below (once waiting here) is ported: the `UInitCons` /
+`FsConsPin` part and `fupd_wp_triv` / `cons_ro_sub` / `xfam_open` /
+`sbundle_at_open_*` in `UConsOpenSup` (its header maps each name), the K3
+table-view part (`uk_open_fd_arm_at`, `init_cons_fail_std_at`, here;
+`init_cons_any_std_at`) in `UConsOpenAny`.  The original list:
 
 * On `UInitCons` (lane I-init: `init_cons_pl`, `init_cons_path_elems`,
   `init_cons_start`, `init_cons_abs_law`, `cons_pin_misses_at`,

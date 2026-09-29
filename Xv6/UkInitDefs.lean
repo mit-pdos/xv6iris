@@ -437,8 +437,8 @@ def kinitLent (N : UkNames GF) (T : IProp GF) (stc : FdState) (cn : ConsNames) (
 
 end Round
 
-/-! ## §5 THE PRINTF INIT CALLS (an interface: P-printf's proof, linked
-through the pending `UlibRunP.ofUkRun` bridge) -/
+/-! ## §5 THE PRINTF INIT CALLS (an interface, `INIT_PRINTF`: discharged from
+the one printf proof by `InitPrintfLink.initPrintf_link`) -/
 
 section Printf
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]

@@ -15,15 +15,13 @@ CONE (re-walked on the pinned globs: 10/35 reached): `a0_idx`, `a1_idx`
 
 ## Ported: `sbundlePay_exec_intro_refR`
 
-## DEFERRED (their inputs are not in Lean yet)
+## The rest: `Xv6/ExecRunSup.lean`
 
-* `exec_walk_of`, `exec_walk_of_pin`: need `ExecBundle.ex_node_id` (U1-T's
-  seccomp-key residual) and `PinnedExec.pobs_node_id` (PinnedExec partial).
-* `sbundle_pay_refR_of_exec`: needs `ExecBundle.exec_bundle_of` and
-  `ExecEntry.image_entry` / `image_entry_taint` (U1-T residual).
-* `uexec_sup_run`, `uexec_sup_run_ids`, `udepw_at_refR_of_sup(_ids)`: need
-  `image_entry` and `UkRun.urun_rows` (K4; UkRunExecRef deviation 2 drops
-  the `urun_rows` lend, so the Lean supply will be stated without it).
+`exec_walk_of`, `exec_walk_of_pin`, `sbundle_pay_refR_of_exec`,
+`uexec_sup_run`, `uexec_sup_run_ids`, `udepw_at_refR_of_sup(_ids)` (once
+deferred here on ExecBundle/ExecEntry/PinnedExec and K4) are ported there as
+`execWalkOf`, `execWalkOf_pin`, `sbundlePayRefR_of_exec`, `uexecSupRun`,
+`uexecSupRunIds`, `udepwAtRefR_of_sup`, `udepwAtRefRIds_of_supIds`.
 
 ## Deviations from Rocq
 

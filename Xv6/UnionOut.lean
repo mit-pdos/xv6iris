@@ -28,12 +28,16 @@ Rocq's header, abridged:
 
 1. **Scope: the reached declarations** (glob walk from
    `union_adequacy_closed` re-run at the pin: UnionOut 47/69), plus the
-   `Persistent`/`Timeless` instances of the reached predicates.  Not ported
-   (unreached): `popenU`, `ucl_unfold`, `udrain_ret`, `ucl_drain`,
-   `ucl_close`, `ucl_step_byte`, `ucl_open`, `pwc_blkU_tie`, `pipesU_HWIT`,
-   and in §5-§7 `union_era_split`, `union_led_init/pow/tx/rx`,
-   `union_birth_all` (the ledger file keeps the reached `union_phi_res`,
-   `union_led`, `union_cl_all`, `union_led_phi`).
+   `Persistent`/`Timeless` instances of the reached predicates.  The glob
+   walk cannot see typeclass resolution: the steps and the birth ARE reached
+   (through the instance `union_laws_at`) and are ported in the U4 seal
+   files -- `udrain_ret`, `ucl_drain`, `ucl_close`, `ucl_step_byte`,
+   `ucl_open` in `UnionOutSealSteps.lean`; `union_era_split`,
+   `union_led_init/pow/tx/rx`, `union_birth_all` in `UnionOutSeal.lean`
+   (the ledger file `UnionOutLed.lean` keeps `union_phi_res`, `union_led`,
+   `union_cl_all`, `union_led_phi`).  Not ported, and unreached by the
+   kernel-term re-audit (notes/cone_reaudit.md): `popenU`, `ucl_unfold`,
+   `pwc_blkU_tie`, `pipesU_HWIT`.
 2. Rocq's section parameter `ug : union_gn` is an explicit first argument;
    the `Local Notation`s `gf`/`pg`/`UT`/`UPIN` are spelled out
    (`ug.ugnFile`, `ugnPipe ug`, `fileTaint ug.ugnFile.fgnCl`,

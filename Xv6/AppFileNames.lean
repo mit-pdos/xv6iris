@@ -39,8 +39,9 @@ hence the `[DiskG GF]` binder; the escrow's one-shot `mono_nat` is
 2. `fileAppΣ` / `subG_fileAppΣ`: subsumed by `BundledGFunctors` (the class
    is the capacity; the slots are U4's).
 3. Scope: the reached declarations plus the `Persistent`/`Timeless`
-   instances of the reached predicates.  Not ported (unreached):
-   `fl_auth_lb`, `fl_lb_prefix`, `fl_auth_grow`, `file_birth`.
+   instances of the reached predicates.  `fl_auth_lb`, `fl_lb_prefix` and
+   `file_birth` are reached only through the instance `union_laws_at`, which the glob walk could not see: they are ported in `AppFileSeal.lean`
+   (U4).  `fl_auth_grow` is unreached (kernel-term re-audit, notes/cone_reaudit.md).
 4. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`
    (`Xv6/AppInv.lean` deviation 5).
 -/

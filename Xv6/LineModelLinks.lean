@@ -30,6 +30,13 @@ Deviations from Rocq:
    `lm_ab_space`, `lm_ab_noc_len`, `lm_wr_blk_lines`, `lm_wr_blk_byte`,
    `lm_wr_blk_open`, `lm_wr_blk_pending_pan`, `lm_alts_pre_le`,
    `lm_alts_pre_of_alts_ok`, `lm_alts_pre_mono`, `lm_pending_at_nonnil`.
+   (U4 correction: the glob walk cannot see typeclass resolution;
+   `lm_proc_before_snoc`, `lm_alts_pre_le`, `lm_alts_pre_of_alts_ok`,
+   `lm_alts_pre_mono` and `lm_pending_at_nonnil` ARE reached, through the
+   instance `union_laws_at`, and are ported in `LineModelLinksSeal.lean`.  The
+   kernel-term re-audit, notes/cone_reaudit.md, finds the
+   `lm_abs_body`/`lm_ab_*`/`lm_wr_blk_*` lemmas unreached; `lm_ok_dec_hook` is
+   reached but is a DU9 decider (deviation 1).)
 -/
 import Xv6.LineModel
 

@@ -1,323 +1,65 @@
-# Union wave U0 — residuals handed to later lanes
+# Union: open items
 
-Collected from the U0 agent reports (Sept 26 2026). Each item names the lane that owns it.
+Rewritten Sept 29 2026 (cleanup lane A), after U4 (2504c6277) and krelax (af31d1908).  Each entry of
+the old file was checked against the tree at b210bd3ea.  The discharged ones are gone: the fprintf
+entries (`ushFprintf_holds`, `catFprintf_link`, `seccFprintf_link`, `initPrintf_link`), all the
+parameter entries (R-pipes, R-round, I-init, sh-run, sh-main, R-sh, H-file/H-pipe), the H-io
+follow-ups (`ukSysIO_holds`, `ukPostRows_holds`, `wp_uk_pipe_read_end`), the UkRunSys gaps, the K3/K4
+and U1-T/U1-R/U1-P/U1-F follow-ups, and the camera slots (`UnionGF.lean`).  For their history, see git
+(`git show b210bd3ea:notes/coord/union_residuals.md`).
 
-## U1-T (image pins)
-- `EchoFsPure`, `FileFsPure` (U0-2) wait on `FsInitPinBoot`, `FsShPin`, `FsEchoPin`, `FsCatPin`,
-  `FsGrepPin`, `FsSeccPin`.
-- Rest of `Xv6/FileName.lean` (existing file → worktree lane): `sys_names`, `name_laws`,
-  `txt_laws`, `txt_sys_ok`, `txt_img_ok`, `nl_ne_sys`, `nl_ne_console`, three `era0_*` lemmas.
-  Needs `fname_*` pins (missing from `FsImgCheck`), `fname_console`, `TreeImg.img_root_ents`,
-  `FsInitPin`.
-- `UNamePath.cat_words_head` needs `fname_cat` (then `rfl`).
-- When porting `UserConsole`: reuse the kernel's `consSwallow` / `consStoredLb` (as `ReadRec`
-  does) instead of redefining Rocq's `ucons_*` duplicates.
+## State
 
-## MachCSL/ObsTrace
-- `obs_ins` missing (U0-1 defined `consIns` directly by recursion); `open_seg_prefix_of_boots`
-  missing (copy lives at `EchoOutPure.openSeg_prefix_boots`). Fold back when convenient.
+- `Xv6.unionAdequacyClosed` (LinkUInitUnion) takes Rocq's hypotheses exactly: `Hgen0`/`Hpow0`/`Hdisk`.
+  Its axioms are the baseline: propext, Classical.choice, Quot.sound, the bv_decide certificates.
+- `userProof : USER` and the system theorem are closed too.
+- **Cone re-audit** (notes/cone_reaudit.md; kernel-term walker `tools/cone_reaudit/`, which sees
+  instance, hint, canonical and obligation resolution).
+  - It finds NO real gap: no reached Rocq declaration is missing in a way that weakens a Lean statement.
+  - The 116 undocumented unported union-side declarations are proof-internal helpers of ported
+    consumers.
 
-## U4 (seal)
-- `EchoOutG` (new camera class, one field: era map `GhostMapG GF Nat EraPins RegMapF`) needs a
-  slot in `xv6GF` / `unionGF`.
+## Open (optional cleanups; nothing blocks a theorem)
 
-## U0-5 (union model) — CLOSED
-- Anti-vacuity demos done in `Xv6/UnionDemo.lean` (`demo_disc : lmDisc ulmG hist`, thread demo,
-  admission demos) via the round-trip `ulineOfU_body`. Those general lemmas (`ulineOfU_body`,
-  `parseLine_pipe_none`, `plParse_pipe_body`) live in UnionDemo; move to UnionDisc if a lane
-  needs them.
+1. **Redundant K1/K2/K3 premises.**
+   - These U4 seal lemmas take `hK1`/`hK2`/`hK3` beside `hev : consEvOk …`, which carries them since
+     krelax: `GenOutHistSeal.gclPure_open/_close`, `GenOutSeal.gcl_open/_close`,
+     `PipeOutNEvSealPure.gclPureO_open/_close`, `PipeOutNEvSeal.popenV_*`/`peclV_*`,
+     `PipeOutWSeal.pwclV_open/_close`, `UnionOutSealSteps.ucl_open/_close`.
+   - The callers pass `hev`'s projections (`UnionLinksSeal.union_happ_echo`).
+   - Fix: derive them inside and drop the premises.  This is a signature change, so rebuild the chain.
+2. **Lean over-ports** (reached by the glob walk only; the kernel walk finds them unreached, and no
+   Lean file uses them): `PipesDisc.allCats`, `admEcho`, `pipesLmE` (Rocq `all_cats`, `adm_echo`,
+   `pipes_lmE`).  They can be deleted.  The union reads `UnionDisc`'s admission, not the pipeline
+   application's.
+3. **Intermediate link statements still carry the parameter records they are discharged from
+   downstream.**  This is by design (one function per file): `cat_linked (HF : CAT_FPRINTF)`,
+   `init_linked (HP : INIT_PRINTF)`, `secc_linked (HS HF)`, `shMain_linked (HS HSS HF)`, and
+   `UshExecEnv` in the sh-exec specs.
+   - Each header now names its discharger: `CatPrintfLink`, `InitPrintfLink`, `SeccPrintfLink`,
+     `UkSysPHolds`, `UshSysPHolds`, `LinkShFprintf`, `ushExecEnvOf`.
+   - Collapsing them into `*_linked_ulib` forms is cosmetic.
+4. **Re-run the cone audit after the drift wave** (Rocq has moved past 1900b8a43; user instruction,
+   Sept 29).  Use `tools/cone_reaudit/run_vm.sh` on the new pin, then the local scripts.
+   - `trimcheck.py` lists every Lean header that calls a reached declaration "unreached".
+   - `stmt.py` re-checks the statement cones.
 
-## K3 (seccomp) — DONE (branch k3-secc: S0, S2k–S2k3, exec mask pin, whole-table view)
-- `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
-- Landed: `MachFixedGS.wild`/`rdwild` slots + `wildNone` (MachCSL); `AppIface.wild`/`wild_lic`/`rdwild`,
-  `wildNone_lic`, `consLicenceAt_of_wild` (takes the wild/consRes slot equations: Rocq reads
-  riscvF_app_iface); `ConsLog.wildEv`; `UartLinks.consLicenceAt` (+`_of_licence`),
-  `outLink_of_licenceAt`, `consReadPay_trivAt`; `AppInv.appRdcred` (+`_of_sup`/`_of_rdwild`/`_elim`)
-  at the console escrow; `AppLaws.al_programs`/`al_echo` take `wild`/`rdwild` slot equations.
-- S2k: `ConsNames.era`, `consEra`, `consPlaced`, `consSwallowPlaced`, `consoleCaps`/`consoleReadyApp`
-  carry `era = genId + 1` (`consoleReadyApp_era`); consoleread/fileread marked arms relayed at
-  `genId + 1`. DEVIATION: `consResCur` got only relax-d2's `nrd ≤ cur` (Rocq's `cons_dlcnt`/`ndl ≤ nrd`
-  still unported, pre-existing).
-- S5b (`ep_rpos`): nothing kernel-side; EchoOut/LinkRec/GenLinksLine/ReadRec already at the pin (U0-C).
-- Exec mask pin: `execSlotPre`/`execAuPre … cw secc …`, `initBootBundle cw secc sts`,
-  `EraInitBoot` at `ROOTINO seccAll fdt0`, `parkMode`/`parkPkg` carry `secc`.
-- Whole-table view: UserFd camera is `GhostMapG GF (Option Nat) UfdCell UfdMapF` (FileG slot 64);
-  `ustdAt`, `tabLe`, `ushViewOk`, `ustdOk`, `uallocV`; `uslot_of_urun_all_at`/`_ro_at`,
-  `UkFork.wp_uk_ecall_fork_at`, `UConsOpen.ukOpenFdArmAt`/`initCons_fail_std_at`.
-- Left for U1-T: UConsOpen `init_cons_any_std(_at)`; UInitFd `ufd_alloc0_v`, `ufd_headL*`,
-  `ufd_head1*`, `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row` (no non-`_at` forms yet);
-  ExecEntry/ExecBundle's `image_entry_taint` two key pins (Rocq 3e7fee0d2, union-side).
-- Left for U1-R/K4: UkRun `udepwf_std*`. For U1-P: `UexecSecc.ush_view_secc_rows`.
-- For P-secc / P-init: `UkFork.wp_uk_ecall_fork_at` is now Rocq's view-keeping leaf (`ustdAt l v`);
-  the plain-ledger statement is `wp_uk_ecall_fork`, which InitMainFork / ProofSeccMain now call.
-  Retire UkSeccDefs deviation 5 (`seccTabFork`) and the `Obl` mask parameter onto the `_at` leaf and
-  `uvis_secc` (`UkSeccLit.secc_mask_masked`).
+## Deviations kept on purpose (documented in the headers; listed so they are not re-opened)
 
-## UkShPipes* / UShUPipes wave (after DU8 repoint)
-- `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
-  the shell's lexer/parser (`UkSh.ush_line_at`, `UkShPipesLex`/`UkShPipesCmd`/`UkShParseCmd`/
-  `UkShMain`/`UkShEcho`, `UmodeAbi.ubyte0`); only consumer is UShUPipes.
-- U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
-  U0-3 defines `allCats` in PipesDisc.
+- AppLaws deviation 8: `al_tx`/`al_rx`/`al_echo` take `MachFixedGS.mono = MachGpreS.mono_pre`
+  (`appUnion` is built at the placeholder `AppPreGS.appPreGS` and read back by `preGS_transport`).
+- `udepwfK` carries ⌜uszOk sz⌝, the BitVec lazyFree size (gaps lane); `udepwfK_std` is one-way.
+- DU2/DU3/DU4/DU8/DU9 per the union brief.  In particular, the sh exec child and the N-stage pipes are
+  re-pointed at the general parser walk (DU8, `SpecShChildExec`, `UshPipesCmd`).
+- The statement cones rest on Lean's own machine and device model (the Lean Sail model plus
+  `MachCSL/Dev`), not a port of Rocq's `RiscvLang`/`DevModel`/`VirtioModel`.  A faithfulness review
+  of the model is a separate question from this port audit.
 
-## K4 (PQ-b, after the bump) — absorbs the rest of PQ-a — DONE (branch k4-pq)
-- C1: KILL-TAINT kill row (`KillRow.killRow` at the killer's `□ Wk`, `killPaid_shot_tear`),
-  setkilled keyed on `self`; fileclose_cpay(s)/cpost(_any) (SpecFileclose); kexit/sys_exit on
-  `procPrivUnmarked` + `filecloseCpays`; sys_close cpay→cpostAny; UexecExecInst rows 21/2 + Xfam.clP,
-  freeNum excludes 21/2; usertrap exit+kill arms (`UtExitElim`, `utTear`); UexecExecMintW (udepw suppliers).
-- C2: `pipeQres` is `pipeResAt`'s last conjunct; pipealloc/sys_pipe hand out `pipeQfrag … pst0`
-  (sys_pipe's rollback pays its two closes from the fragment: `sp_fc_cpay_frag`,
-  `sp_fc_cpay_of_cpost`); pipeclose takes `pipeCpay` → fired `pipeCpost`; fileclose takes
-  `filecloseCpay` → `filecloseCpost` (not-last: `fileRest_q_ne_one`); kexit's loop spends the table's
-  payments (`kx_fdpay`); pipewrite/piperead take `pipeWpay`/`pipeRpay` (+ genHalvesPriv, kill arm with
-  the credential); fileread/filewrite/sys_read/sys_write pipe arms are Rocq's; Xfam gains
-  rPq/rPqe/wQe, post 4 is the pipe receipt (`xpostPipe`), `SyscDepPipe` is Rocq's `sysc_out_pipe`;
-  FsAbsInvFire's read/write dischargers pay pipe arms from the taint; PipeReg §4 ported.
-- Retired: PipeInvDefs interim, SpecPipealloc dev 4, SpecSysPipe, PipeReg dev 1, SyscallArmsFdDefs
-  dev 4, UexecExecInst dev 4 (only `of_om` left), SpecFilewrite dev 11.
-- Left for U1-R: the run's pipe rows (`urun_rows`/`urun_nopipe`, `udepw_row*`/`udepw_cl*`,
-  `udep_close_dep`/`udep_exit_*`) and `wp_uk_sb_denied`'s self-minted exit deposit (needs the rows).
-- Name watch: K2 added `fdstNopipe` in FileDefs (Rocq FdSlots name) — U1-R / U0-6 must reuse it.
+## Standing advice (from I-init)
 
-## U1-T (image pins)
-- `EchoFsPure`, `FileFsPure` (U0-2) wait on `FsInitPinBoot`, `FsShPin`, `FsEchoPin`, `FsCatPin`,
-  `FsGrepPin`, `FsSeccPin`.
-- Rest of `Xv6/FileName.lean` (existing file → worktree lane): `sys_names`, `name_laws`,
-  `txt_laws`, `txt_sys_ok`, `txt_img_ok`, `nl_ne_sys`, `nl_ne_console`, three `era0_*` lemmas.
-  Needs `fname_*` pins (missing from `FsImgCheck`), `fname_console`, `TreeImg.img_root_ents`,
-  `FsInitPin`.
-- `UNamePath.cat_words_head` needs `fname_cat` (then `rfl`).
-- When porting `UserConsole`: reuse the kernel's `consSwallow` / `consStoredLb` (as `ReadRec`
-  does) instead of redefining Rocq's `ucons_*` duplicates.
-
-## MachCSL/ObsTrace
-- `obs_ins` missing (U0-1 defined `consIns` directly by recursion); `open_seg_prefix_of_boots`
-  missing (copy lives at `EchoOutPure.openSeg_prefix_boots`). Fold back when convenient.
-
-## U4 (seal)
-- `EchoOutG` (new camera class, one field: era map `GhostMapG GF Nat EraPins RegMapF`) needs a
-  slot in `xv6GF` / `unionGF`.
-
-## U0-5 (union model) — CLOSED
-- Anti-vacuity demos done in `Xv6/UnionDemo.lean` (`demo_disc : lmDisc ulmG hist`, thread demo,
-  admission demos) via the round-trip `ulineOfU_body`. Those general lemmas (`ulineOfU_body`,
-  `parseLine_pipe_none`, `plParse_pipe_body`) live in UnionDemo; move to UnionDisc if a lane
-  needs them.
-
-## K3 (seccomp) — DONE (branch k3-secc: S0, S2k–S2k3, exec mask pin, whole-table view)
-- `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
-- Landed: `MachFixedGS.wild`/`rdwild` slots + `wildNone` (MachCSL); `AppIface.wild`/`wild_lic`/`rdwild`,
-  `wildNone_lic`, `consLicenceAt_of_wild` (takes the wild/consRes slot equations: Rocq reads
-  riscvF_app_iface); `ConsLog.wildEv`; `UartLinks.consLicenceAt` (+`_of_licence`),
-  `outLink_of_licenceAt`, `consReadPay_trivAt`; `AppInv.appRdcred` (+`_of_sup`/`_of_rdwild`/`_elim`)
-  at the console escrow; `AppLaws.al_programs`/`al_echo` take `wild`/`rdwild` slot equations.
-- S2k: `ConsNames.era`, `consEra`, `consPlaced`, `consSwallowPlaced`, `consoleCaps`/`consoleReadyApp`
-  carry `era = genId + 1` (`consoleReadyApp_era`); consoleread/fileread marked arms relayed at
-  `genId + 1`. DEVIATION: `consResCur` got only relax-d2's `nrd ≤ cur` (Rocq's `cons_dlcnt`/`ndl ≤ nrd`
-  still unported, pre-existing).
-- S5b (`ep_rpos`): nothing kernel-side; EchoOut/LinkRec/GenLinksLine/ReadRec already at the pin (U0-C).
-- Exec mask pin: `execSlotPre`/`execAuPre … cw secc …`, `initBootBundle cw secc sts`,
-  `EraInitBoot` at `ROOTINO seccAll fdt0`, `parkMode`/`parkPkg` carry `secc`.
-- Whole-table view: UserFd camera is `GhostMapG GF (Option Nat) UfdCell UfdMapF` (FileG slot 64);
-  `ustdAt`, `tabLe`, `ushViewOk`, `ustdOk`, `uallocV`; `uslot_of_urun_all_at`/`_ro_at`,
-  `UkFork.wp_uk_ecall_fork_at`, `UConsOpen.ukOpenFdArmAt`/`initCons_fail_std_at`.
-- Left for U1-T: UConsOpen `init_cons_any_std(_at)`; UInitFd `ufd_alloc0_v`, `ufd_headL*`,
-  `ufd_head1*`, `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row` (no non-`_at` forms yet);
-  ExecEntry/ExecBundle's `image_entry_taint` two key pins (Rocq 3e7fee0d2, union-side).
-- Left for U1-R/K4: UkRun `udepwf_std*`. For U1-P: `UexecSecc.ush_view_secc_rows`.
-- For P-secc / P-init: `UkFork.wp_uk_ecall_fork_at` is now Rocq's view-keeping leaf (`ustdAt l v`);
-  the plain-ledger statement is `wp_uk_ecall_fork`, which InitMainFork / ProofSeccMain now call.
-  Retire UkSeccDefs deviation 5 (`seccTabFork`) and the `Obl` mask parameter onto the `_at` leaf and
-  `uvis_secc` (`UkSeccLit.secc_mask_masked`).
-
-## UkShPipes* / UShUPipes wave (after DU8 repoint)
-- `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
-  the shell's lexer/parser (`UkSh.ush_line_at`, `UkShPipesLex`/`UkShPipesCmd`/`UkShParseCmd`/
-  `UkShMain`/`UkShEcho`, `UmodeAbi.ubyte0`); only consumer is UShUPipes.
-- U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
-  U0-3 defines `allCats` in PipesDisc.
-
-## K4 (PQ-b, after the bump) — absorbs the rest of PQ-a
-- K2 landed only PQ-a steps 1–2 (PipeNames/PipeQueue/PipeReg defs, `Xv6G.pipeqG` slot 94,
-  `FdType.pipe γp`, `fdstateOk … γp`, `Xv6/PipeQstep.lean` ghost steps). The re-proofs of
-  pipealloc/pipewrite/piperead/pipeclose/sys_pipe and the fileread/filewrite pipe arms are
-  BLOCKED on PQ-b: `pipeQres` must enter `pipeResAt`, and then pipeclose's flag store needs
-  `pipe_cpay`, which only fileclose_cpay → sys_close/kexit deposits → syscall close arm /
-  usertrap exit+kill / UexecExecInst rows 2, 21 can pay. The kill path needs Rocq's KILL-TAINT
-  kill row (Lean `killRow` has no taint). So K4 = rest of PQ-a + PQ-b in one worktree lane.
-- Interim deviations to retire in K4: PipeInvDefs (queue not in payload), SpecPipealloc dev 4
-  (no `pipe_qfrag … pst0` handed out), SpecSysPipe, PipeReg dev 1; PipeReg §4 (fileclose_cpay).
-- Name watch: K2 added `fdstNopipe` in FileDefs (Rocq FdSlots name) — U1-R / U0-6 must reuse it.
-
-## U1-T (post-bump remainder; pre-bump part landed: UImgWordDefs, UStrImg, UserConsole, UInitFd partial, PinnedObs, UConsOpen partial)
-- TreeView/TreeObs/AppTree: 0 reached decls — nothing to port. UConsLine's alias = `UkShLineDefs.ushLineIs`.
-- fs.img literal (after bump): TreeImg (`img_root_blk/ents/nrec_leb/blk_agree/ents_eq`), PinnedExec, PinnedOpen, all Fs*Pin.
-- Seccomp key (`uvis_secc`, bump ckpt 1 / K3): ExecEntry (`image_entry_at`, `image_entry`, `_taint`,
-  `_taint_intro`, `_taint_all_elim`, `_of_at`, `_at_of`); ExecBundle (`ex_node_id`,
-  `exec_slot_of_entry_at`, `sys_exec_slot_of_entry`, `exec_bundle_of(_at)`).
-- K3 UserFd whole-table view (edits `UserFd.ustd`): UInitFd `ufd_alloc0_v`, `ufd_headL*`, `ufd_head1*`,
-  `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row`; UConsOpen `uk_open_fd_arm_at`,
-  `init_cons_fail_std_at`, `init_cons_any_std_at`.
-- UConsOpen waiting on UInitCons (I-init) + FsConsPin: `init_cons_elems_len/_hd`, `cons_hop_dead`,
-  `cons_walk_dead`, `cons_open_bundle_dead`, `cons_open_dead_recv`, `init_cons_absent_fam`,
-  `cons_sup_absent`, `init_cons_console_fam`, `cons_sup_console`; on Xfam after K4 + `utext_img`:
-  `xfam_open`, `sbundle_at_open_intro_at`, `spost_at_open_elim_at`, `cons_ro_sub`; on `wp_triv`: `fupd_wp_triv`.
-- `pobs_elend_aents` proved directly; repoint at K5's `FsAbsEraState.elend_aents` when convenient.
-
-## U1-R (post-K3/K4 remainder; pre-bump part: UkRunLeaf/Mem/Br, UkCode, UkStub, echo walk, UkFork, UkRunExecRef, UEchoKernel)
-- UkRunSys, UkRunSecc (K3's secc key/rows are in; still need K4 close/exit deposits).
-- Restore `wp_uk_sb_denied`'s self-minted exit deposit (Rocq `udep_exit_run`; now from `UprogSG.psok USYS_exit`).
-- UkFork / UkRunExecRef: pipe rows (`urun_rows`/`urun_nopipe`, K4). (`ustd_at`: done in K3; the seccAll
-  pins are Rocq-faithful -- Rocq's run keys are at secc_all -- so no mask change is owed.)
-- Syscall-number premise is on the register file (`extractLsb' 0 32 (m 17#5)).toInt = USYS_…`); switch to
-  UkRunSys's `usysno`.
-- UkFork kill price is `□ (uKillCred -∗ Q (-1))` vs Rocq `app_taint` (process-layer deviation; K4's KILL-TAINT).
-- `stubRet` lives in UkStub (Rocq: UkTree) — H-tree's UkTree must reuse it.
-- Axiom baseline note for U4: echo walks show `MachCSL.nthByte_lo0/lo1._native.bv_decide` via UserHeap.uinstrIs_ukInstr.
-
-## P-printf run interface — CLOSED by the printf bridge (UlibRunUk/UlibUkProg; cat/init/secc `*_linked_ulib`, grep `wp_grep*_ulib`; hart rides in a ghost var). Remaining: grep's `kgrepPaySeq` → `ulibUkPaySeq_of`; stale 'pending' notes in UkCatDefs/UkInitDefs/UkSeccDefs/Link* headers.
-## (old text)
-- `UlibRunP` (the printf lane's stand-in run interface) has one fixed `goal`, but the real leaves
-  re-quantify the hart (`∀ h', … wpLoop h'`), and `UlibRunP.ofUkRun` doesn't exist. Until fixed, cat
-  takes `HF : CAT_FPRINTF` (Rocq's `wp_kcat_fprintf(_s)` verbatim over `urun`) as a parameter and has its
-  own `kcatPaySeq`. Fix: make UlibRunP carry the hart (or build it from `urun`/UK_LEAVES), then discharge
-  `CAT_FPRINTF` from `ulibFprintf_link`; same for grep/init/seccomp.
-- UkCatTree's Iris half (23 decls, `cat_prog` … `wp_kcat_start_env`) waits for H-tree (UkTree/UkHandler).
-
-## U1-T post-bump — remaining
-- PinnedOpen: DONE by K6-B (Xv6/PinnedOpen.lean: the 7 reached + `pinned_open_bundle_dead_lin`; the 3 over PinnedObs' unported spending dead walk stay out).
-- ExecEntry, ExecBundle, PinnedExec's `pobs_node_id` / `pinned_exec_bundle_boot(_at)`: need K3's seccomp key.
-- FileName.lean / UNamePath.lean still say PENDING for items now in FileNamePins / UNamePathCat — update their
-  headers when convenient.
-
-## Exec entries (lane U1-T-exec, landed) — follow-ups
-- (DONE, P-init-view) init's walks are on UInitFdHead's `ufdHead*`/`ufdRow` at `ustdOk`, the fork is
-  `wp_uk_ecall_fork_at`, the dups are `wp_kinit_dup_cons_at`/`_closed_at` over two new `UK_SYS_P` rows
-  (`dupAt`, `dupClosedAt` = Rocq `wp_uk_ecall_dup_at`/`_closed_at`); the `kinit*` head copies are gone.
-- `urun_rows` lend (K4) in `udepwAtRefR` / the exec supply: one extra persistent premise when K4 lands.
-- Seccomp's printing arms still on the plain ledger `ustd` (UkSeccDefs dev 4) until the write leaf is ported.
-- Stale headers to point at the new files: ExecRun "DEFERRED", UInitFd/UConsOpen "not ported yet",
-  UkSeccLit "pending K3". The rest of `UexecSecc` must import UexecSeccMasked (seccB/seccMasked).
-
-## sh-exec (landed) — follow-ups
-- `UshExecEnv` (Xv6/UshExecDefs) is a parameter record to instantiate when sh-run (ushcmd/ush_cmd/jtab/
-  cmd_addr/cmd_exec/wp_kshr_entry) and sh-main (ush_Dg, fd1p/fd2p, execfail law/bytes/paid) land; the
-  seam field `ush_cmd_of_ref` from UkShSeam's Iris half.
-- `ushf_child_law_holds_at_D` owed once sh-run's UkShFork exists (glue over `shChildEcho_holds`).
-- PipesCut: 6 left (`pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`, `pipes_lpg_of_at`,
-  `pipes_lpcg_of_at`) — portable now (ushLineAt landed); PipesCutSh header's "STILL LEFT (13)" is stale.
-
-## sh-main (landed except UshDiagLeaf/UshDiagFinal, which import sh-run) — follow-ups
-- `USH_FPRINTF` (Rocq `wp_kshd_fprintf_s_chain`) not dischargeable from printf-once: `ulibFprintfS`'s `%s`
-  takes only a DATA string, panic prints a `.rodata` text literal. Widen `ulibFprintfS`'s string argument
-  (text or data) in the printf-once proof.
-- `hex` (`psok USYS_exit`) premise on memset's NULL arm (U1-R/K4 residual: `wp_uk_sb_denied` doesn't mint
-  its own exit deposit, Rocq `udep_exit_run`).
-- `USH_SYS_P` (UshSysP): close (non-pipe `udepw_cl` arm), `write_chain_at`, `write_chain_txt_at` — confirm
-  the txt variant's post-state page-table spelling against the UkRunSys port.
-- `ush_cmd_of_ushp(_gen)` needs sh-run's `ush_cmd`.
-- sh-exec's `UshExecEnv` to be instantiated from UshDiagDefs/UshDiagFinal (+ a one-line adapter for
-  `wp_kshd_execfail_paid_at`'s bundled byte premises).
-
-## U1-P (landed: PipeProto(+Read), PipeBothN, PipeOut, PipeOutN*, PipeOutNEv, PipesOut, PipesLinksV, PipeOutW*, UexecSecc(+Mint), UnionOutWild)
-- Union* blocked on U1-F (file claims, lane running) + U3's UShLine/UkSh: UnionOut needs AppFile fileAppG/file_taint/
-  fl_auth/fl_lb, FileOut file_gn/fgn_*/fileOutG/file_cl_all/efl_of/f0_*/f0wa*, AppEcho echo_taint; UnionLinkInst(At) also
-  FileLinksLine f0w/fhead/flw/fturn_pre + FileLinkGen f0w_at*/fhead_at*/fturn_pre_at + FileOut file_era*/fturn_core;
-  UnionReadInstAt also UShLine ush_dirty_law/ush_mid_at/ush_rd_x_at/ush_read_recv_leaf_holds_at + UkSh
-  ush_cycles_snoc_in/ush_read_recv_leaf_at/ush_tag_law(_at/_of_at). UnionOut must import UnionOutWild.
-- U4 camera slots to add: PipeProtoG.eofG; PipeOutG.eraG/curG; the pipesNG `GhostVarG GF (Option (List (BitVec 8)))`
-  (+ EchoOutG from U0-C).
-- `ush_view_secc_rows` residual CLOSED (UexecSecc `ushViewSeccRows`).
-
-## UkRunSys (landed) — remaining gaps (reached in Rocq, no Lean consumer record yet)
-- `wp_uk_ecall_pipe`, `upipe_names_agree`; `read_win`/`read_at`/`read_recv_at` (sh-main's `ush_read_leaf` still a
-  parameter); `write_chain_buf(_at)`, `usrc_ok_ubytesq`, `uheap_ubytes_w/_wat` (need `lazy_free_uw_addr`'s size bound,
-  not exposed by `urun` at the leaf); `open_recv_img_at`, `open_recv_gimg`, `quiet_recv_img`, `uimg_view` + lemmas.
-
-## H-io (landing) — follow-ups (assigned to the runsys agent) — DONE Sept 29 except the HfpSysP fold
-- open: UkConsOut/UkReadCons/UkWriteLeaf still take `HS : UK_SYS_IO`/`HP : UK_POST_ROWS` (holds lemmas exist:
-  ukSysIO_holds UL, ukPostRows_holds) — re-plumb consumers to drop them.
-- Discharge `UK_SYS_IO` (UkIoSysP: read_recv_at, write_chain_buf(_at), write_chain_txt).
-- Restore Rocq's `proc_pt_wf`/`lazy_free` rows in xpostRead/xpostWrite (+ syscDepRead/Write_holds), then discharge
-  `UK_POST_ROWS`.
-- `wp_uk_pipe_read_end` (needs wp_uk_ecall_pipe / upipe_names_agree).
-- Fold `HfpSysP.udepwfSt`/`ureadPipeAns` (H-file/H-pipe lane) with H-io's identical ones.
-
-## sh-run (landed 0efc05af3, Sept 29) — residual
-- `USH_RUN_SYS_P` has one field left: Rocq `UkRunSys.wp_uk_ecall_exec` (failure row; only the
-  cwd/refund forms `wp_uk_ecall_exec_at_cwd_refR(_ids)` exist in Lean). Port it into UkRunSys, then
-  delete `USH_RUN_SYS_P` so `shRuncmd_linked` depends on `UL` alone.
-
-## U1-F file claims (landed Sept 29) — follow-ups
-- lane-hfp's HfpFileClaimsP must move onto U1-F's names (fnCons/…, fgnCl/fgnEra, Option Nat inums) and
-  discharge its parameter record from these files (no duplicate Wordline/Fwline/Dst/FileAppNames/FileGn).
-- New camera classes for xv6GF/unionGF (U4): FileAppG (deed ghost_var, line list, escrow list), FileOutG
-  (era map, boot-state mono_list).
-- AppInv: appStep/appTopUpdate regained Rocq's `==∗` (app_step); header deviation list not yet updated.
-
-## H-file + H-pipe (landed Sept 29) — parameters still taken
-- `hub` (Rocq usrc_ok_ubytesq) in file_write: add ⌜uszOk sz⌝ to udepwfK's ∀ M pm sz (runsys-side fix).
-- `openRecvGimg` (wp_uk_ecall_open_recv_gimg), `HfpSysP.uimgView` (uimg_view): unported (UkRunSys gaps).
-- Union* claims (UnionP/UnionLaws, hcons) + hwild/hPT/era-pin premises of the union entries: lane u1punion.
-- echo/cat/grep `*_image_entry_env_c` (UkTreeEntry deferred); cat stated twice (PseCatImageEntryEnvC,
-  CatImageEntryEnvC) — fold into the owner's lemma.
-- `udepw_law_of_sup*` (UdepwLawsP): UexecExecMint program tier unported. `hfpEchoNodeImg` (echo_node_img).
-- U4 camera slots: fifRegG, pnsRegG, cifRegG, pipesNG.
-
-## R-sh (landed Sept 29) — parameters still taken
-- UshConsK.ShConsOpenCalls: init_cons_laws (UInitCons, I-init), wp_uk_ecall_open_recv_img_at +
-  cons_sup_console/cons_sup_absent/cons_open_dead_recv (lane gaps / UkRunSys).
-- UshExecPinProg (R-prog): shCatPinResolves, catElfLoadable, grepElfLoadable.
-- UshExecPinEcho (R-prog): sh_cat_slot(_of_fs_pure), echo_node_img(_of_cmd_x), sh_exec_path_of_x_holds,
-  image_entry_pay_mono.
-- Perf pattern: run walks generic in the class, read the post at the instance in a separate lemma; never let
-  the kernel evaluate a literal ELF (state size lemmas over an arbitrary file).
-
-## gaps lane (landed Sept 29) — still open
-- Program entries EchoImageEntryEnvC / CatImageEntryEnvC / GrepImageEntryEnvC (single statements in
-  UkTreeEntryStmt): need UShEcho/UShCat/UShGrep key geometry (R-prog) + grep's start walk.
-- `hlic : ⊢ uKillCred -∗ consLicence` in the union entries: `consLicence_of_taint` given the interface slot
-  equations (U4 / union top).
-- Deviation: udepwfK carries ⌜uszOk sz⌝ (BitVec lazyFree size); udepwfK_std one-way.
-- open_recv_img (non-_at), open_recv_dimg unported (check reach if needed).
-
-## R-prog (landed Sept 29, except UshCatFStage{Defs,,Sup} which import R-pipes' UshPipesDefs)
-- UshCatFStage* land with R-pipes; they take `UShPipesStageP D E` (R-pipes names; `prod_stage_law` not
-  yet written by R-pipes; `exf_writer` targets concrete ushExecfailLawAt vs E.ush_execfail_law_at).
-- Switch consumers' `HE` hypotheses (UkCatFEntries, UkPipesEntries, UkUnionEntriesDefs) to
-  echoImageEntryEnvC_of_leaves UL / catImageEntryEnvC_holds UL / grepImageEntryEnvC_of_leaves UL.
-- UshExecPinProg/Echo discharged by UshExecPinHolds.
-
-## R-round (landed Sept 29) — parameters still taken
-- SP : SH_PANIC, HF : USH_FPRINTF, HS : UK_SYS_P (redir child) — sh-main residuals; SC : SH_CHILD_EXEC or
-  MS/HM for echo/secc/cat children (layering: ProofShChildExec import) — U4 wires.
-- hps : ∀ k, freeNum k → psok k; hlic (gaps residual); SE : UshSeccEntryP = Rocq UkSeccEntry.secc_image_entry
-  (UkSeccEntry NOT PORTED — needs a lane).
-- Unlanded callers of the old entry signatures: UshCatFStageSup (R-prog, held) and R-pipes' UshPipesStageCtx
-  must drop HE.
-
-## R-pipes (landed Sept 29, with R-prog's UshCatFStage*) — parameters still taken
-- UPipesEng: UL MS HM SP SW HF US hps hudep hlic (SW only in ProofShSysWait; hudep only at uprogSGFree);
-  I-init's UInitSh.sh_Rsh as `shRsh` + `hRsh` in sh_round_holds_union_closed.
-
-## I-init (landed Sept 29) — parameters still taken
-- HS : INIT_START (UInitKernelSlot; from initStart_holds / init_linked_ulib), SS : SH_START (UInitShSlot),
-  US : USER (file_gen_mint; now userProof), hlic (file_init_deps/file_gen_mint).
-- initElfLoadable / sh_elf_loadable (Rocq ElfLoadable.init_/sh_elf_loadable): R-prog landed Xv6/ElfLoadable
-  (§1 + cat/grep); add init/sh there.
-- KERNEL HAZARD (all lanes): intro'ing a proof-mode hyp whose head is the xv6 instance's unreduced post
-  (UexecSG.spostAt (self := uexecSGXv6) … / xv6Spost …) costs ~6 s/leaf and can deterministic-timeout;
-  read the post via a Lean-level entailment onto the continuation's premise (consOpen_post_pre pattern).
-
-## U4 (landed Sept 29) — the union theorem is closed
-- `Xv6.unionAdequacyClosed` (LinkUInitUnion): hypotheses Hgen0/Hpow0/Hdisk only; axioms = baseline
-  (propext, Classical.choice, Quot.sound, 503 bv_decide certs). `_leaves` variant takes UL.
-- CONE-AUDIT BLIND SPOT: the U0-X glob walk misses typeclass-resolved references; ~300 decls reached only via
-  the `union_laws_at` instance were trimmed as "unreached" and are now ported as *Seal*.lean companions
-  (re-walk script: lane-u4union/scratch/globwalk2.py). Stale "CONE TRIM / not ported (unreached)" headers in
-  UnionOut, UnionOutLed, GenOut*, EchoOut, FileOut*, PipeOut*, LineModel*, AppFile*, PipesLedPure … need updating.
-- krelax (af31d1908): consEvOk gains Rocq's cons_ev_ok K1/K2/K3; UartState.recvd; obsWf input tie; consResCur
-  delivered-count row; al_rx uses Uart.accept.
-- AppLaws deviation 8: al_tx/al_rx/al_echo take `MachFixedGS.mono = MachGpreS.mono_pre` (appUnion built at
-  placeholder AppPreGS.appPreGS, read back via preGS_transport).
-- Stale: SpecShFprintf.lean "BLOCKED" note; fprintf + R-pipes/R-round/I-init parameter entries above are discharged.
+- Never intro a proof-mode hypothesis whose head is the xv6 instance's unreduced post
+  (`UexecSG.spostAt (self := uexecSGXv6) …` / `xv6Spost …`).  It costs ~6 s per leaf and can
+  deterministic-timeout.  Read the post via a Lean-level entailment onto the continuation's premise
+  (the `consOpen_post_pre` pattern).
+- Run walks generic in the class and read the post at the instance in a separate lemma.  Never let the
+  kernel evaluate a literal ELF: state size lemmas over an arbitrary file.

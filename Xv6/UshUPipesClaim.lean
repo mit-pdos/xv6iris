@@ -19,8 +19,9 @@ pinned `1900b8a43`; cut C9f2, design union.md §3, review B3).
 
 Walk (`UShUPipes reached 46/49`): every S1 declaration is ported except
 `ush_pipes_branch_holds` (unreached: DROPPED) and the two local instances
-`uup_T_pers0`/`uup_T_tl0` (unreached; Lean finds `fileTaint`'s instances by
-resolution).  The local notations `U gf T FI PT PD Wcu Wbu pg CPU WAU DPRE
+`uup_T_pers0`/`uup_T_tl0` (`uup_T_pers0` is reached by instance resolution,
+which the glob walk cannot see; Lean finds `fileTaint`'s instances by
+resolution instead).  The local notations `U gf T FI PT PD Wcu Wbu pg CPU WAU DPRE
 pc0 RT GS STG REST PWC Pm` are spelled out, or are the abbreviations below.
 
 ## Deviations from Rocq

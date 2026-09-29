@@ -1,8 +1,9 @@
 /-
 **cat, linked**: the three walks at one engine, over fprintf's interface
 (Rocq's `UkCatCat`/`UkCatMain` sections close them together; DU10 split them
-one function per file).  `CAT_FPRINTF` is discharged from the DU4 printf
-cone once its run interface carries the hart (`UkCatDefs` deviation 2).
+one function per file).  `CAT_FPRINTF` is a parameter here; it is discharged
+from the DU4 printf cone by `CatPrintfLink.catFprintf_link` (and
+`cat_linked_ulib` is this link at that discharge).
 -/
 import Xv6.ProofCatCat
 import Xv6.ProofCatMain

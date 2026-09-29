@@ -21,6 +21,10 @@ Deviations from Rocq:
 4. CONE TRIM (13 of 24 reached): not ported `lb_lookup_total_drop`,
    `lb_take_S`, `lb_lta_take_eq`, `lb_app4`, `lb_prefix_eq`, `lb_nonl_lta`,
    `lb_dollar_split`, `lb_head_ne_panic`, `lb_prompt_of_dollar(_r)`.
+   (U4 correction: the glob walk cannot see typeclass resolution; all of these
+   except `lb_head_ne_panic` ARE reached, through the instance
+   `union_laws_at`, and are ported in `LineBytesSeal.lean`.  The kernel-term
+   re-audit, notes/cone_reaudit.md, finds `lb_head_ne_panic` unreached.)
 -/
 import Xv6.EchoDisc
 

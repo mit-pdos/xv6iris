@@ -45,7 +45,11 @@ Deviations from Rocq:
    and name laws, the `fadm_boot_*` laws, `file_phi`, the `*_lm`
    conversions, `sessf_prefix_det(2)`, section 7 except `fline_ok_echo`,
    and section 8's demos (DU9: the union model, U0-5, carries the `decide`
-   demos).
+   demos).  (U4 correction: the glob walk cannot see typeclass resolution;
+   `echof_lines_in_app`, `echof_cyc_app`, `echof_lines_of_snoc`,
+   `fadm_boot_empty` and `fadm_boot_nil` ARE reached, through the instance
+   `union_laws_at`, and are ported in `FileDiscSeal.lean`.  The kernel-term
+   re-audit, notes/cone_reaudit.md, finds the rest unreached.)
 -/
 import Xv6.FileDiscLine
 import Xv6.LineModel

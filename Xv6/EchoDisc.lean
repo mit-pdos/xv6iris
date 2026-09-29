@@ -54,7 +54,16 @@ Deviations from Rocq:
    `out_last`, `pro_alts_1`, `pro_fail_bound`, `pro_rounds_from`,
    `pro_idx_S_le`, `in_pres_*`, `obs_wire_length`).  The line model
    (`LineModel.lean`) restates the discipline and claim generically; these
-   are its echo instance, which `LineModelInst` (not needed) was.
+   are its echo instance, which `LineModelInst` (not needed) was.  (U4
+   correction: the glob walk cannot see typeclass resolution; `ins_out`, `ins_snoc_other`, `not_cons_in`,
+   `in_pres_in/_length/_prefix/_prefix_all/_snoc_other`,
+   `pro_alts_head_dollar`, `pro_of_dollar_prompt`, `pro_of_open_head`,
+   `pro_rounds_from`, `pro_rounds_replicate_0` ARE reached, through the
+   instance `union_laws_at`, and are ported in `EchoDiscSeal.lean`
+   (`ins_obs_ins` is `consIns_obsIns` here).  The kernel-term re-audit,
+   notes/cone_reaudit.md, finds the rest unreached, except the candidate
+   enumerations and `obs_wire_length`, which are reached only through the
+   DU9 deciders (`UnionDecU`).)
 -/
 import Xv6.LineWords
 import MachCSL.Lang

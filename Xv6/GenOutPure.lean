@@ -32,6 +32,16 @@ Deviations from Rocq:
    `lm_alts_pad*` family, `lm_pro_idx_le/ge`, `lm_pro_ok_pad`,
    `lm_stage_sess_pad`, `lm_good_out_of_stage`, `lm_good_out_step`,
    `lm_cs_len_ok_mid/echo/0`, `lm_ps_len_ok_0/echo`, `lm_out_pure_0`.
+   (U4 correction: the glob walk cannot see typeclass resolution; `gstage0`,
+   `lm_alts_pad*`, `lm_D_from_app`, `lm_D_app`,
+   `lm_E_disc_app_l/echo/of_hist`, `lm_echo_of_disc`, `lm_D_pending_sess`,
+   `lm_D_stage_prefix`, `lm_cs_len_ok_0/echo`, `lm_good_out_of_stage`,
+   `lm_good_out_step`, `lm_out_pure_0`, `lm_pcount_echo`,
+   `lm_pending_nil_inv`, `lm_pending_nonnil`, `lm_pending_ps_mono`,
+   `lm_pro_idx_ge/le`, `lm_pro_ok_pad`, `lm_ps_len_ok_0/echo`,
+   `lm_stage_sess_pad` ARE reached, through the instance `union_laws_at`, and
+   are ported in `GenOutPureSeal.lean`.  The kernel-term re-audit,
+   notes/cone_reaudit.md, finds the rest unreached.)
 -/
 import Xv6.LineModelLinks
 import Xv6.EchoOutPure
