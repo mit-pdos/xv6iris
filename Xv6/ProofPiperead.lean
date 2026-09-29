@@ -2022,7 +2022,7 @@ theorem pr_empty_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : 
   iintro Hk Hpc
   iapply (pr_acquire AC c _ γl γp (k.regs 10#5) w q ?hna ?hKa ?hla ?ha0) $$ [- $Hk $Hpc $Href]
   rotate_right 1
-  k_norm_g [prj_472c, hsie, hb.proc, MachCSL.withSpie_withSpie]
+  k_norm_g [prj_472c, hsie, hb.proc, MachCSL.KCtx.withSpie_twice]
   iframe #
   case hna => k_norm_g; rw [hb.noff]; decide
   case hKa => k_norm_g; unfold pipereadSlots at hK; omega
@@ -2032,7 +2032,7 @@ theorem pr_empty_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : 
   iintro %spie7 %spp7 %R7 %hsp7 Hk Hpc %hcs7 Hlocked HR _ Harm Href
   -- the acquire's arm and the complement: the whole bundle again
   icases armExt_join c k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-  k_norm_g [MachCSL.withSpie_withSpie, KCtx.pushOffAt_withRegs, pr_withSpie_pushOffAt,
+  k_norm_g [MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs, pr_withSpie_pushOffAt,
     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
   have hpre7 : prPre k j n R7 := prPre_cs k j n _ R7
     (by unfold prPre at hpreS ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreS) hcs7

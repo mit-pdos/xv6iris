@@ -195,31 +195,6 @@ theorem p4_toNat_addN4 (a : BitVec 64) (j : Nat) (hj : j < 4) (hlt : a.toNat + j
     (a + BitVec.ofNat 64 j).toNat = a.toNat + j := by
   rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
 
-/-- **A 4-aligned word forgets to its four bytes.** -/
-theorem word4_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 32) (hal : a.toNat % 4 = 0) :
-    wordPointsTo (GF := GF) a 4 dq w ⊢ byteBuf a dq (wordToBytes4 w) := by
-  have hz : a + BitVec.ofNat 64 0 = a := by simp
-  unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %hf, Hb⟩
-  unfold bytesPointsTo ctxBytes
-  simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.add_zero]
-  icases Hb with ⟨Hb0, Hb1, Hb2, Hb3, _⟩
-  ihave H1 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 1) 1 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb1
-  ihave H2 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 2) 2 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb2
-  ihave H3 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 3) 3 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb3
-  ihave H0 := wordPointsTo_intro a 1 dq (nthByte (n := 4) w 0) ppn
-    ⟨hf.1, hf.2.1, by unfold inRam at hf ⊢; omega, by omega⟩ $$ Hcl
-  unfold byteBuf wordToBytes4
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, Nat.reduceAdd, hz]
-  isplitl [Hb0]
-  · iapply H0
-    unfold bytesPointsTo ctxBytes
-    simp only [List.range_succ, List.range_zero, List.nil_append,
-      Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, nthByte_one, BitVec.add_zero]
-    iframe Hb0
-  iframe H1 H2 H3
-
 end
 
 /-! ## The page reassembly -/
@@ -308,10 +283,10 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
     intro c hc
     rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat, Nat.reducePow]
     omega
-  ihave Hnr := word4_to_bytes (aPnread pi) (DFrac.own 1) nr (by rw [e_nr]; exact hal4 536 (by decide)) $$ Hnr
-  ihave Hnw := word4_to_bytes (aPnwrite pi) (DFrac.own 1) nw (by rw [e_nw]; exact hal4 540 (by decide)) $$ Hnw
-  ihave Hro := word4_to_bytes (aPopen pi false) (DFrac.own 1) ro (by rw [e_ro]; exact hal4 544 (by decide)) $$ Hro
-  ihave Hwo := word4_to_bytes (aPopen pi true) (DFrac.own 1) wo (by rw [e_wo]; exact hal4 548 (by decide)) $$ Hwo
+  ihave Hnr := MachCSL.wordPointsTo_to_bytes4 (aPnread pi) (DFrac.own 1) nr (by rw [e_nr]; exact hal4 536 (by decide)) $$ Hnr
+  ihave Hnw := MachCSL.wordPointsTo_to_bytes4 (aPnwrite pi) (DFrac.own 1) nw (by rw [e_nw]; exact hal4 540 (by decide)) $$ Hnw
+  ihave Hro := MachCSL.wordPointsTo_to_bytes4 (aPopen pi false) (DFrac.own 1) ro (by rw [e_ro]; exact hal4 544 (by decide)) $$ Hro
+  ihave Hwo := MachCSL.wordPointsTo_to_bytes4 (aPopen pi true) (DFrac.own 1) wo (by rw [e_wo]; exact hal4 548 (by decide)) $$ Hwo
   ihave P5 := byteBuf_bytesFree (aPnread pi) (wordToBytes4 nr) $$ Hnr
   ihave P6 := byteBuf_bytesFree (aPnwrite pi) (wordToBytes4 nw) $$ Hnw
   ihave P7 := byteBuf_bytesFree (aPopen pi false) (wordToBytes4 ro) $$ Hro

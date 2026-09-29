@@ -317,8 +317,6 @@ theorem cr_epi_ctx (k : KCtx) (s0 s1b a b : Bool) (Rb R : RegMap) :
     ((((k.pushed 12).withSpie s0 s1b).withRegs Rb).withSpie a b).withRegs R =
       ((k.withSpie a b).pushed 12).withRegs R := by
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k; rfl
-theorem cr_withSpie_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
-    (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
 
 /-- The loop's base context `kb` (depth 0, just before the first `acquire`). -/
 structure CrBase (k kb : KCtx) : Prop where
@@ -1832,7 +1830,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   -- back from sleep, on whichever hart
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie7 %spp7 %R7 Hk Hpc Hte Hce %hcs7
-  k_norm_g [cr_withSpie_collapse]
+  k_norm_g [MachCSL.withSpie_collapse]
   have hfix7 : crFix k N R7 := crFix_cs k N _ R7
     (by unfold crFix at hfix6 ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix6)
     hcs7

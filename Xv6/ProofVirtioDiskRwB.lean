@@ -1028,7 +1028,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [MachCSL.withSpie_withSpie] at HLq
+    isimp only [MachCSL.KCtx.withSpie_twice] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %0xffffffff#32 %x1 %x2 %y HLq
   -- turn 1
   iapply (vdrw_iter c (vdrwK (k.withSpie a b)) γ pd pav pu (vdrwK_sie _)
@@ -1062,7 +1062,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [MachCSL.withSpie_withSpie] at HLq
+    isimp only [MachCSL.KCtx.withSpie_twice] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %(BitVec.ofNat 32 n0) %0xffffffff#32 %x2 %y HLq
   -- turn 2
   have hne10 : n1 ≠ n0 := by
@@ -1098,7 +1098,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hout1 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [MachCSL.withSpie_withSpie] at HLq
+    isimp only [MachCSL.KCtx.withSpie_twice] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %(BitVec.ofNat 32 n0) %(BitVec.ofNat 32 n1) %0xffffffff#32
       %y HLq
   -- three descriptors: the seam

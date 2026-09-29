@@ -31,7 +31,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
 
-/-! ## Four bytes as a word (the inverse of `word4_to_bytes`) -/
+/-! ## Four bytes as a word (the inverse of `MachCSL.wordPointsTo_to_bytes4`) -/
 
 private theorem list4 {α : Type _} (l : List α) (h : l.length = 4) :
     ∃ a0 a1 a2 a3, l = [a0, a1, a2, a3] := by

@@ -1353,7 +1353,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   iintro Hk Hpc
   iapply (pw_acquire AC c _ γl γp (k.regs 10#5) w q ?hna ?hKa ?hla ?ha0) $$ [- $Hk $Hpc $Href]
   rotate_right 1
-  k_norm_g [pwj_4640, hsie, hb.proc, MachCSL.withSpie_withSpie]
+  k_norm_g [pwj_4640, hsie, hb.proc, MachCSL.KCtx.withSpie_twice]
   iframe #
   case hna => k_norm_g; rw [hb.noff]; decide
   case hKa => k_norm_g; unfold pipewriteSlots at hK; omega
@@ -1363,7 +1363,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   iintro %spie7 %spp7 %R7 %hsp7 Hk Hpc %hcs7 Hlocked HR _ Harm Href
   -- the acquire's arm and the complement: the whole bundle again
   icases armExt_join c k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-  k_norm_g [MachCSL.withSpie_withSpie, KCtx.pushOffAt_withRegs, pw_withSpie_pushOffAt,
+  k_norm_g [MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs, pw_withSpie_pushOffAt,
     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
   have hfix7 : pwFix k j n R7 := pwFix_cs k j n _ R7 (pwFix_call k j n RS hfixS _ _) hcs7
   have h18_7 : R7 18#5 = BitVec.ofNat 64 m := (pw_cs18 _ _ _ _ hcs7).trans h18_S

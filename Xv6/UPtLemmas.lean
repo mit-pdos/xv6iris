@@ -23,10 +23,6 @@ set_option linter.unusedSectionVars false
 
 /-! ## The leaf word -/
 
-/-- The user leaf IS what `mappages` writes (`Xv6/PtOwn.lean`). -/
-theorem uLeaf_ne_zero (ppn : BitVec 44) (perm : BitVec 64) : leafOf ppn perm ≠ 0#64 :=
-  leafOf_ne_zero ppn perm
-
 /-- `PTE2PA` of a user leaf, when `perm` is flag bits only. -/
 theorem pte2pa_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hp : perm &&& ~~~0x3FF#64 = 0#64) :
     pte2pa (leafOf ppn perm) = pageAddr ppn := by

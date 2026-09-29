@@ -273,17 +273,8 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 /-! ## The leaf `uvmalloc` writes -/
 
 
-theorem uLeaf_valid (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
-    (leafOf ppn perm).getLsbD 0 = true ∧ (leafOf ppn perm) &&& 0xE#64 ≠ 0#64 := by
-  refine ⟨by unfold leafOf; bv_decide, ?_⟩
-  have he : (leafOf ppn perm) &&& 0xE#64 = (perm &&& 0xE#64) ||| ((BitVec.setWidth 64 ppn <<< 10) &&& 0xE#64) := by
-    unfold leafOf; bv_decide
-  have hz : (BitVec.setWidth 64 ppn <<< 10) &&& 0xE#64 = 0#64 := by bv_decide
-  rw [he, hz, BitVec.or_zero]
-  exact hr
-
 theorem uLeaf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (uLeaf_valid ppn perm hr)
+    isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (Xv6.leafOf_valid ppn perm hr)
 
 theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3FF#64 = 0#64) :
     ptePpn (leafOf ppn perm) = ppn := by

@@ -523,7 +523,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
   -- past kfree: `j 0x4590`, the epilogue, page count incremented
   iapply wpNext_intro_pin
   iintro %cF %hpF %spie3 %spp3 %R5 %hsp3 Hk Hpc Hav %hcs5
-  k_norm_g [MachCSL.withSpie_withSpie, MachCSL.pushed_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   k_norm_g at hsp3
   unfold calleeSaved at hcs5
   k_norm_g at hcs5

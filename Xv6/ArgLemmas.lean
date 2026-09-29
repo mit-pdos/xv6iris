@@ -72,8 +72,8 @@ theorem word8_join4 (a : BitVec 64) (lo hi : BitVec 32) (hal : a.toNat % 8 = 0) 
     wordPointsTo (GF := GF) a 4 (DFrac.own 1) lo ∗ wordPointsTo (a + 4#64) 4 (DFrac.own 1) hi ⊢
       ∃ w : BitVec 64, wordPointsTo a 8 (DFrac.own 1) w := by
   iintro ⟨Hlo, Hhi⟩
-  ihave Hlo := word4_to_bytes a (DFrac.own 1) lo (align4_of_8 a hal) $$ Hlo
-  ihave Hhi := word4_to_bytes (a + 4#64) (DFrac.own 1) hi (align4_add4 a hal) $$ Hhi
+  ihave Hlo := MachCSL.wordPointsTo_to_bytes4 a (DFrac.own 1) lo (align4_of_8 a hal) $$ Hlo
+  ihave Hhi := MachCSL.wordPointsTo_to_bytes4 (a + 4#64) (DFrac.own 1) hi (align4_add4 a hal) $$ Hhi
   ihave Hhi := (show byteBuf (GF := GF) (a + 4#64) (DFrac.own 1) (wordToBytes4 hi) ⊢
       byteBuf (a + BitVec.ofNat 64 (wordToBytes4 lo).length) (DFrac.own 1) (wordToBytes4 hi) from by
     rw [word4Bytes_length]) $$ Hhi

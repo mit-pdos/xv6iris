@@ -126,8 +126,6 @@ theorem uwj_74 : jumpPc (KA.«uartwrite» + 0x74#64) = KA.«uartwrite» + 0x74#6
 
 /-! ## Context shapes -/
 
-theorem uw_ws_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
-    (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
 theorem uw_filter_self (s : String) : ([s].filter (fun x => x ≠ s)) = ([] : List String) := by
   simp
 theorem uw_ctx_self (k : KCtx) : (k.withSpie k.spie k.spp).withRegs k.regs = k := by
@@ -549,7 +547,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   case hspt => k_norm_g [hbb.tier, hkt]
   k_next_e
   iintro %sp1 %spp1 %R1 %_ Hk Hpc %hcs1
-  k_norm_g [uw_ws_collapse, MachCSL.KCtx.withSpie_twice]
+  k_norm_g [MachCSL.withSpie_collapse, MachCSL.KCtx.withSpie_twice]
   have hfix1 : uwFix k i n R1 := uwFix_cs k i n _ R1 (uwFix_call k i n R hfix _ _) hcs1
   have h9_1 : R1 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs1).trans h9
   obtain ⟨p2, p8, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hfix1
@@ -647,7 +645,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_40, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
       MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
-      MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
+      MachCSL.KCtx.withSpie_twice, MachCSL.withSpie_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
     -- jal sleep
@@ -667,7 +665,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     case hslpp => k_norm_g [hbb.proc]
     iapply wpNext_intro_pin
     iintro %cpu2 %hpin2 %spS %sppS %RS Hk Hpc Hte Hce %hcsS
-    k_norm_g [uw_ws_collapse, MachCSL.KCtx.withSpie_twice, hbb.proc]
+    k_norm_g [MachCSL.withSpie_collapse, MachCSL.KCtx.withSpie_twice, hbb.proc]
     have hfix4 : uwFix k i n RS := uwFix_cs k i n _ RS (uwFix_call' k i n R3 hfix3 _) hcsS
     have h9_4 : RS 9#5 = BitVec.ofNat 64 m := (uw_cs9' _ _ _ hcsS).trans h9_3
     ihave IH' := uwLoop_elim c0 k kb i γ dq bs cs n Φ $$ IH
@@ -760,7 +758,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_74, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
       MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
-      MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
+      MachCSL.KCtx.withSpie_twice, MachCSL.withSpie_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
     -- c.addiw s1,s1,1 ; c.j +0x44

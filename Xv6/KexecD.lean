@@ -114,9 +114,6 @@ theorem kxdKept_set (Rb R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : kxdKept 
 theorem kxd_succ (b : BitVec 64) (n : Nat) :
     b + (BitVec.ofNat 64 n + 1#64) = b + BitVec.ofNat 64 (n + 1) := by bv_omega
 
-theorem kxd_succ' (b : BitVec 64) (n : Nat) :
-    b + BitVec.ofNat 64 n + 1#64 = b + BitVec.ofNat 64 (n + 1) := by bv_omega
-
 theorem kxd_pred (b : BitVec 64) (n : Nat) :
     b + (BitVec.ofNat 64 (n + 1) + 18446744073709551615#64) = b + BitVec.ofNat 64 n := by bv_omega
 
@@ -324,7 +321,7 @@ theorem kxd_name_loop (k : KCtx) (spie spp : Bool) (Rb : RegMap) (pv : BitVec 64
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     -- +0x2bc  c.addi a5,a5,1
     k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0x2bc#64) true 1#12 15#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, kxd_succ pv n, kxd_succ' pv n]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, kxd_succ pv n, MachCSL.addr_succ pv n]
     iintro Hk Hpc
     -- +0x2be  lbu a4,-1(a5) : byte n
     icases byteBuf_acc pv dq (bview (plen + 1) pfun) n (pfun n) (bview_lookup _ _ _ (by omega)) $$ Hp

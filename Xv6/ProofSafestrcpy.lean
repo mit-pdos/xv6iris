@@ -38,10 +38,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-- The 12-bit immediate `-1`, sign-extended. -/
 theorem ss_negone : BitVec.signExtend 64 (4095#12) = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
-/-- `addi rs,+1` on the cursor. -/
-theorem ss_succ (b : BitVec 64) (k : Nat) :
-    b + BitVec.ofNat 64 k + 1#64 = b + BitVec.ofNat 64 (k + 1) := by bv_omega
-
 /-- The same, right-associated: the form `k_norm` leaves after `BitVec.add_assoc`. -/
 theorem ss_succ' (b : BitVec 64) (k : Nat) :
     b + (BitVec.ofNat 64 k + 1#64) = b + BitVec.ofNat 64 (k + 1) := by bv_omega
@@ -77,9 +73,6 @@ theorem ss_addiw :
 
 /-- `slli a3,a3,32 ; srli a3,a3,32` zero-extends `15`. -/
 theorem ss_a3 : (15#64 <<< (32#6).toNat) >>> (32#6).toNat = 15#64 := by decide
-
-/-- The initial cursor `src + ofNat 0 = src`. -/
-theorem ss_base0 (b : BitVec 64) : b = b + BitVec.ofNat 64 0 := by simp
 
 /-! ## Register bookkeeping -/
 
@@ -150,11 +143,11 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     iintro Hk Hpc
     -- addi a1,a1,1
     k_step_gen (wp_s_addi c1 _ (KA.«safestrcpy» + 0x1c#64) true 1#12 11#5 11#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h11, ss_succ src k] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h11, MachCSL.addr_succ src k] next c2 hp2
     iintro Hk Hpc
     -- addi a5,a5,1
     k_step_gen (wp_s_addi c2 _ (KA.«safestrcpy» + 0x1e#64) true 1#12 15#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h15, ss_succ dst k] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h15, MachCSL.addr_succ dst k] next c3 hp3
     iintro Hk Hpc
     -- lbu a4,-1(a1) : reads src[k]
     have hbk : ∃ b, bss[k]? = some b := by
