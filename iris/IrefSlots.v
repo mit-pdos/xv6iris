@@ -42,9 +42,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list.
 From iris.algebra Require Import auth numbers ufrac.
+From xv6iris Require Import StepIndex.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
 Require Import ProcGeom.
 Require Import FdSlots.   (* [NFILE]; NOT FileInv -- see FdSlots.v *)
 Local Open Scope Z_scope.

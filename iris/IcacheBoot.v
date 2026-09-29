@@ -86,8 +86,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import ufrac auth gmap frac excl.
-From iris.base_logic.lib Require Import invariants own ghost_map ghost_var.
+From transfinite.base_logic.lib Require Import invariants own ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvModelBytes.
@@ -122,7 +123,7 @@ Require Import IcacheEscrow.
 Require Import OffBox.   (* [off_cfg] / [off_set_auth] -- the boot mint of [ic_slp]'s off rows (r25 pass 1) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-From iris.base_logic.lib Require Import mono_nat.
+From transfinite.base_logic.lib Require Import mono_nat.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)

@@ -29,8 +29,9 @@
    custody fupd at [⊤], i.e. at a point where no step is being taken, so it
    composes with anything the continuation's step opens later. *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import mono_nat invariants.
-From iris.program_logic Require Import language weakestpre.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import mono_nat invariants.
+From transfinite.program_logic Require Import language weakestpre.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 
 Section Custody.

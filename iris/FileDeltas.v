@@ -41,6 +41,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sorting bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 
 Require Import FsTree.             (* [DOT], [DOTDOT]                     *)
 Require Import FsImg.              (* [ROOTINO]                           *)

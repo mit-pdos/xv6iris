@@ -12,7 +12,8 @@
    proof share [wire_inv] instead of threading the owned cells. *)
 From stdpp Require Import gmap finite.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.

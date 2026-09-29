@@ -27,6 +27,7 @@
 From Stdlib Require Import ZArith FunctionalExtensionality.
 From stdpp Require Import gmap finite bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Local Open Scope Z_scope.

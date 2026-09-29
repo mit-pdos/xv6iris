@@ -29,8 +29,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
-From iris.program_logic Require Import language weakestpre lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_var gen_heap invariants.
+From transfinite.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.

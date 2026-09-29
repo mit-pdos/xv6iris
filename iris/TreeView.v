@@ -72,6 +72,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 (* the ssreflect tactic language only ([rewrite /def]); no [iProp], no
    camera and no ghost name appears anywhere below *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 (* the tree-wide [set_solver] override -- EXPORT so the dead-import sweep
    keeps it (FastSetSolver.v's rule, BitmapEnc.v's note) *)
 Require Export FastSetSolver.

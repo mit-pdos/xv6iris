@@ -50,7 +50,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map invariants saved_prop.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map invariants saved_prop.
 Require Import VirtioModel.   (* [disk_wr]/[wr_apply]: the write identity *)
 Require Import RiscvPtsto.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)

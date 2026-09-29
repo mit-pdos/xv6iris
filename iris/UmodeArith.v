@@ -24,6 +24,7 @@
 From Stdlib Require Import ZArith Bool Lia Znumtheory.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

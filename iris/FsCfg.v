@@ -65,7 +65,8 @@
     and builds its own.  *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.base_logic.lib Require Import own.   (* [gname] *)
+From transfinite.base_logic.lib Require Import own.   (* [gname] *)
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import UartNames.     (* [uart_names] -- NOT WpUart, which would

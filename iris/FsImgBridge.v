@@ -415,7 +415,8 @@ Qed.
 (*  above is written in.  Everything above is pure.                       *)
 (* ---------------------------------------------------------------------- *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import iprop ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import iprop ghost_map.
 
 (* proofmode re-opens [nat_scope] on top: [=?] and [<=] would silently
    become the nat ones. *)

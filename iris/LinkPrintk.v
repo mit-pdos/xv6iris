@@ -29,9 +29,10 @@ From Stdlib Require Import ZArith String.
 Require Import Stdlib.micromega.Lia.
 From stdpp Require Import list bitvector.definitions.
 From iris.algebra Require Import dfrac.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var.
-From iris.program_logic Require Import language lifting.
+From transfinite.base_logic.lib Require Import ghost_var.
+From transfinite.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.

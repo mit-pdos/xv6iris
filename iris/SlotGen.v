@@ -54,9 +54,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import dfrac gmap agree.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import dfrac_agree mono_list.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_map.
+From transfinite.base_logic.lib Require Import own ghost_map.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import ProcGeom.

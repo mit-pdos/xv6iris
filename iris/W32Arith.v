@@ -26,6 +26,7 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions.
 (* for the ssreflect [rewrite]/[by] the bitvector proofs below are written in *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

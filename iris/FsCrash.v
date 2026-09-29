@@ -40,9 +40,10 @@
 From Stdlib Require Import ZArith Lia List FunctionalExtensionality.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat invariants.
+From transfinite.base_logic.lib Require Import own ghost_var ghost_map mono_nat invariants.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.   (* [GenId]/[gen_id], for the seam section's permit *)
 Require Import VirtioModel.

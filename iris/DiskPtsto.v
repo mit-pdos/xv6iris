@@ -33,7 +33,8 @@
 (* ====================================================================== *)
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_map ghost_var mono_nat.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own ghost_map ghost_var mono_nat.
 From iris.algebra.lib Require Import dfrac_agree.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.

@@ -44,9 +44,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import gmap dfrac.
 From iris.bi.lib Require Import fractional.
-From iris.base_logic.lib Require Import iprop own ghost_map fancy_updates.
+From transfinite.base_logic.lib Require Import iprop own ghost_map fancy_updates.
 Require Import DinodeEnc.      (* [di_major], [di_minor]                     *)
 Require Import DirView.        (* [T_DIR_z]                                  *)
 Require Import FsTree.         (* [fname], [fsnode], [path_at], [node_of]    *)

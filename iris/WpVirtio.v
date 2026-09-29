@@ -33,9 +33,10 @@
    "Could not find an instance for gen_heapGS".  Mirror RiscvPtsto's imports. *)
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
-From iris.program_logic Require Import weakestpre.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map ghost_var.
+From transfinite.program_logic Require Import weakestpre.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.

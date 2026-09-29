@@ -62,9 +62,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list gmap bitvector.definitions.
 From iris.algebra Require Import excl agree csum.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import mono_list.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own invariants ghost_var.
+From transfinite.base_logic.lib Require Import own invariants ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.       (* [riscvGS] *)

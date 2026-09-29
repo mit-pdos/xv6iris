@@ -20,8 +20,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import mono_nat.
+From transfinite.base_logic.lib Require Import mono_nat.
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.

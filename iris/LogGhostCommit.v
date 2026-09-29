@@ -35,8 +35,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list sets coPset namespaces bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map mono_nat.
-From iris.program_logic Require Import language weakestpre.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants ghost_map mono_nat.
+From transfinite.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Values.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.

@@ -36,8 +36,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map invariants.
-From iris.program_logic Require Import language weakestpre.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map invariants.
+From transfinite.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartSpanChar HartRegNode HartMCycle RegFile WpGpr.

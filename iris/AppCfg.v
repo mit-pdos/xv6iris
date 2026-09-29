@@ -50,7 +50,8 @@
     is anything, the kernel stays correct. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
-From iris.base_logic Require Import iprop.
+From transfinite.base_logic Require Import iprop.
+From xv6iris Require Import StepIndex.
 Require Import FsAbsDefs.     (* [aview]: the predicate's domain, the VIEW *)
 
 Class appcfg (Σ : gFunctors) := MkAppcfg {

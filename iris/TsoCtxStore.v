@@ -13,9 +13,10 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import dfrac auth.
 From iris.bi.lib Require Import fractional.
-From iris.base_logic.lib Require Import ghost_var ghost_map mono_nat gen_heap.
+From transfinite.base_logic.lib Require Import ghost_var ghost_map mono_nat gen_heap.
 (* SailStdpp.Base is deliberately ABSENT (the SC file imported it): it
    exports [Countable_mword]/[Decidable_eq_mword], which would make every
    [gmap]/[ghost_map] over [Arch.pa] in THIS file elaborate at the Sail

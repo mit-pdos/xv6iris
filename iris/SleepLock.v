@@ -85,9 +85,10 @@
    locked@0 (4B), lk@8 (24B inner spinlock: word@8 name@16 cpu@24),
    name@32 (8B), pid@40 (4B). *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import excl auth ufrac updates local_updates.
 From iris.algebra.lib Require Import excl_auth.
-From iris.base_logic.lib Require Import invariants own.
+From transfinite.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.

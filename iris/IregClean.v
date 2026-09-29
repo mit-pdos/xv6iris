@@ -24,7 +24,8 @@
 (* ====================================================================== *)
 
 Require Import stdpp.base stdpp.gmap stdpp.sets.
-From iris.base_logic.lib Require Import invariants ghost_map.
+From transfinite.base_logic.lib Require Import invariants ghost_map.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
 
 Require Import RiscvPtsto.    (* [riscvGS] / [diskGhostG] -- IMPORTED, not merely

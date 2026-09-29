@@ -44,9 +44,10 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var own.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_var own.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker *)
+From transfinite.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker *)
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import RiscvLang ObsTrace.   (* [mobs] -- what a tag's history is made of *)
 Require Import RiscvPtsto.           (* [riscv_rx_tag] -- the application's tag on

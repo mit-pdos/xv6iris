@@ -69,8 +69,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap gmultiset frac excl numbers.
-From iris.base_logic.lib Require Import iprop own ghost_map mono_nat.
+From transfinite.base_logic.lib Require Import iprop own ghost_map mono_nat.
 Require Import SailStdpp.Operators_mwords.
 Require Import RiscvPtsto.
 (* EARLY, before the block layer: [FsState] exports four names that collide

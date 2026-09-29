@@ -30,8 +30,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth.
-From iris.base_logic.lib Require Import ghost_map mono_nat.
+From transfinite.base_logic.lib Require Import ghost_map mono_nat.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost.
 Require Import TsoCtx.

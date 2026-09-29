@@ -16,7 +16,8 @@
    need one, you are writing a phase proof, not vocabulary. *)
 
 From stdpp Require Import bitvector.definitions.
-From iris.base_logic.lib Require Import mono_nat.
+From transfinite.base_logic.lib Require Import mono_nat.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -35,7 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* [ghost_map]'s element notation: a free descriptor carries its receipt
    fragment now (finding 5), and this section names it. *)
-From iris.base_logic.lib Require Import ghost_map.
+From transfinite.base_logic.lib Require Import ghost_map.
 Require Import TsoCtx.
 Import Defs.
 
@@ -410,8 +411,8 @@ Definition vdrw_sector_raw (bno : mword 32) : mword 64 :=
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language weakestpre lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+From transfinite.program_logic Require Import language weakestpre lifting.
+From transfinite.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import VirtioQueue VirtioProto.
 Import Defs.
 

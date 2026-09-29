@@ -34,8 +34,9 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap gset frac.
-From iris.base_logic.lib Require Import own invariants ghost_map ghost_var.
+From transfinite.base_logic.lib Require Import own invariants ghost_map ghost_var.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.

@@ -24,7 +24,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

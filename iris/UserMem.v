@@ -10,7 +10,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language lifting.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import SmodePte.
 Require Import RiscvExtras.   (* pma_ok_aligned + the split-loop kit *)

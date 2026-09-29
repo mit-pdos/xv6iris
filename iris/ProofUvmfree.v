@@ -66,9 +66,10 @@ Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import excl.
-From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
-From iris.program_logic Require Import language weakestpre lifting.
+From transfinite.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
+From transfinite.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.

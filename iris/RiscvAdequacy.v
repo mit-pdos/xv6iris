@@ -40,11 +40,12 @@
 
 From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import csum excl auth gset.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
-From iris.program_logic Require Import weakestpre lifting adequacy.
-From iris.program_logic Require Import language.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
+From transfinite.program_logic Require Import weakestpre lifting adequacy.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang ObsTrace RiscvPtsto.

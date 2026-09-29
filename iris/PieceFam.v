@@ -68,7 +68,8 @@
 
 From Stdlib Require Import ZArith.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import iprop.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import iprop.
 
 (* ===================================================================== *)
 (*  1.  THE PAIR                                                          *)

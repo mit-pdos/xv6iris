@@ -27,7 +27,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
@@ -41,7 +42,7 @@ Require Import WpMmodeUtype.
 Require Import WpMmodeItype.
 Require Import WpMmodeRtype.
 Require Import InstrBytes KernelText.
-From iris.base_logic.lib Require Import invariants.
+From transfinite.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeEntryAux.

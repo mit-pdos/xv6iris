@@ -41,7 +41,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list namespaces.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map mono_nat.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants ghost_map mono_nat.
 Require Import SailStdpp.Values.
 Require Import RiscvLang.   (* [GenId]/[gen_id]: the era the hooks are at *)
 Require Import RiscvPtsto.  (* [riscv_sync_hook] *)

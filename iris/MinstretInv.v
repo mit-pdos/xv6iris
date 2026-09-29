@@ -56,8 +56,9 @@
    [exec] step with one program step. *)
 From Stdlib Require Import FunctionalExtensionality.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.

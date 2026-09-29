@@ -43,7 +43,8 @@
    to rebind a SECTION variable's name ("CID is already used"), which is
    exactly the shadowing every consumer relies on. *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.   (* [zero_reg]: the idle hatch *)
 Require Import RiscvLang.

@@ -94,7 +94,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -106,9 +107,9 @@ Require Import VcGen.   (* [trunc32_unsigned]/[trunc32_sext]: the ring index's w
 Require Import WpLock.
 Require Export UartNames.   (* [uart_names]: the receive side's ghost names;
                                the ring's high-water mark is one of them *)
-From iris.base_logic.lib Require Import ghost_var own.
+From transfinite.base_logic.lib Require Import ghost_var own.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker: [cons_dirty_lb] *)
+From transfinite.base_logic.lib Require Import mono_nat.   (* the ring's dirty marker: [cons_dirty_lb] *)
 Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

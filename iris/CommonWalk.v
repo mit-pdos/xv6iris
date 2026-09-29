@@ -18,6 +18,7 @@
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -26,8 +27,8 @@ Require Import WpDecodeBridge.
 (* the [swp] layer's vocabulary: the walk's memory reads become obligations
    at this level (main-cycle-port), so the lemmas below are stated over
    frames rather than over a whole state. *)
-From iris.base_logic.lib Require Import gen_heap ghost_map.
-From iris.program_logic Require Import language weakestpre.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map.
+From transfinite.program_logic Require Import language weakestpre.
 Require Import RiscvPtsto HartSwp HartLift HartRegNode HartSpan HartSpanChar
         HartGoodb.
 Require Import CtxIdDefs.

@@ -30,6 +30,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import ProofSyscall.

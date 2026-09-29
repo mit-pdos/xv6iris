@@ -8,8 +8,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From iris.algebra Require Import excl.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map mono_nat own.
+From transfinite.base_logic.lib Require Import invariants ghost_map mono_nat own.
 Require Import RiscvPtsto.
 (* [FsState.top_frag] / [FsBytesGamma.fs_gamma_L] -- the era's abstract value,
    which the EMPTY arm carries from iput's mint at +0x8a to the off-lock

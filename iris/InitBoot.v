@@ -25,7 +25,8 @@
     facts are stated at them). *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.base_logic Require Import iprop.
+From transfinite.base_logic Require Import iprop.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.

@@ -51,8 +51,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap gmultiset.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap ufrac gset.
-From iris.base_logic.lib Require Import own ghost_var invariants ghost_map.
+From transfinite.base_logic.lib Require Import own ghost_var invariants ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost.

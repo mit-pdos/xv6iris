@@ -13,8 +13,9 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra.lib Require Import mono_list.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import RiscvExtras.  (* [ret_pc] *)
 Require Import ProcGeom.     (* [tf_epc_idx] *)

@@ -66,6 +66,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import FsBlocks.       (* [blk_splice]: the landed byte splice        *)
 Require Import CtxIdDefs.         (* [CurCtx]: [delta_trunc]'s binder            *)
 Require Import FsTree.         (* [fname]                                     *)

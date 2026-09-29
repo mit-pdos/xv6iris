@@ -69,7 +69,8 @@
 From Stdlib Require Import ZArith Lia List FunctionalExtensionality.
 From stdpp Require Import gmap finite list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord
         SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.

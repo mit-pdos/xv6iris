@@ -69,6 +69,7 @@ From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 (* for ssreflect's [rewrite /x] and [by]; nothing in this file is an [iProp] *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

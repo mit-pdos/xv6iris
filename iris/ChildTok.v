@@ -60,8 +60,9 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.algebra Require Import dfrac excl agree csum.  (* [exclR] -- the taken token's camera; [csumR]/[agreeR] -- the kill flag's one-shot *)
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own saved_prop.
+From transfinite.base_logic.lib Require Import own saved_prop.
 Require Import SailStdpp.Base SailStdpp.Values.
 Local Open Scope Z_scope.
 
@@ -108,11 +109,11 @@ Local Open Scope Z_scope.
    two: PENDING while the row's zero arm holds it, SHOT the moment a writer
    sets the flag, and the shot half is persistent and duplicable, which is
    exactly what makes it relayable.  Its camera is [kshotR] below. *)
-Definition genF : oFunctor :=
-  prodOF (constOF (leibnizO (Values.mword 64 * Values.mword 32 * gname * gname)))
-         (Z -d> ▶ ∙).
+Definition genF : tFunctor :=
+  prodTF (constTF (leibnizO (Values.mword 64 * Values.mword 32 * gname * gname)))
+         (Z -d> ▶ ∙)%TF.
 
-Global Instance genF_contractive : oFunctorContractive genF.
+Global Instance genF_contractive : tFunctorContractive genF.
 Proof. apply _. Qed.
 
 (* THE TAKEN TOKEN'S VALUE, AND IT IS A TYPE OF OUR OWN.  [exclR unitO] is
@@ -252,7 +253,7 @@ Section ChildTok.
 
   (* the saved element, spelled once: the three PURE values and the
      payload under [Next] (the functor's ▷) *)
-  Definition gen_el pa pid ga gk Q : oFunctor_apply genF (iPropO Σ) :=
+  Definition gen_el pa pid ga gk Q : tFunctor_apply genF (iPropO Σ) :=
     (((pa, pid, ga, gk)
         : leibnizO (Values.mword 64 * Values.mword 32 * gname * gname)),
      Next ∘ Q).

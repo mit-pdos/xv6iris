@@ -44,6 +44,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 (* the proofs below are ssreflect-style multi-rewrites, which is what the
    proofmode's tactic language gives; nothing here is an [iProp] *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

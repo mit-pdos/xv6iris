@@ -73,10 +73,11 @@
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import mono_list.
 From iris.algebra Require Import excl auth gmap frac numbers.
-From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
-From iris.program_logic Require Import language weakestpre lifting.
+From transfinite.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
+From transfinite.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.

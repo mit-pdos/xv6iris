@@ -9,8 +9,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
 From iris.algebra Require Import excl dfrac.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map mono_nat own invariants.
+From transfinite.base_logic.lib Require Import ghost_map mono_nat own invariants.
 Require Import RiscvPtsto.
 Require Import IcacheRefDefs.
 

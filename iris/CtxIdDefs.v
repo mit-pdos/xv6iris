@@ -20,7 +20,8 @@
 (* the identity should require THIS one instead.                          *)
 (* ====================================================================== *)
 From stdpp Require Import base countable.
-From iris.base_logic.lib Require Import own.   (* [gname] *)
+From transfinite.base_logic.lib Require Import own.   (* [gname] *)
+From xv6iris Require Import StepIndex.
 
 (* TWO GNAMES, BOTH THE CONTEXT'S OWN ([TsoCtxTwin2.CtxId] is the same
    record): the BOUND authority (one monotone nat -- clean facts'

@@ -53,7 +53,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map ghost_var mono_nat.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map ghost_var mono_nat.
 
 (* the crash predicate and the adequacy-level pure projection: the two
    PRODUCERS of [snap_holds] (section 4).  They come first so that the

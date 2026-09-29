@@ -1,8 +1,9 @@
 (* RiscvFetchExec.v -- exec-level fetch reduction + the conditioned Hne engine. *)
 From Stdlib Require Import ZArith Zquot.
 From stdpp Require Import list_monad bitvector.definitions.
-From iris.program_logic Require Import lifting.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.

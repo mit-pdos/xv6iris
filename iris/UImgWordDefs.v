@@ -18,6 +18,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
                                    (* the ssreflect [rewrite A B] the
                                       moved proofs are written in *)
 Require Import SailStdpp.Values SailStdpp.Operators_mwords.

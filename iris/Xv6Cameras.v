@@ -65,6 +65,7 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import excl auth agree csum frac ufrac dfrac gmap gset
+From xv6iris Require Import StepIndex.
      gset gmultiset numbers updates local_updates.
 From iris.algebra.lib Require Import excl_auth dfrac_agree mono_list.
 Require Import PipeNames.   (* [pipe_st]: the byte queue's abstract state, plain data *)
@@ -72,7 +73,7 @@ Require Import KallocEv.    (* [kev]: the allocator ledger's events, plain data 
 Require Import PidEv.       (* [pev]: the pid ledger's events, plain data *)
 Require Import ZombEv.      (* [zev]: the zombie ledger's events, plain data *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var ghost_map saved_prop
+From transfinite.base_logic.lib Require Import own ghost_var ghost_map saved_prop
      mono_nat cancelable_invariants.
 (* THE SAIL IMPORTS ARE EXACTLY [RiscvModelBytes]'s / [VirtioModel]'s, and
    deliberately no more.  [gmap Arch.pa (bv 8)] appears in [dclaim] and in

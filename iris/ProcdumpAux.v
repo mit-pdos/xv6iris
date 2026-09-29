@@ -31,8 +31,9 @@
 From Stdlib Require Import ZArith Lia List String Ascii.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import iprop invariants.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import iprop invariants.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.

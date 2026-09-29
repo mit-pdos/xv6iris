@@ -25,6 +25,7 @@ From stdpp Require Import bitvector.definitions.
    [uint]/[bv_unsigned] bridges below are written against (they came from
    KallocInv.v, which gets ssreflect through the proofmode) *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.

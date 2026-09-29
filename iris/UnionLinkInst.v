@@ -18,7 +18,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import mono_nat own ghost_var ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import mono_nat own ghost_var ghost_map.
 From iris.algebra.lib Require Import mono_list.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values

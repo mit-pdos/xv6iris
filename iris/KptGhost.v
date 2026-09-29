@@ -24,7 +24,8 @@
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap namespaces.
 From iris.algebra Require Import csum excl agree.
-From iris.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own.
 From iris.proofmode Require Import proofmode.
 Require Import RiscvPtsto.
 Require Import TsoGhost.   (* A6.71: [llb] rides inside [kpt_bound] *)

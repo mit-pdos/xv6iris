@@ -30,8 +30,9 @@
 From Stdlib Require Import ZArith Zquot.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map.
+From transfinite.program_logic Require Import language.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords.
 Require Import HartSwp HartLift HartLift2 HartSpan HartSpanChar HartRunGen

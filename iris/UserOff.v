@@ -58,7 +58,8 @@
    (fork: RULED = park), claude-notes/design/fs-syscall-specs.md section 4. *)
 From Stdlib Require Import ZArith Lia.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own ghost_var invariants.
 Require Import RiscvPtsto.    (* [riscvGS] -- the [invGS] the invariant lives at *)
 Require Import Xv6Cameras.    (* [offboxG] -- the shadow's pinned class          *)
 Require Import OffGv.         (* [off_gv], [off_user_inv], [foffN]               *)

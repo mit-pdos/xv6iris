@@ -42,9 +42,10 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.base_logic Require Import iprop.
-From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
-From iris.base_logic.lib Require Import mono_nat.   (* [mono_nat_lb_own_get]: the era's turn at 0 is the reader's receipt residue (step 4) *)
+From transfinite.base_logic Require Import iprop.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map ghost_var invariants.
+From transfinite.base_logic.lib Require Import mono_nat.   (* [mono_nat_lb_own_get]: the era's turn at 0 is the reader's receipt residue (step 4) *)
 (* [mono_list] AND [ghost_var_frac] ARE REQUIRED HERE FOR A REASON, and so is
    [TsoCtx] below: a [Context] binder naming a class whose defining module
    is not in scope does not fail -- the backtick generalisation invents a

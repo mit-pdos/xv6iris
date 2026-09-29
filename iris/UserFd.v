@@ -51,7 +51,8 @@
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map.
 Require Import FdSlots.
 Require Import ProcGeom.  (* [NOFILE] -- how many slots a table has *)
 Local Open Scope Z_scope.

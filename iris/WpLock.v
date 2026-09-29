@@ -35,9 +35,10 @@
      Some (i, true)  -- held by i, lk->cpu = cpus_ptr i                     *)
 From stdpp Require Import bitvector.definitions.  (* [bv 8]: the M4 owner-cell kit is stated per byte *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import excl gmap auth ufrac.
 From iris.algebra.lib Require Import excl_auth.
-From iris.base_logic.lib Require Import invariants cancelable_invariants own.
+From transfinite.base_logic.lib Require Import invariants cancelable_invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import Riscv.rv64d_types.  (* A6.84: the ledger word's carrier types *)

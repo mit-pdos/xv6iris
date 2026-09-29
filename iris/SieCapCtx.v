@@ -19,10 +19,11 @@
    step (ii) records the same ruling for the same reason). *)
 
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 (* base_logic's canonical [uPredI] structure must be IMPORTED here: with
    [proofmode] alone the [-∗] in this file's statement elaborates to a bare
    [bi_car ?PROP] and does not unify with [iProp Σ]. *)
-From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap own.
+From transfinite.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

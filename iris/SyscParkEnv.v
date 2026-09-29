@@ -40,7 +40,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.

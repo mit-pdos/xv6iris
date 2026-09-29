@@ -12,7 +12,8 @@
 (*  [uart_names] through it still does.                                    *)
 (* ======================================================================= *)
 
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
 
 (*  The UART's ghost names travel together in ONE record, so [dev_inv] and
     every client-facing resource take a single [γ : uart_names] rather than a

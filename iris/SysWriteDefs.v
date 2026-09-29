@@ -24,6 +24,7 @@ From stdpp Require Import gmap list functions bitvector.definitions.
 (* the proofmode, for ssreflect's [rewrite /x] -- the pure proofs below are
    written in it, and it is not transitive *)
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import BioDefs.        (* [BSIZE]                                   *)
 Require Import InodeInv.       (* [MAXFILE]                                 *)

@@ -35,8 +35,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import excl.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map mono_nat own.
+From transfinite.base_logic.lib Require Import invariants ghost_map mono_nat own.
 Require Import RiscvPtsto.
 Require Import LogInv.
 Require Import FsBlocks.

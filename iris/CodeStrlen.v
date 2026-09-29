@@ -7,8 +7,9 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From iris.program_logic Require Import lifting.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.

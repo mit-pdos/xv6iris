@@ -35,7 +35,8 @@
 (*  A LEAF below RiscvPtsto on purpose: nothing rebuilds under it.          *)
 
 From stdpp Require Import gmap finite relations bitvector.definitions.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

@@ -165,8 +165,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import excl dfrac.
-From iris.base_logic.lib Require Import own ghost_map mono_nat invariants.
+From transfinite.base_logic.lib Require Import own ghost_map mono_nat invariants.
 Require Import RiscvLang.        (* [mobs] *)
 Require Import ObsTrace.         (* [trace_shape], [obs_boots], [ObsPowerOn] *)
 Require Import PathElems.        (* [path_elems] *)

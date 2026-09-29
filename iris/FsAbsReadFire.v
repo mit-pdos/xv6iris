@@ -87,8 +87,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap frac dfrac.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+From transfinite.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords.   (* [mword_of_int]              *)
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.

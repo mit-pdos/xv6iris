@@ -18,8 +18,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.algebra Require Import auth dfrac numbers functions gset.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_map mono_nat.
+From transfinite.base_logic.lib Require Import own ghost_map mono_nat.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvModelBytes.

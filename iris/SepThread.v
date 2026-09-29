@@ -19,7 +19,7 @@
    and a generic statement cannot drift from the kit. *)
 From Stdlib Require Import List.
 From stdpp Require Import coPset.
-From iris.algebra Require Import stepindex_finite.
+From xv6iris Require Import StepIndex.
 From iris.bi Require Import bi.
 From iris.proofmode Require Import proofmode.
 

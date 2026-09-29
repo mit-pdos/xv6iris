@@ -1,11 +1,12 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvTryStep RiscvExtras ExecCommon.
-From iris.base_logic.lib Require Import invariants.
+From transfinite.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
 Definition gpr_of_Z (n : Z) : register_bitvector_64 :=

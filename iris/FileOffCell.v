@@ -11,7 +11,8 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var.   (* [iProp] *)
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own ghost_var.   (* [iProp] *)
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.

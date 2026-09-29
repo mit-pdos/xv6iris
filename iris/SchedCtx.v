@@ -42,9 +42,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language lifting.
 From iris.algebra Require Import excl agree ofe.
-From iris.base_logic.lib Require Import invariants own ghost_var.
+From transfinite.base_logic.lib Require Import invariants own ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
@@ -1396,7 +1397,7 @@ Section SchedCtxPay.
   Proof using .
     rewrite /sched_vc_at bi.later_exist. iIntros "(%XIs & H)".
     rewrite bi.later_sep. iDestruct "H" as "[Hown Hrec]".
-    iPoseProof (@timeless _ _ (own_context (CID := h) XIs) (own_context_timeless (CID := h) XIs)
+    iPoseProof (bi.equiv_entails_1_1 _ _ (bi.timeless_except_0 _ (own_context_timeless (CID := h) XIs))
                   with "Hown") as "Hown".
     iMod "Hown". iModIntro. iExists XIs. iFrame.
   Qed.

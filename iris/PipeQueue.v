@@ -35,9 +35,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list gmap bitvector.definitions.
 From iris.algebra Require Import auth cmra updates.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import excl_auth.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own invariants.
+From transfinite.base_logic.lib Require Import own invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.

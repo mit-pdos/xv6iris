@@ -34,7 +34,8 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import own gen_heap.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own gen_heap.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.

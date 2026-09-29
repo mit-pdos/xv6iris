@@ -43,12 +43,13 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants.
-From iris.program_logic Require Import language lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants.
+From transfinite.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-From iris.base_logic.lib Require Import ghost_var.
+From transfinite.base_logic.lib Require Import ghost_var.
 Require Import RiscvLang RiscvPtsto.
 Require Import ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserExec.

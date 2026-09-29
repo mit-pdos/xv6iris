@@ -12,9 +12,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap finite list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import csum excl.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
-From iris.program_logic Require Import language lifting.
+From transfinite.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
+From transfinite.program_logic Require Import language lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.

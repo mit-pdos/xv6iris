@@ -4,8 +4,9 @@ From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From Stdlib Require Import FunctionalExtensionality.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gset.
-From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat.
+From transfinite.base_logic.lib Require Import own ghost_var ghost_map mono_nat.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.   (* [GenId]/[gen_id]: the born-true mirror row is per-era *)
 Require Import RiscvPtsto.

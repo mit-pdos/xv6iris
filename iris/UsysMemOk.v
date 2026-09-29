@@ -54,7 +54,8 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 (* [gname] alone -- the generation row is a statement about a ghost NAME and
    about no resource, so this file stays a pure one *)
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import Riscv.rv64d.   (* [sign_extend'] -- sbrk's argument, sign-extended *)

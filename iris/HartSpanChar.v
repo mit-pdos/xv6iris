@@ -17,8 +17,9 @@
        [hregwrite_resume]) and the unit-silent resume below. *)
 From stdpp Require Import gmap relations bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
-From iris.program_logic Require Import language weakestpre.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map.
+From transfinite.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

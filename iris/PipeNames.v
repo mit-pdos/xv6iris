@@ -7,7 +7,8 @@
    Design of record: claude-notes/design/pipe.md, "The byte queue". *)
 From Stdlib Require Import ZArith List.
 From stdpp Require Import base gmap list bitvector.definitions.
-From iris.base_logic.lib Require Import own.   (* [gname] *)
+From transfinite.base_logic.lib Require Import own.   (* [gname] *)
+From xv6iris Require Import StepIndex.
 
 (* THE ABSTRACT STATE OF A PIPE: every byte ever written, in order; the
    read pointer -- [ws !! rp] is the next byte a read delivers -- and the

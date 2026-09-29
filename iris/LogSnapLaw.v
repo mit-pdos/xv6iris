@@ -46,7 +46,8 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list sets coPset namespaces bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants ghost_map.
 
 Require Import RiscvPtsto.     (* [riscvGS] -- IMPORTED: a capacity class
                                   used as a Context binder is inert

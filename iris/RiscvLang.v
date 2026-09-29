@@ -9,7 +9,8 @@
 (* ============================================================== *)
 
 From stdpp Require Import gmap finite relations bitvector.definitions.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
 (* NOTE: SailStdpp.Base/Values/TypeCasts are imported LATER (before the         *)
 (* ExecClose section), NOT here: they make the model's [mword] Countable        *)
 (* (Countable_mword) canonical, but the Lang/Iris/Exec sections + the iris-free  *)

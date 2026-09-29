@@ -48,9 +48,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap frac excl.
 From iris.algebra.lib Require Import dfrac_agree.
-From iris.base_logic.lib Require Import invariants ghost_map.
+From transfinite.base_logic.lib Require Import invariants ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvPtsto.
 Require Import FsBlocks.

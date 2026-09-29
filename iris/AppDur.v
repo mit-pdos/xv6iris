@@ -50,7 +50,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map.
 Require Import Xv6Cameras.      (* [fsTopG]: the top map's ghost class *)
 Require Import FsNode.          (* [fs_node] *)
 Require Import FsAbsDefs.       (* [aview], [abs_view] *)

@@ -66,7 +66,8 @@ From stdpp Require Import gmap relations bitvector.definitions.
 (* imported for the same reason RiscvLang.v does, and BEFORE the model: it is
    what makes ssreflect's [rewrite /def] available (the model's own imports
    otherwise restore vanilla [rewrite]) *)
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 (* [Require Import] and not merely inherited: [RiscvLang] requires TsoMemPa

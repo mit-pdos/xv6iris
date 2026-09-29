@@ -55,7 +55,8 @@
 
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import DevModel.
 Require Import RiscvLang.

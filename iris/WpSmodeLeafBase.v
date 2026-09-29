@@ -5,13 +5,14 @@
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 From stdpp Require Import bitvector.definitions gmap.
 
 From Kernel Require Import KernelInstrs KernelSyms.
 From Stdlib Require Import Lia List.
-From iris.program_logic Require Import lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
+From transfinite.program_logic Require Import lifting.
+From transfinite.base_logic.lib Require Import ghost_var invariants gen_heap.
 From iris.bi.lib Require Import fractional.
 Require Import Riscv.riscv_extras SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d.

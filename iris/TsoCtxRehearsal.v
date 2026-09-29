@@ -57,8 +57,9 @@
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import ghost_map ghost_var.
+From transfinite.base_logic.lib Require Import ghost_map ghost_var.
 From xv6iris Require Import TsoMem TsoCtxTwin.
 
 Local Open Scope Z_scope.

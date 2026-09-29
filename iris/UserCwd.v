@@ -31,7 +31,8 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_var.
 Local Open Scope Z_scope.
 
 Section UserCwd.

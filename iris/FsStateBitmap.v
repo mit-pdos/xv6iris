@@ -24,8 +24,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
 From iris.algebra Require Import dfrac.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import iprop.
+From transfinite.base_logic.lib Require Import iprop.
 Require Import BioDefs.
 Require Import BitmapEnc.
 Require Import FsImg.

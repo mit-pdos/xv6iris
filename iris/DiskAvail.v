@@ -23,7 +23,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map.
 (* NB: no [SailStdpp.Values] import -- a [gmap Arch.pa _] written under it
    picks a different Countable instance from VirtioProto's (durable-notes'
    instance-leak trap); [mword] is spelled qualified below. *)

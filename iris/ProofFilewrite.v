@@ -379,7 +379,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language weakestpre lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language weakestpre lifting.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* The Sail side, in [ProofFileread.v]'s exact spelling.  It is NOT
    decoration: the Sail [uint] the [bltu] range facts below are stated over
@@ -862,7 +863,7 @@ End FwWriteiSrc.
 From Stdlib Require Import Eqdep_dec.
 From stdpp Require Import list_monad bitvector.tactics.
 From iris.algebra Require Import excl auth gmap frac numbers.
-From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
+From transfinite.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.

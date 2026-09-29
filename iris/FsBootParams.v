@@ -22,6 +22,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
                             (* the ssreflect [rewrite /x] the moved proof of
                                [fsimg_cov_elem_of] is written in.  IMPORT,
                                never Export: an Export propagates the [by]

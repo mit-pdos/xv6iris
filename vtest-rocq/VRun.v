@@ -46,7 +46,7 @@
 From Stdlib Require Import List ZArith String Bool.
 From stdpp Require Import base list gmap bitvector.definitions finite.
 Import ListNotations.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import language.
 From VTest Require Import VTest.
 Local Open Scope Z_scope.
 

@@ -48,7 +48,8 @@
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes VirtioQueue.

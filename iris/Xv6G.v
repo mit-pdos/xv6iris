@@ -58,7 +58,8 @@
     with "Cannot infer this placeholder"), the field below, and a row in
     [xv6GΣ].  *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own cancelable_invariants ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own cancelable_invariants ghost_map.
 Require Export Xv6Cameras.
 
 Class xv6G (Σ : gFunctors) := Xv6G {

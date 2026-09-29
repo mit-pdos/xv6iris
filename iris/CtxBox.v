@@ -76,8 +76,9 @@
 From Stdlib Require Import ZArith Lia QArith Qcanon.
 From stdpp Require Import gmap countable.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap ufrac.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From transfinite.base_logic.lib Require Import own ghost_var invariants.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoGhost.
 Require Import TsoCtx.

@@ -12,7 +12,8 @@
    With [WpLockAt.newlock_at] the remaining [own_alloc] comes out too, and the
    pair of free-state tokens is one row: [sl_free_pair]. *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.

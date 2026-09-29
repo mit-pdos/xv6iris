@@ -3,8 +3,9 @@
    within_clint/sig/htif discharges; and the x2 (sp) register-write leaves. *)
 From Stdlib Require Import ZArith Zquot.
 From stdpp Require Import bitvector.definitions.
-From iris.program_logic Require Import lifting.
-From iris.program_logic Require Import language.
+From transfinite.program_logic Require Import lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.

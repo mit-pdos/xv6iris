@@ -35,7 +35,8 @@
    propositions that print identically (durable-notes). *)
 From Stdlib Require Import ZArith.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own ghost_var invariants.
 Require Import RiscvPtsto.    (* [riscvGS] -- the [invGS] the invariant lives at *)
 Require Import Xv6Cameras.    (* [offboxG] -- the shadow's pinned class *)
 

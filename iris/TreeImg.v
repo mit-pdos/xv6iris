@@ -45,8 +45,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list.
 From stdpp.bitvector Require Import definitions.
-From iris.base_logic Require Import iprop.
-From iris.base_logic.lib Require Import own ghost_map mono_nat invariants.
+From transfinite.base_logic Require Import iprop.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import own ghost_map mono_nat invariants.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Values.
 Require Import RiscvLang.          (* [gstate] *)

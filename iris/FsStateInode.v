@@ -29,8 +29,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap gmultiset numbers dfrac.
-From iris.base_logic.lib Require Import iprop own.
+From transfinite.base_logic.lib Require Import iprop own.
 Require Import BioDefs.
 Require Import RiscvModelBytes.
 Require Import BlockWords.

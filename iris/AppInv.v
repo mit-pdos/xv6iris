@@ -68,8 +68,9 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.bi.lib Require Import fractional.
-From iris.base_logic.lib Require Import invariants ghost_map.
+From transfinite.base_logic.lib Require Import invariants ghost_map.
 Require Import RiscvPtsto.      (* [riscvGS]: the invariant class *)
 Require Import Xv6Cameras.      (* [fsTopG]: the top map's ghost class *)
 Require Import FsBlocks.        (* [fs_names], [fs_top] *)

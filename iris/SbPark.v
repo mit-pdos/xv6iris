@@ -42,7 +42,8 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import invariants.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import invariants.
 
 Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.

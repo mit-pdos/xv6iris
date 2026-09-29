@@ -47,7 +47,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.

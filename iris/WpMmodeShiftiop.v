@@ -1,7 +1,8 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base.
@@ -9,7 +10,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr RegFile.
 Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
-From iris.base_logic.lib Require Import invariants.
+From transfinite.base_logic.lib Require Import invariants.
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 

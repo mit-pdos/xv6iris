@@ -62,11 +62,12 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.algebra Require Import excl agree csum.
+From xv6iris Require Import StepIndex.
 From iris.algebra.lib Require Import mono_list.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var.
-From iris.program_logic Require Import weakestpre.
-From iris.program_logic Require Import language.
+From transfinite.base_logic.lib Require Import own ghost_var.
+From transfinite.program_logic Require Import weakestpre.
+From transfinite.program_logic Require Import language.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.

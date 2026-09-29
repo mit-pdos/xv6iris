@@ -28,7 +28,8 @@
    The tx_lock field is NOT here -- it is a lock like any other, and its
    address is [UartTxInv]'s business. *)
 From stdpp Require Import gmap finite bitvector.definitions.
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.

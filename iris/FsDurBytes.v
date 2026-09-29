@@ -45,8 +45,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import iprop ghost_map.
+From transfinite.base_logic.lib Require Import iprop ghost_map.
 Require Import BioDefs.        (* [BSIZE] -- the flattening's stride       *)
 Require Import LogDefs.        (* [fs_dbytes] -- the byte flattening       *)
 Require Import DiskImg.        (* [diskImgG] -- section 3's byte class.

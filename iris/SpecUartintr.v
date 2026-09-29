@@ -56,8 +56,9 @@
 From Stdlib Require Import ZArith List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language weakestpre lifting.
-From iris.base_logic.lib Require Import invariants ghost_var.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language weakestpre lifting.
+From transfinite.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.

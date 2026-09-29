@@ -91,8 +91,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From xv6iris Require Import StepIndex.
 From iris.algebra Require Import auth gmap numbers dfrac.
-From iris.base_logic.lib Require Import iprop own ghost_map invariants.
+From transfinite.base_logic.lib Require Import iprop own ghost_map invariants.
 (* The [FsState*] stack exports names with live twins ([byte_range],
    [fs_view]); the LAST import wins, so it goes FIRST and the block layer's
    spellings below shadow it back.  Every [FsStateDefs] run in this file is

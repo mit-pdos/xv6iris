@@ -769,7 +769,8 @@ Proof using . udec_base_bridge. Qed.
    [rewrite A, B] and [rewrite _ by _] are the vanilla forms.  Everything
    below this line is separation logic. *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map.
 Require Import RiscvLang.
 Require Import UserPerm UserHeap.
 Local Open Scope Z_scope.

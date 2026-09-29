@@ -34,8 +34,9 @@
 From Stdlib Require Import ZArith FunctionalExtensionality.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language lifting.
-From iris.base_logic.lib Require Import ghost_var gen_heap.
+From xv6iris Require Import StepIndex.
+From transfinite.program_logic Require Import language lifting.
+From transfinite.base_logic.lib Require Import ghost_var gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.

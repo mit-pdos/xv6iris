@@ -30,8 +30,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth numbers frac agree gmap.
+From xv6iris Require Import StepIndex.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own.
+From transfinite.base_logic.lib Require Import own.
 Require Import ProcGeom.
 Require SailStdpp.Values RiscvExtras.   (* [mword] / [trunc32], qualified: importing them shadows [∈] below *)
 Require Import RiscvPtsto Xv6Cameras.   (* [riscvGS] / [offboxG] -- the classes the offset row binds; IMPORTED, or the binder below generalises them silently *)

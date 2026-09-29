@@ -76,9 +76,10 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap finite list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
-From iris.program_logic Require Import language lifting adequacy.
-From iris.program_logic Require Import language. (* after [adequacy]: Iris master's [adequacy] brings stdpp's [relations.nsteps] into scope *)
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
+From transfinite.program_logic Require Import language lifting adequacy.
+From transfinite.program_logic Require Import language. (* after [adequacy]: Iris master's [adequacy] brings stdpp's [relations.nsteps] into scope *)
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.

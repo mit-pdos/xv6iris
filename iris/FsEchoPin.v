@@ -70,7 +70,8 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map.
 
 (* [FsShPin.v]'s import block, VERBATIM and in its order (the ghost classes
    first, so the file-system stack's names win over the block layer's twins

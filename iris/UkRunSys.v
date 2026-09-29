@@ -35,8 +35,9 @@
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
-From iris.program_logic Require Import language lifting.
+From xv6iris Require Import StepIndex.
+From transfinite.base_logic.lib Require Import ghost_map ghost_var invariants.
+From transfinite.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -63,7 +64,7 @@ Require Import UserChildren. (* [uch] / [uch_update] -- the program's half of
 Local Open Scope Z_scope.
 Import Defs.
 From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
-From iris.base_logic.lib Require Import invariants gen_heap.
+From transfinite.base_logic.lib Require Import invariants gen_heap.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle

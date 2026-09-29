@@ -13,6 +13,7 @@
 # a nat literal of 5000+ is meant to be an of_num_uint term, not unary
 -arg -w
 -arg -abstract-large-number
+StepIndex.v
 SetShrink.v
 SepThread.v
 FastSetSolver.v

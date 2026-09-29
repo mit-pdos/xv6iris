@@ -14,7 +14,8 @@ Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-From iris.base_logic.lib Require Import invariants.
+From transfinite.base_logic.lib Require Import invariants.
+From xv6iris Require Import StepIndex.
 
 Definition h_lui : mword 16 := mword_of_int 0x6505.
 
