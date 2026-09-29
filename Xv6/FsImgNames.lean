@@ -21,8 +21,8 @@ FsImgCheck's: no kernel proof file imports this one; the pin files do.
 ## Deviations from Rocq
 
 1. `fsimg_byte` takes a `Nat` (`mword_of_int` on a `Z` literal).
-2. `fsimg_sync_path` is not ported (unreached: `sync` is not dumped, DU1);
-   `fname_sync` is (FileName's `sys_names` reads it).
+2. `fsimg_sync_path` is ported since drift SY2 (the union runs /sync);
+   `fname_sync` was already (FileName's `sys_names` reads it).
 3. `fsimg_root_data` / `fsimg_root_nrec` are named here; `fsimgPathRoot`
    (landed) is stated unfolded, and `fsimgPathRoot_named` restates it at
    the two names.
@@ -95,6 +95,11 @@ theorem fsimgGrepPath : pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameGrep] =
 /-- Rocq `fsimg_seccomp_path`. -/
 theorem fsimgSeccompPath :
     pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameSeccomp] = some 23 := by
+  rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
+
+/-- Rocq `fsimg_sync_path` (drift SY2). -/
+theorem fsimgSyncPath :
+    pathAt (treeOfDisk fsimgP fsimgSb) ROOTINO [fnameSync] = some 22 := by
   rw [fsimgPathRoot, fsimgP_eq]; decide +kernel
 
 end Xv6
