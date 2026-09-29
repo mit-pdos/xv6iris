@@ -45,7 +45,7 @@ theorem ukm_umaPhys {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P
 /-- A move of the file only at `tlb` keeps the GPRs. -/
 theorem ukm_regs_tlb {f f' : RegFile} {m : RegMap} (hr : ukRegs f m) (hf : ∀ r, r ≠ .tlb → f' r = f r) :
     ukRegs f' m :=
-  uke_regs_congr hr (fun r hr' => hf r (by intro e; subst e; revert hr'; decide))
+  ukRegs_congr (fun r hr' => hf r (by intro e; subst e; revert hr'; decide)) hr
 
 /-- **C3, a DATA page**: `ukRetire_load`. -/
 theorem ukRetire_load (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 rd : BitVec 5) (u : Bool)

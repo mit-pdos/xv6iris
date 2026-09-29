@@ -81,6 +81,12 @@ def uxaXget (f : RegFile) (i : BitVec 5) : BitVec 64 :=
   | 30 => f .x30
   | _ => f .x31
 
+/-- `uxaXget` reads only the GPRs. -/
+theorem uxaXget_congr (f f' : RegFile) (h : ∀ r ∈ uxaGprs, f' r = f r) (i : BitVec 5) :
+    uxaXget f' i = uxaXget f i := by
+  unfold uxaXget
+  split <;> first | rfl | exact h _ (by decide)
+
 /-- Pin GPR `i` to `v` (`x0` ignores writes). -/
 def uxaXset (p : RegPin) (i : BitVec 5) (v : BitVec 64) : RegPin :=
   match i.toNat with

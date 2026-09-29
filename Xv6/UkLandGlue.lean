@@ -84,21 +84,10 @@ theorem uke_ucNpcS_other (s : UWSt) (len : Int) (r : Register) (hr : r ≠ .next
 
 /-! ## §3 The GPR algebra (`ukRegs`, `ukWr`) -/
 
-/-- `uxaXget` reads only the GPRs. -/
-theorem uke_xget_congr (f f' : RegFile) (h : ∀ r ∈ uxaGprs, f' r = f r) (i : BitVec 5) :
-    uxaXget f' i = uxaXget f i := by
-  rcases uxa_bv5_cases i with
-    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
-    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  all_goals first | rfl | exact h _ (by decide)
-
-theorem uke_regs_congr {f f' : RegFile} {m : RegMap} (hr : ukRegs f m) (h : ∀ r ∈ uxaGprs, f' r = f r) :
-    ukRegs f' m := fun i => (uke_xget_congr f f' h i).trans (hr i)
-
 /-- A non-GPR write keeps `ukRegs`. -/
 theorem uke_regs_setR {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (r : Register) (v : RegisterType r)
     (hg : r ∉ uxaGprs) : ukRegs (s.setR r v).file m :=
-  uke_regs_congr hr (fun r' h' => UWSt.setR_file_other s r r' v (fun e => hg (e ▸ h')))
+  ukRegs_congr (fun r' h' => UWSt.setR_file_other s r r' v (fun e => hg (e ▸ h'))) hr
 
 theorem uke_regs_ucNpcS {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (len : Int) :
     ukRegs (ucNpcS s len).file m :=

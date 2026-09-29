@@ -86,6 +86,10 @@ structure UkLand (C : UCfg) (P : UPtd) (T : BMap) (s : UWSt) : Prop where
 /-- The file's GPRs ARE the register map (x0 reads zero on both sides). -/
 def ukRegs (f : RegFile) (m : RegMap) : Prop := ∀ i : BitVec 5, uxaXget f i = m.get i
 
+/-- `ukRegs` reads only the GPR cells. -/
+theorem ukRegs_congr {f f' : RegFile} {m : RegMap} (h : ∀ r ∈ uxaGprs, f' r = f r) (hm : ukRegs f m) :
+    ukRegs f' m := fun i => (uxaXget_congr f f' h i).trans (hm i)
+
 /-- **Where a retiring execute lands** (before the cycle's epilogue): an
 engine machine whose GPRs are `m'`, whose `nextPC` is `pc'`, whose pages read
 `V'`. -/

@@ -62,15 +62,6 @@ def ukQ (C : UCfg) (P : UPtd) (T : BMap) (m : RegMap) (pc : BitVec 64) (V : Nat 
 
 /-! ## §2 Transport -/
 
-/-- The GPRs read off a file depend on its GPR cells only. -/
-theorem uxaXget_congr (f f' : RegFile) (h : ∀ r ∈ uxaGprs, f' r = f r) (i : BitVec 5) :
-    uxaXget f' i = uxaXget f i := by
-  unfold uxaXget
-  split <;> first | rfl | exact h _ (by decide)
-
-theorem ukRegs_congr {f f' : RegFile} {m : RegMap} (h : ∀ r ∈ uxaGprs, f' r = f r) (hm : ukRegs f m) :
-    ukRegs f' m := fun i => (uxaXget_congr f f' h i).trans (hm i)
-
 /-- The GPRs are none of the cells the cycle's glue writes. -/
 theorem uk_gpr_ne : ∀ r ∈ uxaGprs, r ≠ .PC ∧ r ≠ .nextPC ∧ r ≠ .minstret ∧ r ≠ .minstret_increment ∧
     r ≠ .hart_state ∧ r ≠ .mcycle ∧ r ≠ .mtime ∧ r ≠ .mip ∧ r ∉ ufTrapRw ∧ r ≠ .tlb := by decide
