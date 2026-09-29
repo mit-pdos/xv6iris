@@ -295,3 +295,7 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   (UkSeccEntry NOT PORTED — needs a lane).
 - Unlanded callers of the old entry signatures: UshCatFStageSup (R-prog, held) and R-pipes' UshPipesStageCtx
   must drop HE.
+
+## R-pipes (landed Sept 29, with R-prog's UshCatFStage*) — parameters still taken
+- UPipesEng: UL MS HM SP SW HF US hps hudep hlic (SW only in ProofShSysWait; hudep only at uprogSGFree);
+  I-init's UInitSh.sh_Rsh as `shRsh` + `hRsh` in sh_round_holds_union_closed.
