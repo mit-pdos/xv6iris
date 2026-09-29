@@ -17,10 +17,10 @@ them).  The entries are `UkPipesEntries`.
    `PnsCtx`/`PnsCtxOk` take but the program instance and the registry,
    which the entry fixes (`pctx`/`pok`).  The five stub laws are built from
    `UkStub.<p>_stub_*` at the engine (as Rocq passes `cat_stub_read N'` …).
-2. **The program entries are hypotheses** at their ONE statement,
-   `UkTreeEntryStmt.EchoImageEntryEnvC` / `CatImageEntryEnvC` /
-   `GrepImageEntryEnvC` (Rocq `UkTreeEntry.echo_/cat_/grep_image_entry_env_c`;
-   not proved yet: UShEcho/UShCat/UShGrep's key geometry is unported).
+2. **The program entries** (Rocq `UkTreeEntry.echo_/cat_/grep_image_entry_env_c`)
+   are the landed proofs at the context's engine (`echoImageEntryEnvC_of_leaves
+   X.UL` / `catImageEntryEnvC_holds X.UL` / `grepImageEntryEnvC_of_leaves X.UL`,
+   UkPipesEntries), no longer hypotheses.
 3. **Two images** (ExecArgs deviation 1, as hfp-C): Rocq's `M : gmap Z
    (bv 8)` is the key's image `Me : ElfMem` for `echo_node_img` (HfpProgP's
    `echoNodeImg`) and the caller's page view `Mv` for `image_entry`,

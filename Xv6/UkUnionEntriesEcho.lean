@@ -42,7 +42,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 
 /-- **Rocq `uecho_cons_image_entry`**: echo at the console, at the union's
 record (deviations 1-3). -/
-theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
+theorem uecho_cons_image_entry (UL : UK_LEAVES)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
@@ -85,7 +85,7 @@ theorem uecho_cons_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL :
     (X N').fileIface (ueDevP UL) UL (ukSysP_holds UL) (ukSysFH_holds UL) (HNc := ukn_const_of_eq N' Q hpq hQc) (HPc := ue_echo_code_persistent N')
       (ueEchoHyps UL hlic N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
       (union_links_gl_taint_at ug sb) hw0
-  ihave He := TE.echo_image_entry_env_c ws M Mv s0 t gb sts cw cs pidv Q
+  ihave He := (echoImageEntryEnvC_of_leaves UL) ws M Mv s0 t gb sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
       (gwcBlk (unionParamsAt (hlc := hlc) (GF := GF) ug sb) (genId (hlc := hlc) (GF := GF) + 1) v I0 0 0 ∗ fdq r q s ∗ F))
     [0] I E {0} hline hMv himg hbytes hfdl (echo_conforms ws _ hne) (echoTree_safe _ _) ue_dp0 $$ [] Hnpw Hdep

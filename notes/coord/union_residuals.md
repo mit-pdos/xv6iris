@@ -287,3 +287,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - Switch consumers' `HE` hypotheses (UkCatFEntries, UkPipesEntries, UkUnionEntriesDefs) to
   echoImageEntryEnvC_of_leaves UL / catImageEntryEnvC_holds UL / grepImageEntryEnvC_of_leaves UL.
 - UshExecPinProg/Echo discharged by UshExecPinHolds.
+
+## R-round (landed Sept 29) — parameters still taken
+- SP : SH_PANIC, HF : USH_FPRINTF, HS : UK_SYS_P (redir child) — sh-main residuals; SC : SH_CHILD_EXEC or
+  MS/HM for echo/secc/cat children (layering: ProofShChildExec import) — U4 wires.
+- hps : ∀ k, freeNum k → psok k; hlic (gaps residual); SE : UshSeccEntryP = Rocq UkSeccEntry.secc_image_entry
+  (UkSeccEntry NOT PORTED — needs a lane).
+- Unlanded callers of the old entry signatures: UshCatFStageSup (R-prog, held) and R-pipes' UshPipesStageCtx
+  must drop HE.

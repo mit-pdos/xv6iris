@@ -38,7 +38,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 
 /-- **Rocq `uefile_image_entry`**: echo at a file, at the union's record
 (deviations 1-3). -/
-theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
+theorem uefile_image_entry (UL : UK_LEAVES)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn)
     (sb : Fstate) (nm : Fname) (ws : Wordline) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat)
@@ -80,7 +80,7 @@ theorem uefile_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_
       (HPc := ue_echo_code_persistent N')
       (ueEchoHyps UL hlic N') heq (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
       (union_links_gl_taint_at ug sb) hw0
-  ihave He := TE.echo_image_entry_env_c ws M Mv s0 t gb sts cw cs pidv Q
+  ihave He := (echoImageEntryEnvC_of_leaves UL) ws M Mv s0 t gb sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗ efPay (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws)
     [0] I E {0} hline hMv himg hbytes hfdl (echo_file_conforms ws _ hne hnn) (echoTree_safe _ _) ue_dp0
     $$ [] Hnpw Hdep

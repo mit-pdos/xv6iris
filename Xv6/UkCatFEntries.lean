@@ -33,9 +33,8 @@ reached, not ported: `T` (a local notation), `cfe_cat_code_persistent`
    classes).  The free handler's four minting laws
    (UkFreeHandler `FhHyps.lawW/R/C/O`) are fields (Rocq: `udepw_law_of_sup_*`
    at the section's `app_sup`, UkFreeHandler deviation 2).
-2. **`UkTreeEntry.cat_image_entry_env_c` is a hypothesis** at its ONE
-   statement `UkTreeEntryStmt.CatImageEntryEnvC` (not proved yet: `UShCat`'s
-   key geometry, `cat_args_det_holds`, are unported).
+2. **`UkTreeEntry.cat_image_entry_env_c`** is the landed proof at the
+   context's engine, `catImageEntryEnvC_holds C.UL` (lane R-prog).
 3. **Two images** (ExecArgs deviation 1): Rocq's `Mn : gmap Z (bv 8)` is the
    key's image `Me : ElfMem` for `echo_node_img` (HfpProgP's
    `echoNodeImg`) and the caller's page view `Mv` for `image_entry`, with
@@ -58,6 +57,7 @@ import Xv6.ExecEntry
 import Xv6.UexecRet
 import Xv6.HfpProgP
 import Xv6.ElfUser
+import Xv6.UkTreeEntryCat
 import Xv6.UkTreeEntryStmt
 
 namespace Xv6
@@ -188,7 +188,6 @@ end CfeCtx
 /-- **Rocq `pse_catf_image_entry_gen`**: THE ENTRY, at either state of the
 file `f` -- any name of the class (cut W3). -/
 theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
-    (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
     (f : List (BitVec 8)) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (Q : Int → IProp GF) (pn : PNames) (gp : PipeNames) (w : Wid) (A X ds xs : List (List (BitVec 8)))
@@ -222,7 +221,7 @@ theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
   iapply uslot_bupd
   imod cif_reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE (prodWords (.PrCatF f)) Me Mv sv t gn sts cw cs pidv Q
+  ihave #He := catImageEntryEnvC_holds C.UL (prodWords (.PrCatF f)) Me Mv sv t gn sts cw cs pidv Q
     iprop(cifPoolOwn γreg (fun _ => False) wv ∗ C.lend qf sf pn gp w A X ds xs Q) (kds.map Prod.fst)
     (fun N' hpq => C.iface γreg kds (cfe_nodup0 _) (cfe_kdp0 pn gp w A X) qf sf N'
       (ukn_const_of_eq N' Q hpq hQc))

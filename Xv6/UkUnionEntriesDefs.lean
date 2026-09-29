@@ -20,11 +20,10 @@ not reached (Lean's `ukCode` is persistent by instance).
 
 ## Deviations from Rocq
 
-1. **`UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c` are
-   hypotheses** (`UkTreeEntryP`, typed by their ONE statement
-   `UkTreeEntryStmt.EchoImageEntryEnvC` / `CatImageEntryEnvC`): not proved
-   yet (`UShEcho`/`UShCat`'s key geometry, `*_args_det_holds`, are the
-   program lanes', unported).
+1. **`UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c`** are
+   the landed proofs at the engine `UL` (`echoImageEntryEnvC_of_leaves UL`,
+   `catImageEntryEnvC_holds UL`, lane R-prog); the former hypothesis record
+   `UkTreeEntryP` is retired (lane R-round).
 2. **THE IMAGE IS A PAGE VIEW** (ExecEntry deviation 1): Rocq's key image
    `M : gmap Z (bv 8)` is the key's `ElfMem` in the argv facts, and the entry
    is concluded at any page view `Mv` agreeing with it (`imgAgrees M Mv`).
@@ -68,6 +67,8 @@ import Xv6.HfpFileOpenHolds
 import Xv6.UkFileDevSysHolds
 import Xv6.UexecExecMintW
 import Xv6.UkTreeEntryStmt
+import Xv6.UkTreeEntryEcho
+import Xv6.UkTreeEntryCat
 import Xv6.User.EchoElfRaw
 import Xv6.User.CatElfRaw
 
@@ -118,14 +119,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §1 the parameters (deviations 1, 3) -/
-
-/-- **Rocq `UkTreeEntry.echo_image_entry_env_c` / `cat_image_entry_env_c`,
-hypotheses** (deviations 1, 2) at their ONE statement (`UkTreeEntryStmt`). -/
-structure UkTreeEntryP : Prop where
-  /-- Rocq `echo_image_entry_env_c` -/
-  echo_image_entry_env_c : EchoImageEntryEnvC (hlc := hlc) (GF := GF)
-  /-- Rocq `cat_image_entry_env_c` -/
-  cat_image_entry_env_c : CatImageEntryEnvC (hlc := hlc) (GF := GF)
 
 /-- **Rocq `udepw_law_of_sup_write`** at the application's credentials, the
 licence read off the taint by `hlic` (deviation 3). -/
@@ -214,7 +207,7 @@ noncomputable abbrev ueCtx (ug : UnionGn)
 
 /-- **Rocq `ucat_image_entry_env_c`**: `cat_image_entry_env_c` at the
 line's name, positionally. -/
-theorem ucat_image_entry_env_c (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (nm : List (BitVec 8))
+theorem ucat_image_entry_env_c (UL : UK_LEAVES) (nm : List (BitVec 8))
     (ws : List (List (BitVec 8))) (Mn : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
@@ -234,7 +227,7 @@ theorem ucat_image_entry_env_c (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (nm :
   have htail : catTree ws = catTree [fdWCat, nm] :=
     catTree_tail _ _ (by rw [cat_name_tail ws nm hws2 halen hfname]; rfl)
   rw [← htail] at hc hs
-  exact TE.cat_image_entry_env_c ws Mn Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok hMv himg hbytes hfdl hc hs hdp
+  exact catImageEntryEnvC_holds UL ws Mn Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok hMv himg hbytes hfdl hc hs hdp
 
 end Params
 

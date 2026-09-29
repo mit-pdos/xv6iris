@@ -2,8 +2,9 @@
 **THE N-STAGE PIPELINE'S THREE STAGE ENTRIES** (Rocq `UkPipesEntries.v` §2,
 pinned `1900b8a43`; design pipes-general.md §1.2, §5 cut C6).
 
-Each entry is `UkTreeEntry.<p>_image_entry_env_c` (a parameter,
-UkPipesEntriesDefs deviation 2) at the round's ONE instance
+Each entry is `UkTreeEntry.<p>_image_entry_env_c` (the landed proof at the
+context's engine `X.UL`: `echoImageEntryEnvC_of_leaves` /
+`catImageEntryEnvC_holds` / `grepImageEntryEnvC_of_leaves`) at the round's ONE instance
 (`PseCtx.pseIface*` = `UkPipesIface.pipes_iface`), with the registry
 allocated INSIDE the slot (`UexecRet.uslot_bupd`) at the stage's protected
 devices, and the stage's environment from `pns_*_env_res`:
@@ -30,6 +31,9 @@ parameters, the two images).  `take NSTD sts !! k` is
 `(sts.take NSTD)[k]?`; the empty file table is `fun _ => none`.
 -/
 import Xv6.UkPipesEntriesDefs
+import Xv6.UkTreeEntryEcho
+import Xv6.UkTreeEntryCat
+import Xv6.UkTreeEntryGrep
 
 namespace Xv6
 
@@ -49,8 +53,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Icache
 variable (X : PseCtx hlc GF)
 
 /-- **Rocq `pse_echo_image_entry`**: ECHO AT THE HEAD. -/
-theorem pse_echo_image_entry (HE : EchoImageEntryEnvC (hlc := hlc) (GF := GF))
-    (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
+theorem pse_echo_image_entry (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (rb : Bool)
     (Q : Int → IProp GF) (pn : PNames) (gp : PipeNames)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : lineOk ws) (hag : imgAgrees Me Mv) (hnode : echoNodeImg ws Me s0 t gb)
@@ -70,7 +73,7 @@ theorem pse_echo_image_entry (HE : EchoImageEntryEnvC (hlc := hlc) (GF := GF))
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE ws Me Mv s0 t gb sts cw cs pidv Q
+  ihave #He := echoImageEntryEnvC_of_leaves X.UL ws Me Mv s0 t gb sts cw cs pidv Q
     iprop(iOwn (F := HfpReg.RegF Pdev) γreg (HfpReg.pool (fun _ => False) wv) ∗ pnsEchoLend X.R pn gp Q)
     (kds.map Prod.fst)
     (fun N' hpq => X.pseIfaceEcho γreg kds (pse_nodup0 _) N' (ukn_const_of_eq N' Q hpq hQc))
@@ -88,8 +91,7 @@ theorem pse_echo_image_entry (HE : EchoImageEntryEnvC (hlc := hlc) (GF := GF))
   iframe Hpool HPay
 
 /-- **Rocq `pse_copy_image_entry`**: A COPY STAGE (the middle cat, the last cat): one proof, the sink a parameter. -/
-theorem pse_copy_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
-    (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
+theorem pse_copy_image_entry (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (sk : Csink) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords .FCat)) (hag : imgAgrees Me Mv)
@@ -112,7 +114,7 @@ theorem pse_copy_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE (filtWords .FCat) Me Mv sv t gn sts cw cs pidv Q
+  ihave #He := catImageEntryEnvC_holds X.UL (filtWords .FCat) Me Mv sv t gn sts cw cs pidv Q
     iprop(iOwn (F := HfpReg.RegF Pdev) γreg (HfpReg.pool (fun _ => False) wv) ∗ pnsCopyLend X.R w2 A2 alts2 pin gin .FCat sk Q)
     (kds.map Prod.fst)
     (fun N' hpq => X.pseIfaceCat γreg kds (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q hpq hQc))
@@ -131,8 +133,7 @@ theorem pse_copy_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
 
 /-- **Rocq `pse_mid_image_entry`**: THE MIDDLE CAT -- the sink the next
 pipe's write end, fd 2 owing `cat_dg_write` among its alternatives. -/
-theorem pse_mid_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
-    (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
+theorem pse_mid_image_entry (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (pin : PNames) (gin : PipeNames) (pn : PNames)
     (gp : PipeNames) (wb rb1 rb2 : Bool)
@@ -146,12 +147,11 @@ theorem pse_mid_image_entry (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
     ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
         (pnsCopyLend X.R w2 A2 alts2 pin gin .FCat (.CSPipe pn gp) Q) (uslot (hlc := hlc)) :=
-  pse_copy_image_entry X HE Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc hok
+  pse_copy_image_entry X Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc hok
     hag hnode hab hfdl hl0 hl1 hl2 hnil (fun _ => hdg)
 
 /-- **Rocq `pse_last_image_entry_m`**: THE LAST CAT, fd 2 MUTE: the sink the console writer `wL`, the registry's device 0 `PDMute`. -/
-theorem pse_last_image_entry_m (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
-    (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
+theorem pse_last_image_entry_m (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (wL : Wid) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
     (hQc : ∀ x y : Int, Q x = Q y) (hok : execOk (filtWords .FCat)) (hag : imgAgrees Me Mv)
@@ -173,7 +173,7 @@ theorem pse_last_image_entry_m (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE (filtWords .FCat) Me Mv sv t gn sts cw cs pidv Q
+  ihave #He := catImageEntryEnvC_holds X.UL (filtWords .FCat) Me Mv sv t gn sts cw cs pidv Q
     iprop(iOwn (F := HfpReg.RegF Pdev) γreg (HfpReg.pool (fun _ => False) wv) ∗ pnsCopyLendM X.R pin gin .FCat (.CSCon wL) Q)
     (kds.map Prod.fst)
     (fun N' hpq => X.pseIfaceCat γreg kds (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q hpq hQc))
@@ -191,7 +191,7 @@ theorem pse_last_image_entry_m (HE : CatImageEntryEnvC (hlc := hlc) (GF := GF))
   iframe Hpool HPay
 
 /-- **Rocq `pse_grep_image_entry`**: A GREP STAGE (a middle grep, or any grep whose fd 2 is a lent console writer): the sink a parameter. -/
-theorem pse_grep_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_image_entry (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (sk : Csink) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
@@ -215,7 +215,7 @@ theorem pse_grep_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE (filtWords (.FGrep wp)) Me Mv sv t gn sts cw cs pidv Q
+  ihave #He := grepImageEntryEnvC_of_leaves X.UL (filtWords (.FGrep wp)) Me Mv sv t gn sts cw cs pidv Q
     iprop(iOwn (F := HfpReg.RegF Pdev) γreg (HfpReg.pool (fun _ => False) wv) ∗ pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) sk Q)
     (kds.map Prod.fst)
     (fun N' hpq => X.pseIfaceGrep γreg kds (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q hpq hQc))
@@ -233,7 +233,7 @@ theorem pse_grep_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (
   iframe Hpool HPay
 
 /-- **Rocq `pse_grep_mid_image_entry`**: THE MIDDLE GREP. -/
-theorem pse_grep_mid_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_mid_image_entry (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (w2 : Wid) (A2 alts2 : List (List (BitVec 8))) (pin : PNames) (gin : PipeNames) (pn : PNames)
@@ -248,11 +248,11 @@ theorem pse_grep_mid_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF
     ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
       imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
         (pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) (.CSPipe pn gp) Q) (uslot (hlc := hlc)) :=
-  pse_grep_image_entry X HE wp Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc
+  pse_grep_image_entry X wp Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc
     hok hag hnode hab hfdl hl0 hl1 hl2 hLg hnil
 
 /-- **Rocq `pse_grep_last_image_entry`**: THE LAST GREP, fd 2 MUTE: the sink the content writer `wL`. -/
-theorem pse_grep_last_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := GF)) (wp : List (BitVec 8))
+theorem pse_grep_last_image_entry (wp : List (BitVec 8))
     (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (Q : Int → IProp GF)
     (wL : Wid) (pin : PNames) (gin : PipeNames) (wb rb1 rb2 : Bool)
@@ -276,7 +276,7 @@ theorem pse_grep_last_image_entry (HE : GrepImageEntryEnvC (hlc := hlc) (GF := G
   iapply uslot_bupd
   imod HfpReg.reg_alloc (GF := GF) wv with ⟨%γreg, Hpool⟩
   imodintro
-  ihave #He := HE (filtWords (.FGrep wp)) Me Mv sv t gn sts cw cs pidv Q
+  ihave #He := grepImageEntryEnvC_of_leaves X.UL (filtWords (.FGrep wp)) Me Mv sv t gn sts cw cs pidv Q
     iprop(iOwn (F := HfpReg.RegF Pdev) γreg (HfpReg.pool (fun _ => False) wv) ∗ pnsCopyLendM X.R pin gin (.FGrep wp) (.CSCon wL) Q)
     (kds.map Prod.fst)
     (fun N' hpq => X.pseIfaceGrep γreg kds (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q hpq hQc))

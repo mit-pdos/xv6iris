@@ -68,7 +68,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 
 /-- **Rocq `ucat_image_entry`**: cat at the union's record (deviations
 1-3). -/
-theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LEAVES)
+theorem ucat_image_entry (UL : UK_LEAVES)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
@@ -132,7 +132,7 @@ theorem ucat_image_entry (TE : UkTreeEntryP (hlc := hlc) (GF := GF)) (UL : UK_LE
       (HPc := ue_cat_code_persistent N')
       (ueCatHyps UL hlic N') heq (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
       (union_links_gl_taint_at ug sq) hw0
-  ihave He := ucat_image_entry_env_c TE nm ws Mn Mv sv t gn sts cw cs pidv Q
+  ihave He := ucat_image_entry_env_c UL nm ws Mn Mv sv t gn sts cw cs pidv Q
     iprop(fifPoolOwn γreg (fun _ => False) w0 ∗
       (consCur (unionParamsAt (hlc := hlc) (GF := GF) ug sq) v ps0 cs0 sq I0 P 0 0 ∗ fdq r q s ∗ F))
     [0] I E {0} hok himg hbytes hMv hfdl hws2 halen hfname (ucat_conforms nm files content hfiles)
