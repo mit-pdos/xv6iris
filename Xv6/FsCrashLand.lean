@@ -15,7 +15,7 @@ picture agrees with the disk on the extent.  The accessor is
 **THE COMMIT** (`fsCommitL_sector0_rec`) is the one landing that moves the
 committed map: to `L` on the home set (a term the caller can name), the old
 snapshot DROPPED and the caller's fresh pair installed
-(`dsnapStep_xfer`), the history extended, and the receipt handed out.
+(`dsnapStep_merge`), the history extended, and the token handed back.
 **THE PRESERVING CLEAR** (`fsClearV_sector0_rec`) moves nothing recovery
 reads: the caught-up premise is computation on the caller's view.
 
@@ -290,9 +290,11 @@ theorem fsV_sector1_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) 
 /-! ## §7b The commit point, at the logged view -/
 
 /-- THE COMMIT'S FIRST SECTOR (Rocq `fs_commit_L_sector0_rec`): the committed
-map jumps to `L` on the home set; the snapshot steps to the caller's pair; the
-receipt is handed out. -/
-theorem fsCommitL_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
+map jumps to `L` on the home set; the old guest goes to the pair's MERGE
+(SY3-K2), which yields the new one; the application's token `T` comes back
+out of the merge into the residual (sync K3-3).  (The durability receipt
+the bank read here is gone with the bank, sync cleanups F.) -/
+theorem fsCommitL_sector0_rec (G : GName → IProp GF) (T : IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (M0 : LogMirror) (V : Nat → List (BitVec 8)) (L : BlockMap) (nn : Nat) (Ws : List Nat)
     (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) (hdec : hdrDec bs = (nn, Ws))
     (hnn : nn ≤ LOGBLOCKS) (hnd : Ws.Nodup)
@@ -305,12 +307,11 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat com
       (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      durPair G T (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
         (some (logHdrBno ls * BSIZE + 0, bs.take Virtio.sectorSize))
         iprop(logMirrorHalf (hlc := hlc)
-            (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗
-          fsReceiptAny (hlc := hlc) (fsRestrict (dvOfD L) (fsHomeList cov ls)) ∗
+            (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗ T ∗
           ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) := by
   have hfit : 0 + (bs.take Virtio.sectorSize).length ≤ BSIZE := by
     rw [sector0_len bs hlen, bsize_two_sectors]; omega
@@ -335,14 +336,13 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat com
       (fsBlocks (Virtio.diskWrite dk (logHdrBno ls * BSIZE + 0) (bs.take Virtio.sectorSize)))
       cov ls := by
     rw [← hnew]; exact logMirrorOk_upd_sector M0 dk cov ls (logHdrBno ls) 0 _ hfit hok
-  -- THE SNAPSHOT STEPS: the old copy and the old guest are dropped, the pair installed
-  imod dsnapStep_xfer G gt r.frD (fsRestrict (dvOfD L) (fsHomeList cov ls)) $$ Hepoch Hdur HG
-    with Hpair
-  unfold durPair
+  -- THE SNAPSHOT STEPS: the old copy dropped, the old guest MERGED into the
+  -- new one, the token back
+  imod dsnapStep_merge G T gt r.frD (fsRestrict (dvOfD L) (fsHomeList cov ls)) $$ Hepoch Hdur HG
+    with ⟨Hpair, HT⟩
   icases Hpair with ⟨%gt', Hdur, HG⟩
   imod fsHist_update γs.hist r.frHist (r.frHist ++ [fsRestrict (dvOfD L) (fsHomeList cov ls)])
     (List.prefix_append _ _) $$ Hhist with Hhist
-  ihave ⟨Hhist, #Hlb⟩ := fsHist_snapshot γs.hist _ $$ Hhist
   imod Hclose $$ %_ %_ %hok' with ⟨Harm, Hmir⟩
   imodintro
   iexists gt'
@@ -359,15 +359,7 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat com
     ipureintro
     exact fsCommit_recWf cov ls M0 V L nn Ws bs r.frHist dk hlen hdec hnn hnd hin hinsb hoff
       htie hslot hok
-  iframe HG Hsa Hmir
-  isplitl
-  · unfold fsReceiptAny
-    iexists γs
-    isplitr
-    · ipureintro; exact ⟨hsw, hrg, hstn⟩
-    unfold fsReceipt
-    iexists r.frHist
-    iexact Hlb
+  iframe HG Hsa Hmir HT
   ipureintro; exact hlold
 
 /-! ## §7c The preserving clear's first sector -/

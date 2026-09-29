@@ -510,6 +510,10 @@ import Xv6.LinkPrintint
 import Xv6.LogDefs
 import Xv6.FsBlocks
 import Xv6.LogInv
+import Xv6.SyncHook
+import Xv6.LogHelp
+import Xv6.LogQuiet
+import Xv6.LogGhostCommit
 import Xv6.SpecWriteHead
 import Xv6.SpecInstallTrans
 import Xv6.SpecInitlog
@@ -1122,7 +1126,6 @@ import Xv6.FsCrashSeam
 import Xv6.FsCrashLand
 import Xv6.FsCrashSeq
 import Xv6.FsCrashCommit
-import Xv6.FsFlushedCore
 import Xv6.AppDur
 import Xv6.LogSnapLaw
 import Xv6.SpecUservec

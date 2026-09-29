@@ -18,6 +18,7 @@ A definitional file (no `Code*`/`Proof*` import).
 -/
 import Xv6.EndOpDefs
 import Xv6.FsCrashCommit
+import Xv6.LogQuiet
 
 namespace Xv6
 
@@ -175,30 +176,6 @@ theorem eo_fill_facts (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (Mc 
   · exact lmLogged_insert_ne L cov ls _ bs hnh
 
 /-! ## The logged view on the home set, read through the cache's parked halves -/
-
-/-- Rocq `eo_restrict_of_sub`: the law is stated at the byte invariant's own
-cache picture `C`, the commit at the checked-out `L`, and on the home set --
-which is `C`'s domain -- the two are one map. -/
-theorem eo_restrict_of_sub (C L : BlockMap) (home : List Nat)
-    (hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ b ∈ home)
-    (hsub : ∀ b bs, PartialMap.get? C b = some bs → PartialMap.get? L b = some bs) :
-    fsRestrict (dvOfD C) home = fsRestrict (dvOfD L) home := by
-  apply fsRestrict_ext
-  intro b hb
-  obtain ⟨bs, hbs⟩ := (hdom b).2 hb
-  unfold dvOfD
-  rw [hbs, hsub b bs hbs]
-
-/-- The cardinality tie turns an empty ledger into an empty transaction map. -/
-theorem eo_tx_empty (T : RegMapF Unit) (om : RegMapF OpEntry)
-    (hT : (FiniteMap.toList T).length = (FiniteMap.toList om).length)
-    (hom : (FiniteMap.toList om).length = 0) : T = ∅ := by
-  have hT0 : (FiniteMap.toList T).length = 0 := by rw [hT, hom]
-  refine equiv_iff_eq.1 (fun c => ?_)
-  rw [get?_empty]
-  cases h : PartialMap.get? T c with
-  | none => rfl
-  | some v => exact absurd h (eo_map_empty T hT0 c v)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

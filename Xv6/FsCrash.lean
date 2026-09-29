@@ -1,7 +1,7 @@
 /-
 **THE FILE SYSTEM'S CRASH PREDICATE** -- the resource half of Rocq `FsCrash.v`
 §3 (`P_fs_at`, :1991; the named forms, :2025-2064; `P_fs_rec_agree`, :2097;
-the bank reading, :2208; the snapshot accessor and lend, :2264-2310; the
+the snapshot accessor and lend, :2264-2310; the
 projection, :2335-2400; the custody swap at birth, :2431-2540; allocation,
 :2556).  Crash batch C-1, agent CG.  The seam onto the machine's `crashPred`
 and the permits are `Xv6/FsCrashSeam.lean` onward.
@@ -169,31 +169,6 @@ theorem pFsCrashRead (γd : GName) (N : Nat) (dk dk0 : Nat → BitVec 8) :
   exact fsDurKeep h
 
 /-! ## §3a What the predicate says -/
-
-/-- THE BANK'S SOURCE (Rocq `P_fs_bank`): a receipt at the committed map, with
-the word that says it is a file system; non-destructive. -/
-theorem pFs_bank (gt : GName) (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (dk : Nat → BitVec 8) :
-    pFsAt (GF := GF) gt γs cov ls dk ⊢
-      ∃ D : BlockMap, fsReceipt γs D ∗ ⌜snapHolds D⌝ ∗ pFsAt gt γs cov ls dk := by
-  iintro Hp
-  ihave ⟨%r, Hauth, %hwf, Harm, Hdur⟩ := (pFsAt_unfold gt γs cov ls dk).1 $$ Hp
-  ihave ⟨%S, %hok, Hdur⟩ := pDurAt_tieKeep gt r.frD
-    (fsRecovery_blocks_full dk r.frD cov ls hwf.1) $$ Hdur
-  ihave ⟨Hauth, #Hlb⟩ := fsHist_snapshot γs.hist r.frHist $$ Hauth
-  obtain ⟨l, hl⟩ := List.getLast?_eq_some_iff.1 hwf.2.1
-  iexists r.frD
-  isplitr
-  · unfold fsReceipt
-    iexists l
-    rw [← hl]
-    iexact Hlb
-  isplitr
-  · ipureintro; exact ⟨S, hok⟩
-  iapply (pFsAt_unfold gt γs cov ls dk).2
-  iexists r
-  iframe Hauth Harm Hdur
-  ipureintro; exact hwf
 
 /-- The ACCESSOR the boot mint takes: the snapshot, lent out with the record's
 own recovery fact beside it (Rocq `P_fs_dur_acc`). -/

@@ -45,6 +45,7 @@ shape; see its own comment.
 -/
 import MachCSL.LockBornHook
 import Xv6.UartTrace
+import Xv6.SyncHook
 
 namespace Xv6
 
@@ -424,6 +425,9 @@ structure LogNames where
   lg : GName
   /-- the open transactions -/
   tx : GName
+  /-- the helping slot's map (Rocq `ln_help`, sync K3-2): the `sys_sync`
+  waiters' ids to their escrow-token gname and the `ncommit` word they read -/
+  help : GName
 
 /-- The ghost libraries the log layer needs (Rocq's `logG`).
 
@@ -446,8 +450,12 @@ class LogG (GF : BundledGFunctors) where
   [gmOps : GhostMapG GF Nat OpEntry RegMapF]
   /-- the append registry: row id ↦ (epoch, block) -/
   [gmLg : GhostMapG GF Nat (Nat × Nat) RegMapF]
+  /-- THE HELPING SLOT'S MAP (Rocq `loghelp_inG`, sync K3-2; `LogNames.help`):
+  a `sync` waiter's id to its escrow token's gname and the `ncommit` word it
+  read at its deposit.  A value type no other class carries. -/
+  [gmHelp : GhostMapG GF Nat (GName × BitVec 32) RegMapF]
 
-attribute [reducible, instance] LogG.gmOps LogG.gmLg
+attribute [reducible, instance] LogG.gmOps LogG.gmLg LogG.gmHelp
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
@@ -594,7 +602,7 @@ theorem logTxRetire (γ : LogNames) (T : RegMapF Unit) :
   · ipureintro; exact hlk
   · iexact Ha
 
-/-- **THE FIVE GNAMES' FREE STATE, AS ONE TOKEN** (Rocq's `log_free_tok`):
+/-- **THE SIX GNAMES' FREE STATE, AS ONE TOKEN** (Rocq's `log_free_tok`):
 the names at their GENESIS VALUES, in exactly the shape `Xv6.logResAt`
 wants them.  GENESIS IS EPOCH ONE, not zero: the region receipt's "never
 observed" counter value is zero and the two must not collide, so
@@ -610,10 +618,19 @@ def logFreeTok (γ : LogNames) : IProp GF := iprop%
   (γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗
   logEpochAuth γ 1 ∗
   logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗
-  logTxAuth γ (∅ : RegMapF Unit)
+  logTxAuth γ (∅ : RegMapF Unit) ∗
+  -- the helping slot's authority, born empty: no `sync` waiter yet (sync K3-2)
+  (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗
+  -- ...and THE ERA'S SYNC TOKEN, the application's opaque slot of the fixed
+  -- record (`MachFixedGS.syncTok`).  Its birth is the era's mint, which hands
+  -- it here; `initlog` seals it into the first `logResAt` (sync K3-2/K3-3).
+  eraSyncTok (hlc := hlc) (GF := GF)
 
-/-- Rocq's `log_ghost_alloc`: mint all five names at their genesis values. -/
-theorem logGhostAlloc : ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
+/-- Rocq's `log_ghost_alloc`: mint all six names at their genesis values, the
+era's sync token handed in. -/
+theorem logGhostAlloc :
+    eraSyncTok (hlc := hlc) (GF := GF) ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
+  iintro Hstok
   imod (lockGhostAlloc (GF := GF)) with ⟨%γlk, Hl⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := OpEntry) (H := RegMapF))
     with ⟨%γo, Ho⟩
@@ -622,10 +639,12 @@ theorem logGhostAlloc : ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) :
     with ⟨%γg, Hg⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Unit) (H := RegMapF))
     with ⟨%γt, Ht⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := (GName × BitVec 32)) (H := RegMapF))
+    with ⟨%γh, Hh⟩
   imodintro
-  iexists ⟨γlk, γo, γe, γg, γt⟩
+  iexists ⟨γlk, γo, γe, γg, γt, γh⟩
   unfold logFreeTok logEpochAuth logRegAuth logTxAuth
-  iframe Hl Ho He Hg Ht
+  iframe Hl Ho He Hg Ht Hh Hstok
 
 /-- ...and using one (Rocq's `logged_at_in`). -/
 theorem loggedAt_in (γ : LogNames) (X : RegMapF (Nat × Nat)) (e b : Nat) :

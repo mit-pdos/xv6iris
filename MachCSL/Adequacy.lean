@@ -155,6 +155,7 @@ so that `Hboot` can be told its shape: every functor instance from
 trace predicate `Ptp`, and the application's slots. -/
 @[reducible] def bootFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
+    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
@@ -202,6 +203,8 @@ trace predicate `Ptp`, and the application's slots. -/
   diskName := γdisk
   diskSize := ndisk
   crashPred := Pcp
+  syncTok := Tkp
+  syncHook := Hkp
   swapName := γswap
   mirrorG := MachGpreS.mirror_pre
 
@@ -250,6 +253,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (HPc : ∀ (γdisk γsw γreg γst : GName) (c : CT),
       diskImgBytes γdisk 0 (Virtio.diskRead (diskOf g.m.devs) 0 ndisk) ∗
         MonoNat.auth_own γsw (DFrac.own 1) (.ofNat 0) ⊢@{IProp GF} |==> Pc γdisk γsw γreg γst c)
+    (Tk : GName → GName → GName → GName → CT → Nat → IProp GF)
+    (Hk : GName → GName → GName → GName → CT → Nat → IProp GF → IProp GF)
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ (γdisk γsw γreg γst : GName) (c : CT) (dk : Nat → BitVec 8),
       diskImgAuthSized γdisk ndisk dk ∗ ▷ Pc γdisk γsw γreg γst c ⊢@{IProp GF}
@@ -289,7 +294,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
       @powerInterp hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
+          (Pc γdisk γswap γreg γstart c)
+          (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
@@ -298,6 +304,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
         (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT) (T : List Obs),
       F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
+          (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) →
@@ -335,6 +342,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
   · inext; iexact HPt0
   imodintro
   iexists (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
+    (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c)
     γobs T (Pt γobs c) γhist
     (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c))
@@ -362,14 +370,16 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       iframe HobA HobH
   isplitl []
   · iapply (@wp_power hlc GF ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-      (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
+      (Pc γdisk γswap γreg γstart c)
+          (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c)).withInv Hinv) _
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (fun E gen dk => Hswap γdisk γswap γreg γstart c E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
       (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-        (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
+        (Pc γdisk γswap γreg γstart c)
+          (Tk γdisk γswap γreg γstart c) (Hk γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
         (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c)).withInv Hinv)
         Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl E gen σ hbf hdv hpp))
@@ -526,30 +536,32 @@ theorem obsLedgerAt_phi (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
 /-- At the literal, the trivial trace predicate IS `obsPredAt`. -/
 theorem bootFixedGS_obsPredTriv (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
+    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsPredAt γobs) γhist
+    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) =
-      @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsPredAt γobs) γhist
+      @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsPredAt γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) := rfl
 
 /-- ...and the ledger IS `obsLedger`. -/
 theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
     (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
+    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H))
     (Wd : Nat → IProp GF) (HWd : ∀ k, Persistent (Wd k)) (HWdt : ∀ k, Timeless (Wd k))
     (Rw : Nat → IProp GF) (HRw : ∀ k, Persistent (Rw k)) (HRwt : ∀ k, Timeless (Rw k)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsLedgerAt R γobs) γhist
+    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) =
-      @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsLedgerAt R γobs) γhist
+      @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T (obsLedgerAt R γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest Wd HWd HWdt Rw HRw HRwt) R := rfl
 
 /-- THE PACKAGED TRACE THEOREM (Rocq `riscv_trace_adequacy` :2037):
@@ -584,6 +596,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
         (γgen γstart γreg γdisk γswap γobs γhist : GName) (T : List Obs),
       F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart)
+          (fun _ => iprop(True)) (fun _ Q => Q)
           γobs T (obsLedgerAt R γobs) γhist
           rxTagTriv (fun _ => inferInstance) (fun _ => inferInstance)
           killCredTriv inferInstance inferInstance
@@ -603,6 +616,8 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (by imodintro; iexists (); itrivial)
     (fun γdisk γsw γreg γst _ => Pc γdisk γsw γreg γst)
     (fun γdisk γsw γreg γst _ => HPc γdisk γsw γreg γst)
+    -- no sync ledger at this packaged theorem
+    (fun _ _ _ _ _ _ => iprop(True)) (fun _ _ _ _ _ _ Q => Q)
     Ppure (fun γdisk γsw γreg γst _ => Hproj γdisk γsw γreg γst)
     Mof (fun _ _ => Rb) (fun γdisk γsw γreg γst _ => Hswap γdisk γsw γreg γst)
     (fun γobs _ => obsLedgerAt R γobs)

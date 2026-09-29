@@ -3,8 +3,8 @@
 Rocq `FsCrash.v` §4-§6 (`Section fs_crash_seam`, :2600-2800: `P_fs_rec_at`,
 `P_fs_any_at`, the composite `P_fs_comp`, the seam `fs_crash_seam_at` /
 `fs_crash_seam`, the record-level permit `fs_rec_permit` and its conversion
-`fs_permit_of_rec`, `fs_receipt_any`, the bank `fs_bank`, `fs_rec_permit_bank`,
-`fs_rec_permit_mono`).  Crash batch C-1, agent CG.
+`fs_permit_of_rec`, `fs_rec_permit_mono`; the bank and `fs_receipt_any` are
+gone, Rocq sync cleanups F).  Crash batch C-1, agent CG.
 
 **A SEPARATE SECTION, OVER `MachFixedGS`, AND THAT IS FORCED** (Rocq's
 reason): `pFsAt` (`Xv6/FsCrash.lean`) INSTANTIATES the fixed layer's
@@ -144,56 +144,6 @@ theorem fsPermit_ofRec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (
     iframe Hfr HPr
     ipureintro; exact hext
   iframe Hsa HQ
-
-/-- A durability receipt at the record's own gnames, `γs` existential (Rocq
-`fs_receipt_any`). -/
-def fsReceiptAny (D : BlockMap) : IProp GF :=
-  iprop(∃ γs : FsCrashNames,
-    ⌜γs.swap = MachFixedGS.swapName (hlc := hlc) (GF := GF) ∧
-      γs.reg = MachFixedGS.registryName (hlc := hlc) (GF := GF) ∧
-      γs.start = MachFixedGS.startName (hlc := hlc) (GF := GF)⌝ ∗ fsReceipt γs D)
-
-instance fsReceiptAny_persistent (D : BlockMap) :
-    Persistent (fsReceiptAny (hlc := hlc) (GF := GF) D) := by
-  unfold fsReceiptAny; infer_instance
-
-/-- THE BANK: what a WAL write can leave behind for a later reader -- a durable
-map with the word that says it is a file system (Rocq `fs_bank`). -/
-def fsBank : IProp GF :=
-  iprop(∃ D : BlockMap, fsReceiptAny (hlc := hlc) D ∗ ⌜snapHolds D⌝)
-
-instance fsBank_persistent : Persistent (fsBank (hlc := hlc) (GF := GF)) := by
-  unfold fsBank; infer_instance
-
-/-- EVERY RECORD-LEVEL PERMIT CAN BANK, FOR FREE (Rocq `fs_rec_permit_bank`). -/
-theorem fsRecPermit_bank (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (gd : Nat) (w : DiskWr) (Q : IProp GF) :
-    fsRecPermit (hlc := hlc) G cov ls gd w Q ⊢
-      fsRecPermit (hlc := hlc) G cov ls gd w iprop(Q ∗ fsBank (hlc := hlc)) := by
-  iintro Hp
-  unfold fsRecPermit
-  iintro %dk %n %gt Hsa %hn HP HG
-  imod Hp $$ %dk %n %gt Hsa %hn HP HG with ⟨%gt', HP, HG, Hsa, HQ⟩
-  imod HP
-  ihave ⟨%γs, %hseam, HPfs⟩ := (pFsRecNamedAt_unfold gt' _ _ _ cov ls (wrApply w dk)).1 $$ HP
-  ihave ⟨%D, #Hrc, %hh, HPfs⟩ := pFs_bank gt' γs cov ls (wrApply w dk) $$ HPfs
-  imodintro
-  iexists gt'
-  isplitl [HPfs]
-  · inext
-    iapply (pFsRecNamedAt_unfold gt' _ _ _ cov ls (wrApply w dk)).2
-    iexists γs
-    iframe HPfs
-    ipureintro; exact hseam
-  iframe HG Hsa HQ
-  unfold fsBank fsReceiptAny
-  iexists D
-  isplitl
-  · iexists γs
-    isplitr
-    · ipureintro; exact hseam
-    · iexact Hrc
-  · ipureintro; exact hh
 
 /-- The residual is whatever the caller can make of the receipt (Rocq
 `fs_rec_permit_mono`). -/

@@ -18,6 +18,7 @@ import MachCSL.DiskPermit
 import MachCSL.CrashPermInv
 import MachCSL.Ctx
 import MachCSL.Wp
+import MachCSL.HartCustody
 import MachCSL.HwConfig
 import MachCSL.WpDev
 import MachCSL.WpSmodeDev

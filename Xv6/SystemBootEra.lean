@@ -367,10 +367,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Wch
 the era). -/
 @[reducible] def xv6FixedGS {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF) :
+    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF)
+    (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) :
     MachFixedGS hlc GF :=
   Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-    (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist
+    (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record

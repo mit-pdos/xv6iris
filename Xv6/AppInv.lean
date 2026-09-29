@@ -74,7 +74,7 @@ the Rocq tree's `claude-notes/projects/app-instances.md` sections 0-2 and
    icfg`.  Here `[MachGS hlc GF]` (the invariant class, Rocq's `riscvGS`),
    `[FsTopG GF]`, `[Appcfg GF]` and `[Icfg]` are given PER DECLARATION,
    only where used (`Xv6/FsCfgDefs.lean` deviation 4): `appSup`,
-   `appXfer`, `appStep` and their lemmas need `[Appcfg GF]` alone; `[Icfg]`
+   `appStep` and its lemmas need `[Appcfg GF]` alone; `[Icfg]`
    rides with `appDom` (the region's width) and so with `appBody`/
    `appInv`.
 5. Rocq's curried `A -∗ B -∗ C` statements are kept curried (`⊢ A -∗ B -∗
@@ -97,6 +97,7 @@ import Xv6.AppCfg
 import Xv6.FsStateTop
 import Xv6.FsBlocks
 import Xv6.IcacheRefDefs
+import Xv6.SyncHook
 
 namespace Xv6
 
@@ -214,7 +215,113 @@ theorem appXferRaw_pers_or_pure {N : Type} (A : N → Aview → IProp GF)
   · iexists r
     iexact H
 
+/-! ### 1c.  THE MERGE (Rocq `app_merge_raw`, SY3-K2 / K3-3) -/
+
+/-- THE COMMIT'S LAW (Rocq's `app_merge_raw`): the new durable copy is built
+from the running claim AND the old durable copy, so a durable-only resource
+can move from the old copy to the new one instead of being dropped with it.
+CURRIED AT THE COLLECTION, because no one instant holds both: the running
+claim is in hand only where `appN` opens (the commit's collection), the old
+copy only inside the header write's permit, at mask `∅`.  The old copy
+arrives as the crash slot holds it, `▷` over its existentials, and is not
+stripped.  ...AND THE TOKEN `T` (sync K3-3): the collection hands it in with
+the running claim, and the law returns an ADDITIVE pair -- the wand that
+turns the old copy into the new one and gives the token back (the header
+write's permit applies it), or the token alone (the empty-log commit). -/
+def appMergeRaw {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) : IProp GF :=
+  iprop(□ ∀ (r : N) (av : Aview), ▷ A r av -∗ T ==∗ ▷ A r av ∗
+    ∃ r' : N, (((▷ ∃ (r_o : N) (av_o : Aview), A r_o av_o) ==∗ ▷ A r' av ∗ T) ∧ T))
+
+instance appMergeRaw_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) :
+    Persistent (appMergeRaw A T) := by
+  unfold appMergeRaw; infer_instance
+
+/-- EVERY TRANSPORT IS A MERGE, AT ANY TOKEN (Rocq's `app_merge_raw_of_xfer`):
+drop the old copy, copy the running claim, and hand the token back on either
+arm.  What every application with nothing to carry across the commit
+instantiates the merge with. -/
+theorem appMergeRaw_ofXfer {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (hx : ⊢ appXferRaw A) : ⊢ appMergeRaw A T := by
+  ihave #Hx := hx
+  unfold appXferRaw appMergeRaw
+  imodintro
+  iintro %r %av Hp HT
+  imod Hx $$ %r %av Hp with ⟨Hp, ⟨%r', Hn⟩⟩
+  imodintro
+  iframe Hp
+  iexists r'
+  isplit
+  · iintro _
+    imodintro
+    iframe Hn HT
+  · iexact HT
+
 end AppCredsRaw
+
+/-! ### 1d.  THE SYNC RUNNER (Rocq `app_sync_run_raw`, sync K3-3) -/
+
+section AppSyncRaw
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsTopG GF]
+
+/-- THE ONE PLACE A SYNC HOOK'S MEANING IS USED (Rocq's `app_sync_run_raw`).
+A `sync` caller hands the kernel a hook `Hk Q` -- an opaque member of the
+application's hook family, which the WAL only moves -- and the GHOST COMMIT
+fires it where the new durable copy is built out of the running claim: with
+the fresh guest half, the new durable claim, the running claim and the token
+all at ONE map (`FsCollectAll.fsCollectGhost`).  The hook returns every
+resource it is handed and yields its `Q`.  A fupd at mask `∅`: it runs inside
+the collection, with the file system's invariants open. -/
+def appSyncRunRaw {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) : IProp GF :=
+  iprop(□ ∀ (Q : IProp GF) (gt : GName) (I : RegMapF FsNode) (r r' : N),
+    Hk Q -∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
+    T ={∅}=∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗ ▷ A r (absView I) ∗
+      T ∗ Q)
+
+instance appSyncRunRaw_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) : Persistent (appSyncRunRaw (hlc := hlc) A T Hk) := by
+  unfold appSyncRunRaw; infer_instance
+
+/-- AN APPLICATION WITH NO SYNC LEDGER (Rocq's `app_sync_run_raw_triv`): every
+hook is its own `Q`, and the runner hands it straight back. -/
+theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) (hid : ∀ Q : IProp GF, Hk Q ⊣⊢ Q) :
+    ⊢ appSyncRunRaw (hlc := hlc) A T Hk := by
+  unfold appSyncRunRaw
+  imodintro
+  iintro %Q %gt %I %r %r' HQ Hh Hn Hp HT
+  imodintro
+  iframe Hh Hn Hp HT
+  iapply (hid Q).1 $$ HQ
+
+/-- ...FIRED ONCE PER HOOK (Rocq's `app_sync_run_list`): the collection's
+reading of a list of waiters' hooks, at any mask. -/
+theorem appSyncRun_list {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) (E : CoPset) (Qs : List (IProp GF)) (gt : GName)
+    (I : RegMapF FsNode) (r r' : N) :
+    appSyncRunRaw (hlc := hlc) A T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
+      (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
+      T -∗ |={E}=> ((gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗
+        ▷ A r (absView I) ∗ T ∗ ([∗list] Q ∈ Qs, Q)) := by
+  induction Qs with
+  | nil =>
+    iintro _ _ Hh Hn Hp HT
+    imodintro
+    iframe Hh Hn Hp HT
+    exact BigSepL.bigSepL_nil_intro
+  | cons Q Qs IH =>
+    iintro #Hrun HQs Hh Hn Hp HT
+    icases BigSepL.bigSepL_cons.1 $$ HQs with ⟨HQ, HQs⟩
+    imod IH $$ Hrun HQs Hh Hn Hp HT with ⟨Hh, Hn, Hp, HT, HQs⟩
+    unfold appSyncRunRaw
+    imod (fupd_mask_mono (E1 := ∅) (E2 := E) LawfulSet.empty_subset) $$
+      (Hrun $$ %Q %gt %I %r %r' HQ Hh Hn Hp HT) with ⟨Hh, Hn, Hp, HT, HQ⟩
+    imodintro
+    iframe Hh Hn Hp HT
+    iapply BigSepL.bigSepL_cons.2
+    iframe HQ HQs
+
+end AppSyncRaw
 
 /-! ## 2.  The invariant, at the ambient configuration -/
 
@@ -280,13 +387,28 @@ theorem appRdcred_elim [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
   · iapply hs $$ H
   · iapply hw $$ H
 
-/-- THE TRANSPORT, PINNED (round C; Rocq's `app_xfer`): parked in the body
-so the era owns it, and the one application-side premise of the era
-mint. -/
-def appXfer [Appcfg GF] : IProp GF := appXferRaw appPred
+/-- THE MERGE, PINNED (Rocq's `app_merge`; round C's transport, the merge
+since SY3-K2) at the era's sync token (K3-3): the application-side premise
+of the era mint, which hands it to fsinit on the kit.  The commit is its one
+runner. -/
+def appMerge [MachGS hlc GF] [Appcfg GF] : IProp GF :=
+  appMergeRaw appPred (eraSyncTok (hlc := hlc) (GF := GF))
 
-instance appXfer_persistent [Appcfg GF] : Persistent (appXfer (GF := GF)) := by
-  unfold appXfer; infer_instance
+instance appMerge_persistent [MachGS hlc GF] [Appcfg GF] :
+    Persistent (appMerge (hlc := hlc) (GF := GF)) := by
+  unfold appMerge; infer_instance
+
+/-- THE SYNC RUNNER, PINNED (Rocq's `app_sync_run`, sync K3-3): at the era's
+token and hook family, the two slots of the fixed record.  It rides beside the
+merge from the mint to fsinit on the kit, where the hooked law is built out
+of it. -/
+def appSyncRun [MachGS hlc GF] [FsTopG GF] [Appcfg GF] : IProp GF :=
+  appSyncRunRaw (hlc := hlc) appPred (eraSyncTok (hlc := hlc) (GF := GF))
+    (eraSyncHook (hlc := hlc) (GF := GF))
+
+instance appSyncRun_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF] :
+    Persistent (appSyncRun (hlc := hlc) (GF := GF)) := by
+  unfold appSyncRun; infer_instance
 
 /-- THE DOMAIN ROW (round C; Rocq's `app_dom`).  The abstract map names
 EXACTLY the region's inums.  `InodeRegion.ftop_body` carries no such row,
@@ -312,15 +434,17 @@ theorem appDom_insert [Icfg] (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
   · rw [if_neg hz]
 
 /-- THE BODY (Rocq's `app_body`): the application's half of the
-authority, the claim about the map it carries (read through the view), the
-domain row and the transport.  NOT timeless: the claim is an arbitrary
-iProp and stays under the later. -/
+authority, the claim about the map it carries (read through the view) and
+the domain row.  NOT timeless: the claim is an arbitrary iProp and stays
+under the later.  THE MERGE IS NOT PARKED HERE (sync K3-3): it is pinned at
+the era's token (`appMerge`), so parking it would make the invariant era-
+dependent, and nothing read it here anyway.  The commit takes `appMerge`
+off fsinit's kit. -/
 def appBody [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
   iprop(∃ I : RegMapF FsNode,
     (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
     appPred appRun (absView I) ∗
-    ⌜appDom I⌝ ∗
-    appXfer)
+    ⌜appDom I⌝)
 
 /-- Rocq's `app_inv`. -/
 def appInv [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
@@ -343,20 +467,19 @@ theorem topAuth_halves [FsTopG GF] (γ : GName) (I : RegMapF FsNode) :
 /-- ALLOCATION, at the era mint (Rocq's `app_inv_alloc`): the guest half of
 the authority the boot founded, the claim at the founded map --
 LATER-SHAPED, because it arrives from the durable instance through the
-transport (round C) and `inv_alloc` takes the later -- the domain row and
-the transport. -/
+transport (round C) and `inv_alloc` takes the later -- and the domain
+row. -/
 theorem appInv_alloc [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
     (γfs : FsNames) (I : RegMapF FsNode) (E : CoPset) (hd : appDom I) :
     ⊢@{IProp GF} (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
-      ▷ appPred appRun (absView I) -∗
-      appXfer -∗ |={E}=> appInv (hlc := hlc) γfs := by
-  iintro Hh Hp #Hx
+      ▷ appPred appRun (absView I) -∗ |={E}=> appInv (hlc := hlc) γfs := by
+  iintro Hh Hp
   unfold appInv
   iapply (inv_alloc appN E (appBody (GF := GF) γfs))
   inext
   unfold appBody
   iexists I
-  iframe Hh Hp Hx
+  iframe Hh Hp
   ipureintro; exact hd
 
 /-! ## 3.  THE ONE GHOST MOVE ON THE MAP
@@ -386,7 +509,7 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I', >Hh, Hp, >%hd, #Hx⟩
+  icases Hbody with ⟨%I', >Hh, Hp, >%hd⟩
   ihave %heq := ghost_map_auth_agree _ _ _ _ _ $$ Hk Hh
   subst heq
   ihave %hi := ghost_map_lookup $$ Hk Hf
@@ -400,7 +523,7 @@ theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   imod Hclose $$ [Hh Hp]
   · inext
     iexists (PartialMap.insert I i n')
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact appDom_insert I i n n' hi hd
   imodintro
   iframe Hk Hf
@@ -482,27 +605,6 @@ theorem appStep_id [Appcfg GF] (i : Nat) (I : RegMapF FsNode) :
   imodintro
   iexact Hp
 
-/-- THE TRANSPORT, READ OFF THE INVARIANT (Rocq's `app_xfer_acc`):
-`▷`-shaped and persistent, so the body closes unchanged.  Note what this is
-NOT good for: a fupd under a later cannot run without a step, so the
-commit's law does not read the transport here -- it takes `appXfer`
-itself, carried from the mint on the fsinit kit. -/
-theorem appXfer_acc [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
-    (E : CoPset) (γfs : FsNames) (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ |={E}=> ▷ appXfer := by
-  iintro #Hinv
-  unfold appInv
-  imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
-    with ⟨Hbody, Hclose⟩
-  unfold appBody
-  icases Hbody with ⟨%I, Hh, Hp, Hd, #Hx⟩
-  imod Hclose $$ [Hh Hp Hd]
-  · inext
-    iexists I
-    iframe Hh Hp Hd Hx
-  imodintro
-  iexact Hx
-
 /-- AN UPDATE OF THE CLAIM THAT DOES NOT MOVE THE MAP (lane E2 / SH-OPEN;
 Rocq's `app_claim_update`).  `appTopUpdate` is for a party that HOLDS half
 the authority and is moving a row; this is for one that holds neither and
@@ -525,12 +627,12 @@ theorem appClaimUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I, >Hh, Hp, >%hd, #Hx⟩
+  icases Hbody with ⟨%I, >Hh, Hp, >%hd⟩
   imod Hstep $$ %(absView I) HR Hp with ⟨Hp, HQ⟩
   imod Hclose $$ [Hh Hp]
   · inext
     iexists I
-    iframe Hh Hp Hx
+    iframe Hh Hp
     ipureintro; exact hd
   imodintro
   iexact HQ

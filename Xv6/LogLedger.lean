@@ -71,6 +71,15 @@ theorem toListP_get {V : Type} (m : RegMapF V) (k : Nat) (v : V) :
     (k, v) ∈ FiniteMap.toList m ↔ PartialMap.get? m k = some v :=
   LawfulFiniteMap.toList_get (M := RegMapF)
 
+/-- An empty ledger has no entries (the tie `logRes` states between `out`
+and the list view, read at `out = 0`). -/
+theorem eo_map_empty {V : Type} (m : RegMapF V) (h : (FiniteMap.toList m).length = 0)
+    (i : Nat) (v : V) : PartialMap.get? m i ≠ some v := by
+  intro hv
+  have hmem : (i, v) ∈ FiniteMap.toList m := (toListP_get m i v).2 hv
+  rw [List.eq_nil_of_length_eq_zero h] at hmem
+  exact absurd hmem (by simp)
+
 /-- THE ONE FACT THE LIST VIEW COSTS: the fold is over a commutative
 monoid, so the unspecified order of `FiniteMap.toList` does not matter. -/
 theorem opSumL_perm {l₁ l₂ : List (Nat × OpEntry)} (h : l₁.Perm l₂) : opSumL l₁ = opSumL l₂ := by

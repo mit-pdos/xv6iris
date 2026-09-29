@@ -481,13 +481,13 @@ record literal with the composite slot, `diskProjTrace` promotes
 theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
-    (Ptp : IProp GF) (g' : GState) :
+    (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g' ∗
+        (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
       ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜fsBootPure cov ls (diskOf g'.m.devs)⌝ :=
   @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-      (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist)
+      (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist)
     XV6_DISK_BYTES γd (xv6Slot N appFs cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
     (fun dk => xv6Slot_project N appFs cov ls γd γsw γreg γstart c dk) rfl rfl g'
 
@@ -497,16 +497,16 @@ invariant. -/
 theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
-    (Ptp : IProp GF) (g' : GState) :
+    (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g' ∗
+        (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
       ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜xv6TracePure cov ls g'⌝ := by
   iintro ⟨Hsi, HP⟩
   ihave %hresv := (@powerInterp_mmOk hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
-    XV6_DISK_BYTES γsw (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g')
+    XV6_DISK_BYTES γsw (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g')
     $$ Hsi
-  imod fsTraceHook N appFs cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp g'
+  imod fsTraceHook N appFs cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp g'
     $$ [Hsi HP] with %hdisk
   · isplitl [Hsi]
     · iexact Hsi

@@ -652,15 +652,6 @@ theorem eo_nodup_inj (W : List (BitVec 32)) (h : (W.map (fun w => w.toNat)).Nodu
     rw [List.getElem?_map, hk, he]; rfl
   exact eo_nodup_inj_gen _ h i k v.toNat hi' hk'
 
-/-- An empty ledger has no entries (the tie `logRes` states between `out`
-and the list view, read at `out = 0`). -/
-theorem eo_map_empty {V : Type} (m : RegMapF V) (h : (FiniteMap.toList m).length = 0)
-    (i : Nat) (v : V) : PartialMap.get? m i ≠ some v := by
-  intro hv
-  have hmem : (i, v) ∈ FiniteMap.toList m := (toListP_get m i v).2 hv
-  rw [List.eq_nil_of_length_eq_zero h] at hmem
-  exact absurd hmem (by simp)
-
 /-- A permutation that puts a NoDup sublist first (Rocq's `eo_cov_split`
 is `big_sepS_union`; this port's row is a list, so the union is a
 permutation). -/

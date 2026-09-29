@@ -206,6 +206,8 @@ instance ugfOffSet : ElemG unionGF (constOF OffSetUR) := ugf_slot 92
 instance ugfRegistry : GhostMapG unionGF Nat EraGS RegMapF := ⟨ugf_slot 93⟩
 -- Xv6G: the pipe byte queue
 instance ugfPipeq : ElemG unionGF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) := ugf_slot 94
+-- LogG: the helping slot's map (inherited from `xv6GF`'s slot 120)
+instance ugfHelp : GhostMapG unionGF Nat (GName × BitVec 32) RegMapF := ⟨ugf_slot 120⟩
 
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩

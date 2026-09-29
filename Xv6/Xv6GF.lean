@@ -183,6 +183,9 @@ def xv6GF : BundledGFunctors :=
   |>.set 93 ⟨xgfGm Nat EraGS RegMapF, inferInstance⟩
   -- Xv6G: the pipe byte queue (Rocq `pipeqR`)
   |>.set 94 ⟨constOF (ExclAuth.ExclAuthR (A := PipeSt)), inferInstance⟩
+  -- LogG: the helping slot's map (Rocq `loghelp_inG`, sync K3-2); slot 120, clear of
+  -- the union's own slots (95..)
+  |>.set 120 ⟨xgfGm Nat (GName × BitVec 32) RegMapF, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -307,6 +310,8 @@ instance xgfOffSet : ElemG xv6GF (constOF OffSetUR) := xgf_slot 92
 instance xgfRegistry : GhostMapG xv6GF Nat EraGS RegMapF := ⟨xgf_slot 93⟩
 -- Xv6G: the pipe byte queue
 instance xgfPipeq : ElemG xv6GF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) := xgf_slot 94
+-- LogG: the helping slot's map
+instance xgfHelp : GhostMapG xv6GF Nat (GName × BitVec 32) RegMapF := ⟨xgf_slot 120⟩
 
 end cameras
 

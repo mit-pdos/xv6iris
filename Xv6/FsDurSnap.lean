@@ -199,10 +199,26 @@ theorem pDurAt_intro (g gl gt : GName) (D : BlockMap) (S : FsStateRec) :
 instance pDurAt_timeless (gt : GName) (D : BlockMap) : Timeless (pDurAt (GF := GF) gt D) := by
   unfold pDurAt; infer_instance
 
-/-- THE PAIR: the snapshot and an OPAQUE guest at its map name, the guest
-under a later (Rocq's `dur_pair`). -/
-def durPair (G : GName → IProp GF) (D : BlockMap) : IProp GF :=
-  iprop(∃ gt : GName, pDurAt gt D ∗ ▷ G gt)
+/-- THE GUEST'S MERGE (Rocq's `dur_merge`, SY3-K2 / K3-3): the new guest
+at `gt` out of whichever old guest the crash slot holds.  The commit builds
+it at the collection, where the running claim is in hand and the old guest
+is not, and the header write's permit -- where the old guest is in hand and
+the running claim is not -- applies it (`dsnapStep_merge`).  A BASIC update,
+so it runs at the permit's mask `∅`; the guest stays OPAQUE.
+...AND THE APPLICATION'S TOKEN `T` RIDES IT (sync K3-3): the collection
+hands the token in, and whichever arm the commit takes gives it back -- the
+header write's permit applies the LEFT arm to the old guest (the token comes
+out beside the new guest), the EMPTY-LOG commit, which writes no header,
+takes the RIGHT arm.  An additive pair because exactly one of the two
+fires. -/
+def durMerge (G : GName → IProp GF) (T : IProp GF) (gt : GName) : IProp GF :=
+  iprop((∀ gt_o : GName, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T)
+
+/-- THE PAIR (Rocq's `dur_pair`): the snapshot AND the MERGE of an opaque
+guest at its map name (since SY3-K2 the merge rather than the guest itself,
+so the old durable copy is read, not dropped), at the token `T`. -/
+def durPair (G : GName → IProp GF) (T : IProp GF) (D : BlockMap) : IProp GF :=
+  iprop(∃ gt : GName, pDurAt gt D ∗ durMerge G T gt)
 
 /-! ## 6b.  The epoch off an instance -/
 
@@ -723,13 +739,30 @@ theorem fsSnap_readOk_keep (g gl gt : GName) (D : BlockMap) (S : FsStateRec) (hf
       ⌜snapOk S D⌝ ∗ fsSnap (snapGamma g gl gt) g D S :=
   fsDurKeep (fsSnap_readOk g gl gt D S hf)
 
-/-- THE COMMIT'S STEP: the next pair is taken whole; the old snapshot and
-the old guest are DISCARDED (Rocq's `dsnap_step_xfer`). -/
-theorem dsnapStep_xfer (G : GName → IProp GF) (gt : GName) (D D' : BlockMap) :
-    durPair G D' ⊢ pDurAt gt D -∗ ▷ G gt ==∗ durPair G D' := by
-  iintro H - -
+/-- THE COMMIT'S STEP (Rocq's `dsnap_step_merge`, SY3-K2 / K3-3): the old
+snapshot is DISCARDED, the old GUEST goes to the pair's merge, which yields
+the new one; the token comes back beside it. -/
+theorem dsnapStep_merge (G : GName → IProp GF) (T : IProp GF) (gt : GName) (D D' : BlockMap) :
+    durPair G T D' ⊢ pDurAt gt D -∗ ▷ G gt ==∗
+      (∃ gt' : GName, pDurAt gt' D' ∗ ▷ G gt') ∗ T := by
+  iintro H - HG
+  unfold durPair durMerge
+  icases H with ⟨%gt', Hd, ⟨Hm, -⟩⟩
+  imod Hm $$ %gt HG with ⟨HG, HT⟩
   imodintro
-  iexact H
+  iframe HT
+  iexists gt'
+  iframe Hd HG
+
+/-- THE PAIR'S RIGHT ARM (Rocq's `snap_law_out_tok`, stated here at the
+pair): a commit that writes no header -- the EMPTY-LOG commit -- never
+applies the merge, and takes the token back out of the pair instead. -/
+theorem durPair_tok (G : GName → IProp GF) (T : IProp GF) (D : BlockMap) :
+    durPair G T D ⊢ T := by
+  iintro H
+  unfold durPair durMerge
+  icases H with ⟨%gt, -, ⟨-, HT⟩⟩
+  iexact HT
 
 /-! ## 8.  What a consumer reads off the current snapshot -/
 

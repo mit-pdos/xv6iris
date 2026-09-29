@@ -321,6 +321,20 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   authority lent for the instant (`diskWritePermit`).  An ARBITRARY
   predicate; nothing between here and the disk thread names it. -/
   crashPred : IProp GF
+  /-- THE TWO SYNC SLOTS (Rocq `riscv_sync_tok`/`riscv_sync_hook`, sync K3-2;
+  Rocq design/sync.md §4.2 "where the WAL names the application's two opaque
+  things").  The application's durability token and the hooks a `sync` waiter
+  hands the committer live inside the LOG invariant -- the token in
+  `logRes`'s idle arm, the hooks in its helping slot -- so both need a type
+  the WAL can write and the application can match, at one place both can
+  name.  `syncTok k` is era `k`'s opaque token, `syncHook k Q` the family of
+  a waiter's hooks at its promised `Q`.  Client slots exactly as `crashPred`
+  is: adequacy fills them from two parameters stated at the same raw gnames
+  and fixed part (`riscvPowerAdequacy`'s `Tk`/`Hk`), every boot learns them
+  through the record-shape equation, and the machine never reads them.  An
+  application with no sync ledger takes `True` and `Q`. -/
+  syncTok : Nat → IProp GF
+  syncHook : Nat → IProp GF → IProp GF
   /-- THE SWAP COUNTER (Rocq `riscv_swap_name`): a mono-nat whose FULL auth
   lives inside the crash predicate's checked-out arm, at the generation in
   custody of the FS record; an era keeps only a persistent lower bound

@@ -29,16 +29,19 @@ rides as a pure conjunct.
 * `SB_BNO`.  `logStateAt`'s third row excludes block 1 from the write set
   (Rocq's `uint w <> FsImg.SB_BNO`); `log_write`'s append arm supplies it
   from `Xv6.sbParked_bno_ne`.
-* THE BANK.  `logResAt` carries `logFlushedBank γ E` (Rocq
-  `log_flushed_bank`), the durability receipt a reader that writes no block
-  (`sys_sync`) copies out; it rides beside the transaction authority, before
-  the committing arm, as in Rocq.
+* THE SYNC ROWS (Rocq sync K1/K3-3/K3-4, ported in their post-cleanup
+  shape).  `logResAt` carries the HELPING SLOT `logHelp γ nc out cmt`
+  (`Xv6/LogHelp.lean`) where the bank used to be (the bank, its deposits and
+  `sys_sync`'s pre-sync receipt are gone, Rocq cleanups F 653187d8f); its
+  non-committing arm carries QUIESCENCE `⌜out = 0 → n = 0⌝` and the era's
+  sync TOKEN `eraSyncTok` just before the bundle.
 * THE CONTEXT.  `logCtx` carries the era's swap receipt `swapLb (genId + 1)`,
-  block 1's park `sbParked γfs` and the file system's law `snapLaw` (Rocq's
-  `log_ctx` rows).  DEVIATION (position only): Rocq's order is lock, frozen,
-  swap, bytes, park, law, seal; Lean's byte view already bundles the seal
-  (`fsBytesAnyAt`), and the three restored rows are appended LAST (brief
-  §5 risk 6) so that no positional opener of `logCtx` moves.
+  block 1's park `sbParked γfs`, the file system's law `snapLaw` at the era's
+  token, and the ghost commit's three -- the hooked law `snapLawGhost`, the
+  crash invariant and the era certificate (Rocq's `log_ctx` rows).
+  DEVIATION (position only): Rocq's order is lock, frozen, swap, bytes, park,
+  law, seal, hooked law, crash inv, cert; Lean's byte view already bundles the
+  seal (`fsBytesAnyAt`), so the rows after it follow the law directly.
 
 **What could not be ported, and why**:
 
@@ -61,7 +64,7 @@ import Xv6.FsBytesMint
 import Xv6.BcacheInv
 import Xv6.LogMirrorHalf
 import Xv6.LogSnapLaw
-import Xv6.FsFlushedCore
+import Xv6.LogHelp
 import Xv6.SbPark
 
 namespace Xv6
@@ -165,74 +168,6 @@ def opPending (om : RegMapF OpEntry) (b : Nat) : Prop :=
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
-
-/-! ## The bank (Rocq `log_flushed_bank`)
-
-WHAT THE LOG INVARIANT CARRIES FOR A LATER READER: the batch counter stands
-at `e`, and the state the last write made durable is `D` -- the `b`-th
-committed state, and a file system.  A receipt is only obtainable where the
-crash predicate is OPEN (a disk write's own fupd), so `sys_sync`'s fast path
-has no fupd to run; what there is, is a COPY an earlier writer deposited
-here.  Persistent, so openers take one and close unchanged.  The joint
-reading is established where the two are minted together: `end_op`'s
-re-deposit (the commit's clear) and `initlog`'s genesis seal. -/
-
-def logFlushedBank (γ : LogNames) (e : Nat) : IProp GF := iprop%
-  ∃ (b : Nat) (D : BlockMap),
-    logEpochLb γ e ∗ flushed (hlc := hlc) (GF := GF) b D ∗ ⌜snapHolds D⌝
-
-instance logFlushedBank_persistent (γ : LogNames) (e : Nat) :
-    Persistent (logFlushedBank (hlc := hlc) (GF := GF) γ e) := by
-  unfold logFlushedBank; infer_instance
-
-variable [FsLinkG GF] [FsTopG GF] in
-/-- The bank is TIMELESS (a history lower bound and a pure fact), so a
-receipt handed back under `▷` (a `bwrite`'s DMA completion) strips at any
-fupd. -/
-instance fsBank_timeless : Timeless (fsBank (hlc := hlc) (GF := GF)) := by
-  unfold fsBank fsReceiptAny fsReceipt; infer_instance
-
-variable [FsLinkG GF] [FsTopG GF] in
-/-- THE DEPOSIT SIDE (Rocq `log_flushed_bank_mk`). -/
-theorem logFlushedBank_mk (γ : LogNames) (E : Nat) :
-    logEpochAuth (GF := GF) γ E ⊢ fsBank (hlc := hlc) (GF := GF) -∗
-      logEpochAuth γ E ∗ logFlushedBank (hlc := hlc) γ E := by
-  iintro Ha #Hbk
-  ihave ⟨Ha, #Hlb⟩ := logEpochLb_get γ E $$ Ha
-  ihave ⟨%b, %D, #Hf, %hh⟩ := flushed_ofBank (hlc := hlc) (GF := GF) $$ Hbk
-  iframe Ha
-  unfold logFlushedBank
-  iexists b, D
-  isplitr
-  · iexact Hlb
-  isplitr
-  · iexact Hf
-  ipureintro; exact hh
-
-variable [FsLinkG GF] [FsTopG GF] in
-/-- ...and BACK to the raw copy (Rocq `log_flushed_bank_recycle`): `end_op`'s
-empty-log path re-banks the copy it already had at the moved counter. -/
-theorem logFlushedBank_recycle (γ : LogNames) (e : Nat) :
-    logFlushedBank (hlc := hlc) (GF := GF) γ e ⊢ fsBank (hlc := hlc) (GF := GF) := by
-  unfold logFlushedBank fsBank
-  iintro ⟨%b, %D, -, #Hf, %hh⟩
-  iexists D
-  isplitl
-  · iapply flushed_receiptAny $$ Hf
-  · ipureintro; exact hh
-
-/-- THE READ SIDE's one step (Rocq `log_flushed_bank_le`). -/
-theorem logFlushedBank_le (γ : LogNames) (E e : Nat) (hle : e ≤ E) :
-    logFlushedBank (hlc := hlc) (GF := GF) γ E ⊢ logFlushedBank (hlc := hlc) γ e := by
-  unfold logFlushedBank
-  iintro ⟨%b, %D, #Hlb, #Hf, %hh⟩
-  iexists b, D
-  isplitr
-  · unfold logEpochLb
-    iapply MonoNat.lb_own_le _ _ _ (by simp only [MaxNat.le_toNat]; omega) $$ Hlb
-  isplitr
-  · iexact Hf
-  ipureintro; exact hh
 
 /-! ## An active operation -/
 
@@ -544,55 +479,24 @@ def logResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     -- the ledger entry the same `end_op` retires, and both retires drop
     -- exactly one row -- which is all a commit reads
     ⌜(FiniteMap.toList T).length = (FiniteMap.toList om).length⌝ ∗
-    -- THE BANK, at the counter's current value (last before the arm)
-    logFlushedBank (hlc := hlc) γ E ∗
+    -- THE HELPING SLOT (Rocq sync K3-4; `Xv6.logHelp`): the `sys_sync`
+    -- waiters' hooks, each Pending entry pinned to THIS `ncommit` word and to
+    -- `cmt = true ∨ out ≠ 0`.  In BOTH arms; LAST among the non-arm conjuncts
+    -- (where the bank used to be, sync cleanups F).
+    logHelp (hlc := hlc) γ nc out cmt ∗
     (if cmt then iprop(emp) else iprop(
       ∃ (n : Nat) (LB : List Nat),
         ⌜n + opSum om ≤ LOGBLOCKS⌝ ∗
         ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
         ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
+        -- QUIESCENT MEANS NOTHING IS LOGGED (Rocq sync K1): not committing
+        -- and nothing outstanding, the batch is EMPTY, so row (b) covers the
+        -- whole home set (`Xv6.logQuiet_committed`)
+        ⌜out = 0 → n = 0⌝ ∗
+        -- THE APPLICATION'S TOKEN (Rocq sync K3-3): the era's opaque
+        -- `syncTok`, held here while no commit is in flight
+        eraSyncTok (hlc := hlc) (GF := GF) ∗
         logStateAt γb γfs cov logstart n LB (opPending om) ξ))
-
-/-- **THE WHOLE OF WHAT SYS_SYNC DOES, in the logic** (Rocq
-`log_res_flushed`): with the lock held and a client's own batch witness in
-hand, the lock's resource yields a durability receipt at a batch AT OR PAST
-the client's, and closes UNCHANGED. -/
-theorem logResAt_flushed (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (ξ : CtxId) (e : Nat) :
-    logEpochLb (GF := GF) γ e ⊢ logResAt (hlc := hlc) γ γb γfs cov logstart ξ -∗
-      (∃ E : Nat, ⌜e ≤ E⌝ ∗ logFlushedBank (hlc := hlc) γ E) ∗
-      logResAt (hlc := hlc) γ γb γfs cov logstart ξ := by
-  unfold logResAt
-  iintro #Hlb ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-    Hout, Hcmt, Hnc, Hops, %hlen, %hp, %hfresho, Hep, %hE, Hreg, %hfreshl, %hlive, %hcap,
-    Htx, %hfresht, %hTlen, #Hbank, Harm⟩
-  ihave %hle := logEpochLb_le γ E e $$ Hep Hlb
-  isplitr
-  · iexists E
-    isplitr
-    · ipureintro; exact hle
-    · iexact Hbank
-  iexists out, cmt, nc, om, E, X, T, nxo, nxt, nxl
-  iframe Hout Hcmt Hnc Hops Hep Hreg Htx Harm
-  isplitr
-  · ipureintro; exact hlen
-  isplitr
-  · ipureintro; exact hp
-  isplitr
-  · ipureintro; exact hfresho
-  isplitr
-  · ipureintro; exact hE
-  isplitr
-  · ipureintro; exact hfreshl
-  isplitr
-  · ipureintro; exact hlive
-  isplitr
-  · ipureintro; exact hcap
-  isplitr
-  · ipureintro; exact hfresht
-  isplitr
-  · ipureintro; exact hTlen
-  iexact Hbank
 
 /-! ## The payload transports
 
@@ -641,18 +545,22 @@ instance instCtxMorphLogResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsName
   refine @instCtxMorphExists _ _ _ _ _ (fun nxo => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun nxt => ?_)
   refine @instCtxMorphExists _ _ _ _ _ (fun nxl => ?_)
+  have hhelp := instCtxMorphConst (GF := GF) (logHelp (hlc := hlc) γ nc out cmt)
   have harm : CtxMorph (GF := GF) (fun ξ =>
       if cmt then iprop(emp) else iprop(
         ∃ (n : Nat) (LB : List Nat),
           ⌜n + opSum om ≤ LOGBLOCKS⌝ ∗
           ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
           ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
+          ⌜out = 0 → n = 0⌝ ∗
+          eraSyncTok (hlc := hlc) (GF := GF) ∗
           logStateAt γb γfs cov logstart n LB (opPending om) ξ)) := by
     cases cmt
     · simp only [Bool.false_eq_true, if_false]
       refine @instCtxMorphExists _ _ _ _ _ (fun n => ?_)
       refine @instCtxMorphExists _ _ _ _ _ (fun LB => ?_)
       have := instCtxMorphLogStateAt (GF := GF) γb γfs cov logstart n LB (opPending om)
+      have := instCtxMorphConst (GF := GF) (eraSyncTok (hlc := hlc) (GF := GF))
       infer_instance
     · simp only [if_true]
       exact instCtxMorphConst _
@@ -697,8 +605,19 @@ def logCtx (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
   -- BLOCK 1, OWNED (Rocq's `sb_parked`)
   sbParked γfs ∗
-  -- THE FILE SYSTEM'S LAW (Rocq's `snap_law`)
-  snapLaw (hlc := hlc) γ γfs cov logstart
+  -- THE FILE SYSTEM'S LAW (Rocq's `snap_law`), at the era's sync token
+  -- (sync K3-3): the law carries the application's opaque token into the
+  -- durable pair and back
+  snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
+  -- THE GHOST COMMIT'S THREE (Rocq sync K3-3, `log_ctx`'s last rows): the
+  -- HOOKED LAW pinned at the era's two fixed-record slots, the CRASH
+  -- INVARIANT it opens (`MachCSL.wpHart_crash_fupd`), and the ERA
+  -- CERTIFICATE the record's squeeze reads.  All persistent, all parked by
+  -- `initlog`.  LAST, so no pattern that opens this bundle moves.
+  snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+    (eraSyncHook (hlc := hlc) (GF := GF)) ∗
+  crashInv (hlc := hlc) (GF := GF) ∗
+  genCert (hlc := hlc) (GF := GF)
 
 variable [FsLinkG GF] [FsTopG GF] in
 instance logCtx_persistent (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -738,8 +657,32 @@ variable [FsLinkG GF] [FsTopG GF] in
 /-- The file system's law. -/
 theorem logCtx_snapLaw (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
-    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ snapLaw (hlc := hlc) γ γfs cov logstart := by
-  unfold logCtx; iintro ⟨-, -, -, -, -, H⟩; iexact H
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
+      snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) := by
+  unfold logCtx; iintro ⟨-, -, -, -, -, H, -⟩; iexact H
+
+variable [FsLinkG GF] [FsTopG GF] in
+/-- The ghost commit's hooked law (Rocq `log_ctx_snap_law_ghost`). -/
+theorem logCtx_snapLawGhost (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
+      snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+        (eraSyncHook (hlc := hlc) (GF := GF)) := by
+  unfold logCtx; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H
+
+variable [FsLinkG GF] [FsTopG GF] in
+/-- The crash invariant (Rocq `log_ctx_crash_inv`). -/
+theorem logCtx_crashInv (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ crashInv (hlc := hlc) (GF := GF) := by
+  unfold logCtx; iintro ⟨-, -, -, -, -, -, -, H, -⟩; iexact H
+
+variable [FsLinkG GF] [FsTopG GF] in
+/-- The era certificate (Rocq `log_ctx_gen_cert`). -/
+theorem logCtx_genCert (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
+    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ genCert (hlc := hlc) (GF := GF) := by
+  unfold logCtx; iintro ⟨-, -, -, -, -, -, -, -, H⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
 /-- **The byte view's row, off the context every log function threads**

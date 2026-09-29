@@ -95,6 +95,40 @@ theorem appDurRaw_clone {N : Type} (A : N → Aview → IProp GF) (gt : GName)
   iframe Hp
   iapply appDurRaw_pack A gt I $$ Hh Hnew
 
+/-- THE MERGE (the commit, SY3-K2 / K3-3; Rocq `app_dur_raw_merge`): run the
+merge on the running claim, keep the original, and hand out the guest-level
+wand the WAL applies to the old guest at the header write
+(`FsDurSnap.durMerge`).  The fresh guest half goes INTO the wand beside the
+merge's own; the old guest's half is dropped with it, its claim goes to the
+merge.  The token `T` goes in with the running claim and comes back on
+either arm of the additive pair. -/
+theorem appDurRaw_merge {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) (gt : GName)
+    (I : RegMapF FsNode) (r : N) :
+    appMergeRaw A T ⊢ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r (absView I) -∗ T ==∗
+      ▷ A r (absView I) ∗
+      ((∀ gt_o : GName, ▷ appDurRaw A gt_o ==∗ ▷ appDurRaw A gt ∗ T) ∧ T) := by
+  iintro #Hm Hh Hp HT
+  unfold appMergeRaw
+  imod Hm $$ %r %(absView I) Hp HT with ⟨Hp, ⟨%r', Hw⟩⟩
+  imodintro
+  iframe Hp
+  isplit
+  · icases Hw with ⟨Hw, -⟩
+    iintro %gt_o Hold
+    imod Hw $$ [Hold] with ⟨Hnew, HT⟩
+    · inext
+      unfold appDurRaw
+      icases Hold with ⟨%r_o, %I_o, -, Hold⟩
+      iexists r_o, (absView I_o)
+      iexact Hold
+    imodintro
+    iframe HT
+    iapply appDurRaw_pack A gt I $$ Hh
+    iexists r'
+    iexact Hnew
+  · icases Hw with ⟨-, HT⟩
+    iexact HT
+
 end AppDurRaw
 
 section AppDur

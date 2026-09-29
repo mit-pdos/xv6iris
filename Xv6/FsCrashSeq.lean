@@ -15,9 +15,9 @@ half travels INSIDE the residual, and both orders end at the SAME picture
   * INSTALL (`fsInstallV_seqPermit`): a home write the header names.
   * THE COMMIT (`fsCommitL_seqPermit`): the header write that moves the
     committed map to `L` on the home set -- at the seam's OWN guest, with the
-    law's pair; the receipt comes out.
+    law's pair; the application's sync token comes out (sync K3-3).
   * THE PRESERVING CLEAR (`fsClearKeep_seqPermit`): the header write that moves
-    nothing, and banks the disk's durable state (`fsBank`).
+    nothing.
 
 ## DEVIATIONS from Rocq
 
