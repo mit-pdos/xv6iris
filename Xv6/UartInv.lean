@@ -97,13 +97,14 @@ instance uartInv_persistent (i : UartId) (γ : UartNames) : Persistent (uartInv 
 keeps them. -/
 theorem uartBody_keep (i : UartId) (γ : UartNames) (u u' : UartState)
     (hacc : Uart.acc u' = Uart.acc u) (hout : u'.out = u.out) (hdl : Uart.dlab u' = Uart.dlab u)
-    (hrx : u'.rx = u.rx) (hlb : Uart.loopback u' = Uart.loopback u) (hw : u'.wire = u.wire) :
+    (hrx : u'.rx = u.rx) (hlb : Uart.loopback u' = Uart.loopback u) (hw : u'.wire = u.wire)
+    (hrc : u'.recvd = u.recvd) :
     uartBody (GF := GF) i γ u ⊢ uartBody i γ u' := by
   unfold uartBody
   rw [uartGhosts_eq γ u u' hacc hout hdl, consClaimAt_eq i γ u u' hacc]
   iintro ⟨HG, Hcol, Hcl⟩
   iframe HG Hcl
-  iapply uartColE_stable i γ u u' hrx hlb hw hout $$ Hcol
+  iapply uartColE_stable i γ u u' hrx hlb hw hout hrc $$ Hcol
 
 /-! ## The port's thread -/
 
@@ -176,9 +177,10 @@ it stood, the era stamp). -/
 theorem uartObsPermit_step (i : UartId) (γ : UartNames) :
     uartObsPermit i γ ⊢@{IProp GF} devStepPermit (uartN i) (.uart i) (uartStep i) (uartBody i γ) := by
   unfold devStepPermit uartObsPermit
-  iintro #Hp !> %h %ds %u' %os %⟨hst, _, hsh, hwire, hbts⟩ HB Ha
+  iintro #Hp !> %h %ds %u' %os %⟨hst, _, hsh, hwire, hrecv, hbts⟩ HB Ha
   have hw : obsWire i (openSeg h) = (ds.st (.uart i)).wire := hwire i
-  generalize ds.st (.uart i) = u at hst hw ⊢
+  have htie : obsIns i (openSeg h) = (ds.st (.uart i)).recvd := hrecv i
+  generalize ds.st (.uart i) = u at hst hw htie ⊢
   unfold uartBody
   icases HB with ⟨HG, Hcol, Hcl⟩
   icases uartColE_facts i γ u $$ Hcol with ⟨%⟨hwo, hloop⟩, Hcol⟩
@@ -208,27 +210,29 @@ theorem uartObsPermit_step (i : UartId) (γ : UartNames) :
       obtain ⟨rfl, rfl⟩ := hrx
       icases uartColE_top i γ u h $$ [Hcol Ha] with ⟨Ha, %ins, %hs, %k, %hl, %ht, Hcol, %htop⟩
       · iframe Hcol Ha
-      imod Hp $$ %h %([.uartIn i b] : List DevObs) %u %(Uart.recv u b) %⟨Or.inr ⟨b, by simp [Uart.rxArm, *]⟩, hsh, hw, hwo, hbts⟩
+      imod Hp $$ %h %([.uartIn i b] : List DevObs) %u %(Uart.accept u b) %⟨Or.inr ⟨b, by simp [Uart.rxArm, *]⟩, hsh, hw, hwo, hbts⟩
         Hcl HG Ha with ⟨Hcl, HG, Ha, #Htg⟩
       simp only [List.map_cons, List.map_nil, uartTagOf]
-      rw [← consClaimAt_eq i γ u (Uart.recv u b) rfl] at *
+      rw [← consClaimAt_eq i γ u (Uart.accept u b) rfl] at *
       icases obsAuth_lb (h ++ [Obs.dev (.uartIn i b)]) $$ Ha with ⟨Ha, #Hlbn⟩
       unfold uartGhosts
       icases HG with ⟨Hs, Ho, Ht, Hd⟩
-      icases outLb_get γ (Uart.recv u b) $$ Ho with ⟨Ho, #Hwlb⟩
-      have hrider : obsWire i (openSeg (h ++ [Obs.dev (.uartIn i b)])) = (Uart.recv u b).out := by
+      icases outLb_get γ (Uart.accept u b) $$ Ho with ⟨Ho, #Hwlb⟩
+      have hrider : obsWire i (openSeg (h ++ [Obs.dev (.uartIn i b)])) = (Uart.accept u b).out := by
         rw [obsWire_openSeg_in, hw, hwo]; rfl
       have hbts' : obsBoots (h ++ [Obs.dev (.uartIn i b)]) = genId (hlc := hlc) (GF := GF) + 1 := by
         rw [obsBoots_app, obsBoots_io [Obs.dev (.uartIn i b)] (by simp [isIo]), hbts]
-      imod (uartCol_push i γ u (Uart.recv u b) ins hs k hl ht h b htop
-        (by simp [Uart.recv, hroom]) rfl rfl rfl) $$ [Hcol] with Hcol
+      have hshn : traceShape (h ++ [Obs.dev (.uartIn i b)]) true :=
+        traceShape_io h _ hsh (by simp [isIo])
+      imod (uartCol_push i γ u (Uart.accept u b) ins hs k hl ht h b htop htie
+        (by simp [Uart.accept, Uart.recv, hroom]) rfl rfl rfl rfl hrider) $$ [Hcol] with Hcol
       · iframe Hcol
         unfold rxRider
         rw [hrider]
         iframe Hlbn Hwlb
         isplitl
         · iexact Htg
-        · ipureintro; exact hbts'
+        · ipureintro; exact ⟨hbts', hshn⟩
       iframe Ha Hs Ho Ht Hd Hcol Hcl
     · -- the FIFO is full: the byte is refused, silently
       simp only [Option.some.injEq, Prod.mk.injEq] at hrx
@@ -328,7 +332,7 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       cresAt Cres i (genId (hlc := hlc) (GF := GF) + 1) ho H ∗ uartGhosts γ u' ∗
         R (h ++ [Obs.dev (.uartOut i b)])))
     (Hrx : ⊢ iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState),
-      ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.recv u b ∧ traceShape h true ∧
+      ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.accept u b ∧ traceShape h true ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
       uartGhosts γ u' -∗ R h ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
       uartGhosts γ u' ∗ R (h ++ [Obs.dev (.uartIn i b)]) ∗ Tg (h ++ [Obs.dev (.uartIn i b)]))) :
@@ -339,7 +343,7 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
   unfold uartObsPermit
   iintro #Hoinv !> %h %os %u %u' %⟨hst, hsh, hw, hwo, hbts⟩ Hcl HG Ha
   unfold consClaimAt
-  icases Hcl with ⟨%o0, %CH, #Holb, Hres, Hlgh, Hdv, Hau, Hlm, Harm, %hacc0, %hlok⟩
+  icases Hcl with ⟨%o0, %CH, #Holb, Hres, Hlgh, Hdv, Hdc, Hau, Hlm, Harm, %hacc0, %hlok, %hlins⟩
   icases obsHistLbO_prefix o0 h $$ [Ha Holb] with ⟨%hopre, Ha⟩
   · iframe Ha Holb
   unfold obsInv
@@ -363,8 +367,8 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       iframe Ha HG
       isplitl
       · iexists o0, CH
-        iframe Holb Hres Hlgh Hdv Hau Hlm Harm
-        ipureintro; exact ⟨hacc0, hlok⟩
+        iframe Holb Hres Hlgh Hdv Hdc Hau Hlm Harm
+        ipureintro; exact ⟨hacc0, hlok, hlins⟩
       · unfold uartTagOf; iempintro
     · rename_i b u'' hpop
       simp only [Option.some.injEq, Prod.mk.injEq] at htx
@@ -387,8 +391,8 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
         isplitl
         · iexists o0, CH
           rw [hchist]
-          iframe Holb Hres Hlgh Hdv Hau Hlm Harm
-          ipureintro; exact ⟨hacc0, hlok⟩
+          iframe Holb Hres Hlgh Hdv Hdc Hau Hlm Harm
+          ipureintro; exact ⟨hacc0, hlok, hlins⟩
         · unfold uartTagOf; iempintro
       · -- under LOOP nothing reached the wire
         simp only [if_true]
@@ -399,8 +403,8 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
         iframe Ha HG
         isplitl
         · iexists o0, CH
-          iframe Holb Hres Hlgh Hdv Hau Hlm Harm
-          ipureintro; exact ⟨hacc0, hlok⟩
+          iframe Holb Hres Hlgh Hdv Hdc Hau Hlm Harm
+          ipureintro; exact ⟨hacc0, hlok, hlins⟩
         · unfold uartTagOf; iempintro
   · unfold Uart.rxArm at hrx
     split at hrx
@@ -409,7 +413,7 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       simp only [Option.some.injEq, Prod.mk.injEq] at hrx
       obtain ⟨rfl, rfl⟩ := hrx
       ihave #Hrx := Hrx
-      imod Hrx $$ %h %b %u %(Uart.recv u b) %⟨hroom, rfl, hsh, hbts⟩ HG HR with ⟨HG, HR, Htg⟩
+      imod Hrx $$ %h %b %u %(Uart.accept u b) %⟨hroom, rfl, hsh, hbts⟩ HG HR with ⟨HG, HR, Htg⟩
       imod obsUpdate h (h ++ [Obs.dev (.uartIn i b)]) (List.prefix_append _ _) $$ [Ha Hfrag]
         with ⟨Ha, Hfrag⟩
       · iframe Ha Hfrag
@@ -418,10 +422,10 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       imodintro
       simp only [List.map_cons, List.map_nil]
       iframe Ha HG
-      isplitl [Holb Hres Hlgh Hdv Hau Hlm Harm]
+      isplitl [Holb Hres Hlgh Hdv Hdc Hau Hlm Harm]
       · iexists o0, CH
-        iframe Holb Hres Hlgh Hdv Hau Hlm Harm
-        ipureintro; exact ⟨hacc0, hlok⟩
+        iframe Holb Hres Hlgh Hdv Hdc Hau Hlm Harm
+        ipureintro; exact ⟨hacc0, hlok, hlins⟩
       · unfold uartTagOf; rw [htag]; iexact Htg
     · simp only [Option.some.injEq, Prod.mk.injEq] at hrx
       obtain ⟨rfl, rfl⟩ := hrx
@@ -432,8 +436,8 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       iframe Ha HG
       isplitl
       · iexists o0, CH
-        iframe Holb Hres Hlgh Hdv Hau Hlm Harm
-        ipureintro; exact ⟨hacc0, hlok⟩
+        iframe Holb Hres Hlgh Hdv Hdc Hau Hlm Harm
+        ipureintro; exact ⟨hacc0, hlok, hlins⟩
       · unfold uartTagOf; iempintro
 
 /-! ## Taking the body apart and putting it back -/
@@ -565,7 +569,7 @@ theorem thr_write_au (i : UartId) (γ : UartNames) (l bs : List (BitVec 8)) (b :
   icases Hup $$ %_ %hacc' with ⟨Htx, Htok⟩
   imod Hmask
   -- THE STORE OBLIGATION: the port's claim moves by the caller's ghost step
-  imod Hob $$ %u %({ u with tx := u.tx ++ [b], thri := false }) %⟨rfl, rfl, rfl, rfl, acc_thr u b⟩
+  imod Hob $$ %u %({ u with tx := u.tx ++ [b], thri := false }) %⟨rfl, rfl, rfl, rfl, acc_thr u b, rfl⟩
     Hout Hcol Hcl with ⟨Hout, Hcol, Hcl, HΦ⟩
   ihave Hc := Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hcol Hcl]
   case' _ =>
@@ -610,7 +614,7 @@ theorem isr_read_au (i : UartId) (γ : UartNames) :
   have hkeep : uartBody (GF := GF) i γ u ⊢
       uartBody i γ (if Uart.isrThri u then { u with thri := false } else u) := by
     split
-    · exact uartBody_keep i γ u _ rfl rfl rfl rfl rfl rfl
+    · exact uartBody_keep i γ u _ rfl rfl rfl rfl rfl rfl rfl
     · exact .rfl
   ihave HB := hkeep $$ HB
   imod Hmask
@@ -646,7 +650,7 @@ theorem lsr_read_rx_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (Lis
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hrd')
   icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
   unfold uartColE uartCol
-  icases Hcol with ⟨%ins, %hs, %k', %hl', %ht, Hin, Hpop, Hts, Hht, %hok⟩
+  icases Hcol with ⟨%ins, %hs, %k', %hl', %ht, Hin, Hpop, Hts, Hht, %hte, %hok⟩
   icases rxTok_agree γ k k' hl hl' $$ [Hpop Htok] with ⟨%⟨hkk, hll⟩, Hpop, Htok⟩
   · iframe
   subst k' hl'
@@ -662,7 +666,7 @@ theorem lsr_read_rx_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (Lis
     unfold uartColE uartCol
     iexists ins, hs, k, hl, ht
     iframe Hin Hpop Hts Hht
-    ipureintro; exact hok
+    ipureintro; exact ⟨hte, hok⟩
   imod Hc
   imodintro
   iframe Htok
@@ -674,19 +678,22 @@ theorem lsr_read_rx_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (Lis
 off (Rocq `wp_uart_rhr_pop_s_sconf_at`): the FIFO's head pops, it is the
 `k`-th arrival, and it comes with THE HISTORY IT ARRIVED AT -- strictly
 after the token's anchor -- and that history's rider; the token comes back
-at that history. -/
+at that history.  ...AND THE TWO INPUT NUMBERS (Rocq relax-d2, lane K1): the
+anchor it replaces was input `k` of the era at this port, and this byte is
+input `k + 1`. -/
 theorem rhr_read_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs))
     (ins : List (BitVec 8)) (hk : k < ins.length) :
     uartInv i γ ∗ rxTok γ k hl ∗ rxInLb γ ins ∗ dlabOff γ ⊢@{IProp GF}
       devReadAU (.uart i) 0 1 (fun b => iprop(⌜ins[k]? = some b⌝ ∗
-        ∃ h : List Obs, ⌜obsEndsIn i h b ∧ ohistExt hl h⌝ ∗ rxRider i γ h ∗ rxTok γ (k + 1) (some h))) := by
+        ∃ h : List Obs, ⌜obsEndsIn i h b ∧ ohistExt hl h ∧ insLen i hl = k ∧
+          (obsIns i (openSeg h)).length = k + 1⌝ ∗ rxRider i γ h ∗ rxTok γ (k + 1) (some h))) := by
   unfold uartInv devInvR devReadAU
   iintro ⟨#Hinv, Htok, #Hlb, #Hoff⟩
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%u, >Hfrag, >HB⟩
   icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
   unfold uartColE uartCol
-  icases Hcol with ⟨%ins', %hs, %k', %hl', %ht, Hin, Hpop, Hts, Hht, %hok⟩
+  icases Hcol with ⟨%ins', %hs, %k', %hl', %ht, Hin, Hpop, Hts, Hht, %hte, %hok⟩
   icases rxTok_agree γ k k' hl hl' $$ [Hpop Htok] with ⟨%⟨hkk, hll⟩, Hpop, Htok⟩
   · iframe
   subst k' hl'
@@ -714,8 +721,8 @@ theorem rhr_read_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List O
   -- the column: the head's history comes out, the anchor moves to it
   rcases hs with _ | ⟨hh, hs'⟩
   · exfalso; have h3 := hok.2.2.1; rw [hrx] at h3; simp at h3; omega
-  obtain ⟨hok', hends, hanch⟩ := uartColOk_pop i u { u with rx := ins'.drop (k + 1) } ins' hh hs' k hl ht
-    ins'[k] (ins'.drop (k + 1)) hok hrx rfl rfl rfl rfl
+  obtain ⟨hok', hends, hanch, hanum, hnum⟩ := uartColOk_pop i u { u with rx := ins'.drop (k + 1) } ins' hh
+    hs' k hl ht ins'[k] (ins'.drop (k + 1)) hok hrx rfl rfl rfl rfl rfl
   ihave ⟨#Hr, Hts⟩ := BigSepL.bigSepL_cons.1 $$ Hts
   imod (rxTok_update γ k (k + 1) hl (some hh)) $$ [Hpop Htok] with ⟨Hpop, Htok⟩
   · iframe
@@ -730,14 +737,14 @@ theorem rhr_read_au (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List O
     unfold uartColE uartCol
     iexists ins', hs', k + 1, some hh, ht
     iframe Hin Hpop Hts Hht
-    ipureintro; exact hok'
+    ipureintro; exact ⟨hte, hok'⟩
   imod Hc
   imodintro
   isplitr
   · ipureintro; exact hget
   iexists hh
   iframe Hr Htok
-  ipureintro; exact ⟨hends, hanch⟩
+  ipureintro; exact ⟨hends, hanch, hanum, hnum⟩
 
 /-- Writing IER with the latch known off (the driver's half at `false`). -/
 theorem ier_write_au (i : UartId) (γ : UartNames) (b : BitVec 8) :
@@ -768,7 +775,7 @@ theorem ier_write_au (i : UartId) (γ : UartNames) (b : BitVec 8) :
     iexists u'
     iframe Hfrag
     iapply uartBody_keep i γ u u' (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
-      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
+      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
     iapply uartBody_intro i γ u
     iframe Hsent Hout Htx Hdlab Hcol Hcl
   imod Hc
@@ -800,7 +807,7 @@ theorem lcr_write_au (i : UartId) (γ : UartNames) (b0 : Bool) (b : BitVec 8) :
   imod (dlabOwn_update γ u b0 (b.getLsbD 7) hdlab) $$ [Hdlab Hown] with Hup
   · iframe
   icases Hup $$ %({ u with lcr := b }) %rfl with ⟨Hdlab, Hown⟩
-  ihave Hcol := uartColE_stable i γ u { u with lcr := b } rfl rfl rfl rfl $$ Hcol
+  ihave Hcol := uartColE_stable i γ u { u with lcr := b } rfl rfl rfl rfl rfl $$ Hcol
   imod Hmask
   ihave Hc := Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hcol Hcl]
   case' _ =>
@@ -843,7 +850,7 @@ theorem dll_write_au (i : UartId) (γ : UartNames) (b : BitVec 8) :
     iexists u'
     iframe Hfrag
     iapply uartBody_keep i γ u u' (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
-      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
+      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
     iapply uartBody_intro i γ u
     iframe Hsent Hout Htx Hdlab Hcol Hcl
   imod Hc
@@ -879,7 +886,7 @@ theorem dlm_write_au (i : UartId) (γ : UartNames) (b : BitVec 8) :
     iexists u'
     iframe Hfrag
     iapply uartBody_keep i γ u u' (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
-      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
+      (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl) (by subst hu'; rfl)
     iapply uartBody_intro i γ u
     iframe Hsent Hout Htx Hdlab Hcol Hcl
   imod Hc
@@ -889,18 +896,25 @@ theorem dlm_write_au (i : UartId) (γ : UartNames) (b : BitVec 8) :
 /-- Writing FCR with the transmit token at a trace the transmitter has
 finished (so the FIFO clear drops nothing accepted) and the receive token:
 a receive clear is a pop of EVERYTHING (Rocq `uart_colE_flush`: the anchor
-becomes the column's top). -/
+becomes the column's top).  ...AND WHAT THE DISCARDED BYTES WERE (Rocq
+relax-d2, lane K1, as `ProofUartinitone` reads it): either the anchor did
+not move, or the new anchor is the column's top, whose era is this one and
+the wire as it stood there is what the transmitter had finished with -- so
+with NOTHING accepted for transmission (`l = []`, uartinit), no console
+output preceded the discarded bytes (`uartFlushed`). -/
 theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Nat)
     (hl : Option (List Obs)) (b : BitVec 8) :
     uartInv i γ ∗ txOwn γ l ∗ outLb γ l ∗ rxTok γ k hl ⊢@{IProp GF}
-      devWriteAU (.uart i) 2 1 b iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl') := by
+      devWriteAU (.uart i) 2 1 b iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)),
+        rxTok γ k' hl' ∗ ⌜(b.getLsbD 1 = false ∧ hl' = hl) ∨
+          (l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl')⌝) := by
   unfold uartInv devInvR devWriteAU
   iintro ⟨#Hinv, Htok, #Hlb, Hrx⟩
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%u, >Hfrag, >HB⟩
   icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
   unfold uartColE uartCol
-  icases Hcol with ⟨%ins, %hs, %k', %hl', %ht, Hin, Hpop, Hts, #Hht, %hok⟩
+  icases Hcol with ⟨%ins, %hs, %k', %hl', %ht, Hin, Hpop, Hts, #Hht, %hte, %hok⟩
   icases txOwn_agree γ u l $$ [Htx Htok] with ⟨%hacc, Htx, Htok⟩
   · iframe
   icases outLb_prefix γ u l $$ [Hout Hlb] with ⟨%hpre, Hout⟩
@@ -926,6 +940,7 @@ theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Na
   have hdl' : Uart.dlab u' = Uart.dlab u := by rw [← hu']; rfl
   have hlb' : Uart.loopback u' = Uart.loopback u := by rw [← hu']; rfl
   have hw' : u'.wire = u.wire := by rw [← hu']
+  have hrc' : u'.recvd = u.recvd := by rw [← hu']
   by_cases hclr : fcrClrRx u b = true
   · -- the receive FIFO is flushed: everything is popped
     have hrx' : u'.rx = [] := by rw [← hu']; simp [hclr]
@@ -944,12 +959,24 @@ theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Na
       iframe Hin Hpop Hht
       isplitr
       · exact BigSepL.bigSepL_nil_intro
-      ipureintro; exact uartColOk_flush i u u' ins hs k hl ht hok hrx' hlb' hw' hout'
+      ipureintro; exact ⟨hte, uartColOk_flush i u u' ins hs k hl ht hok hrx' hlb' hw' hout' hrc'⟩
     imod Hc
     imodintro
     iframe Htok
     iexists ins.length, ht
-    iexact Hrx
+    iframe Hrx
+    ipureintro
+    -- WHAT THE CLEAR DISCARDED: the top's era, and the wire as it stood there
+    -- is a prefix of what the transmitter has finished with -- nothing, when
+    -- nothing was accepted
+    refine Or.inr fun hl0 => uartFlushed_intro _ i ht hte ?_
+    have hout0 : u.out = [] := by
+      subst hl0
+      unfold Uart.acc at hacc
+      exact (List.append_eq_nil_iff.mp hacc).1
+    have htw := hok.2.2.2.2.2.2.2.2.2.2.2.2.2.2
+    rw [hout0] at htw
+    exact List.prefix_nil.mp htw
   · have hrx' : u'.rx = u.rx := by rw [← hu']; simp [hclr]
     imod Hmask
     ihave Hc := Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hin Hpop Hts Hht Hcl]
@@ -962,12 +989,16 @@ theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Na
       unfold uartColE uartCol
       iexists ins, hs, k, hl, ht
       iframe Hin Hpop Hts Hht
-      ipureintro; exact uartColOk_stable i u u' ins hs k hl ht hok hrx' hlb' hw' hout'
+      ipureintro; exact ⟨hte, uartColOk_stable i u u' ins hs k hl ht hok hrx' hlb' hw' hout' hrc'⟩
     imod Hc
     imodintro
     iframe Htok
     iexists k, hl
-    iexact Hrx
+    iframe Hrx
+    ipureintro
+    refine Or.inl ⟨?_, rfl⟩
+    unfold fcrClrRx at hclr
+    cases hb1 : b.getLsbD 1 <;> simp_all
 
 end
 
@@ -984,53 +1015,40 @@ at the console port (`win_at iu (S gen_id)`, `riscv_win_res`).  After
 Rocq's redesign R2 nothing reads it -- consoleintr's contract takes the
 arm's half instead and the payload's token "rides through untouched"
 (`ProofUartintr.v`) -- so it is not ported (nor is the power-on turn `Tn`
-that travels with it), and the writer loses the port argument it existed
-for. -/
+that travels with it).  The writer keeps Rocq's port argument for the log
+mark's clause (`UartGhosts.uartLogAt`, relax-d2 lane K1): at the console
+port the log's mark IS the popper's anchor (or nothing is logged yet and
+everything popped went to uartinit's flush). -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- The popper's resource at count `k` and anchor `hl` (Rocq `uart_rx_writer`). -/
-def uartRxWriter (γ : UartNames) (k : Nat) (hl : Option (List Obs)) : IProp GF := iprop%
+def uartRxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) : IProp GF := iprop%
   rxTok γ k hl ∗
   (∃ hh : Option (List Obs), rxHi γ (1 : Qp).half hh ∗ ⌜ohistLe hh hl⌝) ∗
-  (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗ ⌜ohistLe hg hl⌝) ∗
+  (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗
+    ⌜uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg hl⌝) ∗
   uartArm γ (1 : Qp).half none
 
 /-- What a pending, unclaimed UART source hands its handler (Rocq
 `plic_payload_uart`). -/
-def plicPayloadUart (γ : UartNames) : IProp GF := iprop%
-  ∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter γ k hl
+def plicPayloadUart (i : UartId) (γ : UartNames) : IProp GF := iprop%
+  ∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter i γ k hl
 
-instance uartRxWriter_timeless (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
-    Timeless (uartRxWriter (GF := GF) γ k hl) := by
+instance uartRxWriter_timeless (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
+    Timeless (uartRxWriter (GF := GF) i γ k hl) := by
   unfold uartRxWriter; infer_instance
 
-instance plicPayloadUart_timeless (γ : UartNames) : Timeless (plicPayloadUart (GF := GF) γ) := by
+instance plicPayloadUart_timeless (i : UartId) (γ : UartNames) :
+    Timeless (plicPayloadUart (GF := GF) i γ) := by
   unfold plicPayloadUart; infer_instance
 
-theorem plicPayloadUart_elim (γ : UartNames) :
-    plicPayloadUart (GF := GF) γ ⊢ ∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter γ k hl := .rfl
+theorem plicPayloadUart_elim (i : UartId) (γ : UartNames) :
+    plicPayloadUart (GF := GF) i γ ⊢ ∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter i γ k hl := .rfl
 
-theorem plicPayloadUart_intro (γ : UartNames) :
-    (∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter (GF := GF) γ k hl) ⊢ plicPayloadUart γ := .rfl
-
-/-- The writer across a pop: the token moves forward (its new anchor strictly
-after the old), so the halves' "at or before the anchor" clauses carry
-over. -/
-theorem uartRxWriter_advance (γ : UartNames) (k k' : Nat) (hl : Option (List Obs)) (h : List Obs)
-    (hx : ohistExt hl h) :
-    uartRxWriter (GF := GF) γ k hl ⊢
-      rxTok γ k hl ∗ (rxTok γ k' (some h) -∗ uartRxWriter γ k' (some h)) := by
-  unfold uartRxWriter
-  iintro ⟨Htok, ⟨%hh, Hhi, %hhle⟩, ⟨%hg, Hlg, %hgle⟩, Harm⟩
-  iframe Htok
-  iintro Htok
-  iframe Htok Harm
-  have hle := ohistLe_of_ext hl h hx
-  isplitl [Hhi]
-  · iexists hh; iframe Hhi; ipureintro; exact ohistLe_trans _ _ _ hhle hle
-  · iexists hg; iframe Hlg; ipureintro; exact ohistLe_trans _ _ _ hgle hle
+theorem plicPayloadUart_intro (i : UartId) (γ : UartNames) :
+    (∃ (k : Nat) (hl : Option (List Obs)), uartRxWriter (GF := GF) i γ k hl) ⊢ plicPayloadUart i γ := .rfl
 
 end
 
@@ -1041,8 +1059,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- `lsr_read_rx_au` with the whole PLIC payload in hand. -/
 theorem lsr_read_rx_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
-    uartInv i γ ∗ uartRxWriter γ k hl ⊢@{IProp GF} devReadAU (.uart i) 5 1 (fun b =>
-      iprop(uartRxWriter γ k hl ∗ ∃ (u : UartState) (ins : List (BitVec 8)),
+    uartInv i γ ∗ uartRxWriter i γ k hl ⊢@{IProp GF} devReadAU (.uart i) 5 1 (fun b =>
+      iprop(uartRxWriter i γ k hl ∗ ∃ (u : UartState) (ins : List (BitVec 8)),
         ⌜b = Uart.lsr u ∧ k ≤ ins.length ∧ u.rx = ins.drop k⌝ ∗ rxInLb γ ins)) := by
   unfold uartRxWriter
   iintro ⟨#Hinv, Htok, Hhi, Hlg, Harm⟩
@@ -1052,33 +1070,6 @@ theorem lsr_read_rx_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (L
   inext
   iintro %w ⟨Htok, Hrest⟩
   iframe Htok Hhi Hlg Harm Hrest
-
-/-- `rhr_read_au` with the whole PLIC payload in hand: the payload comes
-back at the popped byte's history (`uartRxWriter_advance`). -/
-theorem rhr_read_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs))
-    (ins : List (BitVec 8)) (hk : k < ins.length) :
-    uartInv i γ ∗ uartRxWriter γ k hl ∗ rxInLb γ ins ∗ dlabOff γ ⊢@{IProp GF}
-      devReadAU (.uart i) 0 1 (fun b => iprop(⌜ins[k]? = some b⌝ ∗
-        ∃ h : List Obs, ⌜obsEndsIn i h b ∧ ohistExt hl h⌝ ∗ rxRider i γ h ∗
-          uartRxWriter γ (k + 1) (some h))) := by
-  iintro ⟨#Hinv, Hw, #Hlb, #Hoff⟩
-  unfold uartRxWriter
-  icases Hw with ⟨Htok, ⟨%hh, Hhi, %hhle⟩, ⟨%hg, Hlg, %hgle⟩, Harm⟩
-  ihave HAU := rhr_read_au i γ k hl ins hk $$ [Hinv Htok Hlb Hoff]
-  · iframe Htok Hinv Hlb Hoff
-  iapply devReadAU_wand $$ HAU
-  inext
-  iintro %w ⟨%hget, %h, %⟨hends, hanch⟩, #Hr, Htok⟩
-  isplitr
-  · ipureintro; exact hget
-  iexists h
-  iframe Hr Htok Harm
-  have hle := ohistLe_of_ext hl h hanch
-  isplitr
-  · ipureintro; exact ⟨hends, hanch⟩
-  isplitl [Hhi]
-  · iexists hh; iframe Hhi; ipureintro; exact ohistLe_trans _ _ _ hhle hle
-  · iexists hg; iframe Hlg; ipureintro; exact ohistLe_trans _ _ _ hgle hle
 
 end
 

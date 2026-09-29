@@ -51,8 +51,8 @@ the receive token of whichever UART port it names. -/
 def plicClaimRetOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (γ0 γ1 : UartNames) (v : BitVec 64) : IProp GF := iprop(
   ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
-  (⌜v = 10#64⌝ -∗ plicPayloadUart γ0) ∗
-  (⌜v = 12#64⌝ -∗ plicPayloadUart γ1))
+  (⌜v = 10#64⌝ -∗ plicPayloadUart .uart0 γ0) ∗
+  (⌜v = 12#64⌝ -∗ plicPayloadUart .uart1 γ1))
 
 /-- **WP of `plic_claim`.** -/
 def wp_plic_claim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]

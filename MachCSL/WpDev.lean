@@ -157,9 +157,10 @@ is what lets the disk's DRAIN run the client's write permit
 not the disk frames both (`wpDev_lift_obs`).  A device step may be observed
 (the UARTs' tx/rx arms), so this rule hands its callback the state
 interpretation's half of the HISTORY ghost (`obsAuth h`) at the history so
-far -- with the three facts about it the callback can use: the power is on
+far -- with the four facts about it the callback can use: the power is on
 (`traceShape h true`), the WIRE TIE (the outputs of the open cycle are
-exactly each port's `wire`), and the ERA STAMP (`obsBoots h = genId + 1`:
+exactly each port's `wire`), the INPUT TIE (its inputs are exactly each
+port's `recvd`; Rocq relax-d2 lane K1), and the ERA STAMP (`obsBoots h = genId + 1`:
 the history belongs to THIS generation's era) -- and takes it back at
 `h ++ obs`.  The client can only get there with the OTHER half, which lives
 in its trace predicate (`obsInv`): that is how every observation is
@@ -167,6 +168,7 @@ authorised by the client (`devObsPermit`). -/
 theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     (∀ σ (h : List Obs),
       ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
+        (∀ i, obsIns i (openSeg h) = σ.devs.recvd i) ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
       machInterp σ ∗ obsAuth h ∗ diskFixedAuth (diskOf σ.devs) ∗
         startAuth (genId (hlc := hlc) (GF := GF) + 1) ={⊤,∅}=∗
@@ -208,10 +210,11 @@ theorem wpDev_lift_obs_disk (d : DevId) (tid : TaskId) (m : DevProg d) :
     unfold obsInterp
     icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
     have hfacts : traceShape h true ∧ (∀ i, obsWire i (openSeg h) = g.m.devs.wire i) ∧
+        (∀ i, obsIns i (openSeg h) = g.m.devs.recvd i) ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1 := by
-      obtain ⟨hsh, hbt, hwire⟩ := hwf
+      obtain ⟨hsh, hbt, hwire, hrecv⟩ := hwf
       rw [hpow] at hsh hbt
-      exact ⟨hsh, hwire hpow, by rw [hbt, hge]; rfl⟩
+      exact ⟨hsh, hwire hpow, hrecv hpow, by rw [hbt, hge]; rfl⟩
     have hsc : startCount g = genId (hlc := hlc) (GF := GF) + 1 := by
       simp [startCount, hpow, hge]
     rw [hsc]
@@ -293,6 +296,7 @@ frames the lent authorities. -/
 theorem wpDev_lift_obs (d : DevId) [hd : DevDiskInert d] (tid : TaskId) (m : DevProg d) :
     (∀ σ (h : List Obs),
       ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
+        (∀ i, obsIns i (openSeg h) = σ.devs.recvd i) ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
       machInterp σ ∗ obsAuth h ={⊤,∅}=∗
       ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
@@ -733,7 +737,8 @@ that never observes; `devObsPermit_triv` for the trivial trace predicate. -/
 def devObsPermit (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF := iprop%
   □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
     ⌜devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
-      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧
+      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
     R s' -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
 
 instance devObsPermit_persistent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) :
@@ -808,7 +813,8 @@ def devStepPermit (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Lis
     (R : DevSt d → IProp GF) : IProp GF := iprop%
   □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
     ⌜rel (ds.st d) s' os ∧ devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
-      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧
+      (∀ i, obsIns i (openSeg h) = ds.recvd i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
     R (ds.st d) -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
 
 instance devStepPermit_persistent (N : Namespace) (d : DevId)

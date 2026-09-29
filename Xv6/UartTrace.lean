@@ -97,7 +97,7 @@ keeps only their count, `un_rxpush`, and the Lean list is its refinement)
 and the popped count with the anchor (`ghost_var` halves -- the popper's
 token), the one-shot that says whether `uartinit` has run (`ghost_var` over
 `Bool`), and the console I/O ghosts of Rocq's redesign R2 (`rxhi`, `loghi`,
-`log`, `deliv`, `logm`, `arm`). -/
+`log`, `deliv`, `logm`, `arm`), and relax-d2's delivered count `dlcnt`. -/
 structure UartNames where
   acc : GName
   out : GName
@@ -129,6 +129,13 @@ structure UartNames where
   /-- ghost-var halves: the consoleintr arm in progress (Rocq `un_arm`,
   redesign R2): the port's claim's, and the PLIC payload's. -/
   arm : GName
+  /-- ghost-var halves over the DELIVERED COUNT, a number the console ring can
+  see (Rocq `un_dlcnt`, relax-d2 lane K2): one half in the console port's
+  claim at `length (chDl H)`, the other in the ring's resource under
+  `ndl ≤ nrd`.  A full-ring drop spends the pair: the ring's `cur + 128`
+  echoed entries are at least 128 beyond the delivered ones.  It moves at
+  ONE site, consoleread's final release (`UartConsAcc.uartInv_consRead`). -/
+  dlcnt : GName
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

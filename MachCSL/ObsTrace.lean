@@ -13,6 +13,8 @@ proves it a STEP INVARIANT of the semantics, with no Iris in it:
                 ∧ obsBoots h = g.gen + (1 if powered)    -- boot count
                 ∧ (g.pow → ∀ i, obsWire i (openSeg h) = g.m.devs.wire i)
                                                          -- WIRE TIE, per port
+                ∧ (g.pow → ∀ i, obsIns i (openSeg h) = g.m.devs.recvd i)
+                                                         -- INPUT TIE, per port
 
 `primStep_obsWf` re-establishes it across every arm of `primStep`, and
 `nsteps_obsWf` lifts that to a whole run (`run_obsWf`).  The Iris side
@@ -115,6 +117,17 @@ theorem obsIns_in (i : UartId) (b : BitVec 8) : obsIns i [.dev (.uartIn i b)] = 
 /-- Rocq `obs_ins_out`. -/
 theorem obsIns_out (i j : UartId) (b : BitVec 8) : obsIns i [.dev (.uartOut j b)] = [] := rfl
 
+/-- A device's events, as observations: their input projection is the
+device-level one. -/
+theorem obsIns_map_dev (i : UartId) (os : List DevObs) :
+    obsIns i (os.map Obs.dev) = devObsIns i os := by
+  induction os with
+  | nil => rfl
+  | cons o os ih =>
+    cases o with
+    | uartIn j b => by_cases h : j = i <;> simp [obsIns, devObsIns, h, ih]
+    | uartOut j b => simp [obsIns, devObsIns, ih]
+
 namespace Uart
 
 /-- The receiver never touches `SOUT`. -/
@@ -180,6 +193,66 @@ theorem writeN_wire (u : UartState) (off n : Nat) (w : BitVec (8 * n)) (u' : Uar
   · exact write_wire u off _ u' h
   · exact absurd h (by simp)
 
+/-! ### The cumulative input `recvd`, one lemma per transition (Rocq
+`DevModel.uart_*_recv`, relax-d2 lane K1): only the accept arm grows it. -/
+
+theorem recv_recvd (u : UartState) (b : BitVec 8) : (recv u b).recvd = u.recvd := rfl
+
+theorem accept_recvd (u : UartState) (b : BitVec 8) : (accept u b).recvd = u.recvd ++ [b] := rfl
+
+theorem txPop_recvd (u : UartState) (b : BitVec 8) (u' : UartState) (h : txPop u = some (b, u')) :
+    u'.recvd = u.recvd := by
+  unfold txPop at h
+  split at h
+  · exact absurd h (by simp)
+  · simp only [Option.some.injEq, Prod.mk.injEq] at h
+    obtain ⟨rfl, rfl⟩ := h
+    cases loopback u <;> rfl
+
+theorem read_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
+    (h : read u off = some (b, u')) : u'.recvd = u.recvd := by
+  have key : ∀ r, read u off = some r → r.2.recvd = u.recvd := by
+    intro r hr
+    rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
+    all_goals simp only [read, Nat.reduceEqDiff, if_true, if_false, reduceIte] at hr
+    · cases hd : dlab u <;> simp only [hd, Bool.false_eq_true, if_true, if_false, reduceIte] at hr
+      · cases hx : u.rx <;> simp only [hx] at hr <;> obtain rfl := Option.some.inj hr <;> rfl
+      · obtain rfl := Option.some.inj hr; rfl
+    all_goals first
+      | (obtain rfl := Option.some.inj hr; rfl)
+      | (obtain rfl := Option.some.inj hr; dsimp only; split <;> rfl)
+      | nomatch hr
+      | (simp at hr)
+  exact key (b, u') h
+
+theorem write_recvd (u : UartState) (off : Nat) (b : BitVec 8) (u' : UartState)
+    (h : write u off b = some u') : u'.recvd = u.recvd := by
+  rcases off with _ | _ | _ | _ | _ | _ | _ | _ | n
+  all_goals simp only [write, Nat.reduceEqDiff, if_true, if_false, reduceIte] at h
+  all_goals first
+    | (obtain rfl := Option.some.inj h; rfl)
+    | (split at h <;> (obtain rfl := Option.some.inj h; rfl))
+    | (split at h <;> (try split at h) <;> (obtain rfl := Option.some.inj h; rfl))
+    | nomatch h
+    | (simp at h)
+
+theorem readN_recvd (u : UartState) (off n : Nat) (w : BitVec (8 * n)) (u' : UartState)
+    (h : readN u off n = some (w, u')) : u'.recvd = u.recvd := by
+  unfold readN at h
+  split at h
+  · obtain ⟨⟨b, u''⟩, hr, he⟩ := Option.map_eq_some_iff.mp h
+    simp only [Prod.mk.injEq] at he
+    obtain ⟨_, rfl⟩ := he
+    exact read_recvd u off b u'' hr
+  · exact absurd h (by simp)
+
+theorem writeN_recvd (u : UartState) (off n : Nat) (w : BitVec (8 * n)) (u' : UartState)
+    (h : writeN u off n w = some u') : u'.recvd = u.recvd := by
+  unfold writeN at h
+  split at h
+  · exact write_recvd u off _ u' h
+  · exact absurd h (by simp)
+
 /-- THE BOARD'S DRAIN IS FAITHFUL: the transmit arm's events are exactly the
 wire's growth (the Rocq `uart_step_wire`, tx arm). -/
 theorem txArm_ok (i : UartId) (u u' : UartState) (os : List DevObs) (h : txArm i u = some (u', os)) :
@@ -188,16 +261,19 @@ theorem txArm_ok (i : UartId) (u u' : UartState) (os : List DevObs) (h : txArm i
   split at h
   · simp only [Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp, by simp [devObsOut]⟩
+    exact ⟨by simp, by simp [devObsOut], by simp [devObsIns]⟩
   · rename_i b u'' hp
     simp only [Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨hu, hos⟩ := h
     subst hos hu
     have hw := txPop_wire u b u'' hp
-    refine ⟨?_, ?_⟩
+    have hr := txPop_recvd u b u'' hp
+    refine ⟨?_, ?_, ?_⟩
     · cases hl : loopback u <;> simp [hl, DevObs.port]
     · show u''.wire = u.wire ++ devObsOut i (if loopback u = true then [] else [.uartOut i b])
       cases hl : loopback u <;> simp_all [devObsOut]
+    · show u''.recvd = u.recvd ++ devObsIns i (if loopback u = true then [] else [.uartOut i b])
+      cases hl : loopback u <;> simp_all [devObsIns]
 
 /-- ...and so is the receive arm: an accepted byte is an observation and
 touches no wire (the Rocq `uart_step_wire`, rx arm, and `uart_rx_push_wire`). -/
@@ -207,10 +283,10 @@ theorem rxArm_ok (i : UartId) (b : BitVec 8) (u u' : UartState) (os : List DevOb
   split at h
   · simp only [Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp [DevObs.port], by simp [devObsOut, recv]⟩
+    exact ⟨by simp [DevObs.port], by simp [devObsOut, accept, recv], by simp [devObsIns, accept]⟩
   · simp only [Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨by simp, by simp [devObsOut]⟩
+    exact ⟨by simp, by simp [devObsOut], by simp [devObsIns]⟩
 
 end Uart
 
@@ -233,7 +309,7 @@ theorem devObsOk_wire (ds : DevStates) (d : DevId) (s' : DevSt d) (os : List Dev
     (hok : devObsOk d (ds.st d) s' os) (j : UartId) :
     (ds.set d s').wire j = ds.wire j ++ devObsOut j os := by
   match d, s', hok with
-  | .uart i, s', ⟨hport, hw⟩ =>
+  | .uart i, s', ⟨hport, hw, _⟩ =>
     by_cases hji : j = i
     · subst hji
       rw [DevStates.wire_set_uart, hw]
@@ -279,6 +355,72 @@ theorem devWrite_wire (ds : DevStates) (pa : PAddr) (n : Nat) (w : BitVec (8 * n
       rw [DevStates.wire_set_uart]
       exact Uart.writeN_wire _ off n w s' hr
     · exact DevStates.wire_set_other ds d s' j hd
+  · exact absurd h (by simp)
+
+/-! ### ...and the same for the cumulative input (Rocq `set_duart_recv`,
+`dev_read_u_recv`, `dev_write_u_recv`, `uart_step_recv`; relax-d2 lane K1) -/
+
+theorem DevStates.recvd_set_uart (ds : DevStates) (i : UartId) (s : DevSt (.uart i)) :
+    (ds.set (.uart i) s).recvd i = UartState.recvd s := by
+  simp [DevStates.recvd]
+
+theorem DevStates.recvd_set_other (ds : DevStates) (d : DevId) (s : DevSt d) (j : UartId)
+    (h : DevId.uart j ≠ d) : (ds.set d s).recvd j = ds.recvd j := by
+  simp only [DevStates.recvd]
+  rw [DevStates.set_other ds d (.uart j) s h]
+
+theorem DevStates.recvd_reset (ds : DevStates) (j : UartId) : ds.reset.recvd j = [] := rfl
+
+/-- A faithful move of device `d` grows every port's cumulative input by
+exactly that port's input events. -/
+theorem devObsOk_recvd (ds : DevStates) (d : DevId) (s' : DevSt d) (os : List DevObs)
+    (hok : devObsOk d (ds.st d) s' os) (j : UartId) :
+    (ds.set d s').recvd j = ds.recvd j ++ devObsIns j os := by
+  match d, s', hok with
+  | .uart i, s', ⟨hport, _, hr⟩ =>
+    by_cases hji : j = i
+    · subst hji
+      rw [DevStates.recvd_set_uart, hr]
+      rfl
+    · rw [DevStates.recvd_set_other ds _ s' j (by simpa using hji), devObsIns_other i j os hport hji]
+      simp
+  | .plic, s', hok =>
+    have hok' : os = [] := hok
+    subst hok'
+    rw [DevStates.recvd_set_other ds _ s' j (by simp)]
+    simp [devObsIns]
+  | .virtio, s', hok =>
+    have hok' : os = [] := hok
+    subst hok'
+    rw [DevStates.recvd_set_other ds _ s' j (by simp)]
+    simp [devObsIns]
+
+theorem devRead_recvd (ds : DevStates) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ds' : DevStates)
+    (h : devRead ds pa n = some (w, ds')) (j : UartId) : ds'.recvd j = ds.recvd j := by
+  unfold devRead at h
+  split at h
+  · rename_i d off _
+    obtain ⟨⟨w', s'⟩, hr, he⟩ := Option.map_eq_some_iff.mp h
+    simp only [Prod.mk.injEq] at he
+    obtain ⟨_, rfl⟩ := he
+    by_cases hd : DevId.uart j = d
+    · subst hd
+      rw [DevStates.recvd_set_uart]
+      exact Uart.readN_recvd _ off n w' s' hr
+    · exact DevStates.recvd_set_other ds d s' j hd
+  · exact absurd h (by simp)
+
+theorem devWrite_recvd (ds : DevStates) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ds' : DevStates)
+    (h : devWrite ds pa n w = some ds') (j : UartId) : ds'.recvd j = ds.recvd j := by
+  unfold devWrite at h
+  split at h
+  · rename_i d off _
+    obtain ⟨s', hr, rfl⟩ := Option.map_eq_some_iff.mp h
+    by_cases hd : DevId.uart j = d
+    · subst hd
+      rw [DevStates.recvd_set_uart]
+      exact Uart.writeN_recvd _ off n w s' hr
+    · exact DevStates.recvd_set_other ds d s' j hd
   · exact absurd h (by simp)
 
 /-- A device step's events are console I/O and nothing else. -/
@@ -328,6 +470,41 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
       · obtain ⟨_, rfl⟩ := hb; rfl
       · exact hb.elim
 
+/-- ...and never makes a byte arrive (Rocq `mnode_step_u_recv`). -/
+theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV64D.Register
+      LeanRV64D.RegisterType) (σ : MState) (v : o.ret) (σ' : MState) (h : evStep cpu o σ v σ')
+    (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
+  cases o
+  case memRead n _ req =>
+    rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
+    · exact devRead_recvd _ _ _ _ _ hr j
+    all_goals rfl
+  case memWrite n _ req =>
+    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+    · exact devWrite_recvd _ _ _ _ _ hw j
+    · rfl
+  case readRam => exact h.elim
+  case writeRam => exact h.elim
+  case regRead => obtain ⟨_, rfl⟩ := h; rfl
+  case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
+  all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
+
+theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
+    (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
+  unfold hartStep at h
+  split at h
+  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · exact h.elim
+  · rename_i o k
+    rcases h with ⟨v, _, hs⟩ | ⟨hb, _⟩
+    · exact evStep_recvd cpu o σ v σ' hs j
+    · unfold blockedStep at hb
+      split at hb
+      · obtain ⟨_, _, rfl⟩ := hb; rfl
+      · obtain ⟨_, rfl⟩ := hb; rfl
+      · exact hb.elim
+
 /-- THE OBSERVATIONS ARE FAITHFUL: a device step's events are device events,
 and they grow every port's wire by exactly that port's output events -- a
 byte cannot appear on a wire the device that emitted it is not attached to
@@ -336,37 +513,46 @@ device program: the language's `devObsOk` side condition does the work). -/
 theorem devStep_obs (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
     (obs : List Obs) (m' : DevProg d) (σ' : MState) (efs : List Expr)
     (h : devStep gen d tid m σ obs m' σ' efs) :
-    ∃ os : List DevObs, obs = os.map Obs.dev ∧ ∀ j, σ'.devs.wire j = σ.devs.wire j ++ devObsOut j os := by
+    ∃ os : List DevObs, obs = os.map Obs.dev ∧
+      (∀ j, σ'.devs.wire j = σ.devs.wire j ++ devObsOut j os) ∧
+      (∀ j, σ'.devs.recvd j = σ.devs.recvd j ++ devObsIns j os) := by
   cases m with
   | pure _ =>
     obtain ⟨rfl, _, h⟩ := h
-    refine ⟨[], rfl, fun j => ?_⟩
-    rcases h with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩
-    · simp [devObsOut]
-    · split <;> simp [devObsOut]
+    refine ⟨[], rfl, fun j => ?_, fun j => ?_⟩
+    · rcases h with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩
+      · simp [devObsOut]
+      · split <;> simp [devObsOut]
+    · rcases h with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩
+      · simp [devObsIns]
+      · split <;> simp [devObsIns]
   | op o k =>
     rcases h with ⟨v, _, hop⟩ | ⟨_, _, rfl, rfl, _⟩
     · cases o with
       | step g =>
         obtain ⟨s', os, _, hok, rfl, rfl, _⟩ := hop
-        exact ⟨os, rfl, devObsOk_wire σ.devs d s' os hok⟩
-      | get => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
-      | choose => obtain ⟨rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
-      | dmaRead pa n => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
+        exact ⟨os, rfl, devObsOk_wire σ.devs d s' os hok, devObsOk_recvd σ.devs d s' os hok⟩
+      | get => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
+      | choose => obtain ⟨rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
+      | dmaRead pa n => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
       | dmaWrite g pa n w =>
         obtain ⟨rfl, _, hcase⟩ := hop
-        refine ⟨[], rfl, fun j => ?_⟩
-        rcases hcase with ⟨s', _, hok, _, _, rfl⟩ | ⟨_, rfl⟩
-        · exact devObsOk_wire σ.devs d s' [] hok j
-        · simp [devObsOut]
-      | sample src => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
+        refine ⟨[], rfl, fun j => ?_, fun j => ?_⟩
+        · rcases hcase with ⟨s', _, hok, _, _, rfl⟩ | ⟨_, rfl⟩
+          · exact devObsOk_wire σ.devs d s' [] hok j
+          · simp [devObsOut]
+        · rcases hcase with ⟨s', _, hok, _, _, rfl⟩ | ⟨_, rfl⟩
+          · exact devObsOk_recvd σ.devs d s' [] hok j
+          · simp [devObsIns]
+      | sample src => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
       | setPin c mm b =>
         obtain ⟨rfl, _, rfl⟩ := hop
-        refine ⟨[], rfl, fun j => ?_⟩
-        split <;> simp [devObsOut]
-      | fork t => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
-      | join tid => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
-    · exact ⟨[], rfl, fun j => by simp [devObsOut]⟩
+        refine ⟨[], rfl, fun j => ?_, fun j => ?_⟩
+        · split <;> simp [devObsOut]
+        · split <;> simp [devObsIns]
+      | fork t => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
+      | join tid => obtain ⟨_, rfl, rfl, _⟩ := hop; exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
+    · exact ⟨[], rfl, fun j => by simp [devObsOut], fun j => by simp [devObsIns]⟩
 
 /-! ## 2. The shape of a history
 
@@ -617,42 +803,65 @@ theorem openSeg_prefix_of_boots (h1 h2 : List Obs) (hp : h1 <+: h2)
     rw [openSeg_io h1 k hF]
     exact List.prefix_append _ _
 
+/-- THE INPUT NUMBER OF A HISTORY (Rocq `ins_len`, relax-d2 lane K1), with
+`none` read as "before the first": how many bytes port `i` had accepted in
+the open cycle by the time the history was `g`. -/
+def insLen (i : UartId) : Option (List Obs) → Nat
+  | some g => (obsIns i (openSeg g)).length
+  | none => 0
+
+/-- What an INPUT event does to the input projection (Rocq
+`WpUart.obs_ins_open_seg_in`): the open cycle's accepted list grows by
+exactly its byte. -/
+theorem obsIns_openSeg_in (i : UartId) (h : List Obs) (b : BitVec 8) :
+    obsIns i (openSeg (h ++ [Obs.dev (.uartIn i b)])) = obsIns i (openSeg h) ++ [b] := by
+  rw [openSeg_io h _ (by simp [isIo]), obsIns_app, obsIns_in]
+
 /-! ## 3. THE STEP INVARIANT -/
 
 def obsWf (h : List Obs) (g : GState) : Prop :=
   traceShape h g.pow ∧
   obsBoots h = g.gen + (if g.pow then 1 else 0) ∧
-  (g.pow = true → ∀ i, obsWire i (openSeg h) = g.m.devs.wire i)
+  (g.pow = true → ∀ i, obsWire i (openSeg h) = g.m.devs.wire i) ∧
+  -- THE INPUT TIE, the wire tie's dual (Rocq relax-d2, lane K1): the era's
+  -- `uartIn` events at port `i`, in order, ARE what port `i`'s receiver
+  -- accepted.  It is what lets a client that owns the UART's state count the
+  -- host's keystrokes -- the receive FIFO is consumed, so the count exists
+  -- nowhere else.
+  (g.pow = true → ∀ i, obsIns i (openSeg h) = g.m.devs.recvd i)
 
 /-- The powered-off, never-booted machine every top-level theorem starts at. -/
 theorem obsWf_init (g : GState) (hpw : g.pow = false) (hgen : g.gen = 0) : obsWf [] g := by
-  refine ⟨?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
   · rw [hpw]; exact traceShape_nil
   · simp [obsBoots, hpw, hgen]
+  · intro h; rw [hpw] at h; simp at h
   · intro h; rw [hpw] at h; simp at h
 
 theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' : GState)
     (efs : List Expr) (hstep : PrimStep.primStep (e, g) κ (e', g', efs)) (h : List Obs)
     (hwf : obsWf h g) : obsWf (h ++ κ) g' := by
-  obtain ⟨hsh, hbt, hwire⟩ := hwf
+  obtain ⟨hsh, hbt, hwire, hrecv⟩ := hwf
   cases e with
   | hart gen cpu m =>
     obtain ⟨rfl, rfl, hc⟩ := primStep_hart_inv hstep
     rw [List.append_nil]
     rcases hc with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl⟩
-    · -- a hart node: silent, and it never moves a wire
-      refine ⟨hsh, hbt, fun hpw i => ?_⟩
-      rw [hwire hpw i]
-      exact (hartStep_wire cpu m m' g.m σ' hs i).symm
-    · exact ⟨hsh, hbt, hwire⟩
+    · -- a hart node: silent, and it never moves a wire or a receiver
+      refine ⟨hsh, hbt, fun hpw i => ?_, fun hpw i => ?_⟩
+      · rw [hwire hpw i]
+        exact (hartStep_wire cpu m m' g.m σ' hs i).symm
+      · rw [hrecv hpw i]
+        exact (hartStep_recvd cpu m m' g.m σ' hs i).symm
+    · exact ⟨hsh, hbt, hwire, hrecv⟩
   | dev gen d tid m =>
     rcases primStep_dev_inv hstep with ⟨⟨hpw, _⟩, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl, rfl⟩
     · -- a device: its events extend the open cycle, and by exactly what
       -- reached the wires
-      obtain ⟨os, rfl, hw⟩ := devStep_obs gen d tid m g.m κ m' σ' efs hs
+      obtain ⟨os, rfl, hw, hr⟩ := devStep_obs gen d tid m g.m κ m' σ' efs hs
       have hio := isIo_map_dev os
       rw [hpw] at hsh hbt
-      refine ⟨?_, ?_, fun _ i => ?_⟩
+      refine ⟨?_, ?_, fun _ i => ?_, fun _ i => ?_⟩
       · show traceShape _ g.pow
         rw [hpw]; exact traceShape_io h _ hsh hio
       · show _ = g.gen + (if g.pow then 1 else 0)
@@ -660,22 +869,26 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
         simpa using hbt
       · show _ = σ'.devs.wire i
         rw [openSeg_io h _ hio, obsWire_app, hwire hpw i, hw i, obsWire_map_dev]
-    · rw [List.append_nil]; exact ⟨hsh, hbt, hwire⟩
+      · show _ = σ'.devs.recvd i
+        rw [openSeg_io h _ hio, obsIns_app, hrecv hpw i, hr i, obsIns_map_dev]
+    · rw [List.append_nil]; exact ⟨hsh, hbt, hwire, hrecv⟩
   | power =>
     obtain ⟨rfl, hc⟩ := primStep_power_inv hstep
     rcases hc with ⟨hpw, rfl, rfl, rfl⟩ | ⟨hpw, rfl, rfl, hb⟩
     · -- PowerOff
       rw [hpw] at hsh hbt
-      refine ⟨traceShape_snoc h _ true false hsh rfl, ?_, fun h' => by simp at h'⟩
+      refine ⟨traceShape_snoc h _ true false hsh rfl, ?_, fun h' => by simp at h',
+        fun h' => by simp at h'⟩
       show obsBoots (h ++ [Obs.powerOff]) = g.gen + 1 + 0
       rw [obsBoots_app]; simpa [obsBoots] using hbt
     · -- PowerOn: the next cycle opens empty, over reset UARTs
       obtain ⟨hgen, hpw', _, hdevs⟩ := hb
       rw [hpw] at hsh hbt
-      refine ⟨?_, ?_, fun _ i => ?_⟩
+      refine ⟨?_, ?_, fun _ i => ?_, fun _ i => ?_⟩
       · rw [hpw']; exact traceShape_snoc h _ false true hsh rfl
       · rw [hpw', hgen, obsBoots_app]; simpa [obsBoots] using hbt
       · rw [openSeg_power h _ rfl, hdevs, DevStates.wire_reset]; rfl
+      · rw [openSeg_power h _ rfl, hdevs, DevStates.recvd_reset]; rfl
 
 /-! ## 4. THE WHOLE RUN, with no Iris: a machine that starts powered off
 emits a well-formed history, whatever the schedule.  What the adequacy

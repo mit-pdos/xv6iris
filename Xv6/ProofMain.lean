@@ -504,7 +504,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   unfold mainUartRaw
   icases Hur0 with ⟨⟨%vl0, %vn0, %vc0, Hpre0⟩, #Hs0, Hh0, Hg0, Ha0⟩
   icases Hur1 with ⟨⟨%vl1, %vn1, %vc1, Hpre1⟩, #Hs1, Hh1, Hg1, Ha1⟩
-  iapply (mn_console CN startedPrimary (k.pushed 2) R1 (by simp [hsie]) (by simp; omega) γ0 γ1 [] []
+  iapply (mn_console CN startedPrimary (k.pushed 2) R1 (by simp [hsie]) (by simp; omega) γ0 γ1 [] [] rfl
     vl0 vl1 vn0 vc0 vn1 vc1 vcl vcn vcc dr dw)
   iframe Hk Hpc Hplic Hc0 Hc16 Hcw Hcn Hcc Hpre0 Hpre1 Hdr Hdw Hdrest Hh0 Hg0 Ha0 Hh1 Hg1 Ha1
   iintro %R2 Hk Hpc Hout

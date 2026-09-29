@@ -194,9 +194,9 @@ theorem dv_call_uartintr (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k' : KCt
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (hid : k'.regs 10#5 = BitVec.ofNat 64 i.idx) :
     kctx cpu k' ∗ pcIs cpu KA.«uartintr» ∗ procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗
-    uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ ∗
+    uartRxWriter i γ kp hl ∗ uartRxCaps i γc γl γ ∗
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
+      ⌜calleeSaved k'.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := UI.wp_uartintr (hlc := hlc) (GF := GF) Γ cpu k' i γc γl γ kp hl hsie hnoff hK hlk htier hid
   unfold wp_uartintr_body at h
@@ -262,7 +262,7 @@ theorem dv_frame_close (sp ra s0 w1 : BitVec 64) :
 /-! ## The claim's answer, rebuilt for `plic_complete` -/
 
 theorem dv_retOk_10 (γ0 γ1 : UartNames) :
-    (plicPayloadUart (GF := GF) γ0) ⊢ plicClaimRetOk γ0 γ1 10#64 := by
+    (plicPayloadUart (GF := GF) .uart0 γ0) ⊢ plicClaimRetOk γ0 γ1 10#64 := by
   unfold plicClaimRetOk
   iintro H
   isplit
@@ -272,7 +272,7 @@ theorem dv_retOk_10 (γ0 γ1 : UartNames) :
   · iintro %h; exact absurd h (by decide)
 
 theorem dv_retOk_12 (γ0 γ1 : UartNames) :
-    (plicPayloadUart (GF := GF) γ1) ⊢ plicClaimRetOk γ0 γ1 12#64 := by
+    (plicPayloadUart (GF := GF) .uart1 γ1) ⊢ plicClaimRetOk γ0 γ1 12#64 := by
   unfold plicClaimRetOk
   iintro H
   isplit
@@ -430,7 +430,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (h9 : R 9#5 = 10#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x4e#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter .uart0 γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -468,7 +468,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     simp only [KCtx.withRegs_regs, KCtx.pushed_regs, RegMap.set_apply, BitVec.reduceEq,
       ite_false, ite_true] at h
     rw [h]; exact h9
-  ihave Htok' := plicPayloadUart_intro γ0 $$ Htok'
+  ihave Htok' := plicPayloadUart_intro .uart0 γ0 $$ Htok'
   ihave HrOk := dv_retOk_10 γ0 γ1 $$ Htok'
   iapply (dv_join PM cpu k sc γ0 γ1 hsie hK R2 hpres2 10#64 h92 (dv_ret_of_ext sc hext))
   iframe
@@ -483,7 +483,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (h9 : R 9#5 = 12#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x60#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter .uart1 γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -525,7 +525,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_j cpu _ (KA.«devintr» + 0x66#64) true 2097134#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  ihave Htok' := plicPayloadUart_intro γ1 $$ Htok'
+  ihave Htok' := plicPayloadUart_intro .uart1 γ1 $$ Htok'
   ihave HrOk := dv_retOk_12 γ0 γ1 $$ Htok'
   iapply (dv_join PM cpu k sc γ0 γ1 hsie hK R2 hpres2 12#64 h92 (dv_ret_of_ext sc hext))
   iframe
@@ -590,7 +590,7 @@ theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     (γ0 γ1 : UartNames) (v : BitVec 64) :
     plicClaimRetOk (GF := GF) γ0 γ1 v ⊢
       ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
-      (⌜v = 10#64⌝ -∗ plicPayloadUart γ0) ∗ (⌜v = 12#64⌝ -∗ plicPayloadUart γ1) := by
+      (⌜v = 10#64⌝ -∗ plicPayloadUart .uart0 γ0) ∗ (⌜v = 12#64⌝ -∗ plicPayloadUart .uart1 γ1) := by
   unfold plicClaimRetOk; iintro H; iexact H
 
 section
@@ -610,7 +610,7 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (hv : R 10#5 = 10#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter .uart0 γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -646,7 +646,7 @@ theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (hv : R 10#5 = 12#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter .uart1 γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -871,13 +871,13 @@ theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRT
     iframe #
   · -- 10: UART0, with the token the claim carried out of the slot
     ihave Htok := H10 $$ %hv
-    icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
+    icases plicPayloadUart_elim _ _ $$ Htok with ⟨%kp, %hl, Htok⟩
     iapply (dv_disp_10 PM UI Γ cpu k sc γ0 γ1 γc γl0 kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #
   · -- 12: UART1
     ihave Htok := H12 $$ %hv
-    icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
+    icases plicPayloadUart_elim _ _ $$ Htok with ⟨%kp, %hl, Htok⟩
     iapply (dv_disp_12 PM UI Γ cpu k sc γ0 γ1 γc γl1 kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #

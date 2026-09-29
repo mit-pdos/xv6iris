@@ -53,6 +53,16 @@ structure UartState where
   rbr : BitVec 8
   /-- the transmit interrupt latch -/
   thri : Bool
+  /-- THE RECEIVER'S CUMULATIVE INPUT (Rocq `u_recv`, relax-d2 lane K1): every
+  byte this port's receiver has ACCEPTED FROM OUTSIDE since reset, in arrival
+  order -- the input side's `wire`.  The receive FIFO is consumed, so without
+  it nothing in the state remembers what came in, and `MachCSL.obsWf`'s INPUT
+  TIE (`obsIns i (openSeg h) = recvd`) would have nothing to tie the `uartIn`
+  trace to.  It grows in `rxArm`'s accept arm (`accept`) and NOWHERE else: a
+  byte the transmitter loops back (`txPop` under LOOP, through `recv`) did not
+  come from outside and emits no observation.  (Named `recvd` because `recv`
+  is the receive FIFO's own step below.) -/
+  recvd : List (BitVec 8)
   deriving DecidableEq, Repr, Inhabited
 
 namespace Uart
@@ -158,6 +168,11 @@ register always takes it). -/
 def recv (u : UartState) (b : BitVec 8) : UartState :=
   { u with rx := if u.rx.length < fifoDepth then u.rx ++ [b] else u.rx, rbr := b }
 
+/-- A byte FROM OUTSIDE is accepted (Rocq `uart_rx_push`'s accept arm): the
+receive step, and the ONE place the cumulative input `recvd` grows. -/
+def accept (u : UartState) (b : BitVec 8) : UartState :=
+  { recv u b with recvd := u.recvd ++ [b] }
+
 /-- The transmitter drains one byte: onto the wire, or -- under LOOP -- back
 into this port's own receiver.  An emptied transmitter arms the latch. -/
 def txPop (u : UartState) : Option (BitVec 8 × UartState) :=
@@ -177,7 +192,8 @@ def acc (u : UartState) : List (BitVec 8) := u.out ++ u.tx
 divisor at 9600 baud. -/
 def reset : UartState :=
   { rx := [], tx := [], out := [], wire := [], ier := 0#8, lcr := 0#8, fcr := 0#8,
-    dll := 0x0c#8, dlm := 0#8, mcr := 0x08#8, scr := 0#8, rbr := 0#8, thri := false }
+    dll := 0x0c#8, dlm := 0#8, mcr := 0x08#8, scr := 0#8, rbr := 0#8, thri := false,
+    recvd := [] }
 
 /-- The transmit arm of the chip's program: drain one byte if there is one
 (an observation unless looped back), else nothing. -/
@@ -189,7 +205,7 @@ def txArm (i : UartId) (u : UartState) : Option (UartState × List DevObs) :=
 /-- The receive arm: accept `b` from the outside world if the FIFO has room
 (an observation), else refuse it silently (flow control). -/
 def rxArm (i : UartId) (b : BitVec 8) (u : UartState) : Option (UartState × List DevObs) :=
-  if u.rx.length < fifoDepth then some (recv u b, [.uartIn i b]) else some (u, [])
+  if u.rx.length < fifoDepth then some (accept u b, [.uartIn i b]) else some (u, [])
 
 /-- The chip's autonomous behaviour, one iteration. -/
 def body (i : UartId) : DevM UartState Empty Unit := do

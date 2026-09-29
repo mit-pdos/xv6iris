@@ -117,10 +117,13 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- A port's popper resource (Rocq `uart_rx_writer`), out of the token
-`uartinit` handed back and the three halves main holds at `none`. -/
-theorem mn_rxWriter (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
+`uartinit` handed back and the three halves main holds at `none`.  The log
+mark's clause (relax-d2 lane K1, `uartLogAt`): nothing is logged yet, and at
+the console port everything popped went to uartinit's flush. -/
+theorem mn_rxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs))
+    (hat : uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i none hl) :
     rxTok (GF := GF) γ k hl ∗ rxHi γ (1 : Qp).half none ∗ logHi γ (1 : Qp).half none ∗
-      uartArm γ (1 : Qp).half none ⊢ uartRxWriter γ k hl := by
+      uartArm γ (1 : Qp).half none ⊢ uartRxWriter i γ k hl := by
   unfold uartRxWriter
   iintro ⟨Ht, Hh, Hl, Ha⟩
   iframe Ht Ha
@@ -130,7 +133,7 @@ theorem mn_rxWriter (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
     ipureintro; exact ohistLe_none hl
   · iexists none
     iframe Hl
-    ipureintro; exact ohistLe_none hl
+    ipureintro; exact hat
 
 /-- What `consoleinit` hands back, as main's next steps take it. -/
 def mnConsOut [CurCtx] (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) : IProp GF := iprop%
@@ -151,6 +154,7 @@ PLIC invariant (Rocq's two `uart_rx_tok_deposit`s), minting each port's
 `uartInited`. -/
 theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap)
     (hsie : k.sie = false) (hK : 8 ≤ k.avail) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8))
+    (hl0 : l0 = [])
     (vl0 vl1 : BitVec 32) (vn0 vc0 vn1 vc1 : BitVec 64)
     (vcl : BitVec 32) (vcn vcc vr vw : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 0x42#64) ∗ plicInv γ0 γ1 ∗
@@ -189,13 +193,13 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
   iintro %R' Hk Hpc %_ Hnm Hfr Hp0 Hp1 #Htbl
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_46]
   unfold uartinitonePost
-  icases Hp0 with ⟨Htx0, #Hdo0, ⟨%kk0, %hl0, Hrt0⟩, Hn0, Hf0⟩
-  icases Hp1 with ⟨Htx1, #Hdo1, ⟨%kk1, %hl1, Hrt1⟩, Hn1, Hf1⟩
-  ihave Hw0 := mn_rxWriter γ0 kk0 hl0 $$ [$Hrt0 $Hh0 $Hg0 $Ha0]
-  ihave Hw1 := mn_rxWriter γ1 kk1 hl1 $$ [$Hrt1 $Hh1 $Hg1 $Ha1]
+  icases Hp0 with ⟨Htx0, #Hdo0, ⟨%kk0, %hla0, Hrt0, %hfl0⟩, Hn0, Hf0⟩
+  icases Hp1 with ⟨Htx1, #Hdo1, ⟨%kk1, %hla1, Hrt1, -⟩, Hn1, Hf1⟩
+  ihave Hw0 := mn_rxWriter .uart0 γ0 kk0 hla0 (Or.inr ⟨rfl, hfl0 hl0⟩) $$ [$Hrt0 $Hh0 $Hg0 $Ha0]
+  ihave Hw1 := mn_rxWriter .uart1 γ1 kk1 hla1 (ohistLe_none hla1) $$ [$Hrt1 $Hh1 $Hg1 $Ha1]
   iapply wpLoop_fupd
-  imod plicInv_deposit10 γ0 γ1 ⊤ CoPset.subseteq_top kk0 hl0 $$ [$Hplic $Hw0] with #Hin0
-  imod plicInv_deposit12 γ0 γ1 ⊤ CoPset.subseteq_top kk1 hl1 $$ [$Hplic $Hw1] with #Hin1
+  imod plicInv_deposit10 γ0 γ1 ⊤ CoPset.subseteq_top kk0 hla0 $$ [$Hplic $Hw0] with #Hin0
+  imod plicInv_deposit12 γ0 γ1 ⊤ CoPset.subseteq_top kk1 hla1 $$ [$Hplic $Hw1] with #Hin1
   imodintro
   iapply HΦ $$ %R' Hk Hpc
   unfold mnConsOut

@@ -171,9 +171,9 @@ theorem bootSharedDev_uarts (X : CurCtx) :
   · iframe Hc0 Hi0 Hr0
   ihave Hu1 := bootCarveProc_uartRaw (hlc := hlc) (GF := GF) X .uart1 γ1 $$ [Hc1 Hr1]
   · iframe Hc1 Hi1 Hr1
-  icases Hu0 with ⟨Hm0, Hhi0, Hdv0, Hlm0, Hpre0⟩
-  icases Hu1 with ⟨Hm1, -, -, -, Hpre1⟩
-  imod consGhostsAlloc (GF := GF) γ0 (genId (hlc := hlc) (GF := GF) + 1) $$ Hhi0 Hdv0 Hlm0
+  icases Hu0 with ⟨Hm0, Hhi0, Hdv0, Hlm0, Hdc0, Hpre0⟩
+  icases Hu1 with ⟨Hm1, -, -, -, -, Hpre1⟩
+  imod consGhostsAlloc (GF := GF) γ0 (genId (hlc := hlc) (GF := GF) + 1) $$ Hhi0 Hdv0 Hlm0 Hdc0
     with ⟨%cn, %hcn, %hcne, Hg⟩
   imodintro
   iexists γ0, γ1, cn

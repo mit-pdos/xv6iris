@@ -166,6 +166,7 @@ theorem ci_kill_out (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (γc : GNam
 
 theorem ciKillRun_elim (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat) :
     ciKillRun (GF := GF) γ hb cb nrem ⊢ ∃ (hg : Option (List Obs)) (i n : Nat), ⌜ohistExt hg hb⌝ ∗
+      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
       ⌜nrem ≤ n⌝ ∗ logHi γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++
         (List.replicate n consputcBs).flatten), ((List.replicate i consputcBs).flatten).length)) ∗
@@ -174,6 +175,7 @@ theorem ciKillRun_elim (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : 
 
 theorem ciKillRun_intro (γ : UartNames) (hb : List Obs) (cb : BitVec 8) (nrem : Nat) :
     (∃ (hg : Option (List Obs)) (i n : Nat), ⌜ohistExt hg hb⌝ ∗
+      ⌜k1Next hg hb⌝ ∗ ⌜traceShape hb true⌝ ∗ ⌜obsBoots hb = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
       ⌜nrem ≤ n⌝ ∗ logHi γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half (some ((hb, cb, (List.replicate i consputcBs).flatten ++
         (List.replicate n consputcBs).flatten), ((List.replicate i consputcBs).flatten).length)) ∗
@@ -279,7 +281,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (c : CPU) (k : KCtx) (a b : 
     ihave Hgh := ciGh_pop cn hb cb r w e bs ts hne $$ Hgh
     rw [← consDec_eq]
     -- one triple off the run
-    icases ciKillRun_elim γ hb cb _ $$ Hrun with ⟨%hg, %i, %n, %hx, %hle, Hlgh, Harm, Hrun⟩
+    icases ciKillRun_elim γ hb cb _ $$ Hrun with ⟨%hg, %i, %n, %hx, %hk1, %hsh, %hbh, %hle, Hlgh, Harm, Hrun⟩
     have hge : 1 ≤ (e - w).toNat := consSub_ne e w hne
     obtain ⟨n', rfl⟩ : ∃ n', n = n' + 1 := ⟨n - 1, by omega⟩
     rw [ci_rep_succ] at *
@@ -328,7 +330,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (c : CPU) (k : KCtx) (a b : 
       simp only [List.append_assoc]
       iframe Hlgh Harm Hrun
       ipureintro
-      refine ⟨hx, ?_⟩
+      refine ⟨hx, hk1, hsh, hbh, ?_⟩
       rw [← BitVec.sub_eq_add_neg, consDec_eq, consSub_dec e w hge]
       omega
     -- lw a5,160(s1) ; lw a4,156(s1)
@@ -472,7 +474,8 @@ theorem ci_kill (CP : CONSPUTC) (RE : RELEASE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_beq_eq _ _ hbr]
     iintro Hk Hpc
     iapply wpLoop_fupd
-    imod ci_drop_gh cn γ r w e bs ts hb cb hcn hends $$ [Hinv Hpay Hmark Hgh] with ⟨Hlgh, Harm, Hgh⟩
+    imod ci_drop_gh cn γ r w e bs ts hb cb hcn hends (Or.inr (Or.inr her)) $$ [Hinv Hpay Hmark Hgh]
+      with ⟨Hlgh, Harm, Hgh⟩
     · iframe Hinv Hpay Hmark Hgh
     imodintro
     ihave Hres := ciGh_res cn r w e bs ts hlb hlt hok hrow $$ [Hr Hw He Hd Hts Hgh]

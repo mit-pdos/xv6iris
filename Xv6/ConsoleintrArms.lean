@@ -68,6 +68,22 @@ theorem ci_room (r e : BitVec 32)
   have h3 := BitVec.lt_def.mp h2
   simpa using h3
 
+/-- ...and TAKEN (relax-d2 lane K2, Rocq `ct_nofit`): with `consOk`'s `≤ 128`
+it pins the live range at exactly the whole ring -- the drop's full-ring
+reason. -/
+theorem ci_nofit (r w e : BitVec 32) (hok : consOk r w e)
+    (h : (127#64 : BitVec 64).ult (BitVec.signExtend 64
+      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 e) +
+        -BitVec.extractLsb' 0 32 (BitVec.signExtend 64 r))) = true) :
+    INPUT_BUF_SIZE ≤ (e - r).toNat := by
+  rw [ci_lo32_sext, ci_lo32_sext] at h
+  have hle : (e - r).toNat ≤ 128 := hok.2
+  have hle' : e - r ≤ 128#32 := by rw [BitVec.le_def]; simpa using hle
+  unfold INPUT_BUF_SIZE
+  have h2 : 128#32 ≤ e - r := by bv_decide
+  rw [BitVec.le_def] at h2
+  simpa using h2
+
 /-- The erase arms' `cons.e--` keeps the live range inside the old one. -/
 theorem ci_dec_le (r w e : BitVec 32) (hok : consOk r w e) (hne : e ≠ w) :
     (e - 1#32 - r).toNat ≤ (e - r).toNat := by
@@ -180,7 +196,7 @@ theorem ci_store_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : 
     (hh hg : Option (List Obs)) (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hlb : bs.length = INPUT_BUF_SIZE)
     (hlt : ts.length = INPUT_BUF_SIZE) (hok : consOk r w e) (hroom : (e - r).toNat < INPUT_BUF_SIZE)
     (hi : i = consSlot e 0) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
-    (hxg : ohistExt hg hb) :
+    (hxg : ohistExt hg hb) (hk1 : k1Next hg hb) :
     uartInv (GF := GF) .uart0 γ ∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗
       rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗
       ciAppend γ hb cb [echoOf cb] [echoOf cb].length iprop(True) ∗ consTags ts ∗
@@ -190,7 +206,8 @@ theorem ci_store_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : 
         ciGh cn none r w (e + 1#32) (bs.set i (consXlate cb)) (ts.set i (some hb)) := by
   iintro ⟨#Hinv, #Htag, Hhi, Hlgh, Hap, #Hts, Hgh⟩
   imod ciGh_push cn γ r w e bs ts i hb cb hh hg [echoOf cb] [echoOf cb].length iprop(True) hcn
-    hlb hlt hok hroom hi hends hx hxg rfl hbe $$ [Hinv Hhi Hlgh Hap Hgh] with ⟨Hhi, Hlgh, Harm, -, Hgh⟩
+    hlb hlt hok hroom hi hends hx hxg rfl hbe (fun _ => rfl) hk1 $$ [Hinv Hhi Hlgh Hap Hgh]
+    with ⟨Hhi, Hlgh, Harm, -, Hgh⟩
   · iframe Hinv Hhi Hlgh Hap Hgh
   imodintro
   ihave Hts' := consTags_upd ts i hb $$ Htag Hts
@@ -231,10 +248,10 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   obtain ⟨v18, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hsv
   -- open the arm: the echo's one byte is paid for
   unfold ciMark
-  icases Hmark with ⟨%hg, %hxg, Hlgh, Harm⟩
+  icases Hmark with ⟨%hg, %hxg, %hk1, Hlgh, Harm⟩
   iapply wpLoop_fupd
-  imod ciChFull γ hb 13#8 hg [echoOf 13#8] iprop(True) hxg hends (Or.inr (Or.inl rfl))
-    $$ [Hinv Hpay Hlgh Harm] with Hch
+  imod ciChFull γ hb 13#8 hg [echoOf 13#8] iprop(True) hxg hends (Or.inr (Or.inl rfl)) hk1
+    (fun hc => absurd hc (by simp)) $$ [Hinv Hpay Hlgh Harm] with Hch
   · iframe Hinv Hpay Hlgh Harm
   imodintro
   -- li a0,10 ; jal consputc
@@ -312,7 +329,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   -- THE STORE
   have hi := consSlot_of_and e
   iapply wpLoop_fupd
-  imod ci_store_gh cn γ r w e bs ts _ hb 13#8 hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg
+  imod ci_store_gh cn γ r w e bs ts _ hb 13#8 hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg hk1
     $$ [Hinv Htag Hhi Hlgh Hap Hts Hgh] with ⟨Hhi, Hlgh, Harm, #Hts', Hgh⟩
   · iframe Hinv Htag Hhi Hlgh Hap Hts Hgh
   imodintro
@@ -387,10 +404,10 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   obtain ⟨v18, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hsv
   -- open the arm: the echo's one byte is paid for
   unfold ciMark
-  icases Hmark with ⟨%hg, %hxg, Hlgh, Harm⟩
+  icases Hmark with ⟨%hg, %hxg, %hk1, Hlgh, Harm⟩
   iapply wpLoop_fupd
-  imod ciChFull γ hb cb hg [echoOf cb] iprop(True) hxg hends (Or.inr (Or.inl rfl))
-    $$ [Hinv Hpay Hlgh Harm] with Hch
+  imod ciChFull γ hb cb hg [echoOf cb] iprop(True) hxg hends (Or.inr (Or.inl rfl)) hk1
+    (fun hc => absurd hc (by simp)) $$ [Hinv Hpay Hlgh Harm] with Hch
   · iframe Hinv Hpay Hlgh Harm
   imodintro
   -- mv a0,s1 ; jal consputc
@@ -462,7 +479,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   -- THE STORE
   have hi := consSlot_of_and e
   iapply wpLoop_fupd
-  imod ci_store_gh cn γ r w e bs ts _ hb cb hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg
+  imod ci_store_gh cn γ r w e bs ts _ hb cb hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg hk1
     $$ [Hinv Htag Hhi Hlgh Hap Hts Hgh] with ⟨Hhi, Hlgh, Harm, #Hts', Hgh⟩
   · iframe Hinv Htag Hhi Hlgh Hap Hts Hgh
   imodintro
@@ -637,16 +654,54 @@ the arm opens and closes at `[]`, the entry is logged, the ring does not
 move. -/
 theorem ci_drop_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : List (BitVec 8))
     (ts : List (Option (List Obs))) (hb : List Obs) (cb : BitVec 8) (hcn : cn.uart = γ)
-    (hends : obsEndsIn .uart0 hb cb) :
+    (hends : obsEndsIn .uart0 hb cb) (hk2 : cb.toNat = 0 ∨ cb.toNat = 16 ∨ consErase cb = true) :
     uartInv (GF := GF) .uart0 γ ∗ ciPay γ hb cb ∗ ciMark γ hb ∗ ciGh cn none r w e bs ts ⊢
       |={⊤}=> logHi γ (1 : Qp).half (some hb) ∗ uartArm γ (1 : Qp).half none ∗
         ciGh cn none r w e bs ts := by
   unfold ciMark
-  iintro ⟨#Hinv, #Hpay, ⟨%hg, %hxg, Hlgh, Harm⟩, Hgh⟩
-  imod ciAppend_nil γ hb cb hg hxg hends $$ [Hinv Hpay Hlgh Harm] with ⟨Hlgh, Hap⟩
+  iintro ⟨#Hinv, #Hpay, ⟨%hg, %hxg, %hk1, Hlgh, Harm⟩, Hgh⟩
+  -- K2: the switch's own guard is the reason
+  imod ciAppend_nil γ hb cb hg iprop(emp) hxg hends hk1 $$ [Hinv Hpay Hlgh Harm] with ⟨Hlgh, -, Hap⟩
   · iframe Hinv Hpay Hlgh Harm
-  imod ciGh_drop cn γ r w e bs ts hb cb hg [] 0 iprop(True) hcn hxg rfl $$ [Hinv Hlgh Hap Hgh]
-    with ⟨Hlgh, Harm, -, Hgh⟩
+    unfold consDropPay
+    ileft
+    isplitr
+    · ipureintro; exact fun _ => hk2
+    · iempintro
+  imod ciGh_drop cn γ r w e bs ts hb cb hg [] 0 iprop(True) hcn hxg rfl (fun hc => absurd hc (by simp)) hk1
+    $$ [Hinv Hlgh Hap Hgh] with ⟨Hlgh, Harm, -, Hgh⟩
+  · iframe Hinv Hlgh Hap Hgh
+  imodintro
+  iframe Hlgh Harm Hgh
+
+/-- ...AND AT A FULL RING (Rocq's full-ring drop, relax-d2 lane K2): the one
+drop reason the switch's guard cannot hand over.  The ring's log mirror and
+its delivered count go out as the payment (`ciGh_fullLog`) and the wand
+brings the ring straight back -- an open moves neither. -/
+theorem ci_drop_gh_full (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : List (BitVec 8))
+    (ts : List (Option (List Obs))) (hb : List Obs) (cb : BitVec 8) (hcn : cn.uart = γ)
+    (hends : obsEndsIn .uart0 hb cb) (hok : consOk r w e) (hfull : INPUT_BUF_SIZE ≤ (e - r).toNat) :
+    uartInv (GF := GF) .uart0 γ ∗ ciPay γ hb cb ∗ ciMark γ hb ∗ ciGh cn none r w e bs ts ⊢
+      |={⊤}=> logHi γ (1 : Qp).half (some hb) ∗ uartArm γ (1 : Qp).half none ∗
+        ciGh cn none r w e bs ts := by
+  subst hcn
+  unfold ciMark
+  iintro ⟨#Hinv, #Hpay, ⟨%hg, %hxg, %hk1, Hlgh, Harm⟩, Hgh⟩
+  icases ciGh_fullLog cn r w e bs ts hok hfull $$ Hgh with ⟨%L0, %ndl, %hcnt, Hlm, Hdc, Hback⟩
+  imod ciAppend_nil cn.uart hb cb hg (ciGh cn none r w e bs ts) hxg hends hk1
+    $$ [Hinv Hpay Hlgh Harm Hlm Hdc Hback] with ⟨Hlgh, Hgh, Hap⟩
+  · iframe Hinv Hpay Hlgh Harm
+    unfold consDropPay
+    iright
+    iexists L0, ndl
+    unfold consLogm consDlcnt
+    iframe Hlm Hdc
+    isplitr
+    · ipureintro; exact hcnt
+    iintro Hlm Hdc
+    iapply Hback $$ Hlm Hdc
+  imod ciGh_drop cn cn.uart r w e bs ts hb cb hg [] 0 iprop(True) rfl hxg rfl
+    (fun hc => absurd hc (by simp)) hk1 $$ [Hinv Hlgh Hap Hgh] with ⟨Hlgh, Harm, -, Hgh⟩
   · iframe Hinv Hlgh Hap Hgh
   imodintro
   iframe Hlgh Harm Hgh
@@ -713,7 +768,8 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_bne_eq _ _ hbr]
     iintro Hk Hpc
     iapply wpLoop_fupd
-    imod ci_drop_gh cn γ r w e bs ts hb cb hcn hends $$ [Hinv Hpay Hmark Hgh] with ⟨Hlgh, Harm, Hgh⟩
+    imod ci_drop_gh cn γ r w e bs ts hb cb hcn hends (Or.inr (Or.inr her)) $$ [Hinv Hpay Hmark Hgh]
+      with ⟨Hlgh, Harm, Hgh⟩
     · iframe Hinv Hpay Hmark Hgh
     imodintro
     ihave Hres := ciGh_res cn r w e bs ts hlb hlt hok hrow $$ [Hr Hw He Hd Hts Hgh]
@@ -754,10 +810,10 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
     ihave Hgh := ciGh_pop cn hb cb r w e bs ts hne $$ Hgh
     -- the arm is opened and its triple paid
     unfold ciMark
-    icases Hmark with ⟨%hg, %hxg, Hlgh, Harm⟩
+    icases Hmark with ⟨%hg, %hxg, %hk1, Hlgh, Harm⟩
     iapply wpLoop_fupd
-    imod ciChFull γ hb cb hg consputcBs iprop(True) hxg hends (ci_echo_bs cb her)
-      $$ [Hinv Hpay Hlgh Harm] with Hch
+    imod ciChFull γ hb cb hg consputcBs iprop(True) hxg hends (ci_echo_bs cb her) hk1
+      (fun hc => absurd hc (by simp [consputcBs])) $$ [Hinv Hpay Hlgh Harm] with Hch
     · iframe Hinv Hpay Hlgh Harm
     imodintro
     -- li a0,256 ; jal consputc
@@ -799,7 +855,8 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
       iexists consputcBs, consputcBs, consputcBs.length, hg
       iframe Hlgh Hap
       ipureintro
-      exact ⟨ci_echo_bs cb her, List.take_length, hxg⟩
+      -- K3: the backspace arm's plan is one erase TRIPLE, never one glyph
+      exact ⟨ci_echo_bs cb her, List.take_length, hxg, fun hc => absurd hc (by simp [consputcBs]), hk1⟩
     imodintro
     ihave Hres := ciGh_res cn r w (e + 4294967295#32) bs ts hlb hlt hok1 hrow1
       $$ [Hr Hw He Hd Hts Hgh]
@@ -954,7 +1011,8 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     iintro Hk Hpc
     ihave #Hinv := ci_port_inv γl γ $$ Hport
     iapply wpLoop_fupd
-    imod ci_drop_gh cn γ r w e bs ts hb cb hcn hends $$ [Hinv Hpay Hmark Hgh] with ⟨Hlgh, Harm, Hgh⟩
+    imod ci_drop_gh_full cn γ r w e bs ts hb cb hcn hends hok (ci_nofit r w e hok hfull)
+      $$ [Hinv Hpay Hmark Hgh] with ⟨Hlgh, Harm, Hgh⟩
     · iframe Hinv Hpay Hmark Hgh
     imodintro
     ihave Hres := ciGh_res cn r w e bs ts hlb hlt hok hrow $$ [Hr Hw He Hd Hts Hgh]

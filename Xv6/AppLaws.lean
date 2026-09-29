@@ -38,7 +38,7 @@ Rocq's header on the laws, kept because the reasons are the content:
 1. **The laws are a `Prop`-valued `class` over the landed hooks.**
    `al_programs` is `SystemBootEra.EraInitBoot`, `al_echo` is `EraEcho`, and
    `al_tx`/`al_rx` are `uartObsPermit_ledger`'s `Htx`/`Hrx` (whose pure
-   premises are one conjunction, `Uart.txPop`/`Uart.recv` for Rocq's
+   premises are one conjunction, `Uart.txPop`/`Uart.accept` for Rocq's
    `uart_tx_pop`/`uart_rx_push`, and `cresAt` for Rocq's
    `if i is Uart0 then … else emp`).
 2. **The instance equations.**  Rocq quantifies `al_programs`/`al_echo` over
@@ -127,7 +127,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   al_rx : ∀ [MachGS hlc GF] [Fscfg] (c : A.fixed) (i : UartId) (γ : UartNames),
     (i = .uart0 → fscUart = γ) →
     ⊢@{IProp GF} iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState),
-      ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.recv u b ∧ traceShape h true ∧
+      ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.accept u b ∧ traceShape h true ∧
         obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
       uartGhosts γ u' -∗ A.R c h ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
       uartGhosts γ u' ∗ A.R c (h ++ [Obs.dev (.uartIn i b)]) ∗

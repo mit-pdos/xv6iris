@@ -294,6 +294,13 @@ def consDeliv (cn : ConsNames) (dv : List (List Obs × BitVec 8)) : IProp GF :=
 bound, because the accumulator quantifies over the log entries ABOVE the
 ring's top, which a lower bound cannot exclude). -/
 def consLogm (cn : ConsNames) (L : List LogEntry) : IProp GF := uartLogm cn.uart (1 : Qp).half L
+/-- ...AND THE DELIVERED COUNT, WHICH THE RING DOES SEE (Rocq `cons_dlcnt`,
+relax-d2 lane K2): `consDeliv`'s kernel half rides the LEASE, so the ring
+cannot say how much of the log has been handed out -- and a full-ring drop
+has to.  This is the NUMBER beside the list: one half here, under
+`ndl ≤ nrd`, the other in the console port's claim at the delivered list's
+length.  It moves at one site, `UartConsAcc.uartInv_consRead`. -/
+def consDlcnt (cn : ConsNames) (n : Nat) : IProp GF := uartDlcnt cn.uart (1 : Qp).half n
 /-- The ring's half of the HIGH-WATER MARK: the same proposition as the uart's
 `rxHi` half at the uart's names. -/
 def consHi (cn : ConsNames) (hh : Option (List Obs)) : IProp GF := rxHi cn.uart (1 : Qp).half hh
@@ -314,6 +321,8 @@ instance consLogm_timeless (cn : ConsNames) (L : List LogEntry) : Timeless (cons
   unfold consLogm; infer_instance
 instance consHi_timeless (cn : ConsNames) (hh : Option (List Obs)) : Timeless (consHi (GF := GF) cn hh) := by
   unfold consHi; infer_instance
+instance consDlcnt_timeless (cn : ConsNames) (n : Nat) : Timeless (consDlcnt (GF := GF) cn n) := by
+  unfold consDlcnt; infer_instance
 
 /-- THE CURSOR PAIR MOVES ALONE (ruling F1). -/
 theorem consCursor_agree (cn : ConsNames) (n n' : Nat) :
@@ -627,7 +636,7 @@ theorem consCredRead (cn : ConsNames) (Wd : IProp GF) (E : CoPset) (hE : ↑cons
 /-- WHAT `cons.lock` PROTECTS (Rocq `cons_res`), at the ambient context. -/
 def consResCur [X : CurCtx] (cn : ConsNames) : IProp GF := iprop%
   ∃ (r w e : BitVec 32) (bs : List (BitVec 8)) (ts : List (Option (List Obs)))
-    (cur nrd : Nat) (st pd : List (List Obs × BitVec 8)) (hh : Option (List Obs))
+    (cur nrd ndl : Nat) (st pd : List (List Obs × BitVec 8)) (hh : Option (List Obs))
     (L0 : List LogEntry) (gp : Bool),
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -642,14 +651,20 @@ def consResCur [X : CurCtx] (cn : ConsNames) : IProp GF := iprop%
     ⌜consBelow (st ++ pd) hh⌝ ∗
     ⌜consEra (st ++ pd) cn.era⌝ ∗
     -- the reader's position never runs ahead of the ring's consumed count
-    -- (Rocq's `nrd <= cur`, relax-d2 K2; the `dlcnt` half is not ported)
+    -- (Rocq's `nrd <= cur`, relax-d2 K2)
     ⌜nrd ≤ cur⌝ ∗
     consData bs ∗ consTags ts ∗
     consStoredAuth cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗
     consLogm cn L0 ∗ ⌜consLogOk L0 (st ++ pd) gp⌝ ∗
+    -- THE DELIVERED-COUNT BOUND (Rocq relax-d2, lane K2): the boundary's
+    -- delivered list is never longer than the reader's position, because the
+    -- only thing that grows it is that same read's final release.  With
+    -- `nrd ≤ cur` it is what a full-ring drop spends: the ring's `cur + 128`
+    -- echoed entries are at least 128 beyond the `ndl` delivered ones.
+    consDlcnt cn ndl ∗ ⌜ndl ≤ nrd⌝ ∗
     (⌜cur = nrd⌝ ∨ consDirtyLb cn)
 
--- the payload has twelve binders and twenty-one conjuncts: the default instance size is too small
+-- the payload has thirteen binders and twenty-three conjuncts: the default instance size is too small
 set_option synthInstance.maxSize 1024 in
 /-- A LOCK PAYLOAD must be timeless (acquire strips a `▷` off it). -/
 instance consResCur_timeless [X : CurCtx] (cn : ConsNames) : Timeless (consResCur (GF := GF) cn) := by
@@ -773,7 +788,7 @@ the committed sequence's authority at `[]`, the ring's halves of the cursor
 (0), the high-water mark (`none`) and the log's mirror (`[]`), the READER
 TOKEN at 0 and the CLEAN token. -/
 def consGhostsBoot (cn : ConsNames) : IProp GF := iprop%
-  consStoredAuth cn [] ∗ consCursor cn 0 ∗ consHi cn none ∗ consLogm cn [] ∗
+  consStoredAuth cn [] ∗ consCursor cn 0 ∗ consHi cn none ∗ consLogm cn [] ∗ consDlcnt cn 0 ∗
   consReader cn 0 ∗ consCleanTok cn
 
 /-- `cn.uart` is NOT allocated here: its `rxhi`/`deliv`/`logm` pairs are
@@ -782,9 +797,9 @@ claim and one for the ring, and this allocation takes the ring's halves as
 its input -- which is why the ring's names record carries the uart's. -/
 theorem consGhostsAlloc (γu : UartNames) (k : Nat) :
     rxHi (GF := GF) γu (1 : Qp).half none ⊢
-      uartDeliv γu (1 : Qp).half [] -∗ uartLogm γu (1 : Qp).half [] -∗
+      uartDeliv γu (1 : Qp).half [] -∗ uartLogm γu (1 : Qp).half [] -∗ uartDlcnt γu (1 : Qp).half 0 -∗
       |==> ∃ cn : ConsNames, ⌜cn.uart = γu⌝ ∗ ⌜cn.era = k⌝ ∗ consGhostsBoot cn := by
-  iintro Hhi Hdv Hlm
+  iintro Hhi Hdv Hlm Hdc
   imod MonoList.own_alloc (GF := GF) ([] : List (List Obs × BitVec 8)) with ⟨%γl, Hl, #Hlb⟩
   imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%γr, Hr⟩
   icases ghostVar_halves γr (0 : Nat) $$ Hr with ⟨Hr1, Hr2⟩
@@ -796,8 +811,8 @@ theorem consGhostsAlloc (γu : UartNames) (k : Nat) :
   isplitr
   · ipureintro; rfl
   unfold consGhostsBoot consStoredAuth consCursor consReader consRdtok consDl consDeliv consLogm
-    consStoredLb consHi consCleanTok
-  iframe Hl Hr1 Hhi Hlm Hr2 Hk
+    consDlcnt consStoredLb consHi consCleanTok
+  iframe Hl Hr1 Hhi Hlm Hdc Hr2 Hk
   iexists []
   iframe Hdv Hlb
   ileft; ipureintro; rfl

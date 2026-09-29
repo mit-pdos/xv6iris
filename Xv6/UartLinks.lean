@@ -351,23 +351,23 @@ theorem consClaimAt_store (i : UartId) (γ : UartNames) (u u' : UartState) (b : 
     consLink i (genId (hlc := hlc) (GF := GF) + 1) (.evOut b) Φ ⊢
       consClaimAt i γ u ={⊤ \ ↑(uartN i)}=∗ consClaimAt i γ u' ∗ Φ := by
   unfold consClaimAt consLink
-  iintro HΨ ⟨%o, %H, Hlb, Hres, Hhi, Hdv, Hau, Hlm, Harm, %hacc0, %hok⟩
+  iintro HΨ ⟨%o, %H, Hlb, Hres, Hhi, Hdv, Hdc, Hau, Hlm, Harm, %hacc0, %hok, %hins⟩
   imod HΨ $$ %o %H Hlb Hres %hok %trivial with ⟨%o', Hlb', Hres', HΦ⟩
   imodintro
   iframe HΦ
   iexists o', consStep H (.evOut b)
   have hok' := consHistOk_step H (.evOut b) hok trivial
   simp only [consStep] at hok' ⊢
-  iframe Hlb' Hres' Hhi Hdv Hau Hlm Harm
+  iframe Hlb' Hres' Hhi Hdv Hdc Hau Hlm Harm
   ipureintro
-  exact ⟨by rw [hacc0, hacc], hok'⟩
+  exact ⟨by rw [hacc0, hacc], hok', hins⟩
 
 /-- THE STORE OBLIGATION (Rocq `store_ob`): the ghost step of one THR store
 at port `i`, run with the port's invariant open. -/
 def storeOb (i : UartId) (γ : UartNames) (b : BitVec 8) (Φ : IProp GF) : IProp GF := iprop%
   ∀ (u u' : UartState),
     ⌜u'.rx = u.rx ∧ Uart.loopback u' = Uart.loopback u ∧ u'.wire = u.wire ∧ u'.out = u.out ∧
-      Uart.acc u' = Uart.acc u ++ [b]⌝ -∗
+      Uart.acc u' = Uart.acc u ++ [b] ∧ u'.recvd = u.recvd⌝ -∗
     outAuth γ u -∗ uartColE i γ u -∗ consClaimAt i γ u ={⊤ \ ↑(uartN i)}=∗
     outAuth γ u ∗ uartColE i γ u' ∗ consClaimAt i γ u' ∗ Φ
 
@@ -406,9 +406,9 @@ theorem storeOb_of_consLink (i : UartId) (γ : UartNames) (b : BitVec 8) (Φ : I
     consLink i (genId (hlc := hlc) (GF := GF) + 1) (.evOut b) Φ ⊢ storeOb i γ b Φ := by
   iintro HΨ
   unfold storeOb
-  iintro %u %u' %⟨h1, h2, h3, h4, h5⟩ Hout Hcol Hin
+  iintro %u %u' %⟨h1, h2, h3, h4, h5, h6⟩ Hout Hcol Hin
   imod (consClaimAt_store i γ u u' b Φ h5) $$ HΨ Hin with ⟨Hin, HΦ⟩
-  ihave Hcol := uartColE_stable i γ u u' h1 h2 h3 h4 $$ Hcol
+  ihave Hcol := uartColE_stable i γ u u' h1 h2 h3 h4 h6 $$ Hcol
   imodintro
   iframe Hout Hcol Hin HΦ
 
@@ -453,9 +453,9 @@ theorem storeOb_of_echoLink (γ : UartNames) (b : BitVec 8) (h : List Obs) (c : 
       storeOb .uart0 γ b iprop(uartArm γ (1 : Qp).half (some ((h, c, cs), j + 1)) ∗ Φ) := by
   iintro Hmine HΨ
   unfold storeOb
-  iintro %u %u' %⟨h1, h2, h3, h4, h5⟩ Hout Hcol Hin
+  iintro %u %u' %⟨h1, h2, h3, h4, h5, h6⟩ Hout Hcol Hin
   unfold consClaimAt
-  icases Hin with ⟨%o, %H, #Hlb, Hres, Hhi, Hdv, Hau, Hlm, Harm, %hacc0, %hok⟩
+  icases Hin with ⟨%o, %H, #Hlb, Hres, Hhi, Hdv, Hdc, Hau, Hlm, Harm, %hacc0, %hok, %hins⟩
   icases uartArm_agree γ _ _ _ _ $$ [Hmine Harm] with ⟨%harm, Hmine, Harm⟩
   · iframe Hmine Harm
   have hev : consEvOk H (.evByte b) := ⟨((h, c, cs), j), harm.symm, hlk⟩
@@ -463,7 +463,7 @@ theorem storeOb_of_echoLink (γ : UartNames) (b : BitVec 8) (h : List Obs) (c : 
   imod HΨ $$ %o %H Hlb Hres %hok %hev with ⟨%o', #Hlb', Hres', HΦ⟩
   imod (uartArm_update γ _ _ (some ((h, c, cs), j + 1))) $$ [Hmine Harm] with ⟨Hmine, Harm⟩
   · iframe Hmine Harm
-  ihave Hcol := uartColE_stable .uart0 γ u u' h1 h2 h3 h4 $$ Hcol
+  ihave Hcol := uartColE_stable .uart0 γ u u' h1 h2 h3 h4 h6 $$ Hcol
   imodintro
   iframe Hout Hcol HΦ Hmine
   iexists o', consStep H (.evByte b)
@@ -472,9 +472,9 @@ theorem storeOb_of_echoLink (γ : UartNames) (b : BitVec 8) (h : List Obs) (c : 
       ⟨H.chAcc ++ [b], H.chLog, H.chDl, some ((h, c, cs), j + 1)⟩ := by
     simp only [consStep, ← harm]
   rw [hstep] at hok' ⊢
-  iframe Hlb' Hres' Hhi Hdv Hau Hlm Harm
+  iframe Hlb' Hres' Hhi Hdv Hdc Hau Hlm Harm
   ipureintro
-  exact ⟨by rw [hacc0, h5], hok'⟩
+  exact ⟨by rw [hacc0, h5], hok', hins⟩
 
 /-- THE ECHO'S CHAIN (Rocq `store_chain_of_echo_chain`). -/
 theorem storeChain_of_echoChain (γ : UartNames) (h : List Obs) (c : BitVec 8) (cs : List (BitVec 8))

@@ -9,7 +9,11 @@ THE BYTE, ITS HISTORY AND THE RING'S HIGH-WATER MARK are PARAMETERS
 (`hb`, `cb`, `hh`, `hg`): `a0` carries `cb`, which arrived at the history
 `hb` (`obsEndsIn`), IN THIS ERA (`obsBoots`), strictly after everything
 the ring holds (`ohistExt hh hb`) and everything the kernel has logged
-(`ohistExt hg hb`).  The caller hands in the byte's RIDER (its tag, a
+(`ohistExt hg hb`) -- AND IT IS THE VERY NEXT INPUT AFTER THE ONE THE LOG'S
+MARK NAMES (Rocq relax-d2, lane K1: `k1Next hg hb`, with the byte's trace
+shape; uartintr supplies it out of the pop's two input numbers and the PLIC
+payload's `uartLogAt` clause, and the arms spend it at the log's OPEN and
+CLOSE, where it becomes `ConsLog.consEvOk`'s K1).  The caller hands in the byte's RIDER (its tag, a
 lower bound on `hb`, the wire as it stood when the byte arrived -- what
 the receive column filed beside it), the ring's high-water half
 (`rxHi`), the log's (`logHi`) and the arm's half at `none` (`uartArm`):
@@ -63,7 +67,8 @@ def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = BitVec.setWidth 64 cb)
     (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1)
-    (hx : ohistExt hh hb) (hxg : ohistExt hg hb) : Prop :=
+    (hx : ohistExt hh hb) (hxg : ohistExt hg hb)
+    (hshb : traceShape hb true) (hnext : k1Next hg hb) : Prop :=
   kctx cpu k ∗ pcIs cpu consoleintrAddr ∗ procsInv Γ ∗ consoleCaps γc γl γ ∗
   MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗ obsHistLb hb ∗
   outLb γ (obsWire .uart0 (openSeg hb)) ∗
@@ -81,8 +86,8 @@ structure CONSOLEINTR : Prop where
   wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh hg : Option (List Obs))
-    hnoff hK hlk htier ha0 hends hboots hx hxg,
+    hnoff hK hlk htier ha0 hends hboots hx hxg hshb hnext,
     wp_consoleintr_body (hlc := hlc) (GF := GF) Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0
-      hends hboots hx hxg
+      hends hboots hx hxg hshb hnext
 
 end Xv6

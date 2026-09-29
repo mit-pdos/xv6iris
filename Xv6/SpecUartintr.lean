@@ -53,10 +53,10 @@ def wp_uartintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) (hid : k.regs 10#5 = BitVec.ofNat 64 i.idx) : Prop :=
   kctx cpu k ∗ pcIs cpu uartintrAddr ∗ procsInv Γ ∗
-  uartPort i γl γ ∗ uartRxWord i ∗ uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ ∗
+  uartPort i γl γ ∗ uartRxWord i ∗ uartRxWriter i γ kp hl ∗ uartRxCaps i γc γl γ ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗
+    ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

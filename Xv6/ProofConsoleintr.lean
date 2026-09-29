@@ -181,7 +181,7 @@ theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
           iintro Hk Hpc
           ihave #Hinv := ci_port_inv γl γ $$ Hport
           iapply wpLoop_fupd
-          imod ci_drop_gh cn γ r w e bs ts hb 0#8 hcn hends $$ [Hinv Hpay Hmark Hgh]
+          imod ci_drop_gh cn γ r w e bs ts hb 0#8 hcn hends (Or.inl rfl) $$ [Hinv Hpay Hmark Hgh]
             with ⟨Hlgh, Harm, Hgh⟩
           · iframe Hinv Hpay Hmark Hgh
           imodintro
@@ -240,7 +240,8 @@ set_option maxHeartbeats 8000000 in
 dispatch. -/
 theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     CONSOLEINTR := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0 hends hboots hx hxg => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0 hends hboots hx hxg
+    hshb hnext => by
   unfold wp_consoleintr_body
   simp only [consoleintrAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hcaps, #Htag, #Hlbh, #Hwlb, Hhi, Hlgh, Harm, Hnext⟩
@@ -249,9 +250,9 @@ theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WA
   have hbe : obsBoots hb = cn.era := by rw [hcne]; exact hboots
   ihave #Hlk : ciLk γc cn $$ [Hlk0]
   · unfold ciLk; iexact Hlk0
-  ihave #Hpay := ciMkPay γ hb cb hends hboots $$ Hsh Htag Hlbh Hwlb
+  ihave #Hpay := ciMkPay γ hb cb hends hboots hshb $$ Hsh Htag Hlbh Hwlb
   ihave Hmark : ciMark γ hb $$ [Hlgh Harm]
-  · unfold ciMark; iexists hg; iframe Hlgh Harm; ipureintro; exact hxg
+  · unfold ciMark; iexists hg; iframe Hlgh Harm; ipureintro; exact ⟨hxg, hnext⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨hlk1, hlk2, hlk3⟩ := hlk

@@ -56,12 +56,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- Rocq `cr_ghost`. -/
 def crGhost (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVec 8))
     (ts : List (Option (List Obs))) : IProp GF := iprop%
-  ∃ (cur nrd : Nat) (st pd : List (List Obs × BitVec 8)) (hh : Option (List Obs))
+  ∃ (cur nrd ndl : Nat) (st pd : List (List Obs × BitVec 8)) (hh : Option (List Obs))
     (L0 : List LogEntry) (gp : Bool),
     ⌜consStored r w cur st bs ts⌝ ∗ ⌜consPend r w e pd bs ts⌝ ∗ ⌜consChain (st ++ pd)⌝ ∗
     ⌜consBelow (st ++ pd) hh⌝ ∗ ⌜consEra (st ++ pd) cn.era⌝ ∗ ⌜nrd ≤ cur⌝ ∗
     consStoredAuth cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗
     consLogm cn L0 ∗ ⌜consLogOk L0 (st ++ pd) gp⌝ ∗
+    consDlcnt cn ndl ∗ ⌜ndl ≤ nrd⌝ ∗
     (⌜cur = nrd⌝ ∨ consDirtyLb cn)
 
 instance crGhost_timeless (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVec 8))
@@ -69,28 +70,29 @@ instance crGhost_timeless (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVe
   unfold crGhost; infer_instance
 
 theorem crGhost_intro (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVec 8))
-    (ts : List (Option (List Obs))) (cur nrd : Nat) (st pd : List (List Obs × BitVec 8))
+    (ts : List (Option (List Obs))) (cur nrd ndl : Nat) (st pd : List (List Obs × BitVec 8))
     (hh : Option (List Obs)) (L0 : List LogEntry) (gp : Bool)
     (hst : consStored r w cur st bs ts) (hpd : consPend r w e pd bs ts) (hch : consChain (st ++ pd))
     (hbl : consBelow (st ++ pd) hh) (her : consEra (st ++ pd) cn.era) (hnc : nrd ≤ cur)
-    (hlog : consLogOk L0 (st ++ pd) gp) :
+    (hlog : consLogOk L0 (st ++ pd) gp) (hdn : ndl ≤ nrd) :
     consStoredAuth (GF := GF) cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗ consLogm cn L0 ∗
-      (⌜cur = nrd⌝ ∨ consDirtyLb cn) ⊢ crGhost cn r w e bs ts := by
-  iintro ⟨Ha, Hcu, Hhi, Hlm, Hmk⟩
+      consDlcnt cn ndl ∗ (⌜cur = nrd⌝ ∨ consDirtyLb cn) ⊢ crGhost cn r w e bs ts := by
+  iintro ⟨Ha, Hcu, Hhi, Hlm, Hdc, Hmk⟩
   unfold crGhost
-  iexists cur, nrd, st, pd, hh, L0, gp
-  iframe Ha Hcu Hhi Hlm Hmk
+  iexists cur, nrd, ndl, st, pd, hh, L0, gp
+  iframe Ha Hcu Hhi Hlm Hdc Hmk
   ipureintro
-  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog⟩
+  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog, hdn⟩
 
 theorem crGhost_elim (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVec 8))
     (ts : List (Option (List Obs))) :
-    crGhost (GF := GF) cn r w e bs ts ⊢ ∃ (cur nrd : Nat) (st pd : List (List Obs × BitVec 8))
+    crGhost (GF := GF) cn r w e bs ts ⊢ ∃ (cur nrd ndl : Nat) (st pd : List (List Obs × BitVec 8))
       (hh : Option (List Obs)) (L0 : List LogEntry) (gp : Bool),
       ⌜consStored r w cur st bs ts⌝ ∗ ⌜consPend r w e pd bs ts⌝ ∗ ⌜consChain (st ++ pd)⌝ ∗
       ⌜consBelow (st ++ pd) hh⌝ ∗ ⌜consEra (st ++ pd) cn.era⌝ ∗ ⌜nrd ≤ cur⌝ ∗
       consStoredAuth cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗
       consLogm cn L0 ∗ ⌜consLogOk L0 (st ++ pd) gp⌝ ∗
+      consDlcnt cn ndl ∗ ⌜ndl ≤ nrd⌝ ∗
       (⌜cur = nrd⌝ ∨ consDirtyLb cn) := .rfl
 
 /-- Rocq `cr_res_open`. -/
@@ -103,8 +105,8 @@ theorem crResOpen [CurCtx] (cn : ConsNames) :
       wordPointsTo consWAddr 4 (DFrac.own 1) w ∗ wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
       consData bs ∗ consTags ts ∗ crGhost cn r w e bs ts := by
   unfold consResCur
-  iintro ⟨%r, %w, %e, %bs, %ts, %cur, %nrd, %st, %pd, %hh, %L0, %gp, Hr, Hw, He, %hlb, %hlt, %hok,
-    %hrow, %hst, %hpd, %hch, %hbl, %her, %hnc, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩
+  iintro ⟨%r, %w, %e, %bs, %ts, %cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, Hr, Hw, He, %hlb, %hlt, %hok,
+    %hrow, %hst, %hpd, %hch, %hbl, %her, %hnc, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hdc, %hdn, Hmk⟩
   iexists r, w, e, bs, ts
   iframe Hr Hw He Hd Hts
   isplitr; · ipureintro; exact hlb
@@ -112,10 +114,10 @@ theorem crResOpen [CurCtx] (cn : ConsNames) :
   isplitr; · ipureintro; exact hok
   isplitr; · ipureintro; exact hrow
   unfold crGhost
-  iexists cur, nrd, st, pd, hh, L0, gp
-  iframe Ha Hcur Hhi Hlm Hmk
+  iexists cur, nrd, ndl, st, pd, hh, L0, gp
+  iframe Ha Hcur Hhi Hlm Hdc Hmk
   ipureintro
-  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog⟩
+  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog, hdn⟩
 
 /-- Rocq `cr_res_seal`. -/
 theorem crResSeal [CurCtx] (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVec 8))
@@ -125,34 +127,40 @@ theorem crResSeal [CurCtx] (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitV
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗ wordPointsTo consEAddr 4 (DFrac.own 1) e ∗
     consData bs ∗ consTags ts ∗ crGhost cn r w e bs ts ⊢ consResCur cn := by
   iintro ⟨Hr, Hw, He, Hd, #Hts, Hgh⟩
-  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm,
-    %hlog, Hmk⟩
+  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm,
+    %hlog, Hdc, %hdn, Hmk⟩
   unfold consResCur
-  iexists r, w, e, bs, ts, cur, nrd, st, pd, hh, L0, gp
-  iframe Hr Hw He Hd Hts Ha Hcur Hhi Hlm Hmk
+  iexists r, w, e, bs, ts, cur, nrd, ndl, st, pd, hh, L0, gp
+  iframe Hr Hw He Hd Hts Ha Hcur Hhi Hlm Hdc Hmk
   ipureintro
-  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, her, hnc, hlog⟩
+  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, her, hnc, hlog, hdn⟩
 
 /-- THE ONE ACCESSOR THE FINAL RELEASE NEEDS, at the SEALED ring (Rocq
-`cr_res_log`). -/
+`cr_res_log`).  ...AND IT HANDS OUT THE DELIVERED COUNT TOO (relax-d2, lane
+K2): the release is that count's one mover, and what it must re-establish is
+`ndl' ≤ nrd` -- the reader's own cursor, which the token pins and which this
+call does not touch. -/
 theorem crResLog [CurCtx] (cn : ConsNames) :
-    consResCur (GF := GF) cn ⊢ ∃ (st R : List (List Obs × BitVec 8)) (L0 : List LogEntry) (gp : Bool),
-      ⌜st <+: R⌝ ∗ ⌜consChain R⌝ ∗ ⌜consLogOk L0 R gp⌝ ∗
-      consStoredAuth cn st ∗ consLogm cn L0 ∗
-      (consStoredAuth cn st -∗ consLogm cn L0 -∗ consResCur cn) := by
+    consResCur (GF := GF) cn ⊢ ∃ (st R : List (List Obs × BitVec 8)) (L0 : List LogEntry) (gp : Bool)
+      (nrd ndl : Nat),
+      ⌜st <+: R⌝ ∗ ⌜consChain R⌝ ∗ ⌜consLogOk L0 R gp⌝ ∗ ⌜ndl ≤ nrd⌝ ∗
+      consStoredAuth cn st ∗ consLogm cn L0 ∗ consCursor cn nrd ∗ consDlcnt cn ndl ∗
+      (∀ ndl' : Nat, ⌜ndl' ≤ nrd⌝ -∗ consStoredAuth cn st -∗ consLogm cn L0 -∗
+        consCursor cn nrd -∗ consDlcnt cn ndl' -∗ consResCur cn) := by
   unfold consResCur
-  iintro ⟨%r, %w, %e, %bs, %ts, %cur, %nrd, %st, %pd, %hh, %L0, %gp, Hr, Hw, He, %hlb, %hlt, %hok,
-    %hrow, %hst, %hpd, %hch, %hbl, %her, %hnc, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩
-  iexists st, st ++ pd, L0, gp
-  iframe Ha Hlm
+  iintro ⟨%r, %w, %e, %bs, %ts, %cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, Hr, Hw, He, %hlb, %hlt, %hok,
+    %hrow, %hst, %hpd, %hch, %hbl, %her, %hnc, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hdc, %hdn, Hmk⟩
+  iexists st, st ++ pd, L0, gp, nrd, ndl
+  iframe Ha Hlm Hcur Hdc
   isplitr; · ipureintro; exact List.prefix_append _ _
   isplitr; · ipureintro; exact hch
   isplitr; · ipureintro; exact hlog
-  iintro Ha Hlm
-  iexists r, w, e, bs, ts, cur, nrd, st, pd, hh, L0, gp
-  iframe Hr Hw He Hd Hts Ha Hcur Hhi Hlm Hmk
+  isplitr; · ipureintro; exact hdn
+  iintro %ndl' %hdn' Ha Hlm Hcur Hdc
+  iexists r, w, e, bs, ts, cur, nrd, ndl', st, pd, hh, L0, gp
+  iframe Hr Hw He Hd Hts Ha Hcur Hhi Hlm Hdc Hmk
   ipureintro
-  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, her, hnc, hlog⟩
+  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, her, hnc, hlog, hdn'⟩
 
 /-! ## What the run earns -/
 
@@ -296,7 +304,8 @@ theorem crOut_of_rout [CurCtx] (cn : ConsNames) (Wd : IProp GF) (γc : GName)
           rw [List.length_append, hwin.1]; simp; omega
       unfold crDlc
       icases Hdl with ⟨%dv, Hdv, #Hdvlb, %hdvl⟩
-      icases crResLog cn $$ Hres with ⟨%st, %R, %L0, %gp, %hpst, %hchR, %hlog, Ha, Hlm, Hback⟩
+      icases crResLog cn $$ Hres with ⟨%st, %R, %L0, %gp, %nrdk, %ndlk, %hpst, %hchR, %hlog, %hdnk, Ha,
+        Hlm, Hcu, Hdc, Hback⟩
       ihave %hp1 := consStoredLb_prefix cn st slx $$ Ha Hslx
       ihave %hag := consStoredLb_agree cn dv slx $$ Hdvlb Hslx
       have hdvp : dv <+: slx := crPfxLe dv slx hag (by omega)
@@ -310,12 +319,15 @@ theorem crOut_of_rout [CurCtx] (cn : ConsNames) (Wd : IProp GF) (γc : GName)
         congr 1; omega
       have hpfxr : dv ++ wsx <+: R := by rw [hws]; exact hp1.trans hpst
       have hro : readOk L0 dv wsx := consReadOk_of L0 R dv wsx hlog.1 hlog.2.1 hchR hpfxr
-      unfold consDeliv consLogm consReadPay readLink
-      imod uartInv_consRead cn.uart dv wsx L0 (Rin wsx) hro $$ [Huinv Hdv Hlm Hpay]
-        with ⟨Hdv, Hlm, HRin⟩
-      · iframe Huinv Hdv Hlm
+      -- K2 (relax-d2): the reader's token pins the ring's cursor, and the
+      -- boundary's delivered count lands exactly on it
+      ihave %hnrdk := consCursor_agree cn nrdk (n0 + dc) $$ Hcu Hrd
+      unfold consDeliv consLogm consDlcnt consReadPay readLink
+      imod uartInv_consRead cn.uart dv wsx L0 ndlk (Rin wsx) hro $$ [Huinv Hdv Hlm Hdc Hpay]
+        with ⟨Hdv, Hlm, %hndlk, Hdc, HRin⟩
+      · iframe Huinv Hdv Hlm Hdc
         iapply Hpay
-      ihave Hres := Hback $$ Ha Hlm
+      ihave Hres := Hback $$ %(ndlk + wsx.length) %(by omega) Ha Hlm Hcu Hdc
       imodintro
       iframe Hres
       inext
@@ -402,8 +414,8 @@ theorem crPop (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
       |={⊤}=> crGhost cn (r + 1#32) w e bs ts ∗ crRacc cn Wd Rin ord (d + 1) src' (hs ++ [h]) := by
   iintro ⟨#Hlk, #Hpr, Hgh, Hacc⟩
   ihave #Hcinv := isConslock_cred cn Wd γc $$ Hlk
-  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
-    %hlog, Hmk⟩
+  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
+    %hlog, Hdc, %hdn, Hmk⟩
   obtain ⟨h', b', hs0, ht0, he0, -⟩ := hst.2 0 (by omega)
   rw [Nat.add_zero] at hs0
   rw [hts] at ht0
@@ -430,9 +442,9 @@ theorem crPop (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
         ihave #Hsl' := consStoredLb_weaken cn st (sl ++ [(h, b')]) hsnoc $$ Hstlb
         imod consCursor_update cn (n0 + d) (cur + 1) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
         imodintro
-        isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (cur + 1) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+        isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (cur + 1) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           ileft; ipureintro; rfl
         ileft
         iexists sl ++ [(h, b')]
@@ -446,9 +458,10 @@ theorem crPop (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
         -- just popped is at the cursor, which `n0 + d` never exceeds
         imod consCursor_update cn (n0 + d) (n0 + (d + 1)) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
         imodintro
-        isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+        isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
+            (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           iright; iexact Hdt
         iright
         iframe Hrd Hdt
@@ -469,9 +482,10 @@ theorem crPop (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
       icases consStoredLb_get cn st $$ Ha with ⟨Ha, #Hstlb⟩
       imod consCursor_update cn (n0 + d) (n0 + (d + 1)) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
       imodintro
-      isplitl [Ha Hcu Hhi Hlm]
-      · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-        iframe Ha Hcu Hhi Hlm
+      isplitl [Ha Hcu Hhi Hlm Hdc]
+      · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
+            (by omega)
+        iframe Ha Hcu Hhi Hlm Hdc
         iright; iexact Hdt
       iright
       iframe Hrd Hdl Hdt
@@ -488,9 +502,9 @@ theorem crPop (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
     icases consStoredLb_get cn st $$ Ha with ⟨Ha, #Hstlb⟩
     imod consCredPay cn Wd ⊤ (by simp) $$ Hcinv Hpr with #Hdt
     imodintro
-    isplitl [Ha Hcu Hhi Hlm]
-    · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (nrd) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-      iframe Ha Hcu Hhi Hlm
+    isplitl [Ha Hcu Hhi Hlm Hdc]
+    · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (nrd) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog (by omega)
+      iframe Ha Hcu Hhi Hlm Hdc
       iright; iexact Hdt
     isplitr
     · iexists st
@@ -510,8 +524,8 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
       consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ⊢
       crGhost cn r w e bs ts ∗ crRacc cn Wd Rin ord 0 g [] := by
   iintro ⟨Hgh, Hpay, Hrp⟩
-  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
-    %hlog, Hmk⟩
+  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
+    %hlog, Hdc, %hdn, Hmk⟩
   icases consStoredLb_get cn st $$ Ha with ⟨Ha, #Hstlb⟩
   have hstpd : st <+: st ++ pd := List.prefix_append _ _
   have hchst : consChain st := consChain_prefix _ _ hstpd hch
@@ -527,9 +541,9 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
         have hcur : cur = n0 := by rw [hcn, hnrd]
         obtain ⟨sl, hpfx, hlsl⟩ := consPrefix_len st n0 (by rw [hst.1]; omega)
         ihave #Hsl := consStoredLb_weaken cn st sl hpfx $$ Hstlb
-        isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur) (nrd) st pd hh L0 gp hst hpd hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+        isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur) (nrd) ndl st pd hh L0 gp hst hpd hch hbl her (by omega) hlog (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           ileft; ipureintro; exact hcn
         ileft
         iexists sl
@@ -542,9 +556,9 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
           ipureintro; exact hdvl
         ipureintro
         exact ⟨consWindow_0 sl n0 g hlsl, consChain_prefix _ _ (hpfx.trans hstpd) hch⟩
-      · isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur) (nrd) st pd hh L0 gp hst hpd hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+      · isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur) (nrd) ndl st pd hh L0 gp hst hpd hch hbl her (by omega) hlog (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           iright; iexact Hdt
         iright
         rw [Nat.add_zero]
@@ -554,9 +568,9 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
         iexists dv
         iframe Hdv Hdvlb
         try (ileft; ipureintro; exact hdvl)
-    · isplitl [Ha Hcu Hhi Hlm Hmk]
-      · iapply crGhost_intro cn _ _ _ bs ts cur nrd st pd hh L0 gp hst hpd hch hbl her (by omega) hlog
-        iframe Ha Hcu Hhi Hlm Hmk
+    · isplitl [Ha Hcu Hhi Hlm Hdc Hmk]
+      · iapply crGhost_intro cn _ _ _ bs ts cur nrd ndl st pd hh L0 gp hst hpd hch hbl her (by omega) hlog (by omega)
+        iframe Ha Hcu Hhi Hlm Hdc Hmk
       iright
       rw [Nat.add_zero]
       iframe Hpay Hdt0
@@ -567,9 +581,9 @@ theorem crRaccInit (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × Bit
       try (iright; iexact Hdt0)
   | none =>
     unfold crRacc
-    isplitl [Ha Hcu Hhi Hlm Hmk]
-    · iapply crGhost_intro cn _ _ _ bs ts cur nrd st pd hh L0 gp hst hpd hch hbl her (by omega) hlog
-      iframe Ha Hcu Hhi Hlm Hmk
+    isplitl [Ha Hcu Hhi Hlm Hdc Hmk]
+    · iapply crGhost_intro cn _ _ _ bs ts cur nrd ndl st pd hh L0 gp hst hpd hch hbl her (by omega) hlog (by omega)
+      iframe Ha Hcu Hhi Hlm Hdc Hmk
     isplitr
     · iexists st; iframe Hstlb; ipureintro; exact ⟨hchst, consPlaced_0 _ _ _⟩
     ileft; ipureintro; rfl
@@ -589,8 +603,8 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
       |={⊤}=> crGhost cn (r + 1#32) w e bs ts ∗ crRout cn Wd Rin fault ord d (d + 1) src hs := by
   iintro ⟨#Hlk, #Hpr, #Htag, Hgh, Hacc⟩
   ihave #Hcinv := isConslock_cred cn Wd γc $$ Hlk
-  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
-    %hlog, Hmk⟩
+  icases crGhost_elim cn _ _ _ bs ts $$ Hgh with ⟨%cur, %nrd, %ndl, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcu, Hhi, Hlm,
+    %hlog, Hdc, %hdn, Hmk⟩
   have hst' := consStored_pop r w cur st bs ts hge hst
   have hpd' := consPend_shift r w e pd bs ts hge hpd
   have hstpd : st <+: st ++ pd := List.prefix_append _ _
@@ -619,9 +633,9 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
         have hchsn : consChain (sl ++ [(h, b')]) := consChain_prefix _ _ (hsnoc.trans hstpd) hch
         imod consCursor_update cn (n0 + d) (cur + 1) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
         imodintro
-        isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (cur + 1) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+        isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (cur + 1) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           ileft; ipureintro; rfl
         ileft
         iexists sl
@@ -640,9 +654,10 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
         -- call's pops, and the swallowed byte is placed at it
         imod consCursor_update cn (n0 + d) (n0 + (d + 1)) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
         imodintro
-        isplitl [Ha Hcu Hhi Hlm]
-        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-          iframe Ha Hcu Hhi Hlm
+        isplitl [Ha Hcu Hhi Hlm Hdc]
+        · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
+            (by omega)
+          iframe Ha Hcu Hhi Hlm Hdc
           iright; iexact Hdt
         iright
         iframe Hrd Hdt
@@ -669,9 +684,10 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
       icases consStoredLb_get cn st $$ Ha with ⟨Ha, #Hstlb⟩
       imod consCursor_update cn (n0 + d) (n0 + (d + 1)) $$ Hcu Hrd with ⟨Hcu, Hrd⟩
       imodintro
-      isplitl [Ha Hcu Hhi Hlm]
-      · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-        iframe Ha Hcu Hhi Hlm
+      isplitl [Ha Hcu Hhi Hlm Hdc]
+      · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (n0 + (d + 1)) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
+            (by omega)
+        iframe Ha Hcu Hhi Hlm Hdc
         iright; iexact Hdt
       iright
       iframe Hrd Hdl Hdt
@@ -693,9 +709,9 @@ theorem crPopSwallow (cn : ConsNames) (Wd : IProp GF) (γc : GName) [CurCtx]
     icases consStoredLb_get cn st $$ Ha with ⟨Ha, #Hstlb⟩
     imod consCredPay cn Wd ⊤ (by simp) $$ Hcinv Hpr with #Hdt
     imodintro
-    isplitl [Ha Hcu Hhi Hlm]
-    · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (nrd) st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog
-      iframe Ha Hcu Hhi Hlm
+    isplitl [Ha Hcu Hhi Hlm Hdc]
+    · iapply crGhost_intro cn _ _ _ bs ts (cur + 1) (nrd) ndl st pd hh L0 gp hst' hpd' hch hbl her (by omega) hlog (by omega)
+      iframe Ha Hcu Hhi Hlm Hdc
       iright; iexact Hdt
     isplitr
     · iexists st

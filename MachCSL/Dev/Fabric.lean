@@ -78,10 +78,19 @@ Rocq. -/
 def DevStates.wire (ds : DevStates) (i : UartId) : List (BitVec 8) :=
   UartState.wire (ds.st (.uart i))
 
-/-- Device `d`'s move from `s` to `s'` is faithful to the events `os`. -/
+/-- Port `i`'s cumulative input: the bytes its receiver ever accepted from
+outside (Rocq `u_recv`, relax-d2 lane K1). -/
+def DevStates.recvd (ds : DevStates) (i : UartId) : List (BitVec 8) :=
+  UartState.recvd (ds.st (.uart i))
+
+/-- Device `d`'s move from `s` to `s'` is faithful to the events `os`: a
+port's events are its own, its wire grows by exactly its output events and
+its cumulative input by exactly its input events (the second is the Rocq
+`uart_step_recv`, relax-d2 lane K1). -/
 def devObsOk : (d : DevId) → DevSt d → DevSt d → List DevObs → Prop
   | .uart i, s, s', os =>
-      (∀ o ∈ os, o.port = i) ∧ UartState.wire s' = UartState.wire s ++ devObsOut i os
+      (∀ o ∈ os, o.port = i) ∧ UartState.wire s' = UartState.wire s ++ devObsOut i os ∧
+        UartState.recvd s' = UartState.recvd s ++ devObsIns i os
   | .plic, _, _, os => os = []
   | .virtio, _, _, os => os = []
 

@@ -26,10 +26,9 @@ and their two calls in `BootShared.boot_shared_alloc`).
   `MachCSL.powerBootRes` carries); the kernel's port's is `emp`.
 
 DEVIATIONS from Rocq:
-1. No `uart_dlcnt` (Lean's `UartNames` has no delivered-count name) and no
-   `u_recv` premise (Lean's `UartState` has no receive log): the premises are
-   `u.rx = []`, `Uart.loopback u = false`, `u.wire = u.out`,
-   `Uart.acc u = []`.
+1. (relax-d2 ported: the delivered count `uartDlcnt` is minted at 0, one half
+   in the port's claim and one for the ring; the premises include Rocq's
+   `u_recv u = []` as `u.recvd = []`.)
 2. Rocq allocates the console port's invariant together with the PLIC's and
    the disk's (`dev_inv_alloc`, one `dev_inv`); Lean has one invariant per
    device (`uartInv i`, `plicInv`, `diskInv`), so BOTH ports go through
@@ -60,12 +59,14 @@ theorem uartBoot_consHistOk : consHistOk uartBootHist := by
   refine ⟨⟨fun e he => absurd he (List.not_mem_nil), fun i e1 e2 h1 _ => ?_⟩, trivial⟩
   simp at h1
 
-theorem uartBoot_colOk (i : UartId) (u : UartState) (hrx : u.rx = [])
+theorem uartBoot_colOk (i : UartId) (u : UartState) (hrx : u.rx = []) (hrc : u.recvd = [])
     (hlb : Uart.loopback u = false) (hwo : u.wire = u.out) :
     uartColOk i u [] [] 0 none none := by
-  refine ⟨Nat.le_refl 0, by simp [hrx], by simp [hrx], hlb, hwo, ?_, ?_, ?_, trivial, ?_⟩
+  refine ⟨Nat.le_refl 0, by simp [hrx], by simp [hrx], hlb, hwo, ?_, ?_, ?_, trivial, ?_, hrc, ?_, rfl, rfl,
+    List.nil_prefix⟩
   · intro j b h _ hh; simp at hh
   · intro a j ha hj h1 _ _; simp at h1
+  · intro j h hh; simp at hh
   · intro j h hh; simp at hh
   · intro j h hh; simp at hh
 
@@ -73,7 +74,7 @@ theorem uartBoot_colOk (i : UartId) (u : UartState) (hrx : u.rx = [])
 with an empty receive FIFO, LOOP off, the wire drained and nothing
 accepted; the port's claim is founded on the power-on step's console
 resource. -/
-theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
+theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = []) (hrc : u.recvd = [])
     (hlb : Uart.loopback u = false) (hwo : u.wire = u.out) (hacc : Uart.acc u = []) :
     chistAt (GF := GF) i (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ⊢
       |==> ∃ γ : UartNames,
@@ -81,7 +82,8 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
         txOwn γ (Uart.acc u) ∗ uartSent γ (Uart.acc u) ∗ dlabOwn γ (Uart.dlab u) ∗
         rxTok γ 0 none ∗ rxHi γ (1 : Qp).half none ∗ rxHi γ (1 : Qp).half none ∗
         logHi γ (1 : Qp).half none ∗ uartDeliv γ (1 : Qp).half [] ∗
-        uartLogm γ (1 : Qp).half [] ∗ uartArm γ (1 : Qp).half none ∗ uartPreinit γ := by
+        uartLogm γ (1 : Qp).half [] ∗ uartDlcnt γ (1 : Qp).half 0 ∗ uartArm γ (1 : Qp).half none ∗
+        uartPreinit γ := by
   iintro Hres
   imod MonoList.own_alloc (GF := GF) (Uart.acc u) with ⟨%γa, Ha, #Hsent⟩
   imod MonoList.own_alloc (GF := GF) u.out with ⟨%γb, Hb, -⟩
@@ -104,13 +106,16 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
   icases ghostVar_halves γlm ([] : List LogEntry) $$ Hlm with ⟨Hlm1, Hlm2⟩
   imod ghost_var_alloc (GF := GF) (none : Option ConsArm) with ⟨%γar, Har⟩
   icases ghostVar_halves γar (none : Option ConsArm) $$ Har with ⟨Har1, Har2⟩
+  -- the delivered COUNT, at 0 (Rocq relax-d2, lane K2)
+  imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%γdc, Hdc⟩
+  icases ghostVar_halves γdc (0 : Nat) $$ Hdc with ⟨Hdc1, Hdc2⟩
   imodintro
   iexists ({ acc := γa, out := γb, tx := γc, dlab := γd, rxin := γin, rxpop := γpo,
              init := γini, rxhi := γhi, loghi := γlg, log := γml, deliv := γdv, logm := γlm,
-             arm := γar } : UartNames)
+             arm := γar, dlcnt := γdc } : UartNames)
   unfold uartGhosts sentAuth outAuth txAuth dlabAuth txOwn uartSent dlabOwn rxTok rxHi logHi
-    uartDeliv uartLogm uartArm uartPreinit
-  iframe Ha Hb Hc1 Hd1 Hc2 Hsent Hd2 Hpo2 Hhi1 Hhi2 Hlg2 Hdv2 Hlm2 Har2 Hini
+    uartDeliv uartLogm uartDlcnt uartArm uartPreinit
+  iframe Ha Hb Hc1 Hd1 Hc2 Hsent Hd2 Hpo2 Hhi1 Hhi2 Hlg2 Hdv2 Hlm2 Hdc2 Har2 Hini
   isplitl [Hin Hpo1]
   · unfold uartColE uartCol rxInAuth rxPopAuth
     iexists [], [], 0, none, none
@@ -119,8 +124,8 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
     · exact BigSepL.bigSepL_nil_intro
     isplitl []
     · unfold obsHistLbO; iempintro
-    · ipureintro; exact uartBoot_colOk i u hrx hlb hwo
-  · unfold consClaimAt logHi uartDeliv inLogAuth uartLogm uartArm
+    · ipureintro; exact ⟨fun _ h => (nomatch h), uartBoot_colOk i u hrx hrc hlb hwo⟩
+  · unfold consClaimAt logHi uartDeliv uartDlcnt inLogAuth uartLogm uartArm
     iexists none, uartBootHist
     rw [show (none : Option (List Obs)).getD [] = [] from rfl,
       show logTop uartBootHist.chLog = none from rfl]
@@ -132,6 +137,8 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
     · iexact Hlg1
     isplitl [Hdv1]
     · iexact Hdv1
+    isplitl [Hdc1]
+    · iexact Hdc1
     isplitl [Hml]
     · iexact Hml
     isplitl [Hlm1]
@@ -140,7 +147,9 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = [])
     · iexact Har1
     isplitl []
     · ipureintro; exact hacc.symm
+    isplitl []
     · ipureintro; exact uartBoot_consHistOk
+    · ipureintro; exact consLogIns_nil _ i
 
 /-- **Rocq `WpUart.uart_inv_alloc`**: the port's invariant, sealed with the
 device's mirror. -/
@@ -157,12 +166,12 @@ theorem uartInvAlloc (E : CoPset) (i : UartId) (γ : UartNames) (u : UartState) 
 `SpecMain.mainUartRaw` (`uartinitonePre`'s ghosts at `l = []`, `k = 0`, the
 DLAB half at `false`; the receipt; one `rxHi`/`logHi`/`uartArm` half each),
 `ConsoleInvDefs.consGhostsAlloc` (the other `rxHi` half, `uartDeliv`,
-`uartLogm`) and `PlicInv.plicInv_alloc` (`uartPreinit`) take. -/
+`uartLogm`, `uartDlcnt`) and `PlicInv.plicInv_alloc` (`uartPreinit`) take. -/
 def uartBootRes (γ : UartNames) : IProp GF := iprop%
   txOwn γ [] ∗ outLb γ [] ∗ uartSent γ [] ∗ dlabOwn γ false ∗ rxTok γ 0 none ∗
   rxHi γ (1 : Qp).half none ∗ rxHi γ (1 : Qp).half none ∗ logHi γ (1 : Qp).half none ∗
-  uartDeliv γ (1 : Qp).half [] ∗ uartLogm γ (1 : Qp).half [] ∗ uartArm γ (1 : Qp).half none ∗
-  uartPreinit γ
+  uartDeliv γ (1 : Qp).half [] ∗ uartLogm γ (1 : Qp).half [] ∗ uartDlcnt γ (1 : Qp).half 0 ∗
+  uartArm γ (1 : Qp).half none ∗ uartPreinit γ
 
 /-- The kernel's port claims nothing (Rocq `cons_res_at_uart1`). -/
 theorem uartBoot_chist1 (k : Nat) (ho : List Obs) (H : ConsHist) :
@@ -181,8 +190,8 @@ theorem uartBootAlloc (E : CoPset) (i : UartId) :
       chistAt i (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ⊢
       |={E}=> ∃ γ : UartNames, uartInv i γ ∗ uartBootRes γ := by
   iintro ⟨Hf, Hres⟩
-  imod uartGhostsAlloc i Uart.reset rfl rfl rfl rfl $$ Hres with
-    ⟨%γ, Hg, Hcol, Hcl, Htx, Hsent, Hdl, Htok, Hhi1, Hhi2, Hlg, Hdv, Hlm, Har, Hpre⟩
+  imod uartGhostsAlloc i Uart.reset rfl rfl rfl rfl rfl $$ Hres with
+    ⟨%γ, Hg, Hcol, Hcl, Htx, Hsent, Hdl, Htok, Hhi1, Hhi2, Hlg, Hdv, Hlm, Hdc, Har, Hpre⟩
   unfold uartGhosts
   icases Hg with ⟨Hsa, Hoa, Hta, Hda⟩
   have hlb : outAuth (GF := GF) γ Uart.reset ⊢ outAuth γ Uart.reset ∗ outLb γ [] :=
@@ -198,7 +207,7 @@ theorem uartBootAlloc (E : CoPset) (i : UartId) :
   iframe Hinv
   unfold uartBootRes
   rw [uartReset_acc, uartReset_dlab]
-  iframe Htx Hsent Hdl Htok Hhi1 Hhi2 Hlg Hdv Hlm Har Hpre
+  iframe Htx Hsent Hdl Htok Hhi1 Hhi2 Hlg Hdv Hlm Hdc Har Hpre
   iexact Hlb
 
 /-- **Both ports at power-on** (the two `uart_ghosts_alloc`/invariant

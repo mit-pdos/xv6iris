@@ -139,6 +139,61 @@ def consOwed (L : List LogEntry) (pe : Option (List Obs × BitVec 8))
   | none => consLogOk L R gp
   | some (h, c) => gp = true ∧ ∀ cs : List (BitVec 8), consLogOk (L ++ [(h, c, cs)]) R true
 
+/-! ## THE RING'S BYTES ARE DISTINCT ECHOED LOG ENTRIES (Rocq relax-d2, lane K2)
+
+A full ring is the kernel's reason for dropping a byte, and the only form
+that reason can take at the boundary is a COUNT: the log holds at least as
+many echoed entries as the ring holds bytes.  The injection is the ring's
+own two clauses -- `consLogged` says every ring entry IS an echoed log entry,
+`consChain` says the ring's histories strictly increase, hence are pairwise
+distinct. -/
+
+/-- Strictly increasing histories are distinct histories (Rocq
+`cons_chain_nodup`). -/
+theorem consChain_nodup (R : List (List Obs × BitVec 8)) (hch : consChain R) :
+    (R.map Prod.fst).Nodup := by
+  rw [List.Nodup, List.pairwise_iff_getElem]
+  intro i j hi hj hij heq
+  simp only [List.length_map] at hi hj
+  simp only [List.getElem_map] at heq
+  have h := hch i j R[i].1 R[j].1 R[i].2 R[j].2 (by simp [List.getElem?_eq_getElem hi])
+    (by simp [List.getElem?_eq_getElem hj]) hij
+  rw [heq] at h
+  exact Nat.lt_irrefl _ h.2
+
+/-- A duplicate-free list inside another is no longer than it. -/
+theorem consNodup_length_le {α : Type} [DecidableEq α] :
+    ∀ (l m : List α), l.Nodup → (∀ x ∈ l, x ∈ m) → l.length ≤ m.length := by
+  intro l
+  induction l with
+  | nil => intro m _ _; exact Nat.zero_le _
+  | cons x l ih =>
+    intro m hl hsub
+    have hx : x ∈ m := hsub x (by simp)
+    have hlnd := List.nodup_cons.1 hl
+    have hsub' : ∀ y ∈ l, y ∈ m.erase x := by
+      intro y hy
+      have hne : y ≠ x := fun he => hlnd.1 (he ▸ hy)
+      exact (List.mem_erase_of_ne hne).2 (hsub y (List.mem_cons_of_mem x hy))
+    have := ih (m.erase x) hlnd.2 hsub'
+    rw [List.length_erase_of_mem hx] at this
+    have hpos : 0 < m.length := List.length_pos_of_mem hx
+    simp only [List.length_cons]
+    omega
+
+/-- Rocq `cons_logged_count`: the ring holds no more bytes than the log has
+echoed entries. -/
+theorem consLogged_count (L : List LogEntry) (R : List (List Obs × BitVec 8))
+    (hlg : consLogged L R) (hch : consChain R) : R.length ≤ echoedCount L := by
+  have hsub : ∀ x ∈ R.map Prod.fst, x ∈ (L.filter (fun e => decide (logEchoed e))).map leHist := by
+    intro x hx
+    obtain ⟨p, hp, rfl⟩ := List.mem_map.mp hx
+    obtain ⟨e, he, hpe, hec⟩ := hlg p hp
+    refine List.mem_map.mpr ⟨e, List.mem_filter.mpr ⟨he, by simpa using hec⟩, ?_⟩
+    rw [← hpe]
+  have := consNodup_length_le _ _ (consChain_nodup R hch) hsub
+  simpa [echoedCount] using this
+
 /-! ## The four transitions, as pure list algebra -/
 
 theorem consGtop_snoc (R : List (List Obs × BitVec 8)) (p : List Obs × BitVec 8) :

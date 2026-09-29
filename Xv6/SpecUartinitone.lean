@@ -24,6 +24,15 @@ back at the same trace, the latch FROZEN off (`dlabOff`), a receive token,
 and the lock as `lkFresh` (its name field at the pointer passed).  The Rocq
 `SpecUartinitone`.
 
+...WITH WHAT THE FCR CLEAR DISCARDED (Rocq relax-d2, lane K1): when nothing
+had been accepted for transmission (`l = []` -- uartinit is the first thing
+main runs on the port), the token comes back at an anchor all of whose
+popped bytes went to the clear with no console output before them
+(`UartGhosts.uartFlushed`, `ConsLog.flushLost`'s witness).  DEVIATION from
+Rocq: Rocq takes `l = []` as a premise and returns `hl' = hl ∨ uart_flushed
+i hl'`; the anchor `hl` is existential in this `Pre`, so the post states the
+implication instead (the FIFO clear bit of `FCR := 7` always fires).
+
 Imports only definitional files.
 -/
 import Xv6.Image
@@ -50,7 +59,9 @@ def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 def uartinitonePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (name : BitVec 64) : IProp GF := iprop(
-  txOwn γ l ∗ dlabOff γ ∗ (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl') ∗
+  txOwn γ l ∗ dlabOff γ ∗
+  (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
+    ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) ∗
   wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) name ∗ lkFresh (txLockAddr i))
 
 /-- **WP of `uartinitone`.**  `a0 = &uarts[i]`, `a1` the name.  Two stack

@@ -254,14 +254,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- What a pending, unclaimed source hands its handler: the port's receive
 token.  (Nothing, for a source the invariant does not track.) -/
 def plicPayload (γ0 γ1 : UartNames) (i : Nat) : IProp GF :=
-  if i = 10 then plicPayloadUart γ0
-  else if i = 12 then plicPayloadUart γ1
+  if i = 10 then plicPayloadUart .uart0 γ0
+  else if i = 12 then plicPayloadUart .uart1 γ1
   else iprop(emp)
 
 theorem plicPayload_10 (γ0 γ1 : UartNames) :
-    plicPayload (GF := GF) γ0 γ1 10 = plicPayloadUart γ0 := rfl
+    plicPayload (GF := GF) γ0 γ1 10 = plicPayloadUart .uart0 γ0 := rfl
 theorem plicPayload_12 (γ0 γ1 : UartNames) :
-    plicPayload (GF := GF) γ0 γ1 12 = plicPayloadUart γ1 := rfl
+    plicPayload (GF := GF) γ0 γ1 12 = plicPayloadUart .uart1 γ1 := rfl
 
 /-- The payload, held by the slot exactly while the source is NOT in
 service: once a hart has claimed it, the hart holds it instead. -/
@@ -373,21 +373,21 @@ below never have to reduce `plicNames` / `plicPayload` under unification). -/
 theorem plicSlot_take10 (γ0 γ1 : UartNames) (p q : PlicState)
     (hp : p.claimed 10 = false) (hq : q.claimed 10 = true) :
     uartInited (GF := GF) γ0 ∗ plicSlot γ0 γ1 p 10 ⊢
-      plicSlot γ0 γ1 q 10 ∗ plicPayloadUart γ0 :=
+      plicSlot γ0 γ1 q 10 ∗ plicPayloadUart .uart0 γ0 :=
   plicSlot_take γ0 γ1 p q 10 hp hq
 
 theorem plicSlot_take12 (γ0 γ1 : UartNames) (p q : PlicState)
     (hp : p.claimed 12 = false) (hq : q.claimed 12 = true) :
     uartInited (GF := GF) γ1 ∗ plicSlot γ0 γ1 p 12 ⊢
-      plicSlot γ0 γ1 q 12 ∗ plicPayloadUart γ1 :=
+      plicSlot γ0 γ1 q 12 ∗ plicPayloadUart .uart1 γ1 :=
   plicSlot_take γ0 γ1 p q 12 hp hq
 
 theorem plicSlot_give10 (γ0 γ1 : UartNames) (q : PlicState) (hq : q.claimed 10 = false) :
-    uartInited (GF := GF) γ0 ∗ (plicPayloadUart γ0) ⊢ plicSlot γ0 γ1 q 10 :=
+    uartInited (GF := GF) γ0 ∗ (plicPayloadUart .uart0 γ0) ⊢ plicSlot γ0 γ1 q 10 :=
   plicSlot_give γ0 γ1 q 10 hq
 
 theorem plicSlot_give12 (γ0 γ1 : UartNames) (q : PlicState) (hq : q.claimed 12 = false) :
-    uartInited (GF := GF) γ1 ∗ (plicPayloadUart γ1) ⊢ plicSlot γ0 γ1 q 12 :=
+    uartInited (GF := GF) γ1 ∗ (plicPayloadUart .uart1 γ1) ⊢ plicSlot γ0 γ1 q 12 :=
   plicSlot_give γ0 γ1 q 12 hq
 
 /-- **`plicSlots_claim`**: what a claim does to the slots.  It answers one
@@ -396,8 +396,8 @@ payload to the claimer. -/
 theorem plicSlots_claim (γ0 γ1 : UartNames) (p : PlicState) (c : Nat) (hok : plicOk p) :
     uartInited (GF := GF) γ0 ∗ uartInited γ1 ∗ plicSlots γ0 γ1 p ⊢
       plicSlots γ0 γ1 (Plic.claim p c).2 ∗
-      (⌜(Plic.claim p c).1 = 10#32⌝ -∗ plicPayloadUart γ0) ∗
-      (⌜(Plic.claim p c).1 = 12#32⌝ -∗ plicPayloadUart γ1) := by
+      (⌜(Plic.claim p c).1 = 10#32⌝ -∗ plicPayloadUart .uart0 γ0) ∗
+      (⌜(Plic.claim p c).1 = 12#32⌝ -∗ plicPayloadUart .uart1 γ1) := by
   cases hb : Plic.best p c with
   | none =>
     have hval : (Plic.claim p c).1 = 0#32 := by rw [plic_claim_none p c hb]
@@ -464,7 +464,7 @@ have answered puts the payload back. -/
 theorem plicSlots_complete (γ0 γ1 : UartNames) (p : PlicState) (n : Nat)
     (hn : n = 0 ∨ n = 1 ∨ n = 10 ∨ n = 12) :
     uartInited (GF := GF) γ0 ∗ uartInited γ1 ∗ plicSlots γ0 γ1 p ∗
-      (⌜n = 10⌝ -∗ plicPayloadUart γ0) ∗ (⌜n = 12⌝ -∗ plicPayloadUart γ1) ⊢
+      (⌜n = 10⌝ -∗ plicPayloadUart .uart0 γ0) ∗ (⌜n = 12⌝ -∗ plicPayloadUart .uart1 γ1) ⊢
       plicSlots γ0 γ1 (Plic.complete p n) := by
   rcases hn with rfl | rfl | rfl | rfl
   · -- 0: not a source; the completion is a no-op
@@ -653,8 +653,8 @@ theorem plic_claim_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) :
     plicInv (GF := GF) γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ⊢
       devReadAU .plic (sclaimOff hrt) 4 (fun w => iprop(
         ⌜w = 0#32 ∨ w = 1#32 ∨ w = 10#32 ∨ w = 12#32⌝ ∗
-        (⌜w = 10#32⌝ -∗ plicPayloadUart γ0) ∗
-        (⌜w = 12#32⌝ -∗ plicPayloadUart γ1))) := by
+        (⌜w = 10#32⌝ -∗ plicPayloadUart .uart0 γ0) ∗
+        (⌜w = 12#32⌝ -∗ plicPayloadUart .uart1 γ1))) := by
   unfold plicInv devInvR devReadAU
   iintro ⟨#Hinv, #H0, #H1⟩
   iinv Hinv with Hbody Hclose
@@ -702,7 +702,7 @@ source back, and with it the resource the claim handed out. -/
 theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w : BitVec 32)
     (hw : w = 0#32 ∨ w = 1#32 ∨ w = 10#32 ∨ w = 12#32) :
     plicInv (GF := GF) γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
-      (⌜w = 10#32⌝ -∗ plicPayloadUart γ0) ∗ (⌜w = 12#32⌝ -∗ plicPayloadUart γ1) ⊢
+      (⌜w = 10#32⌝ -∗ plicPayloadUart .uart0 γ0) ∗ (⌜w = 12#32⌝ -∗ plicPayloadUart .uart1 γ1) ⊢
       devWriteAU .plic (sclaimOff hrt) 4 w emp := by
   have hn : w.toNat = 0 ∨ w.toNat = 1 ∨ w.toNat = 10 ∨ w.toNat = 12 := by
     rcases hw with rfl | rfl | rfl | rfl <;> decide
@@ -729,8 +729,8 @@ theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w 
   obtain rfl : Plic.complete p w.toNat = p'' := Option.some.inj (hx.symm.trans hwr)
   unfold plicGhosts
   icases HG with ⟨%hokp, Hslots⟩
-  ihave Hw10 := plic_wand_conv (plicPayloadUart γ0) w 10 hc10 $$ Hw10
-  ihave Hw12 := plic_wand_conv (plicPayloadUart γ1) w 12 hc12 $$ Hw12
+  ihave Hw10 := plic_wand_conv (plicPayloadUart .uart0 γ0) w 10 hc10 $$ Hw10
+  ihave Hw12 := plic_wand_conv (plicPayloadUart .uart1 γ1) w 12 hc12 $$ Hw12
   ihave Hslots := plicSlots_complete γ0 γ1 p w.toNat hn $$ [$H0 $H1 $Hslots $Hw10 $Hw12]
   imod Hmask
   ihave Hcl := Hclose $$ [Hfrag Hslots]
@@ -756,7 +756,7 @@ invariant does not need to know that). -/
 
 /-- The slot of source `10` takes UART0's writer. -/
 theorem plicSlot_deposit10 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl : Option (List Obs)) :
-    plicSlot (GF := GF) γ0 γ1 p 10 ∗ uartRxWriter γ0 k hl ⊢ |==> (plicSlot γ0 γ1 p 10 ∗ uartInited γ0) := by
+    plicSlot (GF := GF) γ0 γ1 p 10 ∗ uartRxWriter .uart0 γ0 k hl ⊢ |==> (plicSlot γ0 γ1 p 10 ∗ uartInited γ0) := by
   unfold plicSlot
   simp only [plicNames_10]
   cases hb : p.claimed 10 <;> simp only [plicHeld_true, plicHeld_false, plicPayload_10]
@@ -801,7 +801,7 @@ theorem plicSlot_deposit10 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl :
 
 /-- The slot of source `12` takes UART1's writer. -/
 theorem plicSlot_deposit12 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl : Option (List Obs)) :
-    plicSlot (GF := GF) γ0 γ1 p 12 ∗ uartRxWriter γ1 k hl ⊢ |==> (plicSlot γ0 γ1 p 12 ∗ uartInited γ1) := by
+    plicSlot (GF := GF) γ0 γ1 p 12 ∗ uartRxWriter .uart1 γ1 k hl ⊢ |==> (plicSlot γ0 γ1 p 12 ∗ uartInited γ1) := by
   unfold plicSlot
   simp only [plicNames_12]
   cases hb : p.claimed 12 <;> simp only [plicHeld_true, plicHeld_false, plicPayload_12]
@@ -848,7 +848,7 @@ theorem plicSlot_deposit12 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl :
 `Uart0`). -/
 theorem plicInv_deposit10 (γ0 γ1 : UartNames) (E : CoPset) (hE : (↑plicN : CoPset) ⊆ E) (k : Nat)
     (hl : Option (List Obs)) :
-    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter γ0 k hl ⊢ |={E}=> uartInited γ0 := by
+    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter .uart0 γ0 k hl ⊢ |={E}=> uartInited γ0 := by
   unfold plicInv devInvR
   iintro ⟨#Hinv, Hw⟩
   imod (inv_acc_timeless (E := E) (N := plicN) (P := iprop(∃ s : DevSt .plic, devFrag .plic s ∗ plicGhosts γ0 γ1 s)) hE) $$ Hinv with ⟨Hbody, Hclose⟩
@@ -869,7 +869,7 @@ theorem plicInv_deposit10 (γ0 γ1 : UartNames) (E : CoPset) (hE : (↑plicN : C
 `Uart1`). -/
 theorem plicInv_deposit12 (γ0 γ1 : UartNames) (E : CoPset) (hE : (↑plicN : CoPset) ⊆ E) (k : Nat)
     (hl : Option (List Obs)) :
-    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter γ1 k hl ⊢ |={E}=> uartInited γ1 := by
+    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter .uart1 γ1 k hl ⊢ |={E}=> uartInited γ1 := by
   unfold plicInv devInvR
   iintro ⟨#Hinv, Hw⟩
   imod (inv_acc_timeless (E := E) (N := plicN) (P := iprop(∃ s : DevSt .plic, devFrag .plic s ∗ plicGhosts γ0 γ1 s)) hE) $$ Hinv with ⟨Hbody, Hclose⟩

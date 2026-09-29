@@ -18,8 +18,12 @@ Ported one-to-one (Rocq name → Lean name):
   `readOk`, `log_ok` → `logOk`, `cons_ev` → `ConsEv` (constructors
   `evOut evOpen evByte evClose evRead`), `cons_step` → `consStep`,
   `cons_ev_ok` → `consEvOk`, `arm_ok` → `armOk`, `cons_hist_ok` →
-  `consHistOk`;
+  `consHistOk`; the relaxed discipline's (relax-d2) `echoed_count` →
+  `echoedCount`, `cons_drop_ok` → `consDropOk`, `flush_lost` → `flushLost`
+  (and `cons_ev_ok`'s three clauses K1/K2/K3, as at the pin 1900b8a43);
 * lemmas: `log_echoed_dec` (instance), `log_echoed_nonnil`, `log_ok_lt`,
+  `echoed_count_eq`, `cons_bs_join_length`, `cons_bs_join_not_single`,
+  `cons_bs_join_app_not_single` (as `consBsJoin_*`),
   `hist_chain_lt`, `cl_log_ok_last_ext`, `cl_top_snoc`, `cl_log_ok_snoc`,
   `cons_hist_ok_step`, `cons_step_log` (same names, camelCased).
 
@@ -105,6 +109,42 @@ instance logEchoed_dec (e : LogEntry) : Decidable (logEchoed e) := by
 clause's left disjunct into "not an echoed entry". -/
 theorem logEchoed_nonnil (e : LogEntry) (h : logEchoed e) : leEcho e ≠ [] := by
   rw [h]; exact List.cons_ne_nil _ _
+
+/-- HOW MANY OF THE LOG'S ENTRIES WERE ECHOED (Rocq `echoed_count`, relax-d2):
+what `consDropOk`'s full-ring disjunct counts, as a name. -/
+def echoedCount (L : List LogEntry) : Nat :=
+  (L.filter (fun e => decide (logEchoed e))).length
+
+/-- Rocq `echoed_count_eq`. -/
+theorem echoedCount_eq (L : List LogEntry) :
+    echoedCount L = (L.filter (fun e => decide (logEchoed e))).length := rfl
+
+/-- THE ERASE RUN IS NEVER ONE GLYPH (Rocq `cons_bs_join_length`, relax-d2
+K3): an erase arm's echo is a whole number of `consputcBs` triples. -/
+theorem consBsJoin_length (n : Nat) :
+    ((List.replicate n consputcBs).flatten).length = 3 * n := by
+  induction n with
+  | zero => rfl
+  | succ k ih =>
+    rw [List.replicate_succ, List.flatten_cons, List.length_append, ih]
+    simp [consputcBs]; omega
+
+/-- Rocq `cons_bs_join_not_single`. -/
+theorem consBsJoin_not_single (n : Nat) (x : BitVec 8) :
+    (List.replicate n consputcBs).flatten ≠ [x] := by
+  intro he
+  have := congrArg List.length he
+  rw [consBsJoin_length] at this
+  simp at this; omega
+
+/-- ...and the same for a run SPLIT at the arm's position, the shape the kill
+loop's early stop is in (Rocq `cons_bs_join_app_not_single`). -/
+theorem consBsJoin_app_not_single (i n : Nat) (x : BitVec 8) :
+    (List.replicate i consputcBs).flatten ++ (List.replicate n consputcBs).flatten ≠ [x] := by
+  intro he
+  have := congrArg List.length he
+  rw [List.length_append, consBsJoin_length, consBsJoin_length] at this
+  simp at this; omega
 
 /-- The log's order is transitive, not merely consecutive. -/
 theorem logOk_lt (pops : List LogEntry) (i j : Nat) (e1 e2 : LogEntry)
@@ -229,6 +269,25 @@ def consStep (H : ConsHist) : ConsEv → ConsHist
       | none => H
   | .evRead ws => ⟨H.chAcc, H.chLog, H.chDl ++ ws, H.chArm⟩
 
+/-- WHAT A DROP ARM (`cs = []`) OWES (Rocq `cons_drop_ok`, relaxed
+discipline).  A consoleintr arm that echoes nothing is one of four: a NUL
+byte, ^P (procdump), an erase byte with nothing to erase, or a FULL RING.
+The fourth is the one the application must be able to refute from its own
+discipline, so the kernel says what a full ring MEANS in the boundary's own
+terms: the log has at least 128 echoed entries beyond the delivered ones. -/
+def consDropOk (c : BitVec 8) (L : List LogEntry) (dl : List (List Obs × BitVec 8)) : Prop :=
+  c.toNat = 0 ∨ c.toNat = 16 ∨ consErase c = true
+  ∨ 128 + dl.length ≤ (L.filter (fun e => decide (logEchoed e))).length
+
+/-- WHAT THE RECEIVER MAY HAVE LOST (Rocq `flush_lost`, relaxed discipline).
+The log is complete up to ONE exception the hardware forces: uartinit's FCR
+write clears the receive FIFO, so bytes pushed before the console was
+initialised are discarded and no arm ever files them.  `flushLost h f`: `f`
+inputs of this era were lost, and if any were, some prefix of the era's
+segment holds exactly those `f` inputs and NO console output. -/
+def flushLost (h : List Obs) (f : Nat) : Prop :=
+  f = 0 ∨ ∃ sf : List Obs, sf <+: openSeg h ∧ obsWire .uart0 sf = [] ∧ (obsIns .uart0 sf).length = f
+
 /-- THE KERNEL'S PURE PREMISE at each event -- what the kernel proves from
 its own state before firing the application's link.
 
@@ -240,8 +299,15 @@ prefix-closed -- the erase arm's `cs` is a multiple of the three bytes
 that is no echo of anything.  Stating it as `j ≤ length cs` would make
 `consHistOk_step` UNPROVABLE at `evClose`.
 
-`evOpen`'s last clause is the WIRE RIDER: what the application has accounted
-for is already on the wire the kernel is about to extend. -/
+`evOpen`'s fifth clause is the WIRE RIDER: what the application has accounted
+for is already on the wire the kernel is about to extend.
+
+THE RELAXED DISCIPLINE'S THREE CLAUSES (Rocq relax-d2): `evOpen` says THE LOG
+IS COMPLETE -- every input of this era before `c` has been popped and filed,
+so the entry this arm will file is input number `length log + 1`, up to the
+`f` bytes uartinit's flush lost (`flushLost`) -- and A DROP SAYS WHY
+(`consDropOk`); `evClose` says A STORE ARM SENDS ITS BYTE (the arm whose echo
+is the byte itself closes only after that byte went out). -/
 def consEvOk (H : ConsHist) : ConsEv → Prop
   | .evOut _ => True
   | .evOpen h c cs =>
@@ -250,8 +316,11 @@ def consEvOk (H : ConsHist) : ConsEv → Prop
       ∧ consEcho c cs
       ∧ (∀ e, e ∈ H.chLog → histExt (leHist e) h)
       ∧ obsWire .uart0 (openSeg h) <+: H.chAcc
+      ∧ (∃ f : Nat, flushLost h f ∧ H.chLog.length + 1 + f = (obsIns .uart0 (openSeg h)).length)
+      ∧ (cs = [] → consDropOk c H.chLog H.chDl)
   | .evByte b => ∃ a, H.chArm = some a ∧ (caEcho a)[caSent a]? = some b
   | .evClose => ∃ a, H.chArm = some a ∧ consEcho (caByte a) ((caEcho a).take (caSent a))
+      ∧ (caEcho a = [echoOf (caByte a)] → caSent a = 1)
   | .evRead ws => readOk H.chLog H.chDl ws
 
 /-- The arm's own well-formedness, against the log it will be filed into AND
@@ -293,7 +362,7 @@ theorem consHistOk_step (H : ConsHist) (ev : ConsEv)
       exact ⟨hends, hecho, hle, hbelow, hwire.trans (List.prefix_append _ _)⟩
   | evOpen h c cs =>
     -- the arm is founded, and its facts ARE the premises
-    obtain ⟨_, hends, hecho, hbelow, hwire⟩ := hev
+    obtain ⟨_, hends, hecho, hbelow, hwire, _, _⟩ := hev
     exact ⟨hlog, hends, hecho, Nat.zero_le _, hbelow, hwire⟩
   | evByte b =>
     -- the counter advances into a byte the echo really has, so it stays
@@ -306,7 +375,7 @@ theorem consHistOk_step (H : ConsHist) (ev : ConsEv)
       hwire.trans (List.prefix_append _ _)⟩
   | evClose =>
     -- the entry is filed, and the arm's facts are exactly `clLogOk_snoc`'s premises
-    obtain ⟨a, ha, hpre⟩ := hev
+    obtain ⟨a, ha, hpre, _⟩ := hev
     cases ha
     obtain ⟨⟨h, c, cs⟩, j⟩ := a
     obtain ⟨hends, _, _, hbelow, _⟩ := harm

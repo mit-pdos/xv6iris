@@ -154,7 +154,7 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (ha0 : k'.regs 10#5 = BitVec.setWidth 64 cb)
     (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1)
-    (hx : ohistExt hh hb) (hxg : ohistExt hg hb) :
+    (hx : ohistExt hh hb) (hxg : ohistExt hg hb) (hshb : traceShape hb true) (hnext : k1Next hg hb) :
     kctx cpu k' ∗ pcIs cpu KA.«consoleintr» ∗ procsInv Γ ∗ consoleCaps γc γl γ ∗
     MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗ obsHistLb hb ∗
     outLb γ (obsWire .uart0 (openSeg hb)) ∗
@@ -165,7 +165,7 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
       logHi γ (1 : Qp).half (some hb) -∗ uartArm γ (1 : Qp).half none -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := CI.wp_consoleintr (hlc := hlc) (GF := GF) Γ cpu k' γc γl γ hb cb hh hg hnoff hK hlk htier
-    ha0 hends hboots hx hxg
+    ha0 hends hboots hx hxg hshb hnext
   unfold wp_consoleintr_body at h
   simp only [consoleintrAddr] at h
   iintro ⟨Hk, Hpc, HΓ, Hc, Ht, Hl, Ho, Hhi, Hlg, Harm, HΦ⟩
@@ -229,44 +229,50 @@ theorem ui_caps0 [CurCtx] (γc γl : GName) (γ : UartNames) :
 /-- The RHR pop with the PLIC payload OPENED (the Rocq `uart_rx_writer`
 destructed at the pop, as `ProofUartintr.v` does): the token moves to the
 popped byte, and the three halves come out with their order facts made
-STRICT against the new anchor -- what `consoleintr`'s contract asks. -/
+STRICT against the new anchor -- what `consoleintr`'s contract asks.
+...AND THE TWO INPUT NUMBERS with the log mark's clause against the OLD
+anchor (Rocq relax-d2, lane K1): uartintr turns them into consoleintr's
+`k1Next` at the console port (`k1Next_of_logAt`). -/
 theorem ui_rhr_pop (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs))
     (ins : List (BitVec 8)) (hk : k < ins.length) :
-    uartInv i γ ∗ uartRxWriter γ k hl ∗ rxInLb γ ins ∗ dlabOff γ ⊢@{IProp GF}
+    uartInv i γ ∗ uartRxWriter i γ k hl ∗ rxInLb γ ins ∗ dlabOff γ ⊢@{IProp GF}
       devReadAU (.uart i) 0 1 (fun b => iprop(⌜ins[k]? = some b⌝ ∗
-        ∃ h : List Obs, ⌜obsEndsIn i h b⌝ ∗ rxRider i γ h ∗ rxTok γ (k + 1) (some h) ∗
+        ∃ h : List Obs, ⌜obsEndsIn i h b ∧ ohistExt hl h ∧ insLen i hl = k ∧
+          (obsIns i (openSeg h)).length = k + 1⌝ ∗ rxRider i γ h ∗ rxTok γ (k + 1) (some h) ∗
           (∃ hh : Option (List Obs), rxHi γ (1 : Qp).half hh ∗ ⌜ohistExt hh h⌝) ∗
-          (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗ ⌜ohistExt hg h⌝) ∗
+          (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗ ⌜ohistExt hg h⌝ ∗
+            ⌜uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg hl⌝) ∗
           uartArm γ (1 : Qp).half none)) := by
   iintro ⟨#Hinv, Hw, #Hlb, #Hoff⟩
   unfold uartRxWriter
-  icases Hw with ⟨Htok, ⟨%hh, Hhi, %hhle⟩, ⟨%hg, Hlg, %hgle⟩, Harm⟩
+  icases Hw with ⟨Htok, ⟨%hh, Hhi, %hhle⟩, ⟨%hg, Hlg, %hgat⟩, Harm⟩
   ihave HAU := rhr_read_au i γ k hl ins hk $$ [Hinv Htok Hlb Hoff]
   · iframe Htok Hinv Hlb Hoff
   iapply devReadAU_wand $$ HAU
   inext
-  iintro %w ⟨%hget, %h, %⟨hends, hanch⟩, #Hr, Htok⟩
+  iintro %w ⟨%hget, %h, %⟨hends, hanch, hanum, hnum⟩, #Hr, Htok⟩
   isplitr
   · ipureintro; exact hget
   iexists h
   iframe Hr Htok Harm
   isplitr
-  · ipureintro; exact hends
+  · ipureintro; exact ⟨hends, hanch, hanum, hnum⟩
   isplitl [Hhi]
   · iexists hh; iframe Hhi; ipureintro; exact ohistExt_le_ext hh hl h hhle hanch
-  · iexists hg; iframe Hlg; ipureintro; exact ohistExt_le_ext hg hl h hgle hanch
+  · iexists hg; iframe Hlg; ipureintro
+    exact ⟨ohistExt_le_ext hg hl h (uartLogAt_le _ i hg hl hgat) hanch, hgat⟩
 
 /-- ...and the payload back together at the popped byte. -/
-theorem ui_writer_back (γ : UartNames) (k : Nat) (h : List Obs) (hh hg : Option (List Obs))
-    (hhle : ohistLe hh (some h)) (hgle : ohistLe hg (some h)) :
+theorem ui_writer_back (i : UartId) (γ : UartNames) (k : Nat) (h : List Obs) (hh hg : Option (List Obs))
+    (hhle : ohistLe hh (some h)) (hgat : uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg (some h)) :
     rxTok (GF := GF) γ k (some h) ∗ rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗
-      uartArm γ (1 : Qp).half none ⊢ uartRxWriter γ k (some h) := by
+      uartArm γ (1 : Qp).half none ⊢ uartRxWriter i γ k (some h) := by
   unfold uartRxWriter
   iintro ⟨Htok, Hhi, Hlg, Harm⟩
   iframe Htok Harm
   isplitl [Hhi]
   · iexists hh; iframe Hhi; ipureintro; exact hhle
-  · iexists hg; iframe Hlg; ipureintro; exact hgle
+  · iexists hg; iframe Hlg; ipureintro; exact hgat
 
 theorem ui_zext (b : BitVec 8) : BitVec.setWidth 64 b &&& 255#64 = BitVec.setWidth 64 b := by
   bv_decide
@@ -291,9 +297,9 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
     procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗
       pcIs cpu (KA.«uartintr» + 0x76#64) -∗ ⌜uiPres k R'⌝ -∗
-      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
+      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu)
     ⊢ ∀ (R : RegMap) (kp : Nat) (hl : Option (List Obs)),
-      uartRxWriter γ kp hl -∗ kctx cpu ((k.pushed 4).withRegs R) -∗
+      uartRxWriter i γ kp hl -∗ kctx cpu ((k.pushed 4).withRegs R) -∗
       pcIs cpu (KA.«uartintr» + 0x46#64) -∗
       ⌜uiPres k R ∧ R 9#5 = uartElt i ∧ R 13#5 = uartBaseAddr i + 5#64 ∧
         R 14#5 = uartBaseAddr i⌝ -∗ wpLoop (GF := GF) cpu := by
@@ -338,7 +344,8 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $HS $HAU]
     iintro %b2 Hk Hpc Hpost2
     case hb2 => k_norm; exact hR14
-    icases Hpost2 with ⟨%hget, %hpop, %hends, #Hrider, Hrtok, ⟨%hh, Hhi, %hx⟩, ⟨%hg, Hlg, %hxg⟩, Harm⟩
+    icases Hpost2 with ⟨%hget, %hpop, %⟨hends, hanch, hanum, hnum⟩, #Hrider, Hrtok, ⟨%hh, Hhi, %hx⟩,
+      ⟨%hg, Hlg, %hxg, %hgat⟩, Harm⟩
     -- +0x52  zext.b a0,a0
     k_step (wp_s_andi cpu _ (KA.«uartintr» + 0x52#64) false 255#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -356,7 +363,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x58#64) true 8174#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_hook1_bcond]
       iintro Hk Hpc
-      ihave Hrtok := ui_writer_back γ (kp + 1) hpop hh hg (ohistLe_of_ext hh hpop hx)
+      ihave Hrtok := ui_writer_back .uart1 γ (kp + 1) hpop hh hg (ohistLe_of_ext hh hpop hx)
         (ohistLe_of_ext hg hpop hxg) $$ [Hrtok Hhi Hlg Harm]
       · iframe Hrtok Hhi Hlg Harm
       iapply IH $$ Hexit %_ %(kp + 1) %(some hpop) Hrtok Hk Hpc
@@ -378,9 +385,13 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       iintro Hk Hpc
       ihave #Hcc := ui_caps0 γc γl γ $$ Hcaps
       unfold rxRider
-      icases Hrider with ⟨#Htg, #Hlbh, #Hwlb, %hboots⟩
+      icases Hrider with ⟨#Htg, #Hlbh, #Hwlb, %hboots, %hshh⟩
+      -- K1's RELAY (relax-d2): at the console the payload's clause says the
+      -- log's mark IS the anchor, and the pop gave both their input numbers,
+      -- so the byte is the very next input after the mark's
+      have hnext : k1Next hg hpop := k1Next_of_logAt _ hg hl hpop kp hgat hanum hnum hanch hshh hboots
       iapply (ui_call_consoleintr CI Γ cpu _ γc γl γ hpop b2 hh hg ?hs2 ?hn2 ?hK2 ?hl2 ?ht2 ?ha02
-          hends hboots hx hxg) $$ [- $Hk $Hpc $Hhi $Hlg $Harm]
+          hends hboots hx hxg hshh hnext) $$ [- $Hk $Hpc $Hhi $Hlg $Harm]
       rotate_right 1
       k_norm
       iframe #
@@ -391,7 +402,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       case ht2 => k_norm; exact htier
       case ha02 => k_norm; exact ui_zext b2
       iintro %R2 Hk Hpc %hcs2 ⟨%hh', Hhi, %hle'⟩ Hlg Harm
-      ihave Hrtok := ui_writer_back γ (kp + 1) hpop hh' (some hpop) hle' (ohistLe_some hpop)
+      ihave Hrtok := ui_writer_back .uart0 γ (kp + 1) hpop hh' (some hpop) hle' (Or.inl rfl)
         $$ [Hrtok Hhi Hlg Harm]
       · iframe Hrtok Hhi Hlg Harm
       k_norm [ui_jump_5c]
@@ -447,10 +458,10 @@ theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) :
-    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ ∗ uartRxWriter γ kp hl ∗
+    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ ∗ uartRxWriter i γ kp hl ∗
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«uartintr» + 0x2e#64) ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗ pcIs cpu (KA.«uartintr» + 0x76#64) -∗
-      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu) ∗
+      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu) ∗
     ⌜uiPres k R ∧ R 9#5 = BitVec.ofNat 64 i.idx⌝
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HΓ, #Hport, #Hrxw, #Hcaps, Hrtok, Hk, Hpc, Hexit, %⟨hpres, hR9⟩⟩
@@ -507,14 +518,14 @@ theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
 /-! ## The epilogue, packaged as the drain's exit continuation -/
 
 set_option maxHeartbeats 4000000 in
-theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (γ : UartNames)
+theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames)
     (hsie : k.sie = false) (hK : uartintrSlots ≤ k.avail) :
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
-      ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
+      ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu)
     ⊢ ∀ R' : RegMap, kctx (GF := GF) cpu ((k.pushed 4).withRegs R') -∗
       pcIs cpu (KA.«uartintr» + 0x76#64) -∗ ⌜uiPres k R'⌝ -∗
-      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu := by
+      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu := by
   iintro ⟨Hframe, HΦ⟩ %R' Hk Hpc %hpres' Hrtok
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   iapply (wp_epilogue4s1 cpu k hsie (KA.«uartintr» + 0x76#64)
@@ -541,10 +552,10 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) :
-    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ ∗ uartRxWriter γ kp hl ∗
+    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ ∗ uartRxWriter i γ kp hl ∗
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«uartintr» + 0x5e#64) ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗ pcIs cpu (KA.«uartintr» + 0x76#64) -∗
-      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu) ∗
+      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu) ∗
     ⌜uiPres k R ∧ R 9#5 = BitVec.ofNat 64 i.idx ∧ R 10#5 = BitVec.ofNat 64 i.idx⌝
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HΓ, #Hport, #Hrxw, #Hcaps, Hrtok, Hk, Hpc, Hexit, %⟨hpres, hR9, hR10⟩⟩
@@ -634,7 +645,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
   iframe
   inext
   iintro Hk Hpc Hframe
-  ihave Hexit := ui_exit cpu k γ hsie hK $$ [Hframe HΦ']
+  ihave Hexit := ui_exit cpu k i γ hsie hK $$ [Hframe HΦ']
   · iframe
   -- +0x0a  mv s1,a0
   k_step (wp_s_add cpu _ (KA.«uartintr» + 0xa#64) true 9#5 0#5 10#5 (by decide))

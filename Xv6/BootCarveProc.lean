@@ -56,9 +56,8 @@ Deviations (none process-layer):
    (`consWord_persist`) where Rocq reads a persisted physical snapshot and
    its ledger residue (`uart_field_word_of_pinned`): Lean's `ctxBytes`
    needs no ledger element at timestamp 0 (BootCarve deviation 3).
-3. Rocq's `cons_dlcnt` row (the delivered count) has no Lean counterpart
-   in `consResCur` (ConsoleInvDefs), so `bootCarveProc_consRes` takes four
-   ghost rows, not five.
+3. (Retired: relax-d2's `cons_dlcnt` row is ported, so
+   `bootCarveProc_consRes` takes Rocq's five ghost rows.)
 4. `ProcPriv`'s ghost names on the dormant block (`fdg`, `gen`, `chg`) are
    JUNK (`0`), as Rocq's `1%positive`: `procDormantNofd` names none of
    them; allocproc / the seal install the real ones.
@@ -458,7 +457,7 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
       consStoredAuth cn [] -∗ consCursor cn 0 -∗ consHi cn none -∗ consLogm cn [] -∗
-      consResAt cn curCtx := by
+      consDlcnt cn 0 -∗ consResAt cn curCtx := by
   rw [bcp_cons_val, consResAt_cur]
   have hB : (consBufAddr).toNat = 0x80012380 + 24 := rfl
   have hbs : ∀ j, j < INPUT_BUF_SIZE → (consBufAddr + BitVec.ofNat 64 j).toNat = 0x80012380 + 24 + 1 * j := by
@@ -467,7 +466,7 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
     omega
   have hN : INPUT_BUF_SIZE = 128 := rfl
   have hts := consTags_none (GF := GF) INPUT_BUF_SIZE
-  iintro #Hk H Hsa Hcu Hhi Hlm
+  iintro #Hk H Hsa Hcu Hhi Hlm Hdc
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012380 + 24) (0x80012380 + 152)
     (0x80012380 + 164) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80012380 + 152) (0x80012380 + 156)
@@ -483,8 +482,8 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
   ihave Hts := hts
   unfold consResCur
   iexists 0#32, 0#32, 0#32, List.replicate INPUT_BUF_SIZE 0#8, List.replicate INPUT_BUF_SIZE none,
-    0, 0, [], [], none, [], false
-  iframe Hr Hw He Hsa Hcu Hhi Hlm Hts
+    0, 0, 0, [], [], none, [], false
+  iframe Hr Hw He Hsa Hcu Hhi Hlm Hdc Hts
   isplitr
   · ipureintro; exact List.length_replicate
   isplitr
@@ -509,6 +508,8 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
   · unfold consData byteBuf; iexact Hb
   isplitr
   · ipureintro; exact bcp_consLogOk0
+  isplitr
+  · ipureintro; exact Nat.le_refl 0
   · ileft; ipureintro; rfl
 
 /-- **The ring and its two boot-time tokens** (`consGhostsBoot` through
@@ -521,8 +522,8 @@ theorem bootCarveProc_consBoot [CurCtx] (cn : ConsNames) :
       consResAt cn curCtx ∗ consReader cn 0 ∗ consCleanTok cn := by
   iintro #Hk H Hg
   unfold consGhostsBoot
-  icases Hg with ⟨Hsa, Hcu, Hhi, Hlm, Hrd, Hcl⟩
-  ihave Hres := bootCarveProc_consRes cn $$ Hk H Hsa Hcu Hhi Hlm
+  icases Hg with ⟨Hsa, Hcu, Hhi, Hlm, Hdc, Hrd, Hcl⟩
+  ihave Hres := bootCarveProc_consRes cn $$ Hk H Hsa Hcu Hhi Hlm Hdc
   iframe Hres Hrd Hcl
 
 end cons
@@ -658,17 +659,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `boot_shared_alloc`): the port's carved `.data` cells at the entry
 context `X`, its invariant, and `UartBoot.uartBootRes` (SA-1's mint) give
 `mainUartRaw X i γ []`, handing back the rows the ring's and the PLIC's
-mints take (the other `rxHi` half, `uartDeliv`, `uartLogm`,
+mints take (the other `rxHi` half, `uartDeliv`, `uartLogm`, `uartDlcnt`,
 `uartPreinit`). -/
 theorem bootCarveProc_uartRaw (X : CurCtx) (i : UartId) (γ : UartNames) :
     bcpUartCells (Y := X) i ∗ uartInv i γ ∗ uartBootRes γ ⊢
       mainUartRaw (hlc := hlc) (GF := GF) X i γ [] ∗
       (rxHi γ (1 : Qp).half none ∗ uartDeliv γ (1 : Qp).half [] ∗ uartLogm γ (1 : Qp).half [] ∗
-        uartPreinit γ) := by
+        uartDlcnt γ (1 : Qp).half 0 ∗ uartPreinit γ) := by
   unfold bcpUartCells uartBootRes mainUartRaw uartinitonePre
   iintro ⟨⟨#Hb, #Hr, Hid1, Hid2, Hl, Hn, Hc⟩, #Hinv, Htx, #Hlb, #Hsent, Hdl, Htok, Hhi1, Hhi2, Hlg, Hdv,
-    Hlm, Har, Hpre⟩
-  iframe Hhi2 Hdv Hlm Hpre Hsent Hhi1 Hlg Har
+    Hlm, Hdc, Har, Hpre⟩
+  iframe Hhi2 Hdv Hlm Hdc Hpre Hsent Hhi1 Hlg Har
   iexists 0#32, 0#64, 0#64
   iframe Hinv Hb Hr Hdl Htx Hlb Hid1 Hid2 Hl Hn Hc
   iexists none

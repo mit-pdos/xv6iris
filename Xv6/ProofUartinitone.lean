@@ -88,7 +88,9 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' ((k.pushed 2).withRegs R') -∗ pcIs cpu' (KA.«uartinitone» + 0x42#64) -∗
       ⌜∀ r : BitVec 5, r ≠ 14#5 → r ≠ 15#5 → R' r = R r⌝ -∗
-      txOwn γ l -∗ dlabOwn γ false -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl') -∗
+      txOwn γ l -∗ dlabOwn γ false -∗
+      (∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl' ∗
+        ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   unfold uartBaseWord uartRxWord
@@ -182,10 +184,21 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
   · iframe #; iframe
   k_step_gen (wp_uart_sb c14 _ (KA.«uartinitone» + 0x30#64) false 2#12 15#5 14#5 (by decide) (by decide)
       i 2 (by omega) ?hb15 (by decide)
-      iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl'))
+      iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
+        ⌜((7#8 : BitVec 8).getLsbD 1 = false ∧ hl' = hl) ∨
+          (l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl')⌝))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
-  iintro Hk Hpc ⟨Htx, Hrtok⟩
+  iintro Hk Hpc ⟨Htx, ⟨%kp', %hl', Hrtok, %hfl⟩⟩
   case hb15 => k_norm_g
+  -- WHAT THE CLEAR DISCARDED (relax-d2, lane K1): `FCR := 7` always clears
+  -- the receive FIFO, so the report is the flush's
+  have hfl' : l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl' := by
+    rcases hfl with ⟨h7, _⟩ | h
+    · exact absurd h7 (by decide)
+    · exact h
+  ihave Hrtok : iprop(∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl' ∗
+      ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) $$ [Hrtok]
+  · iexists kp', hl'; iframe Hrtok; ipureintro; exact hfl'
   -- +0x34  ld a5,8(a0)
   k_step_gen (wp_s_ld c15 _ (KA.«uartinitone» + 0x34#64) true 8#12 15#5 10#5 (by decide) (by decide)
       DFrac.discard (uartRxHook i))
@@ -333,7 +346,9 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   iapply wpLoop_bupd
   imod (dlabOwn_freeze γ) $$ Hdlab with #Hoff
   imodintro
-  ihave Hpost : iprop(txOwn γ l ∗ dlabOff γ ∗ (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl') ∗
+  ihave Hpost : iprop(txOwn γ l ∗ dlabOff γ ∗
+      (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
+        ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) ∗
       wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) (k.regs 11#5) ∗ lkFresh (txLockAddr i))
     $$ [Htx Hrtok Hwname Hfresh]
   case' _ => iframe #; iframe
