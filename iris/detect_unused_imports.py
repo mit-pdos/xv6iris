@@ -755,6 +755,9 @@ class FileResult:
     note: str = ""
     glob_state: str = "fresh"        # 'fresh' | 'stale' | 'missing'
     analysed: bool = True            # False => no usable evidence, NOT "no candidates"
+    # Build-confirmed edits withheld by `downstream_guard`, each with the reason
+    # (which downstream file loses which module).
+    downstream: list[tuple[Candidate, str]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1402,6 +1405,121 @@ def result_from_dict(d: dict) -> FileResult:
 
 
 # ---------------------------------------------------------------------------
+# The downstream guard: a removal must not unload a module a LATER file uses.
+# ---------------------------------------------------------------------------
+def _local_module(u: str, locals_: set[str]) -> str | None:
+    """The local file module a glob libname lives in (or None if not local)."""
+    while u:
+        if u in locals_:
+            return u
+        u = u.rpartition(".")[0]
+    return None
+
+
+def downstream_guard(dir_path: str, results: list[FileResult],
+                     local_prefix: str, graph: ExportGraph,
+                     applied_kinds: set[str]) -> int:
+    """Withhold every build-confirmed edit that would break a DOWNSTREAM file.
+
+    `--verify` compiles each file on its own, but `Require` is transitive for
+    LOADING: a file G may use a module B -- typically qualified, `B.lemma` --
+    that it never requires itself, because something G requires happens to
+    require B.  Removing that link elsewhere compiles fine where it is made and
+    breaks G.  (`UkFileDev.v` used `UEchoOut.echo_count_is` and reached
+    `UEchoOut` only through `UEchoFile.v`'s dead import of it; every nightly
+    sweep removed that import, failed its whole-tree gate, and so landed
+    nothing at all.)
+
+    So: B is BORROWED by G when G's glob references B but no `Require` of G's
+    own (nor the Export closure of one) loads it.  Once the edits are applied
+    to the require graph, a borrowed module G can no longer reach is LOST, and
+    every edit that dropped an edge F -> M with F reachable from G and B
+    reachable from M is withheld.  Restoring all such edges restores every
+    original path from G to B, so one pass suffices, and nothing else is
+    touched.  This is conservative (it may withhold an edit another path made
+    harmless) and only as good as the globs: a file without a fresh glob
+    borrows nothing here, and the whole-tree rebuild remains the gate.
+
+    The real fix is always in G -- require what it uses -- so the report names
+    each borrower.  Returns the number of edits withheld.
+    """
+    by_mod = {f"{local_prefix}.{r.vfile[:-2]}": r for r in results}
+    locals_ = set(by_mod)
+    texts: dict[str, str] = {}
+    req: dict[str, set[str]] = {}
+    for mod, r in by_mod.items():
+        with open(os.path.join(dir_path, r.vfile)) as f:
+            texts[mod] = f.read()
+        req[mod] = _local_requires(texts[mod], local_prefix, locals_)
+
+    borrowed: dict[str, set[str]] = {}
+    for mod, r in by_mod.items():
+        if glob_status(dir_path, r.vfile) != "fresh":
+            continue
+        glob = os.path.join(dir_path, r.vfile[:-2] + ".glob")
+        used = {m for u in referenced_libnames(glob)
+                if (m := _local_module(u, locals_)) is not None}
+        covered = {mod}
+        for s in parse_imports(texts[mod]):
+            for tok in s.modules:
+                covered |= graph.closure(logical_path(s, tok, local_prefix))[0]
+        if used - covered:
+            borrowed[mod] = used - covered
+    if not borrowed:
+        return 0
+
+    edits = {mod: [c for c in r.removable
+                   if getattr(c, "kind", "remove") in applied_kinds]
+             for mod, r in by_mod.items()}
+    new_req = dict(req)
+    for mod, es in edits.items():
+        if es:
+            new_req[mod] = _local_requires(
+                apply_edits(texts[mod], es, local_prefix), local_prefix, locals_)
+
+    def reach(start: str, g: dict[str, set[str]], memo: dict) -> set[str]:
+        if start in memo:
+            return memo[start]
+        seen, stack = {start}, [start]
+        while stack:
+            for n in g.get(stack.pop(), ()):
+                if n not in seen:
+                    seen.add(n)
+                    stack.append(n)
+        memo[start] = seen
+        return seen
+
+    old_memo: dict = {}
+    new_memo: dict = {}
+    withheld: dict[int, tuple[str, Candidate, str]] = {}
+    for g, bs in sorted(borrowed.items()):
+        old = reach(g, req, old_memo)
+        lost = bs - reach(g, new_req, new_memo)
+        for b in sorted(lost):
+            for f in old:
+                for c in edits.get(f, ()):
+                    if getattr(c, "kind", "remove") == "dupe":
+                        continue       # the module stays required by f
+                    if b in reach(c.full_path, req, old_memo):
+                        why = (f"`{by_mod[g].vfile}` uses `{b}` without "
+                               f"requiring it; it is loaded only through this "
+                               f"import -- add `Require {b[len(local_prefix) + 1:]}.` "
+                               f"to `{by_mod[g].vfile}`")
+                        withheld.setdefault(id(c), (f, c, why))
+    for f, c, why in withheld.values():
+        r = by_mod[f]
+        r.removable.remove(c)
+        r.downstream.append((c, why))
+    return len(withheld)
+
+
+def _local_requires(text: str, local_prefix: str, locals_: set[str]) -> set[str]:
+    """The local modules `text` requires (any of Require/Import/Export)."""
+    return {fp for s in parse_imports(text) for tok in s.modules
+            if (fp := logical_path(s, tok, local_prefix)) in locals_}
+
+
+# ---------------------------------------------------------------------------
 # Reporting.
 # ---------------------------------------------------------------------------
 def render_report(results: list[FileResult], verified_mode: bool) -> str:
@@ -1480,6 +1598,20 @@ def render_report(results: list[FileResult], verified_mode: bool) -> str:
         if not any_needed:
             lines.append("_(none)_")
             lines.append("")
+        withheld = [r for r in results if r.downstream]
+        if withheld:
+            lines.append("## Confirmed edits WITHHELD for a downstream file")
+            lines.append("")
+            lines.append("Each compiles where it is made, but unloads a module "
+                         "some later file uses without requiring it.  Fix that "
+                         "file (require what it uses) and the next sweep lands "
+                         "the edit.")
+            lines.append("")
+            for r in withheld:
+                lines.append(f"### {r.vfile}")
+                for c, why in r.downstream:
+                    lines.append(describe(c) + f"\n  - withheld: {why}")
+                lines.append("")
     else:
         lines.append("## Candidates (require --verify to confirm)")
         lines.append("")
@@ -1653,6 +1785,13 @@ def main() -> int:
             futures = [pool.submit(verify_one, r) for r in todo]
             for fut in concurrent.futures.as_completed(futures):
                 fut.result()   # re-raise in the main thread rather than swallow
+
+    if args.verify:
+        kinds = {"remove", "dupe"} | ({"rewrite"} if args.apply_rewrites else set())
+        n_held = downstream_guard(dir_path, results, local_prefix, graph, kinds)
+        if n_held:
+            print(f"[guard] withheld {n_held} edit(s) that would unload a module "
+                  f"a downstream file uses (see the report)", file=sys.stderr)
 
     report = render_report(results, verified_mode=args.verify)
     print(report)

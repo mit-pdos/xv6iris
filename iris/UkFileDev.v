@@ -98,6 +98,7 @@ Require Import UserOff.                (* [uoff], [foff_pub] *)
 Require Import UkFileOpen.             (* the deed's leaves *)
 Require Import FileWrite.
 Require Import UEchoFile.              (* [efany] / [efcur] / [ef_chain] *)
+Require UEchoOut.                      (* [UEchoOut.echo_count_is], used qualified *)
 Require Import ArgPath.                (* [arg_path_of] *)
 Require Import PathElems.              (* [path_elems] *)
 Require Import FsAbsEra.               (* [um_start_of] *)
