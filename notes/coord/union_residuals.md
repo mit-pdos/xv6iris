@@ -263,3 +263,12 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   CatImageEntryEnvC) — fold into the owner's lemma.
 - `udepw_law_of_sup*` (UdepwLawsP): UexecExecMint program tier unported. `hfpEchoNodeImg` (echo_node_img).
 - U4 camera slots: fifRegG, pnsRegG, cifRegG, pipesNG.
+
+## R-sh (landed Sept 29) — parameters still taken
+- UshConsK.ShConsOpenCalls: init_cons_laws (UInitCons, I-init), wp_uk_ecall_open_recv_img_at +
+  cons_sup_console/cons_sup_absent/cons_open_dead_recv (lane gaps / UkRunSys).
+- UshExecPinProg (R-prog): shCatPinResolves, catElfLoadable, grepElfLoadable.
+- UshExecPinEcho (R-prog): sh_cat_slot(_of_fs_pure), echo_node_img(_of_cmd_x), sh_exec_path_of_x_holds,
+  image_entry_pay_mono.
+- Perf pattern: run walks generic in the class, read the post at the instance in a separate lemma; never let
+  the kernel evaluate a literal ELF (state size lemmas over an arbitrary file).
