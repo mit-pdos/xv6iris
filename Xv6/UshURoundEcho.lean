@@ -260,7 +260,7 @@ theorem uwc0 (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   have hnp := union_D_nopipe I0 HD
   have hc0 : ualtCode (.UR (.REcho 0)) = 0 := rfl
   have haprs : lmAprs ulmG I0 0 := by
-    have h := ulm_aprs_R I0 (.REcho 0) hnp (by rw [HD.2]; exact (by decide : (0 : Nat) < 4)) rfl
+    have h := ulm_aprs_R I0 (.REcho 0) hnp (by rw [HD.2]; exact ⟨by decide, by decide⟩) rfl
     rw [hc0] at h
     exact h
   iintro #Hp Hc HR

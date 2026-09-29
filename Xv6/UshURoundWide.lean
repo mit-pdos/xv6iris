@@ -11,8 +11,11 @@ ARM (seccomp design 10.5): the read that completed a `seccomp x` line.  The two
 pipeline shapes are PARAMETERS here (`UshURoundShapes` names them).
 
 CONE (UShURoundDefs S3, reached): `uWcu`, `uWcu_of`, `uWcu_wild`, `uWcu_3`,
-`uWcu_3_nw`, `uWcu_taint`, `uHwbl_u`, `uHwbwc_u`, `uHpanic`, `uHktaint`,
-`ush_kill_law_u`.
+`uWcu_3_nw`, `uWcu_taint`, `uHwbwc_u`, `uHpanic`, `uHktaint`,
+`ush_kill_law_u`.  DRIFT SY1 (Rocq 7adb0cba2): `uHwbl_u` is deleted (no
+conversion of a block owed back to the boundary); new `uHoom` and
+`uoom_law_deed` (Rocq `UShURound.uoom_law_deed`, here beside `uHoom`), with
+the shared record step `uoom_diag` and `altOom_len`.
 
 ## Deviations from Rocq
 
@@ -111,14 +114,88 @@ theorem uWcu_taint (I : List (BitVec 8)) (p : Nat) (v : EraPins) :
   iapply uWcu_of ug r s0 PT PD I p
   iapply uWcf_taint ug r s0 I p v $$ Hpin HT
 
-/-- **Rocq `uHwbl_u`**. -/
-theorem uHwbl_u (I : List (BitVec 8)) :
-    ⊢ uWcu (hlc := hlc) (GF := GF) ug r s0 PT PD I 3 -∗ uWcu (hlc := hlc) ug r s0 PT PD I 0 := by
-  iintro H
-  icases uWcu_3 ug r s0 PT PD I $$ H with (H | #Hw)
-  · iapply uWcu_of ug r s0 PT PD I 0
-    iapply uHwbl_f ug r s0 I $$ H
-  · iapply uWcu_wild ug r s0 PT PD I 0 $$ Hw
+/-- `altOom`'s bytes before its prompt: "out of memory", 13 bytes, and the
+newline. -/
+theorem altOom_len : altOom.length - 2 = 14 := by decide
+
+/-- The record's diagnostic law at the out-of-memory alternative, its bytes
+`altOom` (`UshPanicLaws.ushDiagLaw_hold_at_alt` at `uoom`), from the lend
+beside any `Hold` to the block written up to its prompt beside `Hold`. -/
+theorem uoom_diag (UL : UK_LEAVES) (Hold : IProp GF) (I : List (BitVec 8)) (hnw : uwild (ul I) = false) :
+    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
+      ushExecfailLawAt (hlc := hlc) altOom 14
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ Hold)
+        iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
+          lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I uoom ∗ Hold) := by
+  have hab : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I uoom = altOom := by
+    rw [ufi_ab]; exact ulm_ab_oom I
+  have hx := ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) Hold I uoom
+  have el : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLinks = unionLinks (hlc := hlc) (GF := GF) ug := rfl
+  rw [hab, altOom_len, el] at hx
+  iintro #Hlk
+  unfold uWcl
+  iapply hx
+  · ileft
+    ipureintro
+    rw [ufi_wild, hnw]
+    simp
+  · iexact Hlk
+
+/-- **Rocq `uHoom`**: THE CHILD'S OUT-OF-MEMORY DIAGNOSTIC (upstream d66e41c;
+sync design section 2), at the widened credential: the lend opens into the
+record's block at the out-of-memory alternative (`uoom`), the fourteen bytes
+of "out of memory" and the newline step it, and the end is the block written
+up to its prompt beside the deed as the round found it -- the alternative's
+step is the identity, so that is a position-0 credential
+(`uWcf0_of_post_pre_id`).  At every line the record disciplines.  (DRIFT SY1,
+Rocq 7adb0cba2: replaces `uHwbl_u`.) -/
+theorem uHoom (UL : UK_LEAVES) (I : List (BitVec 8)) (hnw : uwild (ul I) = false) (hpos : 0 < nlines I) :
+    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
+      ushExecfailLawAt (hlc := hlc) altOom 14
+        (uWcu (hlc := hlc) ug r s0 PT PD I 3) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+  have hx := uoom_diag (hlc := hlc) (GF := GF) ug s0 UL (ushPreAt (hlc := hlc) ug r s0 I) I hnw
+  unfold ushExecfailLawAt at hx
+  iintro #Hlk
+  ihave #Hx := hx $$ Hlk
+  unfold ushExecfailLawAt
+  imodintro
+  iintro %N %l %hfd Hc
+  ihave Hc := uWcu_3_nw ug r s0 PT PD I hnw $$ Hc
+  rw [show (3 : Nat) = 0 + 3 from rfl, uWcf_S3]
+  icases Hx $$ %N %l %hfd Hc with ⟨%Pf, H0, #Hs, #He⟩
+  iexists Pf
+  iframe H0 Hs
+  imodintro
+  iintro Hp
+  icases He $$ Hp with ⟨%v, #Hpin, Hblk, Hpre⟩
+  iapply uWcu_of ug r s0 PT PD I 0
+  iapply uWcf0_of_post_pre_id ug r s0 I uoom v (ulm_apr_oom I) hnw hpos (fun s => ulm_step_oom s (ul I))
+    $$ Hpin Hblk Hpre
+
+/-- **Rocq `uoom_law_deed`**: THE OUT-OF-MEMORY DIAGNOSTIC WITH THE DEED
+OPENED (the cat and redirect children open the lend before the parse). -/
+theorem uoom_law_deed (UL : UK_LEAVES) (I : List (BitVec 8)) (cs : List Nat) (s : Dst) (v' : EraPins)
+    (hnw : uwild (ul I) = false) (htie : upreTie cs s0 I (dstContent s)) (hpos : 0 < nlines I) :
+    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ fTyped ug.ugnFile.fgnCl s -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
+      ushExecfailLawAt (hlc := hlc) altOom 14
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+  have hx := uoom_diag (hlc := hlc) (GF := GF) ug s0 UL (fown r s) I hnw
+  unfold ushExecfailLawAt at hx
+  iintro #Hlk #Hty #Hpin' #Hcs
+  ihave #Hx := hx $$ Hlk
+  unfold ushExecfailLawAt
+  imodintro
+  iintro %N %l %hfd Hc
+  icases Hx $$ %N %l %hfd Hc with ⟨%Pf, H0, #Hs, #He⟩
+  iexists Pf
+  iframe H0 Hs
+  imodintro
+  iintro Hp
+  icases He $$ Hp with ⟨%v, #Hp, Hblk, Hd⟩
+  iapply uWcu_of ug r s0 PT PD I 0
+  iapply uWcf0_of_post_alt ug r s0 I uoom v v' cs s (ulm_apr_oom I) hnw htie.1 hpos
+    (by rw [ulm_step_oom]; exact htie.2) $$ Hp Hblk Hd Hty Hpin' Hcs
 
 /-- **Rocq `uHwbwc_u`**: the banner-owed credential is a boundary one, its
 wild arm the wild arm. -/

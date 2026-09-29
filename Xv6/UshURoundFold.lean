@@ -6,13 +6,18 @@ THE FILE FAMILY** (Rocq `UShURoundDefs.v` S2, second half, pinned
 The line credential beside a deed at PRE is a position-0 file credential
 whenever every alternative of the line leaves `f` alone
 (`uWcf0_of_pre_line_id`), or at the alternative the holder took with the deed
-at that alternative's step (`uWcf0_of_posts_alt`, `uWcf0_of_post_alt`); a
-fork that failed re-enters at the boundary (`uHwbl_f`); the banner-owed
+at that alternative's step (`uWcf0_of_posts_alt`, `uWcf0_of_post_alt`), or
+at an identity-step alternative with the deed as found
+(`uWcf0_of_post_pre_id`, the out-of-memory death's); the banner-owed
 credential is a boundary one (`uHwbwc_f`); sh's own fork panic moves the deed
 PRE -> DONE (`ush_done_of_pre_ban`).
 
 CONE (reached): `uWcf0_of_pre_line_id`, `uWcf0_of_posts_alt`,
-`uWcf0_of_post_alt`, `uHwbl_f`, `uHwbwc_f`, `ush_done_of_pre_ban`.
+`uWcf0_of_post_alt`, `uWcf0_of_post_pre_id`, `uHwbwc_f`, `ush_done_of_pre_ban`.
+DRIFT SY1 (Rocq 3d74ec49f, 7adb0cba2): `uHwbl_f` (a block owed folded back
+at the silent alternative) is deleted with the model's silent alternative;
+`uWcf0_of_pre_line_id`'s first-byte-prompt arm files PEND at the block's own
+alternative.
 
 ## Deviations from Rocq
 
@@ -367,12 +372,6 @@ theorem uWcf0_of_post_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : L
 
 /-! ## §2 the loop's laws at the family -/
 
-/-- The block-owed credential re-enters at the boundary
-(`LinkRec.lkLcred_blk_line`, at the family's name). -/
-theorem uWcl_blk_line (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗ uWcl (hlc := hlc) ug s0 I 0 :=
-  lkLcred_blk_line (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) _ I
-
 /-- ...and lends its block (`LinkRec.lkLcred_blk_lend`). -/
 theorem uWcl_blk_lend (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
     ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗
@@ -380,37 +379,29 @@ theorem uWcl_blk_lend (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
         ∗ gwcLend (unionParamsAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I :=
   lkLcred_blk_lend (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) _ I
 
-/-- **Rocq `uHwbl_f`**: a fork that failed re-enters at the boundary -- the
-deed pending at the line's silent alternative. -/
-theorem uHwbl_f (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
-    ⊢ uWcf (hlc := hlc) (GF := GF) ug r s0 I 3 -∗ uWcf (hlc := hlc) ug r s0 I 0 := by
-  rw [show (3 : Nat) = 0 + 3 from rfl, uWcf_S3, uWcf_0]
-  iintro ⟨Hc, Hp⟩
+/-- **Rocq `uWcf0_of_post_pre_id`**: THE FOLD AT AN ALTERNATIVE WHOSE STEP IS
+THE IDENTITY, with the deed still at its PRE tie: the block written up to its
+prompt at `a` and the deed as the round found it are a position-0 credential
+-- DONE once the prompt's first byte is out, PEND at `a` before it.  The
+out-of-memory death is the one caller (`uHoom`): it dies in the parse, before
+any line shape moves `f`.  (DRIFT SY1, Rocq 7adb0cba2: replaces `uHwbl_f`,
+the silent conversion `uWcf I 3 -∗ uWcf I 0`.) -/
+theorem uWcf0_of_post_pre_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat)
+    (v : EraPins) (hapr : lmApr ulmG ulmGHooks I a) (hnw : uwild (ul I) = false) (hpos : 0 < nlines I)
+    (hid : ∀ s : Fstate, ulmG.lmStep s (ul I) (ulmG.lmDec a) = s) :
+    ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
+      lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
+      ushPreAt (hlc := hlc) ug r s0 I -∗ uWcf (hlc := hlc) ug r s0 I 0 := by
+  iintro #Hpin Hblk Hp
   unfold ushPreAt
   icases Hp with ⟨Hp, -⟩
   unfold ushDeedAt
-  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
-  · ihave ⟨%v, #Hpin, Hl⟩ := uWcl_blk_lend ug s0 I $$ Hc
-    unfold gwcLend gcur
-    rw [unionParamsAt_gW, unionParamsAt_gT]
-    unfold f0wAt
-    icases Hl with (⟨%ps, %cs, %sw, %P, %hw, Htn, #Hps, #Hcs, #HE, #Hf, %hs⟩ | #HT)
-    · subst sw
-      have hn : nlines I = cs.length + 1 := hw.1.2.2.1
-      iright
-      isplitl [Htn]
-      · iapply uWcl3_close ug s0 I v ps cs P hw $$ Hpin
-        iapply ugcur_intro $$ Htn Hps Hcs HE Hf
-      · iapply ushDeed_intro ug r upendTie s0 I cs' s v'
-          ⟨_, upend_tie_of_pre cs' s0 I _ (by omega) htie⟩ hnw $$ Hd Hty Hpin' Hcs'
-    · ileft
-      isplitr
-      · iapply uHcltaint ug s0 I 0 v $$ Hpin HT
-      · iapply ush_deed_taint ug r udoneTie s0 I $$ HT
-  · ileft
-    isplitl [Hc]
-    · iapply uWcl_blk_line ug s0 I $$ Hc
-    · iapply ush_deed_taint ug r udoneTie s0 I $$ HT
+  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', -⟩ | #HT)
+  · iapply uWcf0_of_post_alt ug r s0 I a v v' cs' s hapr hnw htie.1 hpos (by rw [hid]; exact htie.2)
+      $$ Hpin Hblk Hd Hty Hpin' Hcs'
+  · iapply uWcf_taint ug r s0 I 0 v $$ [] HT
+    rw [← ufi_pin ug s0]
+    iexact Hpin
 
 /-- The banner-owed credential is a boundary one (`LinkRec.lkLcred_of_ban`, at
 the family's name). -/

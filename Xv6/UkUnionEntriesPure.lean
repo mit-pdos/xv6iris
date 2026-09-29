@@ -96,7 +96,8 @@ theorem ulm_echo_adm (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (ws : L
   unfold consAdm
   show uok admUG _ _ (ualtDec 0) ∧ uterm (ualtDec 0) = false
   rw [ualtDec_0, hfl]
-  exact ⟨show raltOk (.LEcho ws) (raltDec 0) from (by decide : (0 : Nat) < 4), rfl⟩
+  exact ⟨show raltOk (.LEcho ws) (raltDec 0) by
+    rw [raltDec_lt4 0 (by omega)]; exact ⟨by decide, by decide⟩, rfl⟩
 
 /-- **Rocq `ulm_cat_body_ran`**: cat's body at a present content. -/
 theorem ulm_cat_body_ran (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (nm content : List (BitVec 8))

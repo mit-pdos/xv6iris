@@ -322,7 +322,8 @@ theorem uksh_w_prompt_pend (UL : UK_LEAVES)
       · iexact Hstd
       · iexact Hc0
   · -- a tainted deed: the record's law, DONE := T
-    ihave Hc0 := uWcl_blk_line ug s0 I $$ Hc
+    ihave ⟨%v0, #Hpin0, -⟩ := uWcl_blk_lend ug s0 I $$ Hc
+    ihave Hc0 := uHcltaint ug s0 I 0 v0 $$ Hpin0 HT
     iapply Htaint $$ HT Hlk %h %m %avail %ha0 %ha1 %ha2 Hcode [Hstd Hc0] Hrun Hcont
     isplitl [Hstd]
     · iexact Hstd
