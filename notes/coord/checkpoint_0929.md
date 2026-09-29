@@ -1,3 +1,5 @@
+# MILESTONE Sept 29 2026: union theorem closed — Xv6.unionAdequacyClosed (2504c6277; krelax af31d1908). All three top theorems (system, USER, union) closed at the axiom baseline.
+
 # Coordinator checkpoint (Sept 29 2026, resumed after the Sept 26 weekly-limit cut-off)
 
 origin/lean-v2 tip: 757df6199. Old coordinator transcript (kmit profile):
@@ -34,3 +36,5 @@ In flight (session 354a8854, stanford profile; transcripts under /root/.claude-s
 - LinkUkLeaves: agent a84509f955ac87499, worktree agent-a84509f955ac87499 (branch worktree-agent-a84509f955ac87499).
 Both resumed after a session-limit cut-off. dead_lane_tail.py reads kmit-profile transcripts: point D at the stanford dir for these.
 LinkUkLeaves LANDED (ukLeaves_holds : UK_LEAVES; icache stamp in userPtInvX, minted at userret fence.i). Remaining: U4 only (agent a6e72870d0b8146b8, lane-u4union).
+Cleanup lanes (Sept 29): A cone re-audit (worktree), B duplicate merges (worktree), C Rocq drift survey (read-only -> notes/rocq_drift.md).
+USER INSTRUCTION (Sept 29): after cleanup, update the Lean proofs to match the LATEST Rocq (main is actively developed; moved past 1900b8a43). Use lane C's drift report as the plan.
