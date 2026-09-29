@@ -388,15 +388,15 @@ set_option maxRecDepth 10000 in
 sound for the landing tree, the walker's frame at the landing map (same
 domain), the unchanged text map and the receipt, the address space is back at
 the landing's page view. -/
-theorem uk_userPtInvXS_close [CurCtx] (cpu : CPU) (P : UPtd) (t t' : PTree) (mm' T : BMap) (K : Nat)
+theorem uk_userPtInvXS_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t' : PTree) (mm' T : BMap) (K : Nat)
     (tlb' : Tlb) (hm' : UkMem P t' mm' T) (htlb : utlbOk t' tlb') :
-    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ubFrame curCtx (ubTreeAddrs 2 t ++ ukDataAddrs P.um)).B mm' -∗
+    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ubFrame curCtx D).B mm' -∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T -∗ iviewLb cpu K -∗ userPtInvXS cpu P (ukView P.um mm' T) := by
   have hl := ukView_length P.um mm' T
   iintro #HS Hr HB HX #HK
   icases ubFrame_elim curCtx _ mm' $$ HB with ⟨%⟨hnd, hdom⟩, HO⟩
   have hnd' : (ubTreeAddrs 2 t' ++ ukDataAddrs P.um).Nodup := uk_nodup_left _ _ hm'.nodup
-  have hperm : (ubTreeAddrs 2 t ++ ukDataAddrs P.um).Perm (ubTreeAddrs 2 t' ++ ukDataAddrs P.um) :=
+  have hperm : D.Perm (ubTreeAddrs 2 t' ++ ukDataAddrs P.um) :=
     (List.perm_ext_iff_of_nodup hnd hnd').2 (fun a => (hdom a).symm.trans (hm'.dom a))
   ihave HO := (ubOwn_perm curCtx _ _ mm' hperm).1 $$ HO
   have ha : ubTreeAddrs 2 t' ++ ukDataAddrs P.um =
