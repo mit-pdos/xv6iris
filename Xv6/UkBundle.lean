@@ -45,14 +45,14 @@ structure UkOpened (C : UCfg) (P : UPtd) (T : BMap) (m : RegMap) (pc : BitVec 64
     (V : Nat → List (BitVec 8)) (s : UWSt) : Prop where
   land : UkLand C P T s
   regs : ukRegs s.file m
-  pc : s.file .PC = pc
-  npc : s.file .nextPC = pc
+  hpc : s.file .PC = pc
+  hnpc : s.file .nextPC = pc
   view : ukView P.um s.mm T = V
 
 theorem ukOpened_preS {C : UCfg} {P : UPtd} {T : BMap} {m : RegMap} {pc : BitVec 64}
     {V : Nat → List (BitVec 8)} {s : UWSt} (h : UkOpened C P T m pc V s) : UkOpened C P T m pc V (ucPreS s) :=
-  ⟨ukLand_preS h.land, ukRegs_preS h.regs, by rw [ucPreS_file_other _ _ (by decide)]; exact h.pc,
-    by rw [ucPreS_file_other _ _ (by decide)]; exact h.npc, h.view⟩
+  ⟨ukLand_preS h.land, ukRegs_preS h.regs, by rw [ucPreS_file_other _ _ (by decide)]; exact h.hpc,
+    by rw [ucPreS_file_other _ _ (by decide)]; exact h.hnpc, h.view⟩
 
 section core
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -87,11 +87,10 @@ theorem uk_core_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → 
   iframe
   iframe HK
   ipureintro
-  refine ⟨⟨⟨ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, hhs, ⟨t, hmem, ?_⟩⟩, ukRegs_ufFile C P v m hvg, hva, hva', rfl⟩,
-    ?_, hsz⟩
-  · show utlbOk t v.tlb
-    rw [hvt]; exact htlb
-  · rw [← hM]; exact umemLazy_congr P sz _ _ hview
+  have htl : utlbOk t v.tlb := by rw [hvt]; exact htlb
+  have hlz : umemLazy P sz (ukView P.um mm T) = M := by rw [← hM]; exact umemLazy_congr P sz _ _ hview
+  exact ⟨⟨⟨ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, hhs, ⟨t, hmem, htl⟩⟩, ukRegs_ufFile C P v m hvg, hva, hva', rfl⟩,
+    hlz, hsz⟩
 
 set_option maxRecDepth 10000 in
 /-- **The core, re-sealed at a retired landing** (Rocq `uvb_intro` after
@@ -112,11 +111,11 @@ theorem uk_core_close [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd →
   ihave Hpt := uk_userPtInvXS_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
   rw [h.view]
   unfold ukCore userPtmInvXS
-  iframe
+  iframe Hregs Hcfg Hg Hpc Hrut
   isplitr
   · ipureintro; exact hsz
   iexists V'
-  iframe
+  iframe Hpt
   ipureintro; rfl
 
 set_option maxRecDepth 10000 in
@@ -132,6 +131,9 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
       iviewLb cpu K -∗ ufAside cpu -∗ (ctxToken cpu -∗ Rut P) -∗
       trappedMachine cpu C P Rut sz sc stv (uvisOfRun m pc (umemLazy P sz V) π sz fdv cw gn cs pidv lz secc) := by
   obtain ⟨t', hm', htlb'⟩ := h.mem
+  obtain rfl := h.sepc
+  obtain rfl := h.scause
+  obtain rfl := h.stval
   iintro #HS Hfr HX #HK Ha Hres
   icases uk_frames_close cpu C P Rut D s $$ [Hfr Hres] with ⟨HF, HB, Hrut⟩
   · iframe
@@ -140,24 +142,22 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
   · iframe
   ihave Hpt := uk_userPtInvXS_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
   ihave Hpt := userPtInvXS_forget cpu P _ $$ HS Hpt
-  rw [h.view] at *
-  have hg : ∀ i, i ≠ 0#5 → uxaXget s.file i = tfResumeGpr0 (tfOf m pc) i := by
+  rw [h.view]
+  have hg : ∀ i, i ≠ 0#5 → uxaXget s.file i = tfResumeGpr0 (tfOf m (s.file .sepc)) i := by
     intro i hi
     rw [ukRegs_ne s.file m h.regs i hi]
-    show m i = (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m pc) (4 + i.toNat))
-    rw [if_neg hi, tfOf_reg m pc i hi]
-  ihave Hg := uexec_gprFile_congr cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m pc)) hg $$ Hg
+    show m i = (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m (s.file .sepc)) (4 + i.toNat))
+    rw [if_neg hi, tfOf_reg m (s.file .sepc) i hi]
+  ihave Hg := uexec_gprFile_congr cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hg
   unfold trappedMachine userTrapFrameAtm userPtmInv
   iexists s.file .mstatus
   isplitr
-  · ipureintro; exact tfOf_length m pc
-  rw [h.sepc, h.scause, h.stval] at *
-  show iprop(⌜trapMstatusOk (s.file .mstatus)⌝ ∗ _)
+  · ipureintro; exact tfOf_length m (s.file .sepc)
+  dsimp only [uvisOfRun]
   rw [tfOf_epc]
   iframe
   isplitr
   · ipureintro; exact h.ms
-  iexists V
   iframe
   ipureintro; rfl
 
