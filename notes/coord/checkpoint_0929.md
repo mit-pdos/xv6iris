@@ -15,7 +15,7 @@ Relaunched Sept 29 (new session 354a8854, stanford profile) — old agentId -> l
 - BootReset phase 3: LANDED 5d020b1eb (trusted reset table retired; SLeft leftover record)
 Already landed before the cut-off: andelim (781099a29), UPIN, U4 (e91bd4112), U2-R, UkFork.
 Next after these: Union* (UnionOut/Links/LinkInst/ReadInst; needs U1-F + UShLine from U3 shell rounds).
-Pending user decision: Zkr CSR 0x747/0x757 (Sail one-line currentlyEnabled(Ext_Zkr) clause in regen
+RULED Sept 29: regen the Sail model with the patched backend (/shared/sail-upstream lean-short-circuit d0ef9371) -> worktree lane 'sail-regen' running; must discharge hZkr. (Old text: Zkr CSR 0x747/0x757 (Sail one-line currentlyEnabled(Ext_Zkr) clause in regen
 script, vs backend &&-fix) — the last hypothesis (hZkr) on the USER-free final theorem.
 
 New lanes Sept 29: P-echo LANDED 38812aaaa (UkTreeEntry echo entries wait on ExecEntry+UShEcho), R-sh (lane-rsh; UShLine… UShExecPin).
@@ -23,3 +23,4 @@ Still to start in U3: R-prog, R-pipes, R-round, I-init (after H-file/H-pipe, U1-
 land.sh: `postpush` mode redoes the main-tree ff + seed after a manual push; fetch/push retry (GitHub ssh auth flaky Sept 29).
 Union* lane (lane-u1punion) started Sept 29 after U1-F.
 Lane gaps (lane-gaps) started Sept 29: udepwfK uszOk, open_recv_gimg/uimg_view, read_win/at, udepw_law_of_sup*, echo_node_img, image entries.
+Sept 29 later: R-sh LANDED 1daabddd7; Union* LANDED d707ae720 (+ UnionReadInstAt follow-up); running: R-prog (lane-rprog), R-pipes (lane-rpipes), gaps (lane-gaps), sail-regen (worktree). Not started: R-round, I-init, U4, LinkUkLeaves.
