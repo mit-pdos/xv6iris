@@ -1,0 +1,25 @@
+RESUME PREAMBLE (Sept 29 2026). You are relaunching a lane of the Lean xv6 union port whose previous
+agent was cut off by a usage limit on Sept 26 ~22:30 UTC. Its transcript survives; its work is on disk.
+
+1. Rules are unchanged: read /shared/lean-xv6/notes/coord/gcp_rule.txt (NO lake/lean/lake env lean on
+   the local machine, EVER — every build runs on the GCP VM via run-on-gcp from YOUR lane worktree;
+   never pkill -f on the VM), and the lane's own brief files named in its original prompt.
+2. Recover state before doing anything:
+     python3 /shared/lean-xv6/notes/coord/dead_lane_tail.py <old agentId> 20 30
+   prints the old prompt, its sub-agents (with their agentIds — run the script on those too), its last
+   texts and tool calls. Then inspect the lane worktree(s) (`git -C <wt> status`, file mtimes) — the
+   files there are the newest state. Do NOT redo finished work; do not trust an old claim of "green"
+   without rebuilding.
+3. origin/lean-v2 tip is 757df6199 (unchanged since the cut-off). Rebase/refresh your worktree onto it
+   first (`git -C <wt> fetch -q origin && git -C <wt> checkout --detach origin/lean-v2`; untracked files
+   survive; stash-free). Refresh the remote .lake from /mnt/rocq/lean-seed if the remote tree is gone.
+4. You may run sub-agents in parallel for independent pieces (each gets its own lane-<L>-<x> worktree
+   per gcp_rule.txt); keep them few and tell each the rules above. Never `cd` the main tree into a
+   worktree path in a way that confuses others; prefer absolute paths / git -C.
+5. Deliver: copy final files into /shared/lean-xv6 (same relative paths; new Xv6/ files; edits to
+   landed files allowed only where the lane needs them — list every edited landed file). Do NOT edit
+   Xv6.lean, do NOT commit/push in /shared/lean-xv6 — the coordinator lands. Before reporting: a full
+   `lake build Xv6 MachCSL` on the VM in your lane worktree WITH your new modules imported (add them
+   to the worktree's Xv6.lean there only), tools/check_layering.sh, no sorry, no top-level name clashes.
+   Report: files + import order, landed files edited, Rocq decls ported/dropped, deviations,
+   parameters still taken, remaining gaps.

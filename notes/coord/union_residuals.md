@@ -233,3 +233,15 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `wp_uk_ecall_pipe`, `upipe_names_agree`; `read_win`/`read_at`/`read_recv_at` (sh-main's `ush_read_leaf` still a
   parameter); `write_chain_buf(_at)`, `usrc_ok_ubytesq`, `uheap_ubytes_w/_wat` (need `lazy_free_uw_addr`'s size bound,
   not exposed by `urun` at the leaf); `open_recv_img_at`, `open_recv_gimg`, `quiet_recv_img`, `uimg_view` + lemmas.
+
+## H-io (landing) — follow-ups (assigned to the runsys agent)
+- Discharge `UK_SYS_IO` (UkIoSysP: read_recv_at, write_chain_buf(_at), write_chain_txt).
+- Restore Rocq's `proc_pt_wf`/`lazy_free` rows in xpostRead/xpostWrite (+ syscDepRead/Write_holds), then discharge
+  `UK_POST_ROWS`.
+- `wp_uk_pipe_read_end` (needs wp_uk_ecall_pipe / upipe_names_agree).
+- Fold `HfpSysP.udepwfSt`/`ureadPipeAns` (H-file/H-pipe lane) with H-io's identical ones.
+
+## sh-run (landed 0efc05af3, Sept 29) — residual
+- `USH_RUN_SYS_P` has one field left: Rocq `UkRunSys.wp_uk_ecall_exec` (failure row; only the
+  cwd/refund forms `wp_uk_ecall_exec_at_cwd_refR(_ids)` exist in Lean). Port it into UkRunSys, then
+  delete `USH_RUN_SYS_P` so `shRuncmd_linked` depends on `UL` alone.
