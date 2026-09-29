@@ -2534,15 +2534,19 @@ Section ProofAllocproc.
            scope, so this call supplies no order proof for it -- left as-is
            rather than guessed at; flagging for whoever owns
            SpecProcPagetable.v. *)
+        iDestruct "Hlend" as (klc1 Hklc1) "Hlend".
         iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa γk F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme (avail_dec on) false
-                  ({["proc"]} ∪ lks)
+                  ({["proc"]} ∪ lks) klc1
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K36 K HK); lia)
                   (ap_tf_align tfr Hpvtf) (ap_tf_bound tfr Hpvtf)
-                  with "Hcg Hcpu Htext Hpc [Htfcell] Henv").
+                  with "Hcg Hcpu Htext Hpc [Htfcell] Henv Hlend").
         all: try lkbelow.
         { iEval (rewrite HF6a0). iExact "Htfcell". }
         iApply wp_next_off_intro.
-        iIntros (mpt) "Hcg Hcpu Hpc Htfcell Hppt %Hcspt".
+        iIntros (mpt) "Hcg Hcpu Hlend Hpc Htfcell Hppt %Hcspt".
+        iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
+        iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
+        { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
         iEval (rewrite HF6a0) in "Htfcell".
         assert (Hp52 : ret_pc (F6 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0xac))
           by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).

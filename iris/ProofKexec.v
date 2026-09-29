@@ -997,11 +997,13 @@ Section KexecAUMain.
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z) "Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z Uz) "%HUz Hst1a2 Hcont".
+      (* proc_pagetable took the block's counter (permit sweep L2) *)
+      destruct HUz as (kz & Hkz & ->).
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
-                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv (upd_usV U (upd_ev (us_V U) kz)) eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz Miz
@@ -1015,7 +1017,7 @@ Section KexecAUMain.
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
-                pidv U eb dqb dqs dqa dqpv dqas m My K
+                pidv (upd_usV U (upd_ev (us_V U) kz)) eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
@@ -1032,14 +1034,15 @@ Section KexecAUMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
-      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
+      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil Ul) "%HUl Hst12c Hcont".
+      destruct HUl as (kl0 & Hkl0 & ->).
       iApply (PB3.kxc_b2 (CID0 := CIDl)
                 (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
-                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv (upd_usV U (upd_ev (us_V U) kl0)) eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
@@ -1057,7 +1060,7 @@ Section KexecAUMain.
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
-                pidv (upd_usV U (upd_ev (us_V U) kb)) eb dqb dqs dqa dqpv dqas m My K
+                pidv (upd_usV (upd_usV U (upd_ev (us_V U) kl0)) (upd_ev (us_V (upd_usV U (upd_ev (us_V U) kl0))) kb)) eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)

@@ -1454,12 +1454,18 @@ Section ProofGrowproc.
                  with "Hcpu") as "Hcpu".
     (* [Hpt] is indexed at [pv_sz (us_V U)]; the same crossing as uvmalloc's. *)
     iEval (rewrite -HE3a1) in "Hpt".
-    iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa E3 (pv_upt (us_V U)) (us_M U) (av - 4)%nat eb p b lks
+    (* the lend (permit sweep L2): the block's counter, borrowed *)
+    iDestruct "Hcnt" as (kd0) "[%Hkd0 Hcnt]".
+    iDestruct (act_lend_borrow with "Hcnt") as "[Hlend Hlback]".
+    iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa E3 (pv_upt (us_V U)) (us_M U) (av - 4)%nat eb p b lks kd0
               ltac:(lia) HE3a0
               ltac:(rewrite HE3a1; exact Hszmax)
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID17 Hn17 md) "Hcg Hcpu Hpc %Hcsd %Hdret Hpt".
+    iIntros (CID17 Hn17 md) "Hcg Hcpu (%kd1 & %Hkd1 & Hlend) Hpc %Hcsd %Hdret Hpt".
+    iDestruct ("Hlback" $! kd1 with "[%] Hlend") as (kd2) "[%Hkd2 Hcnt]"; [exact Hkd1|].
+    iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
+    { iExists kd2. iFrame "Hcnt". iPureIntro; lia. }
     rewrite HE3a1 HE3a2 in Hdret.
     iEval (rewrite HE3a1 HE3a2) in "Hpt".
     (* uvmdealloc's own contract indexes its block at [uvmd_rsz oldsz newsz];

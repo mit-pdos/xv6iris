@@ -664,7 +664,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 
 Section KvmmakeHouse.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -950,7 +950,7 @@ Proof. lia. Qed.
 (* parameterized by the callee WP lemmas so it compiles standalone.        *)
 (* ===================================================================== *)
 Section KvmmakeBody.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -1002,6 +1002,7 @@ Section KvmmakeBody.
       (eb : bool) (p : mword 64) (nb : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat ->
     (K_kvmmake < nb)%nat ->
@@ -1036,7 +1037,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using wp_kalloc wp_memset.
-    intros sp0 spr Hbelow HK Hnb.
+    intros sp0 spr Hp0 Hbelow HK Hnb.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Henv Hcont".
     (* frame-cell address facts (same 4-slot frame as the sealed epilogue) *)
@@ -1268,6 +1269,7 @@ Section KvmmakeBody.
       (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat ->
     (166 < nb)%nat ->
@@ -1294,7 +1296,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     (* +0x18 li a4,6 *)
@@ -1384,7 +1386,7 @@ Section KvmmakeBody.
               (pt_rep0_empty bppn)
               ltac:(intros i Hi; rewrite (lt1 i Hi); apply lookup_empty)
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -1422,6 +1424,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 2)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -1445,7 +1448,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x28)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
@@ -1525,7 +1528,7 @@ Section KvmmakeBody.
                     assert (Hv0 : vpn_at uart1_vpn 0 = uart1_vpn) by (apply bv_eq; apply vpn_at_0_bv);
                     rewrite Hv0; exact kvm_m1_none_uart1)
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -1557,6 +1560,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 2)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -1580,7 +1584,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x38)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
@@ -1660,7 +1664,7 @@ Section KvmmakeBody.
                     assert (Hv0 : vpn_at virtio_vpn 0 = virtio_vpn) by (apply bv_eq; apply vpn_at_0_bv);
                     rewrite Hv0; exact kvm_m2_none_virtio)
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -1692,6 +1696,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 2)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -1715,7 +1720,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x48)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
@@ -1795,7 +1800,7 @@ Section KvmmakeBody.
                     rewrite (vpn_at_unsigned plic_vpn i ltac:(rewrite plic_vpn_uns; exact (proj1 (plic_bounds i Hi))));
                     rewrite plic_vpn_uns; exact (proj2 (plic_bounds i Hi)))
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -1827,6 +1832,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 34)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -1850,7 +1856,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x5a)) (mword_of_int 14 : mword 5) (mword_of_int 10 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))
@@ -1946,7 +1952,7 @@ Section KvmmakeBody.
                     rewrite (vpn_at_unsigned text_vpn0 i ltac:(rewrite text_vpn_uns; exact (proj1 (text_bounds i Hi))));
                     rewrite text_vpn_uns; exact (proj2 (text_bounds i Hi)))
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID9 Hs9 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -1978,6 +1984,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 36)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -2001,7 +2008,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x70)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
@@ -2123,7 +2130,7 @@ Section KvmmakeBody.
                     rewrite (vpn_at_unsigned data_vpn0 i ltac:(rewrite data_vpn_uns; exact (proj1 (data_bounds i Hi))));
                     rewrite data_vpn_uns; exact (proj2 (data_bounds i Hi)))
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID12 Hs12 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -2155,6 +2162,7 @@ Section KvmmakeBody.
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
+    p = (zero_reg : mword 64) ->
     locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 99)%nat ->
     M !!! Regidx csp_rs1 = spr ->
@@ -2178,7 +2186,7 @@ Section KvmmakeBody.
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spr Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
+    intros sp0 spr Hp0 Hbelow HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kvmmake + 0x92)) (mword_of_int 14 : mword 5) (mword_of_int 10 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 10 : mword 6))))
@@ -2279,7 +2287,7 @@ Section KvmmakeBody.
                     assert (Hv0 : vpn_at tramp_vpn 0 = tramp_vpn) by (apply bv_eq; apply vpn_at_0_bv);
                     rewrite Hv0; exact kvm_m6_none_tramp)
               ltac:(eexists; split; [reflexivity | exact Hbud])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID10 Hs10 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
@@ -2313,56 +2321,56 @@ Section KvmmakeBody.
     wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
   Proof using wp_kalloc wp_kvmmap wp_memset wp_pms.
     unfold wp_kvmmake_sconf_body.
-    intros Hlvl HK Hex Hbelow.
+    intros Hlvl HK Hex Hp0 Hbelow.
     destruct Hex as (nb & Hon & Hnbk).
     subst lvl. subst on.
     assert (Hnb : (166 < nb)%nat) by (exact Hnbk).
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Henv Hcont".
     (* ---- prologue: frame + root kalloc + memset -> pt_empty_node bppn ---- *)
-    iApply (wp_kmk_prologue_node γa γk mm K eb p nb b lks Hbelow HK Hnbk
+    iApply (wp_kmk_prologue_node γa γk mm K eb p nb b lks Hp0 Hbelow HK Hnbk
               with "Hcg Hcnt Htext Hpc Henv").
     iIntros (CIDpr Hspr M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
     (* ---- region 1: UART ---- *)
     iApply (wp_kmk_region_uart γa γk mm M0 bppn K eb p nb 0%nat b lks
-              Hbelow HK Hnb (Nat.le_0_l 0) Hsp0 H9
+              Hp0 Hbelow HK Hnb (Nat.le_0_l 0) Hsp0 H9
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID1 Hs1 mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
     (* ---- region 2: UART1 (the second 16550; grows the tree by nothing) ---- *)
     assert (Bu1 : (0 + g1 <= 2)%nat) by (rewrite Nat.add_0_l; exact Hg1).
     iApply (wp_kmk_region_uart1 γa γk mm mr1 bppn t1 K eb p nb (0 + g1)%nat b lks
-              Hbelow HK Hnb Bu1 Hsp1 H9_1 Hbase1 Hrep1
+              Hp0 Hbelow HK Hnb Bu1 Hsp1 H9_1 Hbase1 Hrep1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CIDu1 Hsu1 mru1 tu1 gu1) "Hcg Hcnt Hpc Hptree Henv %Hcsu1 %H9_u1 %Hspu1 %Hbaseu1 %Hrepu1 %Hnodesu1 %Hgu1".
     (* ---- region 3: VIRTIO ---- *)
     assert (Bv : (0 + g1 + gu1 <= 2)%nat)
       by exact (acc_step (0+g1) gu1 2 0 2 Bu1 Hgu1 ltac:(nat_le)).
     iApply (wp_kmk_region_virtio γa γk mm mru1 bppn tu1 K eb p nb (0 + g1 + gu1)%nat b lks
-              Hbelow HK Hnb Bv Hspu1 H9_u1 Hbaseu1 Hrepu1
+              Hp0 Hbelow HK Hnb Bv Hspu1 H9_u1 Hbaseu1 Hrepu1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID2 Hs2 mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
     (* ---- region 4: PLIC ---- *)
     assert (Bp : (0 + g1 + gu1 + g2 <= 2)%nat) by exact (acc_step (0+g1+gu1) g2 2 0 2 Bv Hg2 ltac:(nat_le)).
     iApply (wp_kmk_region_plic γa γk mm mr2 bppn t2 K eb p nb (0 + g1 + gu1 + g2)%nat b lks
-              Hbelow HK Hnb Bp Hsp2 H9_2 Hbase2 Hrep2
+              Hp0 Hbelow HK Hnb Bp Hsp2 H9_2 Hbase2 Hrep2
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID3 Hs3 mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
     (* ---- region 5: text ---- *)
     assert (Bt : (0 + g1 + gu1 + g2 + g3 <= 34)%nat) by exact (acc_step (0+g1+gu1+g2) g3 2 32 34 Bp Hg3 ltac:(nat_le)).
     iApply (wp_kmk_region_text γa γk mm mr3 bppn t3 K eb p nb (0 + g1 + gu1 + g2 + g3)%nat b lks
-              Hbelow HK Hnb Bt Hsp3 H9_3 Hbase3 Hrep3
+              Hp0 Hbelow HK Hnb Bt Hsp3 H9_3 Hbase3 Hrep3
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID4 Hs4 mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
     (* ---- region 6: data ---- *)
     assert (Bd : (0 + g1 + gu1 + g2 + g3 + g4 <= 36)%nat) by exact (acc_step (0+g1+gu1+g2+g3) g4 34 2 36 Bt Hg4 ltac:(nat_le)).
     iApply (wp_kmk_region_data γa γk mm mr4 bppn t4 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4)%nat b lks
-              Hbelow HK Hnb Bd Hsp4 H9_4 Hbase4 Hrep4
+              Hp0 Hbelow HK Hnb Bd Hsp4 H9_4 Hbase4 Hrep4
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID5 Hs5 mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
     (* ---- region 7: trampoline ---- *)
     assert (Br : (0 + g1 + gu1 + g2 + g3 + g4 + g5 <= 99)%nat) by exact (acc_step (0+g1+gu1+g2+g3+g4) g5 36 63 99 Bd Hg5 ltac:(nat_le)).
     iApply (wp_kmk_region_tramp γa γk mm mr5 bppn t5 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4 + g5)%nat b lks
-              Hbelow HK Hnb Br Hsp5 H9_5 Hbase5 Hrep5
+              Hp0 Hbelow HK Hnb Br Hsp5 H9_5 Hbase5 Hrep5
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID6 Hs6 mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
     (* ---- census pin: pt_nodes t6 = 102, growth-sum = 101 ---- *)
@@ -2400,7 +2408,7 @@ Section KvmmakeBody.
                     [apply avail_sub_Some
                     | rewrite (kstacks_missing_zero t6 Hrep6);
                       exact (pms_budget_arm (0 + g1 + gu1 + g2 + g3 + g4 + g5 + g6) 101 nb ltac:(rewrite Hgtot101; nat_le) ltac:(nat_le) Hnb)])
-              Hbelow
+              Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { rewrite avail_sub_Some. iExact "Henv". }
     iIntros (CID9 Hs9 mr7 t7 g7 pas) "Hcg Hcnt Hpc Hptree %Hnodes7' Henv %Hcs7 %Hbase7' %Hpasok %Hrep7 %Hg7le Hpages".
@@ -2472,7 +2480,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      BARE, at this [Definition]'s own ambient [CID], implicit-argument
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
-  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen

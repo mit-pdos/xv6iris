@@ -84,6 +84,7 @@ Require Import SpecWalk SpecKfree.
 Require Import SpecUvmunmap.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -1874,7 +1875,7 @@ Module UvmunmapProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE) : UVMUNMAP.
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmap.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
@@ -1892,12 +1893,15 @@ Section SealUvmunmap.
       (γa : gname) (mm : regfile)
       (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_uvmunmap_mem_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hlive Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2), framed through: no callee takes it yet *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
     { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
       change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
@@ -1992,12 +1996,15 @@ Section SealUvmunmap.
       (γa : gname) (mm : regfile)
       (P : uptd) (sz : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_uvmunmap_live_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hlive Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2), framed through: no callee takes it yet *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
     { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
       change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
@@ -2131,7 +2138,7 @@ Module UvmunmapBareProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE)
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapBare.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [bare_pt] IS the [∅] instance, definitionally -- there is nothing
@@ -2140,12 +2147,15 @@ Section SealUvmunmapBare.
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2), framed through: no callee takes it yet *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
     { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
       change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
@@ -2188,7 +2198,7 @@ Module UvmunmapFixedProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE)
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapFixed.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_uvmunmap_fixed_sconf
@@ -2196,12 +2206,15 @@ Section SealUvmunmapFixed.
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_uvmunmap_fixed_sconf_body].
     intros pcE va ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hv Hfixed Hrange.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2), framed through: no callee takes it yet *)
+    iDestruct (act_lend_cont_frame with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     (* the run is ONE page, so the only vpn it clears is [svpn_of va] itself
        ([vpn_at _ 0]), which the caller has named as a fixed leaf. *)
     assert (Hside : forall k : nat, (k < 1)%nat ->

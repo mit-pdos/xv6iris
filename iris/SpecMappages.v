@@ -21,12 +21,13 @@ Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 
 
-Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 13) in
   let vpn0 := svpn_of va in
@@ -56,21 +57,25 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   pc_is (mword_of_int KernelSyms.mappages) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env_at γa γk on -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile) (t' : ptree) (k : nat) (g : nat),
+    ∀ (mr : regfile) (t' : ptree) (nm : nat) (g : nat),
     sie_cap_gpr kt mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
     kalloc_env_at γa γk (avail_sub on g) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜pt_base t' = pt_base t⌝ -∗
-    ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
+    ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm nm)⌝ -∗
     ⌜pt_present_mono t t'⌝ -∗
     ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
-    ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
-      \/ ((k < npages)%nat /\
+    ⌜ (nm = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
+      \/ ((nm < npages)%nat /\
           mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
           avail_zero (avail_sub on g)) ⌝ -∗
     mWP (Loop : expr riscv_lang)) -∗
@@ -78,7 +83,7 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type MAPPAGES.
   Parameter wp_mappages_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_mappages_sconf_body kt γa γk mm t m npages perm lvl K eb p on b lks.
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat),
+      wp_mappages_sconf_body kt γa γk mm t m npages perm lvl K eb p on b lks k.
 End MAPPAGES.

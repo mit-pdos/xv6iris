@@ -22,6 +22,7 @@ Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [wchG]: mappages' lend, the permit sweep L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 
@@ -39,7 +40,7 @@ Require Import CtxIdDefs.
    graft -- see KvmMap; the proof telescopes it), so every kalloc-null /
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
-Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
@@ -55,6 +56,10 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   (* proc_mapstacks kalloc's a page for each of the 64 kernel stacks: its
      cone touches "kmem" (13) via the per-iteration kalloc call, and nothing
      lower (kvmmap's own Spec exposes no locks_below premise). *)
+  (* THE BOOT HART HAS NO CURRENT PROC (permit sweep L2): the kernel page
+     table is built at [c->proc = 0], so mappages' lend is the left
+     disjunct ([SlotGen.act_lend_zero]) -- the boot lends nothing. *)
+  p = (zero_reg : mword 64) ->
   locks_below lks "kmem" ->
   sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
@@ -81,7 +86,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
 
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body γa γk mm t m lvl K eb p on b lks.
 End PROC_MAPSTACKS.

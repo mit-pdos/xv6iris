@@ -90,6 +90,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecUvmunmap SpecFreewalk SpecUvmfree.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
@@ -215,7 +216,7 @@ Proof.
 Qed.
 
 Section ProofUvmfree.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -236,14 +237,14 @@ Section ProofUvmfree.
   Lemma wp_uvmfree_sconf
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmfree_sconf_body γa mm uroot um K eb p ilvl b lks.
+      (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmfree_sconf_body γa mm uroot um K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_uvmfree_sconf_body].
     intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hlend Hcont".
 
     (* the two callee stack budgets, discharged once (never inline: the
        inline-ltac rule in claude-notes/optimization.md) *)
@@ -420,11 +421,13 @@ Section ProofUvmfree.
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr KT1 (CID := CIDj) mj (K - 4)%nat b p -∗
         cpu_own (CID := CIDj) ilvl eb p b lks -∗
+        (* the lend (permit sweep L2): as it left, or as uvmunmap returned it *)
+        (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k') -∗
         pc_is (mword_of_int (KernelSyms.uvmfree + 0x0e) : mword 64) -∗
         bare_pt uroot ∅ -∗
         mWP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hgap]" as "Hjoin".
-    { iIntros (CIDj Hcrossj mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hpc Hpt".
+    { iIntros (CIDj Hcrossj mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hlend Hpc Hpt".
       (* +0x0e c.mv a0,s1 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmfree + 0x0e)) Ra0 Rs1 mj (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -623,7 +626,7 @@ Section ProofUvmfree.
       iDestruct (cpu_own_transport CIDk3 CIDk8 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDk8 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%]").
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hlend Hpc [%]").
       unfold callee_saved. split_and!;
           first [ exact HE3sp | exact HE3s0 | exact HE3s1
                 | apply HE3thr; vm_compute; first [reflexivity | discriminate] ]. }
@@ -655,7 +658,9 @@ Section ProofUvmfree.
       iDestruct (cpu_own_transport CID CID7 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hjoin" $! CID7 with "[%]"); [wp_next_chain|].
-      iApply ("Hjoin" $! A2 with "[%] Hcg Hcpu Hpc Hpt").
+      iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+      { iExists kl. iFrame "Hlend". done. }
+      iApply ("Hjoin" $! A2 with "[%] Hcg Hcpu Hlend Hpc Hpt").
       split_and!; [exact HA2sp | exact HA2s1 | exact HA2thr]. }
 
     (* ---- TAKEN: sz > 0, so uvmunmap first ---- *)
@@ -864,11 +869,11 @@ Section ProofUvmfree.
     { rewrite HB7a1.
       assert (Hz : uint (mword_of_int 0 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz. rewrite Z.add_0_l. exact Hnrange. }
-    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p ilvl b lks
+    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p ilvl b lks kl
               HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID15 Hs15 mr) "Hcg Hcpu Hpc %Hcs Hpt".
+    iIntros (CID15 Hs15 mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
     iEval (rewrite HB7a1) in "Hpt".
     (* everything the table still mapped was inside the run it just cleared *)
     assert (Hempty : um_del_run um (svpn_of (mword_of_int 0 : mword 64)) n = ∅)
@@ -904,7 +909,7 @@ Section ProofUvmfree.
     iDestruct (cpu_own_transport CID15 CID16 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hjoin" $! CID16 with "[%]"); [wp_next_chain|].
-    iApply ("Hjoin" $! mr with "[%] Hcg Hcpu Hpc Hpt").
+    iApply ("Hjoin" $! mr with "[%] Hcg Hcpu Hlend Hpc Hpt").
     split_and!; [exact Hmrsp | exact Hmrs1 | exact Hmrthr].
   Qed.
 

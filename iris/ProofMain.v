@@ -1016,6 +1016,9 @@ Section ProofMain.
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     hart_agent cpu_id = 0%nat ->
+    (* main has no current proc: the kernel page table's boot lend
+       (permit sweep L2) *)
+    p0 = (zero_reg : mword 64) ->
     sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
@@ -1129,7 +1132,7 @@ Section ProofMain.
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hphystop Hs1 Hprun Hlen H0cid.
+    intros Hn Hphystop Hs1 Hprun Hlen H0cid Hp0.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hchb Hnpid Hprocs Hppub Hpshare Hfds Hirs Hbss Hparks Hpst Hcont".
@@ -1194,7 +1197,7 @@ Section ProofMain.
     iEval (rewrite Htgtkv) in "Hpc".
     iApply (Kvminit.wp_kvminit_sconf fsc_kalloc fsc_kpages V2 0%nat n false p0
               (Some (length ps)) kpt0 false ∅ eq_refl ltac:(lia)
-              ltac:(exists (length ps); split; [reflexivity | lia])
+              ltac:(exists (length ps); split; [reflexivity | lia]) Hp0
               with "Hcg Hcpu Htext Hpc Hkpt Hkenv").
     all: try lkbelow.
     iApply wp_next_off_intro.
@@ -2609,7 +2612,7 @@ Section ProofMain.
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
-              (StartedInv.cid_zero_agent cpu_id Hcid)
+              (StartedInv.cid_zero_agent cpu_id Hcid) Hp0
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hchb Hnpid Hprocs Hppub Hpshare Hfds Hirs
                     Hbss Hparks Hpst").

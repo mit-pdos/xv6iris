@@ -49,6 +49,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import CtxIdDefs.
@@ -63,10 +64,10 @@ Require Import CtxIdDefs.
    shrank, the old one otherwise).  On the two arms where the C code
    unmaps nothing, [uvmd_np] is 0 and [umem_del M _ 0] is [M], so one
    postcondition covers all three, exactly as at the [proc_pt] altitude. *)
-Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -81,10 +82,14 @@ Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
   pc_is pcE -∗
   proc_ptm P (uint oldsz) M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own 0%nat eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ ((uint newsz >= uint oldsz)%Z /\
@@ -100,9 +105,9 @@ Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
 
 Module Type UVMDEALLOC.
   Parameter wp_uvmdealloc_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string),
-      wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks.
+      (b : bool) (lks : gset string) (k : nat),
+      wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks k.
 End UVMDEALLOC.

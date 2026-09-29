@@ -46,7 +46,7 @@ Proof. lia. Qed.
 (* THE BODY: sealed and parameterized by the kvmmake WP hypothesis.       *)
 (* ===================================================================== *)
 Section KvminitBody.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -77,7 +77,7 @@ Section KvminitBody.
     wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
-    intros Hlvl HK Hex Hlkbelow.
+    intros Hlvl HK Hex Hp0 Hlkbelow.
     destruct Hex as (nb & Hon & Hnbk). subst lvl. subst on.
     pose proof (kii_cap_bounds K HK) as (Hc2 & HKmk).
     iIntros "Hcg Hcnt #Htext Hpc Hcell Henv Hcont".
@@ -160,7 +160,7 @@ Section KvminitBody.
                  with "Hcnt") as "Hcnt".
     iApply (wp_kvmmake γa γk J 0%nat (K - 2)%nat eb p (Some nb) b lks
               eq_refl HKmk
-              ltac:(exists nb; split; [reflexivity | exact Hnbk])
+              ltac:(exists nb; split; [reflexivity | exact Hnbk]) Hp0
               with "Hcg Hcnt Htext Hpc Henv").
     all: try lkbelow.
     iIntros (CID6 Hs6 mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
@@ -280,7 +280,7 @@ End KvminitBody.
 (* proven spec, discharging the KVMINIT Module Type.                       *)
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
-  Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+  Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
       : wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
