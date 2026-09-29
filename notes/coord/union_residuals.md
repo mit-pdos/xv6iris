@@ -254,3 +254,12 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - New camera classes for xv6GF/unionGF (U4): FileAppG (deed ghost_var, line list, escrow list), FileOutG
   (era map, boot-state mono_list).
 - AppInv: appStep/appTopUpdate regained Rocq's `==∗` (app_step); header deviation list not yet updated.
+
+## H-file + H-pipe (landed Sept 29) — parameters still taken
+- `hub` (Rocq usrc_ok_ubytesq) in file_write: add ⌜uszOk sz⌝ to udepwfK's ∀ M pm sz (runsys-side fix).
+- `openRecvGimg` (wp_uk_ecall_open_recv_gimg), `HfpSysP.uimgView` (uimg_view): unported (UkRunSys gaps).
+- Union* claims (UnionP/UnionLaws, hcons) + hwild/hPT/era-pin premises of the union entries: lane u1punion.
+- echo/cat/grep `*_image_entry_env_c` (UkTreeEntry deferred); cat stated twice (PseCatImageEntryEnvC,
+  CatImageEntryEnvC) — fold into the owner's lemma.
+- `udepw_law_of_sup*` (UdepwLawsP): UexecExecMint program tier unported. `hfpEchoNodeImg` (echo_node_img).
+- U4 camera slots: fifRegG, pnsRegG, cifRegG, pipesNG.
