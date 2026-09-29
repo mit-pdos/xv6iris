@@ -91,6 +91,23 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   an option. A make run under the wrong switch
   **rewrites `CoqMakefile` with the wrong Rocq version** and every later build
   inherits it; recovery is to delete `CoqMakefile`/`CoqMakefile.conf`.
+- **Branch `transfinite` (since 2026-09-29) builds on a DIFFERENT export**: `main`'s plus
+  `rocq-iris` re-pinned to the same upstream commit with Iris's unmerged branch
+  `robbert/transfinite` applied (version `…8e490959+transfinite.<commit>`) and the package
+  `rocq-iris-transfinite` (github.com/dongjaelee1/transfinite-iris: the Transfinite Iris core —
+  ordinal step indices, transfinite `uPred`/`iProp`, base-logic libraries, a program logic
+  generic in the index). The proofs import `transfinite.base_logic.lib.*` and
+  `transfinite.program_logic.*` instead of `iris.base_logic.lib.*`/`iris.program_logic.*`
+  (`iris.algebra`, `iris.bi`, `iris.proofmode` stay upstream's), and `iris/StepIndex.v` fixes the
+  development's step index by ONE global instance (`natSI` today; the ordinal phase switches it to
+  `ordI`) — never declare a second `sidx` instance. Every core name takes the index as its FIRST
+  implicit, so an explicit application is `@ghost_var _ Σ …`, not `@ghost_var Σ …`. In the agent
+  container the switch is `transfinite` in root `/work/opam`
+  (`OPAMROOT=/work/opam make SWITCH=transfinite`); the two pins are local paths until the
+  repositories are hosted (`opam/README.md`, "The transfinite pins"). Audits on this branch print
+  more axioms than `main`'s (the transfinite model: `propositional_extensionality`,
+  `proof_irrelevance`, `classic`; at the ordinals also `epsilon_statement`) — the numbers are in
+  `local-plan/transfinite-integration.md` §7.
 - The generated Sail model is not an opam package — rebuild from
   `model-xv6iris/` in order `rv64d_types.v → riscv_extras.v → rv64d.v`.
 - **The image toolchain is Ubuntu's `gcc-riscv64-linux-gnu` (gcc 15) with its
