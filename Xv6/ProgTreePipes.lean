@@ -91,11 +91,6 @@ theorem catpEnv_open (x : Dspec) (files : Bytes → Option Bytes) (paths : List 
     · subst h1; simp [hd0]
     · simp [h1]
 
-/-- Rocq `catp_set_dev_id`: setting a device to what it already is changes
-nothing (`envSetDev_same`). -/
-theorem catp_set_dev_id (E : Penv) (d : Nat) (x : Dspec) (h : E.dev d = x) : envSetDev E d x = E :=
-  envSetDev_same E d x h
-
 theorem catp_dg_open_ne (p : Bytes) : catDgOpen p ≠ [] := by simp [catDgOpen]
 
 /-- a run of one-byte diagnostic writes on a diagnostic the device owes. -/

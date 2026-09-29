@@ -32,7 +32,7 @@ arm.
 1. eb is GENERIC (SpecSysChdir deviation 1): Rocq DROPS the complement at
    the top and re-mints it at every callee under `eb = true`; here the
    function is one level-0 stretch (`k_step_e`), the contract's `true`
-   crossing is made hart-free once at entry (`sys_chdir_pin`), and each
+   crossing is made hart-free once at entry (`Xv6.rd_pin`), and each
    callee is entered through a wrapper that carries the complement
    (SysChdirCalls).
 2. STAGES (speed; the Rocq proof is one 1550-line lemma): `sys_chdir_main`,
@@ -51,6 +51,10 @@ arm.
 import Xv6.SysChdirTails
 import Xv6.FsAbsOpenFire
 import MachCSL.WpSmodeLh
+import Xv6.KexecACode
+import Xv6.NamexParts
+import Xv6.ReadiDefs
+import Xv6.SysUnlinkPure
 
 namespace Xv6
 
@@ -65,12 +69,6 @@ set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem sys_chdir_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 theorem sysChdirPins_entry (k : KCtx) :
     sysChdirPins k ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))
@@ -78,10 +76,6 @@ theorem sysChdirPins_entry (k : KCtx) :
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
-theorem sys_chdir_arg0 : 0 < NARG := by decide
-
-theorem sys_chdir_tdir_z (t : BitVec 16) (h : t = T_DIR) : t.toNat = T_DIR_z := by
-  subst h; decide
 
 /-- the observed row is NOT a directory's (Rocq's `abs_row_dir_inv` step). -/
 theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -93,13 +87,9 @@ theorem sys_chdir_notdir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVe
   have hnd : dn.diType.toNat ≠ T_DIR_z := by
     intro h1; apply h; unfold T_DIR; apply BitVec.eq_of_toNat_eq
     simp only [T_DIR_z] at h1; rw [h1]; rfl
-  rw [opfEra_not_dir dn bm data hnd] at hd
+  rw [Xv6.era_notDir dn bm data hnd] at hd
   cases hd
 
-theorem sys_chdir_bne_tdir1 (t : BitVec 16) :
-    bcond bop.BNE (BitVec.signExtend 64 t) 1#64 = decide (t ≠ T_DIR) := by
-  have := sys_chdir_bne_tdir t
-  simpa using this
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -110,10 +100,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The block, taken apart the way argstr and namei take it -/
 
-theorem sys_chdir_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
-  simp only [ite_true]; exact .rfl
-theorem sys_chdir_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
-  simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
 /-- `procPrivFd` IS core ∗ array (its definition). -/
 theorem sys_chdir_blk_open (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -176,7 +162,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
   unfold icLoadedFlatBody
   icases Hload with ⟨%data, %hok, %hrl, %hdok, %hddix, %hdoc, %hduq, Hdl, Hd, Hmeta, Ha, Hr, Hb, Ht⟩
   -- THE OBSERVATION, fired the instant the node is locked
-  ihave #Hrdy := sys_chdir_env_rdy Γ $$ Henv
+  ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
   iapply wpLoop_fupd
@@ -207,7 +193,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
   iintro Hk Hpc
   -- +0x3e  bne a4,a5,+0x32
   have hbt := sys_chdir_bne_tdir dn.diType
-  have hbt1 := sys_chdir_bne_tdir1 dn.diType
+  have hbt1 := Xv6.namex_bne_tdir dn.diType
   by_cases hnt : dn.diType ≠ T_DIR
   · -- ===== NOT A DIRECTORY: ARM C =====
     have hd : decide (dn.diType ≠ T_DIR) = true := by simp [hnt]
@@ -236,7 +222,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x3e#64) false 50#13 14#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hbt1, hd]
     iintro Hk Hpc
-    have hrow := opfEra_dir_row dn bm data (sys_chdir_tdir_z _ hty)
+    have hrow := opfEra_dir_row dn bm data (Xv6.sys_unlink_tdir_zof _ hty)
     rw [hrow] at harow
     ihave HFo := (show A.Fo.pfRecv av inum.toNat (absRow (eraNode dn bm data)) ⊢
       A.Fo.pfRecv av inum.toNat ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩
@@ -350,7 +336,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
   -- +0x32  beqz a0 : falls through
   have hd : decide (ipv = 0#64) = false := by simp [hnz]
   k_step_e (wp_s_branch cpu _ (KA.«sys_chdir» + 0x32#64) true 52#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- +0x34  jal ilock
   k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x34#64) false 2088634#21 1#5 (by decide))
@@ -361,7 +347,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
   icases Href with ⟨Href, Hru⟩
   icases (inodeRef_shed kk q icfgDev inum).1 $$ Href with ⟨Hkeep, Hshr⟩
   icases (inodeShr_gen_intro kk q.half icfgDev inum).1 $$ Hshr with ⟨%g, %lo, %tl, %hle, #Hfl, Hshr⟩
-  ihave #Hrdy := sys_chdir_env_rdy Γ $$ Henv
+  ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
   icases icSleeplocks_lookup fscIc kk hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases sys_chdir_cwdpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
@@ -381,7 +367,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
   unfold sysChdirIlockK
   iintro %cpu %spie1 %spp1 %R1 %dn %bm %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hsl Hdep Hoff Hdev Hinum Hval
     Hload Hshot Hfrz Hru
-  k_norm_g [sys_chdir_ret_38, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_38, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysChdirPins k R1 (ientry kk) (procAddr A.j) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
     refine sysChdirPins_set _ _ _ _ 1#5 _ ?_ (Or.inl rfl)
@@ -483,7 +469,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     unfold sysChdirNameiK
     iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %ok %ipv %w %⟨hcs1, -, -, hlo, -⟩ Hk Hpc Hte Hce Hcore Hp
       Hbs HopS Htx Harm
-    k_norm_g [sys_chdir_ret_30, sysfile_ww, sysfile_psw]
+    k_norm_g [sys_chdir_ret_30, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
       byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1)
@@ -497,14 +483,14 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
       rw [List.length_drop]; omega
     cases ok
     · -- ===== the walk DIED: ARM B =====
-      ihave Harm := sys_chdir_ite_f _ _ $$ Harm
+      ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
       icases Harm with ⟨%h10, Hir, Hdead⟩
       ihave Hdead := sys_chdir_dead A.P A.Pmiss _ $$ Hdead
       iapply (sys_chdir_miss EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' hj hproc hK hnoff htier hct
           hp1 h10 hal hP2 hlen)
         $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hdead $Hoc]
     · -- ===== the walk LANDED =====
-      ihave Harm := sys_chdir_ite_t _ _ $$ Harm
+      ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
       icases Harm with ⟨%iL, %h10, Hheld, HP, Hir⟩
       have hn : iputUnits ≤ n' := sys_chdir_bud_iput n' w true hlo
       iapply (sys_chdir_found IL IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' ipv iL hj hproc
@@ -571,7 +557,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   ihave Hbuf := (show byteBuf (GF := GF) (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
-      (procAddr A.j) A.pid A.V A.M 0 v old sys_chdir_arg0 ?ga0 hv ?gpr ?gt ?gn ?gK ?gmx (by omega))
+      (procAddr A.j) A.pid A.V A.M 0 v old Xv6.sysfile_arg0_lt ?ga0 hv ?gpr ?gt ?gn ?gK ?gmx (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare]
   rotate_right 1
   k_norm_g [sys_chdir_ret_22]
@@ -583,7 +569,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_chdir_ret_22, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_22, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) bs ⊢
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
@@ -626,7 +612,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   ihave HΦ : (∀ c : CPU, sysChdirPostA k (⟨γ, j, pid, V, M, P, Pmiss, Fo⟩ : SysChdirArgs GF) c)
     $$ [Hnext]
   · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (sys_chdir_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
   simp only [sysChdirAddr]
@@ -657,7 +643,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   case hKM => k_norm_g; omega
   k_next_e
   iintro %spie1 %spp1 %R1 %_ Hk Hpc %⟨hcs1, h10⟩
-  k_norm_g [sys_chdir_ret_0e, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_0e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   k_norm_g at h10
   have hp1 : sysChdirPins k R1 (k.regs 9#5) (k.regs 18#5) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
@@ -684,7 +670,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_chdir_ret_14, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := sys_chdir_hole_close _ _ _ _ _ $$ [Hhole Hpid Hcwd Hcwr]
   · unfold sysChdirRows; iframe
   have hp2 : sysChdirPins k R2 (k.regs 9#5) (procAddr j) := by

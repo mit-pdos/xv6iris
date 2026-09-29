@@ -190,7 +190,7 @@ theorem iput_ofl_tail (LW : LOG_WRITE) (BL : BRELSE)
   k_step_c (wp_s_jal c _ (KA.«iput» + 0xba#64) false 2524#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_log_write]
   iintro Hk Hpc
-  obtain ⟨hbnoN, -⟩ := iput_ofl_bno inum hgeom hcov
+  obtain ⟨hbnoN, -⟩ := Xv6.iu_bno inum hgeom hcov
   iapply (dislot_log_write LW c _ γl b pidv inum dn ds bsd d0 u true Sb1 e0 e0 Pout
       ?lK ?lnoff ?llk ?lbc ?ltier hb ?la0 hbnoN ⟨hcov, hlog⟩ hds hdn)
     $$ [- $Hk $Hpc $Hbc $Hlc $Hsl1 $Hvlb $Hcrd $Hop $Hau $Hhold $Hpay]

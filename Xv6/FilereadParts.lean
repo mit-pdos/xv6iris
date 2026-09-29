@@ -37,6 +37,7 @@ eager three and pops.
 import Xv6.SpecFileread
 import MachCSL.WpSmodeFrame6c
 import Xv6.FilePay
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -69,10 +70,6 @@ theorem frd_jump_cr : jumpPc KA.«consoleread» = KA.«consoleread» := by decid
 
 /-! ## 2.  The pure arithmetic -/
 
-/-- `c.beqz a5` on a loaded device-table cell. -/
-theorem frd_beqz64 (w : BitVec 64) : bcond bop.BEQ w 0#64 = decide (w = 0#64) := by
-  simp only [bcond]; bv_decide
-
 /-- `lw a3,32(s1)`: a wf offset, sign-extended, is its own value. -/
 theorem frd_lw_off (v : BitVec 32) (h : v.toNat < 2 ^ 31) :
     BitVec.signExtend 64 v = BitVec.signExtend 64 (BitVec.ofNat 32 v.toNat) := by
@@ -81,7 +78,7 @@ theorem frd_lw_off (v : BitVec 32) (h : v.toNat < 2 ^ 31) :
 /-- The count register, as readi's `uint` argument (Rocq `fr_sext_moi32`). -/
 theorem frd_n_arg (n : Int) (h0 : 0 ≤ n) (h1 : n < 2 ^ 31) :
     BitVec.ofInt 64 n = BitVec.signExtend 64 (BitVec.ofNat 32 n.toNat) := by
-  rw [rd_arg32_small n.toNat (by omega)]
+  rw [MachCSL.signExtend_ofNat32 n.toNat (by omega)]
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_ofInt, BitVec.toNat_ofNat]
   omega

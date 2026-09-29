@@ -46,6 +46,8 @@ The cell at `16(sp)` is never written; `0(sp)..15(sp)` is the `de` record
 -/
 import Xv6.SpecDirlookup
 import Xv6.FsWords
+import Xv6.DinodeSlot
+import Xv6.ReadiParts
 
 namespace Xv6
 
@@ -116,25 +118,6 @@ end
 
 /-! ## Register arithmetic -/
 
-/-- A 32-bit word below `2^31`, sign-extended, is its value. -/
-theorem dirlookup_sext_small (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 w = BitVec.ofNat 64 w.toNat := by
-  have hw : w = BitVec.ofNat 32 w.toNat := by simp
-  rw [hw, fw_sext32 _ (by simpa using h)]
-  simp
-
-/-- `c.bnez a5` at `+0x36` on the size. -/
-theorem dirlookup_bnez_nat (x : Nat) (h : x < 2 ^ 64) :
-    bcond bop.BNE (BitVec.ofNat 64 x) 0#64 = decide (x ≠ 0) := by
-  rw [bcond_bne_eq]
-  by_cases hx : x = 0
-  · subst hx; rfl
-  · rw [decide_eq_true hx]
-    refine bne_iff_ne.mpr fun e => hx ?_
-    have := congrArg BitVec.toNat e
-    simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt h] at this
-    simpa using this
-
 /-- `bne a0,s3` at `+0x6a`: readi's count against sixteen. -/
 theorem dirlookup_bne16 (t : Nat) (h : t < 2 ^ 64) :
     bcond bop.BNE (BitVec.ofNat 64 t) 16#64 = decide (t ≠ 16) := by
@@ -184,7 +167,7 @@ theorem dirlookup_addiw16 (x : Nat) (h : x + 16 < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
-  rw [e, fw_w32 _ (by omega), fw_sext32 _ h]
+  rw [e, fw_w32 _ (by omega), MachCSL.signExtend_ofNat32 _ h]
 
 /-- iget's inum argument: the `lhu`'s zero-extension IS the sign-extension
 of the 32-bit widening (Rocq's `dlk_sext_zext_16_32_64`). -/
@@ -207,14 +190,7 @@ theorem dirlookup_live_pos (data : Nat → List (BitVec 8)) (k : Nat) (h : dirLi
   · exact absurd (BitVec.eq_of_toNat_eq (by simpa using h0)) h
   · exact h0
 
-/-- `sw s1,0(s7)` at `+0x82`: the store writes the offset. -/
-theorem dirlookup_off32 (x : Nat) (h : x < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 x) = BitVec.ofNat 32 x := fw_w32 x h
-
 /-! ## The loop's numeric facts (Rocq's §6, granularity-free) -/
-
-/-- The largest file, in bytes. -/
-theorem dirlookup_maxbytes : MAXFILE * BSIZE = 274432 := by decide
 
 /-- The loop test alone bounds `i` by `nrec` (Rocq's `dlk_le_nrec`). -/
 theorem dirlookup_le_nrec (sz i : Nat) (h : 16 * i < sz) : i ≤ dirNrec sz := by
@@ -340,11 +316,6 @@ theorem dirlookup_frame_close [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 : BitVe
   iexists bytesToWord l2, bytesToWord l1
   iframe
 
-theorem dirlookup_imm_m96 : BitVec.signExtend 64 4000#12 = -(8#64 * BitVec.ofNat 64 12) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem dirlookup_imm_p96 : BitVec.signExtend 64 96#12 = 8#64 * BitVec.ofNat 64 12 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 set_option maxHeartbeats 4000000 in
 /-- dirlookup's prologue `+0x00 .. +0x14` at `pc`, at either `SIE`. -/
 theorem wp_prologue_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
@@ -373,7 +344,7 @@ theorem wp_prologue_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, #Hi14, #Hi16, #Hi18, #Hi20,
     Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK dirlookup_imm_m96) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK MachCSL.imm_m96) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -469,7 +440,7 @@ theorem wp_epilogue_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 12
     $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ (pc + 18#64) true 96#12 12 dirlookup_imm_p96) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c9 _ (pc + 18#64) true 96#12 12 MachCSL.imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_ret c10 _ (pc + 20#64) true 1#5) $$ [- $Hk $Hpc] next c11 hp11

@@ -20,11 +20,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-! ## The bytes as raw histories -/
 
-theorem range_getElem?_lt {n k x : Nat} (hx : (List.range n)[k]? = some x) : x < n := by
-  obtain ⟨h1, h2⟩ := List.getElem?_eq_some_iff.1 hx
-  rw [List.length_range] at h1
-  rw [List.getElem_range] at h2
-  omega
 
 /-- The bytes of a window, forgotten down to their histories: what a word
 cell owns. -/
@@ -51,7 +46,7 @@ theorem histBytes_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → 
     · rw [BigSepL.bigSepL_eq (l := List.range n)
         (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} (if j = n then e :: He else Hs j)))
         (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j))
-        (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (range_getElem?_lt hx))])]
+        (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
       iexact Hb
     · simp only [↓reduceIte]
       iexact Hpt

@@ -78,9 +78,6 @@ theorem ush_retPc (x : Nat) (hx : x % 2 = 0) (hlt : x < 2 ^ 64) :
 theorem ush_tgt {w : Nat} (x t : Nat) (imm : BitVec w) (h : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t) :
     BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t := h
 
-/-- The link a `jal ra` writes, as a `Nat` pc. -/
-theorem ush_link (x y : Nat) (r : Bool) (h : x + (if r then 2 else 4) = y) :
-    BitVec.ofNat 64 x + instrLen r = BitVec.ofNat 64 y := ukPc x y r h
 
 /-- `addi rd, rs, -d` at a `Nat` value (a local's address off the frame
 pointer). -/

@@ -11,6 +11,8 @@ import Xv6.SpecMemset
 import Xv6.PtOwnLemmas
 import Xv6.CodeTactics
 import Xv6.UvmCallSites
+import Xv6.KvmLemmas
+import Xv6.PtRunLemmas
 
 namespace Xv6
 
@@ -35,19 +37,6 @@ theorem uc_ret_119a : jumpPc (KA.«uvmcreate» + 0xe#64) = (KA.«uvmcreate» + 0
 /-- `ret` out of `memset` lands on the `c.mv a0,s1`. -/
 theorem uc_ret_11a6 : jumpPc (KA.«uvmcreate» + 0x1a#64) = (KA.«uvmcreate» + 0x1a#64) := by
   decide
-
-/-- A valid page is the page of its own page number. -/
-theorem uc_pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
-    pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  obtain ⟨h1, -, h3⟩ := h
-  unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h1 h3
-  bv_decide
-
-/-- A valid page is not `0`. -/
-theorem uc_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -131,7 +120,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
     iintro Hk Hpc
     have hpinF : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
       (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
-    simp only [uc_pushed_withSpie]
+    simp only [MachCSL.KCtx.withSpie_pushed]
     have hKe : 4 ≤ (k.withSpie spie1 spp1).avail := by
       simp only [KCtx.withSpie_avail]; omega
     have hR2e : ((R1.set 9#5 (R1 10#5)).set 10#5 (R1 10#5)) 2#5
@@ -166,7 +155,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
           | exact a18 | exact a19 | exact a20 | exact a21 | exact a22 | exact a23
           | exact a24 | exact a25 | exact a26 | exact a27
   · -- `kalloc` succeeded: memset the page to zero
-    have hne : R1 10#5 ≠ 0#64 := uc_page_ne_zero _ hvalid
+    have hne : R1 10#5 ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero _ hvalid
     k_step_gen (wp_s_branch c4 _ (KA.«uvmcreate» + 0x10#64) true 10#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [uc_beq_ne _ hne] next c5 hp5
@@ -196,7 +185,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
     obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs2
     -- the zeroed page is an empty root node
     have hpb : pageAddr (BitVec.extractLsb' 12 44 (R1 10#5)) = R1 10#5 :=
-      uc_pageAddr_of_valid _ hvalid
+      Xv6.Kvm.pageAddr_of_valid _ hvalid
     ihave Hnode : nodeOwn (GF := GF) (DFrac.own 1)
         (PTree.zeroNode (BitVec.extractLsb' 12 44 (R1 10#5))) $$ [Hbuf]
     case' _ =>
@@ -215,7 +204,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
     have hpinF : k.sie = false ∨ k.proc = 0#64 → c10 = cpu := fun h =>
       (hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
         ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))
-    simp only [uc_pushed_withSpie]
+    simp only [MachCSL.KCtx.withSpie_pushed]
     have hKe : 4 ≤ (k.withSpie spie1 spp1).avail := by
       simp only [KCtx.withSpie_avail]; omega
     have hR2e : (R2.set 10#5 (R2 9#5)) 2#5

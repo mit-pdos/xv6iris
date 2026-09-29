@@ -85,7 +85,7 @@ theorem createFailMkdir_quarters (t : Nat) :
   iintro H1 H2
   have h := (ghost_map_elem_fractional (GF := GF) icfgLog.tx t ()).fractional
     Qp.quarter Qp.quarter
-  rw [qp_quarter_add_quarter] at h
+  rw [Xv6.ctok_quarter_add_quarter] at h
   iapply h.2
   iframe H1 H2
 
@@ -489,7 +489,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by
     have := hS.hns; unfold createIrefSlots at this; simp; omega
   have hled : (∀ x ∈ Sb, x ∈ Sb6) ∧ n6 ≤ u ∧ (false = true → iputUnits ≤ n6) :=
-    ⟨create_sub3 _ _ _ _ hsb4 (create_sub_cons Sb4 _) (create_sub2 _ _ _ hsb5 hsb6),
+    ⟨create_sub3 _ _ _ _ hsb4 (create_sub_cons Sb4 _) (Xv6.namex_sub_trans _ _ _ hsb5 hsb6),
       by have := hn4.2; omega, fun h => absurd h (by decide)⟩
   ispecialize Hpost $$ %c'
   unfold createPost

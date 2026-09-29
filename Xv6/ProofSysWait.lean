@@ -18,6 +18,8 @@ import Xv6.SysfileCalls
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.SysFstatParts
 
 namespace Xv6
 
@@ -34,15 +36,6 @@ set_option linter.unusedVariables false
 
 theorem sw_ret_2984 : jumpPc (KA.«sys_wait» + 0x12#64) = (KA.«sys_wait» + 0x12#64) := by decide
 theorem sw_ret_298c : jumpPc (KA.«sys_wait» + 0x1a#64) = (KA.«sys_wait» + 0x1a#64) := by decide
-
-theorem sw_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sw_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by bv_decide
-
-theorem sw_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sw_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sw_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 theorem sw_calleeSaved_mk (KR R : RegMap)
     (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
@@ -260,10 +253,10 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   iintro %c1 %hp1 Hk Hpc Hframe
   icases sw_frame_open _ _ _ $$ Hframe with ⟨Hra, Hs0, ⟨%w1, Hslot⟩, ⟨%w2, Hc2⟩⟩
   k_step_gen (wp_s_addi c1 _ (KA.«sys_wait» + 0x8#64) false 4072#12 11#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sw_p_addr] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_f_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_wait» + 0xc#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sw_li0] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_jal c3 _ (KA.«sys_wait» + 0xe#64) false 2096872#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_fffffffffffffef6] next c4 hp4
@@ -271,23 +264,23 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   iapply (sysfile_argaddr_wp AA c4 _ 0 V.upt.tfp V.tf v w1 (DFrac.own 1) (by decide) ?ha0 hv ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sw_ret_2984, sw_li0, sw_p_addr]
+  k_norm_g [sw_ret_2984, Xv6.co_li_zero, Xv6.sfs_f_addr]
   iframe Htf HTf Hslot
   iframe #
-  case ha0 => k_norm_g [sw_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; unfold sysWaitSlots kwaitSlots at hK; unfold argaddrSlots argrawSlots; omega
   -- past argaddr: ld a0,-24(s0) ; jal kwait
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie %spp %R1 %hsp1 Hk Hpc %hcs1 Htf HTf Hslot
-  k_norm_g [sw_pushed_withSpie, sw_withRegs_withSpie, sw_p_addr]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, Xv6.sfs_f_addr]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   k_step_gen (wp_s_ld c5 _ (KA.«sys_wait» + 0x12#64) false 4072#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, sw_p_addr] next c6 hp6
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, Xv6.sfs_f_addr] next c6 hp6
   iintro Hk Hpc Hslot
   k_step_gen (wp_s_jal c6 _ (KA.«sys_wait» + 0x16#64) false 2095102#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_fffffffffffff814] next c7 hp7
@@ -326,7 +319,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   -- past kwait, on some hart: the epilogue
   iapply wpNext_intro_pin
   iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %hfacts Hans Hch Hk Hpc Hte Hce Hblk
-  k_norm_g [sw_withSpie_withSpie, sw_pushed_withSpie, sw_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   obtain ⟨hcs2, h10, hext, hd, hans, hmap⟩ := hfacts
   unfold calleeSaved at hcs2
   k_norm_g at hcs2

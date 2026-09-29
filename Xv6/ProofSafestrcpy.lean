@@ -23,6 +23,7 @@ copies, so the destination comes back `pnameWf` (16 bytes, NUL within).
 -/
 import Xv6.SpecSafestrcpy
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -73,17 +74,6 @@ theorem ss_beq_ite {α : Type} (src : BitVec 64) (k : Nat) (hk : k ≤ 15) (p q 
   · rw [if_neg h]
     have : ¬ (src + BitVec.ofNat 64 k = src + 15#64) := fun hc => h (he.mp hc)
     simp only [bcond, beq_iff_eq, this, if_false]
-
-/-- `bnez a4`: `a4 = 0` exactly when the copied byte is `0`. -/
-theorem ss_bnez_ite {α : Type} (b : BitVec 8) (p q : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 b) 0#64 then p else q) = if b = 0#8 then q else p := by
-  have he : (BitVec.setWidth 64 b = 0#64) ↔ (b = 0#8) := by bv_decide
-  by_cases h : b = 0#8
-  · rw [if_pos h]
-    simp only [bcond, bne_iff_ne, ne_eq, he.mpr h, not_true, if_false]
-  · rw [if_neg h]
-    have : ¬ (BitVec.setWidth 64 b = 0#64) := fun hc => h (he.mp hc)
-    simp only [bcond, bne_iff_ne, ne_eq, this, not_false_iff, if_true]
 
 /-- The low byte of the zero-extended byte is the byte. -/
 theorem ss_extract (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 b) = b := by
@@ -219,7 +209,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     -- bnez a4,80000e84
     k_step_gen (wp_s_branch c5 _ (KA.«safestrcpy» + 0x28#64) true 8176#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, ss_bnez_ite bk] next c6 hp6
+      with [RegMap.set_apply, Xv6.ite_bne_byte bk] next c6 hp6
     iintro Hk Hpc
     have hpin6 : kb.sie = false ∨ kb.proc = 0#64 → c6 = cpu :=
       fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))

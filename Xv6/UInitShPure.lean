@@ -23,7 +23,7 @@ closed arithmetic (`kxcSpFinal 0x5000 alen 1 = 0x4FE0`).
 `init_argv_args`, `init_argv_args_length`, `init_argv_args_lookup`,
 `init_argv_shape`, `init_ro_sh_bytes_bool`, `init_argv_img`,
 `init_args_det`, `sh_tbl_ok`, `sh_tbl_ok_true`, `sh_tbl_parts`,
-`sh_dat_img`, `sh_bss_img`, `moi0_bv0_64`, `nth_byte_zero64`,
+`sh_dat_img`, `sh_bss_img`, `moi0_bv0_64`, `Xv6.ush_nthByte_zero`,
 `umap_win_lookup`, `umap_win_lookup_out`, `init_sh_sp_final`,
 `init_sh_room`, `init_sh_path_of`, `ufd_l0_lcl`.
 
@@ -80,6 +80,7 @@ import Xv6.UkShMallocDefs
 import Xv6.ArgPath
 import Xv6.UexecExecInst
 import Xv6.UInitFd
+import Xv6.UshNodes
 
 namespace Xv6
 
@@ -265,10 +266,6 @@ theorem sh_bss_img (a : Nat) (h1 : 0x2010 ≤ a) (h2 : a < 0x2098) : elfImage Us
 
 /-- **Rocq `moi0_bv0_64`** (deviation 5). -/
 theorem moi0_bv0_64 : BitVec.ofInt 64 0 = 0#64 := by decide
-
-/-- **Rocq `nth_byte_zero64`**. -/
-theorem nth_byte_zero64 (j : Nat) : nthByte (n := 8) (0#64) j = ubyte0 := by
-  apply BitVec.eq_of_toNat_eq; simp [nthByte, ubyte0]
 
 /-- **Rocq `umap_win_lookup`**: a WINDOW of a map, in. -/
 theorem umap_win_lookup (D : RegMapF (BitVec 8)) (lo hi a : Nat) (b : BitVec 8) (ha : lo ≤ a ∧ a < hi)

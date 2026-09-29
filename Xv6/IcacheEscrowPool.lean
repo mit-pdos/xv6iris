@@ -57,7 +57,7 @@ doors) are `Xv6/IcacheEscrowPoolMove.lean`, split off for size at Rocq's own
    `ic_ci_wf`'s `M : gmap nat (Qp * positive)` is `RegMapF (Qp × PosNat)`
    (`IcacheUR`'s payload).
 4. **Fractions:** `1/2` is `(1 : Qp).half`, `1/4` is `Qp.quarter`; Rocq's
-   `Qp.quarter_quarter` is `qp_quarter_add_quarter` (new, one line).
+   `Qp.quarter_quarter` is `Xv6.ctok_quarter_add_quarter` (new, one line).
 5. **`ipool_corpse_no_ops`**: the premise `ghost_map_auth (ln_tx icfg_log) 1
    ∅` is `logTxAuth icfgLog ∅` (`Xv6/TxPin.lean` deviation 1), the wand is
    curried as `A ⊢ B -∗ C` (`IcacheEscrowTok` deviation 4), `map_Forall` is
@@ -393,10 +393,6 @@ theorem icIdsOf_live (dvs : Nat → BitVec 32 × BitVec 32) : icLiveInums (icIds
     simp only [Option.map_some, Option.some.injEq] at hk
     subst hk
     rfl
-
-/-- One quarter and another make the half the escrow arm holds. -/
-theorem qp_quarter_add_quarter : Qp.quarter + Qp.quarter = (1 : Qp).half :=
-  Subtype.ext (by simp only [Qp.val_add, Qp.val_quarter, Qp.val_half, Qp.val_one]; grind)
 
 end PoolPure
 
@@ -749,14 +745,14 @@ theorem icId_splitQ (cn : IcNames) (k : Nat) (q1 q2 : Qp) (v : Bool) (d n : BitV
 theorem icId_quartersJoin (cn : IcNames) (k : Nat) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k Qp.quarter v d n ⊢ icId cn k Qp.quarter v d n -∗
       icId cn k (1 : Qp).half v d n := by
-  rw [← qp_quarter_add_quarter]
+  rw [← Xv6.ctok_quarter_add_quarter]
   exact icId_join cn k Qp.quarter Qp.quarter v d n
 
 /-- Rocq's `ic_id_quarters_split`. -/
 theorem icId_quartersSplit (cn : IcNames) (k : Nat) (v : Bool) (d n : BitVec 32) :
     icId (GF := GF) cn k (1 : Qp).half v d n ⊢
       icId cn k Qp.quarter v d n ∗ icId cn k Qp.quarter v d n := by
-  rw [← qp_quarter_add_quarter]
+  rw [← Xv6.ctok_quarter_add_quarter]
   exact icId_splitQ cn k Qp.quarter Qp.quarter v d n
 
 /-! ### THE BODY -/

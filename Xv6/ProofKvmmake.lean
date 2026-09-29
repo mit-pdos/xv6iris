@@ -16,6 +16,7 @@ import Xv6.SpecMemset
 import Xv6.SpecKvmmap
 import Xv6.KvmCounts
 import Xv6.CodeTactics
+import Xv6.UvmCallSites
 
 namespace Xv6
 
@@ -103,35 +104,12 @@ theorem km_cnt4 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 := by om
 theorem km_cnt5 {nb : Nat} (h : 166 < nb) : 63 < nb - 1 - 2 - 0 - 0 - 32 - 2 := by omega
 theorem km_cnt6 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 - 2 - 63 := by omega
 
-/-- The context algebra of the exit interrupt state. -/
-theorem km_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-/-- The exit interrupt state of the last callee is the one that counts. -/
-theorem km_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
-set_option maxHeartbeats 1000000 in
-/-- `kalloc`'s contract as a rule. -/
-theorem km_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx)
-    (γl : GName) (γk : KmemNames) (on : Option Nat)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
-  exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `memset`'s contract as a rule. -/
@@ -728,7 +706,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
      (hsp6 h).2.trans ((hsp5 h).2.trans ((hsp4 h).2.trans ((hsp3 h).2.trans
       ((hsp2 h).2.trans ((hsp1a h).2.trans (hsp1 h).2)))))⟩
   rw [km_nb102 nb]
-  simp only [km_withSpie_withSpie]
+  simp only [MachCSL.KCtx.withSpie_twice]
   ihave Hnext := wpNext_at _ _ _ c59 _ hpinr6 $$ Hnext
   simp only [kvmRegionsCont]
   iapply Hnext $$ %spie6 %spp6 %_ %_ %hspF Hk Hpc Htree Hav HRes1 HRes2
@@ -789,7 +767,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   k_step_gen (wp_s_jal c1 _ (KA.«kvmmake» + 0xa#64) false 2095636#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kvmmake_br_fffffffffffffa1e] next c2 hp2
   iintro Hk Hpc
-  iapply (km_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c2 _ γl γk (some nb) ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -906,7 +884,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   case hctS =>
     refine Nat.lt_of_le_of_lt (Nat.add_le_add_left (Nat.le_of_eq hsix.2.2.2.2.2.1) 64) ?_
     omega
-  k_norm_g [km_ret_1212, km_withSpie_withSpie]
+  k_norm_g [km_ret_1212, MachCSL.KCtx.withSpie_twice]
   iapply wpNext_intro_pin
   iintro %c12 %hp12 %spieS %sppS %R4 %frs %pas %hspS Hk Hpc Htree Hstack Hav %hpostS
   obtain ⟨hcsS, hleft, hlenS, hnodupS, hpgS⟩ := hpostS
@@ -932,7 +910,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   have hspF : k.sie = false → spieS = k.spie ∧ sppS = k.spp := fun h =>
     ⟨(hspS h).1.trans ((hspR h).1.trans (hsp1 h).1),
      (hspS h).2.trans ((hspR h).2.trans (hsp1 h).2)⟩
-  simp only [km_withSpie_withSpie, km_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hKe : 4 ≤ (k.withSpie spieS sppS).avail := by simp only [KCtx.withSpie_avail]; omega
   have hR2e : (R4.set 10#5 (pageAddr (BitVec.extractLsb' 12 44 (R1 10#5)))) 2#5
       = (k.withSpie spieS sppS).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by

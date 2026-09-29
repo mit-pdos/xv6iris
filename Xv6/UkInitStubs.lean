@@ -246,7 +246,7 @@ theorem wp_kinit_dup_cons_at (UL : UK_LEAVES) (HS : UK_SYS_P)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact harg) hne (by decide) $$ Hi Hrun [] Hstd []
   · rw [show USYS_dup = (10 : Int) from rfl]
     iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
-  · iapply ufd_dup_src N.fd l fd0 st hlt hrow
+  · iapply Xv6.ufdOwn_std N.fd l fd0 st hlt hrow
   rw [hpc]
   iintro %h2 %r Hal Hrun
   iapply Hmid $$ %h2 %r Hrun

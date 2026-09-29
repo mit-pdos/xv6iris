@@ -24,6 +24,7 @@ import Xv6.IgetParts
 import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.SpecIget
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -87,9 +88,6 @@ theorem IgRegs.set [Icfg] {k : KCtx} {inum : BitVec 32} {R : RegMap} (h : IgRegs
       by simpa [RegMap.set_apply] using p25, by simpa [RegMap.set_apply] using p26,
       by simpa [RegMap.set_apply] using p27⟩⟩
 
-/-- `sw`'s stored low word of a sign-extended cell value. -/
-theorem ig_trunc_sext (x : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x) = x := by
-  bv_decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]

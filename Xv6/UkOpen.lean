@@ -50,7 +50,7 @@ theorem ukDataBytes_fst (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8))
     (hl : ∀ kv ∈ toList um, (M kv.1).length = 4096) : (ukDataBytes um M).map Prod.fst = ukDataAddrs um := by
   unfold ukDataBytes ukDataAddrs
   rw [List.map_flatMap]
-  apply ub_flatMap_congr
+  apply Xv6.PtRun.flatMap_eq_of_mem
   intro kv hkv
   split
   · rfl
@@ -60,7 +60,7 @@ theorem ukTextBytes_fst (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8))
     (hl : ∀ kv ∈ toList um, (M kv.1).length = 4096) : (ukTextBytes um M).map Prod.fst = ukTextAddrs um := by
   unfold ukTextBytes ukTextAddrs
   rw [List.map_flatMap]
-  apply ub_flatMap_congr
+  apply Xv6.PtRun.flatMap_eq_of_mem
   intro kv hkv
   split
   · exact ukPageBytes_fst _ _ (hl kv hkv)

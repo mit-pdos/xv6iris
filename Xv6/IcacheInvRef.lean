@@ -84,7 +84,7 @@ itable.lock's payload.
 10. **Lemma names** (`Xv6/IcacheInvAlg.lean` deviation 7): a definition
     prefix is camelCased (`pinwSlot_acc`, `pinwSlot_acc_upd`,
     `pinwSlot_slice`, `irefClaims_at`, `frzPark_intro_on/_off`,
-    `frzPark_shr_off`, `frzPark_ref1_off`, `islotRest_join`); names with no
+    `frzPark_shr_off`, `Xv6.frzPark_shr_off`, `islotRest_join`); names with no
     definition prefix are Rocq's verbatim (`iref_load_pinw_au`,
     `iref_load_locked_pinw_au`, `iref_share_lookup_pinw_au`,
     `frz_slot_kill_pinw`, `frz_slot_freeze_pinw`, `live_slot_regen_pinw`,
@@ -1001,13 +1001,6 @@ theorem frzPark_shr_off [Icfg] (Eo : CoPset) (k z : Nat) (s : Qp) (g : GName) (l
     iframe
   · imod frz_slot_kill_pinw Eo k (1 : Qp).half.half s g lo hE hk $$ Hinv Hq Hs with H
     icases H with ⟨⟩
-
-theorem frzPark_ref1_off [Icfg] (Eo : CoPset) (k z : Nat) (qt : Qp) (g : GName) (lo : Nat)
-    (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ liveGenlo k qt g lo -∗ frzPark k z -∗
-      |={Eo}=> liveGenlo k qt g lo ∗ frzmH z false ∗ frzsel k (1 : Qp).half false ∗
-        hpnFull k none :=
-  frzPark_shr_off Eo k z qt g lo hE hk
 
 end IcacheRefInv
 

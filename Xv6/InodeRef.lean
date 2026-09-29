@@ -40,11 +40,4 @@ import Xv6.IcacheRefDefs
 
 namespace Xv6
 
-/-- `ientry k` is a kernel address, so it is never null.  Stated here under
-the name the process layer used before the split; `IcacheRefDefs` proves it
-from `ientry_unsigned`, together with injectivity, the scan step and the
-sentinel. -/
-theorem ientry_nonzero (k : Nat) (hk : k ≤ NINODE) : ientry k ≠ 0#64 :=
-  ientry_ne_zero k hk
-
 end Xv6

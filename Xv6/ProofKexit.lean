@@ -95,6 +95,9 @@ import Xv6.SpecWakeup
 import Xv6.FsCallSitesOp
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
 
 namespace Xv6
 
@@ -132,19 +135,10 @@ theorem kx_pOfile_ne_cwd (pa : BitVec 64) (m : Nat) (hm : m < NOFILE) : pOfile p
   have hmm : 8 * m < 128 := by omega
   bv_omega
 
-/-- `beq` as an equality test. -/
-theorem kx_ite_beq {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x y then p else q) = if x = y then p else q := by
-  by_cases h : x = y <;> simp [bcond, h]
-
 /-- `bne` as a disequality test. -/
 theorem kx_ite_bne {α : Type _} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BNE x y then p else q) = if x ≠ y then p else q := by
   by_cases h : x = y <;> simp [bcond, h]
-
-/-- The immediate `-48` of `c.addi16sp sp,-48`. -/
-theorem kx_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
 
 theorem kx_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
 theorem kx_pXstate (pa : BitVec 64) : pa + 44#64 = pXstate pa := rfl
@@ -286,10 +280,6 @@ theorem kx_setReg_frame {availval : Nat} {eb : Bool} (k : KCtx) (j : Nat) (statu
   · show (k.setReg i v).avail = availval
     rw [KCtx.setReg_avail]; exact hav
 
-/-- `+ signExtend 0` is the identity. -/
-theorem kx_add0 (a : BitVec 64) : a + BitVec.signExtend 64 0#12 = a := by
-  simp only [BitVec.reduceSignExtend, BitVec.add_zero]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-- The resume pc of a call whose return address `v` (even) sits in `ra`. -/
@@ -426,7 +416,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     -- ld a0,0(s1)
     k_step_e (wp_s_ld cpu _ (KA.«kexit» + 0x3e#64) true 0#12 10#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (L[fd]'hfdlt2))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h9, kx_add0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h9, Xv6.dsOff0]
     iintro Hk Hpc Hcell
     ihave Hofs := Hofback $$ Hcell
     ihave Hofs := (show procOfilesOwe (GF := GF) γ V.fdg (procAddr j) L [] ⊢
@@ -434,7 +424,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     -- beqz a0
     k_step_e (wp_s_branch cpu _ (KA.«kexit» + 0x40#64) true 8184#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kx_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, KCtx.setReg_sie, KCtx.setReg_proc]
+      with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
     have hkframe10 : kxFrame (k.setReg 10#5 (L[fd]'hfdlt2)) j k.sie status spval availval :=
       kx_setReg_frame k j status spval 10#5 _ hf0
@@ -505,7 +495,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       icases procOfilesOwe_close γ V.fdg (procAddr j) L [] fd _ (by simp) hget $$ Hofs with ⟨Hc, Hcw2⟩
       k_step_e (wp_s_sd cpu _ (KA.«kexit» + 0x46#64) false 0#12 9#5 0#5 (by decide) (L[fd]'hfdlt2))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [KCtx.rget_withRegs', hR9, kx_add0, KCtx.rget_zero, KCtx.setReg_sie, KCtx.setReg_proc]
+        with [KCtx.rget_withRegs', hR9, Xv6.dsOff0, KCtx.rget_zero, KCtx.setReg_sie, KCtx.setReg_proc]
       iintro Hk Hpc Hc
       -- j +0x38
       k_step_e (wp_s_j cpu _ (KA.«kexit» + 0x4a#64) true 2097134#21)
@@ -553,7 +543,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     -- beq s1,s2 (taken)
     k_step_e (wp_s_branch cpu _ (KA.«kexit» + 0x3a#64) false 18#13 9#5 18#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kx_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
+      with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
     ihave Hpc := kx_pcIs_pos cpu _ _ _
       (show pOfile (procAddr j) (fd + 1) = pCwd (procAddr j) from by
@@ -584,7 +574,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     -- beq s1,s2 (not taken)
     k_step_e (wp_s_branch cpu _ (KA.«kexit» + 0x3a#64) false 18#13 9#5 18#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kx_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
+      with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
     ihave Hpc := kx_pcIs_neg cpu _ _ _
       (kx_pOfile_ne_cwd (procAddr j) (fd + 1) hfdlt1) $$ Hpc
@@ -1544,7 +1534,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   ihave Hfenv : filecloseFsEnv (hlc := hlc) (GF := GF) Γ j (procAddr j) $$ [Hbs]
   · unfold filecloseFsEnv; iframe Hpinv Hrdy Hbs; ipureintro; exact ⟨rfl, hj⟩
   -- the prologue: c.addi16sp sp,-48 ; six sd ; c.addi4spn s0,sp,48
-  k_step_e (wp_s_push cpu _ KA.«kexit» true 4048#12 6 hK6 kx_imm_m48)
+  k_step_e (wp_s_push cpu _ KA.«kexit» true 4048#12 6 hK6 MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe

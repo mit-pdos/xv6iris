@@ -86,7 +86,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
       (k.regs 19#5) (k.regs 20#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
-  obtain ⟨hbnoN, -⟩ := iput_ofl_bno inum hgeom hcov
+  obtain ⟨hbnoN, -⟩ := Xv6.iu_bno inum hgeom hcov
   iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hdn, #Hesc, Hdep, Hcel, Htxa, Hpid, Hsb, Hsi, Hsl1,
     Hsl2, Hlocked, Hop, Hslot, Hframe, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -106,10 +106,10 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
   ihave Hpay := Hpayback $$ HpL
   obtain ⟨ds, hds, rfl, hdeq⟩ := hex
   -- the slot, out of the handle's bytes, with ONE way back at any record
-  icases iput_ofl_hold_open _ _ _ _ _ _ _ _ $$ Hhold with ⟨%hb, Hown, Hholdback⟩
+  icases Xv6.iu_hold_open _ _ _ _ _ _ _ _ $$ Hhold with ⟨%hb, Hown, Hholdback⟩
   icases dsBuf_bytes (bnode b) _ 0#32 ds hds $$ Hown with ⟨Hby, Hbyback⟩
   icases diblkSlot_acc (aBufData (bnode b)) ds (islot inum) hds (islot_lt inum)
-    (iput_ofl_slot_align b (islot inum) hb (islot_lt inum)) $$ Hby with ⟨Hsl, Hslotback⟩
+    (Xv6.dislotAlign_buf b (islot inum) hb (islot_lt inum)) $$ Hby with ⟨Hsl, Hslotback⟩
   rw [hdeq]
   unfold dislot
   icases Hsl with ⟨Hd0, Hrest⟩
@@ -134,10 +134,10 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc
   k_step_c (wp_s_andi c _ (KA.«iput» + 0xae#64) false 15#12 15#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, iput_ofl_andi15]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, Xv6.iu_andi15]
   iintro Hk Hpc
   k_step_c (wp_s_slli c _ (KA.«iput» + 0xb2#64) true 6#6 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_ofl_slli6]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.iu_slli6]
   iintro Hk Hpc
   k_step_c (wp_s_add c _ (KA.«iput» + 0xb4#64) true 15#5 15#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
@@ -214,7 +214,7 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨hK6, hKbr, -, -⟩ := iput_ofl_slots k.avail hK
-  obtain ⟨hbnoN, hib31⟩ := iput_ofl_bno inum hgeom hcov
+  obtain ⟨hbnoN, hib31⟩ := Xv6.iu_bno inum hgeom hcov
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -261,7 +261,7 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
   case dbno => rw [hbnoN]; exact hib31
   case dcov => rw [hbnoN]; exact hcov
   case da0 => k_norm_g
-  case da1 => k_norm_g; exact iput_ofl_sext_bno _ hib31
+  case da1 => k_norm_g; exact Xv6.iu_sext_bno _ hib31
   -- back from bread
   iapply wpNext_intro_pin
   iintro %c %_ %spie2 %spp2 %R2 %b %bs2 %bsd2 %d2 %hcs2 Hk Hpc Hte Hce Hpid Hlocked

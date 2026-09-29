@@ -81,7 +81,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
   iframe Htext HS Hst Hpage Hsepc
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
-  ihave HF := uexec_gprFile_congr cpu
+  ihave HF := MachCSL.gprFile_ext cpu
     ((urLoadSeq urLoadsC ws (urLoadSeq urLoadsB ws (urLoadSeq urLoadsA ws (R.set 10#5 TRAPFRAME)))).set 10#5
       (tfW ws (4 + (10#5).toNat)))
     (tfResumeGpr0 ws) (fun i hi => urLoadSeq_resume ws (R.set 10#5 TRAPFRAME) i hi) $$ HF

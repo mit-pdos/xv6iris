@@ -124,7 +124,7 @@ theorem ctxBytes_split_bytes (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
           (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half}
             (if j = n then e :: He else Hs j)))
           (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (range_getElem?_lt hx))])]
+          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
         iexact Hb
       · simp only [↓reduceIte]
         iexact Hpt1

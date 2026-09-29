@@ -83,12 +83,6 @@ end Fam
 
 /-! ## §2 The count and the shut descriptor -/
 
-/-- **Rocq `ush_count_is_cap`**: below the sign boundary the kernel's count
-IS the caller's request. -/
-theorem ushCountIsCap (w : BitVec 64) (cap : Nat) (hu : w.toNat = cap) (hlt : cap < 2 ^ 31) :
-    argZ w = (cap : Int) :=
-  uread_count_is_cap w cap hu hlt
-
 /-- **Rocq `ush_fd_st_closed`**: a SHUT fd 0 in the caller's ledger is the
 key's descriptor. -/
 theorem ushFdStClosed (v0 : BitVec 64) (fdv l : List FdState) (h0 : (BitVec.setWidth 32 v0).toInt = 0)
@@ -115,7 +109,7 @@ theorem ushReadSupClosed (N : UkNames GF) (γp : GName) (T Rp : IProp GF)
   iframe Hh Hf
   iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (ushReadFamAt (hlc := hlc) γp T n Rp Rin N.pay)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
-    (ukio_tfOf_arg0 m pc) (ukio_tfOf_arg2 m pc) rfl
+    (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [ushFdStClosed (m.get 10#5) fdv l ha0 htake hl0]
   unfold filereadIn
   iintro H

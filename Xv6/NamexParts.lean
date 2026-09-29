@@ -41,6 +41,8 @@ import Xv6.SpecIunlock
 import Xv6.SpecIunlockput
 import Xv6.SpecIlock
 import Xv6.SpecIdup
+import Xv6.DinodeSlot
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -71,40 +73,38 @@ theorem namex_ret_14a : jumpPc (KA.«namex» + 0x14a#64) = KA.«namex» + 0x14a#
 
 /-! ## The stack budget (Rocq's `nx_kb`) -/
 
-theorem namex_slots_val : namexSlots = 116 := by decide
-
 theorem namex_slots_sub (a : Nat) (h : namexSlots ≤ a) : dirlookupSlots ≤ a - 12 := by
   unfold namexSlots at h; omega
 
 theorem namex_slots_iunlockput (a : Nat) (h : namexSlots ≤ a) : iunlockputSlots ≤ a - 12 := by
   have : iunlockputSlots = 82 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_iput (a : Nat) (h : namexSlots ≤ a) : iputSlots ≤ a - 12 := by
   have : iputSlots = 78 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_ilock (a : Nat) (h : namexSlots ≤ a) : ilockSlots ≤ a - 12 := by
   have : ilockSlots = 66 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_iunlock (a : Nat) (h : namexSlots ≤ a) : iunlockSlots ≤ a - 12 := by
   have : iunlockSlots = 26 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_iget (a : Nat) (h : namexSlots ≤ a) : igetSlots ≤ a - 12 := by
   have : igetSlots = 62 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_idup (a : Nat) (h : namexSlots ≤ a) : idupSlots ≤ a - 12 := by
   have : idupSlots = 14 := by decide
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_12 (a : Nat) (h : namexSlots ≤ a) : 12 ≤ a := by
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 theorem namex_slots_small (a : Nat) (h : namexSlots ≤ a) : 10 ≤ a - 12 := by
-  rw [namex_slots_val] at h; omega
+  rw [Xv6.namexSlots_eq] at h; omega
 
 /-! ## The byte tests (Rocq's `nx_slash_*` / `nx_nul_*` / `nx_a4_*`)
 
@@ -164,20 +164,10 @@ theorem namex_beqz_half (t : BitVec 16) :
   · subst h; decide
   · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply h; bv_decide
 
-/-- A register tested against `x0` (the `beqz s6` / `c.beqz a0` tests). -/
-theorem namex_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; exact beq_eq_false_iff_ne.mpr h
-
 theorem namex_nlink_nz (t : BitVec 16) (h : t ≠ 0#16) : t.toNat ≠ 0 := by
   intro hz; apply h; exact BitVec.eq_of_toNat_eq (by simp [hz])
 
 /-! ## The pointer and length arithmetic -/
-
-/-- `lbu _,0(r)`: the offset-0 address. -/
-theorem namex_off0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by
-  simp
 
 /-- `c.addi s1,s1,1` (and `s2`): one byte further along the path. -/
 theorem namex_addi1 (pv : BitVec 64) (i : Nat) :
@@ -199,7 +189,7 @@ theorem namex_sub (pv : BitVec 64) (a e : Nat) (hae : a ≤ e) (he : e < 2 ^ 64)
 /-- `sext.w` of a small length, in the shape the step rules leave it. -/
 theorem namex_sextw0 (r : Nat) (h : r < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 r)) = BitVec.ofNat 64 r := by
-  rw [fw_w32 r h, fw_sext32 r h]
+  rw [fw_w32 r h, MachCSL.signExtend_ofNat32 r h]
 
 /-- `bge s8,s10` at +0x9e: `13 ≥ len`, signed, decided on small values
 (Rocq's `nx_bge13_le` / `nx_bge13_gt`). -/
@@ -451,15 +441,6 @@ theorem namex_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.to
   simp only [BitVec.toNat_setWidth]
   have := w.isLt
   omega
-
-/-- Rocq's `dlk_live_pos`: a live record's inum is positive. -/
-theorem namex_live_pos (data : Nat → List (BitVec 8)) (k : Nat) (h : dirLive data k) :
-    0 < (BitVec.setWidth 32 (dirInum data k)).toNat := by
-  rw [namex_zext32_toNat]
-  unfold dirLive at h
-  rcases Nat.eq_zero_or_pos (dirInum data k).toNat with h0 | h0
-  · exact absurd (BitVec.eq_of_toNat_eq (by simpa using h0)) h
-  · exact h0
 
 /-! ## The buffers, split for the two memmoves -/
 

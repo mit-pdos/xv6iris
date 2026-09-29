@@ -33,7 +33,7 @@ process's slot, `procsInv`, `FsReady.fsReady`, three bcache slots); an
 untyped file costs NOTHING (`filecloseEnv_none` -- what keeps pipealloc's
 failure path cheap).  A closer of an ARBITRARY descriptor (sys_close, kexit)
 carries both bundles and hands over the one the state asks for
-(`filecloseEnv_split` / `_frame` / `filecloseLoop_open`).
+(`filecloseEnv_split` / `_frame` / `Xv6.filecloseEnv_frame`).
 
 ONE IREF UNIT IS BORROWED ACROSS THE CALL (`irefSlot`, in and out on every
 arm): the last close deposits it into the slot it frees (a free slot's
@@ -79,7 +79,7 @@ descriptor that is not a pipe pays and gets back nothing.
    `wordPointsTo (pPid k.proc) 4 dqp pidv` (the Lean fs layer's convention,
    brief fs7 §1): the only field the FS arm's acquiresleep reads.
 5. `fileclose_fs_env_nopid` / `_nopid_eq` are not ported: Rocq defines the
-   two as equal (`reflexivity`); `filecloseLoop_open` is stated over
+   two as equal (`reflexivity`); `Xv6.filecloseEnv_frame` is stated over
    `filecloseFsEnv` directly (its only use, kexit's loop).
 6. `ic_escrows_acc` (Rocq, stated here) is `FsReady.fsReady_escrow` in Lean.
 7. (RETIRED by crash batch C-4, D38.)  The crash layer's `fs_crash_seam`
@@ -297,16 +297,6 @@ theorem filecloseEnv_frame (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl : G
   isplitl [Hpo]
   · iapply Hpre $$ Hpo
   · iapply Hfre $$ Hfo
-
-/-- THE LOOP'S OWN OPENING (Rocq `fileclose_loop_open`; deviation 5: the
-`_nopid` form is the same bundle). -/
-theorem filecloseLoop_open (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (on : Option Nat) (st : FdState) :
-    fileclosePipeEnv (hlc := hlc) (GF := GF) Γ γkl γk on ∗ filecloseFsEnv (hlc := hlc) Γ j p ⊢
-      filecloseEnv (hlc := hlc) Γ j p γkl γk on st ∗
-      (filecloseEnvOut γk on st -∗
-        (∃ on', fileclosePipeEnv Γ γkl γk on') ∗ filecloseFsEnv (hlc := hlc) Γ j p) :=
-  filecloseEnv_frame Γ j p γkl γk on st
 
 end Env
 

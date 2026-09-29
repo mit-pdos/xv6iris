@@ -52,7 +52,7 @@ Rocq's, over the same algebra.
 
 ## DEVIATIONS from Rocq
 
-1. **`positive` IS `Nat`** in `irefSlots_supply` / `irefSlots_no_overflow`.
+1. **`positive` IS `Nat`** in `Xv6.irefSlots_bound` / `irefSlots_no_overflow`.
    Rocq states both at `n : positive` (the icache count column's type) with
    `iref_slots (Pos.to_nat n)`; here they take `n : Nat` and the premise
    `irefSlots n`.  The conclusions are Rocq's (`n <= IREFSLOTS`;
@@ -265,12 +265,6 @@ theorem irefSlots_bound (n : Nat) :
   icombine Ha Hf gives %Hv
   ipureintro
   exact natUfrac_incl n IREFSLOTS (Auth.auth_both_valid_discrete.mp Hv).1
-
-/-- The supply bound as a plain count fact (tso-flip A6.145: the pinw
-member set `IcacheInv.iref_set` is stated against it).  Deviation 1:
-`n : Nat`. -/
-theorem irefSlots_supply (n : Nat) :
-    irefSlotsAuth (GF := GF) ∗ irefSlots n ⊢ ⌜n ≤ IREFSLOTS⌝ := irefSlots_bound n
 
 /-- ...and its consequence, the one idup needs: a count backed by iref
 slots is far below what an `int` can hold, so incrementing it is safe.

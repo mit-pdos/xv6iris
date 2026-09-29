@@ -14,6 +14,7 @@ with an `Int` corollary; `ushp_slots_cap`/`_upd` go through one accessor on
 `List.range` (`ush_range_acc`).
 -/
 import Xv6.UshTreeDefs
+import Xv6.UkRunSysWin
 
 namespace Xv6
 
@@ -74,15 +75,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 
 /-! ## §2 Byte runs -/
 
-/-- **Rocq `ushp_ubytes_ext`**. -/
-theorem ush_ubytes_ext (γd : GName) (a n : Nat) (f g : Nat → BitVec 8) (h : ∀ j, j < n → f j = g j) :
-    ubytes (GF := GF) γd a n f ⊢ ubytes γd a n g := by
-  unfold ubytes ubytesq
-  apply BigSepL.bigSepL_mono
-  intro k x hk
-  obtain ⟨hlt, rfl⟩ := uRange_get hk
-  rw [h _ hlt]
-
 /-- **Rocq `ushp_peel0`**. -/
 theorem ush_peel0 (γd : GName) (a k n : Nat) :
     ubytes (GF := GF) γd a (k + n) (fun _ => ubyte0) ⊢
@@ -92,7 +84,7 @@ theorem ush_peel0 (γd : GName) (a k n : Nat) :
 /-- Eight zero bytes are the zero word. -/
 theorem ush_zero_word (γd : GName) (a : Nat) :
     ubytes (GF := GF) γd a 8 (fun _ => ubyte0) ⊢ uword γd a 0#64 :=
-  ush_ubytes_ext γd a 8 _ _ (fun j _ => (ush_nthByte_zero j).symm)
+  Xv6.ubytes_ext γd a 8 _ _ (fun j _ => (ush_nthByte_zero j).symm)
 
 /-- `k` zero words out of a zero run. -/
 theorem ush_zero_words (γd : GName) (base : Nat) : ∀ k : Nat,

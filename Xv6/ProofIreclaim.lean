@@ -121,7 +121,7 @@ theorem ireclaim_setup (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x0e  addi sp,sp,-64 ; +0x10 .. +0x1e  sd ra, s0, s1..s6 ; +0x20  addi s0,sp,64
   k_step_e (wp_s_push cpu (k.withRegs R) (KA.«ireclaim» + 0xe#64) true 4032#12 8 hK8'
-      ireclaim_imm_m64)
+      MachCSL.imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2]
   iintro Hk Hpc Hframe
   irevert Hframe

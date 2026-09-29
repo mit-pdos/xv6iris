@@ -101,7 +101,7 @@ theorem ialloc_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec 3
   · ipureintro; exact ⟨hwf, hkk⟩
   iintro H0
   have hlen : islot inum < ds.length := by rw [hwf.1]; exact hk
-  ihave Hby := Hsback $$ %ds[islot inum]! %(ialloc_slot_wf ds _ hwf hk) [H0 H2 H4 H6 H8 Ha]
+  ihave Hby := Hsback $$ %ds[islot inum]! %(Xv6.iregBlkSlot ds _ hwf hk) [H0 H2 H4 H6 H8 Ha]
   · iframe
   rw [dsSet_self ds (islot inum) hlen]
   ihave Hown := Hbyback $$ %ds %hwf Hby
@@ -194,7 +194,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
-  ihave Hsl := ialloc_slots_join2 fscBio $$ [Hsl Hsl1]
+  ihave Hsl := Xv6.ba_slots_join2 fscBio $$ [Hsl Hsl1]
   case' _ => iframe
   have hb' : iallocBody k ty R1 := by
     apply iallocBody_callee k ty _ R1 _ _ _ _ _ _ _ _ _ hb <;>
@@ -295,7 +295,7 @@ theorem ialloc_scan_body (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
   have hn31' : n < 2 ^ 31 := by omega
-  have hnN : (BitVec.ofNat 32 n).toNat = n := ialloc_inum_toNat n hn31'
+  have hnN : (BitVec.ofNat 32 n).toNat = n := Xv6.bf_bnoB n hn31'
   have hnib' : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by omega
   obtain ⟨hbnoN, hib, hhome⟩ := ialloc_bno n hnib' hblk hgeom
   iintro ⟨Hk, Hpc, Hframe, #Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hit2, #Hiti, #Hinv, #Hopen, Hte, Hce,
@@ -390,7 +390,7 @@ theorem ialloc_scan_head (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELS
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hn31' : n < 2 ^ 31 := by omega
-  have hnN : (BitVec.ofNat 32 n).toNat = n := ialloc_inum_toNat n hn31'
+  have hnN : (BitVec.ofNat 32 n).toNat = n := Xv6.bf_bnoB n hn31'
   have hnib' : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by omega
   obtain ⟨hbnoN, hib, hhome⟩ := ialloc_bno n hnib' hblk hgeom
   obtain ⟨hb, h18⟩ := hr
@@ -399,7 +399,7 @@ theorem ialloc_scan_head (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELS
   iintro ⟨Hk, Hpc, Hframe, #Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hit2, #Hiti, #Hinv, #Hopen, Hte, Hce,
     Hsn, Hsi, Hpid, Hsl, Hiref, Htx, Hop, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases ialloc_slots_split2 fscBio $$ Hsl with ⟨Hsl1, Hsl⟩
+  icases Xv6.ba_slots_split2 fscBio $$ Hsl with ⟨Hsl1, Hsl⟩
   -- +0x30  srli a1,s2,4 ; +0x34  lw a5,24(s4) ; +0x38  c.addw a1,a1,a5 ; +0x3a  c.mv a0,s5
   k_step_e (wp_s_srli cpu _ (KA.«ialloc» + 0x30#64) false 4#6 11#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, ialloc_srli4 n hn31']
@@ -432,7 +432,7 @@ theorem ialloc_scan_head (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELS
   case dbno => rw [hbnoN]; exact hib
   case dcov => rw [hbnoN]; exact hhome.1
   case da0 => k_norm_g; try exact a21
-  case da1 => k_norm_g; try exact ialloc_sext_bno _ hib
+  case da1 => k_norm_g; try exact Xv6.iu_sext_bno _ hib
   -- back from bread (at any hart)
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie2 %spp2 %R2 %kk %bs2 %bsd2 %d2 %hcs2 Hk Hpc Hte Hce Hpid Hlocked

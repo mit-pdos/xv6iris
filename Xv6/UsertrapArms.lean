@@ -13,6 +13,7 @@ Deviation from Rocq: none of substance; the trap-CSR set rides folded
 (`trapCsrsExt cpu false`) as in Rocq's `ut_hold` at `false`.
 -/
 import Xv6.UsertrapBlocks
+import Xv6.SysOpenWalkCalls
 
 namespace Xv6
 
@@ -49,13 +50,6 @@ theorem utA_rows_entry {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne 
 theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare)
     (hne : A.sc ≠ uecallScause) : utLive A V2 cs2 :=
   utLiveOut_ne _ _ _ _ _ _ hne
-
-theorem utA_bcond_beq_sext (kl : BitVec 32) :
-    bcond bop.BEQ (BitVec.signExtend 64 kl) 0#64 = decide (kl = 0#32) := by
-  by_cases h : kl = 0#32
-  · subst h; decide
-  · have : BitVec.signExtend 64 kl ≠ 0#64 := by bv_decide
-    simp [bcond, h, this]
 
 theorem utA_bcond_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem utA_decide_False : (decide False = true) = False := by simp
@@ -182,7 +176,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   k_norm at e
   obtain ⟨rfl, rfl⟩ := e
   have hret : jumpPc (KA.«usertrap» + 0xf0#64) = KA.«usertrap» + 0xf0#64 := utA_ea_ret
-  k_norm [ut_pushed_withSpie, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, hret]
+  k_norm [MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, hret]
   have hpins1 : utPins A R1 := utPins_calleeSaved A _ R1
     ⟨by simp [RegMap.set_apply, p2], by simp [RegMap.set_apply, p9], by simp [RegMap.set_apply, p19],
      by simp [RegMap.set_apply, p20], by simp [RegMap.set_apply, p21], by simp [RegMap.set_apply, p22],
@@ -198,7 +192,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   · -- not killed: beqz taken, +0xfc
     subst hk0
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xf0#64) true 12#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, utA_bcond_beq_sext, utA_bcond_beq_00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.sys_open_walk_beqz_om, utA_bcond_beq_00]
     iintro Hk Hpc
     ihave Hko := utA_killOut_slot A.sc A.Wk hne $$ Hslot
     iapply (HF A cpu R1 (utV1 A) A.M A.sts A.cs hok hpins1 (utA_rows_entry A hok hne)
@@ -207,7 +201,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
     iapply utOuts_quiet _ _ _ _ _ hne
   · -- killed: +0xf2 j +0xf6 ; li a0,-1 ; jal kexit
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xf0#64) true 12#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, utA_bcond_beq_sext, hk0, utA_decide_False]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.sys_open_walk_beqz_om, hk0, utA_decide_False]
     iintro Hk Hpc
     k_step (wp_s_j cpu _ (KA.«usertrap» + 0xf2#64) true 4#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

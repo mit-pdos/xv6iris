@@ -45,6 +45,8 @@ import Xv6.UartConsAcc
 import Xv6.PipeRw
 import MachCSL.WpSmodeFrame16
 import Xv6.SpecUartwrite
+import Xv6.FsWords
+import Xv6.UmodeArith
 
 namespace Xv6
 
@@ -66,29 +68,16 @@ theorem cw_br_uartwrite : KA.«consolewrite» + 0x848#64 = KA.«uartwrite» := b
 
 /-! ## Word arithmetic, as the instructions compute it -/
 
-theorem cw_w32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) = BitVec.ofNat 32 a := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
-theorem cw_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
 /-- `subw a5,s4,s1`: `n - i` with `0 ≤ i ≤ n < 2^31`. -/
 theorem cw_subw (i n : Nat) (hi : i ≤ n) (hn : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n) -
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 i)) = BitVec.ofNat 64 (n - i) := by
-  rw [cw_w32 n hn, cw_w32 i (by omega)]
+  rw [Xv6.fw_w32 n hn, Xv6.fw_w32 i (by omega)]
   rw [show BitVec.ofNat 32 n - BitVec.ofNat 32 i = BitVec.ofNat 32 (n - i) from by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]
     omega]
-  exact cw_sext32 _ (by omega)
+  exact MachCSL.signExtend_ofNat32 _ (by omega)
 
 /-- ... as `k_norm` leaves it (`BitVec.sub_eq_add_neg`). -/
 theorem cw_subw' (i n : Nat) (hi : i ≤ n) (hn : n < 2 ^ 31) :
@@ -100,24 +89,24 @@ theorem cw_subw' (i n : Nat) (hi : i ≤ n) (hn : n < 2 ^ 31) :
 theorem cw_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 b)) = BitVec.ofNat 64 (a + b) := by
-  rw [cw_w32 a (by omega), cw_w32 b (by omega)]
+  rw [Xv6.fw_w32 a (by omega), Xv6.fw_w32 b (by omega)]
   rw [show BitVec.ofNat 32 a + BitVec.ofNat 32 b = BitVec.ofNat 32 (a + b) from by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega]
-  exact cw_sext32 _ h
+  exact MachCSL.signExtend_ofNat32 _ h
 
 /-- `sext.w s3,s2` (`addiw s3,s2,0`). -/
 theorem cw_sextw (a : Nat) (h : a < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.ofNat 64 a + BitVec.signExtend 64 (0#12))) = BitVec.ofNat 64 a := by
-  rw [show BitVec.signExtend 64 (0#12) = 0#64 from by decide, BitVec.add_zero, cw_w32 a h]
-  exact cw_sext32 _ h
+  rw [show BitVec.signExtend 64 (0#12) = 0#64 from by decide, BitVec.add_zero, Xv6.fw_w32 a h]
+  exact MachCSL.signExtend_ofNat32 _ h
 
 /-- ... as `k_norm` leaves it once the zero immediate has been folded away. -/
 theorem cw_sext_id (a : Nat) (h : a < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a)) = BitVec.ofNat 64 a := by
-  rw [cw_w32 a h]; exact cw_sext32 a h
+  rw [Xv6.fw_w32 a h]; exact MachCSL.signExtend_ofNat32 a h
 
 theorem cw_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
   rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
@@ -139,9 +128,6 @@ theorem cw_blez (n : Int) (h : -2 ^ 63 ≤ n ∧ n < 2 ^ 63) :
   show (!(0#64 : BitVec 64).slt (BitVec.ofInt 64 n)) = decide (n ≤ 0)
   simp only [BitVec.slt, cw_toInt_ofInt n h, show (0#64 : BitVec 64).toInt = 0 from by decide]
   by_cases hc : n ≤ 0 <;> simp [hc] <;> omega
-
-theorem cw_ofInt_nat (m : Nat) : BitVec.ofInt 64 (m : Int) = BitVec.ofNat 64 m :=
-  BitVec.ofInt_natCast 64 m
 
 /-- `bge s9,a5` with the constant `32` in `s9`. -/
 theorem cw_bge32 (m : Nat) (hm : m < 2 ^ 63) :
@@ -1313,7 +1299,7 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
     obtain ⟨N, hnN⟩ : ∃ N : Nat, n = (N : Int) := ⟨n.toNat, by omega⟩
     have hN : N < 2 ^ 31 := by omega
     have hNn : (N : Int) ≤ max 0 n := by omega
-    have hn2 : k.regs 12#5 = BitVec.ofNat 64 N := by rw [hn, hnN, cw_ofInt_nat]
+    have hn2 : k.regs 12#5 = BitVec.ofNat 64 N := by rw [hn, hnN, Xv6.umoi_natCast]
     k_step_e (wp_s_branch0 cpu _ (KA.«consolewrite» + 0xa#64) false 120#13 12#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hn, cw_blez n (by omega), decide_eq_false hn0]

@@ -46,11 +46,6 @@ theorem and_lsb0_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFF
   have h0 : pc.getLsbD 0 = false := (lsb0_iff_even pc).2 h
   bv_decide
 
-unseal LeanRV64D.Functions.hartSupports in
-/-- Zca is supported on this platform (compressed instructions), so
-`legalize_xepc` clears bit 0. -/
-theorem zca_supported : hartSupports extension.Ext_Zca = true := rfl
-
 /-! ## The leaves -/
 
 set_option maxHeartbeats 4000000 in
@@ -82,7 +77,7 @@ theorem swp_write_CSR_sepc (cpu : CPU) (e v : BitVec 64)
     ▷ (Register.sepc ↦ᵣ[cpu] (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗ Φ (.Ok (v &&& 0xFFFFFFFFFFFFFFFE#64)))
     ⊢ swp cpu (write_CSR 0x141#12 v) Φ := by
   iintro ⟨#Hhw, Hsepc, HΦ⟩
-  have hz : hartSupports extension.Ext_Zca = true := zca_supported
+  have hz : hartSupports extension.Ext_Zca = true := LeanRV64D.Functions.hartSupports_Ext_Zca
   swp_run 40
   simp only [legalize_xepc, hz, ite_true, update_bit0_eq]
   iapply HΦ $$ Hsepc
@@ -187,7 +182,7 @@ theorem execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   iframe
   iintro HF
   swp_run 300
-  simp only [legalize_xepc, zca_supported, ite_true, update_bit0_eq, hal]
+  simp only [legalize_xepc, LeanRV64D.Functions.hartSupports_Ext_Zca, ite_true, update_bit0_eq, hal]
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]

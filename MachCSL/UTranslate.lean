@@ -109,7 +109,6 @@ theorem utr_texc (acc : MemoryAccessType mem_payload) (h : utrAcc acc = true) (f
 /-! ## §2 The pins -/
 
 theorem utr_sxl (ms : BitVec 64) : _get_Mstatus_SXL ms = BitVec.extractLsb' 34 2 ms := rfl
-theorem utr_mprv (ms : BitVec 64) : _get_Mstatus_MPRV ms = BitVec.extractLsb' 17 1 ms := rfl
 theorem utr_satpMode (x : BitVec 64) : _get_Satp64_Mode (Mk_Satp64 x) = BitVec.extractLsb' 60 4 x := rfl
 theorem utr_arch2 : architecture_bits_backwards 2#2 = pure Architecture.RV64 := rfl
 theorem utr_sv39 : satpMode_of_bits Architecture.RV64 8#4 = some SATPMode.Sv39 := rfl
@@ -169,7 +168,7 @@ privilege is the current one (a term equation). -/
 theorem utr_effPriv (acc : MemoryAccessType mem_payload) (ms : BitVec 64) (p : Privilege)
     (h : BitVec.extractLsb' 17 1 ms = 0#1) : effectivePrivilege acc ms p = pure p := by
   unfold effectivePrivilege
-  rw [utr_mprv, h]
+  rw [MachCSL.get_Mstatus_MPRV_eq, h]
   simp
 
 /-- Rocq `goodb_translationMode_U`: Sv39 at User. -/

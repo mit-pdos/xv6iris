@@ -10,7 +10,7 @@ is `'e'`, and it re-bases at the line's own start.
 
 ## Deviations from Rocq
 
-1. `ushs_sym_val`/`ushs_ws_val` are `UkShWords`' `ushpIsSym_val`/
+1. `Xv6.ushpIsSym_val`/`Xv6.ushpIsWs_val` are `UkShWords`' `ushpIsSym_val`/
    `ushpIsWs_val` (the same statements), restated under Rocq's names.
 2. `UNameBytes`' `suf_gt_len`/`_0`/`_1`/`_2`/`_name` (U0-2's file, not yet in
    the tree) are proved inline in `ushsLineIs_of_at` (`FileDiscLine`'s
@@ -26,34 +26,21 @@ namespace Xv6
 
 /-! ## §1 The byte classes against the lexer's tables -/
 
-theorem ushs_sym_val (b : BitVec 8) (h : ushpIsSym b = true) :
-    b.toNat = 60 ∨ b.toNat = 124 ∨ b.toNat = 62 ∨ b.toNat = 38 ∨ b.toNat = 59 ∨ b.toNat = 40 ∨ b.toNat = 41 :=
-  ushpIsSym_val b h
-
-theorem ushs_ws_val (b : BitVec 8) (h : ushpIsWs b = true) :
-    b.toNat = 32 ∨ b.toNat = 9 ∨ b.toNat = 13 ∨ b.toNat = 10 ∨ b.toNat = 11 :=
-  ushpIsWs_val b h
-
 theorem ushs_alnum_not_sym (b : BitVec 8) (h : wlAlnum b) : ushpIsSym b = false := (wlAlnum_plain b h).2
 
 theorem ushs_fn_not_sym (b : BitVec 8) (h : fnByte b) : ushpIsSym b = false := (fnByte_plain b h).2
 
 theorem ushs_fn_not_ws (b : BitVec 8) (h : fnByte b) : ushpIsWs b = false := (fnByte_plain b h).1
 
-theorem ushs_sp_ws : ushpIsWs wlSp = true := wlSp_ws
-theorem ushs_nl_ws : ushpIsWs wlNl = true := wlNl_ws
-theorem ushs_sp_not_sym : ushpIsSym wlSp = false := wlSp_nsym
-theorem ushs_nl_not_sym : ushpIsSym wlNl = false := wlNl_nsym
-
 theorem ushs_body_not_sym (b : BitVec 8) (h : wlBodyByte b) : ushpIsSym b = false := by
   rcases h with ha | rfl
   · exact ushs_alnum_not_sym b ha
-  · exact ushs_sp_not_sym
+  · exact Xv6.wlSp_nsym
 
 theorem ushs_fnbody_not_sym (b : BitVec 8) (h : fnByte b ∨ b = wlSp) : ushpIsSym b = false := by
   rcases h with ha | rfl
   · exact ushs_fn_not_sym b ha
-  · exact ushs_sp_not_sym
+  · exact Xv6.wlSp_nsym
 
 /-! ## §3 The redirect line, stated positionally -/
 
@@ -90,9 +77,9 @@ theorem ushsLineIs_redir (ws : List (List (BitVec 8))) (file : List (BitVec 8)) 
     by_cases hlo : j < p0
     · exact hbodycl j hlo
     by_cases h0 : j = p0
-    · subst h0; rw [hsp1]; exact ushs_sp_not_sym
+    · subst h0; rw [hsp1]; exact Xv6.wlSp_nsym
     by_cases h2 : j = p0 + 2
-    · subst h2; rw [show k + (p0 + 2) = k + p0 + 2 by omega, hsp2]; exact ushs_sp_not_sym
+    · subst h2; rw [show k + (p0 + 2) = k + p0 + 2 by omega, hsp2]; exact Xv6.wlSp_nsym
     by_cases hfi : j < p0 + 3 + file.length
     · have := hfilecl (j - (p0 + 3)) (by omega)
       rw [show k + p0 + 3 + (j - (p0 + 3)) = k + j by omega] at this
@@ -100,7 +87,7 @@ theorem ushsLineIs_redir (ws : List (List (BitVec 8))) (file : List (BitVec 8)) 
     · have hj' : j = p0 + 3 + file.length := by omega
       subst hj'
       rw [show k + (p0 + 3 + file.length) = k + p0 + 3 + file.length by omega, hnl]
-      exact ushs_nl_not_sym
+      exact Xv6.wlNl_nsym
   refine ⟨⟨?_, ?_⟩, by omega, ?_, ?_, by omega, by omega, ?_, ?_⟩
   · intro j hj hs
     by_cases hne : j = p0 + 1
@@ -110,8 +97,8 @@ theorem ushsLineIs_redir (ws : List (List (BitVec 8))) (file : List (BitVec 8)) 
     simp only [Option.some.injEq] at hq
     subst hq
     exact ⟨by omega, by dsimp only; rw [show k + (p0 + 1) = k + p0 + 1 by omega]; exact hgt⟩
-  · dsimp only; rw [show k + (p0 + 1 - 1) = k + p0 by omega, hsp1]; exact ushs_sp_ws
-  · dsimp only; rw [show k + (p0 + 1 + 1) = k + p0 + 2 by omega, hsp2]; exact ushs_sp_ws
+  · dsimp only; rw [show k + (p0 + 1 - 1) = k + p0 by omega, hsp1]; exact Xv6.wlSp_ws
+  · dsimp only; rw [show k + (p0 + 1 + 1) = k + p0 + 2 by omega, hsp2]; exact Xv6.wlSp_ws
   · intro j hj1 hj2
     have := hfilecl (j - (p0 + 3)) (by omega)
     rw [show k + p0 + 3 + (j - (p0 + 3)) = k + j by omega] at this
@@ -121,7 +108,7 @@ theorem ushsLineIs_redir (ws : List (List (BitVec 8))) (file : List (BitVec 8)) 
     subst hj'
     dsimp only
     rw [show k + (p0 + 3 + file.length) = k + p0 + 3 + file.length by omega, hnl]
-    exact ushs_nl_ws
+    exact Xv6.wlNl_ws
 
 /-! ## §4 The redirect line is the typed line `LEchoF` -/
 

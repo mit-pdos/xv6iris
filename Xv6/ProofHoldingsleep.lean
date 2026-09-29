@@ -27,6 +27,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.WpLock
 import Xv6.SpecMyproc
+import Xv6.KilledDefs
 
 namespace Xv6
 
@@ -54,9 +55,6 @@ theorem hsl_sp40 (x : BitVec 64) :
 theorem hsl_sp40' (x : BitVec 64) :
     x + 0xFFFFFFFFFFFFFFD0#64 + 8#64 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 
-theorem hsl_bne (v : BitVec 32) (h : v ≠ 0#32) :
-    bcond bop.BNE (BitVec.signExtend 64 v) 0#64 = true := bcond_bne_sext_ne v h
-
 theorem hsl_sub_self (x : BitVec 64) : x - x = 0#64 := by bv_decide
 theorem hsl_addneg_self (x : BitVec 64) : x + -x = 0#64 := by bv_decide
 theorem hsl_ult01 : (0#64 : BitVec 64).ult (BitVec.signExtend 64 1#12) = true := by decide
@@ -70,14 +68,8 @@ theorem hsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem hsl_withLocks_self (k : KCtx) (m : Nat) (a b : Bool) :
-    ((k.pushed m).withSpie a b).withLocks k.locks = (k.pushed m).withSpie a b := rfl
 theorem hsl_withLocks_self' (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-theorem hsl_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem hsl_withRegs_withSpie (k : KCtx) (RM : RegMap) (a b : Bool) :
-    (k.withRegs RM).withSpie a b = (k.withSpie a b).withRegs RM := rfl
 theorem hsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 6).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 6 := rfl
 
@@ -258,7 +250,7 @@ theorem hsl_join (RE : RELEASE) (cpu c : CPU) (k : KCtx) (P Q : IProp GF)
   iapply (hsl_release RE c _ γl γ slk Rp H ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hbody]
   rotate_right 1
-  k_norm_g [hsl_withLocks_self, hsl_filter_sleep k.locks hs,
+  k_norm_g [Xv6.kl_withLocks_self, hsl_filter_sleep k.locks hs,
     KCtx.pushOffAt_popExit k spie spp hwf, hK6, hR18, hsl_ret_4070]
   iframe #
   case ha0 => k_norm_g; all_goals exact rfl
@@ -489,7 +481,7 @@ theorem holdingsleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : HOLDING
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9]
   iintro Hk Hpc H3
   k_step (wp_s_branch c _ (KA.«holdingsleep» + 0x1a#64) true 24#13 15#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsl_bne v hv]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne v hv]
   iintro Hk Hpc
   iapply (hsl_taken MP RE cpu c k γl γ (k.regs 10#5) Rp H q pid dqp v vln vn hv hwf (by omega) hK hs
       spie spp hsp hpin6 _

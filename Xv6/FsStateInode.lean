@@ -56,7 +56,7 @@ to other inodes are carried as tokens, never as an equation.
   `entDsetOk_empty`, `nodeExact_notDir`, `dot_ne_dotdot`,
   `entTokenless_name` / `_selfNe` / `_orphUp` / `_dotdot` / `_dot` /
   `_ne`.
-* helper: `range_lookup` (`List.range`'s lookup; Rocq uses stdpp's
+* helper: `Xv6.rangeGetElem?` (`List.range`'s lookup; Rocq uses stdpp's
   `lookup_seq`).
 
 ## WHAT LIVES IN `Xv6/FsStateInodeOwned.lean`
@@ -163,6 +163,7 @@ import Xv6.FsNode
 import Xv6.FsTree
 import Xv6.FsImg
 import Xv6.FsStateDefs
+import Xv6.FsStateBitmap
 
 namespace Xv6
 
@@ -581,18 +582,13 @@ theorem recOwned_sbQ (Γ : FsViewNames GF) (dq : DFrac) (sb : FsSb) (i : Nat) (d
   recOwned_sb (FsView.gammaQ Γ dq) sb i dn hi
 
 /-! ### The 16-fold split/gather -/
-/-- `List.range`'s lookup, both halves. -/
-theorem range_lookup {n k x : Nat} (h : (List.range n)[k]? = some x) : x = k ∧ k < n := by
-  obtain ⟨hk, hx⟩ := List.getElem?_eq_some_iff.1 h
-  rw [List.getElem_range] at hx
-  exact ⟨hx.symm, by simpa using hk⟩
 
 /-- An index-only big-op read either way (Rocq's `big_sepL_seq0`). -/
 theorem bigSepL_seq0 (Ψ : Nat → IProp GF) (n : Nat) :
     ([∗list] j ∈ List.range n, Ψ j) ⊣⊢ ([∗list] k ↦ _j ∈ List.range n, Ψ k) := by
   refine BiEntails.of_eq (BigSepL.bigSepL_eq ?_)
   intro k x h
-  rw [(range_lookup h).1]
+  rw [(Xv6.rangeGetElem? h).1]
 
 /-- A range of `m * n`, as `n` runs of `m` (Rocq's `big_sepL_seq_chunks`). -/
 theorem bigSepL_seqChunks (Phi : Nat → IProp GF) (m n : Nat) :
@@ -673,7 +669,7 @@ theorem recOwnedAt_diblk (Γ : FsViewNames GF) (istart bi : Nat) (ds : List Dino
   refine BiEntails.trans ?_ (bigSepL_seq0 _ 16).symm
   refine BiEntails.of_eq (BigSepL.bigSepL_eq ?_)
   intro k x hkx
-  exact (BiEntails.to_eq (recOwnedAt_slot Γ istart bi k ds[k]! (range_lookup hkx).2)).symm
+  exact (BiEntails.to_eq (recOwnedAt_slot Γ istart bi k ds[k]! (Xv6.rangeGetElem? hkx).2)).symm
 
 end RecOwned
 

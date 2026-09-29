@@ -36,9 +36,6 @@ theorem bw_ret_1c : jumpPc (KA.«bwrite» + 0x1c#64) = (KA.«bwrite» + 0x1c#64)
 theorem bw_br_hold : KA.«bwrite» + 0x13d4#64 = KA.«holdingsleep» := by decide
 theorem bw_br_vdr : KA.«bwrite» + 0x2c88#64 = KA.«virtio_disk_rw» := by decide
 
-/-- The `beqz a0` after `holdingsleep` returns 1: not taken. -/
-theorem bw_beqz : bcond bop.BEQ 1#64 0#64 = false := by decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
@@ -181,7 +178,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   have h9 : R1 9#5 = bnode kk := b9
   -- c.beqz a0 ; c.li a1,1 ; c.mv a0,s1 ; jal virtio_disk_rw
   k_step_e (wp_s_branch cpu _ (KA.«bwrite» + 0x12#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0r, bw_beqz]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0r, MachCSL.bcond_beq_one]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«bwrite» + 0x14#64) true 1#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

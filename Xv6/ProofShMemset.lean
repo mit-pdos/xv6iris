@@ -32,6 +32,7 @@ import Xv6.UshTreeDefs
 import Xv6.UshMainCode
 import Xv6.UkEchoDefs
 import MachCSL.ByteWord
+import Xv6.UkGrepDefs
 
 namespace Xv6
 
@@ -54,19 +55,6 @@ theorem ushMs_zext32 (x : Nat) (hx : x < 2 ^ 32) :
     Nat.shiftRight_eq_div_pow]
   rw [Nat.mod_eq_of_lt (show x < 2 ^ 64 by omega)]
   omega
-
-/-- `bne` at two small `Nat` values. -/
-theorem ushMs_bne (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BNE (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = !decide (x = y) := by
-  unfold ukBtaken
-  by_cases h : x = y
-  · subst h; simp
-  · have hne : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
-      intro e
-      have := congrArg BitVec.toNat e
-      simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] at this
-      exact h this
-    simp [h, hne]
 
 /-- The register file at the loop's head (0xa70). -/
 def ushMsM (m : RegMap) (a Nb : Nat) : RegMap :=
@@ -176,7 +164,7 @@ theorem ushMs_loop (UL : UK_LEAVES) (N : UkNames GF) (c : BitVec 8) (a Nb nn : N
     iapply ushS_brN UL N (ushMI_a76 N.t) 0xa7a h2 m2 nn
       (by show ukBtaken .BNE ((ukWr mc _ _).get 15#5) ((ukWr mc _ _).get 14#5) = false
           rw [ukWr_get_other _ 15#5 14#5 _ (by decide), ukWr_get_same _ _ _ (by decide), h14,
-            ushMs_bne _ _ (by omega) (by omega)]
+            Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]
           simp; omega)
       $$ Hc Hrun
     iintro %h3 Hrun
@@ -210,7 +198,7 @@ theorem ushMs_loop (UL : UK_LEAVES) (N : UkNames GF) (c : BitVec 8) (a Nb nn : N
     iapply ushS_brT UL N (ushMI_a76 N.t) 0xa70 h2 m2 nn
       (by show ukBtaken .BNE ((ukWr mc _ _).get 15#5) ((ukWr mc _ _).get 14#5) = true
           rw [ukWr_get_other _ 15#5 14#5 _ (by decide), ukWr_get_same _ _ _ (by decide), h14,
-            ushMs_bne _ _ (by omega) (by omega)]
+            Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]
           simp; omega)
       $$ Hc Hrun
     iintro %h3 Hrun

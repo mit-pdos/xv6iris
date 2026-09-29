@@ -211,7 +211,7 @@ theorem ialloc_entry (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
   have hpn : k.proc ≠ 0#64 := by rw [hproc]; exact procAddr_nonzero hj
   simp only [iallocAddr]
   -- +0x00  addi sp,sp,-64 ; +0x02 / +0x04  sd ra, s0 ; +0x06  addi s0,sp,64
-  k_step_e (wp_s_push cpu _ (KA.«ialloc») true 4032#12 8 hK8 ialloc_imm_m64)
+  k_step_e (wp_s_push cpu _ (KA.«ialloc») true 4032#12 8 hK8 MachCSL.imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe

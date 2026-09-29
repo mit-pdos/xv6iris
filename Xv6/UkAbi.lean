@@ -102,7 +102,7 @@ theorem uMWord_bytes (M : ElfMem) (a k : Nat) (hex : ∀ j, j < k → (M (a + j)
 /-- **Rocq `uM_bytes_inj`**. -/
 theorem uMBytes_inj {M : ElfMem} {a k : Nat} {w w' : BitVec (8 * k)} (h1 : uMBytes M a k w)
     (h2 : uMBytes M a k w') : w = w' :=
-  nthByte_ext w w' fun j hj => Option.some.inj ((h1 j hj).symm.trans (h2 j hj))
+  MachCSL.bv_eq_of_bytes w w' fun j hj => Option.some.inj ((h1 j hj).symm.trans (h2 j hj))
 
 /-! ## §1 Readable pages and readable windows on the key -/
 
@@ -282,7 +282,7 @@ theorem ukArgvW_ext {M M' : ElfMem} {av i : Nat}
     (heq : ∀ j, j < 8 → M' (av + 8 * i + j) = M (av + 8 * i + j)) :
     ukArgvW M' av i = ukArgvW M av i := by
   unfold ukArgvW
-  apply nthByte_ext
+  apply MachCSL.bv_eq_of_bytes
   intro j hj
   rw [uMWord_nthByte _ _ _ _ hj, uMWord_nthByte _ _ _ _ hj, heq j hj]
 

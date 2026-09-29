@@ -98,10 +98,6 @@ theorem vdrwRegs6_ws (k : KCtx) (a b : Bool) (R : RegMap) :
 
 /-! ## Two marking identities -/
 
-theorem updB_idem (f : Nat → Bool) (i : Nat) (b b' : Bool) :
-    updB (updB f i b) i b' = updB f i b' := by
-  funext j; simp only [updB]; by_cases h : j = i <;> simp [h]
-
 theorem updB_nil (i : Nat) : updB (fun _ => false) i false = (fun _ => false) := by
   funext j; simp only [updB]; by_cases h : j = i <;> simp [h]
 
@@ -334,11 +330,6 @@ theorem vdrw_popctx (k : KCtx) (s : Bool) (hs : k.sie = s) (hlocks : k.locks = [
 
 theorem vdrw5_saved_ws (k : KCtx) (a b : Bool) :
     vdrwSaved (GF := GF) (k.withSpie a b) = vdrwSaved k := rfl
-
-theorem vdrw5_postK_ws (k : KCtx) (a b : Bool) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
-    (dataBuf dataDisk : List (BitVec 8)) :
-    vdrwPostK (GF := GF) (k.withSpie a b) γ bno wr dataBuf dataDisk =
-      vdrwPostK k γ bno wr dataBuf dataDisk := rfl
 
 theorem vdrwP5Loop_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
@@ -586,15 +577,6 @@ theorem wpNext_here (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
   iintro H
   iapply H $$ %cpu %(fun _ => rfl)
 
-/-- The caller's continuation follows the thread to whichever hart
-`sleep` brings it back on. -/
-theorem vdrw5_next_at (cpu c : CPU) (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
-    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) (jp : Nat) (hj : jp < NPROC)
-    (hproc : k.proc = procAddr jp) :
-    vdrwNext (GF := GF) k γ bno wr dataBuf dataDisk rq cpu ⊢
-      vdrwNext k γ bno wr dataBuf dataDisk rq c :=
-  vdrwNext_shift cpu c k γ bno wr dataBuf dataDisk rq jp hj hproc
-
 end calls
 
 /-! ## Addresses, branch targets and small arithmetic of P5 and P6
@@ -651,9 +633,6 @@ theorem vdrw6_flagsTail :
 theorem vdrw6_flagsTailS :
     BitVec.setWidth 64 (BitVec.ofNat 16 Virtio.descFWrite) &&& BitVec.signExtend 64 (1#12) =
       0#64 := by decide
-
-theorem vdrw6_bnez_1 : bcond bop.BNE 1#64 0#64 = true := by decide
-theorem vdrw6_bnez_0 : bcond bop.BNE 0#64 0#64 = false := by decide
 
 /-- The loop's index register, after `lhu s2,14(a5)` and after
 `lw s2,-96(s0)`. -/

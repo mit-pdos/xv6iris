@@ -23,6 +23,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFilestat
+import Xv6.CopyLemmas
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -45,8 +47,6 @@ theorem sfs_ret_12 : jumpPc (KA.«sys_fstat» + 0x12#64) = (KA.«sys_fstat» + 0
 theorem sfs_ret_1e : jumpPc (KA.«sys_fstat» + 0x1e#64) = (KA.«sys_fstat» + 0x1e#64) := by decide
 theorem sfs_ret_32 : jumpPc (KA.«sys_fstat» + 0x32#64) = (KA.«sys_fstat» + 0x32#64) := by decide
 
-theorem sfs_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sfs_li1 : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
 theorem sfs_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sfs_add0 (x : BitVec 64) : 0#64 + x = x := by simp
 /-- `addi a1,s0,-32` / `ld a1,-32(s0)`: `&st`, frame slot 4. -/
@@ -67,19 +67,6 @@ theorem sfs_f_nonnull (sp : BitVec 64) (h : 32 ≤ sp.toNat) : sp + 0xFFFFFFFFFF
   simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
-
-theorem sfs_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sfs_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sfs_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
-
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem sfs_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The register bundle: `sp`, `s0` and the untouched `s1..s11` -/
 

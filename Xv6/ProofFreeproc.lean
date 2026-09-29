@@ -9,6 +9,7 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.PtOwnLemmas
 import Xv6.CodeTactics
+import Xv6.WordFrac
 
 namespace Xv6
 
@@ -47,25 +48,6 @@ theorem fp_ctxByte_join (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8)
     · ipureintro; exact hv1
     · iexact Hk1
 
-/-- A byte cell splits. -/
-theorem fp_ctxByte_split (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v : BitVec 8) :
-    ctxByte (GF := GF) ξ a (DFrac.own (q1 + q2)) v ⊢
-      ctxByte ξ a (DFrac.own q1) v ∗ ctxByte ξ a (DFrac.own q2) v := by
-  unfold ctxByte
-  iintro ⟨%e, %H, Hp, %hv, #Hk⟩
-  ihave Hp := (Fractional.fractional (Φ := fun q => iprop(a ↦ₕ{DFrac.own q} (e :: H))) q1 q2).1 $$ Hp
-  icases Hp with ⟨Hp1, Hp2⟩
-  isplitl [Hp1]
-  · iexists e, H
-    iframe Hp1
-    isplit
-    · ipureintro; exact hv
-    · iexact Hk
-  · iexists e, H
-    iframe Hp2
-    isplit
-    · ipureintro; exact hv
-    · iexact Hk
 
 /-- A four-byte word's fractions join. -/
 theorem fp_word4_join [CurCtx] (a : BitVec 64) (q1 q2 : Qp) (w1 w2 : BitVec 32) :
@@ -114,10 +96,10 @@ theorem fp_word4_split [CurCtx] (a : BitVec 64) (q1 q2 : Qp) (w : BitVec 32) :
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
     Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   icases Hb with ⟨A0, A1, A2, A3, _⟩
-  icases fp_ctxByte_split curCtx _ q1 q2 _ $$ A0 with ⟨B0, C0⟩
-  icases fp_ctxByte_split curCtx _ q1 q2 _ $$ A1 with ⟨B1, C1⟩
-  icases fp_ctxByte_split curCtx _ q1 q2 _ $$ A2 with ⟨B2, C2⟩
-  icases fp_ctxByte_split curCtx _ q1 q2 _ $$ A3 with ⟨B3, C3⟩
+  icases Xv6.ctxByte_split curCtx _ q1 q2 _ $$ A0 with ⟨B0, C0⟩
+  icases Xv6.ctxByte_split curCtx _ q1 q2 _ $$ A1 with ⟨B1, C1⟩
+  icases Xv6.ctxByte_split curCtx _ q1 q2 _ $$ A2 with ⟨B2, C2⟩
+  icases Xv6.ctxByte_split curCtx _ q1 q2 _ $$ A3 with ⟨B3, C3⟩
   isplitl [B0 B1 B2 B3]
   · iexists ppn
     iframe B0 B1 B2 B3

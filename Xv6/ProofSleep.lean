@@ -32,6 +32,7 @@ import Xv6.SpecMyproc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import Xv6.KilledDefs
 
 namespace Xv6
 
@@ -43,12 +44,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 
 /-! ## Pure facts -/
-
-/-- The lock list after `release` drops `proc`. -/
-theorem sl_filter_proc (l : List String) (h : "proc" ∉ l) :
-    ("proc" :: l).filter (fun x => x ≠ "proc") = l := by
-  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
-  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 /-- `beqz` on a word. -/
 theorem sl_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
@@ -252,7 +247,7 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
   ihave Hclaim := (show procClaim (GF := GF) Γ cpu (procAddr j) ⊢ cpuClaim cpu (procAddr j) from by
     rw [cpuClaim_eq Γ]) $$ Hclaim
   icases armExt_split cpu k.sie (procAddr j) $$ [$Htc $Hclaim $Hir] with ⟨Harm, Hte, Hce⟩
-  have hfilt := sl_filter_proc ([] : List String) (by simp)
+  have hfilt := Xv6.kl_filter_proc ([] : List String) (by simp)
   have hK4 : 4 ≤ k.avail := by omega
   iapply (hre _ ?hs1 ?hn1 ?hK1 k.sie ?hr1 ?ho1) $$ [- $Hk $Hpc $Hlocked $HRnew]
   rotate_right 1

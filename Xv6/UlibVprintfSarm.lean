@@ -16,6 +16,8 @@ the argument's bytes (Rocq's middle chain).  The argument word is read at
 a fraction and handed back; so is the string (any fraction `sdq`).
 -/
 import Xv6.UlibVprintfPct
+import Xv6.ByteCursor
+import Xv6.PrintkDefs
 
 namespace Xv6
 
@@ -28,12 +30,6 @@ theorem ulibOfNat_beq0 (x : Nat) (hx : x < 2 ^ 64) (h : x ≠ 0) : (BitVec.ofNat
   rw [BitVec.toNat_ofNat] at this
   simp at this
   omega
-
-theorem ulibOfNat_toNat (x : Nat) (hx : x < 2 ^ 64) : (BitVec.ofNat 64 x).toNat = x := by
-  rw [BitVec.toNat_ofNat]; omega
-
-theorem ulibOfNat_succ (x : Nat) : BitVec.ofNat 64 x + 1#64 = BitVec.ofNat 64 (x + 1) := by
-  rw [BitVec.ofNat_add]
 
 section
 variable {GF : BundledGFunctors}
@@ -75,7 +71,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
       rw [hcs 9#5 (by decide)]; ulib_regs; exact h9
     -- +0x2b4  addi s1,s1,1
     iapply (ulibS_addiV L _ (ulibVprintf_i2b4 L.toUlibRun base) 0x2b6 rfl _ _ (by decide) (by decide)
-      (BitVec.ofNat 64 (sa + (j + 1))) (by ulib_regs; rw [h9', ulibOfNat_succ, Nat.add_assoc])) $$ Hc Hrun
+      (BitVec.ofNat 64 (sa + (j + 1))) (by ulib_regs; rw [h9', Xv6.ofNat_succ', Nat.add_assoc])) $$ Hc Hrun
     iintro Hrun
     match k, hk with
     | 0, hk =>
@@ -83,7 +79,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
       icases ulibStr_nul L sdq sa slen sf $$ Hstr with ⟨Hn, Hcl⟩
       rw [show slen = j + 1 by omega]
       iapply (ulibS_lbuq L _ (ulibVprintf_i2b6 L.toUlibRun base) 0x2ba rfl _ _ sdq (sa + (j + 1)) ubyte0
-        (by decide) (by decide) (by ulib_regs; rw [ulibOfNat_toNat _ (by omega)])) $$ Hc Hn Hrun
+        (by decide) (by decide) (by ulib_regs; rw [Xv6.bcOfNatToNat _ (by omega)])) $$ Hc Hn Hrun
       iintro Hn Hrun
       ihave Hstr := Hcl $$ Hn
       -- +0x2ba  bnez a1 : not taken
@@ -99,7 +95,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
       -- +0x2b6  lbu a1,0(s1) : the next byte
       icases ulibStr_byte L sdq sa slen sf (j + 1) (by omega) $$ Hstr with ⟨Hn, Hcl⟩
       iapply (ulibS_lbuq L _ (ulibVprintf_i2b6 L.toUlibRun base) 0x2ba rfl _ _ sdq (sa + (j + 1)) (sf (j + 1))
-        (by decide) (by decide) (by ulib_regs; rw [ulibOfNat_toNat _ (by omega)])) $$ Hc Hn Hrun
+        (by decide) (by decide) (by ulib_regs; rw [Xv6.bcOfNatToNat _ (by omega)])) $$ Hc Hn Hrun
       iintro Hn Hrun
       ihave Hstr := Hcl $$ Hn
       -- +0x2ba  bnez a1 → +0x2ae
@@ -182,7 +178,7 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
   iintro Hrun
   -- +0x2a2  ld s1,0(s7) : the argument
   iapply (ulibS_ldq L _ (ulibVprintf_i2a2 L.toUlibRun base) 0x2a6 rfl _ _ dq apz (BitVec.ofNat 64 sa)
-    (by decide) (by decide) (by ulib_regs; rw [h23, ulibOfNat_toNat _ (by omega)]) hapal) $$ Hc Hw Hrun
+    (by decide) (by decide) (by ulib_regs; rw [h23, Xv6.bcOfNatToNat _ (by omega)]) hapal) $$ Hc Hw Hrun
   iintro Hw Hrun
   -- +0x2a6  beqz s1 : not taken, non-null
   iapply (ulibS_brN L _ (ulibVprintf_i2a6 L.toUlibRun base) 0x2a8 rfl _ _
@@ -195,7 +191,7 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     -- +0x2a8  lbu a1,0(s1) : the terminator ; +0x2ac  beqz a1 → +0x2dc
     icases ulibStr_nul L sdq sa 0 sf $$ Hstr with ⟨Hn, Hcl⟩
     iapply (ulibS_lbuq L _ (ulibVprintf_i2a8 L.toUlibRun base) 0x2ac rfl _ _ sdq (sa + 0) ubyte0
-      (by decide) (by decide) (by simp only [Nat.add_zero]; ulib_regs; rw [ulibOfNat_toNat _ (by omega)])) $$ Hc Hn Hrun
+      (by decide) (by decide) (by simp only [Nat.add_zero]; ulib_regs; rw [Xv6.bcOfNatToNat _ (by omega)])) $$ Hc Hn Hrun
     iintro Hn Hrun
     ihave Hstr := Hcl $$ Hn
     iapply (ulibS_brT L _ (ulibVprintf_i2ac L.toUlibRun base) 0x2dc (by decide) hb (by decide) _ _
@@ -210,7 +206,7 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     -- +0x2a8  lbu a1,0(s1) : the first byte ; +0x2ac  beqz a1 : not taken
     icases ulibStr_byte L sdq sa (k + 1) sf 0 (by omega) $$ Hstr with ⟨Hn, Hcl⟩
     iapply (ulibS_lbuq L _ (ulibVprintf_i2a8 L.toUlibRun base) 0x2ac rfl _ _ sdq (sa + 0) (sf 0)
-      (by decide) (by decide) (by simp only [Nat.add_zero]; ulib_regs; rw [ulibOfNat_toNat _ (by omega)])) $$ Hc Hn Hrun
+      (by decide) (by decide) (by simp only [Nat.add_zero]; ulib_regs; rw [Xv6.bcOfNatToNat _ (by omega)])) $$ Hc Hn Hrun
     iintro Hn Hrun
     ihave Hstr := Hcl $$ Hn
     iapply (ulibS_brN L _ (ulibVprintf_i2ac L.toUlibRun base) 0x2ae rfl _ _

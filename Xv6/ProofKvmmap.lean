@@ -31,10 +31,6 @@ theorem kvm_bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
-/-- The context algebra of the exit interrupt state. -/
-theorem kvm_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -140,7 +136,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   -- the epilogue
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>
     (hp7 h).trans ((hp6 h).trans (hpin5 h))
-  simp only [kvm_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   have hK' : 2 ≤ (k.withSpie spie spp).avail := by
     simp only [KCtx.withSpie_avail]; omega
   have hR2 : R 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := e2

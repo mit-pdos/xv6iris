@@ -61,7 +61,7 @@ theorem ush_ustr_bytes (γd : GName) (a len : Nat) (f : Nat → BitVec 8) :
   iintro ⟨-, -, Hbs, Hnul⟩
   iapply (ubytes_app γd a len 1 (ushpExt len f)).2
   isplitl [Hbs]
-  · iapply ush_ubytes_ext γd a len f (ushpExt len f) (fun j hj => by simp [ushpExt, hj]) $$ Hbs
+  · iapply Xv6.ubytes_ext γd a len f (ushpExt len f) (fun j hj => by simp [ushpExt, hj]) $$ Hbs
   · iapply (ubytesq_one γd (DFrac.own 1) (a + len) _).2
     rw [show ushpExt len f (len + 0) = ubyte0 by simp [ushpExt]]
     iexact Hnul

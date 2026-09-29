@@ -20,6 +20,13 @@ lazily), exactly as `Xv6/ProofInstallTrans.lean` carries its own ten-slot
 pair.
 -/
 import Xv6.LogLedger
+import MachCSL.WpLock
+import MachCSL.WpSmodeFrame8
+import Xv6.FsWords
+import Xv6.IcacheEscrowPool
+import Xv6.InitlogHead
+import Xv6.VirtioDiskRwDefs2
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -50,16 +57,6 @@ theorem eo_o_dev : logAddr + 36#64 = lDev := rfl
 theorem eo_o_nc : logAddr + 40#64 = lNcommit := rfl
 theorem eo_o_lhn : logAddr + 44#64 = lhNAddr := rfl
 
-/-- `addi s5,s5,4`: the cursor steps one header word. -/
-theorem eo_lhBlock_succ (i : Nat) : lhBlock i + 4#64 = lhBlock (i + 1) := by
-  unfold lhBlock
-  rw [BitVec.add_assoc]
-  congr 1
-  rw [show (48 + 4 * (i + 1)) = (48 + 4 * i) + 4 from by omega, ← ofNat64_add]
-
-/-- `addi a1,a0,88` / `addi a0,s1,88`: the buffer's data field. -/
-theorem eo_bufData (b : BitVec 64) : b + 88#64 = aBufData b := rfl
-
 theorem eo_br_acq : KA.«end_op» + 0xffffffffffffce24#64 = KA.«acquire» := by decide
 theorem eo_br_rel : KA.«end_op» + 0xffffffffffffceac#64 = KA.«release» := by decide
 theorem eo_br_wk : KA.«end_op» + 0xffffffffffffe20c#64 = KA.«wakeup» := by decide
@@ -89,28 +86,7 @@ theorem eo_ret_11a : jumpPc (KA.«end_op» + 0x11a#64) = KA.«end_op» + 0x11a#6
 
 theorem eo_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
 
-theorem eo_bnez0 : bcond bop.BNE 0#64 0#64 = false := by decide
-theorem eo_bnez1 : bcond bop.BNE 1#64 0#64 = true := by decide
-
-theorem eo_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem eo_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 /-! ## The 32-bit arithmetic -/
-
-theorem eo_w32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) = BitVec.ofNat 32 a := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
-theorem eo_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
 
 theorem eo_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
   rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
@@ -142,7 +118,7 @@ theorem eo_addiw1 (t : Nat) (h : t + 1 < 2 ^ 31) :
   rw [show BitVec.ofNat 64 t + 1#64 = BitVec.ofNat 64 (t + 1) from by
     show _ + BitVec.ofNat 64 1 = _
     rw [← ofNat64_add]]
-  rw [eo_w32 (t + 1) (by omega), eo_sext32 (t + 1) (by omega)]
+  rw [Xv6.fw_w32 (t + 1) (by omega), MachCSL.signExtend_ofNat32 (t + 1) (by omega)]
 
 /-- `addiw a5,a5,-1` at `+0x1c`: the outstanding count, at `1 ≤ out ≤ 3`. -/
 theorem eo_dec (out : Nat) (h1 : 1 ≤ out) (h2 : out ≤ 3) :
@@ -155,18 +131,18 @@ theorem eo_dec (out : Nat) (h1 : 1 ≤ out) (h2 : out ≤ 3) :
 /-- ...and the 32-bit half of it, which is what `sw a5,28(s1)` stores. -/
 theorem eo_dec32 (out : Nat) (h1 : 1 ≤ out) (h2 : out ≤ 3) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (out - 1)) = BitVec.ofNat 32 (out - 1) :=
-  eo_w32 _ (by omega)
+  Xv6.fw_w32 _ (by omega)
 
 /-- `addw a1,a1,s2` at `+0xb8`. -/
 theorem eo_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 b)) = BitVec.ofNat 64 (a + b) := by
-  rw [eo_w32 a (by omega), eo_w32 b (by omega)]
+  rw [Xv6.fw_w32 a (by omega), Xv6.fw_w32 b (by omega)]
   rw [show BitVec.ofNat 32 a + BitVec.ofNat 32 b = BitVec.ofNat 32 (a + b) from by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega]
-  exact eo_sext32 (a + b) (by omega)
+  exact MachCSL.signExtend_ofNat32 (a + b) (by omega)
 
 /-- The block number the two `bread`s compute: `log.start + tail + 1`. -/
 theorem eo_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
@@ -177,14 +153,9 @@ theorem eo_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
   rw [show BitVec.ofNat 64 (ls + t) + 1#64 = BitVec.ofNat 64 (ls + t + 1) from by
     show _ + BitVec.ofNat 64 1 = _
     rw [← ofNat64_add]]
-  rw [eo_w32 _ (by omega), eo_sext32 _ (by omega)]
+  rw [Xv6.fw_w32 _ (by omega), MachCSL.signExtend_ofNat32 _ (by omega)]
   rw [show ls + 1 + t = ls + t + 1 from by omega]
-  rw [eo_sext32 _ (by omega)]
-
-theorem eo_ofNat32_toNat (w : BitVec 32) : BitVec.ofNat 32 w.toNat = w := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_ofNat]
-  omega
+  rw [MachCSL.signExtend_ofNat32 _ (by omega)]
 
 /-! ## The eight-slot frame
 
@@ -247,7 +218,7 @@ theorem eo_prologue (cpu : CPU) (k : KCtx) (hK : 8 ≤ k.avail) :
           eoFrameJ (k.regs 2#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hi0, #Hi1, #Hi2, #Hi3, #Hi4, #Hi5, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ KA.«end_op» true 4032#12 8 hK eo_imm_m64) $$ [- $Hk $Hpc] next c0 hp0
+  k_step_gen (wp_s_push cpu _ KA.«end_op» true 4032#12 8 hK MachCSL.imm_m64) $$ [- $Hk $Hpc] next c0 hp0
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -317,7 +288,7 @@ theorem eo_epilogue (cpu : CPU) (k : KCtx) (hK : 8 ≤ k.avail) (R : RegMap)
   iintro Hk Hpc F3
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop d4 _ (KA.«end_op» + 0x9a#64) true 64#12 8 eo_imm_p64) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop d4 _ (KA.«end_op» + 0x9a#64) true 64#12 8 MachCSL.imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next d5 hq5
   iintro Hk Hpc
   k_step_gen (wp_s_ret d5 _ (KA.«end_op» + 0x9c#64) true 1#5) $$ [- $Hk $Hpc] next d6 hq6
@@ -424,9 +395,6 @@ theorem eoK_popExit_ws (k : KCtx) (a b : Bool) (hwf : k.wf) (hnoff : k.noff = 0)
   · subst hi
     simp [trapRes, KCtx.intrOn]
     omega
-
-theorem eo_withSpie2 (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
 
 theorem eoK_ws (k : KCtx) (a b : Bool) : (eoK k).withSpie a b = eoK (k.withSpie a b) := by
   unfold eoK; rfl

@@ -25,6 +25,7 @@ import MachCSL.WpSmodeFrame12b
 import Xv6.DiskInvDefs
 import Xv6.SchedCtx
 import Xv6.BufDefs
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -111,20 +112,11 @@ end desc
 
 /-! ### Address arithmetic -/
 
-theorem ofNat_add64 (a b : Nat) :
-    BitVec.ofNat 64 (a + b) = BitVec.ofNat 64 a + BitVec.ofNat 64 b := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.add_mod_mod, Nat.mod_add_mod]
-
-theorem addr_plus (a : BitVec 64) (m k : Nat) :
-    a + BitVec.ofNat 64 m + BitVec.ofNat 64 k = a + BitVec.ofNat 64 (m + k) := by
-  rw [ofNat_add64, BitVec.add_assoc]
-
 /-- Descriptor `i`'s field at offset `k`. -/
 theorem descAt_plus (pd : PAddr) (i k : Nat) :
     descAt pd i + BitVec.ofNat 64 k = pd + BitVec.ofNat 64 (16 * i + k) := by
   show pd + BitVec.ofNat 64 (16 * i) + BitVec.ofNat 64 k = _
-  rw [ofNat_add64, BitVec.add_assoc]
+  rw [MachCSL.ofNat64_add, BitVec.add_assoc]
 
 theorem descAt_0' (pd : PAddr) (i : Nat) : descAt pd i = pd + BitVec.ofNat 64 (16 * i + 0) := by
   show pd + BitVec.ofNat 64 (16 * i) = _
@@ -141,10 +133,10 @@ theorem descAt_s8 (pd : PAddr) (i : Nat) :
     descAt pd i + BitVec.ofNat 64 8 = descAt pd i + 8#64 := rfl
 theorem descAt_s12 (pd : PAddr) (i : Nat) :
     descAt pd i + BitVec.ofNat 64 8 + BitVec.ofNat 64 4 = descAt pd i + 12#64 := by
-  rw [addr_plus]
+  rw [Xv6.paAddBump]
 theorem descAt_s14 (pd : PAddr) (i : Nat) :
     descAt pd i + 12#64 + BitVec.ofNat 64 2 = descAt pd i + 14#64 := by
-  rw [addr_plus]
+  rw [Xv6.paAddBump]
 
 section bridge
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -464,7 +456,7 @@ theorem aOpsSector_eq (i : Nat) :
 theorem diskIdx_addr (off i : Nat) :
     BitVec.ofNat 64 (16 * i) + BitVec.ofNat 64 off + KA.«disk» =
       KA.«disk» + BitVec.ofNat 64 (off + 16 * i) := by
-  rw [← ofNat_add64, BitVec.add_comm, Nat.add_comm (16 * i) off]
+  rw [← MachCSL.ofNat64_add, BitVec.add_comm, Nat.add_comm (16 * i) off]
 
 /-- ... and the same sum as `k_norm` reassociates it. -/
 theorem diskIdx_addr' (off i : Nat) :

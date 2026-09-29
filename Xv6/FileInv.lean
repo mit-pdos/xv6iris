@@ -6,6 +6,9 @@ halves, the fd token parked), and the cursor arithmetic of the scan.
 -/
 import Xv6.FileDefs
 import Xv6.StepLemmas
+import Xv6.BcacheInv
+import Xv6.BmapParts
+import Xv6.VirtioQueue
 
 namespace Xv6
 
@@ -67,69 +70,15 @@ theorem fa_bne_end_last : bcond bop.BNE (fnode NFILE) (fnode NFILE) = false := b
 
 /-! ## The `ref` cell's value -/
 
-theorem fa_ref_zero : BitVec.signExtend 64 (BitVec.ofNat 32 0) = 0#64 := by decide
-
-theorem fa_ref_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 n) ≠ 0#64 := by
-  intro e
-  have h32 : BitVec.ofNat 32 n = 0#32 := by
-    revert e; generalize BitVec.ofNat 32 n = x; intro e; bv_decide
-  have h := congrArg BitVec.toNat h32
-  simp only [BitVec.toNat_ofNat, BitVec.toNat_zero] at h
-  omega
 
 theorem fa_beqz_zero : bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 0)) 0#64 = true := by
   decide
 theorem fa_beqz_nonzero (n : Nat) (hn : n ≠ 0) (hlt : n < 2 ^ 31) :
     bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 n)) 0#64 = false := by
-  rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr (fa_ref_nonzero n hn hlt)
+  rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr (Xv6.bc_refcnt_nonzero n hn hlt)
 
 /-! ## Pure facts for the count -/
 
-/-- Distinct naturals below `n` are at most `n` (the fd-slot bound). -/
-theorem nodup_lt_length_le : ∀ (n : Nat) (l : List Nat), l.Nodup → (∀ i ∈ l, i < n) → l.length ≤ n := by
-  intro n
-  induction n with
-  | zero =>
-    intro l _ hb
-    cases l with
-    | nil => simp
-    | cons a t => exact absurd (hb a (List.mem_cons_self)) (Nat.not_lt_zero a)
-  | succ n ih =>
-    intro l hn hb
-    by_cases hmem : n ∈ l
-    · have hp : l.Perm (n :: l.erase n) := List.perm_cons_erase hmem
-      have hlen : l.length = (l.erase n).length + 1 := by rw [hp.length_eq]; rfl
-      have hb' : ∀ i ∈ l.erase n, i < n := by
-        intro i hi
-        have h1 := hb i (List.mem_of_mem_erase hi)
-        have hne : i ≠ n := by
-          intro e; subst e; exact hn.not_mem_erase hi
-        omega
-      have := ih _ (hn.erase n) hb'
-      omega
-    · have hb' : ∀ i ∈ l, i < n := fun i hi => by
-        have := hb i hi
-        have : i ≠ n := fun e => hmem (e ▸ hi)
-        omega
-      have := ih l hn hb'
-      omega
-
-/-- `f->ref++`: `addiw a5,a5,1; sw a5,4(s1)` stores `n + 1`. -/
-theorem fd_incr (n : Nat) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 1#12))) = BitVec.ofNat 32 (n + 1) := by
-  have h : ∀ nw : BitVec 32, BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 nw + BitVec.signExtend 64 1#12))) = nw + 1#32 := by
-    intro nw; bv_decide
-  rw [h]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-theorem fd_incr' (n : Nat) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 1#64))) = BitVec.ofNat 32 (n + 1) := by
-  rw [← fd_incr n]; rfl
 
 /-- `blez a5` with `ref ≥ 1` is not taken. -/
 theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
@@ -146,40 +95,12 @@ theorem fd_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
 
 /-! ## `fileclose`'s counter and field arithmetic -/
 
-theorem fc_decr (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 4095#12))) = BitVec.ofNat 32 (n - 1) := by
-  have hb : ∀ nw : BitVec 32, BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 nw + BitVec.signExtend 64 4095#12))) = nw - 1#32 := by
-    intro nw; bv_decide
-  rw [hb]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_sub, BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat,
-    Nat.mod_eq_of_lt (show n < 2 ^ 32 by omega), Nat.mod_eq_of_lt (show n - 1 < 2 ^ 32 by omega)]
-  show (2 ^ 32 - 1 % 2 ^ 32 + n) % 2 ^ 32 = n - 1
-  rw [Nat.mod_eq_of_lt (show 1 < 2 ^ 32 by decide)]
-  omega
-
-theorem fc_decr' (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 0xFFFFFFFFFFFFFFFF#64))) = BitVec.ofNat 32 (n - 1) := by
-  rw [← fc_decr n h1 h]; rfl
-
-theorem fc_sext_decr (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 4095#12)) =
-      BitVec.signExtend 64 (BitVec.ofNat 32 (n - 1)) := by
-  rw [← fc_decr n h1 h]
-  have hb : ∀ x : BitVec 64, BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 x))) = BitVec.signExtend 64 (BitVec.extractLsb' 0 32 x) := by
-    intro x; bv_decide
-  rw [hb]
 
 /-- `bgtz a5` after `--ref`: taken iff two or more references remained. -/
 theorem fc_bgtz (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
     bcond bop.BLT 0#64 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 4095#12))) = decide (2 ≤ n) := by
-  rw [fc_sext_decr n h1 h]
+  rw [Xv6.bc_sext_decr n h1 h]
   show (0#64).slt (BitVec.signExtend 64 (BitVec.ofNat 32 (n - 1))) = decide (2 ≤ n)
   have h2 : (BitVec.ofNat 32 (n - 1)).toInt = ((n - 1 : Nat) : Int) := by
     rw [BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega), BitVec.toNat_ofNat,

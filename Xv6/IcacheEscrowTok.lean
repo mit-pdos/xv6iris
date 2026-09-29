@@ -61,7 +61,7 @@ step; iget / ilock / iunlock / iput are stated over this file.
   (+ `At`), `inode_raw_timeless` → `inodeRaw_timeless` (+ `At`),
   `ind_res_timeless` → `indResQ_timeless` / `indRes_timeless`,
   `blk_res_timeless` → `blkRes_timeless`, `word2_pointsto_timeless` →
-  `wordPointsTo_timeless` (all widths).  `ind_blk_timeless` /
+  `MachCSL.instTimelessIPropWordPointsTo` (all widths).  `ind_blk_timeless` /
   `inode_blocks_timeless` already exist (`Xv6/InodeInv.lean`).
 * §1 tokens: `ic_tok` → `icTok`, `ic_deposit` → `icDeposit`,
   `ic_dep_neutral` → `icDepNeutral`, `ic_dep_checkout` → `icDepCheckout`,
@@ -196,11 +196,6 @@ timeless -- but they are `def`s, so the instances are declared. -/
 
 section TimelessCells
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- Rocq's `word2_pointsto_timeless`, at every width. -/
-instance wordPointsTo_timeless [CurCtx] (a : PAddr) (n : Nat) (dq : DFrac)
-    (w : BitVec (8 * n)) : Timeless (wordPointsTo (GF := GF) a n dq w) := by
-  unfold wordPointsTo; infer_instance
 
 variable [FsBlocksG GF]
 

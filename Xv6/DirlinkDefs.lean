@@ -29,6 +29,7 @@ block statements `dl_tail_body`, `dl_after_body`/`dl_after_exit`,
    (DirlookupDefs deviation 2).
 -/
 import Xv6.DirlinkParts
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -72,12 +73,6 @@ structure DirlinkStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (bm : Blkmap)
     (bmapInd (16 * dirSlot data (dirNrec dn.diSize.toNat) / BSIZE)) ≤ ncount
   ha2 : k.regs 12#5 = BitVec.setWidth 64 inum
   hal : (dirlinkDeAddr (k.regs 2#5)).toNat % 8 = 0
-
-/-- The pinning fact every exit needs: the process is not `0`. -/
-theorem dirlink_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-- The thirteen callee-saved registers: `sp = &de`, `s0 = sp₀`, `s1 = v9`,
 `s2 = dp`, `s3 = v19`, `s4 = v20`, `s5 = name`, `s6 = inum`, and
@@ -163,7 +158,7 @@ def dirlinkPost (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ wpLoop cpu')
 
 /-- The specification's `wpNext`, named, and hart-free: a `true` crossing at
-a process (`dirlink_pin`), so any hart may consume it. -/
+a process (`Xv6.rd_pin`), so any hart may consume it. -/
 theorem dirlink_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     (hproc : k.proc = procAddr j) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16)
@@ -195,7 +190,7 @@ theorem dirlink_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
   unfold dirlinkPost
   iintro H %c %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte
     Hce Hkeep Hbs Hsl Hlk Hop Htx
-  ihave HK := wpNext_at true k.proc cpu c _ (dirlink_pin hj k hproc c cpu) $$ H
+  ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
   unfold dirlinkKeep
   icases Hkeep with ⟨Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid⟩
   iapply HK $$ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte

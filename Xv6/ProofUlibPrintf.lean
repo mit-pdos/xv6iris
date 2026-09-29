@@ -143,7 +143,7 @@ theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base 
           · decide
           · decide
           · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨h1, h2⟩)))))]
-      simp only [ulibSet_eq, n1, n2, n8, n10, n11, n12, if_false]
+      simp only [MachCSL.RegMap.set_apply, n1, n2, n8, n10, n11, n12, if_false]
     rcases hr with rfl | rfl | rfl | rfl | rfl | ⟨h1, h2⟩
     · ulib_regs
     · exact hne _ (Or.inl rfl)

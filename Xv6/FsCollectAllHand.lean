@@ -164,7 +164,7 @@ theorem colRecs_byInum (γfs : FsNames) (ist nib : Nat) (m : IregMapF Dinode) :
   iintro ⟨%ds, -, %hcpl, Hr⟩
   iapply BigSepL.bigSepL_mono ?_ $$ Hr
   intro k i hk
-  obtain ⟨hik, hlt⟩ := range_lookup hk
+  obtain ⟨hik, hlt⟩ := Xv6.rangeGetElem? hk
   subst hik
   iintro H
   iexists ds[i]!
@@ -197,7 +197,7 @@ theorem colRecs_ofInum (γfs : FsNames) (ist nib : Nat) (m : IregMapF Dinode)
       [∗list] bi ∈ List.range nib,
         ∃ ds : List Dinode, ⌜diblkWf ds⌝ ∗ ⌜iregCouple m bi ds⌝ ∗ iregRecs γfs ist bi ds := by
   refine (colRegion_nested _ nib).2.trans (BigSepL.bigSepL_mono fun {k bi} hk => ?_)
-  obtain ⟨hbk, hlt⟩ := range_lookup hk
+  obtain ⟨hbk, hlt⟩ := Xv6.rangeGetElem? hk
   subst hbk
   obtain ⟨ds, hwf, hcpl⟩ := hds bi hlt
   iintro Hb
@@ -209,7 +209,7 @@ theorem colRecs_ofInum (γfs : FsNames) (ist nib : Nat) (m : IregMapF Dinode)
   unfold iregRecs
   iapply BigSepL.bigSepL_mono ?_ $$ Hb
   intro k i hk
-  obtain ⟨hik, hlt2⟩ := range_lookup hk
+  obtain ⟨hik, hlt2⟩ := Xv6.rangeGetElem? hk
   subst hik
   iintro ⟨%d, %hd, H⟩
   have he : d = ds[i]! := by

@@ -22,6 +22,7 @@ the three write laws** (Rocq `UkPipeDev.v` §3–§4, pinned `1900b8a43`).
 view (`umemByte Mv (ua + j) = bs[j]!`, Rocq `M !! uint (ua + j) = bs !! j`).
 -/
 import Xv6.UkPipeDevWalk
+import Xv6.UEchoOut
 
 namespace Xv6
 
@@ -31,15 +32,6 @@ open Std (ExtTreeSet)
 open UexecSG
 
 set_option linter.unusedSectionVars false
-
-/-- A write count the kernel reads back exactly. -/
-theorem pdev_argZ_ofNat (n : Nat) (h : (n : Int) < 2 ^ 31) : argZ (BitVec.ofNat 64 n) = (n : Int) := by
-  have hn : n < 2 ^ 31 := by omega
-  rw [pdev_argZ, BitVec.toInt_eq_toNat_cond]
-  have e : (BitVec.setWidth 32 (BitVec.ofNat 64 n)).toNat = n := by
-    rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat]; omega
-  rw [e]
-  split <;> omega
 
 section Write
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
@@ -160,9 +152,9 @@ theorem pdev_wr_obl (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (P 
   unfold stubRet
   have hn : UkSysP.usysno (ukWr m 17#5 (BitVec.ofInt 64 16)) = 16 := by rw [fh_usysno]; decide
   have h0 : argZ ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 10#5) = (fd : Int) := by
-    rw [ukWr_get_other _ _ _ _ (by decide), pdev_argZ]; exact ha0
+    rw [ukWr_get_other _ _ _ _ (by decide), Xv6.argZ_setWidth]; exact ha0
   have hcnt : argZ ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5) = (bs.length : Int) := by
-    rw [ukWr_get_other _ _ _ _ (by decide), ha2]; exact pdev_argZ_ofNat _ hbnd
+    rw [ukWr_get_other _ _ _ _ (by decide), ha2]; exact Xv6.echoCountIs _ hbnd
   have ha1' : (ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5 = BitVec.ofNat 64 ua := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha1
   have hal' : (BitVec.ofNat 64 (P.write + 2) + 4#64) &&& 1#64 = 0#64 := by rw [hpc]; exact fh_align _ hal
@@ -243,7 +235,7 @@ theorem pipe_write [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK 
       icases HK with ⟨-, -, HK⟩
       iapply HK $$ Hstd Ht
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases Hobs with ⟨%k, %s, %hks, HQe⟩
       ihave H := pipeWQe_roShot pn L c k s hks.2 $$ HQe
       unfold pipeWQ
@@ -287,7 +279,7 @@ theorem pipe_write_halt [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : Pipe
       simp only [pdevQh]
       iexfalso; iexact HQ
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases HR with ⟨%k, -, -, HQ⟩
       cases k with
       | zero =>
@@ -298,7 +290,7 @@ theorem pipe_write_halt [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : Pipe
         simp only [pdevQh]
         iexfalso; iexact HQ
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases Hobs with ⟨%k, %s, -, HQ⟩
       cases k with
       | zero =>
@@ -339,7 +331,7 @@ theorem pipe_write_nil (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) 
         icases HK with ⟨HK, -⟩
         iapply HK $$ Hstd HQ
       · subst hr
-        rw [pdev_signed_m1]
+        rw [Xv6.fh_m1]
         icases HK with ⟨-, HK, -⟩
         iapply HK $$ Hstd HQ
     · icases HR with ⟨%k, %hk, -⟩

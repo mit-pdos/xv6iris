@@ -149,63 +149,63 @@ theorem swtch_loads [CurCtx] (cpu : CPU) (k : KCtx)
   iintro ⟨%hlen, C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, _⟩
   -- ld x1,0(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x34#64) false 0#12 1#5 11#5 (by decide) (by decide) (DFrac.own 1) w0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h11, KCtx.setReg_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h11, MachCSL.KCtx.setReg_eq_withRegs]
   iintro Hk Hpc C0
   -- ld x2,8(a1)
   k_step (wp_s_ld_sp cpu _ ?hs (KA.«swtch» + 0x38#64) false 8#12 11#5 (by decide) (DFrac.own 1) w1 av)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setSp_eq, KCtx.withAvail_withRegs, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setSp_eq, KCtx.withAvail_withRegs, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C1 Hold
   -- ld x8,16(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x3c#64) true 16#12 8#5 11#5 (by decide) (by decide) (DFrac.own 1) w2)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C2
   -- ld x9,24(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x3e#64) true 24#12 9#5 11#5 (by decide) (by decide) (DFrac.own 1) w3)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C3
   -- ld x18,32(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x40#64) false 32#12 18#5 11#5 (by decide) (by decide) (DFrac.own 1) w4)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C4
   -- ld x19,40(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x44#64) false 40#12 19#5 11#5 (by decide) (by decide) (DFrac.own 1) w5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C5
   -- ld x20,48(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x48#64) false 48#12 20#5 11#5 (by decide) (by decide) (DFrac.own 1) w6)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C6
   -- ld x21,56(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x4c#64) false 56#12 21#5 11#5 (by decide) (by decide) (DFrac.own 1) w7)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C7
   -- ld x22,64(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x50#64) false 64#12 22#5 11#5 (by decide) (by decide) (DFrac.own 1) w8)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C8
   -- ld x23,72(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x54#64) false 72#12 23#5 11#5 (by decide) (by decide) (DFrac.own 1) w9)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C9
   -- ld x24,80(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x58#64) false 80#12 24#5 11#5 (by decide) (by decide) (DFrac.own 1) w10)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C10
   -- ld x25,88(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x5c#64) false 88#12 25#5 11#5 (by decide) (by decide) (DFrac.own 1) w11)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C11
   -- ld x26,96(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x60#64) false 96#12 26#5 11#5 (by decide) (by decide) (DFrac.own 1) w12)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C12
   -- ld x27,104(a1)
   k_step (wp_s_ld cpu _ (KA.«swtch» + 0x64#64) false 104#12 27#5 11#5 (by decide) (by decide) (DFrac.own 1) w13)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h11, MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc C13
   -- ret
   k_step (wp_s_ret cpu _ (KA.«swtch» + 0x68#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.withAvail_sie, KCtx.withAvail_proc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.withAvail_sie, KCtx.withAvail_proc]
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ %_ [] Hk Hpc [C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13] Hold

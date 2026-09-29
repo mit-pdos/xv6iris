@@ -111,6 +111,8 @@ import Xv6.BlkmapDefs
 import Xv6.DinodeEnc
 import Xv6.FsBytesGamma
 import MachCSL.WpSmodeFrame
+import Xv6.FsStateBitmap
+import Xv6.FsStateInode
 
 namespace Xv6
 
@@ -124,14 +126,10 @@ Rocq gets these from stdpp (`lookup_total_replicate_2`,
 `list_lookup_total_insert`, `list_lookup_total_insert_ne`); this port's
 total lookup is `[·]!`. -/
 
-private theorem ii_replicate_getElem! {α : Type _} [Inhabited α] (n : Nat) (a : α) (k : Nat)
-    (hk : k < n) : (List.replicate n a)[k]! = a :=
-  getElem!_of_getElem? (by rw [List.getElem?_replicate, if_pos hk])
-
 private theorem replicate_zero_getElem! (n k : Nat) :
     (List.replicate n (0 : BitVec 32))[k]! = 0 := by
   rcases Nat.lt_or_ge k n with h | h
-  · exact ii_replicate_getElem! n 0 k h
+  · exact Xv6.replicate_getElem! n 0 k h
   · rw [List.getElem!_eq_getElem?_getD,
       List.getElem?_eq_none (by rw [List.length_replicate]; exact h)]
     rfl
@@ -342,7 +340,7 @@ theorem blkmapWf_ind_nz {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} 
   apply hnz
   unfold blkmapGet
   rw [if_neg (by omega), blkmapWf_no_ind h hiz,
-    ii_replicate_getElem! NINDIRECT (0 : BitVec 32) (i - NDIRECT)
+    Xv6.replicate_getElem! NINDIRECT (0 : BitVec 32) (i - NDIRECT)
       (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
   rfl
 
@@ -852,19 +850,6 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
-/-- A position of `List.range` is its own value (Rocq's stdpp
-`lookup_seq`).  `Xv6.rangeGetElem?` says the same in
-`Xv6/FsStateBitmap.lean`; it is restated privately here so that the inode
-invariant does not import the block bitmap (Rocq's `InodeInv.v` does not
-either). -/
-private theorem rangeGet {nb k x : Nat} (h : (List.range nb)[k]? = some x) :
-    x = k ∧ k < nb := by
-  rcases Nat.lt_or_ge k nb with hk | hk
-  · rw [List.getElem?_range hk] at h
-    exact ⟨(Option.some.inj h).symm, hk⟩
-  · rw [List.getElem?_eq_none (by rw [List.length_range]; exact hk)] at h
-    exact absurd h (by simp)
-
 /-! ### BUILDING `inodeBlocks` FROM BLOCK-GRANULAR RESOURCES
 
 A boot client (and, in general, anyone holding one byte run per DISK BLOCK
@@ -1039,7 +1024,7 @@ theorem inodeBlocksQ_frame (γfs : FsNames) (dq : DFrac) (bm bm' : Blkmap)
   unfold inodeBlocksQ
   refine BigSepL.bigSepL_mono ?_
   intro k y hky
-  obtain ⟨hyk, hk⟩ := rangeGet hky
+  obtain ⟨hyk, hk⟩ := Xv6.rangeGetElem? hky
   subst hyk
   obtain ⟨hf, hd⟩ := hag y hk
   rw [hf, hd]
@@ -1076,7 +1061,7 @@ theorem inodeBlocksQ_acc (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
       if k = i then (emp : IProp GF) else blkResQ γfs dq (blkmapGet bm y) (data y)) := by
     refine BigSepL.bigSepL_eq ?_
     intro k y hky
-    obtain ⟨hyk, _⟩ := rangeGet hky
+    obtain ⟨hyk, _⟩ := Xv6.rangeGetElem? hky
     subst hyk
     by_cases hki : y = i
     · simp only [hki, if_pos]
@@ -1116,7 +1101,7 @@ theorem inodeBlocksQ_insert (γfs : FsNames) (dq : DFrac) (bm bm' : Blkmap)
       if k = bn then (emp : IProp GF) else blkResQ γfs dq (blkmapGet bm y) (data y)) := by
     refine BigSepL.bigSepL_eq ?_
     intro k y hky
-    obtain ⟨hyk, hk⟩ := rangeGet hky
+    obtain ⟨hyk, hk⟩ := Xv6.rangeGetElem? hky
     subst hyk
     by_cases hki : y = bn
     · simp only [hki, if_pos]

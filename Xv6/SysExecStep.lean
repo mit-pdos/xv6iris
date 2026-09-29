@@ -47,6 +47,8 @@ THEOREM, the frozen `sysExecStepBody`).
 Imports only the shared vocabulary, the call sites and callee Specs.
 -/
 import Xv6.SysExecStepCalls
+import Xv6.PrintkDefs
+import Xv6.SysExecFree
 
 namespace Xv6
 
@@ -93,24 +95,15 @@ theorem sys_exec_bne_back (i : Nat) (h : i + 1 < 32) :
   rw [sys_exec_bne1 i (by omega)]; simp; omega
 
 theorem sys_exec_beqz_ne (x : BitVec 64) (h : x ≠ 0#64) : bcond bop.BEQ x 0#64 = false := by
-  rw [sysfile_beqz]; simp [h]
+  rw [Xv6.dirlookup_beqz]; simp [h]
 
 theorem sys_exec_bltz0 : bcond bop.BLT 0#64 0#64 = false := by decide
-
-theorem sys_exec_s2_succ (i : Nat) : BitVec.ofNat 64 i + 1#64 = BitVec.ofNat 64 (i + 1) := by
-  rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, ← BitVec.ofNat_add]
-
-theorem sys_exec_s3_succ (sp0 : BitVec 64) (i : Nat) :
-    sysExecArgvAt sp0 i + 8#64 = sysExecArgvAt sp0 (i + 1) := by
-  unfold sysExecArgvAt
-  rw [show (8#64 : BitVec 64) = BitVec.ofNat 64 8 from rfl, BitVec.add_assoc, ← BitVec.ofNat_add]
-  congr 2
 
 /-- The back edge's two increments: the pins at `i + 1`. -/
 theorem sys_exec_pins_succ (k : KCtx) (R : RegMap) (i : Nat) (h : sysExecLoopPins k R i) :
     sysExecLoopPins k ((R.set 18#5 (BitVec.ofNat 64 i + 1#64)).set 19#5
       (sysExecArgvAt (k.regs 2#5) i + 8#64)) (i + 1) := by
-  rw [sys_exec_s2_succ, sys_exec_s3_succ]
+  rw [Xv6.ofNat_succ', Xv6.sysExecFree_cursor]
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] <;> assumption
@@ -192,7 +185,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
   case gK => k_norm_g; omega
   case gmx => k_norm_g; rw [List.length_replicate]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext1, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_exec_ret_86, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_exec_ret_86, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
     refine sysExecPins_cs k _ R1 _ _ _ _ _ _ _ ?_ hcs1
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
@@ -336,7 +329,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
-  k_norm_g [sys_exec_ret_74, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_exec_ret_74, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
     refine sysExecPins_cs k _ R1 _ _ _ _ _ _ _ ?_ hcs1
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
@@ -446,7 +439,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
   iintro %cpu %spie1 %spp1 %R1 %P2 %w %⟨hcs1, hext1, hans⟩ Hk Hpc Hte Hce Hext H60
-  k_norm_g [sys_exec_ret_66, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_exec_ret_66, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
     refine sysExecPins_cs k _ R1 _ _ _ _ _ _ _ ?_ hcs1
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))

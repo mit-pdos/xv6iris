@@ -24,15 +24,15 @@ the frames' layouts, pins and cells).
   `sysfile_iunlockput` (the counted write arm), `sysfile_meta_type`;
 * the path buffer: `sysfilePfun` / `sysfile_bview` / `sysfile_pfun_nn` /
   `sysfile_pfun_term`, `sysfileRestAddr` / `sysfile_buf_split` /
-  `sysfile_buf_join`, `sysfileAny`, `sysfile_stack_bytes` (the converse is
+  `sysfile_buf_join`, `sysfileAny`, `Xv6.kxc_stackOwn_byteBuf` (the converse is
   the landed `KstackMap.byteBuf_stackOwn`, which the two
   `sys_link_bytes_stack` / `sys_unlink_bytes_stack` copies restated);
 * the one-halfword `nlink` store (Rocq's `sl_setnl` / `su_setnl` family):
   `sysfileSetnl` and its eight projections (sys_link / sys_unlink);
 * instruction constants and `KCtx` identities (`sysfile_beq00`,
-  `sysfile_bltz_nat`, `sysfile_bltz_m1`, `sysfile_beqz`, `sysfile_li0`,
+  `sysfile_bltz_nat`, `sysfile_bltz_m1`, `Xv6.dirlookup_beqz`, `Xv6.co_li_zero`,
   `sysfile_li_m1`, `sysfile_sext_m1`, `sysfile_li128`, `sysfile_arg0_lt`,
-  `sysfile_beq_tdir`, `sysfile_ww`, `sysfile_psw`, `sysfile_ctx`,
+  `sysfile_beq_tdir`, `MachCSL.KCtx.withSpie_twice`, `MachCSL.KCtx.withSpie_pushed`, `sysfile_ctx`,
   `sysfile_cur_kpt`, `sysfilePidQ`).
 
 The fetched string's shape facts are `UMemL.umemStr_nul` /
@@ -44,6 +44,9 @@ import Xv6.SpecArgfd
 import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
 import Xv6.SpecIunlockput
+import Xv6.CopyLemmas
+import Xv6.DirlookupParts
+import Xv6.KexecParts
 
 namespace Xv6
 
@@ -69,13 +72,6 @@ theorem sysfile_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
 
 theorem sysfile_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 
-theorem sysfile_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
-
-theorem sysfile_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-
 theorem sysfile_li_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
 theorem sysfile_sext_m1 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
@@ -91,11 +87,6 @@ theorem sysfile_beq_tdir (t : BitVec 16) :
   simp only [bcond]; by_cases h : t = 1#16
   · subst h; decide
   · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply h; bv_decide
-
-theorem sysfile_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-
-theorem sysfile_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
 
 theorem sysfile_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
   cases X; simp only at h; subst h; rfl
@@ -179,52 +170,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
 def sysfileAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
   iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
-
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned (the converse of `KstackMap.byteBuf_stackOwn`). -/
-theorem sysfile_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
 
 /-- THE PATH, CUT OUT OF THE BUFFER (Rocq `sc_buf_split`): argstr's success
 arm, read as namei's `bview (plen + 1) pfun` and the untouched rest. -/

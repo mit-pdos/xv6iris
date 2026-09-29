@@ -15,6 +15,9 @@ import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.PtOwnLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame8
+import Xv6.KvmLemmas
+import Xv6.PtRunLemmas
 
 namespace Xv6
 
@@ -47,14 +50,6 @@ theorem walkPres_trans {R R' R'' : RegMap} (h : walkPres R R') (h' : walkPres R'
   exact ⟨b1.trans a1, b2.trans a2, b3.trans a3, b4.trans a4, b5.trans a5, b6.trans a6,
     b7.trans a7, b8.trans a8, b9.trans a9, b10.trans a10, b11.trans a11⟩
 
-/-- A valid page is the page of its own page number. -/
-theorem w_pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
-    pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  obtain ⟨h1, -, h3⟩ := h
-  unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h1 h3
-  bv_decide
 
 /-- `PA2PTE(p) | V` is the pointer entry of `p`'s page. -/
 theorem w_kPtr_of_page (p : BitVec 64) (h : pageValid p) :
@@ -65,9 +60,6 @@ theorem w_kPtr_of_page (p : BitVec 64) (h : pageValid p) :
   revert h1 h3
   bv_decide
 
-/-- A valid page is not `0`. -/
-theorem w_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
 
 /-- `PTE2PA(kPtr b)` is `b`'s page. -/
 theorem w_ptr_page (b : BitVec 44) : ((kPtr b >>> 10) <<< 12) = pageAddr b := by
@@ -118,12 +110,6 @@ theorem availSub_availSub (on : Option Nat) (a b : Nat) :
 
 theorem availSub_one (on : Option Nat) : availSub on 1 = availDec on := rfl
 
-theorem pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem withSpie_withSpie (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := by
-  cases k; rfl
 
 /-- The context with its own pinned bits, as a callee's exit context. -/
 theorem kctx_withSpie_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :
@@ -155,13 +141,13 @@ theorem kctx_pushed_withSpie [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k
     (a b : Bool) (R : RegMap) :
     kctx (GF := GF) c (((k.pushed m).withSpie a b).withRegs R)
       ⊢ kctx c (((k.withSpie a b).pushed m).withRegs R) := by
-  rw [pushed_withSpie]
+  rw [MachCSL.KCtx.withSpie_pushed]
 
 theorem kctx_withSpie2 [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx)
     (a b a' b' : Bool) (R : RegMap) :
     kctx (GF := GF) c (((k.withSpie a b).withSpie a' b').withRegs R)
       ⊢ kctx c ((k.withSpie a' b').withRegs R) := by
-  rw [withSpie_withSpie]
+  rw [MachCSL.KCtx.withSpie_twice]
 
 /-! ## The eight-slot frame -/
 
@@ -176,10 +162,6 @@ def frame8 [CurCtx] (sp ra s0 s1 s2 s3 s4 s5 s6 : BitVec 64) : IProp GF := iprop
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) s5 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) s6
 
-theorem imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue `addi sp,sp,-64; sd ra,56(sp); ... sd s6,0(sp); addi s0,sp,64`. -/
@@ -204,7 +186,7 @@ theorem wp_prologue8_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
             (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, #Hi14, #Hi16, #Hi18, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4032#12 8 hK imm_m64) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4032#12 8 hK MachCSL.imm_m64) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -288,7 +270,7 @@ theorem wp_epilogue8_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
   iintro Hk Hpc Hf64
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 8 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c8 _ (pc + 16#64) true 64#12 8 imm_p64) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c8 _ (pc + 16#64) true 64#12 8 MachCSL.imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c9 hp9
   iintro Hk Hpc
   k_step_gen (wp_s_ret c9 _ (pc + 18#64) true 1#5) $$ [- $Hk $Hpc] next c10 hp10
@@ -396,7 +378,7 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       by simp [RegMap.set_apply, e25], by simp [RegMap.set_apply, e26],
       by simp [RegMap.set_apply, e27]⟩
   · -- kalloc gave a page
-    rw [if_neg (w_page_ne_zero _ hvalid)]
+    rw [if_neg (Xv6.PtRun.pageValid_ne_zero _ hvalid)]
     -- c.lui a2,0x1 ; c.li a1,0 ; jal memset
     k_step_gen (wp_s_lui c5 _ (KA.«walk» + 0x7e#64) true 1#20 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next c6 hp6
@@ -455,7 +437,7 @@ theorem walk_alloc (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       $$ [- $Hk $Hpc] next c14 hp14
     iintro Hk Hpc
     have hpb : pageAddr (BitVec.extractLsb' 12 44 (R2 10#5)) = R2 10#5 :=
-      w_pageAddr_of_valid _ hvalid
+      Xv6.Kvm.pageAddr_of_valid _ hvalid
     have hpin : kb.sie = false ∨ kb.proc = 0#64 → c14 = cpu :=
       fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
         ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
@@ -923,7 +905,7 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
         rw [hfillc] at h
         exact h
       have hnz : pageAddr c0.base ≠ 0#64 := by
-        refine w_page_ne_zero _ ?_
+        refine Xv6.PtRun.pageValid_ne_zero _ ?_
         have hmem : c0.base
             ∈ (PTree.fill 2 t (vpnOf (k.regs 11#5)) (fresh1 ++ fresh2)).1.pages 2 := by
           rw [hfillt]

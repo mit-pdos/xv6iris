@@ -18,6 +18,7 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecMemset
 import Xv6.CodeTactics
+import Xv6.PtRunLemmas
 
 namespace Xv6
 
@@ -80,12 +81,6 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
   have h8' := congrArg BitVec.toNat h8
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow] at h8'
   omega
-
-/-- A page of the allocator is above the kernel image, hence not `0`. -/
-theorem ka_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he
-  subst he
-  exact h.2.1 (by decide)
 
 /-- `pcIs` at a branch that was taken / not taken. -/
 theorem ka_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -453,7 +448,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     obtain ⟨hhead, hvalid⟩ := hhd
     have hhead' : pg = head := hhead.symm
     subst hhead'
-    ihave Hpc := ka_pcIs_neg c _ _ _ (ka_page_ne_zero pg hvalid) $$ Hpc
+    ihave Hpc := ka_pcIs_neg c _ _ _ (Xv6.PtRun.pageValid_ne_zero pg hvalid) $$ Hpc
     simp only [wordAtN_cur, pageRestAt_cur]
     -- c.ld a5,0(s1) : r->next
     k_step (wp_s_ld c _ (KA.«kalloc» + 0x20#64) true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) nxt)

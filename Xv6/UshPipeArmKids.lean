@@ -17,6 +17,7 @@ the caller (`UshPipeArmG3`).  The children's `close(1)` pays the free close
 deposit (`UshArmDefs.ushCldep_nonpipe`).
 -/
 import Xv6.UshPipeArmBase
+import Xv6.UshRedirArm
 
 namespace Xv6
 
@@ -54,10 +55,6 @@ section UshPipeArmKids
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-
-/-- `ushPtr` is its word. -/
-theorem ushpi_ptr (g : GName) (a p : Nat) :
-    ushPtr (GF := GF) g a p ⊢ uwordq g DFrac.discard a (BitVec.ofNat 64 p) := .rfl
 
 /-- The two p[] closes a process ends its fd plumbing with: `lw a0,-40(s0) ;
 jal close ; lw a0,-36(s0) ; jal close`, at `x .. x+16`. -/
@@ -162,7 +159,7 @@ theorem ushpi_left (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP)
     $$ HC Hb0 Hb1 HdR HdW Hha Hhb Hrun
   iintro %h6 %m6 %hst6 Hb0 Hb1 Hrun
   -- 0x16c  c.ld a0,8(s1) -- pcmd->left
-  ihave Hqp := ushpi_ptr N.d (t + 8) ql $$ Hqp
+  ihave Hqp := Xv6.ushPtr_word N.d (t + 8) ql $$ Hqp
   iapply ushS_ld UL N (ushRI_16c N.t) 0x16e h6 m6 av DFrac.discard (t + 8) _
     (ushpi_at m6 t 8 _ hst6.2 hta.1.2 (by decide)) (by omega) $$ HC Hqp Hrun
   iintro _ %h7 Hrun
@@ -229,7 +226,7 @@ theorem ushpi_right (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP)
     $$ HC Hb0 Hb1 HdR HdW Hha Hhb Hrun
   iintro %h5 %m5 %hst5 Hb0 Hb1 Hrun
   -- 0x1a0  c.ld a0,16(s1) -- pcmd->right
-  ihave Hqp := ushpi_ptr N.d (t + 16) qr $$ Hqp
+  ihave Hqp := Xv6.ushPtr_word N.d (t + 16) qr $$ Hqp
   iapply ushS_ld UL N (ushRI_1a0 N.t) 0x1a2 h5 m5 av DFrac.discard (t + 16) _
     (ushpi_at m5 t 16 _ hst5.2 hta.1.2 (by decide)) (by omega) $$ HC Hqp Hrun
   iintro _ %h6 Hrun

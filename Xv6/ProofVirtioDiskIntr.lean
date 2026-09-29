@@ -45,6 +45,8 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.DiskAcc
 import Xv6.CodeTactics
+import Xv6.VirtioDiskRwDefs2
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -527,16 +529,10 @@ theorem vdis_shl3 (j : Nat) : BitVec.ofNat 64 j <<< 3 = BitVec.ofNat 64 (8 * j) 
   simp only [Nat.reducePow]
   omega
 
-theorem vdis_shl4 (i : Nat) : BitVec.ofNat 64 i <<< 4 = BitVec.ofNat 64 (16 * i) := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  simp only [Nat.reducePow]
-  omega
-
 theorem vdis_usedElem_addr (pu : PAddr) (j : Nat) :
     BitVec.ofNat 64 (8 * j) + (pu + 4#64) = usedElemAt pu j := by
   unfold usedElemAt
-  rw [ofNat_add64 4 (8 * j), BitVec.add_comm (BitVec.ofNat 64 (8 * j)) (pu + 4#64),
+  rw [MachCSL.ofNat64_add 4 (8 * j), BitVec.add_comm (BitVec.ofNat 64 (8 * j)) (pu + 4#64),
     BitVec.add_assoc]
 
 theorem vdis_usedIdx_addr (pu : PAddr) : pu + 2#64 = usedIdxAt pu := rfl
@@ -545,24 +541,15 @@ theorem vdis_status_addr2 (i : Nat) :
     KA.«disk» + (32#64 + (BitVec.ofNat 64 (16 * i) + 16#64)) = aInfoStatus i := by
   unfold aInfoStatus diskAddr dOffInfo infoSize
   rw [show (32#64 : BitVec 64) = BitVec.ofNat 64 32 from rfl,
-    show (16#64 : BitVec 64) = BitVec.ofNat 64 16 from rfl, ← ofNat_add64, ← ofNat_add64,
+    show (16#64 : BitVec 64) = BitVec.ofNat 64 16 from rfl, ← MachCSL.ofNat64_add, ← MachCSL.ofNat64_add,
     show 32 + (16 * i + 16) = 40 + 16 * i + 8 from by omega]
 
 theorem vdis_infob_addr2 (i : Nat) :
     KA.«disk» + (32#64 + (BitVec.ofNat 64 (16 * i) + 8#64)) = aInfoB i := by
   unfold aInfoB diskAddr dOffInfo infoSize
   rw [show (32#64 : BitVec 64) = BitVec.ofNat 64 32 from rfl,
-    show (8#64 : BitVec 64) = BitVec.ofNat 64 8 from rfl, ← ofNat_add64, ← ofNat_add64,
+    show (8#64 : BitVec 64) = BitVec.ofNat 64 8 from rfl, ← MachCSL.ofNat64_add, ← MachCSL.ofNat64_add,
     show 32 + (16 * i + 8) = 40 + 16 * i from by omega]
-
-theorem vdis_bufdisk_addr (b : BitVec 64) : b + 4#64 = aBufDisk b := rfl
-
-theorem vdis_bnez_zero' : bcond bop.BNE (0#64) 0#64 = false := by decide
-
-theorem vdis_sext_i (i : Nat) (hi : i < NUM) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 i) = BitVec.ofNat 64 i := by
-  unfold NUM at hi
-  rcases i with _ | _ | _ | _ | _ | _ | _ | _ | i <;> first | decide | omega
 
 theorem vdis_bump (x : BitVec 16) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 x + 1#64)) <<< 48 >>> 48
@@ -623,15 +610,6 @@ theorem vdis_usedElem_facts (pu : PAddr) (h : descPageRw pu) (j : Nat) (hj : j <
   rw [hadd]
   have := h.2.1
   omega
-
-theorem vdis_status_kmap (i : Nat) (hi : i < NUM) :
-    kmapClass (vpnOf (aInfoStatus i)).toNat = some .rw := by
-  unfold NUM at hi
-  rcases i with _ | _ | _ | _ | _ | _ | _ | _ | i <;> first | decide | omega
-
-theorem vdis_status_ram (i : Nat) (hi : i < NUM) : inRam (aInfoStatus i) 1 := by
-  unfold NUM at hi
-  rcases i with _ | _ | _ | _ | _ | _ | _ | _ | i <;> first | decide | omega
 
 /-! ## The loop -/
 
@@ -758,7 +736,7 @@ theorem vdis_loop (WK : WAKEUP)
   -- +0x50  slli a4,a5,4 ; +0x54  addi a4,a4,32 ; +0x58  add a4,a4,s1
   k_step (wp_s_slli cpu _ (KA.«virtio_disk_intr» + 0x50#64) false 4#6 14#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdisK_sie k, vdis_sext_i c.hd hi, vdis_shl4 c.hd]
+    with [vdisK_sie k, Xv6.vdrw2_sext32 c.hd hi, Xv6.vdrw3_shl4 c.hd]
   iintro Hk Hpc
   k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x54#64) false 32#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
@@ -768,13 +746,13 @@ theorem vdis_loop (WK : WAKEUP)
     with [vdisK_sie k, hR9, diskIdx_addr' 32 c.hd]
   iintro Hk Hpc
   -- +0x5a  lbu a4,16(a4)  disk.info[id].status
-  ihave #Hid2 := kmapStatic_rw c.status (vdis_status_kmap c.hd hi) $$ HS
+  ihave #Hid2 := kmapStatic_rw c.status (Xv6.info_status_kmapRw c.hd hi) $$ HS
   ihave #Hwm1 := diskWm_mono γ m (nr + 1) F F (by omega) (Nat.le_refl F) $$ Hwm
   ihave HAU2 := disk_status_read γ (slotQ (HState.active c)) pd pav pu cpu F nr t1 c hcwf ht1
     $$ [Hinv Hgeom Hnr Htok HdoneAt]
   · iframe #; iframe
   k_step (wp_s_lbu_au cpu _ ?hs (KA.«virtio_disk_intr» + 0x5a#64) false 16#12 14#5 14#5
-      (by decide) c.status ?hb2 (vdis_status_ram c.hd hi) F [] _)
+      (by decide) c.status ?hb2 (Xv6.info_status_ram c.hd hi) F [] _)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hid2 $Hview $HAU2]
     with [vdisK_sie k]
   try (case hs => k_norm [vdisK_sie k])
@@ -788,12 +766,12 @@ theorem vdis_loop (WK : WAKEUP)
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_intr» + 0x5e#64) true 66#13 14#5 0#5 (by decide)
       bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdisK_sie k, KCtx.rget_zero, vdis_bnez_zero, vdis_bnez_zero']
+    with [vdisK_sie k, KCtx.rget_zero, vdis_bnez_zero, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- +0x60  slli a5,a5,4 ; +0x62  addi a5,a5,32 ; +0x66  add a5,a5,s1
   k_step (wp_s_slli cpu _ (KA.«virtio_disk_intr» + 0x60#64) true 4#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdisK_sie k, vdis_shl4 c.hd]
+    with [vdisK_sie k, Xv6.vdrw3_shl4 c.hd]
   iintro Hk Hpc
   k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x62#64) false 32#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
@@ -814,7 +792,7 @@ theorem vdis_loop (WK : WAKEUP)
   icases claimRes_bufDisk_acc γ pd c $$ Hclaim with ⟨%dsk0, Hdsk, Hdback⟩
   k_step (wp_s_sw cpu _ (KA.«virtio_disk_intr» + 0x6a#64) false 4#12 10#5 0#5 (by decide) dsk0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdisK_sie k, vdis_bufdisk_addr c.bp]
+    with [vdisK_sie k, Xv6.vdrw3_bufDisk c.bp]
   iintro Hk Hpc Hdsk
   -- +0x6e  jal wakeup
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081690#21 1#5 (by decide))

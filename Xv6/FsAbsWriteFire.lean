@@ -125,16 +125,13 @@ has no Lean analogue to port: a Lean `def` is not unfolded by `iframe`.)
 import Xv6.FsAbsOpenFire
 import Xv6.FsAbsReadFire
 import Xv6.SpecWritei
+import Xv6.FsAbsUnlinkFire
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-! ## 0.  The byte-list arithmetic (pure) -/
-
-/-- Rocq's `wrf_fb_length`. -/
-theorem wrfFb_length (data : Nat → List (BitVec 8)) (sz : Nat) : (fileBytes data sz).length = sz :=
-  fileBytes_length' data sz
 
 /-- Rocq's `wrf_fb_lookup`. -/
 theorem wrfFb_lookup (data : Nat → List (BitVec 8)) (sz j : Nat) (hj : j < sz) :
@@ -192,7 +189,7 @@ theorem wrfFile_bytes_splice_dist (data data' : Nat → List (BitVec 8)) (sz off
     fileBytes data' (max (off + tot) sz) =
       blkSplice off (wrfLanded wrote dstb sz off tot dist) (fileBytes data sz) := by
   have hsub := wrfLanded_length wrote dstb sz off tot dist
-  have hbs : (fileBytes data sz).length = sz := wrfFb_length data sz
+  have hbs : (fileBytes data sz).length = sz := Xv6.fileBytes_length' data sz
   have hlen : (blkSplice off (wrfLanded wrote dstb sz off tot dist) (fileBytes data sz)).length =
       max (off + tot) sz := by
     rw [blkSplice_length_grow _ _ _ (by rw [hbs]; exact hoff), hsub, hbs]
@@ -200,7 +197,7 @@ theorem wrfFile_bytes_splice_dist (data data' : Nat → List (BitVec 8)) (sz off
   apply List.ext_getElem?
   intro j
   by_cases hj' : max (off + tot) sz ≤ j
-  · rw [List.getElem?_eq_none (by rw [wrfFb_length]; omega),
+  · rw [List.getElem?_eq_none (by rw [Xv6.fileBytes_length']; omega),
       List.getElem?_eq_none (by rw [hlen]; omega)]
   have hj : j < max (off + tot) sz := by omega
   rw [wrfFb_lookup data' _ j hj, hbytes j hj]
@@ -777,17 +774,6 @@ theorem wrfDelta_insert (I : RegMapF FsNode) (i off : Nat) (bs bs0 : List (BitVe
   · rename_i hz
     rw [deltaWrite_file (absView I) i off bs bs0 nl (arowAt_live _ _ _ hrow hz)]
 
-/-- the ftop row survives the retag at an `InodeLocal` record (Rocq inlines
-this in both fires' close). -/
-theorem wrfFtopClean_insert (I : RegMapF FsNode) (A : RegMapF IregArmEnt) (i : Nat) (n' : FsNode)
-    (hloc : InodeLocal i n') (hcl : ftopClean I A) : ftopClean (PartialMap.insert I i n') A := by
-  intro j m hj hun
-  by_cases hji : i = j
-  · subst hji
-    rw [get?_insert_eq rfl] at hj; cases hj; exact hloc
-  · rw [get?_insert_ne hji] at hj
-    exact hcl j m hj hun
-
 /-- THE ONE CRITICAL SECTION every chunk fire runs (the common body of Rocq's
 `wrf_awrite_fire_gen` / `_adv` / `wrf_apart_fire_gen` / `_adv`, which Rocq
 spells four times): `ftopN` opened, the row read off the firing function's
@@ -842,7 +828,7 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
   imod Hclose $$ [Ha Hla Hpark]
   · iexists PartialMap.insert I i n', A
     iframe Ha Hla Hpark
-    ipureintro; exact wrfFtopClean_insert I A i n' hloc hcl
+    ipureintro; exact Xv6.ufFtopClean_insert I A i n' hloc hcl
   imodintro
   iframe Hf HX
 

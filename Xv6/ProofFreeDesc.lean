@@ -23,6 +23,7 @@ The descriptor's four fields are written through the four cells of
 -/
 import Xv6.SpecFreeDesc
 import Xv6.CodeTactics
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -56,11 +57,6 @@ theorem fd_withSpie (k : KCtx) (m : Nat) : (k.pushed m).withSpie k.spie k.spp = 
 
 theorem fd_ret_56 : jumpPc (KA.«free_desc» + 0x56#64) = KA.«free_desc» + 0x56#64 := by decide
 
-/-- `&disk.free[i]`, as the code computes it (`k_norm` has reassociated the
-sum). -/
-theorem fd_free_addr (i : Nat) : KA.«disk» + (BitVec.ofNat 64 i + 24#64) = aFree i := by
-  unfold aFree diskAddr dOffFree
-  rw [← BitVec.add_assoc, addr_plus, Nat.add_comm i 24]
 
 /-- `i << 4` is `16 i`. -/
 theorem fd_shl4 (i : Nat) (h : i < NUM) :
@@ -89,7 +85,6 @@ theorem fd_blt_false (i : Nat) (h : i < NUM) :
   have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by omega
   rcases this with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
 
-theorem fd_bnez_false : bcond bop.BNE 0#64 0#64 = false := by decide
 
 /-! ## The stored zeroes -/
 
@@ -177,12 +172,12 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_step (wp_s_lbu cpu _ (KA.«free_desc» + 0x18#64) false 24#12 15#5 15#5 (by decide)
       (by decide) (DFrac.own 1) 0#8)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [fd_free_addr i]
+    with [Xv6.vdrw2_free_addr i]
   iintro Hk Hpc Hfree
   -- bnez a5,+0x6a  (refuted)
   k_step (wp_s_branch cpu _ (KA.«free_desc» + 0x1c#64) true 78#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_zero, fd_bnez_false]
+    with [KCtx.rget_zero, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- slli a3,a0,0x4
   k_step (wp_s_slli cpu _ (KA.«free_desc» + 0x1e#64) false 4#6 13#5 10#5 (by decide))
@@ -244,7 +239,7 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   iintro Hk Hpc
   k_step (wp_s_sb cpu _ (KA.«free_desc» + 0x46#64) false 24#12 15#5 14#5 (by decide) 0#8)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [fd_free_addr i, fd_s8]
+    with [Xv6.vdrw2_free_addr i, fd_s8]
   iintro Hk Hpc Hfree
   -- auipc a0,0x1e ; addi a0,a0,-680 ; jal wakeup
   k_step (wp_s_auipc cpu _ (KA.«free_desc» + 0x4a#64) false 0x1e#20 10#5 (by decide))

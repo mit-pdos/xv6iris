@@ -61,6 +61,8 @@ import MachCSL.WpSmodeFrame6c
 import Xv6.FsCallSites
 import Xv6.SpecInitlock
 import Xv6.SpecWriteHead
+import Xv6.BallocDefs
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -82,8 +84,6 @@ theorem il_log_addr : KA.«initlog» + 0x1e90a#64 = logAddr := by
 theorem il_lhn_reloc : KA.«initlog» + 0x1e936#64 = lhNAddr := by
   unfold lhNAddr logAddr; decide
 
-theorem il_lStart : logAddr + 24#64 = lStart := rfl
-theorem il_lDev : logAddr + 36#64 = lDev := rfl
 theorem il_lhN : logAddr + 44#64 = lhNAddr := rfl
 
 theorem il_br_initlock : KA.«initlog» + 0xffffffffffffceb2#64 = KA.«initlock» := by decide
@@ -101,8 +101,6 @@ theorem il_ret_74 : jumpPc (KA.«initlog» + 0x74#64) = (KA.«initlog» + 0x74#6
 /-! ## Small arithmetic -/
 
 theorem il_ext0 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
-theorem il_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-! ## The held buffer -/
 
@@ -360,12 +358,6 @@ theorem il_slots_split (γ : BcacheNames) :
   icases bslots_uncons (LOGBLOCKS + 2) $$ H2 with ⟨H3, H4⟩
   iframe H1 H3 H4
 
-theorem il_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=
-  bslots_cons 1
-
-theorem il_slots_split2 (γ : BcacheNames) : bslots (GF := GF) 2 ⊢ bslot ∗ bslot :=
-  bslots_uncons 1
-
 end
 
 /-! ## The constructor's ghost step, the epilogue and the return -/
@@ -601,12 +593,12 @@ theorem initlog_proof
   -- +0x2c  sw a1,24(s2)
   k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x2c#64) false 24#12 18#5 11#5 (by decide) vStart)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [a18', il_lStart, il_ext_sext (BitVec.ofNat 32 logstart)]
+    with [a18', Xv6.eo_o_start, Xv6.fw_ext32 (BitVec.ofNat 32 logstart)]
   iintro Hk Hpc HlStart
   -- +0x30  sw s1,36(s2)
   k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x30#64) false 36#12 18#5 9#5 (by decide) vDev)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [a18', a9', il_lDev, il_ext_sext dev]
+    with [a18', a9', Xv6.eo_o_dev, Xv6.fw_ext32 dev]
   iintro Hk Hpc HlDev
   -- the two cells are FROZEN here
   iapply wpLoop_bupd
@@ -713,7 +705,7 @@ theorem initlog_proof
   k_norm_g at hcs3
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
   -- ===== install_trans(1) =====
-  ihave Hs2 := il_slots_join2 γb $$ [Hu1 Hu2]
+  ihave Hs2 := Xv6.ba_slots_join2 γb $$ [Hu1 Hu2]
   case' _ => iframe
   k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x62#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -871,7 +863,7 @@ theorem initlog_proof
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_lhn_reloc, il_ext0]
   iintro Hk Hpc HlhN
   -- +0x70 jal ra,write_head
-  icases il_slots_split2 γb $$ Hs2 with ⟨Hu1, Hu2⟩
+  icases Xv6.ba_slots_split2 γb $$ Hs2 with ⟨Hu1, Hu2⟩
   ihave Hch := (show fsChalf (GF := GF) γfs (logHdrBno logstart) bs ⊢
       ∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh from by
     iintro H; iexists bs; iexact H) $$ Hhdr
@@ -908,7 +900,7 @@ theorem initlog_proof
   unfold calleeSaved at hcs5
   k_norm_g at hcs5
   obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs5
-  ihave Hs2 := il_slots_join2 γb $$ [Hu1 Hu2]
+  ihave Hs2 := Xv6.ba_slots_join2 γb $$ [Hu1 Hu2]
   case' _ => iframe
   -- **THE SEAL OF THE EXCEPTION SET** (Rocq's `exc_seal`): recovery is over,
   -- the handle is spent at `[]`, and the discarded element is the permanent

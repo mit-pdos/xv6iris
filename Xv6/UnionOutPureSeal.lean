@@ -4,8 +4,8 @@ THE UNION LEDGER'S PURE CARRIER, SEALED -- the declarations of Rocq
 as "unreached" but that the union laws reach (U4 seal wave, walk3.txt).
 Pure.
 
-Added (Rocq → Lean): `um_sess_nonnil` → `umSess_nonnil`,
-`um_disc_open_seg` → `umDisc_open_seg` (both Rocq-local duplicates of
+Added (Rocq → Lean): `um_sess_nonnil` → `Xv6.lmSess_nonnil`,
+`um_disc_open_seg` → `Xv6.lmDisc_open_seg` (both Rocq-local duplicates of
 `GenOutHist`'s `lm_sess_nonnil` / `lm_disc_open_seg`; kept as named
 aliases), `lm_disc_first_out` → `lmDisc_first_out`, `efl_of_first_out_u` →
 `eflOf_first_out_u`, `union_phi_body_nil/_off/_on/_step_io/_last_adm/_out/
@@ -57,22 +57,12 @@ section FirstOut
 
 variable (M : LModel)
 
-/-- Rocq `um_sess_nonnil` (= `GenOutHist.lm_sess_nonnil`). -/
-theorem umSess_nonnil (ps cs : List Nat) (s : M.lmSt) (I : List (BitVec 8))
-    (hF : ∀ a ∈ ps, a < proAlts.length) (hd : proDone ps) : lmSess M ps cs s I ≠ [] :=
-  lmSess_nonnil M ps cs s I hF hd
-
-/-- Rocq `um_disc_open_seg` (= `GenOutHist.lm_disc_open_seg`). -/
-theorem umDisc_open_seg (h : List Obs) (hsh : traceShape h true) (hd : lmDisc M h) :
-    ∃ s : M.lmSt, M.lmStOk s ∧ lmDiscSeg' M s (openSeg h) :=
-  lmDisc_open_seg M h hsh hd
-
 /-- Rocq `lm_disc_first_out`: under the discipline, a cycle whose console wire
 is empty has received no console input. -/
 theorem lmDisc_first_out (h : List Obs) (hd : lmDisc M h) (hsh : traceShape h true)
     (hw : obsWire .uart0 (openSeg h) = []) : consIns (openSeg h) = [] := by
   refine Classical.byContradiction fun hne => ?_
-  obtain ⟨s, _, _, ps, cs, _, _, hall⟩ := umDisc_open_seg M h hsh hd
+  obtain ⟨s, _, _, ps, cs, _, _, hall⟩ := Xv6.lmDisc_open_seg M h hsh hd
   obtain ⟨p, hp, hpi⟩ := inPres_first _ hne
   obtain ⟨⟨hpsb, hlt⟩, hpt⟩ := hall p hp
   unfold lmDiscPt at hpt
@@ -82,7 +72,7 @@ theorem lmDisc_first_out (h : List Obs) (hd : lmDisc M h) (hsh : traceShape h tr
     rw [← hz, obsWire_app] at hw
     exact (List.append_eq_nil_iff.mp hw).1
   rw [hwp] at hpt
-  exact umSess_nonnil M ps cs s [] hpsb ((proDone_rounds ps).mpr (by omega)) (List.prefix_nil.mp hpt)
+  exact Xv6.lmSess_nonnil M ps cs s [] hpsb ((proDone_rounds ps).mpr (by omega)) (List.prefix_nil.mp hpt)
 
 end FirstOut
 

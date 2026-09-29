@@ -933,11 +933,6 @@ def cyclesOf (h : List Obs) : List (List Obs) := (cyclesRev h).reverse
 theorem cyclesRev_app (h κ : List Obs) : cyclesRev (h ++ κ) = κ.foldl cycStep (cyclesRev h) := by
   simp [cyclesRev, List.foldl_append]
 
-private theorem obsStep_none (h : List Obs) : h.foldl obsStep none = none := by
-  induction h with
-  | nil => rfl
-  | cons e h ih => cases e <;> exact ih
-
 /-- The fold form of `traceShape_cycles`, from any automaton state: while
 the parse is powered on, the cycle stack's head is the open segment. -/
 private theorem cycles_aux (h : List Obs) : ∀ (st : Option Bool) (cs0 : List (List Obs))

@@ -145,7 +145,7 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«bread» + 0x2e#64) false 54#13 9#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [bd_beq_ne _ _ (bnode_ne_bhead kk0 hkk0)]
+    with [Xv6.ci_beq_ne _ _ (bnode_ne_bhead kk0 hkk0)]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«bread» + 0x32#64) true 14#5 0#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -258,7 +258,7 @@ theorem bread_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB)
     iintro Hk Hpc
     k_step (wp_s_branch cpu _ (KA.«bread» + 0x74#64) false 16#13 9#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [bd_beq_ne _ _ (bnode_ne_bhead klast hklast)]
+      with [Xv6.ci_beq_ne _ _ (bnode_ne_bhead klast hklast)]
     iintro Hk Hpc
     k_step (wp_s_add cpu _ (KA.«bread» + 0x78#64) true 14#5 0#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

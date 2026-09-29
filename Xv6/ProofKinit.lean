@@ -36,10 +36,6 @@ theorem ki_ret_ac8 : jumpPc (KA.«kinit» + 0x1c#64) = (KA.«kinit» + 0x1c#64) 
 theorem ki_ret_ad8 : jumpPc (KA.«kinit» + 0x2c#64) = (KA.«kinit» + 0x2c#64) := by
   decide
 
-/-- The context algebra of the exit interrupt state. -/
-theorem ki_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 /-- `freerange` starts the count at zero. -/
 theorem ki_availAdd0 : availAdd (some 0) kinitPages = some kinitPages := by
   simp only [availAdd, Option.map_some, Nat.zero_add]
@@ -143,7 +139,7 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, #Hlk, Hav, Hwname, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
-  simp only [ki_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   have hK' : 2 ≤ (k.withSpie spie spp).avail := hK
   have hR2' : R 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := hR2
   iapply (wp_epilogue2_gen c (k.withSpie spie spp) (KA.«kinit» + 0x2c#64) hK' R hR2'

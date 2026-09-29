@@ -233,7 +233,7 @@ theorem ialloc_claim_rel (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg] [CurCtx] (Γ :
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
-  ihave Hsl := ialloc_slots_join2 fscBio $$ [Hsl Hsl1]
+  ihave Hsl := Xv6.ba_slots_join2 fscBio $$ [Hsl Hsl1]
   case' _ => iframe
   have hb' : iallocBody k ty R1 := by
     apply iallocBody_callee k ty _ R1 _ _ _ _ _ _ _ _ _ hb <;>
@@ -432,7 +432,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   have hsl := islot_lt inum
   have hal := dislotAlign_buf kk (islot inum) hkk hsl
   have hlen : (dinodeBytes ds[islot inum]!).length = 64 :=
-    dinodeBytes_length _ (ialloc_slot_wf ds _ hwf hsl)
+    dinodeBytes_length _ (Xv6.iregBlkSlot ds _ hwf hsl)
   obtain ⟨a2, a20, a21, a22, p23, p24, p25, p26, p27⟩ := id hb
   iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, #Hlc, #Hit2, #Hiti, #Hinv, #Hopen, #Hpe, Hte, Hce,
     Hsn, Hsi, Hpid, Hlocked, Hsl, Hiref, Htx, Hop, Hnext⟩

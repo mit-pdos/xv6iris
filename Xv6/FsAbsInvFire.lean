@@ -49,7 +49,7 @@ Rocq's header, point for point:
    Lean arm is update-free, so the discharger is a plain entailment.
 5. `fsabs_open_pre_plain`/`fsabs_open_pre_create`/`fsabs_trunc_piece` are
    folded into `fsabsOpenIn` (their only consumer); `fsabs_mkdir` is the
-   landed `SpecSysMkdir.mkdirAuPre_unit` (re-exported as `fsabsMkdirPre`).
+   landed `SpecSysMkdir.mkdirAuPre_unit` (re-exported as `Xv6.mkdirAuAt_unit`).
 -/
 import Xv6.SpecSysOpen
 import Xv6.SpecSysChdir
@@ -340,17 +340,6 @@ theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8))
   isplitl []
   · iapply fsabsDlookup
   · iapply fsabsDmiss
-
-/-- mkdir's (the landed `mkdirAuAt_unit`, under this file's name; the
-syscall-tier bundle is path-fixed since TL-3C). -/
-theorem fsabsMkdirPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
-    appSup (GF := GF) ⊢
-      mkdirAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv (fun _ _ => iprop(True))
-        (fun _ _ => iprop(True))
-        (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
-        (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
-        (pfamTriv (fun _ _ _ _ => iprop(True))) :=
-  mkdirAuAt_unit γfs cw M pv
 
 /-- **exec's bundle at a caller that tracks nothing** (Rocq's
 `xv6_sbundle_of_supply` exec branch, stated once here at `SpecSysExec`'s

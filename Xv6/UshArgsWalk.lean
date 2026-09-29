@@ -34,6 +34,7 @@ import Xv6.SpecShParseredirs
 import Xv6.UshLits
 import Xv6.UshNodes
 import Xv6.UshRedirsWalk
+import Xv6.UlibVprintfInv
 
 namespace Xv6
 
@@ -46,15 +47,6 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-! ## §0 Pure helpers -/
-
-/-- `addiw s2,s2,1` on a small count. -/
-theorem ushPex_addiw (i : Nat) (h : i + 1 < 2 ^ 31) :
-    ukAddiwVal (BitVec.ofNat 64 i) 1#12 = BitVec.ofNat 64 (i + 1) := by
-  unfold ukAddiwVal
-  simp only [Functions.sign_extend, Sail.BitVec.extractLsb, Sail.BitVec.signExtend]
-  rw [show BitVec.signExtend 64 (1#12) = BitVec.ofInt 64 1 from by decide, ← umoi_natCast,
-    umoi_addw (by omega) (by omega)]
-  rfl
 
 /-- `slli s2,s2,3` on a small count. -/
 theorem ushPex_slli3 (k : Nat) (h : k < 16) :
@@ -372,7 +364,7 @@ theorem shPex_store (UL : UK_LEAVES) (SR : SH_PARSEREDIRS) (N : UkNames GF) (UM 
       BitVec.ofNat 64 (s0 + e) by ureg]; iexact He
   -- 0x650  addiw s2,s2,1 ; 0x652  bne s2,s9 : taken (argc < MAXARGS)
   iapply ushS_addiw UL N (ushI_650 N.t) 0x652 h6 _ _ (BitVec.ofNat 64 (done.length + 1))
-    (by ureg; rw [r18]; exact ushPex_addiw _ (by omega)) $$ Hc Hrun
+    (by ureg; rw [r18]; exact Xv6.ulibAddiw_succ _ (by omega)) $$ Hc Hrun
   iintro %h7 Hrun
   iapply ushS_brT UL N (ushI_652 N.t) 0x614 h7 _ _
     (by ureg; rw [r25]

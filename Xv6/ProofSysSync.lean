@@ -56,6 +56,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
+import MachCSL.WpLock
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -96,9 +98,6 @@ theorem ss_ret_6a : jumpPc (KA.«sys_sync» + 0x6a#64) = KA.«sys_sync» + 0x6a#
 
 theorem ss_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
 
-/-- `bnez a5` on the `committing` cell, at each of its two readings. -/
-theorem ss_bnez0 : bcond bop.BNE 0#64 0#64 = false := by decide
-theorem ss_bnez1 : bcond bop.BNE 1#64 0#64 = true := by decide
 
 /-! ## The context and the register pins -/
 
@@ -164,8 +163,6 @@ theorem ssK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
     _root_.true_and, _root_.and_true]
   omega
 
-theorem ss_withSpie2 (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
 
 /-- The register pins the wait loop maintains: the frame pointers,
 `s1 = &log`, `s2` the saved `log.ncommit`, and the callee-saved registers
@@ -947,7 +944,7 @@ theorem ss_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       hjp hproc hK hnoff hlocks htier hint hR)
     $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hlocked $Hpay $Hfr $Hpid $Hnext]
   iframe #
-  isimp only [ss_withSpie2]
+  isimp only [MachCSL.KCtx.withSpie_twice]
   iexact IH
 
 end
@@ -1142,7 +1139,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     iintro Hk Hpc Hcmt
     k_step (wp_s_branch cpu _ (KA.«sys_sync» + 0x1c#64) true 14#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, ss_bnez0]
+      with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- +0x1e auipc a5,0x1e ; +0x22 lw a5,1066(a5) ; +0x26 blez a5
     k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x1e#64) false 0x1e#20 15#5 (by decide))
@@ -1166,7 +1163,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
       iapply (ss_tail RE Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ jp
           hjp hproc hK hnoff hlocks htier hint ?hRt) $$ [- $Hk $Hpc]
       rotate_right 1
-      isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, ss_withSpie2]
+      isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
       iframe #
       iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext
       case hRt =>
@@ -1182,7 +1179,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
       iintro Hk Hpc
       iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ hK ?hRs) $$ [- $Hk $Hpc]
       rotate_right 1
-      isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, ss_withSpie2]
+      isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
       iframe #
       iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext Hloop
       case hRs =>
@@ -1199,7 +1196,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     iintro Hk Hpc Hcmt
     k_step (wp_s_branch cpu _ (KA.«sys_sync» + 0x1c#64) true 14#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, ss_bnez1]
+      with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, Xv6.vdrw2_bnez_1]
     iintro Hk Hpc
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
@@ -1207,7 +1204,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     ihave Hpay := Hclose $$ Hout Hcmt Hnc
     iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ hK ?hRs2) $$ [- $Hk $Hpc]
     rotate_right 1
-    isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, ss_withSpie2]
+    isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
     iframe #
     iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext Hloop
     case hRs2 =>

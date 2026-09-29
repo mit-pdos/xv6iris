@@ -110,7 +110,7 @@ theorem fsGeomOk_ofSnap [Fscfg] [Icfg] (S : FsStateRec) (Pb : Nat → List (BitV
     cases hc : logRegion S.fssSb.sbLogstart b with
     | false => rfl
     | true =>
-      have := logRegion_bound _ b hc
+      have := Xv6.logRegion_range _ b hc
       unfold LOGBLOCKS at this; omega
   subst hcovq hnibq
   refine {
@@ -181,7 +181,7 @@ theorem firstFsinitPures_ofSnap [Fscfg] [Icfg] (dk : Nat → BitVec 8) (S : FsSt
   have h1log : logRegion S.fssSb.sbLogstart 1 = false := by
     cases hc : logRegion S.fssSb.sbLogstart 1 with
     | false => rfl
-    | true => have := logRegion_bound _ 1 hc; omega
+    | true => have := Xv6.logRegion_range _ 1 hc; omega
   have h1home : 1 ∈ fsHomeList cov S.fssSb.sbLogstart := (mem_fsHomeList _ _ _).2 ⟨h1cov, h1log⟩
   have hsbb : fsBlocks dk 1 = S.fssSbb := by
     rw [← hagr 1 h1home (hdrWset_sb (fsBlocks dk) cov _ hhwf)]

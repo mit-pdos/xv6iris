@@ -29,6 +29,7 @@ bundle `dlk_regs`), and the three callees at their call sites.
 import Xv6.DirlookupParts
 import Xv6.SpecNamecmp
 import Xv6.SpecIget
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -67,12 +68,6 @@ structure DirlookupStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (bm : Blkmap)
   hdrnl : dr.diNlink = dn.diNlink
   hpoff : if hasp then k.regs 12#5 ≠ 0#64 else k.regs 12#5 = 0#64
   hal : (dirlookupDeAddr (k.regs 2#5)).toNat % 8 = 0
-
-/-- The pinning fact every exit needs: the process is not `0`. -/
-theorem dirlookup_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-- The registers the loop keeps live at `+0x5c` for record `i` (Rocq's
 `dlk_regs`): `sp = s4 = &de`, `s0 = sp₀`, `s1 = 16 i`, `s2 = dp`, `s3 = 16`,
@@ -162,7 +157,7 @@ def dirlookupPost (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     wpLoop cpu')
 
 /-- The specification's `wpNext`, named, and hart-free: a `true` crossing at
-a process (`dirlookup_pin`), so any hart may consume it. -/
+a process (`Xv6.rd_pin`), so any hart may consume it. -/
 theorem dirlookup_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     (hproc : k.proc = procAddr j) (ip : BitVec 64) (dinum : BitVec 32)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn dr : Dinode) (fn : Nat → BitVec 8)
@@ -193,7 +188,7 @@ theorem dirlookup_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     ⊢ ∀ c : CPU, dirlookupPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c := by
   unfold dirlookupPost
   iintro H %c %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hkeep Harm
-  ihave HK := wpNext_at true k.proc cpu c _ (dirlookup_pin hj k hproc c cpu) $$ H
+  ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hsl, Hlk, Hdi⟩
   iapply HK $$ %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
@@ -323,7 +318,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     bm data dn false off 16 olds pidv dirlookupVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
     hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
     (by simp only [Bool.false_eq_true, if_false]; exact ha1)
-    (by rw [ha3, fw_sext32 _ (by omega)]) (by rw [ha4]; rfl) (fun _ => holds)
+    (by rw [ha3, MachCSL.signExtend_ofNat32 _ (by omega)]) (by rw [ha4]; rfl) (fun _ => holds)
   unfold wp_readi_eb_body at h
   simp only [readiAddr, Bool.false_eq_true, if_false, and_false, false_and, false_or, fsView_gd] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, #Hkl, #Hav, Hdev, Hmeta, Hmap,

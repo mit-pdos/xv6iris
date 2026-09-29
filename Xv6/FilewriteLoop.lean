@@ -45,7 +45,7 @@ theorem fwr_subw (n : Int) (t : Nat) (ht : (t : Int) < n) (hn : n < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]
     omega
-  rw [this, fw_sext32 _ (by omega)]
+  rw [this, MachCSL.signExtend_ofNat32 _ (by omega)]
 
 /-- ... in the normaliser's `x + -y` spelling. -/
 theorem fwr_subw' (n : Int) (t : Nat) (ht : (t : Int) < n) (hn : n < 2 ^ 31) :
@@ -97,7 +97,7 @@ theorem fwr_addw_nat (a b : Nat) (h : a + b < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
-  rw [this, fw_sext32 _ h]
+  rw [this, MachCSL.signExtend_ofNat32 _ h]
 
 /-- `bge s4,s5`: `i ≥ n`. -/
 theorem fwr_bge_n (x : Nat) (n : Int) (hx : x < 2 ^ 31) (hn : 0 ≤ n ∧ n < 2 ^ 31) :

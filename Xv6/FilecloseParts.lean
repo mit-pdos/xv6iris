@@ -24,6 +24,7 @@ import Xv6.FilePay
 import Xv6.FtableLock
 import MachCSL.WpSmodeFrame8
 import Xv6.CodeTactics
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -61,7 +62,6 @@ theorem fileclose_br_begin_op : KA.«fileclose» + 0xfffffffffffffb46#64 = KA.«
 theorem fileclose_br_iput : KA.«fileclose» + 0xfffffffffffff25e#64 = KA.«iput» := by decide
 theorem fileclose_br_end_op : KA.«fileclose» + 0xfffffffffffffbd2#64 = KA.«end_op» := by decide
 
-theorem fc_one : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
 theorem fc_beq_none : bcond bop.BEQ (BitVec.signExtend 64 FD_NONE) 1#64 = false := by decide
 theorem fc_beq_pipe : bcond bop.BEQ (BitVec.signExtend 64 FD_PIPE) 1#64 = true := by decide
 theorem fc_bgeu_none : bcond bop.BGEU 1#64 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
@@ -97,10 +97,6 @@ theorem fc_sp32' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFC0#64 + 32#64 = x + 0xFFF
 theorem fc_sp24' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFC0#64 + 24#64 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 theorem fc_sp16' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFC0#64 + 16#64 = x + 0xFFFFFFFFFFFFFFD0#64 := by bv_decide
 theorem fc_sp8' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFC0#64 + 8#64 = x + 0xFFFFFFFFFFFFFFC8#64 := by bv_decide
-
-theorem fc_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem fc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 theorem fc_calleeSaved_mk (KR R : RegMap)
     (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)

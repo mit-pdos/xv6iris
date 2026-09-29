@@ -85,7 +85,7 @@ theorem dirlookup_latch (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlookup_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hsz := hs.hsz
   have hsz31 : dn.diSize.toNat < 2 ^ 31 := by omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -97,7 +97,7 @@ theorem dirlookup_latch (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j
   have hbg : bcond bop.BGEU (BitVec.ofNat 64 (16 * i) + 16#64) (BitVec.ofNat 64 dn.diSize.toNat)
       = decide (dn.diSize.toNat ≤ 16 * i + 16) := by
     rw [hs16, fw_bgeu_nat _ _ (by omega) (by omega), show 16 * (i + 1) = 16 * i + 16 by omega]
-  have hsx := dirlookup_sext_small dn.diSize hsz31
+  have hsx := Xv6.dsSext_small dn.diSize hsz31
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hin, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x52  c.addiw s1,s1,16

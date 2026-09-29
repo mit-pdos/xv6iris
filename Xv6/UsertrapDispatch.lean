@@ -23,6 +23,8 @@ devintr is called at EVERY cause but the ecall, through its one contract
 -/
 import Xv6.UsertrapBlocks
 import MachCSL.WpSmodeTrapCsr
+import Xv6.BreadDefs
+import Xv6.ConsoleintrParts
 
 namespace Xv6
 
@@ -50,10 +52,7 @@ theorem utd_bd0a : KA.«usertrap» + 0x48#64 + BitVec.signExtend 64 136#13 = KA.
 theorem utd_bd0b : KA.«usertrap» + 0x52#64 + BitVec.signExtend 64 126#13 = KA.«usertrap» + 0xd0#64 := by
   decide
 
-theorem utd_beq_self (v : BitVec 64) : bcond bop.BEQ v v = true := by simp [bcond]
-theorem utd_beq_ne (v w : BitVec 64) (h : v ≠ w) : bcond bop.BEQ v w = false := by simp [bcond, h]
 theorem utd_bne_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BNE v 0#64 = true := by simp [bcond, h]
-theorem utd_bne_00 : bcond bop.BNE 0#64 0#64 = false := by decide
 
 theorem utd_ext_ne8 (sc : BitVec 64) (h : sCauseOk sc) : sc ≠ 8#64 := by
   unfold sCauseOk at h; rcases h with rfl | rfl <;> decide
@@ -247,7 +246,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
   by_cases h15 : A.sc = 15#64
   · -- +0x48  beq : taken
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x48#64) false 136#13 14#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, utd_beq_self, utd_bd0a]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, Xv6.bd_beq_eq, utd_bd0a]
     iintro Hk Hpc
     icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
       ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
@@ -258,7 +257,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
     iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hki Hpay Hkont
     case hp1 => ut_pins
   · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x48#64) false 136#13 14#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h15]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_beq_ne _ _ h15]
     iintro Hk Hpc
     -- +0x4c  csrr a4,scause ; +0x50 li a5,13
     k_step (wp_s_csrr_scause cpu _ ?hs (KA.«usertrap» + 0x4c#64) false 14#5 (by decide) A.sc)
@@ -269,7 +268,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
     iintro Hk Hpc
     by_cases h13 : A.sc = 13#64
     · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x52#64) false 126#13 14#5 15#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13, utd_beq_self, utd_bd0b]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13, Xv6.bd_beq_eq, utd_bd0b]
       iintro Hk Hpc
       icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
         ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
@@ -280,7 +279,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
       iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hki Hpay Hkont
       case hp2 => ut_pins
     · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x52#64) false 126#13 14#5 15#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h13]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_beq_ne _ _ h13]
       iintro Hk Hpc
       have hne : A.sc ≠ uecallScause := h8
       icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
@@ -335,7 +334,7 @@ theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x40#64) true 170#13 10#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, utd_bne_00]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   iapply (ut_disp_fault PT Γ HD0 H56 hI A cpu _ tv hok ?hp2 h8 hsc)
   rotate_left 1
@@ -363,7 +362,7 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
   by_cases h8 : A.sc = 8#64
   · -- +0x36  beq : taken, the ecall
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x36#64) false 90#13 14#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8, utd_beq_self, utd_b90]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8, Xv6.bd_beq_eq, utd_b90]
     iintro Hk Hpc
     icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
       ⟨Hfr, Hte, Hce, #Hcaps, Hown, Hsi, Hfi, Hpi, -, Hkont⟩
@@ -374,7 +373,7 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     case hp1 => ut_pins
     case h10' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
   · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x36#64) false 90#13 14#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h8]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_beq_ne _ _ h8]
     iintro Hk Hpc
     by_cases hsc : sCauseOk A.sc
     · iapply (ut_disp_dev PT Γ DI HEA hI A cpu _ tv hok ?hp2 hsc)

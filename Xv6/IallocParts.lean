@@ -28,6 +28,9 @@ import Xv6.SpecBrelse
 import Xv6.SpecLogWrite
 import Xv6.FsWords
 import Xv6.SpecIget
+import MachCSL.WpSmodeFrame8
+import Xv6.BfreeParts
+import Xv6.IupdateSteps
 
 namespace Xv6
 
@@ -66,9 +69,6 @@ theorem ialloc_ret_ae : jumpPc (KA.«ialloc» + 0xae#64) = KA.«ialloc» + 0xae#
 
 /-! ## The frame -/
 
-theorem ialloc_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by decide
-theorem ialloc_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by decide
-
 /-- The frame's eight slots and every callee's reach, out of `iallocSlots`. -/
 theorem ialloc_slots (a : Nat) (h : iallocSlots ≤ a) :
     8 ≤ a ∧ breadSlots ≤ a - 8 ∧ igetSlots ≤ a - 8 ∧ logWriteSlots ≤ a - 8 ∧
@@ -78,10 +78,6 @@ theorem ialloc_slots (a : Nat) (h : iallocSlots ≤ a) :
   omega
 
 /-! ## The scan's arithmetic (inum as a `Nat`, `s2 = ofNat 64 n`) -/
-
-/-- The claimed inum's value. -/
-theorem ialloc_inum_toNat (n : Nat) (h : n < 2 ^ 31) : (BitVec.ofNat 32 n).toNat = n := by
-  simp only [BitVec.toNat_ofNat]; omega
 
 /-- `srli a1,s2,4` (64-bit). -/
 theorem ialloc_srli4 (n : Nat) (h : n < 2 ^ 31) :
@@ -99,7 +95,7 @@ theorem ialloc_addw_ibl (n ist : Nat) (hn : n < 2 ^ 31)
       (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (n / 16))
         + BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.ofNat 32 ist)))
       = BitVec.ofNat 64 (IBLOCK (BitVec.ofNat 32 n) ist) := by
-  have h16 : (BitVec.ofNat 32 n).toNat / 16 = n / 16 := by rw [ialloc_inum_toNat n hn]
+  have h16 : (BitVec.ofNat 32 n).toNat / 16 = n / 16 := by rw [Xv6.bf_bnoB n hn]
   rw [BitVec.add_comm, ← dsAddwIbl (BitVec.ofNat 32 n) ist hib, h16]
 
 /-- The block number fits the 31 bits bread's argument wants. -/
@@ -113,16 +109,12 @@ theorem ialloc_bno [Fscfg] [Icfg] (n : Nat) (hn : (BitVec.ofNat 32 n).toNat < 16
   refine ⟨?_, h, hh⟩
   simp only [BitVec.toNat_ofNat]; omega
 
-/-- The sign extension of the 32-bit block number (bread's `a1`). -/
-theorem ialloc_sext_bno (b : Nat) (h : b < 2 ^ 31) :
-    BitVec.ofNat 64 b = BitVec.signExtend 64 (BitVec.ofNat 32 b) := (fw_sext32 b h).symm
-
 /-- `andi a5,s2,15` (the BASE encoding): the slot index. -/
 theorem ialloc_andi15 (n : Nat) (h : n < 2 ^ 31) :
     BitVec.ofNat 64 n &&& BitVec.signExtend 64 15#12 = BitVec.ofNat 64 (islot (BitVec.ofNat 32 n)) := by
   rw [dsAndi15]
   unfold islot
-  rw [ialloc_inum_toNat n h, BitVec.toNat_ofNat]
+  rw [Xv6.bf_bnoB n h, BitVec.toNat_ofNat]
   congr 1
   omega
 
@@ -150,7 +142,7 @@ theorem ialloc_succ' (n m : Nat) (hm : m = n + 1) (h : m < 2 ^ 64) :
 /-- `sext.w` of a small 64-bit value. -/
 theorem ialloc_sextw (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n)) = BitVec.ofNat 64 n := by
-  rw [fw_w32 n h]; exact fw_sext32 n h
+  rw [fw_w32 n h]; exact MachCSL.signExtend_ofNat32 n h
 
 theorem ialloc_sextw' (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + BitVec.signExtend 64 0#12))
@@ -182,14 +174,14 @@ theorem ialloc_sextw_toNat' (inum : BitVec 32) :
 theorem ialloc_bltu (n nin : Nat) (hn : n < 2 ^ 31) (hnin : nin < 2 ^ 31) :
     bcond bop.BLTU (BitVec.ofNat 64 n) (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) =
       decide (n < nin) := by
-  rw [fw_sext32 nin hnin]
+  rw [MachCSL.signExtend_ofNat32 nin hnin]
   exact dsBltu n nin (by omega) (by omega)
 
 /-- `bgeu a5,a4` at `+0x12`: NOT taken, from `1 < ninodes` (the dead
 empty-region arm). -/
 theorem ialloc_bgeu_dead (nin : Nat) (h1 : 1 < nin) (hnin : nin < 2 ^ 31) :
     bcond bop.BGEU 1#64 (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) = false := by
-  rw [fw_sext32 nin hnin, show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl,
+  rw [MachCSL.signExtend_ofNat32 nin hnin, show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl,
     fw_bgeu_nat 1 nin (by omega) (by omega)]
   simp; omega
 
@@ -209,14 +201,6 @@ what the `sh` does to `dislot`'s first cell. -/
 theorem ialloc_fresh_of_zero (ty : BitVec 16) :
     iallocFresh ty = ⟨ty, iallocDzero.diMajor, iallocDzero.diMinor, iallocDzero.diNlink, iallocDzero.diSize,
       iallocDzero.diAddrs⟩ := rfl
-
-/-- Slot `k`'s record is well formed. -/
-theorem ialloc_slot_wf (ds : List Dinode) (k : Nat) (hwf : diblkWf ds) (hk : k < 16) :
-    dinodeWf ds[k]! := by
-  have hlen : k < ds.length := by rw [hwf.1]; exact hk
-  apply hwf.2
-  rw [getElem!_of_getElem? (List.getElem?_eq_getElem hlen)]
-  exact List.getElem_mem hlen
 
 /-! ## The no-inodes message -/
 

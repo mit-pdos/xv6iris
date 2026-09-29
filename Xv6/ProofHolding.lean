@@ -24,16 +24,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic -/
 
-theorem bcond_bne_00' : bcond bop.BNE 0#64 0#64 = false := by decide
-
-theorem bcond_bne_sext_ne (w : BitVec 32) (h : w ≠ 0#32) : bcond bop.BNE (BitVec.signExtend 64 w) 0#64 = true := by
-  simp only [bcond, bne_iff_ne, ne_eq]
-  intro h'
-  apply h
-  bv_decide
-
-theorem bcond_bne_one : bcond bop.BNE (BitVec.signExtend 64 lkOne) 0#64 = true := by decide
-
 /-- `seqz` of a nonzero difference (in the executor's normal form). -/
 theorem sltiu_diff_ne (a b : BitVec 64) (h : a ≠ b) :
     (if (a + -b).ult 1#64 then 1#64 else 0#64) = 0#64 := by
@@ -168,7 +158,7 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
   · -- the word is 0: not held; return 0
     subst hw
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [bcond_bne_00']
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- li a0,0
     k_step (wp_s_addi cpu _ (KA.«holding» + 0x4#64) true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -184,7 +174,7 @@ theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors}
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
   · -- the word is nonzero: read the owner word, which is not ours
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [bcond_bne_sext_ne w hw]
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
     iintro Hk Hpc
     iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))) hsie hK
       (isLock γ (k.regs 10#5) s R) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝)) 0#64 ?hld ?hans)
@@ -245,7 +235,7 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
   · -- the word is 0: not held; return 0, handing Tc back
     subst hw
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [bcond_bne_00']
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- li a0,0
     k_step (wp_s_addi cpu _ (KA.«holding» + 0x4#64) true 0#12 10#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -261,7 +251,7 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, BitVec.reduceSignExtend, BitVec.add_zero]
   · -- the word is nonzero: read the owner word, which is not ours; Tc rides in Q
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [bcond_bne_sext_ne w hw]
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
     iintro Hk Hpc
     iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))) hsie hK
       (iprop(lockOpenable γ (k.regs 10#5) s R D ∗ Tc)) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝ ∗ Tc)) 0#64 ?hld ?hans)
@@ -319,7 +309,7 @@ theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} 
   iintro %w Hk Hpc %hw Hlc
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [bcond_bne_one]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
     iprop(isLock γ (k.regs 10#5) s R ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))
@@ -384,7 +374,7 @@ theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFuncto
   iintro %w Hk Hpc %hw Hlc Hcred
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [bcond_bne_one]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
     iprop(lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu ∗ Tc)
@@ -446,7 +436,7 @@ theorem holding_locked_refute_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
   iintro %w Hk Hpc %hw Hlc
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [bcond_bne_one]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
     iprop(lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))

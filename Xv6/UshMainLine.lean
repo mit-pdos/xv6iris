@@ -22,6 +22,8 @@ byte is not a blank.
    is `(BitVec.setWidth 32 w).toInt.toNat`.
 -/
 import Xv6.UshMainPure
+import Xv6.EchoOutPure
+import Xv6.PipesCut
 
 namespace Xv6
 
@@ -72,10 +74,6 @@ theorem ushUline_no_nul (lu : Uline) (j : Nat) (hok : ulineOk lu) (hj : j < (lin
   have hv := ushUline_body_val lu j hok hj
   rw [hc] at hv
   simp [ubyte0] at hv
-
-/-- **Rocq `ush_wl_body_pos`**: an admissible echo line's body is nonempty. -/
-theorem ushWl_body_pos (ws : List (List (BitVec 8))) (hok : lineOk ws) : 0 < (wlBody ws).length := by
-  have := lineOk_body_len ws hok; omega
 
 /-- A body's first byte is its first word's. -/
 theorem ushWlBody_head (w : List (BitVec 8)) (r : List (List (BitVec 8))) (hw : w ≠ []) (t : List (BitVec 8)) :
@@ -134,9 +132,6 @@ theorem ushNl_of_val (b : BitVec 8) (h : b.toNat = 10) : b = wlNl := BitVec.eq_o
 /-- **Rocq `ush_nl_ne_of_val`**. -/
 theorem ushNl_ne_of_val (b : BitVec 8) (h : b.toNat ≠ 10) : b ≠ wlNl := by
   rintro rfl; exact h rfl
-
-/-- **Rocq `ush_elem_of_rev_head`**. -/
-theorem ushElem_of_rev_head {A : Type} (x : A) (l : List A) : x ∈ (x :: l).reverse := by simp
 
 /-- **Rocq `ush_cycles_snoc_in`**: the cycle the last input byte is in ends
 with it. -/

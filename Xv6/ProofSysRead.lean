@@ -25,7 +25,7 @@ WHOLE block joined at fileread's grown descriptor.
 **Deviations from Rocq** (beyond SpecSysRead's):
 
 1. eb is GENERIC: one level-0 stretch (`k_step_e`), the contract's `true`
-   crossing made hart-free once at entry (`srd_pin`), each callee entered
+   crossing made hart-free once at entry (`Xv6.rd_pin`), each callee entered
    through a wrapper that carries the complement.
 2. STAGES (speed): `sys_read_main` is the prologue and argaddr;
    `srd_argint_call` (`+0x12`); `srd_argfd_call` (`+0x1c`, the dispatch);
@@ -96,7 +96,7 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x28  c.mv a5,a0 ; +0x2a  c.li a0,-1
   k_step_e (wp_s_add cpu _ (KA.«sys_read» + 0x28#64) true 15#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_add0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0x2a#64) true 4095#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
@@ -250,7 +250,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   unfold filereadPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href Hcore
     Henvo Harms
-  k_norm_g [srd_ret_40, srd_ww, srd_psw, srd_rsw]
+  k_norm_g [srd_ret_40, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
   have hr5 : srdRegs k R3 := by
     refine srdRegs_cs _ _ _ ?_ hcs3
@@ -294,7 +294,7 @@ theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases Hcells with ⟨Hra, Hs0, Hcf, Hlo, Hn, Hp, Hpad⟩
   -- +0x28  c.mv a5,a0 ; +0x2a  c.li a0,-1
   k_step_e (wp_s_add cpu _ (KA.«sys_read» + 0x28#64) true 15#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_add0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0x2a#64) true 4095#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
@@ -314,7 +314,7 @@ theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   iintro Hk Hpc Hp
   k_step_e (wp_s_ld cpu _ (KA.«sys_read» + 0x38#64) false 4072#12 10#5 8#5 (by decide) (by decide)
       (DFrac.own 1) fv)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, srd_f_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, Xv6.sfs_f_addr]
   iintro Hk Hpc Hcf
   ihave Hcells : srdCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) fv lo
       (BitVec.extractLsb' 0 32 v2) v1 $$ [Hra Hs0 Hcf Hlo Hn Hp Hpad]
@@ -368,13 +368,13 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (
   icases Hcells with ⟨Hra, Hs0, Hcf, Hlo, Hn, Hp, Hpad⟩
   -- +0x1c  addi a2,s0,-24 ; +0x20  c.li a1,0 ; +0x22  c.li a0,0 ; +0x24  jal argfd
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0x1c#64) false 4072#12 12#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, srd_f_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, Xv6.sfs_f_addr]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0x20#64) true 0#12 11#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0x22#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«sys_read» + 0x24#64) false 2096530#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_br_argfd]
@@ -384,10 +384,10 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (
       ?ht ?hn ?hKf)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [srd_ret_28, sysfile_li0, srd_f_addr, hr.2.1]
+  k_norm_g [srd_ret_28, Xv6.co_li_zero, Xv6.sfs_f_addr, hr.2.1]
   iframe
-  case ha0' => k_norm_g [sysfile_li0]
-  case hpf => k_norm_g [srd_f_addr, hr.2.1]; exact srd_f_nonnull (k.regs 2#5) hsp
+  case ha0' => k_norm_g [Xv6.co_li_zero]
+  case hpf => k_norm_g [Xv6.sfs_f_addr, hr.2.1]; exact srd_f_nonnull (k.regs 2#5) hsp
   case hpr => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
   case hn => k_norm_g; omega
@@ -399,7 +399,7 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (
   · iexact Hpfd
   -- ===== back from argfd =====
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
-  k_norm_g [srd_ret_28, srd_ww, srd_psw, srd_rsw]
+  k_norm_g [srd_ret_28, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr2 : srdRegs k R2 := by
     refine srdRegs_cs _ _ _ ?_ hcs2
     repeat (refine srdRegs_set _ _ _ _ ?_ (by decide))
@@ -485,7 +485,7 @@ theorem srd_argint_call (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNa
     unfold argintSlots argrawSlots; omega
   -- ===== back from argint =====
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hn
-  k_norm_g [srd_ret_1c, srd_n_addr, srd_ww, srd_psw, srd_rsw]
+  k_norm_g [srd_ret_1c, srd_n_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : srdRegs k R1 := by
     refine srdRegs_cs _ _ _ ?_ hcs1
     repeat (refine srdRegs_set _ _ _ _ ?_ (by decide))
@@ -529,7 +529,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ : (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c) $$ [Hnext]
   · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (srd_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   simp only [sysReadAddr]
   -- +0x00 .. +0x06  the prologue
@@ -551,7 +551,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_p_addr]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_read» + 0xc#64) true 1#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_li1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«sys_read» + 0xe#64) false 2087568#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [srd_br_argaddr]
@@ -565,7 +565,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
   rotate_right 1
   k_norm_g [srd_ret_12, srd_p_addr]
   iframe
-  case ha0 => k_norm_g [srd_li1]
+  case ha0 => k_norm_g [Xv6.ci_li_one]
   case hna => k_norm_g; omega
   case hKa =>
     k_norm_g
@@ -573,7 +573,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
     unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
-  k_norm_g [srd_ret_12, srd_p_addr, srd_ww, srd_psw, srd_rsw]
+  k_norm_g [srd_ret_12, srd_p_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : srdRegs k R1 := by
     refine srdRegs_cs _ _ _ ?_ hcs1
     repeat (refine srdRegs_set _ _ _ _ ?_ (by decide))

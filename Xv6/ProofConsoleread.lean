@@ -306,11 +306,6 @@ theorem cr_addr_succ' (a : BitVec 64) (m : Nat) :
     a + BitVec.ofNat 64 m + BitVec.signExtend 64 1#12 = a + BitVec.ofNat 64 (m + 1) := by
   rw [pw_sext1]; exact cr_addr_succ a m
 
-/-- `sw a3,152(a4)`: `cons.r` bumped. -/
-theorem cr_incr32 (r : BitVec 32) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 r + 1#64))) = r + 1#32 := by
-  bv_decide
 
 /-- `sw a5,392(a4)` on the `^D` arm: `cons.r` put back. -/
 theorem cr_keep32 (r : BitVec 32) :
@@ -321,10 +316,6 @@ end
 
 /-! ## Context bookkeeping -/
 
-theorem cr_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem cr_withSpie_pushOffAt (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
 theorem cr_filter_cons : (["cons"].filter (fun x => x ≠ "cons")) = ([] : List String) := by decide
 theorem cr_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
   cases k0; simp only [KCtx.withLocks]; simp only at h; rw [h]
@@ -952,7 +943,6 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
 end
 
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -1162,7 +1152,6 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
 end
 
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
@@ -1235,7 +1224,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15]
   iintro Hk Hpc
   k_step (wp_s_sw c _ (KA.«consoleread» + 0x82#64) false 152#12 14#5 13#5 (by decide) r)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_rA, cr_incr32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_rA, Xv6.pw_incr']
   iintro Hk Hpc Hr
   -- andi a3,a5,127 ; add a4,a4,a3 ; lbu a4,24(a4)
   k_step (wp_s_andi c _ (KA.«consoleread» + 0x86#64) false 127#12 13#5 15#5 (by decide))
@@ -1525,7 +1514,6 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
   all_goals first | rfl | exact cr_addr_succ'' _ _ | (congr 1; omega)
 
 end
-
 
 
 section
@@ -1876,7 +1864,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   iintro Hk Hpc
   iapply (cr_acquire AC cpu _ γc cn ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [cr_ret_68, cr_withSpie_withSpie]
+  k_norm_g [cr_ret_68, MachCSL.KCtx.withSpie_twice]
   iframe #
   case ha0a => k_norm_g
   case hna => k_norm_g; rw [hb.noff]; decide
@@ -1888,7 +1876,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   ihave Harm := (show sieArm (GF := GF) cpu kb.sie kb.proc ⊢ sieArm cpu kb.sie k.proc by
     rw [hb.proc]) $$ Harm
   icases armExt_join cpu kb.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-  k_norm_g [cr_withSpie_withSpie, KCtx.pushOffAt_withRegs, cr_withSpie_pushOffAt,
+  k_norm_g [MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs, MachCSL.KCtx.withSpie_pushOffAt,
     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
   have hfix8 : crFix k N R8 := crFix_cs k N _ R8
     (by unfold crFix at hfix7 ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix7)

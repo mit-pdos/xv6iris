@@ -193,7 +193,7 @@ theorem ptRep_none_of_walk {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L)
 /-- An incomplete path in a well-formed tree is a blocked walk. -/
 theorem walk_none_of_not_complete : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
     t.wfU lvl → ¬ t.complete lvl vpn → t.walk lvl vpn = none
-  | 0, t, vpn, _, hc => absurd (PtRun.complete_zero t vpn) hc
+  | 0, t, vpn, _, hc => absurd (MachCSL.PTree.complete_zero t vpn) hc
   | lvl+1, t, vpn, hwf, hc => by
     have hi := hwf (vpnIdx vpn (lvl+1))
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
@@ -233,17 +233,17 @@ theorem ptRep_fill {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec 27)
     (hfr : ∀ b ∈ fr, pageValid (pageAddr b) ∧ b ∉ t.pages 2) :
     ptRep (t.fill 2 vpn fr).1 L := by
   obtain ⟨hwf, hndt, hpg, hsome, hnone⟩ := h
-  refine ⟨PtRun.wfU_fill 2 t vpn fr hwf,
-    PtRun.pagesNodup_fill 2 t vpn fr hndt hnd (fun b hb => (hfr b hb).2), ?_, ?_, ?_⟩
+  refine ⟨MachCSL.PTree.wfU_fill 2 t vpn fr hwf,
+    MachCSL.PTree.pagesNodup_fill 2 t vpn fr hndt hnd (fun b hb => (hfr b hb).2), ?_, ?_, ?_⟩
   · intro b hb
     rcases (PtRun.mem_pages_fill 2 t vpn fr b).mp hb with hb' | hb'
     · exact hpg b hb'
     · exact (hfr b (List.mem_of_mem_take hb')).1
   · intro vpn' w hw
     obtain ⟨addr, v, hwalk, had⟩ := hsome vpn' w hw
-    exact ⟨addr, v, by rw [PtRun.walk_fill 2 t vpn fr hwf vpn']; exact hwalk, had⟩
+    exact ⟨addr, v, by rw [MachCSL.PTree.walk_fill 2 t vpn fr hwf vpn']; exact hwalk, had⟩
   · intro vpn' hw
-    rw [PtRun.walk_fill 2 t vpn fr hwf vpn']
+    rw [MachCSL.PTree.walk_fill 2 t vpn fr hwf vpn']
     exact hnone vpn' hw
 
 /-- **Writing a leaf on a complete path adds exactly that key.** -/

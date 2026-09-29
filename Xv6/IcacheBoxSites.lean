@@ -15,7 +15,7 @@ iget's recycle -- (a) `icRecycleWithdraw` [`boxWithdrawL1` at `c = 0`, `mD
 inside the residue fupd], (b″) `icRecycleDeposit` [`boxDepositL1Hook`, the
 header rebuilt inside the deposit]; iget's / idup's hit -- (c) `icHitIncr`
 [`boxRefIncr`]; iput's `ref--` -- (d) `icDecr` [`boxRefDecr`]; ilock's
-checkout -- (e′) `icCheckout` / `icCheckoutRd` [`boxCheckoutSplit`];
+checkout -- (e′) `icCheckout` / `icCheckoutRd` [`MachCSL.boxCheckoutHook`];
 iunlock's park -- (f′) `icParkHold` / `icPark` [`boxParkJoin`]; iput's guard
 (a) `icGuardWithdraw` [`boxWithdrawL1` at `c = 1`], the free path's hooked
 (a) `icEvictWithdrawFrz` [`boxWithdrawL1Hook`], its mid-free park
@@ -117,7 +117,7 @@ Everything of `Xv6/IcacheBox.lean`; `ipoolTakeLend`
 `icBoxRaw_allocAt` (Xv6/IcacheRefDefs.lean); `ifreeze_excl`
 (Xv6/IcacheRefLink.lean); `icacheN`, `itableInv` (Xv6/IcacheInvRef.lean);
 `MachCSL.boxWithdrawL1(Hook)`, `boxDepositL1Hook` / `Shape`, `boxRefIncr`,
-`boxRefDecr`, `boxCheckoutSplit`, `boxParkJoin`, `boxL1ToL2`, `boxQ1Update`,
+`boxRefDecr`, `MachCSL.boxCheckoutHook`, `boxParkJoin`, `boxL1ToL2`, `boxQ1Update`,
 `boxAllocAt`, `stampsFrag_empty`, `qsum_*`, `maxStamp_empty`,
 `unitMass_zero`.
 -/
@@ -467,7 +467,7 @@ theorem icCheckout [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (
     iapply icQ2_intro cn γfs γi cov logstart k d dev inum hid $$ Hd Hs Hq
   unfold icEscrow icRegp
   iintro #Hbox Hrun #Hflt #Hflp Hbody ⟨%m, %hm, %hmt, Href⟩ Hd Hs Hrp
-  imod boxCheckoutSplit (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
       (some (dev, inum)) (icHdrHeld cn γfs γi cov logstart k false)
       iprop(icDeposit cn k d ∗ icQSide γfs γi cov logstart k d) m s0 Kt Kp E
       (nclose_subseteq' k hE) hs0 hmt hKp hsplit
@@ -556,7 +556,7 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
   unfold icEscrow icRegp
   simp only [icBody]
   iintro #Hbox Hrun #Hflt #Hflp #Hinv #Hshot ⟨Hident, Hlv⟩ ⟨%m, %hm, %hmt, Href⟩ Hd Hrp
-  imod boxCheckoutSplit (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
       (some (dev, inum)) (icHdrHeldRdSl cn γfs γi cov logstart k s g lo)
       iprop(icDeposit cn k (.depRd s dev inum g lo) ∗ liveGenlo k s g lo ∗
         itableInv (hlc := hlc) ∗ ityShot g ty) m s0 Kt Kp E

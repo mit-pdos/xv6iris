@@ -15,7 +15,7 @@ section parameter (here the explicit `heq : fileAppIs g.fgnCl r`).
 `fsm_panic`, `fsm_fnoc`, `ush_line_len`, the local notation `T` (spelled
 `fileTaint g.fgnCl`), `redir_K` (`UshFileRedir.redirK`), `redir_Kf`
 (`UshFileRedir.redirKf`), `redir_K_inum` (`UshFileRedir.redirK_inum`),
-`sh_open_stub_pc`, `ucallee_saved_a0a7`, `Hopen_hand`
+`Xv6.shOpen_pc`, `ucallee_saved_a0a7`, `Hopen_hand`
 (`UshFileRedir.hopen_hand`), `redir_K'` (`UshFileRedir.redirK'`).
 
 ## Dropped
@@ -60,6 +60,7 @@ import Xv6.UshMainStubs
 import Xv6.FileHooks
 import Xv6.UkEchoDefs
 import Xv6.FileOutEra
+import Xv6.UshConsK
 
 namespace Xv6
 
@@ -100,10 +101,6 @@ theorem ush_line_len (ws : List (List (BitVec 8))) (h : lineOk ws) :
         omega
   unfold lineMax at hl
   omega
-
-/-- **Rocq `sh_open_stub_pc`**: sh's open stub, where its symbol table pins
-it. -/
-theorem sh_open_stub_pc : User.Sh.Sym.«open» = 0xcc6 := rfl
 
 /-- **Rocq `ucallee_saved_a0a7`** (deviation 5): the stub's two writes keep
 the callee-saved file. -/

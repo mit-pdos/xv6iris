@@ -383,7 +383,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   iintro Hk Hpc
   ihave Hmetai := Hmtw $$ Htyc
   -- +0x146  lhu a5,74(s1) ; +0x14a  c.addiw a5,-1 ; +0x14c  sh a5,74(s1)
-  icases sys_unlink_meta_nlink (ientry kd) dnW $$ Hmeta with ⟨Hnl, Hmw⟩
+  icases Xv6.sys_link_meta_nlink (ientry kd) dnW $$ Hmeta with ⟨Hnl, Hmw⟩
   k_step_e (wp_s_lhu cpu _ (KA.«sys_unlink» + 0x146#64) false 74#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) dnW.diNlink)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1, iNlink]
@@ -440,7 +440,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [hpins.2.2.1]
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
-  k_norm_g [sys_unlink_ret_156, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_156, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 15#5 _ (sysUnlinkPins_set k _ _ _ _ 15#5 _

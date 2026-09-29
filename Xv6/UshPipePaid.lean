@@ -13,12 +13,12 @@ contributes.  S2 is the "pipe" message's byte facts.
 ## Deviations from Rocq
 
 1. sh-main's vocabulary (`UshDiagDefs` deviations 1-6): `shd_lit` is
-   `ushLit`, `shd_fmt_ok` is `ushLitOk` (so `ushq_pipe_msg_fmt` /
-   `ushq_fork_msg_fmt` are sh-main's `ushLitOk_12d8` / `ushLitOk_12a8`,
+   `ushLit`, `shd_fmt_ok` is `ushLitOk` (so `Xv6.ushLitOk_12d8` /
+   `Xv6.ushLitOk_12a8` are sh-main's `ushLitOk_12d8` / `ushLitOk_12a8`,
    restated as aliases), `shd_msg_str` is `ushLit_str`,
    `wp_kshd_panic_chain` is `SH_PANIC.wp_shPanicChain`; `shk_code` and
    `shk_rodata` are one `ushCode` (DU3).
-2. `ushq_pid_sext_ne_m1` is `UshForkDefs.ushf_pid_sext_ne_m1` (the same
+2. `Xv6.ushf_pid_sext_ne_m1` is `UshForkDefs.ushf_pid_sext_ne_m1` (the same
    statement; Rocq restated it only because of its import cone).
 3. `uint a0 = msg` is `(m.get 10#5).toNat = msg`; `l !!! p` is `l[p]!`;
    `PipeDisc.dg_pipe` is `dgPipe`.
@@ -37,18 +37,10 @@ open Std (ExtTreeSet)
 
 set_option linter.unusedSectionVars false
 
-/-- **Rocq `ushq_pid_sext_ne_m1`** (deviation 2). -/
-theorem ushq_pid_sext_ne_m1 (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX) :
-    BitVec.signExtend 64 pidv ≠ -1#64 :=
-  ushf_pid_sext_ne_m1 pidv h
-
 /-! ## S2 The two messages' bytes -/
 
 /-- **Rocq `ushq_pipe_msg_len`**. -/
 theorem ushq_pipe_msg_len : (wlLine dgPipe).length = 5 := by decide
-
-/-- **Rocq `ushq_pipe_msg_fmt`** (deviation 1). -/
-theorem ushq_pipe_msg_fmt : ushLitOk 0x12d8 4 = true := ushLitOk_12d8
 
 /-- **Rocq `ushq_pipe_msg_byte`**: "pipe" at 0x12d8 is the message's first
 four bytes. -/
@@ -57,9 +49,6 @@ theorem ushq_pipe_msg_byte (p : Nat) (hp : p < 4) : ushLit 0x12d8 p = (wlLine dg
 
 /-- **Rocq `ushq_pipe_msg_nl`**: the '\n' of panic's format. -/
 theorem ushq_pipe_msg_nl : ushLit 0x12a0 2 = (wlLine dgPipe)[4]! := by decide
-
-/-- **Rocq `ushq_fork_msg_fmt`** (deviation 1). -/
-theorem ushq_fork_msg_fmt : ushLitOk 0x12a8 4 = true := ushLitOk_12a8
 
 section UshPipePaid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]

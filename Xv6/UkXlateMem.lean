@@ -29,13 +29,13 @@ variable {P : UPtd} {t : PTree} {mm T : BMap}
 /-- **The walker's view of the table** from the engine's maps. -/
 theorem ukm_treeMem (h : UkMem P t mm T) : uwkTreeMem mm t := by
   intro a v he
-  obtain ⟨b, hb, i, hi⟩ := ub_entries_page 2 t (a, v) he
+  obtain ⟨b, hb, i, hi⟩ := Xv6.entries_page 2 t (a, v) he
   have hrd : bmRead mm a 8 = some v :=
     ubWordBytes_read mm a v (fun p hp => h.tree p (List.mem_flatMap.2 ⟨(a, v), he, hp⟩))
   refine ⟨?_, hrd⟩
   have hi' : a = pteAddr b i := hi
   rw [hi']
-  exact uft_pteAddrOk b (h.rep.2.2.1 b hb) i
+  exact Xv6.uptPteAddrOk b (h.rep.2.2.1 b hb) i
 
 /-- The window of an entry of the tree lies in the tree's addresses. -/
 theorem ukm_entry_win {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) (x : PAddr) (hx : x ∈ ubWin a 8) :
@@ -124,8 +124,8 @@ theorem ukm_setLeaf (h : UkMem P t mm T) (vpn : BitVec 27) (addr w v : BitVec 64
       · exact h.tree _ hp'
       intro hin
       obtain ⟨j₂, hj₂, hjj⟩ := (ubWin_mem _ _ _).1 hin
-      obtain ⟨b, -, i, hbi⟩ := ub_entries_page 2 t e hold
-      obtain ⟨b', -, i', hbi'⟩ := ub_entries_page 2 t (addr, w) hwe
+      obtain ⟨b, -, i, hbi⟩ := Xv6.entries_page 2 t e hold
+      obtain ⟨b', -, i', hbi'⟩ := Xv6.entries_page 2 t (addr, w) hwe
       simp only at hbi'
       rw [hbi, hbi'] at hjj
       exact h1 (by rw [hbi, hbi']; exact ub_pteAddr_win b b' i i' j j₂ hj' hj₂ hjj)

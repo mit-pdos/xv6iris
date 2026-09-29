@@ -22,7 +22,7 @@ two PT_LOADs, the break, the entry pc) are the `UShGeom` chain at
 (`line_nonul(_x)`, `uint_avi_moi`: `Xv6/UshEchoArgs.lean`.)
 
 Re-exports, landed in UshGeom (cited, not redefined): `ubyte0_bv0`,
-`ubyte0_moi0`, `kxc_span_le_line` (`kxcSpan_le_line`), `uk_slen_nul`
+`Xv6.ubyte0_bv0`, `kxc_span_le_line` (`kxcSpan_le_line`), `uk_slen_nul`
 (`ukSlen_nul`), `kexec_vec_bytes` (`kexecVecBytes`), `uk_argv_p_of_bytes`
 (`ukArgvP_of_bytes`).
 

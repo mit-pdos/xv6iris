@@ -87,18 +87,11 @@ theorem sum_list_with_lookup_total (cs : List (List (BitVec 8))) (l : List Nat) 
       = ((l.map (fun j => cs[j]!)).map (fun c => c.length)).sum := by
   rw [List.map_map]; rfl
 
-/-- `range`'s total lookups are the list itself. -/
-theorem sum_seq_lookup_map (cs : List (List (BitVec 8))) :
-    (List.range cs.length).map (fun j => cs[j]!) = cs := by
-  apply List.ext_getElem (by simp)
-  intro i h1 h2
-  simp [List.getElem_range, h2]
-
 /-- Rocq `sum_seq_lookup_total`. -/
 theorem sum_seq_lookup_total (cs : List (List (BitVec 8))) :
     ((List.range cs.length).map (fun j => (cs[j]!).length)).sum
       = (cs.map (fun c => c.length)).sum := by
-  rw [sum_list_with_lookup_total, sum_seq_lookup_map]
+  rw [sum_list_with_lookup_total, Xv6.fmap_lookup_total_seq]
 
 /-- Rocq `subseq_length_le`. -/
 theorem subseq_length_le (cs : List (List (BitVec 8))) (sel : List Nat) (h : selOk cs sel) :

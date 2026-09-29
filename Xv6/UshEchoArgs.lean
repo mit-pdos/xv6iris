@@ -41,6 +41,7 @@ forms), `uargv_exec_of_cmd`, `echo_uargv_exec_of_cmd(_x)`.
 import Xv6.UshEchoImg
 import Xv6.ExecArgs
 import Xv6.UshMainLine
+import Xv6.BootCarve
 
 namespace Xv6
 
@@ -55,12 +56,6 @@ theorem lineNonul_x (ws : List (List (BitVec 8))) (j : Nat) (hok : execOk ws) (h
 theorem lineNonul (ws : List (List (BitVec 8))) (j : Nat) (hok : lineOk ws) (hj : j < (wlLine ws).length) :
     (wlLine ws)[j]! ≠ ubyte0 :=
   lineNonul_x ws j (lineOk_execOk hok) hj
-
-/-- **Rocq `uint_avi_moi`** (deviation 2): the machine's address sum is the
-number sum when it does not wrap. -/
-theorem uintAviMoi (a d : Nat) (h : a + d < 2 ^ 64) :
-    (BitVec.ofNat 64 a + BitVec.ofNat 64 d).toNat = a + d :=
-  ua_ofNat_add a d h
 
 /-! ## §2 The node is a general argument vector -/
 

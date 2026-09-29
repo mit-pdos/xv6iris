@@ -75,6 +75,8 @@ SpecSys*.v, ProofSys*.v), ProofCreateShared.v excluded.
 -/
 import Xv6.CreateFreshTy
 import Xv6.SpecNamecmp
+import Xv6.NamexParts
+import Xv6.SysUnlinkShared
 
 namespace Xv6
 
@@ -531,17 +533,6 @@ theorem create_walk_need (L n : Nat) (h : createUnits ≤ n) : walkNeed L ≤ n 
   unfold walkNeed iputUnits
   cases L <;> simp <;> omega
 
-/-- THE NAME TIE (Rocq's `cr_last_of_npar`): nameiparent's name clause
-`nameiparentOf pl es e` is `pathElems pl = es ++ [e]`, and the arms speak of
-the path's LAST element. -/
-theorem create_last_of_npar (pl : List (BitVec 8)) (nf : Nat → BitVec 8)
-    (h : ∃ es e, nameiparentOf pl es e ∧ bname 14 nf = e) :
-    (pathElems pl).getLast? = some (bname 14 nf) := by
-  obtain ⟨es, e, hnp, hb⟩ := h
-  unfold nameiparentOf at hnp
-  rw [hnp, hb]
-  simp
-
 /-- nameiparent's success arm leaves nine (Rocq's `cr_n1_lo`). -/
 theorem create_n1_lo (u n1 : Nat) (w : Bool) (hu : createUnits ≤ u)
     (hn : u - (walkSpend w + 0) ≤ n1) : 9 ≤ n1 := by
@@ -559,10 +550,6 @@ theorem create_after_ip (n n' : Nat) (w : Bool) (hn : 9 ≤ n)
     (hn' : n - ipSpendW w false false ≤ n') : iputUnits ≤ n' ∧ 7 ≤ n' := by
   unfold ipSpendW ipBm iputUnits at *
   cases w <;> simp at hn' <;> omega
-
-/-- the op-wide set's growth, composed (Rocq's `cr_sub2`) -/
-theorem create_sub2 (A B C : List Nat) (h1 : ∀ x ∈ A, x ∈ B) (h2 : ∀ x ∈ B, x ∈ C) :
-    ∀ x ∈ A, x ∈ C := fun x hx => h2 x (h1 x hx)
 
 /-- Rocq's `cr_sub3`. -/
 theorem create_sub3 (A B C D : List Nat) (h1 : ∀ x ∈ A, x ∈ B) (h2 : ∀ x ∈ B, x ∈ C)
@@ -606,11 +593,6 @@ theorem create_ns_1 (ns : Nat) (h : createIrefSlots ≤ ns) : 1 + (ns - 2) = ns 
 /-- Rocq's `cr_ns_2`. -/
 theorem create_ns_2 (ns : Nat) (h : createIrefSlots ≤ ns) : 1 + (ns - 3) = ns - 2 := by
   unfold createIrefSlots at h; omega
-
-/-- the mkdir arm's slot ledger: three `dirlink`s, each net zero (Rocq's
-`cr_ns_3`, the same figure as `cr_ns_2`). -/
-theorem create_ns_3 (ns : Nat) (h : createIrefSlots ≤ ns) : 1 + (ns - 3) = ns - 2 :=
-  create_ns_2 ns h
 
 /-! ## §1c  The allocate half's pure cluster -/
 
@@ -798,8 +780,6 @@ theorem create_nlink_incr (h : BitVec 16) :
       (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 h + BitVec.signExtend 64 1#12))) = h + 1#16 := by
   bv_decide
 
-/-- THE DIRECTORY-VIEW READINGS (Rocq's `cr_nrec_0` / `cr_nrec_16`). -/
-theorem create_nrec_0 : dirNrec 0 = 0 := rfl
 theorem create_nrec_16 : dirNrec 16 = 1 := rfl
 
 /-- the empty child's first link lands at slot 0 (Rocq's `cr_slot_0`) -/

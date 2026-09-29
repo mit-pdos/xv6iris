@@ -48,11 +48,12 @@ Rocq's header, kept (the reasons are the content):
    (`sys_open_arm_notr` / `_file_tr`, `sys_open_flat_*`), as Rocq's Stores
    imports `ProofSysOpenShared`.
 
-Imports `SysOpenParts`, the parts layer `SysOpenShared` and `SysfileCalls` (`sysfile_ww` / `_psw`).
+Imports `SysOpenParts`, the parts layer `SysOpenShared` and `SysfileCalls` (`MachCSL.KCtx.withSpie_twice` / `_psw`).
 -/
 import Xv6.SysOpenShared
 import MachCSL.WpSmodeSltu
 import MachCSL.WpSmodeLh
+import Xv6.SysOpenWalkCalls
 
 namespace Xv6
 
@@ -72,12 +73,8 @@ theorem sys_open_stores_ret_154 :
     jumpPc (KA.«sys_open» + 0x154#64) = KA.«sys_open» + 0x154#64 := by decide
 
 theorem sys_open_stores_fip (k : Nat) : fnode k + BitVec.signExtend 64 24#12 = aFip k := rfl
-theorem sys_open_stores_fip' (k : Nat) : fnode k + 24#64 = aFip k := rfl
 theorem sys_open_stores_frd (k : Nat) : fnode k + BitVec.signExtend 64 8#12 = aFreadable k := rfl
-theorem sys_open_stores_frd' (k : Nat) : fnode k + 8#64 = aFreadable k := rfl
 theorem sys_open_stores_fwr (k : Nat) : fnode k + BitVec.signExtend 64 9#12 = aFwritable k := rfl
-theorem sys_open_stores_fwr' (k : Nat) : fnode k + 9#64 = aFwritable k := rfl
-theorem sys_open_stores_omode (x : BitVec 64) : x + 0xFFFFFFFFFFFFFF4C#64 = sysOpenOmode x := rfl
 
 /-- The content after the three field stores (deviation 3). -/
 def sysOpenStoredC (C0 : FContent) (kk : Nat) (om : BitVec 32) : FContent :=
@@ -104,7 +101,7 @@ theorem sys_open_stores_trbr (vom : BitVec 64) :
       (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 vom) &&& 1024#64) := by
     unfold soAnd soOmv; rfl
   rw [e] at h
-  rw [sys_open_beqz]
+  rw [Xv6.dirlookup_beqz]
   cases ht : omTrunc vom
   · simp [h.2 ht]
   · have hne : ¬ (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 vom) &&& 1024#64) = 0#64 := by
@@ -213,13 +210,6 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     %dn %bm %kf %fd %l %(sysOpenStoredC C0 kk (sysOpenOm A)) %pn %γo %P2 %u %nsj %t %hA %hB
     %⟨rfl, hty0, rfl, rfl⟩ %⟨hdir, hdvw⟩ %hty2 %hE %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk
     Hload Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Harm Hpost
-
-/-- the file system out of the persistent environment -/
-theorem sys_open_stores_ready (Γ : SchedNames) (A : SysOpenArgs GF) :
-    sysOpenEnv (hlc := hlc) Γ A ⊢ fsReady (hlc := hlc) := by
-  unfold sysOpenEnv
-  iintro ⟨-, -, #Hrdy, -⟩
-  iexact Hrdy
 
 set_option maxHeartbeats 8000000 in
 /-- `itrunc(ip)` at +0x150 (Rocq `Itrunc.wp_itrunc_gen` at the walk's set,
@@ -380,7 +370,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
   case ta => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hblk Hat Hbs
     ⟨%u', Hop⟩
-  k_norm_g [sys_open_stores_ret_154, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_stores_ret_154, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   ihave Hcore := Hcback $$ Hpid
@@ -401,7 +391,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
   -- this fires the caller's own step
   ihave Htc := (openTruncAt_true (hlc := hlc) (fsGammaL fscFs) A.vom inum.toNat
     (creFtKept (truncTermAt pl A.P) inum.toNat A.Ft) htr).1 $$ Htc
-  ihave #Hrdy := sys_open_stores_ready Γ A $$ Henv
+  ihave #Hrdy := Xv6.sys_open_walk_rdy Γ A $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hftop := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Happ := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
@@ -461,13 +451,13 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   simp only [wordAtN_cur]
   k_step_e (wp_s_sd cpu _ (KA.«sys_open» + 0x88#64) false 24#12 18#5 9#5 (by decide) C0.ip)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hpins.2.2.2.1, hpins.2.2.1, sys_open_stores_fip, sys_open_stores_fip']
+    with [hpins.2.2.2.1, hpins.2.2.1, sys_open_stores_fip, Xv6.aFip_eq']
   iintro Hk Hpc Hfip
   -- ===== +0x8c lw a5,-180(s0) =====
   icases sysOpenCells_om _ _ _ _ _ _ _ _ _ _ $$ Hcells with ⟨Hom, Hcback⟩
   k_step_e (wp_s_lw cpu _ (KA.«sys_open» + 0x8c#64) false 3916#12 15#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (sysOpenOm A))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.1, sys_open_stores_omode]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.1, Xv6.sys_open_walk_omode_fold]
   iintro Hk Hpc Hom
   ihave Hcells := Hcback $$ %(sysOpenOm A) Hom
   -- ===== +0x90 andi a4,a5,1 ; +0x94 xori a4,a4,1 ; +0x98 sb a4,8(s2) =====
@@ -479,7 +469,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro Hk Hpc
   k_step_e (wp_s_sb cpu _ (KA.«sys_open» + 0x98#64) false 8#12 18#5 14#5 (by decide) C0.readable)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hpins.2.2.2.1, sys_open_stores_frd, sys_open_stores_frd']
+    with [hpins.2.2.2.1, sys_open_stores_frd, Xv6.aFreadable_eq']
   iintro Hk Hpc Hfrd
   -- ===== +0x9c andi a4,a5,3 ; +0xa0 snez a4,a4 ; +0xa4 sb a4,9(s2) =====
   k_step_e (wp_s_andi cpu _ (KA.«sys_open» + 0x9c#64) false 3#12 14#5 15#5 (by decide))
@@ -490,7 +480,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro Hk Hpc
   k_step_e (wp_s_sb cpu _ (KA.«sys_open» + 0xa4#64) false 9#12 18#5 14#5 (by decide) C0.writable)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hpins.2.2.2.1, sys_open_stores_fwr, sys_open_stores_fwr']
+    with [hpins.2.2.2.1, sys_open_stores_fwr, Xv6.aFwritable_eq']
   iintro Hk Hpc Hfwr
   -- ===== +0xa8 andi a5,a5,1024 =====
   k_step_e (wp_s_andi cpu _ (KA.«sys_open» + 0xa8#64) false 1024#12 15#5 15#5 (by decide))

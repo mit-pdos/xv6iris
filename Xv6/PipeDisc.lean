@@ -78,13 +78,6 @@ theorem pd_wlLine_shape (ws : List (List (BitVec 8))) (hwf : wlWf ws) :
   simp only [nodollar]
   omega
 
-/-- Rocq `pd_wl_line_shape'`. -/
-theorem pd_wlLine_shape' (ws : List (List (BitVec 8))) (hwf : wlWf ws) :
-    (∀ b ∈ wlLine ws, nodollar b) ∧
-      (wlNl ∉ wlLine ws ∨ ∃ v, wlNl ∉ v ∧ wlLine ws = v ++ [wlNl]) :=
-  let h := pd_wlLine_shape ws hwf
-  ⟨h.1, Or.inr h.2⟩
-
 /-- Rocq `dg_execL_nodollar`. -/
 theorem dgExecL_nodollar : ∀ b ∈ dgExecL, nodollar b := by
   simp only [nodollar]; decide

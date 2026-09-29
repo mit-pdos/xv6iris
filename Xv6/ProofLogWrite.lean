@@ -83,6 +83,9 @@ import Xv6.LogLedger
 import Xv6.BcacheLock
 import Xv6.CodeTactics
 import Xv6.SpecBpin
+import Xv6.FsWords
+import Xv6.InitlogHead
+import Xv6.PrintkDefs
 
 namespace Xv6
 
@@ -117,9 +120,6 @@ theorem lw_blk0 : KA.«log_write» + 0x1e70a#64 = lhBlock 0 := by unfold lhBlock
 theorem lw_lhn_addr : logAddr + 44#64 = lhNAddr := rfl
 theorem lw_out_addr : logAddr + 28#64 = lOut := rfl
 
-theorem lw_succ64 (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m + 1) := by
-  show _ + BitVec.ofNat 64 1 = _
-  rw [← ofNat64_add]
 
 /-- **The scan's index, as the machine holds it**: a 64-bit word the
 normaliser does not take apart (`BitVec.ofNat_add` would split every
@@ -152,33 +152,21 @@ theorem lw_blk_addr (i : Nat) :
   congr 1
   omega
 
-/-- `addi a4,a4,4`: the scan's cursor. -/
-theorem lw_cursor (i : Nat) : lhBlock i + 4#64 = lhBlock (i + 1) := by
-  unfold lhBlock
-  rw [BitVec.add_assoc]
-  congr 1
-  show _ + BitVec.ofNat 64 4 = _
-  rw [← ofNat64_add]
-  congr 1 <;> omega
 
 /-- `lw` of a small counter cell (`log.lh.n`, `log.outstanding`). -/
 theorem lw_lwn (m : Nat) (h : m < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 m) = lwIx m := bo_sext32 m h
+    BitVec.signExtend 64 (BitVec.ofNat 32 m) = lwIx m := MachCSL.signExtend_ofNat32 m h
 
 /-- `c.addiw a5,a5,1` on the scan index. -/
 theorem lw_addiw (i : Nat) (h : i + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (lwIx i + 1#64)) = lwIx (i + 1) :=
-  bo_addiw1 i h
+  Xv6.addiw_succ i h
 
 theorem lw_addiw' (i : Nat) (h : i + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (lwIx i + BitVec.signExtend 64 1#12)) =
       lwIx (i + 1) :=
-  bo_addiw1' i h
+  Xv6.ba_addiw1 i h
 
-/-- The low half of a sign-extended word is the word (`sw` of a value just
-`lw`-ed). -/
-theorem lw_ext_sext (x : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x) = x := by
-  bv_decide
 
 /-- `beq a3,a1` on two sign-extended block numbers. -/
 theorem lw_beq_sext (x y : BitVec 32) :
@@ -189,7 +177,7 @@ theorem lw_beq_sext (x y : BitVec 32) :
   · rw [decide_eq_false h]
     refine beq_eq_false_iff_ne.2 (fun hc => h ?_)
     have hx := congrArg (BitVec.extractLsb' 0 32) hc
-    rwa [lw_ext_sext, lw_ext_sext] at hx
+    rwa [Xv6.fw_ext32, Xv6.fw_ext32] at hx
 
 /-- `beq a2,a5` / `bne a2,a5` on the count against the index. -/
 theorem lw_beq_nat (a b : Nat) (ha : a ≤ LOGBLOCKS) (hb : b ≤ LOGBLOCKS) :
@@ -537,13 +525,6 @@ theorem lw_bp (BP : BPIN) (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames
   exact h
 
 
-
-
-
-
-
-
-
 /-- `Xv6.bufHold0`, opened for the buffer's two KEY halves: `b->blockno`
 (the three `lw a?,12(s1)`) and `b->dev` (what pins `bpin`'s reference). -/
 theorem lw_hold_key (γb : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev bno : BitVec 32)
@@ -628,8 +609,6 @@ theorem lw_state_intro (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSe
   isplitr
   · ipureintro; exact hMhdr
   · ipureintro; exact hMtie
-
-
 
 
 /-- The `cmt = false` arm of `logResAt`, named. -/
@@ -950,7 +929,7 @@ theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
         with [h15, lw_addiw i hi30, lw_addiw' i hi30]
       iintro Hk Hpc
       k_step (wp_s_addi c _ (KA.«log_write» + 0x4c#64) true 4#12 14#5 14#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, lw_cursor i]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, Xv6.il_lhBlock_step i]
       iintro Hk Hpc
       have hprev' : ∀ j, j < i + 1 → ¬ (W[j]? = some bno) := by
         intro j hj
@@ -1063,7 +1042,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
     rw [lw_bno_addr]) $$ Hbno
   k_step (wp_s_sw c _ (KA.«log_write» + 0xa8#64) true 16#12 14#5 13#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [lw_blk_addr i, lw_ext_sext bno]
+    with [lw_blk_addr i, Xv6.fw_ext32 bno]
   iintro Hk Hpc Hcell
   -- +0xaa beq a2,a5
   by_cases heq : i = n
@@ -1139,7 +1118,7 @@ theorem lw_miss (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk n : Nat)
     rw [lw_bno_addr]) $$ Hbno
   k_step (wp_s_sw c _ (KA.«log_write» + 0x64#64) true 16#12 15#5 14#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [lw_blk_addr n, lw_ext_sext bno]
+    with [lw_blk_addr n, Xv6.fw_ext32 bno]
   iintro Hk Hpc Hcell
   iapply HC $$ %_ [] Hk Hpc Hbno Hcell
   ipureintro
@@ -1801,11 +1780,6 @@ theorem lw_exit (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (k
     (e26.trans p26) (e27.trans p27)
 
 
-
-
-
-
-
 /-! ## The function's exit, once an arm's ghost step is done -/
 
 set_option maxHeartbeats 8000000 in
@@ -1839,7 +1813,6 @@ theorem lw_finish (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) 
   iapply HΦ $$ %a %b %R'' [] Hk Hpc [] Hopsw Hch Hlk2 Hsl
   · ipureintro; exact hsp
   · ipureintro; exact hcs
-
 
 
 end

@@ -8,6 +8,8 @@ import Xv6.SpecMyproc
 import Xv6.SpecHolding
 import Xv6.SpecSwtch
 import Xv6.CodeTactics
+import MachCSL.WpLock
+import MachCSL.WpSmodeFrame6
 
 namespace Xv6
 
@@ -32,11 +34,6 @@ def schedFrame [CurCtx] (sp ra s0 s1 s2 s3 : BitVec 64) : IProp GF := iprop%
 def schedRegs (R : RegMap) (sp ra s0 s1 s2 s3 : BitVec 64) : RegMap :=
   ((((((R.set 1#5 ra).set 8#5 s0).set 9#5 s1).set 18#5 s2).set 19#5 s3).set 2#5 sp)
 
-theorem sched_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-
-theorem sched_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 set_option maxHeartbeats 4000000 in
 /-- The prologue `addi sp,sp,-48; sd ra,40(sp); sd s0,32(sp); sd s1,24(sp);
@@ -51,7 +48,7 @@ theorem sched_prologue [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
     ⊢ wpLoop cpu := by
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_push cpu _ KA.«sched» true 4048#12 6 hK sched_imm_m48)
+  k_step (wp_s_push cpu _ KA.«sched» true 4048#12 6 hK MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -118,7 +115,7 @@ theorem sched_tp_noff [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_add cpu _ (KA.«sched» + 0x1a#64) true 15#5 0#5 4#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq]
   iintro Hk Hpc
   k_step (wp_s_addiw cpu _ (KA.«sched» + 0x1c#64) true 0#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -157,7 +154,7 @@ theorem sched_tp_intena [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_add cpu _ (KA.«sched» + 0x44#64) true 15#5 0#5 4#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq]
   iintro Hk Hpc
   k_step (wp_s_auipc cpu _ (KA.«sched» + 0x46#64) false 16#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
@@ -199,7 +196,7 @@ theorem sched_tp_ctx [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_add cpu _ (KA.«sched» + 0x58#64) true 15#5 0#5 4#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq]
   iintro Hk Hpc
   k_step (wp_s_addiw cpu _ (KA.«sched» + 0x5a#64) true 0#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -247,7 +244,7 @@ theorem sched_tp_back [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_add cpu _ (KA.«sched» + 0x72#64) true 15#5 0#5 4#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq]
   iintro Hk Hpc
   k_step (wp_s_addiw cpu _ (KA.«sched» + 0x74#64) true 0#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -284,25 +281,25 @@ theorem sched_epilogue [CurCtx] (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
   iintro ⟨Hk, Hpc, ⟨Hf8, Hf16, Hf24, Hf32, Hf40, %w₆, Hf48⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_ld cpu _ (KA.«sched» + 0x7e#64) true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) ra)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hsp]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, hsp]
   iintro Hk Hpc Hf8
   k_step (wp_s_ld cpu _ (KA.«sched» + 0x80#64) true 32#12 8#5 2#5 (by decide) (by decide) (DFrac.own 1) s0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hsp]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, hsp]
   iintro Hk Hpc Hf16
   k_step (wp_s_ld cpu _ (KA.«sched» + 0x82#64) true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) s1)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hsp]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, hsp]
   iintro Hk Hpc Hf24
   k_step (wp_s_ld cpu _ (KA.«sched» + 0x84#64) true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) s2)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hsp]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, hsp]
   iintro Hk Hpc Hf32
   k_step (wp_s_ld cpu _ (KA.«sched» + 0x86#64) true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) s3)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hsp]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, hsp]
   iintro Hk Hpc Hf40
   ihave Hframe : stackOwn (GF := GF) sp0 6 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48]
   case' _ => stack_cells; iframe
-  k_step (wp_s_pop cpu _ (KA.«sched» + 0x88#64) true 48#12 6 sched_imm_p48)
+  k_step (wp_s_pop cpu _ (KA.«sched» + 0x88#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.setReg_eq, KCtx.rget_eq, KCtx_pop_withRegs, hsp, KCtx.withAvail_sie, KCtx.withAvail_proc, KCtx.withAvail_regs, KCtx.withAvail_avail, KCtx.withAvail_sp]
+    with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, KCtx_pop_withRegs, hsp, KCtx.withAvail_sie, KCtx.withAvail_proc, KCtx.withAvail_regs, KCtx.withAvail_avail, KCtx.withAvail_sp]
   iintro Hk Hpc
   k_step (wp_s_ret cpu _ (KA.«sched» + 0x8a#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.withAvail_sie, KCtx.withAvail_proc, KCtx.withAvail_regs, KCtx.withAvail_avail, KCtx.withAvail_sp]
@@ -312,9 +309,7 @@ theorem sched_epilogue [CurCtx] (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
 
 /-! ## The branch conditions `sched` takes -/
 
-theorem sched_bcond_beq_10 : bcond bop.BEQ 1#64 0#64 = false := by decide
 theorem sched_bcond_bne_11 : bcond bop.BNE 1#64 1#64 = false := by decide
-theorem sched_bcond_bne_00 : bcond bop.BNE 0#64 0#64 = false := by decide
 
 /-- The state word is not RUNNING, so the `beq` at `sched+0x38` is not taken. -/
 theorem sched_bcond_beq_state (st : BitVec 32) (h : st ≠ RUNNING) :
@@ -526,7 +521,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   -- beqz a0: holding() returned 1, so the panic is not reached
   k_step (wp_s_branch cpu _ (KA.«sched» + 0x18#64) true 116#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h10', KCtx.rget_eq, sched_bcond_beq_10]
+    with [h10', KCtx.rget_eq, MachCSL.bcond_beq_one]
   iintro Hk Hpc
   -- a5 = &cpus[hartid] (through &pid_lock)
   iapply (sched_tp_noff cpu _ ?hsT1) $$ [- $Hk $Hpc]
@@ -580,7 +575,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   -- bnez a5: not taken
   k_step (wp_s_branch cpu _ (KA.«sched» + 0x42#64) true 110#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, sched_sstatus_sie_zero v k.spie k.spp hv, sched_bcond_bne_00]
+    with [KCtx.rget_eq, sched_sstatus_sie_zero v k.spie k.spp hv, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- s2 = &pid_lock, a5 = &cpus[hartid]
   iapply (sched_tp_intena cpu _ ?hsT2) $$ [- $Hk $Hpc]

@@ -21,6 +21,7 @@
   fault arm on readi's `-1`).
 -/
 import Xv6.FilereadInode
+import Xv6.UMemWindow
 
 namespace Xv6
 
@@ -32,10 +33,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-/-- The empty window: nothing written, the entry table. -/
-theorem frd_wrote0 (P : UPtd) (M : Nat → List (BitVec 8)) (a : BitVec 64) : umemWrote P M a 0 P M :=
-  ⟨[], rfl, by rw [UMemL.viewFaulted_self, UMemL.umemWrite_nil], fun _ h => absurd h (Nat.not_lt_zero _)⟩
 
 /-- readi's image IS a window. -/
 theorem frd_wrote_rdImg (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (a : BitVec 64)
@@ -153,9 +150,9 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   -- ===== back from piperead =====
   iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %⟨hcs1, hext, hdle, hret, hwin⟩ Hk Hpc Hte Hce Hpref Hpriv
     Hgen Hpost
-  k_norm_g [frd_ret_70, frd_ww, frd_psw] at hwin
+  k_norm_g [frd_ret_70, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hwin
   rw [h11] at hwin
-  k_norm_g [frd_ret_70, frd_ww, frd_psw]
+  k_norm_g [frd_ret_70, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : frdRegs k (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) R1 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ (by k_norm_g at hcs1; exact hcs1)
     repeat (refine frdRegs_set _ _ _ _ _ _ _ ?_ (by decide))

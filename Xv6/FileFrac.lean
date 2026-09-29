@@ -16,7 +16,6 @@ set_option linter.unusedSectionVars false
 /-! ## `qsum` -/
 
 theorem qp_add_assoc (x y z : Qp) : x + y + z = x + (y + z) := Subtype.ext (Rat.add_assoc ..)
-theorem qp_add_comm (x y : Qp) : x + y = y + x := Subtype.ext (Rat.add_comm ..)
 
 theorem qsum_cons (e : Nat × Qp) (L : List (Nat × Qp)) (h : L ≠ []) : qsum (e :: L) = e.2 + qsum L := by
   cases L with
@@ -32,9 +31,9 @@ theorem qsum_app_cons (s t : List (Nat × Qp)) (e : Nat × Qp) (h : s ++ t ≠ [
     by_cases hst : s ++ t = []
     · obtain ⟨rfl, rfl⟩ := List.append_eq_nil_iff.1 hst
       show f.2 + e.2 = e.2 + f.2
-      exact qp_add_comm _ _
+      exact Xv6.slh_add_comm _ _
     · rw [qsum_cons _ _ (by simp), qsum_cons _ _ hst, ih hst, ← qp_add_assoc, ← qp_add_assoc,
-        qp_add_comm f.2 e.2]
+        Xv6.slh_add_comm f.2 e.2]
 
 /-- The dup'd list's fraction is the old list's. -/
 theorem qsum_dup (s t : List (Nat × Qp)) (nx id : Nat) (q : Qp) :

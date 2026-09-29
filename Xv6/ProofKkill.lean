@@ -18,6 +18,10 @@ prelude is in `Xv6/KilledDefs.lean`.
 import Xv6.SpecKkill
 import Xv6.KilledDefs
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -32,15 +36,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## `kkill`: arithmetic, the frame and the branch conditions -/
 
-/-- The immediates of the six-slot frame. -/
-theorem kk_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem kk_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
-theorem kk_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem kk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
@@ -92,13 +87,6 @@ theorem kk_bne_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
       simp only [bcond, bne_iff_ne, ne_eq]
       exact fun hc => he ((kk_cursor_eq i hi).mp hc))]
 
-theorem kk_beq_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem kk_beq_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- A state cell whose sign-extension is `2` holds SLEEPING. -/
 theorem kk_sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by
@@ -481,7 +469,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   · -- SLEEPING: wake it
     k_step (wp_s_branch c _ (KA.«kkill» + 0x48#64) false 26#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kk_beq_eq (BitVec.signExtend 64 st) 2#64 hst]
+      with [Xv6.wa_beq_eq (BitVec.signExtend 64 st) 2#64 hst]
     iintro Hk Hpc
     have hsl : st = SLEEPING := kk_sext_sleeping st hst
     subst hsl
@@ -516,7 +504,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   · -- not SLEEPING: only the kill flag is set
     k_step (wp_s_branch c _ (KA.«kkill» + 0x48#64) false 26#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [kk_beq_ne (BitVec.signExtend 64 st) 2#64 hst]
+      with [Xv6.wa_beq_neq (BitVec.signExtend 64 st) 2#64 hst]
     iintro Hk Hpc
     ihave HR := procLockRes_intro Γ ξ0 (procAddr i) st ch 1#32 xs pid
       $$ [Hstate Hpg Hchan Hrest Hslots]
@@ -585,7 +573,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   -- past acquire: the payload in hand, the hart pinned until the release
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Hlocked HR _ Harm
-  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, kl_withSpie_pushOffAt, hK6,
+  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, MachCSL.KCtx.withSpie_pushOffAt, hK6,
     kl_ret_211c]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -617,7 +605,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       iframe
     k_step (wp_s_branch c3 _ (KA.«kkill» + 0x2a#64) false 22#13 15#5 18#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [g18, kk_beq_eq (BitVec.signExtend 64 pid) arg hpm]
+      with [g18, Xv6.wa_beq_eq (BitVec.signExtend 64 pid) arg hpm]
     iintro Hk Hpc
     iapply (kk_found RE Γ k arg hwf hnoff hK hlk htier i hi spie spp spie1 spp1 R _ ?hkp ?hcr
       hsp1 pid (kk_pid_nz pid arg hpm harg) cur c3 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
@@ -635,7 +623,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     ihave HR := kl_pay_intro Γ ξ0 i $$ HR
     k_step (wp_s_branch c3 _ (KA.«kkill» + 0x2a#64) false 22#13 15#5 18#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [g18, kk_beq_ne (BitVec.signExtend 64 pid) arg hpm]
+      with [g18, Xv6.wa_beq_neq (BitVec.signExtend 64 pid) arg hpm]
     iintro Hk Hpc
     iapply (kk_rel_nomatch RE Γ k arg hwf hnoff hK hlk i hi spie spp spie1 spp1 R _ ?hkp2 ?hcr2
       ?hc18 ?hc19 hsp1 ξ0 rfl cur c3 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
@@ -651,12 +639,6 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 
 /-! ## `kkill`: the loop -/
 
-theorem kl_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem kl_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 set_option maxHeartbeats 4000000 in
 /-- The scan from `+0x22` with `i` slots behind it runs to the
@@ -819,7 +801,7 @@ theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   iintro Hk Hpc F4
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c5 _ (KA.«kkill» + 0x5e#64) true 48#12 6 kk_imm_p48)
+  k_step_gen (wp_s_pop c5 _ (KA.«kkill» + 0x5e#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c6 hq6
   iintro Hk Hpc
@@ -858,7 +840,7 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
   by_cases h0 : k.regs 10#5 = 0#64
   · k_step_gen (wp_s_branch cpu _ KA.«kkill» true 104#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, kk_beq_eq (k.regs 10#5) 0#64 h0] next z1 hz1
+      with [KCtx.rget_eq, Xv6.wa_beq_eq (k.regs 10#5) 0#64 h0] next z1 hz1
     iintro Hk Hpc
     k_step_gen (wp_s_addi z1 _ (KA.«kkill» + 0x68#64) true 4095#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -884,10 +866,10 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
       try decide
   k_step_gen (wp_s_branch cpu _ KA.«kkill» true 104#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, kk_beq_ne (k.regs 10#5) 0#64 h0] next c0 hp0
+    with [KCtx.rget_eq, Xv6.wa_beq_neq (k.regs 10#5) 0#64 h0] next c0 hp0
   iintro Hk Hpc
   -- the prologue
-  k_step_gen (wp_s_push c0 _ (KA.«kkill» + 0x2#64) true 4048#12 6 hK6 kk_imm_m48)
+  k_step_gen (wp_s_push c0 _ (KA.«kkill» + 0x2#64) true 4048#12 6 hK6 MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -932,7 +914,7 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
       ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
         ((hp2 h).trans ((hp1 h).trans (hp0 h))))))))))))
   -- the scan
-  rw [kl_pushed_spie_self k 6, kl_pushed_withSpie]
+  rw [Xv6.ua_pushed_spie_self k 6, MachCSL.KCtx.withSpie_pushed]
   iapply (kk_loop AC RE Γ k (k.regs 10#5) hwf hnoff hK hlk htier h0 63 0 (by decide)
     k.spie k.spp _ ?g9 ?g18 ?g19 c12) $$ [- $Hk $Hpc]
   rotate_right 1

@@ -22,6 +22,7 @@ Nothing here is PLIC-specific state: no Iris ghosts, no invariant.
 import Xv6.PlicPlan
 import Xv6.SpecCpuid
 import MachCSL.WpSmodeFrame
+import MachCSL.WpSmodeFrame12b
 
 namespace Xv6
 
@@ -33,21 +34,6 @@ set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-set_option maxHeartbeats 4000000 in
-/-- `slliw rd, rs1, shamt`: shift the low word left, sign-extend. -/
-theorem execSpecF_slliw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
-    (shamt : BitVec 5) (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap)
-    (p : Privilege := Privilege.Supervisor) :
-    execSpecPP (GF := GF) cpu dq p c p c
-      (instruction.SHIFTIWOP (shamt, regidx.Regidx rs1, regidx.Regidx rd, sopw.SLLIW))
-      pc npc₀ npc₀ (gprFile cpu R)
-      (gprFile cpu (RegMap.set R rd
-        (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (RegMap.get R rs1) <<< shamt.toNat)))) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
-  conf_cases HmConf
-  alu_file_r1 hrd
 
 /-- `slliw rd, rs1, shamt` in the kernel context. -/
 theorem wp_s_slliw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx)
@@ -62,7 +48,7 @@ theorem wp_s_slliw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : C
     ⊢ wpLoop cpu :=
   wpLoop_k_setReg cpu k pc _ is_rvc _ rd hrd _
     (fun cpu' c _ _ _ =>
-      execSpecF_slliw cpu' (DFrac.own 1) c pc _ shamt rd rs1 hrd.1 (tpPin cpu' k.regs))
+      MachCSL.execSpecF_slliw cpu' (DFrac.own 1) c pc _ shamt rd rs1 hrd.1 (tpPin cpu' k.regs))
 
 end
 

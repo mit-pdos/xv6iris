@@ -150,7 +150,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_mknod_ret_5c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_5c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x5c  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x5c#64) true 4095#12 10#5 0#5 (by decide))
@@ -226,7 +226,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ut => k_norm_g; exact htier
   case ua => k_norm_g [h10]
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_mknod_ret_4a, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_4a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x4a  jal end_op
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x4a#64) false 2091514#21 1#5 (by decide))
@@ -242,11 +242,11 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_mknod_ret_4e, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysMknodPins_cs k _ R2 (sysMknodPins_set k R1 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x4e  li a0,0
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x4e#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   have hp3 := sysMknodPins_set k R2 10#5 0#64 hp2 (by decide)
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr A.j) ⊢ cpuClaimExt cpu k.sie k.proc

@@ -19,6 +19,7 @@ accessor in `PrepareReturnRules`.
 -/
 import Xv6.SpecMyproc
 import Xv6.PrepareReturnStores
+import Xv6.EitherDefs
 
 namespace Xv6
 
@@ -40,10 +41,6 @@ theorem prepare_return_br_myproc : KA.«prepare_return» + 0xfffffffffffff43c#64
 theorem prepare_return_ret_0c : jumpPc (KA.«prepare_return» + 0xc#64) = KA.«prepare_return» + 0xc#64 := by
   decide
 
-/-- A balanced push/pop pair commutes with the frame push. -/
-theorem prepare_return_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 /-- The context the body ends in, as the epilogue wants it: interrupts off
 with the sret bits (`SPIE = 1`, `SPP = User`), the frame still pushed. -/
 theorem prepare_return_ctx_eq (k : KCtx) (a b s1 s2 : Bool) (h : 2 ≤ k.avail) :
@@ -56,20 +53,6 @@ theorem prepare_return_ctx_eq (k : KCtx) (a b s1 s2 : Bool) (h : 2 ≤ k.avail) 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
-/-- `myproc`'s contract at its entry address. -/
-theorem prepare_return_myproc (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«myproc» ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
-  unfold wp_myproc_body at h
-  simp only [myprocAddr] at h
-  exact h
 
 /-- A cell at an equal value. -/
 theorem prepare_return_cell_eq [CurCtx] (a : BitVec 64) (x y : BitVec 64) (h : x = y) :
@@ -102,7 +85,7 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   k_step_gen (wp_s_jal c1 _ (KA.«prepare_return» + 0x8#64) false 2094132#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [prepare_return_br_myproc] next c2 hp2
   iintro Hk Hpc
-  iapply (prepare_return_myproc MP c2 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
+  iapply (Xv6.ec_myproc_call MP c2 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [prepare_return_ret_0c]
   case hnm => k_norm_g; omega
@@ -110,8 +93,8 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie %spp %R1 %hsp Hk Hpc %hcs1
   obtain ⟨hcs1, ha0⟩ := hcs1
-  k_norm_g [prepare_return_ret_0c, prepare_return_withSpie_pushed] at ha0
-  k_norm_g [prepare_return_ret_0c, prepare_return_withSpie_pushed]
+  k_norm_g [prepare_return_ret_0c, MachCSL.KCtx.withSpie_pushed] at ha0
+  k_norm_g [prepare_return_ret_0c, MachCSL.KCtx.withSpie_pushed]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs1

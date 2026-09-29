@@ -21,6 +21,9 @@ import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFileread
+import Xv6.CopyLemmas
+import Xv6.ReadiDefs
+import Xv6.SysFstatParts
 
 namespace Xv6
 
@@ -45,17 +48,12 @@ theorem srd_ret_1c : jumpPc (KA.«sys_read» + 0x1c#64) = (KA.«sys_read» + 0x1
 theorem srd_ret_28 : jumpPc (KA.«sys_read» + 0x28#64) = (KA.«sys_read» + 0x28#64) := by decide
 theorem srd_ret_40 : jumpPc (KA.«sys_read» + 0x40#64) = (KA.«sys_read» + 0x40#64) := by decide
 
-theorem srd_li1 : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
 theorem srd_li2 : 0#64 + BitVec.signExtend 64 2#12 = 2#64 := by decide
-theorem srd_add0 (x : BitVec 64) : 0#64 + x = x := by simp
 /-- `addi a1,s0,-40` / `ld a1,-40(s0)`: `&p`, frame slot 5. -/
 theorem srd_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
   bv_decide
 /-- `addi a1,s0,-28` / `lw a2,-28(s0)`: `&n`, the upper word of slot 4. -/
 theorem srd_n_addr (x : BitVec 64) : x + BitVec.signExtend 64 4068#12 = x + 0xFFFFFFFFFFFFFFE4#64 := by
-  bv_decide
-/-- `addi a2,s0,-24` / `ld a0,-24(s0)`: `&f`, frame slot 3. -/
-theorem srd_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
   bv_decide
 theorem srd_n_hi (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFE0#64 + 4#64 = x + 0xFFFFFFFFFFFFFFE4#64 := by
   bv_decide
@@ -70,19 +68,6 @@ theorem srd_f_nonnull (sp : BitVec 64) (h : 40 ≤ sp.toNat) : sp + 0xFFFFFFFFFF
   simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
-
-theorem srd_ww (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem srd_psw (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem srd_rsw (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
-
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem srd_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The register bundle -/
 

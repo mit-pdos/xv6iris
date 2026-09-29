@@ -56,7 +56,7 @@ theorem fsimgSeccompNlinkNz : (fsDinode fsimgP fsimgSb SECC_INO).diNlink.toNat �
 
 /-- Rocq `fsimg_seccomp_size_bound`. -/
 theorem fsimgSeccompSizeBound : (fsDinode fsimgP fsimgSb SECC_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgSeccompSize, maxfileBytes]; decide
+  rw [fsimgSeccompSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `fsimg_seccomp_type_nz`. -/
 theorem fsimgSeccompTypeNz : (fsDinode fsimgP fsimgSb SECC_INO).diType.toNat ≠ 0 := by

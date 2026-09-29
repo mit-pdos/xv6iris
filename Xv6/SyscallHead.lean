@@ -81,10 +81,6 @@ theorem syscall_head_jump (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 23) : jumpPc (sy
 /-- `myproc`'s return lands at `+0x10`. -/
 theorem syscall_head_ret10 : jumpPc (KA.«syscall» + 0x10#64) = KA.«syscall» + 0x10#64 := by decide
 
-theorem syscall_head_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-
-theorem syscall_head_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
 
 /-- The `beqz a4` at `+0x36` falls through: the entry is nonzero. -/
 theorem syscall_head_beqz (n : Nat) (h1 : 1 ≤ n) (h22 : n ≤ 23) :
@@ -280,7 +276,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     · -- ALLOWED: +0x42  beqz a5 falls through, +0x44  jalr a4, INTO THE ARM
       have hnum : syscNum V = ((n : Nat) : Int) := syscall_eff_allowed V n hraw hb
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, syscall_beq10, syscall_beq00, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, syscall_beq00, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       k_step_e (wp_s_jalr cpu _ (KA.«syscall» + 0x44#64) true 14#5 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_jump n hn1' hn22']
@@ -305,7 +301,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       have hb' : V.pvSecc.getLsbD n = false := by simpa using hb
       have hblk : syscNum V = 0 := syscall_eff_blocked V n hraw hb'
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, syscall_beq10, syscall_beq00, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, syscall_beq00, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       have hbl : KA.«syscall» + 76#64 = syscallBlocked := rfl
       rw [hbl]
@@ -503,7 +499,7 @@ theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : Sc
   case hKM => k_norm_g; have := syscallSlots_val; omega
   k_next_e
   iintro %spie1 %spp1 %R1 %_ Hk Hpc %⟨hcs1, h10⟩
-  k_norm_g [syscall_head_ret10, syscall_head_ww, syscall_head_psw]
+  k_norm_g [syscall_head_ret10, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   k_norm_g at h10
   -- +0x10  mv s1,a0
   k_step_e (wp_s_add cpu _ (KA.«syscall» + 0x10#64) true 9#5 0#5 10#5 (by decide))

@@ -14,6 +14,8 @@ import Xv6.SpecKfree
 import Xv6.CodeTactics
 import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -37,12 +39,6 @@ theorem ret_a96 : jumpPc (KA.«freerange» + 0x32#64) = (KA.«freerange» + 0x32
 
 theorem physTop_toNat : physTop.toNat = 0x88000000 := rfl
 theorem kernelEnd_toNat : kernelEndAddr.toNat = KernelSyms.«end» := rfl
-
-theorem toNat_add_ofNat (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
-    (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : m < 2 ^ 64)]
-  exact Nat.mod_eq_of_lt (by omega)
 
 theorem ofNat_mul4096 (i : Nat) : BitVec.ofNat 64 (4096 * i) = 4096#64 * BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
@@ -72,7 +68,7 @@ theorem fr_bltu (stop base : BitVec 64) (n : Nat)
     (hb4 : stop.toNat ≤ physTop.toNat) :
     bcond bop.BLTU stop (base + 4096#64) = decide (n = 0) := by
   rw [physTop_toNat] at hb4
-  have he : (base + 4096#64).toNat = base.toNat + 4096 := toNat_add_ofNat base 4096 (by omega)
+  have he : (base + 4096#64).toNat = base.toNat + 4096 := Xv6.paAddToNat' base 4096 (by omega)
   simp only [bcond, BitVec.ult, he, decide_eq_decide]
   omega
 
@@ -83,7 +79,7 @@ theorem fr_bgeu (stop base : BitVec 64) (n i : Nat) (hi : i + 1 ≤ n)
     bcond bop.BGEU stop (base + BitVec.ofNat 64 (4096 * (i + 2))) = decide (i + 1 < n) := by
   rw [physTop_toNat] at hb4
   have he : (base + BitVec.ofNat 64 (4096 * (i + 2))).toNat = base.toNat + 4096 * (i + 2) :=
-    toNat_add_ofNat base _ (by omega)
+    Xv6.paAddToNat' base _ (by omega)
   simp only [bcond, BitVec.ult, he, ← decide_not, decide_eq_decide]
   omega
 
@@ -95,7 +91,7 @@ theorem fr_pageValid (stop base : BitVec 64) (n i : Nat) (hi : i < n)
     pageValid (base + BitVec.ofNat 64 (4096 * i)) := by
   rw [physTop_toNat] at hb4
   have he : (base + BitVec.ofNat 64 (4096 * i)).toNat = base.toNat + 4096 * i :=
-    toNat_add_ofNat base _ (by omega)
+    Xv6.paAddToNat' base _ (by omega)
   refine ⟨?_, ?_, ?_⟩
   · rw [ofNat_mul4096]
     revert hbal
@@ -144,14 +140,6 @@ theorem availInc_availAdd (on : Option Nat) (i : Nat) :
   cases on with
   | none => rfl
   | some m => simp only [availInc, availAdd, Option.map_some]; congr 1
-
-/-- The context algebra of the exit interrupt state. -/
-theorem KCtx.pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-/-- Entering the body: the frame's context carries the caller's `spie`/`spp`. -/
-theorem KCtx.pushed_spie_self (k : KCtx) (m : Nat) : k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -229,7 +217,7 @@ theorem freerange_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, ⟨F0, F1, F2, F3, F4, F5⟩, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 6 ≤ (k.withSpie spie spp).avail := hK
-  simp only [KCtx.pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«freerange» + 0x3e#64) true 40#12 1#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc F0
@@ -326,7 +314,7 @@ theorem freerange_iter (KF : KFREE) [CurCtx]
   case hpv => k_norm_g; exact fr_pageValid (k.regs 11#5) base n i hi hbal hb1 hb3 hb4
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav %hcs2
-  k_norm_g [KCtx.withSpie_withSpie, ret_a96, availInc_availAdd]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, ret_a96, availInc_availAdd]
   unfold calleeSaved at hcs2
   k_norm_g [h9, h18, h19, h20] at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
@@ -523,7 +511,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
     ihave Hframe := frFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w3 w4 w5
       $$ [F0 F1 F2 F3 F4 F5]
     case' _ => iframe
-    rw [KCtx.pushed_spie_self k 6]
+    rw [Xv6.ua_pushed_spie_self k 6]
     iapply (freerange_epi cpu c12 k hpin12 (by omega) γk on k.spie k.spp
       (fun _ => ⟨rfl, rfl⟩) _ ?e2 ?e18 ?e19 ?e20 ?e21 ?e22 ?e23 ?e24 ?e25 ?e26 ?e27 w3 w4 w5)
       $$ [- $Hk $Hpc $Hframe $Hav $HΦ]
@@ -564,7 +552,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h : k.sie = false ∨ k.proc = 0#64 =>
       (hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans
         ((hp13 h).trans (hpin12 h))))))) $$ HΦ
-    rw [KCtx.pushed_spie_self k 6]
+    rw [Xv6.ua_pushed_spie_self k 6]
     iapply (freerange_loop KF k γl γk on base n hnoff hK hlk hbal hb1 hb2 hb3 hb4 (n - 1)
       0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?g2 ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23
       ?g24 ?g25 ?g26 ?g27 c18) $$ [- $Hk $Hpc $Hframe $HΦ]

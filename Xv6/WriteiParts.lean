@@ -21,6 +21,8 @@ single-block receipt `wi16Pre` / `wi16Fresh`.
    deviation 5): the chunk's view composes by `Xv6.viewFaulted_trans`.
 -/
 import Xv6.WriteiBudgetW
+import Xv6.DinodeSlot
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -416,31 +418,6 @@ theorem writei_ad_of_alloced_any (cov : Std.ExtTreeSet Nat compare) (logstart : 
 
 /-! ## (1) The machine arithmetic (Rocq's `wi_sext32` .. `wi_lt_moi`) -/
 
-/-- `sext.w` of a small literal is the literal (Rocq's `wi_sext32`). -/
-theorem writei_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
-/-- ...and of a small word (Rocq's `wi_sext32_unsigned`). -/
-theorem writei_sext_toNat (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 w = BitVec.ofNat 64 w.toNat := by
-  have e : w = BitVec.ofNat 32 w.toNat := by simp
-  conv => lhs; rw [e]
-  exact writei_sext32 w.toNat h
-
-theorem writei_bgeu_nat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    bcond bop.BGEU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
-  show (!(BitVec.ofNat 64 a).ult (BitVec.ofNat 64 b)) = decide (b ≤ a)
-  simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb]
-  by_cases h : b ≤ a <;> simp [h] <;> omega
-
-theorem writei_bltu_nat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    bcond bop.BLTU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (a < b) := by
-  show (BitVec.ofNat 64 a).ult (BitVec.ofNat 64 b) = decide (a < b)
-  simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb]
-
 /-- `addw` of two small naturals (Rocq's `wi_addw`). -/
 theorem writei_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) +
@@ -450,7 +427,7 @@ theorem writei_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero]
     omega
-  rw [e, writei_sext32 _ h]
+  rw [e, MachCSL.signExtend_ofNat32 _ h]
 
 /-- `subw` of two small naturals (Rocq's `wi_subw`). -/
 theorem writei_subw (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 31) :
@@ -461,7 +438,7 @@ theorem writei_subw (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_sub, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero]
     omega
-  rw [e, writei_sext32 _ (by omega)]
+  rw [e, MachCSL.signExtend_ofNat32 _ (by omega)]
 
 /-- `srliw a1,s2,10`: the file block index, in bmap's argument shape
 (Rocq's `wi_srliw10`). -/

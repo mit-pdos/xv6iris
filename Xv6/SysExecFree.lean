@@ -338,7 +338,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
     case hlk => rw [hlocks]; simp
     case hp => k_norm_g; exact hpv
     iintro %cpu %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce
-    k_norm_g [hret, sysfile_ww, sysfile_psw, KCtx.withSpie_withRegs]
+    k_norm_g [hret, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_withRegs]
     have hkeep := sysExecKeepS1_round R R2 (pg m) (p + 8#64) (sysExecArgvAt (k.regs 2#5) m + 8#64) hcs
     obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c9 c20

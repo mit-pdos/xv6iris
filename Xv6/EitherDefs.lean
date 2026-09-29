@@ -42,6 +42,7 @@ import Xv6.SpecMemmove
 import Xv6.SpecCopyin
 import Xv6.CodeTactics
 import Xv6.ProcPrivBare
+import MachCSL.WpSmodeFrame6
 
 namespace Xv6
 
@@ -157,11 +158,6 @@ theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-! ## Arithmetic facts -/
 
-theorem ec_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-
-theorem ec_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 theorem ec_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = p := by
@@ -192,13 +188,6 @@ theorem ei_ret_32c : jumpPc (KA.«either_copyin» + 0x2c#64) = (KA.«either_copy
 theorem ei_ret_348 : jumpPc (KA.«either_copyin» + 0x48#64) = (KA.«either_copyin» + 0x48#64) := by
   decide
 
-/-- The pinned bits after the outer call, at a frame. -/
-theorem ec_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem ec_withSpie_twice (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := by
-  cases k; rfl
 
 theorem ec_ret_2d0 : jumpPc (KA.«either_copyout» + 0x1c#64) = (KA.«either_copyout» + 0x1c#64) := by
   decide
@@ -271,7 +260,7 @@ theorem ec_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   iintro Hk Hpc Hf6
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 6 $$ [Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ (KA.«either_copyout» + 0x38#64) true 48#12 6 ec_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«either_copyout» + 0x38#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
@@ -332,7 +321,7 @@ theorem ei_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   iintro Hk Hpc Hf6
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 6 $$ [Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ (KA.«either_copyin» + 0x38#64) true 48#12 6 ec_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«either_copyin» + 0x38#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc

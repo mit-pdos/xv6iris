@@ -73,13 +73,13 @@ theorem uwr_blk_dollar_at (ps cs : List Nat) (s : Fstate) (I : List (BitVec 8)) 
   have hup : lmProcStream ulmG ps (cs ++ [a]) s I = lmProcBefore ulmG ps cs s I ++ uPrompt := by
     unfold lmProcStream; rw [hlow, hpend]
   have hlen : (lmProcStream ulmG ps (cs ++ [a]) s I).length = P + 1 + 1 := by
-    rw [hup, List.length_append, ll_prompt_len, hP]
+    rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
   refine ⟨⟨lmWrBlk_pin_snoc ulmG ps cs s I P a ⟨hpin, hm, hdv, hP⟩, hm, ?_, ?_, hlen.symm⟩, ?_⟩
   · rw [hdv, List.length_append, List.length_singleton]
   · rw [hdv, lmProIdx_snoc_ne ulmG cs a hnp]
     exact hpin cs.length (by rw [hst]; omega)
   · rw [hup, hP, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left]
-    exact ll_prompt_tail
+    exact Xv6.wrPrompt_tail
 
 section UShURoundLawsInp
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

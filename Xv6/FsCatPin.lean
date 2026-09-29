@@ -56,7 +56,7 @@ theorem fsimgCatNlinkNz : (fsDinode fsimgP fsimgSb CAT_INO).diNlink.toNat ≠ 0 
 
 /-- Rocq `fsimg_cat_size_bound`. -/
 theorem fsimgCatSizeBound : (fsDinode fsimgP fsimgSb CAT_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgCatSize, maxfileBytes]; decide
+  rw [fsimgCatSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `fsimg_cat_type_nz`. -/
 theorem fsimgCatTypeNz : (fsDinode fsimgP fsimgSb CAT_INO).diType.toNat ≠ 0 := by

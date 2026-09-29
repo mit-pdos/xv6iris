@@ -30,7 +30,7 @@ few seconds:
 
 * call-site wrappers for the four callees at create's bundles
   (`createFound_npar`, `createFound_ilock`, `createFound_iunlockput`,
-  `createFound_dirlookup`), and the pid cell's loan (`createFound_pid`);
+  `createFound_dirlookup`), and the pid cell's loan (`Xv6.kxc_priv_pid`);
 * the two exits into the funnel (`createFound_exit_fail`,
   `createFound_exit_ok`, over `CreateSharedBody.create_tail`);
 * the arms: `createFound_armN`, `createFound_armG` (+0x84),
@@ -62,7 +62,7 @@ is needed to share the context.
    out).  nameiparent gets its core (`FdTable.procPrivFd_split`, the
    descriptor array stays behind as `procOfilesOwe … []`), exactly Rocq's
    `proc_priv_bare_cref` / `cwd_ref_at_held_at` choreography; the callees
-   after it get the pid cell at `pidPriv` (`createFound_pid`, over
+   after it get the pid cell at `pidPriv` (`Xv6.kxc_priv_pid`, over
    `SpecNamexEra.namexEra_core_rows`), Rocq's `proc_priv_bare_acc`.
 3. **THE TRANSACTIONAL FORMS.**  Rocq calls `wp_ilock_dep_sconf` /
    `wp_iunlockput_dep_gen` at the descriptor `DepTx (q/2) … t (1/2)` with
@@ -106,6 +106,9 @@ import Xv6.CreateSharedBody
 import MachCSL.WpSmodeLh
 import Xv6.SpecNamexEra
 import Xv6.SpecNparWrapEra
+import Xv6.DirlookupParts
+import Xv6.KexecTail
+import Xv6.NamexParts
 
 namespace Xv6
 
@@ -120,14 +123,6 @@ set_option linter.unusedVariables false
 
 /-! ## 0.  Pure helpers -/
 
-/-- `c.beqz a5` at +0x2e on the `lh`'s sign-extended halfword: TAKEN exactly
-at `nlink = 0` (Rocq's `nx_nlz_eq` / `nx_nlz_ne`). -/
-theorem createFound_beqz_nl (h : BitVec 16) :
-    bcond bop.BEQ (BitVec.signExtend 64 h) 0#64 = decide (h = 0#16) := by
-  simp only [bcond]
-  by_cases hh : h = 0#16
-  · subst hh; decide
-  · simp only [hh, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply hh; bv_decide
 
 theorem createFound_caller1 : createCaller 1#5 := by unfold createCaller; decide
 theorem createFound_caller10 : createCaller 10#5 := by unfold createCaller; decide
@@ -141,13 +136,6 @@ theorem createFound_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat 
   have := w.isLt
   omega
 
-theorem createFound_live_pos (data : Nat → List (BitVec 8)) (kk : Nat) (h : dirLive data kk) :
-    0 < (BitVec.setWidth 32 (dirInum data kk)).toNat := by
-  rw [createFound_zext32_toNat]
-  unfold dirLive at h
-  rcases Nat.eq_zero_or_pos (dirInum data kk).toNat with h0 | h0
-  · exact absurd (BitVec.eq_of_toNat_eq (by simpa using h0)) h
-  · exact h0
 
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the
 shape the Lean rules produce (`CreateParts.create_bltu_trange`, restated). -/
@@ -182,8 +170,6 @@ theorem createFound_beqz_tym1 (t : BitVec 16) :
   rw [e] at h
   exact h
 
-theorem createFound_nl_toNat (h : BitVec 16) (hh : h ≠ 0#16) : h.toNat ≠ 0 :=
-  fun he => hh (BitVec.eq_of_toNat_eq (by simpa using he))
 
 /-! ## 1.  The process block's pid cell (Rocq's `proc_priv_bare_acc`) -/
 
@@ -191,21 +177,6 @@ section Pid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
-/-- THE PID CELL, LENT OUT OF THE WHOLE BLOCK (Rocq's `proc_priv_bare_acc`),
-at the ambient context once its tier is pinned. -/
-theorem createFound_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames)
-    (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
-  iintro H
-  icases (procPrivFd_split γ pa pid V M).1 $$ H with ⟨Hcore, Hofs⟩
-  icases namexEra_core_rows hct pa pid V M $$ Hcore with ⟨Hpid, Hcwd, Hcwr, Hcl⟩
-  iframe Hpid
-  iintro Hpid
-  iapply (procPrivFd_split γ pa pid V M).2
-  iframe Hofs
-  iapply Hcl $$ Hpid Hcwd Hcwr
 
 end Pid
 
@@ -824,7 +795,7 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   unfold createIrefSlots at hns
   iapply (createFound_exit_fail cpu k A F spie1 spp1 (R1.set 18#5 0#64) v3 nf tl (1 + 1) n2 Sb2
     hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ (createRegs_s2 k _ _ 0#64 _ _ _ R1 _ rfl hr1))
-    (by simp [RegMap.set_apply]) (by omega) (create_sub2 _ _ _ hsub hsub2) (by omega))
+    (by simp [RegMap.set_apply]) (by omega) (Xv6.namex_sub_trans _ _ _ hsub hsub2) (by omega))
   iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hsl Hop Htx Hcf Hpost
 
 set_option maxHeartbeats 16000000 in
@@ -914,7 +885,7 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   unfold createIrefSlots at hns
   iapply (createFound_exit_fail cpu k A F spie1 spp1 (R1.set 18#5 0#64) v3 nf tl (1 + 1) n2 Sb2
     hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ (createRegs_s2 k _ _ 0#64 _ _ _ R1 _ rfl hr1))
-    (by simp [RegMap.set_apply]) (by omega) (create_sub2 _ _ _ hsub hsub2) (by omega))
+    (by simp [RegMap.set_apply]) (by omega) (Xv6.namex_sub_trans _ _ _ hsub hsub2) (by omega))
   iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hsl Hop Htx Hcf Hpost
 
 set_option maxHeartbeats 16000000 in
@@ -1054,7 +1025,7 @@ theorem createFound_fbad (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   unfold createIrefSlots at hns
   iapply (createFound_exit_fail cpu k A F spie1 spp1 (R1.set 18#5 0#64) v3 nf tl (1 + 1) n3 Sb3
     hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ (createRegs_s2 k _ _ 0#64 _ _ _ R1 _ rfl hr1))
-    (by simp [RegMap.set_apply]) (by omega) (create_sub2 _ _ _ hsub hsub3) (by omega))
+    (by simp [RegMap.set_apply]) (by omega) (Xv6.namex_sub_trans _ _ _ hsub hsub3) (by omega))
   iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hsl Hop Htx Hcf Hpost
 
 set_option maxHeartbeats 16000000 in
@@ -1095,7 +1066,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
   have hr := hR
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
   have hK10 := create_slots_10 _ hS.hK
-  have hlast := create_last_of_npar _ nf hname
+  have hlast := Xv6.sys_unlink_last_of_npar _ nf hname
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Henv, Hlk, Hload, Hsi, Hsb, Howe, Hpid, Hbs, Hs1, Hop, HP, Hex,
     Hcre, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1303,7 +1274,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
   ihave Hs1 := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   iapply (createFound_tests IUP Γ cpu k A F hS spie2 spp2 R2 v3 (ientry kd) nf tl dind kslot qq gc
     loc tlc cinum dnc bmc γilc γislc n2 Sb2 hr2 hks hcnib hcpos hlec hal htl hname hip2
-    (create_sub2 _ _ _ hsub hsub2) (Nat.le_trans hhi2 hn1))
+    (Xv6.namex_sub_trans _ _ _ hsub hsub2) (Nat.le_trans hhi2 hn1))
   iframe Hk Hpc Hfr Hte Hce Hlkc Hloadc Hsi Hsb Howe Hpid Hbs Hs1 Hop HP Hex Hcre Hpost
   iframe #
 
@@ -1352,7 +1323,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
-  have hnlz := createFound_nl_toNat _ hnl
+  have hnlz := Xv6.namex_nlink_nz _ hnl
   have htyz : dn.diType.toNat = T_DIR_z := by rw [htype]; rfl
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Henv, Hlk, Hload, Hsi, Hsb, Howe, Hpid, Hbs, Hs1, Hop, HP, Hdlc,
     Hcre, Hpost⟩
@@ -1448,7 +1419,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     have hlive := dirFirst_live _ _ _ _ hsome
     have hcnib : (BitVec.setWidth 32 (dirInum data kk)).toNat < 16 * icfgNib := by
       rw [createFound_zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
-    have hcpos := createFound_live_pos data kk hlive
+    have hcpos := Xv6.dirlookup_live_pos data kk hlive
     have hents : (dirEntries (eraNode dn bm data))[bname 14 nf]? =
         some (BitVec.setWidth 32 (dirInum data kk)).toNat := by
       rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz,
@@ -1460,7 +1431,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       topFragQ (fsGammaL fscFs) (DFrac.own 1) dind.toNat (eraNode dn bm data) from .rfl) $$ Htop
     imod (mkfDlookup_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) F.Fex dind.toNat
       (BitVec.setWidth 32 (dirInum data kk)).toNat (bname 14 nf) (eraNode dn bm data)
-      CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (mkfEra_live dn bm data hnlz) hents)
+      CoPset.subseteq_top (mkfEra_is_dir dn bm data htyz) (Xv6.eraNlink_nz dn bm data hnlz) hents)
       $$ Hft Hdlc Htop with ⟨Htop, %av, %hrow, %hnm, Hrecv⟩
     imodintro
     ihave Htop := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1) dind.toNat
@@ -1690,7 +1661,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
   · iframe
   -- +0x2e  c.beqz a5 -> +0x84
   k_step_e (wp_s_branch cpu _ (KA.«create» + 0x2e#64) true 86#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [createFound_beqz_nl]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.namex_beqz_half]
   iintro Hk Hpc
   by_cases hz : dn.diNlink = 0#16
   · -- ===== ARM G =====
@@ -1805,7 +1776,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     $$ Hk
   -- the process block, whole again, and its pid cell lent out
   ihave Hpriv := (procPrivFd_split A.γ k.proc A.pid A.V A.M).2 $$ [$Hcore $Hofs]
-  icases createFound_pid hct A.γ k.proc A.pid A.V A.M $$ Hpriv with ⟨Hpid, Hpcl⟩
+  icases Xv6.kxc_priv_pid hct A.γ k.proc A.pid A.V A.M $$ Hpriv with ⟨Hpid, Hpcl⟩
   ihave Howe : createFoundOwe k A $$ [Hsn Hss Hpath Hpcl Hrest]
   · unfold createFoundOwe; iframe
   ihave Hfr : createFoundFr k v3 nf tl $$ [Hfr Hnm Htl]

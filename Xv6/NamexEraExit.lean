@@ -398,7 +398,7 @@ theorem namexEra_done (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   have hK12 := namex_slots_12 _ hs.hK
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
   have hnpar := hs.hnpar
-  have hbz := namex_beqz (R 22#5)
+  have hbz := Xv6.dirlookup_beqz (R 22#5)
   have hpl : pathElems A.pl = es0 := by rw [hes0, hdone, List.append_nil]
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

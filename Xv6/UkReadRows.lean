@@ -15,7 +15,7 @@ member).
 
 CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
 `sbundle_at_read_intro`, `spost_at_read_elim`, `std_fd_st_of_key`,
-`ufd_fd_st_of_key`, `udepwf_st`, `ufd_key_agree`, `uread_count_le`,
+`ufd_fd_st_of_key`, `udepwf_st`, `ufd_key_agree`, `Xv6.ushNarrow_count_le`,
 `uread_count_is_cap`.  Unreached (not ported): `udepwf_st_K`.
 
 ## Deviations from Rocq
@@ -45,6 +45,7 @@ CONE (re-walked on the pinned globs: 10/11 reached): `xfam_rd`, `xfam_rdf`,
 -/
 import Xv6.UkIoSysP
 import Xv6.UexecExecInst
+import Xv6.UshMainLine
 
 namespace Xv6
 
@@ -59,16 +60,6 @@ set_option linter.unusedSectionVars false
 theorem argZ_setWidth (v : BitVec 64) : argZ v = (BitVec.setWidth 32 v).toInt := by
   unfold argZ
   congr 1
-
-/-- The trapframe's argument words at a run's key (Rocq `tf_of_arg0/1/2`). -/
-theorem ukio_tfOf_arg0 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 0) = m.get 10#5 := by
-  rw [tfOf_arg m pc 0 (by decide)]; rfl
-
-theorem ukio_tfOf_arg1 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 1) = m.get 11#5 := by
-  rw [tfOf_arg m pc 1 (by decide)]; rfl
-
-theorem ukio_tfOf_arg2 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 2) = m.get 12#5 := by
-  rw [tfOf_arg m pc 2 (by decide)]; rfl
 
 /-! ## §1 THE TWO FAMILIES -/
 
@@ -193,17 +184,6 @@ theorem ufd_key_agree (N : UkNames GF) (fd : Nat) (st : FdState) (v0 : BitVec 64
 end StateFixed
 
 /-! ## §4 THE COUNT, ACROSS THE SIGN BOUNDARY -/
-
-/-- **Rocq `uread_count_le`**: the kernel's window (the SIGNED low word, at
-`toNat`) is never longer than the unsigned request. -/
-theorem uread_count_le (w : BitVec 64) (k : Nat) (hu : w.toNat = k) :
-    ((BitVec.setWidth 32 w).toInt).toNat ≤ k := by
-  have h1 : (BitVec.setWidth 32 w).toNat = w.toNat % 2 ^ 32 := by simp
-  have h2 : ((BitVec.setWidth 32 w).toInt).toNat ≤ (BitVec.setWidth 32 w).toNat := by
-    rw [BitVec.toInt_eq_toNat_cond]
-    split <;> omega
-  have h3 : w.toNat % 2 ^ 32 ≤ w.toNat := Nat.mod_le _ _
-  omega
 
 /-- **Rocq `uread_count_is_cap`**: below the sign boundary the kernel's count
 IS the request. -/

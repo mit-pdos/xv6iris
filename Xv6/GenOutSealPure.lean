@@ -107,7 +107,7 @@ theorem lmNext_input_of_complete (B : LmByteLaws M) (ps cs : List Nat) (s : M.lm
     have h1 : lmD M ps cs s E ++ lmPending M ps cs s E <+: lmD M ps cs s E ++ w := by
       rw [lmD_pending_sess M B ps cs s E hEb, hs]
       exact hlow.trans hup
-    have h2 := prefixApp_cancel _ _ _ h1
+    have h2 := Xv6.wlPrefix_app_cancel _ _ _ h1
     exact hw.eq_of_length (Nat.le_antisymm hw.length_le h2.length_le)
   · have hne : E.map Prod.snd ≠ [] := fun hq => hr (by rw [hq]; rfl)
     have hp : lmPending M ps cs s E = [] := by

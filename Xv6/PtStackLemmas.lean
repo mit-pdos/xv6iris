@@ -12,6 +12,7 @@ page of the caller's tree.
 -/
 import Xv6.PtRunLemmas
 import Xv6.KvmDefs
+import Xv6.PtOwnLemmas
 
 namespace Xv6.PtStack
 
@@ -295,20 +296,20 @@ theorem stackInv_step (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr fres
   · -- len
     rw [List.length_append, hinv.len, hflen, gap_eq t T pas i fr hinv, missingStacks_succ' t i]
   · -- base
-    rw [hTT, PTree.base_setLeaf, PtRun.base_fill, hinv.base]
+    rw [hTT, PTree.base_setLeaf, MachCSL.PTree.base_fill, hinv.base]
   · -- wf
     rw [hTT]
     exact PtRun.wfU_setLeaf_complete 2 _ (kstackVpn i) (leafOf p (permBits .rw))
       (leafOf_valid p (permBits .rw) (by decide))
-      (PtRun.wfU_fill 2 T (kstackVpn i) fresh hinv.wf) hc
+      (MachCSL.PTree.wfU_fill 2 T (kstackVpn i) fresh hinv.wf) hc
   · -- pagesNodup
     rw [hTT]
     exact PTree.pagesNodup_setLeaf 2 _ _ _
-      (PtRun.pagesNodup_fill 2 T (kstackVpn i) fresh hinv.ndp hfnd (fun b hb => (hfv b hb).2))
+      (MachCSL.PTree.pagesNodup_fill 2 T (kstackVpn i) fresh hinv.ndp hfnd (fun b hb => (hfv b hb).2))
   · -- unmapped
     intro j hj hj64
     rw [hTT, PtRun.walk_setLeaf_ne _ _ _ _ hc (kstackVpn_ne i j hi hj64 (by omega)),
-      PtRun.walk_fill 2 T (kstackVpn i) fresh hinv.wf]
+      MachCSL.PTree.walk_fill 2 T (kstackVpn i) fresh hinv.wf]
     exact hinv.unm j (by omega) hj64
   · -- Nodup
     refine List.nodup_append.mpr ⟨hfrfresh, hpnd, ?_⟩
@@ -352,39 +353,6 @@ here so that this file depends only on `PtRunLemmas`.) -/
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-theorem ctxByte_excl (ξ ξ' : CtxId) (a : PAddr) (dq : DFrac) (v v' : BitVec 8) :
-    iprop(ctxByte (GF := GF) ξ a (DFrac.own 1) v ∗ ctxByte ξ' a dq v') ⊢ (False : IProp GF) := by
-  unfold ctxByte
-  iintro ⟨⟨%e, %H, Hp, %_, _⟩, ⟨%e', %H', Hp', %_, _⟩⟩
-  icases pointsTo_ne $$ Hp Hp' with %hne
-  exact (hne rfl).elim
-
-theorem wordPointsTo_excl [CurCtx] (a : BitVec 64) (dq : DFrac) (w w' : BitVec 64) :
-    iprop(wordPointsTo (GF := GF) a 8 (DFrac.own 1) w ∗ wordPointsTo a 8 dq w') ⊢
-      (False : IProp GF) := by
-  have hb : ∀ (ppn : BitVec 44) (dq' : DFrac) (u : BitVec 64),
-      bytesPointsTo (GF := GF) (paOf ppn a) 8 dq' u ⊢
-        ctxByte curCtx (paOf ppn a + BitVec.ofNat 64 0) dq' (nthByte (n := 8) u 0) := by
-    intro ppn dq' u
-    exact BigSepL.bigSepL_lookup (Φ := fun (_ : Nat) (j : Nat) =>
-      iprop(ctxByte (GF := GF) curCtx (paOf ppn a + BitVec.ofNat 64 j) dq' (nthByte (n := 8) u j)))
-      (l := List.range 8) (i := 0) (x := 0) (by simp)
-  unfold wordPointsTo
-  iintro ⟨⟨%ppn, #Hcl, %_, Hb1⟩, ⟨%ppn', #Hcl', %_, Hb2⟩⟩
-  icases kmapAt_agree (vpnOf a) (kLeaf ppn .rw 0#1 0#1) (kLeaf ppn' .rw 0#1 0#1) $$ [Hcl Hcl']
-    with %heq
-  · isplit
-    · iexact Hcl
-    · iexact Hcl'
-  have hp : ppn = ppn' := kLeaf_rw_ppn_inj _ _ heq
-  subst hp
-  ihave Hb1 := hb ppn (DFrac.own 1) w $$ Hb1
-  ihave Hb2 := hb ppn dq w' $$ Hb2
-  iapply ctxByte_excl
-  isplitl [Hb1]
-  · iexact Hb1
-  · iexact Hb2
-
 /-- A page, witnessed by the word at its first entry. -/
 def pageWord [CurCtx] (b : BitVec 44) : IProp GF := iprop%
   ∃ v : BitVec 64, wordPointsTo (pageAddr b) 8 (DFrac.own 1) v
@@ -393,48 +361,16 @@ theorem pageWord_excl [CurCtx] (b : BitVec 44) :
     iprop(pageWord (GF := GF) b ∗ pageWord b) ⊢ (False : IProp GF) := by
   unfold pageWord
   iintro ⟨⟨%v, H1⟩, ⟨%v', H2⟩⟩
-  iapply (wordPointsTo_excl (pageAddr b) (DFrac.own 1) v v')
+  iapply (Xv6.wordPointsTo_excl (pageAddr b) (DFrac.own 1) v v')
   isplitl [H1]
   · iexact H1
   · iexact H2
-
-theorem bigSepL_nodup_of_excl {α : Type _} (l : List α) (Φ : α → IProp GF)
-    (hex : ∀ x : α, iprop(Φ x ∗ Φ x) ⊢ (False : IProp GF)) :
-    ([∗list] x ∈ l, Φ x) ⊢ ⌜l.Nodup⌝ := by
-  by_cases hnd : l.Nodup
-  · iintro _
-    ipureintro
-    exact hnd
-  · rw [List.Nodup, List.pairwise_iff_getElem] at hnd
-    obtain ⟨i, j, hi, hj, hij, heq⟩ : ∃ (i j : Nat) (_hi : i < l.length) (_hj : j < l.length),
-        i < j ∧ l[i] = l[j] :=
-      Classical.byContradiction fun hc =>
-        hnd (fun i j hi hj hlt he => hc ⟨i, j, hi, hj, hlt, he⟩)
-    have h1 : l[i]? = some l[i] := List.getElem?_eq_getElem hi
-    have h2 : l[j]? = some l[j] := List.getElem?_eq_getElem hj
-    have hlem : ([∗list] k ↦ x ∈ l, iprop(if k = i then emp else Φ x)) ⊢ Φ l[j] := by
-      have hl := BigSepL.bigSepL_lookup
-        (Φ := fun (k : Nat) (x : α) => iprop(if k = i then emp else Φ x)) h2
-      rw [if_neg (by omega : ¬ j = i)] at hl
-      exact hl
-    have hfin : iprop(Φ l[i] ∗ Φ l[j]) ⊢ (False : IProp GF) := by
-      rw [heq]; exact hex l[j]
-    have hstep : ([∗list] x ∈ l, Φ x) ⊢ (False : IProp GF) := by
-      iintro H
-      icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (x : α) => Φ x) h1).1 $$ H
-        with ⟨Hi, Hrest⟩
-      ihave Hj := hlem $$ Hrest
-      iapply hfin
-      isplitl [Hi]
-      · iexact Hi
-      · iexact Hj
-    exact hstep.trans false_elim
 
 theorem nodeOwn_read0 [CurCtx] (dq : DFrac) (t : PTree) :
     nodeOwn (GF := GF) dq t ⊢ wordPointsTo (pteAddr t.base 0#9) 8 dq (t.ents 0#9) := by
   unfold nodeOwn
   exact BigSepL.bigSepL_lookup (Φ := fun (_ : Nat) (j : BitVec 9) =>
-    iprop(wordPointsTo (GF := GF) (pteAddr t.base j) 8 dq (t.ents j))) (PtRun.allIdx_get 0#9)
+    iprop(wordPointsTo (GF := GF) (pteAddr t.base j) 8 dq (t.ents j))) (MachCSL.allIdx_getElem? 0#9)
 
 theorem nodeOwn_pageWord [CurCtx] (t : PTree) :
     nodeOwn (GF := GF) (DFrac.own 1) t ⊢ pageWord t.base := by
@@ -504,7 +440,7 @@ theorem stackPages_nodup [CurCtx] (T : PTree) (m : Nat) (pas : Nat → BitVec 44
     iprop(ptreeOwn (GF := GF) 2 (DFrac.own 1) T ∗
       [∗list] j ∈ List.range m, byteBuf (pageAddr (pas j)) (DFrac.own 1) (List.replicate 4096 5#8))
     ⊢ ⌜(T.pages 2 ++ (List.range m).map pas).Nodup⌝ := by
-  refine Entails.trans ?_ (bigSepL_nodup_of_excl (GF := GF)
+  refine Entails.trans ?_ (Xv6.bigSepL_nodup_of_excl (GF := GF)
     (T.pages 2 ++ (List.range m).map pas) pageWord pageWord_excl)
   iintro ⟨H1, H2⟩
   iapply BigSepL.bigSepL_append.2

@@ -21,9 +21,6 @@ namespace Xv6
 
 /-! ## S2  THE BYTE LAYOUTS AROUND A NAME OF ANY LENGTH -/
 
-/-- the redirect suffix `' ' '>' ' '` then the name -/
-theorem sufGt_len (nm : List (BitVec 8)) : (sufGt nm).length = 3 + nm.length := sufGt_length nm
-
 theorem sufGt_0 (nm : List (BitVec 8)) : (sufGt nm)[0]! = wlSp := rfl
 
 theorem sufGt_1 (nm : List (BitVec 8)) : (sufGt nm)[1]! = 62#8 := rfl

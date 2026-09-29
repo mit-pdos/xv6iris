@@ -86,12 +86,6 @@ structure UshCtx (GF : BundledGFunctors) where
   Wb : List (BitVec 8) → IProp GF
   Pm : List (BitVec 8) → IProp GF
 
-/-- **Rocq `UkShLoop.ush_line_lexable_redir_shape`** (deviation 6). -/
-theorem ushLineLexableRedirShape (ws : List (List (BitVec 8))) (file : List (BitVec 8)) (f : Nat → BitVec 8)
-    (k len : Nat) (h : ushsLineIs ws file f k len) :
-    ushsRedir len (fun j => f (k + j)) ((wlBody ws).length + 1) ((wlBody ws).length + 3 + file.length) :=
-  ushsLineIs_redir ws file f k len h
-
 section UshMainDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

@@ -32,7 +32,7 @@ path[128]` at `sp0-144`.  The buffer is a `byteBuf` list
    only `p->pid`'s share, not the bare block.
 3. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers
-   (`sysfile_stack_bytes`, `sysfile_buf_split` / `_join`); the fold is the
+   (`Xv6.kxc_stackOwn_byteBuf`, `sysfile_buf_split` / `_join`); the fold is the
    landed `KstackMap.byteBuf_stackOwn`.
 -/
 import Xv6.SysfileCalls
@@ -110,7 +110,7 @@ theorem sys_mkdir_carve [CurCtx] (sp0 : BitVec 64) :
     unfold sysMkdirBuf; bv_omega
   rw [e]
   iintro H
-  icases sysfile_stack_bytes (sysMkdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysMkdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   isplitr
   · ipureintro; exact hal
   · unfold sysfileAny

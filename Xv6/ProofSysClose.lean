@@ -30,6 +30,9 @@ import Xv6.SpecSysClose
 import Xv6.SysfileCalls
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
+import Xv6.SysFstatParts
 
 namespace Xv6
 
@@ -49,10 +52,7 @@ theorem sc_ret_4e4c : jumpPc (KA.«sys_close» + 0x20#64) = (KA.«sys_close» + 
 theorem sc_ret_4e64 : jumpPc (KA.«sys_close» + 0x38#64) = (KA.«sys_close» + 0x38#64) := by decide
 
 theorem sc_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem sc_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sc_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem sc_add0' (x : BitVec 64) : x + 0#64 = x := by simp
-theorem sc_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4064#12 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 theorem sc_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4076#12 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 theorem sc_ec (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFE8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 theorem sc_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
@@ -92,12 +92,6 @@ theorem sc_ofile_addr (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.reducePow, Nat.shiftLeft_eq]
   omega
-
-theorem sc_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sc_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 theorem sc_calleeSaved_mk (KR R : RegMap)
     (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
@@ -355,13 +349,13 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
   ihave Hfd := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64 + 4#64) 4 (DFrac.own 1) oldfd ⊢
       wordPointsTo afd 4 (DFrac.own 1) oldfd from by rw [sc_ec, hafd]) $$ Hfd
   k_step_gen (wp_s_addi c1 _ (KA.«sys_close» + 0x8#64) false 4064#12 12#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_f_addr] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_st_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_close» + 0xc#64) false 4076#12 11#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_fd_addr] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_addi c3 _ (KA.«sys_close» + 0x10#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_li0] next c4 hp4
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_jal c4 _ (KA.«sys_close» + 0x12#64) false 2096404#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffffd26] next c5 hp5
@@ -370,11 +364,11 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
   iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v oldfd wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sc_ret_4e42, sc_li0, sc_fd_addr, hafd]
+  k_norm_g [sc_ret_4e42, Xv6.co_li_zero, sc_fd_addr, hafd]
   iframe Hcore Howe Hpfd Hcf
   iframe #
-  case ha0 => k_norm_g [sc_li0]
-  case hpf => k_norm_g [sc_f_addr]; exact sc_f_nonnull (k.regs 2#5) hsp
+  case ha0 => k_norm_g [Xv6.co_li_zero]
+  case hpf => k_norm_g [Xv6.sfs_st_addr]; exact sc_f_nonnull (k.regs 2#5) hsp
   case hpr => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
   case hn => k_norm_g; omega
@@ -382,7 +376,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
   -- past argfd: li a5,-1 ; bltz a0
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie %spp %R1 %hsp1 Hk Hpc %hcs1 Hcore Howe Hpost1
-  k_norm_g [sc_pushed_withSpie, sc_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
@@ -454,7 +448,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     case hKm => k_norm_g; rw [sysCloseSlots_eq] at hK; omega
     iapply wpNext_intro_pin
     iintro %c10 %hp10 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2
-    k_norm_g [sc_withSpie_withSpie, sc_pushed_withSpie, sc_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -488,7 +482,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     have hfv' : V.ofile[fd0]? = some (fnode kk) := hfv
     icases procOfilesOwe_close γ V.fdg pa V.ofile [] fd0 (fnode kk) (by simp) hfv' $$ Howe with ⟨Hc, Hcw⟩
     k_step_gen (wp_s_sd c14 _ (KA.«sys_close» + 0x2c#64) false 0#12 10#5 0#5 (by decide) (fnode kk))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_add0, sc_add0'] next c15 hp15
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.dsOff0, sc_add0'] next c15 hp15
     iintro Hk Hpc Hc
     -- the descriptor's state: the row the bundle holds
     icases fdFrags_acc V.fdg sts fd0 _ hrow $$ Hfr with ⟨Hfrag0, -, Hfrw0⟩
@@ -497,7 +491,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     subst hst'
     -- a0 = f ; jal fileclose
     k_step_gen (wp_s_ld c15 _ (KA.«sys_close» + 0x30#64) false 4064#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) (fnode kk))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d8', sc_f_addr] next c16 hp16
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d8', Xv6.sfs_st_addr] next c16 hp16
     iintro Hk Hpc Hcf
     k_step_gen (wp_s_jal c16 _ (KA.«sys_close» + 0x34#64) false 2093822#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffff332] next c17 hp17
@@ -529,7 +523,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     -- past fileclose (at any hart): settle the descriptor ; li a5,0 ; exit
     iapply wpNext_intro_pin
     iintro %c18 %hp18 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hu Hir Hout Hcpost
-    k_norm_g [sc_withSpie_withSpie, sc_pushed_withSpie, sc_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     unfold calleeSaved at hcs3
     k_norm_g at hcs3
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
@@ -539,7 +533,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
       rw [hproc]) $$ Hpid
     ihave Hcore := Hcw $$ Hpid
     k_step_gen (wp_s_addi c18 _ (KA.«sys_close» + 0x38#64) true 0#12 15#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_li0] next c19 hp19
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c19 hp19
     iintro Hk Hpc
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hp19 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hp19 (Or.inl h)) $$ Hce

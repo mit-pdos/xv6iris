@@ -86,10 +86,6 @@ theorem seccCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
     · cases hab
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
-/-- A register word is its own `toNat` read back (Rocq `moi_of_uint`). -/
-theorem seccEntry_ofNat_toNat (x : BitVec 64) : BitVec.ofNat 64 x.toNat = x := by
-  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
-
 section UkSeccRows
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
@@ -196,7 +192,7 @@ theorem seccImageEntry_holds (UL : UK_LEAVES) (GS : SECC_START)
     seccKexecEntryRows na alen afun sts W' hokk hroom hfdl hwr hrp
   have hfd : W'.fd = sts := kexecImageOk_fd hokk
   have hcode := seccCode_rows W'.M W'.perm hsub hx
-  have ha0 : (tfResumeGpr0 W'.tf).get 10#5 = BitVec.ofNat 64 (uvisArgc W') := (seccEntry_ofNat_toNat _).symm
+  have ha0 : (tfResumeGpr0 W'.tf).get 10#5 = BitVec.ofNat 64 (uvisArgc W') := (Xv6.ofNat_toNat_pc _).symm
   have hl2 : (W'.fd.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)) := by rw [hfd]; exact hcons
   -- the credentials: the console payer
   icases HPay with ⟨#Hw, #Hrw, #Hrows⟩

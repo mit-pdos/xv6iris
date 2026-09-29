@@ -148,7 +148,7 @@ theorem grepLoop_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap
     obtain ⟨nb, hnb⟩ : ∃ nb : Nat, ret.toInt = nb := ⟨ret.toInt.toNat, by omega⟩
     have hnb1 : 0 < nb := by omega
     have hnb2 : nb ≤ grepRoom left := by omega
-    have hret : BitVec.ofNat 64 nb = ret := kgrep_ofNat_of_toInt ret nb hnb
+    have hret : BitVec.ofNat 64 nb = ret := Xv6.kcat_ofNat_of_toInt ret nb hnb
     -- 0x180  addw s4,s6,a0 : m += n
     gfetch 0x180 false (.RTYPEW (.Regidx 10#5, .Regidx 22#5, .Regidx 20#5, .ADDW))
     iapply wp_uk_rtypew UL N h6 m5 (BitVec.ofNat 64 0x180) false 10#5 22#5 20#5 .ADDW (4 + n2)

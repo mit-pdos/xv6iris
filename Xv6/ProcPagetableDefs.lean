@@ -13,6 +13,7 @@ import Xv6.SpecUvmunmap
 import Xv6.SpecUvmfree
 import Xv6.UPtPptLemmas
 import Xv6.UPtLemmas
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -27,16 +28,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Shared facts -/
-
-theorem pp_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem pp_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem pp_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-- `ret` out of the first `uvmunmap` of `proc_freepagetable`. -/
 theorem pp_ret_1a56 : jumpPc (KA.«proc_freepagetable» + 0x20#64) = (KA.«proc_freepagetable» + 0x20#64) := by

@@ -668,7 +668,7 @@ theorem vdrw3_disk_off (off i k : Nat) :
     BitVec.ofNat 64 (16 * i) + BitVec.ofNat 64 off + KA.«disk» + BitVec.ofNat 64 k =
       KA.«disk» + BitVec.ofNat 64 (off + 16 * i + k) := by
   rw [BitVec.add_assoc (BitVec.ofNat 64 (16 * i)) (BitVec.ofNat 64 off) KA.«disk»,
-    diskIdx_addr' off i, BitVec.add_assoc, ← ofNat_add64]
+    diskIdx_addr' off i, BitVec.add_assoc, ← MachCSL.ofNat64_add]
 
 /-- ... and the same sum with `k_norm`'s associativity. -/
 theorem vdrw3_disk_off' (off i k : Nat) :
@@ -687,11 +687,11 @@ theorem vdrw3_ops0 (i : Nat) : KA.«disk» + BitVec.ofNat 64 (160 + 16 * i + 8) 
 theorem vdrw3_ops4 (i : Nat) :
     KA.«disk» + BitVec.ofNat 64 (160 + 16 * i + 12) = aOps i + 4#64 := by
   unfold aOps diskAddr dOffOps opsSize
-  rw [show 160 + 16 * i + 12 = 168 + 16 * i + 4 from by omega, ofNat_add64, ← BitVec.add_assoc]
+  rw [show 160 + 16 * i + 12 = 168 + 16 * i + 4 from by omega, MachCSL.ofNat64_add, ← BitVec.add_assoc]
 theorem vdrw3_ops8 (i : Nat) :
     KA.«disk» + BitVec.ofNat 64 (160 + 16 * i + 16) = aOps i + 8#64 := by
   unfold aOps diskAddr dOffOps opsSize
-  rw [show 160 + 16 * i + 16 = 168 + 16 * i + 8 from by omega, ofNat_add64, ← BitVec.add_assoc]
+  rw [show 160 + 16 * i + 16 = 168 + 16 * i + 8 from by omega, MachCSL.ofNat64_add, ← BitVec.add_assoc]
 
 /-- The two cells of `disk.info[h]`, as `+0x14c` and `+0x172` name them
 (`a6 = &disk + 32 + 16 h`). -/
@@ -748,7 +748,7 @@ theorem vdrw4_availIdx (pav : PAddr) : pav + 2#64 = availIdxAt pav := rfl
 theorem vdrw4_availRing (pav : PAddr) (j : Nat) :
     pav + (BitVec.ofNat 64 (2 * j) + 4#64) = availRingAt pav j := by
   unfold availRingAt
-  rw [← ofNat_add64, show 2 * j + 4 = 4 + 2 * j from by omega]
+  rw [← MachCSL.ofNat64_add, show 2 * j + 4 = 4 + 2 * j from by omega]
 
 /-- `*R(QUEUE_NOTIFY)`, out of `lui a5,0x10001; sw zero,80(a5)`. -/
 theorem vdrw4_notify_addr : 0x10001000#64 + 80#64 = 0x10001050#64 := by decide
@@ -821,16 +821,6 @@ theorem vdrw3_nextIdx (i : Nat) (hi : i < NUM) :
 theorem vdrw3_statusByte :
     BitVec.extractLsb' 0 8 (0xffffffffffffffff#64) = 0xff#8 := by decide
 
-/-- `sw a1,4(s3)` with `a1 = 1`: `b->disk = 1`. -/
-theorem vdrw3_one32 : BitVec.extractLsb' 0 32 (1#64) = 1#32 := by decide
-
-/-- `sh a0,4(a3)`: the head index, as the ring cell takes it. -/
-theorem vdrw4_headHalf (i : Nat) (hi : i < NUM) :
-    BitVec.extractLsb' 0 16 (BitVec.ofNat 64 i) = BitVec.ofNat 16 i :=
-  vdrw3_nextIdx i hi
-
-theorem vdrw4_ofNat16_toNat (i : Nat) (hi : i < NUM) : (BitVec.ofNat 16 i).toNat = i := by
-  rcases lt8_cases i hi with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
 
 /-- `lhu a5,2(a4) ; addiw a5,a5,1 ; sh a5,2(a4)`: the published count. -/
 theorem vdrw4_bump (n : Nat) :
@@ -874,7 +864,7 @@ theorem vdrw4_ring_write (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (np : 
       ctxBytes curCtx (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half) w0 ⊢
       writeAU cpu (availRingAt pav (np % NUM)) 2 (BitVec.ofNat 16 i)
         (ringWritePost γ pav cpu np i) := by
-  have he : (BitVec.ofNat 16 i).toNat = i := vdrw4_ofNat16_toNat i hi
+  have he : (BitVec.ofNat 16 i).toNat = i := Xv6.toNat_ofNat16 i hi
   have h2 := disk_ring_write (GF := GF) γ pd pav pu cpu np stg0 w0 (BitVec.ofNat 16 i)
     (by rw [he]; exact hi)
   rw [he] at h2

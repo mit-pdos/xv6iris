@@ -221,7 +221,7 @@ theorem sys_open_tails_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' 
   unfold sysOpenLk
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, ⟨#Hslk, Hsl, #Hfl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot, Hfrz⟩,
     Hload, Hpid, HK⟩
-  icases sys_open_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  icases Xv6.sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
@@ -301,7 +301,7 @@ theorem sys_open_tail_a (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_d6, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_d6, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xd6  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0xd6#64) true 4095#12 10#5 0#5 (by decide))
@@ -358,7 +358,7 @@ theorem sys_open_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_110, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_110, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x110  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x110#64) true 4095#12 10#5 0#5 (by decide))
@@ -423,7 +423,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_open_tails_ret_102, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_102, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- 0x102  jal end_op
@@ -439,7 +439,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_106, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_106, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x106  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x106#64) true 4095#12 10#5 0#5 (by decide))
@@ -501,7 +501,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_open_tails_ret_11c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_11c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- 0x11c  jal end_op
@@ -517,7 +517,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_120, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_120, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x120  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x120#64) true 4095#12 10#5 0#5 (by decide))
@@ -583,7 +583,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_open_tails_ret_134, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_134, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- +0x134  jal end_op
@@ -599,7 +599,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_138, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_138, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x138  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x138#64) true 4095#12 10#5 0#5 (by decide))
@@ -673,7 +673,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   case ft => k_norm_g; exact hS.htier
   case fa => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hfd Hiru
-  k_norm_g [sys_open_tails_ret_12c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_12c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   -- +0x12c  ld s3,152(sp)
@@ -734,7 +734,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
   case iut => k_norm_g; exact hS.htier
   case iua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
-  k_norm_g [sys_open_tails_ret_be, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_be, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
   ihave Hop := logOpb_op icfgLog u $$ Hop Htx
@@ -751,7 +751,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_open_tails_ret_c2, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_tails_ret_c2, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0xc2  mv a0,s3
   k_step_e (wp_s_add cpu _ (sysOpenAddr + 0xc2#64) true 10#5 0#5 19#5 (by decide))

@@ -46,6 +46,7 @@ bodies are byte-identical and the offsets above are the Lean image's.
 -/
 import Xv6.DirlookupRead
 import MachCSL.WpSmodeLh
+import Xv6.NamexLevel
 
 namespace Xv6
 
@@ -60,17 +61,6 @@ set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-/-- The type cell, borrowed out of `inodeMeta`. -/
-theorem dirlookup_meta_type (ip : BitVec 64) (dn : Dinode) :
-    inodeMeta (GF := GF) ip dn ⊢
-      wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType ∗
-      (wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType -∗ inodeMeta ip dn) := by
-  unfold inodeMeta
-  iintro ⟨Ht, Hrest⟩
-  iframe Ht
-  iintro Ht
-  iframe Ht Hrest
 
 theorem dirlookup_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 12).withRegs R) ⊢
@@ -106,18 +96,18 @@ theorem dirlookup_setup (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   subst hX
-  have hmaxb := dirlookup_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hsz := hs.hsz
   have hsz31 : dn.diSize.toNat < 2 ^ 31 := by omega
-  have hsx := dirlookup_sext_small dn.diSize hsz31
-  have hbz := dirlookup_bnez_nat dn.diSize.toNat (by omega)
+  have hsx := Xv6.dsSext_small dn.diSize hsz31
+  have hbz := Xv6.bcond_bne_ofNat dn.diSize.toNat (by omega)
   have hty : BitVec.signExtend 64 dn.diType = BitVec.signExtend 64 T_DIR := by rw [hs.htype]
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hin, #Henv, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x16  lh a4,68(a0) ; +0x1a  c.li a5,1 ; +0x1c  bne a4,a5 (REFUTED)
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbsl, Hlk, Hdi⟩
-  icases dirlookup_meta_type ip dn $$ Hmeta with ⟨Hty, Hmcl⟩
+  icases Xv6.namex_meta_type ip dn $$ Hmeta with ⟨Hty, Hmcl⟩
   k_step_e (wp_s_lh cpu _ (KA.«dirlookup» + 0x16#64) false 68#12 14#5 10#5 (by decide) (by decide)
       (DFrac.own 1) dn.diType)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, iType]

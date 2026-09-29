@@ -30,6 +30,8 @@ import Xv6.UshGetsLine
 import Xv6.UshMainStubs
 import Xv6.UshMainBytes
 import Xv6.UshMainCode
+import Xv6.UshGettokScan
+import Xv6.UshMainLine
 
 namespace Xv6
 
@@ -67,10 +69,6 @@ theorem ushGets_blez1 : ukBtaken .BGE 0#64 1#64 = false := by decide
 
 theorem ushGets_blezm1 : ukBtaken .BGE 0#64 (BitVec.ofInt 64 (-1)) = true := by decide
 
-theorem ushGets_zext (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofNat 64 b.toNat := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
-
 theorem ushGets_nth0 (b : BitVec 8) : nthByte (n := 8) (BitVec.setWidth 64 b) 0 = b := by
   unfold nthByte
   apply BitVec.eq_of_toNat_eq
@@ -85,10 +83,6 @@ theorem ushGets_keepWr (m m0 : RegMap) (rd : BitVec 5) (v : BitVec 64) (hrd : us
     (h : ∀ r, ushGetsKeep r = true → m.get r = m0.get r) :
     ∀ r, ushGetsKeep r = true → (ukWr m rd v).get r = m0.get r := fun r hr => by
   rw [ukWr_get_other _ _ _ _ (ushKeep_ne r rd hr hrd)]; exact h r hr
-
-theorem ushGets_nl_eq (b : BitVec 8) (h : b.toNat = 10) : b = wlNl := BitVec.eq_of_toNat_eq (by rw [h]; rfl)
-
-theorem ushGets_nl_ne (b : BitVec 8) (h : b.toNat ≠ 10) : b ≠ wlNl := fun e => h (by rw [e]; rfl)
 
 /-- The newline's line, pure half (Rocq's `Hdsc_line` step of the `'\n'`
 arm). -/
@@ -239,7 +233,7 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
   let m2 := ukWr m1 18#5 (BitVec.ofNat 64 (a + i + 1))
   have h2_15 : m2.get 15#5 = BitVec.ofNat 64 b.toNat := by
     show (ukWr (ukWr m 15#5 _) 18#5 _).get 15#5 = _
-    rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_same _ _ _ (by decide), ushGets_zext]
+    rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_same _ _ _ (by decide), Xv6.ushG_zext]
   -- 0xaf4  addi a4,a5,-10
   iapply ushS_itype UL N (ushMI_af4 N.t) 0xaf8 h3 m2 nn (ukItypeVal .ADDI (BitVec.ofNat 64 b.toNat) 4086#12)
     (by rw [h2_15]) $$ Hc Hrun
@@ -269,7 +263,7 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
     · ipureintro; exact ushGets_keepWr _ _ _ _ (by decide) hk
   by_cases hb10 : b.toNat = 10
   · -- '\n': 0xaf8 taken
-    have hbe := ushGets_nl_eq b hb10
+    have hbe := Xv6.ushNl_of_val b hb10
     iapply ushS_brT UL N (ushMI_af8 N.t) 0xafe h4 m3 nn
       (by show ukBtaken _ ((ukWr m2 14#5 _).get 14#5) ((ukWr m2 14#5 _).get 0#5) = _
           rw [ukWr_get_same _ _ _ (by decide), RegMap.get_zero, hbnl]; simp [hb10]) $$ Hc Hrun
@@ -315,7 +309,7 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
       show (ukWr m3 15#5 _).get 19#5 = _
       rw [ukWr_get_other _ _ _ _ (by decide), h3_19]
     have hbcr := ushGets_crv b.toNat hbnd
-    have hbne := ushGets_nl_ne b hb10
+    have hbne := Xv6.ushNl_ne_of_val b hb10
     by_cases hb13 : b.toNat = 13
     · -- '\r': falls into 0xafe
       iapply ushS_brN UL N (ushMI_afc N.t) 0xafe h6 m4 nn

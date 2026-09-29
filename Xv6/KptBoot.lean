@@ -19,6 +19,7 @@ Imports only definitional files.
 -/
 import Xv6.KstackMap
 import Xv6.SyscallEnv
+import Xv6.LogBoot
 
 namespace Xv6
 
@@ -131,25 +132,6 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
   · iframe Hkpt Hs
     iexact Htr
 
-/-- A context byte gives up its fraction and keeps its value. -/
-theorem kptBoot_ctxBytePersist (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
-    ctxByte (GF := GF) ξ a dq v ⊢ |==> ctxByte ξ a DFrac.discard v := by
-  unfold ctxByte
-  iintro ⟨%e, %H, Hpt, %hv, #Hkey⟩
-  imod (pointsTo_persist (l := a) (dq := dq) (v := (e :: H))) $$ Hpt with #Hpt
-  imodintro
-  iexists e, H
-  iframe Hpt Hkey
-  ipureintro; exact hv
-
-theorem kptBoot_ctxBytesPersist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    ctxBytes (GF := GF) ξ pa n dq w ⊢ |==> ctxBytes ξ pa n DFrac.discard w := by
-  unfold ctxBytes
-  iintro H
-  ihave H' := BigSepL.bigSepL_mono
-    (fun {_ j} _ => kptBoot_ctxBytePersist ξ (pa + BitVec.ofNat 64 j) dq (nthByte w j)) $$ H
-  iapply BigSepL.bigSepL_bupd $$ H'
-
 /-- **THE ROOT CELL, PERSISTED** (Rocq `kernel_pagetable ↦₈□ root`): the
 word kvminit wrote, at the Bare tier (so its page is its own address),
 becomes the discarded physical word every hart's `kvminithart` reads. -/
@@ -163,7 +145,7 @@ theorem kptRoot_persist [CurCtx] (hct : curTier = KTier.bare) (va : BitVec 64) (
     exact h
   rw [hpa] at hram
   rw [hpa]
-  imod kptBoot_ctxBytesPersist curCtx va 8 (DFrac.own 1) w $$ Hb with #Hb
+  imod Xv6.lbBytes_persist curCtx va 8 (DFrac.own 1) w $$ Hb with #Hb
   imodintro
   isplitr
   · ipureintro; exact ⟨hram, hal⟩

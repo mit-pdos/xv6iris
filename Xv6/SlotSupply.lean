@@ -37,6 +37,7 @@ the one shared `Xv6G.gmUnitG` (one capacity per camera type).
    split is left to it.
 -/
 import Xv6.UartTrace
+import Xv6.VirtioQueue
 
 set_option linter.unusedSectionVars false
 
@@ -58,34 +59,6 @@ def FDSLOTS : Nat := NPROC * (NOFILE + FDSPARE)
 
 /-- The supply of buffer-cache references (Rocq `BioDefs.BSLOTS`). -/
 def BSLOTS : Nat := 1024
-
-/-- Distinct naturals below `n` are at most `n` (the slot bound). -/
-theorem bslot_nodup_bound : ∀ (n : Nat) (l : List Nat), l.Nodup → (∀ i ∈ l, i < n) → l.length ≤ n := by
-  intro n
-  induction n with
-  | zero =>
-    intro l _ hb
-    cases l with
-    | nil => simp
-    | cons a t => exact absurd (hb a (List.mem_cons_self)) (Nat.not_lt_zero a)
-  | succ n ih =>
-    intro l hn hb
-    by_cases hmem : n ∈ l
-    · have hp : l.Perm (n :: l.erase n) := List.perm_cons_erase hmem
-      have hlen : l.length = (l.erase n).length + 1 := by rw [hp.length_eq]; rfl
-      have hb' : ∀ i ∈ l.erase n, i < n := by
-        intro i hi
-        have h1 := hb i (List.mem_of_mem_erase hi)
-        have hne : i ≠ n := by intro e; subst e; exact hn.not_mem_erase hi
-        omega
-      have := ih _ (hn.erase n) hb'
-      omega
-    · have hb' : ∀ i ∈ l, i < n := fun i hi => by
-        have := hb i hi
-        have : i ≠ n := fun e => hmem (e ▸ hi)
-        omega
-      have := ih l hn hb'
-      omega
 
 /-! ## The generic keyed-token supply -/
 
@@ -116,7 +89,7 @@ theorem slotToks_bound (γ : GName) (B n : Nat) :
   · iexists l; iframe H; ipureintro; exact ⟨hlen, hnd, hb⟩
   · ipureintro
     rw [← hlen]
-    exact bslot_nodup_bound B l hnd hb
+    exact Xv6.queue_nodup_length_le B l hnd hb
 
 theorem slotToks_cons (γ : GName) (B n : Nat) :
     slotToks (GF := GF) γ B 1 ∗ slotToks γ B n ⊢ slotToks γ B (n + 1) := by

@@ -23,7 +23,7 @@ early; a zero-length write is its own law; the source run must reach the
 deposit (`udepwfKs`); the stub hands the return to the caller.
 
 CONE (re-walked on the pinned globs: 32/48 reached).  Ported: `pdev_signed_nat`,
-`pdev_signed_m1`, `pdev_signed_uint0`, `pdev_stub_next`, `pdev_rd_ans`,
+`Xv6.fh_m1`, `pdev_signed_uint0`, `pdev_stub_next`, `pdev_rd_ans`,
 `pdev_map_seq`, `pdev_chunk_byte`, `pdev_qh`, the notations `γt γd γfd a0_idx
 a1_idx a2_idx a7_idx` (as `N.t` / `N.d` / `N.fd` / `10#5` / `11#5` / `12#5` /
 `17#5`), `pipe_out`, `pipe_halt`, `pipe_in`, `pipe_in_eof`, `udepwf_Ks` (this
@@ -70,7 +70,7 @@ DROPPED (unreached): `pdev_rd_ans_m1`, `pipe_out_payL`, `pipe_halt_payL`,
 4. Words: `bv_signed x` is `x.toInt`, `mword_of_int (Z.of_nat n)` is
    `BitVec.ofNat 64 n`, `-1` is `-1#64`, `bv_signed (trunc32 v)` is
    `(BitVec.setWidth 32 v).toInt` (UkTree's reading) or `argZ v` (the
-   kernel's; `pdev_argZ` equates them); `sys_rw_count` is `argZ`;
+   kernel's; `Xv6.argZ_setWidth` equates them); `sys_rw_count` is `argZ`;
    `app_taint` is `MachFixedGS.killCred`, and the kill arm's `kill_shot gn ∗
    app_taint` is `killShot gn ∗ □ killCred` (SpecFilewrite's spelling).
 5. The number premise is on the register file (`UkSysP.usysno`, UkFork
@@ -97,9 +97,6 @@ set_option linter.unusedSectionVars false
 /-- **Rocq `pdev_signed_nat`**. -/
 theorem pdev_signed_nat (n : Nat) (h : (n : Int) < 2 ^ 31) : (BitVec.ofNat 64 n).toInt = (n : Int) :=
   fh_toInt_small n (by omega)
-
-/-- **Rocq `pdev_signed_m1`**. -/
-theorem pdev_signed_m1 : (-1#64 : BitVec 64).toInt = -1 := fh_m1
 
 /-- **Rocq `pdev_signed_uint0`**. -/
 theorem pdev_signed_uint0 (r : BitVec 64) (h : r.toNat = 0) : r.toInt = 0 := by
@@ -143,11 +140,6 @@ nothing past it. -/
 def pdevQh {PROP : Type} [BI PROP] (R : PROP) : Nat → PROP
   | 0 => R
   | _ + 1 => iprop(False)
-
-/-- The kernel's `int` reading is UkTree's. -/
-theorem pdev_argZ (v : BitVec 64) : argZ v = (BitVec.setWidth 32 v).toInt := by
-  unfold argZ
-  congr 1
 
 /-! ## §1 The devices -/
 

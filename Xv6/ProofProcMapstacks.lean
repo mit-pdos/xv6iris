@@ -14,6 +14,10 @@ import Xv6.SpecKalloc
 import Xv6.SpecKvmmap
 import Xv6.PtStackLemmas
 import Xv6.CodeTactics
+import Xv6.ByteCursor
+import Xv6.KvmLemmas
+import Xv6.UvmCallSites
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -43,9 +47,6 @@ theorem pms_ret_17c4 : jumpPc (KA.«proc_mapstacks» + 0x78#64) = (KA.«proc_map
 /-- The virtual address of process `i`'s kernel stack (`KSTACK(i)`). -/
 def pmsVa (i : Nat) : BitVec 64 := BitVec.ofNat 64 (4096 * (0x3FFFFFF - 2 * (i + 1)))
 
-theorem pms_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 theorem pms_h1 (i : Nat) :
     KA.«proc» + (BitVec.ofNat 64 (368 * i) + -KA.«proc») = BitVec.ofNat 64 (368 * i) := by
@@ -55,33 +56,33 @@ theorem pms_h1 (i : Nat) :
 
 theorem pms_h2 (i : Nat) (hi : i < 64) :
     (BitVec.ofNat 64 (368 * i)).sshiftRight 4 = BitVec.ofNat 64 (23 * i) := by
-  have ht : (BitVec.ofNat 64 (368 * i)).toNat = 368 * i := pms_toNat _ (by omega)
+  have ht : (BitVec.ofNat 64 (368 * i)).toNat = 368 * i := Xv6.bcOfNatToNat _ (by omega)
   have hmsb : (BitVec.ofNat 64 (368 * i)).msb = false := by
     simp only [BitVec.msb_eq_decide, ht, decide_eq_false_iff_not, Nat.not_le]
     omega
   rw [BitVec.sshiftRight_eq_of_msb_false hmsb]
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_ushiftRight, ht, pms_toNat (23 * i) (by omega), Nat.shiftRight_eq_div_pow]
+  rw [BitVec.toNat_ushiftRight, ht, Xv6.bcOfNatToNat (23 * i) (by omega), Nat.shiftRight_eq_div_pow]
   omega
 
 theorem pms_h3 (i : Nat) (hi : i < 64) :
     BitVec.ofNat 64 (23 * i) * 15238614669586151335#64 = BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_mul, pms_toNat (23 * i) (by omega), pms_toNat i (by omega),
-    pms_toNat 15238614669586151335 (by omega)]
+  rw [BitVec.toNat_mul, Xv6.bcOfNatToNat (23 * i) (by omega), Xv6.bcOfNatToNat i (by omega),
+    Xv6.bcOfNatToNat 15238614669586151335 (by omega)]
   omega
 
 theorem pms_h4 (i : Nat) (hi : i < 64) :
     (BitVec.ofNat 64 i) <<< 13 = BitVec.ofNat 64 (8192 * i) := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, pms_toNat i (by omega), pms_toNat (8192 * i) (by omega),
+  rw [BitVec.toNat_shiftLeft, Xv6.bcOfNatToNat i (by omega), Xv6.bcOfNatToNat (8192 * i) (by omega),
     Nat.shiftLeft_eq]
   omega
 
 theorem pms_h5 (i : Nat) (_hi : i < 64) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (8192 * i)) = BitVec.ofNat 32 (8192 * i) := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat, pms_toNat (8192 * i) (by omega), Nat.shiftRight_zero,
+  rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat (8192 * i) (by omega), Nat.shiftRight_zero,
     BitVec.toNat_ofNat]
 
 theorem pms_h6 : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (2#20 ++ 0#12)) = 8192#32 := by
@@ -103,15 +104,15 @@ theorem pms_h8 (i : Nat) (hi : i < 64) :
     omega
   rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_setWidth, ht, pms_toNat (8192 * (i + 1)) (by omega)]
+  rw [BitVec.toNat_setWidth, ht, Xv6.bcOfNatToNat (8192 * (i + 1)) (by omega)]
   omega
 
 theorem pms_h9 (i : Nat) (hi : i < 64) :
     274877902848#64 + -BitVec.ofNat 64 (8192 * (i + 1)) = pmsVa i := by
   unfold pmsVa
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_add, BitVec.toNat_neg, pms_toNat (8192 * (i + 1)) (by omega),
-    pms_toNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega), BitVec.toNat_ofNat]
+  rw [BitVec.toNat_add, BitVec.toNat_neg, Xv6.bcOfNatToNat (8192 * (i + 1)) (by omega),
+    Xv6.bcOfNatToNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega), BitVec.toNat_ofNat]
   omega
 
 /-- The compiler's `(p - proc) / sizeof(struct proc)` idiom, then
@@ -129,7 +130,7 @@ theorem pms_arith (i : Nat) (hi : i < 64) :
 theorem pms_vpn (i : Nat) (hi : i < 64) : vpnOf (pmsVa i) = kstackVpn i := by
   unfold pmsVa vpnOf kstackVpn
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat, pms_toNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega),
+  rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega),
     Nat.shiftRight_eq_div_pow, BitVec.toNat_ofNat]
   omega
 
@@ -137,8 +138,8 @@ theorem pms_va_shl (i : Nat) (hi : i < 64) :
     pmsVa i = BitVec.ofNat 64 (0x3FFFFFF - 2 * (i + 1)) <<< 12 := by
   unfold pmsVa
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, pms_toNat (0x3FFFFFF - 2 * (i + 1)) (by omega), Nat.shiftLeft_eq,
-    pms_toNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega)]
+  rw [BitVec.toNat_shiftLeft, Xv6.bcOfNatToNat (0x3FFFFFF - 2 * (i + 1)) (by omega), Nat.shiftLeft_eq,
+    Xv6.bcOfNatToNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega)]
   omega
 
 theorem pms_va_align (i : Nat) (hi : i < 64) : pmsVa i &&& 0xfff#64 = 0#64 := by
@@ -148,7 +149,7 @@ theorem pms_va_align (i : Nat) (hi : i < 64) : pmsVa i &&& 0xfff#64 = 0#64 := by
 
 theorem pms_va_range (i : Nat) (hi : i < 64) : (pmsVa i).toNat + 4096 ≤ 2 ^ 38 := by
   unfold pmsVa
-  rw [pms_toNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega)]
+  rw [Xv6.bcOfNatToNat (4096 * (0x3FFFFFF - 2 * (i + 1))) (by omega)]
   omega
 
 /-- The `lui`/`auipc` constants of the cursor set-up. -/
@@ -158,20 +159,6 @@ theorem pms_lui_ff4df : BitVec.signExtend 64 (0xff4df#20 ++ 0#12) = 0xffffffffff
 theorem pms_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 theorem pms_lui_1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by bv_decide
 
-/-- The page `kalloc` returned, as a page number. -/
-theorem pms_pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
-    pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  obtain ⟨h1, -, h3⟩ := h
-  unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h1 h3
-  bv_decide
-
-theorem pms_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  obtain ⟨-, hlo, -⟩ := h
-  intro h0
-  subst h0
-  exact hlo (by decide)
 
 theorem pms_page_range (p : BitVec 64) (h : pageValid p) : p.toNat + 4096 < 2 ^ 56 := by
   obtain ⟨-, -, hhi⟩ := h
@@ -192,7 +179,7 @@ theorem pms_s1_eq (i : Nat) (hi : i < 64) :
   have hproc : KernelSyms.«proc» < 2 ^ 32 := by decide
   have hval : (KA.«proc» + BitVec.ofNat 64 (368 * (i + 1))).toNat
       = KernelSyms.«proc» + 368 * (i + 1) := by
-    rw [BitVec.toNat_add, pms_toNat (368 * (i + 1)) (by omega),
+    rw [BitVec.toNat_add, Xv6.bcOfNatToNat (368 * (i + 1)) (by omega),
       show (KA.«proc» : BitVec 64).toNat = KernelSyms.«proc» from rfl]
     exact Nat.mod_eq_of_lt (by omega)
   have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
@@ -244,38 +231,12 @@ theorem pmsKept_trans {R R' R'' : RegMap} (h : pmsKept R R') (h' : pmsKept R' R'
     h'.2.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
-/-- The exit interrupt state of a second call replaces the first's. -/
-theorem pms_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem pms_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem pms_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
-set_option maxHeartbeats 1000000 in
-/-- `kalloc`'s contract at its entry address, as a rule. -/
-theorem pms_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName)
-    (γk : KmemNames) (on : Option Nat)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
-  exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `kvmmap`'s contract at its entry address, for one read-write page. -/
@@ -365,7 +326,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   k_step_gen (wp_s_jal cur _ (KA.«proc_mapstacks» + 0x52#64) false 2093874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_mapstacks_br_fffffffffffff384] next c1 hp1
   iintro Hk Hpc
-  iapply (pms_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl) $$ [- $Hk $Hpc]
+  iapply (Xv6.uc_kalloc_call KAL c1 _ γl γk (some (nb - i - fr.length)) ?hn ?hKa ?hl) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe #
@@ -375,7 +336,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
   case hl => k_norm_g; exact hlk
   iapply wpNext_intro_pin
   iintro %c2 %hp2 %spie2 %spp2 %R2 %hsp2 Hk Hpc HPost %hcs2
-  k_norm_g [pms_withSpie_withSpie, pms_ret_17a2]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, pms_ret_17a2]
   have hcs' : calleeSaved R R2 := by
     unfold calleeSaved at hcs2 ⊢
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs2
@@ -399,9 +360,9 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     · have hm : nb - i - fr.length = 0 := by injection hzz
       omega
   · -- the page `kalloc` gave
-    have hne0 : R2 10#5 ≠ 0#64 := pms_page_ne_zero _ hvalid
+    have hne0 : R2 10#5 ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero _ hvalid
     have hpa : pageAddr (BitVec.extractLsb' 12 44 (R2 10#5)) = R2 10#5 :=
-      pms_pageAddr_of_valid _ hvalid
+      Xv6.Kvm.pageAddr_of_valid _ hvalid
     -- c.mv a2,a0 ; c.beqz a0 (not taken)
     k_step_gen (wp_s_add c2 _ (KA.«proc_mapstacks» + 0x56#64) true 12#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
@@ -477,7 +438,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     case k14 => k_norm_g
     iapply wpNext_intro_pin
     iintro %c16 %hp16 %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Htree Hav %hpost3
-    k_norm_g [pms_withSpie_withSpie, pms_ret_17c4]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, pms_ret_17c4]
     rw [pms_vpn i hi]
     rw [pms_vpn i hi] at hpost3
     obtain ⟨hcs3, hflen, hrun3, hfnd3, hfv3⟩ := hpost3
@@ -702,7 +663,7 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases pmsFrame_split _ _ _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7, F8, F9⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
-  simp only [pms_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«proc_mapstacks» + 0x80#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -892,7 +853,7 @@ theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
           ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans
             (hpin12 h)))))))))))))))))))
   -- the loop
-  rw [pms_pushed_spie_self k 10]
+  rw [Xv6.ua_pushed_spie_self k 10]
   iapply (pms_loop KAL KM k γl γk t hnoff hK hlk nb hpgt hcount 63 0 (by omega) t (fun _ => 0#44) []
     (PtStack.stackInv_init t (fun _ => 0#44) hwf hnd hunm) k.spie k.spp _
     ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 ?g24 c31) $$ [- $Hk $Hpc $Htree $Hav]

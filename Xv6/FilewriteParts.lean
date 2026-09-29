@@ -382,7 +382,7 @@ theorem fwr_cs_epi (k : KCtx) (fk : Nat) (n : Int) (R : RegMap)
 
 /-! ## 5.  The writer's image (SpecFilewrite deviation 4)
 
-`UMemImg.writerImg` and its lemmas (`writerImg_fault`, `umPages_congr`,
+`UMemImg.writerImg` and its lemmas (`writerImg_fault`, `Xv6.UPtCopy.umPages_congr`,
 `procPtAt_congr`) -- shared with consolewrite's chain. -/
 
 section Block

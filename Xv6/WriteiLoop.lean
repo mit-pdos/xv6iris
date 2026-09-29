@@ -178,7 +178,7 @@ theorem writei_iter_bread (IU : IUPDATE) (BR : BREAD) (LW : LOG_WRITE) (BE : BRE
   · -- +0xa8  bgeu a3,a4 : TAKEN, m = BSIZE - off%BSIZE -> +0x4c
     k_step_e (wp_s_branch cpu _ (KA.«writei» + 0xa8#64) false 8100#13 13#5 14#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [f13, f14, writei_bgeu_nat (A.n - tot) (1024 - (A.off + tot) % BSIZE) (by omega) (by omega), writei_decide_t hge]
+      with [f13, f14, Xv6.fw_bgeu_nat (A.n - tot) (1024 - (A.off + tot) % BSIZE) (by omega) (by omega), writei_decide_t hge]
     iintro Hk Hpc
     iapply (writei_iter_copy IU LW BE EC Γ cpu k spie1 spp1 _ A hA W tot bmI dataI wroteI PI nI
         SI bm2 data2 uX Sb2 fbn ((A.off + tot) % BSIZE) (min (A.n - tot) (BSIZE - (A.off + tot) % BSIZE))
@@ -197,7 +197,7 @@ theorem writei_iter_bread (IU : IUPDATE) (BR : BREAD) (LW : LOG_WRITE) (BE : BRE
   · -- +0xa8  bgeu a3,a4 : FALLS THROUGH ; +0xac  c.mv s10,a3 ; +0xae  c.j +0x4c
     k_step_e (wp_s_branch cpu _ (KA.«writei» + 0xa8#64) false 8100#13 13#5 14#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [f13, f14, writei_bgeu_nat (A.n - tot) (1024 - (A.off + tot) % BSIZE) (by omega) (by omega), writei_decide_f hge]
+      with [f13, f14, Xv6.fw_bgeu_nat (A.n - tot) (1024 - (A.off + tot) % BSIZE) (by omega) (by omega), writei_decide_f hge]
     iintro Hk Hpc
     k_step_e (wp_s_add cpu _ (KA.«writei» + 0xac#64) true 26#5 0#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

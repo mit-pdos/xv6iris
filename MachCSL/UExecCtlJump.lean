@@ -107,7 +107,7 @@ theorem uxc_jalr_gen (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitVec 12) 
   unfold uxcTgtR at hok ⊢
   simp only [uxaIdx] at h0 hok ⊢
   simp only [execute_JALR, update_elp_state, runRW_bind, hlp, Option.bind, Bool.false_eq_true,
-    ↓reduceIte, runRW_pure, get_next_pc, uxc_readReg D orc s _ hD.npcR, uxa_rX hD.alu,
+    ↓reduceIte, runRW_pure, get_next_pc, MachCSL.utr_readReg D orc s _ hD.npcR, uxa_rX hD.alu,
     uxc_jump_to D orc s _ z hz h0 hok hD.npcW]
   simp only [RETIRE_SUCCESS, uxa_wX hD.alu, runRW_bind, Option.bind]
   rfl
@@ -129,7 +129,7 @@ theorem uxc_jalr_misaligned (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (imm : BitV
   unfold uxcTgtR at h1 ⊢
   simp only [uxaIdx] at h0 h1 ⊢
   simp only [execute_JALR, update_elp_state, runRW_bind, hlp, Option.bind, Bool.false_eq_true,
-    ↓reduceIte, runRW_pure, get_next_pc, uxc_readReg D orc s _ hD.npcR, uxa_rX hD.alu,
+    ↓reduceIte, runRW_pure, get_next_pc, MachCSL.utr_readReg D orc s _ hD.npcR, uxa_rX hD.alu,
     uxc_jump_to_misaligned D orc s _ hz h0 h1 hD.priv hD.pc]
 
 /-- **JALR at the user tier**: the jump retires. -/

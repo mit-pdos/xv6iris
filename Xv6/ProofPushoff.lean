@@ -11,6 +11,7 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecPushoff
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -41,11 +42,6 @@ theorem bcond_beq_ofNat' (n : Nat) (hn : n < 2 ^ 64) :
   · have : BitVec.ofNat 64 n ≠ 0#64 := fun e => h ((ofNat64_eq_zero_iff' n hn).mp e)
     simp [this, h]
 
-theorem extractLsb'_ofNat64' (n : Nat) (hn : n < 2 ^ 32) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n) = BitVec.ofNat 32 n := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : n < 18446744073709551616)]
 
 theorem extractLsb'_ofNat64_succ (n : Nat) (hn : n + 1 < 2 ^ 31) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64) = BitVec.ofNat 32 n + 1#32 := by
@@ -59,15 +55,6 @@ theorem extractLsb'_ofNat64_succ (n : Nat) (hn : n + 1 < 2 ^ 31) :
   simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
   omega
 
-theorem addiw_succ' (n : Nat) (hn : n + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64)) = BitVec.ofNat 64 (n + 1) := by
-  have h32 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64) = BitVec.ofNat 32 (n + 1) := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.extractLsb'_toNat, BitVec.toNat_add, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega : n < 18446744073709551616)]
-    omega
-  rw [h32]
-  exact signExtend_ofNat32 _ hn
 
 /-! ## The callee-saved registers `s2`–`s11` -/
 
@@ -148,7 +135,7 @@ theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   iintro Hk Hpc
   -- addiw a5,a5,1
   k_step (wp_s_addiw cpu _ (KA.«push_off» + 0x1e#64) true 1#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-    with [addiw_succ' k.noff hnoff]
+    with [Xv6.addiw_succ k.noff hnoff]
   iintro Hk Hpc
   -- sw a5,120(a0): the depth becomes noff + 1 (the lent cell, if any, is pinned again)
   k_step (wp_s_sw_noff_inc cpu _ ?hs (KA.«push_off» + 0x20#64) true 120#12 10#5 15#5 ?haddr ?hval b ?hb ?hl ?hwf') from (text_instr _ _ _ _ rfl rfl) HT

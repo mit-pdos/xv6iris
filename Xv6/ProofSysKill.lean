@@ -16,6 +16,7 @@ import Xv6.SpecSysKill
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecKkill
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -33,18 +34,10 @@ set_option linter.unusedVariables false
 theorem sk_ret_12 : jumpPc (KA.«sys_kill» + 0x12#64) = (KA.«sys_kill» + 0x12#64) := by decide
 theorem sk_ret_1a : jumpPc (KA.«sys_kill» + 0x1a#64) = (KA.«sys_kill» + 0x1a#64) := by decide
 
-theorem sk_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem sk_pid_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 4076#12 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 theorem sk_ec (x : BitVec 64) :
     x + 0xFFFFFFFFFFFFFFE8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
-
-theorem sk_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sk_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sk_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 theorem sk_calleeSaved_mk (KR R : RegMap)
     (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
@@ -182,22 +175,22 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sk_pid_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_kill» + 0xc#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sk_li0] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_jal c3 _ (KA.«sys_kill» + 0xe#64) false 2096512#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_kill_br_argint] next c4 hp4
   iintro Hk Hpc
   iapply (sk_argint AI c4 _ tfp ws v old dqt ?ha0 hws ?hn ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sk_ret_12, sk_li0, sk_pid_addr, hapid]
+  k_norm_g [sk_ret_12, Xv6.co_li_zero, sk_pid_addr, hapid]
   iframe Htf Hpage Hpid
-  case ha0 => k_norm_g [sk_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; unfold sysKillSlots at hK; omega
   -- past argint: lw a0,-20(s0) ; jal kkill
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie %spp %R1 %hsp1 Hk Hpc %hcs1 Htf Hpage Hpid
-  k_norm_g [sk_pushed_withSpie, sk_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g at Htf
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -222,7 +215,7 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
   -- past kkill: close the frame and return
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %spie2 %spp2 %R2 %hsp2 Hk Hpc %⟨hcs2, hr2⟩
-  k_norm_g [sk_withSpie_withSpie, sk_pushed_withSpie, sk_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g at hsp2
   unfold calleeSaved at hcs2
   k_norm_g at hcs2

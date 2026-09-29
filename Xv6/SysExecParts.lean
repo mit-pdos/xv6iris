@@ -127,6 +127,7 @@ import Xv6.SpecSysExec
 import Xv6.SpecFetchaddr
 import Xv6.SysfileCalls
 import Xv6.KstackMap
+import Xv6.SysMknodFrame
 
 namespace Xv6
 
@@ -175,17 +176,11 @@ theorem sys_exec_K (a : Nat) (h : sysExecSlots ≤ a) :
   simp only [kexecSlots, argaddrSlots, argrawSlots, argstrSlots, fetchaddrSlots, fetchstrSlots]
   omega
 
-/-- An 8-aligned entry sp makes every slot 8-aligned (Rocq `sx_alp` /
-`sx_ala`, read off one fact). -/
-theorem sys_exec_al (sp0 c : BitVec 64) (hal : sp0.toNat % 8 = 0) (hc : c.toNat % 8 = 0) :
-    (sp0 + c).toNat % 8 = 0 := by
-  rw [BitVec.toNat_add]; omega
-
 theorem sys_exec_path_al (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) :
-    (sysExecPath sp0).toNat % 8 = 0 := sys_exec_al _ _ hal (by decide)
+    (sysExecPath sp0).toNat % 8 = 0 := Xv6.align8_add _ _ hal (by decide)
 
 theorem sys_exec_argv_al (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) :
-    (sysExecArgv sp0).toNat % 8 = 0 := sys_exec_al _ _ hal (by decide)
+    (sysExecArgv sp0).toNat % 8 = 0 := Xv6.align8_add _ _ hal (by decide)
 
 /-! ## §1.  THE FRAME: 480 bytes, SIXTY slots -/
 
@@ -354,8 +349,8 @@ theorem sys_exec_carve [CurCtx] (sp0 : BitVec 64) :
   rw [e32]
   icases stackOwn_split (sysExecArgv sp0 + BitVec.ofNat 64 (8 * (31 + 1))) 32 2 $$ H34 with ⟨H32, H2⟩
   rw [e2]
-  icases sysfile_stack_bytes (GF := GF) (sysExecPath sp0) 15 $$ H16 with ⟨%bp, ⟨%hlp, %halp⟩, Bp⟩
-  icases sysfile_stack_bytes (GF := GF) (sysExecArgv sp0) 31 $$ H32 with ⟨%ba, ⟨%hla, -⟩, Ba⟩
+  icases Xv6.kxc_stackOwn_byteBuf (GF := GF) (sysExecPath sp0) 15 $$ H16 with ⟨%bp, ⟨%hlp, %halp⟩, Bp⟩
+  icases Xv6.kxc_stackOwn_byteBuf (GF := GF) (sysExecArgv sp0) 31 $$ H32 with ⟨%ba, ⟨%hla, -⟩, Ba⟩
   irevert H10 H2
   stack_cells
   iintro ⟨⟨%w1, H1⟩, ⟨%w2, H2⟩, ⟨%w3, H3⟩, ⟨%w4, H4⟩, ⟨%w5, H5⟩, ⟨%w6, H6⟩, ⟨%w7, H7⟩, ⟨%w8, H8⟩,
@@ -790,16 +785,6 @@ theorem sysExec_viewLazy_faulted (V : ProcPriv) (P : UPtd) (M : Nat → List (Bi
     | none =>
       simp only [h0, h1, Option.isNone_none, Option.isSome_none, Bool.false_eq_true, and_false,
         if_false, true_and]
-
-/-- The fetched path as kexec's `bview` (its buffer, NUL excluded). -/
-theorem sysExec_bview_path (pl : List (BitVec 8)) : bview pl.length (sysfilePfun pl) = pl := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h2]
-    rfl
 
 /-! ## §4.  THE STAGE RECORD, THE STATES AND THE SEAMS -/
 

@@ -42,6 +42,7 @@ DecodeBridge's read congruence).
 import MachCSL.UCycleDefs
 import MachCSL.UDispatch
 import MachCSL.UDecode
+import MachCSL.UTranslate
 
 namespace MachCSL
 
@@ -72,14 +73,6 @@ theorem UWSt.setR_file_other (s : UWSt) (r r' : Register) (v : RegisterType r) (
 
 section steps
 variable (D : UFoot)
-
-theorem ucRW_readReg {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (k : RegisterType r → SailM X)
-    (h : D.Dr r = true) : runRW D orc s (readReg r >>= k) = runRW D orc s (k (s.file r)) :=
-  runRW_regRead_dr D orc s r _ h
-
-theorem ucRW_readReg_pure (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    runRW D orc s (readReg r) = some (s.file r, s, orc) :=
-  runRW_regRead_dr D orc s r _ h
 
 theorem ucRW_readReg_any {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (k : RegisterType r → SailM X)
     (h : D.Dr r = false) (h' : D.Dany r = true) :
@@ -134,16 +127,16 @@ and the step body is picked by the hart state. -/
 theorem uc_prelude (hD : UcFoot D) (orc : UOrc) (s : UWSt) :
     runRW D orc s ucPrelude = some (s.file .hart_state, ucPreS s, orc) := by
   simp only [ucPrelude, should_inc_minstret, bind_assoc, pure_bind,
-    ucRW_readReg D _ _ _ _ hD.rd_priv, ucRW_readReg D _ _ _ _ hD.rd_mcountinhibit]
+    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_priv, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mcountinhibit]
   unfold ucPreS ucMiFlag
   -- `minstretcfg` is read only under `mcountinhibit.IR = 0`
   cases (_get_Counterin_IR (s.file .mcountinhibit) == 0#1)
   · simp only [Bool.false_eq_true, ↓reduceIte, pure_bind, Bool.false_and,
-      ucRW_writeReg D _ _ _ _ _ hD.wr_mi, ucRW_readReg_pure D _ _ _ hD.rd_hs]
+      ucRW_writeReg D _ _ _ _ _ hD.wr_mi, MachCSL.utr_readReg D _ _ _ hD.rd_hs]
     rw [UWSt.setR_file_other _ _ _ _ (by decide)]
   · simp only [↓reduceIte, bind_assoc, pure_bind, Bool.true_and,
-      ucRW_readReg D _ _ _ _ hD.rd_minstretcfg, ucRW_writeReg D _ _ _ _ _ hD.wr_mi,
-      ucRW_readReg_pure D _ _ _ hD.rd_hs]
+      MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_minstretcfg, ucRW_writeReg D _ _ _ _ _ hD.wr_mi,
+      MachCSL.utr_readReg D _ _ _ hD.rd_hs]
     rw [UWSt.setR_file_other _ _ _ _ (by decide)]
 
 theorem ucPreS_file_other (s : UWSt) (r : Register) (h : r ≠ .minstret_increment) :
@@ -190,15 +183,15 @@ theorem ucEpi_file_pc (r : Bool) (s : UWSt) : (ucEpi r s).file .PC = s.file .nex
 /-- `tick_pc`'s walk. -/
 theorem uc_tickPc {X : Type} (hD : UcFoot D) (orc : UOrc) (s : UWSt) (k : Unit → SailM X) :
     runRW D orc s (tick_pc () >>= k) = runRW D orc (ucTickS s) (k ()) := by
-  simp only [tick_pc, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hD.rd_npc,
-    ucRW_writeReg D _ _ _ _ _ hD.wr_pc, ucRW_readReg D _ _ _ _ hD.rd_pc]
+  simp only [tick_pc, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_npc,
+    ucRW_writeReg D _ _ _ _ _ hD.wr_pc, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc]
   rfl
 
 /-- **The epilogue of a WAITING hart**: no tick, `true`. -/
 theorem uc_epilogue_waiting (hD : UcFoot D) (orc : UOrc) (s : UWSt) (r : Bool) (wr : WaitReason)
     (ib : BitVec 32) (h : s.file .hart_state = .HART_WAITING (wr, ib)) :
     runRW D orc s (ucEpilogue r) = some (true, s, orc) := by
-  simp only [ucEpilogue, ucRW_readReg D _ _ _ _ hD.rd_hs, h]
+  simp only [ucEpilogue, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, h]
   rfl
 
 /-- **The epilogue of an ACTIVE hart** (Rocq's shared tail of the five
@@ -206,16 +199,16 @@ ticking arms): the tick, the bump iff `retired`, `false`. -/
 theorem uc_epilogue_active (hD : UcFoot D) (orc : UOrc) (s : UWSt) (r : Bool)
     (h : s.file .hart_state = .HART_ACTIVE ()) :
     runRW D orc s (ucEpilogue r) = some (false, ucEpi r s, orc) := by
-  simp only [ucEpilogue, ucRW_readReg D _ _ _ _ hD.rd_hs, h]
+  simp only [ucEpilogue, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, h]
   simp only [uc_tickPc hD, get_config_rvfi, Bool.false_eq_true, if_false]
   unfold ucEpi
   cases r
   · simp only [Bool.false_and, Bool.false_eq_true, if_false, pure_bind]; rfl
-  · simp only [if_true, Bool.true_and, ucRW_readReg D _ _ _ _ hD.rd_mi]
+  · simp only [if_true, Bool.true_and, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mi]
     rw [ucTickS_file_other _ _ (by decide)]
     cases hb : s.file .minstret_increment
     · simp only [Bool.false_eq_true, if_false]; rfl
-    · simp only [if_true, ucRW_readReg D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
+    · simp only [if_true, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
       rw [ucTickS_file_other _ _ (by decide)]
       rfl
 
@@ -234,7 +227,7 @@ theorem uc_finish_retire (hD : UcFoot D) (orc : UOrc) (s : UWSt) (ib : BitVec 32
     (hact : s.file .hart_state = .HART_ACTIVE ()) :
     runRW D orc s (ucFinish (Step_Execute (Retire_Success (), ib))) = some (false, ucEpi true s, orc) := by
   apply uc_finish_of_arm hD _ orc orc s s _ hact
-  simp only [ucArm, ucRW_readReg D _ _ _ _ hD.rd_hs, hact]
+  simp only [ucArm, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, hact]
   rfl
 
 /-- **Arm: interrupt** (`Step_Pending_Interrupt (i, p)`), from the
@@ -296,7 +289,7 @@ theorem uc_finish_waiting (hD : UcFoot D) (orc : UOrc) (s : UWSt) (wr wr' : Wait
   unfold ucFinish
   rw [runRW_bind_some D _ _ orc orc s s ()]
   · exact uc_epilogue_waiting hD orc _ _ wr' ib h
-  · simp only [ucArm, ucRW_readReg D _ _ _ _ hD.rd_hs, h]
+  · simp only [ucArm, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, h]
     rfl
 
 /-! ## §4 The dispatch at User -/
@@ -370,9 +363,9 @@ theorem uc_dispatch (hD : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s
           (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip)),
         s, orc.tail.tail) := by
   simp only [ucDispatch, dispatchInterrupt, getPendingSet, read_mip, external_interrupts_pending,
-    bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hD.rd_priv, hpriv, uc_currentlyEnabled_S hm,
-    ucRW_readReg D _ _ _ _ hD.rd_mip, ucRW_readReg D _ _ _ _ hD.rd_mie,
-    ucRW_readReg D _ _ _ _ hD.rd_mideleg, ucRW_readReg D _ _ _ _ hD.rd_mstatus,
+    bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_priv, hpriv, uc_currentlyEnabled_S hm,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mie,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mideleg, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mstatus,
     ucRW_readReg_any D _ _ _ _ hD.meip_nr hD.meip_any, ucRW_readReg_any D _ _ _ _ hD.seip_nr hD.seip_any,
     if_true]
   have e1 : (Privilege.User == Privilege.Machine) = false := rfl
@@ -419,7 +412,7 @@ theorem uc_exec_redirect (orc orc' orc'' : UOrc) (s s' s'' : UWSt) (i j : instru
 theorem uc_lpad {X : Type} (orc : UOrc) (s : UWSt) (hrd : D.Dr .elp = true) (hv : s.file .elp = 0#1)
     (k : Bool → SailM X) :
     runRW D orc s (is_landing_pad_expected () >>= k) = runRW D orc s (k false) := by
-  simp only [is_landing_pad_expected, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hrd, hv]
+  simp only [is_landing_pad_expected, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hrd, hv]
   rfl
 
 /-- The PC write of the tail: `nextPC := PC + len`. -/
@@ -435,7 +428,7 @@ theorem uc_afterFetch_base (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (w : 
     runRW D orc s (ucAfterFetch (F_Base w)) = some (Step_Execute (r, zero_extend (m := 32) w), s2, orc2) := by
   simp only [ucAfterFetch, ext_fetch_hook]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
-  simp only [Bool.false_and, Bool.false_eq_true, if_false, ucRW_readReg D _ _ _ _ hD.rd_pc,
+  simp only [Bool.false_and, Bool.false_eq_true, if_false, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc,
     ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
   exact runRW_bind_some D _ _ orc orc2 _ s2 r hex
 
@@ -450,7 +443,7 @@ theorem uc_afterFetch_rvc (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (h : B
   simp only [ucAfterFetch, ext_fetch_hook]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
   simp only [Bool.false_eq_true, if_false, uc_currentlyEnabled_Zca hm, if_true,
-    ucRW_readReg D _ _ _ _ hD.rd_pc, ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
+    MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc, ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
   exact runRW_bind_some D _ _ orc orc2 _ s2 r hex
 
 /-- **The fetch-fault tail**: the step is `Step_Fetch_Failure`, nothing

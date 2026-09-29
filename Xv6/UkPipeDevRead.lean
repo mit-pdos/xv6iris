@@ -78,11 +78,11 @@ theorem pdev_ecall_read (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF)
     have hst : fdStOfKey (xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 0)
         (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd = .open true wb (.pipe γp) := by
       show fdStOfKey (tfW (tfOf m pc) (tfArgIdx 0)) fdv = _
-      rw [pdev_tfArg m pc 0 (by decide)]
+      rw [Xv6.tfOf_aget m pc 0 (by decide)]
       exact std_fd_st_of_key _ fdv l fd _ (by rw [← argZ_setWidth]; exact h0) hlt htake hl
     have hc : argZ (xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 2) = (cap : Int) := by
       show argZ (tfW (tfOf m pc) (tfArgIdx 2)) = _
-      rw [pdev_tfArg m pc 2 (by decide)]; exact h2
+      rw [Xv6.tfOf_aget m pc 2 (by decide)]; exact h2
     iapply DK.rpIntro N.pay Rp Rpe _ wb γp cap hst hc $$ Hpay
   iintro %h' %r %d %g %W %M' %fdv' %cw' %cs' %hd %hgf %hlin %himg %hnf %hk0 %hk1 %hk2 %htake %hlz %_
     Hstd Hpost Hrun Hbuf

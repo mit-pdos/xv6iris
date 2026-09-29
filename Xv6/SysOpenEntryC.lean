@@ -60,9 +60,9 @@ Rocq's header, kept (the reasons are the content):
    `so_buf_split` / `so_buf_join` / `so_bytes_name`).
 6. `so_esc_acc` / `is_itable2_claims` are inside `fsReady` (the join takes
    `sysOpenEnv`); the payload is peeled by `IcacheEscrowDep.icLoaded_open`
-   (Rocq's `so_flat_open`, restated here as `sys_open_ec_flat_open`: a stage
+   (Rocq's `so_flat_open`, restated here as `Xv6.sys_open_flat_open`: a stage
    file of the same set cannot import `SysOpenShared`), the topFrag
-   leg out and back by `sys_open_ec_flat_top` (Rocq's `so_flat_top`).
+   leg out and back by `Xv6.sys_open_flat_top` (Rocq's `so_flat_top`).
 7. The create call site is `sys_open_ec_create` (the
    `SysMkdirCalls.sys_mkdir_create` shape over `sysOpenEnv`; a stage file of
    another Proof cannot be imported).
@@ -73,6 +73,8 @@ call-site file.
 import Xv6.SysOpenCreArm
 import Xv6.SysfileCalls
 import Xv6.FsAbsOpenFire
+import Xv6.KexecACode
+import Xv6.SysOpenShared
 
 namespace Xv6
 
@@ -121,7 +123,7 @@ theorem sys_open_ec_nd (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 
 /-- ...and it is typed (Rocq's `Htynz`). -/
 theorem sys_open_ec_tynz (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (h : dn.diType = T_FILE_w ∨ dn.diType = T_DEVICE_w) : fnType (eraNode dn bm data) ≠ 0 := by
-  apply opfEra_typed
+  apply Xv6.arfEra_typed
   rcases h with h | h <;> rw [h] <;> decide
 
 /-- THE FRESH CHILD IS EMPTY (Rocq's `Hbsnil` / `Harow`): create's `T_FILE`
@@ -147,32 +149,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The payload, peeled (deviation 6) -/
-
-/-- Rocq's `so_flat_open`. -/
-theorem sys_open_ec_flat_open (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) :
-    icLoaded (GF := GF) fscFs fscIreg fscCov fscLogst kk inum dn bm ⊢
-      ∃ data : Nat → List (BitVec 8), sysOpenFlat kk inum dn bm data := by
-  iintro H
-  ihave H := icLoaded_open fscFs fscIreg fscCov fscLogst kk inum dn bm $$ H
-  unfold icLoadedFlatBody
-  icases H with ⟨%data, H⟩
-  iexists data
-  unfold sysOpenFlat
-  iexact H
-
-/-- Rocq's `so_flat_top`: the topFrag leg out, and back. -/
-theorem sys_open_ec_flat_top (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
-    (data : Nat → List (BitVec 8)) :
-    sysOpenFlat (GF := GF) kk inum dn bm data ⊢
-      topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
-      (topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗ sysOpenFlat kk inum dn bm data) := by
-  unfold sysOpenFlat
-  iintro ⟨%h1, %h2, %h3, %h4, %h5, %h6, Hl, Hd, Hm, Ha, Hr, Hb, Ht⟩
-  iframe Ht
-  iintro Ht
-  iframe Hl Hd Hm Ha Hr Hb Ht
-  ipureintro
-  exact ⟨h1, h2, h3, h4, h5, h6⟩
 
 /-! ## The create call site (deviation 7) -/
 
@@ -321,7 +297,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   iintro Hk Hpc
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 210#64) ⊢
     pcIs cpu (sysOpenAddr + 0xd2#64) from .rfl) $$ Hpc
-  icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
+  icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
   have hp1 := sysOpenPins_s1 k R s1v _ _ 0#64 hpins
   unfold sysOpenTailABody at hTA
   iapply hTA $$ %cpu %spie %spp %(R.set 9#5 0#64) %0#64 %w4 %w5 %w6 %lo %(sysOpenOm A) %w24 %u
@@ -471,7 +447,7 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
     icases Henv with ⟨-, -, #Hrdy, -⟩
     icases fsReady_region $$ Hrdy with ⟨#Hinv, -⟩
     iapply iregInv_ftop $$ Hinv
-  icases sys_open_ec_flat_top kk inum dn bm data $$ Hflat with ⟨Htop, Hflatb⟩
+  icases Xv6.sys_open_flat_top kk inum dn bm data $$ Hflat with ⟨Htop, Hflatb⟩
   iapply wpLoop_fupd
   imod (opfOpen_fire_1 fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data) CoPset.subseteq_top
     (sys_open_ec_tynz dn bm data hty)) $$ Hft Hoc Htop with ⟨Htop, Hobs0⟩
@@ -517,7 +493,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x46 .. +0x48` on a successful create**: `c.mv s1,a0`, the `c.beqz`
 falls through to the join at +0x4a; the locked node is read in
 `SysOpenParts`' pieces (`sysOpen_of_createLocked`), the payload PEELED
-(`sys_open_ec_flat_open`), and the flavour decided by create's `made`
+(`Xv6.sys_open_flat_open`), and the flavour decided by create's `made`
 (`CreateDefs.creOkPure_file`): `sys_open_ec_fresh` / `sys_open_ec_exists`. -/
 theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
     (A : SysOpenArgs GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -561,7 +537,7 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
   iintro Hk Hpc
   -- +0x48  c.beqz a0 : falls through
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x48#64) true 138#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 74#64) ⊢
     pcIs cpu (sysOpenAddr + 0x4a#64) from .rfl) $$ Hpc
@@ -569,7 +545,7 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
   -- the locked node, in its pieces; the payload peeled
   icases sysOpen_of_createLocked A.pid kk qi s g inum dn bm $$ Hlocked with
     ⟨%γil, %γisl, %loc, %tlc, %⟨hqs, hle⟩, Hlk, Hload, Hkeep⟩
-  icases sys_open_ec_flat_open kk inum dn bm $$ Hload with ⟨%data, Hflat⟩
+  icases Xv6.sys_open_flat_open kk inum dn bm $$ Hload with ⟨%data, Hflat⟩
   ihave Hop := logOpS_opb icfgLog u Sb $$ Hop
   have hrep := creOkPure_file 0#16 0#16 made dn hpure
   cases made
@@ -590,11 +566,6 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
         $Hcauf $Hoc $Htc $HΦ]
 
 /-! ## The O_CREATE entry, +0x38 -/
-
-theorem sys_open_ec_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
-  simp only [ite_true]; exact .rfl
-theorem sys_open_ec_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
-  simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
 set_option maxHeartbeats 32000000 in
 /-- **THE O_CREATE ARM, +0x38 .. +0x48, AND ARM A-FAIL** (Rocq
@@ -688,7 +659,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   unfold sysOpenCreateK
   iintro %cpu %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc
     Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop Harm
-  k_norm_g [sys_open_ec_ret_46, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_ec_ret_46, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 70#64) ⊢
     pcIs cpu (sysOpenAddr + 0x46#64) from .rfl) $$ Hpc
   ihave Hblk := (show procPrivFd (GF := GF) A.γ k.proc A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ⊢
@@ -710,7 +681,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     exact hpins
   cases ok
   · -- ===== create REFUSED: ARM A-FAIL =====
-    ihave Harm := sys_open_ec_ite_f _ _ $$ Harm
+    ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Htx, Hcf⟩
     simp only [Bool.false_eq_true, if_false] at hns'
     subst hns'
@@ -719,7 +690,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
         (bview plen bp) u' hct hp1 h10 hal hP2 hpl)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hblk $Hop $Hbs $Hir $Hfd $Hfr $Hcf $Hoc $Htc $HΦ]
   · -- ===== create SUCCEEDED: the locked inode =====
-    ihave Harm := sys_open_ec_ite_t _ _ $$ Harm
+    ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%hA, Hlocked, Hcauf⟩
     simp only [if_true] at hns'
     iapply (sys_open_ec_ok Γ k A Farm Fun Fok Fex hJ cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 made kk qi

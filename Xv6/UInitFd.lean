@@ -101,12 +101,6 @@ theorem ufd_scan2 (st : FdState) (hne : st ≠ .closed) : fdLowestClosed (ufdL2 
 section UInitFd
 variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
-/-- **Rocq `ufd_dup_src`**: init's claim on the descriptor being duplicated
-is its own LEDGER's row -- a standard stream, `ufdOwn`'s LEFT arm. -/
-theorem ufd_dup_src (γfd : GName) (l : List FdState) (fd : Nat) (st : FdState) (hlt : fd < NSTD)
-    (hl : l[fd]? = some st) : ⊢ ufdOwn (GF := GF) γfd l fd st :=
-  ufdOwn_std γfd l fd st hlt hl
-
 end UInitFd
 
 end Xv6

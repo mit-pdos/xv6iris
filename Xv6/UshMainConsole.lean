@@ -19,12 +19,13 @@ command loop is entered at whatever the last open left, with the row
    takes the `bltz`; a standard-stream descriptor `k < 3` takes the back
    edge; a descriptor above them falls through to `close`.
 2. `ush_bge_std` is `ushCons_bge` (the whole table below `NOFILE`, by
-   `decide`); `trunc32`/`bv_signed` of the descriptor is `ushCons_fd32`.
+   `decide`); `trunc32`/`bv_signed` of the descriptor is `Xv6.kcat_cint_small`.
 3. The engine `UL`, the rows `HS`/`HSS`, getcmd `SC`; the section context
    (`UshMainDefs` deviation 1).  One code resource for `shk_code` and
    `shk_rodata` (`UshMainDefs` deviation 3).
 -/
 import Xv6.UshMainLoop
+import Xv6.UkCatDefs
 
 namespace Xv6
 
@@ -42,9 +43,6 @@ theorem ushCons_blt_nat : ∀ k, k < 16 → ukBtaken .BLT (BitVec.ofNat 64 k) 0#
 
 /-- **Rocq `ush_bge_std`** (deviation 2). -/
 theorem ushCons_bge : ∀ k, k < 16 → ukBtaken .BGE (BitVec.ofNat 64 2) (BitVec.ofNat 64 k) = decide (k ≤ 2) := by
-  decide
-
-theorem ushCons_fd32 : ∀ fd, fd < 16 → (BitVec.setWidth 32 (BitVec.ofNat 64 fd)).toInt = (fd : Int) := by
   decide
 
 section Console
@@ -161,7 +159,7 @@ theorem ushMain_console (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (SC :
       iapply ushS_jal UL N (ushMI_910 N.t) User.Sh.Sym.«close» 0x914 h6 _ _ $$ Hc Hrun
       iintro %h7 Hrun
       iapply wp_ksh_close UL HSS N h7 _ fd _ _
-        (by rw [ukWr_get_other _ _ _ _ (by decide), ha0D, hret]; exact ushCons_fd32 fd hlt)
+        (by rw [ukWr_get_other _ _ _ _ (by decide), ha0D, hret]; exact Xv6.kcat_cint_small fd hlt)
         (fun _ _ _ e => by cases e) $$ Hc Hrun Hfd
       iintro %h8 %ret2 Hrun
       rw [show (ukWr (stubRet mC 15 ret) 1#5 (BitVec.ofNat 64 0x914)).get 1#5 = BitVec.ofNat 64 0x914

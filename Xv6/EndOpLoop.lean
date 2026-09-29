@@ -203,16 +203,16 @@ theorem eo_slotaddr2 (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
       BitVec.signExtend 64 (BitVec.ofNat 32 (logSlotBno ls t)) := by
   have h1 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 ls) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t) = BitVec.ofNat 32 (ls + t) := by
-    rw [eo_w32 ls hls, eo_w32 t ht]
+    rw [Xv6.fw_w32 ls hls, Xv6.fw_w32 t ht]
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
   have h2 : ls + t < 2 ^ 31 := by unfold logSlotBno at hsum; omega
-  rw [h1, eo_sext32 (ls + t) h2,
+  rw [h1, MachCSL.signExtend_ofNat32 (ls + t) h2,
     show (BitVec.ofNat 64 (ls + t) + 1#64) = BitVec.ofNat 64 (ls + t + 1) from by
       rw [← ofNat64_add],
-    eo_w32 (ls + t + 1) (by unfold logSlotBno at hsum; omega),
-    eo_sext32 _ (by unfold logSlotBno at hsum; omega), eo_sext32 _ hsum]
+    Xv6.fw_w32 (ls + t + 1) (by unfold logSlotBno at hsum; omega),
+    MachCSL.signExtend_ofNat32 _ (by unfold logSlotBno at hsum; omega), MachCSL.signExtend_ofNat32 _ hsum]
   congr 1
   unfold logSlotBno
   omega
@@ -350,7 +350,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   iintro Hk Hpc -
   k_step_e (wp_s_addw cpu _ (KA.«end_op» + 0xb8#64) false 11#5 11#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [p18, eo_sext32 ls hls31]
+    with [p18, MachCSL.signExtend_ofNat32 ls hls31]
   iintro Hk Hpc
   k_step_e (wp_s_addiw cpu _ (KA.«end_op» + 0xbc#64) true 1#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -469,11 +469,11 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xda#64) false 88#12 11#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, eo_bufData]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xde#64) false 88#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [(id hfix3).2.2.1, eo_bufData]
+    with [(id hfix3).2.2.1, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084450#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_memmove]
@@ -659,7 +659,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     with [r18, eo_addiw1 t (by omega)]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xfa#64) true 4#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r21, eo_lhBlock_succ t]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r21, Xv6.il_lhBlock_step t]
   iintro Hk Hpc
   icases eoOpen_lhn γb γfs V.cov ls n W (PartialMap.insert L (logSlotBno ls t) bsD)
     D (eoExt Lw t bsD) (t + 1) $$ Hopen with ⟨HlhN, HlhNback⟩
@@ -692,7 +692,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     k_step_e (wp_s_branch cpu _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
+      with [r18, MachCSL.signExtend_ofNat32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
         decide_eq_true hdone]
     iintro Hk Hpc
     ihave IH' := eoLoopInv_elim Γ c0 k γb γfs V.cov ls n W pidv dqp G $$ IH
@@ -706,7 +706,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     k_step_e (wp_s_branch cpu _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
+      with [r18, MachCSL.signExtend_ofNat32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
         decide_eq_false hdone]
     iintro Hk Hpc
     have htn1 : t + 1 = n := by omega

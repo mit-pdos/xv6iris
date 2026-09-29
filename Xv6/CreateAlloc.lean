@@ -93,6 +93,7 @@ contract's own continuation `createPost`.
 -/
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -126,7 +127,7 @@ theorem create_alloc_tx_split [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2)
 end Tx
 
 theorem create_alloc_quarters : (1 : Qp).half = Qp.quarter + Qp.quarter :=
-  qp_quarter_add_quarter.symm
+  Xv6.ctok_quarter_add_quarter.symm
 
 /-! ## 1.  The callees at create's environment, hart-free -/
 
@@ -504,7 +505,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   have hisdir' : fnIsDir (eraNode dn' bm' data') = fnIsDir (eraNode dn bm data) := by
     unfold fnIsDir fnType; rw [eraNode_rec, eraNode_rec, hty']
   have hnleq : fnNlink (eraNode dn' bm' data') = fnNlink (eraNode dn bm data) := by
-    rw [mkfEra_nlink, mkfEra_nlink, hnl']
+    rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnl']
   have habsp' : absOf (eraNode dn' bm' data') =
       some ⟨.ADir ((dirEntries (eraNode dn bm data)).insert (bname 14 nf) cinum.toNat),
         fnNlink (eraNode dn bm data) +
@@ -546,7 +547,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   · rw [← topFrag_1]; iexact Hctop
   imod (cafAcre_fire_nm (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Nm Pd Farm
     Fok dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hNm hloc
-    (mkfEra_is_dir dn bm data hdz) (mkfEra_live dn bm data hnl0z) hnoneE
+    (mkfEra_is_dir dn bm data hdz) (Xv6.eraNlink_nz dn bm data hnl0z) hnoneE
     ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc)
     $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat
@@ -795,7 +796,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
       ipureintro; exact hle0
   · iapply (create_ok_of_made (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P Farm Fdots Fun
       Fok Fex (bview plen pfun) dind.toNat (bname 14 nf) cinum.toNat
-      (create_last_of_npar _ nf hnp)) $$ HP [Hdots] HFok Hun Hdlk
+      (Xv6.sys_unlink_last_of_npar _ nf hnp)) $$ HP [Hdots] HFok Hun Hdlk
     iright; iexact Hdots
 
 end Cok
@@ -1050,7 +1051,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     imod (create_alloc_repark (hlc := hlc) dind cinum dn dn' bm bm' data data' nf ty major minor dnc
       bmc datc Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
       hnone hc16 hcpos.1 hcinb htdir htyc hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp
-      hrng (hNmL _ (create_last_of_npar _ nf hnp)))
+      hrng (hNmL _ (Xv6.sys_unlink_last_of_npar _ nf hnp)))
       $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok⟩
     imodintro
     icases create_alloc_map_open (ientry kd) bm' $$ Hmap with ⟨Ha, Hi⟩
@@ -1110,11 +1111,6 @@ rules produce. -/
 theorem create_alloc_imajor (x : Nat) : ientry x + 70#64 = iMajor (ientry x) := rfl
 theorem create_alloc_iminor (x : Nat) : ientry x + 72#64 = iMinor (ientry x) := rfl
 theorem create_alloc_inlink (x : Nat) : ientry x + 74#64 = iNlink (ientry x) := rfl
-
-/-- An `sh` of a sign-extended halfword stores the halfword. -/
-theorem create_alloc_ext16 (w : BitVec 16) :
-    BitVec.extractLsb' 0 16 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-- The fresh child's count is zero, as a halfword. -/
 theorem create_alloc_nl0 (dnc : Dinode) (hf : freshShape dnc) : dnc.diNlink = 0#16 :=
@@ -1289,12 +1285,12 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   -- +0xb4  sh s5,70(s3) : ip->major = major
   k_step_e (wp_s_sh cpu _ (KA.«create» + 0xb4#64) false 70#12 19#5 21#5 (by decide) dnc.diMajor)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [r19, create_alloc_imajor, r21, create_alloc_ext16]
+    with [r19, create_alloc_imajor, r21, Xv6.fw_ext16]
   iintro Hk Hpc Hcmaj
   -- +0xb8  sh s6,72(s3) : ip->minor = minor
   k_step_e (wp_s_sh cpu _ (KA.«create» + 0xb8#64) false 72#12 19#5 22#5 (by decide) dnc.diMinor)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [r19, create_alloc_iminor, r22, create_alloc_ext16]
+    with [r19, create_alloc_iminor, r22, Xv6.fw_ext16]
   iintro Hk Hpc Hcmin
   -- +0xbc  c.li a4,1
   k_step_e (wp_s_addi cpu _ (KA.«create» + 0xbc#64) true 1#12 14#5 0#5 (by decide))

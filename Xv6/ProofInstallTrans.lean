@@ -37,6 +37,12 @@ import Xv6.FsCallSites
 import Xv6.SpecMemmove
 import Xv6.SpecBwrite
 import Xv6.SpecBunpin
+import Xv6.EndOpDefs
+import Xv6.FsWords
+import Xv6.IcacheEscrowPool
+import Xv6.InitlogHead
+import Xv6.VirtioDiskRwDefs2
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -61,22 +67,8 @@ theorem it_a_fmt :
 /-- `auipc s4,0x1e ; addi s4,s4,1972` at `+0x38`. -/
 theorem it_a_log : KA.«install_trans» + 0x1e9d6#64 = logAddr := by decide
 
-/-- `lw a1,24(s4)`. -/
-theorem it_o_start : logAddr + 24#64 = lStart := rfl
-/-- `lw a0,36(s4)`. -/
-theorem it_o_dev : logAddr + 36#64 = lDev := rfl
 /-- `lw a5,44(s4)`. -/
 theorem it_o_lhn : logAddr + 44#64 = lhNAddr := rfl
-
-/-- `addi s5,s5,4`: the cursor steps one header word. -/
-theorem it_lhBlock_succ (i : Nat) : lhBlock i + 4#64 = lhBlock (i + 1) := by
-  unfold lhBlock
-  rw [BitVec.add_assoc]
-  congr 1
-  rw [show (48 + 4 * (i + 1)) = (48 + 4 * i) + 4 from by omega, ← ofNat64_add]
-
-/-- `addi a0,a0,88` / `addi a1,s2,88`: the buffer's data field. -/
-theorem it_bufData (b : BitVec 64) : b + 88#64 = aBufData b := rfl
 
 theorem it_br_printk :
     KA.«install_trans» + 0xffffffffffffc8cc#64 = KA.«printk» := by decide
@@ -107,19 +99,6 @@ theorem it_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := b
 
 /-! ## The 32-bit arithmetic -/
 
-theorem it_w32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) = BitVec.ofNat 32 a := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
-theorem it_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
 theorem it_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
   rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
   simp [BitVec.toNat_ofNat]; omega
@@ -148,21 +127,6 @@ theorem it_bge_add (x y m : Nat) (hx : x + y < 2 ^ 63) (hm : m < 2 ^ 63) :
       decide (m ≤ x + y) := by
   rw [← ofNat64_add]; exact it_bge_nat (x + y) m hx hm
 
-/-- `bnez s6` with `s6 = 1` (the recovering arm). -/
-theorem it_bnez1 : bcond bop.BNE 1#64 0#64 = true := by decide
-
-/-- `bnez s6` with `s6 = 0` (the COMMIT arm: the `printk` is skipped and the
-`bunpin` is taken). -/
-theorem it_bnez0 : bcond bop.BNE 0#64 0#64 = false := by decide
-
-/-- `addiw s3,s3,1` at `+0x60`. -/
-theorem it_addiw1 (t : Nat) (h : t + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t + 1#64)) =
-      BitVec.ofNat 64 (t + 1) := by
-  rw [show (BitVec.ofNat 64 t + 1#64) = BitVec.ofNat 64 (t + 1) from by rw [← ofNat64_add],
-    it_w32 (t + 1) h]
-  exact it_sext32 _ h
-
 /-- `addw a1,a1,s3 ; addiw a1,a1,1` at `+0x74`: `start + tail + 1`. -/
 theorem it_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
     (hsum : logSlotBno ls t < 2 ^ 31) :
@@ -172,24 +136,18 @@ theorem it_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
       BitVec.signExtend 64 (BitVec.ofNat 32 (logSlotBno ls t)) := by
   have h1 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 ls) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t) = BitVec.ofNat 32 (ls + t) := by
-    rw [it_w32 ls hls, it_w32 t ht]
+    rw [Xv6.fw_w32 ls hls, Xv6.fw_w32 t ht]
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
   have h2 : ls + t < 2 ^ 31 := by unfold logSlotBno at hsum; omega
-  rw [h1, it_sext32 (ls + t) h2,
+  rw [h1, MachCSL.signExtend_ofNat32 (ls + t) h2,
     show (BitVec.ofNat 64 (ls + t) + 1#64) = BitVec.ofNat 64 (ls + t + 1) from by
       rw [← ofNat64_add],
-    it_w32 (ls + t + 1) (by unfold logSlotBno at hsum; omega),
-    it_sext32 _ (by unfold logSlotBno at hsum; omega), it_sext32 _ hsum]
+    Xv6.fw_w32 (ls + t + 1) (by unfold logSlotBno at hsum; omega),
+    MachCSL.signExtend_ofNat32 _ (by unfold logSlotBno at hsum; omega), MachCSL.signExtend_ofNat32 _ hsum]
   congr 1
   unfold logSlotBno
-  omega
-
-/-- The word `bread` is handed, read off the header cell. -/
-theorem it_ofNat32_toNat (w : BitVec 32) : BitVec.ofNat 32 w.toNat = w := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_ofNat]
   omega
 
 /-! ## The format string -/
@@ -1025,7 +983,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   icases bslots_uncons 0 $$ Hslots with ⟨Hsl2, Hslots⟩
   -- +0x6c  bnez s6  (taken: the true arm)
   k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x6c#64) false 8154#13 22#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g22, it_bnez1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g22, Xv6.vdrw2_bnez_1]
   iintro Hk Hpc
   -- +0x46  lw a2,0(s5) ; mv a1,s3 ; mv a0,s8 ; jal printk
   k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x46#64) false 0#12 12#5 21#5 (by decide) (by decide)
@@ -1068,14 +1026,14 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [p20, it_o_start]
+  k_norm_g [p20, Xv6.eo_o_start]
   iframe Hstartc
   inext
-  k_norm_g [p20, it_o_start]
+  k_norm_g [p20, Xv6.eo_o_start]
   k_next_e
   iintro Hk Hpc Hstartc
   k_step_e (wp_s_addw cpu _ (KA.«install_trans» + 0x74#64) false 11#5 11#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p19, it_sext32 logstart hls31]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p19, MachCSL.signExtend_ofNat32 logstart hls31]
   iintro Hk Hpc
   k_step_e (wp_s_addiw cpu _ (KA.«install_trans» + 0x78#64) true 1#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1086,10 +1044,10 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [p20, it_o_dev]
+  k_norm_g [p20, Xv6.eo_o_dev]
   iframe Hdevc
   inext
-  k_norm_g [p20, it_o_dev]
+  k_norm_g [p20, Xv6.eo_o_dev]
   k_next_e
   iintro Hk Hpc Hdevc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x7e#64) false 2093006#21 1#5 (by decide))
@@ -1144,10 +1102,10 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [q20, it_o_dev]
+  k_norm_g [q20, Xv6.eo_o_dev]
   iframe Hdevc
   inext
-  k_norm_g [q20, it_o_dev]
+  k_norm_g [q20, Xv6.eo_o_dev]
   k_next_e
   iintro Hk Hpc Hdevc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x8c#64) false 2092992#21 1#5 (by decide))
@@ -1244,10 +1202,10 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x94#64) false 88#12 11#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18L, it_bufData]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18L, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x98#64) false 88#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, it_bufData]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084994#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_memmove]
@@ -1327,7 +1285,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   · iframe HbufL HpayL
   -- +0xa6  bnez s6  (taken: the bunpin is skipped)
   k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0xa6#64) false 8110#13 22#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s22, it_bnez1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s22, Xv6.vdrw2_bnez_1]
   iintro Hk Hpc
   -- +0x54  mv a0,s2 ; jal brelse
   k_step_e (wp_s_add cpu _ (KA.«install_trans» + 0x54#64) true 10#5 0#5 18#5 (by decide))
@@ -1400,10 +1358,10 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   -- +0x60  addiw s3,s3,1 ; addi s5,s5,4 ; lw a5,44(s4) ; bge s3,a5
   k_step_e (wp_s_addiw cpu _ (KA.«install_trans» + 0x60#64) true 1#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [v19, it_addiw1 t (by omega)]
+    with [v19, Xv6.addiw_succ t (by omega)]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x62#64) true 4#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v21, it_lhBlock_succ t]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v21, Xv6.il_lhBlock_step t]
   iintro Hk Hpc
   k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x64#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
@@ -1418,7 +1376,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   · -- the last entry: out at +0xb2
     k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_true hdone]
+      with [MachCSL.signExtend_ofNat32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_true hdone]
     iintro Hk Hpc
     have htn1 : t + 1 = n := by omega
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs (itRecLUpto W Lw L (t + 1)) ⊢
@@ -1448,7 +1406,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   · -- more entries: back to the head
     k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
+      with [MachCSL.signExtend_ofNat32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
     iintro Hk Hpc
     ihave IH' := itLoopInv_elim c0 k γb γfs true logstart n W Lw L D pidv dqp Xexc Rt $$ IH
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs (itRecLUpto W Lw L (t + 1)) ⊢
@@ -1558,7 +1516,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   icases bslots_uncons t $$ Hslots with ⟨Hsl2, Hslots⟩
   -- +0x6c  bnez s6  (NOT taken at commit time: the printk arm is skipped)
   k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x6c#64) false 8154#13 22#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g22, it_bnez0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g22, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   have hfixP : itFix k false t R := hfix
   obtain ⟨p2, p8, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hfixP
@@ -1568,14 +1526,14 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [p20, it_o_start]
+  k_norm_g [p20, Xv6.eo_o_start]
   iframe Hstartc
   inext
-  k_norm_g [p20, it_o_start]
+  k_norm_g [p20, Xv6.eo_o_start]
   k_next_e
   iintro Hk Hpc Hstartc
   k_step_e (wp_s_addw cpu _ (KA.«install_trans» + 0x74#64) false 11#5 11#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p19, it_sext32 logstart hls31]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p19, MachCSL.signExtend_ofNat32 logstart hls31]
   iintro Hk Hpc
   k_step_e (wp_s_addiw cpu _ (KA.«install_trans» + 0x78#64) true 1#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1586,10 +1544,10 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [p20, it_o_dev]
+  k_norm_g [p20, Xv6.eo_o_dev]
   iframe Hdevc
   inext
-  k_norm_g [p20, it_o_dev]
+  k_norm_g [p20, Xv6.eo_o_dev]
   k_next_e
   iintro Hk Hpc Hdevc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x7e#64) false 2093006#21 1#5 (by decide))
@@ -1644,10 +1602,10 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm_g [q20, it_o_dev]
+  k_norm_g [q20, Xv6.eo_o_dev]
   iframe Hdevc
   inext
-  k_norm_g [q20, it_o_dev]
+  k_norm_g [q20, Xv6.eo_o_dev]
   k_next_e
   iintro Hk Hpc Hdevc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x8c#64) false 2092992#21 1#5 (by decide))
@@ -1716,10 +1674,10 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x94#64) false 88#12 11#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18L, it_bufData]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18L, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x98#64) false 88#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, it_bufData]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, Xv6.vdrw3_bufData]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«install_trans» + 0x9c#64) false 2084994#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [it_br_memmove]
@@ -1799,7 +1757,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   · iframe HbufL HpayL
   -- +0xa6  bnez s6  (NOT taken at commit time) ; +0xaa mv a0,s1 ; +0xac jal bunpin
   k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0xa6#64) false 8110#13 22#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s22, it_bnez0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s22, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«install_trans» + 0xaa#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9D3]
@@ -1909,10 +1867,10 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   -- +0x60  addiw s3,s3,1 ; addi s5,s5,4 ; lw a5,44(s4) ; bge s3,a5
   k_step_e (wp_s_addiw cpu _ (KA.«install_trans» + 0x60#64) true 1#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [v19, it_addiw1 t (by omega)]
+    with [v19, Xv6.addiw_succ t (by omega)]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«install_trans» + 0x62#64) true 4#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v21, it_lhBlock_succ t]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v21, Xv6.il_lhBlock_step t]
   iintro Hk Hpc
   k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x64#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
@@ -1927,7 +1885,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   · -- the last entry: out at +0xb2
     k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_true hdone]
+      with [MachCSL.signExtend_ofNat32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_true hdone]
     iintro Hk Hpc
     have htn1 : t + 1 = n := by omega
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
@@ -1957,7 +1915,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   · -- more entries: back to the head
     k_step_e (wp_s_branch cpu _ (KA.«install_trans» + 0x68#64) false 74#13 19#5 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [it_sext32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
+      with [MachCSL.signExtend_ofNat32 n hn31, it_bge_add t 1 n (by omega) (by omega), decide_eq_false hdone]
     iintro Hk Hpc
     ihave IH' := itLoopInv_elim c0 k γb γfs false logstart n W Lw L D pidv dqp Xexc Rt $$ IH
     ihave Hexc := itExcAt_false γfs Xexc ((W.take t).map (fun w => w.toNat))
@@ -2126,7 +2084,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     subst hW
     k_step_e (wp_s_branch0 cpu _ (KA.«install_trans» + 0x8#64) false 194#13 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.setReg_eq_withRegs, it_sext32 n hn31, it_blez n (by omega), decide_eq_true hzero]
+      with [KCtx.setReg_eq_withRegs, MachCSL.signExtend_ofNat32 n hn31, it_blez n (by omega), decide_eq_true hzero]
     iintro Hk Hpc
     k_step_e (wp_s_ret cpu _ (KA.«install_trans» + 0xca#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs]
@@ -2177,7 +2135,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
   · -- n > 0: the prologue, the register set-up and the loop
     k_step_e (wp_s_branch0 cpu _ (KA.«install_trans» + 0x8#64) false 194#13 15#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.setReg_eq_withRegs, it_sext32 n hn31, it_blez n (by omega), decide_eq_false hzero]
+      with [KCtx.setReg_eq_withRegs, MachCSL.signExtend_ofNat32 n hn31, it_blez n (by omega), decide_eq_false hzero]
     iintro Hk Hpc
     iapply (it_prologue cpu _ (by k_norm_g; exact hK10)) $$ [- $Hk $Hpc]
     rotate_right 1

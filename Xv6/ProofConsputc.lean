@@ -13,6 +13,7 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecConsputc
 import Xv6.SpecUartputcSync
 import Xv6.CodeTactics
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -26,16 +27,6 @@ set_option linter.unusedVariables false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Small facts -/
-
-/-- A taken `beq`. -/
-theorem cp_beq_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-/-- A `beq` that falls through. -/
-theorem cp_beq_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- The three bytes of the BACKSPACE arm, as one list. -/
 theorem cp_three (bs : List (BitVec 8)) (a b c : BitVec 8) :
@@ -140,7 +131,7 @@ theorem consputc_proof (UP : UARTPUTC_SYNC) : CONSPUTC :=
     ihave Hch := storeChain_cons .uart0 γd 8#8 [32#8, 8#8] Φ $$ Hch
     k_step (wp_s_branch cpu _ (KA.«consputc» + 0xc#64) false 20#13 10#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [cp_beq_eq (k.regs 10#5) 256#64 hbs]
+      with [Xv6.wa_beq_eq (k.regs 10#5) 256#64 hbs]
     iintro Hk Hpc
     -- c.li a1,8 ; c.li a0,0 ; jal uartputc_sync
     k_step (wp_s_addi cpu _ (KA.«consputc» + 0x20#64) true 8#12 11#5 0#5 (by decide))
@@ -241,7 +232,7 @@ theorem consputc_proof (UP : UARTPUTC_SYNC) : CONSPUTC :=
     rw [hcs] at *
     k_step (wp_s_branch cpu _ (KA.«consputc» + 0xc#64) false 20#13 10#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [cp_beq_ne (k.regs 10#5) 256#64 hbs]
+      with [Xv6.wa_beq_neq (k.regs 10#5) 256#64 hbs]
     iintro Hk Hpc
     -- c.mv a1,a0 ; c.li a0,0 ; jal uartputc_sync
     k_step (wp_s_add cpu _ (KA.«consputc» + 0x10#64) true 11#5 0#5 10#5 (by decide))

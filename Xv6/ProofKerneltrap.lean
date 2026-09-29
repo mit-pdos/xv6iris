@@ -42,7 +42,6 @@ theorem and_256_of_spp (v : BitVec 64) (h : BitVec.extractLsb' 8 1 v = 1#1) : v 
 theorem and_2_of_sie0 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &&& 2#64 = 0#64 := by
   bv_decide
 theorem bcond_beq_256_0 : bcond bop.BEQ 256#64 0#64 = false := by decide
-theorem bcond_bne_00_kt : bcond bop.BNE 0#64 0#64 = false := by decide
 theorem bcond_beq_dev_0 (sc : BitVec 64) (hsc : sCauseOk sc) : bcond bop.BEQ (devintrRet sc) 0#64 = false := by
   simp [bcond, devintrRet_ne_zero sc hsc]
 theorem devintrRet_ext (sc : BitVec 64) (h : sc = sCause InterruptType.I_S_External) : devintrRet sc = 1#64 := by
@@ -113,7 +112,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     iintro Hk Hpc Hsepc
     -- csrw sstatus,s1 : the pinned bits are the trap's again
     k_step (wp_s_csrw_sstatus_off c _ ?hs (KA.«kerneltrap» + 0x3a#64) false 9#5 true true ?hv) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [hR9, KCtx.withSpie_withSpie, KCtx.withSpie_self' (k.pushed 6) true true hspie.symm hspp.symm]
+      $$ [- $Hk $Hpc] with [hR9, MachCSL.KCtx.withSpie_twice, KCtx.withSpie_self' (k.pushed 6) true true hspie.symm hspp.symm]
     case hv => k_norm; rw [hR9]; exact hv
     iintro Hk Hpc
     -- ld ra,40(sp) ; ld s0,32(sp) ; ld s1,24(sp) ; ld s2,16(sp) ; ld s3,8(sp)
@@ -197,7 +196,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     with [hsie2]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x28#64) true 48#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [bcond_bne_00_kt]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- jal devintr
   k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x2a#64) false 2096712#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffffe72]

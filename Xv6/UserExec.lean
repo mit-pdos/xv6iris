@@ -82,6 +82,7 @@ import Xv6.UPtDefs
 import Xv6.ElfFile
 import Xv6.KernelMap
 import MachCSL.CtxX
+import MachCSL.WpSmodeSret
 
 namespace Xv6
 
@@ -441,17 +442,6 @@ theorem uvRegs_uRegs (cpu : CPU) (va : BitVec 64) (g : RegMap) :
   · ipureintro; exact hms
   · iframe
 
-/-- **The register file does not own x0** (deviation 2; Rocq `gpr_file_x0`'s
-role): two maps agreeing off x0 are the same file. -/
-theorem uexec_gprFile_congr (cpu : CPU) (g g' : RegMap) (h : ∀ i, i ≠ 0#5 → g i = g' i) :
-    gprFile (GF := GF) cpu g ⊢ gprFile cpu g' := by
-  unfold gprFile
-  refine BigSepL.bigSepL_mono (fun {k x} hk => ?_)
-  have hx : x ∈ gprIdxs := List.mem_of_getElem? hk
-  have hx0 : x ≠ 0#5 := by
-    have : ∀ y ∈ gprIdxs, y ≠ 0#5 := by decide
-    exact this x hx
-  rw [h x hx0]
 
 end UVocab
 

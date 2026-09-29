@@ -67,30 +67,11 @@ theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff0a8#64 = KA.«mypr
 theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee44#64 = KA.«copyinstr» := by decide
 theorem fetchstr_br_strlen : KA.«fetchstr» + 0xffffffffffffe5c2#64 = KA.«strlen» := by decide
 
-theorem fetchstr_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem fetchstr_withSpie_twice (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := by
-  cases k; rfl
-
 /-- `s4..s11`, pinned to the entry map. -/
 def fetchstrPins (k : KCtx) (R : RegMap) : Prop :=
   R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧
   R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧ R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
-
-theorem fetchstr_calleeSaved_mk (KR R : RegMap)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR ((((((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 9#5 (KR 9#5)).set 18#5 (KR 18#5)).set
-      19#5 (KR 19#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -224,7 +205,7 @@ theorem fetchstr_exit (cpu cr : CPU) (k : KCtx) (Q : BitVec 64 → IProp GF) (hK
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
     iexact HQ
   · ipureintro
-    exact fetchstr_calleeSaved_mk _ _ p20 p21 p22 p23 p24 p25 p26 p27
+    exact MachCSL.calleeSaved_epi6s3 _ _ p20 p21 p22 p23 p24 p25 p26 p27
 
 /-! ## The two arms, from the `bltz` at `+0x26` -/
 
@@ -452,7 +433,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   ihave Hblk := fetchstr_priv_close (GF := GF) ξ0 rfl pa pid V P P' (viewFaulted P P' M) hpost.1 hfacts
     $$ [Hsz Hpg Hspace Hrest]
   case' _ => simp only [pSz, pPagetable]; iframe
-  rw [fetchstr_withSpie_twice, fetchstr_pushed_withSpie]
+  rw [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hpins : fetchstrPins k R2 := ⟨f20.trans e20, f21.trans e21, f22.trans e22, f23.trans e23,
     f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
   have hR2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := f2.trans e2

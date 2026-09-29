@@ -18,6 +18,7 @@
   complement and prepare_return's payment (`ut_ret_claim`).
 -/
 import Xv6.UsertrapClose
+import Xv6.ForkretTail
 
 namespace Xv6
 
@@ -29,12 +30,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedVariables false
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-
-/-- **MAKE_SATP** (`(pa >> 12) | (8L << 60)`), at a page address. -/
-theorem ut_make_satp (r : BitVec 44) :
-    (pageAddr r >>> 12) ||| 0x8000000000000000#64 = satpOf KTier.kpt r := by
-  unfold pageAddr pteAddr zero_extend Sail.BitVec.zeroExtend satpOf
-  bv_decide
 
 theorem ut_br_prepare_return : utPc 0xae#64 + BitVec.signExtend 64 0x1ffe02#21 = KA.«prepare_return» := by
   decide
@@ -150,7 +145,7 @@ theorem ut_exit (A : UtArgs GF) (c : CPU) (R1 : RegMap) (V2 : ProcPriv) (M2 : Na
   case ha0 =>
     simp only [RegMap.set_apply]
     k_norm_g
-    exact ut_make_satp _
+    exact Xv6.fkr_make_satp _
   case hR2 => k_norm_g; exact p2
   iframe
   iexact Hcaps

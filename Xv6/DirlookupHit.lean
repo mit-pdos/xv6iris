@@ -289,13 +289,13 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlookup_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hi31 : 16 * i < 2 ^ 31 := by
     have := dirFirst_lt _ _ _ _ hsome
     have := hs.hsz
     unfold dirNrec at *
     omega
-  have hoff := dirlookup_off32 (16 * i) hi31
+  have hoff := Xv6.fw_w32 (16 * i) hi31
   have hpoff := hs.hpoff
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hhalf, Hname, Hte, Hce, Hkeep, Hin, #Hit2, #Hiti, #Hinv, #Hpe,

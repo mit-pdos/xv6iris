@@ -55,7 +55,7 @@ theorem udepwf_st_read_file_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64) 
   iframe Hh Hf
   iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (readFileFam N.pay F)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
-    (ukio_tfOf_arg0 m pc) (ukio_tfOf_arg2 m pc) rfl
+    (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [hkey]
   unfold filereadIn
   iintro HP

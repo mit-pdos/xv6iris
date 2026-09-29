@@ -79,7 +79,7 @@ theorem uc_readMip {X : Type} (hT : UcTickFoot D) {s : UWSt} (hm : UcMisa D s) (
     runRW D orc s (read_mip .IncludePlatformInterrupts >>= k) =
       runRW D orc.tail.tail s (k (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip))) := by
   simp only [read_mip, external_interrupts_pending, bind_assoc, pure_bind,
-    ucRW_readReg D _ _ _ _ hT.rd_mip, ucRW_readReg_any D _ _ _ _ hT.meip_nr hT.meip_any,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, ucRW_readReg_any D _ _ _ _ hT.meip_nr hT.meip_any,
     uc_currentlyEnabled_S hm, if_true, ucRW_readReg_any D _ _ _ _ hT.seip_nr hT.seip_any]
   rfl
 
@@ -102,23 +102,23 @@ theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMis
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
     ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
   simp only [clint_dispatch, get_config_print_clint, Bool.false_eq_true, if_false,
-    ucRW_readReg D _ _ _ _ hT.rd_mip, ucRW_readReg D _ _ _ _ hT.rd_mtimecmp,
-    ucRW_readReg D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
+    MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtimecmp,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
   generalize hs1 : s.setR .mip _ = s1
   have ha1 : ucClockAgree s s1 := hs1 ▸ ucClockAgree_setR _ _ _ (Or.inr (Or.inr rfl))
   rw [uc_currentlyEnabled_Sstc (hmS s1 ha1)]
-  simp only [↓reduceIte, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_menvcfg]
+  simp only [↓reduceIte, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_menvcfg]
   split
-  · simp only [ucRW_readReg D _ _ _ _ hT.rd_mip, ucRW_readReg D _ _ _ _ hT.rd_stimecmp,
-      ucRW_readReg D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
+  · simp only [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_stimecmp,
+      MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
     generalize hs2 : s1.setR .mip _ = s2
     have ha2 : ucClockAgree s s2 :=
       hs2 ▸ ucClockAgree_trans ha1 (ucClockAgree_setR _ _ _ (Or.inr (Or.inr rfl)))
     obtain ⟨o, e⟩ := uc_clintTail hT orc s2 (hmS s2 ha2) (s.file .mip)
-    try rw [ucRW_readReg D _ _ _ _ hT.rd_mip]
+    try rw [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip]
     exact ⟨s2, o, e, ha2⟩
   · obtain ⟨o, e⟩ := uc_clintTail hT orc s1 (hmS s1 ha1) (s.file .mip)
-    try rw [ucRW_readReg D _ _ _ _ hT.rd_mip]
+    try rw [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip]
     exact ⟨s1, o, e, ha1⟩
 
 /-- **The clock tick** (over any user frame): one walk, moving only
@@ -127,23 +127,23 @@ theorem uc_tickClock (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D 
     ∃ s' orc', runRW D orc s (tick_clock ()) = some ((), s', orc') ∧ ucClockAgree s s' := by
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
     ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
-  simp only [tick_clock, should_inc_mcycle, bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_priv,
-    ucRW_readReg D _ _ _ _ hT.rd_mcountinhibit]
+  simp only [tick_clock, should_inc_mcycle, bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_priv,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mcountinhibit]
   have rest : ∀ (t : UWSt), ucClockAgree s t →
       ∃ s' orc', runRW D orc t (do
         writeReg mtime (BitVec.addInt (← readReg mtime) 1)
         clint_dispatch false) = some ((), s', orc') ∧ ucClockAgree s s' := by
     intro t ht
-    simp only [ucRW_readReg D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mtime]
+    simp only [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mtime]
     obtain ⟨s', o', e, ha⟩ := uc_clintDispatch hT orc _ (hmS _
       (ucClockAgree_trans ht (ucClockAgree_setR _ _ _ (Or.inr (Or.inl rfl)))))
     exact ⟨s', o', e, ucClockAgree_trans ht (ucClockAgree_trans
       (ucClockAgree_setR _ _ _ (Or.inr (Or.inl rfl))) ha)⟩
   -- `mcyclecfg` is read only under `mcountinhibit.CY = 0`
   split
-  · simp only [bind_assoc, pure_bind, ucRW_readReg D _ _ _ _ hT.rd_mcyclecfg]
+  · simp only [bind_assoc, pure_bind, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mcyclecfg]
     split
-    · simp only [ucRW_readReg D _ _ _ _ hT.rd_mcycle, ucRW_writeReg D _ _ _ _ _ hT.wr_mcycle]
+    · simp only [MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mcycle, ucRW_writeReg D _ _ _ _ _ hT.wr_mcycle]
       exact rest _ (ucClockAgree_setR _ _ _ (Or.inl rfl))
     · try simp only [pure_bind]
       exact rest s (ucClockAgree_refl s)

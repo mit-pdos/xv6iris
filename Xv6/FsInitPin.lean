@@ -40,6 +40,7 @@ import Xv6.FsImgFiles
 import Xv6.FsDurNode
 import Xv6.FsAbsDefs
 import Xv6.FsStateEraPure
+import Xv6.ReadiParts
 
 namespace Xv6
 
@@ -155,12 +156,9 @@ theorem era0Arow (S : FsStateRec) (z : Nat) (n : FsNode) (hS : snapOk S era0D)
 theorem fsimgInitNlinkNz : (fsDinode fsimgP fsimgSb INIT_INO).diNlink.toNat ≠ 0 := by
   rw [fsimgInitNlink]; decide
 
-/-- Rocq `maxfile_bytes`. -/
-theorem maxfileBytes : MAXFILE * BSIZE = 274432 := by decide
-
 /-- Rocq `fsimg_init_size_bound`. -/
 theorem fsimgInitSizeBound : (fsDinode fsimgP fsimgSb INIT_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgInitSize, maxfileBytes]; decide
+  rw [fsimgInitSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `node_at_nondir`: a typed non-directory record's node IS its
 `fileBytes`. -/

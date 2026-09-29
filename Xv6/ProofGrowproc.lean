@@ -30,6 +30,8 @@ import Xv6.SpecGrowproc
 import Xv6.SpecMyproc
 import Xv6.SpecUvmdealloc
 import Xv6.CodeTactics
+import Xv6.UPtPptLemmas
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -44,18 +46,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Shared facts -/
 
-theorem gp_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem gp_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
-
-theorem gp_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-/-- `lui a5,0x2000`. -/
-theorem gp_lui_2000 : BitVec.signExtend 64 (8192#20 ++ 0#12) = 0x2000000#64 := by decide
 
 /-- `blez`/`bgez` (the signed branches against `zero`). -/
 theorem gp_toInt_zero : (0#64 : BitVec 64).toInt = 0 := by decide
@@ -175,7 +165,7 @@ theorem gp_epi (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (R 
       kctx cpu' ((kb.withSpie spie spp).withRegs R'') -∗ pcIs cpu' (jumpPc (kb.regs 1#5)) -∗
       ⌜R'' 10#5 = R 10#5 ∧ calleeSaved kb.regs R''⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  simp only [gp_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   have hepi := wp_epilogue4s2_gen (GF := GF) (lent := false) c (kb.withSpie spie spp)
@@ -374,7 +364,6 @@ theorem gp_ret_c4e : jumpPc (KA.«growproc» + 0x32#64) = (KA.«growproc» + 0x3
   decide
 theorem gp_ret_c72 : jumpPc (KA.«growproc» + 0x56#64) = (KA.«growproc» + 0x56#64) := by
   decide
-theorem gp_slli_13 : (0x1FFFFFF#64) <<< (13 : Nat) = 0x3FFFFFE000#64 := by decide
 theorem gp_minus_one : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
 theorem gp_uvmMaxsz_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
 
@@ -509,13 +498,13 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, d9] next c8 hp8
     iintro Hk Hpc
     k_step_gen (wp_s_lui c8 _ (KA.«growproc» + 0x1e#64) false 8192#20 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [gp_lui_2000] next c9 hp9
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_2000] next c9 hp9
     iintro Hk Hpc
     k_step_gen (wp_s_addi c9 _ (KA.«growproc» + 0x22#64) true 4095#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c10 hp10
     iintro Hk Hpc
     k_step_gen (wp_s_slli c10 _ (KA.«growproc» + 0x24#64) true 13#6 15#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [gp_slli_13] next c11 hp11
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.tf_va] next c11 hp11
     iintro Hk Hpc
     by_cases hbig : uvmMaxsz < (k.regs 10#5 + V.sz).toNat
     case pos =>
@@ -599,7 +588,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         exact fun i hi => GrowProc.um_free_above V.sz (k.regs 10#5 + V.sz) V.upt hbelow i hi
       iapply wpNext_intro_pin
       iintro %c16 %hp16 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
-      k_norm_g [gp_ret_c4e, gp_withSpie_withSpie]
+      k_norm_g [gp_ret_c4e, MachCSL.KCtx.withSpie_twice]
       have hspf : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
         ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
       unfold calleeSaved at hcs2
@@ -776,7 +765,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       case hoD => k_norm_g; exact hszb
       iapply wpNext_intro_pin
       iintro %c12 %hp12 %spie2 %spp2 %R2 %hsp2 Hk Hpc HP %hpostD
-      k_norm_g [gp_ret_c72, gp_withSpie_withSpie]
+      k_norm_g [gp_ret_c72, MachCSL.KCtx.withSpie_twice]
       have hspf : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
         ⟨(hsp2 h).1.trans (hsp h).1, (hsp2 h).2.trans (hsp h).2⟩
       obtain ⟨hcs2, hr10⟩ := hpostD
@@ -831,7 +820,6 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
             | rfl
             | exact e19 | exact e20 | exact e21 | exact e22 | exact e23
             | exact e24 | exact e25 | exact e26 | exact e27⟩
-
 
 
 end Xv6

@@ -21,6 +21,8 @@ Modelled on `Xv6/ProofSafestrcpy.lean`.
 -/
 import Xv6.SpecStrncpy
 import Xv6.CodeTactics
+import Xv6.FsWords
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -36,33 +38,14 @@ theorem sy_E_add (x y : BitVec 64) :
     BitVec.extractLsb' 0 32 (x + y) = BitVec.extractLsb' 0 32 x + BitVec.extractLsb' 0 32 y := by
   bv_decide
 
-/-- Truncating a sign-extended word gives the word back. -/
-theorem sy_E_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
 /-- The truncation of the `-1` immediate (as `k_norm` leaves it). -/
 theorem sy_E_negone : BitVec.extractLsb' 0 32 (18446744073709551615#64) = 4294967295#32 := by
   bv_decide
 
-/-- The truncation of a small count. -/
-theorem sy_E_ofNat (m : Nat) (hm : m < 2 ^ 32) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m) = BitVec.ofNat 32 m := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-  omega
-
-/-- Sign-extending a small count. -/
-theorem sy_sext_ofNat (m : Nat) (hm : m < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 m) = BitVec.ofNat 64 m := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_signExtend, BitVec.msb_eq_decide]
-  simp only [BitVec.toNat_ofNat, BitVec.toNat_setWidth, Nat.reducePow]
-  split <;> rename_i hc <;> simp only [decide_eq_true_eq] at hc <;> omega
-
 /-- `sext.w` is the identity on a small count. -/
 theorem sy_sext32 (m : Nat) (hm : m < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m)) = BitVec.ofNat 64 m := by
-  rw [sy_E_ofNat m (by omega), sy_sext_ofNat m hm]
+  rw [Xv6.extractLsb'_ofNat64 m (by omega), MachCSL.signExtend_ofNat32 m hm]
 
 /-- Subtracting one from a positive count. -/
 theorem sy_sub1 (m : Nat) (h0 : 0 < m) :
@@ -107,17 +90,6 @@ theorem sy_ite_bgtz {α : Type} (m : Nat) (hm : m < 2 ^ 63) (x y : α) :
   · have h1 : 0 < m := Nat.pos_of_ne_zero h
     simp [h, h1]
 
-/-- `bnez` on a zero-extended byte. -/
-theorem sy_ite_bnez_byte {α : Type} (b : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then y else x := by
-  have he : (BitVec.setWidth 64 b = 0#64) ↔ (b = 0#8) := by bv_decide
-  by_cases h : b = 0#8
-  · rw [if_pos h]
-    simp only [bcond, bne_iff_ne, ne_eq, he.mpr h, not_true, if_false]
-  · rw [if_neg h]
-    have : ¬ (BitVec.setWidth 64 b = 0#64) := fun hc => h (he.mp hc)
-    simp only [bcond, bne_iff_ne, ne_eq, this, not_false_iff, if_true]
-
 /-- The low byte of the zero-extended byte is the byte. -/
 theorem sy_extract (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 b) = b := by bv_decide
 
@@ -143,9 +115,9 @@ theorem sy_pad_w (dst : BitVec 64) (n i : Nat) (hi : i < n) (hn : n < 2 ^ 31) :
                 BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (n - i))) +
             18446744073709551615#64)))
       = BitVec.extractLsb' 0 32 (dst + BitVec.ofNat 64 n) := by
-  refine (sy_E_sext _).trans ?_
-  rw [sy_E_add, sy_E_sext, sy_E_negone, sy_E_add, sy_E_add,
-      sy_E_ofNat (i + 1) (by omega), sy_E_ofNat (n - i) (by omega), sy_E_ofNat n (by omega)]
+  refine (Xv6.fw_ext32 _).trans ?_
+  rw [sy_E_add, Xv6.fw_ext32, sy_E_negone, sy_E_add, sy_E_add,
+      Xv6.extractLsb'_ofNat64 (i + 1) (by omega), Xv6.extractLsb'_ofNat64 (n - i) (by omega), Xv6.extractLsb'_ofNat64 n (by omega)]
   generalize BitVec.extractLsb' 0 32 dst = D
   bv_omega
 
@@ -155,12 +127,12 @@ theorem sy_subw_pad (w dst : BitVec 64) (n m : Nat) (hmn : m ≤ n) (hn : n < 2 
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 w +
         -BitVec.extractLsb' 0 32 (dst + BitVec.ofNat 64 m)) = BitVec.ofNat 64 (n - m) := by
   rw [hw, ← BitVec.sub_eq_add_neg, sy_E_add, sy_E_add,
-      sy_E_ofNat n (by omega), sy_E_ofNat m (by omega)]
+      Xv6.extractLsb'_ofNat64 n (by omega), Xv6.extractLsb'_ofNat64 m (by omega)]
   have h : BitVec.extractLsb' 0 32 dst + BitVec.ofNat 32 n -
       (BitVec.extractLsb' 0 32 dst + BitVec.ofNat 32 m) = BitVec.ofNat 32 (n - m) := by
     generalize BitVec.extractLsb' 0 32 dst = D
     bv_omega
-  rw [h, sy_sext_ofNat (n - m) (by omega)]
+  rw [h, MachCSL.signExtend_ofNat32 (n - m) (by omega)]
 
 /-- A list of length `0` is empty. -/
 theorem sy_nil (l : List (BitVec 8)) (h : l.length = 0) : l = [] := by
@@ -440,7 +412,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     -- bnez a4,e32
     k_step_gen (wp_s_branch c7 _ (KA.«strncpy» + 0x24#64) true 8168#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sy_ite_bnez_byte bss[i]] next c8 hp8
+      with [RegMap.set_apply, Xv6.ite_bne_byte bss[i]] next c8 hp8
     iintro Hk Hpc
     have hpin8 : kb.sie = false ∨ kb.proc = 0#64 → c8 = cpu :=
       fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans

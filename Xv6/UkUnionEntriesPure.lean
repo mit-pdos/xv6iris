@@ -6,7 +6,7 @@ cat's file name positionally, the shell's prompt, cat's round at its line's
 own file in its three arms, and the union model's bodies at the file lines
 (`ulmG` at `UR` alternatives).
 
-CONE (this file, all reached): `cat_prompt_len`, `cat_cont_ran_some_at`,
+CONE (this file, all reached): `Xv6.wrPrompt_len`, `cat_cont_ran_some_at`,
 `cat_cont_ran_absent_at`, `cat_cont_noopen_at`, `ulm_abs_R`,
 `ulm_cons_adm_R`, `ulm_echo_body`, `ulm_echo_adm`, `ulm_cat_body_ran`,
 `ucat_diag_take`, `ulm_cat_body_ran_none`, `ulm_cat_body_noopen`,
@@ -32,9 +32,6 @@ open MachCSL Ualt
 file model's. -/
 theorem fif_cat_dg_open (nm : List (BitVec 8)) : catDgOpen nm = dgCatopenN nm := by
   simp [catDgOpen, dgCatopenN, dgCatopenPre, nlb, wlNl]
-
-/-- **Rocq `cat_prompt_len`**: the shell's prompt is two bytes. -/
-theorem cat_prompt_len : uPrompt.length = 2 := rfl
 
 /-- **Rocq `cat_cont_ran_some_at`**. -/
 theorem cat_cont_ran_some_at (s : Fstate) (nm bs : List (BitVec 8)) (h : s[nm]? = some bs) :
@@ -90,7 +87,7 @@ theorem ulm_echo_body (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (ws : 
   simp only [show ulmG.lmCont = ucont from rfl, show ulmG.lmDec = ualtDec from rfl]
   rw [ualtDec_0, hfl]
   show List.take ((lineAltsOf ws)[0]!.length - 2) (lineAltsOf ws)[0]! = _
-  rw [lineAltsOf_0, List.length_append, cat_prompt_len, Nat.add_sub_cancel, List.take_left']
+  rw [lineAltsOf_0, List.length_append, Xv6.wrPrompt_len, Nat.add_sub_cancel, List.take_left']
   rfl
 
 /-- **Rocq `ulm_echo_adm`**. -/
@@ -107,7 +104,7 @@ theorem ulm_cat_body_ran (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (nm
     (hst : (ulmState s0 cs I)[nm]? = some content) :
     lmBody ulmG s0 cs I (ualtCode (UR .RCRan)) = content := by
   unfold lmBody
-  rw [ulm_abs_R, hfl, cat_cont_ran_some_at _ nm content hst, List.length_append, cat_prompt_len,
+  rw [ulm_abs_R, hfl, cat_cont_ran_some_at _ nm content hst, List.length_append, Xv6.wrPrompt_len,
     Nat.add_sub_cancel, List.take_left']
   rfl
 
@@ -116,7 +113,7 @@ whole continuation. -/
 theorem ucat_diag_take (nm : List (BitVec 8)) :
     (altCatopenN nm).take ((altCatopenN nm).length - 2) = catDgOpen nm := by
   unfold altCatopenN
-  rw [List.length_append, cat_prompt_len, Nat.add_sub_cancel, List.take_left' rfl, fif_cat_dg_open]
+  rw [List.length_append, Xv6.wrPrompt_len, Nat.add_sub_cancel, List.take_left' rfl, fif_cat_dg_open]
 
 /-- **Rocq `ulm_cat_body_ran_none`**. -/
 theorem ulm_cat_body_ran_none (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (nm : List (BitVec 8))

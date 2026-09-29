@@ -4,31 +4,20 @@ Proof of `putc` at ANY load address (`Xv6/SpecUlibPutc.lean`; Rocq
 
 The walk is Rocq's, instruction by instruction, with every pc written
 `base + off`: a leaf's fall-through `base + off + len` is folded to the next
-`base + off'` by `ulibPutc_pc` (pure BitVec arithmetic, no `base` facts),
+`base + off'` by `Xv6.ulibPc_next` (pure BitVec arithmetic, no `base` facts),
 the `jal` target to `ulibWriteAt base` by `ulibPutc_jal`, and the return
 address `base + 0x16` survives `ulibRetPc` because `base` is even.
 Nothing else in the proof mentions `base`.
 -/
 import Xv6.SpecUlibPutc
 import MachCSL.WpMmodeAlu
+import Xv6.UlibStep
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 /-! ## Pure facts -/
-
-/-- `RegMap.set` as a conditional (for `simp` on literal indices). -/
-theorem ulibPutc_set (m : RegMap) (i j : BitVec 5) (v : BitVec 64) :
-    m.set i v j = if j = i then v else m j := rfl
-
-/-- A fall-through, folded. -/
-theorem ulibPutc_pc (b : BitVec 64) (x y : Nat) (r : Bool) (h : x + (if r then 2 else 4) = y) :
-    b + BitVec.ofNat 64 x + ulibLen r = b + BitVec.ofNat 64 y := by
-  rw [BitVec.add_assoc]
-  congr 1
-  cases r <;> simp only [ulibLen, if_true, Bool.false_eq_true, if_false] at h ⊢ <;>
-    (subst h; apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_add])
 
 /-- The `jal` at `base + 0x12` lands on the `write` stub. -/
 theorem ulibPutc_jal (b : BitVec 64) :
@@ -151,39 +140,39 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   iapply (L.wp_sd _ _ n true 24#12 1#5 2#5 ((m 2#5).toNat - 8) vra ?ha1 ?hal1) $$ Hi1 Hwra Hrun
   case ha1 => simp [ulibRget, ulibPutc_sext_24, ulibPutc_s24 _ hsp]
   case hal1 => omega
-  rw [ulibPutc_pc base 2 4 true rfl]
+  rw [Xv6.ulibPc_next base 2 4 true rfl]
   iintro Hwra Hrun
   -- +0x04  sd s0,16(sp)
   ihave #Hi2 := c2 $$ Hcode
   iapply (L.wp_sd _ _ n true 16#12 8#5 2#5 ((m 2#5).toNat - 16) vs0 ?ha2 ?hal2) $$ Hi2 Hws0 Hrun
   case ha2 => simp [ulibRget, ulibPutc_sext_16, ulibPutc_s16 _ hsp]
   case hal2 => omega
-  rw [ulibPutc_pc base 4 6 true rfl]
+  rw [Xv6.ulibPc_next base 4 6 true rfl]
   iintro Hws0 Hrun
   -- +0x06  addi s0,sp,32 : s0 := the entry sp
   ihave #Hi3 := c3 $$ Hcode
   iapply (L.wp_addi _ _ n true 32#12 2#5 8#5 (by decide) (by decide)) $$ Hi3 Hrun
-  rw [ulibPutc_pc base 6 8 true rfl]
+  rw [Xv6.ulibPc_next base 6 8 true rfl]
   iintro Hrun
   -- +0x08  sb a1,-17(s0) : the byte, into byte 7 of the third frame word
   icases L.uword_byte7_acc _ _ $$ Hwb with ⟨Hb7, Hwbc⟩
   ihave #Hi4 := c4 $$ Hcode
   iapply (L.wp_sb _ _ n false 4079#12 11#5 8#5 ((m 2#5).toNat - 24 + 7) _ ?ha4) $$ Hi4 Hb7 Hrun
   case ha4 =>
-    simp (config := { decide := true }) only [ulibRget, ulibPutc_set, ulibPutc_sext_32,
+    simp (config := { decide := true }) only [ulibRget, MachCSL.RegMap.set_apply, ulibPutc_sext_32,
       ulibPutc_sext_m17, if_true, if_false]
     exact (ulibPutc_byte _ hsp).symm
-  rw [ulibPutc_pc base 8 12 false rfl]
+  rw [Xv6.ulibPc_next base 8 12 false rfl]
   iintro Hb7 Hrun
   -- +0x0c  li a2,1
   ihave #Hi5 := c5 $$ Hcode
   iapply (L.wp_addi _ _ n true 1#12 0#5 12#5 (by decide) (by decide)) $$ Hi5 Hrun
-  rw [ulibPutc_pc base 12 14 true rfl]
+  rw [Xv6.ulibPc_next base 12 14 true rfl]
   iintro Hrun
   -- +0x0e  addi a1,s0,-17
   ihave #Hi6 := c6 $$ Hcode
   iapply (L.wp_addi _ _ n false 4079#12 8#5 11#5 (by decide) (by decide)) $$ Hi6 Hrun
-  rw [ulibPutc_pc base 14 18 false rfl]
+  rw [Xv6.ulibPc_next base 14 18 false rfl]
   iintro Hrun
   -- +0x12  jal ra,<write>
   ihave #Hi7 := c7 $$ Hcode
@@ -193,13 +182,13 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   -- write(fd, sp0-17, 1): the per-call obligation, at the stored byte
   iapply (ulibPutcWb_apply L base _ _ _ Ci Co _ _ n ?h10 ?h11 ?h12 ?hb (base + BitVec.ofNat 64 22) ?hr)
     $$ Hw HCi Hb7 Hrun
-  case h10 => simp [ulibPutc_set]
+  case h10 => simp [MachCSL.RegMap.set_apply]
   case h11 =>
-    simp (config := { decide := true }) only [ulibRget, ulibPutc_set, ulibPutc_sext_32,
+    simp (config := { decide := true }) only [ulibRget, MachCSL.RegMap.set_apply, ulibPutc_sext_32,
       ulibPutc_sext_m17, if_true, if_false]
     exact ulibPutc_byte_ofNat _ hsp
-  case h12 => simp [ulibPutc_set, ulibRget, ulibPutc_sext_1]
-  case hb => simp [ulibPutc_set, ulibRget]
+  case h12 => simp [MachCSL.RegMap.set_apply, ulibRget, ulibPutc_sext_1]
+  case hb => simp [MachCSL.RegMap.set_apply, ulibRget]
   case hr => rw [RegMap.set_same]; exact ulibPutc_ret base hbase
   iintro %ret ⟨HCo, Hb7⟩ Hrun
   ihave Hwb := Hwbc $$ Hb7
@@ -207,17 +196,17 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   ihave #Hi8 := c8 $$ Hcode
   iapply (L.wp_ld _ _ n true 24#12 2#5 1#5 ((m 2#5).toNat - 8) _ (by decide) (by decide) ?ha8 ?hal8)
     $$ Hi8 Hwra Hrun
-  case ha8 => simp [ulibRget, ulibPutc_set, ulibPutc_sext_24, ulibPutc_s24 _ hsp]
+  case ha8 => simp [ulibRget, MachCSL.RegMap.set_apply, ulibPutc_sext_24, ulibPutc_s24 _ hsp]
   case hal8 => omega
-  rw [ulibPutc_pc base 22 24 true rfl]
+  rw [Xv6.ulibPc_next base 22 24 true rfl]
   iintro Hwra Hrun
   -- +0x18  ld s0,16(sp)
   ihave #Hi9 := c9 $$ Hcode
   iapply (L.wp_ld _ _ n true 16#12 2#5 8#5 ((m 2#5).toNat - 16) _ (by decide) (by decide) ?ha9 ?hal9)
     $$ Hi9 Hws0 Hrun
-  case ha9 => simp [ulibRget, ulibPutc_set, ulibPutc_sext_16, ulibPutc_s16 _ hsp]
+  case ha9 => simp [ulibRget, MachCSL.RegMap.set_apply, ulibPutc_sext_16, ulibPutc_s16 _ hsp]
   case hal9 => omega
-  rw [ulibPutc_pc base 24 26 true rfl]
+  rw [Xv6.ulibPc_next base 24 26 true rfl]
   iintro Hws0 Hrun
   -- +0x1a  addi sp,sp,32 : the pop, the frame goes back
   ihave Hstk : L.ustack (m 2#5) 4 $$ [Hwra Hws0 Hwb Hw32]
@@ -229,22 +218,22 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
     iframe
   ihave #Hi10 := c10 $$ Hcode
   iapply (ulibPutc_pop L _ _ n (m 2#5) ?hsp10) $$ Hi10 Hstk Hrun
-  case hsp10 => simp [ulibPutc_set, BitVec.sub_add_cancel]
-  rw [ulibPutc_pc base 26 28 true rfl]
+  case hsp10 => simp [MachCSL.RegMap.set_apply, BitVec.sub_add_cancel]
+  rw [Xv6.ulibPc_next base 26 28 true rfl]
   iintro Hrun
   -- +0x1c  ret
   ihave #Hi11 := c11 $$ Hcode
   iapply (ulibPutc_ret' L _ _ (4 + n) (ulibRetPc (m 1#5)) ?htgt) $$ Hi11 Hrun
-  case htgt => simp [ulibPutc_set, ulibRget]
+  case htgt => simp [MachCSL.RegMap.set_apply, ulibRget]
   iintro Hrun
   iapply (ulibPutc_cont L m _ _ _ Co ?hcs) $$ Hcont HCo Hrun
   case hcs =>
     intro r hr
     rcases hr with rfl | rfl | rfl | rfl | rfl | ⟨h1, h2⟩
-    all_goals try (simp (config := { decide := true }) only [ulibPutc_set, ulibRget, if_true,
+    all_goals try (simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, ulibRget, if_true,
         if_false]; done)
     have e : ∀ k : BitVec 5, k.toNat < 18 → r ≠ k := fun k hk e => by subst e; omega
-    simp only [ulibPutc_set, e 1#5 (by decide), e 2#5 (by decide), e 8#5 (by decide),
+    simp only [MachCSL.RegMap.set_apply, e 1#5 (by decide), e 2#5 (by decide), e 8#5 (by decide),
       e 10#5 (by decide), e 11#5 (by decide), e 12#5 (by decide), e 17#5 (by decide), if_false]
 
 end

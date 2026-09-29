@@ -943,12 +943,6 @@ theorem IUNLOCKPUT.wp_iunlockput_dep_gen (A : IUNLOCKPUT) {hlc : HasLC} {GF : Bu
   iintro %cpu' HK %spie %spp %R' %n' %Sb' %w %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 %p10 H11 H12 H13
   iapply HK $$ %spie %spp %R' %n' %Sb' %w %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 %p10 H11 H12 H13
 
-/-- The counted seal's arithmetic (Rocq's `unfold ip_spend_w, ip_bm; destruct
-wf; lia`), in iunlockput's own name. -/
-theorem iunlockput_spend (w : Bool) (n n' : Nat) (h : n - ipSpendW w false false ≤ n') :
-    n - iputUnits ≤ n' :=
-  ipSpendW_uncredited w n n' h
-
 /-- **THE COUNTED SEAL at a caller-chosen descriptor** (Rocq's `Local Lemma
 wp_iunlockput_dep_sconf`): the budget half opens at its set and birth epoch,
 the generic form runs uncredited (`crb = cru = crz = false`), and the grown
@@ -995,7 +989,7 @@ theorem IUNLOCKPUT.wp_iunlockput_dep_sconf (A : IUNLOCKPUT) {hlc : HasLC}
   ihave Hopb := logOpS_opb icfgLog n' Sb' $$ Hops
   iapply HΦ $$ %spie %spp %R' %n' %hcs Hk Hpc Htc Hcl Hir Hpid Hsb Hsi Hbs [] Hopb Hslot Hside
   ipureintro
-  exact ⟨iunlockput_spend w n n' hlo, hhi⟩
+  exact ⟨Xv6.ipSpendW_uncredited w n n' hlo, hhi⟩
 
 theorem IUNLOCKPUT.wp_iunlockput_dep_sconf_eb (A : IUNLOCKPUT) {hlc : HasLC}
     {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -1039,7 +1033,7 @@ theorem IUNLOCKPUT.wp_iunlockput_dep_sconf_eb (A : IUNLOCKPUT) {hlc : HasLC}
   ihave Hopb := logOpS_opb icfgLog n' Sb' $$ Hops
   iapply HΦ $$ %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs [] Hopb Hslot Hside
   ipureintro
-  exact ⟨iunlockput_spend w n n' hlo, hhi⟩
+  exact ⟨Xv6.ipSpendW_uncredited w n n' hlo, hhi⟩
 
 /-- The credited transactional form (Rocq `wp_iunlockput_tx_gen`, defined by
 `wp_iunlockput_tx_of_dep_gen`). -/

@@ -72,7 +72,7 @@ theorem ialloc_epilogue [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCtx) (spie 
   -- +0x84  addi sp,sp,64
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_e (wp_s_pop cpu _ (KA.«ialloc» + 0x84#64) true 64#12 8 ialloc_imm_p64)
+  k_step_e (wp_s_pop cpu _ (KA.«ialloc» + 0x84#64) true 64#12 8 MachCSL.imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2]
   iintro Hk Hpc

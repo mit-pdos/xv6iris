@@ -12,6 +12,7 @@ installed table and the hart's TLB at the kernel page table.
 -/
 import MachCSL.WpPtWalk
 import MachCSL.WpSmode
+import MachCSL.WpStagesM
 
 namespace MachCSL
 
@@ -149,12 +150,6 @@ theorem swp_translateAddr_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
 
 /-! ## Pointer masking: none -/
 
-/-- The 64 low bits of a 64-bit value, zero- or sign-extended: the value. -/
-theorem setWidth_extract64 (va : BitVec 64) : BitVec.setWidth 64 (BitVec.extractLsb' 0 64 va) = va := by
-  bv_decide
-
-theorem signExtend_extract64 (va : BitVec 64) : BitVec.signExtend 64 (BitVec.extractLsb' 0 64 va) = va := by
-  bv_decide
 
 set_option maxHeartbeats 4000000 in
 -- the linter walks the 12-case `swp_run` info tree: 10 s, a third of the file
@@ -193,7 +188,7 @@ theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c :
         Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
         Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
       reduce_closed_widths
-      try simp only [BitVec.zeroExtend, setWidth_extract64, signExtend_extract64]
+      try simp only [BitVec.zeroExtend, MachCSL.setWidth_extract64', MachCSL.signExtend_extract64']
       conf_intro HmConf
       iapply HΦ $$ HmConf
   | kpt =>
@@ -214,7 +209,7 @@ theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c :
         Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
         Int.reduceToNat, Int.reduceAdd, Nat.reduceSub, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
       reduce_closed_widths
-      try simp only [BitVec.zeroExtend, setWidth_extract64, signExtend_extract64]
+      try simp only [BitVec.zeroExtend, MachCSL.setWidth_extract64', MachCSL.signExtend_extract64']
       conf_intro HmConf
       iapply HΦ $$ HmConf
 

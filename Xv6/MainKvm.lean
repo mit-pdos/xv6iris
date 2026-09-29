@@ -30,6 +30,7 @@ import Xv6.KptBoot
 import Xv6.ProcsInvAlloc
 import Xv6.SpecKvminit
 import Xv6.MainSecondaryParts
+import Xv6.KexecSeam
 
 namespace Xv6
 
@@ -133,10 +134,6 @@ end
 
 /-! ## The table publication and `kvminithart()` -/
 
-theorem mn_pageAddr_extract (t : BitVec 44) : BitVec.extractLsb' 12 44 (pageAddr t) = t := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  bv_decide
-
 theorem mn_pageAddr_hi (t : BitVec 44) : BitVec.extractLsb' 56 8 (pageAddr t) = 0#8 := by
   simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
@@ -182,14 +179,14 @@ theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.ba
   iintro Hk Hpc
   have hkv := KVH.wp_kvminithart (hlc := hlc) (GF := GF) X cpu (k.withRegs (R0.set 1#5 (KA.«main» + 122#64)))
     tlb0 (pageAddr t.base) DFrac.discard t M hX (by simp [hsie]) (by simp; omega) (mn_pageAddr_hi t.base)
-    (mn_pageAddr_extract t.base).symm
+    (Xv6.kxc_tfp_extract t.base).symm
   unfold wp_kvminithart_body at hkv
   simp only [kvminithartAddr] at hkv
   iapply hkv
   iframe Hk Hpc Htlb Hkpt Hroot
   iintro %R' Hk Hpc Hstv _ _
   simp only [KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7a, KCtx.toKpt_withRegs,
-    mn_pageAddr_extract, KCtx.withRegs_withRegs]
+    Xv6.kxc_tfp_extract, KCtx.withRegs_withRegs]
   iapply HΦ $$ %R' Hk Hpc Hstv
 
 end

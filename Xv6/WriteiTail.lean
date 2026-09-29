@@ -11,6 +11,7 @@
 -/
 import Xv6.WriteiDefs
 import Xv6.DinodeSlot
+import Xv6.ReadiFrame
 
 namespace Xv6
 
@@ -22,8 +23,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-theorem writei_imm_p112 : BitVec.signExtend 64 112#12 = 8#64 * BitVec.ofNat 64 14 := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -91,7 +90,7 @@ theorem writei_ret (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : Wi
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 14 $$
     [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13]
   case' _ => stack_cells; iframe
-  k_step_e (wp_s_pop cpu _ (KA.«writei» + 0xea#64) true 112#12 14 writei_imm_p112)
+  k_step_e (wp_s_pop cpu _ (KA.«writei» + 0xea#64) true 112#12 14 Xv6.rd_imm_p112)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hsp]
   iintro Hk Hpc
@@ -300,7 +299,7 @@ theorem writei_ext_ofNat (x : Nat) : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 x)
 /-- `bgeu a5,s2` at `+0xc0`: the file is already `off + tot` long. -/
 theorem writei_size_bgeu (w : BitVec 32) (x : Nat) (hw : w.toNat < 2 ^ 31) (hx : x < 2 ^ 31) :
     bcond bop.BGEU (BitVec.signExtend 64 w) (BitVec.ofNat 64 x) = decide (x ≤ w.toNat) := by
-  rw [writei_sext_toNat w hw, writei_bgeu_nat _ _ (by omega) (by omega)]
+  rw [Xv6.dsSext_small w hw, Xv6.fw_bgeu_nat _ _ (by omega) (by omega)]
 
 /-- ...in the shape `k_norm` leaves it (`BitVec.ofNat_add` splits the sum). -/
 theorem writei_size_bgeu2 (w : BitVec 32) (a b : Nat) (hw : w.toNat < 2 ^ 31) (hx : a + b < 2 ^ 31) :

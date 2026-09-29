@@ -252,15 +252,15 @@ theorem ushqTailWs_sym (g : Nat → BitVec 8) (len : Nat) :
     | nil =>
       obtain ⟨hlen, hnl⟩ := hrest
       have hje : j = c + (wlBody r).length := by omega
-      rw [hje, hnl, ushs_nl_not_sym] at hs; cases hs
+      rw [hje, hnl, Xv6.wlNl_nsym] at hs; cases hs
     | cons r2 rs =>
       obtain ⟨hsp1, hbar, hsp2, ht⟩ := hrest
       by_cases hj0 : j = c + (wlBody r).length
-      · rw [hj0, hsp1, ushs_sp_not_sym] at hs; cases hs
+      · rw [hj0, hsp1, Xv6.wlSp_nsym] at hs; cases hs
       by_cases hj1 : j = c + (wlBody r).length + 1
       · rw [hj1]; exact hbar
       by_cases hj2' : j = c + (wlBody r).length + 2
-      · rw [hj2', hsp2, ushs_sp_not_sym] at hs; cases hs
+      · rw [hj2', hsp2, Xv6.wlSp_nsym] at hs; cases hs
       exact ih _ ht j (by omega) hj2 hs
 
 /-- the stages after the first bar are a pipeline tail. -/
@@ -280,8 +280,8 @@ theorem ushqTailWs_bars (g : Nat → BitVec 8) (len : Nat) (hsym : ushqSymOk len
       by_cases hlt : j < c + (wlBody r).length
       · exact ushq_body_not_sym g c r hwf hb j hj1 hlt
       · have hje : j = c + (wlBody r).length := by omega
-        rw [hje, hnl]; exact ushs_nl_not_sym
-    · exact ushq_stage_toks len len g c r wlNl hwf hb hnl ushs_nl_ws (by omega) (Nat.le_refl _) (Or.inl rfl)
+        rw [hje, hnl]; exact Xv6.wlNl_nsym
+    · exact ushq_stage_toks len len g c r wlNl hwf hb hnl Xv6.wlNl_ws (by omega) (Nat.le_refl _) (Or.inl rfl)
     · rw [ushqRebase_length, wlToks_length]; exact hlt10
   | cons r2 rs ih =>
     intro r c h
@@ -295,11 +295,11 @@ theorem ushqTailWs_bars (g : Nat → BitVec 8) (len : Nat) (hsym : ushqSymOk len
     apply UshqBars.cons c (c + (wlBody r).length + 1)
     · omega
     · refine ⟨by omega, hbar, ?_, ?_, hsym⟩
-      · rw [show c + (wlBody r).length + 1 + 1 = c + (wlBody r).length + 2 by omega, hsp2]; exact ushs_sp_ws
+      · rw [show c + (wlBody r).length + 1 + 1 = c + (wlBody r).length + 2 by omega, hsp2]; exact Xv6.wlSp_ws
       · have := hb2 0 hb2pos
         rw [show c + (wlBody r).length + 1 + 2 = c + (wlBody r).length + 3 + 0 by omega, this]
         exact ushq_ws_first_nonws r2 hwf2 hpos2
-    · exact ushq_stage_toks len _ g c r wlSp hwf hb hsp1 ushs_sp_ws rfl (by omega)
+    · exact ushq_stage_toks len _ g c r wlSp hwf hb hsp1 Xv6.wlSp_ws rfl (by omega)
         (Or.inr (by rw [hbar]; exact ushqBar_not_ws))
     · rw [ushqRebase_length, wlToks_length]; exact hpos
     · rw [ushqRebase_length, wlToks_length]; exact hlt10
@@ -336,20 +336,20 @@ theorem ushqLinesWs_bars (ws : List (List (BitVec 8))) (rs : List (List (List (B
       by_cases hj0 : j = (wlBody ws).length
       · exfalso
         have hs' : ushpIsSym (f (k + j)) = true := hs
-        rw [hj0, hsp1, ushs_sp_not_sym] at hs'; cases hs'
+        rw [hj0, hsp1, Xv6.wlSp_nsym] at hs'; cases hs'
       by_cases hj1 : j = (wlBody ws).length + 1
       · rw [hj1]; exact hg0
       by_cases hj2 : j = (wlBody ws).length + 2
       · exfalso
         have hs' : ushpIsSym (f (k + j)) = true := hs
-        rw [show k + j = k + (wlBody ws).length + 2 by omega, hsp2, ushs_sp_not_sym] at hs'; cases hs'
+        rw [show k + j = k + (wlBody ws).length + 2 by omega, hsp2, Xv6.wlSp_nsym] at hs'; cases hs'
       exact ushqTailWs_sym _ len _ _ htail j (by omega) hj hs
     simp only [ushqRtoksWs]
     apply UshqBars.cons 0 ((wlBody ws).length + 1)
     · omega
     · refine ⟨by omega, hg0, ?_, ?_, hsym⟩
       · show ushpIsWs (f (k + ((wlBody ws).length + 1 + 1))) = true
-        rw [show k + ((wlBody ws).length + 1 + 1) = k + (wlBody ws).length + 2 by omega, hsp2]; exact ushs_sp_ws
+        rw [show k + ((wlBody ws).length + 1 + 1) = k + (wlBody ws).length + 2 by omega, hsp2]; exact Xv6.wlSp_ws
       · have := hb 0 hrpos
         rw [show (wlBody ws).length + 1 + 2 = (wlBody ws).length + 3 + 0 by omega, this]
         exact ushq_ws_first_nonws r hwf2 hpos2

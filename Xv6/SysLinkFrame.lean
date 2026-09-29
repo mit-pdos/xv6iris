@@ -151,9 +151,9 @@ theorem sys_link_carve [CurCtx] (sp0 : BitVec 64) :
       ⌜(sysLinkOld sp0).toNat % 8 = 0⌝ ∗ sysLinkBufs sp0 := by
   refine (sys_link_low_split sp0).1.trans ?_
   iintro ⟨Hn, Hw, Ho⟩
-  icases sysfile_stack_bytes (sysLinkName sp0) 1 $$ Hn with ⟨%bn, ⟨%hn, -⟩, Bn⟩
-  icases sysfile_stack_bytes (sysLinkNew sp0) 15 $$ Hw with ⟨%bw, ⟨%hw, -⟩, Bw⟩
-  icases sysfile_stack_bytes (sysLinkOld sp0) 15 $$ Ho with ⟨%bo, ⟨%ho, %hal⟩, Bo⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysLinkName sp0) 1 $$ Hn with ⟨%bn, ⟨%hn, -⟩, Bn⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysLinkNew sp0) 15 $$ Hw with ⟨%bw, ⟨%hw, -⟩, Bw⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysLinkOld sp0) 15 $$ Ho with ⟨%bo, ⟨%ho, %hal⟩, Bo⟩
   isplitr
   · ipureintro; exact hal
   unfold sysLinkBufs sysfileAny

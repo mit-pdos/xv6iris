@@ -46,7 +46,7 @@ theorem wfU_entAt : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27), t.wfU lvl →
 the walk finds nothing. -/
 theorem wfU_walk_none : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27), t.wfU lvl →
     ¬ t.complete lvl vpn → t.walk lvl vpn = none
-  | 0, t, vpn, _, hc => absurd (PtRun.complete_zero t vpn) hc
+  | 0, t, vpn, _, hc => absurd (MachCSL.PTree.complete_zero t vpn) hc
   | lvl+1, t, vpn, hwf, hc => by
       have hi := hwf (vpnIdx vpn (lvl+1))
       cases hk : t.kids (vpnIdx vpn (lvl+1)) with

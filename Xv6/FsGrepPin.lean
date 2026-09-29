@@ -56,7 +56,7 @@ theorem fsimgGrepNlinkNz : (fsDinode fsimgP fsimgSb GREP_INO).diNlink.toNat ≠ 
 
 /-- Rocq `fsimg_grep_size_bound`. -/
 theorem fsimgGrepSizeBound : (fsDinode fsimgP fsimgSb GREP_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgGrepSize, maxfileBytes]; decide
+  rw [fsimgGrepSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `fsimg_grep_type_nz`. -/
 theorem fsimgGrepTypeNz : (fsDinode fsimgP fsimgSb GREP_INO).diType.toNat ≠ 0 := by

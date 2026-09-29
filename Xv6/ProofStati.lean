@@ -5,8 +5,8 @@ Proof of `stati`'s specification (`SpecStati.STATI`).  A port of Rocq
 18 instructions, straight-line: the 2-slot prologue, five load/store pairs,
 the epilogue.  The only arithmetic is the width bookkeeping of the pairs:
 
-- `lw`/`sw` (dev, inum): `trunc32 ∘ sext64` is the identity (`stati_ext32`);
-- `lh`/`sh` (type, nlink): `trunc16 ∘ sext64` is the identity (`stati_ext16`);
+- `lw`/`sw` (dev, inum): `trunc32 ∘ sext64` is the identity (`Xv6.fw_ext32`);
+- `lh`/`sh` (type, nlink): `trunc16 ∘ sext64` is the identity (`Xv6.fw_ext16`);
 - `lwu`/`sd` (size): the 8-byte store keeps the ZERO-extension, which is the
   contract's `BitVec.setWidth 64 dn.diSize`.
 
@@ -18,6 +18,7 @@ import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeLh
 import Xv6.SpecStati
 import Xv6.CodeTactics
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -27,11 +28,6 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## The width bookkeeping -/
-
-theorem stati_ext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-theorem stati_ext16 (w : BitVec 16) : BitVec.extractLsb' 0 16 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-! ## The function -/
 
@@ -62,7 +58,7 @@ theorem stati_proof : STATI := ⟨fun {hlc GF} _ _ _ cpu k ip st dev inum dn dev
   iintro Hk Hpc Hdev
   -- c.sw a5,0(a1)
   k_step_gen (wp_s_sw c2 _ (KA.«stati» + 0xa#64) true 0#12 11#5 15#5 (by decide) dev0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [stati_ext32] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32] next c3 hp3
   iintro Hk Hpc Sdev
   -- c.lw a5,4(a0)
   k_step_gen (wp_s_lw c3 _ (KA.«stati» + 0xc#64) true 4#12 15#5 10#5 (by decide) (by decide) dqn inum)
@@ -70,7 +66,7 @@ theorem stati_proof : STATI := ⟨fun {hlc GF} _ _ _ cpu k ip st dev inum dn dev
   iintro Hk Hpc Hinum
   -- c.sw a5,4(a1)
   k_step_gen (wp_s_sw c4 _ (KA.«stati» + 0xe#64) true 4#12 11#5 15#5 (by decide) ino0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [stati_ext32] next c5 hp5
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32] next c5 hp5
   iintro Hk Hpc Sino
   -- lh a5,68(a0)
   k_step_gen (wp_s_lh c5 _ (KA.«stati» + 0x10#64) false 68#12 15#5 10#5 (by decide) (by decide)
@@ -79,7 +75,7 @@ theorem stati_proof : STATI := ⟨fun {hlc GF} _ _ _ cpu k ip st dev inum dn dev
   iintro Hk Hpc Hty
   -- sh a5,8(a1)
   k_step_gen (wp_s_sh c6 _ (KA.«stati» + 0x14#64) false 8#12 11#5 15#5 (by decide) ty0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [stati_ext16] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext16] next c7 hp7
   iintro Hk Hpc Sty
   -- lh a5,74(a0)
   k_step_gen (wp_s_lh c7 _ (KA.«stati» + 0x18#64) false 74#12 15#5 10#5 (by decide) (by decide)
@@ -88,7 +84,7 @@ theorem stati_proof : STATI := ⟨fun {hlc GF} _ _ _ cpu k ip st dev inum dn dev
   iintro Hk Hpc Hnl
   -- sh a5,10(a1)
   k_step_gen (wp_s_sh c8 _ (KA.«stati» + 0x1c#64) false 10#12 11#5 15#5 (by decide) nl0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [stati_ext16] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext16] next c9 hp9
   iintro Hk Hpc Snl
   -- lwu a5,76(a0)
   k_step_gen (wp_s_lwu c9 _ (KA.«stati» + 0x20#64) false 76#12 15#5 10#5 (by decide) (by decide)

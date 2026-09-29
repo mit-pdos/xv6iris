@@ -41,7 +41,7 @@ any").  Three things hang off it:
    `Xv6.bread_call` / `Xv6.brelse_call` / `Xv6.log_write_gen_call`
    (`Xv6/FsCallSites.lean`; formerly `bm_bread` / `bm_brelse` /
    `bm_log_write_gen`, copies of BallocDefs').  `bm_balloc` and the view
-   lemma `bm_view_eq` (a copy of `Xv6/BallocDefs.lean`'s
+   lemma `Xv6.bioView_eq_fsView` (a copy of `Xv6/BallocDefs.lean`'s
    `bioView_eq_fsView`: a stage file may not import another function's)
    stay here; promotion candidates.
 -/
@@ -50,6 +50,7 @@ import Xv6.DinodeSlot
 import Xv6.BlkmapBuf
 import Xv6.BmapParts
 import MachCSL.WpSmodeFrame6c
+import Xv6.BallocDefs
 
 namespace Xv6
 
@@ -514,22 +515,12 @@ end
 
 /-! ## The payload at a generic view -/
 
-/-- A view with `fsView`'s two fields IS `fsView` of its own geometry
-(a copy of `Xv6.bioView_eq_fsView`, BallocDefs). -/
-theorem bm_view_eq {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] (V : BioView GF)
-    (γfs : FsNames) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) :
-    V = fsView γfs V.gd V.dev V.cov := by
-  cases V
-  simp only at hcl hdt
-  subst hcl hdt
-  rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `bm_held_content` at a share, at the parameter view
-(`Xv6.dsPay_contentQ` through `bm_view_eq`). -/
+(`Xv6.dsPay_contentQ` through `Xv6.bioView_eq_fsView`). -/
 theorem bm_pay_contentQ (E : CoPset) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) (dq : DFrac) (kk : Nat)
     (dv bno : BitVec 32) (b : Nat) (hb : bno.toNat = b) (bs bsd bs0 : List (BitVec 8)) (d : Bool)
@@ -541,7 +532,7 @@ theorem bm_pay_contentQ (E : CoPset) (γb : BcacheNames) (γfs : FsNames) (V : B
           bioPay γb V kk dv bno bs bsd d)) := by
   subst hb
   have h := dsPay_contentQ (GF := GF) E γb γfs V.gd dq V.dev V.cov kk dv bno bs bsd bs0 d hE
-  rw [← bm_view_eq V γfs hcl hdt] at h
+  rw [← Xv6.bioView_eq_fsView V γfs hcl hdt] at h
   exact h
 
 end

@@ -49,6 +49,7 @@ gone (balloc's printk is behind `BMAP`, and writei calls none itself --
 uses checked: ProofWritei.v only).
 -/
 import Xv6.WriteiMain
+import Xv6.ReadiFrame
 
 namespace Xv6
 
@@ -74,11 +75,11 @@ theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 theorem writei_bltu_sum (c a b : Nat) (h : a + b < 2 ^ 31) (hc : c < 2 ^ 31) :
     bcond bop.BLTU (BitVec.ofNat 64 c) (BitVec.ofNat 64 a + BitVec.ofNat 64 b) = decide (c < a + b) := by
-  rw [← BitVec.ofNat_add, writei_bltu_nat _ _ (by omega) (by omega)]
+  rw [← BitVec.ofNat_add, Xv6.dsBltu _ _ (by omega) (by omega)]
 
 theorem writei_bltu_sum2 (a b : Nat) (h : a + b < 2 ^ 31) :
     bcond bop.BLTU (BitVec.ofNat 64 a + BitVec.ofNat 64 b) (BitVec.ofNat 64 a) = false := by
-  rw [← BitVec.ofNat_add, writei_bltu_nat _ _ (by omega) (by omega)]; simp
+  rw [← BitVec.ofNat_add, Xv6.dsBltu _ _ (by omega) (by omega)]; simp
 
 theorem writei_beqz_n (n : Nat) (h : n < 2 ^ 31) :
     bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 = decide (n = 0) := by
@@ -89,13 +90,10 @@ theorem writei_beqz_n (n : Nat) (h : n < 2 ^ 31) :
       intro e; have := congrArg BitVec.toNat e; simp at this; omega
     simp [this, hn]
 
-theorem writei_imm_m112 : BitVec.signExtend 64 3984#12 = -(8#64 * BitVec.ofNat 64 14) := by
-  decide
-
 /-- `bltu a5,a3` at `+0x02`: `off > ip->size`. -/
 theorem writei_bltu_size (w : BitVec 32) (off : Nat) (hw : w.toNat < 2 ^ 31) (ho : off < 2 ^ 31) :
     bcond bop.BLTU (BitVec.signExtend 64 w) (BitVec.ofNat 64 off) = decide (w.toNat < off) := by
-  rw [writei_sext_toNat w hw, writei_bltu_nat _ _ (by omega) (by omega)]
+  rw [Xv6.dsSext_small w hw, Xv6.dsBltu _ _ (by omega) (by omega)]
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -239,7 +237,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
     iintro Hk Hpc
     have hK14 : 14 ≤ k.avail := by have := hA.hK; unfold writeiSlots at this; omega
     k_step_e (wp_s_push cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 A.dn.diSize)))
-        (KA.«writei» + 0x6#64) true 3984#12 14 hK14 writei_imm_m112)
+        (KA.«writei» + 0x6#64) true 3984#12 14 hK14 Xv6.rd_imm_m112)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc Hframe
     irevert Hframe

@@ -521,7 +521,7 @@ theorem aFree0_nz : aFree 0 ≠ 0#64 := by unfold aFree diskAddr dOffFree; decid
 /-- `&disk.free[i]`, as the `lbu`/`sb` of the scan compute it. -/
 theorem vdrw2_free_addr (i : Nat) : KA.«disk» + (BitVec.ofNat 64 i + 24#64) = aFree i := by
   unfold aFree diskAddr dOffFree
-  rw [← BitVec.add_assoc, addr_plus, Nat.add_comm i 24]
+  rw [← BitVec.add_assoc, Xv6.paAddBump, Nat.add_comm i 24]
 
 /-- `a4 = &disk` is `&disk + 0`. -/
 theorem vdrw2_disk_zero : KA.«disk» = KA.«disk» + BitVec.ofNat 64 0 := by
@@ -532,7 +532,7 @@ theorem vdrw2_disk_zero : KA.«disk» = KA.«disk» + BitVec.ofNat 64 0 := by
 theorem vdrw2_disk_succ (j : Nat) :
     KA.«disk» + BitVec.ofNat 64 j + 1#64 = KA.«disk» + BitVec.ofNat 64 (j + 1) := by
   show _ + BitVec.ofNat 64 1 = _
-  rw [addr_plus]
+  rw [Xv6.paAddBump]
 
 /-- The four `jal` targets of the retry path. -/
 theorem vdrw2_br_free_desc : KA.«virtio_disk_rw» + 0xfffffffffffffdc2#64 = KA.«free_desc» := by decide
@@ -572,8 +572,6 @@ theorem vdrw2_addiw1 (n : Nat) (h : n < NUM) :
       BitVec.ofNat 64 (n + 1) := by
   rcases lt8_cases n h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
 
-/-- `bnez a3` on a `free` byte. -/
-theorem vdrw2_bnez_0 : bcond bop.BNE 0#64 0#64 = false := by decide
 theorem vdrw2_bnez_1 : bcond bop.BNE 1#64 0#64 = true := by decide
 
 /-- `bne a5,s1` with `s1 = NUM`. -/

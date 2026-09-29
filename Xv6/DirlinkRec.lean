@@ -9,7 +9,7 @@ empty-directory shortcut, the scan's break, the scan's exhaustion):
            (into the append at +0x80)
 
 The record's old sixteen bytes (whatever the scan or the frame left) are
-split into the halfword the `sh` overwrites (`dirlink_half_any`) and the
+split into the halfword the `sh` overwrites (`Xv6.halfBytes_surj`) and the
 fourteen strncpy owns; strncpy's post forces the name to `namePad s` on
 both of its arms (`dirlink_snc`, Rocq's `snc_bview` step), and the `sh`
 stores exactly the inum (`dirlink_trunc16`), so the record IS

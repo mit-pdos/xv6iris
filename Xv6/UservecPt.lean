@@ -71,13 +71,6 @@ theorem uservec_ux [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF
   iapply HΦ $$ [HmConf Hclock Hpc Hslot Htok HF] HE
   iframe
 
-/-- The trapframe offset of register `n`, as a bit-vector expression. -/
-theorem uvTfOff_eq (n : BitVec 5) : BitVec.ofNat 64 (8 * (4 + n.toNat)) = 8#64 * (n.setWidth 64 + 4#64) := by
-  have := n.isLt
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_ofNat, BitVec.toNat_mul, BitVec.toNat_add, BitVec.toNat_setWidth]
-  omega
-
 set_option maxHeartbeats 2000000 in
 /-- **A trapframe store under the user table** (Rocq `wp_usd_pt`): `sd rs2,
 8(4+n)(a0)` with `a0 = TRAPFRAME` writes `rs2`'s value (`v`) into
@@ -114,7 +107,7 @@ theorem uservec_usd [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     unfold vpnOf TRAPFRAME tfVpn; bv_decide
   have hpa : paOf P.tfp (TRAPFRAME + 8#64 * (n.setWidth 64 + 4#64)) =
       pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat)) := by
-    rw [uvTfOff_eq]
+    rw [Xv6.urTfOff_eq]
     unfold paOf pageAddr pteAddr TRAPFRAME
     simp only [zero_extend, Sail.BitVec.zeroExtend]
     bv_decide

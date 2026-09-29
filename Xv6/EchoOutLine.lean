@@ -10,7 +10,7 @@ does not wait on, or import, the pure layer.
   (`chArmE`).  Rocq's redesign-R1 comment: the input claim's settled and
   window arms are ONE arm because `ch_E` counts the in-flight entry as soon
   as its byte is out, and filing the entry does not move the list.
-* `linesBytes_nil`, `nstarted_rest_nil`: two parse facts the generic claim
+* `linesBytes_nil`, `Xv6.ll_nstarted_rest_nil`: two parse facts the generic claim
   (`GenOut`) spends.
 * `einReadByte` (Rocq `ein_read_byte`): THE PER-BYTE FORM sh's `gets` reads
   -- one byte, placed by the reader's own delivered count.
@@ -28,6 +28,7 @@ does not wait on, or import, the pure layer.
 -/
 import Xv6.EchoOut
 import Xv6.EchoOutPure
+import Xv6.LineModelLinks
 
 namespace Xv6
 
@@ -41,11 +42,6 @@ def chE (H : ConsHist) : List (List Obs × BitVec 8) :=
 `lines_bytes_nil`) -/
 theorem linesBytes_nil (n : Nat) : linesBytes [] n = 0 := by
   simp [linesBytes, bodiesOf_nil, wlJoin_nil]
-
-/-- an input that stops at a newline has started no further line (Rocq
-`nstarted_rest_nil`) -/
-theorem nstarted_rest_nil (I : List (BitVec 8)) (hr : restOf I = []) : nstarted I = nlines I := by
-  simp [nstarted, hr]
 
 /-- THE PER-BYTE FORM sh's `gets` reads (Rocq `ein_read_byte`). -/
 theorem einReadByte (pops : List LogEntry) (dl ws : List (List Obs × BitVec 8)) (n : Nat)

@@ -99,7 +99,7 @@ theorem ucont_prompt_nopanic (s : Fstate) (l : Uline) (a : ulmG.lmAlt)
     exfalso
     rw [ulmG_laws.lmlContPanic s l a hp] at h
     have := congrArg List.length h
-    rw [altPanic_len5, wrPrompt_len] at this
+    rw [Xv6.lbPanic_len, wrPrompt_len] at this
     omega
 
 /-! ### filing one alternative moves the state by one step -/

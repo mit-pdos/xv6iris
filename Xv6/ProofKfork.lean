@@ -100,6 +100,8 @@ import Xv6.SpecRelease
 import Xv6.UexecApply
 import Xv6.SpecIdup
 import Xv6.SpecFiledup
+import Xv6.ConsoleintrParts
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -221,18 +223,10 @@ theorem kf_j_failtail : (KA.«kfork» + 0x8c#64) + BitVec.signExtend 64 (120#21)
 /-- `c.j 0x80001e1e` at `0x80001e2e` (allocproc-fail tail to the epilogue). -/
 theorem kf_j_allocfail : (KA.«kfork» + 0x114#64) + BitVec.signExtend 64 (-16#21) = (KA.«kfork» + 0x104#64) := by decide
 
-/-- The `bne` back-edge is TAKEN while the src cursor has not reached the
-end (`a5 ≠ a3`): `bcond BNE a5 a3 = true`. -/
-theorem kf_bne_true (a5 a3 : BitVec 64) (h : a5 ≠ a3) : bcond bop.BNE a5 a3 = true := by
-  unfold bcond; simp [bne, h]
 
 /-- The `bne` back-edge FALLS THROUGH once the src cursor reaches the end. -/
 theorem kf_bne_false (a5 : BitVec 64) : bcond bop.BNE a5 a5 = false := by
   unfold bcond; simp
-
-theorem kf_ite_beq {α : Type _} (x y : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x y then p else q) = if x = y then p else q := by
-  by_cases h : x = y <;> simp [bcond, h]
 
 
 /-! ## Trapframe-copy arithmetic (the 9-chunk word loop)
@@ -755,7 +749,7 @@ theorem kf_tf_loop [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (BitV
     -- bne a5,a3 : taken back to 0x80001d6c (a5 ≠ a3)
     have hane : kf.rget cpu 15#5 ≠ kf.rget cpu 13#5 := by
       rw [h15, h13, ha3]; exact kf_tf_cursor_ne (pageAddr bo) i hi
-    have htrue : bcond bop.BNE (kf.rget cpu 15#5) (kf.rget cpu 13#5) = true := kf_bne_true _ _ hane
+    have htrue : bcond bop.BNE (kf.rget cpu 15#5) (kf.rget cpu 13#5) = true := Xv6.ci_bne_ne _ _ hane
     iapply (kf_step_bne cpu kf hsf (KA.«kfork» + 0x62#64) false (-24#13) 15#5 13#5 (by decide)
         true htrue (KA.«kfork» + 0x4a#64) (by decide))
     iframe Hk Hpc
@@ -2030,7 +2024,6 @@ theorem kf_pay_unused [CurCtx] (Γ : SchedNames) (ξl : CtxId) (j : Nat) (c : CP
   iframe Hstate Hpl Hchan Hslots Hrest
 
 
-
 /-- `uvmcopyOk` carries the parent's `umBelow` to the copied child table:
 every leaf `Pnew'` has came from a parent leaf below `sz` (the fresh child
 `Pnew` was empty, so `Pnew'` maps nothing beyond the copied run). -/
@@ -2997,7 +2990,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
       -- beq a0,zero,0x80001e2c (taken, a0 = 0)
       kf_gstep cpu (wp_s_branch cpu _ (KA.«kfork» + 0x16#64) false 252#13 10#5 0#5 (by decide) bop.BEQ)
         $$ [- $Hk $Hpc]
-        with [kf_ite_beq, KCtx.rget_eq, KCtx.rget_zero, hr0, kf_br_allocfail]
+        with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.rget_zero, hr0, kf_br_allocfail]
       iintro Hk Hpc
       -- c.li s1,-1
       kf_gstep cpu (wp_s_addi cpu _ (KA.«kfork» + 0x112#64) true 4095#12 9#5 0#5 (by decide))
@@ -3104,7 +3097,7 @@ theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
       -- beq a0,zero (not taken, a0 = procAddr i ≠ 0)
       k_step (wp_s_branch cpu _ (KA.«kfork» + 0x16#64) false 252#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [kf_ite_beq, KCtx.rget_eq, KCtx.rget_zero, hri, hbne]
+        with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.rget_zero, hri, hbne]
       iintro Hk Hpc
       -- c.sdsp s3,24(sp): save the caller's s3 into the frame slot
       k_step (wp_s_sd cpu _ (KA.«kfork» + 0x1a#64) true 24#12 2#5 19#5 (by decide) w4)

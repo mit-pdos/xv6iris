@@ -134,12 +134,6 @@ theorem ukSingletonMap (Φ : Nat → BitVec 8 → IProp GF) (a : Nat) (b : BitVe
     ([∗map] k ↦ v ∈ (singleton a b : RegMapF (BitVec 8)), Φ k v) ⊣⊢ Φ a b :=
   BigSepM.bigSepM_singleton
 
-/-- Rocq's `bi.pure_forall` move: a pure `∀`, each instance from the SAME
-resources. -/
-theorem ukPureForall {α : Type _} {P : IProp GF} {φ : α → Prop} (h : ∀ x, P ⊢ ⌜φ x⌝) :
-    P ⊢ ⌜∀ x, φ x⌝ :=
-  (forall_intro h).trans pure_forall.2
-
 /-- **Rocq `pers_map_union`**: a union of persistent big-ops. -/
 theorem ukPersUnion (Φ : Nat → BitVec 8 → IProp GF) [hΦ : ∀ a b, Persistent (Φ a b)]
     (T1 T2 : RegMapF (BitVec 8)) :
@@ -172,7 +166,7 @@ from any other fragment map at the same name. -/
 theorem ukFrags_disjoint (γ : GName) (F G : RegMapF (BitVec 8)) (dq : DFrac) :
     ([∗map] a ↦ b ∈ F, γ ↪◯MAP[a] b) ∗ ([∗map] a ↦ b ∈ G, γ ↪◯MAP[a]{dq} b) ⊢@{IProp GF} ⌜F ##ₘ G⌝ := by
   refine BI.Entails.trans ?_ (pure_mono (PartialMap.disjoint_iff F G).2)
-  refine ukPureForall fun k => ?_
+  refine Xv6.fsSnapPureAll fun k => ?_
   cases hF : get? F k with
   | none => exact pure_intro (Or.inl rfl)
   | some b1 =>
@@ -190,7 +184,7 @@ overlap. -/
 theorem ukFrags_agree (γ : GName) (dq1 dq2 : DFrac) (T1 T2 : RegMapF (BitVec 8)) :
     ([∗map] a ↦ b ∈ T1, γ ↪◯MAP[a]{dq1} b) ∗ ([∗map] a ↦ b ∈ T2, γ ↪◯MAP[a]{dq2} b) ⊢@{IProp GF}
       ⌜∀ a b1 b2, get? T1 a = some b1 → get? T2 a = some b2 → b1 = b2⌝ := by
-  refine ukPureForall fun a => ?_
+  refine Xv6.fsSnapPureAll fun a => ?_
   cases h1 : get? T1 a with
   | none => exact pure_intro (fun _ _ h => by cases h)
   | some c1 =>
@@ -214,7 +208,7 @@ theorem ukFork_below (γ : GName) (Md Ms F Fp : RegMapF (BitVec 8)) (sz : Nat)
     ([∗map] a ↦ b ∈ Ms, γ ↪◯MAP[a] b) ∗ ([∗map] a ↦ b ∈ F, γ ↪◯MAP[a] b) ∗
       ([∗map] a ↦ b ∈ Fp, γ ↪◯MAP[a]{DFrac.discard} b) ⊢@{IProp GF}
       ⌜∀ a, (get? (F ∪ₚ Fp) a).isSome → a < sz⌝ := by
-  refine ukPureForall fun a => ?_
+  refine Xv6.fsSnapPureAll fun a => ?_
   by_cases hlt : a < sz
   · exact pure_intro (fun _ => hlt)
   cases hu : get? (F ∪ₚ Fp) a with

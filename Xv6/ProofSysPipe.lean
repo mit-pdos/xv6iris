@@ -80,7 +80,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   case hKm => k_norm_g; rw [sysPipeSlots_eq] at hK; omega
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie %spp %R1 %hsp1 Hk Hpc %⟨hcs1, h10⟩
-  k_norm_g [sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g at hsp1
   k_norm_g at h10
   unfold calleeSaved at hcs1
@@ -96,13 +96,13 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
     (hp3 h).trans ((hp2 h).trans (hp1 h))
   -- mv s1,a0 ; a1 = &fdarray ; a0 = 0 ; jal argaddr
   k_step_gen (wp_s_add c3 _ (KA.«sys_pipe» + 0xe#64) true 9#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, hproc, sys_pipe_mv] next c4 hp4
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, hproc, Xv6.sfs_add0] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_addi c4 _ (KA.«sys_pipe» + 0x10#64) false 4056#12 11#5 8#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a40] next c5 hp5
   iintro Hk Hpc
   k_step_gen (wp_s_addi c5 _ (KA.«sys_pipe» + 0x14#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_li0] next c6 hp6
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_jal c6 _ (KA.«sys_pipe» + 0x16#64) false 2085708#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_argaddr] next c7 hp7
@@ -121,7 +121,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   case hKa => k_norm_g; rw [sysPipeSlots_eq] at hK; unfold argaddrSlots argrawSlots; omega
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Htf Htfp Hfa
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g at hsp2
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
@@ -167,7 +167,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   -- back from pipealloc (at any hart)
   iapply wpNext_intro_pin
   iintro %c12 %hp12 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpost Hpid Hir
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   have hpins2' : sysPipePins k (((R2.set 11#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64)).set 10#5

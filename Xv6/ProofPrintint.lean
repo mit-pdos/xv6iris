@@ -60,9 +60,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic -/
 
-/-- A word is the `ofNat` of its own `toNat`. -/
-theorem pi_ofNat_toNat (v : BitVec 64) : BitVec.ofNat 64 v.toNat = v :=
-  (BitVec.ofNat_toNat 64 v).trans (BitVec.setWidth_eq v)
 
 /-- `8`-alignment survives adding a multiple of eight. -/
 theorem pi_align_add (a : BitVec 64) (m : Nat) (h : a.toNat % 8 = 0) (hm : m % 8 = 0) :
@@ -402,7 +399,7 @@ theorem pi_body (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (buf dg base : B
   have hdget : digitsStr[(x % base).toNat]? = some (digitsStr[(x % base).toNat]'hidx) :=
     List.getElem?_eq_getElem hidx
   have hdgaddr : x % base + dg = dg + BitVec.ofNat 64 (x % base).toNat := by
-    rw [pi_ofNat_toNat]; exact BitVec.add_comm _ _
+    rw [Xv6.ofNat_toNat_pc]; exact BitVec.add_comm _ _
   iintro ⟨Hk, Hpc, Hbuf, Hdig, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   -- +0x22 c.mv a7,a4

@@ -56,6 +56,7 @@ import Xv6.UkEchoDefs
 import Xv6.UkProgAbi
 import Xv6.UsysMemOk
 import Xv6.User.ShText
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -341,13 +342,10 @@ end States
 
 /-! ## §8 The value kit: the model's results at the walks' operands -/
 
-theorem ushm_toNat (v : Nat) (h : v < 2 ^ 64) : (BitVec.ofNat 64 v).toNat = v := by
-  rw [BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt h
-
 /-- An address off a register holding a small value. -/
 theorem ushm_adr {x : BitVec 64} {v : Nat} (hx : x = BitVec.ofNat 64 v) (hv : v < 2 ^ 64) (imm : BitVec 12)
     (a : Nat) (h : (v : Int) + imm.toInt = a) : (x.toNat : Int) + imm.toInt = a := by
-  rw [hx, ushm_toNat v hv]; exact h
+  rw [hx, Xv6.bcOfNatToNat v hv]; exact h
 
 /-- `addi rd, rs, -d`. -/
 theorem ushm_addi_neg (x d : Nat) (imm : BitVec 12) (h : BitVec.signExtend 64 imm = BitVec.ofInt 64 (-(d : Int))) :
@@ -529,7 +527,7 @@ theorem ushm_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (me : RegMap) (q0 
     simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
-    rw [uv_avi_pos _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
+    rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
     omega
   ihave Hfr : ustack N.d (m2.get spIdx + BitVec.ofNat 64 (8 * 2)) 2 $$ [Hra Hs0]
   · rw [hsp2]

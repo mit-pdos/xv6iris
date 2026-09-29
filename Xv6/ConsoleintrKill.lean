@@ -275,7 +275,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (c : CPU) (k : KCtx) (a b : 
     iintro Hk Hpc
     -- sw a5,160(s1)
     k_step (wp_s_sw c _ (KA.«consoleintr» + 0xc8#64) false 160#12 9#5 15#5 (by decide) e)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9, ci_eA, ci_lo32_sext]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9, ci_eA, Xv6.fw_ext32]
     iintro Hk Hpc He
     -- the ring POPS
     ihave Hgh := ciGh_pop cn hb cb r w e bs ts hne $$ Hgh

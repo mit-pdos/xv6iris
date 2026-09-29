@@ -89,7 +89,7 @@ theorem ireclaim_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie s
   -- +0xc2  addi sp,sp,64
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_e (wp_s_pop cpu _ (KA.«ireclaim» + 0xc2#64) true 64#12 8 ireclaim_imm_p64)
+  k_step_e (wp_s_pop cpu _ (KA.«ireclaim» + 0xc2#64) true 64#12 8 MachCSL.imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2]
   iintro Hk Hpc
@@ -146,7 +146,7 @@ theorem ireclaim_step [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k :
   -- +0x78  bgeu a5,a4 : ninodes ≤ inum ?
   k_step_e (wp_s_branch cpu _ (KA.«ireclaim» + 0x78#64) false 58#13 15#5 14#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [ireclaim_bgeu m fscNinodes hm1 hn31]
+    with [Xv6.ba_bgeu_scan m fscNinodes hm1 hn31]
   iintro Hk Hpc
   by_cases hge : fscNinodes ≤ m
   · -- OUT: the scan is done

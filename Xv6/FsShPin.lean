@@ -56,7 +56,7 @@ theorem fsimgShNlinkNz : (fsDinode fsimgP fsimgSb SH_INO).diNlink.toNat ≠ 0 :=
 
 /-- Rocq `fsimg_sh_size_bound`. -/
 theorem fsimgShSizeBound : (fsDinode fsimgP fsimgSb SH_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgShSize, maxfileBytes]; decide
+  rw [fsimgShSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `fsimg_sh_type_nz`. -/
 theorem fsimgShTypeNz : (fsDinode fsimgP fsimgSb SH_INO).diType.toNat ≠ 0 := by

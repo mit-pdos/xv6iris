@@ -273,7 +273,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   unfold sysUnlinkDlK
   iintro %cpu %spie1 %spp1 %R1 %found %kk %ks %qq %hcs1 Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hnm
     Hpid Hb1 Hdl Hdi Harm
-  k_norm_g [sys_unlink_ret_6c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_6c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 11#5 _ (sysUnlinkPins_set k R _ _ _ 12#5 _ hpins (by decide))
@@ -324,7 +324,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x6e#64) false 234#13 10#5 0#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h10, sysfile_beqz, decide_true]
+      with [h10, Xv6.dirlookup_beqz, decide_true]
     iintro Hk Hpc
     ihave Hlk : sysUnlinkLkTx A.pid kd q g lo tl dinum dnd γil γisl
       $$ [Hsl Hdep Hoffr Hdev Hinum Hval Hshot Hfrz Hkeep Hru]
@@ -350,7 +350,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x6e#64) false 234#13 10#5 0#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h10, sysfile_beqz, decide_eq_false hnz]
+      with [h10, Xv6.dirlookup_beqz, decide_eq_false hnz]
     iintro Hk Hpc
     rw [h10] at hp2
     iapply (hW3 cpu spie1 spp1 _ datd kk ks qq)
@@ -416,7 +416,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [h10]
   iintro %cpu %spie1 %spp1 %R1 %dnd %bmd %γil %γisl %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hlk Hload
-  k_norm_g [sys_unlink_ret_34, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_34, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -461,7 +461,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   · k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x44#64) false 278#13 10#5 0#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [sysfile_beqz, decide_eq_true hz2]
+      with [Xv6.dirlookup_beqz, decide_eq_true hz2]
     iintro Hk Hpc
     have hdot : bname 14 nf = DOT ∨ bname 14 nf = DOTDOT := by
       left; rw [hcmp2.1 hz2, sys_unlink_dot_name]; rfl
@@ -475,7 +475,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x44#64) false 278#13 10#5 0#5 (by decide)
       bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [sysfile_beqz, decide_eq_false hz2]
+    with [Xv6.dirlookup_beqz, decide_eq_false hz2]
   iintro Hk Hpc
   -- +0x48  auipc a1,0x2 ; +0x4c  addi a1,a1,1308 ; +0x50  addi a0,s0,-80 ; +0x54  jal namecmp
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x48#64) false 2#20 11#5 (by decide))
@@ -511,7 +511,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   · k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x58#64) false 258#13 10#5 0#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [sysfile_beqz, decide_eq_true hz3]
+      with [Xv6.dirlookup_beqz, decide_eq_true hz3]
     iintro Hk Hpc
     have hdot : bname 14 nf = DOT ∨ bname 14 nf = DOTDOT := by
       right; rw [hcmp3.1 hz3, sys_unlink_dotdot_name]; rfl
@@ -525,7 +525,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x58#64) false 258#13 10#5 0#5 (by decide)
       bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [sysfile_beqz, decide_eq_false hz3]
+    with [Xv6.dirlookup_beqz, decide_eq_false hz3]
   iintro Hk Hpc
   iapply (sys_unlink_w2_look DL IUP EO Γ cpu k A ok P2 spie1 spp1 R3 w₄ w₅ nf tln pl kd q g lo tl
       dinum dnd bmd γil γisl n Sb hp3 htln hname hnd hndd hkd hnib hpos hle hn hty

@@ -149,7 +149,7 @@ theorem kinitb_post_cons1 (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (
       UexecSG.spostAt (uslot (hlc := hlc)) 16 (kbnFamAt N Q) W r W.M W.fd cw' cs' ⊢ Q nb := by
   intro W r cw' cs' hka0 hka1 hka2 htk hlz hnf
   refine (uwrite_no_short (hlc := hlc) Q N.pay W r W.M W.fd cw' cs' l 1 rb nb
-    (by rw [hka0, ha0]; decide) (by decide) htk hl1 (by rw [hka2, ha2]; exact consCountIs nb hnb) hlz
+    (by rw [hka0, ha0]; decide) (by decide) htk hl1 (by rw [hka2, ha2]; exact Xv6.echoCountIs nb hnb) hlz
     (by rw [hka1]; exact hnf)).trans sep_elim_right
 
 /-- **Rocq `kinit_w1_of_step`**: ONE BYTE AT fd 1 FROM ANY STEP OF THE

@@ -7,7 +7,7 @@
 * `iput_ent_open` -- Rocq 4331--4450: the transaction share split in two
   (the window half, the freeze half), the slot's live row out of the table
   (`islots2_acc_upd` at count 1), THE REF-1 PARK DECISION
-  (`frzPark_ref1_off`), the slot's payload row out
+  (`Xv6.frzPark_shr_off`), the slot's payload row out
   (`itableSlotRes_acc_upd_llb`), the window half split again (the pin, the
   kept part), the pin entered (`icPinEnter`), and the guard's (a)
   (`icGuardWithdraw`) at the closer's unit under the acquire's floor.
@@ -20,6 +20,7 @@
 -/
 import Xv6.IcacheBoxSites
 import Xv6.IputParts
+import Xv6.IdupCore
 
 namespace Xv6
 
@@ -29,17 +30,6 @@ open LeanRV64D
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-/-- A proposition equation as an entailment. -/
-theorem iput_ent_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q := h ▸ .rfl
-
-/-- `ci` names every live slot (`icCiWf`'s domain clause). -/
-theorem iput_ent_ci_live (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
-    (nib : Nat) (dv : BitVec 32) (k : Nat) (v : Qp × PosNat) (hciwf : icCiWf M ci nib dv)
-    (hMk : PartialMap.get? M k = some v) : ∃ p, PartialMap.get? ci k = some p := by
-  have h1 : k ∈ mdom M := by rw [mem_mdom, hMk]; rfl
-  rw [← hciwf.1, mem_mdom] at h1
-  exact Option.isSome_iff_exists.mp h1
 
 /-- The share's fraction plan (Rocq's `Qp.div_2` twice). -/
 theorem iput_ent_frac (q : Qp) : q.half.half + (q.half.half + q.half) = q := by
@@ -110,34 +100,34 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
   icases iput_txPin_split tid qtx.half qtx.half $$ [Htx] with ⟨Htxw, Htxf⟩
   · rw [Qp.half_add_half]; iexact Htx
   -- the slot's table row, at count 1
-  obtain ⟨⟨cdev, cinum⟩, hcik⟩ := iput_ent_ci_live Mt ci icfgNib icfgDev kk _ hciwf hMk
+  obtain ⟨⟨cdev, cinum⟩, hcik⟩ := Xv6.id_ci_live Mt ci icfgNib icfgDev kk _ hciwf hMk
   icases islots2_acc_upd fscIc Mt ci kk hkk $$ Hslots with ⟨Hslot, Hback⟩
-  ihave Hslot := iput_ent_eq (islot2_some curCtx fscIc Mt ci kk q PosNat.one cdev cinum hMk hcik)
+  ihave Hslot := Xv6.id_ent_of_eq (islot2_some curCtx fscIc Mt ci kk q PosNat.one cdev cinum hMk hcik)
     $$ Hslot
   unfold islotLive
   icases Hslot with ⟨Hrest, Hiu, Hgid, Hicnt, Hpark⟩
   -- one entry, one identity
   rcases hqr : qpSub (1 : Qp).half q with _ | qr
-  · ihave Hrest := iput_ent_eq (show islotRestAtCtx (GF := GF) curCtx kk q cdev cinum = iprop(False)
+  · ihave Hrest := Xv6.id_ent_of_eq (show islotRestAtCtx (GF := GF) curCtx kk q cdev cinum = iprop(False)
       by unfold islotRestAtCtx islotRestAt; rw [hqr]) $$ Hrest
     icases Hrest with ⟨⟩
-  ihave Hrest := iput_ent_eq (show islotRestAtCtx (GF := GF) curCtx kk q cdev cinum =
+  ihave Hrest := Xv6.id_ent_of_eq (show islotRestAtCtx (GF := GF) curCtx kk q cdev cinum =
       inodeIdent kk (.own qr) cdev cinum by unfold islotRestAtCtx islotRestAt; rw [hqr]) $$ Hrest
   icases persistent_entails_left (inodeIdent_agree kk qr cdev cinum q icfgDev inum)
     $$ [Hrest Hid] with ⟨⟨Hrest, Hid⟩, %hcdn⟩
   · iframe
   obtain ⟨hcd, hcn⟩ := hcdn
   subst cdev cinum
-  ihave Hrest := iput_ent_eq (show inodeIdent (GF := GF) kk (.own qr) icfgDev inum =
+  ihave Hrest := Xv6.id_ent_of_eq (show inodeIdent (GF := GF) kk (.own qr) icfgDev inum =
       islotRestAt kk q icfgDev inum by unfold islotRestAt; rw [hqr]) $$ Hrest
   ihave Hiu := (show irefSlots (GF := GF) PosNat.one.val ⊢ irefSlots 1 from .rfl) $$ Hiu
   ihave Hicnt := (show icntHalf (GF := GF) inum.toNat PosNat.one.val ⊢ icntHalf inum.toNat 1 from .rfl) $$ Hicnt
   -- THE REF-1 PARK DECISION
-  imod frzPark_ref1_off (hlc := hlc) ⊤ kk inum.toNat q g lo CoPset.subseteq_top hkk
+  imod Xv6.frzPark_shr_off (hlc := hlc) ⊤ kk inum.toNat q g lo CoPset.subseteq_top hkk
     $$ Hinv Hlv Hpark with ⟨Hlv, Hmir, Hsel, Hpin⟩
   -- the slot's payload row
   icases itableSlotRes_acc_upd_llb curCtx Mt ci kk hkk $$ Hstamps with ⟨Hsrow, Hstampsback⟩
-  ihave Hsrow := iput_ent_eq (itableSlotRes_some curCtx Mt ci kk q PosNat.one hMk) $$ Hsrow
+  ihave Hsrow := Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk q PosNat.one hMk) $$ Hsrow
   unfold icSlotRowFl icSlotRow
   rw [hcik]
   icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc⟩, #Hllbb, #Hflb⟩, Hlive⟩
@@ -289,7 +279,7 @@ theorem iput_ent_mint (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum : BitVec 32)
   have hag : ∀ j, j ≠ kk → PartialMap.get? Mt j = PartialMap.get? Mt j := fun _ _ => rfl
   have hagc : ∀ j, j ≠ kk → PartialMap.get? ci j = PartialMap.get? ci j := fun _ _ => rfl
   ihave Hslots := Hback $$ %Mt %ci %hag %hagc [Hrest Hiu Hgid Hicnt Hpark]
-  · iapply iput_ent_eq (islot2_some curCtx fscIc Mt ci kk q PosNat.one icfgDev inum hMk hcik).symm
+  · iapply Xv6.id_ent_of_eq (islot2_some curCtx fscIc Mt ci kk q PosNat.one icfgDev inum hMk hcik).symm
     unfold islotLive
     iframe Hgid Hpark
     isplitl [Hrest]

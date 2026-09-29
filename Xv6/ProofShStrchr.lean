@@ -55,7 +55,7 @@ theorem shStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (tx : Bool) (dq : DFrac)
     by_cases hhit : f j = c
     · -- 0xa90  beq a1,a5 : TAKEN, this byte is the one
       iapply ushS_brT UL N (ushI_a90 N.t) 0xa9e h mc n
-        (by rw [ha1, ha5, ush_beq_zext]; simp [hhit]) $$ Hc Hrun
+        (by rw [ha1, ha5, Xv6.kgrep_beq_byte]; simp [hhit]) $$ Hc Hrun
       iintro %h1 Hrun
       iapply Hk $$ Hs %h1 %mc [] [] Hrun
       · ipureintro; intro q _ _; rfl
@@ -64,7 +64,7 @@ theorem shStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (tx : Bool) (dq : DFrac)
         rfl
     · -- 0xa90  beq a1,a5 : not taken
       iapply ushS_brN UL N (ushI_a90 N.t) 0xa94 h mc n
-        (by rw [ha1, ha5, ush_beq_zext]; simp [Ne.symm hhit]) $$ Hc Hrun
+        (by rw [ha1, ha5, Xv6.kgrep_beq_byte]; simp [Ne.symm hhit]) $$ Hc Hrun
       iintro %h1 Hrun
       -- 0xa94  addi a0,a0,1
       iapply ushS_itype UL N (ushI_a94 N.t) 0xa96 h1 mc n (BitVec.ofNat 64 (s + (j + 1)))
@@ -88,7 +88,7 @@ theorem shStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (tx : Bool) (dq : DFrac)
         iapply ushS_brT UL N (ushI_a9a N.t) 0xa90 h3 m3 n
           (by show ukBtaken .BNE ((ukWr m2 15#5 _).get 15#5) (RegMap.get _ 0#5) = true
               rw [ukWr_get_same _ _ _ (by decide), RegMap.get_zero,
-                show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, ush_bne_zext]
+                show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, Xv6.kgrep_bne_byte]
               simp [hne (j + 1) hj1]) $$ Hc Hrun
         iintro %h4 Hrun
         iapply ih (j + 1) h4 m3 (by omega) hj1 hs64 (by show (ukWr (ukWr mc _ _) _ _).get _ = _; ureg)
@@ -220,7 +220,7 @@ theorem wp_shStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (tx
     iapply ushS_brN UL N (ushI_a8e N.t) 0xa90 h2 m2 n
       (by show ukBtaken .BEQ ((ukWr m1 15#5 _).get 15#5) (RegMap.get _ 0#5) = false
           rw [ukWr_get_same _ _ _ (by decide), RegMap.get_zero,
-            show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, ush_beq_zext]
+            show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, Xv6.kgrep_beq_byte]
           simp [hne 0 hl]) $$ Hc Hrun
     iintro %h3 Hrun
     iapply shStrchr_loop UL N tx dq s len f c n len 0 h3 m2 (by omega) hl hs64

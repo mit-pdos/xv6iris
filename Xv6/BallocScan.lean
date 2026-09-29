@@ -123,10 +123,10 @@ theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
   have hb1 : bi + 1 < 2 ^ 31 := by unfold BPB BSIZE at hbi; omega
   -- +0xde  addiw a4,a4,1 ; +0xe0  addiw s1,s1,1 ; +0xe2  bne a4,s4
   k_step_e (wp_s_addiw cpu _ (KA.«balloc» + 0xde#64) true 1#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, ba_addiw1 bi hb1, ba_addiw1' bi hb1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, ba_addiw1 bi hb1, Xv6.addiw_succ bi hb1]
   iintro Hk Hpc
   k_step_e (wp_s_addiw cpu _ (KA.«balloc» + 0xe0#64) true 1#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, ba_addiw1 bi hb1, ba_addiw1' bi hb1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, ba_addiw1 bi hb1, Xv6.addiw_succ bi hb1]
   iintro Hk Hpc
   k_step_e (wp_s_branch cpu _ (KA.«balloc» + 0xe2#64) false 8148#13 14#5 20#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a20, ba_bne_bpb (bi + 1) hb1, ba_bne_bpb' bi hb1]

@@ -113,7 +113,7 @@ theorem prepare_return_execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool)
   iframe
   iintro HF
   swp_run 300
-  simp only [legalize_xepc, zca_supported, ite_true, update_bit0_eq]
+  simp only [legalize_xepc, LeanRV64D.Functions.hartSupports_Ext_Zca, ite_true, update_bit0_eq]
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]

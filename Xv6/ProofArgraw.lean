@@ -80,10 +80,6 @@ theorem ar_calleeSaved_mk (KR R : RegMap)
       | rfl
       | assumption
 
-/-- `withSpie` commutes with a frame push. -/
-theorem ar_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -227,7 +223,7 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   k_norm_g at hcs1
   k_norm_g at ha0'
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
-  k_norm_g [ar_withSpie_pushed, ar_ret_2784]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, ar_ret_2784]
   have q0 : k.sie = false ∨ k.proc = 0#64 → cm = cpu :=
     fun h => (hpm h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
   -- c.li a5,5 ; bltu a5,s1 (dead)

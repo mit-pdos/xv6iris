@@ -12,12 +12,6 @@ open LeanRV64D
 
 set_option linter.unusedSectionVars false
 
-theorem uc_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem uc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 /-- A branch on a value known to be zero: taken. -/
 theorem uc_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = p := by

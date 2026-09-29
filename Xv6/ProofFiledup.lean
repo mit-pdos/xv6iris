@@ -33,13 +33,6 @@ set_option linter.unusedVariables false
 theorem fd_ret_4130 : jumpPc (KA.«filedup» + 0x18#64) = (KA.«filedup» + 0x18#64) := by decide
 theorem fd_ret_4146 : jumpPc (KA.«filedup» + 0x2e#64) = (KA.«filedup» + 0x2e#64) := by decide
 
-/-- The normaliser splits `BitVec.ofNat 32 (n + 1)` into `BitVec.ofNat 32 n + 1#32`;
-this folds it back. -/
-theorem fd_ofNat32_succ (n : Nat) : BitVec.ofNat 32 n + 1#32 = BitVec.ofNat 32 (n + 1) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
 theorem fd_lock_4124 : KA.«filedup» + 0x1e55c#64 = ftableAddr := by
   unfold ftableAddr; decide
 theorem fd_lock_413a : KA.«filedup» + 0x1e55c#64 = ftableAddr := by
@@ -207,13 +200,13 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_sw c _ (KA.«filedup» + 0x20#64) true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fd_incr n, fd_incr' n]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, Xv6.bc_incr n, Xv6.bc_incr' n]
   iintro Hk Hpc Hrefc
   ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1)
         (BitVec.ofNat 32 n + 1#32) ⊢
       wordAtN curCtx (aFref kk) 4 (DFrac.own 1)
         (BitVec.ofNat 32 ((nx, q.half) :: (id, q.half) :: (s ++ t)).length) from by
-    rw [wordAtN_cur, aFref_eq', hlen, fd_ofNat32_succ]) $$ Hrefc
+    rw [wordAtN_cur, aFref_eq', hlen, Xv6.bc_ofNat32_succ]) $$ Hrefc
   -- the dup ghost step
   iapply wpLoop_bupd
   ihave Hup := file_dup_step γ M Ls s t nx id kk q hkk hfresh hok hL hnd $$ [Ha He Hhalves]

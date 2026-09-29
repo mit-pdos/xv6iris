@@ -32,6 +32,10 @@ import Xv6.CodeTactics
 import MachCSL.BigSepLib
 import Xv6.DiskTier
 import Xv6.LogInv
+import Xv6.BlkmapBuf
+import Xv6.FileInv
+import Xv6.FsWords
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -87,53 +91,16 @@ theorem il_hdrw (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
   unfold hdrN leWord at *
   omega
 
-/-- A word read and put straight back. -/
-theorem il_word_roundtrip (bs : List (BitVec 8)) (i : Nat) (hl : 4 * i + 4 ≤ bs.length) :
-    bs.take (4 * i) ++ wordToBytes4 (bytesToWord4 ((bs.drop (4 * i)).take 4))
-      ++ bs.drop (4 * i + 4) = bs := by
-  have h4 : ((bs.drop (4 * i)).take 4).length = 4 := by
-    simp only [List.length_take, List.length_drop]; omega
-  rw [wordToBytes4_bytesToWord4 _ h4, List.append_assoc,
-    show bs.drop (4 * i + 4) = (bs.drop (4 * i)).drop 4 by rw [List.drop_drop],
-    List.take_append_drop, List.take_append_drop]
-
 /-! ## Arithmetic the code computes -/
-
-theorem il_sext_ofNat (m : Nat) (h : m < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 m) = BitVec.ofNat 64 m := by
-  have hw : (BitVec.ofNat 32 m).toNat = m := by
-    simp only [BitVec.toNat_ofNat]; omega
-  have hmsb : (BitVec.ofNat 32 m).msb = false := by
-    rw [BitVec.msb_eq_decide, hw]
-    exact decide_eq_false (by omega)
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, hw]
-
-theorem il_ext_sext32 (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
 
 /-- `blez a2` at `n = 0`: taken. -/
 theorem il_blez_z : bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 0)) = true := by
   decide
-theorem il_blez_zero : bcond bop.BGE 0#64 0#64 = true := by decide
-
-/-- `blez a2` at `n ≥ 1`: not taken. -/
-theorem il_blez_pos (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
-    bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 n)) = false := by
-  show (!(0#64).slt (BitVec.signExtend 64 (BitVec.ofNat 32 n))) = false
-  have h2 : (BitVec.ofNat 32 n).toInt = n := by
-    rw [BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega), BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (by omega)]
-  have hlt : (0#64).slt (BitVec.signExtend 64 (BitVec.ofNat 32 n)) = true := by
-    rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_signExtend_of_le (by omega), h2]
-    simp; omega
-  rw [hlt]; rfl
 
 /-- `slli a2,a2,2` on the loaded `n`. -/
 theorem il_slli2 (n : Nat) (h : n < 2 ^ 31) :
     (BitVec.signExtend 64 (BitVec.ofNat 32 n)) <<< 2 = BitVec.ofNat 64 (4 * n) := by
-  rw [il_sext_ofNat n h]
+  rw [MachCSL.signExtend_ofNat32 n h]
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.shiftLeft_eq, Nat.reducePow]
   omega
@@ -192,15 +159,6 @@ theorem il_bne_ne (kk x y : Nat) (hx : x ≤ 30) (hy : y ≤ 30) (h : x ≠ y) :
     bcond bop.BNE (ilCur kk x) (ilCur kk y) = true := by
   rw [ilCur_bne kk x y hx hy, decide_eq_false h]; rfl
 
-/-- `b->data` is four-byte aligned. -/
-theorem il_data_align (kk : Nat) (hkk : kk < NBUF) : (aBufData (bnode kk)).toNat % 4 = 0 := by
-  have h := bufData_toNat kk 0 hkk (by unfold BSIZE; omega)
-  have hz : aBufData (bnode kk) + BitVec.ofNat 64 0 = aBufData (bnode kk) := by simp
-  rw [hz] at h
-  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
-  rw [hbc] at h
-  omega
-
 theorem il_word0_addr (kk : Nat) :
     aBufData (bnode kk) + BitVec.ofNat 64 (4 * 0) = bnode kk + 88#64 := by
   unfold aBufData bOffData
@@ -249,14 +207,14 @@ theorem il_slot_acc (kk t : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8))
         (bytesToWord4 ((bs.drop (4 * (t + 1))).take 4)) -∗
         byteBuf (aBufData (bnode kk)) (DFrac.own 1) bs) := by
   have h := byteBuf_word4_at (GF := GF) (aBufData (bnode kk)) bs (t + 1) hl
-    (il_data_align kk hkk)
+    (Xv6.bm_base_align4 kk hkk)
   rw [il_slot_addr kk t] at h
   iintro H
   icases h $$ H with ⟨Hw, Hc⟩
   iframe Hw
   iintro Hw
   ihave Hb := Hc $$ %(bytesToWord4 ((bs.drop (4 * (t + 1))).take 4)) Hw
-  rw [il_word_roundtrip bs (t + 1) hl]
+  rw [Xv6.bm_buf_restore bs (t + 1) hl]
   iexact Hb
 
 /-- The header's `n` word, at the address `c.lw a2,88(a0)` computes, READ
@@ -267,7 +225,7 @@ theorem il_word0_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4
       (wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1) (BitVec.ofNat 32 (hdrN bs)) -∗
         byteBuf (aBufData (bnode kk)) (DFrac.own 1) bs) := by
   have h := byteBuf_word4_at (GF := GF) (aBufData (bnode kk)) bs 0 (by omega)
-    (il_data_align kk hkk)
+    (Xv6.bm_base_align4 kk hkk)
   rw [il_word0_addr kk] at h
   iintro H
   icases h $$ H with ⟨Hw, Hc⟩
@@ -275,7 +233,7 @@ theorem il_word0_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4
   iframe Hw
   iintro Hw
   ihave Hb := Hc $$ %(BitVec.ofNat 32 (hdrN bs)) Hw
-  rw [← il_hdrw bs hl, il_word_roundtrip bs 0 (by omega)]
+  rw [← il_hdrw bs hl, Xv6.bm_buf_restore bs 0 (by omega)]
   iexact Hb
 
 end
@@ -335,7 +293,7 @@ theorem il_loop_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
         wordPointsTo (GF := GF) (lhBlock k) 4 (DFrac.own 1) z) ⊢
       ([∗list] i ↦ w ∈ (ilW bs).take (t + 1) ++ C.drop (t + 1),
         wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) by
-    rw [il_ext_sext32, ← ilW_getElem bs t htW, il_cells_step (ilW bs) C t htW htC]) $$ HW
+    rw [Xv6.fw_ext32, ← ilW_getElem bs t htW, il_cells_step (ilW bs) C t htW htC]) $$ HW
   -- +0x56  c.addi a5,a5,4
   k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x56#64) true 4#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h15, ilCur_step kk t]
@@ -459,13 +417,13 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   ihave Hby := Hclose $$ Hword
   -- +0x3c  sw a2,44(s2)
   k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x3c#64) false 44#12 18#5 12#5 (by decide) vN)
-    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h18, hlhN, il_ext_sext32]
+    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h18, hlhN, Xv6.fw_ext32]
   iintro Hk Hpc HlhN
   by_cases hn0 : hdrN bs = 0
   · -- +0x40  blez a2 : TAKEN, nothing to copy
     have hW0 : ilW bs = [] := List.eq_nil_of_length_eq_zero (by rw [ilW_length]; exact hn0)
     k_step_e (wp_s_branch0 cpu _ (KA.«initlog» + 0x40#64) false 30#13 12#5 (by decide) bop.BGE)
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hn0, il_blez_z, il_blez_zero]
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hn0, il_blez_z, Xv6.vdrw2_blez0]
     iintro Hk Hpc
     ihave HW := (show ([∗list] i ↦ w ∈ C, wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) ⊢
         ([∗list] i ↦ w ∈ ilW bs ++ C.drop 0,
@@ -478,7 +436,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   · -- +0x40  blez a2 : falls through, the copy loop
     have hn1 : 1 ≤ hdrN bs := by omega
     k_step_e (wp_s_branch0 cpu _ (KA.«initlog» + 0x40#64) false 30#13 12#5 (by decide) bop.BGE)
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [il_blez_pos (hdrN bs) hn1 hn31]
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [Xv6.fd_bgtz (hdrN bs) hn1 hn31]
     iintro Hk Hpc
     -- +0x44 c.mv a5,a0
     k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x44#64) true 15#5 0#5 10#5 (by decide))

@@ -89,9 +89,6 @@ theorem umo_gtda_zero {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU :
 
 /-! ## §0 Two rewrites the walks' side conditions use -/
 
-/-- The model's `trunc` is `setWidth`. -/
-theorem umo_trunc {k m : Nat} (x : BitVec k) : trunc (m := m) x = BitVec.setWidth m x := rfl
-
 section
 variable {D : UFoot}
 
@@ -202,7 +199,7 @@ theorem umo_amocas_ok (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (
   rcases hw with rfl | rfl | rfl | rfl
   all_goals
     subst hc
-    uwk_run [hga, hx, hwx, umo_trunc, umoRv_file]
+    uwk_run [hga, hx, hwx, MachCSL.trunc_eq, umoRv_file]
     simp [sign_extend, trunc, Sail.BitVec.signExtend, Sail.BitVec.truncate, umoRv_file]
 
 set_option maxHeartbeats 4000000 in
@@ -228,7 +225,7 @@ theorem umo_amocas_fail (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
   have hx := uxa_rX hD.ctl.alu
   have hwx := uxa_wX hD.ctl.alu
   rcases hw with rfl | rfl | rfl | rfl
-  all_goals uwk_run [hga, hx, hwx, umo_trunc, umoRv_file]
+  all_goals uwk_run [hga, hx, hwx, MachCSL.trunc_eq, umoRv_file]
 
 /-! ## §3 `AMOCAS.Q` (width 16, the register pairs) -/
 
@@ -257,7 +254,7 @@ theorem umo_amocas16_ok (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
   have hga := umo_gtda_zero hD orc s hU hp i1 (umoAcc .AMOCAS aq rl) 16
   have hx := umo_rX_pair hD.ctl.alu
   have hwx := umo_wX_pair hD.ctl.alu
-  uwk_run [hga, hx, hwx, umo_trunc, umoRv_file]
+  uwk_run [hga, hx, hwx, MachCSL.trunc_eq, umoRv_file]
   simp [sign_extend, trunc, Sail.BitVec.signExtend, Sail.BitVec.truncate, umoRv_file]
 
 set_option maxHeartbeats 4000000 in
@@ -281,7 +278,7 @@ theorem umo_amocas16_fail (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg 
   have hga := umo_gtda_zero hD orc s hU hp i1 (umoAcc .AMOCAS aq rl) 16
   have hx := umo_rX_pair hD.ctl.alu
   have hwx := umo_wX_pair hD.ctl.alu
-  uwk_run [hga, hx, hwx, umo_trunc, umoRv_file]
+  uwk_run [hga, hx, hwx, MachCSL.trunc_eq, umoRv_file]
   simp [sign_extend, Sail.BitVec.signExtend]
 
 end

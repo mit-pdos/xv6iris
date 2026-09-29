@@ -14,6 +14,7 @@ zero is a whole page, ready for `kfree`.
 import Xv6.PtOwnLemmas
 import Xv6.UPtDefs
 import MachCSL.WpSmodeFrame
+import Xv6.PtRunLemmas
 
 namespace Xv6.UPtFree
 
@@ -25,9 +26,6 @@ set_option linter.unusedSectionVars false
 
 /-! ## Indices of a node page -/
 
-theorem allIdx_length : allIdx.length = 512 := by
-  simp only [allIdx, List.length_map, List.length_range]
-
 theorem ofNat9_toNat (i : Nat) (hi : i < 512) : (BitVec.ofNat 9 i).toNat = i := by
   simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega
 
@@ -37,7 +35,7 @@ theorem allIdx_get (i : Nat) (hi : i < 512) : allIdx[i]? = some (BitVec.ofNat 9 
 
 theorem allIdx_drop_cons (i : Nat) (hi : i < 512) :
     allIdx.drop i = BitVec.ofNat 9 i :: allIdx.drop (i + 1) := by
-  have hlt : i < allIdx.length := by rw [allIdx_length]; exact hi
+  have hlt : i < allIdx.length := by rw [Xv6.PtRun.allIdx_length]; exact hi
   rw [List.drop_eq_getElem_cons hlt]
   congr 1
   have h := allIdx_get i hi
@@ -50,10 +48,10 @@ theorem allIdx_take_snoc (i : Nat) (hi : i < 512) :
   rfl
 
 theorem allIdx_take_all : allIdx.take 512 = allIdx := by
-  rw [← allIdx_length, List.take_length]
+  rw [← Xv6.PtRun.allIdx_length, List.take_length]
 
 theorem allIdx_drop_all : allIdx.drop 512 = [] := by
-  rw [← allIdx_length, List.drop_length]
+  rw [← Xv6.PtRun.allIdx_length, List.drop_length]
 
 theorem pteAddr_ofNat (b : BitVec 44) (i : Nat) (hi : i < 512) :
     pteAddr b (BitVec.ofNat 9 i) = pageAddr b + BitVec.ofNat 64 (8 * i) := by

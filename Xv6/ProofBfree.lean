@@ -24,7 +24,7 @@ twice: after `bread` (`Xv6.bitmapReadOwn`, in `bf_mid`) and at
 
 ONE BITMAP BLOCK: `size ≤ BPB`, so the `srliw a5,a1,0xd` at `+0x0e`
 contributes zero (`Xv6.bf_srliw13`) and `BBLOCK b sb` is `sb.bmapstart`
-(`Xv6.bf_ext_sext`).
+(`Xv6.fw_ext32`).
 
 **Deviations from Rocq.**  The contract's (see `Xv6/SpecBfree.lean`).
 The proof follows Rocq's route; its `Z`/`mword` plumbing lemmas are not
@@ -98,7 +98,7 @@ theorem bfree_proof (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) : BFREE := ⟨
   iintro Hk Hpc Hsb
   -- +0x1a  addw a1,a1,a5 : BBLOCK(b, sb) = bmapstart
   k_step_e (wp_s_addw cpu _ (KA.«bfree» + 0x1a#64) true 11#5 11#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32]
   iintro Hk Hpc
   -- +0x1c  jal bread
   k_step_e (wp_s_jal cpu _ (KA.«bfree» + 0x1c#64) false 2096192#21 1#5 (by decide))

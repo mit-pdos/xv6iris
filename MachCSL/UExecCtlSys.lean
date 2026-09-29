@@ -105,7 +105,7 @@ theorem uxc_sfence_vma (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
   show runRW D orc s (execute_SFENCE_VMA _ _) = _
   simp only [execute_SFENCE_VMA]
   split <;> split <;>
-    simp only [runRW_bind, uxa_rX hD.alu, Option.bind, runRW_pure, uxc_readReg D orc s _ hD.priv, hp] <;>
+    simp only [runRW_bind, uxa_rX hD.alu, Option.bind, runRW_pure, MachCSL.utr_readReg D orc s _ hD.priv, hp] <;>
     rfl
 
 /-- **SFENCE.W.INVAL** at User: illegal. -/

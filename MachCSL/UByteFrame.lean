@@ -132,25 +132,13 @@ theorem bmWrite_isSome (mm : BMap) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
   · rw [bmWrite_other mm pa n w a ha]
 
 
-/-- A word is determined by its bytes. -/
-theorem ub_eq_of_nthByte {n : Nat} (w w' : BitVec (8 * n)) (h : ∀ j, j < n → nthByte w j = nthByte w' j) :
-    w = w' := by
-  unfold nthByte at h
-  apply BitVec.eq_of_getLsbD_eq
-  intro i hi
-  have h1 := h (i / 8) (by omega)
-  have h2 := congrArg (fun x => x.getLsbD (i % 8)) h1
-  have hlt : i % 8 < 8 := Nat.mod_lt _ (by decide)
-  simp only [BitVec.getLsbD_extractLsb', hlt, decide_true, Bool.true_and] at h2
-  rwa [show 8 * (i / 8) + i % 8 = i by omega] at h2
-
 /-- A window whose bytes are the word's reads the word. -/
 theorem bmRead_of_bytes (mm : BMap) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (h : ∀ j, j < n → mm (pa + BitVec.ofNat 64 j) = some (nthByte w j)) : bmRead mm pa n = some w := by
   obtain ⟨w', hw'⟩ := bmRead_of_owned mm pa n ((bmOwned_iff mm pa n).2 (fun j hj => by rw [h j hj]; rfl))
   rw [hw']
   congr 1
-  apply ub_eq_of_nthByte
+  apply MachCSL.bv_eq_of_bytes
   intro j hj
   have := (bmRead_spec mm pa n w' hw' j hj).symm.trans (h j hj)
   exact Option.some.inj this

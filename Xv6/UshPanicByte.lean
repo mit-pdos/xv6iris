@@ -73,7 +73,7 @@ theorem ushp_post_cons2 (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (l 
       UexecSG.spostAt (uslot (hlc := hlc)) 16 (kshFam N Q) W r W.M W.fd cw' cs' ⊢ Q nb := by
   intro W r cw' cs' hka0 hka1 hka2 htk hlz hnf
   refine (uwrite_no_short (hlc := hlc) Q N.pay W r W.M W.fd cw' cs' l 2 rb nb
-    (by rw [hka0, ha0]; decide) (by decide) htk hl2 (by rw [hka2, ha2]; exact consCountIs nb hnb) hlz
+    (by rw [hka0, ha0]; decide) (by decide) htk hl2 (by rw [hka2, ha2]; exact Xv6.echoCountIs nb hnb) hlz
     (by rw [hka1]; exact hnf)).trans sep_elim_right
 
 /-- **Rocq `ksh_w1_of_step`**: ONE BYTE AT fd 2 FROM ANY STEP OF THE CONSOLE

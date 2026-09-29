@@ -91,7 +91,7 @@ theorem ushq_body_law_upipes (E : UPipesEng (hlc := hlc) (GF := GF))
     -- `cat f | F1 | .. | Fn` -- the cat body walk at the pipeline's line
     obtain ⟨hu, -⟩ := (admUG_catf g np).1 ha
     obtain ⟨hb0, hb1, hl2⟩ := pipesLpcg_bytes _ f k len ⟨g, np, hu, rfl, hlat⟩
-    iapply wp_ushBodyCaWith E.UL N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) (kshf_fork_law_pipe E.UL E.SF E.SP E.hps N (Xu (hlc := hlc) (GF := GF) ug r s0 γp))
+    iapply wp_ushBodyCaWith E.UL N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) (Xv6.wp_ushForkPipe E.UL E.SF E.SP E.hps N (Xu (hlc := hlc) (GF := GF) ug r s0 γp))
       pipesLpcg (68 + ushDpipe) h m f k len (ulineWs (.LPipe (.PrCatF g) np)) sz l n (Nat.le_refl _) hregs hs1
       ha5 hnn hnul hkl2 (pipesLpcg_of_at g np f k len hu hlat) hb0 hb1 hl2 hszlo hszal hszok hpm1 hpmwb hwbl
       $$ Hgen Hhead Hcode Hjt Hkl Hchc Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun

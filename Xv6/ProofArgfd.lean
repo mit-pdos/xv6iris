@@ -19,6 +19,9 @@ The `int` local rides in the top half of an 8-byte frame slot
 import Xv6.SpecArgfd
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -37,7 +40,6 @@ theorem af_ret_4b6a : jumpPc (KA.«argfd» + 0x18#64) = (KA.«argfd» + 0x18#64)
 theorem af_ret_4b78 : jumpPc (KA.«argfd» + 0x26#64) = (KA.«argfd» + 0x26#64) := by decide
 
 theorem af_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem af_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem af_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem af_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
@@ -47,7 +49,6 @@ theorem af_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem af_beq_z (x : BitVec 64) (h : x = 0#64) : bcond bop.BEQ x 0#64 = true := by subst h; decide
 theorem af_beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
   simp only [bcond, beq_iff_eq]; exact decide_eq_false h
-theorem af_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by bv_decide
 
 theorem af_msb_false (w : BitVec 32) (h0 : 0 ≤ w.toInt) : w.msb = false := by
   rw [BitVec.msb_eq_toInt]; simp only [decide_eq_false_iff_not, Int.not_lt]; exact h0
@@ -213,13 +214,7 @@ end
 
 /-! ## The function -/
 
-theorem af_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem af_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
-theorem af_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 theorem af_li15 : 0#64 + BitVec.signExtend 64 15#12 = 15#64 := by decide
-theorem af_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 /-- `a0 = p + (fd << 3) + 208` is `&p->ofile[fd]` (the shift as the rule states it). -/
 theorem af_ofile_addr' (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
@@ -264,7 +259,7 @@ theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, af_beq_ne _ hpf] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_sd c2 _ (KA.«argfd» + 0x44#64) true 0#12 9#5 15#5 (by decide) oldf)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h15, af_add0, af_add0'] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h15, Xv6.dsOff0, af_add0'] next c3 hp3
   iintro Hk Hpc Hpf
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h =>
     (hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))
@@ -281,7 +276,7 @@ theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa :
       (by
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
-      0#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, af_li0]))
+      0#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, Xv6.co_li_zero]))
     $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpost $Hnext]
 
 end
@@ -368,7 +363,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
   -- past argint
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie %spp %R1 %hsp Hk Hpc %hcs1 Htf HTf Hfd
-  k_norm_g [af_pushed_withSpie, af_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
@@ -408,7 +403,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
     case hKm => k_norm_g; unfold argfdSlots argintSlots argrawSlots at hK; omega
     iapply wpNext_intro_pin
     iintro %c11 %hp11 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2
-    k_norm_g [af_withSpie_withSpie, af_pushed_withSpie, af_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -450,7 +445,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
       ⟨_, List.getElem?_eq_getElem (by rw [hlen]; unfold NOFILE; exact hfd16)⟩
     icases procOfilesOwe_read γ V.fdg pa V.ofile D fd fv hfv $$ Howe with ⟨Hc, Hcl⟩
     k_step_gen (wp_s_ld c15 _ (KA.«argfd» + 0x34#64) true 0#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) fv)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_add0, af_add0'] next c16 hp16
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.dsOff0, af_add0'] next c16 hp16
     iintro Hk Hpc Hc
     ihave Howe := Hcl $$ Hc
     have hpin16 : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
@@ -505,7 +500,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
       iintro Hk Hpc
       have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h => (hp17 h).trans (hpin16 h)
       have hext : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 fd) = BitVec.extractLsb' 0 32 v := by
-        rw [← hsext]; exact af_ext_sext _
+        rw [← hsext]; exact Xv6.fw_ext32 _
       -- the frame, back together (the `int` cell holds the argument)
       ihave Hfd := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFDC#64) 4 (DFrac.own 1) _ ⊢
           wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64 + 4#64) 4 (DFrac.own 1) _ from by rw [af_dc]) $$ Hfd
@@ -541,7 +536,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
         ihave Hpfd := (show ofdOut (GF := GF) (k.regs 11#5) oldfd ⊢ wordPointsTo (k.regs 11#5) 4 (DFrac.own 1) oldfd from by
           unfold ofdOut; rw [if_neg hpfd]) $$ Hpfd
         k_step_gen (wp_s_sw c18 _ (KA.«argfd» + 0x3c#64) false 0#12 18#5 14#5 (by decide) oldfd)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', af_add0, af_add0', hext] next c19 hp19
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', Xv6.dsOff0, af_add0', hext] next c19 hp19
         iintro Hk Hpc Hpfd
         have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cpu := fun h => (hp19 h).trans ((hp18 h).trans (hpin17 h))
         ihave Hpfd := (show wordPointsTo (GF := GF) (k.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) ⊢

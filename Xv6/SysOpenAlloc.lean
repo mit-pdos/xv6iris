@@ -60,6 +60,8 @@ import Xv6.SysOpenShared
 import MachCSL.WpStoreFree4
 import MachCSL.WpSmodeLh
 import Xv6.SpecFilealloc
+import Xv6.FsWords
+import Xv6.SysOpenTails
 
 namespace Xv6
 
@@ -83,17 +85,6 @@ theorem sys_open_alloc_ret_64 : jumpPc (KA.«sys_open» + 0x64#64) = KA.«sys_op
 theorem sys_open_alloc_ret_6e : jumpPc (KA.«sys_open» + 0x6e#64) = KA.«sys_open» + 0x6e#64 := by
   decide
 
-theorem sys_open_alloc_sp160 (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + BitVec.signExtend 64 160#12 = x + 0xFFFFFFFFFFFFFFE0#64 := by
-  bv_decide
-theorem sys_open_alloc_sp160' (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + 160#64 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
-theorem sys_open_alloc_sp152 (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + BitVec.signExtend 64 152#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
-  bv_decide
-theorem sys_open_alloc_sp152' (x : BitVec 64) :
-    x + 0xFFFFFFFFFFFFFF40#64 + 152#64 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
-
 theorem sys_open_alloc_foff (k : Nat) : fnode k + BitVec.signExtend 64 32#12 = aFoff k := rfl
 theorem sys_open_alloc_foff' (k : Nat) : fnode k + 32#64 = aFoff k := rfl
 theorem sys_open_alloc_fmaj (k : Nat) : fnode k + BitVec.signExtend 64 36#12 = aFmajor k := rfl
@@ -105,7 +96,7 @@ theorem sys_open_alloc_li3 : 0#64 + BitVec.signExtend 64 3#12 = 3#64 := by decid
 /-- the +0x66 `c.beqz a0` on filealloc's slot: never taken. -/
 theorem sys_open_alloc_beqz_f (kf : Nat) (hkf : kf < NFILE) :
     bcond bop.BEQ (fnode kf) 0#64 = false := by
-  rw [sys_open_beqz]; exact decide_eq_false (fnode_nonzero kf hkf)
+  rw [Xv6.dirlookup_beqz]; exact decide_eq_false (fnode_nonzero kf hkf)
 
 theorem sys_open_alloc_beqz_0 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
@@ -121,10 +112,6 @@ theorem sys_open_alloc_beq_dev (t : BitVec 16) :
     rw [beq_eq_false_iff_ne]
     intro he
     exact h ((sys_open_tdev_z t).1 ((sys_open_ty_dev t).1 he))
-
-/-- the `lh` then `sh` of the major: the halfword round-trips. -/
-theorem sys_open_alloc_major (h : BitVec 16) :
-    BitVec.extractLsb' 0 16 (BitVec.signExtend 64 h) = h := by bv_decide
 
 /-- the +0x140 `sw a4,0(s2)`: the device's own type word IS `FD_DEVICE`. -/
 theorem sys_open_alloc_ty3 (t : BitVec 16) (h : t = 3#16) :
@@ -168,7 +155,7 @@ theorem sys_open_alloc_filealloc (FA : FILEALLOC) (Γ : SchedNames) (cpu : CPU) 
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hfd, HK⟩
-  icases sys_open_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  icases Xv6.sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   have h := FA.wp_filealloc (hlc := hlc) (GF := GF) cpu k' A.γl A.γ (by rw [hnoff]; omega) hK
@@ -348,7 +335,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
     -- +0x148 sh a5,36(s2) -- f->major
     k_step_e (wp_s_sh cpu _ (KA.«sys_open» + 0x148#64) false 36#12 18#5 15#5 (by decide) Cf.major)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hpins.2.2.2.1, sys_open_alloc_fmaj, sys_open_alloc_fmaj', sys_open_alloc_major]
+      with [hpins.2.2.2.1, sys_open_alloc_fmaj, sys_open_alloc_fmaj', Xv6.fw_ext16]
     iintro Hk Hpc Hfmaj
     -- +0x14c c.j +0x88
     k_step_e (wp_s_j cpu _ (KA.«sys_open» + 0x14c#64) true 2096956#21)
@@ -471,7 +458,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   icases Hcells with ⟨Hra, Hs0, H3, H4, H5, H6, Hlo, Hom, H24⟩
   k_step_e (wp_s_sd cpu _ (KA.«sys_open» + 0x68#64) true 152#12 2#5 19#5 (by decide) w5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hpins.1, sys_open_alloc_sp152, sys_open_alloc_sp152', hpins.2.2.2.2.1]
+    with [hpins.1, Xv6.sys_open_tails_sp152, Xv6.sys_open_tails_sp152', hpins.2.2.2.2.1]
   iintro Hk Hpc H5
   -- ===== +0x6a jal fdalloc =====
   k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x6a#64) false 2095604#21 1#5 (by decide))
@@ -490,7 +477,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   case fK => k_norm_g; exact hKfd
   case fn => k_norm_g; exact hS.hnoff
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
-  k_norm_g [sys_open_alloc_ret_6e, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_alloc_ret_6e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   unfold fdallocPost
   icases Hpost with (⟨%⟨hr, hfr⟩, Howe⟩ | ⟨%fd, %l, %⟨hr, hfr⟩, Howe, Hfds, Hauth⟩)
@@ -508,7 +495,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
     have hct : curTier = KTier.kpt := by
       simp only [k_norm_simps] at htk; exact htk.symm.trans hS.htier
-    icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+    icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
     -- fileclose's loan, off the allowance (deviation 4)
     have hsplit : nsj = 1 + (nsj - 1) := by omega
     ihave Hisl := (show irefSlots (GF := GF) nsj ⊢ irefSlots (1 + (nsj - 1)) from by
@@ -569,7 +556,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
   icases Hcells with ⟨Hra, Hs0, H3, H4, H5, H6, Hlo, Hom, H24⟩
   k_step_e (wp_s_sd cpu _ (KA.«sys_open» + 0x5e#64) true 160#12 2#5 18#5 (by decide) w4)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hpins.1, sys_open_alloc_sp160, sys_open_alloc_sp160', hpins.2.2.2.1]
+    with [hpins.1, Xv6.sys_open_tails_sp160, Xv6.sys_open_tails_sp160', hpins.2.2.2.1]
   iintro Hk Hpc H4
   -- ===== +0x60 jal filealloc =====
   k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x60#64) false 2092812#21 1#5 (by decide))
@@ -582,7 +569,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
   case aK => k_norm_g; exact hK14
   case an => k_norm_g; exact hS.hnoff
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
-  k_norm_g [sys_open_alloc_ret_64, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_alloc_ret_64, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   unfold fileallocPost
   icases Hpost with (⟨%hr, Hfds⟩ | ⟨%kf, %⟨hkf, hr⟩, Hf⟩)
@@ -598,7 +585,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
     icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
     have hct : curTier = KTier.kpt := by
       simp only [k_norm_simps] at htk; exact htk.symm.trans hS.htier
-    icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+    icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
     ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
     ihave Hcells : sysOpenCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
         (k.regs 18#5) w5 w6 lo (sysOpenOm A) w24 $$ [Hra Hs0 H3 H4 H5 H6 Hlo Hom H24]

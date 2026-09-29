@@ -19,6 +19,7 @@ user page with W clear is `E_SAMO_Page_Fault`.
 -/
 import Xv6.UkXlateMem
 import Xv6.UserFetchWf
+import Xv6.UMemLemmas
 
 namespace Xv6
 
@@ -29,16 +30,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 set_option linter.unusedSectionVars false
 
 /-! ## §1 Small facts -/
-
-/-- A user leaf is a leaf of the table. -/
-theorem ukm_leaves_of_um (P : UPtd) (hwf : uptWf P) (k : Nat) (lw : BitVec 64) (h : get? P.um k = some lw) :
-    get? P.leaves k = some lw := by
-  have hk := (hwf.1 k lw h).1
-  have e1 : tfVpn.toNat = 67108862 := rfl
-  have e2 : trampVpn.toNat = 67108863 := rfl
-  unfold UPtd.leaves
-  rw [Iris.Std.get?_insert_ne (by omega), Iris.Std.get?_insert_ne (by omega)]
-  exact h
 
 /-- A page below `TRAPFRAME`: its addresses are canonical, their `vpn` is
 the page. -/
@@ -116,7 +107,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
   rw [← hm.root]
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
   have hdw : ufFoot.Dw .tlb = true := ufFoot_wr _ (by decide)
-  have hL := ukm_leaves_of_um P hm.wf _ lw hlw
+  have hL := Xv6.UMemL.leaves_of_um P hm.wf _ lw hlw
   obtain ⟨addr, w, hw, had⟩ := hrep.2.2.2.1 vpn lw hL
   have had' : pteAD lw w := had
   have hlok := uft_leaves_ok P hm.wf hv _ lw hL
@@ -187,7 +178,7 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
   have hdw : ufFoot.Dw .tlb = true := ufFoot_wr _ (by decide)
   obtain ⟨addr, w, w', hw, had', rfl⟩ := utlbOk_hit t _ htlb vpn ent hslot hmt
   obtain ⟨lw', hlw', had⟩ := uft_walk_leaf hrep hw
-  have hL := ukm_leaves_of_um P hm.wf _ lw hlw
+  have hL := Xv6.UMemL.leaves_of_um P hm.wf _ lw hlw
   rw [hL] at hlw'
   cases hlw'
   have hlok := uft_leaves_ok P hm.wf hv _ lw hL

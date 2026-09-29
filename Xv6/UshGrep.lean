@@ -74,6 +74,7 @@ key), at `User.Grep.elf`, and the differences are all of it:
 import Xv6.UshGeom
 import Xv6.ElfLoadable
 import Xv6.SpecGrepStart
+import Xv6.UEchoOut
 
 namespace Xv6
 
@@ -176,12 +177,6 @@ theorem ushGrepRoom (ws : List (List (BitVec 8))) (alen : Nat → Nat) (hfit : g
   rw [grepKexecSz] at this ⊢
   omega
 
-/-- `ws[i]?` at an in-range index is `ws[i]!`. -/
-theorem ushGrep_getElem?_bang (ws : List (List (BitVec 8))) (i : Nat) (hi : i < ws.length) :
-    ws[i]? = some ws[i]! := by
-  rw [List.getElem?_eq_getElem hi, List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-  rfl
-
 /-- **Rocq `kxc_span_off`**: THE SPAN OF A LINE'S PUSH, EXACTLY -- word `i`'s
 end in the line plus fifteen bytes of rounding slack per word pushed before
 it and sixteen for its own. -/
@@ -194,7 +189,7 @@ theorem kxcSpan_off (ws : List (List (BitVec 8))) (i : Nat) (hi : i < ws.length)
     omega
   | succ i ih =>
     have ih' := ih (by omega)
-    have hw := ushGrep_getElem?_bang ws i (by omega)
+    have hw := Xv6.ws_at ws i (by omega)
     have hoff : ushEchoOff ws (i + 1) = ushEchoOff ws i + ushEchoAlen ws i + 1 := by
       unfold ushEchoOff ushEchoAlen
       exact wlOff_S_at ws 0 i _ hw

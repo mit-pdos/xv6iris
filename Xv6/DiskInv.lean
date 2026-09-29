@@ -1251,9 +1251,6 @@ theorem usedIdx_write_lease (γ : DiskNames) (s : VirtioState) (key : Nat) (h : 
 The device-side counterpart of `Xv6.permTok`: how a task takes a permit,
 what it pins while it holds one, and how it gives it back. -/
 
-/-- A free slot's row is EMPTY: the accounting rules out a fetch there. -/
-theorem headRes_inactive_eq (γ : DiskNames) (pd : PAddr) (i : Nat) :
-    headRes (GF := GF) γ pd i .inactive = iprop(emp) := rfl
 
 /-- **Opening the protocol in the live world.**  A frozen configuration
 rules the dead arm out -- the dead arm holds a HALF of the same ghost
@@ -3359,14 +3356,6 @@ theorem leaseV_root_get (γ : DiskNames) (s : VirtioState) :
     iframe Hfr
     ipureintro; exact ⟨hcfg.1, hl.1, hl.2⟩
 
-/-- A `get` of the root loop that only keeps what it already has. -/
-theorem leaseV_get_keep (γ : DiskNames) (C : IProp GF) (s : VirtioState) :
-    iprop(C ∗ diskProto (GF := GF) γ s) ⊢ |==> (diskProto γ s ∗ ∃ _ : Unit, C) := by
-  iintro ⟨HC, HR⟩
-  imodintro
-  iframe HR
-  iexists ()
-  iexact HC
 
 theorem leaseV_dmaReadPin_any (γ : DiskNames) (C : IProp GF) (s : VirtioState)
     (pa : PAddr) (n : Nat) :
@@ -3606,7 +3595,7 @@ theorem leaseD_body (γ : DiskNames) :
           · simp only [bind, DevM.bind, Pure.pure]
             refine DevM.LeaseD.get _ (X := Unit)
               (fun _ _ => iprop(bodyKnow γ v lo c0 ∗ ringAnswer γ lo hw)) _
-              (fun s1 => leaseV_get_keep γ _ s1) (fun popped _ => ?_)
+              (fun s1 => Xv6.leaseL_get_keep γ _ s1) (fun popped _ => ?_)
             split
             · refine DevM.LeaseD.pure _ () ?_
               iintro ⟨HC, _⟩
@@ -3665,7 +3654,7 @@ theorem leaseD_body (γ : DiskNames) :
     · refine DevM.LeaseD.pure _ () (bodyKnow_root γ v lo c0)
   · split
     · refine DevM.LeaseD.get _ (X := Unit) (fun _ _ => diskRoot γ) _
-        (fun s => leaseV_get_keep γ (diskRoot γ) s) (fun v _ => ?_)
+        (fun s => Xv6.leaseL_get_keep γ (diskRoot γ) s) (fun v _ => ?_)
       split
       · exact DevM.LeaseD.pure _ () .rfl
       · refine DevM.LeaseD.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun

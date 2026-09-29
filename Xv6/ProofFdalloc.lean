@@ -30,6 +30,9 @@ import Xv6.SpecFdalloc
 import Xv6.SpecMyproc
 import Xv6.FtableLock
 import Xv6.CodeTactics
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
+import Xv6.PrintkDefs
 
 namespace Xv6
 
@@ -96,10 +99,8 @@ theorem fdFrees_eq_nil (fs : List (BitVec 64))
 
 theorem fda_ret_4bbc : jumpPc (KA.«fdalloc» + 0x10#64) = (KA.«fdalloc» + 0x10#64) := by decide
 
-theorem fda_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem fda_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem fda_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem fda_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem fda_li16 : 0#64 + BitVec.signExtend 64 16#12 = 16#64 := by decide
 
 theorem fda_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
@@ -111,11 +112,6 @@ theorem fda_incr_bv (x : BitVec 64) (h : x.ult 2147483647#64 = true) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (x + BitVec.signExtend 64 1#12)) = x + 1#64 := by
   bv_decide
 
-theorem fda_ofNat_succ (n : Nat) : BitVec.ofNat 64 n + 1#64 = BitVec.ofNat 64 (n + 1) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
 theorem fda_ult (n : Nat) (h : n < 16) : (BitVec.ofNat 64 n).ult 2147483647#64 = true := by
   have h1 : (BitVec.ofNat 64 n).toNat = n := by simp only [BitVec.toNat_ofNat]; omega
   have h2 : (2147483647#64 : BitVec 64).toNat = 2147483647 := by decide
@@ -125,7 +121,7 @@ theorem fda_ult (n : Nat) (h : n < 16) : (BitVec.ofNat 64 n).ult 2147483647#64 =
 theorem fda_incr (n : Nat) (h : n < 16) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + BitVec.signExtend 64 1#12))
       = BitVec.ofNat 64 (n + 1) := by
-  rw [fda_incr_bv _ (fda_ult n h), fda_ofNat_succ]
+  rw [fda_incr_bv _ (fda_ult n h), Xv6.ofNat_succ']
 
 theorem fda_incr' (n : Nat) (h : n < 16) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64))
@@ -149,11 +145,11 @@ theorem fda_bne_end : bcond bop.BNE (BitVec.ofNat 64 16) 16#64 = false := by dec
 `BitVec.ofNat 64 n + 1#64`; the two branch facts on that form. -/
 theorem fda_bne_lt_succ (n : Nat) (h : n + 1 < 16) :
     bcond bop.BNE (BitVec.ofNat 64 n + 1#64) 16#64 = true := by
-  rw [fda_ofNat_succ]; exact fda_bne_lt (n + 1) h
+  rw [Xv6.ofNat_succ']; exact fda_bne_lt (n + 1) h
 
 theorem fda_bne_end_succ (n : Nat) (h : n + 1 = 16) :
     bcond bop.BNE (BitVec.ofNat 64 n + 1#64) 16#64 = false := by
-  rw [fda_ofNat_succ, h]; exact fda_bne_end
+  rw [Xv6.ofNat_succ', h]; exact fda_bne_end
 
 /-! ## Addresses in the descriptor array -/
 
@@ -201,11 +197,6 @@ theorem fda_a2'' (pa : BitVec 64) (fd : Nat) :
   rw [show (BitVec.signExtend 64 208#12 : BitVec 64) = 208#64 by decide]; exact fda_a2' pa fd
 
 /-! ## Context shapes -/
-
-theorem fda_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem fda_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
@@ -339,7 +330,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
   icases procOfilesOwe_read γ γd k.proc fs D fd v hv $$ Howe with ⟨Hcell, Hcl⟩
   -- c.ld a4,0(a5)
   k_step_gen (wp_s_ld c _ (KA.«fdalloc» + 0x1a#64) true 0#12 14#5 15#5 (by decide) (by decide) (DFrac.own 1) v)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, fda_add0, fda_add0'] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, Xv6.dsOff0, fda_add0'] next c1 hp1
   iintro Hk Hpc Hcell
   ihave Howe := Hcl $$ Hcell
   by_cases hv0 : v = 0#64
@@ -362,7 +353,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
     iintro Hk Hpc
     -- c.sd s1,0(a2)
     k_step_gen (wp_s_sd c5 _ (KA.«fdalloc» + 0x3c#64) true 0#12 12#5 9#5 (by decide) 0#64)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fda_add0, fda_add0'] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, Xv6.dsOff0, fda_add0'] next c6 hp6
     iintro Hk Hpc Hcell
     ihave Howe := Hw $$ Hcell
     -- c.j 0x80004cd8
@@ -534,7 +525,7 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
   -- back with `p` in a0
   iapply wpNext_intro_pin
   iintro %c %hp4 %spie %spp %R1 %hsp Hk Hpc %hcs1
-  k_norm_g [fda_pushed_withSpie, fda_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   obtain ⟨hcs1, ha0m⟩ := hcs1
   k_norm_g at ha0m
   unfold calleeSaved at hcs1
@@ -549,7 +540,7 @@ theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
     with [ha0m, fda_ofile0, fda_ofile0'] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_addi c6 _ (KA.«fdalloc» + 0x16#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_li0] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_addi c7 _ (KA.«fdalloc» + 0x18#64) true 16#12 13#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_li16] next c8 hp8

@@ -23,6 +23,7 @@ import Xv6.SpecReleasesleep
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import Xv6.KilledDefs
 
 namespace Xv6
 
@@ -52,16 +53,8 @@ theorem rsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem rsl_withLocks_self (k : KCtx) (m : Nat) (a b : Bool) :
-    ((k.pushed m).withSpie a b).withLocks k.locks = (k.pushed m).withSpie a b := rfl
 theorem rsl_withLocks_self' (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-theorem rsl_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem rsl_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem rsl_withRegs_withSpie (k : KCtx) (RM : RegMap) (a b : Bool) :
-    (k.withRegs RM).withSpie a b = (k.withSpie a b).withRegs RM := rfl
 theorem rsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 4).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 4 := rfl
 
@@ -214,7 +207,7 @@ theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
   iapply (rsl_release RE c _ γl γ slk Rp Rin H ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hbody $Hhook]
   rotate_right 1
-  k_norm_g [rsl_withLocks_self, rsl_filter_sleep k.locks hs,
+  k_norm_g [Xv6.kl_withLocks_self, rsl_filter_sleep k.locks hs,
     KCtx.pushOffAt_popExit k spie spp hwf, hK4, hR18, rsl_ret_4040]
   iframe #
   case ha0 => k_norm_g

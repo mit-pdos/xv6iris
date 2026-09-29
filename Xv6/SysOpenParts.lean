@@ -52,7 +52,7 @@ current values and the cells hold junk until saved.
     `sysOpenPostP` / `sysOpenPostC`);
   - the locked node (`sysOpenLk` + `sysOpenKeep`, `createLocked`'s shape
     minus the payload), the peeled payload, the AU residue, the off cell,
-    and the block's pid seams (`sysOpen_pid_fd` / `sysOpen_pid_core`);
+    and the block's pid seams (`Xv6.sys_mknod_pid` / `sysOpen_pid_core`);
   - the ONE argstr call site (`sys_open_argstr`, §3b; `SpecSysOpen`
     deviation 10);
   - THE STAGE BODIES (§4): the Rocq stage lemmas `so_tail_a` .. `so_tail_f`,
@@ -92,7 +92,7 @@ current values and the cells hold junk until saved.
    (`ProcPrivAcc` deviation 7).  Rocq's `proc_priv_bare pj pidv Upr`, which
    the failure tails thread only to lend its pid cell to their callees, is
    the pid cell alone at the block's own share `pidPriv`
-   (`sysOpen_pid_fd` / `sysOpen_pid_core`; the `SysMkdirFrame` deviation-2
+   (`Xv6.sys_mknod_pid` / `sysOpen_pid_core`; the `SysMkdirFrame` deviation-2
    / `sysLinkRows` precedent: the Lean callees take only `p->pid`'s share).
    D8's conjuncts are absent from the block (`ProcPrivAcc` deviation 1).
    Rocq's `U` after argstr (`us_upt U P2`) is `sysOpenV2 A P2` /
@@ -126,7 +126,7 @@ current values and the cells hold junk until saved.
    cast chains of Rocq's step rules.  In Lean the branch conditions are
    `bcond` over `BitVec` and one `bv_decide` / `decide` each: the ones a
    stage needs are stated here at the Lean shapes (`sys_open_bltz_*`,
-   `sys_open_beqz`, `sys_open_ty_*`, `sys_open_omode_eqz`,
+   `Xv6.dirlookup_beqz`, `sys_open_ty_*`, `sys_open_omode_eqz`,
    `sys_open_wr_rdonly`), the byte readings are `SysOpenBits`'
    `sys_open_rd_byte` / `sys_open_wr_byte`, the major test
    `sys_open_major_bound` / `_bltu`.
@@ -156,6 +156,12 @@ import Xv6.SpecIunlockput
 import Xv6.SpecFileclose
 import Xv6.SpecIlock
 import Xv6.SpecNamei
+import Xv6.DirlookupParts
+import Xv6.KexecParts
+import Xv6.PrintkDefs
+import Xv6.SysChdirFrame
+import Xv6.SysMknodFrame
+import Xv6.SysfileCalls
 
 namespace Xv6
 
@@ -170,10 +176,6 @@ set_option linter.unusedVariables false
 
 /-! ## §0.  Constants, the stack budget and the branch readings -/
 
-theorem sys_open_imm_m192 : BitVec.signExtend 64 3904#12 = -(8#64 * BitVec.ofNat 64 24) := by
-  decide
-theorem sys_open_imm_p192 : BitVec.signExtend 64 192#12 = 8#64 * BitVec.ofNat 64 24 := by
-  decide
 
 /-- `char path[MAXPATH]`: `s0 - 176` off the frame pointer (= the entry sp),
 slots 7..22 (Rocq `so_bufpath`). -/
@@ -217,36 +219,17 @@ theorem sys_open_K (a : Nat) (h : sysOpenSlots ≤ a) :
   rw [sysOpenSlots_eq] at h
   omega
 
-/-- WHAT SURVIVES namei's WALK, in the ledger's own vocabulary (Rocq
-`so_bud_iput`). -/
-theorem sys_open_bud_iput (n' : Nat) (w ok : Bool)
-    (h : MAXOPBLOCKS - (walkSpend w + (if ok then 0 else 1)) ≤ n') : iputUnits ≤ n' := by
-  have e1 : MAXOPBLOCKS = 10 := rfl
-  have e2 : iputUnits = 3 := rfl
-  cases w <;> cases ok <;> simp [walkSpend, e1, e2] at h ⊢ <;> omega
 
 /-! ### The sign cluster: the two `bltz`s (+0x24 argstr, +0x70 fdalloc) -/
 
-theorem sys_open_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
-    bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
-  omega
 
 theorem sys_open_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 
 /-- The descriptor fdalloc returns is signed-nonneg (Rocq `so_fd_range`). -/
 theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
     bcond bop.BLT (BitVec.ofNat 64 fd) 0#64 = false :=
-  sys_open_bltz_nat fd (by unfold NOFILE at h; omega)
+  Xv6.sysfile_bltz_nat fd (by unfold NOFILE at h; omega)
 
-theorem sys_open_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
 
 theorem sys_open_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
@@ -562,52 +545,6 @@ variable {lent : Bool}
 def sysOpenAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
   iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
 
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned (restated from `SysLinkFrame.sys_link_stack_bytes`: a stage file
-of another Proof cannot be imported, brief fs7b rule 2). -/
-theorem sys_open_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
 
 /-- sys_open's cells: the six upper slots (ra, s0, the three shrink-wrapped
 save slots, a dead one), slot 23 as its two words (the dead lower word and
@@ -655,7 +592,7 @@ theorem sys_open_carve [CurCtx] (sp0 : BitVec 64) :
     unfold sysOpenPath; bv_omega
   rw [e16] at *
   rw [e2]
-  icases sys_open_stack_bytes (sysOpenPath sp0) 15 $$ H16 with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysOpenPath sp0) 15 $$ H16 with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   irevert H6 H2
   stack_cells
   iintro ⟨⟨%w1, H1⟩, ⟨%w2, H2⟩, ⟨%w3, H3⟩, ⟨%w4, H4⟩, ⟨%w5, H5⟩, ⟨%w6, H6⟩, _⟩
@@ -731,7 +668,7 @@ theorem wp_prologue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 3904#12 24 hK sys_open_imm_m192) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 3904#12 24 hK Xv6.imm_m192) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   icases sys_open_carve (k.regs 2#5) $$ Hframe with
     ⟨%w1, %w2, %w3, %w4, %w5, %w6, %lo, %om, %w24, %hal, Hcells, Hbuf⟩
@@ -782,7 +719,7 @@ theorem wp_epilogue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   ihave Hframe := sys_open_fold (k.regs 2#5) hal ra s0 w3 w4 w5 w6 lo om w24 $$ [Hf8 Hf16 H3 H4 H5 H6
     Hlo Hom H24 Hbuf]
   · unfold sysOpenCells; iframe
-  k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 192#12 24 sys_open_imm_p192) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 192#12 24 Xv6.imm_p192) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
@@ -866,11 +803,6 @@ theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
 
 /-! ### The ambient context, pinned at the kernel tier -/
 
-theorem sys_open_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-theorem sys_open_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_open_ctx inst hct).symm
 
 section Exit
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -1044,22 +976,6 @@ def sysOpenRet (k : KCtx) (Φ : BitVec 64 → IProp GF) : IProp GF :=
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ Φ (R' 10#5) -∗ wpLoop c)
 
-/-- THE PID SEAM (Rocq's `proc_priv_bare_acc` + lend, deviation 5): the pid
-share out of the block and back at the same record. -/
-theorem sysOpen_pid_fd (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
-  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
-  rw [sys_open_cur_kpt hct]
-  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩, Hof⟩
-  iframe Hpid
-  iintro Hpid
-  iframe Hpid Hf Hpt Htfp Hc Hof
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
 
 /-- ...and the same out of the block's core (after fdalloc split it off
 the descriptor array). -/
@@ -1069,7 +985,7 @@ theorem sysOpen_pid_core (hct : curTier = KTier.kpt) (pa : BitVec 64)
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
-  rw [sys_open_cur_kpt hct]
+  rw [Xv6.sysfile_cur_kpt hct]
   iintro ⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩
   iframe Hpid
   iintro Hpid
@@ -1188,14 +1104,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- A context at depth 0 holds no lock (`KCtx.wf`). -/
-theorem sys_open_nolocks (cpu : CPU) (k' : KCtx) (hnoff : k'.noff = 0) :
-    kctx (GF := GF) cpu k' ⊢ ⌜k'.locks = []⌝ ∗ kctx cpu k' := by
-  iintro Hk
-  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  iframe Hk
-  ipureintro
-  exact List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
 
 set_option maxHeartbeats 8000000 in
 /-- `argstr(0, path, MAXPATH)` at +0x1c (Rocq `Argstr.wp_argstr_sconf`):
@@ -1222,7 +1130,7 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hbuf, HK⟩
-  icases sys_open_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  icases Xv6.sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩

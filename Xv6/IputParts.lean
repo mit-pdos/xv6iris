@@ -76,21 +76,6 @@ theorem iput_br_bread : KA.«iput» + 0xfffffffffffff7e6#64 = KA.«bread» := by
 theorem iput_br_log_write : KA.«iput» + 0xa96#64 = KA.«log_write» := by decide
 theorem iput_br_brelse : KA.«iput» + 0xfffffffffffff8ee#64 = KA.«brelse» := by decide
 
-/-- The `c.addiw a5,a5,-1` at +0x20 / +0x88 (Rocq `ip_storeval_pred`): the
-stored word IS the predecessor count. -/
-theorem iput_decr (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 4095#12))) =
-      BitVec.ofNat 32 (n - 1) := by
-  have h : ∀ nw : BitVec 32, BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 nw + BitVec.signExtend 64 4095#12))) =
-      nw - 1#32 := by
-    intro nw; bv_decide
-  rw [h]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]
-  omega
-
 /-! ## The pure set steps at the LAST CLOSE (Rocq `ip_ci_inums_delete`,
 `ip_pool_set`, `ip_notin_diff`) -/
 

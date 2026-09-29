@@ -1227,7 +1227,7 @@ theorem ctxBytes_tails (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitV
           (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq}
             (if j = n then e :: He else Hold j)))
           (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hold j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (range_getElem?_lt hx))])]
+          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
         iexact Hb
       · simp only [↓reduceIte]
         iexact Hpt
@@ -1843,15 +1843,6 @@ theorem phase_setPhase_other (v : VirtioState) (h k : BitVec 16) (ph : VPhase) (
   unfold Virtio.phase Virtio.setPhase
   rw [Alist.get_set_ne _ _ _ _ hk]
 
-theorem phase_complete_self (v : VirtioState) (h : BitVec 16) :
-    Virtio.phase (Virtio.complete v h) h = none := by
-  unfold Virtio.phase Virtio.complete
-  rw [Alist.get_del_eq]
-
-theorem phase_complete_other (v : VirtioState) (h k : BitVec 16) (hk : k ≠ h) :
-    Virtio.phase (Virtio.complete v h) k = Virtio.phase v k := by
-  unfold Virtio.phase Virtio.complete
-  rw [Alist.get_del_ne _ _ _ hk]
 
 /-- What `MachCSL.Virtio.pushOk` says head by head. -/
 theorem pushOk_not_pushed (v : VirtioState) (hok : Virtio.pushOk v = true) (h : BitVec 16)
@@ -2018,7 +2009,7 @@ theorem permOk_complete (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → H
     intro he; subst he
     exact hk (hinj k k' h' c (some (.pushed c.req)) (some ui) c' p' u' hget hget')
   have hx : Virtio.phase (Virtio.complete v h) h' = Virtio.phase v h' :=
-    phase_complete_other v h h' hne
+    Xv6.phase_complete_other' v h h' hne
   refine ⟨hlt, hst, by rw [hx]; exact h3, fun q hq => ⟨by rw [hx]; exact (h4 q hq).1,
     (h4 q hq).2⟩, ?_, fun hp => by rw [hx]; exact h6 hp⟩
   intro y hy
@@ -2496,9 +2487,9 @@ theorem p3Ok_complete (v : VirtioState) (pm : RegMapF PermVal) (dl : List UsedRe
   refine ⟨fun hh hs hnw e he hlt => ?_, h.2⟩
   by_cases hhh : hh = hd
   · subst hhh
-    rw [phase_complete_self] at hs
+    rw [Xv6.phase_complete_self'] at hs
     exact absurd hs (by simp)
-  · rw [phase_complete_other v hd hh hhh] at hs
+  · rw [Xv6.phase_complete_other' v hd hh hhh] at hs
     refine h.1 hh hs (fun hx => hnw ?_) e he hlt
     exact (wroteAt_delete_other pm key x0 hh hget (by rw [h0]; exact hhh)).2 hx
 
@@ -2640,8 +2631,8 @@ theorem pushedUniq_complete (v : VirtioState) (h : BitVec 16) (hu : pushedUniq v
       Virtio.phase v hx = some (.pushed rx) := by
     intro hx rx hpx
     by_cases hxh : hx = h
-    · subst hxh; rw [phase_complete_self] at hpx; exact absurd hpx (by simp)
-    · rwa [phase_complete_other v h hx hxh] at hpx
+    · subst hxh; rw [Xv6.phase_complete_self'] at hpx; exact absurd hpx (by simp)
+    · rwa [Xv6.phase_complete_other' v h hx hxh] at hpx
   exact hu h1 h2 r1 r2 (key h1 r1 hp1) (key h2 r2 hp2)
 
 theorem pushedUniq_congr (v v' : VirtioState)
@@ -2789,8 +2780,8 @@ theorem inflightOff_complete (v : VirtioState) (st : Nat → HState) (ring : Nat
     inflightOff (Virtio.complete v h) st ring lo np stg := by
   refine ⟨inflightOk_complete v st h hx.1, fun h' hs => ?_⟩
   by_cases hhh : h' = h
-  · subst hhh; rw [phase_complete_self] at hs; exact absurd hs (by simp)
-  · rw [phase_complete_other v h h' hhh] at hs
+  · subst hhh; rw [Xv6.phase_complete_self'] at hs; exact absurd hs (by simp)
+  · rw [Xv6.phase_complete_other' v h h' hhh] at hs
     exact hx.2 h' hs
 
 /-- **The ring store.**  The staging cell is outside the window (there is
@@ -3432,17 +3423,17 @@ theorem unreadArmed_complete (v : VirtioState) (st : Nat → HState) (dl : List 
   refine ⟨fun hh => ?_, fun hh ph hpp hnp e he hlt => ?_, h.2.2⟩
   · by_cases hhh : hh = hd
     · subst hhh
-      rw [phase_complete_self]
+      rw [Xv6.phase_complete_self']
       refine ⟨⟨fun he => ?_, fun hx => ?_⟩, fun r hr => ?_⟩
       · obtain ⟨ts, hts⟩ := (h.1 hh).2 r0 (Or.inr hph)
         rw [hts] at he; exact absurd he (by simp)
       · obtain ⟨r, hr⟩ := hx; exact absurd hr (by simp)
       · rcases hr with hr | hr <;> exact absurd hr (by simp)
-    · rw [phase_complete_other v hd hh hhh]
+    · rw [Xv6.phase_complete_other' v hd hh hhh]
       exact h.1 hh
   · by_cases hhh : hh = hd
-    · subst hhh; rw [phase_complete_self] at hpp; exact absurd hpp (by simp)
-    · rw [phase_complete_other v hd hh hhh] at hpp
+    · subst hhh; rw [Xv6.phase_complete_self'] at hpp; exact absurd hpp (by simp)
+    · rw [Xv6.phase_complete_other' v hd hh hhh] at hpp
       exact h.2.1 hh ph hpp hnp e he hlt
 
 /-! ## The ARMING EPOCH
@@ -3771,9 +3762,9 @@ theorem epOk_write_complete (v : VirtioState) (st : Nat → HState) (pm : RegMap
   · -- the completion takes `hd` out of flight, so only OTHER heads are left
     have hne : hh ≠ hd := by
       rintro rfl
-      rw [phase_complete_self] at hs
+      rw [Xv6.phase_complete_self'] at hs
       exact absurd hs (by simp)
-    rw [phase_complete_other v hd hh hne] at hs
+    rw [Xv6.phase_complete_other' v hd hh hne] at hs
     rcases List.mem_append.1 hr with hr | hr
     · exact hdone hh cc hsc hs r hr hrh
     · have hre : r = ((nc, t, hd.toNat, c.ep) : UsedRec) := by simpa using hr
@@ -4386,9 +4377,9 @@ theorem dryOk_complete (v : VirtioState) (h : BitVec 16) (hx : dryOk v) :
   rw [heq]
   by_cases hk : k = h
   · subst hk
-    rw [phase_complete_self] at hp
+    rw [Xv6.phase_complete_self'] at hp
     exact absurd hp (by simp)
-  · exact hx k r (by rw [← phase_complete_other v h k hk]; exact hp) hty
+  · exact hx k r (by rw [← Xv6.phase_complete_other' v h k hk]; exact hp) hty
 
 /-! ## The payload, in the image
 
@@ -4510,7 +4501,7 @@ theorem capOk_complete (v : VirtioState) (st : Nat → HState) (sb : Nat → SBy
   · refine h i c hi hst hdw ?_
     rcases hx with ⟨ph', hp, hpc⟩ | hx
     · exact Or.inl ⟨ph', by
-        rw [← phase_complete_other v hd (BitVec.ofNat 16 i) (ofNat16_ne i hd hi hid)]
+        rw [← Xv6.phase_complete_other' v hd (BitVec.ofNat 16 i) (ofNat16_ne i hd hi hid)]
         exact hp, hpc⟩
     · exact Or.inr hx
 

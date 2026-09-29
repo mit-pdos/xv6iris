@@ -179,7 +179,7 @@ theorem node_obl_of (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (HS : UK_SYS_P)
     unfold ushFork1Ans
     icases Hans with (⟨-, -, HRc⟩ | ⟨%γ', %pidv, %hr', %hrng, -⟩)
     · iapply node_fork_panic H UL SP k st0 N ld h' m' av γp hk hpeq hfd2 ha0 $$ Hfam Hcode Hstd HRc HCx Hrun
-    · exact absurd (hr' ▸ hr) (ushq_pid_sext_ne_m1 pidv hrng)
+    · exact absurd (hr' ▸ hr) (Xv6.ushf_pid_sext_ne_m1 pidv hrng)
   iintro %h' %m' %γp %r1 %r2 %rw1 %rw2 %S1 %S2 %S3 %S4 %hn1 %hn2 Hf1 Hf2 Hw1 Hw2 - - - - - #HRk HCx - Hrun
   iapply node_parent H UL HS k st0 N h' m' γp r1 r2 rw1 rw2 S1 S2 S3 S4 _ hk hpeq hn1 hn2
     $$ Hfam Hcode Hf1 Hf2 Hw1 Hw2 HRk HCx Hrun

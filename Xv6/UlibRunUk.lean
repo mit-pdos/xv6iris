@@ -39,6 +39,7 @@ import Xv6.UkRunMem
 import Xv6.UkRunBr
 import Xv6.UkCode
 import Xv6.UlibVprintfInv
+import Xv6.CodeTactics
 
 namespace Xv6
 
@@ -64,8 +65,6 @@ theorem ulibUk_ofInt_neg (x : Nat) : BitVec.ofInt 64 (-((x : Nat) : Int)) = 0#64
 theorem ulibUk_addNeg (a : BitVec 64) (x : Nat) :
     a + BitVec.ofInt 64 (-((x : Nat) : Int)) = a - BitVec.ofNat 64 x := by
   rw [ulibUk_ofInt_neg]; bv_omega
-
-theorem ulibUk_ofNat_toNat (x : BitVec 64) : BitVec.ofNat 64 x.toNat = x := by simp
 
 /-- The stand-in's geometry, unpacked. -/
 theorem uTextGeom_spec {t : User.UTextTree} {w pc : Nat} (h : uTextGeom t w pc = true) :
@@ -402,7 +401,7 @@ theorem ulibUk_store (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p
 theorem ulibUk_va (m : RegMap) (rs1 : BitVec 5) (imm : BitVec 12) (a : Nat)
     (ha : a = (ulibRget m rs1 + BitVec.signExtend 64 imm).toNat) :
     m.get rs1 + BitVec.signExtend 64 imm = BitVec.ofNat 64 a := by
-  rw [ha, ulibRget_eq, ulibUk_ofNat_toNat]
+  rw [ha, ulibRget_eq, Xv6.ofNat_toNat_pc]
 
 theorem ulibUk_byteF (γd : GName) (dq : DFrac) (a : Nat) (f : Nat → BitVec 8) (c : BitVec 8) (hf : f 0 = c) :
     ubyteq (GF := GF) γd dq a c ⊣⊢ ubytesq γd dq a 1 f := by
@@ -654,7 +653,7 @@ theorem ulibUk_utext_instr (t0 : User.UTextTree) (img : ElfMem) (hok : User.UTex
   subst ht
   obtain ⟨hpg, i₀, n, w, hd⟩ := uTextDecode_real hok pc rvc i h
   have H := uinstrIs_of_text (GF := GF) N.t hok pc.toNat rvc i i₀ n w hd pc.isLt hpg
-  rw [ulibUk_ofNat_toNat] at H
+  rw [Xv6.ofNat_toNat_pc] at H
   iapply H $$ Hc
 
 end Inst

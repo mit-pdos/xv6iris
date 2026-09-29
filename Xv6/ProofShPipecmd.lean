@@ -85,7 +85,7 @@ theorem wp_shPipecmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : CP
   -- 0x284  sw a5,0(s1)
   iapply ushS_store UL N (k := 4) (ushI_284 N.t) 0x286 h8 m8 (10 + n) p (0#32) (Or.inr (Or.inr (Or.inl rfl)))
     (by rw [g _ (by decide), hs1]; exact ush_fld p 0 _ rfl hp64) (by omega) $$ Hc [Ht] Hrun
-  · iapply ush_ubytes_ext $$ Ht; intro j _; exact (ush_nthByte32_zero j).symm
+  · iapply Xv6.ubytes_ext $$ Ht; intro j _; exact (ush_nthByte32_zero j).symm
   iintro Ht %h9 Hrun
   -- 0x286  sd s2,8(s1) ; 0x28a  sd s3,16(s1)
   ihave Hc8 := ush_zero_word N.d _ $$ Hc8
@@ -131,7 +131,7 @@ theorem wp_shPipecmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : CP
     isplitr; · ipureintro; omega
     isplitl [Ht Hpad]
     · isplitl [Ht]
-      · iapply ush_ubytes_ext $$ Ht
+      · iapply Xv6.ubytes_ext $$ Ht
         intro j _
         show nthByte (n := 8) ((ukWr m7 15#5 _).get 15#5) j = _
         rw [ukWr_get_same _ _ _ (by decide), show BitVec.ofInt 32 3 = BitVec.ofNat 32 3 by decide]

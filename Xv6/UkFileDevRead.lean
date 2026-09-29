@@ -76,7 +76,7 @@ theorem file_read_at (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : D
   have hua : ((ukWr m 17#5 (BitVec.ofInt 64 5)).get 11#5).toNat = a := by
     rw [ha1r, BitVec.toNat_ofNat]; omega
   have hcnt : argZ ((ukWr m 17#5 (BitVec.ofInt 64 5)).get 12#5) = (n : Int) := by
-    rw [ukWr_get_other _ _ _ _ (by decide), fdev_argZ_setWidth]; exact ha2
+    rw [ukWr_get_other _ _ _ _ (by decide), Xv6.argZ_setWidth]; exact ha2
   have ha0r : (BitVec.setWidth 32 ((ukWr m 17#5 (BitVec.ofInt 64 5)).get 10#5)).toInt = (fd : Int) := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha0
   have hnum : UkSysP.usysno (ukWr m 17#5 (BitVec.ofInt 64 5)) = USYS_read := by rw [fh_usysno]; decide

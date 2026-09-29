@@ -31,7 +31,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 theorem wp_shSysCloseH (UL : UK_LEAVES) : wpShSysCloseHBody (hlc := hlc) (GF := GF) := by
   intro N h m fd st avail harg
   iintro #Hc #Hdep Hh Hrun Hcont
-  ihave Hs := ushRS_stub_close (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_close (hlc := hlc) UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   unfold stubRet
@@ -49,7 +49,7 @@ theorem wp_shSysCloseH (UL : UK_LEAVES) : wpShSysCloseHBody (hlc := hlc) (GF := 
 theorem wp_shSysCloseStd (UL : UK_LEAVES) : wpShSysCloseStdBody (hlc := hlc) (GF := GF) := by
   intro N h m l fdn st avail harg hs hkl hne
   iintro #Hc #Hdep Hstd Hrun Hcont
-  ihave Hs := ushRS_stub_close (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_close (hlc := hlc) UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   unfold stubRet

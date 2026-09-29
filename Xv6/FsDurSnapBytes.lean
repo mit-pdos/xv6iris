@@ -36,7 +36,7 @@ producer that has to supply it is era 0's carve (`FsDurAlloc`, batch CF).
 6. **THE ENCODER INJECTIVITY IS NOT RE-PORTED**: Rocq's `bv16_eq_of_bytes`,
    `bv32_eq_of_bytes`, `half_bytes_inj`, `word_bytes_inj`, `ind_bytes_inj`,
    `dinode_bytes_inj` (FsDurSnap.v §1b, whose own comment asks for them to be
-   relocated beside their encoders) are landed as `Xv6.halfBytes_inj` /
+   relocated beside their encoders) are landed as `Xv6.deHalfBytes_inj` /
    `wordBytes_inj` / `indBytes_inj` / `dinodeBytes_inj`
    (`Xv6/InodeRegionDefs.lean`); `recInBlk_inj` reads them.
 7. **`fs_recovery_sb_parse`** (Rocq `FsCrash.v` :815, deferred from batch CC,

@@ -960,12 +960,6 @@ theorem iepFunAlloc (n : Nat) :
       iexists γ
       iexact H) n
 
-/-- The A6.145 slot families: `iepFunAlloc` at slot keys. -/
-theorem monoSlotFunAlloc (n : Nat) :
-    ⊢@{IProp GF} |==> ∃ f : Nat → GName,
-      [∗list] k ∈ List.range n, MonoNat.auth_own (f k) (DFrac.own 1) (.ofNat 0) :=
-  iepFunAlloc n
-
 /-- The per-slot sleeplock "may hold" counters at their authoritative zero,
 which is what `itable_body` parks for a free slot (deviation 4). -/
 theorem islFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] (n : Nat) :
@@ -1060,8 +1054,8 @@ theorem icfgAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF]
         iOwn (F := constOF OffSetUR) (I.icfgOff k) (● (LeibnizSet.valid (∅ : OffSet))))) := by
   imod iepFunAlloc (16 * nib) with ⟨%fep, Hep⟩
   imod islFunAlloc NINODE with ⟨%fisl, Hisl⟩
-  imod monoSlotFunAlloc NINODE with ⟨%feplo, Heplo⟩
-  imod monoSlotFunAlloc NINODE with ⟨%fstmp, Hstmp⟩
+  imod Xv6.iepFunAlloc NINODE with ⟨%feplo, Heplo⟩
+  imod Xv6.iepFunAlloc NINODE with ⟨%fstmp, Hstmp⟩
   imod iOwn_alloc (GF := GF) (F := constOF IcacheUR) (● (∅ : RegMapF (Qp × PosNat)))
     with ⟨%γ, Ha⟩
   · exact Auth.auth_valid.mpr (fun _ => trivial)

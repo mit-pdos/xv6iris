@@ -115,12 +115,6 @@ theorem soCreate_nofloor_busts : 0 ≤ soU0 ∧ iputUnits > 0 := by decide
 /-! ## 4.  The four failure arms below the join -/
 
 theorem soArmD_closes : iputUnits ≤ soJoin := by decide
-theorem soArmE_closes : iputUnits ≤ soJoin := by decide
-theorem soArmF_closes : iputUnits ≤ soJoin := by decide
-
-/-- on the namei side each of them has six to spare (Rocq's
-`so_arms_DEF_namei`) -/
-theorem soArms_DEF_namei (w : Bool) : iputUnits ≤ soUn w := by cases w <;> decide
 
 /-- THE SPEND IS NOT THE ENTRY BOUND (Rocq's `so_arms_DEF_survivors`) -/
 theorem soArms_DEF_survivors (w : Bool) : soJoin - ipSpendW w false false ≤ 2 := by

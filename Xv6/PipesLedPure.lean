@@ -13,7 +13,7 @@ Ported (Rocq → Lean, camelCase as `LineModel.lean`):
 `lmDisc_other`, `lm_disc_out` → `lmDisc_out`, `lm_disc_seg'_nil` →
 `lmDiscSeg'_nil`, `lm_disc_nil` → `lmDisc_nil`, `lm_disc_power` →
 `lmDisc_power`, `lm_d4_take_snoc` → `lmD4_take_snoc`, `lm_alts_ok_take` →
-`lmAltsOk_take`, `lm_disc_seg'_in` → `lmDiscSeg'_in`, `lm_disc_in` →
+`Xv6.lmAltsOk_prefix`, `lm_disc_seg'_in` → `lmDiscSeg'_in`, `lm_disc_in` →
 `lmDisc_in`, `lm_good_out_nil` → `lmGoodOut_nil`.
 
 Not ported (unreached; kernel-term re-audit, notes/cone_reaudit.md):
@@ -135,11 +135,6 @@ theorem lmD4_take_snoc (cs : List Nat) (s : M.lmSt) (I : List (BitVec 8)) (b : B
   · rw [restOf_snoc_other I b hb] at hr
     simp at hr
 
-/-- Rocq `lm_alts_ok_take`. -/
-theorem lmAltsOk_take (s : M.lmSt) (I I' : List (BitVec 8)) (cs : List Nat) (hp : I <+: I')
-    (h : lmAltsOk M s I' cs) : lmAltsOk M s I (cs.take (nlines I)) :=
-  lmAltsOk_prefix M s I I' cs hp h
-
 /-- Rocq `lm_disc_seg'_in`: THE INPUT STEP -- the discipline is
 prefix-closed. -/
 theorem lmDiscSeg'_in (B : LmByteLaws M) (s : M.lmSt) (seg : List Obs) (b : BitVec 8)
@@ -151,7 +146,7 @@ theorem lmDiscSeg'_in (B : LmByteLaws M) (s : M.lmSt) (seg : List Obs) (b : BitV
     intro j hj
     simp [List.getElem!_eq_getElem?_getD, hj]
   refine ⟨lmDiscInput_prefix B _ _ hpre hd, ps, cs.take (nlines (consIns seg)),
-    lmAltsOk_take M s _ _ cs hpre hl, lmD4_take_snoc M cs s _ b hd4, ?_⟩
+    Xv6.lmAltsOk_prefix M s _ _ cs hpre hl, lmD4_take_snoc M cs s _ b hd4, ?_⟩
   intro p hp
   have hpin : p ∈ inPres (seg ++ [.dev (.uartIn .uart0 b)]) := by
     rw [inPres_in]; exact List.mem_append_left _ hp

@@ -595,7 +595,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     γd γdl γt ((k.pushed 2).toKpt t.base) R9 (by simp [hsie]) (by simp; omega) (by simp [hnoff])
     (by simp [hlocks]) (by simp [hproc]) (by simp) fscCons hcn hcne rfl c0 hdead dk sb Rspent Pb hg hpures
     hcov0 hnib0 hdev hγd hdl γi ξd P fscPrintk (pageAddr t.base) t (kvmMapT pas) (mn_pageAddr_hi t.base)
-    (mn_pageAddr_extract t.base).symm pas hok)
+    (Xv6.kxc_tfp_extract t.base).symm pas hok)
   iframe Hk Hpc HB Hγt Hγc Hcfr Hstk Hsmap HW Hstv HFs Hkav Hdinv Hcrash Hcfg Hgh Hcells Hpav Hipt
     Hbundle Hrdr Hinv Hprim Hrec Hbare Hcsrs Hfree
   isplitl [Hhart Hps Hsf Hlks Hrows]

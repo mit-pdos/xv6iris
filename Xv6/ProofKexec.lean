@@ -27,7 +27,7 @@ three things of its own:
 
 1. **eb-generic, hart-free** (SpecKexec deviation 1): the contract's
    `wpNext true k.proc cpu (kexecK …)` is made hart-free ONCE at entry
-   (`kxau_pin`: kexec parks, `k.proc ≠ 0`); Rocq's `kxau_exit_conv`
+   (`Xv6.rd_pin`: kexec parks, `k.proc ≠ 0`); Rocq's `kxau_exit_conv`
    (`wp_next` transport) is `iintro %c'` at each conversion;
    `kxc_sie_b_agree` / `cpu_own_eb_agree` / `cpu_own_zero_empty` are gone
    (`kctx`).  `kxau_ret` IS SpecKexec's `kexecK`.
@@ -42,6 +42,7 @@ three things of its own:
 -/
 import Xv6.KexecA
 import Xv6.KexecCore
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -55,13 +56,6 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-! ## The pure plumbing -/
-
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem kxau_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-- Rocq `kxau_argc_ne_m1`: argc is never `-1`. -/
 theorem kxau_argc_ne_m1 (na : Nat) (h : na ≤ MAXARG) :
@@ -379,7 +373,7 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave Hret : (∀ c : CPU, kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c) $$ [Hnext]
   · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (kxau_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   -- THE BUNDLE, OPENED: the walk premise, the one observation, the slot piece
   unfold execAuPre
   icases Hau with ⟨Hstart, Hoc, Hsl⟩

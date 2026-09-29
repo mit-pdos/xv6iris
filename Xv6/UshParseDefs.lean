@@ -26,6 +26,7 @@ Rocq `UkShParse.v` §2/§2c, `UkShParseTok.ushp_cell`, `UkShParseLex`'s
 import Xv6.UshStep
 import Xv6.UshCode
 import Xv6.UkShParsePure
+import Xv6.UkGrepDefs
 
 namespace Xv6
 
@@ -37,56 +38,12 @@ set_option linter.unusedSectionVars false
 
 /-! ## §1 The byte algebra (Rocq §2) -/
 
-/-- **Rocq `ushp_zext_eq`**: two bytes are equal exactly when their
-zero-extended words are (strchr's `beq a1,a5` compares two `lbu`s). -/
-theorem ush_zext_inj (b c : BitVec 8) : BitVec.setWidth 64 b = BitVec.setWidth 64 c ↔ b = c := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_setWidth] at this
-    rwa [Nat.mod_eq_of_lt (Nat.lt_trans b.isLt (by decide)),
-      Nat.mod_eq_of_lt (Nat.lt_trans c.isLt (by decide))] at this
-  · intro h; rw [h]
-
 /-- **Rocq `ushp_zext_nul`**: a byte is NUL exactly when its zero-extended
 word is zero. -/
 theorem ush_zext_zero (b : BitVec 8) : BitVec.setWidth 64 b = 0#64 ↔ b = ubyte0 := by
-  have := ush_zext_inj b ubyte0
+  have := Xv6.setWidth64_inj b ubyte0
   rw [show BitVec.setWidth 64 ubyte0 = 0#64 from rfl] at this
   exact this
-
-/-- `beq`/`bne` on two zero-extended bytes. -/
-theorem ush_beq_zext (b c : BitVec 8) :
-    ukBtaken .BEQ (BitVec.setWidth 64 b) (BitVec.setWidth 64 c) = decide (b = c) := by
-  simp only [ukBtaken]
-  by_cases h : b = c
-  · subst h; simp
-  · have hn : ¬BitVec.setWidth 64 b = BitVec.setWidth 64 c := fun he => h ((ush_zext_inj b c).1 he)
-    simp [h, hn]
-
-theorem ush_bne_zext (b c : BitVec 8) :
-    ukBtaken .BNE (BitVec.setWidth 64 b) (BitVec.setWidth 64 c) = !decide (b = c) := by
-  simp only [ukBtaken]
-  by_cases h : b = c
-  · subst h; simp
-  · have hn : ¬BitVec.setWidth 64 b = BitVec.setWidth 64 c := fun he => h ((ush_zext_inj b c).1 he)
-    simp [h, hn]
-
-/-- `beqz`/`bnez` on a zero-extended byte. -/
-theorem ush_beqz_zext (b : BitVec 8) : ukBtaken .BEQ (BitVec.setWidth 64 b) 0#64 = decide (b = ubyte0) := by
-  simp only [ukBtaken]
-  by_cases h : b = ubyte0
-  · subst h; rfl
-  · have hn : ¬BitVec.setWidth 64 b = 0#64 := fun he => h ((ush_zext_zero b).1 he)
-    simp [h, hn]
-
-theorem ush_bnez_zext (b : BitVec 8) : ukBtaken .BNE (BitVec.setWidth 64 b) 0#64 = !decide (b = ubyte0) := by
-  simp only [ukBtaken]
-  by_cases h : b = ubyte0
-  · subst h; rfl
-  · have hn : ¬BitVec.setWidth 64 b = 0#64 := fun he => h ((ush_zext_zero b).1 he)
-    simp [h, hn]
 
 /-- `beqz`/`bnez` on a `Nat`-valued word below `2^64`. -/
 theorem ush_beqz_nat (x : Nat) (hx : x < 2 ^ 64) : ukBtaken .BEQ (BitVec.ofNat 64 x) 0#64 = decide (x = 0) := by

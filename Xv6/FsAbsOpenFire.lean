@@ -69,14 +69,14 @@ Rocq's header, abridged (the reasons are the content):
    opened with `inv_acc_timeless`, and the commit's `appE` is reached by
    `fupd_mask_mono (appN_sub_ftop E hE)`.  Rocq's
    `mkf_abs_of_dir`/`abs_view_arow`/`app_top_update`/`app_step_at` are the
-   landed `mkfAbs_of_dir`/`absView_arow`/`appTopUpdate`/`appStep_at`; the
+   landed `Xv6.absOf_dir`/`absView_arow`/`appTopUpdate`/`appStep_at`; the
    delta's collapse is `FsAbsWriteFire.wrfDelta_insert`'s proof at
    `deltaTrunc` (inlined, as Rocq inlines it; that file imports this one).
 5. `opf_start_of_open`'s `rewrite /ex_start` is `exHops_is_axHops` (the
    Lean `exHopsFrom` is a definition over `axHopsFrom`, FsAbsEra).  Rocq
    reuses `FsAbsNparMknod.np_rootino_agree` there; Lean has one `ROOTINO`
    (`Xv6/FsAbsEra.lean` deviation 2), so nothing is reused.
-6. Names: `opf_era_type` → `opfEra_type`, `opf_trunc_row` → `opfTrunc_row`,
+6. Names: `opf_era_type` → `Xv6.cafEra_type`, `opf_trunc_row` → `opfTrunc_row`,
    `opf_era_dev_of` → `opfEra_dev_of`, `opf_start_of_open` →
    `opfStart_of_open`, `opf_open_fire(_1)` → `opfOpen_fire(_1)`,
    `opf_atrunc_fire` → `opfAtrunc_fire`, and so on (camel head, Rocq's
@@ -88,23 +88,13 @@ Rocq's header, abridged (the reasons are the content):
 -/
 import Xv6.SpecItrunc
 import Xv6.SysOpenDefs
+import Xv6.FsAbsReadFire
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-! ## 0.  The row readings of an era node (pure) -/
-
-/-- Rocq's `opf_era_type`. -/
-theorem opfEra_type (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    fnType (eraNode dn bm data) = dn.diType.toNat := rfl
-
-/-- Rocq's `opf_era_not_dir`. -/
-theorem opfEra_not_dir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (h : dn.diType.toNat ≠ T_DIR_z) : fnIsDir (eraNode dn bm data) = false := by
-  unfold fnIsDir
-  rw [opfEra_type]
-  exact decide_eq_false h
 
 /-- THE FILE ROW: the abstract node is the record's bytes at its own count
 (Rocq's `opf_era_file_row`). -/
@@ -113,7 +103,7 @@ theorem opfEra_file_row (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec
     absRow (eraNode dn bm data) =
       ⟨.AFile (fnFileBytes (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩ := by
   have hnd : fnIsDir (eraNode dn bm data) = false :=
-    opfEra_not_dir dn bm data (by rw [hty]; decide)
+    Xv6.era_notDir dn bm data (by rw [hty]; decide)
   have ht : fnType (eraNode dn bm data) = T_FILE := hty
   simp [absRow, absNode, hnd, ht]
 
@@ -123,7 +113,7 @@ theorem opfEra_dev_row (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 
     (hnd : dn.diType.toNat ≠ T_DIR_z) (hnf : dn.diType.toNat ≠ T_FILE) :
     absRow (eraNode dn bm data) =
       ⟨.ADev dn.diMajor.toNat dn.diMinor.toNat, fnNlink (eraNode dn bm data)⟩ := by
-  have hd : fnIsDir (eraNode dn bm data) = false := opfEra_not_dir dn bm data hnd
+  have hd : fnIsDir (eraNode dn bm data) = false := Xv6.era_notDir dn bm data hnd
   have ht : fnType (eraNode dn bm data) ≠ T_FILE := hnf
   simp [absRow, absNode, hd, ht, fnMajor, fnMinor, eraNode_rec]
 
@@ -161,22 +151,17 @@ theorem opfTrunc_row (dn : Dinode) (bm bm' : Blkmap) (data data' : Nat → List 
 
 /-! ### The typed row, as `absOf` (E2-V) -/
 
-/-- an era node whose record has a nonzero type has a row (Rocq's
-`opf_era_typed`) -/
-theorem opfEra_typed (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (h : dn.diType.toNat ≠ 0) : fnType (eraNode dn bm data) ≠ 0 := h
-
 /-- ...which every `inodeOk` payload has: its fourth clause is the type
 (Rocq's `opf_era_typed_ok`) -/
 theorem opfEra_typed_ok (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (h : inodeOk cov logstart dn bm data) :
     fnType (eraNode dn bm data) ≠ 0 :=
-  opfEra_typed dn bm data h.2.2.2.1
+  Xv6.arfEra_typed dn bm data h.2.2.2.1
 
 /-- a FILE record is typed (Rocq's `opf_era_file_typed`) -/
 theorem opfEra_file_typed (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hty : dn.diType.toNat = T_FILE) : fnType (eraNode dn bm data) ≠ 0 := by
-  apply opfEra_typed
+  apply Xv6.arfEra_typed
   rw [hty]; decide
 
 /-! ### The rows as `absOf` (E2-V, sharpened by E2-V2)
@@ -194,7 +179,7 @@ theorem opfEra_dev_of (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8
     (hnz : dn.diType.toNat ≠ 0) (hnl : dn.diNlink.toNat ≠ 0) :
     absOf (eraNode dn bm data) =
       some ⟨.ADev dn.diMajor.toNat dn.diMinor.toNat, fnNlink (eraNode dn bm data)⟩ := by
-  rw [absOf_live _ (opfEra_typed dn bm data hnz) (mkfEra_live dn bm data hnl),
+  rw [absOf_live _ (Xv6.arfEra_typed dn bm data hnz) (Xv6.eraNlink_nz dn bm data hnl),
     opfEra_dev_row dn bm data hnd hnf]
 
 /-- Rocq's `opf_era_dir_of`. -/
@@ -202,7 +187,7 @@ theorem opfEra_dir_of (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8
     (hty : dn.diType.toNat = T_DIR_z) (hnl : dn.diNlink.toNat ≠ 0) :
     absOf (eraNode dn bm data) =
       some ⟨.ADir (dirEntries (eraNode dn bm data)), fnNlink (eraNode dn bm data)⟩ :=
-  mkfAbs_of_dir _ (mkfEra_is_dir dn bm data hty) (mkfEra_live dn bm data hnl)
+  Xv6.absOf_dir _ (mkfEra_is_dir dn bm data hty) (Xv6.eraNlink_nz dn bm data hnl)
 
 section OpenFire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

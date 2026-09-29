@@ -24,11 +24,11 @@ open UexecSG
 theorem ut_readCons_sys (sep : BitVec 64) (V : ProcPriv) (sts : List FdState)
     (h : utReadCons (utProTf sep V) sts) : utReadCons (utSysTf sep V) sts := by
   unfold utReadCons usysArgfd at *
-  rw [ut_sysTf_arg _ _ _ (by decide)]; exact h
+  rw [Xv6.urc_sysTf_proTf _ _ _ (by decide)]; exact h
 
 theorem ut_rdcount_sys (sep : BitVec 64) (V : ProcPriv) :
     usysRdcount (utSysTf sep V) = usysRdcount (utProTf sep V) := by
-  unfold usysRdcount; rw [ut_sysTf_arg _ _ _ (by decide)]
+  unfold usysRdcount; rw [Xv6.urc_sysTf_proTf _ _ _ (by decide)]
 
 set_option maxHeartbeats 1000000 in
 /-- **The live row's reason**, off the syscall channel's and wait's answers
@@ -80,7 +80,7 @@ theorem ut_sys_live (hW : UtReadWhy (GF := GF)) (A : UtArgs GF) (V2 : ProcPriv)
       · obtain ⟨ha0, hr1⟩ := hg
         have ha0' : tfW (utSysRec A.sep A.V).tf (tfArgIdx 0) = 0#64 := by
           show tfW (utSysTf A.sep A.V) (tfArgIdx 0) = 0#64
-          rw [ut_sysTf_arg _ _ _ (by decide)]; exact BitVec.eq_of_toNat_eq (by simpa using ha0)
+          rw [Xv6.urc_sysTf_proTf _ _ _ (by decide)]; exact BitVec.eq_of_toNat_eq (by simpa using ha0)
         unfold syscWaitOut syscUwaitAnsAtM
         ihave Hw := Hw $$ %hwt
         icases Hw with ⟨%rv, %xw, %hr, %hwr, Ha⟩

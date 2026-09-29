@@ -32,6 +32,9 @@ arm, and the image algebra of the user arm
 import Xv6.SpecReadi
 import Xv6.UMemWindow
 import Xv6.FsWords
+import Xv6.ByteCursor
+import Xv6.DinodeSlot
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -55,13 +58,6 @@ theorem rd_ret_b0 : jumpPc (KA.«readi» + 0xb0#64) = KA.«readi» + 0xb0#64 := 
 
 /-! ## Register arithmetic -/
 
-/-- A 32-bit word below `2^31`, sign-extended, is its value. -/
-theorem rd_sext_small (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 w = BitVec.ofNat 64 w.toNat := by
-  have hw : w = BitVec.ofNat 32 w.toNat := by simp
-  rw [hw, rd_arg32_small _ (by simpa using h)]
-  simp
-
 /-- The `bltu a5,a3` at `+0x02` (`size < off`), at the ABI's sign-extended
 `off`. -/
 theorem rd_bltu_size (sz off : Nat) (hs : sz < 2 ^ 31) (ho : off < 2 ^ 32) :
@@ -69,7 +65,7 @@ theorem rd_bltu_size (sz off : Nat) (hs : sz < 2 ^ 31) (ho : off < 2 ^ 32) :
       = decide (sz < off) := by
   show (BitVec.ofNat 64 sz).ult (BitVec.signExtend 64 (BitVec.ofNat 32 off)) = _
   by_cases h : off < 2 ^ 31
-  · rw [rd_arg32_small off h]
+  · rw [MachCSL.signExtend_ofNat32 off h]
     simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show sz < 2 ^ 64 by omega),
       Nat.mod_eq_of_lt (show off < 2 ^ 64 by omega)]
   · rw [decide_eq_true (by omega)]
@@ -100,7 +96,7 @@ theorem rd_bltu_wrap (off s : Nat) (ho : off < 2 ^ 31) (hle : off ≤ s) (hj : s
     bcond bop.BLTU (BitVec.signExtend 64 (BitVec.ofNat 32 s)) (BitVec.ofNat 64 off) = false := by
   show (BitVec.signExtend 64 (BitVec.ofNat 32 s)).ult (BitVec.ofNat 64 off) = false
   by_cases h : s < 2 ^ 31
-  · rw [rd_arg32_small _ h]
+  · rw [MachCSL.signExtend_ofNat32 _ h]
     simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show off < 2 ^ 64 by omega),
       Nat.mod_eq_of_lt (show s < 2 ^ 64 by omega), decide_eq_false_iff_not]
     omega
@@ -119,7 +115,7 @@ theorem rd_bgeu_clamp (sz s : Nat) (hsz : sz < 2 ^ 31) (hj : s < 2 ^ 32) :
       = decide (s ≤ sz) := by
   show (!(BitVec.ofNat 64 sz).ult (BitVec.signExtend 64 (BitVec.ofNat 32 s))) = _
   by_cases h : s < 2 ^ 31
-  · rw [rd_arg32_small _ h]
+  · rw [MachCSL.signExtend_ofNat32 _ h]
     simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show sz < 2 ^ 64 by omega),
       Nat.mod_eq_of_lt (show s < 2 ^ 64 by omega)]
     by_cases h2 : s ≤ sz
@@ -144,7 +140,7 @@ theorem rd_subw (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]
     omega
-  rw [e, rd_arg32_small _ (by omega)]
+  rw [e, MachCSL.signExtend_ofNat32 _ (by omega)]
 
 /-- `addw` of two small literals, no carry. -/
 theorem rd_addw (a b : Nat) (h : a + b < 2 ^ 31) :
@@ -155,7 +151,7 @@ theorem rd_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
-  rw [e, rd_arg32_small _ h]
+  rw [e, MachCSL.signExtend_ofNat32 _ h]
 
 /-- A `beq`/`beqz` against zero on a literal. -/
 theorem rd_beqz (x : Nat) (h : x < 2 ^ 64) :
@@ -201,18 +197,6 @@ theorem rd_zext32 (x : Nat) (h : x < 2 ^ 32) :
   have h1 : x * 2 ^ 32 % 2 ^ 64 = x * 2 ^ 32 := Nat.mod_eq_of_lt (by omega)
   rw [h1]
   simp
-
-/-- `addi a2,s2,88`: the buffer's data area. -/
-theorem rd_data_addr (p : BitVec 64) : p + 88#64 = aBufData p := rfl
-
-/-- The destination cursor advances. -/
-theorem rd_addr_step (a : BitVec 64) (t m : Nat) :
-    a + BitVec.ofNat 64 t + BitVec.ofNat 64 m = a + BitVec.ofNat 64 (t + m) := by
-  rw [BitVec.add_assoc]
-  congr 1
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
 
 /-- `li a5,-1 ; beq a0,a5`: the either_copyout answer against `-1`. -/
 theorem rd_beq_m1_t : bcond bop.BEQ (-1#64) 0xFFFFFFFFFFFFFFFF#64 = true := by decide

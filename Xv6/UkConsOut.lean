@@ -57,6 +57,8 @@ import Xv6.UkWriteLeaf
 import Xv6.UkSysIOHolds
 import Xv6.UkTree
 import Xv6.GenLinksLine
+import Xv6.UEchoOut
+import Xv6.UkFreeHandler
 
 namespace Xv6
 
@@ -80,25 +82,12 @@ theorem dqHalf_op (dq : DFrac) : dqHalf dq • dqHalf dq = dq := by
   | discard => rfl
   | ownDiscard q => show DFrac.ownDiscard (q.half + q.half) = _; rw [Qp.half_add_half]
 
-/-- **Rocq `cons_count_is`**: the kernel's count is the caller's request,
-below the sign boundary. -/
-theorem consCountIs (nb : Nat) (h : (nb : Int) < 2 ^ 31) : argZ (BitVec.ofNat 64 nb) = (nb : Int) :=
-  uread_count_is_cap (BitVec.ofNat 64 nb) nb (by rw [BitVec.toNat_ofNat]; omega) (by omega)
-
 /-- A small count, as the signed word (Rocq `bvsigned_moi_small`). -/
 theorem ukco_toInt_small (n : Nat) (h : n < 2 ^ 63) : (BitVec.ofNat 64 n).toInt = (n : Int) := by
   rw [BitVec.toInt_eq_toNat_cond]
   have h1 : (BitVec.ofNat 64 n).toNat = n := by rw [BitVec.toNat_ofNat]; omega
   rw [h1]
   split <;> omega
-
-/-- An even address is 2-aligned. -/
-theorem ukco_align (a : Nat) (h : a % 2 = 0) : BitVec.ofNat 64 a &&& 1#64 = 0#64 := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_and, BitVec.toNat_ofNat]
-  show a % 2 ^ 64 &&& 1 = 0
-  rw [Nat.and_one_is_mod]
-  omega
 
 /-- **Rocq `cons_short`**: every alternative a console write can answer the
 length of. -/
@@ -373,7 +362,7 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
   have e2 : (ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5 = m.get 12#5 := ukWr_get_other _ _ _ _ (by decide)
   have hi0 : (BitVec.setWidth 32 ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 10#5)).toInt = (fd : Int) := by
     rw [e0]; exact ha0
-  have hcz := consCountIs bs.length (by omega)
+  have hcz := Xv6.echoCountIs bs.length (by omega)
   have hcnt : (argZ ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5)).toNat = bs.length := by
     rw [e2, ha2, hcz]; simp
   have hsys : UkSysP.usysno (ukWr m 17#5 (BitVec.ofInt 64 16)) = 16 := by
@@ -389,7 +378,7 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
   iapply Hs $$ %h %m %avail Hcode Hrun
   iintro %h1 %hpc %hal6 #Hi Hrun Hmid
   have hal : (BitVec.ofNat 64 (P.write + 2) + 4#64) &&& 1#64 = 0#64 := by
-    rw [hpc]; exact ukco_align _ hal6
+    rw [hpc]; exact Xv6.fh_align _ hal6
   -- THE DEPOSIT: the console chain at the device, and the half of the run
   -- the chain's premise is read off, handed back beside it
   ihave Hdep : UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N (ukWr m 17#5 (BitVec.ofInt 64 16))

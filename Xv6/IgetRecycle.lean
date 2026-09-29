@@ -56,6 +56,7 @@ at (dev, inum).
 import Xv6.IgetTail
 import Xv6.IcacheBoxSites
 import Xv6.IcacheInvStore
+import Xv6.IputOfflockParts
 
 namespace Xv6
 
@@ -247,10 +248,6 @@ end
 
 /-! ## The masks of the flip (Rocq's `solve_ndisj`) -/
 
-theorem ig_sub_diff {A B E : CoPset} (hA : A ⊆ E) (hd : A ## B) : A ⊆ E \ B := by
-  intro p hp
-  rw [CoPset.in_diff]
-  exact ⟨hA p hp, fun hc => hd p ⟨hp, hc⟩⟩
 
 theorem ig_ipool_box (e : Nat) : (↑ipoolN : CoPset) ## (↑(ndot icBoxN e) : CoPset) :=
   fun p ⟨h1, h2⟩ => (ndot_ne_disjoint nroot (by decide) : (↑ipoolN : CoPset) ## (↑icBoxN : CoPset))
@@ -296,7 +293,7 @@ theorem ig_ident_split4 (k : Nat) (dev inum : BitVec 32) :
   have h1 := (inodeIdent_split (GF := GF) k (1 : Qp).half (1 : Qp).half dev inum).1
   rw [Qp.half_add_half] at h1
   have h2 := (inodeIdent_split (GF := GF) k Qp.quarter Qp.quarter dev inum).1
-  rw [qp_quarter_add_quarter] at h2
+  rw [Xv6.ctok_quarter_add_quarter] at h2
   iintro H
   icases h1 $$ H with ⟨Hh, Hq⟩
   icases h2 $$ Hq with ⟨Hq1, Hq2⟩
@@ -344,10 +341,10 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   -- the pool's take and the identification flip
   imod icRecycleFlip fscIc fscFs fscIreg fscCov fscLogst e r icfgIst icfgNib P icfgDev inum devT
       inumT devB inumB l ⊤ CoPset.subseteq_top
-      (ig_sub_diff CoPset.subseteq_top (ig_ipool_box e))
-      (ig_sub_diff (ig_sub_diff CoPset.subseteq_top (ig_esc_box _ e)) (ig_esc_pool _))
-      (ig_sub_diff (ig_sub_diff CoPset.subseteq_top (ig_ireg_box e)) ig_ireg_pool)
-      (ig_sub_diff (ig_sub_diff (ig_sub_diff CoPset.subseteq_top (ig_ireg_box e)) ig_ireg_pool)
+      (Xv6.iput_ofl_sub_diff CoPset.subseteq_top (ig_ipool_box e))
+      (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff CoPset.subseteq_top (ig_esc_box _ e)) (ig_esc_pool _))
+      (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff CoPset.subseteq_top (ig_ireg_box e)) ig_ireg_pool)
+      (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff CoPset.subseteq_top (ig_ireg_box e)) ig_ireg_pool)
         (ig_ireg_esc _))
       hw he hin hnib $$ Hesc Hrinv Hpinv Hrd Hc Hpool HgidT HgidB Hlic
     with ⟨Hrd, Hc, Hlic, Hicnt0, Hmir, Hfoff, Hpool, Hgid⟩
@@ -511,7 +508,6 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
     c24.trans p24, c25.trans p25, c26.trans p26, c27.trans p27⟩
 
 
-
 /-! ## THE RECYCLE, `+0x6a .. +0x8c` -/
 
 set_option maxHeartbeats 16000000 in
@@ -566,10 +562,10 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
   ihave Hinm := (show wordPointsTo (GF := GF) (iInum (ientry e)) 4 (DFrac.own 1) inumT ⊢
       wordPointsTo (ientry e + 4#64) 4 (DFrac.own 1) inumT from .rfl) $$ Hinm
   k_step (wp_s_sw c _ (KA.«iget» + 0x6e#64) false 0#12 19#5 18#5 (by decide) devT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, h18, ig_trunc_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, h18, Xv6.fw_ext32]
   iintro Hk Hpc Hdev
   k_step (wp_s_sw c _ (KA.«iget» + 0x72#64) false 4#12 19#5 20#5 (by decide) inumT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, h20, ig_trunc_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, h20, Xv6.fw_ext32]
   iintro Hk Hpc Hinm
   -- +0x76 li a5,1 ; +0x78 sw a5,8(s3) : ip->ref = 1, the MINT
   k_step (wp_s_addi c _ (KA.«iget» + 0x76#64) true 1#12 15#5 0#5 (by decide))

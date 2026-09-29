@@ -15,7 +15,7 @@ more `destruct`.
    `UEchoKernel.echo_uexec_slot`), their dumped images (`SyncInstrs`,
    `EchoInstrs`) and the `UkRun`/`UkAbi` supplier vocabulary (`udep`,
    `udepw_law`, `uk_xpage`, `uk_args_c`) -- all of it the D24 user-mode tower.
-   So `condEntrySlot` is the generic tail only, and its premises are the
+   So `Xv6.uexecWp_uslot_triv` is the generic tail only, and its premises are the
    generic tail's (`□ ssupply`, `□ killCred`, `□ uexecWp`, the pay fact);
    the `PF`/`Hpsok_free`/`udepw_law`/`udep` premises return with the gates.
    The gate-independent pieces are ported: the image test
@@ -70,21 +70,6 @@ theorem ustopGate_at {W : Uvis} (h : ustopGate W) (p : Nat) (q : UPerm) (hq : W.
 section UexecCond
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
-
-/-- **Rocq `cond_entry_slot`**, at the empty gate chain: the generic slot at
-the trivial payload.  THE SUPPLY and THE KILL CREDENTIAL are what the generic
-tail spends (every number's deposit, every killing cause). -/
-theorem condEntrySlot (W : Uvis) :
-    ⊢ □ ssupply -∗ □ uKillCred -∗ □ uexecWp -∗ myPay W.gen (fun _ => iprop(True)) -∗
-      uslot (GF := GF) W :=
-  uexecWp_uslot_triv W
-
-/-- **Rocq `cond_entry_slot_pay`**: THE ENTRY AT A CONSTANT PAYLOAD
-(GENERIC-PAY) -- the payload as the persistent carrier `□ (killCred -∗ R)`. -/
-theorem condEntrySlot_pay (R : IProp GF) (W : Uvis) :
-    ⊢ □ ssupply -∗ □ uKillCred -∗ □ uexecWp -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
-      uslot W :=
-  uexecWp_uslot R W
 
 end UexecCond
 

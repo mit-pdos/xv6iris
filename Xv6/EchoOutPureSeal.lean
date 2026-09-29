@@ -9,7 +9,7 @@ Added (Rocq → Lean, the landed convention): `echo_of_other` →
 `linesBytes_0`, `lines_bytes_S` → `linesBytes_S`, `lines_bytes_last` →
 `linesBytes_last`, `lines_bytes_snoc_nl` → `linesBytes_snoc_nl`,
 `lines_bytes_snoc_other` → `linesBytes_snoc_other`, `prefix_app_cancel` →
-`prefixApp_cancel` (Rocq's duplicate of `wl_prefix_app_cancel`; kept as a
+`Xv6.wlPrefix_app_cancel` (Rocq's duplicate of `wl_prefix_app_cancel`; kept as a
 named alias of `wlPrefix_app_cancel`).
 
 Deviations: `epuFilter_all` filters by a `Bool` predicate (EchoOutPure
@@ -111,9 +111,5 @@ theorem linesBytes_snoc_other (I : List (BitVec 8)) (b : BitVec 8) (n : Nat) (hb
     linesBytes (I ++ [b]) n = linesBytes I n := by
   unfold linesBytes
   rw [bodiesOf_snoc_other I b hb]
-
-/-- Rocq `prefix_app_cancel` (a duplicate of `wl_prefix_app_cancel`). -/
-theorem prefixApp_cancel {A : Type} (k a b : List A) (h : k ++ a <+: k ++ b) : a <+: b :=
-  wlPrefix_app_cancel k a b h
 
 end Xv6

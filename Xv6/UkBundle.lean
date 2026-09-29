@@ -148,7 +148,7 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
     rw [ukRegs_ne s.file m h.regs i hi]
     show m i = (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m (s.file .sepc)) (4 + i.toNat))
     rw [if_neg hi, tfOf_reg m (s.file .sepc) i hi]
-  ihave Hg := uexec_gprFile_congr cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hg
+  ihave Hg := MachCSL.gprFile_ext cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hg
   unfold trappedMachine userTrapFrameAtm userPtmInv
   iexists s.file .mstatus
   isplitr

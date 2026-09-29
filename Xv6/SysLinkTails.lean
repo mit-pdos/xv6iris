@@ -60,9 +60,6 @@ set_option linter.unusedVariables false
 
 /-! ## Context bookkeeping -/
 
-theorem sys_link_era_nlink (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    fnNlink (eraNode dn bm data) = dn.diNlink.toNat := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -105,7 +102,7 @@ theorem sys_link_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_link_ret_c0, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_c0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 s1v (k.regs 18#5)
     (sysLinkPins_set k R s1v _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xc0  li a5,-1
@@ -199,7 +196,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_link_ret_cc, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_cc, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -217,7 +214,7 @@ theorem sys_link_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_link_ret_d0, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_d0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0xd0  li a5,-1
@@ -296,7 +293,7 @@ theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_link_ret_dc, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_dc, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -314,7 +311,7 @@ theorem sys_link_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_link_ret_e0, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_e0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0xd0  li a5,-1
@@ -418,7 +415,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   unfold sysLinkIlockK
   iintro %cpu %spie1 %spp1 %R1 %dn %bm %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hsl Hdep Hoff Hdev Hinum Hval
     Hload #Hshot1 Hfrz Hru
-  k_norm_g [sys_link_ret_fa, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_fa, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) s2v
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -479,11 +476,11 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   have hloc : InodeLocal inum.toNat (eraNode (sysLinkDec dn) bm data) :=
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst (sysLinkDec dn) bm data hokD hrlD hduqD hddixD
   have hnl1 : 1 ≤ fnNlink (eraNode dn bm data) := by
-    rw [sys_link_era_nlink]; omega
+    rw [Xv6.cafEra_nlink]; omega
   have habs' := ufNlink_row dn (sysLinkDec dn) bm data htynz htyD (sysfile_setnl_size dn _)
     (sysfile_setnl_major dn _) (sysfile_setnl_minor dn _)
-    (by rw [sys_link_era_nlink, sys_link_era_nlink]; omega)
-  have hnzt : fnType (eraNode dn bm data) ≠ 0 := by rw [lfEra_type]; exact htynz
+    (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink]; omega)
+  have hnzt : fnType (eraNode dn bm data) ≠ 0 := by rw [Xv6.cafEra_type]; exact htynz
   -- +0x104  mv a0,s1
   k_step_e (wp_s_add cpu _ (KA.«sys_link» + 0x104#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1]
@@ -498,7 +495,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
           (sysLinkDec dn).diNlink.toNat) uty) from by
     rw [iregDotDelta_not_dir (sysLinkDec dn).diType.toNat _ hndD, FsStateLink.linkReps_1]
     exact .rfl) $$ Htok
-  iapply (sys_link_iupdate_unlink IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kk inum
+  iapply (Xv6.sys_unlink_iupdate_unlink IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kk inum
       (sysLinkDec dn) dn bm u Sb true uty A.pid hj ?up ?uK ?un ?ut (fun _ => hmem) hnib
       (sysfile_setnl_type_stable dn _) htynzD hdec hdaD (blkmapWf_dir_len hwf) ?ua)
     $$ [- $Hk $Hpc $Hte $Hce $Hdev $Hinum $Hmeta $Hd $Htok $Hpid $Hb2 $Hop]
@@ -515,7 +512,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hd Hb2 Hop
-  k_norm_g [sys_link_ret_10a, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_10a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (ientry kk) s2v
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R1 _ _ 10#5 _ hp1 (by decide)) (Or.inl rfl))
     hcs2
@@ -565,7 +562,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   case pt => k_norm_g; exact htier
   case pa => k_norm_g
   iintro %cpu %spie3 %spp3 %R3 %n' %⟨hcs3, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_link_ret_110, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_110, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysLinkPins_cs k _ R3 (ientry kk) s2v
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R2 _ _ 10#5 _ hp2 (by decide)) (Or.inl rfl))
     hcs3
@@ -583,7 +580,7 @@ theorem sys_link_tail_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : E
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_link_ret_114, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_114, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp4 := sysLinkPins_cs k _ R4 (ientry kk) s2v (sysLinkPins_set k R3 _ _ 1#5 _ hp3 (Or.inl rfl))
     hcs4
   -- +0x114  li a5,-1
@@ -675,7 +672,7 @@ theorem sys_link_tail_e2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, hf⟩ Hk Hpc Hte Hce Hpid Hbs Hops Htx Hslot
-  k_norm_g [sys_link_ret_ec, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_ec, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 pv (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -735,7 +732,7 @@ theorem sys_link_tail_f (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hl
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, hf⟩ Hk Hpc Hte Hce Hpid Hbs Hops Htx Hslot
-  k_norm_g [sys_link_ret_f4, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_f4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 pv (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1

@@ -225,7 +225,7 @@ theorem ushMain_line (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
   iintro %h6 Hrun
   iapply Htail $$ %h6 %_ %0 %r4 %(Nat.zero_le _) [] [] [] Hbs Hrun
   · ipureintro; ureg
-  · ipureintro; ureg; exact ushScan_zext _
+  · ipureintro; ureg; exact Xv6.ushG_zext _
   · unfold ushRestLineAt
     icases Hline with (%hl | HT)
     · ileft

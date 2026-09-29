@@ -5,6 +5,7 @@ constants, and pure facts about the format language.  Definitional only
 -/
 import Xv6.SpecPrintk
 import Xv6.StepLemmas
+import MachCSL.WpSmodeBits
 
 namespace Xv6
 
@@ -322,10 +323,6 @@ theorem ite_bne_sub_l {α : Type} (c : BitVec 8) (x y : α) :
   ite_bne_sub c chL x y
 
 
-theorem and_bits (p q : Prop) [Decidable p] [Decidable q] :
-    (if p then 1#64 else 0#64) &&& (if q then 1#64 else 0#64) = if p ∧ q then 1#64 else 0#64 := by
-  by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
-
 theorem ite_bne_bit {α : Type} (p : Prop) [Decidable p] (x y : α) :
     (if bcond bop.BNE (if p then 1#64 else 0#64) 0#64 then x else y) = if p then x else y := by
   by_cases hp : p <;> simp [hp, bcond]
@@ -419,11 +416,6 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-theorem cell8_lo_acc (a : BitVec 64) (dq : DFrac) (w : BitVec 64) :
-    wordPointsTo (GF := GF) a 8 dq w ⊢
-      wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) ∗
-      (wordPointsTo a 4 dq (BitVec.extractLsb' 0 32 w) -∗ wordPointsTo a 8 dq w) :=
-  wordPointsTo_lo4_acc a dq w
 
 /-- Description `kk` of the varargs. -/
 theorem pkDescs_acc (R : RegMap) (descs : List PkArgDesc) (kk : Nat) (d : PkArgDesc) (hd : descs[kk]? = some d) :
@@ -1098,7 +1090,6 @@ macro_rules
                k_norm_noite [$extra,*]
                iapply wpNext_off_intro
                try (case hs => k_norm_noite)))
-
 
 
 section

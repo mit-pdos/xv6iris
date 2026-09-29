@@ -224,7 +224,6 @@ theorem fkr_beqz_taken : KA.«forkret» + 0x1c#64 + BitVec.signExtend 64 56#13 =
   decide
 theorem fkr_beqz_tgt : KA.«forkret» + 84#64 = KA.«forkret» + 0x54#64 := rfl
 theorem fkr_bcond_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-theorem fkr_bcond_10 : bcond bop.BEQ 1#64 0#64 = false := by decide
 
 /-- `FkrAfter` does not read `a5` (nor any register but `sp`, `s0`, `s1`). -/
 theorem FkrAfter.setReg {kr : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitVec 64}
@@ -300,7 +299,7 @@ theorem fkr_first_boot [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3
   ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext
-  simp only [fkr_bcond_10, Bool.false_eq_true, if_false]
+  simp only [MachCSL.bcond_beq_one, Bool.false_eq_true, if_false]
   iapply Hn $$ %_ %?_ Hk Hpc Hf
   exact (h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide) (by decide)
 

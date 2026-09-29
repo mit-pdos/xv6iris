@@ -30,19 +30,23 @@ record is the two bottom cells (`&de = s0-80 = sp`, `&de.name = s0-78`).
    `dirlink_frame_open/_close`.  No MachCSL frame covers this layout (five
    eager saves over five lazy/record cells), so the two rules are proved
    here, by copy of `Xv6.wp_prologue_dirlookup` / `wp_epilogue_dirlookup`.
-3. `dl_bytes_half` (any two bytes are a halfword) is `dirlink_half_any`;
+3. `dl_bytes_half` (any two bytes are a halfword) is `Xv6.halfBytes_surj`;
    `dl_rec_hi`/`dl_rec_nm` are `dirlink_snc` + `direntBytes` unfolded.
 4. Dropped as dead (the granularity premise is gone, fs-icache §15(b)):
    Rocq's `dl_nrec_pos` -- uses checked: `grep -w` over
    `/shared/xv6rocq/iris/*.v` finds it only in ProofDirlink.v, unused there
    -- reason: no use.  `dl_wi_cost` (the loose seven) -- uses checked:
    ProofDirlink.v only, in a comment -- reason: writei's contract charges
-   `wiCostBmonly` (`dirlink_wi_cost_bmonly`).
+   `wiCostBmonly` (`Xv6.sys_unlink_wi_cost`).
 -/
 import Xv6.SpecDirlink
 import Xv6.FsWords
 import Xv6.DinodeSlot
 import Xv6.SpecStrncpy
+import Xv6.DirlookupParts
+import Xv6.IcacheBootDecode
+import Xv6.ReadiParts
+import Xv6.SysUnlinkPure
 
 namespace Xv6
 
@@ -114,20 +118,6 @@ end
 
 /-! ## Register arithmetic -/
 
-/-- A 32-bit word below `2^31`, sign-extended, is its value. -/
-theorem dirlink_sext_small (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 w = BitVec.ofNat 64 w.toNat := by
-  have hw : w = BitVec.ofNat 32 w.toNat := by simp
-  rw [hw, fw_sext32 _ (by simpa using h)]
-  simp
-
-/-- `c.bnez a0` at `+0x1a`: dirlookup's answer. -/
-theorem dirlink_bnez (x : BitVec 64) : bcond bop.BNE x 0#64 = decide (x ≠ 0#64) := by
-  rw [bcond_bne_eq]
-  by_cases hx : x = 0#64
-  · subst hx; rfl
-  · rw [decide_eq_true hx]; exact bne_iff_ne.mpr hx
-
 /-- `c.beqz s1` at `+0x22` on the size. -/
 theorem dirlink_beqz_nat (x : Nat) (h : x < 2 ^ 64) :
     bcond bop.BEQ (BitVec.ofNat 64 x) 0#64 = decide (x = 0) := by
@@ -139,45 +129,6 @@ theorem dirlink_beqz_nat (x : Nat) (h : x < 2 ^ 64) :
     have := congrArg BitVec.toNat e
     simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt h] at this
     simpa using this
-
-/-- `bne a0,s3` at `+0x3e`: readi's count against sixteen. -/
-theorem dirlink_bne16 (t : Nat) (h : t < 2 ^ 64) :
-    bcond bop.BNE (BitVec.ofNat 64 t) 16#64 = decide (t ≠ 16) := by
-  rw [bcond_bne_eq]
-  by_cases ht : t = 16
-  · subst ht; rfl
-  · rw [decide_eq_true ht]
-    refine bne_iff_ne.mpr fun e => ht ?_
-    have := congrArg BitVec.toNat e
-    simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt h] at this
-    simpa using this
-
-/-- `lhu a5,-80(s0)` + `c.beqz a5` at `+0x42`: the free test. -/
-theorem dirlink_beqz_half (w : BitVec 16) :
-    bcond bop.BEQ (BitVec.setWidth 64 w) 0#64 = decide (w = 0#16) := by
-  rw [bcond_beq_eq]
-  by_cases hw : w = 0#16
-  · subst hw; rfl
-  · rw [decide_eq_false hw]
-    refine beq_eq_false_iff_ne.mpr fun e => hw ?_
-    have := congrArg (BitVec.setWidth 16) e
-    simpa using this
-
-/-- The latch's `c.addiw s1,s1,16` at `+0x48`. -/
-theorem dirlink_addiw16 (x : Nat) (h : x + 16 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 x + 16#64))
-      = BitVec.ofNat 64 (x + 16) := by
-  have e : BitVec.ofNat 64 x + 16#64 = BitVec.ofNat 64 (x + 16) := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-    omega
-  rw [e, fw_w32 _ (by omega), fw_sext32 _ h]
-
-/-- `bltu s1,a5` at `+0x4e`: one more record? -/
-theorem dirlink_bltu_nat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
-    bcond bop.BLTU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (a < b) := by
-  show (BitVec.ofNat 64 a).ult (BitVec.ofNat 64 b) = decide (a < b)
-  simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb]
 
 /-- `sh s6,-80(s0)` at `+0x7c`: the zero-extended inum's low sixteen bits
 ARE the inum (Rocq's `dl_trunc16_zext`). -/
@@ -210,21 +161,6 @@ theorem dirlink_ofNat_16 (t : Nat) (h : t ≤ 16) : (BitVec.ofNat 64 t = 16#64) 
 
 /-! ## The loop's numeric facts (Rocq §2, granularity-free) -/
 
-/-- The largest file, in bytes. -/
-theorem dirlink_maxbytes : MAXFILE * BSIZE = 274432 := by decide
-
-/-- Rocq's `dl_wi_blocks`: sixteen bytes at a 16-aligned offset straddle
-exactly ONE block (`1024 = 64 * 16`). -/
-theorem dirlink_wi_blocks (k : Nat) : wiBlocks (16 * k) 16 = 1 := by
-  unfold wiBlocks
-  have hB : BSIZE = 1024 := by decide
-  rw [hB]
-  omega
-
-/-- Rocq's `dl_wi_cost_bmonly`: writei's charge for that window, four. -/
-theorem dirlink_wi_cost_bmonly (k : Nat) : wiCostBmonly (16 * k) 16 = 4 := by
-  unfold wiCostBmonly; rw [dirlink_wi_blocks]
-
 /-- Rocq's `dl_slot_off`: the append slot is at most `nrec`, so the write
 is at `off ≤ size`. -/
 theorem dirlink_slot_off (data : Nat → List (BitVec 8)) (sz : Nat) :
@@ -240,14 +176,6 @@ theorem dirlink_wiDinode_id (dn : Dinode) (bm : Blkmap) (off : Nat)
     wiDinode dn bm off 0 = dn := by
   unfold wiDinode
   rw [Nat.add_zero, if_neg (by omega), ← haddr]
-
-/-- The loop test alone bounds `i` by `nrec` (Rocq's `dlk_le_nrec`). -/
-theorem dirlink_le_nrec (sz i : Nat) (h : 16 * i < sz) : i ≤ dirNrec sz := by
-  unfold dirNrec; omega
-
-/-- Rocq's `dlk_full_lt`: a full read is a whole record. -/
-theorem dirlink_full_lt (sz i : Nat) (h : ¬ sz < 16 * i + 16) : i < dirNrec sz := by
-  unfold dirNrec; omega
 
 /-- The latch's exit: `size ≤ 16 (i+1)` with `i < nrec` makes `i + 1 = nrec`
 (Rocq's `dl_eqn` + `dlk_nle_of_ge`). -/
@@ -305,18 +233,6 @@ theorem dirlink_snc (fn : Nat → BitVec 8) (bsd' : List (BitVec 8)) (hl : bsd'.
     rw [hl] at h1
     simp only [bview, List.getElem_map, List.getElem_range]
     exact (getElem!_pos bsd' n (by omega)).symm
-
-/-- ANY two bytes are a halfword (Rocq's `dl_bytes_half`): the `sh` wants a
-`wordPointsTo … 2` to overwrite. -/
-theorem dirlink_half_any (l : List (BitVec 8)) (hl : l.length = 2) :
-    ∃ w : BitVec 16, l = halfBytes w := by
-  match l, hl with
-  | [b0, b1], _ =>
-    refine ⟨b1 ++ b0, ?_⟩
-    unfold halfBytes nthByte
-    congr 1
-    · bv_decide
-    · congr 1; bv_decide
 
 /-! ## The frame -/
 
@@ -409,7 +325,7 @@ theorem dirlink_de_split [CurCtx] (sp : BitVec 64) (bs : List (BitVec 8))
       bs = l1 ++ l2 :=
     ⟨bs.take 2, bs.drop 2, by rw [List.length_take]; omega, by rw [List.length_drop]; omega,
       (List.take_append_drop 2 bs).symm⟩
-  obtain ⟨w, rfl⟩ := dirlink_half_any l1 hl1
+  obtain ⟨w, rfl⟩ := Xv6.halfBytes_surj l1 hl1
   have hsplit := (byteBuf_append (GF := GF) (dirlinkDeAddr sp) (DFrac.own 1) (halfBytes w) l2).1
   rw [hl1, dirlink_de_name] at hsplit
   icases hsplit $$ B with ⟨B1, B2⟩

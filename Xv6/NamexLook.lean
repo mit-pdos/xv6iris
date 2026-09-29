@@ -84,7 +84,7 @@ theorem namex_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (kd kslo
   have hlive := dirFirst_live _ _ _ _ hf
   have hnib : (BitVec.setWidth 32 (dirInum data kd)).toNat < 16 * icfgNib := by
     rw [namex_zext32_toNat]; exact hinums kd hlt hlive
-  have hpos := namex_live_pos data kd hlive
+  have hpos := Xv6.dirlookup_live_pos data kd hlive
   iintro ⟨Href, Hru⟩
   unfold inodeHeld inodeRefp
   iexists kslot, qq, BitVec.setWidth 32 (dirInum data kd)
@@ -215,7 +215,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   k_step_e (wp_s_add cpu _ (KA.«namex» + 0xe8#64) true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hbz := namex_beqz (R' 10#5)
+  have hbz := Xv6.dirlookup_beqz (R' 10#5)
   cases found
   · -- ===== MISS: +0xea c.beqz a0 TAKEN, L_miss =====
     simp only [Bool.false_eq_true, if_false]

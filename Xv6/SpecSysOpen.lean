@@ -159,7 +159,7 @@ reaches this contract.
    read at is `v.toNat` (`SysOpenDefs` deviation 7).
 7. **`so_rd_of` / `so_wr_of` read `BitVec 32`** (`soRdOf` / `soWrOf`), and
    Rocq's `trunc32 vom` is `BitVec.extractLsb' 0 32 vom` (argint's store,
-   `SysOpenBits`); `om_arg_trunc32` is `omArg_extract`.
+   `SysOpenBits`); `om_arg_trunc32` is `Xv6.sys_open_om_arg`.
 8. **`wp_sys_open_frame` is a `Prop`-valued definition over `EXTRA` / `ARMS`
    exactly as Rocq's** (three instances: the body and the two decided
    arms).  Its continuation is NAMED, `sysOpenK` (Rocq spells it inline;
@@ -203,6 +203,7 @@ import Xv6.SysOpenKept
 import Xv6.ConsoleInvDefs
 import Xv6.UMemLazy
 import Xv6.UserOff
+import Xv6.SysOpenBits
 
 namespace Xv6
 
@@ -240,16 +241,11 @@ def soRdOf (om : BitVec 32) : Bool := decide (om.toNat % 2 = 0)
 /-- Rocq's `so_wr_of`. -/
 def soWrOf (om : BitVec 32) : Bool := !decide (om.toNat % 4 = 0)
 
-/-- THE MODE READINGS ARE THE LANDED ONES (Rocq's `om_arg_trunc32`): the
-argint'd word's value is `omArg`. -/
-theorem omArg_extract (v : BitVec 64) : (BitVec.extractLsb' 0 32 v).toNat = omArg v := by
-  simp [BitVec.extractLsb'_toNat, omArg]
-
 /-- Rocq's `om_modes_landed`. -/
 theorem omModes_landed (v : BitVec 64) :
     soRdOf (BitVec.extractLsb' 0 32 v) = omReadable v ∧
       soWrOf (BitVec.extractLsb' 0 32 v) = omWritable v := by
-  simp only [soRdOf, soWrOf, omReadable, omWritable, omWronly, omRdwr, omArg_extract]
+  simp only [soRdOf, soWrOf, omReadable, omWritable, omWronly, omRdwr, Xv6.sys_open_om_arg]
   generalize omArg v = x
   have h0 : x.testBit 0 = decide (x % 2 = 1) := by
     rw [Nat.testBit_eq_decide_div_mod_eq, Nat.pow_zero, Nat.div_one]

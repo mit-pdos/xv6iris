@@ -36,6 +36,8 @@ import Xv6.SpecRelease
 import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8b
+import Xv6.PrintkDefs
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -110,24 +112,6 @@ theorem uw_beq_false (v : BitVec 64) (h : ¬ v = 0#64) : bcond bop.BEQ v 0#64 = 
   show (v == 0#64) = false
   exact beq_eq_false_iff_ne.mpr h
 
-/-- `addiw s1,s1,1`. -/
-theorem uw_addiw (m : Nat) (h : m + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m + 1#64)) =
-      BitVec.ofNat 64 (m + 1) := by
-  have h1 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m + 1#64) = BitVec.ofNat 32 (m + 1) := by
-    apply BitVec.eq_of_toNat_eq
-    rw [BitVec.extractLsb'_toNat]
-    simp only [BitVec.toNat_ofNat, BitVec.toNat_add, Nat.shiftRight_zero]
-    omega
-  rw [h1, BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
-theorem uw_ofNat_succ (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m + 1) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
 /-- The byte the `sb` writes is the one the `lbu` read. -/
 theorem uw_ext8 (x : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 x) = x := by
   bv_decide
@@ -149,9 +133,6 @@ theorem uwj_74 : jumpPc (KA.«uartwrite» + 0x74#64) = KA.«uartwrite» + 0x74#6
 
 theorem uw_ws_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
     (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
-theorem uw_ws_ws (kb : KCtx) (a b c d : Bool) : (kb.withSpie a b).withSpie c d = kb.withSpie c d := rfl
-theorem uw_ws_pushOffAt (kb : KCtx) (a b c d : Bool) :
-    (kb.withSpie a b).pushOffAt c d = kb.pushOffAt c d := rfl
 theorem uw_sec_ws (kb : KCtx) (a b : Bool) (l : List String) :
     ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l := rfl
 theorem uw_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
@@ -585,7 +566,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   case hspt => k_norm_g [hbb.tier, hkt]
   k_next_e
   iintro %sp1 %spp1 %R1 %_ Hk Hpc %hcs1
-  k_norm_g [uw_ws_collapse, uw_ws_ws]
+  k_norm_g [uw_ws_collapse, MachCSL.KCtx.withSpie_twice]
   have hfix1 : uwFix k i n R1 := uwFix_cs k i n _ R1 (uwFix_call k i n R hfix _ _) hcs1
   have h9_1 : R1 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs1).trans h9
   obtain ⟨p2, p8, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hfix1
@@ -607,7 +588,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   k_next_e
   iintro %sp2 %spp2 %R2 %_ Hk Hpc %hcs2 Hlocked HR _ Harm
   ihave Harm := uw_arm_eq cpu _ kb.sie _ k.proc rfl hbb.proc $$ Harm
-  k_norm_g [KCtx.pushOffAt_withRegs, uw_ws_pushOffAt, KCtx.withRegs_withLocks,
+  k_norm_g [KCtx.pushOffAt_withRegs, MachCSL.KCtx.withSpie_pushOffAt, KCtx.withRegs_withLocks,
     KCtx.withRegs_withRegs, hbb.locks]
   -- the critical section: interrupts off while the transmit lock is held
   have hsie := KCtx.pushOffAt_sie kb
@@ -683,7 +664,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_40, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
       uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
-      uw_ws_ws, uw_ws_collapse]
+      MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
     -- jal sleep
@@ -703,7 +684,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     case hslpp => k_norm_g [hbb.proc]
     iapply wpNext_intro_pin
     iintro %cpu2 %hpin2 %spS %sppS %RS Hk Hpc Hte Hce %hcsS
-    k_norm_g [uw_ws_collapse, uw_ws_ws, hbb.proc]
+    k_norm_g [uw_ws_collapse, MachCSL.KCtx.withSpie_twice, hbb.proc]
     have hfix4 : uwFix k i n RS := uwFix_cs k i n _ RS (uwFix_call' k i n R3 hfix3 _) hcsS
     have h9_4 : RS 9#5 = BitVec.ofNat 64 m := (uw_cs9' _ _ _ hcsS).trans h9_3
     ihave IH' := uwLoop_elim c0 k kb i γ dq bs cs n Φ $$ IH
@@ -796,13 +777,13 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_74, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
       uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
-      uw_ws_ws, uw_ws_collapse]
+      MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
     -- c.addiw s1,s1,1 ; c.j +0x44
     k_step_e (wp_s_addiw cpu _ (KA.«uartwrite» + 0x74#64) true 1#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h9_3, uw_addiw m (by omega)]
+      with [h9_3, Xv6.addiw_succ m (by omega)]
     iintro Hk Hpc
     k_step_e (wp_s_j cpu _ (KA.«uartwrite» + 0x76#64) true 2097102#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -811,7 +792,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iapply IH' $$ %cpu %sp2 %spp2 %_ %(m + 1) [] Hk Hpc Hte Hce Hbuf [Hsub'] Hch Hframe Hnext
     · ipureintro
       refine ⟨uwFix_set9 k i n R3 hfix3 _, ?_, by omega⟩
-      · simp [RegMap.set_apply, uw_ofNat_succ]
+      · simp [RegMap.set_apply, Xv6.ofNat_succ']
     · iexact Hsub'
 
 /-! ## The loop, closed by Löb at the guard `+0x44` -/

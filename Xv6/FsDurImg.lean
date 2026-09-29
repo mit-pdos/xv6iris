@@ -83,7 +83,7 @@ theorem imgOwnHome (P : Nat → List (BitVec 8)) (sb : FsSb) (cov : Std.ExtTreeS
   cases hlr : logRegion sb.sbLogstart b with
   | false => rfl
   | true =>
-    have := logRegion_bound _ b hlr
+    have := Xv6.logRegion_range _ b hlr
     unfold LOGBLOCKS at this
     omega
 
@@ -126,7 +126,7 @@ theorem imgSnapOk (dk : Nat → BitVec 8) (ndisk : Nat) (sb : FsSb) (nib : Nat)
   -- the home set: which blocks are in it
   have hlogI : ∀ b, logRegion sb.sbLogstart b = true → 1 < b ∧ b < sb.sbInodestart := by
     intro b hb
-    have := logRegion_bound _ b hb
+    have := Xv6.logRegion_range _ b hb
     unfold LOGBLOCKS at this
     omega
   have hhome : ∀ b, b ∈ cov → ¬ (1 < b ∧ b < sb.sbInodestart) →

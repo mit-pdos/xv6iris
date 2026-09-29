@@ -220,7 +220,7 @@ theorem kgrepWb_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (b : BitVec 8
   rw [treePay_vis]
   simp only [evObl, wrObl, grepProg]
   iapply Ht $$ %h %m %avail %ua.toNat %false %(DFrac.own 1) %(fun _ => b) [] [] [] [] Hc [Hb] Hrun
-  · ipureintro; exact grepBytesOf_one b
+  · ipureintro; exact Xv6.ukBytesOf_one b
   · ipureintro; rw [ha0]; exact hfd
   · ipureintro; rw [ha1]; simp
   · ipureintro; rw [ha2]; rfl

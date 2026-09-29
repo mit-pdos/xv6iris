@@ -28,6 +28,7 @@ import Xv6.SpecMemset
 import Xv6.SpecFreeproc
 import Xv6.UPtLemmas
 import Xv6.CodeTactics
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -131,9 +132,6 @@ theorem ap_bcond_beq_end {m : Nat} (h : m < NPROC) :
   simp only [beq_eq_false_iff_ne, ne_eq]
   exact ap_procAddr_ne_end h
 
-/-- Two balanced pairs in a row. -/
-theorem ap_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 
 /-- The context a balanced `acquire`/`release` pair leaves. -/
 theorem ap_relctx (k : KCtx) (a b : Bool) (R : RegMap) (m : Nat) :
@@ -144,9 +142,6 @@ theorem ap_relctx (k : KCtx) (a b : Bool) (R : RegMap) (m : Nat) :
 theorem ap_pushed_withSpie (k : KCtx) (a b : Bool) (m : Nat) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
-/-- A `push_off` overwrites the pinned bits a balanced pair left. -/
-theorem ap_withSpie_pushOffAt (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
 
 /-- A scratch register is not callee-saved. -/
 theorem ap_calleeSaved_set (R R2 : RegMap) (i : BitVec 5) (v : BitVec 64)
@@ -758,7 +753,7 @@ theorem ap_scan_acq (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   k_norm_g
   iapply wpNext_intro_pin
   iintro %c %hp %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hlocked HR _ Harm
-  k_norm_g [KCtx.pushOffAt_withRegs, ap_withSpie_pushOffAt, KCtx.pushOffAt_pushed, hK4, ap_ret_b02]
+  k_norm_g [KCtx.pushOffAt_withRegs, MachCSL.KCtx.withSpie_pushOffAt, KCtx.pushOffAt_pushed, hK4, ap_ret_b02]
   have hsie : ((((k.pushed 4).withSpie spie spp).withRegs R).pushOffAt spie2 spp2).sie = false := rfl
   -- open the payload
   ihave HR := (show procLockPay (GF := GF) Γ n curCtx ⊢ procLockResAt Γ ξ0 (procAddr n) from by
@@ -779,7 +774,7 @@ theorem ap_scan_acq (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   ihave HΦ := wpNext_at _ _ _ c _ (fun h => (hp h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
-  k_norm [ap_bcond_state, decide_eq_true_eq, KCtx.pushOffAt_withRegs, ap_withSpie_pushOffAt,
+  k_norm [ap_bcond_state, decide_eq_true_eq, KCtx.pushOffAt_withRegs, MachCSL.KCtx.withSpie_pushOffAt,
     KCtx.pushOffAt_pushed, hK4]
   iapply HΦ $$ %spie2 %spp2 %(R2.set 15#5 (BitVec.signExtend 64 st)) %st %ch %kl %xs %pid0 []
     Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm
@@ -850,7 +845,7 @@ theorem ap_scan_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     iframe Hstate Hpl Hchan Hrest Hslots
   iapply (hre _ ?hs1 ?hn2 ?hK2 k.sie ?hr1 ?ho1) $$ [- $Hk $Hpc $Hlocked $HRes]
   rotate_right 1
-  k_norm_g [hfilt, KCtx.pushOffAt_popExit _ spie2 spp2 hwf, ap_withSpie_pushOffAt,
+  k_norm_g [hfilt, KCtx.pushOffAt_popExit _ spie2 spp2 hwf, MachCSL.KCtx.withSpie_pushOffAt,
     KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4, ap_ret_b0c, h9]
   iframe #
   case hs1 => k_norm_g
@@ -869,8 +864,8 @@ theorem ap_scan_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   · iapply (popArm_sie c _ _ (by rfl)) $$ Harm
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %R3 Hk Hpc %hcs3
-  k_norm_g [hfilt, KCtx.pushOffAt_popExit _ spie2 spp2 hwf, ap_withSpie_pushOffAt,
-    ap_withSpie_withSpie, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4, ap_ret_b0c,
+  k_norm_g [hfilt, KCtx.pushOffAt_popExit _ spie2 spp2 hwf, MachCSL.KCtx.withSpie_pushOffAt,
+    MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4, ap_ret_b0c,
     ap_relctx]
   ihave HΦ := wpNext_at _ _ _ c3 _ hp3 $$ HΦ
   ihave Hk2 : kctx (GF := GF) c3 (((k.pushed 4).withSpie spie2 spp2).withRegs R3) $$ [Hk]
@@ -906,9 +901,6 @@ theorem ap_addiw_succ (x : BitVec 32) :
       = BitVec.signExtend 64 (x + 1#32) := by
   bv_decide
 
-/-- The low half of a sign-extended word (what `sw` stores). -/
-theorem ap_extract_signExtend (x : BitVec 32) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x) = x := by bv_decide
 
 /-- The registers the pid scan leaves alone. -/
 def apKeep (R R' : RegMap) : Prop := ∀ i : BitVec 5, i ≠ 14#5 → i ≠ 15#5 → R' i = R i
@@ -1972,7 +1964,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   ihave Hcell := (show wordPointsTo (GF := GF) (pPid (procAddr n)) 4 (DFrac.own 1)
       (BitVec.extractLsb' 0 32 (Rf 13#5)) ⊢
       wordPointsTo (GF := GF) (pPid (procAddr n)) 4 (DFrac.own 1) pid from by
-    rw [hRf13, ap_extract_signExtend]) $$ Hcell
+    rw [hRf13, Xv6.fw_ext32]) $$ Hcell
   icases (ap_pid_join (pPid (procAddr n)) pid).2 $$ Hcell with ⟨HpidPriv, HpidPub, HpidQ⟩
   -- put the lock's quarter back into the payload's big-op
   ihave HpidQ := (show wordPointsTo (GF := GF) (pPid (procAddr n)) 4 pidLockQ pid ⊢
@@ -1983,7 +1975,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   ihave Hnp := (show wordPointsTo (GF := GF) nextpidAddr 4 (DFrac.own 1)
       (BitVec.extractLsb' 0 32 (Rf 11#5)) ⊢
       wordPointsTo (GF := GF) nextpidAddr 4 (DFrac.own 1) (apNewPid pid) from by
-    rw [hRf11, ap_extract_signExtend]) $$ Hnp
+    rw [hRf11, Xv6.fw_ext32]) $$ Hnp
   -- build the pid_lock payload
   have hpidnz : pid ≠ 0#32 := by intro h; rw [h] at hpidlo; exact absurd hpidlo (by decide)
   obtain ⟨hnplo', hnphi'⟩ := apNewPid_bounds pid hpidlo hpidhi
@@ -2282,7 +2274,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     have hsls : ∀ (kk : KCtx) (a b : Bool),
         ((kk.withSpie a b).withLocks kk.locks) = kk.withSpie a b := fun _ _ _ => rfl
     k_norm_g [hfilt1, hfilt2, hpews, KCtx.popExit_withLocks, hpid_pe, hproc_pe, hwls,
-      ap_withSpie_pushOffAt, ap_withSpie_withSpie, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
+      MachCSL.KCtx.withSpie_pushOffAt, MachCSL.KCtx.withSpie_twice, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
       KCtx.pushOffAt_pushed, ap_relctx, ap_pushed_withSpie, ap_ret_bcc]
     -- s2 = 0 (kalloc failed) threaded through the calls
     have hRr218 : Rr2 18#5 = 0#64 := by
@@ -2688,7 +2680,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hfilt := ap_filter_cons "nextpid" ("proc" :: k.locks)
           (by simp only [List.mem_cons, not_or]; exact ⟨by decide, hlp⟩)
         k_norm_g [hpid_pe, hpews, KCtx.popExit_withLocks, hwls, hposw,
-          ap_withSpie_withSpie, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
+          MachCSL.KCtx.withSpie_twice, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
           hpp4, hplw, hfilt]
         have hspc6 : k.sie = false → spie6 = k.spie ∧ spp6 = k.spp := by
           intro hks
@@ -2992,7 +2984,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       have hsls : ∀ (kk : KCtx) (a b : Bool),
           ((kk.withSpie a b).withLocks kk.locks) = kk.withSpie a b := fun _ _ _ => rfl
       k_norm_g [hfilt1, hfilt2, hpews, KCtx.popExit_withLocks, hpid_pe, hproc_pe, hwls,
-        ap_withSpie_pushOffAt, ap_withSpie_withSpie, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
+        MachCSL.KCtx.withSpie_pushOffAt, MachCSL.KCtx.withSpie_twice, KCtx.withLocks_withLocks, KCtx.pushOffAt_withRegs,
         KCtx.pushOffAt_pushed, ap_relctx, ap_pushed_withSpie, ap_ret_bdc]
       -- s2 = 0 (kalloc failed) threaded through the calls
       have hRr218 : Rr2 18#5 = 0#64 := by

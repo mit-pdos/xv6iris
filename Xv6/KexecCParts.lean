@@ -49,6 +49,7 @@ import Xv6.KexecSeam
 import Xv6.SpecMyproc
 import Xv6.SpecStrlen
 import Xv6.SpecCopyout
+import Xv6.UmodeArith
 
 namespace Xv6
 
@@ -344,8 +345,6 @@ end Frame
 
 /-! ## §4b SMALL ACCESSORS -/
 
-theorem kxcC_ofInt_toNat (x : BitVec 64) : BitVec.ofInt 64 (x.toNat : Int) = x := by
-  rw [BitVec.ofInt_natCast]; simp
 
 section Acc
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]

@@ -19,6 +19,7 @@ bread's buffer goes to either_copyout and comes back at the SAME bytes, so
 the `bioLocked` brelse wants is the one bread produced (Rocq's banner).
 -/
 import Xv6.ReadiExit
+import Xv6.BreadDefs
 
 namespace Xv6
 
@@ -30,9 +31,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-theorem rd_beq_self (v : BitVec 64) : bcond bop.BEQ v v = true := by
-  rw [bcond_beq_eq]; simp
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -164,7 +162,7 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
   case inr =>
     k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x64#64) false 70#13 10#5 24#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr1, q24, rd_beq_self]
+      with [hr1, q24, Xv6.bd_beq_eq]
     iintro Hk Hpc
     -- THE FAILING CHUNK MOVED `dd` BYTES: readi's `tot` is `tot + dd` (Rocq's +0xb0 exit)
     subst huser
@@ -239,7 +237,7 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
   iintro Hk Hpc
   have hs4 : k.regs 12#5 + (BitVec.ofNat 64 tot + BitVec.ofNat 64 m) =
       k.regs 12#5 + BitVec.ofNat 64 tot' := by
-    rw [← BitVec.add_assoc, rd_addr_step, htot', Nat.add_comm]
+    rw [← BitVec.add_assoc, Xv6.paAddBump, htot', Nat.add_comm]
   have hok'' : rdUserOk user Vp M P' Mi' (k.regs 12#5) data off tot' := by
     rw [htot', Nat.add_comm]; exact hok'
   -- +0x78  bgeu s3,s5 : done?

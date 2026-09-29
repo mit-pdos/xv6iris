@@ -49,7 +49,7 @@ All leaves are proved from ONE step lemma, `urun_step` (the destructuring of
    immediate's value an equation, as in Rocq.  The pop's no-wrap premise is
    derived from the returned frame's room (Lean's `ustack` carries it,
    UserHeap deviation 4) where Rocq reads it off the heap bound.
-4. `uv_avi_pos` (Rocq, reached) is `uv_avi_pos` here, over Lean's `BitVec`.
+4. `Xv6.paAddToNat'` (Rocq, reached) is `Xv6.paAddToNat'` here, over Lean's `BitVec`.
 5. The program walks' arithmetic helpers live here once (Rocq repeats them
    inline per walk): `ukWr_get` / the `ureg` register-algebra tactic, `ukPc`
    (the fall-through pc at a `Nat` address), and the value lemmas `ukMv`,
@@ -57,6 +57,7 @@ All leaves are proved from ONE step lemma, `urun_step` (the destructuring of
 -/
 import Xv6.UkRun
 import Xv6.UmodeArith
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -88,13 +89,6 @@ theorem ukWr_get_other (m : RegMap) (rd r : BitVec 5) (v : BitVec 64) (h : r ≠
     split
     · rfl
     · exact RegMap.set_other _ _ _ _ h
-
-/-- **Rocq `uv_avi_pos`**: sp moving UP by `d`, as unsigned arithmetic. -/
-theorem uv_avi_pos (a : BitVec 64) (d : Nat) (hlt : a.toNat + d < 2 ^ 64) :
-    (a + BitVec.ofNat 64 d).toNat = a.toNat + d := by
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat]
-  have : d < 2 ^ 64 := by omega
-  rw [Nat.mod_eq_of_lt this, Nat.mod_eq_of_lt hlt]
 
 /-- A read past a write, as one conditional (the walks' register algebra). -/
 theorem ukWr_get (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (r : BitVec 5) :
@@ -436,7 +430,7 @@ theorem wp_uk_addi_sp_up (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
           rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hk]; omega
         omega
     have hu : (m.get spIdx).toNat = (m.get spIdx + BitVec.ofNat 64 (8 * k)).toNat - 8 * k := by
-      rw [uv_avi_pos _ _ hnw]; omega
+      rw [Xv6.paAddToNat' _ _ hnw]; omega
     isplitl [Hs Hf]
     · iapply (ustack_app N.d _ (m.get spIdx) k n hu).2
       iframe

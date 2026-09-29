@@ -240,7 +240,7 @@ theorem sys_unlink_loop_bump (off : Nat) (h : off + 16 < 2 ^ 31) :
   have e : BitVec.ofNat 64 off + BitVec.signExtend 64 16#12 = BitVec.ofNat 64 (off + 16) := by
     rw [sys_unlink_li16]; apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
-  rw [e, fw_w32 _ h, fw_sext32 _ h]
+  rw [e, fw_w32 _ h, MachCSL.signExtend_ofNat32 _ h]
 
 /-- the `c.bnez a5` at +0x120 on the ZERO-extended `de.inum`: taken exactly
 when the record is LIVE (Rocq's `su_inum_zero` / `su_inum_nz`). -/

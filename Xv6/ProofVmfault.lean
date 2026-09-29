@@ -52,7 +52,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue: six slots, `ra`, `s0`, `s4`
-  k_step_gen (wp_s_push cpu _ KA.«vmfault» true 4048#12 6 (by omega) vf_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«vmfault» true 4048#12 6 (by omega) MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -147,7 +147,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       k_step_gen (wp_s_jal c18 _ (KA.«vmfault» + 0x3a#64) false 2094590#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vmfault_br_fffffffffffff638] next c19 hp19
       iintro Hk Hpc
-      iapply (vf_kalloc_call KAL c19 _ γl γk none ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
+      iapply (Xv6.uc_kalloc_call KAL c19 _ γl γk none ?hn1 ?hK1 ?hl1) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm_g
       iframe #
@@ -156,7 +156,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       case hl1 => k_norm_g; exact hlk
       iapply wpNext_intro_pin
       iintro %c20 %hp20 %spie %spp %R3 %hsp Hk Hpc HPost %hcs3
-      k_norm_g [vf_ret_14d6, vf_pushed_withSpie]
+      k_norm_g [vf_ret_14d6, MachCSL.KCtx.withSpie_pushed]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3
       obtain ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := hcs3
@@ -316,7 +316,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           · rw [e19]; exact hblock
         iapply wpNext_intro_pin
         iintro %c34 %hp34 %spie2 %spp2 %R5 %fresh %hsp2 Hk Hpc Htree _ %hpost5
-        k_norm_g [vf_ret_14f2, vf_pushed_withSpie, vf_withSpie_withSpie]
+        k_norm_g [vf_ret_14f2, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice]
         obtain ⟨hcs5, hsup, hfrnd, hfrpg, hres⟩ := hpost5
         unfold calleeSaved at hcs5
         k_norm_g at hcs5
@@ -419,7 +419,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
             (P.insertLeaf (vpnOf (k.regs 12#5)).toNat (R3 10#5) (PTE_W ||| PTE_U ||| PTE_R))
             (viewZero M (vpnOf (k.regs 12#5)).toNat) _
             (UPtFault.uptWf_insertLeaf P _ (R3 10#5) hwf hltf hvalid hfresh)
-            (by rw [PTree.base_setLeaf, PtRun.base_fill]; exact hbase) hrep2 $$ [Htree Hum]
+            (by rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbase) hrep2 $$ [Htree Hum]
           case' _ => iframe Htree Hum
           ihave Hfr : vfFrame (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
               (R2 18#5) (k.regs 19#5) (k.regs 20#5) $$ [Hs1 Hs2 Hs3 Hs4 Hs5 Hs6]
@@ -507,7 +507,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           case hpf => k_norm_g; exact hvalid
           iapply wpNext_intro_pin
           iintro %c38 %hp38 %spie3 %spp3 %R6 %hsp3 Hk Hpc Hav2 %hcs6
-          k_norm_g [vf_ret_1502, vf_pushed_withSpie, vf_withSpie_withSpie]
+          k_norm_g [vf_ret_1502, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice]
           unfold calleeSaved at hcs6
           k_norm_g at hcs6
           obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hcs6
@@ -546,7 +546,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           -- the page never joined the address space: `P`/`M` are unchanged
           ihave Hpt := UPtFault.procPtAt_close P M (t.mapRun (vpnOf (k.regs 12#5))
               (BitVec.extractLsb' 12 44 (R3 10#5)) 22#64 1 fresh).1
-            hwf (by rw [htreefail, PtRun.base_fill]; exact hbase)
+            hwf (by rw [htreefail, MachCSL.PTree.base_fill]; exact hbase)
             (by rw [htreefail]; exact hrepf) $$ [Htree Hum]
           case' _ => iframe Htree Hum
           ihave Hfr : vfFrame (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

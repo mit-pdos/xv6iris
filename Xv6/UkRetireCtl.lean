@@ -71,7 +71,7 @@ theorem ukRetire_btype (imm : BitVec 13) (rs2 rs1 : BitVec 5) (op : bop)
 theorem ukTrap_ecall : UkExecTrap C P T (.ECALL ()) len m pc V (.E_U_EnvCall ()) := by
   intro s hl hr hpc hv orc
   obtain ⟨hl1, hr1, hpc1, -, hv1⟩ := uke_npc_land hl hr hpc hv len
-  have hw := uke_ecall ufFoot_uxc orc _ hl1.priv
+  have hw := MachCSL.uxc_ecall ufFoot_uxc orc _ hl1.priv
   rw [hpc1] at hw
   exact ⟨_, _, orc, uke_uxRun_of_runRW hl1 _ orc _ hw, rfl, rfl, hl1, hr1, hpc1, hv1⟩
 

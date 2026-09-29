@@ -30,10 +30,6 @@ theorem kvi_root_117c :
     KA.«kvminit» + 0x914a#64 = kernelPagetableAddr := by
   decide
 
-/-- The context algebra of the exit interrupt state. -/
-theorem kvi_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -116,7 +112,7 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   -- the epilogue
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans (hpin2 h)))
-  simp only [kvi_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   have hK' : 2 ≤ (k.withSpie spie spp).avail := by
     simp only [KCtx.withSpie_avail]; omega
   have hR2 : (R.set 15#5 (KA.«kvminit» + 0x900c#64)) 2#5

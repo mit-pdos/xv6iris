@@ -59,16 +59,11 @@ theorem leAt_shift_of_list (g l : List (BitVec 8)) (base o n : Nat)
   intro j hj
   exact h j (List.mem_range.1 hj)
 
-/-- Rocq `le_at_of_list`: the `base = 0` instance. -/
-theorem leAt_of_list (g l : List (BitVec 8)) (o n : Nat)
-    (h : ∀ j, j < n → g[o + j]! = l[o + j]!) : leAt g o n = leAt l o n :=
-  leAt_ext g l o n h
-
 /-- Rocq `le_at_of_list_below`: "the buffer agrees with the file below `m`"
 (which is how a `readi` postcondition reads). -/
 theorem leAt_of_list_below (g l : List (BitVec 8)) (o n m : Nat) (hm : o + n ≤ m)
     (h : ∀ j, j < m → g[j]! = l[j]!) : leAt g o n = leAt l o n :=
-  leAt_of_list g l o n fun j hj => h (o + j) (by omega)
+  Xv6.leAt_ext g l o n fun j hj => h (o + j) (by omega)
 
 /-! ## 2.  TRUNCATION: an `m`-byte read of an `n`-byte field -/
 

@@ -18,6 +18,7 @@ import MachCSL.UMemRam
 import MachCSL.UWalk
 import MachCSL.UWalkRun
 import MachCSL.Tactics
+import MachCSL.UMemAmoBase
 
 namespace MachCSL
 
@@ -65,12 +66,6 @@ theorem uma_pmm_applicable_sc (acc : MemoryAccessType mem_payload) (h : umaDAcc 
   rw [show _get_Mstatus_MXR ms = BitVec.extractLsb' 19 1 ms from rfl, hmxr]
   rfl
 
-/-- Pointer masking with `PMLEN = 0` is the identity. -/
-theorem uma_pm_transform_VA0 (va : BitVec 64) : pm_transform_VA (.Virtaddr va) 0 = .Virtaddr va := by
-  simp only [pm_transform_VA, sign_extend, Sail.BitVec.signExtend, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    virtaddr.Virtaddr.injEq, Functions.xlen]
-  sail_norm
-
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **The data-address transform at User** (Rocq §9): the identity. -/
@@ -86,7 +81,7 @@ theorem uma_transform_effective_address_U (D : UFoot) (orc : UOrc) (s : UWSt) (h
   obtain ⟨hpm1, hpm2, hpm3, hpm4⟩ := uma_pmm_applicable_sc acc hacc _ hmxr
   uwk_pins hw
   uwk_run [htm, hcp, utr_effPriv _ _ _ hmprv]
-  rw [uma_pm_transform_VA0]
+  rw [MachCSL.umo_pm_transform_VA0]
 
 /-- The data address of a user access: the base register plus the offset,
 untransformed (Rocq `exec_transform_effective_address_u` under

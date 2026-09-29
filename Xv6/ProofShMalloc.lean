@@ -142,7 +142,7 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
     have hne : BitVec.ofNat 64 sz ≠ BitVec.ofInt 64 (-1) := by
       intro he
       have := congrArg BitVec.toNat he
-      rw [ushm_toNat sz (by omega), show (BitVec.ofInt 64 (-1)).toNat = 2 ^ 64 - 1 from by decide] at this
+      rw [Xv6.bcOfNatToNat sz (by omega), show (BitVec.ofInt 64 (-1)).toNat = 2 ^ 64 - 1 from by decide] at this
       omega
     rw [if_neg hne]
     have o18 : m5.get 18#5 = BitVec.ofNat 64 (ushmNu nbytes) := by

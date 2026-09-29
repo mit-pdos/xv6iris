@@ -45,7 +45,7 @@ Rocq's header, kept because the reasons are the content:
    * k0]!` (Rocq's `!!!`) under Lean's `if`, and `inum ≠ bv_0 16` is
    `inum ≠ 0#16`.  The `tot` binder and its `tot = 16` premise are kept
    (SpecDirlink reports a byte count).
-3. Names: `lf_era_type` → `lfEra_type`, `lf_era_not_dir` → `lfEra_not_dir`,
+3. Names: `lf_era_type` → `Xv6.cafEra_type`, `lf_era_not_dir` → `Xv6.era_notDir`,
    `lf_inum_nz` → `lfInum_nz`, `lf_nlink_row` → `lfNlink_row`,
    `lf_tgt_delta` → `lfTgt_delta`, `lf_parent_row` → `lfParent_row`,
    `lf_tgt_fire` → `lfTgt_fire`, `lf_ent_fire` → `lfEnt_fire`.
@@ -58,23 +58,13 @@ Nothing.  (Section 2c, the undo, is a comment in Rocq too: the fire is
 import Xv6.FsAbsUnlinkFire
 import Xv6.SysLinkDefs
 import Xv6.FsStateEraResB
+import Xv6.FsStateEraRes
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-! ## 1.  The pure reading bridges -/
-
-/-- Rocq's `lf_era_type`. -/
-theorem lfEra_type (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    fnType (eraNode dn bm data) = dn.diType.toNat := rfl
-
-/-- Rocq's `lf_era_not_dir`. -/
-theorem lfEra_not_dir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (hnd : dn.diType.toNat ≠ T_DIR_z) : fnIsDir (eraNode dn bm data) = false := by
-  unfold fnIsDir
-  rw [lfEra_type]
-  exact decide_eq_false hnd
 
 /-- a dirent's inum is a `BitVec 16` and a ZERO one is a FREE SLOT
 (`DirView.dirLive`); the one-line bridge from the held positivity (Rocq's
@@ -95,7 +85,7 @@ theorem lfNlink_row (dn dn' : Dinode) (bm : Blkmap) (data : Nat → List (BitVec
       absRow (eraNode dn' bm data) =
         ⟨(absRow (eraNode dn bm data)).anNode, fnNlink (eraNode dn bm data) + 1⟩ := by
   refine ⟨?_, ?_⟩
-  · rw [lfEra_type, hty]; exact hnz
+  · rw [Xv6.cafEra_type, hty]; exact hnz
   · unfold absRow
     rw [ufAbs_node_nlink dn dn' bm data hty hsz hmaj hmin, hnl]
 
@@ -133,7 +123,7 @@ theorem lfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → L
     hnz hty hty' hsz hrng hnone hh hh' hb hb'
   have hdir' : fnIsDir (eraNode dn' bm' data') = true := by
     unfold fnIsDir
-    rw [lfEra_type, hty']
+    rw [Xv6.cafEra_type, hty']
     exact decide_eq_true hty
   have hnleq : fnNlink (eraNode dn' bm' data') = fnNlink (eraNode dn bm data) := by
     show dn'.diNlink.toNat = dn.diNlink.toNat

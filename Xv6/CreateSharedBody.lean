@@ -83,6 +83,7 @@ bodies stated here:
 -/
 import Xv6.CreateSharedRegs
 import Xv6.SpecCreate
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -129,13 +130,6 @@ structure CreateStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (pd : BitVec 64) (ple
   ha2 : k.regs 12#5 = BitVec.signExtend 64 major
   ha3 : k.regs 13#5 = BitVec.signExtend 64 minor
   hpd : descPageRw pd
-
-/-- The pinning fact every exit needs: the process is not `0` (the
-`Xv6.dirlink_pin` shape). -/
-theorem create_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 section Env
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -185,7 +179,7 @@ theorem create_post_pin {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
       ∀ c : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c := by
   iintro H %c
-  iapply (wpNext_at true k.proc cpu c _ (create_pin hj k hproc c cpu)) $$ H
+  iapply (wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu)) $$ H
 
 end Env
 

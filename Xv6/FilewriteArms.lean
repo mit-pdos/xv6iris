@@ -21,6 +21,7 @@ Rocq `ProofFilewrite.v` `wp_filewrite_sconf`'s arms and
 import Xv6.FilewriteLoop
 import MachCSL.WpSmodeLh
 import MachCSL.WpSmodeJalr
+import Xv6.WriteiLoop
 
 namespace Xv6
 
@@ -246,7 +247,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   -- ===== back from pipewrite =====
   iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hpref Hpriv Hgen Hpost
   ihave HΦ := fwrKG_elim $$ HΦG Hgen
-  k_norm_g [fwr_ret_62, fwr_ww, fwr_psw]
+  k_norm_g [fwr_ret_62, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
     refine fwrRegs_cs _ _ _ _ _ _ _ _ _ _ _ ?_ (by k_norm_g at hcs1; exact hcs1)
@@ -305,7 +306,6 @@ theorem fwr_devsw_slot (w : BitVec 16) (h : w.toNat ≤ 9) :
 theorem fwr_jump_cw : jumpPc KA.«consolewrite» = KA.«consolewrite» := by decide
 theorem fwr_ret_88 : jumpPc (KA.«filewrite» + 0x88#64) = KA.«filewrite» + 0x88#64 := by decide
 theorem fwr_beq_cw : bcond bop.BEQ KA.«consolewrite» 0#64 = false := by decide
-theorem fwr_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- The FD_DEVICE environment at a major the range test admitted. -/
 theorem fwr_dev_env_in (γl : GName) (γu : UartNames) (mj : Nat) (h : mj ≤ NDEV_max) :
@@ -465,7 +465,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   · -- +0x82  c.beqz a5 : taken, the null slot
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x82#64) true 160#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [devswWriteVal_other mj hc, fwr_beq_00]
+      with [devswWriteVal_other mj hc, Xv6.writei_beq00]
     iintro Hk Hpc
     -- +0x122  c.li a0,-1 ; +0x124  c.j +0xf4
     k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x122#64) true 4095#12 10#5 0#5 (by decide))
@@ -517,7 +517,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case cn => k_norm_g; exact h12
   -- ===== back from consolewrite =====
   iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy⟩ Hk Hpc Hte Hce Hpriv HQ
-  k_norm_g [fwr_ret_88, fwr_ww, fwr_psw]
+  k_norm_g [fwr_ret_88, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
     refine fwrRegs_cs _ _ _ _ _ _ _ _ _ _ _ ?_ (by k_norm_g at hcs1; exact hcs1)

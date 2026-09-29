@@ -37,7 +37,7 @@ unreached: `ua_ubyte0_moi0`, `ua_ubyte0_bv0`, `uheap_ubytesq_range`,
    (`(∀ q < n, f q ≠ 0) ∧ f n = 0`, SpecSysExec deviation 6).
 2. **Numbers**: addresses are `Nat` (Rocq `Z`), so `0 ≤ av` disappears and
    the `< Z64` rows are `< 2 ^ 64`.  `ua_avi_pos` / `ua_uint_avi_moi` (the
-   no-wrap address sum) are the one lemma `ua_ofNat_add`.
+   no-wrap address sum) are the one lemma `Xv6.bc_addr_toNat`.
 3. **`uimg_word_agree` is trivial** here: Lean's `execArgsOf` states each
    pointer word as an equation `bytesToWord (umemRead …) = avf i`, so two
    readings of one address are equal by transitivity (`uimgWord_agree`).
@@ -47,6 +47,7 @@ unreached: `ua_ubyte0_moi0`, `ua_ubyte0_bv0`, `uheap_ubytesq_range`,
 import Xv6.SpecSysExec
 import Xv6.UImgWordDefs
 import Xv6.UserHeap
+import Xv6.BootCarve
 
 namespace Xv6
 
@@ -94,13 +95,6 @@ def uargvImg (E : ElfMem) (av : Nat) (args : List UArg) : Prop :=
   (∀ k, k < 8 → E (av + 8 * args.length + k) = some (nthByte (n := 8) (0#64) k)) ∧
   (∀ (i : Nat) (x : UArg), args[i]? = some x → ∀ j, j ≤ x.len → E (x.ptr + j) = some (x.bytes j))
 
-/-- **Rocq `ua_avi_pos` / `ua_uint_avi_moi`** (deviation 2): a sum below
-`2^64` does not wrap. -/
-theorem ua_ofNat_add (a d : Nat) (h : a + d < 2 ^ 64) :
-    (BitVec.ofNat 64 a + BitVec.ofNat 64 d).toNat = a + d := by
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  omega
-
 /-- **Rocq `exec_args_of_uargv_img`**: THE VECTOR A CALLER LAID OUT IS A
 VECTOR sys_exec READS. -/
 theorem execArgsOf_uargvImg (E : ElfMem) (Mv : Nat → List (BitVec 8)) (av : Nat) (args : List UArg)
@@ -114,7 +108,7 @@ theorem execArgsOf_uargvImg (E : ElfMem) (Mv : Nat → List (BitVec 8)) (av : Na
   · exact (hs i _ (hel i hi)).2.2
   · intro i hi
     have ea : (BitVec.ofNat 64 av + BitVec.ofNat 64 (8 * i)).toNat = av + 8 * i :=
-      ua_ofNat_add av (8 * i) (by omega)
+      Xv6.bc_addr_toNat av (8 * i) (by omega)
     rw [ea]
     dsimp only
     by_cases hlt : i < args.length

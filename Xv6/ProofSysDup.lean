@@ -27,6 +27,8 @@ import Xv6.SysfileCalls
 import Xv6.SpecFiledup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
 
 namespace Xv6
 
@@ -46,8 +48,6 @@ theorem sd_ret_4d78 : jumpPc (KA.«sys_dup» + 0x28#64) = (KA.«sys_dup» + 0x28
 theorem sd_ret_4d86 : jumpPc (KA.«sys_dup» + 0x36#64) = (KA.«sys_dup» + 0x36#64) := by decide
 
 theorem sd_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem sd_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sd_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem sd_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem sd_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 theorem sd_sp24 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + BitVec.signExtend 64 24#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
@@ -75,12 +75,6 @@ theorem sd_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFFF
   simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
-
-theorem sd_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sd_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sd_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 theorem sd_calleeSaved_mk (KR R : RegMap)
     (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
@@ -286,10 +280,10 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_f_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_dup» + 0xc#64) true 0#12 11#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_li0] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_addi c3 _ (KA.«sys_dup» + 0xe#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_li0] next c4 hp4
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_jal c4 _ (KA.«sys_dup» + 0x10#64) false 2096626#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_dup_br_fffffffffffffe02] next c5 hp5
@@ -299,10 +293,10 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sd_ret_4d64, sd_li0, sd_f_addr]
+  k_norm_g [sd_ret_4d64, Xv6.co_li_zero, sd_f_addr]
   iframe Hcore Howe Hpfd Hcf
   iframe #
-  case ha0 => k_norm_g [sd_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hpf => k_norm_g [sd_f_addr]; exact sd_f_nonnull _ hsp
   case hpr => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
@@ -311,7 +305,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   -- past argfd: li a5,-1 ; bltz a0
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie %spp %R1 %hsp1 Hk Hpc %hcs1 Hcore Howe Hpost1
-  k_norm_g [sd_pushed_withSpie, sd_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
@@ -389,7 +383,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     -- past fdalloc: mv s2,a0 ; li a5,-1 ; bltz a0
     iapply wpNext_intro_pin
     iintro %c14 %hp14 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hpost2
-    k_norm_g [sd_withSpie_withSpie, sd_pushed_withSpie, sd_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -490,7 +484,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       -- past filedup: mv a5,s2 ; ld s1,24(sp) ; ld s2,16(sp)
       iapply wpNext_intro_pin
       iintro %c20 %hp20 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hcs3 Href1 Href2
-      k_norm_g [sd_withSpie_withSpie, sd_pushed_withSpie, sd_withRegs_withSpie]
+      k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
       k_norm_g at hsp3
       unfold calleeSaved at hcs3
       k_norm_g at hcs3

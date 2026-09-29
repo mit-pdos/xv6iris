@@ -15,7 +15,7 @@ Added (Rocq → Lean, the landed convention): `ch_arm_E_open` →
 `ch_dl_close` → `chDl_close`, `echoed_nil`, `echoed_snoc_no`,
 `echoed_snoc_yes`, `echoed_all_len` (same names), `seg_echoed_snoc` →
 `segEchoed_snoc`, `epu_lookup_nil_absurd` → `epuLookup_nil_absurd`,
-`epu_removelast_take` → `epuRemovelast_take`, `fmap_snd_snoc` →
+`epu_removelast_take` → `Xv6.pop_removelast_take`, `fmap_snd_snoc` →
 `fmapSnd_snoc`, `log_echoed_echo` → `logEchoed_echo`, `log_ok_nil` →
 `logOk_nil`.
 
@@ -25,6 +25,7 @@ Deviations: spelling only (Rocq's arm `(h, c, cs, j)` is Lean's
 ConsLog's `logEchoed_dec`).
 -/
 import Xv6.EchoOutLine
+import Xv6.PipeOutPure
 
 namespace Xv6
 
@@ -114,10 +115,6 @@ theorem chDl_close (H : ConsHist) : (consStep H .evClose).chDl = H.chDl := by
 theorem epuLookup_nil_absurd {A : Type} (j : Nat) (x : A) (h : ([] : List A)[j]? = some x) :
     False := by
   simp at h
-
-/-- Rocq `epu_removelast_take`. -/
-theorem epuRemovelast_take {A : Type} (l : List A) : l.dropLast = l.take (l.length - 1) :=
-  List.dropLast_eq_take
 
 /-- Rocq `fmap_snd_snoc`. -/
 theorem fmapSnd_snoc (E : List (List Obs × BitVec 8)) (x : List Obs × BitVec 8) :

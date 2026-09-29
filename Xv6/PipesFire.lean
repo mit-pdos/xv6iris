@@ -32,13 +32,14 @@ own short names are kept (`real`, `realP`, `realN`, `realT`, `upok`,
    fs`, `F := sfilt fs`) are written out; the section hypotheses
    (`fs ≠ []`, `oneline L`) are explicit arguments.
 4. Helpers not in Rocq: `pfire_getD_lt`, `pfire_soLastd_rd`, `subf_SS`,
-   `dgPipeB_ne_nil`, `altForkc_ne_nil`, `catDgWrite_ne_nil` (Rocq's inline
+   `dgPipeB_ne_nil`, `altForkc_ne_nil`, `Xv6.catDgWrite_ne` (Rocq's inline
    `vm_compute; discriminate`); `widsFrom_nil` is Rocq's `wids_from_nil`.
 5. `WLeft_inj` (an `Inj` instance) is `Wid.WLeft.inj`.
 6. CONE TRIM (108 of 122 reached): `dg_execL_ne_R` and the `Decision`
    instances above are not ported.
 -/
 import Xv6.PipeBothNPure
+import Xv6.PipesCut
 
 namespace Xv6
 
@@ -86,10 +87,6 @@ theorem subf_0 (F : Nat → Filt) (j : Nat) : subf F j 0 = [F j] := rfl
 
 theorem subf_S (F : Nat → Filt) (j m : Nat) : subf F j (m + 1) = F j :: subf F (j + 1) m := by
   simp [subf, List.range'_succ]
-
-/-- Rocq `map_lookup_opt`. -/
-theorem map_lookup_opt {A B : Type} (f : A → B) (l : List A) (k : Nat) :
-    (l.map f)[k]? = (l[k]?).map f := List.getElem?_map
 
 theorem subf_fs (fs : List Filt) (hne : fs ≠ []) : fs = subf (sfilt fs) 1 (fs.length - 1) := by
   have hl : fs.length - 1 + 1 = fs.length := by
@@ -1247,7 +1244,6 @@ theorem passes_last (fs : List Filt) (hn : fs ≠ []) (L : List (BitVec 8)) (hp 
 
 theorem dgPipeB_ne_nil : dgPipeB ≠ [] := by decide
 theorem altForkc_ne_nil : altForkc ≠ [] := by decide
-theorem catDgWrite_ne_nil : catDgWrite ≠ [] := by decide
 
 /-- Rocq `fire_nt`: a non-terminal commit. -/
 theorem fire_nt (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Producer) (fs : List Filt)
@@ -1331,7 +1327,7 @@ theorem fire_nt (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produce
         refine hrealN _ haS fun D hD hne hnx => ?_
         rcases hch D hD hne hnx with ⟨i, hi, hic, hib, hif⟩ | ⟨hall, hDL, hpass⟩
         · have hik : i ≠ k := by
-            rintro rfl; rw [hic] at hw0; exact catDgWrite_ne_nil hw0
+            rintro rfl; rw [hic] at hw0; exact Xv6.catDgWrite_ne hw0
           left
           by_cases hlt : k < i
           · refine ⟨i, hi, by rw [vupd_other _ _ _ _ (by simp [hik])]; exact hic, ?_, hif⟩
@@ -1453,7 +1449,7 @@ theorem fireSrc_ne (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Prod
   | WLeft k =>
     rcases h with hf | ⟨_, rfl⟩
     · exact failSrc_ne p fs k s hf
-    · exact catDgWrite_ne_nil
+    · exact Xv6.catDgWrite_ne
   | WLast =>
     rcases h with ⟨rfl, hL, _⟩ | rfl
     · exact hL

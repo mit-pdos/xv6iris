@@ -49,6 +49,7 @@ import Xv6.SysfileCalls
 import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -107,7 +108,6 @@ theorem sys_mknod_K (a : Nat) (h : sysMknodSlots ≤ a) :
 /-! ## The sign cluster (the `bltz` at +0x2e, the `c.beqz` at +0x44) and
 the immediates -/
 
-theorem sys_mknod_li1 : 0#64 + BitVec.signExtend 64 1#12 = BitVec.ofNat 64 1 := by decide
 theorem sys_mknod_li2 : 0#64 + BitVec.signExtend 64 2#12 = BitVec.ofNat 64 2 := by decide
 theorem sys_mknod_li3 : 0#64 + BitVec.signExtend 64 3#12 = BitVec.signExtend 64 T_DEVICE_w := by
   decide
@@ -156,7 +156,7 @@ theorem sys_mknod_carve [CurCtx] (sp0 : BitVec 64) :
     unfold sysMknodBuf; bv_omega
   rw [e]
   iintro H
-  icases sysfile_stack_bytes (sysMknodBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysMknodBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   isplitr
   · ipureintro; exact hal
   · unfold sysfileAny

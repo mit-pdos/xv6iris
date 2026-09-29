@@ -16,9 +16,9 @@ literal, and the lock/panic call wrappers.
    `wp_iget_sconf`.
 2. **The compares are `bcond` facts** (`MachCSL.bcond`): Rocq's
    `ig_sext_eqv` / `ig_sext_neqv` / `ig_neqv_eq` / `ig_neqv_refl` /
-   `ig_neqv_ne` are the two lemmas `ig_bne_sext_eq` / `ig_bne_sext_ne`; `ig_ref_spos` is
+   `ig_neqv_ne` are the two lemmas `ig_bne_sext_eq` / `Xv6.bd_bne_of_ne`; `ig_ref_spos` is
    `InodeLock.inodeRef_spos`; `ig_ref_bge_zero` / `ig_ref_neqz_zero` are
-   `ig_blez_zero` / `ig_bnez_zero`; `ig_entry_nonzero` / `ig_entry_neqz` /
+   `Xv6.il_blez_z` / `MachCSL.bcond_bne_zero`; `ig_entry_nonzero` / `ig_entry_neqz` /
    `ig_zero_eqz` / `ig_zero_neqz` are `ig_beqz_entry` / `ig_bnez_entry` /
    `ig_beqz_zero` / `ig_bnez_zero'`.
 3. **The recycle's set step** (`ig_ci_inums_insert` + `ig_pool_set`) is
@@ -38,6 +38,8 @@ import MachCSL.WpSmodeFrame6
 import Xv6.IcacheInvRef
 import Xv6.IcacheEscrowPool
 import Xv6.SpecPanic
+import Xv6.BreadDefs
+import Xv6.InitlogHead
 
 namespace MachCSL
 
@@ -224,13 +226,6 @@ theorem ig_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem ig_bnez_entry (e : Nat) (he : e ≤ NINODE) : bcond bop.BNE (ientry e) 0#64 = true := by
   rw [bcond_bne_eq]; exact bne_iff_ne.mpr (ientry_ne_zero e he)
 
-/-- ...on no candidate (Rocq `ig_zero_neqz`). -/
-theorem ig_bnez_zero : bcond bop.BNE 0#64 0#64 = false := by decide
-
-/-- A free slot's word: `blez` taken (Rocq `ig_ref_bge_zero`). -/
-theorem ig_blez_zero : bcond bop.BGE 0#64 (BitVec.signExtend 64 (0#32 : BitVec 32)) = true := by
-  decide
-
 /-- ...and `c.bnez a5` falls through (Rocq `ig_ref_neqz_zero`). -/
 theorem ig_bnez_a5zero : bcond bop.BNE (BitVec.signExtend 64 (0#32 : BitVec 32)) 0#64 = false := by
   decide
@@ -240,15 +235,6 @@ theorem ig_bnez_a5zero : bcond bop.BNE (BitVec.signExtend 64 (0#32 : BitVec 32))
 theorem ig_bne_sext_eq (a : BitVec 32) :
     bcond bop.BNE (BitVec.signExtend 64 a) (BitVec.signExtend 64 a) = false := by
   rw [bcond_bne_eq]; exact bne_self_eq_false _
-
-theorem ig_bne_sext_ne (a b : BitVec 32) (h : a ≠ b) :
-    bcond bop.BNE (BitVec.signExtend 64 a) (BitVec.signExtend 64 b) = true := by
-  rw [bcond_bne_eq]
-  refine bne_iff_ne.mpr ?_
-  intro e
-  apply h
-  revert e
-  bv_decide
 
 /-- A live slot's word (Rocq `ig_ref_spos`, via `InodeLock.inodeRef_spos`). -/
 theorem ig_blez_live (n : PosNat) (hn : n.val < 2 ^ 31) :
@@ -283,7 +269,7 @@ theorem ig_quarter_lt : Qp.quarter < (1 : Qp).half := by
   rw [Qp.lt_iff]; simp only [Qp.val_quarter, Qp.val_half, Qp.val_one]; grind
 
 theorem ig_quarter_rest : qpSub (1 : Qp).half Qp.quarter = some Qp.quarter := by
-  rw [qpSub_some]; exact qp_quarter_add_quarter.symm
+  rw [qpSub_some]; exact Xv6.ctok_quarter_add_quarter.symm
 
 /-! ## The `"iget: no inodes"` literal -/
 

@@ -308,7 +308,7 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     have hv1 : v = 1#32 := hbs.2.resolve_left hv
     subst hv1
     k_step_e (wp_s_branch cpu _ (KA.«bread» + 0xb6#64) true 18#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_beqz_one]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bcond_beq_one]
     iintro Hk Hpc
     k_norm_g
     icases bufPay_valid γ V kk dev bno 1#32 bs hcov (by decide) $$ Hpay with

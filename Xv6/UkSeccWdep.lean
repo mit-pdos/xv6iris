@@ -116,7 +116,7 @@ theorem uwrite_sup_secc (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List
   iframe Hh Hf
   iapply sbundleAt_write_intro_at (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (kwcFam N)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 11#5) (m.get 12#5) fdv
-    M pm sz false (ukio_tfOf_arg0 m pc) (ukio_tfOf_arg1 m pc) (ukio_tfOf_arg2 m pc) rfl rfl rfl rfl rfl
+    M pm sz false (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a1 m pc) (Xv6.tfOf_a2 m pc) rfl rfl rfl rfl rfl
   rw [std_fd_st_of_key (m.get 10#5) fdv l 2 _ (by rw [h0]; rfl) (by decide) htake hl2]
   have hq : (kwcFam (GF := GF) N).wQ = fun _ => iprop(True) := rfl
   have hqe : (kwcFam (GF := GF) N).wQe = fun _ _ => iprop(True) := rfl

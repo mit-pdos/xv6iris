@@ -64,7 +64,7 @@ reached -- `fdev_signed_small`, `fdev_m1`, `fdev_cint_lt`,
 2. Images and words as in `UkFileOpenDefs` (deviations 2-3); the C `int`
    reading `bv_signed (trunc32 v)` is `(BitVec.setWidth 32 v).toInt` (the
    holes' spelling, UkTree deviation 1) and `sys_rw_count v` is `argZ v`
-   (`fdev_argZ_setWidth` is their equation).  Rocq's `echo_count_is`
+   (`Xv6.argZ_setWidth` is their equation).  Rocq's `echo_count_is`
    (UEchoOut) is `fdev_argZ_nat`.
 3. **The close leaves take the non-pipe premise** (`fdstNopipe st`, the
    pure fact Rocq's `UkRun.udepw_cl_nopipe` turns into the close row's
@@ -86,6 +86,7 @@ import Xv6.UStrImg
 import Xv6.UNamePath
 import Xv6.UkHandler
 import Xv6.UshMainBytes
+import Xv6.UkGrepTreeDefs
 
 namespace Xv6
 
@@ -114,22 +115,13 @@ theorem fdev_cint_lt (v : BitVec 64) (n : Nat) (h : (BitVec.setWidth 32 v).toInt
   have := BitVec.toInt_lt (x := BitVec.setWidth 32 v)
   simpa using this
 
-/-- The two C readings of a word agree (deviation 2). -/
-theorem fdev_argZ_setWidth (v : BitVec 64) : argZ v = (BitVec.setWidth 32 v).toInt := by
-  unfold argZ
-  congr 1
-
 /-- **Rocq `UEchoOut.echo_count_is`**: a small count reads as itself. -/
 theorem fdev_argZ_nat (n : Nat) (h : n < 2 ^ 31) : argZ (BitVec.ofNat 64 n) = (n : Int) := by
-  rw [fdev_argZ_setWidth]
+  rw [Xv6.argZ_setWidth]
   have h1 : (BitVec.setWidth 32 (BitVec.ofNat 64 n)).toNat = n := by
     rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
   rw [BitVec.toInt_eq_toNat_cond, h1]
   split <;> omega
-
-/-- ...and the C `int` reading of the same. -/
-theorem fdev_cint_nat (n : Nat) (h : n < 2 ^ 31) : (BitVec.setWidth 32 (BitVec.ofNat 64 n)).toInt = (n : Int) := by
-  rw [← fdev_argZ_setWidth]; exact fdev_argZ_nat n h
 
 /-- **Rocq `fdev_map_seq_take`**: the buffer the held read filled IS the
 next `k` bytes of the content. -/

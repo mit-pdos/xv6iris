@@ -32,6 +32,7 @@ and `UkShParser.v` (5) -- `ushp_nul_row(_exec/_redir/_pipe)`,
 -/
 import Xv6.UshTreeDefs
 import Xv6.UshParserPure
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -229,9 +230,6 @@ theorem ushS_jr (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C] 
   rw [ht]
   iexact Hk
 
-theorem ush_toNat_ofNat (x : Nat) (hx : x < 2 ^ 64) : (BitVec.ofNat 64 x).toNat = x := by
-  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx]
-
 /-! ## §4 The head (Rocq `wp_ref_nul_head`) -/
 
 /-- **Rocq `wp_ref_nul_head`**: nulterminate from its entry through the jump
@@ -251,7 +249,7 @@ theorem shNul_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p :
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 arm) nn -∗ wpLoop h') -∗
       wpLoop h := by
   obtain ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9⟩ := ushNulRow_facts hrow
-  have hpn : (BitVec.ofNat 64 p).toNat = p := ush_toNat_ofNat p (by omega)
+  have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
   iintro #Hc Hty Hrun Hk
   -- 0x7ee..0x7f6  the prologue
   iapply ush_frame_pro UL N 4 [1#5, 8#5, 9#5] 1 0x7ee 0x7f8 (ushI_7ee N.t)
@@ -315,7 +313,7 @@ theorem shNul_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p :
   iapply ushS_lwT UL N (ushI_814 N.t) 0x816 h10 m8 nn row rowv (BitVec.signExtend 64 rowv)
     (by rw [extend_value_false])
     (by show (((ukWr m7 15#5 _).get 15#5).toNat : Int) + _ = _
-        rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat row (by omega)]; rfl) F5 $$ Hc Hrow Hrun
+        rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat row (by omega)]; rfl) F5 $$ Hc Hrow Hrun
   iintro %h11 Hrun
   let m9 := ukWr m8 15#5 (BitVec.signExtend 64 rowv)
   -- 0x816  add a5,a5,a4
@@ -413,7 +411,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     icases ushSlots_some N s0 (p + 88) toks Prod.snd done.length tk hi (by omega) $$ Hev with ⟨Hw, Hevc⟩
     iapply ushS_ld UL N (ushI_822 N.t) 0x824 h mc nn (DFrac.own 1) (p + 88 + 8 * done.length)
       (BitVec.ofNat 64 (s0 + tk.2))
-      (by rw [ha5, ush_toNat_ofNat _ (by omega)]; simp; omega) (by omega) $$ Hc Hw Hrun
+      (by rw [ha5, Xv6.bcOfNatToNat _ (by omega)]; simp; omega) (by omega) $$ Hc Hw Hrun
     iintro Hw %h1 Hrun
     ihave Hev := Hevc $$ Hw
     let m1 := ukWr mc 14#5 (BitVec.ofNat 64 (s0 + tk.2))
@@ -421,7 +419,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     icases ush_bytes_upd N.d s0 (len + 1) g tk.2 (by have := htk.2; omega) $$ Hl with ⟨Hb, Hlc⟩
     iapply ushS_sb0 UL N (ushI_824 N.t) 0x828 h1 m1 nn (s0 + tk.2) (g tk.2)
       (by show (((ukWr mc 14#5 _).get 14#5).toNat : Int) + _ = _
-          rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat _ (by have := htk.2; omega)]; rfl) $$ Hc Hb Hrun
+          rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat _ (by have := htk.2; omega)]; rfl) $$ Hc Hb Hrun
     iintro Hb %h2 Hrun
     ihave Hl := Hlc $$ %ubyte0 Hb
     -- 0x828  addi a5,a5,8
@@ -434,7 +432,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     icases ushSlots_cap N s0 (p + 8) toks Prod.fst hlen $$ Hav with ⟨Hw, Havc⟩
     iapply ushS_ld UL N (ushI_82a N.t) 0x82e h3 m2 nn (DFrac.own 1) (p + 8 + 8 * toks.length) 0#64
       (by show (((ukWr m1 15#5 _).get 15#5).toNat : Int) + _ = _
-          rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat _ (by omega), hlen']
+          rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat _ (by omega), hlen']
           simp; omega) (by omega) $$ Hc Hw Hrun
     iintro Hw %h4 Hrun
     ihave Hav := Havc $$ Hw
@@ -466,7 +464,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
       $$ Hev with ⟨Hw, Hevc⟩
     iapply ushS_ld UL N (ushI_822 N.t) 0x824 h mc nn (DFrac.own 1) (p + 88 + 8 * done.length)
       (BitVec.ofNat 64 (s0 + tk.2))
-      (by rw [ha5, ush_toNat_ofNat _ (by rw [htoks] at hlen; simp at hlen; omega)]; simp; omega)
+      (by rw [ha5, Xv6.bcOfNatToNat _ (by rw [htoks] at hlen; simp at hlen; omega)]; simp; omega)
       (by omega) $$ Hc Hw Hrun
     iintro Hw %h1 Hrun
     ihave Hev := Hevc $$ Hw
@@ -475,7 +473,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     icases ush_bytes_upd N.d s0 (len + 1) g tk.2 (by have := htk.2; omega) $$ Hl with ⟨Hb, Hlc⟩
     iapply ushS_sb0 UL N (ushI_824 N.t) 0x828 h1 m1 nn (s0 + tk.2) (g tk.2)
       (by show (((ukWr mc 14#5 _).get 14#5).toNat : Int) + _ = _
-          rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat _ (by have := htk.2; omega)]; rfl) $$ Hc Hb Hrun
+          rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat _ (by have := htk.2; omega)]; rfl) $$ Hc Hb Hrun
     iintro Hb %h2 Hrun
     ihave Hl := Hlc $$ %ubyte0 Hb
     have hl2 : done.length + 1 + 1 ≤ toks.length := by rw [htoks]; simp; omega
@@ -490,7 +488,7 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     iapply ushS_ld UL N (ushI_82a N.t) 0x82e h3 m2 nn (DFrac.own 1) (p + 8 + 8 * (done.length + 1))
       (BitVec.ofNat 64 (s0 + tk'.1))
       (by show (((ukWr m1 15#5 _).get 15#5).toNat : Int) + _ = _
-          rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat _ (by omega)]
+          rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat _ (by omega)]
           simp; omega) (by omega) $$ Hc Hw Hrun
     iintro Hw %h4 Hrun
     ihave Hav := Havc $$ Hw
@@ -528,7 +526,7 @@ theorem shNul_exec (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
         ⌜∀ q : BitVec 5, q ≠ 14#5 → q ≠ 15#5 → mc'.get q = mc.get q⌝ -∗
         urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x83e) nn -∗ wpLoop h') -∗
       wpLoop h := by
-  have hpn : (BitVec.ofNat 64 p).toNat = p := ush_toNat_ofNat p (by omega)
+  have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
   have hA : ((mc.get 10#5).toNat : Int) + (8#12 : BitVec 12).toInt = ((p + 8 + 8 * 0 : Nat) : Int) := by
     rw [ha0, hpn]; simp
   iintro #Hc Hav Hev Hl Hrun Hk

@@ -601,7 +601,7 @@ theorem fsExtent_ofImage (dk : Nat → BitVec 8) (ndisk : Nat) (sb : FsSb) (nib 
   rcases hb with hb | hb
   · exact hincov b hb
   · apply hincov
-    have hbb := logRegion_bound _ b hb
+    have hbb := Xv6.logRegion_range _ b hb
     apply hcovmeta
     · have : (2 : Nat) ≤ b := by omega
       omega

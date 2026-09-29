@@ -27,11 +27,12 @@ pure model `ushpFind`, and the parse tree `UshpCmd`.
    kept as the "apply-shaped" forms Rocq uses.
 4. `bv_unsigned` is `BitVec.toNat` (cast to `Int` where a code is an `Int`);
    `Z_to_bv 8 n` is `n#8`; `toks !! i` is `toks[i]?`.
-5. `ushp_len_app1`/`ushp_app_cons`/`ushp_len_app_cons`/`ushp_lookup_app_*`
+5. `ushp_len_app1`/`Xv6.epuApp_snoc`/`ushp_len_app_cons`/`ushp_lookup_app_*`
    are kept under their Rocq names (walks cite them) although each is one
    `simp` in Lean.
 -/
 import Xv6.UmodeAbi
+import Xv6.EchoOutPure
 
 namespace Xv6
 
@@ -352,8 +353,6 @@ theorem ushpTokens_cons_inv' (len i j q : Nat) (f : Nat → BitVec 8) (tk : Nat 
   subst hj hq; exact ushpTokens_cons_inv len i f tk rest h
 
 theorem ushp_len_app1 {A : Type} (l : List A) (x : A) : (l ++ [x]).length = l.length + 1 := by simp
-
-theorem ushp_app_cons {A : Type} (l : List A) (x : A) (r : List A) : (l ++ [x]) ++ r = l ++ x :: r := by simp
 
 theorem ushp_len_app_cons {A : Type} (l : List A) (x : A) (r : List A) :
     (l ++ x :: r).length = l.length + r.length + 1 := by simp; omega

@@ -109,7 +109,6 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
 
 
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
@@ -715,28 +714,19 @@ instance instCtxMorphTfPageAt (tier : KTier) (tfp : BitVec 44) (ws : List (BitVe
         (fun bs => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜bs.length = 4096 - 288⌝)) _
           (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))))
 
-/-- The address-space arm of `procDormant` (empty at UNUSED, the ZOMBIE's
-space and trapframe page at ZOMBIE) re-indexes. -/
-instance instCtxMorphStackOwn (tier : KTier) (sp : BitVec 64) (n : Nat) :
-    CtxMorph (GF := GF) (fun ξ => @stackOwn hlc GF _ ⟨ξ, tier⟩ sp n) := by
-  unfold stackOwn
-  exact ctxMorph_bigSepL (List.range n)
-    (fun _ i ξ => iprop(∃ w : BitVec 64,
-      @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w))
-    (fun _ _ => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
 
 instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid) := by
   unfold dormantSpace
   by_cases h : st = UNUSED
   · simp only [if_pos h]
-    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphStackOwn _ _ _)
+    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (MachCSL.instCtxMorphStackOwn _ _ _)
   · simp only [if_neg h]
     exact @instCtxMorphExists hlc GF _ _ _
       (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
-            (instCtxMorphStackOwn _ _ _))))
+            (MachCSL.instCtxMorphStackOwn _ _ _))))
 
 instance instCtxMorphProcFieldsNoctx (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) :
     CtxMorph (GF := GF) (fun ξ => @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa dq V) :=

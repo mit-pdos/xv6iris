@@ -45,7 +45,7 @@ Rocq's header, kept point for point:
    UexecSlot's deferred remainder; it lives HERE because UexecSlot is a
    landed file (the recommended append is in the W8-F report).
 2. **MachCSL's `gprFile` does not own x0** (`gprIdxs` is `x1..x31`), so Rocq's
-   `gpr_file_x0` is `uexec_gprFile_congr`: a file is the same resource at any
+   `gpr_file_x0` is `MachCSL.gprFile_ext`: a file is the same resource at any
    map agreeing off x0, and the trap-out key is built at `g` with x0 zeroed.
 3. **The U-tier vocabulary Rocq keeps in `UserPtTree`/`UmodeText`/`UserExec`/
    `UmodeRegs`/`UserPerm`** that the trap contract states itself over, and
@@ -81,7 +81,7 @@ set_option linter.unusedSectionVars false
 /-! ## §0 The U-tier vocabulary the contract is stated over (deviation 3)
 
 `userPtmInv`/`userPtmInvX`, `userTrapFrameAt(m)`, `uvRegs`/`uvAmb` and
-`uexec_gprFile_congr` live in `Xv6/UserExec.lean` (batch 8-P, the 8-M
+`MachCSL.gprFile_ext` live in `Xv6/UserExec.lean` (batch 8-P, the 8-M
 review); the register file `zeroRf`/`tfResumeGpr*` in `Xv6/UexecSlot.lean`;
 `exitXs` in `Xv6/ProcGeom.lean` (Rocq `ProcGeom.exit_xs`, shared with
 kexit/sys_exit). -/
@@ -304,7 +304,7 @@ theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut :
   ihave ⟨%M, Hpt⟩ := userPtmInv_intro cpu pt sz $$ Hany
   let g0 : RegMap := g.set 0#5 0#64
   have hg0 : g0 0#5 = 0#64 := by simp [g0]
-  ihave Hg0 := uexec_gprFile_congr cpu g g0 (fun i hi => by simp [g0, RegMap.set, hi]) $$ Hg
+  ihave Hg0 := MachCSL.gprFile_ext cpu g g0 (fun i hi => by simp [g0, RegMap.set, hi]) $$ Hg
   iexists uvisOfRun g0 sep M π sz fdv cw gn cs pidv lz secc, sc, stv
   isplitr
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩

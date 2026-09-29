@@ -35,12 +35,13 @@ The close splits on the count, which is what lets its entries share it:
    park decision is already in hand (`iputRowOpen`'s `false` halves, taken
    by the free path's entry); the header's frozen alternative is refuted
    against it (`iput_tail_hdr_open`).
-3. `iput_tail_ciwf_update` restates iget's `ig_ciwf_update` (a stage file may
+3. `Xv6.ig_ciwf_update` restates iget's `ig_ciwf_update` (a stage file may
    not import another function's): promotion candidate.
 -/
 import Xv6.IputStages
 import Xv6.IcacheInvStore
 import Xv6.IcacheBoxSites
+import Xv6.IgetHit
 
 namespace Xv6
 
@@ -83,20 +84,6 @@ theorem iput_tail_ref_sub [Icfg] {GF : BundledGFunctors} [IcacheG GF]
   obtain ⟨⟨qt, n⟩, hy, hle⟩ := Heap.singleton_inc_iff.mp hinc
   exact ⟨qt, n, hy, iputTail_sub_of_inc hle⟩
 
-/-- `icCiWf` after a count move at a live slot (iget's `ig_ciwf_update`,
-restated: a stage file may not import another function's). -/
-theorem iput_tail_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
-    (nib : Nat) (dv : BitVec 32) (j : Nat) (v v' : Qp × PosNat)
-    (hMj : PartialMap.get? M j = some v) (hciwf : icCiWf M ci nib dv) :
-    icCiWf (PartialMap.insert M j v') ci nib dv := by
-  obtain ⟨hdom, hinj, hrange, hdv⟩ := hciwf
-  refine ⟨?_, hinj, hrange, hdv⟩
-  rw [hdom]
-  apply LawfulSet.ext; intro y
-  rw [mem_mdom, mem_mdom, LawfulPartialMap.get?_insert]
-  by_cases h : j = y
-  · subst h; simp [hMj]
-  · simp only [h, if_false]
 
 /-- The decrement of a count `k_norm` split as `x + 1`. -/
 theorem iput_tail_decr1 (x : BitVec 32) :
@@ -104,12 +91,6 @@ theorem iput_tail_decr1 (x : BitVec 32) :
       (BitVec.signExtend 64 (x + 1#32) + 0xFFFFFFFFFFFFFFFF#64))) = x := by
   bv_decide
 
-/-- The decrement in the normal form `k_norm` leaves it in. -/
-theorem iput_tail_decr (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 0xFFFFFFFFFFFFFFFF#64))) =
-      BitVec.ofNat 32 (n - 1) := by
-  rw [← iput_decr n h1 h2]; rfl
 
 /-- The rest's fraction after a non-last close: the departing share joins
 the table's retained one. -/
@@ -280,10 +261,9 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   isplitr [Hslot1]
   · iapply itableRes2Llb_intro curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev _ ci
       (icMWf_insert Mt kk _ _ hMwf hkk hnom)
-      (iput_tail_ciwf_update Mt ci icfgNib icfgDev kk _ _ hMk hciwf)
+      (Xv6.ig_ciwf_update Mt ci icfgNib icfgDev kk _ _ hMk hciwf)
     iframe
   · unfold irefSlot; iexact Hslot1
-
 
 
 /-- The table's retained share is at most a half (Rocq `ip_rest_sum`). -/

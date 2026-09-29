@@ -129,7 +129,7 @@ theorem ukFetch_rvc (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat �
     obtain ⟨w, hT4⟩ := bmRead_of_owned T _ 4 hown
     have hlo : Sail.BitVec.extractLsb w 15 0 = h := by
       rw [ukf_extractLsb]
-      apply ub_eq_of_nthByte (n := 2)
+      apply MachCSL.bv_eq_of_bytes (n := 2)
       intro j hj
       rw [ukf_lo_byte w j hj]
       have a := bmRead_spec T _ 4 w hT4 j (by omega)

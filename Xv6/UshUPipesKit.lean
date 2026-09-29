@@ -201,10 +201,6 @@ theorem ushCmd_stages (γ : GName) (q sa len : Nat) (gb : Nat → BitVec 8) (pw 
         (ushArgs sa (uGS pw (F :: fs') len gb) (ushqRebase (pc0 pw) (wlToks (filtWords F)))
           :: uREST pw F fs' len gb sa)) := .rfl
 
-/-- R-prog's cat slot is persistent (Rocq: by `apply _`). -/
-instance ushCatSlot_persistent (T : IProp GF) : Persistent (shCatSlot (hlc := hlc) T) := by
-  unfold shCatSlot; infer_instance
-
 /-- The grep slot is persistent. -/
 instance ushGrepSlot_persistent (T : IProp GF) : Persistent (shGrepSlot (hlc := hlc) T) := by
   unfold shGrepSlot; infer_instance

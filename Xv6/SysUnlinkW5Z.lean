@@ -196,7 +196,7 @@ theorem sys_unlink_li0' : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 theorem sys_unlink_sext_off (kk : Nat) (h : 16 * kk < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.ofNat 32 (16 * kk)) = BitVec.ofNat 64 (16 * kk) :=
-  fw_sext32 _ h
+  MachCSL.signExtend_ofNat32 _ h
 
 theorem sys_unlink_de_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 4032#12 = sysUnlinkDe x := by
@@ -320,7 +320,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
   unfold sysUnlinkWiK
   iintro %cpu %spie1 %spp1 %R2 %tot %bmW %datW %dnW %dn0W %nw %wrote %dist %dstb %P' %Sbw
     %⟨hcs2, hout⟩ Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hdi Hde Hpid Hbs Hop
-  k_norm_g [sys_unlink_ret_a8, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_a8, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 11#5 _ (sysUnlinkPins_set k _ _ _ _ 12#5 _

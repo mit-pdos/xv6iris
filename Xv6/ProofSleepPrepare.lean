@@ -24,6 +24,7 @@ import Xv6.SpecMyproc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import Xv6.KilledDefs
 
 namespace Xv6
 
@@ -33,12 +34,6 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Pure facts -/
-
-/-- The lock list after `release` drops `proc`. -/
-theorem sp_filter_proc (l : List String) (h : "proc" ∉ l) :
-    ("proc" :: l).filter (fun x => x ≠ "proc") = l := by
-  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
-  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 /-- `beqz` on a word. -/
 theorem sp_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
@@ -227,7 +222,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     $$ [$Hstate $Hpstl $Hchan $Hrest $Hslots]
   ihave HRnew := (show procLockResAt (GF := GF) Γ curCtx (procAddr j) ⊢ procLockPay Γ j curCtx from by
     unfold procLockPay; iintro H; iexact H) $$ HRnew
-  have hfilt := sp_filter_proc k.locks hlk
+  have hfilt := Xv6.kl_filter_proc k.locks hlk
   have hpe : ((((k.pushed 4).withSpie spieM sppM).pushOffAt spie spp).popExit k.sie)
       = (k.pushed 4).withSpie spie spp :=
     KCtx.pushOffAt_popExit ((k.pushed 4).withSpie spieM sppM) spie spp hwf

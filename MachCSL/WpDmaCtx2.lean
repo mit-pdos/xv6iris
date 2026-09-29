@@ -161,7 +161,7 @@ theorem histBytes_congr (pa : PAddr) (n : Nat) (dq : DFrac) (Hs Hs' : Nat → Hi
     (h : ∀ j, j < n → Hs j = Hs' j) :
     histBytes (GF := GF) pa n (fun _ => dq) Hs = histBytes pa n (fun _ => dq) Hs' := by
   unfold histBytes
-  exact BigSepL.bigSepL_eq (fun {_ x} hx => by rw [h x (range_getElem?_lt hx)])
+  exact BigSepL.bigSepL_eq (fun {_ x} hx => by rw [h x (MachCSL.rangeIdx_lt hx)])
 
 /-- **The join at the raw tier**, with the histories chosen: two adjacent
 windows at the same fraction are one window. -/
@@ -198,14 +198,14 @@ theorem ctxBytes_split_at (ξ : CtxId) (pa : PAddr) (k m : Nat) (dq : DFrac)
       (Ψ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 j) dq
         (nthByte (n := k) (BitVec.extractLsb' 0 (8 * k) w) j)) ?_) $$ H1
     intro _ j hj
-    rw [nthByte_lo w j (range_getElem?_lt hj)]
+    rw [nthByte_lo w j (MachCSL.rangeIdx_lt hj)]
   · iapply (BigSepL.bigSepL_mono (l := List.range m)
       (Φ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 (k + j)) dq
         (nthByte w (k + j)))
       (Ψ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 k + BitVec.ofNat 64 j) dq
         (nthByte (n := m) (BitVec.extractLsb' (8 * k) (8 * m) w) j)) ?_) $$ H2
     intro _ j hj
-    rw [nthByte_hi w j (range_getElem?_lt hj), shiftAddr pa k j]
+    rw [nthByte_hi w j (MachCSL.rangeIdx_lt hj), shiftAddr pa k j]
 
 theorem ctxBytes_join_at (ξ : CtxId) (pa : PAddr) (k m : Nat) (dq : DFrac)
     (w : BitVec (8 * (k + m))) :
@@ -222,14 +222,14 @@ theorem ctxBytes_join_at (ξ : CtxId) (pa : PAddr) (k m : Nat) (dq : DFrac)
       (Φ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 j) dq
         (nthByte (n := k) (BitVec.extractLsb' 0 (8 * k) w) j)) ?_) $$ H1
     intro _ j hj
-    rw [nthByte_lo w j (range_getElem?_lt hj)]
+    rw [nthByte_lo w j (MachCSL.rangeIdx_lt hj)]
   · iapply (BigSepL.bigSepL_mono (l := List.range m)
       (Ψ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 (k + j)) dq
         (nthByte w (k + j)))
       (Φ := fun _ (j : Nat) => ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 k + BitVec.ofNat 64 j) dq
         (nthByte (n := m) (BitVec.extractLsb' (8 * k) (8 * m) w) j)) ?_) $$ H2
     intro _ j hj
-    rw [nthByte_hi w j (range_getElem?_lt hj), shiftAddr pa k j]
+    rw [nthByte_hi w j (MachCSL.rangeIdx_lt hj), shiftAddr pa k j]
 
 end ambient
 

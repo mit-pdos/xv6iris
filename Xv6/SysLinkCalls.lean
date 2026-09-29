@@ -14,7 +14,7 @@ its own crossing).
 * `sys_link_ilock` (+0x42, +0x80, +0xf6): the WRITE ARM (`ILOCK.wp_ilock_tx_eb`,
   Rocq `Ilock.wp_ilock_tx_sconf`) at the plain licence and `topLb 0`;
 * `sys_link_iunlock` (+0x6c): `IUNLOCK.wp_iunlock_tx`;
-* `sys_link_iupdate_link` (+0x66), `sys_link_iupdate_unlink` (+0x106);
+* `sys_link_iupdate_link` (+0x66), `Xv6.sys_unlink_iupdate_unlink` (+0x106);
 * `sys_link_iunlockput_sconf` (ip's, on ARMS C / D and the `bad:` tail) and
   `sys_link_iunlockput_gen` (dp's, on ARMS E2 / F and the success arm);
 * `sys_link_iput` (the success arm's `iput(ip)`, counted);
@@ -37,6 +37,7 @@ projection family); the superblock cells are the persistent
 -/
 import Xv6.SysLinkFrame
 import Xv6.SpecNamecmp
+import Xv6.SysUnlinkCalls
 
 namespace Xv6
 
@@ -443,67 +444,6 @@ theorem sys_link_iupdate_link (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
   iexists w
   iframe Htok
   ipureintro; exact hw
-
-set_option maxHeartbeats 8000000 in
-/-- `iupdate(ip)` after the `ip->nlink--` at +0x106 (Rocq
-`Iupdate.wp_iupdate_unlink`): the minted pile consumed. -/
-theorem sys_link_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (j : Nat) (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity) (pidv : BitVec 32)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
-    (hcru : cru = true → IBLOCK inum icfgIst ∈ Sb) (hnib : inum.toNat < 16 * icfgNib)
-    (hstab : diTypeStable dn dn0) (hnz : dn.diType.toNat ≠ 0)
-    (hdec : dn0.diNlink.toNat = dn.diNlink.toNat + 1)
-    (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
-    (ha0 : k'.regs 10#5 = ientry kk) :
-    kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
-    wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
-    wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
-    inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
-    dinodeAt fscIreg inum dn0 ∗
-    FsStateLink.linkToks (fsGammaL fscFs) (inum.toNat : Int)
-      (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      wordPointsTo (pPid pj) 4 pidPriv pidv -∗
-      wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
-      wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum -∗
-      inodeMeta (ientry kk) dn -∗ inodeMap fscFs (ientry kk) bm -∗
-      dinodeAt fscIreg inum dn -∗ bslots 2 -∗
-      logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb) -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  subst hs hpj
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hdi, Htok, Hpid, Hbs, Hop, HK⟩
-  unfold sysfileEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
-  ihave %hg := fsReady_geom $$ Hrdy
-  icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
-  icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, -⟩
-  have h := IU.wp_iupdate_unlink_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j (ientry kk)
-    inum dn dn0 bm u Sb cru uty pidv pidPriv (DFrac.own (1 : Qp).half)
-    (DFrac.own (1 : Qp).half) DFrac.discard hj hproc hK hnoff htier hcru hg.fgoLog
-    (hg.iblockCov inum hnib) (hg.iblockOut inum hnib) hnib hstab hnz hdec hda hdir hpd ha0
-  unfold wp_iupdate_unlink_eb_body at h
-  simp only [iupdateAddr] at h
-  iapply h
-  iframe Hk Hpc Hte Hce Hdi Htok Hpid Hbs Hop
-  iframe #
-  isplitl [Hdev Hinum Hmeta Hmap]
-  · unfold iuCells; iframe Hdev Hinum Hmeta Hmap; iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi Hbs Hop
-  unfold iuCells
-  icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, -⟩
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hbs Hop
 
 /-! ## iunlockput (the write arm), iput -/
 

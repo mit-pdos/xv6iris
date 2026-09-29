@@ -210,7 +210,7 @@ def WiLoopGoal (Γ : SchedNames) (k : KCtx) (A : WiArgs) (W : Nat) : Prop :=
 theorem writei_bgeu_sum (a b n : Nat) (h : a + b < 2 ^ 31) (hn : n < 2 ^ 31) :
     bcond bop.BGEU (BitVec.ofNat 64 a + BitVec.ofNat 64 b) (BitVec.ofNat 64 n) =
       decide (n ≤ a + b) := by
-  rw [← BitVec.ofNat_add, writei_bgeu_nat _ _ (by omega) (by omega)]
+  rw [← BitVec.ofNat_add, Xv6.fw_bgeu_nat _ _ (by omega) (by omega)]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x68 .. +0x7e`: THE COPY SUCCEEDED** (Rocq's `Hr0` arm):

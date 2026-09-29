@@ -23,6 +23,8 @@ and is what `Xv6/ProofBeginOp.lean` (and, later, the `log_write` / `end_op`
 proofs) reads the ledger through.
 -/
 import Xv6.LogInv
+import Xv6.BallocParts
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -78,9 +80,6 @@ theorem opSumL_perm {l₁ l₂ : List (Nat × OpEntry)} (h : l₁.Perm l₂) : o
   | trans _ _ ih₁ ih₂ => omega
 
 /-! ## The five `op_sum` laws -/
-
-/-- Rocq `op_sum_empty` (already in `LogInv`, restated for uniformity). -/
-theorem opSum_empty' : opSum ∅ = 0 := opSum_empty
 
 /-- Rocq `op_sum_insert`. -/
 theorem opSum_insert (om : RegMapF OpEntry) (i : Nat) (e : OpEntry)
@@ -268,43 +267,6 @@ natural, so each step is `ofNat 64 v -> ofNat 64 v'` with no wrap.
 Rocq's `bo_slli2`/`bo_addw1`/`bo_slli1` split four ways on `out`; here the
 bridges are general and the smallness is the side condition. -/
 
-/-- Rocq `bo_sext32`, the low half. -/
-theorem bo_w32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) = BitVec.ofNat 32 a := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat]
-  simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
-/-- Rocq `bo_sext32`. -/
-theorem bo_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
-
-/-- `lw` of a small counter cell. -/
-theorem bo_lw (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := bo_sext32 a h
-
-/-- `addiw a4,a4,1` at `+0x40`. -/
-theorem bo_addiw1 (t : Nat) (h : t + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t + 1#64)) =
-      BitVec.ofNat 64 (t + 1) := by
-  rw [show (BitVec.ofNat 64 t + 1#64) = BitVec.ofNat 64 (t + 1) from by
-      apply BitVec.eq_of_toNat_eq
-      simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-      omega,
-    bo_w32 (t + 1) h]
-  exact bo_sext32 _ h
-
-/-- ...before `k_norm` folds the immediate. -/
-theorem bo_addiw1' (t : Nat) (h : t + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.ofNat 64 t + BitVec.signExtend 64 1#12)) = BitVec.ofNat 64 (t + 1) := by
-  rw [show BitVec.signExtend 64 (1#12) = (1#64 : BitVec 64) from by decide]
-  exact bo_addiw1 t h
-
 /-- `slliw rd,rs,s`: multiply by `2 ^ s`. -/
 theorem bo_slliw (a s : Nat) (h : a * 2 ^ s < 2 ^ 31) (hs : s < 32) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) <<< s) =
@@ -314,23 +276,23 @@ theorem bo_slliw (a s : Nat) (h : a * 2 ^ s < 2 ^ 31) (hs : s < 32) :
     calc a = a * 1 := (Nat.mul_one a).symm
       _ ≤ a * 2 ^ s := Nat.mul_le_mul_left a this
       _ < 2 ^ 31 := h
-  rw [bo_w32 a ha,
+  rw [Xv6.fw_w32 a ha,
     show BitVec.ofNat 32 a <<< s = BitVec.ofNat 32 (a * 2 ^ s) from by
       apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.shiftLeft_eq,
         Nat.mod_eq_of_lt (show a < 2 ^ 32 by omega)]]
-  exact bo_sext32 _ h
+  exact MachCSL.signExtend_ofNat32 _ h
 
 /-- `addw rd,ra,rb` on two small naturals. -/
 theorem bo_addw (a b : Nat) (h : a + b < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 b)) = BitVec.ofNat 64 (a + b) := by
-  rw [bo_w32 a (by omega), bo_w32 b (by omega),
+  rw [Xv6.fw_w32 a (by omega), Xv6.fw_w32 b (by omega),
     show BitVec.ofNat 32 a + BitVec.ofNat 32 b = BitVec.ofNat 32 (a + b) from by
       apply BitVec.eq_of_toNat_eq
       simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
       omega]
-  exact bo_sext32 _ h
+  exact MachCSL.signExtend_ofNat32 _ h
 
 theorem bo_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
   rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
@@ -353,9 +315,5 @@ theorem bo_bge30 (v : Nat) (h : v < 2 ^ 63) :
 theorem bo_bnez_cmt (cmt : Bool) :
     bcond bop.BNE (BitVec.signExtend 64 (if cmt then 1#32 else 0#32)) 0#64 = cmt := by
   cases cmt <;> decide
-
-/-- The store at `+0x70` writes back `a4 = out + 1`. -/
-theorem bo_sw_out (t : Nat) (h : t < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t) = BitVec.ofNat 32 t := bo_w32 t h
 
 end Xv6

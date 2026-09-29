@@ -67,10 +67,6 @@ theorem echoCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
     · cases hab
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
-/-- A register word is its own `toNat` read back (Rocq `moi_of_uint`). -/
-theorem echoEntry_ofNat_toNat (x : BitVec 64) : BitVec.ofNat 64 x.toNat = x := by
-  rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
-
 section UkTreeEntryEcho
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
@@ -107,9 +103,9 @@ theorem echoImageEntryEnvC_holds (HS : ECHO_START) : EchoImageEntryEnvC (hlc := 
   -- the two register facts
   have ha0 : (tfResumeGpr0 W'.tf).get 10#5 =
       BitVec.ofNat 64 (echoArgs W'.M (uvisAv W') (uvisArgc W')).length := by
-    rw [echoArgs_length]; exact (echoEntry_ofNat_toNat _).symm
+    rw [echoArgs_length]; exact (Xv6.ofNat_toNat_pc _).symm
   have ha1 : (tfResumeGpr0 W'.tf).get 11#5 = BitVec.ofNat 64 (uvisAv W') :=
-    (echoEntry_ofNat_toNat _).symm
+    (Xv6.ofNat_toNat_pc _).symm
   have hcode := echoCode_rows W'.M W'.perm hsub hx
   ihave #Hnpw' : urunNopipe (hlc := hlc) W'.fd $$ []
   · rw [hfd]; iexact Hnpw

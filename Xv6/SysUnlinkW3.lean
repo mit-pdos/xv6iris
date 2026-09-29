@@ -60,13 +60,6 @@ theorem sys_unlink_li32_16 : BitVec.signExtend 64 16#12 = 16#64 := by decide
 theorem sys_unlink_del_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 3864#12 = sysUnlinkDel x := by
   simp only [sysUnlinkDel]; bv_decide
-theorem sys_unlink_del_lhu (x : BitVec 64) :
-    x + BitVec.signExtend 64 3864#12 = sysUnlinkDel x := sys_unlink_del_addr x
-theorem sys_unlink_bump16 (off : Nat) (h : off + 16 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 off + 16#64))
-      = BitVec.ofNat 64 (off + 16) := by
-  have := sys_unlink_loop_bump off h
-  rwa [sys_unlink_li16] at this
 
 theorem sys_unlink_add16 (n : Nat) : BitVec.ofNat 64 n + 16#64 = BitVec.ofNat 64 (n + 16) := by
   rw [BitVec.ofNat_add]
@@ -178,7 +171,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   case rda => k_norm_g [hpins.2.1, sys_unlink_del_addr]
   iintro %cpu %spie1 %spp1 %R1 %tot %⟨hcs1, h10, htot⟩ Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hdel
     Hpid Hb1
-  k_norm_g [sys_unlink_ret_116, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_116, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (BitVec.ofNat 64 (16 * jj))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
@@ -217,7 +210,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   -- +0x11c  lhu a5,-232(s0)
   k_step_e (wp_s_lhu cpu _ (KA.«sys_unlink» + 0x11c#64) false 3864#12 15#5 8#5 (by decide)
       (by decide) (DFrac.own 1) (dirInum dati jj))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1, sys_unlink_del_lhu]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.1, Xv6.sys_unlink_del_addr]
   iintro Hk Hpc Hhalf
   ihave Hdel := sys_unlink_del_join (k.regs 2#5) (dirInum dati jj) (dirName dati jj) ok.hal
     $$ [$Hhalf $Hname]
@@ -246,7 +239,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   -- +0x122  c.addiw s3,16 ; +0x124  lw a5,76(s2) ; +0x128  bltu s3,a5
   k_step_e (wp_s_addiw cpu _ (KA.«sys_unlink» + 0x122#64) true 16#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hp1.2.2.2.2.1, sys_unlink_bump16 (16 * jj) (by omega)]
+    with [hp1.2.2.2.2.1, Xv6.dirlookup_addiw16 (16 * jj) (by omega)]
   iintro Hk Hpc
   unfold sysUnlinkIpCells
   icases Hip with ⟨Hdev, Hmeta, Hmap, Hblk⟩
@@ -257,7 +250,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1, iSize_sext, iSize]
   iintro Hk Hpc Hsz
   have hszw : BitVec.signExtend 64 dni.diSize = BitVec.ofNat 64 dni.diSize.toNat :=
-    sys_unlink_size_sext _ hsz31
+    Xv6.dsSext_small _ hsz31
   ihave Hip : sysUnlinkIpCells ks dni bmi dati $$ [Hdev Hty Hma Hmi Hnl Hsz Hmap Hblk]
   · unfold sysUnlinkIpCells inodeMeta; iframe; unfold iSize; iexact Hsz
   have hjj : 16 * (jj + 1) = 16 * jj + 16 := by omega
@@ -520,7 +513,6 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   unfold sysfileEnv; iframe #
 
 
-
 /-! ## W4's entry (+0xf8 .. +0x104), after the T_DIR test took the branch -/
 
 set_option maxHeartbeats 32000000 in
@@ -584,7 +576,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hszw : BitVec.signExtend 64 dni.diSize = BitVec.ofNat 64 dni.diSize.toNat :=
-    sys_unlink_size_sext _ hsz31
+    Xv6.dsSext_small _ hsz31
   ihave Hip : sysUnlinkIpCells ks dni bmi dati $$ [Hdevi Hty Hma Hmi Hnl Hsz Hmap Hblk]
   · unfold sysUnlinkIpCells inodeMeta; iframe; unfold iSize; iexact Hsz
   -- the empty exit's facts, for both ways out
@@ -707,7 +699,6 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
   iframe #
 
 
-
 /-! ## W3: +0x72 .. +0x86 -/
 
 theorem sys_unlink_li1 : BitVec.signExtend 64 1#12 = 1#64 := by decide
@@ -788,7 +779,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   unfold sysfileEnv; iframe #
   iintro %cpu %spie1 %spp1 %R1 %dni %bmi %γili %γisli %gi %loi %tli %⟨hcs1, hlei⟩ Hk Hpc Hte Hce
     Hpid Hb1 Hlki Hloadi
-  k_norm_g [sys_unlink_ret_78, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_78, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1

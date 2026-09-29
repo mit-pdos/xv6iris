@@ -80,26 +80,6 @@ theorem id_lock : KA.«idup» + 0x1d880#64 = itableLock := by
 theorem id_br_acq : KA.«idup» + 0xffffffffffffd950#64 = KA.«acquire» := by decide
 theorem id_br_rel : KA.«idup» + 0xffffffffffffd9d8#64 = KA.«release» := by decide
 
-/-- The `c.addiw a5,a5,1` arithmetic: the stored word IS the successor count
-(Rocq `moi32_storeval_succ`). -/
-theorem id_incr (n : Nat) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + BitVec.signExtend 64 1#12))) =
-      BitVec.ofNat 32 (n + 1) := by
-  have h : ∀ nw : BitVec 32, BitVec.extractLsb' 0 32 (BitVec.signExtend 64
-      (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 nw + BitVec.signExtend 64 1#12))) =
-      nw + 1#32 := by
-    intro nw; bv_decide
-  rw [h]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
-theorem id_incr' (n : Nat) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 1#64))) = BitVec.ofNat 32 (n + 1) := by
-  rw [← id_incr n]; rfl
-
 theorem id_filter_itable (l : List String) (h : "itable" ∉ l) :
     ("itable" :: l).filter (fun x => x ≠ "itable") = l := by
   rw [List.filter_cons_of_neg (by simp)]
@@ -368,7 +348,7 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   try (case hs2 => k_norm)
   iintro Hk Hpc Hcl
   case hb2 => k_norm [h9]; exact iRef_sext _
-  case hd2 => k_norm [PosNat.succ_val, id_incr, id_incr']
+  case hd2 => k_norm [PosNat.succ_val, Xv6.bc_incr, Xv6.bc_incr']
   unfold idClosed
   icases Hcl with ⟨HR, Hshr, Hnew, Hru1, Hru2⟩
   -- auipc a0,0x1d ; addi a0,a0,1656 ; jal release

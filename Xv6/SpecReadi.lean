@@ -179,21 +179,6 @@ theorem rdFailWhy_mono {P : UPtd} {dst : BitVec 64} {n n' : Nat} (hle : n ≤ n'
   obtain ⟨d, hd, hn⟩ := h
   exact ⟨d, by omega, hn⟩
 
-/-- Rocq's `rd_arg32_small`: below `2^31` the ABI's sign-extended `uint` is
-the plain literal. -/
-theorem rd_arg32_small (x : Nat) (h : x < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 x) = BitVec.ofNat 64 x := by
-  have hb : BitVec.ofNat 32 x ≤ 0x7FFFFFFF#32 := by
-    rw [BitVec.le_def]; simp only [BitVec.toNat_ofNat]; omega
-  have hx : (BitVec.ofNat 64 x) = BitVec.setWidth 64 (BitVec.ofNat 32 x) := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_ofNat, BitVec.toNat_setWidth]
-    omega
-  rw [hx]
-  revert hb
-  generalize BitVec.ofNat 32 x = v
-  bv_decide
-
 /-- **readi** (Rocq's `wp_readi_sconf_body`). -/
 def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]

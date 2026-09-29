@@ -21,6 +21,10 @@ import Xv6.SpecWalk
 import Xv6.SpecKfree
 import Xv6.UPtUnmapLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame8
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -36,12 +40,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- The immediates of the eight-slot frame. -/
-theorem un_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem un_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 /-- `ret` out of `walk` lands on the instruction after the `jal`. -/
 theorem un_ret_120c : jumpPc (KA.«uvmunmap» + 0x5a#64) = (KA.«uvmunmap» + 0x5a#64) := by
   decide
@@ -52,12 +50,6 @@ theorem un_ret_1226 : jumpPc (KA.«uvmunmap» + 0x74#64) = (KA.«uvmunmap» + 0x
 
 /-- `c.lui s6,0x1` is `4096`. -/
 theorem un_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
-
-theorem un_toNat_add (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
-    (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : m < 2 ^ 64)]
-  exact Nat.mod_eq_of_lt (by omega)
 
 /-- `c.slli a2,0xc`: `npages * PGSIZE`. -/
 theorem un_shl12 (n : Nat) : (BitVec.ofNat 64 n) <<< 12 = BitVec.ofNat 64 (4096 * n) := by
@@ -93,7 +85,7 @@ theorem un_va_aligned (va : BitVec 64) (h : va &&& 0xfff#64 = 0#64) : va <<< 52 
 theorem un_bgeu0 (va : BitVec 64) (n : Nat) (hr : va.toNat + 4096 * n ≤ 2 ^ 38) :
     bcond bop.BGEU va (BitVec.ofNat 64 (4096 * n) + va) = decide (n = 0) := by
   have he : (BitVec.ofNat 64 (4096 * n) + va).toNat = va.toNat + 4096 * n := by
-    rw [BitVec.add_comm]; exact un_toNat_add va _ (by omega)
+    rw [BitVec.add_comm]; exact Xv6.paAddToNat' va _ (by omega)
   simp only [bcond, BitVec.ult, he, ← decide_not, decide_eq_decide]
   omega
 
@@ -109,9 +101,9 @@ theorem un_bgeu (va : BitVec 64) (n i : Nat) (hi : i < n) (hr : va.toNat + 4096 
     bcond bop.BGEU (va + BitVec.ofNat 64 (4096 * (i + 1))) (BitVec.ofNat 64 (4096 * n) + va)
       = decide (n ≤ i + 1) := by
   have he : (BitVec.ofNat 64 (4096 * n) + va).toNat = va.toNat + 4096 * n := by
-    rw [BitVec.add_comm]; exact un_toNat_add va _ (by omega)
+    rw [BitVec.add_comm]; exact Xv6.paAddToNat' va _ (by omega)
   have hl : (va + BitVec.ofNat 64 (4096 * (i + 1))).toNat = va.toNat + 4096 * (i + 1) :=
-    un_toNat_add va _ (by omega)
+    Xv6.paAddToNat' va _ (by omega)
   simp only [bcond, BitVec.ult, he, hl, ← decide_not, decide_eq_decide]
   omega
 
@@ -142,17 +134,6 @@ theorem unKept_trans {R R' R'' : RegMap} (h : unKept R R') (h' : unKept R' R'') 
     h'.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2⟩
-
-/-- The exit interrupt state of a second call replaces the first's. -/
-theorem un_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem un_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem un_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 theorem un_availInc_none : availInc none = none := rfl
 
@@ -199,21 +180,6 @@ theorem unFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 64) :
 /-! ## The calls -/
 
 set_option maxHeartbeats 1000000 in
-/-- `walk`'s non-allocating contract at its entry address, as a rule. -/
-theorem un_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
-    (hK' : 8 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t.base)
-    (hva' : (k'.regs 11#5).toNat < 2 ^ 38) (halloc' : k'.regs 12#5 = 0#64) (hwf' : t.wfU 2) :
-    kctx c k' ∗ pcIs c KA.«walk» ∗ ptreeOwn 2 dq t ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
-      ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t hK' hroot' hva' halloc' hwf'
-  unfold wp_walk_noalloc_body at h
-  simp only [walkAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
 /-- `kfree`'s contract at its entry address, as a rule. -/
 theorem un_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
     (γl : GName) (γk : KmemNames) (on' : Option Nat)
@@ -255,7 +221,7 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   icases unFrame_split _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 8 ≤ (k.withSpie spie spp).avail := hK
-  simp only [un_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«uvmunmap» + 0x78#64) true 32#12 18#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 18#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -286,7 +252,7 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F1
   ihave Hstack : stackOwn (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c7 _ (KA.«uvmunmap» + 0x86#64) true 64#12 8 un_imm_p64)
+  k_step_gen (wp_s_pop c7 _ (KA.«uvmunmap» + 0x86#64) true 64#12 8 MachCSL.imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hp8
   iintro Hk Hpc
@@ -413,7 +379,7 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     case hpv2 => k_norm_g; exact hpv rfl
     iapply wpNext_intro_pin
     iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav %hcs2
-    k_norm_g [un_withSpie_withSpie, un_ret_1226, un_availInc_none]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, un_ret_1226, un_availInc_none]
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
     k_step_gen (wp_s_j c5 _ (KA.«uvmunmap» + 0x74#64) true 2097106#21)
       from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c6 hp6
@@ -521,7 +487,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   obtain ⟨htb, hrep⟩ := htf
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hva : (va + BitVec.ofNat 64 (4096 * i)).toNat < 2 ^ 38 := by
-    rw [un_toNat_add va _ (by omega)]; omega
+    rw [Xv6.paAddToNat' va _ (by omega)]; omega
   have hpg : ∀ b ∈ t.pages 2, pageValid (pageAddr b) := hrep.2.2.1
   -- c.li a2,0 ; c.mv a1,s2 ; c.mv a0,s4 ; jal walk
   k_step_gen (wp_s_addi cur _ (KA.«uvmunmap» + 0x50#64) true 0#12 12#5 0#5 (by decide))
@@ -536,7 +502,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   k_step_gen (wp_s_jal c3 _ (KA.«uvmunmap» + 0x56#64) false 2096376#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmunmap_br_fffffffffffffd4e] next c4 hp4
   iintro Hk Hpc
-  iapply (un_walk_call W c4 _ (DFrac.own 1) t ?hKa ?hro ?hv ?ha hrep.1) $$ [- $Hk $Hpc]
+  iapply (Xv6.wa_walk_call W c4 _ (DFrac.own 1) t ?hKa ?hro ?hv ?ha hrep.1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe Hpt
@@ -921,7 +887,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   have hvash : k.regs 11#5 <<< 52 = 0#64 := un_va_aligned _ hal
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«uvmunmap» true 4032#12 8 hK8 un_imm_m64)
+  k_step_gen (wp_s_push cpu _ KA.«uvmunmap» true 4032#12 8 hK8 MachCSL.imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -995,7 +961,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     ihave Hframe := unFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) $$ [F0 F1 F2 F3 F4 F5 F6 F7]
     case' _ => iframe
-    rw [un_pushed_spie_self k 8]
+    rw [Xv6.ua_pushed_spie_self k 8]
     iapply (uvmunmap_epi cpu c18 k hpin18 hK8 k.spie k.spp _ ?e2 ?e9 ?e23 ?e24 ?e25 ?e26 ?e27
       w2 _ _ _) $$ [- $Hk $Hpc $Hframe $Htree $Hum $Hfree]
     rotate_right 1
@@ -1024,7 +990,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     case' _ => iframe
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h : k.sie = false ∨ k.proc = 0#64 =>
       (hp20 h).trans ((hp19 h).trans (hpin18 h))) $$ HΦ
-    rw [un_pushed_spie_self k 8]
+    rw [Xv6.ua_pushed_spie_self k 8]
     iapply (uvmunmap_loop W KF k df γl γk root L Q M (k.regs 11#5) n
       ((vpnOf (k.regs 11#5)).toNat) rfl hnoff hK hlk hr hQ1 hQ0 hQV hdf hdf0 (n - 1)
       0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?g2 ?g18 ?g19 ?g20 ?g21 ?g22

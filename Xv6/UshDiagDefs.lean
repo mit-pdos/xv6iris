@@ -34,7 +34,7 @@ and `ushExecfailLawAt` ("exec %s failed\n").
    signExtend lo = ofNat fa`, the jumps land on `fprintf` / `exit`; Rocq's
    `ret_pc p4 = p4` is `ush_retPc` at an even `p0`.  `shd_die_solve` is
    `decide`.
-4. `shd_nth_byte0_moi` is `shdNthByte0_ofNat` at `BitVec.ofNat 64 b.toNat`
+4. `shd_nth_byte0_moi` is `Xv6.kcat_nthByte0_ofNat` at `BitVec.ofNat 64 b.toNat`
    (Rocq `mword_of_int (bv_unsigned b)`); `urun_shd_sb_bnd`/`_str_bnd` read
    the bound off `urun` (`UkEchoDefs.urun_ubyte_bnd` and `UserHeap`'s text
    row).
@@ -55,6 +55,8 @@ and `ushExecfailLawAt` ("exec %s failed\n").
 -/
 import Xv6.UshMainStubs
 import Xv6.UshLits
+import Xv6.LineBytes
+import Xv6.UkCatDefs
 
 namespace Xv6
 
@@ -107,16 +109,6 @@ instance (p0 : Nat) (hi : BitVec 20) (lo : BitVec 12) (j3 j5 : BitVec 21) (fa fl
 
 /-! ## §2 The paid laws' byte lemmas (pure) -/
 
-/-- **Rocq `shd_nth_byte0_moi`** (deviation 4). -/
-theorem shdNthByte0_ofNat (b : BitVec 8) : nthByte (n := 8) (BitVec.ofNat 64 b.toNat) 0 = b := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [nthByte, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.mul_zero, Nat.shiftRight_zero]
-  have := b.isLt
-  omega
-
-/-- **Rocq `ush_fork_msg_len`**. -/
-theorem ushForkMsg_len : altPanic.length = 5 := rfl
-
 /-- **Rocq `ush_fork_msg_byte`**: "fork" at 0x12a8 is the alternative's
 first four bytes. -/
 theorem ushForkMsg_byte (p : Nat) (hp : p < 4) : ushLit 0x12a8 p = altPanic[p]! := by
@@ -129,7 +121,7 @@ theorem ushForkMsg_nl : ushLit 0x12a0 2 = altPanic[4]! := by decide
 /-- **Rocq `ush_fork_msg_lookup`**. -/
 theorem ushForkMsg_lookup (p : Nat) (hp : p < 5) : altPanic[p]? = some altPanic[p]! := by
   rw [List.getElem!_eq_getElem?_getD]
-  rw [List.getElem?_eq_getElem (by rw [ushForkMsg_len]; exact hp)]
+  rw [List.getElem?_eq_getElem (by rw [Xv6.lbPanic_len]; exact hp)]
   rfl
 
 /-- **Rocq `ush_bytes_of_forallb`**: a run of byte equalities, decided. -/

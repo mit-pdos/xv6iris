@@ -46,9 +46,9 @@ Rocq's header, abridged:
    re-audit, notes/cone_reaudit.md, finds `gcl_sup` and `gcl_step_byte`
    unreached.)
 3. `gop_lta_prefix` is `ll_lta_prefix`, `gop_prefix_of_removelast` is
-   `ll_prefix_of_removelast` (`Xv6/LineModelLinks.lean`), and
+   `Xv6.pop_prefix_of_removelast` (`Xv6/LineModelLinks.lean`), and
    `gop_prefix_removelast` / `gop_prefix_snoc_lookup` are stated here once
-   (`gopPrefix_removelast`, `gopPrefix_snoc_lookup`).
+   (`Xv6.pop_prefix_removelast`, `gopPrefix_snoc_lookup`).
 4. Names: Rocq's, camelCased (`gen_cparams` → `GenCparams`, fields `gcL`,
    `gcK`, `gcT`, `gcPIN`, `gcW`, …; `gen_wa` → `GenWa`, fields `gwa`,
    `gwa_agree`, `gwaTy`, `gwa_W`, `gwaBoot`, `gwa_file`, `gwaStrict`,
@@ -57,6 +57,7 @@ Rocq's header, abridged:
    `elistAuth`.  `default sd st` is `st.getD sd`.
 -/
 import Xv6.GenOutHist
+import Xv6.PipeOutPure
 
 namespace Xv6
 
@@ -154,14 +155,6 @@ theorem lmAltsPre_snoc (M : LModel) (s0 : M.lmSt) (I : List (BitVec 8)) (cs : Li
     subst hc
     rw [hup cs.length (Nat.le_refl _)]
     exact ⟨hlt, hok⟩
-
-theorem gopPrefix_removelast {A : Type} (l l' : List A) (hp : l <+: l') : l.dropLast <+: l'.dropLast := by
-  have hlen := hp.length_le
-  have ht : l.take (l.length - 1) = l'.take (l.length - 1) := by
-    obtain ⟨z, rfl⟩ := hp
-    rw [List.take_append_of_le_length (by omega)]
-  rw [ll_removelast_take, ll_removelast_take, ht]
-  exact List.take_prefix_take_left (by omega)
 
 theorem gopPrefix_snoc_lookup {A : Type} (w l : List A) (b : A) (hp : w <+: l) (hl : l[w.length]? = some b) :
     (w ++ [b]) <+: l := by

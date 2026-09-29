@@ -281,7 +281,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         apply hpnz
         rw [heq, hret, hm1]
         exact sext_neg1_64
-      have hrv : rv = pidsh := kinit_sext_inj rv pidsh (hret.symm.trans heq.symm)
+      have hrv : rv = pidsh := Xv6.ci_sext_inj rv pidsh (hret.symm.trans heq.symm)
       subst hrv
       ihave %hγ := genUniq_tok cs rv γ' γsh _ hin $$ [Huq Htok]
       · iframe Huq Htok

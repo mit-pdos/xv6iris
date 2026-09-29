@@ -19,6 +19,8 @@ import Xv6.SpecFreewalk
 import Xv6.SpecKfree
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -33,12 +35,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the six-slot frame. -/
-theorem fw_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem fw_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `c.lui s2,0x1` is `4096`. -/
 theorem fw_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
@@ -101,17 +97,6 @@ theorem fw_branch_last {α : Type _} (b : BitVec 44) (i : Nat) (hi : i < 512) (p
       simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
       omega
     rw [if_neg he, if_neg (by simp only [bcond, beq_iff_eq]; exact hb)]
-
-/-- The context algebra of the exit interrupt state. -/
-theorem fw_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem fw_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem fw_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-! ## The contract, as a level-indexed proposition -/
 
@@ -246,7 +231,7 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, ⟨F0, F1, F2, F3, F4, F5⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 6 ≤ (k.withSpie spie spp).avail := hK
-  simp only [fw_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«freewalk» + 0x4e#64) true 40#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -269,7 +254,7 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F4
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c5 _ (KA.«freewalk» + 0x58#64) true 48#12 6 fw_imm_p48)
+  k_step_gen (wp_s_pop c5 _ (KA.«freewalk» + 0x58#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c6 hp6
   iintro Hk Hpc
@@ -334,7 +319,7 @@ theorem freewalk_tail (KF : KFREE) [CurCtx] (cpu cur : CPU) (k : KCtx)
   case hpvg => k_norm_g; exact hpv
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav2 %hcs2
-  k_norm_g [fw_withSpie_withSpie, fw_ret_1378]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, fw_ret_1378]
   unfold calleeSaved at hcs2
   k_norm_g [hR2, h19, h20, h21, h22, h23, h24, h25, h26, h27] at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
@@ -508,7 +493,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     case hroot2 => k_norm_g
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2
-    k_norm_g [fw_withSpie_withSpie, fw_ret_136c]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, fw_ret_136c]
     unfold calleeSaved at hcs2
     k_norm_g [h9, h18] at hcs2
     obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
@@ -643,7 +628,7 @@ theorem freewalk_body (KF : KFREE) (lvl : Nat) (hrec : ∀ l', lvl = l' + 1 → 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK6 : 6 ≤ k.avail := by simp only [freewalkSlots] at hK; omega
   -- the frame
-  k_step_gen (wp_s_push cpu _ KA.«freewalk» true 4048#12 6 hK6 fw_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«freewalk» true 4048#12 6 hK6 MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hstack
   irevert Hstack
@@ -693,7 +678,7 @@ theorem freewalk_body (KF : KFREE) (lvl : Nat) (hrec : ∀ l', lvl = l' + 1 → 
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))
   ihave HΦ := wpNext_shift _ _ _ _ _ hpin12 $$ HΦ
-  rw [fw_pushed_spie_self k 6]
+  rw [Xv6.ua_pushed_spie_self k 6]
   iapply (freewalk_loop KF lvl t hlvl hwf hnl hpg hrec k γl γk hnoff hK hlk 511
     0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?e2 ?e9 ?e18 ?e19 ?e20 ?e21 ?e22 ?e23
     ?e24 ?e25 ?e26 ?e27 w5 c12) $$ [- $Hk $Hpc $Hdone $Htodo $Hframe $HΦ]

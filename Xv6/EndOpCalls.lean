@@ -379,7 +379,7 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
   k_norm at hspw
   obtain ⟨ew1, ew2⟩ := hspw trivial
   subst sw pw
-  k_norm [eo_ret_86, eoK_spie, eoK_spp, eoK_ws, eo_withSpie2]
+  k_norm [eo_ret_86, eoK_spie, eoK_spp, eoK_ws, MachCSL.KCtx.withSpie_twice]
   have hR1 : eoPins k R1 r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsw
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcsw

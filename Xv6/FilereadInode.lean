@@ -30,6 +30,7 @@ Deviations: none beyond SpecFileread's.
 import Xv6.FilereadCalls
 import Xv6.FileOffProto
 import Xv6.FileRwShared
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -41,16 +42,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-theorem frd_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-theorem frd_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
-
-/-- The continuation is hart-free: a `true` crossing at a process. -/
-theorem frd_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The frame's two lazy restores and the tail -/
 
@@ -322,7 +313,7 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- ===== back from ilock =====
   iintro %cpu %spie2 %spp2 %R2 %dn %bm %K %⟨hcs2, hK2⟩ #Hflr Hk Hpc Hte Hce Hpid Hbs Hlk Hoff Hload
     #Hshot'
-  k_norm_g [frd_ret_3a, frd_ww, frd_psw]
+  k_norm_g [frd_ret_3a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr2 : frdRegs k v9 v18 v19 R2 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ (by k_norm_g at hcs2; exact hcs2)
     refine frdRegs_set _ _ _ _ _ _ _ ?_ (by decide)
@@ -421,9 +412,9 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- ===== back from readi =====
   iintro %cpu %spie1 %spp1 %R1 %tot %P' %M' %⟨hcs1, hle, hret, hext, himg⟩ Hk Hpc Hte Hce Hdev
     Hmeta Hmap Hblk Hpriv Hbs
-  k_norm_g [frd_ret_48, frd_ww, frd_psw] at himg
-  k_norm_g [frd_ret_48, frd_ww, frd_psw] at hret
-  k_norm_g [frd_ret_48, frd_ww, frd_psw]
+  k_norm_g [frd_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at himg
+  k_norm_g [frd_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hret
+  k_norm_g [frd_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : frdRegs k (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) R1 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ hcs1
     repeat (refine frdRegs_set _ _ _ _ _ _ _ ?_ (by decide))
@@ -554,7 +545,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
   case ua0 => k_norm_g; exact hip
   -- ===== back from iunlock =====
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr
-  k_norm_g [frd_ret_5a, frd_ww, frd_psw]
+  k_norm_g [frd_ret_5a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : frdRegs k (fnode fk) v18 v19 R1 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ (by k_norm_g at hcs1; exact hcs1)
     refine frdRegs_set _ _ _ _ _ _ _ ?_ (by decide)

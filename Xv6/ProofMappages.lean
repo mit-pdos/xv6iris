@@ -12,6 +12,8 @@ import Xv6.SpecMappages
 import Xv6.SpecWalk
 import Xv6.PtRunLemmas
 import Xv6.CodeTactics
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -38,17 +40,12 @@ theorem mp_ret_102c : jumpPc (KA.«mappages» + 0x48#64) = (KA.«mappages» + 0x
 /-- `c.lui s7,0x1` is `4096`. -/
 theorem mp_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
 
-theorem mp_toNat_add (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
-    (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
 /-- Stepping the page cursor steps the index field, at any width. -/
 theorem mp_extract_step (w : Nat) (x : BitVec 64) (i : Nat) (h : x.toNat + 4096 * i < 2 ^ 64) :
     BitVec.extractLsb' 12 w (x + BitVec.ofNat 64 (4096 * i))
       = BitVec.extractLsb' 12 w x + BitVec.ofNat w i := by
   apply BitVec.eq_of_toNat_eq
-  have he : (x + BitVec.ofNat 64 (4096 * i)).toNat = x.toNat + 4096 * i := mp_toNat_add x _ h
+  have he : (x + BitVec.ofNat 64 (4096 * i)).toNat = x.toNat + 4096 * i := Xv6.paAddToNat' x _ h
   have hd : (x.toNat + 4096 * i) / 2 ^ 12 = x.toNat / 2 ^ 12 + i := by
     rw [show (2:Nat) ^ 12 = 4096 from rfl, Nat.mul_comm 4096 i,
       Nat.add_mul_div_right _ _ (by omega)]
@@ -114,9 +111,9 @@ theorem mp_beq_last {α : Type} (va : BitVec 64) (n i : Nat) (hi : i < n)
     (if bcond bop.BEQ (va + BitVec.ofNat 64 (4096 * i)) (va + BitVec.ofNat 64 (4096 * (n-1)))
       then p else q) = if i + 1 = n then p else q := by
   have h1 : (va + BitVec.ofNat 64 (4096 * i)).toNat = va.toNat + 4096 * i :=
-    mp_toNat_add va _ (by omega)
+    Xv6.paAddToNat' va _ (by omega)
   have h2 : (va + BitVec.ofNat 64 (4096 * (n-1))).toNat = va.toNat + 4096 * (n-1) :=
-    mp_toNat_add va _ (by omega)
+    Xv6.paAddToNat' va _ (by omega)
   by_cases he : i + 1 = n
   · have hb : va + BitVec.ofNat 64 (4096 * i) = va + BitVec.ofNat 64 (4096 * (n-1)) := by
       rw [show i = n - 1 from by omega]
@@ -189,10 +186,6 @@ theorem mpKept_trans {R R' R'' : RegMap} (h : mpKept R R') (h' : mpKept R' R'') 
   ⟨h'.1.trans h.1, h'.2.1.trans h.2.1, h'.2.2.1.trans h.2.2.1, h'.2.2.2.1.trans h.2.2.2.1,
     h'.2.2.2.2.1.trans h.2.2.2.2.1, h'.2.2.2.2.2.trans h.2.2.2.2.2⟩
 
-/-- The exit interrupt state of a second call replaces the first's. -/
-theorem mp_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
 /-- The cursor `s2 = va + size - PGSIZE`. -/
 theorem mp_last_val (size va : BitVec 64) (n : Nat) (hs : size = BitVec.ofNat 64 (4096 * n))
     (h : 1 ≤ n) : size + (0xFFFFFFFFFFFFF000#64 + va) = va + BitVec.ofNat 64 (4096 * (n - 1)) := by
@@ -200,14 +193,6 @@ theorem mp_last_val (size va : BitVec 64) (n : Nat) (hs : size = BitVec.ofNat 64
   rw [show 4096 * n = 4096 * (n - 1) + 4096 from by omega, BitVec.ofNat_add]
   generalize BitVec.ofNat 64 (4096 * (n - 1)) = x
   bv_omega
-
-/-- The frame contexts of the prologue and of a call. -/
-theorem mp_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem mp_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -315,13 +300,13 @@ theorem mappages_iter (W : WALK) [CurCtx]
   case hKa => k_norm_g; omega
   case hl => k_norm_g; exact hlk
   case hro => k_norm_g
-  case hv => k_norm_g; rw [mp_toNat_add va _ hlt64]; omega
+  case hv => k_norm_g; rw [Xv6.paAddToNat' va _ hlt64]; omega
   case ha => k_norm_g
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie2 %spp2 %R2 %fresh %hsp2 Hk Hpc Htree Hav %hpost
   have hpinA : k.sie = false ∨ k.proc = 0#64 → c5 = cur :=
     fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
-  k_norm_g [mp_withSpie_withSpie, mp_ret_102c, mp_vpn va i hlt64]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, mp_ret_102c, mp_vpn va i hlt64]
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false,
     mp_vpn va i hlt64] at hpost
   obtain ⟨hcs, hsupply, hfrnd, hfrpg, hret, hz0⟩ := hpost
@@ -393,7 +378,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
       rw [PtRun.mapRun_one t _ _ perm fresh hlen hcomp]
     have hent0 : (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.entAt 2
         (vpnOf va + BitVec.ofNat 27 i) = 0#64 :=
-      PtRun.entAt_eq_zero 2 _ _ (by rw [PtRun.walk_fill 2 t _ fresh hwf]; exact hblock)
+      PtRun.entAt_eq_zero 2 _ _ (by rw [MachCSL.PTree.walk_fill 2 t _ fresh hwf]; exact hblock)
     obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs'
     have h9' : R2 9#5 = va + BitVec.ofNat 64 (4096 * i) := e9.trans h9
     have h18' : R2 18#5 = va + BitVec.ofNat 64 (4096 * (n - 1)) := e18.trans h18
@@ -403,7 +388,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
         = leafOf (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm := by
       rw [h9', h19', h21', mp_addr_id va pa (BitVec.ofNat 64 (4096 * i))]
       rw [← mp_ppn pa i hplt64]
-      exact mp_leaf _ perm (by rw [mp_toNat_add pa _ hplt64]; omega)
+      exact mp_leaf _ perm (by rw [Xv6.paAddToNat' pa _ hplt64]; omega)
     -- c.beqz a0 : not taken
     k_step_gen (wp_s_branch c5 _ (KA.«mappages» + 0x48#64) true 82#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mp_beq_ne _ hz] next c6 hp6
@@ -606,13 +591,13 @@ theorem mappages_loop (W : WALK) [CurCtx]
       rw [hmo1]
       -- the tree after this page
       have hwff : (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.wfU 2 :=
-        PtRun.wfU_fill 2 t _ fresh hwf
+        MachCSL.PTree.wfU_fill 2 t _ fresh hwf
       have hwf' : ((t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2
           (vpnOf va + BitVec.ofNat 27 i)
           (leafOf (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm)).wfU 2 :=
         PtRun.wfU_setLeaf_complete 2 _ _ _ (leafOf_valid _ perm hrwx) hwff hcomp
       have hndf : (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.pagesNodup 2 :=
-        PtRun.pagesNodup_fill 2 t _ fresh hnd hfrnd (fun b hb => (hfrpg b hb).2)
+        MachCSL.PTree.pagesNodup_fill 2 t _ fresh hnd hfrnd (fun b hb => (hfrpg b hb).2)
       have hnd' : ((t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2
           (vpnOf va + BitVec.ofNat 27 i)
           (leafOf (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm)).pagesNodup 2 :=
@@ -629,7 +614,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
       have hbase' : ((t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2
           (vpnOf va + BitVec.ofNat 27 i)
           (leafOf (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm)).base = t.base := by
-        rw [PTree.base_setLeaf, PtRun.base_fill]
+        rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]
       have hpagesub : ∀ b, b ∈ t.pages 2 ∨ b ∈ fresh →
           b ∈ ((t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2
             (vpnOf va + BitVec.ofNat 27 i)
@@ -655,7 +640,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
         intro j hj
         rw [PtRun.walk_setLeaf_ne _ _ _ _ hcomp
           (mp_vpn_ne (vpnOf va) i (i + 1 + j) (by omega) (by omega) (by omega)),
-          PtRun.walk_fill 2 t _ fresh hwf]
+          MachCSL.PTree.walk_fill 2 t _ fresh hwf]
         have hb := hblock (1 + j) (by omega)
         rw [show i + (1 + j) = i + 1 + j from by omega] at hb
         exact hb
@@ -837,7 +822,7 @@ theorem mappages_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (γk : KmemNames)
   icases mpFrame_split _ _ _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7, F8, F9⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
-  simp only [mp_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«mappages» + 0x9c#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -1003,7 +988,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
   have hpin25 : k.sie = false ∨ k.proc = 0#64 → c25 = cpu := fun h =>
     ((hp25 h).trans ((hp24 h).trans ((hp23 h).trans ((hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans (hpin11 h)))))))))))))))
   -- the loop
-  rw [mp_pushed_spie_self k 10]
+  rw [Xv6.ua_pushed_spie_self k 10]
   iapply (mappages_loop W k γl γk perm (k.regs 11#5) (k.regs 13#5) n hnoff hK hlk hrwx hvr hpr
     (n - 1) 0 (by omega) t on hwf hnd hpgt ?hb k.spie k.spp _
     ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 c25) $$ [- $Hk $Hpc $Htree $Hav]

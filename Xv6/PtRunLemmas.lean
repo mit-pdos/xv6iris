@@ -12,6 +12,7 @@ may prove the same facts under their own names.
 -/
 import Xv6.PtOwn
 import Xv6.KallocDefs
+import Xv6.PtOwnLemmas
 
 namespace Xv6.PtRun
 
@@ -60,46 +61,11 @@ theorem flatMap_perm_upd {α β : Type} [DecidableEq α] (l : List α) (F F' : �
 
 /-! ## Zero nodes -/
 
-@[simp] theorem zeroNode_base (b : BitVec 44) : (PTree.zeroNode b).base = b := rfl
-@[simp] theorem zeroNode_ents (b : BitVec 44) (i : BitVec 9) : (PTree.zeroNode b).ents i = 0#64 := rfl
-@[simp] theorem zeroNode_kids (b : BitVec 44) (i : BitVec 9) : (PTree.zeroNode b).kids i = none := rfl
-
-theorem zeroNode_wf (b : BitVec 44) (lvl : Nat) : (PTree.zeroNode b).wf lvl := by
-  cases lvl with
-  | zero => intro i; exact ⟨rfl, Or.inl rfl⟩
-  | succ l => intro i; simp only [zeroNode_kids, zeroNode_ents]
-
-theorem zeroNode_wfU (b : BitVec 44) (lvl : Nat) : (PTree.zeroNode b).wfU lvl := by
-  cases lvl with
-  | zero => intro i; exact ⟨rfl, Or.inl rfl⟩
-  | succ l => intro i; simp only [zeroNode_kids, zeroNode_ents]
-
-theorem zeroNode_walk (b : BitVec 44) (lvl : Nat) (vpn : BitVec 27) :
-    (PTree.zeroNode b).walk lvl vpn = none := by
-  cases lvl with
-  | zero => simp only [PTree.walk, zeroNode_ents, ite_true]
-  | succ l => simp only [PTree.walk, zeroNode_kids, zeroNode_ents, ite_true]
-
-theorem zeroNode_pages (b : BitVec 44) (lvl : Nat) : (PTree.zeroNode b).pages lvl = [b] := by
-  cases lvl with
-  | zero => rfl
-  | succ l =>
-    simp only [PTree.pages, zeroNode_base, zeroNode_kids]
-    rw [flatMap_nil_of_nil _ _ (fun _ => rfl)]
-
-theorem zeroNode_missingOn (b : BitVec 44) (lvl : Nat) (vpn : BitVec 27) :
-    (PTree.zeroNode b).missingOn lvl vpn = lvl := by
-  cases lvl with
-  | zero => rfl
-  | succ l => simp only [PTree.missingOn, zeroNode_kids]
-
 /-! ## Paths -/
 
 theorem path_setKid_self (lvl : Nat) (t c : PTree) (vpn : BitVec 27) :
     (t.setKid (vpnIdx vpn (lvl+1)) c).path (lvl+1) vpn = vpnIdx vpn (lvl+1) :: c.path lvl vpn := by
   simp only [PTree.path, PTree.setKid, PTree.kids_node, ite_true]
-
-theorem complete_zero (t : PTree) (vpn : BitVec 27) : t.complete 0 vpn := rfl
 
 theorem complete_succ_iff (lvl : Nat) (t : PTree) (vpn : BitVec 27) :
     t.complete (lvl+1) vpn ↔ ∃ c, t.kids (vpnIdx vpn (lvl+1)) = some c ∧ c.complete lvl vpn := by
@@ -173,16 +139,6 @@ theorem path_ne_of_ne (t : PTree) (vpn vpn' : BitVec 27) (hc : t.complete 2 vpn)
 
 /-! ## `fill` -/
 
-theorem base_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44)) :
-    (t.fill lvl vpn fr).1.base = t.base := by
-  cases lvl with
-  | zero => rfl
-  | succ lvl =>
-    simp only [PTree.fill]
-    cases t.kids (vpnIdx vpn (lvl+1)) with
-    | none => cases fr <;> rfl
-    | some c => rfl
-
 theorem supply_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44)) :
     (t.fill lvl vpn fr).2 = fr.drop (t.missingOn lvl vpn) := by
   induction lvl generalizing t fr with
@@ -196,113 +152,12 @@ theorem supply_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec
       | nil => rfl
       | cons b fr' =>
         simp only [List.drop_succ_cons]
-        rw [ih (PTree.zeroNode b) fr', zeroNode_missingOn]
-
-theorem wf_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
-    (hwf : t.wf lvl) : (t.fill lvl vpn fr).1.wf lvl := by
-  induction lvl generalizing t fr with
-  | zero => exact hwf
-  | succ lvl ih =>
-    simp only [PTree.fill]
-    cases hk : t.kids (vpnIdx vpn (lvl+1)) with
-    | some c =>
-      have hc := hwf (vpnIdx vpn (lvl+1))
-      rw [hk] at hc
-      intro j
-      simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
-      by_cases hj : j = vpnIdx vpn (lvl+1)
-      · rw [if_pos hj, hj, hc.1]
-        exact ⟨by rw [base_fill lvl c vpn fr], ih c fr hc.2⟩
-      · rw [if_neg hj]; exact hwf j
-    | none =>
-      cases fr with
-      | nil => exact hwf
-      | cons b fr' =>
-        intro j
-        simp only [PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node]
-        by_cases hj : j = vpnIdx vpn (lvl+1)
-        · rw [if_pos hj, if_pos hj]
-          exact ⟨by rw [base_fill lvl (PTree.zeroNode b) vpn fr', zeroNode_base],
-            ih (PTree.zeroNode b) fr' (zeroNode_wf b lvl)⟩
-        · rw [if_neg hj, if_neg hj]; exact hwf j
-
-theorem wfU_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
-    (hwf : t.wfU lvl) : (t.fill lvl vpn fr).1.wfU lvl := by
-  induction lvl generalizing t fr with
-  | zero => exact hwf
-  | succ lvl ih =>
-    simp only [PTree.fill]
-    cases hk : t.kids (vpnIdx vpn (lvl+1)) with
-    | some c =>
-      have hc := hwf (vpnIdx vpn (lvl+1))
-      rw [hk] at hc
-      intro j
-      simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
-      by_cases hj : j = vpnIdx vpn (lvl+1)
-      · rw [if_pos hj, hj, hc.1]
-        exact ⟨by rw [base_fill lvl c vpn fr], ih c fr hc.2⟩
-      · rw [if_neg hj]; exact hwf j
-    | none =>
-      cases fr with
-      | nil => exact hwf
-      | cons b fr' =>
-        intro j
-        simp only [PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node]
-        by_cases hj : j = vpnIdx vpn (lvl+1)
-        · rw [if_pos hj, if_pos hj]
-          exact ⟨by rw [base_fill lvl (PTree.zeroNode b) vpn fr', zeroNode_base],
-            ih (PTree.zeroNode b) fr' (zeroNode_wfU b lvl)⟩
-        · rw [if_neg hj, if_neg hj]; exact hwf j
-
-theorem walk_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
-    (hwf : t.wfU lvl) (w : BitVec 27) : (t.fill lvl vpn fr).1.walk lvl w = t.walk lvl w := by
-  induction lvl generalizing t fr with
-  | zero => rfl
-  | succ lvl ih =>
-    cases hk : t.kids (vpnIdx vpn (lvl+1)) with
-    | some c =>
-      have hc := hwf (vpnIdx vpn (lvl+1))
-      rw [hk] at hc
-      have hfill : (t.fill (lvl+1) vpn fr).1
-          = t.setKid (vpnIdx vpn (lvl+1)) (c.fill lvl vpn fr).1 := by
-        simp only [PTree.fill, hk]
-      rw [hfill]
-      by_cases hj : vpnIdx w (lvl+1) = vpnIdx vpn (lvl+1)
-      · have h1 : (t.setKid (vpnIdx vpn (lvl+1)) (c.fill lvl vpn fr).1).kids (vpnIdx vpn (lvl+1))
-            = some (c.fill lvl vpn fr).1 := by
-          simp only [PTree.setKid, PTree.kids_node, ite_true]
-        simp only [PTree.walk, hj]
-        simp only [h1, hk]
-        exact ih c fr hc.2
-      · simp only [PTree.walk, PTree.setKid, PTree.kids_node, PTree.ents_node, PTree.base_node,
-          if_neg hj]
-    | none =>
-      cases fr with
-      | nil => simp only [PTree.fill, hk]
-      | cons b fr' =>
-        have hz := hwf (vpnIdx vpn (lvl+1))
-        rw [hk] at hz
-        have hf : (t.fill (lvl+1) vpn (b :: fr')).1
-            = (t.setEnt (vpnIdx vpn (lvl+1)) (kPtr b)).setKid (vpnIdx vpn (lvl+1))
-                ((PTree.zeroNode b).fill lvl vpn fr').1 := by
-          simp only [PTree.fill, hk]
-        rw [hf]
-        by_cases hj : vpnIdx w (lvl+1) = vpnIdx vpn (lvl+1)
-        · have h1 : ((t.setEnt (vpnIdx vpn (lvl+1)) (kPtr b)).setKid (vpnIdx vpn (lvl+1))
-              ((PTree.zeroNode b).fill lvl vpn fr').1).kids (vpnIdx vpn (lvl+1))
-              = some ((PTree.zeroNode b).fill lvl vpn fr').1 := by
-            simp only [PTree.setKid, PTree.kids_node, ite_true]
-          simp only [PTree.walk, hj]
-          simp only [h1, hk, hz, ite_true]
-          rw [ih (PTree.zeroNode b) fr' (zeroNode_wfU b lvl)]
-          exact zeroNode_walk b lvl w
-        · simp only [PTree.walk, PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node,
-            PTree.base_node, if_neg hj]
+        rw [ih (PTree.zeroNode b) fr', MachCSL.PTree.zeroNode_missingOn]
 
 theorem complete_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44)) :
     (t.fill lvl vpn fr).1.complete lvl vpn ↔ t.missingOn lvl vpn ≤ fr.length := by
   induction lvl generalizing t fr with
-  | zero => simp only [PTree.missingOn, Nat.zero_le, iff_true]; exact complete_zero _ _
+  | zero => simp only [PTree.missingOn, Nat.zero_le, iff_true]; exact MachCSL.PTree.complete_zero _ _
   | succ lvl ih =>
     simp only [PTree.fill, PTree.missingOn]
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
@@ -331,11 +186,11 @@ theorem complete_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitV
           simp only [PTree.setKid, PTree.kids_node, ite_true, Option.some.injEq] at hc'
           subst hc'
           have := (ih (PTree.zeroNode b) fr').mp h
-          rwa [zeroNode_missingOn] at this
+          rwa [MachCSL.PTree.zeroNode_missingOn] at this
         · intro h
           refine ⟨((PTree.zeroNode b).fill lvl vpn fr').1, ?_, ?_⟩
           · simp only [PTree.setKid, PTree.kids_node, ite_true]
-          · exact (ih (PTree.zeroNode b) fr').mpr (by rw [zeroNode_missingOn]; omega)
+          · exact (ih (PTree.zeroNode b) fr').mpr (by rw [MachCSL.PTree.zeroNode_missingOn]; omega)
 
 /-- Filling with a longer supply than the path needs is filling with the
 prefix it needs. -/
@@ -373,7 +228,7 @@ theorem fill_append (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr gr : List (Bit
                 ((PTree.zeroNode b).fill lvl vpn fr').1 := by
           simp only [PTree.fill, hk]
         rw [h1, h2, ih (PTree.zeroNode b) fr'
-          (by rw [zeroNode_missingOn]; simp only [List.length_cons] at h; omega)]
+          (by rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at h; omega)]
 
 /-- The pages of a filled tree: the old ones, plus the prefix of the supply
 the fill consumed. -/
@@ -414,7 +269,7 @@ theorem pages_fill_perm (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
           (vpnIdx vpn (lvl+1)) allIdx_nodup (mem_allIdx _) _ ?_ ?_
         · simp only [ite_true, hk, List.nil_append, List.take_succ_cons]
           refine (ih (PTree.zeroNode b) fr').trans ?_
-          rw [zeroNode_pages, zeroNode_missingOn, List.singleton_append]
+          rw [MachCSL.PTree.zeroNode_pages, MachCSL.PTree.zeroNode_missingOn, List.singleton_append]
         · intro j hj; simp only [if_neg hj]
 
 theorem mem_pages_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
@@ -422,17 +277,6 @@ theorem mem_pages_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bit
     b ∈ (t.fill lvl vpn fr).1.pages lvl ↔
       b ∈ t.pages lvl ∨ b ∈ fr.take (t.missingOn lvl vpn) := by
   rw [(pages_fill_perm lvl t vpn fr).mem_iff, List.mem_append]
-
-theorem pagesNodup_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
-    (hnd : t.pagesNodup lvl) (hfr : fr.Nodup) (hdis : ∀ b ∈ fr, b ∉ t.pages lvl) :
-    (t.fill lvl vpn fr).1.pagesNodup lvl := by
-  have hsub : ∀ b ∈ fr.take (t.missingOn lvl vpn), b ∈ fr := fun b hb => List.mem_of_mem_take hb
-  refine (pages_fill_perm lvl t vpn fr).nodup_iff.mpr ?_
-  rw [List.nodup_append]
-  refine ⟨hnd, (List.Sublist.nodup (List.take_sublist _ _) hfr), ?_⟩
-  intro a ha c hc he
-  subst he
-  exact hdis a (hsub a hc) ha
 
 /-! ## `setLeaf` on a complete path -/
 
@@ -579,7 +423,7 @@ theorem sameShape_zeroNode (lvl : Nat) (b e : BitVec 44) :
     sameShape lvl (PTree.zeroNode b) (PTree.zeroNode e) := by
   cases lvl with
   | zero => trivial
-  | succ l => intro i; simp only [zeroNode_kids]
+  | succ l => intro i; simp only [MachCSL.PTree.zeroNode_kids]
 
 theorem sameShape_fill (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : List (BitVec 44))
     (h : sameShape lvl t u) (hl : fr.length = gr.length) :
@@ -815,11 +659,6 @@ theorem allIdx_getElem {k : Nat} {y : BitVec 9} (h : allIdx[k]? = some y) : y.to
   simp only [BitVec.toNat_ofNat]
   omega
 
-theorem allIdx_get (i : BitVec 9) : allIdx[i.toNat]? = some i := by
-  have hk : i.toNat < 512 := i.isLt
-  rw [allIdx, List.getElem?_map, List.getElem?_range hk, Option.map_some]
-  exact congrArg some ((BitVec.ofNat_toNat 9 i).trans (BitVec.setWidth_eq i))
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -830,7 +669,7 @@ theorem bigSepL_allIdx_upd {X : Type} (f : BitVec 9 → IProp GF) (g : X → Bit
     (iprop([∗list] j ∈ allIdx, f j) : IProp GF) ⊢
       iprop(f i ∗ ∀ x : X, g x i -∗ [∗list] j ∈ allIdx, g x j) := by
   iintro H
-  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ y => f y) (allIdx_get i) $$ H
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ y => f y) (MachCSL.allIdx_getElem? i) $$ H
     with ⟨Hi, Hclose⟩
   iframe Hi
   iintro %x Hx
@@ -844,26 +683,6 @@ theorem bigSepL_allIdx_upd {X : Type} (f : BitVec 9 → IProp GF) (g : X → Bit
     simp only [h x y hy]
     iexact Hy
   · iexact Hx
-
-/-- Read and write one entry of a node page. -/
-theorem nodeOwn_upd [CurCtx] (dq : DFrac) (t : PTree) (i : BitVec 9) :
-    nodeOwn (GF := GF) dq t ⊢
-      iprop(wordPointsTo (pteAddr t.base i) 8 dq (t.ents i) ∗
-        ∀ v : BitVec 64, wordPointsTo (pteAddr t.base i) 8 dq v -∗ nodeOwn dq (t.setEnt i v)) := by
-  unfold nodeOwn
-  refine Entails.trans (bigSepL_allIdx_upd (GF := GF)
-    (fun j => wordPointsTo (pteAddr t.base j) 8 dq (t.ents j))
-    (fun (v : BitVec 64) j => wordPointsTo (pteAddr (t.setEnt i v).base j) 8 dq ((t.setEnt i v).ents j))
-    i ?_) ?_
-  · intro v j hj
-    simp only [PTree.setEnt, PTree.base_node, PTree.ents_node, if_neg hj]
-  · iintro ⟨Hi, Hclose⟩
-    isplitl [Hi]
-    · iexact Hi
-    · iintro %v Hv
-      iapply Hclose $$ %v
-      simp only [PTree.setEnt, PTree.base_node, PTree.ents_node, ite_true]
-      iexact Hv
 
 theorem nodeOwn_setKid [CurCtx] (dq : DFrac) (t : PTree) (i : BitVec 9) (c : PTree) :
     nodeOwn (GF := GF) dq (t.setKid i c) = nodeOwn dq t := by
@@ -881,7 +700,7 @@ theorem ptreeOwn_leaf_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (vpn : B
   | zero =>
     rw [ptreeOwn_zero]
     simp only [PTree.slot, PTree.entAt, PTree.setLeaf]
-    refine Entails.trans (nodeOwn_upd dq t (vpnIdx vpn 0)) ?_
+    refine Entails.trans (Xv6.nodeOwn_acc dq t (vpnIdx vpn 0)) ?_
     iintro ⟨Hi, Hclose⟩
     isplitl [Hi]
     · iexact Hi

@@ -302,7 +302,7 @@ theorem iregRecs_acc_upd (γfs : FsNames) (inodestart bi : Nat) (ds : List Dinod
     (BigSepL.bigSepL_delete_cond (range_getElem? hi)).2
   · rw [getElem!_set_self ds i d' (by omega)]
   · intro k x hkx
-    obtain ⟨rfl, _⟩ := range_lookup hkx
+    obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
     by_cases hk : x = i
     · rw [if_pos hk, if_pos hk]
     · rw [if_neg hk, if_neg hk, getElem!_set_ne ds i x d' hk]
@@ -963,7 +963,7 @@ theorem iregBlks_acc_upd [Icfg] (γi : GName) (γfs : FsNames) (inodestart : Nat
   iapply (BigSepL.bigSepL_delete_cond (range_getElem? hbi)).2
   iframe Hblk
   iapply (BigSepL.bigSepL_mono (fun {k x} hkx => ?_)) $$ Hrest
-  obtain ⟨rfl, _⟩ := range_lookup hkx
+  obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
   by_cases hk : x = bi
   · rw [if_pos hk, if_pos hk]
   · rw [if_neg hk, if_neg hk]
@@ -984,7 +984,7 @@ theorem iregSlots_acc_upd [Icfg] (γfs : FsNames) (γi : GName) (bi : Nat) (ds :
     (BigSepL.bigSepL_delete_cond (range_getElem? hi)).2
   · rw [getElem!_set_self ds i d' (by omega)]
   · intro k x hkx
-    obtain ⟨rfl, _⟩ := range_lookup hkx
+    obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
     by_cases hk : x = i
     · rw [if_pos hk, if_pos hk]
     · rw [if_neg hk, if_neg hk, getElem!_set_ne ds i x d' hk]

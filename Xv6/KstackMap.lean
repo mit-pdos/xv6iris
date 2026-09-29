@@ -24,6 +24,7 @@ Imports only definitional/lemma files.
 -/
 import Xv6.KvmSeal
 import Xv6.SpecProcinit
+import Xv6.UPtUnmapLemmas
 
 namespace Xv6
 
@@ -194,9 +195,6 @@ theorem kctx_kptOn_seal_stacks [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
 
 /-! ## The stack of process `i` at its virtual address -/
 
-theorem vpnOf_toNat' (va : BitVec 64) : (vpnOf va).toNat = va.toNat / 4096 % 2 ^ 27 := by
-  simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
-
 theorem kstackVa_toNat (i : Nat) (hi : i < 64) : (kstackVa i).toNat = 0x3ffffff000 - (i + 1) * 8192 := by
   unfold kstackVa
   rw [BitVec.toNat_sub_of_le]
@@ -214,7 +212,7 @@ theorem kstackVa_add_toNat (i : Nat) (hi : i < 64) (off : Nat) (hoff : off < 409
 theorem vpnOf_kstackVa (i : Nat) (hi : i < 64) (off : Nat) (hoff : off < 4096) :
     vpnOf (kstackVa i + BitVec.ofNat 64 off) = kstackVpn i := by
   apply BitVec.eq_of_toNat_eq
-  rw [vpnOf_toNat', kstackVa_add_toNat i hi off hoff]
+  rw [Xv6.UPtUnmap.vpnOf_toNat, kstackVa_add_toNat i hi off hoff]
   unfold kstackVpn
   rw [BitVec.toNat_ofNat]
   omega
@@ -342,7 +340,7 @@ a read-write static entry. -/
 theorem pageValid_kmapClass (b : BitVec 44) (hb : pageValid (pageAddr b)) (off : Nat) (hoff : off < 4096) :
     kmapClass (vpnOf (pageAddr b + BitVec.ofNat 64 off)).toNat = some .rw := by
   obtain ⟨hal, hlo, hhi⟩ := hb
-  rw [vpnOf_toNat']
+  rw [Xv6.UPtUnmap.vpnOf_toNat]
   have hlo' : ¬ (pageAddr b).toNat < kernelEndAddr.toNat := by
     intro h; exact hlo (BitVec.ult_iff_lt.2 h)
   have hhi' : (pageAddr b).toNat < physTop.toNat := BitVec.ult_iff_lt.1 hhi

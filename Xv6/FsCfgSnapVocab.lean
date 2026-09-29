@@ -38,7 +38,7 @@ WHAT IS HERE, bottom up (Rocq name → Lean name):
 | `snap_meta_ireg` | `snapMeta_ireg` |
 | `snap_live_set`, `elem_of_snap_live_set` | `snapLiveSet`, `mem_snapLiveSet` |
 | `snap_spent` | `snapSpent` (+ `mem_snapSpent`) |
-| `InodeRegion.ireg_bare_of_fn_bare` | `iregBare_ofFnBare` |
+| `InodeRegion.ireg_bare_of_fn_bare` | `Xv6.iregBare_of_fnBare` |
 | (helpers) | `snapRestrict_val`, `freeSet_nodup`, `fsLinkNode_split`, `carveRest_mem`, `snapCarve` (the carve step of `ipool_alloc_of_snap`), `ipoolOfSnap_one` (its per-inum step) |
 | the mint's inline set facts `H1home`, `Hiregcov`, `HC`, `Hbmsub`, `Hset` | `snapPeel_one`, `snapPeel_ireg`, `snapPeel_live`, `snapPeel_bitmap`, `snapPeel_rest` (over `snapHomeSet` / `snapPeel1..3`, section 8b) |
 
@@ -110,11 +110,6 @@ theorem snapRecDecode_region (S : FsStateRec) (P : Nat → List (BitVec 8)) (hom
 
 /-! ## 2.  `iregAlloc`'s six decoding conjuncts -/
 
-/-- Rocq `InodeRegion.ireg_bare_of_fn_bare`: a bare node's record is a bare
-record. -/
-theorem iregBare_ofFnBare (n : FsNode) (h : fnBare n) : iregBare n.fnRec := by
-  obtain ⟨ha, _, _, hs, _⟩ := h
-  exact ⟨hs, ha⟩
 
 /-- **Rocq `snap_ireg_premises`**: every one of `iregAlloc`'s image
 conjuncts is an `InodeLocal` clause at the node `skRegdom` names, read
@@ -151,7 +146,7 @@ theorem snapIregPremises (S : FsStateRec) (P : Nat → List (BitVec 8)) (home : 
     rw [hbr z hz]; rfl
   · intro z hz hty
     rw [hbr z hz] at hty ⊢
-    exact iregBare_ofFnBare _ ((hln z hz).inlBareFree hty)
+    exact Xv6.iregBare_of_fnBare _ ((hln z hz).inlBareFree hty)
   · intro z hz
     exact (hbr z hz).symm
 
@@ -638,7 +633,7 @@ theorem mem_snapSpent (S : FsStateRec) (nib b : Nat) :
       simp only [Bool.or_eq_true, beq_iff_eq, Bool.and_eq_true, decide_eq_true_eq]
       omega
     · intro h
-      have := logRegion_bound _ b h
+      have := Xv6.logRegion_range _ b h
       exact ⟨b - S.fssSb.sbLogstart, by omega, by omega⟩
   rw [hreg]
 
@@ -695,7 +690,7 @@ theorem snapPeel_logout (b : Nat) (h : S.fssSb.sbInodestart ≤ b) :
   have := hsb.sboLogstart; have := hsb.sboNlog; have := hsb.sboInodestart
   cases hc : logRegion S.fssSb.sbLogstart b with
   | false => rfl
-  | true => have := logRegion_bound _ b hc; unfold LOGBLOCKS at this; omega
+  | true => have := Xv6.logRegion_range _ b hc; unfold LOGBLOCKS at this; omega
 
 include hb hcovmeta in
 /-- Rocq `H1home`. -/
@@ -710,7 +705,7 @@ theorem snapPeel_one : ({1} : ExtTreeSet Nat compare) ⊆ snapHomeSet cov S.fssS
   refine ⟨hcovmeta 1 (by omega) (by unfold fsDataStart; omega), ?_⟩
   cases hc : logRegion S.fssSb.sbLogstart 1 with
   | false => rfl
-  | true => have := logRegion_bound _ 1 hc; omega
+  | true => have := Xv6.logRegion_range _ 1 hc; omega
 
 include hb hw hcovmeta in
 /-- Rocq `Hiregcov`. -/

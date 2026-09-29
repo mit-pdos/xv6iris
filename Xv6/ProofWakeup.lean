@@ -16,6 +16,10 @@ import Xv6.SpecWakeup
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame8
+import Xv6.ByteCursor
+import Xv6.KilledDefs
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -28,16 +32,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the eight-slot frame. -/
-theorem wk_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem wk_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
-theorem wk_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem wk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
@@ -92,22 +86,9 @@ theorem wk_sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) :
   revert h
   bv_decide
 
-/-- `"proc"` leaves the held set. -/
-theorem wk_filter_proc (l : List String) (h : "proc" ∉ l) :
-    ("proc" :: l).filter (fun x => x ≠ "proc") = l := by
-  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
-  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
-
 /-- Dropping a redundant lock list. -/
 theorem wk_withLocks_self (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-
-theorem wk_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem wk_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-- What an iteration keeps of the registers (everything callee-saved but the
 cursor `s1`). -/
@@ -164,42 +145,6 @@ end
 
 /-! ## The callees, at their entry addresses -/
 
-set_option maxHeartbeats 1000000 in
-/-- `acquire`'s contract at the call site. -/
-theorem wk_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (c : CPU) (k' : KCtx) (γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp]
-    (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "proc" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' (((k'.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k'.locks)) -∗
-      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      locked γ cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
-      sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ "proc" Rp hnoff' hK' hs'
-  unfold wp_acquire_body at h
-  simp only [acquireAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-/-- `release`'s contract at the call site. -/
-theorem wk_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (c : CPU) (k' : KCtx) (γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp]
-    (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
-    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
-    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«release» ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
-    locked γ c ∗ Rp curCtx ∗ popArm c k' reen ∗
-    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
-      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ "proc" Rp hsie' hnoff' hK' reen hreen hon
-  unfold wp_release_body at h
-  simp only [releaseAddr] at h
-  exact h
-
 /-! ## Branch conditions -/
 
 theorem wk_bne_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
@@ -210,25 +155,8 @@ theorem wk_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = p := by
   rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
-/-- `push_off`'s exit does not see the pinned bits it overwrites. -/
-theorem wk_withSpie_pushOffAt (k : KCtx) (s p a b : Bool) :
-    (k.withSpie s p).pushOffAt a b = k.pushOffAt a b := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-
-/-- The lock payload, named at a slot. -/
-theorem wk_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
-    procLockPay (GF := GF) Γ j ξ ⊢ procLockResAt Γ ξ (procAddr j) := by
-  unfold procLockPay
-  iintro H
-  iexact H
-
-theorem wk_pay_intro (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
-    procLockResAt (GF := GF) Γ ξ (procAddr j) ⊢ procLockPay Γ j ξ := by
-  unfold procLockPay
-  iintro H
-  iexact H
 
 end
 
@@ -274,10 +202,10 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   subst e1
   have e2 : c2 = c1 := hq2 (Or.inl rfl)
   subst e2
-  iapply (wk_release RE c2 _ (Γ.lock i) (procLockPay Γ i) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
+  iapply (Xv6.kl_release RE c2 _ (Γ.lock i) (procLockPay Γ i) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1
-  k_norm_g [wk_withLocks_self, wk_filter_proc k.locks hlk,
+  k_norm_g [wk_withLocks_self, Xv6.kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK8, h9]
   iframe #
   case hsr => k_norm_g
@@ -299,7 +227,7 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   iapply wpNext_intro_pin
   iintro %c3 %hq3 %R3 Hk Hpc %hcs3
   have hret : jumpPc (KA.«wakeup» + 0x30#64) = (KA.«wakeup» + 0x30#64) := by decide
-  k_norm_g [wk_withLocks_self, wk_filter_proc k.locks hlk,
+  k_norm_g [wk_withLocks_self, Xv6.kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK8, hret]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -372,7 +300,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   k_step_gen (wp_s_jal c1 _ (KA.«wakeup» + 0x3a#64) false 2091998#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_ffffffffffffec18] next c2 hp2
   iintro Hk Hpc
-  iapply (wk_acquire AC c2 _ (Γ.lock i) (procLockPay Γ i) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
+  iapply (Xv6.kl_acquire AC c2 _ (Γ.lock i) (procLockPay Γ i) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [h9]
   iframe #
@@ -383,7 +311,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Hlocked HR _ Harm
   have hret : jumpPc (KA.«wakeup» + 0x3e#64) = (KA.«wakeup» + 0x3e#64) := by decide
-  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, wk_withSpie_pushOffAt, hK8, hret]
+  k_norm_g [KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, MachCSL.KCtx.withSpie_pushOffAt, hK8, hret]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
@@ -395,7 +323,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   have g21 : R1 21#5 = 3#64 := b21.trans h21
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
     (hp3 h).trans ((hp2 h).trans (hp1 h))
-  ihave HR := wk_pay_elim Γ ξ0 i $$ HR
+  ihave HR := Xv6.kl_pay_elim Γ ξ0 i $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr i) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- c.ld a5,32(s1): a5 := p->chan
@@ -456,7 +384,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
         with HR
       case' _ => simp only [pState, pChan, RUNNABLE]; iframe
       imodintro
-      ihave HR := wk_pay_intro Γ ξ0 i $$ HR
+      ihave HR := Xv6.kl_pay_intro Γ ξ0 i $$ HR
       iapply (wk_rel RE Γ k hwf hnoff hK hlk i hi spie spp spie1 spp1 R _ ?hkp ?hcr ?hsn
         hsp1 ξ0 rfl cur c10 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
       rotate_right 1
@@ -477,7 +405,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       ihave HR := procLockRes_intro Γ ξ0 (procAddr i) st 0#64 kl xs pid
         $$ [Hstate Hpg Hchan Hrest Hslots]
       case' _ => simp only [pState, pChan]; iframe
-      ihave HR := wk_pay_intro Γ ξ0 i $$ HR
+      ihave HR := Xv6.kl_pay_intro Γ ξ0 i $$ HR
       iapply (wk_rel RE Γ k hwf hnoff hK hlk i hi spie spp spie1 spp1 R _ ?hkp2 ?hcr2 ?hsn2
         hsp1 ξ0 rfl cur c8 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
       rotate_right 1
@@ -498,7 +426,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     ihave HR := procLockRes_intro Γ ξ0 (procAddr i) st ch kl xs pid
       $$ [Hstate Hpg Hchan Hrest Hslots]
     case' _ => simp only [pState, pChan]; iframe
-    ihave HR := wk_pay_intro Γ ξ0 i $$ HR
+    ihave HR := Xv6.kl_pay_intro Γ ξ0 i $$ HR
     iapply (wk_rel RE Γ k hwf hnoff hK hlk i hi spie spp spie1 spp1 R _ ?hkp3 ?hcr3 ?hsn3
       hsp1 ξ0 rfl cur c5 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
     rotate_right 1
@@ -673,7 +601,7 @@ theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   iintro Hk Hpc F6
   ihave Hstack : stackOwn (k.regs 2#5) 8 $$ [F0 F1 F2 F3 F4 F5 F6 F7]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c7 _ (KA.«wakeup» + 0x62#64) true 64#12 8 wk_imm_p64)
+  k_step_gen (wp_s_pop c7 _ (KA.«wakeup» + 0x62#64) true 64#12 8 MachCSL.imm_p64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hq8
   iintro Hk Hpc
@@ -721,7 +649,7 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   have hK8 : 8 ≤ k.avail := by unfold wakeupSlots at hK; omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«wakeup» true 4032#12 8 hK8 wk_imm_m64)
+  k_step_gen (wp_s_push cpu _ KA.«wakeup» true 4032#12 8 hK8 MachCSL.imm_m64)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -780,7 +708,7 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h =>
     (hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h)))))))))))))))))
   -- the scan
-  rw [wk_pushed_spie_self k 8, wk_pushed_withSpie]
+  rw [Xv6.ua_pushed_spie_self k 8, MachCSL.KCtx.withSpie_pushed]
   iapply (wk_loop AC RE Γ k (k.regs 10#5) hwf hnoff hK hlk htier 63 0 (by decide)
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 ?g21 c17) $$ [- $Hk $Hpc]
   rotate_right 1

@@ -75,16 +75,6 @@ theorem uftExc_utrTexc (f : PTW_Error) (hf : ∀ x, f ≠ .PTW_Ext_Error x) :
   | PTW_Ext_Error x => exact absurd rfl (hf x)
   | _ => exact Or.inr (Or.inr rfl)
 
-theorem uft_upd_full16 (x : BitVec 16) :
-    Sail.BitVec.updateSubrange (0#16) 15 0 (x : BitVec (15 - 0 + 1)) = x := by
-  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
-  bv_decide
-
-theorem uft_upd_full32 (x : BitVec 32) :
-    Sail.BitVec.updateSubrange (0#32) 31 0 (x : BitVec (31 - 0 + 1)) = x := by
-  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
-  bv_decide
-
 theorem uft_bit0_clear (pc : BitVec 64) (h : pc.toNat % 2 = 0) : (Sail.BitVec.access pc 0 != 0#1) = false :=
   bit0_clear_of_even pc h
 
@@ -158,7 +148,7 @@ macro "uft_phys" hp:term:max n:num hram:term:max hal:term:max : tactic => `(tact
   have hclint := within_clint_ram _ $n $hram
   have halign := is_aligned_paddr_of _ $n (by decide) $hal
   uft_run -bv
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, uft_upd_full16, uft_upd_full32]))
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full16, MachCSL.updateSubrange_full32]))
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

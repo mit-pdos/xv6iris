@@ -296,7 +296,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   iintro Hk Hpc Hcmt
   k_step (wp_s_branch cpu _ (KA.«end_op» + 0x24#64) true 68#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie, KCtx.rget_zero, eo_bnez0]
+    with [eoK_sie, KCtx.rget_zero, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   by_cases hlast : out = 1
   · -- ================= THE LAST OUT: commit =================
@@ -420,7 +420,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     · -- ---- there is something to write out: the copy loop ----
       k_step_e (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [KCtx.rget_zero, eo_sext32 n hn31, eo_bgtz n (by omega),
+        with [KCtx.rget_zero, MachCSL.signExtend_ofNat32 n hn31, eo_bgtz n (by omega),
           decide_eq_true hn0]
       iintro Hk Hpc
       -- +0x9e sd s3,24(sp) ; sd s4,16(sp) ; sd s5,8(sp)
@@ -499,7 +499,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       subst hWnil
       k_step_e (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [KCtx.rget_zero, eo_sext32 0 (by omega), eo_bgtz 0 (by omega),
+        with [KCtx.rget_zero, MachCSL.signExtend_ofNat32 0 (by omega), eo_bgtz 0 (by omega),
           decide_eq_false (by omega)]
       iintro Hk Hpc
       -- THE EMPTY-LOG PATH BANKS THE COPY IT ALREADY HAD (Rocq

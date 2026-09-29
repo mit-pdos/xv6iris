@@ -53,7 +53,7 @@ Rocq's header, kept (the reasons are the content):
    `procPrivFd`'s own definition (core ∗ `procOfiles`), because the Lean
    namei takes the CORE (bare ∗ the cwd reference: `SpecNameiEra`); D8's
    `first_tok` is absent from the Lean block (ProcPrivAcc deviation 1).  ilock
-   and ARMs B / C take only the pid cell, lent by `sysOpen_pid_fd`.
+   and ARMs B / C take only the pid cell, lent by `Xv6.sys_mknod_pid`.
 2. Rocq's one 560-line lemma is FOUR stages (speed): `sys_open_walk_tested`,
    `sys_open_walk_found`, `sys_open_walk_dead`, `sys_open_entry_n`; the
    callee wrappers are `SysOpenWalkCalls`.
@@ -69,6 +69,7 @@ Rocq's header, kept (the reasons are the content):
 import Xv6.SysOpenWalkCalls
 import MachCSL.WpSmodeLh
 import Xv6.SysOpenShared
+import Xv6.KexecACode
 
 namespace Xv6
 
@@ -106,11 +107,6 @@ theorem sys_open_walk_dead_rcpt (P Pmiss : Nat → Nat → IProp GF) (pl : List 
   unfold nameiWalkDeadEra
   simp only [exHops_is_axHops]
   exact .rfl
-
-theorem sys_open_walk_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
-  simp only [ite_true]; exact .rfl
-theorem sys_open_walk_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
-  simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
 /-! ## +0xec: the node, type-tested -/
 
@@ -220,7 +216,7 @@ theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
       have hct : curTier = KTier.kpt := by
         simp only [k_norm_simps] at htk; exact htk.symm.trans hS.htier
-      icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+      icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
       ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
       iapply hTC $$ %cpu %spie %spp %_ %w4 %w5 %w6 %lo %(sysOpenOm A) %w24 %γil %γisl %loc %tlc
         %kk %s %g %inum %dn %bm %u %⟨hkk, hinb, hle, hiu⟩ %?hp %hal Hk Hpc Hte Hce Henv Hcells Hbuf
@@ -273,7 +269,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0xe6#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
   iintro Hk Hpc
-  icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hop := logOpS_op icfgLog n' Sb' $$ HopS Htx
   iapply hTB $$ %cpu %spie %spp %_ %_ %w4 %w5 %w6 %lo %(sysOpenOm A) %w24 %n' %?hp %hal Hk Hpc Hte
     Hce Henv Hcells Hbuf Hpid Hop
@@ -338,7 +334,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- ===== +0xe6 c.beqz a0: falls through =====
   have hd : decide (ipv = 0#64) = false := by simp [hnz]
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0xe6#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_open_beqz, hd]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- ===== +0xe8 jal ilock =====
   k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0xe8#64) false 2088964#21 1#5 (by decide))
@@ -351,7 +347,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   ihave #Hrdy := sys_open_walk_rdy Γ A $$ Henv
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
   icases icSleeplocks_lookup fscIc kk hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
-  icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hce := sys_open_walk_ce cpu k.sie k.proc (procAddr A.j) hS.hproc $$ Hce
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (sys_open_ilock IL Γ A cpu _ k.sie (by k_norm_g) (procAddr A.j)
@@ -368,7 +364,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   unfold sysOpenIlockK
   iintro %cpu %spie1 %spp1 %R1 %dn %bm %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hsl Hdep Hoff Hdev Hinum Hval
     Hload Hshot Hfrz Hru
-  k_norm_g [sys_open_walk_ret_ec, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_walk_ret_ec, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysOpenPins k R1 (ientry kk) (k.regs 18#5) (k.regs 19#5) := by
     refine sysOpenPins_cs k _ R1 _ _ _ ?_ hcs1
     refine sysOpenPins_set _ _ _ _ _ 1#5 _ ?_ (Or.inl rfl)
@@ -474,7 +470,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
   unfold sysOpenNameiK
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %ok %ipv %w %⟨hcs1, -, -, hlo, -⟩ Hk Hpc Hte Hce Hcore Hp
     Hbs HopS Htx Harm
-  k_norm_g [sys_open_walk_ret_e4, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_walk_ret_e4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1)
       (bview (plen + 1) bp) ⊢ byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview (plen + 1) bp)
     from .rfl) $$ Hp
@@ -489,7 +485,7 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
     exact hpins
   cases ok
   · -- ===== the walk DIED: ARM B-FAIL =====
-    ihave Harm := sys_open_walk_ite_f _ _ $$ Harm
+    ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hir2, Hdead⟩
     ihave Hdead := sys_open_walk_dead_rcpt A.P A.Pmiss _ $$ Hdead
     iapply (sys_open_walk_dead Γ k A hS hTB cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n' Sb'
@@ -497,9 +493,9 @@ theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hpriv $HopS $Htx $Hbs $Hir2 $Hirr $Hfds $Hfrags
         $Hdead $Hoc $Htc $Hpost]
   · -- ===== the walk LANDED =====
-    ihave Harm := sys_open_walk_ite_t _ _ $$ Harm
+    ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%iL, %h10, Hheld, HP, Hir1⟩
-    have hn : iputUnits ≤ n' := sys_open_bud_iput n' w true hlo
+    have hn : iputUnits ≤ n' := Xv6.sys_chdir_bud_iput n' w true hlo
     iapply (sys_open_walk_found IL Γ k A hS hJ hAl hTC cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2 n'
         Sb' ipv iL (bview plen bp) hp1 h10 hal hP2 hn (by omega) hpl)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hpriv $HopS $Htx $Hbs $Hir1 $Hirr $Hfds $Hfrags

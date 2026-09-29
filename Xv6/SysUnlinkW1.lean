@@ -35,7 +35,7 @@ Rocq's header, kept because the reasons are the content:
    arms, DERIVED from the landed `ARGSTR` by `argstrW_of_argstr`): ARM A
    re-folds the 128-byte buffer into its stack slots.
 3. eb-generic; the contract's `true` crossing made hart-free once at entry
-   (`sys_unlink_pin`).
+   (`Xv6.rd_pin`).
 4. The process block (FLAGGED, SpecSysUnlink deviation 4): argstr takes the
    bare block out of the core (`procPrivCoreNoctxAt = bare ∗ cwdRefAt`,
    `rfl`), begin_op the pid cell out of the core (`namexEra_core_rows`),
@@ -292,7 +292,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
   case bn => k_norm_g; exact ok.hnoff
   case bt => k_norm_g; exact ok.htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_unlink_ret_20, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv A.pid ⊢
@@ -338,7 +338,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
   unfold sysUnlinkNpK
   iintro %cpu %spie2 %spp2 %R2 %n' %Sb' %okw %nf %ipv %w %⟨hcs2, -, -, hlo, -⟩ Hk Hpc Hte Hce
     Hcore Hpath Hnm Hbs Hop Htx Harm
-  k_norm_g [sys_unlink_ret_2c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_2c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysUnlinkPins_cs k _ R2 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k R1 _ _ _ 11#5 _ hp1 (by decide)) (by decide)) (Or.inl rfl)) hcs2
@@ -366,7 +366,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     ihave Hir := (show irefSlots (GF := GF) 2 ⊢ irefSlots sysUnlinkSlots from .rfl) $$ Hir
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x2e#64) true 180#13 10#5 0#5 (by decide)
         bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, decide_true]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, decide_true]
     iintro Hk Hpc
     ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss
@@ -394,7 +394,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x2e#64) true 180#13 10#5 0#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h10, sysfile_beqz, decide_eq_false hnz]
+      with [h10, Xv6.dirlookup_beqz, decide_eq_false hnz]
     iintro Hk Hpc
     iapply (hW2 cpu spie2 spp2 _ ipv nf tl iL n' Sb')
     unfold sysUnlinkAt30 sysUnlinkCommits
@@ -471,7 +471,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   case gba => k_norm_g [hpins.2.1, sys_unlink_bufpath]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %hf1 Hk Hpc Hte Hce Hbare Hpath
   obtain ⟨hcs1, hext, hret, hlen⟩ := hf1
-  k_norm_g [sys_unlink_ret_16, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_16, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 11#5 _ (sysUnlinkPins_set k R _ _ _ 12#5 _ hpins (by decide))
@@ -545,7 +545,7 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
   ihave HΦ : (∀ c : CPU, sysUnlinkPostA k A c) $$ [Hnext]
   · iintro %c
     unfold sysUnlinkCont
-    iapply wpNext_at true k.proc cpu c _ (sys_unlink_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   simp only [sysUnlinkAddr]
   iapply (wp_prologue_sys_unlink cpu k KA.«sys_unlink» (sysUnlinkK_30 _ hK))
   k_code (text_instr _ _ _ _ rfl rfl) Htext

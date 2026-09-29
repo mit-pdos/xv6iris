@@ -25,6 +25,7 @@ The no-alloc caller never reaches `bm_head_alloc`: an allocated entry at an
 indirect index forces the indirect block (`Xv6.blkmapWf_ind_nz`).
 -/
 import Xv6.BmapIndRead
+import Xv6.ItruncParts
 
 namespace Xv6
 
@@ -37,10 +38,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-/-- `lw s1,128(a0)` / `sw a0,128(s2)`: `&ip->addrs[NDIRECT]` (Rocq's
-`i_addr_ndirect`). -/
-theorem bm_ind_addr (ip : BitVec 64) : ip + 128#64 = iAddr ip NDIRECT := by
-  unfold iAddr NDIRECT; rfl
 
 /-- The indirect cell put back at the value it had. -/
 theorem bm_cells_restore_ind (bm : Blkmap) (hlen : bm.bmDir.length = NDIRECT) :
@@ -134,7 +131,7 @@ theorem bm_head_ok (BA : BALLOC) (LW : LOG_WRITE) (BR : BREAD) (BE : BRELSE)
   ihave Hframe := Hfback $$ %(k.regs 20#5) Hf6
   -- +0x5a  sw a0,128(s2) : ip->addrs[NDIRECT] = blk ; +0x5e  c.j +0x62
   bm_step (wp_s_sw c _ (KA.«bmap» + 0x5a#64) false 128#12 18#5 10#5 (by decide) bm.bmInd)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h10, bm_ind_addr, fw_ext32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h10, Xv6.itrunc_iaddr12, fw_ext32]
   iintro Hk Hpc Hcell
   bm_step (wp_s_j c _ (KA.«bmap» + 0x5e#64) true 4#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -374,7 +371,7 @@ theorem bm_head (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
     with ⟨Hcell, Hback⟩
   bm_step (wp_s_lw c _ (KA.«bmap» + 0x48#64) false 128#12 9#5 10#5 (by decide) (by decide)
       (DFrac.own 1) bm.bmInd)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, bm_ind_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.itrunc_iaddr12]
   iintro Hk Hpc Hcell
   -- +0x4c  c.bnez s1
   by_cases hiz : bm.bmInd.toNat = 0

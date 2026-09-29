@@ -33,7 +33,7 @@ uses (never Rocq's comments):
    * the compare cluster (`sl_sext16_inj`, `sl_sext_one`, `sl_tdir_eq/_ne`,
      `sl_sext_zero`, `sl_nlz_eq/_ne`, `sl_sext_max`, `sl_nmax_eq/_ne`) is
      one `bcond` reading per test (`sysfile_beq_tdir`,
-     `sys_link_beqz_nlink`, `sys_link_beq_nmax`) plus `sys_link_li_nmax`;
+     `Xv6.namex_beqz_half`, `sys_link_beq_nmax`) plus `sys_link_li_nmax`;
    * the `++` chain (`sl_uns16`, `sl_sext16_low`, `sl_ninner*`,
      `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide` (`sys_link_nlink_incr`),
      at the shape `SpecIupdate.wp_iupdate_link` takes
@@ -76,6 +76,7 @@ are read only by ProofSysLink.v's `Z` side conditions, which the `Nat`
 statements above discharge directly).
 -/
 import Xv6.SysfileCalls
+import Xv6.NamexParts
 
 namespace Xv6
 
@@ -146,14 +147,6 @@ theorem sys_link_arg1_lt : 1 < NARG := by decide
 
 /-! ## The sixteen-bit compare cluster -/
 
-/-- THE ORPHAN GUARD at +0x86 (xv6 f60ff58): `c.beqz` on the sign-extended
-`dp->nlink` (Rocq's `sl_nlz_eq` / `sl_nlz_ne`). -/
-theorem sys_link_beqz_nlink (h : BitVec 16) :
-    bcond bop.BEQ (BitVec.signExtend 64 h) 0#64 = decide (h = 0#16) := by
-  simp only [bcond]; by_cases hz : h = 0#16
-  · subst hz; decide
-  · simp only [hz, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply hz; bv_decide
-
 /-- `lui a4,0x8 ; c.addi a4,-1` is `0x7fff = NLINK_MAX = SHRT_MAX` (Rocq's
 `sl_sext_max`). -/
 theorem sys_link_li_nmax :
@@ -165,10 +158,6 @@ theorem sys_link_beq_nmax (h : BitVec 16) :
   simp only [bcond]; by_cases hm : h = 32767#16
   · subst hm; decide
   · simp only [hm, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply hm; bv_decide
-
-/-- a nonzero halfword has a nonzero count -/
-theorem sys_link_nlink_nz (h : BitVec 16) (hz : h ≠ 0#16) : h.toNat ≠ 0 := by
-  intro h0; apply hz; exact BitVec.eq_of_toNat_eq (by simp [h0])
 
 /-! ## The `++` at +0x5e/+0x62 and the `--` at +0xfe/+0x102
 

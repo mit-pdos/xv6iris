@@ -71,7 +71,7 @@ theorem uw_runHartWaiting (hD : UcFoot D) (hW : UwFoot D) (orc : UOrc) (s : UWSt
       some (uwStep wr ib (uwWake wr (s.file .mip) (s.file .mie)),
         uwBodyS s (uwWake wr (s.file .mip) (s.file .mie)), orc) := by
   simp only [run_hart_waiting, shouldWakeForInterrupt, bind_assoc, pure_bind,
-    ucRW_readReg D _ _ _ _ hW.rd_mip, ucRW_readReg D _ _ _ _ hW.rd_mie, get_config_print_instr,
+    MachCSL.uxa_readReg_bind D _ _ _ _ hW.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hW.rd_mie, get_config_print_instr,
     Bool.false_eq_true, if_false]
   unfold uwStep uwBodyS uwWake
   have ez : (zeros : BitVec 64) = 0#64 := rfl

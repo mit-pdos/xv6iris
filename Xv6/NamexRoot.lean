@@ -25,6 +25,7 @@ rules (`Xv6/NamexFrame.lean`), shared with the walk, as in Rocq.
 -/
 import Xv6.NamexFrame
 import Xv6.NamexParts
+import Xv6.IallocDefs
 
 namespace Xv6
 
@@ -84,31 +85,6 @@ theorem namex_rootc_held (kk : Nat) (q : Qp) (hkk : kk < NINODE) (hnib0 : 0 < ic
   isplitr; · ipureintro; unfold ROOTINO; simp
   isplitr; · ipureintro; unfold ROOTINO; simp
   iapply runitAny_intro; iexact Hu
-
-/-- `iget(dev, inum)` at a call site (a copy of `Xv6.dirlookup_iget`,
-DirlookupDefs; promotion candidate). -/
-theorem namex_iget_call (IG : IGET) (c : CPU) (k' : KCtx) (inum : BitVec 32) (l : Ilic)
-    (hK : igetSlots ≤ k'.avail) (hnoff : k'.noff + 3 < 2 ^ 31)
-    (hnib : inum.toNat < 16 * icfgNib) (hpos : 0 < inum.toNat)
-    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
-    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 inum)
-    (hit : "itable" ∉ k'.locks) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«iget» ∗
-    isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-    irefSlot ∗ iname fscIreg fscFs icfgIst inum l ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      ∀ (kk : Nat) (q : Qp), ⌜kk < NINODE ∧ R' 10#5 = ientry kk⌝ -∗
-      inodeRefb (isClaim l) kk q icfgDev inum -∗
-      iname fscIreg fscFs icfgIst inum l -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := IG.wp_iget (hlc := hlc) (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr huart
-  unfold wp_iget_body at h
-  simp only [igetAddr] at h
-  exact h
 
 theorem namex_root_ctx (k : KCtx) (spie spp : Bool) (R : RegMap) :
     ((k.pushed 12).withSpie spie spp).withRegs R = ((k.withSpie spie spp).pushed 12).withRegs R := by
@@ -305,7 +281,7 @@ theorem namex_root_main (IG : IGET) (cpu : CPU) (k : KCtx) (dqp : DFrac)
   iintro Hk Hpc
   ihave Hlic : iname fscIreg fscFs icfgIst (BitVec.ofNat 32 ROOTINO) .rootL $$ []
   · unfold iname; ipureintro; rfl
-  iapply (namex_iget_call IG cpu _ (BitVec.ofNat 32 ROOTINO) .rootL ?gK ?gn
+  iapply (Xv6.ialloc_iget IG cpu _ (BitVec.ofNat 32 ROOTINO) .rootL ?gK ?gn
       (by unfold ROOTINO; simp; omega) (by unfold ROOTINO; simp) ?ga0 ?ga1 ?git ?gpr ?guart)
     $$ [- $Hk $Hpc $Hslot]
   rotate_right 1

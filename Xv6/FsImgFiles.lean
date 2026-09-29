@@ -51,6 +51,7 @@ import Xv6.User.GrepElfRaw
 import Xv6.User.InitElfRaw
 import Xv6.User.ShElfRaw
 import Xv6.User.SeccompElfRaw
+import Xv6.ElfUser
 
 namespace Xv6
 
@@ -193,12 +194,10 @@ theorem fsimgCatAddrs :
 theorem fsimgCatBytesB : fsImgRowsOk (List.range' 51 12 ++ List.range' 64 24) Cat.elfRows = true := by
   decide +kernel
 
-theorem fsimgCatRowsLen : Cat.elfSize ≤ 32 * Cat.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_cat_at`. -/
 theorem fsimgCatAt : nodeAt fsimgP fsimgSb 3 = some (.NFile Cat.elf) := by
   rw [fsimgNodeFile 3 fsimgCatType,
-    fsimgFileBytes_rows 3 _ 36 _ _ fsimgCatSize rfl fsimgCatAddrs fsimgCatBytesB fsimgCatRowsLen]
+    fsimgFileBytes_rows 3 _ 36 _ _ fsimgCatSize rfl fsimgCatAddrs fsimgCatBytesB Xv6.User.Cat.elf_rows_len]
   rfl
 
 /-! ### echo, inum 4, 35640 bytes -/
@@ -222,12 +221,10 @@ theorem fsimgEchoBytesB :
     fsImgRowsOk (List.range' 88 12 ++ List.range' 101 23) Echo.elfRows = true := by
   decide +kernel
 
-theorem fsimgEchoRowsLen : Echo.elfSize ≤ 32 * Echo.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_echo_at`. -/
 theorem fsimgEchoAt : nodeAt fsimgP fsimgSb 4 = some (.NFile Echo.elf) := by
   rw [fsimgNodeFile 4 fsimgEchoType,
-    fsimgFileBytes_rows 4 _ 35 _ _ fsimgEchoSize rfl fsimgEchoAddrs fsimgEchoBytesB fsimgEchoRowsLen]
+    fsimgFileBytes_rows 4 _ 35 _ _ fsimgEchoSize rfl fsimgEchoAddrs fsimgEchoBytesB Xv6.User.Echo.elf_rows_len]
   rfl
 
 /-! ### grep, inum 6, 44496 bytes -/
@@ -251,12 +248,10 @@ theorem fsimgGrepBytesB :
     fsImgRowsOk (List.range' 143 12 ++ List.range' 156 32) Grep.elfRows = true := by
   decide +kernel
 
-theorem fsimgGrepRowsLen : Grep.elfSize ≤ 32 * Grep.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_grep_at`. -/
 theorem fsimgGrepAt : nodeAt fsimgP fsimgSb 6 = some (.NFile Grep.elf) := by
   rw [fsimgNodeFile 6 fsimgGrepType,
-    fsimgFileBytes_rows 6 _ 44 _ _ fsimgGrepSize rfl fsimgGrepAddrs fsimgGrepBytesB fsimgGrepRowsLen]
+    fsimgFileBytes_rows 6 _ 44 _ _ fsimgGrepSize rfl fsimgGrepAddrs fsimgGrepBytesB Xv6.User.Grep.elf_rows_len]
   rfl
 
 /-! ### init, inum 7, 36024 bytes -/
@@ -280,12 +275,10 @@ theorem fsimgInitBytesB :
     fsImgRowsOk (List.range' 188 12 ++ List.range' 201 24) Init.elfRows = true := by
   decide +kernel
 
-theorem fsimgInitRowsLen : Init.elfSize ≤ 32 * Init.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_init_at`. -/
 theorem fsimgInitAt : nodeAt fsimgP fsimgSb 7 = some (.NFile Init.elf) := by
   rw [fsimgNodeFile 7 fsimgInitType,
-    fsimgFileBytes_rows 7 _ 36 _ _ fsimgInitSize rfl fsimgInitAddrs fsimgInitBytesB fsimgInitRowsLen]
+    fsimgFileBytes_rows 7 _ 36 _ _ fsimgInitSize rfl fsimgInitAddrs fsimgInitBytesB Xv6.User.Init.elf_rows_len]
   rfl
 
 /-! ### sh, inum 13, 58360 bytes -/
@@ -311,12 +304,10 @@ theorem fsimgShBytesB :
     fsImgRowsOk (List.range' 412 12 ++ List.range' 425 45) Sh.elfRows = true := by
   decide +kernel
 
-theorem fsimgShRowsLen : Sh.elfSize ≤ 32 * Sh.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_sh_at`. -/
 theorem fsimgShAt : nodeAt fsimgP fsimgSb 13 = some (.NFile Sh.elf) := by
   rw [fsimgNodeFile 13 fsimgShType,
-    fsimgFileBytes_rows 13 _ 57 _ _ fsimgShSize rfl fsimgShAddrs fsimgShBytesB fsimgShRowsLen]
+    fsimgFileBytes_rows 13 _ 57 _ _ fsimgShSize rfl fsimgShAddrs fsimgShBytesB Xv6.User.Sh.elf_rows_len]
   rfl
 
 /-! ### seccomp, inum 23, 36144 bytes -/
@@ -340,13 +331,11 @@ theorem fsimgSeccompBytesB :
     fsImgRowsOk (List.range' 984 12 ++ List.range' 997 24) Seccomp.elfRows = true := by
   decide +kernel
 
-theorem fsimgSeccompRowsLen : Seccomp.elfSize ≤ 32 * Seccomp.elfRows.length := by decide +kernel
-
 /-- Rocq `fsimg_seccomp_at`. -/
 theorem fsimgSeccompAt : nodeAt fsimgP fsimgSb 23 = some (.NFile Seccomp.elf) := by
   rw [fsimgNodeFile 23 fsimgSeccompType,
     fsimgFileBytes_rows 23 _ 36 _ _ fsimgSeccompSize rfl fsimgSeccompAddrs fsimgSeccompBytesB
-      fsimgSeccompRowsLen]
+      Xv6.User.Seccomp.elf_rows_len]
   rfl
 
 end Xv6

@@ -217,7 +217,7 @@ theorem open_absent (fdm : Fdmap) (files : List (BitVec 8) → Option (List (Bit
   icases H with ⟨%l, %vs, %wv, Hstd, Hcwd, %hok, Hpool, Htoks, Hhs, Hd, #He, Hxk⟩
   ihave ⟨-, -, #Hinv, -⟩ := E.env_parts vs $$ He
   ihave ⟨%hlen, Hstd⟩ := ustd_len_keep E.N.fd l $$ Hstd
-  iapply (E.DEV.fileOpenAbsent E.cf E.rf E.sf path E.heq l ROOTINO E.qf m K hun hs rfl (cif_om_create m hcm))
+  iapply (E.DEV.fileOpenAbsent E.cf E.rf E.sf path E.heq l ROOTINO E.qf m K hun hs rfl (Xv6.fif_om_create m hcm))
     $$ Hinv Hstd Hcwd Hd
   isplit
   · iintro Hstd Hcwd Hd

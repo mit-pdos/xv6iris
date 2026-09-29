@@ -722,7 +722,7 @@ theorem xrowMkdir_supply (W : Uvis) :
         xfamPt.dFok xfamPt.dFex W := by
   dsimp only [xrowMkdir, xfamPt, xv6Ssupply]
   iintro #⟨Hsup, -, -⟩ %Mv %_
-  iapply (fsabsMkdirPre (hlc := hlc) fscFs) $$ Hsup
+  iapply (Xv6.mkdirAuAt_unit (hlc := hlc) fscFs) $$ Hsup
 
 /-- every number but exec, at the point (Rocq's branch-by-branch discharge). -/
 theorem xv6SbundleRest_supply (n : Int) (W : Uvis) :

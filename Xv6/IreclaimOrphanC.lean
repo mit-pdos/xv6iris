@@ -20,6 +20,7 @@ deviation 1; the orphan block is cut into three stages (Rocq has one lemma
 for `+0x38 .. +0x6c`) for elaboration speed only.
 -/
 import Xv6.IreclaimTail
+import Xv6.FsCallSitesOp
 
 namespace Xv6
 
@@ -37,11 +38,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
-
-/-- `iputUnits ≤ MAXOPBLOCKS`: the reclaim arm is affordable (Rocq's
-`unfold iput_units, MAXOPBLOCKS; lia`). -/
-theorem ireclaim_iput_units : iputUnits ≤ MAXOPBLOCKS := by
-  unfold iputUnits MAXOPBLOCKS; decide
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x6c`: iput, end_op, and the fall into the step.** -/
@@ -76,7 +72,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hn31' : n < 2 ^ 31 := by omega
   have hnib : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by
-    rw [ireclaim_inum_toNat n hn31']; omega
+    rw [Xv6.bf_bnoB n hn31']; omega
   obtain ⟨hcov, hlog⟩ := hblk _ hnib
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hboot, Href, Hru, HopS, Htx⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -104,7 +100,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
   iintro Hk Hpc
   iapply (ireclaim_iput IP Γ cpu _ γl pd pav pu j γil γisl kslot q (BitVec.ofNat 32 n)
       MAXOPBLOCKS Sb e0 t (1 : Qp).half pidv dqp dqb dqs k.sie (by k_norm_g) hj ?iproc ?iK ?inoff
-      ?itier hkslot hgeom hbg hcov hlog hnib hbel ireclaim_iput_units hpd ?ia0)
+      ?itier hkslot hgeom hbg hcov hlog hnib hbel Xv6.iputUnits_le_max hpd ?ia0)
     $$ [- $Hk $Hpc $Hpi $Hte $Hpe $Hbc $Hlc $Hdc $Hit2 $Hiti $Hesc $Hinv $Hboot $Hslk
         $Hsb $Hsi $Hbmi $Hsl $Hope $Ht1 $Hrefp]
   rotate_right 1

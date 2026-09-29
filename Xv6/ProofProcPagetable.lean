@@ -56,7 +56,7 @@ theorem pp_tail [CurCtx] (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec
       ⌜R'' 10#5 = v ∧ calleeSaved KR R''⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hregs
-  simp only [pp_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   k_step_gen (wp_s_add c _ (KA.«proc_pagetable» + 0x4c#64) true 10#5 0#5 9#5 (by decide))
@@ -104,7 +104,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
   iintro ⟨Hk, Hpc, #Hlk, Hav, Htf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold procPagetableSlots at hK; omega
-  have htfa : pageAddr (BitVec.extractLsb' 12 44 tf) = tf := pageAddr_of_valid tf htfv
+  have htfa : pageAddr (BitVec.extractLsb' 12 44 tf) = tf := Xv6.Kvm.pageAddr_of_valid tf htfv
   -- the prologue
   iapply (wp_prologue4s2_gen cpu k KA.«proc_pagetable» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -145,7 +145,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     obtain ⟨hz0, hzero⟩ := hz
     k_step_gen (wp_s_branch c5 _ (KA.«proc_pagetable» + 0x14#64) true 56#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [beq_pos _ hz0] next c6 hp6
+      with [Xv6.UPtAlloc.beq_pos _ hz0] next c6 hp6
     iintro Hk Hpc
     iapply wpLoop_bupd
     imod (pp_avail_none γk on) $$ [Hav] with Hav
@@ -183,10 +183,10 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
   · -- `uvmcreate` built the root node
     obtain ⟨hb0, hbv⟩ := hb
     have hrep0 : ptRep (PTree.zeroNode b) ∅ := ptRep_zeroNode b hbv
-    have hne : R1 10#5 ≠ 0#64 := by rw [hb0]; exact page_ne_zero _ hbv
+    have hne : R1 10#5 ≠ 0#64 := by rw [hb0]; exact Xv6.PtRun.pageValid_ne_zero _ hbv
     k_step_gen (wp_s_branch c5 _ (KA.«proc_pagetable» + 0x14#64) true 56#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [beq_neg _ hne] next c6 hp6
+      with [Xv6.UPtAlloc.beq_neg _ hne] next c6 hp6
     iintro Hk Hpc
     -- li a4,PTE_R|PTE_X ; a3 = trampoline ; a2 = PGSIZE ; a1 = TRAMPOLINE
     k_step_gen (wp_s_addi c6 _ (KA.«proc_pagetable» + 0x16#64) true 10#12 14#5 0#5 (by decide))
@@ -216,7 +216,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     have hargs1 : mappagesArgs (PTree.zeroNode b) 0x3ffffff000#64 0x1000#64 KA.«_trampoline» 1 := by
       refine ⟨by decide, by decide, by decide, by omega, by decide, by decide, ?_⟩
       intro i hi
-      exact zeroNode_walk b 2 _
+      exact MachCSL.PTree.zeroNode_walk b 2 _
     iapply (pp_mappages_call MP c14 _ γl γk (availDec on) (PTree.zeroNode b) 1 10#64
       ?hn2 ?hK2 ?hl2 ?hr2 ?hg2 ?hpm2 ?hmk2 ?hrw2 ?hwf2 ?hnd2 ?hpg2) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -226,7 +226,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     case hn2 => k_norm_g; omega
     case hK2 => k_norm_g; unfold procPagetableSlots at hK; omega
     case hl2 => k_norm_g; exact hlk
-    case hr2 => k_norm_g; rw [zeroNode_base]; exact hb0
+    case hr2 => k_norm_g; rw [MachCSL.PTree.zeroNode_base]; exact hb0
     case hg2 => k_norm_g; exact hargs1
     case hpm2 => k_norm_g
     case hmk2 => decide
@@ -236,7 +236,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     case hpg2 => exact hrep0.2.2.1
     iapply wpNext_intro_pin
     iintro %c15 %hp15 %spie2 %spp2 %R2 %fresh1 %hsp2 Hk Hpc Htree Hav %hres2
-    k_norm_g [pp_ret_19e0, vpnOf_tramp, trampPpn_eq, pp_withSpie_withSpie]
+    k_norm_g [pp_ret_19e0, vpnOf_tramp, trampPpn_eq, MachCSL.KCtx.withSpie_twice]
     k_norm_g [vpnOf_tramp, trampPpn_eq] at hres2
     obtain ⟨hcs2, hsup2, hnd1, hfr1, hr2⟩ := hres2
     unfold calleeSaved at hcs2
@@ -249,7 +249,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
     rcases hr2 with ⟨hz2, hfull2⟩ | ⟨hm1, hlt1, hz1⟩
     · -- the trampoline is mapped: map the trapframe next
       obtain ⟨hcomp1, hlen1, htree1⟩ := mapRun_one_eq _ _ _ _ _ hsup2 hfull2
-      have hlen1' : fresh1.length = 2 := by rw [hlen1, zeroNode_missingOn]
+      have hlen1' : fresh1.length = 2 := by rw [hlen1, MachCSL.PTree.zeroNode_missingOn]
       rw [hlen1']
       have hrep1 : ptRep ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1
           (insert ∅ trampVpn.toNat trampLeaf) := by
@@ -257,7 +257,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         exact ptRep_setLeaf _ _ _ _ (ptRep_fill _ _ _ _ hrep0 hnd1 hfr1) hcomp1
           (leafOf_valid _ _ (by decide))
       have hbase1 : ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.base = b := by
-        rw [htree1, PTree.base_setLeaf, base_fill, zeroNode_base]
+        rw [htree1, PTree.base_setLeaf, MachCSL.PTree.base_fill, MachCSL.PTree.zeroNode_base]
       have hmiss2 :
           ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.missingOn 2 tfVpn = 0 :=
         missingOn_two_zero _ _ _ (by rw [htree1]; exact complete_setLeaf 2 _ _ _ hcomp1)
@@ -269,7 +269,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         have hi0 : i = 0 := by omega
         subst hi0
         rw [tf_add_zero]
-        exact hrep1.2.2.2.2 tfVpn (get_insert_empty_ne _ _ _ tf_ne_tramp')
+        exact hrep1.2.2.2.2 tfVpn (get_insert_empty_ne _ _ _ Xv6.UPt.tf_ne_tramp)
       k_step_gen (wp_s_branch c15 _ (KA.«proc_pagetable» + 0x2e#64) false 44#13 10#5 0#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [bltz_zero _ hz2] next c16 hp16
@@ -320,7 +320,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hpg5 => exact hrep1.2.2.1
       iapply wpNext_intro_pin
       iintro %c25 %hp25 %spie3 %spp3 %R3 %fresh2 %hsp3 Hk Hpc Htree Hav %hres3
-      k_norm_g [pp_ret_19fa, vpnOf_tf, pp_withSpie_withSpie]
+      k_norm_g [pp_ret_19fa, vpnOf_tf, MachCSL.KCtx.withSpie_twice]
       k_norm_g [vpnOf_tf] at hres3
       obtain ⟨hcs3, hsup3, hnd2, hfr2, hr3⟩ := hres3
       unfold calleeSaved at hcs3
@@ -343,7 +343,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           exact ptRep_setLeaf _ _ _ _ (ptRep_fill _ _ _ _ hrep1 hnd2 hfr2) hcomp2
             (leafOf_valid _ _ (by decide))
         have hbase2 : (((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.mapRun tfVpn (BitVec.extractLsb' 12 44 tf) 6#64 1 fresh2).1.base = b := by
-          rw [htree2, PTree.base_setLeaf, base_fill]; exact hbase1
+          rw [htree2, PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbase1
         ihave HT := ptOwnRep_intro b _ _ hbase2 hrep2 $$ Htree
         ihave HU : umPages (GF := GF) (UPtd.mk b (BitVec.extractLsb' 12 44 tf) ∅) (fun _ => []) $$ []
         case' _ =>
@@ -398,7 +398,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         rw [hlen2', avail_after_pp] at hz2'
         have hrep2 : ptRep (((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.mapRun tfVpn (BitVec.extractLsb' 12 44 tf) 6#64 1 fresh2).1 (insert ∅ trampVpn.toNat trampLeaf) := by
           rw [htree2]; exact ptRep_fill _ _ _ _ hrep1 hnd2 hfr2
-        have hbase2 : (((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.mapRun tfVpn (BitVec.extractLsb' 12 44 tf) 6#64 1 fresh2).1.base = b := by rw [htree2, base_fill]; exact hbase1
+        have hbase2 : (((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.mapRun tfVpn (BitVec.extractLsb' 12 44 tf) 6#64 1 fresh2).1.base = b := by rw [htree2, MachCSL.PTree.base_fill]; exact hbase1
         ihave HT := ptOwnRep_intro b _ _ hbase2 hrep2 $$ Htree
         k_step_gen (wp_s_branch c25 _ (KA.«proc_pagetable» + 0x48#64) false 30#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -477,7 +477,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         case hb8 => exact umBelow_empty _ b _
         iapply wpNext_intro_pin
         iintro %c38 %hp38 %spie4 %spp4 %R5 %hsp4 Hk Hpc %hcs5
-        k_norm_g [pp_ret_1a32, pp_withSpie_withSpie]
+        k_norm_g [pp_ret_1a32, MachCSL.KCtx.withSpie_twice]
         unfold calleeSaved at hcs5
         k_norm_g at hcs5
         obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs5
@@ -534,9 +534,9 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       have hrep1 : ptRep ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1 ∅ := by
         rw [htree1]; exact ptRep_fill _ _ _ _ hrep0 hnd1 hfr1
       have hbase1 : ((PTree.zeroNode b).mapRun trampVpn trampPpn 10#64 1 fresh1).1.base = b := by
-        rw [htree1, base_fill, zeroNode_base]
+        rw [htree1, MachCSL.PTree.base_fill, MachCSL.PTree.zeroNode_base]
       have hlen1' : fresh1.length ≤ 2 := by
-        rw [zeroNode_missingOn] at hlen1; exact hlen1
+        rw [MachCSL.PTree.zeroNode_missingOn] at hlen1; exact hlen1
       ihave HT := ptOwnRep_intro b ∅ _ hbase1 hrep1 $$ Htree
       k_step_gen (wp_s_branch c15 _ (KA.«proc_pagetable» + 0x2e#64) false 44#13 10#5 0#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -574,7 +574,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
       case hb6 => exact umBelow_empty _ b _
       iapply wpNext_intro_pin
       iintro %c20 %hp20 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hcs3
-      k_norm_g [pp_ret_1a14, pp_withSpie_withSpie]
+      k_norm_g [pp_ret_1a14, MachCSL.KCtx.withSpie_twice]
       unfold calleeSaved at hcs3
       k_norm_g at hcs3
       obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3

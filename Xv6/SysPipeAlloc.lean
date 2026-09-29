@@ -122,7 +122,7 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
     case hKf => k_norm_g; rw [sysPipeSlots_eq] at hK; unfold fdallocSlots; omega
     iapply wpNext_intro_pin
     iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hpost2
-    k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -210,7 +210,7 @@ theorem sys_pipe_stage_b (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
     case hKf => k_norm_g; rw [sysPipeSlots_eq] at hK; unfold fdallocSlots; omega
     iapply wpNext_intro_pin
     iintro %c6 %hp6 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hpost2
-    k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
     k_norm_g at hcs2

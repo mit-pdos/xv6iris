@@ -21,7 +21,7 @@ instances):
 
 1. The exit stub (Rocq `UkSh.wp_ksh_exit`, sh-main's) is proved here from
    `UkStub.exit_stub_of_text` at sh's text and `UK_SYS_P.exit`
-   (`ushR_stubExit`, `ushR_exit0`), the exit payload paid from the free
+   (`Xv6.sh_stub_exit`, `ushR_exit0`), the exit payload paid from the free
    payload `⊢ N.pay (-1)` and `UknConst` (the `UkInitStubs.wp_kinit_exit`
    route).
 2. Rocq's `wp_uk_cldq` (a load at a DFRAC) is `UshStep.ushS_ld` at
@@ -34,6 +34,8 @@ import Xv6.UshRunEntry
 import Xv6.SpecShSysWait
 import Xv6.SpecShSysExec
 import Xv6.UkSysP
+import Xv6.UshMainStubs
+import Xv6.UshRedirArm
 
 namespace Xv6
 
@@ -103,12 +105,6 @@ theorem ushR_wait0 (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (hps : ∀ k : Int, freeN
   iapply (show iprop(∃ S : ExtTreeSet GName compare, uch (GF := GF) N.ch S) ⊢ uchAny N.ch from .rfl)
   iexists Sc'; iexact Hch
 
-/-- sh's `exit` stub, as a law (deviation 1). -/
-theorem ushR_stubExit (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ exitStubLaw (hlc := hlc) N (ushCode N.t) User.Sh.Sym.«exit» :=
-  exit_stub_of_text UL N User.Sh.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide)
-
 /-- **Rocq `wp_kshr_exit0`**: `c.li a0,k ; jal ra,exit`, at a free payload. -/
 theorem ushR_exit0 (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknConst N] (hpx : ⊢ N.pay (-1))
     {pc0 pc1 : Nat} {k : BitVec 12} {imm : BitVec 21}
@@ -123,7 +119,7 @@ theorem ushR_exit0 (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknCo
   iintro %h1 Hrun
   iapply ushS_jal UL N hi1 User.Sh.Sym.«exit» (pc1 + 4) h1 _ av ht (by simp) (by decide) $$ Hc Hrun
   iintro %h2 Hrun
-  ihave Hs := ushR_stubExit (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_exit (hlc := hlc) UL N
   unfold exitStubLaw
   iapply Hs $$ %h2 %_ %av Hc Hrun
   iintro %h3 #Hi Hrun
@@ -143,10 +139,6 @@ def ushRunIH (Dg : Nat) (c : Ushcmd) : Prop :=
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 * ushHt c + (2 + (Dg + n))) -∗
       wpLoop h
 
-/-- A read-only pointer slot, as the word the load reads. -/
-theorem ushR_ptr (g : GName) (a p : Nat) : ushPtr (GF := GF) g a p ⊢ uwordq g DFrac.discard a (BitVec.ofNat 64 p) :=
-  .rfl
-
 /-- **The EXEC arm** (Rocq `wp_kshr_runcmd`, EXEC). -/
 theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
     (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (Dg : Nat) (hleaf : ushDiagLeaf (hlc := hlc) (GF := GF) Dg)
@@ -161,12 +153,12 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
   simp only [ushJarm]
   iintro %h1 %m1 %sp0 %hal %hlo %hsp %hs0 %hs1 %ha01 - Hrun
   have hA : ((m1.get 10#5).toNat : Int) + (8#12 : BitVec 12).toInt = ((t + 8 : Nat) : Int) := by
-    rw [ha01, ush_toNat_ofNat t (by omega)]; rfl
+    rw [ha01, Xv6.bcOfNatToNat t (by omega)]; rfl
   cases args with
   | nil =>
     -- argv[0] is the NUL cap: exit(1)
     simp only
-    ihave #Hw := ushR_ptr N.d (t + 8) 0 $$ Hav
+    ihave #Hw := Xv6.ushPtr_word N.d (t + 8) 0 $$ Hav
     iapply ushS_ld UL N (ushRI_0ce N.t) 0xd0 h1 m1 _ DFrac.discard (t + 8) (BitVec.ofNat 64 0) hA (by omega)
       $$ Hc Hw Hrun
     iintro - %h2 Hrun
@@ -179,7 +171,7 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
     icases Hav with ⟨#Hw0, #Hx⟩
     ihave %hxr := (show ushStr (GF := GF) N.d x ⊢ ⌜0 < x.ptr ∧ x.ptr < 2 ^ 38⌝ by
       unfold ushStr; iintro ⟨%h, -⟩; ipureintro; exact h) $$ Hx
-    ihave #Hw := ushR_ptr N.d (t + 8) x.ptr $$ Hw0
+    ihave #Hw := Xv6.ushPtr_word N.d (t + 8) x.ptr $$ Hw0
     iapply ushS_ld UL N (ushRI_0ce N.t) 0xd0 h1 m1 _ DFrac.discard (t + 8) (BitVec.ofNat 64 x.ptr) hA (by omega)
       $$ Hc Hw Hrun
     iintro - %h2 Hrun
@@ -209,7 +201,7 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
     rw [hra]
     have hs1' : (m5.get 9#5).toNat = t := by
       show ((ukWr (ukWr (ukWr (ukWr (ukWr m1 10#5 _) 11#5 _) 1#5 _) 17#5 _) 10#5 _).get 9#5).toNat = t
-      ureg; rw [hs1, ush_toNat_ofNat t (by omega)]
+      ureg; rw [hs1, Xv6.bcOfNatToNat t (by omega)]
     -- 0xda: "exec %s failed" -- the diagnostic cut
     rw [show 2 + (Dg + n) = Dg + (2 + n) by omega]
     iapply hleaf N h6 m5 0xda (2 + n) (Or.inr (Or.inl ⟨rfl, by rw [hs1']; exact ht8⟩)) $$ Hdp Hc [] [] Hrun
@@ -234,7 +226,7 @@ theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
   iintro #Hdp #Hc #Hexs #Hkw #Hjt #Htree Hsz Hstd Hcwd Hch Hrun
   ihave %hta := ushCmd_addr N.d t _ $$ Htree
   obtain ⟨⟨ht0, ht38⟩, ht8⟩ := hta
-  have htn : (BitVec.ofNat 64 t).toNat = t := ush_toNat_ofNat t (by omega)
+  have htn : (BitVec.ofNat 64 t).toNat = t := Xv6.bcOfNatToNat t (by omega)
   iapply hent N (.list l r) h m t _ ha0 $$ Hc Hjt Htree Hrun
   simp only [ushJarm]
   iintro %h1 %m1 %sp0 %hal %hlo %hsp %hs0 %hs1 %ha01 - Hrun
@@ -265,7 +257,7 @@ theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
       (by decide) $$ Hc Hrun Hch
     iintro %hC %mC %hcsC Hrun Hch
     have hs1C : mC.get 9#5 = BitVec.ofNat 64 t := (hcsC 9#5 (by decide)).trans ((hcsA 9#5 (by decide)).trans hs12)
-    ihave #Hw := ushR_ptr N.d (t + 16) qr $$ Hqrp
+    ihave #Hw := Xv6.ushPtr_word N.d (t + 16) qr $$ Hqrp
     iapply ushS_ld UL N (ushRI_136 N.t) 0x138 hC mC _ DFrac.discard (t + 16) (BitVec.ofNat 64 qr)
       (by rw [hs1C, htn]; rfl) (by omega) $$ Hc Hw Hrun
     iintro - %hD Hrun
@@ -286,7 +278,7 @@ theorem ushRun_list (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SF : SH_FORK1)
       (by rw [ha0A, RegMap.get_zero]; decide) $$ Hck Hrun
     iintro %hB Hrun
     have hs1A : mA.get 9#5 = BitVec.ofNat 64 t := (hcsA 9#5 (by decide)).trans hs12
-    ihave #Hw := ushR_ptr N'.d (t + 8) ql $$ Hqlp
+    ihave #Hw := Xv6.ushPtr_word N'.d (t + 8) ql $$ Hqlp
     iapply ushS_ld UL N' (ushRI_12a N'.t) 0x12c hB mA _ DFrac.discard (t + 8) (BitVec.ofNat 64 ql)
       (by rw [hs1A, htn]; rfl) (by omega) $$ Hck Hw Hrun
     iintro - %hC Hrun
@@ -313,7 +305,7 @@ theorem ushRun_back (UL : UK_LEAVES) (HS : UK_SYS_P) (SF : SH_FORK1)
   iintro #Hdp #Hc #Hexs #Hkw #Hjt #Htree Hsz Hstd Hcwd Hch Hrun
   ihave %hta := ushCmd_addr N.d t _ $$ Htree
   obtain ⟨⟨ht0, ht38⟩, ht8⟩ := hta
-  have htn : (BitVec.ofNat 64 t).toNat = t := ush_toNat_ofNat t (by omega)
+  have htn : (BitVec.ofNat 64 t).toNat = t := Xv6.bcOfNatToNat t (by omega)
   iapply hent N (.back c) h m t _ ha0 $$ Hc Hjt Htree Hrun
   simp only [ushJarm]
   iintro %h1 %m1 %sp0 %hal %hlo %hsp %hs0 %hs1 %ha01 - Hrun
@@ -349,7 +341,7 @@ theorem ushRun_back (UL : UK_LEAVES) (HS : UK_SYS_P) (SF : SH_FORK1)
       (by rw [ha0A, RegMap.get_zero]; decide) $$ Hck Hrun
     iintro %hB Hrun
     have hs1A : mA.get 9#5 = BitVec.ofNat 64 t := (hcsA 9#5 (by decide)).trans hs12
-    ihave #Hw := ushR_ptr N'.d (t + 8) q $$ Hqp
+    ihave #Hw := Xv6.ushPtr_word N'.d (t + 8) q $$ Hqp
     iapply ushS_ld UL N' (ushRI_1cc N'.t) 0x1ce hB mA _ DFrac.discard (t + 8) (BitVec.ofNat 64 q)
       (by rw [hs1A, htn]; rfl) (by omega) $$ Hck Hw Hrun
     iintro - %hC Hrun

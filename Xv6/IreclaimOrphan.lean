@@ -95,12 +95,12 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hn31' : n < 2 ^ 31 := by omega
-  have hnN : (BitVec.ofNat 32 n).toNat = n := ireclaim_inum_toNat n hn31'
+  have hnN : (BitVec.ofNat 32 n).toNat = n := Xv6.bf_bnoB n hn31'
   have hnib : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by omega
   have hpos' : 0 < (BitVec.ofNat 32 n).toNat := by omega
   obtain ⟨hbnoN, hib, hhome⟩ := ireclaim_bno n hnib hblk hgeom
   have hsx : BitVec.ofNat 64 n = BitVec.signExtend 64 (BitVec.ofNat 32 n) :=
-    ireclaim_sext_inum n hn31'
+    Xv6.iu_sext_bno n hn31'
   obtain ⟨a2, a20, a21, a22, p23, p24, p25, p26, p27⟩ := id hb
   generalize hi : BitVec.ofNat 32 n = inum at hnN hnib hpos' hbnoN hib hhome hsx htnz ⊢
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hlk, Hiref, Hboot⟩

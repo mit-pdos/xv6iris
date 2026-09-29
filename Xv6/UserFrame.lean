@@ -371,7 +371,7 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
       iframe
     isplitl [Hg]
     · iapply (uf_gprFile_cells cpu (ufFile C pt _)).1
-      iapply uexec_gprFile_congr cpu g _ (fun i hi => by rw [ufFile_gpr _ _ _ i hi]) $$ Hg
+      iapply MachCSL.gprFile_ext cpu g _ (fun i hi => by rw [ufFile_gpr _ _ _ i hi]) $$ Hg
     isplitl [Hstvec Hmie Hmdl Hmedl Hmenv]
     · iapply (uf_cfgRo_cells cpu C.dqc (ufFile C pt _)).2
       dsimp only [ufFile]

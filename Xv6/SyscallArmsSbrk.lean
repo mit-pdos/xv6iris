@@ -36,10 +36,6 @@ set_option linter.unusedVariables false
 
 /-! ## §1 The lazy image under sbrk's moves -/
 
-theorem sbrkArm_pgRoundUp_mono {a b : Nat} (h : a ≤ b) : pgRoundUpN a ≤ pgRoundUpN b := by
-  unfold pgRoundUpN
-  exact Nat.mul_le_mul_right _ (Nat.div_le_div_right (by omega))
-
 /-- A mapped page reads back a byte (the page is full). -/
 theorem sbrkArm_mapped_some (P : UPtd) (M : Nat → List (BitVec 8)) (hlen : umPageLen P M) (x : Nat)
     (w : BitVec 64) (hP : Iris.Std.PartialMap.get? P.um (x / 4096) = some w) :
@@ -53,7 +49,7 @@ a LARGER break is the image grown with zeros (the table unmoved). -/
 theorem sbrkArm_lazy_grow (P : UPtd) (M : Nat → List (BitVec 8)) (sz sz' : Nat) (hle : sz ≤ sz')
     (hlen : umPageLen P M) : umemLazy P sz' M = umemGrow (umemLazy P sz M) sz' := by
   funext x
-  have hm := sbrkArm_pgRoundUp_mono hle
+  have hm := Xv6.UPtAlloc.pgRoundUpN_le hle
   unfold umemLazy umemGrow elfUnion umemZeros
   cases hP : Iris.Std.PartialMap.get? P.um (x / 4096) with
   | some w =>
@@ -75,7 +71,7 @@ theorem sbrkArm_lazy_alloc (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (sz sz
   obtain ⟨hext, hout, hin⟩ := hok
   have hR : pgRoundUpN sz.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
   have hR' : pgRoundUpN sz'.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
-  have hRle := sbrkArm_pgRoundUp_mono hle
+  have hRle := Xv6.UPtAlloc.pgRoundUpN_le hle
   have hRge : sz'.toNat ≤ pgRoundUpN sz'.toNat := by unfold pgRoundUpN; omega
   -- the run's pages sit at or above the old rounded break and below the new
   have hrun : ∀ k, uvmaVpn0 sz ≤ k → k < uvmaVpn0 sz + uvmaNp sz sz' →
@@ -136,7 +132,7 @@ theorem sbrkArm_lazy_dealloc (P : UPtd) (M : Nat → List (BitVec 8)) (sz sz' : 
       umemDel (umemLazy P sz.toNat M) (pgRoundUpN sz'.toNat) (4096 * uvmdNp sz sz') := by
   have hnp : uvmdNp sz sz' = (pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat) / 4096 := by
     unfold uvmdNp; rw [if_pos hlt]
-  have hRle := sbrkArm_pgRoundUp_mono (Nat.le_of_lt hlt)
+  have hRle := Xv6.UPtAlloc.pgRoundUpN_le (Nat.le_of_lt hlt)
   have hR : pgRoundUpN sz.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
   have hR' : pgRoundUpN sz'.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
   funext x

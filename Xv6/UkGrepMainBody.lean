@@ -98,7 +98,7 @@ theorem grepMain_body (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
   rw [treePay_vis]
   simp only [evObl, opObl, grepProg]
   iapply Ht $$ %h3 %m3 %na %g.ptr %false %g.bytes [] [] [] Hc [] Hrun
-  · ipureintro; exact grepUargBytesOf g
+  · ipureintro; exact Xv6.uargBytes_of g
   · ipureintro; ureg
   · ipureintro; ureg; rw [ukLi _ 0#12 0 (by decide)]; decide
   · simp only [upathAt, Bool.false_eq_true, if_false, uargBytes_length]
@@ -146,7 +146,7 @@ theorem grepMain_body (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
     · omega
     · exact ⟨by have : (NOFILE : Int) = 16 := rfl; omega, h0⟩
   obtain ⟨fd, hfdn⟩ : ∃ fd : Nat, ret.toInt = fd := ⟨ret.toInt.toNat, by omega⟩
-  have hret : BitVec.ofNat 64 fd = ret := kgrep_ofNat_of_toInt ret fd hfdn
+  have hret : BitVec.ofNat 64 fd = ret := Xv6.kcat_ofNat_of_toInt ret fd hfdn
   have hcr : (BitVec.setWidth 32 ret).toInt = ret.toInt := by
     rw [hfdn, ← hret, kgrep_cint fd (by omega)]
   -- 0x214  c.mv a1,a0 ; 0x216  c.mv a0,s4 ; 0x218  jal grep

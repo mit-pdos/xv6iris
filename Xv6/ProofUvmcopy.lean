@@ -24,6 +24,9 @@ import Xv6.SpecUvmunmap
 import Xv6.UPtCopyLemmas
 import Xv6.CodeTactics
 import Xv6.UvmCallSites
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -62,15 +65,6 @@ theorem uc_ret_1432 : jumpPc (KA.«uvmcopy» + 0x7a#64) = (KA.«uvmcopy» + 0x7a
 /-- `c.lui s4,0x1` is `4096`. -/
 theorem uc_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
 
-theorem uc_toNat_add (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
-    (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
-theorem uc_toNat_ofNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
 /-- The loop test `bgeu s1,s5`: taken exactly when the run is over. -/
 theorem uc_bgeu_test {α : Type} (sz : BitVec 64) (n i : Nat) (hn : n = uvmNp sz)
     (hsz : sz.toNat ≤ uvmMaxsz) (hi : i ≤ n) (p q : α) :
@@ -78,7 +72,7 @@ theorem uc_bgeu_test {α : Type} (sz : BitVec 64) (n i : Nat) (hn : n = uvmNp sz
   have hmax : uvmMaxsz = 274877898752 := by unfold uvmMaxsz; decide
   have hnv : n = (sz.toNat + 4095) / 4096 := by rw [hn]; rfl
   have hival : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := by
-    refine uc_toNat_ofNat _ ?_
+    refine Xv6.bcOfNatToNat _ ?_
     omega
   by_cases he : i = n
   · rw [if_pos he, if_pos (show bcond bop.BGEU (BitVec.ofNat 64 (4096 * i)) sz = true by
@@ -98,7 +92,7 @@ theorem uc_page_add (i : Nat) :
 /-- The page number of the `i`-th page of the run. -/
 theorem uc_vpnOf (i : Nat) (h : 4096 * i < 2 ^ 38) :
     (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat = i := by
-  have hv : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := uc_toNat_ofNat _ (by omega)
+  have hv : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := Xv6.bcOfNatToNat _ (by omega)
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, hv]
   have h12 : (4096 * i) / 2 ^ 12 = i := by omega
   rw [h12]
@@ -108,7 +102,7 @@ theorem uc_vpnOf (i : Nat) (h : 4096 * i < 2 ^ 38) :
 theorem uc_srli12 (i : Nat) (h : 4096 * i < 2 ^ 64) :
     (BitVec.ofNat 64 (4096 * i)) >>> 12 = BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
-  have hv : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := uc_toNat_ofNat _ (by omega)
+  have hv : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := Xv6.bcOfNatToNat _ (by omega)
   simp only [BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow, hv, BitVec.toNat_ofNat,
     Nat.reducePow]
   omega
@@ -124,10 +118,6 @@ theorem uc_aligned (i : Nat) : (BitVec.ofNat 64 (4096 * i)) &&& 0xfff#64 = 0#64 
   rw [this]
   generalize BitVec.ofNat 64 i = q
   bv_decide
-
-theorem uc_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-- What an iteration keeps: the frame pointer, the cursor and the four
 arguments (`s2`/`s3` are scratch). -/
@@ -188,20 +178,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
-
-set_option maxHeartbeats 1000000 in
-theorem uc_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFrac) (t' : PTree)
-    (hK' : 8 ≤ k'.avail) (hroot' : k'.regs 10#5 = pageAddr t'.base)
-    (hva' : (k'.regs 11#5).toNat < 2 ^ 38) (halloc' : k'.regs 12#5 = 0#64) (hwf' : t'.wfU 2) :
-    kctx c k' ∗ pcIs c KA.«walk» ∗ ptreeOwn 2 dq t' ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t' -∗
-      ⌜calleeSaved k'.regs R' ∧ walkRet t' (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t' hK' hroot' hva' halloc' hwf'
-  unfold wp_walk_noalloc_body at h
-  simp only [walkAddr] at h
-  exact h
 
 set_option maxHeartbeats 1000000 in
 theorem uc_kfree_call (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
@@ -359,7 +335,7 @@ theorem uvmcopy_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (Q : IProp GF)
   icases ucFrame_split _ _ _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7, F8, F9⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
-  simp only [uc_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«uvmcopy» + 0x80#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -539,7 +515,7 @@ theorem uvmcopy_err (UM : UVMUNMAP) [CurCtx] (cpu cur : CPU) (k : KCtx) (γl : G
   iintro %c6 %hp6 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hchild %hcs
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cur :=
     fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
-  k_norm_g [uc_withSpie_withSpie, uc_ret_1432]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1432]
   -- the child is back to `Pnew`
   have hdel0 : P.delRun (vpnOf (0#64)).toNat i = Pnew := by
     rw [uc_vpnOf_zero]; exact UPtCopy.ucInv_delRun hinv hi hfree
@@ -732,7 +708,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
   have hmaxv : uvmMaxsz = 274877898752 := uc_uvmMaxsz
   have hn26 : n ≤ 67108862 := by omega
   have hi38 : 4096 * i < 2 ^ 38 := by omega
-  have hivt : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := uc_toNat_ofNat _ (by omega)
+  have hivt : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := Xv6.bcOfNatToNat _ (by omega)
   have hvpni : (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat = i := uc_vpnOf i hi38
   have hne_tf : i ≠ tfVpn.toNat := by rw [uc_tfVpn]; omega
   have hne_tr : i ≠ trampVpn.toNat := by rw [uc_trampVpn]; omega
@@ -756,7 +732,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
   k_step_gen (wp_s_jal c3 _ (KA.«uvmcopy» + 0x30#64) false 2095896#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uvmcopy_br_fffffffffffffb48] next c4 hp4
   iintro Hk Hpc
-  iapply (uc_walk_call W c4 _ (DFrac.own 1) told ?hKw ?hrow ?hvaw ?halw hrepo.1) $$ [- $Hk $Hpc]
+  iapply (Xv6.wa_walk_call W c4 _ (DFrac.own 1) told ?hKw ?hrow ?hvaw ?halw hrepo.1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe Htreeo
@@ -899,7 +875,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
       have hpin10 : k.sie = false ∨ k.proc = 0#64 → c11 = cur := fun h =>
         (hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
           ((hp6 h).trans (hpin4 h))))))
-      k_norm_g [uc_withSpie_withSpie, uc_ret_13fc]
+      k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_13fc]
       have hkept3 : ucKept R R3 := by
         refine ucKept_trans (ucKept_of_calleeSaved hcs') ?_
         unfold ucKept
@@ -1064,7 +1040,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           (hp23 h).trans ((hp22 h).trans (hpin21 h))
         have hpin25 : k.sie = false ∨ k.proc = 0#64 → c25 = cur := fun h =>
           (hp25 h).trans ((hp24 h).trans (hpin23 h))
-        k_norm_g [uc_withSpie_withSpie, uc_ret_141c, uc_availSub_none]
+        k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_141c, uc_availSub_none]
         obtain ⟨hcs4, hsup, hfrnd, hfrpg, harm⟩ := hpost2
         have hkept5 : ucKept R4 R5 := by
           unfold ucKept
@@ -1121,7 +1097,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           have hb2 : ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
                 (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))).base = ({ P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).root := by
-            rw [PTree.base_setLeaf, PtRun.base_fill]; exact hbasec
+            rw [PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbasec
           have hr2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
                 (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))))))) ({ P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } : UPtd).leaves := by
@@ -1159,7 +1135,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
             simp at hlt1
           rw [uc_mapRun_one, if_neg hnc]
           have hbf : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.base = P.root := by
-            rw [PtRun.base_fill]; exact hbasec
+            rw [MachCSL.PTree.base_fill]; exact hbasec
           have hrf : ptRep (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1 P.leaves :=
             UPtCopy.ptRep_fill _ fresh hrepc hfrnd hfrpg
           k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
@@ -1192,7 +1168,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hav %hcs5
           have hpin29 : k.sie = false ∨ k.proc = 0#64 → c29 = cur := fun h =>
             (hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans (hpin25 h))))
-          k_norm_g [uc_withSpie_withSpie, uc_ret_1424, uc_availInc_none]
+          k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1424, uc_availInc_none]
           ihave Hchild := UPtCopy.procPtAt_intro P (UPtCopy.ucView Mold Mnew n) _ hwfc hbf hrf
             $$ [Htreec Hpagesc]
           case' _ => iframe
@@ -1487,7 +1463,7 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
     have hpin18 : k.sie = false ∨ k.proc = 0#64 → c18 = cpu := fun h =>
       (hp18 h).trans ((hp17 h).trans ((hp16 h).trans (hpin15 h)))
     ihave Hchild := uc_procPtAt_view' Pnew Mold Mnew (uvmNp (k.regs 12#5)) hfree $$ Hchild
-    rw [uc_pushed_spie_self k 10]
+    rw [Xv6.ua_pushed_spie_self k 10]
     iapply (uvmcopy_loop W KAL KF MM MA k γl γk Pold Pnew Mold Mnew (k.regs 12#5)
       (uvmNp (k.regs 12#5)) hnoff hK hlk rfl hsz hmax hfree (uvmNp (k.regs 12#5) - 1)
       0 (by omega) Pnew (UPtCopy.ucInv_zero Pold Pnew) k.spie k.spp _ ?l9 ?l20 ?l21 ?l22 ?l23 c18)

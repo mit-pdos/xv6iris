@@ -17,6 +17,9 @@ import Xv6.SpecMemset
 import Xv6.SpecMappages
 import Xv6.UPtFaultLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.UvmCallSites
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -146,12 +149,6 @@ theorem vf_round_bound (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
   simp only [BitVec.toNat_ofNat] at h2
   omega
 
-theorem vf_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem vf_withSpie_withSpie (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := by cases k; rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -172,12 +169,6 @@ def vfFrame [CurCtx] (sp ra s0 w3 w4 w5 s4 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w4 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w5 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) s4
-
-theorem vf_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-
-theorem vf_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 set_option maxHeartbeats 4000000 in
 /-- The shared exit: `a0 := s4`, the three live slots restored, the frame
@@ -216,7 +207,7 @@ theorem vmfault_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegM
   iintro Hk Hpc Hf6
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 6 $$ [Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c4 _ (KA.«vmfault» + 0x18#64) true 48#12 6 vf_imm_p48)
+  k_step_gen (wp_s_pop c4 _ (KA.«vmfault» + 0x18#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
@@ -263,23 +254,6 @@ theorem vf_ismapped_call (IM : ISMAPPED) [CurCtx] (c : CPU) (k' : KCtx) (dq : DF
   have h := IM.wp_ismapped (hlc := hlc) (GF := GF) c k' dq t L hK hroot hva hrep
   unfold wp_ismapped_body at h
   simp only [ismappedAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-/-- `kalloc`'s contract at its entry address. -/
-theorem vf_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail)
-    (hlk : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
@@ -351,21 +325,6 @@ theorem vf_mappages_call (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : KCtx) (γl
     hargs hperm hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem vf_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFrac) (t : PTree)
-    (hK : 8 ≤ k'.avail) (hroot : k'.regs 10#5 = pageAddr t.base)
-    (hva : (k'.regs 11#5).toNat < 2 ^ 38) (halloc : k'.regs 12#5 = 0#64) (hwf : t.wfU 2) :
-    kctx c k' ∗ pcIs c KA.«walk» ∗ ptreeOwn 2 dq t ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ptreeOwn 2 dq t -∗
-      ⌜calleeSaved k'.regs R' ∧ walkRet t (vpnOf (k'.regs 11#5)) (R' 10#5)⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t hK hroot hva halloc hwf
-  unfold wp_walk_noalloc_body at h
-  simp only [walkAddr] at h
   exact h
 
 end

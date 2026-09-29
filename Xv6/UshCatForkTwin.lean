@@ -21,12 +21,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
-/-- **Rocq `kshf_fork_law_pipe`**: the pipe era's fork twin IS the fork law. -/
-theorem kshf_fork_law_pipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T] : ushKshfForkLaw (hlc := hlc) N X :=
-  wp_ushForkPipe UL SF SP hps N X
-
 /-- **Rocq `wp_kshm_body_cat_pipe`**. -/
 theorem wp_ushBodyCatPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
@@ -45,7 +39,7 @@ theorem wp_ushBodyCatPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
       ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗ ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l (ulineWs (.LCat nm)) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h :=
-  wp_ushBodyCatWith UL N X (kshf_fork_law_pipe UL SF SP hps N X) Dc nm h m f k len sz l n hDc hregs hs1 ha5 hnn
+  wp_ushBodyCatWith UL N X (Xv6.wp_ushForkPipe UL SF SP hps N X) Dc nm h m f k len sz l n hDc hregs hs1 ha5 hnn
     hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl
 
 /-- **Rocq `ushf_body_law_cat_pipe`**: as the body law at the cat line. -/

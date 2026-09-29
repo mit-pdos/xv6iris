@@ -145,7 +145,7 @@ theorem umm_vmem_read_addr_straddle (D : UFoot) (orc : UOrc) (s : UWSt) (hp : Ut
   · intro pa1 v1 h1 r2 s2 o2 htr2
     subst h1
     simp only [utr_assert_true, ExceptT.run_bind, run_liftM, runRW_bind, runRW_pure, Option.bind_some,
-      umm_ofInt_nat, ExceptT.run_pure]
+      Xv6.umoi_natCast, ExceptT.run_pure]
     rw [htr2]
     rcases r2 with ⟨pa2, v2⟩ | e
     · exact ⟨fun _ h => absurd h (by simp), fun _ _ _ => ⟨_, rfl⟩⟩

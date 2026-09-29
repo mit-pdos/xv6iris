@@ -24,7 +24,7 @@ WHOLE block is joined back.
 1. eb is GENERIC (SpecSysFstat deviation 1): Rocq's `cpu_own_eb_agree` pin
    (`b = true`) and its `cpu_own_transport` calls are gone; the function is
    one level-0 stretch (`k_step_e`), the contract's `true` crossing is made
-   hart-free once at entry (`sfs_pin`), and each callee is entered through
+   hart-free once at entry (`Xv6.rd_pin`), and each callee is entered through
    a wrapper that carries the complement (SysFstatParts).
 2. THE BLOCK around filestat is Rocq's: filestat takes the core
    (`procPrivCoreNoctxAt`, Rocq `proc_priv_core`), which is exactly
@@ -255,7 +255,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   iintro %cpu
   unfold filestatPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %⟨hcs3, hret, hext, hd, hwin⟩ Hk Hpc Hte Hce Href Hpriv Henvo
-  k_norm_g [sfs_ret_32, sfs_withSpie_withSpie, sfs_pushed_withSpie, sfs_withRegs_withSpie]
+  k_norm_g [sfs_ret_32, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   k_norm_g [h11] at hwin
   have hr5 : sfsRegs k R3 := by
     refine sfsRegs_cs _ _ _ ?_ hcs3
@@ -353,10 +353,10 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, sfs_f_addr]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0x16#64) true 0#12 11#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0x18#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0x1a#64) false 2096328#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argfd]
@@ -366,9 +366,9 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
       ?ht ?hn ?hKf)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sfs_ret_1e, sfs_li0, sfs_f_addr, hr.2.1]
+  k_norm_g [sfs_ret_1e, Xv6.co_li_zero, sfs_f_addr, hr.2.1]
   iframe
-  case ha0' => k_norm_g [sfs_li0]
+  case ha0' => k_norm_g [Xv6.co_li_zero]
   case hpf => k_norm_g [sfs_f_addr, hr.2.1]; exact sfs_f_nonnull (k.regs 2#5) hsp
   case hpr => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
@@ -378,7 +378,7 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
   · iexact Hpfd
   -- ===== back from argfd =====
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
-  k_norm_g [sfs_ret_1e, sfs_withSpie_withSpie, sfs_pushed_withSpie, sfs_withRegs_withSpie]
+  k_norm_g [sfs_ret_1e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr2 : sfsRegs k R2 := by
     refine sfsRegs_cs _ _ _ ?_ hcs2
     repeat (refine sfsRegs_set _ _ _ _ ?_ (by decide))
@@ -417,7 +417,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ : (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c) $$ [Hnext]
   · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (sfs_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   simp only [sysFstatAddr]
   -- +0x00 .. +0x06  the prologue
@@ -439,7 +439,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_st_addr]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0xc#64) true 1#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_li1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087356#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argaddr]
@@ -453,12 +453,12 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   rotate_right 1
   k_norm_g [sfs_ret_12, sfs_st_addr]
   iframe
-  case ha0 => k_norm_g [sfs_li1]
+  case ha0 => k_norm_g [Xv6.ci_li_one]
   case hna => k_norm_g; omega
   case hKa => k_norm_g; unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hcs
-  k_norm_g [sfs_ret_12, sfs_st_addr, sfs_withSpie_withSpie, sfs_pushed_withSpie, sfs_withRegs_withSpie]
+  k_norm_g [sfs_ret_12, sfs_st_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : sfsRegs k R1 := by
     refine sfsRegs_cs _ _ _ ?_ hcs1
     repeat (refine sfsRegs_set _ _ _ _ ?_ (by decide))

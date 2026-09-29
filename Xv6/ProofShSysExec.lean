@@ -29,7 +29,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 theorem wp_shSysExec (UL : UK_LEAVES) (HR : USH_RUN_SYS_P) : wpShSysExecBody (hlc := hlc) (GF := GF) := by
   intro N h m avail
   iintro #Hc Hrun Hdep Hcont
-  ihave Hs := ushRS_stub_exec (hlc := hlc) UL N
+  ihave Hs := Xv6.ush_stub_exec (hlc := hlc) UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   rw [show User.Sh.Sym.«exec» + 2 = 0xcc0 from rfl]

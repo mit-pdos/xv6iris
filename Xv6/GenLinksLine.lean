@@ -378,7 +378,7 @@ theorem gwcLine_of_blk0 (X : Nat → EraPins → List (BitVec 8) → IProp GF)
   isplitr
   · ipureintro; exact lmApr_aprs M G.gK _ _ (lmApr_noc M G.gK I)
   iapply gwcPost_of_blk G k v I _ (lmApr_noc M G.gK I)
-  rw [lmAb_noc M G.gK I, ll_prompt_len]
+  rw [lmAb_noc M G.gK I, Xv6.wrPrompt_len]
   iapply gwcBlk_0 G k v I a _ $$ Hc
 
 theorem gwcLine_of_post (X : Nat → EraPins → List (BitVec 8) → IProp GF)

@@ -26,6 +26,8 @@ import Xv6.SysfileCalls
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.CopyLemmas
+import Xv6.SysFstatParts
 
 namespace Xv6
 
@@ -44,17 +46,8 @@ theorem ssc_br_argaddr : KA.«sys_seccomp» + 0xfffffffffffffd4c#64 = KA.«argad
 theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed96#64 = KA.«myproc» := by decide
 theorem ssc_ret_12 : jumpPc (KA.«sys_seccomp» + 0x12#64) = KA.«sys_seccomp» + 0x12#64 := by decide
 theorem ssc_ret_16 : jumpPc (KA.«sys_seccomp» + 0x16#64) = KA.«sys_seccomp» + 0x16#64 := by decide
-theorem ssc_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem ssc_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
-  bv_decide
 theorem ssc_secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 360#12 = pSecc x := by
   unfold pSecc; rfl
-theorem ssc_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem ssc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem ssc_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -131,10 +124,10 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   iintro %c1 %hp1 Hk Hpc Hframe
   icases ssc_frame_open _ _ _ $$ Hframe with ⟨Hra, Hs0, ⟨%w1, Hslot⟩, ⟨%w2, Hc2⟩⟩
   k_step_gen (wp_s_addi c1 _ (KA.«sys_seccomp» + 0x8#64) false 4072#12 11#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_p_addr] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_f_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_seccomp» + 0xc#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_li0] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_jal c3 _ (KA.«sys_seccomp» + 0xe#64) false 2096446#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_br_argaddr] next c4 hp4
@@ -142,15 +135,15 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   iapply (sysfile_argaddr_wp AA c4 _ 0 V.upt.tfp V.tf v0 w1 (DFrac.own (1 : Qp).half.half) (by decide) ?ha0
       hv ?hn ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [ssc_ret_12, ssc_li0, ssc_p_addr]
+  k_norm_g [ssc_ret_12, Xv6.co_li_zero, Xv6.sfs_f_addr]
   iframe Htfp Htf Hslot
-  case ha0 => k_norm_g [ssc_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; unfold sysSeccompSlots at hK; omega
   -- past argaddr: jal myproc
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie %spp %R1 %hsp1 Hk Hpc %hcs1 Htfp Htf Hslot
-  k_norm_g [ssc_pushed_withSpie, ssc_withRegs_withSpie, ssc_p_addr]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, Xv6.sfs_f_addr]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs1
@@ -170,8 +163,8 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   iapply wpNext_intro_pin
   iintro %c7 %hp7 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2
   obtain ⟨hcs2, ha0⟩ := hcs2
-  k_norm_g [ssc_ret_16, ssc_pushed_withSpie, ssc_withRegs_withSpie, ssc_withSpie_withSpie] at ha0
-  k_norm_g [ssc_ret_16, ssc_pushed_withSpie, ssc_withRegs_withSpie, ssc_withSpie_withSpie]
+  k_norm_g [ssc_ret_16, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice] at ha0
+  k_norm_g [ssc_ret_16, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
@@ -187,7 +180,7 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   -- ld a4,-24(s0): the mask
   k_step_gen (wp_s_ld c8 _ (KA.«sys_seccomp» + 0x1a#64) false 4072#12 14#5 8#5 (by decide) (by decide)
       (DFrac.own 1) v0)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d8, b8, ssc_p_addr] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d8, b8, Xv6.sfs_f_addr] next c9 hp9
   iintro Hk Hpc Hslot
   -- c.and a5,a5,a4
   k_step_gen (wp_s_and c9 _ (KA.«sys_seccomp» + 0x1e#64) true 15#5 15#5 14#5 (by decide))
@@ -202,7 +195,7 @@ theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
   ihave Hpriv := Hback $$ %(V.pvSecc &&& v0) Hsc
   -- c.li a0,0
   k_step_gen (wp_s_addi c11 _ (KA.«sys_seccomp» + 0x24#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssc_li0] next c12 hp12
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c12 hp12
   iintro Hk Hpc
   -- the epilogue
   ihave Hframe := ssc_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v0 w2 $$ [Hra Hs0 Hslot Hc2]

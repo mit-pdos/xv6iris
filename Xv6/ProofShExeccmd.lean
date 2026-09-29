@@ -86,7 +86,7 @@ theorem wp_shExeccmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : CP
   icases ush_peel0 N.d p 4 164 $$ Hz with ⟨Ht, Hz⟩
   iapply ushS_store UL N (k := 4) (ushI_1f2 N.t) 0x1f4 h3 m3 (10 + n) p (0#32) (Or.inr (Or.inr (Or.inl rfl)))
     (by rw [h3s1, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]; rfl) (by omega) $$ Hc [Ht] Hrun
-  · iapply ush_ubytes_ext $$ Ht
+  · iapply Xv6.ubytes_ext $$ Ht
     intro j _; exact (ush_nthByte32_zero j).symm
   iintro Ht %h4 Hrun
   -- 0x1f4  mv a0,s1
@@ -120,7 +120,7 @@ theorem wp_shExeccmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : CP
     show (ukWr m3 _ _).get _ = _; ureg
   · iapply ush_exec_pre_nil N s0 p hp0 (by omega)
     isplitl [Ht]
-    · iapply ush_ubytes_ext $$ Ht
+    · iapply Xv6.ubytes_ext $$ Ht
       intro j _
       show nthByte (n := 8) ((ukWr m2 15#5 _).get 15#5) j = _
       rw [ukWr_get_same _ _ _ (by decide), show BitVec.ofInt 32 (ushpTy (.exec [])) = BitVec.ofNat 32 1 by decide]

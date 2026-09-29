@@ -11,7 +11,7 @@ half (`Xv6.bf_pay_L`) against it pins the bytes bread returned to
 freed block's own EXCLUSIVE byte run -- that same opening yields
 `bi ∈ used` (`Xv6.bitmapReadOwn`), which is the whole of the panic
 refutation: the tested byte is the mask (`Xv6.bf_test_val`), the `beqz` at
-`+0x3a` falls through (`Xv6.bf_beqz_false`), and the `unreachable` arm at
+`+0x3a` falls through (`Xv6.ba_mask_ne`), and the `unreachable` arm at
 `+0x60` is never entered.  Everything goes back; only facts come out.
 The caller's run then becomes the pool entry (`Xv6.freeBlk_intro`) that
 `bitmapFreeAu` deposits at `log_write`.
@@ -133,7 +133,7 @@ theorem bf_mid (LW : LOG_WRITE) (BE : BRELSE)
   iintro Hk Hpc
   -- +0x3a  beqz a3,+0x60 : falls through, the `unreachable` arm is dead
   k_step_e (wp_s_branch cpu _ (KA.«bfree» + 0x3a#64) true 38#13 13#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_beqz_false]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ba_mask_ne]
   iintro Hk Hpc
   -- +0x3c  mv s2,a0 ; +0x3e  add s1,s1,a0
   k_step_e (wp_s_add cpu _ (KA.«bfree» + 0x3c#64) true 18#5 0#5 10#5 (by decide))
@@ -147,7 +147,7 @@ theorem bf_mid (LW : LOG_WRITE) (BE : BRELSE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_xori_not]
   iintro Hk Hpc
   k_step_e (wp_s_and cpu _ (KA.«bfree» + 0x44#64) true 14#5 14#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_clear_val used]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.bmBit_clear_64 used]
   iintro Hk Hpc
   -- +0x46  sb a4,88(s1) : the byte store
   k_step_e (wp_s_sb cpu _ (KA.«bfree» + 0x46#64) false 88#12 9#5 14#5 (by decide)

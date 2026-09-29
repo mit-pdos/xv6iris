@@ -66,10 +66,10 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb c')
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlink_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
   have hsz31 : dn.diSize.toNat < 2 ^ 31 := hs.hsz31
-  have hsx := dirlink_sext_small dn.diSize hsz31
+  have hsx := Xv6.dsSext_small dn.diSize hsz31
   have hbz := dirlink_beqz_nat dn.diSize.toNat (by omega)
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hbs, Hslot, Hlk, Hop, Htx, #Henv, Hpost⟩

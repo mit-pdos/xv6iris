@@ -57,7 +57,7 @@ theorem sys_open_walk_bud (L : Nat) : walkNeed L ≤ MAXOPBLOCKS := by
 `so_omode_eqz` / `so_omv_zero`). -/
 theorem sys_open_walk_beqz_om (om : BitVec 32) :
     bcond bop.BEQ (BitVec.signExtend 64 om) 0#64 = decide (om = 0#32) := by
-  rw [sys_open_beqz]
+  rw [Xv6.dirlookup_beqz]
   have h := sys_open_omode_eqz om
   unfold soOmv at h
   exact decide_eq_decide.2 h

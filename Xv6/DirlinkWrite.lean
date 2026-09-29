@@ -19,7 +19,7 @@ as ONE disjunction (`dirlink_wiok`) and the walk below is shared.
 
 THE SEAM (Rocq's): `dl16Post` IS `wi16Post` / `wi16SpendAny` /
 `wi16Atomic` at `off = 16 k0`, `n = 16`, at the ENTRY set (dirlookup's
-readi prefix and the scan log nothing), and `dirlink_wi_blocks` is the only
+readi prefix and the scan log nothing), and `Xv6.sys_unlink_wi_blocks` is the only
 arithmetic.
 -/
 import Xv6.DirlinkTail
@@ -76,7 +76,7 @@ theorem dirlink_ret_arms (a0 : BitVec 64) (tot : Nat) (htot : tot ≤ 16)
 /-- **THE APPEND ARM'S POSTCONDITION** (Rocq ProofDirlink 2581–2648), off
 writei's `WriteiOut` at dirlink's window: the counted spend (`4 ≤ 7`), the
 sixteen-byte seam (`dl16Post` IS `wi16Post`/`wi16SpendAny`/`wi16Atomic` at
-`dirlink_wi_blocks`), the two preservations, and the arm -- the record
+`Xv6.sys_unlink_wi_blocks`), the two preservations, and the arm -- the record
 clauses one per writei outcome (`dirlink_wiok`), the range clause two-way
 (the disturbed region is empty on the kernel arm), the branchless return. -/
 theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8))
@@ -91,9 +91,9 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
       readiKVp (fun _ => []) src ncount Sb a0 tot bm' data' dn' dn0' n' wrote 0 dstb P' Sb') :
     DirlinkOut bm data dn dn0 fn inum dinum ncount Sb
       (if a0 = 16#64 then 0#64 else 0xFFFFFFFFFFFFFFFF#64) false bm' data' dn' dn0' n' Sb' tot := by
-  have hb := dirlink_wi_blocks (dirSlot data (dirNrec dn.diSize.toNat))
+  have hb := Xv6.sys_unlink_wi_blocks (dirSlot data (dirNrec dn.diSize.toNat))
   have hsp := hout.spend
-  rw [dirlink_wi_cost_bmonly] at hsp
+  rw [Xv6.sys_unlink_wi_cost] at hsp
   have hwiok := dirlink_wiok dn dn' dn0 dn0' bm bm' data data' _ tot n' ncount 0 a0 hoff hout.arms
   have htot : tot ≤ 16 := by
     rcases hwiok with ⟨_, h, _⟩ | ⟨_, h, _⟩
@@ -240,11 +240,11 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hoff := dirlink_slot_off data dn.diSize.toNat
-  have hmaxb := dirlink_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
   have hsum : 16 * dirSlot data (dirNrec dn.diSize.toNat) + 16 < 2 ^ 31 := by omega
   have hcost : wiCostBmonly (16 * dirSlot data (dirNrec dn.diSize.toNat)) 16 ≤ ncount := by
-    rw [dirlink_wi_cost_bmonly]; exact dirlink_4le _ _ _ hs.hneed
+    rw [Xv6.sys_unlink_wi_cost]; exact dirlink_4le _ _ _ hs.hneed
   have hnz : dn.diType.toNat ≠ 0 := by rw [hs.htype]; decide
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hbs, Hslot, Hlk, Hop, Htx, #Henv, Hpost⟩

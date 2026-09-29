@@ -177,7 +177,7 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       unfold syscallPost
       iintro %spie %spp %R' %V2 %M2 %sts2 %cs2 %hcs %hrows Hk Hpc Hte Hce Hbs - Hfd Hir Henv
         Hpriv Hfrag Hch Hxo Hso Hfo Hwo
-      k_norm_g [ut_pushed_withSpie, ut90_ret_a6]
+      k_norm_g [MachCSL.KCtx.withSpie_pushed, ut90_ret_a6]
       have hpins' : utPins A R' := by
         refine utPins_calleeSaved A _ R' ?_ hcs
         exact utPins_set A R 1#5 _ hpins (by decide) (by decide) (by decide)
@@ -240,7 +240,7 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
     rw [← hsc, show (utSysRec A.sep A.V).pvSecc = A.V.pvSecc from rfl]
     iapply (upayAt_ueq (gn := A.V.gen) (gn' := (utSysRec A.sep A.V).gen) A.sc A.V.pvSecc A.f
       (ut_sysNum_raw A.sep A.V).symm
-      (ut_sysTf_arg A.sep A.V (tfArgIdx 0) (by decide)).symm rfl)
+      (Xv6.urc_sysTf_proTf A.sep A.V (tfArgIdx 0) (by decide)).symm rfl)
     iexact Hpi
   ihave #Hpay : utPay A $$ [Hmy]
   · unfold utPay; rw [hok.hgn]; iexact Hmy
@@ -350,7 +350,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
     iframe Hk Hpc Hframe Hte Hce Hcaps Hown Hsi Hfi Hpi Hkont
   · -- +0x94  c.bnez a0 : taken
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x94#64) true 52#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext_nz kl hk0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bcond_bne_sext_ne kl hk0]
     iintro Hk Hpc
     unfold utKillRead
     icases Hrd with (⟨%he, -⟩ | ⟨-, #Hsh, #Hcr⟩)
@@ -426,7 +426,7 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
     have e := hsp (by k_norm_g <;> exact hsie)
     k_norm_g at e
     obtain ⟨rfl, rfl⟩ := e
-    k_norm_g [ut_pushed_withSpie, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, ut90_ret_94]
+    k_norm_g [MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, ut90_ret_94]
     ihave Hpriv := Hprivb $$ Hqp Hrg Hmk
     ihave Hown := Hownb $$ %(utV1 A) %A.M %A.sts %A.cs [Hpriv] Hfr Hch Hsy
     · rw [hok.pj]; iexact Hpriv

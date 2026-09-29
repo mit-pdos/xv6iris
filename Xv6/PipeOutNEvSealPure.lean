@@ -181,7 +181,7 @@ theorem lmGoodOut_of_stage_open (K : LmHooks M) (B : LmByteLaws M) (ps cs : List
     intro j hj; rw [← hz]; exact wlLta_app_l _ _ _ hj
   have hao' : lmAltsPre M s (consIns seg) (cs ++ [a]) := by
     have hnl := nlines_prefix _ _ hinp
-    refine lmAltsPre_snoc_w M s _ cs a hao (by omega) ?_
+    refine Xv6.lmAltsPre_snoc M s _ cs a hao (by omega) ?_
     rw [hq, hbodj _ (by omega), lmUpto_ext M cs cs s (bodiesOf (consIns seg))
       (bodiesOf (E.map Prod.snd)) _ (fun _ _ => rfl) (fun j hj => hbodj j (by omega))]
     exact hok0
@@ -265,7 +265,7 @@ theorem gclPureO_no_echo (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (h : 
   have hlenA : (so.gsCs ++ [ao]).length = nlines (so.gsE.map Prod.snd) := by
     rw [List.length_append]; simp only [List.length_singleton]; omega
   have haoA : lmAltsPre M (gsState M sd so) (so.gsE.map Prod.snd) (so.gsCs ++ [ao]) :=
-    lmAltsPre_snoc_w M _ _ so.gsCs ao hcsb' (by omega) (by rw [hqq]; exact hokao)
+    Xv6.lmAltsPre_snoc M _ _ so.gsCs ao hcsb' (by omega) (by rw [hqq]; exact hokao)
   have hpinA : lmProPin M so.gsPs (so.gsCs ++ [ao]) (so.gsE.map Prod.snd) := by
     intro q hq
     have hq2 := hq
@@ -293,7 +293,7 @@ theorem gclPureO_no_echo (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (h : 
     (lmD_cs_prefix M _ _ _ _ _ _ (List.prefix_refl _) (List.prefix_append _ _) hpinf
       (by rw [ll_nlines_removelast _ hrr]; omega)).symm
   have hdi1 : lmDiscInput M (doneOf (consIns (openSeg h)).dropLast) :=
-    lmDiscInput_prefix B _ _ ((doneOf_prefix _).trans (gop_removelast_prefix _)) hdseg
+    lmDiscInput_prefix B _ _ ((doneOf_prefix _).trans (Xv6.ll_removelast_prefix _)) hdseg
   have hbelow : lmSess M ps' cs' sdd (doneOf (consIns (openSeg h)).dropLast)
       <+: lmSess M so.gsPs (so.gsCs ++ [ao]) (gsState M sd so) (so.gsE.map Prod.snd) :=
     hlow'.trans (hup.trans (by rw [← hDA]; exact hstP))

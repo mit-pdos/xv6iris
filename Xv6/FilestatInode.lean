@@ -26,6 +26,7 @@ iunlock (`filerw_priv_pid`, Rocq's `proc_priv_core_bare_acc` discipline).
 import Xv6.FilestatCalls
 import Xv6.FilestatTail
 import Xv6.FileRwShared
+import Xv6.SysPipeParts
 
 namespace Xv6
 
@@ -38,17 +39,9 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem filestat_sz (x : BitVec 64) : x + BitVec.signExtend 64 72#12 = pSz x := by
-  unfold pSz; bv_decide
-theorem filestat_pt (x : BitVec 64) : x + BitVec.signExtend 64 80#12 = pPagetable x := by
-  unfold pPagetable; bv_decide
 theorem filestat_sz' (x : BitVec 64) : x + 72#64 = pSz x := rfl
 theorem filestat_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
 
-theorem filestat_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d :=
-  rfl
-theorem filestat_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -100,12 +93,12 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   -- +0x42  ld a1,72(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x42#64) false 72#12 11#5 18#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, filestat_sz, filestat_sz']
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_sz, filestat_sz']
   iintro Hk Hpc Hsz
   -- +0x46  ld a0,80(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x46#64) false 80#12 10#5 18#5 (by decide) (by decide)
       (DFrac.own 1) V.pagetable)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, filestat_pt, filestat_pt']
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_pt, filestat_pt']
   iintro Hk Hpc Hpg
   -- +0x4a  jal copyout
   k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085460#21 1#5 (by decide))
@@ -130,8 +123,8 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   case hlen => k_norm_g; rw [fstatBytes_length]
   -- ===== back from copyout =====
   iintro %c1 %spie1 %spp1 %R1 %P' %M' %⟨hcs, hext, hw⟩ Hk Hpc Hte Hce Hbuf Hpt
-  k_norm_g [filestat_ret_4e, filestat_ww, filestat_psw] at hext
-  k_norm_g [filestat_ret_4e, filestat_ww, filestat_psw, r20]
+  k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hext
+  k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, r20]
   have hr1 : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs
     repeat (refine fstatRegs_set _ _ _ _ _ _ _ ?_ (by decide))
@@ -290,7 +283,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   case ha0u => k_norm_g; exact hip
   -- ===== back from iunlock =====
   iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hshr
-  k_norm_g [filestat_ret_3c, filestat_ww, filestat_psw, hproc]
+  k_norm_g [filestat_ret_3c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, hproc]
   ihave Hpriv := Hpw $$ Hpid
   ihave Hpay := Hback $$ Hshr
   ihave Href := fstat_ref_close γ fk q st C $$ [Htok Hfields Hpay]
@@ -391,7 +384,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
   case ha0l => k_norm_g; exact hip
   -- ===== back from ilock =====
   iintro %c1 %spie1 %spp1 %R1 %dn %bm %hcs Hk Hpc Hte Hce Hpid Hbs Hlk
-  k_norm_g [filestat_ret_2a, filestat_ww, filestat_psw, hproc]
+  k_norm_g [filestat_ret_2a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, hproc]
   ihave Hpriv := Hpw $$ Hpid
   have hr1 : fstatRegs k fk (procAddr j) (k.regs 19#5) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs

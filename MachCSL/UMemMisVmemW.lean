@@ -21,7 +21,7 @@ The translations are hypotheses in lane U2-M1's shapes: a success is lane
 U1-P1's `translate` walk (`runRW D orc s (utrTranslate s va acc) = …`, from
 `uma_utrTranslate_hit/_miss`), turned into `translateAddr` by
 `uma_translateAddr_ok`; a fault is a `translateAddr` fault
-(`uma_translateAddr_err`), returned as `umaTrap`.  The high part's translation
+(`MachCSL.utr_translateAddr_err`), returned as `umaTrap`.  The high part's translation
 runs after the low write, whose bytes are existential, so its hypothesis is
 asked for every byte map with the domain of the translation's landing map
 (the walk reads only page-table bytes the store cannot reach on the user tier;
@@ -117,7 +117,7 @@ macro "umm_store_low" : tactic => `(tactic| (
   simp only [umm_mem_write_value_U D o1 s1 _ pa1 _ v true _ hq.dms hq.dcp hq.mprv hq.cp hcw, Option.bind_some]
   generalize (BitVec.setWidth (8 * ((w : Int) - (p : Int)).toNat) (BitVec.extractLsb' _ _ data)) = v2
   dsimp only [ExceptT.run_pure, runRW_pure, Option.bind_some]
-  try simp only [runRW_bind, runRW_pure, Option.bind_some, umm_ofInt_nat]))
+  try simp only [runRW_bind, runRW_pure, Option.bind_some, Xv6.umoi_natCast]))
 
 /-- **Across a page, owned RAM**: the low part is written, then the high
 part is translated from the state the low write left and written. -/

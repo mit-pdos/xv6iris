@@ -16,6 +16,9 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecProcdump
 import Xv6.CodeTactics
 import MachCSL.ByteWord
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
+import Xv6.WalkaddrDefs
 
 namespace Xv6
 
@@ -169,10 +172,6 @@ theorem pd_tbl5 [CurCtx] :
 
 /-! ## Arithmetic -/
 
-theorem pd_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
-
 /-- The cursor `&proc[i].name`, as a number, up to and including the sentinel. -/
 theorem pd_cursor_toNat (j : Nat) (hj : j ≤ NPROC) :
     (pName (procAddr j)).toNat = KernelSyms.«proc» + 344 + 368 * j := by
@@ -243,14 +242,6 @@ theorem pd_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = p := by
   rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
-theorem pd_beq_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem pd_beq_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
-    (if bcond bop.BEQ a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
 theorem pd_bltu_true {α : Type} (a b : BitVec 64) (h : a.ult b = true) (p q : α) :
     (if bcond bop.BLTU a b then p else q) = p := by
   rw [if_pos (by simp only [bcond]; exact h)]
@@ -281,17 +272,6 @@ theorem pdKept_trans {R R' R'' : RegMap} (h : pdKept R R') (h' : pdKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
-
-/-- Dropping a redundant `withSpie`. -/
-theorem pd_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem pd_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem pd_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-! ## The `auipc`/`addi` address pairs -/
 
@@ -618,7 +598,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
   -- past the first printk
   iapply wpNext_intro_pin
   iintro %c4 %hq4 %spie1 %spp1 %R1 %cs1 %hsp1 Hk Hpc %hcs1 Hfmt1 Hsv Hname Hsent
-  k_norm_g [pd_pushed_withSpie, pd_withSpie_withSpie, hret1, hK10]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice, hret1, hK10]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩, -⟩ := hcs1
@@ -649,7 +629,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
   -- past the second printk
   iapply wpNext_intro_pin
   iintro %c7 %hq7 %spie2 %spp2 %R2 %cs2 %hsp2 Hk Hpc %hcs2 Hnl1 Hsent
-  k_norm_g [pd_pushed_withSpie, pd_withSpie_withSpie, hret2, hK10]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice, hret2, hK10]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩, -⟩ := hcs2
@@ -816,7 +796,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
   · -- UNUSED: skip the slot
     k_step_gen (wp_s_branch c2 _ (KA.«procdump» + 0x74#64) true 8178#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [pd_beq_eq _ 0#64 hst0] next c3 hq3
+      with [Xv6.wa_beq_eq _ 0#64 hst0] next c3 hq3
     iintro Hk Hpc
     ihave Hpid := pd_pid_fold (procAddr i) dqp pid $$ Hpid
     ihave Hname := pd_name_fold (procAddr i) dqn nm $$ Hname
@@ -841,7 +821,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
   · -- a live slot
     k_step_gen (wp_s_branch c2 _ (KA.«procdump» + 0x74#64) true 8178#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [pd_beq_ne _ 0#64 hst0] next c3 hq3
+      with [Xv6.wa_beq_neq _ 0#64 hst0] next c3 hq3
     iintro Hk Hpc
     -- c.mv a2,s3   :  a2 := "???"
     k_step_gen (wp_s_add c3 _ (KA.«procdump» + 0x76#64) true 12#5 0#5 19#5 (by decide))
@@ -1242,7 +1222,7 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   case hu1 => k_norm_g; exact huart
   iapply wpNext_intro_pin
   iintro %d0 %hd0 %spie1 %spp1 %R1 %cs0 %hsp1 Hk Hpc %hcs1 Hnl1 Hsent
-  k_norm_g [pd_pushed_withSpie, pd_withSpie_withSpie, hret0, hK10]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice, hret0, hK10]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩, -⟩ := hcs1

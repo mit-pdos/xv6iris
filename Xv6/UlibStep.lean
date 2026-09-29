@@ -19,10 +19,6 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 /-! ## Pure facts -/
 
-/-- `RegMap.set` as a conditional (for `simp` on literal indices). -/
-theorem ulibSet_eq (m : RegMap) (i j : BitVec 5) (v : BitVec 64) :
-    m.set i v j = if j = i then v else m j := rfl
-
 /-- A fall-through, folded. -/
 theorem ulibPc_next (b : BitVec 64) (x y : Nat) (r : Bool) (h : x + (if r then 2 else 4) = y) :
     b + BitVec.ofNat 64 x + ulibLen r = b + BitVec.ofNat 64 y := by
@@ -362,7 +358,7 @@ namespace Xv6
 /-- Register-file reads through a chain of literal writes, and the literal
 immediates: the one normalizer the walks use on their side conditions. -/
 macro "ulib_regs" : tactic =>
-  `(tactic| simp (config := { decide := true }) only [ulibRget, ulibSet_eq, if_true, if_false,
+  `(tactic| simp (config := { decide := true }) only [ulibRget, MachCSL.RegMap.set_apply, if_true, if_false,
     BitVec.reduceSignExtend, ukRtypeVal, ukBtaken, BitVec.zero_add, BitVec.add_zero])
 
 end Xv6

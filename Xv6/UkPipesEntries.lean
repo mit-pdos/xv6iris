@@ -65,7 +65,7 @@ theorem pse_echo_image_entry (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : N
   let wv : Nat → Pdev := fun _ => .PDWr pn gp
   let kds : List (Nat × Pdev) := [(0, .PDWr pn gp)]
   have hc : Conforms (pipeEnv (.DOutH [X.R.L]) (fun _ => none)) (echoTree ws) := by
-    rw [hLw]; exact echo_pipe_conforms ws _ (pe_drop1_ne ws hok) (pe_line_len ws hok)
+    rw [hLw]; exact echo_pipe_conforms ws _ (Xv6.efe_drop1_ne ws hok) (Xv6.ush_line_len ws hok)
   iintro #Hnpw #Hdep
   unfold imageEntry
   imodintro

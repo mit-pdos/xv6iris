@@ -9,6 +9,8 @@ inline per lemma (the `ProofShSysSbrk` precedent).
 -/
 import Xv6.UshRunDefs
 import Xv6.UkStub
+import Xv6.UshExecCode
+import Xv6.UshMainStubs
 
 namespace Xv6
 
@@ -34,20 +36,6 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem ushRS_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 3 User.Sh.Sym.«wait» :=
   stub_of_text UL N User.Sh.textOk 3 _ 3#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
-
-unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
-/-- sh's `exec` stub (0xcbe, number 7). -/
-theorem ushRS_stub_exec (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 7 User.Sh.Sym.«exec» :=
-  stub_of_text UL N User.Sh.textOk 7 _ 7#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
-
-unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
-/-- sh's `close` stub (0xcae, number 21). -/
-theorem ushRS_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 21 User.Sh.Sym.«close» :=
-  stub_of_text UL N User.Sh.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
     (by decide) (by decide) (by decide) (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in

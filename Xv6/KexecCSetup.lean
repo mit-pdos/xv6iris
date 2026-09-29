@@ -63,6 +63,7 @@ a STAGE file (no `Proof` prefix).
    at `PGROUNDUP(szv)`.
 -/
 import Xv6.KexecCParts
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -88,16 +89,10 @@ theorem kxcC_br_uvmclear : KA.«kexec» + 0x1fc#64 + BitVec.signExtend 64 208333
   decide
 theorem kxcC_ret_1fc : jumpPc (KA.«kexec» + 0x1fc#64 + 4#64) = KA.«kexec» + 0x1fc#64 + 4#64 := by
   decide
-theorem kxcC_bne00 : bcond bop.BNE 0#64 0#64 = false := by decide
 theorem kxcC_sz_off (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
 
 /-- The guard page's address: `lui a1,0xffffe ; add a1,a1,a0` at `a0 = s + 8192`. -/
 theorem kxcC_guard (x : BitVec 64) : 18446744073709543424#64 + (8192#64 + x) = x := by bv_omega
-
-/-- `vpnOf` below the Sv39 top is the page number. -/
-theorem kxcC_vpnOf (x : BitVec 64) (h : x.toNat < 2 ^ 39) : (vpnOf x).toNat = x.toNat / 4096 := by
-  simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
-  omega
 
 /-- The stack top the setup reaches. -/
 theorem kxcC_sz1 (n : Nat) (h : n ≤ uvmMaxsz) :
@@ -290,7 +285,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
   case cv => simp only [RegMap.set_apply]; simp [hs8n]; unfold uvmMaxsz at hpg; omega
   case cm =>
     have e : (vpnOf (BitVec.ofNat 64 (pgRoundUpN szv.toNat))).toNat = pgRoundUpN szv.toNat / 4096 := by
-      rw [kxcC_vpnOf _ (by rw [hs8n]; unfold uvmMaxsz at hpg; omega), hs8n]
+      rw [Xv6.co_vpnOf_toNat _ (by rw [hs8n]; unfold uvmMaxsz at hpg; omega), hs8n]
     simpa [RegMap.set_apply, e] using hv
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -335,7 +330,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     $$ Ha0
   ihave Hargv := Hargv $$ Ha0
   have ev : (vpnOf (BitVec.ofNat 64 (pgRoundUpN szv.toNat))).toNat = pgRoundUpN szv.toNat / 4096 := by
-    rw [kxcC_vpnOf _ (by rw [hs8n]; unfold uvmMaxsz at hpg; omega), hs8n]
+    rw [Xv6.co_vpnOf_toNat _ (by rw [hs8n]; unfold uvmMaxsz at hpg; omega), hs8n]
   obtain ⟨r1, r2, r3, r4, r5⟩ := kxcC_setup_rows A.alen A.V.upt.tfp _ ev hpg hok hv htfp hbelow hcov
     himg hszr hperm
   have hbase := kxcC_base2 _ hpg
@@ -372,7 +367,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
-          a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, kxcC_ofInt_toNat, hbase, UPtd.clearU]
+          a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, Xv6.umoi_of_toNat, hbase, UPtd.clearU]
     isplitr
     · ipureintro
       exact ⟨Nat.zero_le _, by decide, h0, by simp only [kxcSp]; omega⟩
@@ -405,7 +400,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
-          a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, kxcC_ofInt_toNat, hbase, UPtd.clearU,
+          a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, Xv6.umoi_of_toNat, hbase, UPtd.clearU,
           kxcUstackBuf]
     isplitr
     · ipureintro
@@ -553,7 +548,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     icases Hres with (⟨%h0, Hpt⟩ | ⟨%P', %M', %⟨hok, h10⟩, Hpt⟩)
     · -- ===== uvmalloc FAILED: +0x1d4 falls through to the shared -1 tail =====
       k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x1d4#64) true 34#13 10#5 0#5 (by decide) bop.BNE)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, kxcC_bne00]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
       iintro Hk Hpc
       ihave Hfr := kxcFrameB_at (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
         (k.regs 10#5) (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)

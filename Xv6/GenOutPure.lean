@@ -50,8 +50,6 @@ namespace Xv6
 
 open MachCSL
 
-theorem gop_removelast_prefix {A : Type} (l : List A) : l.dropLast <+: l := ll_removelast_prefix l
-
 /-- The stage. -/
 structure GStage (M : LModel) where
   gsPs : List Nat
@@ -172,7 +170,7 @@ theorem lmProcStream_prefix (ps0 ps cs0 cs : List Nat) (s : M.lmSt) (I0 : List (
     lmProcStream M ps0 cs0 s I0 <+: lmProcStream M ps cs s I0 := by
   have hb : lmProcBefore M ps0 cs0 s I0 = lmProcBefore M ps cs s I0 :=
     lmProcBefore_cs_prefix M ps0 ps cs0 cs s I0 hps hcs hpin
-      (Nat.le_trans (nlines_prefix _ _ (gop_removelast_prefix I0)) hn)
+      (Nat.le_trans (nlines_prefix _ _ (Xv6.ll_removelast_prefix I0)) hn)
   rw [lmProcStream, lmProcStream, hb, lmPendingAt_cs_ext M ps0 cs0 cs s I0 hcs hn]
   exact (List.prefix_append_right_inj _).mpr (lmPendingAt_ps_mono M ps0 ps cs s I0 hps)
 

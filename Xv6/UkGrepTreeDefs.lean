@@ -13,12 +13,14 @@
 2. Rocq's §3 `mword` plumbing (`add_vec32_unsigned'`, `moi_addw_rr`,
    `moi_of_sint'`, `cint_moi_small'`, `nth_byte_zero0`, `nth_byte_moi10`,
    `wl_nl_unsigned`, `b01`) is replaced by the `BitVec` facts below at the
-   leaves' values (`kgrep_addw`, `kgrep_ofNat_of_toInt`, `kgrep_cint`,
+   leaves' values (`kgrep_addw`, `Xv6.kcat_ofNat_of_toInt`, `kgrep_cint`,
    `kgrep_nth_zero`, `kgrep_nth_nl`; `b01 b` is `kgrepB01 b`).
 3. Rocq's `args !! 1 = Some g` is `args[1]? = some g`.
 -/
 import Xv6.UkGrepLoopFrame
 import Xv6.UkTree
+import Xv6.UkCatDefs
+import Xv6.UkCatTreePure
 
 namespace Xv6
 
@@ -42,11 +44,6 @@ theorem kgrep_addw (x y : Nat) (h : x + y < 2 ^ 31) :
   rw [hl, usext32_small _ (by rw [BitVec.toNat_ofNat]; omega), BitVec.toNat_ofNat,
     Nat.mod_eq_of_lt (by omega)]
   rfl
-
-/-- A word whose signed reading is a count is that count (Rocq
-`moi_of_sint'`). -/
-theorem kgrep_ofNat_of_toInt (r : BitVec 64) (nb : Nat) (h : r.toInt = nb) : BitVec.ofNat 64 nb = r := by
-  rw [← BitVec.ofInt_natCast, ← h, BitVec.ofInt_toInt]
 
 /-- A small count read back as the C `int` the kernel reads (Rocq
 `cint_moi_small'`). -/
@@ -114,13 +111,6 @@ theorem grepBytesOf_line (F : Nat → BitVec 8) (i k : Nat) (hn : F (i + k) = wl
   simp at hj
   exact mapRange_getElem? _ _ _ hj
 
-/-- **Rocq `gwrite_bytes_app`**. -/
-theorem grepWriteBytes_app (fd : Int) (a b : Bytes) (rest : Proc) :
-    writeBytes fd (a ++ b) rest = writeBytes fd a (writeBytes fd b rest) := by
-  induction a with
-  | nil => rfl
-  | cons x a ih => simp only [List.cons_append, writeBytes, ih]
-
 /-- **Rocq `grep_tree_usage`**. -/
 theorem grepTree_usage (argv : List Bytes) (h : argv.length ≤ 1) :
     grepTree argv = writeBytes 2 grepUsage (exit_ 1) := by
@@ -138,19 +128,6 @@ theorem grepTree_files (args : List UArg) (g : UArg) (hl : 3 ≤ args.length) (h
     grepTree (args.map uargBytes) = grepFiles (uargBytes g) ((args.drop 2).map uargBytes) (exit_ 0) := by
   match args, hl, hg with
   | _ :: b :: c :: r, _, hg => simp at hg; subst hg; rfl
-
-/-- **Rocq `guarg_bytes_of`**. -/
-theorem grepUargBytesOf (g : UArg) : ukBytesOf (uargBytes g) g.bytes := by
-  intro j hj
-  rw [uargBytes_length] at hj
-  exact mapRange_getElem? _ _ _ hj
-
-/-- **Rocq `gbytes_of_one`**. -/
-theorem grepBytesOf_one (b : BitVec 8) : ukBytesOf [b] (fun _ => b) := by
-  intro j hj
-  simp at hj
-  subst hj
-  rfl
 
 /-- **Rocq `grep_main_words`**: THE WORDS main NEEDS BELOW ITS OWN ENTRY --
 its frame, then the deepest callee on the path argc selects. -/

@@ -6,6 +6,7 @@ instruction rules chained -- no symbolic execution.
 import Xv6.SpecMemcmp
 import Xv6.CodeTactics
 import Xv6.StepLemmas
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -29,22 +30,11 @@ theorem ite_bne {α : Type} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BNE x y then p else q) = if x = y then q else p := by
   by_cases h : x = y <;> simp [bcond, h]
 
-/-- Two offsets from the same base agree iff the offsets do (no wrap). -/
-theorem ptr_add_eq (s : BitVec 64) (i n : Nat) (hi : i < 2 ^ 64) (hn : n < 2 ^ 64) :
-    (s + BitVec.ofNat 64 i = s + BitVec.ofNat 64 n) ↔ i = n := by
-  constructor
-  · intro h
-    have h' : BitVec.ofNat 64 i = BitVec.ofNat 64 n := (BitVec.add_right_inj s).mp h
-    have := congrArg BitVec.toNat h'
-    simp only [BitVec.toNat_ofNat] at this
-    rwa [Nat.mod_eq_of_lt hi, Nat.mod_eq_of_lt hn] at this
-  · intro h; rw [h]
-
 /-- The same, for the incremented pointer as the rules leave it. -/
 theorem ptr_next_eq (s : BitVec 64) (i n : Nat) (hi : i + 1 < 2 ^ 64) (hn : n < 2 ^ 64) :
     (s + (BitVec.ofNat 64 i + 1#64) = s + BitVec.ofNat 64 n) ↔ i + 1 = n := by
   rw [← BitVec.ofNat_add]
-  exact ptr_add_eq s (i + 1) n hi hn
+  exact Xv6.paAddEq s (i + 1) n hi hn
 
 /-- `beqz` on a small count. -/
 theorem ite_beq_ofNat {α : Type} (n : Nat) (hn : n < 2 ^ 64) (x y : α) :

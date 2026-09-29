@@ -20,7 +20,7 @@ gives back the row AND the region's slot.
 1. **KEYS** (`Xv6/FsCollect.lean` deviation 1): the cache speaks
    `BitVec 32`, the region and the abstract map `Nat`; Rocq's
    `mword_of_int z` is `BitVec.ofNat 32 z` (`ipoolRows`' own spelling),
-   `moi_unsigned_z` is `colOfNat_toNat`, `ipl_moi_inum` is `colOfNat_self`.
+   `moi_unsigned_z` is `colOfNat_toNat`, `ipl_moi_inum` is `Xv6.iplMoiInum`.
    `colSidez` / `colRowz` are `abbrev`s so the doors unify through them.
 2. **THE REGION CROSSING IS ONE `⊣⊢`** (`colRegion_nested`): the region's
    inums are `ofList (List.range (16 * nib))` and the landed
@@ -59,9 +59,6 @@ set_option linter.unusedSectionVars false
 /-- Rocq's `moi_unsigned_z` (deviation 1). -/
 theorem colOfNat_toNat (z : Nat) (h : z < 2 ^ 32) : (BitVec.ofNat 32 z).toNat = z := by
   rw [BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt h
-
-/-- Rocq's `ipl_moi_inum` (deviation 1). -/
-theorem colOfNat_self (w : BitVec 32) : BitVec.ofNat 32 w.toNat = w := by simp
 
 /-- A live head's inum joins the live set (deviation 4; Rocq's
 `ic_live_inums_cons_true`). -/
@@ -192,7 +189,7 @@ theorem colIregBlk_split [Icfg] (γfs : FsNames) (γi : GName) (ist : Nat)
     ipureintro; exact ⟨hwf, hcpl⟩
   · iapply BigSepL.bigSepL_mono ?_ $$ Hslots
     intro k i hk
-    obtain ⟨hik, hlt⟩ := range_lookup hk
+    obtain ⟨hik, hlt⟩ := Xv6.rangeGetElem? hk
     subst hik
     iintro H
     iexists ds[i]!
@@ -217,7 +214,7 @@ theorem colIregBlk_join [Icfg] (γfs : FsNames) (γi : GName) (ist : Nat)
   · ipureintro; exact hcpl
   iapply BigSepL.bigSepL_mono ?_ $$ Hs
   intro k i hk
-  obtain ⟨hik, hlt⟩ := range_lookup hk
+  obtain ⟨hik, hlt⟩ := Xv6.rangeGetElem? hk
   subst hik
   iintro ⟨%d, %hd, H⟩
   have he : d = ds[i]! := by
@@ -514,7 +511,7 @@ theorem colEscCovers_live [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi :
         iframe Hset
         simp only [Nat.add_zero]
         icases Hhd with ⟨Hid, Hcov⟩
-        rw [colSidez, colOfNat_self]
+        rw [colSidez, Xv6.iplMoiInum]
         iapply colIcSlotCover_side cn γfs γi cov ls o dev inum $$ Hid Hcov
 
 /-! ## WHAT ONE INUM HANDS THE COLLECTION, AND HOW IT GOES BACK -/
@@ -668,7 +665,7 @@ theorem colEscCoversGot_acc [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi
         ihave Hset := colEscCovers_live cn γfs γi cov ls (o + 1) ids $$ Htl
         ihave Hs2 := BigSepS.bigSepS_elem_of hin $$ Hset
         ihave Hs2 := (show colSidez (GF := GF) γfs γi inum.toNat ⊢ colSide γfs γi inum by
-          rw [colSidez, colOfNat_self]) $$ Hs2
+          rw [colSidez, Xv6.iplMoiInum]) $$ Hs2
         ihave ⟨%d, -, Hslot⟩ :=
           BigSepS.bigSepS_elem_of (LawfulSet.mem_union.2 (Or.inl (LawfulSet.mem_singleton.2 rfl))) $$ Hslots
         iapply colSide_slotExcl γfs γi inum d $$ Ht Hslot Hs1 Hs2

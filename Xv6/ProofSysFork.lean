@@ -38,11 +38,6 @@ theorem sys_fork_br_kfork : KA.«sys_fork» + 0xfffffffffffff2ee#64 = KA.«kfork
 /-- The link register of the call. -/
 theorem sys_fork_ret_0c : jumpPc (KA.«sys_fork» + 0xc#64) = KA.«sys_fork» + 0xc#64 := by decide
 
-theorem sys_fork_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sys_fork_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -118,7 +113,7 @@ theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
   unfold kforkPost kforkPostB
   iintro %spie %spp %R1 %rv %hfacts Hk Hpc Hblk
   obtain ⟨hcs1, h10, hans⟩ := hfacts
-  k_norm_g [sys_fork_ret_0c, sys_fork_pushed_withSpie, sys_fork_withRegs_withSpie]
+  k_norm_g [sys_fork_ret_0c, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs1

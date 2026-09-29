@@ -277,7 +277,7 @@ theorem kvm_fill2_pres0 (t : PTree) (v : BitVec 27) (fr : List (BitVec 44))
         simp only [if_true, Option.any_some, hk, Option.any_none, decide_true, Bool.true_and,
           Bool.false_or]
         rw [kvm_fill1_kids (PTree.zeroNode b) v fr' (by
-          rw [zeroNode_missingOn]; simp only [List.length_cons] at h; omega) j']
+          rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at h; omega) j']
         simp
       · simp [hj]
 
@@ -464,10 +464,10 @@ def sOk (b : BitVec 44) (T D : PTree) (Q : Nat → Prop) : Prop :=
 
 theorem sOk_zero (b : BitVec 44) (hb : pageValid (pageAddr b)) :
     sOk b (PTree.zeroNode b) (PTree.zeroNode 0#44) (fun _ => True) :=
-  ⟨zeroNode_wf b 2, rfl, sameShape_zeroNode 2 b 0#44,
-   fun x _ _ => zeroNode_walk b 2 (BitVec.ofNat 27 x),
+  ⟨MachCSL.PTree.zeroNode_wf b 2, rfl, sameShape_zeroNode 2 b 0#44,
+   fun x _ _ => MachCSL.PTree.zeroNode_walk b 2 (BitVec.ofNat 27 x),
    fun q hq => by
-     rw [zeroNode_pages] at hq
+     rw [MachCSL.PTree.zeroNode_pages] at hq
      simp only [List.mem_singleton] at hq
      rw [hq]; exact hb⟩
 
@@ -576,7 +576,7 @@ theorem kvmmake_six (b : BitVec 44) (f1 f1a f2 f3 f4 f5 f6 : List (BitVec 44))
     (hc6 : (T5.mapRun 0x3FFFFFF#27 0x80006#44 (permBits KPerm.rx) 1 f6).2.2 = 1)
     (hunm : ∀ i, i < 64 → T6.walk 2 (kstackVpn i) = none) :
     kvmSix b T6 := by
-  have hw0 : T0.wf 2 := by rw [e0]; exact zeroNode_wf b 2
+  have hw0 : T0.wf 2 := by rw [e0]; exact MachCSL.PTree.zeroNode_wf b 2
   have hw1 : T1.wf 2 := by rw [e1]; exact wf_mapRun 1 T0 0x10000#27 0x10000#44 KPerm.rw f1 hw0
   have hw1a : T1a.wf 2 := by rw [e1a]; exact wf_mapRun 1 T1 0x1000a#27 0x1000a#44 KPerm.rw f1a hw1
   have hw2 : T2.wf 2 := by rw [e2]; exact wf_mapRun 1 T1a 0x10001#27 0x10001#44 KPerm.rw f2 hw1a
@@ -601,7 +601,7 @@ theorem kvmmake_six (b : BitVec 44) (f1 f1a f2 f3 f4 f5 f6 : List (BitVec 44))
     rw [e6, base_mapRun 1 T5 0x3FFFFFF#27 0x80006#44 KPerm.rx f6]; exact hbs5
   have hq0 : ∀ q ∈ T0.pages 2, pageValid (pageAddr q) := by
     intro q hq
-    rw [e0, zeroNode_pages] at hq
+    rw [e0, MachCSL.PTree.zeroNode_pages] at hq
     simp only [List.mem_singleton] at hq
     rw [hq]; exact hb
   have hq1 : ∀ q ∈ T1.pages 2, pageValid (pageAddr q) := by

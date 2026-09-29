@@ -49,7 +49,7 @@ theorem uvmd_tail [CurCtx] (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitV
       ⌜R'' 10#5 = v ∧ calleeSaved KR R''⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hregs
-  simp only [ua_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   k_step_gen (wp_s_add c _ (KA.«uvmdealloc» + 0x26#64) true 10#5 0#5 9#5 (by decide))
@@ -193,7 +193,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
           by omega]
       have hb : ¬ ((BitVec.ofNat 64 (pgRoundUpN (k.regs 12#5).toNat)).toNat
           < (BitVec.ofNat 64 (pgRoundUpN (k.regs 11#5).toNat)).toNat) := by
-        rw [toNat_ofNat_of_lt _ (by omega), toNat_ofNat_of_lt _ (by omega)]; exact hlt
+        rw [Xv6.bcOfNatToNat _ (by omega), Xv6.bcOfNatToNat _ (by omega)]; exact hlt
       k_step_gen (wp_s_branch c11 _ (KA.«uvmdealloc» + 0x22#64) false 16#13 14#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hpo, hpn, bltu_neg _ _ hb] next c12 hp12
@@ -221,7 +221,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       -- unmap the run above `PGROUNDUP(newsz)`
       have hb : (BitVec.ofNat 64 (pgRoundUpN (k.regs 12#5).toNat)).toNat
           < (BitVec.ofNat 64 (pgRoundUpN (k.regs 11#5).toNat)).toNat := by
-        rw [toNat_ofNat_of_lt _ (by omega), toNat_ofNat_of_lt _ (by omega)]; exact hlt
+        rw [Xv6.bcOfNatToNat _ (by omega), Xv6.bcOfNatToNat _ (by omega)]; exact hlt
       k_step_gen (wp_s_branch c11 _ (KA.«uvmdealloc» + 0x22#64) false 16#13 14#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hpo, hpn, bltu_pos _ _ hb] next c12 hp12
@@ -235,7 +235,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
           = BitVec.ofNat 64 (uvmdNp (k.regs 11#5) (k.regs 12#5)) := by
         rw [ofNat_shift12 _ (by omega), hnpe]
       have hnp31 : (BitVec.ofNat 64 (uvmdNp (k.regs 11#5) (k.regs 12#5))).toNat < 2 ^ 31 := by
-        rw [toNat_ofNat_of_lt _ (by rw [hnpe]; omega), hnpe]; omega
+        rw [Xv6.bcOfNatToNat _ (by rw [hnpe]; omega), hnpe]; omega
       have hsext : BitVec.signExtend 64 (BitVec.extractLsb' 0 32
             (BitVec.ofNat 64 (uvmdNp (k.regs 11#5) (k.regs 12#5))))
           = BitVec.ofNat 64 (uvmdNp (k.regs 11#5) (k.regs 12#5)) := sextw_small _ hnp31

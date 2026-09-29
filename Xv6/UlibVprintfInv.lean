@@ -96,7 +96,7 @@ theorem ulibVpInv_bump {m0 m : RegMap} {a : Nat} {fd ap st : BitVec 64} {i : Nat
     (h : ulibVpInv m0 m a fd ap st i) : ulibVpInv m0 (m.set 18#5 (BitVec.ofNat 64 j)) a fd ap st j := by
   obtain ⟨h2, h8, _, h19, h20, h21, h22, h23, h24, hk⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    (try simp (config := { decide := true }) only [ulibSet_eq, if_true, if_false]) <;> try assumption
+    (try simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, if_true, if_false]) <;> try assumption
   intro x hx
   rcases hx with rfl | rfl | rfl | rfl | rfl <;>
     exact (RegMap.set_other _ _ _ _ (by decide)).trans (hk _ (by decide))
@@ -106,7 +106,7 @@ theorem ulibVpInv_st {m0 m : RegMap} {a : Nat} {fd ap st : BitVec 64} {i : Nat} 
     (h : ulibVpInv m0 m a fd ap st i) : ulibVpInv m0 (m.set 19#5 st') a fd ap st' i := by
   obtain ⟨h2, h8, h18, _, h20, h21, h22, h23, h24, hk⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    (try simp (config := { decide := true }) only [ulibSet_eq, if_true, if_false]) <;> try assumption
+    (try simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, if_true, if_false]) <;> try assumption
   intro x hx
   rcases hx with rfl | rfl | rfl | rfl | rfl <;>
     exact (RegMap.set_other _ _ _ _ (by decide)).trans (hk _ (by decide))
@@ -116,7 +116,7 @@ theorem ulibVpInv_ap {m0 m : RegMap} {a : Nat} {fd ap st : BitVec 64} {i : Nat} 
     (h : ulibVpInv m0 m a fd ap st i) : ulibVpInv m0 (m.set 23#5 ap') a fd ap' st i := by
   obtain ⟨h2, h8, h18, h19, h20, h21, h22, _, h24, hk⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    (try simp (config := { decide := true }) only [ulibSet_eq, if_true, if_false]) <;> try assumption
+    (try simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, if_true, if_false]) <;> try assumption
   intro x hx
   rcases hx with rfl | rfl | rfl | rfl | rfl <;>
     exact (RegMap.set_other _ _ _ _ (by decide)).trans (hk _ (by decide))

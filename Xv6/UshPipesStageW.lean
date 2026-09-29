@@ -116,7 +116,7 @@ theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (B
 `cat f` producer. -/
 theorem pdep_left_write (k : Nat) (hk : haltsAt D.fcR D.pr (lfilts D.lR) k) :
     ⊢ D.shotsF k -∗ osS (D.gG k) -∗ pdep D (WLeft k) catDgWrite := by
-  rw [pdep_unfold D (WLeft k) catDgWrite catDgWrite_ne_nil (Or.inr ⟨hk, rfl⟩)]
+  rw [pdep_unfold D (WLeft k) catDgWrite Xv6.catDgWrite_ne (Or.inr ⟨hk, rfl⟩)]
   simp only [PdRound.pdepNe]
   rw [if_neg (fun hq => failSrc_ne_write _ _ _ _ hq rfl)]
   iintro #Hs #HG
@@ -144,7 +144,7 @@ theorem mid_kits (OK : PdRoundOk D) (hfire : HfireP D) (k' : Nat) (F : Filt)
     isplitl []
     · iapply (pkit_of D OK (WLeft (k' + 1)) catDgWrite (fun j hj => by cases hj)
         (hfire (WLeft (k' + 1)) catDgWrite hwk (Or.inr ⟨hh, rfl⟩)))
-      iapply (pexcl_left D (k' + 1) catDgWrite hk catDgWrite_ne_nil) $$ Hpk
+      iapply (pexcl_left D (k' + 1) catDgWrite hk Xv6.catDgWrite_ne) $$ Hpk
     · iapply (pdep_left_write D (k' + 1) hh) $$ Hsk HGs
   | FGrep _ =>
     simp only [mid_alts]

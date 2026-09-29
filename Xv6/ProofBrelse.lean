@@ -286,7 +286,7 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   have h18 : R1 18#5 = aBufLock (bnode kk) := b18.trans (aBufLock_eq' _)
   -- c.beqz a0 (not taken) ; c.mv a0,s2 ; jal releasesleep
   k_step_gen (wp_s_branch c6 _ (KA.«brelse» + 0x18#64) true 96#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0r, bc_beqz_one] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0r, MachCSL.bcond_beq_one] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_add c7 _ (KA.«brelse» + 0x1a#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18] next c8 hp8

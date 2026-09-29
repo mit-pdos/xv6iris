@@ -91,7 +91,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     iapply shNul_head UL N h m p _ 0x13c8 _ 0x832 _ ushNulRow_redir ha0 hp hp8 (by omega) $$ Hc Hty Hrun
     iintro %h1 %m1 %hst %hsp1 %ha1 %hs1 %hk1 Hsv Hloc Hty Hrun
     obtain ⟨hal, hroom⟩ := hst
-    have hpn : (BitVec.ofNat 64 p).toNat = p := ush_toNat_ofNat p (by omega)
+    have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
     -- 0x832  ld a0,8(a0) : the sub-command
     iapply ushS_ld UL N (ushI_832 N.t) 0x834 h1 m1 _ (DFrac.own 1) (p + 8) (BitVec.ofNat 64 pc)
       (by rw [ha1, hpn]; rfl) (by omega) $$ Hc Hwc Hrun
@@ -112,7 +112,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     -- 0x838  ld a5,24(s1) : efile
     have h4s1 : m4.get 9#5 = BitVec.ofNat 64 p := by
       rw [hcs4 9#5 ush_cs9]; show (ukWr (ukWr m1 _ _) _ _).get 9#5 = _; ureg; exact hs1
-    have hsn : (BitVec.ofNat 64 (s0 + e)).toNat = s0 + e := ush_toNat_ofNat _ (by omega)
+    have hsn : (BitVec.ofNat 64 (s0 + e)).toNat = s0 + e := Xv6.bcOfNatToNat _ (by omega)
     iapply ushS_ld UL N (ushI_838 N.t) 0x83a h4 m4 _ (DFrac.own 1) (p + 24) (BitVec.ofNat 64 (s0 + e))
       (by rw [h4s1, hpn]; rfl) (by omega) $$ Hc Hwe Hrun
     iintro Hwe %h5 Hrun
@@ -161,7 +161,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     iapply shNul_head UL N h m p _ 0x13cc _ 0x84a _ ushNulRow_pipe ha0 hp hp8 (by omega) $$ Hc Hty Hrun
     iintro %h1 %m1 %hst %hsp1 %ha1 %hs1 %hk1 Hsv Hloc Hty Hrun
     obtain ⟨hal, hroom⟩ := hst
-    have hpn : (BitVec.ofNat 64 p).toNat = p := ush_toNat_ofNat p (by omega)
+    have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
     let M := max (ushpHt l) (ushpHt r)
     -- 0x84a  ld a0,8(a0) : the left side
     iapply ushS_ld UL N (ushI_84a N.t) 0x84c h1 m1 _ (DFrac.own 1) (p + 8) (BitVec.ofNat 64 pl)

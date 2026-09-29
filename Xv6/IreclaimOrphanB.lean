@@ -79,7 +79,7 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hn31' : n < 2 ^ 31 := by omega
   have hnib : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by
-    rw [ireclaim_inum_toNat n hn31']; omega
+    rw [Xv6.bf_bnoB n hn31']; omega
   obtain ⟨hcov, hlog⟩ := hblk _ hnib
   generalize hi : BitVec.ofNat 32 n = inum at hnib hcov hlog ⊢
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hboot, Href, Hru⟩

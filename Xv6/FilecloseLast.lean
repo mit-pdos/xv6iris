@@ -124,7 +124,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     ihave Hcp := filecloseCpost_nopipe q st Φc hnp $$ Hcpay
     ihave Hnext := fc_cont_fold cpu k γk on st pidv dqp q Φc $$ Hnext Hcp
     k_step_gen (wp_s_branch c1 _ (KA.«fileclose» + 0x56#64) false 66#13 18#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, fc_one, fc_beq_fs C.type hfs] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, Xv6.ci_li_one, fc_beq_fs C.type hfs] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_addiw c2 _ (KA.«fileclose» + 0x5a#64) false 4094#12 15#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
@@ -134,7 +134,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     iintro Hk Hpc
     k_step_gen (wp_s_branch c4 _ (KA.«fileclose» + 0x60#64) false 74#13 14#5 15#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [e18, fc_one, fc_bgeu_fs C.type hfs, fc_bgeu_fs' C.type hfs] next c5 hp5
+      with [e18, Xv6.ci_li_one, fc_bgeu_fs C.type hfs, fc_bgeu_fs' C.type hfs] next c5 hp5
     iintro Hk Hpc
     have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
       (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpinr h)))))
@@ -169,7 +169,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     ihave Hcp := filecloseCpost_nopipe q .closed Φc trivial $$ Hcpay
     ihave Hnext := fc_cont_fold cpu k γk on .closed pidv dqp q Φc $$ Hnext Hcp
     k_step_gen (wp_s_branch c1 _ (KA.«fileclose» + 0x56#64) false 66#13 18#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_beq_none] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, Xv6.ci_li_one, fc_beq_none] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_addiw c2 _ (KA.«fileclose» + 0x5a#64) false 4094#12 15#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
@@ -178,7 +178,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
     k_step_gen (wp_s_branch c4 _ (KA.«fileclose» + 0x60#64) false 74#13 14#5 15#5 (by decide) bop.BGEU)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_bgeu_none, fc_bgeu_none'] next c5 hp5
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, Xv6.ci_li_one, fc_bgeu_none, fc_bgeu_none'] next c5 hp5
     iintro Hk Hpc
     k_step_gen (wp_s_ld c5 _ (KA.«fileclose» + 0x64#64) true 32#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (R 18#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, hR2, fc_sp32, fc_sp32'] next c6 hp6
@@ -239,7 +239,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       unfold filecloseEnv fileclosePipeEnv
       icases Henv with ⟨#Hpi, #Hkl, Hav⟩
       k_step_gen (wp_s_branch c1 _ (KA.«fileclose» + 0x56#64) false 66#13 18#5 15#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, fc_one, fc_beq_pipe] next c2 hp2
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, hty, Xv6.ci_li_one, fc_beq_pipe] next c2 hp2
       iintro Hk Hpc
       k_step_gen (wp_s_add c2 _ (KA.«fileclose» + 0x98#64) true 11#5 0#5 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
@@ -272,7 +272,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
           filecloseCpost (hlc := hlc) q (.open r w (.pipe pn.pipe)) Φc by
         rw [hwb]; exact filecloseCpost_of_fired q _ Φc r w pn.pipe rfl) $$ Hcp
       ihave Hnext := fc_cont_fold cpu k γk on (.open r w (.pipe pn.pipe)) pidv dqp q Φc $$ Hnext Hcp
-      k_norm_g [fc_withSpie_withSpie, fc_pushed_withSpie]
+      k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
       unfold calleeSaved at hcs5
       k_norm_g at hcs5
       obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs5

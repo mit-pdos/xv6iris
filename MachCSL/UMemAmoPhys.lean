@@ -183,7 +183,7 @@ theorem ume_amo16_ok (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (h
   have hga := umo_gtda_zero hD orc s hU hp i1 (umoAcc op aq rl) 16
   have hx := umo_rX_pair hD.ctl.alu
   have hwx := umo_wX_pair hD.ctl.alu
-  exact ⟨_, _, by uwk_run [hga, hx, hwx, umo_trunc, umoRv_file, hop]⟩
+  exact ⟨_, _, by uwk_run [hga, hx, hwx, MachCSL.trunc_eq, umoRv_file, hop]⟩
 
 end
 

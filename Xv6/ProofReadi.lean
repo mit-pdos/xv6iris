@@ -136,7 +136,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
       $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Hdc $Hpe $Hany $Hkl $Hav $Hte $Hce $Hdev $Hmeta $Hmap
         $Hblk $Hdst $Hsl $Hnext]
     case f21 =>
-      rw [h21, hN, rd_arg32_small n (by omega)]
+      rw [h21, hN, MachCSL.signExtend_ofNat32 n (by omega)]
     all_goals (first | assumption | rfl)
   · k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x2c#64) false 8#13 15#5 14#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -145,7 +145,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
     -- +0x30  subw s5,a5,a3
     k_step_e (wp_s_subw cpu _ (KA.«readi» + 0x30#64) false 21#5 15#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h15, h13, rd_arg32_small off hoff31, rd_subw _ off hle hsz31]
+      with [h15, h13, MachCSL.signExtend_ofNat32 off hoff31, rd_subw _ off hle hsz31]
     iintro Hk Hpc
     have hN : rdClamp dn.diSize off n = dn.diSize.toNat - off := by
       unfold rdClamp; rw [if_pos (by omega)]
@@ -222,7 +222,7 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«readi» + 0x1e#64) true 9#5 0#5 13#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha3, rd_arg32_small off hoff31]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha3, MachCSL.signExtend_ofNat32 off hoff31]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«readi» + 0x20#64) true 21#5 0#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha4]
@@ -237,7 +237,7 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
   iintro Hk Hpc
   k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x26#64) false 182#13 14#5 13#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [ha3, rd_arg32_small off hoff31, rd_bltu_wrap off s hoff31 (by omega) (by omega)]
+    with [ha3, MachCSL.signExtend_ofNat32 off hoff31, rd_bltu_wrap off s hoff31 (by omega) (by omega)]
   iintro Hk Hpc
   -- +0x2a  c.sdsp s3,72(sp)
   icases rdFrame_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hframe
@@ -256,7 +256,7 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Hdc $Hpe $Hany $Hkl $Hav $Hte $Hce $Hdev $Hmeta $Hmap
       $Hblk $Hdst $Hsl $Hnext]
   all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first | rfl | exact ha0 | exact ha3 | exact ha4 | exact rd_arg32_small off hoff31 | skip)
+    first | rfl | exact ha0 | exact ha3 | exact ha4 | exact MachCSL.signExtend_ofNat32 off hoff31 | skip)
 
 
 set_option maxHeartbeats 16000000 in
@@ -311,7 +311,7 @@ theorem readi_main (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
   by_cases hlt : dn.diSize.toNat < off
   · k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x2#64) false 236#13 15#5 13#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha3, rd_sext_small _ hsz31, rd_bltu_size _ off hsz31 hoff, decide_eq_true hlt]
+      with [ha3, Xv6.dsSext_small _ hsz31, rd_bltu_size _ off hsz31 hoff, decide_eq_true hlt]
     iintro Hk Hpc
     iapply (rd_early cpu c0 k _ γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd
         hj hproc ?ecs ?e1 ?e12 hlt)
@@ -326,7 +326,7 @@ theorem readi_main (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
   have hon := hjoint hle
   k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x2#64) false 236#13 15#5 13#5 (by decide) bop.BLTU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [ha3, rd_sext_small _ hsz31, rd_bltu_size _ off hsz31 hoff, decide_eq_false hlt]
+    with [ha3, Xv6.dsSext_small _ hsz31, rd_bltu_size _ off hsz31 hoff, decide_eq_false hlt]
   iintro Hk Hpc
   iapply (rd_entry BM BR BE EC Γ cpu c0 k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm data
       dn user off n olds pidv Vp M dqp dq dqd hj hproc hK hnoff hlocks htier hgeom hwf hcov hsz

@@ -98,7 +98,7 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlookup_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hsz := hs.hsz
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl

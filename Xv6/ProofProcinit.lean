@@ -15,6 +15,8 @@ import MachCSL.WpSmodeAlu4
 import Xv6.SpecProcinit
 import Xv6.SpecInitlock
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame8
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -29,12 +31,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the eight-slot frame. -/
-theorem pi_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem pi_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- The `auipc`/`lui` constants. -/
 theorem pi_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by bv_decide
@@ -51,17 +47,12 @@ theorem pi_ret_182c : jumpPc (KA.«procinit» + 0x3c#64) = (KA.«procinit» + 0x
 theorem pi_ret_1870 : jumpPc (KA.«procinit» + 0x80#64) = (KA.«procinit» + 0x80#64) := by
   decide
 
-theorem pi_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
-
 theorem pi_procs_toNat : (KA.«proc» : BitVec 64).toNat = KernelSyms.«proc» := rfl
-theorem pi_procs_lt : KernelSyms.«proc» < 2 ^ 32 := by decide
 
 theorem pi_procAddr_toNat (i : Nat) (hi : i ≤ 64) :
     (procAddr i).toNat = KernelSyms.«proc» + 368 * i := by
-  have hp := pi_procs_lt
-  rw [procAddr_eq, BitVec.toNat_add, pi_toNat (368 * i) (by omega), pi_procs_toNat]
+  have hp := Xv6.procs_lt
+  rw [procAddr_eq, BitVec.toNat_add, Xv6.bcOfNatToNat (368 * i) (by omega), pi_procs_toNat]
   exact Nat.mod_eq_of_lt (by omega)
 
 /-- `&proc[0]`. -/
@@ -79,33 +70,33 @@ theorem pi_h1 (i : Nat) :
 
 theorem pi_h2 (i : Nat) (hi : i < 64) :
     (BitVec.ofNat 64 (368 * i)).sshiftRight 4 = BitVec.ofNat 64 (23 * i) := by
-  have ht : (BitVec.ofNat 64 (368 * i)).toNat = 368 * i := pi_toNat _ (by omega)
+  have ht : (BitVec.ofNat 64 (368 * i)).toNat = 368 * i := Xv6.bcOfNatToNat _ (by omega)
   have hmsb : (BitVec.ofNat 64 (368 * i)).msb = false := by
     simp only [BitVec.msb_eq_decide, ht, decide_eq_false_iff_not, Nat.not_le]
     omega
   rw [BitVec.sshiftRight_eq_of_msb_false hmsb]
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_ushiftRight, ht, pi_toNat (23 * i) (by omega), Nat.shiftRight_eq_div_pow]
+  rw [BitVec.toNat_ushiftRight, ht, Xv6.bcOfNatToNat (23 * i) (by omega), Nat.shiftRight_eq_div_pow]
   omega
 
 theorem pi_h3 (i : Nat) (hi : i < 64) :
     BitVec.ofNat 64 (23 * i) * 15238614669586151335#64 = BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_mul, pi_toNat (23 * i) (by omega), pi_toNat i (by omega),
-    pi_toNat 15238614669586151335 (by omega)]
+  rw [BitVec.toNat_mul, Xv6.bcOfNatToNat (23 * i) (by omega), Xv6.bcOfNatToNat i (by omega),
+    Xv6.bcOfNatToNat 15238614669586151335 (by omega)]
   omega
 
 theorem pi_h4 (i : Nat) (hi : i < 64) :
     (BitVec.ofNat 64 i) <<< 13 = BitVec.ofNat 64 (8192 * i) := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, pi_toNat i (by omega), pi_toNat (8192 * i) (by omega),
+  rw [BitVec.toNat_shiftLeft, Xv6.bcOfNatToNat i (by omega), Xv6.bcOfNatToNat (8192 * i) (by omega),
     Nat.shiftLeft_eq]
   omega
 
 theorem pi_h5 (i : Nat) (_hi : i < 64) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (8192 * i)) = BitVec.ofNat 32 (8192 * i) := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.extractLsb'_toNat, pi_toNat (8192 * i) (by omega), Nat.shiftRight_zero,
+  rw [BitVec.extractLsb'_toNat, Xv6.bcOfNatToNat (8192 * i) (by omega), Nat.shiftRight_zero,
     BitVec.toNat_ofNat]
 
 theorem pi_h6 : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (2#20 ++ 0#12)) = 8192#32 := by
@@ -127,7 +118,7 @@ theorem pi_h8 (i : Nat) (hi : i < 64) :
     omega
   rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_setWidth, ht, pi_toNat (8192 * (i + 1)) (by omega)]
+  rw [BitVec.toNat_setWidth, ht, Xv6.bcOfNatToNat (8192 * (i + 1)) (by omega)]
   omega
 
 theorem pi_h9 (i : Nat) :
@@ -222,7 +213,7 @@ theorem pi_prologue [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
             (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, #Hi14, #Hi16, #Hi18, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4032#12 8 hK pi_imm_m64) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4032#12 8 hK MachCSL.imm_m64) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -306,7 +297,7 @@ theorem pi_epilogue [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   iintro Hk Hpc Hf64
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 8 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c8 _ (pc + 16#64) true 64#12 8 pi_imm_p64) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c8 _ (pc + 16#64) true 64#12 8 MachCSL.imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c9 hp9
   iintro Hk Hpc
   k_step_gen (wp_s_ret c9 _ (pc + 18#64) true 1#5) $$ [- $Hk $Hpc] next c10 hp10

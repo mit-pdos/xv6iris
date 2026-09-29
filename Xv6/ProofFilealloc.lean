@@ -18,6 +18,7 @@ The found arm runs the ALLOC ghost step (`file_alloc_step`) before
 import Xv6.SpecFilealloc
 import Xv6.FtableLock
 import Xv6.CodeTactics
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -48,7 +49,6 @@ theorem fa_end_40d8 : KA.«filealloc» + 0x1f572#64 = fnode NFILE := by
   rw [fnode_end]; decide
 theorem fa_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
-theorem fa_ext1' : BitVec.extractLsb' 0 32 (1#64 : BitVec 64) = 1#32 := by decide
 theorem fa_sext4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
 section
@@ -189,7 +189,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     simp only [List.length_nil] at hn
     subst hn
     k_step (wp_s_branch c _ (KA.«filealloc» + 0x28#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_zero, fa_ref_zero, fa_beq_00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_zero, Xv6.bm_sext0, fa_beq_00]
     iintro Hk Hpc
     icases Hor with ⟨⟨%hfree, Hf, Hn, Hc⟩ | ⟨%hne, -⟩⟩
     rotate_left 1
@@ -203,7 +203,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
         wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 0) from by
       rw [wordAtN_cur, aFref_eq]; rfl) $$ Href
     k_step (wp_s_sw c _ (KA.«filealloc» + 0x44#64) true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 0))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fa_ext1, fa_ext1']
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fa_ext1, Xv6.vdrw3_len1]
     iintro Hk Hpc Href
     ihave Href := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) 1#32 ⊢
         wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 [(nx, (1 : Qp))].length) from by

@@ -57,6 +57,7 @@ cell with those readings, and the ledger is sealed with `initReg`
 import Xv6.SpecUserinit
 import Xv6.SpecRelease
 import Xv6.SpecForkretParkPaid
+import Xv6.LogBoot
 
 namespace Xv6
 
@@ -79,48 +80,19 @@ set_option linter.unusedVariables false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- A single byte cell is publishable. -/
-theorem ctxByte_persist (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
-    ctxByte (GF := GF) ξ a dq v ⊢ |==> ctxByte ξ a DFrac.discard v := by
-  unfold ctxByte
-  iintro ⟨%e, %H, Hpt, %hv, #Hkey⟩
-  imod (pointsTo_persist (l := a) (dq := dq) (v := (e :: H))) $$ Hpt with #Hpt
-  imodintro
-  iexists e, H
-  iframe Hpt Hkey
-  ipureintro; exact hv
-
-/-- The `n` bytes at `pa` are publishable. -/
-theorem ctxBytes_persist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    ctxBytes (GF := GF) ξ pa n dq w ⊢ |==> ctxBytes ξ pa n DFrac.discard w := by
-  unfold ctxBytes
-  iintro H
-  ihave H' := BigSepL.bigSepL_mono
-    (fun {_ j} _ => ctxByte_persist ξ (pa + BitVec.ofNat 64 j) dq (nthByte w j)) $$ H
-  iapply BigSepL.bigSepL_bupd $$ H'
 
 end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-/-- **A word is publishable**: give up the fraction, keep the value forever. -/
-theorem wordPointsTo_persist (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    wordPointsTo (GF := GF) va n dq w ⊢ |==> wordPointsTo va n DFrac.discard w := by
-  unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %hfacts, Hb⟩
-  imod (ctxBytes_persist curCtx (paOf ppn va) n dq w) $$ Hb with Hb
-  imodintro
-  iexists ppn
-  iframe Hb Hcl
-  ipureintro; exact hfacts
 
 /-- **Publish `initproc`**: the owned word becomes the persistent
 `initprocIs`. -/
 theorem initprocIs_publish (ip : BitVec 64) :
     wordPointsTo (GF := GF) initprocAddr 8 (DFrac.own 1) ip ⊢ |==> initprocIs ip := by
   unfold initprocIs
-  exact wordPointsTo_persist initprocAddr 8 (DFrac.own 1) ip
+  exact Xv6.lbWord_persist initprocAddr 8 (DFrac.own 1) ip
 
 end
 

@@ -85,7 +85,6 @@ theorem dv_beq_1_12 : bcond bop.BEQ 1#64 12#64 = false := by decide
 theorem dv_beq_12_12 : bcond bop.BEQ 12#64 12#64 = true := by decide
 theorem dv_beq_0_1 : bcond bop.BEQ 0#64 1#64 = false := by decide
 theorem dv_beq_1_1 : bcond bop.BEQ 1#64 1#64 = true := by decide
-theorem dv_bne_0_0 : bcond bop.BNE 0#64 0#64 = false := by decide
 
 theorem dv_ret_of_ext (sc : BitVec 64) (h : sc = sCause InterruptType.I_S_External) :
     devintrRet sc = 1#64 := by simp only [devintrRet, h, if_pos]
@@ -773,7 +772,7 @@ theorem dv_disp_0 (cpu : CPU) (k : KCtx) (sc : BitVec 64)
   iintro Hk Hpc
   -- +0x48  bnez a4 : NOT taken, the answer was zero (the printk arm is dead)
   k_step (wp_s_branch cpu _ (KA.«devintr» + 0x48#64) true 38#13 14#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_bne_0_0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- +0x4a  ld s1,8(sp)
   k_step (wp_s_ld cpu _ (KA.«devintr» + 0x4a#64) true 8#12 9#5 2#5 (by decide) (by decide)

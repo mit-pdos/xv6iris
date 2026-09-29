@@ -3,7 +3,7 @@ The facts `fileread` and `filewrite` share, ONE copy each (the FsCallSites
 pattern: a stage file belongs to one function, so each had restated them
 under its own prefix -- `frd_*` / `fwr_*`, with identical statements).
 
-* the dispatch's readings: `filerw_beqz` (`readable`/`writable` byte),
+* the dispatch's readings: `Xv6.namex_beqz_byte` (`readable`/`writable` byte),
   `filerw_beq1` / `filerw_beq3` / `filerw_bne2` (the type word), the
   `srliw a5,a2,31` sign test `filerw_sign` / `filerw_bnez_sign`, the
   callee's answer `filerw_bge0_m1` / `filerw_bge0_nat`;
@@ -23,6 +23,7 @@ import Xv6.EitherDefs
 import Xv6.FsWords
 import Xv6.FdTable
 import Xv6.FilePay
+import Xv6.NamexParts
 
 
 namespace Xv6
@@ -36,8 +37,6 @@ set_option linter.unusedSimpArgs false
 
 /-! ## The dispatch's readings and `f->off` -/
 
-theorem filerw_beqz (w : BitVec 8) : bcond bop.BEQ (BitVec.setWidth 64 w) 0#64 = decide (w = 0#8) := by
-  simp only [bcond]; bv_decide
 
 theorem filerw_beq1 (t : BitVec 32) :
     bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = FD_PIPE) := by

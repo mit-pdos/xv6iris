@@ -23,6 +23,7 @@ is the prologue's record `utProTf` (`MachCSL.wp_s_csrr_sepc_any`).
 import Xv6.UsertrapDispatch
 import Xv6.PrepareReturnRules
 import MachCSL.WpSmodeStvec
+import Xv6.UserretClosedDefs
 
 namespace Xv6
 
@@ -42,11 +43,6 @@ theorem ut_spp_clear (v : BitVec 64) (spie : Bool) (h : sstatusFull false spie f
     v &&& 256#64 = 0#64 := by
   have h8 : BitVec.extractLsb' 8 1 v = 0#1 := by simpa using (h.2.1 rfl).2
   bv_decide
-
-theorem ut_bne_00 : bcond bop.BNE 0#64 0#64 = false := by decide
-
-theorem ut_retPc_eq (e : BitVec 64) : e &&& 0xFFFFFFFFFFFFFFFE#64 = retPc e := by
-  unfold retPc; bv_decide
 
 theorem ut_br_myproc : KA.«usertrap» + 0x22#64 + BitVec.signExtend 64 2093770#21 = KA.«myproc» := by
   decide
@@ -142,7 +138,7 @@ theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH (hlc := hlc) PT Γ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x14#64) true 112#13 15#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_bne_00]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- +0x16  auipc a5,0x3 ; addi a5,a5,-36 ; csrw stvec,a5
   k_step (wp_s_auipc cpu _ (KA.«usertrap» + 0x16#64) false 3#20 15#5 (by decide))
@@ -209,7 +205,7 @@ theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH (hlc := hlc) PT Γ)
   ihave Hown := (show utOwn (GF := GF) (utRsys PT Γ A) A.N
         { A.V with tf := A.V.tf.set 3 (A.sep &&& 0xFFFFFFFFFFFFFFFE#64) } A.M A.sts A.cs A.pid ⊢
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid from by
-    rw [ut_retPc_eq]; exact .rfl) $$ Hown
+    rw [Xv6.urc_jump_retPc]; exact .rfl) $$ Hown
   -- +0x30  the dispatch
   iapply (HD A cpu _ tv hok ?hp3 ?h10')
   rotate_left 2

@@ -147,7 +147,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
   have hty2 : dn'.diType.toNat = T_FILE := by rw [hty']; exact hty
   have hnz' : fnType (eraNode dn' bm' data') ≠ 0 := opfEra_file_typed dn' bm' data' hty2
   have hbs0 : (fnFileBytes (eraNode dn bm data)).length = dn.diSize.toNat := by
-    rw [wrfEra_bytes]; exact wrfFb_length _ _
+    rw [wrfEra_bytes]; exact Xv6.fileBytes_length' _ _
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
   iintro #Hft #Hai Htop Hgv Hst

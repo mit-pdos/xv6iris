@@ -82,7 +82,7 @@ theorem union_happ_echo (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag
   · unfold consLink
     iintro %o %H #Hlb Hres %hok %hev
     simp only [chistAt, hcons]
-    obtain ⟨s, -, hseg⟩ := umDisc_open_seg ulmG h hsh hdisc
+    obtain ⟨s, -, hseg⟩ := Xv6.lmDisc_open_seg ulmG h hsh hdisc
     have hK1 := hev.2.2.2.2.2.1
     have hK2 := hev.2.2.2.2.2.2
     ihave Hres := (ucl_open (hlc := hlc) (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) (o.getD []) H

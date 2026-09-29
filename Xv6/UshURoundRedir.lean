@@ -209,7 +209,7 @@ theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : 
   -- the lend, opened
   ihave Hcr := (show (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wc I 3 ⊢ uWcu (hlc := hlc) ug r s0 PT PD I 3
     from .rfl) $$ Hcr
-  ihave ⟨Hc, Hpre⟩ := uredir_lend ug r s0 PT PD I hnw $$ Hcr
+  ihave ⟨Hc, Hpre⟩ := Xv6.uWcu3_nw_open ug r s0 PT PD I hnw $$ Hcr
   ihave ⟨⟨%v0, #Hpin0⟩, Hc⟩ := uWcl_pin ug s0 I 3 $$ Hc
   ihave #Hkillq := uredir_killq ug r s0 PT PD hkill I v0 $$ Hpin0
   ihave #Hgenw := uredir_genw (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) N' _ hpeq' $$ Hgen Hkillq

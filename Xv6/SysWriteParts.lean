@@ -22,6 +22,10 @@ import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
 import Xv6.SpecFilewrite
+import Xv6.CopyLemmas
+import Xv6.ReadiDefs
+import Xv6.SysFstatParts
+import Xv6.SysReadParts
 
 namespace Xv6
 
@@ -46,20 +50,10 @@ theorem swr_ret_1c : jumpPc (KA.«sys_write» + 0x1c#64) = (KA.«sys_write» + 0
 theorem swr_ret_28 : jumpPc (KA.«sys_write» + 0x28#64) = (KA.«sys_write» + 0x28#64) := by decide
 theorem swr_ret_40 : jumpPc (KA.«sys_write» + 0x40#64) = (KA.«sys_write» + 0x40#64) := by decide
 
-theorem swr_li1 : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
 theorem swr_li2 : 0#64 + BitVec.signExtend 64 2#12 = 2#64 := by decide
-theorem swr_add0 (x : BitVec 64) : 0#64 + x = x := by simp
 theorem swr_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 /-- `addi a1,s0,-40` / `ld a1,-40(s0)`: `&p`, frame slot 5. -/
 theorem swr_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
-  bv_decide
-/-- `addi a1,s0,-28` / `lw a2,-28(s0)`: `&n`, the upper word of slot 4. -/
-theorem swr_n_addr (x : BitVec 64) : x + BitVec.signExtend 64 4068#12 = x + 0xFFFFFFFFFFFFFFE4#64 := by
-  bv_decide
-/-- `addi a2,s0,-24` / `ld a0,-24(s0)`: `&f`, frame slot 3. -/
-theorem swr_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
-  bv_decide
-theorem swr_e0_4 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFE0#64 + 4#64 = x + 0xFFFFFFFFFFFFFFE4#64 := by
   bv_decide
 
 /-- `&f` is not null (Rocq's `stack_own_sp_nonzero` reading, off the
@@ -71,16 +65,6 @@ theorem swr_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFF
   simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
-
-theorem swr_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
-
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem swr_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The register bundle: `sp`, `s0` and the untouched `s1..s11` -/
 
@@ -136,10 +120,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem swr_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
-    kctx (GF := GF) c ((k.pushed 6).withRegs R) ⊢
-      kctx c (((k.withSpie k.spie k.spp).pushed 6).withRegs R) := .rfl
-
 /-- THE FOUR LOCAL SLOTS, as the body uses them: `f` (8 bytes), `n` (the
 upper word of its slot; the lower word is anything), `p`, and the unused
 slot, with the alignment the rejoin needs. -/
@@ -174,7 +154,7 @@ theorem swr_frame_open (sp ra s0 : BitVec 64) :
   isplitl [Hlo]
   · iexists lo; iexact Hlo
   isplitl [Hhi]
-  · rw [swr_e0_4]; iexact Hhi
+  · rw [Xv6.srd_n_hi]; iexact Hhi
   iexists wu; iexact Hu
 
 theorem swr_frame_close (sp ra s0 wf : BitVec 64) (wn : BitVec 32) (wp : BitVec 64) :
@@ -189,7 +169,7 @@ theorem swr_frame_close (sp ra s0 wf : BitVec 64) (wn : BitVec 32) (wp : BitVec 
   isplitl [Hlo Hn]
   · iapply word8_join4 _ lo wn hal
     iframe Hlo
-    rw [swr_e0_4]; iexact Hn
+    rw [Xv6.srd_n_hi]; iexact Hn
   iexists wp; iexact Hp
 
 set_option maxHeartbeats 8000000 in

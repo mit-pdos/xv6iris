@@ -10,6 +10,9 @@ import Xv6.SpecWalkaddr
 import Xv6.SpecVmfault
 import Xv6.SpecMemmove
 import Xv6.UMemLemmas
+import MachCSL.WpSmodeFrame12
+import Xv6.ByteCursor
+import Xv6.UPtAllocLemmas
 
 namespace Xv6
 
@@ -62,21 +65,6 @@ theorem co_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
 
 theorem co_lui_mask : BitVec.signExtend 64 (0xfffff#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
 
-theorem co_beq_zero {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem co_beq_ne {α : Type _} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem co_bne_zero {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
-
-theorem co_bne_ne {α : Type _} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 theorem co_li_neg1 : (0#64 : BitVec 64) + BitVec.signExtend 64 4095#12 = -1#64 := by decide
 
@@ -109,13 +97,6 @@ theorem co_bgeu_lt {α : Type _} (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64)
   simp only [bcond, co_ult_ofNat a b ha hb, Bool.not_eq_true', decide_eq_false_iff_not]
   omega
 
-theorem co_sext32 (x : BitVec 64) (h : x.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 x) = x := by
-  have h2 : x.ult 0x80000000#64 = true := by
-    simp only [BitVec.ult, decide_eq_true_eq, BitVec.toNat_ofNat]
-    omega
-  revert h2
-  bv_decide
 
 theorem co_sext_0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
@@ -170,11 +151,6 @@ theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
   simp only [memmoveAddr] at h
   exact h
 
-theorem co_withSpie_withSpie (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := by cases k; rfl
-
-theorem co_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := by cases k; rfl
 
 theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
     BitVec.ofNat 64 (a / 4096 * 4096) + (-BitVec.ofNat 64 a + 4096#64)
@@ -187,23 +163,13 @@ theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
   rw [h1, h, show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl,
     co_ofNat_sub 4096 _ (by omega) (by omega)]
 
-theorem co_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 theorem co_kctx_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c (k.withRegs R) ⊢ kctx c ((k.withSpie k.spie k.spp).withRegs R) := by
   rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
 
-theorem ci_imm_m96 : BitVec.signExtend 64 4000#12 = -(8#64 * BitVec.ofNat 64 12) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-
-theorem ci_imm_p96 : BitVec.signExtend 64 96#12 = 8#64 * BitVec.ofNat 64 12 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 theorem ci_li_one : (0#64 : BitVec 64) + BitVec.signExtend 64 1#12 = 1#64 := by decide
-
-theorem ci_umemRead_zero (M : Nat → List (BitVec 8)) (va : Nat) : umemRead M va 0 = [] := by
-  simp only [umemRead, List.range_zero, List.map_nil]
 
 
 /-! ## Address folds in `k_norm`'s normal form
@@ -257,11 +223,6 @@ theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BGEU x y then p else q) = if x.toNat < y.toNat then q else p := by
   by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
 
-/-- The wrapped byte address of the spec's reason, where the run does not wrap. -/
-theorem ci_addr_toNat (b : BitVec 64) (e : Nat) (h : b.toNat + e < 2 ^ 64) :
-    (b + BitVec.ofNat 64 e).toNat = b.toNat + e := by
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : e < 2 ^ 64)]
-  exact Nat.mod_eq_of_lt h
 
 /-! ## Why the `-1` arm failed, as a fact about the ENTRY table
 

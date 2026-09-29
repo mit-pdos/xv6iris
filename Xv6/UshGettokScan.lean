@@ -24,6 +24,7 @@ Deviations from Rocq: registers read with `RegMap.get` (x0 is zero, no
 Rocq; `wp_kshp_gtk_ws2`/`_eqst` are folded into `shGtk_390`/`shGtk_388`.
 -/
 import Xv6.SpecShStrchr
+import Xv6.UkGrepDefs
 
 namespace Xv6
 
@@ -46,12 +47,6 @@ theorem ushG_bgeu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     Nat.mod_eq_of_lt hy]
   simp [GE.ge]
 
-theorem ushG_bltu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BLTU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x < y) := by
-  simp only [ukBtaken, zopz0zI_u, Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx,
-    Nat.mod_eq_of_lt hy]
-  simp
-
 theorem ushG_beq_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     ukBtaken .BEQ (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x = y) := by
   simp only [ukBtaken]
@@ -62,12 +57,6 @@ theorem ushG_beq_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
       have := congrArg BitVec.toNat he
       simpa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] using this
     simp [h, this]
-
-theorem ushG_bne_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BNE (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = !decide (x = y) := by
-  have := ushG_beq_nat x y hx hy
-  simp only [ukBtaken, bne] at this ⊢
-  rw [this]
 
 theorem ushG_zext (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofNat 64 b.toNat := by
   apply BitVec.eq_of_toNat_eq
@@ -240,7 +229,7 @@ theorem shGtk_ws_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Na
         rw [show len - j = (len - (j + 1)) + 1 by omega, ushpSkipws_step _ _ _ hws]
       by_cases hj1 : j + 1 < len
       · iapply ushS_brT UL N hbne p h3 m2 (2 + n)
-          (by rw [h2_18, h2_9, ushG_bne_nat _ _ (by omega) (by omega)]; simp; omega) hnt
+          (by rw [h2_18, h2_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) hnt
           (by rw [hnt]; exact ushG_lsb _ hpe) $$ Hc Hrun
         iintro %h4 Hrun
         iapply ih (j + 1) h4 m2 (by omega) hj1 hs64 h2_9 h2_18
@@ -251,7 +240,7 @@ theorem shGtk_ws_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Na
           rw [hk' q hq hq9, show m2.get q = m1.get q from ukWr_get_other _ _ _ _ hq9, hcs q hq]
         · ipureintro; rw [h9', hsk]; congr 2; omega
       · iapply ushS_brN UL N hbne (p + 18) h3 m2 (2 + n)
-          (by rw [h2_18, h2_9, ushG_bne_nat _ _ (by omega) (by omega)]; simp; omega) (by ushG_pc)
+          (by rw [h2_18, h2_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) (by ushG_pc)
           (by rw [hnt]; exact ushG_lsb _ hpe) $$ Hc Hrun
         iintro %h4 Hrun
         iapply ushS_mv UL N hmv2 (p + 20) h4 m2 (2 + n) (BitVec.ofNat 64 (s0 + len)) h2_18 (by ushG_pc) $$ Hc Hrun
@@ -409,7 +398,7 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
         by_cases hj1 : j + 1 < len
         · -- 0x41a  bne s2,s1,0x400 : back
           iapply ushS_brT UL N (ushI_41a N.t) 0x400 h5 m3 (2 + n)
-            (by rw [h3_18, h3_9, ushG_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+            (by rw [h3_18, h3_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
           iintro %h6 Hrun
           iapply ih (j + 1) h6 m3 (by omega) hj1 hs64 h3_9 h3_18 (by rw [e3 19#5 (by decide) (by decide), h19])
             (by rw [e3 21#5 (by decide) (by decide), h21]) $$ Hc Hs Hws Hsy Hrun
@@ -424,7 +413,7 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
           · ipureintro; exact h21'
         · -- 0x41a  bne : the line's end
           iapply ushS_brN UL N (ushI_41a N.t) 0x41e h5 m3 (2 + n)
-            (by rw [h3_18, h3_9, ushG_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+            (by rw [h3_18, h3_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
           iintro %h6 Hrun
           iapply ushS_mv UL N (ushI_41e N.t) 0x420 h6 m3 (2 + n) (BitVec.ofNat 64 (s0 + len)) h3_18 $$ Hc Hrun
           iintro %h7 Hrun

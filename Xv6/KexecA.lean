@@ -393,7 +393,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     ihave %hnz := inodeHeldAt_ne_zero ipv zi $$ Hheld
     have hd : decide (ipv = 0#64) = false := by simp [hnz]
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz, hd]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
     iintro Hk Hpc
     iapply HK $$ %cpu %spie3 %spp3 %R3 %ipv %zi %n1 HP Hau [- Hex] Hex
     unfold kxcAtA2 kxcBufs

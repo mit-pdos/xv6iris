@@ -94,7 +94,7 @@ theorem createFail_txPin_quarters (γ : LogNames) (t : Nat) :
     txPin (GF := GF) γ t Qp.quarter ∗ txPin γ t Qp.quarter ⊢ txPin γ t (1 : Qp).half := by
   unfold txPin
   have h := (ghost_map_elem_fractional (GF := GF) γ.tx t ()).fractional Qp.quarter Qp.quarter
-  rw [qp_quarter_add_quarter] at h
+  rw [Xv6.ctok_quarter_add_quarter] at h
   exact h.2
 
 end Small
@@ -536,7 +536,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   · ipureintro; exact hcsf
   · ipureintro; exact create_slots_2 false ns rfl hS.hns
   · ipureintro
-    refine ⟨create_sub2 _ _ _ hsb5 hsb6, by omega, fun h => absurd h (by decide)⟩
+    refine ⟨Xv6.namex_sub_trans _ _ _ hsb5 hsb6, by omega, fun h => absurd h (by decide)⟩
   simp only [Bool.false_eq_true, if_false]
   iframe Htx Hcf
   ipureintro
@@ -704,7 +704,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iapply (createFail_parent_tail IUP Γ cpu k γl pd pav pu j γkl γk plen pfun ty major minor γ pid
       V M u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS spie2 spp2 R2 kd qd gd
       γil γisl dind dnp bmp nf tl t kslot cinum n5 Sb5 hR2 hkd hdib hipn5
-      (create_sub2 _ _ _ (create_sub2 _ _ _ hsb4 (create_sub_cons Sb4 _)) hsb5) (by omega) hal)
+      (Xv6.namex_sub_trans _ _ _ (Xv6.namex_sub_trans _ _ _ hsb4 (create_sub_cons Sb4 _)) hsb5) (by omega) hal)
   iframe Hk Hpc Hte Hce Hframe Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hload
     Hshotl Hfrzl Hkeep Hrud Hsbb Hsbi Hpid Hbsl Hop Hisl1 Htq1 Htx Hbareback Hback Hsbn Hsbs
     Hpath Hislr HPpar Hdlkc Hdots Hacre Hunr Hcont

@@ -9,6 +9,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 import Xv6.PtOwnLemmas
+import Xv6.ByteCursor
 
 namespace Xv6.UPtUnmap
 
@@ -72,7 +73,7 @@ theorem ptRep_none_of_walk {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L)
 slot above level 0 carries a zero entry. -/
 theorem walk_none_of_not_complete : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
     t.wfU lvl → ¬ t.complete lvl vpn → t.walk lvl vpn = none
-  | 0, t, vpn, _, hc => absurd (PtRun.complete_zero t vpn) hc
+  | 0, t, vpn, _, hc => absurd (MachCSL.PTree.complete_zero t vpn) hc
   | lvl+1, t, vpn, hwf, hc => by
     have hi := hwf (vpnIdx vpn (lvl+1))
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
@@ -175,11 +176,6 @@ theorem pteAD_pte2pa {w v : BitVec 64} (h : pteAD w v) : pte2pa v = pte2pa w := 
 
 /-! ## The page-number arithmetic of a run -/
 
-theorem toNat_add_ofNat (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
-    (b + BitVec.ofNat 64 m).toNat = b.toNat + m := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : m < 2 ^ 64)]
-  exact Nat.mod_eq_of_lt (by omega)
 
 theorem vpnOf_toNat (va : BitVec 64) : (vpnOf va).toNat = va.toNat / 4096 % 2 ^ 27 := by
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, Nat.reducePow]
@@ -189,7 +185,7 @@ theorem vpnOf_toNat (va : BitVec 64) : (vpnOf va).toNat = va.toNat / 4096 % 2 ^ 
 theorem vpn_step_toNat (va : BitVec 64) (i : Nat) (h : va.toNat + 4096 * i < 2 ^ 38) :
     (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat = (vpnOf va).toNat + i := by
   have h1 : (va + BitVec.ofNat 64 (4096 * i)).toNat = va.toNat + 4096 * i :=
-    toNat_add_ofNat va _ (by omega)
+    Xv6.paAddToNat' va _ (by omega)
   have hdiv : (va.toNat + 4096 * i) / 4096 = va.toNat / 4096 + i := by
     rw [show va.toNat + 4096 * i = va.toNat + i * 4096 from by omega]
     exact Nat.add_mul_div_right _ _ (by omega)

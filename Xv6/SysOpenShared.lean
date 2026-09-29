@@ -26,8 +26,8 @@ Rocq's header, kept (the reason is the content):
   `sys_open_flat_open` / `_ok` / `_close` / `_pure` / `_top` (the DEFINITION
   `so_flat` is `SysOpenParts.sysOpenFlat`: the stage statements name it).
 * §2 the accessors: `so_meta_acc` / `so_flat_meta` / `so_type_acc` /
-  `so_maj_acc` → `sys_open_meta_acc` / `sys_open_flat_meta` /
-  `sys_open_type_acc` / `sys_open_maj_acc`.
+  `so_maj_acc` → `Xv6.createFound_meta_open` / `sys_open_flat_meta` /
+  `Xv6.sysfile_meta_type` / `sys_open_maj_acc`.
 * §3 the exit continuations `so_cont_au` / `so_cont0_au`: ARE
   `SysOpenParts.sysOpenPostP` (`SpecSysOpen.sysOpenK` at `openArmsPlain`;
   SysOpenParts deviation 3) -- nothing here.
@@ -67,6 +67,7 @@ Imports `SysOpenParts` and the shared `SysfileCalls`.
 import Xv6.SysOpenParts
 import Xv6.SysfileCalls
 import Xv6.FsAbsOpenFire
+import Xv6.CreateFound
 
 namespace Xv6
 
@@ -145,20 +146,6 @@ theorem sys_open_flat_top (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkm
 
 /-! ## §2.  THE ACCESSORS -/
 
-/-- Rocq `so_meta_acc`: the record's cells out of the SEALED payload. -/
-theorem sys_open_meta_acc (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) :
-    icLoaded (GF := GF) fscFs fscIreg fscCov fscLogst kk inum dn bm ⊢
-      inodeMeta (ientry kk) dn ∗
-      (inodeMeta (ientry kk) dn -∗ icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm) := by
-  iintro H
-  icases sys_open_flat_open kk inum dn bm $$ H with ⟨%data, H⟩
-  unfold sysOpenFlat
-  icases H with ⟨%h1, %h2, %h3, %h4, %h5, %h6, Ha, Hb, Hc, Hd, He, Hf, Ht⟩
-  iframe Hc
-  iintro Hc
-  iapply icMkLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm data h1 h2 h3 h4 h5 h6
-    $$ Ha Hb Hc Hd He Hf Ht
-
 /-- Rocq `so_flat_meta`: ...and at the PEELED payload, what the AU walk
 holds between the fire and the stores. -/
 theorem sys_open_flat_meta (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -172,13 +159,6 @@ theorem sys_open_flat_meta (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blk
   iframe Ha Hb Hc Hd He Hf Ht
   ipureintro
   exact ⟨h1, h2, h3, h4, h5, h6⟩
-
-/-- Rocq `so_type_acc`: `ip->type` (the shared `SysfileCalls.sysfile_meta_type`). -/
-theorem sys_open_type_acc (ip : BitVec 64) (dn : Dinode) :
-    inodeMeta (GF := GF) ip dn ⊢
-      wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType ∗
-      (wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType -∗ inodeMeta ip dn) :=
-  sysfile_meta_type ip dn
 
 /-- Rocq `so_maj_acc`: `ip->major`. -/
 theorem sys_open_maj_acc (ip : BitVec 64) (dn : Dinode) :
@@ -201,7 +181,7 @@ theorem sys_open_flat_type (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blk
         sysOpenFlat kk inum dn bm data) := by
   iintro H
   icases sys_open_flat_meta kk inum dn bm data $$ H with ⟨Hm, Hback⟩
-  icases sys_open_type_acc (ientry kk) dn $$ Hm with ⟨Ht, Hmback⟩
+  icases Xv6.sysfile_meta_type (ientry kk) dn $$ Hm with ⟨Ht, Hmback⟩
   iframe Ht
   iintro Ht
   iapply Hback

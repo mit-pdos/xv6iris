@@ -19,6 +19,7 @@ offset row's invariant).
 -/
 import Xv6.FilewriteChain
 import Xv6.FilewriteParts
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -71,17 +72,6 @@ structure FwrFacts [CurCtx] (k : KCtx) (A : FwrA) : Prop where
   htier : k.tier = KTier.kpt
   ht : curTier = KTier.kpt
   hn : 0 < A.n ∧ A.n < 2 ^ 31
-
-theorem fwr_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-theorem fwr_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
-
-/-- The continuation is hart-free: a `true` crossing at a process (Rocq's
-`b = true` pin is not needed, SpecFilewrite deviation 1). -/
-theorem fwr_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

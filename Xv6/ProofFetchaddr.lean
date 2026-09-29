@@ -47,12 +47,6 @@ set_option maxRecDepth 8000
 
 /-! ## Arithmetic facts -/
 
-theorem fetchaddr_imm_m32 : BitVec.signExtend 64 4064#12 = -(8#64 * BitVec.ofNat 64 4) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-
-theorem fetchaddr_imm_p32 : BitVec.signExtend 64 32#12 = 8#64 * BitVec.ofNat 64 4 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 theorem fetchaddr_br_myproc : KA.«fetchaddr» + 0xfffffffffffff0f2#64 = KA.«myproc» := by decide
 
 theorem fetchaddr_br_copyin : KA.«fetchaddr» + 0xffffffffffffedf2#64 = KA.«copyin» := by decide
@@ -172,7 +166,7 @@ theorem fetchaddr_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (R : Re
   iintro Hk Hpc Hf4
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 4 $$ [Hf1 Hf2 Hf3 Hf4]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c4 _ (KA.«fetchaddr» + 0x3e#64) true 32#12 4 fetchaddr_imm_p32)
+  k_step_gen (wp_s_pop c4 _ (KA.«fetchaddr» + 0x3e#64) true 32#12 4 MachCSL.imm_p32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
@@ -218,7 +212,7 @@ theorem fetchaddr_tail [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (spie 
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hframe, HQ, HΦ⟩
-  rw [ec_pushed_withSpie]
+  rw [MachCSL.KCtx.withSpie_pushed]
   iapply (fetchaddr_ret c (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; omega) R
     (k.regs 2#5) rfl hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5))
     $$ [- $Hk $Hpc $Hframe]
@@ -252,7 +246,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«fetchaddr» true 4064#12 4 (by omega) fetchaddr_imm_m32)
+  k_step_gen (wp_s_push cpu _ KA.«fetchaddr» true 4064#12 4 (by omega) MachCSL.imm_m32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -472,7 +466,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
           ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans
             ((hp12 h).trans ((hp11 h).trans (hpin10 h))))))))))))
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
-      rw [ec_withSpie_twice]
+      rw [MachCSL.KCtx.withSpie_twice]
       ihave Hout : (∃ (P'' : UPtd) (w : BitVec 64),
           ⌜P.extSz V.sz P'' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv
             (((R2.set 10#5 (if (0#64 : BitVec 64).ult (R2 10#5) = true then 1#64 else 0#64)).set 10#5

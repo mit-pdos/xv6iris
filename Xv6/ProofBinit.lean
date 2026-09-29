@@ -24,6 +24,9 @@ interrupt state, so the exit context is the plain `k.withRegs R'`.
 import Xv6.SpecBinit
 import Xv6.SpecInitlock
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.ByteCursor
+import Xv6.UPtPptLemmas
 
 namespace Xv6
 
@@ -47,14 +50,7 @@ the value `buf[j].next` ends up holding. -/
 theorem bi_node_zero : bufNextVal 0 = (KA.«bcache» + 0x8268#64) := rfl
 theorem bi_node_succ (j : Nat) : bufNextVal (j + 1) = bufAddr j := rfl
 
-/-- The immediates of the six-slot frame. -/
-theorem bi_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem bi_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
-/-- The four `auipc` constants. -/
-theorem bi_u5 : BitVec.signExtend 64 (4#20 ++ 0#12) = 0x4000#64 := by decide
 theorem bi_u15 : BitVec.signExtend 64 (0x15#20 ++ 0#12) = 0x15000#64 := by decide
 theorem bi_u1d : BitVec.signExtend 64 (0x1d#20 ++ 0#12) = 0x1d000#64 := by decide
 theorem bi_u1e : BitVec.signExtend 64 (0x1e#20 ++ 0#12) = 0x1e000#64 := by decide
@@ -65,9 +61,6 @@ theorem bi_ret_b40 : jumpPc (KA.«binit» + 0x24#64) = (KA.«binit» + 0x24#64) 
 theorem bi_ret_b80 : jumpPc (KA.«binit» + 0x64#64) = (KA.«binit» + 0x64#64) := by
   decide
 
-theorem bi_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 theorem bi_bufAddr_toNat (m : Nat) (h : m ≤ 30) :
     (bufAddr m).toNat = KernelSyms.«bcache» + 0x18 + 1112 * m := by
@@ -519,7 +512,7 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F5
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ (KA.«binit» + 0x82#64) true 48#12 6 bi_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«binit» + 0x82#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
@@ -591,7 +584,7 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   simp only [binitAddr]
   k_norm_g
   -- the frame
-  k_step_gen (wp_s_push cpu _ KA.«binit» true 4048#12 6 (by omega) bi_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«binit» true 4048#12 6 (by omega) MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -620,7 +613,7 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
   iintro Hk Hpc
   -- a1 = "bcache" ; a0 = &bcache.lock
   k_step_gen (wp_s_auipc c8 _ (KA.«binit» + 0x10#64) false 4#20 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u5] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c9 hp9
   iintro Hk Hpc
   k_step_gen (wp_s_addi c9 _ (KA.«binit» + 0x14#64) false 1928#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_4798] next c10 hp10
@@ -691,7 +684,7 @@ theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c24 _ (KA.«binit» + 0x48#64) false 4#20 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bi_u5] next c25 hp25
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c25 hp25
   iintro Hk Hpc
   k_step_gen (wp_s_addi c25 _ (KA.«binit» + 0x4c#64) false 1880#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [binit_br_47a0] next c26 hp26

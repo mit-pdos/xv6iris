@@ -53,13 +53,6 @@ theorem sys_unlink_last_of_npar (pl : List (BitVec 8)) (nf : Nat → BitVec 8)
 
 /-! ## The fire sites' pure side conditions -/
 
-/-- Rocq's `su_au_era_not_dir`. -/
-theorem sys_unlink_era_not_dir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (h : dn.diType.toNat ≠ T_DIR_z) : fnIsDir (eraNode dn bm data) = false := by
-  unfold fnIsDir fnType
-  rw [eraNode_rec]
-  exact decide_eq_false h
-
 /-- Rocq's `su_au_nondir_node`: a non-directory row has no entry map, so
 `unlPre`'s dots-only clause is vacuous. -/
 theorem sys_unlink_nondir_node (n : FsNode) (hd : fnIsDir n = false) :

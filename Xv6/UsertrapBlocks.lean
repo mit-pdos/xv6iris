@@ -301,10 +301,6 @@ end Ctx
 
 /-! ## §4b The `killed` call site (the three kill checks share it) -/
 
-theorem ut_pushed_withSpie (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
-theorem ut_withSpie_withSpie (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-
 section Killed
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]

@@ -26,6 +26,7 @@ join point +0x168.
    iupdate's `IBLOCK ip :: Sb`: Rocq's two calls verbatim.
 -/
 import Xv6.SysUnlinkW5Z
+import Xv6.SysLinkCalls
 
 namespace Xv6
 
@@ -54,19 +55,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- The nlink cell out of an `inodeMeta`, the rest waiting for the new count. -/
-theorem sys_unlink_meta_nlink (ip : BitVec 64) (dn : Dinode) :
-    inodeMeta (GF := GF) ip dn ⊢
-      wordPointsTo (iNlink ip) 2 (DFrac.own 1) dn.diNlink ∗
-      (∀ nl : BitVec 16, wordPointsTo (iNlink ip) 2 (DFrac.own 1) nl -∗
-        inodeMeta ip (sysfileSetnl dn nl)) := by
-  unfold inodeMeta
-  iintro ⟨Ht, Hma, Hmi, Hnl, Hsz⟩
-  iframe Hnl
-  iintro %nl Hnl
-  unfold sysfileSetnl
-  iframe
 
 /-- **THE SEAM AT +0xb8** (both arms rejoin here): the parent LOCKED and
 re-parked at its final record `dnX`, the target LOCKED and OPEN at its
@@ -152,13 +140,13 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n2 %Sb2 %w %⟨hcs1, -, -, -, hlo, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop
     Hslot1 Hq1
-  k_norm_g [sys_unlink_ret_be, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_be, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1
   have hn2 : 4 ≤ n2 := sys_unlink_iunlockput_from5 w nw n2 h5 hlo
   -- +0xbe  lhu a5,74(s2) ; +0xc2  c.addiw a5,-1 ; +0xc4  sh a5,74(s2)
-  icases sys_unlink_meta_nlink (ientry ks) dni $$ Hmeta with ⟨Hnl, Hmw⟩
+  icases Xv6.sys_link_meta_nlink (ientry ks) dni $$ Hmeta with ⟨Hnl, Hmw⟩
   k_step_e (wp_s_lhu cpu _ (KA.«sys_unlink» + 0xbe#64) false 74#12 15#5 18#5 (by decide) (by decide)
       (DFrac.own 1) dni.diNlink)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1, iNlink]
@@ -205,7 +193,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [hp1.2.2.2.1]
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
-  k_norm_g [sys_unlink_ret_ce, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_ce, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 15#5 _ (sysUnlinkPins_set k R1 _ _ _ 15#5 _ hp1 (by decide))
@@ -262,7 +250,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case vt => k_norm_g; exact ok.htier
   case va => k_norm_g [hp2.2.2.2.1]
   iintro %cpu %spie3 %spp3 %R3 %n3 %Sb3 %w3 %⟨hcs3, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot2 Hq2
-  k_norm_g [sys_unlink_ret_d4, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_d4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysUnlinkPins_cs k _ R3 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R2 _ _ _ 10#5 _ hp2 (by decide))
       (Or.inl rfl)) hcs3
@@ -283,7 +271,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_d8, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_d8, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp4 := sysUnlinkPins_cs k _ R4 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k R3 _ _ _ 1#5 _ hp3 (Or.inl rfl)) hcs4
   -- +0xd8  c.li a0,0 ; +0xda/+0xdc/+0xde  the three reloads ; +0xe0  c.j +0x168

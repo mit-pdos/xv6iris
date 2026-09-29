@@ -13,6 +13,9 @@ is the plain `k.withRegs R'`.
 import Xv6.SpecIinit
 import Xv6.SpecInitlock
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.ByteCursor
+import Xv6.UPtPptLemmas
 
 namespace Xv6
 
@@ -26,14 +29,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- The immediates of the six-slot frame. -/
-theorem ii_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem ii_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
-/-- The `auipc` constants. -/
-theorem ii_u4 : BitVec.signExtend 64 (4#20 ++ 0#12) = 0x4000#64 := by decide
 theorem ii_u1e : BitVec.signExtend 64 (0x1e#20 ++ 0#12) = 0x1e000#64 := by decide
 theorem ii_u1f : BitVec.signExtend 64 (0x1f#20 ++ 0#12) = 0x1f000#64 := by decide
 
@@ -43,10 +38,6 @@ theorem ii_ret_3094 : jumpPc (KA.«iinit» + 0x22#64) = (KA.«iinit» + 0x22#64)
 /-- `ret` out of `initsleeplock` lands on the cursor step after the `jal`. -/
 theorem ii_ret_30b4 : jumpPc (KA.«iinit» + 0x42#64) = (KA.«iinit» + 0x42#64) := by
   decide
-
-theorem ii_ofNat_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 theorem ii_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
   BitVec.add_zero x
@@ -385,7 +376,7 @@ theorem ii_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F4
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c5 _ (KA.«iinit» + 0x54#64) true 48#12 6 ii_imm_p48)
+  k_step_gen (wp_s_pop c5 _ (KA.«iinit» + 0x54#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c6 hp6
   iintro Hk Hpc
@@ -425,7 +416,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   simp only [iinitAddr]
   k_norm_g
   -- the prologue: addi sp,sp,-48 and the five saves
-  k_step_gen (wp_s_push cpu _ KA.«iinit» true 4048#12 6 (by omega) ii_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«iinit» true 4048#12 6 (by omega) MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -451,7 +442,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   iintro Hk Hpc
   -- a1 = "itable" ; a0 = &itable.lock
   k_step_gen (wp_s_auipc c7 _ (KA.«iinit» + 0xe#64) false 4#20 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u4] next c8 hp8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c8 hp8
   iintro Hk Hpc
   k_step_gen (wp_s_addi c8 _ (KA.«iinit» + 0x12#64) false 708#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_42d2] next c9 hp9
@@ -500,7 +491,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1f4ca] next c17 hp17
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c17 _ (KA.«iinit» + 0x32#64) false 4#20 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u4] next c18 hp18
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_4] next c18 hp18
   iintro Hk Hpc
   k_step_gen (wp_s_addi c18 _ (KA.«iinit» + 0x36#64) false 680#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_42da] next c19 hp19

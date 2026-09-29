@@ -303,7 +303,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   have hbms := hsb.sboBmapstart
   have hfull : fsBlocksFull Pb := hlPb
   have hreg : ∀ b, logRegion S.fssSb.sbLogstart b = true → b ∈ cov := fun b hr => by
-    have := logRegion_bound _ b hr
+    have := Xv6.logRegion_range _ b hr
     unfold LOGBLOCKS at this
     exact hcovmeta b (by omega) (by unfold fsDataStart; omega)
   have hdom : appDom S.fssInodes := fun z => by

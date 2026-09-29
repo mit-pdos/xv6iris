@@ -68,14 +68,6 @@ theorem uke_btype (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (imm 
       (by simp only [Bool.not_true, Bool.and_false])
   · rfl
 
-/-- **ECALL**, precise: the user environment call at the `PC`, nothing
-written. -/
-theorem uke_ecall (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hp : s.file .cur_privilege = Privilege.User) :
-    runRW D orc s (execute (.ECALL ())) =
-      some (.Trap (Privilege.User, { trap := .E_U_EnvCall (), excinfo := none, ext := none }, s.file .PC),
-        s, orc) :=
-  uxc_ecall hD orc s hp
-
 end
 
 end Xv6

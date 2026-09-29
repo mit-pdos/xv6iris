@@ -35,10 +35,6 @@ theorem sg_br_myproc : KA.«sys_getpid» + 0xffffffffffffef6a#64 = KA.«myproc»
 /-- The link register of the call. -/
 theorem sg_ret_0c : jumpPc (KA.«sys_getpid» + 0xc#64) = KA.«sys_getpid» + 0xc#64 := by decide
 
-/-- A balanced push/pop pair commutes with the frame push. -/
-theorem sg_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -115,8 +111,8 @@ theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie %spp %R1 %hsp Hk Hpc %hcs1
   obtain ⟨hcs1, ha0⟩ := hcs1
-  k_norm_g [sg_ret_0c, sg_withSpie_pushed] at ha0
-  k_norm_g [sg_ret_0c, sg_withSpie_pushed]
+  k_norm_g [sg_ret_0c, MachCSL.KCtx.withSpie_pushed] at ha0
+  k_norm_g [sg_ret_0c, MachCSL.KCtx.withSpie_pushed]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs1

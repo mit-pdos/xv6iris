@@ -152,7 +152,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_sw c _ (KA.«fileclose» + 0x20#64) true 4#12 9#5 15#5 (by decide) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, fc_decr n hn1 hlt', fc_decr' n hn1 hlt']
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, Xv6.bc_decr n hn1 hlt', Xv6.bc_decr' n hn1 hlt']
   iintro Hk Hpc Hrefc
   -- the close ghost step
   iapply wpLoop_bupd

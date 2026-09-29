@@ -717,9 +717,6 @@ theorem availLease_ring_acc (pav : PAddr) (np : Nat) (ring : Nat → Nat) (j : N
 
 /-! ### The two stores of `publish` -/
 
-theorem ofNat_toNat16 (h : BitVec 16) : BitVec.ofNat 16 h.toNat = h := by
-  simp
-
 /-- **`disk.avail->ring[disk.avail->idx % NUM] = idx[0]`**
 (`virtio_disk_rw`, the `sh` that stages the head).  The cell is shared, so
 the store opens the invariant; `diskPub γ np` pins the published count
@@ -773,7 +770,7 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
   · iframe HstgA Hstg
   ihave Hcell := (show dmaHalfAt (GF := GF) (availRingAt pav (np0 % NUM)) 2 h ⊢
       dmaHalfAt (availRingAt pav (np0 % NUM)) 2 (BitVec.ofNat 16 h.toNat) from by
-    rw [ofNat_toNat16]) $$ Hcell
+    rw [Xv6.ofNat16_toNat]) $$ Hcell
   ihave Hav := Hring $$ %h.toNat Hcell
   ihave Hproto := Hback $$ %np0 %(updN ring (np0 % NUM) h.toNat) %pmap %(some h.toNat)
     %(⟨hq.1, queueOk_setcell st ring lo np0 h.toNat hq.2.1 hroom,
@@ -1111,7 +1108,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
       ctxByte (GF := GF) ξ (pa + BitVec.ofNat 64 j) (DFrac.own 1) (nthByte w j))) $$ Hraw
   imodintro
   iintro %k %j %hk Hb
-  have hj : j < n := range_getElem?_lt hk
+  have hj : j < n := MachCSL.rangeIdx_lt hk
   obtain ⟨e, He, heq⟩ : ∃ (e : HEnt) (He : Hist), Hs j = e :: He := by
     have h0 := hp.2 j hj
     cases hx : Hs j with
@@ -1829,23 +1826,6 @@ theorem headTok_update (γ : DiskNames) (i : Nat) (s s' t : HState) :
   iintro ⟨H1, H2⟩
   iapply ghost_var_update_halves t (γ.head i) _ _ $$ H1 H2
 
-/-- Replacing the entry of index `n` in a big-op over `List.range NUM`. -/
-theorem diskArm_acc (n : Nat) (hn : n < NUM) (Φ Ψ : Nat → IProp GF)
-    (heq : ∀ j, j ≠ n → Ψ j = Φ j) :
-    iprop([∗list] j ∈ List.range NUM, Φ j) ⊢ Φ n ∗ (Ψ n -∗ [∗list] j ∈ List.range NUM, Ψ j) := by
-  iintro H
-  icases (bigSepL_upd_acc (GF := GF) (List.range NUM) n n (by rw [List.getElem?_range hn]) Φ
-      (fun (_ : Unit) j => Ψ j)
-      (fun _ k j hjk hne => by
-        have hjn : j ≠ n := by
-          by_cases hk : k < NUM
-          · rw [List.getElem?_range hk] at hjk; cases hjk; exact hne
-          · rw [List.getElem?_eq_none (by simp; omega)] at hjk; cases hjk
-        exact heq j hjn)) $$ H with ⟨Hn, Hback⟩
-  iframe Hn
-  iintro Hn'
-  iapply Hback $$ %() Hn'
-
 /-- **The protocol arms a free head, and takes its two members.**  All
 THREE descriptors of the chain leave the free world: the head becomes
 `.active c` and carries the whole chain, the middle and the tail become
@@ -1897,10 +1877,10 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
     ihave %hgm := diskBlock_agree' γ m c.blk bs0 $$ Hm Hblk
     ihave %hnf := headRes_blk_notFlight γ c0.desc st c.blk bs0 $$ Hr Hblk
     -- the head: `.inactive` to `.active c`
-    icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
+    icases Xv6.diskRange_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
         (fun j => headAuth γ j (armSt st c.hd c j))
         (fun j hj => by rw [armSt_ne st c.hd c j hj]) $$ Ha with ⟨Hai, Haback⟩
-    icases diskArm_acc c.hd hwf.1 (fun j => headRes γ c0.desc j (st j))
+    icases Xv6.diskRange_acc c.hd hwf.1 (fun j => headRes γ c0.desc j (st j))
         (fun j => headRes γ c0.desc j (armSt st c.hd c j))
         (fun j hj => by rw [armSt_ne st c.hd c j hj]) $$ Hr with ⟨Hri, Hrback⟩
     imod headTok_update γ c.hd (st c.hd) .inactive (.active c) $$ [Hai Htok] with ⟨Hai, Htok⟩
@@ -1920,11 +1900,11 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       · iframe Hlease HblkT
     ihave Hr := Hrback $$ Hres
     -- the middle: `.inactive` to `.member c.hd`; the invariant holds nothing either way
-    icases diskArm_acc c.md hwf.2.1 (fun j => headAuth γ j (armSt st c.hd c j))
+    icases Xv6.diskRange_acc c.md hwf.2.1 (fun j => headAuth γ j (armSt st c.hd c j))
         (fun j => headAuth γ j (memSt (armSt st c.hd c) c.md c.hd j))
         (fun j hj => by rw [memSt_ne (armSt st c.hd c) c.md c.hd j hj]) $$ Ha
       with ⟨Ham, Hamback⟩
-    icases diskArm_acc c.md hwf.2.1 (fun j => headRes γ c0.desc j (armSt st c.hd c j))
+    icases Xv6.diskRange_acc c.md hwf.2.1 (fun j => headRes γ c0.desc j (armSt st c.hd c j))
         (fun j => headRes γ c0.desc j (memSt (armSt st c.hd c) c.md c.hd j))
         (fun j hj => by rw [memSt_ne (armSt st c.hd c) c.md c.hd j hj]) $$ Hr
       with ⟨Hrm, Hrmback⟩
@@ -1942,12 +1922,12 @@ theorem diskProto_armHead (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (p
       iempintro
     ihave Hr := Hrmback $$ Hrm2
     -- the tail, the same way
-    icases diskArm_acc c.tl hwf.2.2.1
+    icases Xv6.diskRange_acc c.tl hwf.2.2.1
         (fun j => headAuth γ j (memSt (armSt st c.hd c) c.md c.hd j))
         (fun j => headAuth γ j (armSt3 st c j))
         (fun j hj => by rw [show armSt3 st c j = memSt (armSt st c.hd c) c.md c.hd j from
           memSt_ne _ c.tl c.hd j hj]) $$ Ha with ⟨Hat, Hatback⟩
-    icases diskArm_acc c.tl hwf.2.2.1
+    icases Xv6.diskRange_acc c.tl hwf.2.2.1
         (fun j => headRes γ c0.desc j (memSt (armSt st c.hd c) c.md c.hd j))
         (fun j => headRes γ c0.desc j (armSt3 st c j))
         (fun j hj => by rw [show armSt3 st c j = memSt (armSt st c.hd c) c.md c.hd j from
@@ -2837,7 +2817,7 @@ theorem diskProto_collect (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (c
       · exact (e17 c.hd c hwf.1 hsth hdw (Or.inr ⟨ts, hts⟩)).symm
       · exact imgOk_read_blk v m st c.hd c c.pay e7 hwf.1 hsth hdw hinj hgm
     -- the three receipts
-    icases diskArm_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
+    icases Xv6.diskRange_acc c.hd hwf.1 (fun j => headAuth γ j (st j))
         (fun j => headAuth γ j (freeSt st c.hd j))
         (fun j hj => by rw [freeSt_ne st c.hd j hj]) $$ Ha with ⟨Hai, Haback⟩
     imod headTok_update γ c.hd (st c.hd) (.active c) .inactive $$ [Hai Hthd] with ⟨Hai, Hthd⟩
@@ -2846,7 +2826,7 @@ theorem diskProto_collect (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (c
     · rw [freeSt_self]
       iexact Hai
     ihave Ha := Haback $$ Hai2
-    icases diskArm_acc c.md hwf.2.1 (fun j => headAuth γ j (freeSt st c.hd j))
+    icases Xv6.diskRange_acc c.md hwf.2.1 (fun j => headAuth γ j (freeSt st c.hd j))
         (fun j => headAuth γ j (freeSt (freeSt st c.hd) c.md j))
         (fun j hj => by rw [freeSt_ne (freeSt st c.hd) c.md j hj]) $$ Ha with ⟨Ham, Hamback⟩
     imod headTok_update γ c.md (freeSt st c.hd c.md) (.member c.hd) .inactive
@@ -2857,7 +2837,7 @@ theorem diskProto_collect (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (c
     · rw [freeSt_self]
       iexact Ham
     ihave Ha := Hamback $$ Ham2
-    icases diskArm_acc c.tl hwf.2.2.1 (fun j => headAuth γ j (freeSt (freeSt st c.hd) c.md j))
+    icases Xv6.diskRange_acc c.tl hwf.2.2.1 (fun j => headAuth γ j (freeSt (freeSt st c.hd) c.md j))
         (fun j => headAuth γ j (freeSt3 st c j))
         (fun j hj => by
           unfold freeSt3

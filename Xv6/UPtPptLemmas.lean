@@ -12,6 +12,8 @@ same facts under their own names.
 -/
 import Xv6.UPtLemmas
 import MachCSL.WpSmodeCtl
+import Xv6.KvmLemmas
+import Xv6.UPtAllocLemmas
 
 namespace Xv6.UPtPpt
 
@@ -23,14 +25,6 @@ open Xv6.PtRun Xv6.UPt
 set_option linter.unusedSectionVars false
 
 /-! ## Branches -/
-
-theorem beq_pos {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem beq_neg {α : Type _} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- `bltz` on a result known to be `0`: not taken. -/
 theorem bltz_zero {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
@@ -60,19 +54,6 @@ theorem trampPpn_eq : BitVec.extractLsb' 12 44 (KA.«_trampoline») = trampPpn :
 theorem perm_rx : (PTE_R ||| PTE_X) = 10#64 := by decide
 theorem perm_rw : (PTE_R ||| PTE_W) = 6#64 := by decide
 
-/-- A valid page is the page of its own page number. -/
-theorem pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
-    pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  obtain ⟨h1, -, h3⟩ := h
-  unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h1 h3
-  bv_decide
-
-/-- A valid page is not `0`. -/
-theorem page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
-
 /-! ## The allocator count -/
 
 theorem availSub_zero (on : Option Nat) : availSub on 0 = on := by
@@ -92,15 +73,15 @@ theorem availDec_eq (on : Option Nat) : availDec on = availSub on 1 := by
 /-- A freshly zeroed root page is the table with no leaves at all. -/
 theorem ptRep_zeroNode (b : BitVec 44) (h : pageValid (pageAddr b)) :
     ptRep (PTree.zeroNode b) ∅ := by
-  refine ⟨zeroNode_wfU b 2, ?_, ?_, ?_, ?_⟩
-  · unfold PTree.pagesNodup; rw [zeroNode_pages]; simp
+  refine ⟨MachCSL.PTree.zeroNode_wfU b 2, ?_, ?_, ?_, ?_⟩
+  · unfold PTree.pagesNodup; rw [MachCSL.PTree.zeroNode_pages]; simp
   · intro b' hb'
-    rw [zeroNode_pages] at hb'
+    rw [MachCSL.PTree.zeroNode_pages] at hb'
     cases hb' with
     | head => exact h
     | tail _ hx => cases hx
   · intro vpn w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
-  · intro vpn _; exact zeroNode_walk b 2 vpn
+  · intro vpn _; exact MachCSL.PTree.zeroNode_walk b 2 vpn
 
 /-- Filling a path keeps the representation. -/
 theorem ptRep_fill (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27)
@@ -108,7 +89,7 @@ theorem ptRep_fill (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27)
     (hfr : ∀ b ∈ fr, pageValid (pageAddr b) ∧ b ∉ t.pages 2) :
     ptRep (t.fill 2 vpn fr).1 L := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := hrep
-  refine ⟨wfU_fill 2 t vpn fr h1, pagesNodup_fill 2 t vpn fr h2 hnd
+  refine ⟨MachCSL.PTree.wfU_fill 2 t vpn fr h1, MachCSL.PTree.pagesNodup_fill 2 t vpn fr h2 hnd
     (fun b hb => (hfr b hb).2), ?_, ?_, ?_⟩
   · intro b hb
     rcases (mem_pages_fill 2 t vpn fr b).mp hb with h | h
@@ -116,9 +97,9 @@ theorem ptRep_fill (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27)
     · exact (hfr b (List.mem_of_mem_take h)).1
   · intro v w hw
     obtain ⟨addr, pv, hwalk, had⟩ := h4 v w hw
-    exact ⟨addr, pv, by rw [walk_fill 2 t vpn fr h1]; exact hwalk, had⟩
+    exact ⟨addr, pv, by rw [MachCSL.PTree.walk_fill 2 t vpn fr h1]; exact hwalk, had⟩
   · intro v hw
-    rw [walk_fill 2 t vpn fr h1]
+    rw [MachCSL.PTree.walk_fill 2 t vpn fr h1]
     exact h5 v hw
 
 /-- The leaf `mappages` writes, at the end of a complete path: the leaf map
@@ -200,7 +181,7 @@ theorem mapRun_one_fail (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : 
 theorem complete_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64)
     (h : t.complete lvl vpn) : (t.setLeaf lvl vpn v).complete lvl vpn := by
   induction lvl generalizing t with
-  | zero => exact complete_zero _ _
+  | zero => exact MachCSL.PTree.complete_zero _ _
   | succ lvl ih =>
     obtain ⟨c, hk, hc⟩ := (complete_succ_iff lvl t vpn).mp h
     refine (complete_succ_iff lvl _ vpn).mpr ⟨c.setLeaf lvl vpn v, ?_, ih c hc⟩
@@ -298,7 +279,5 @@ theorem avail_after_pp (on : Option Nat) :
   | some n => simp only [availSub, availDec, Option.map]; exact congrArg some (by omega)
 
 theorem tf_add_zero : vpnOf 0x3fffffe000#64 + BitVec.ofNat 27 0 = tfVpn := by decide
-
-theorem tf_ne_tramp' : tfVpn.toNat ≠ trampVpn.toNat := by decide
 
 end Xv6.UPtPpt

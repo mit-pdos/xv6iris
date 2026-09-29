@@ -41,7 +41,7 @@ reads the guard true and there `Xv6.logBeginStep` mints the op at
 THE GUARD'S ARITHMETIC is computed by the image in W-form
 (`addiw/slliw/addw/slliw/addw`).  `out ≤ 3` is a `logResAt` conjunct and
 `n ≤ LOGBLOCKS` a `logStateAt` one, so every intermediate is a tiny
-natural and the bridges in `Xv6/LogLedger.lean` (`bo_addiw1`, `bo_slliw`,
+natural and the bridges in `Xv6/LogLedger.lean` (`Xv6.addiw_succ`, `bo_slliw`,
 `bo_addw`, `bo_bge30`) carry it with no wrap.
 
 EITHER ENTRY SIE (Rocq `cpu_own 0 eb`).  The caller brings the complement
@@ -60,6 +60,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame12b
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
+import Xv6.PrintkDefs
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -104,9 +106,6 @@ theorem bo_ret_80 : jumpPc (KA.«begin_op» + 0x80#64) = KA.«begin_op» + 0x80#
 
 theorem bo_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
 
-/-- `bnez a5` on the `committing` cell, at each of its two readings. -/
-theorem bo_bnez0 : bcond bop.BNE 0#64 0#64 = false := by decide
-theorem bo_bnez1 : bcond bop.BNE 1#64 0#64 = true := by decide
 
 /-! ## The context and the register pins -/
 
@@ -170,21 +169,13 @@ theorem boK_fold (k : KCtx) (a b : Bool) (hK : 4 ≤ k.avail) :
 `out ≤ 3` and `n ≤ LOGBLOCKS` keep every intermediate tiny; the bridges
 are in `Xv6/LogLedger.lean`. -/
 
-theorem bo_succ64 (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m + 1) := by
-  show _ + BitVec.ofNat 64 1 = _
-  rw [← ofNat64_add]
-
-theorem bo_succ32 (m : Nat) : BitVec.ofNat 32 m + 1#32 = BitVec.ofNat 32 (m + 1) := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
 
 /-- `addiw a4,a4,1` at `+0x40`. -/
 theorem bo_step1 (out : Nat) (h : out ≤ 3) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.signExtend 64 (BitVec.ofNat 32 out) + 1#64)) = BitVec.ofNat 64 (out + 1) := by
-  rw [bo_sext32 out (by omega)]
-  exact bo_addiw1 out (by omega)
+  rw [MachCSL.signExtend_ofNat32 out (by omega)]
+  exact Xv6.addiw_succ out (by omega)
 
 /-- ...before `k_norm` folds the immediate. -/
 theorem bo_step1' (out : Nat) (h : out ≤ 3) :
@@ -198,7 +189,7 @@ theorem bo_step1' (out : Nat) (h : out ≤ 3) :
 theorem bo_step2 (out : Nat) (h : out ≤ 3) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 out + 1#64) <<< 2) =
       BitVec.ofNat 64 (4 * (out + 1)) := by
-  rw [bo_succ64 out, bo_slliw (out + 1) 2 (by omega) (by omega)]
+  rw [Xv6.ofNat_succ' out, bo_slliw (out + 1) 2 (by omega) (by omega)]
   congr 1
   omega
 
@@ -206,7 +197,7 @@ theorem bo_step2 (out : Nat) (h : out ≤ 3) :
 theorem bo_step3 (out : Nat) (h : out ≤ 3) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (4 * (out + 1))) +
       BitVec.extractLsb' 0 32 (BitVec.ofNat 64 out + 1#64)) = BitVec.ofNat 64 (5 * (out + 1)) := by
-  rw [bo_succ64 out, bo_addw (4 * (out + 1)) (out + 1) (by omega)]
+  rw [Xv6.ofNat_succ' out, bo_addw (4 * (out + 1)) (out + 1) (by omega)]
   congr 1
   omega
 
@@ -224,7 +215,7 @@ theorem bo_step5 (out n : Nat) (ho : out ≤ 3) (hn : n ≤ LOGBLOCKS) :
       BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.ofNat 32 n))) =
       BitVec.ofNat 64 (10 * (out + 1) + n) := by
   unfold LOGBLOCKS at hn
-  rw [bo_sext32 n (by omega), bo_addw (10 * (out + 1)) n (by omega)]
+  rw [MachCSL.signExtend_ofNat32 n (by omega), bo_addw (10 * (out + 1)) n (by omega)]
 
 /-- `bge s2,a5` at `+0x50` (both operands in the split form `k_norm`
 leaves). -/
@@ -238,8 +229,8 @@ theorem bo_step6 (out n : Nat) (ho : out ≤ 3) (hn : n ≤ LOGBLOCKS) :
 /-- `sw a4,1614(a5)` at `+0x70`. -/
 theorem bo_store (out : Nat) (h : out ≤ 3) :
     BitVec.extractLsb' 0 32 (BitVec.ofNat 64 out + 1#64) = BitVec.ofNat 32 (out + 1) := by
-  rw [bo_succ64 out]
-  exact bo_w32 _ (by omega)
+  rw [Xv6.ofNat_succ' out]
+  exact Xv6.fw_w32 _ (by omega)
 
 /-- The register pins the loop maintains: the frame pointers, `s1 = &log`,
 `s2 = LOGBLOCKS`, and the callee-saved registers the function never
@@ -262,8 +253,6 @@ theorem boRegs_cs (k : KCtx) (R R' : RegMap) (h : boRegs k R) (hcs : calleeSaved
 theorem boRegs_ws (k : KCtx) (R : RegMap) (a b : Bool) :
     boRegs (k.withSpie a b) R = boRegs k R := rfl
 
-theorem bo_withSpie2 (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
 
 /-- The scratch registers the loop writes (`a3`, `a4`, `a5`, and the `a0`
 and `ra` of a call) are none of the pinned ones. -/
@@ -1196,7 +1185,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro Hk Hpc Hcmt
     k_step (wp_s_branch c _ (KA.«begin_op» + 0x3c#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [boK_sie (k.withSpie a b), bo_bnez0]
+      with [boK_sie (k.withSpie a b), MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- +0x3e lw a4,28(s1) ; +0x40 addiw a4,a4,1
     k_step (wp_s_lw c _ (KA.«begin_op» + 0x3e#64) true 28#12 14#5 9#5 (by decide) (by decide)
@@ -1257,7 +1246,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
         with [boK_sie (k.withSpie a b), bo_lout, bo_step1 out hout3, bo_step1' out hout3,
           bo_store out hout3]
       iintro Hk Hpc Hout
-      isimp only [bo_succ32] at Hout
+      isimp only [Xv6.bc_ofNat32_succ] at Hout
       -- THE LEDGER STEP
       iapply wpLoop_fupd
       imod (logBeginStep γ om E nxo hE hfresho) $$ Hops Hep with ⟨Hops, Hep, Hopse⟩
@@ -1358,7 +1347,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       iframe #
       iframe Htc Hcc Hir Hlocked Hpay Hfr Hpid Hnext
       iintro %cq %aq %bq %Rq HLq
-      isimp only [bo_withSpie2] at HLq
+      isimp only [MachCSL.KCtx.withSpie_twice] at HLq
       iapply IH $$ %cq %aq %bq %Rq HLq
       case hRy =>
         repeat refine boRegs_set _ _ ?_ _ _ (by decide)
@@ -1372,7 +1361,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iintro Hk Hpc Hcmt
     k_step (wp_s_branch c _ (KA.«begin_op» + 0x3c#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [boK_sie (k.withSpie a b), bo_bnez1]
+      with [boK_sie (k.withSpie a b), Xv6.vdrw2_bnez_1]
     iintro Hk Hpc
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
@@ -1390,7 +1379,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hfr Hpid Hnext
     iintro %cq %aq %bq %Rq HLq
-    isimp only [bo_withSpie2] at HLq
+    isimp only [MachCSL.KCtx.withSpie_twice] at HLq
     iapply IH $$ %cq %aq %bq %Rq HLq
     case hRz =>
       repeat refine boRegs_set _ _ ?_ _ _ (by decide)

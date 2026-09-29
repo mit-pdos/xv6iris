@@ -94,6 +94,7 @@ import Xv6.BufDefs
 import Xv6.SleepLockDefs
 import MachCSL.CtxBox
 import Xv6.StepLemmas
+import MachCSL.WpLock
 
 namespace Xv6
 
@@ -1392,9 +1393,6 @@ theorem bc_decr' (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
     BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
       (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 0xFFFFFFFFFFFFFFFF#64))) = BitVec.ofNat 32 (n - 1) := by
   rw [← bc_decr n h1 h]; rfl
-
-/-- `holdingsleep` returned 1, so the `beqz a0` is not taken. -/
-theorem bc_beqz_one : bcond bop.BEQ 1#64 0#64 = false := by decide
 
 /-- `b->refcnt--` at the sign-extended tier. -/
 theorem bc_sext_decr (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :

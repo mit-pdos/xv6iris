@@ -130,7 +130,7 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     exact kernelData_byte j a b hj (by unfold inRam ramBase ramEnd; simp only [BitVec.toNat_ofNat]; omega)
       (by
         have : (vpnOf (BitVec.ofNat 64 a)).toNat = 0x80007 := by
-          rw [vpnOf_toNat']; simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega
+          rw [Xv6.UPtUnmap.vpnOf_toNat]; simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega
         rw [this]; decide)
   have hfour : ∀ (a : Nat) (b0 b1 b2 b3 : BitVec 8), a % 4 = 0 → (KernelSyms.«etext» + 0x780) ≤ a → a + 3 < KernelSyms.«syscalls» →
       wordPointsTo (GF := GF) (BitVec.ofNat 64 a) 1 DFrac.discard b0 ∗

@@ -46,6 +46,7 @@ and INSTANT 2 FIRES, `lfEnt_fire`).  The two failures go to `bad:` through
 -/
 import Xv6.SysLinkTails
 import MachCSL.WpSmodeLh
+import Xv6.CreateSharedRegs
 
 namespace Xv6
 
@@ -68,18 +69,6 @@ theorem sys_link_wi_type (dn : Dinode) (bm' : Blkmap) (off tot : Nat) :
     (wiDinode dn bm' off tot).diType = dn.diType := rfl
 theorem sys_link_wi_nlink (dn : Dinode) (bm' : Blkmap) (off tot : Nat) :
     (wiDinode dn bm' off tot).diNlink = dn.diNlink := rfl
-theorem sys_link_wi_size (dn : Dinode) (bm' : Blkmap) (off tot : Nat) (h : off + tot < 2 ^ 32) :
-    (wiDinode dn bm' off tot).diSize.toNat = max dn.diSize.toNat (off + tot) := by
-  unfold wiDinode
-  simp only
-  split
-  · rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt h]; omega
-  · omega
-
-theorem sys_link_idev (v : BitVec 64) : iDev v = v := by unfold iDev; simp
-
-theorem sys_link_era_type (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    fnType (eraNode dn bm data) = dn.diType.toNat := rfl
 
 /-- `lw a2,4(s1)` SIGN-extends the 32-bit `ip->inum`; dirlink wants the
 halfword ZERO-extended: they agree below `2^16` (Rocq `sl_a2_low16`). -/
@@ -142,7 +131,7 @@ theorem sys_link_dl_repack [Fscfg] [Icfg] (dinum : BitVec 32) (dn dn' : Dinode) 
   have hszmax : dn'.diSize.toNat =
       max dn.diSize.toNat (16 * dirSlot data (dirNrec dn.diSize.toNat) + tot) := by
     rw [hdn']
-    apply sys_link_wi_size
+    apply Xv6.create_wi_size_max
     rcases hatom with h | h <;> omega
   have htot : tot ≤ 16 := by rcases hatom with h | h <;> omega
   refine ⟨⟨hwf', hcov', hda', by rw [htyeq]; exact htynz, hcap hszb, hholes', hsized hsz⟩,
@@ -240,7 +229,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n4 %Sb4 %w %⟨hcs1, -, -, hcrw, hn4, -⟩ Hk Hpc Hte Hce Hpid Hbs Hops Htx
     Hslot
-  k_norm_g [sys_link_ret_aa, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_aa, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -278,7 +267,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case pt => k_norm_g; exact htier
   case pa => k_norm_g
   iintro %cpu %spie2 %spp2 %R2 %n5 %⟨hcs2, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot2
-  k_norm_g [sys_link_ret_b0, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_b0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R1 _ _ 10#5 _ hp1 (by decide)) (Or.inl rfl))
     hcs2
@@ -296,7 +285,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_link_ret_b4, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_b4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysLinkPins_cs k _ R3 (ientry kk) (ientry kd)
     (sysLinkPins_set k R2 _ _ 1#5 _ hp2 (Or.inl rfl)) hcs3
   -- +0xb4  li a5,0
@@ -449,7 +438,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold sysLinkIlockK
   iintro %cpu %spie1 %spp1 %R1 %dnd %bmd %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hsld Hdepd Hoffd Hdevd Hinumd
     Hvald Hloadd #Hshotd1 Hfrzd Hrud
-  k_norm_g [sys_link_ret_84, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_84, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- the parent IS a directory: the shot nameiparent's walk minted, at this generation
@@ -469,7 +458,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   ihave Hmetad := Hmwd $$ Hnld
   have hp2 := sysLinkPins_set k R1 _ _ 15#5 (BitVec.signExtend 64 dnd.diNlink) hp1 (by decide)
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
-  have hbz := sys_link_beqz_nlink dnd.diNlink
+  have hbz := Xv6.namex_beqz_half dnd.diNlink
   -- +0x88  c.beqz a5 -> ARM E2 (THE ORPHAN GUARD)
   by_cases hz : dnd.diNlink = 0#16
   · have hd : decide (dnd.diNlink = 0#16) = true := by simp [hz]
@@ -498,7 +487,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x88#64) true 94#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
   iintro Hk Hpc
-  have hnl0 : dnd.diNlink.toNat ≠ 0 := sys_link_nlink_nz _ hz
+  have hnl0 : dnd.diNlink.toNat ≠ 0 := Xv6.namex_nlink_nz _ hz
   obtain ⟨hwfd, hcovd, hdad, htynzd, hszbd, hholesd, hsizedd⟩ := hokd
   have h16 : inum.toNat < 2 ^ 16 := by have := hg.fgoUshort; omega
   have hinib16 : (BitVec.setWidth 16 inum).toNat < 16 * icfgNib := by
@@ -510,7 +499,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   -- +0x8c  lw a4,0(s2) : dp->dev, the checkout's half
   k_step_e (wp_s_lw cpu _ (KA.«sys_link» + 0x8c#64) false 0#12 14#5 18#5 (by decide) (by decide)
       (DFrac.own (1 : Qp).half) icfgDev)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1, sys_link_idev]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.2.1, Xv6.iDev_eq]
   iintro Hk Hpc Hdevd
   -- +0x90  c.lw a5,0(s1) : ip->dev, READ OFF THE REFERENCE (no lock held)
   unfold sysLinkIpHeld
@@ -519,7 +508,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     with ⟨Hipdev, Hipinum, Hkeepw⟩
   k_step_e (wp_s_lw cpu _ (KA.«sys_link» + 0x90#64) true 0#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own q.half) icfgDev)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1, sys_link_idev]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1, Xv6.iDev_eq]
   iintro Hk Hpc Hipdev
   -- +0x92  bne a4,a5 -- REFUTED: ONE DEVICE
   have hne := sys_link_neq_refl (BitVec.signExtend 64 icfgDev)
@@ -551,7 +540,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   ihave Hslot := (show irefSlots (GF := GF) 1 ⊢ irefSlot from .rfl) $$ Hir
   ihave Hdevd := (show wordPointsTo (GF := GF) (ientry kd) 4 (DFrac.own (1 : Qp).half) icfgDev ⊢
       wordPointsTo (iDev (ientry kd)) 4 (DFrac.own (1 : Qp).half) icfgDev from by
-    rw [sys_link_idev]) $$ Hdevd
+    rw [Xv6.iDev_eq]) $$ Hdevd
   ihave Hinumd := (show wordPointsTo (GF := GF) (ientry kd + 4#64) 4 (DFrac.own (1 : Qp).half) dinum ⊢
       wordPointsTo (iInum (ientry kd)) 4 (DFrac.own (1 : Qp).half) dinum from .rfl) $$ Hinumd
   iapply (sys_link_dirlink DLK Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j
@@ -575,7 +564,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold sysLinkDlK
   iintro %cpu %spie2 %spp2 %R2 %found %bm' %data' %dn' %dn0' %n3 %Sb3 %tot %⟨hcs2, hout⟩ Hk Hpc Hte
     Hce Hdevd Hinumd Hmetad Hmapd Hbd Hname Hdid Hpid Hbs Hslot Hdld Hop Htxp
-  k_norm_g [sys_link_ret_a0, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_link_ret_a0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysLinkPins_cs k _ R2 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 11#5 _ (sysLinkPins_set k _ _ _ 12#5 _
       (sysLinkPins_set k _ _ _ 15#5 _ (sysLinkPins_set k _ _ _ 14#5 _ (sysLinkPins_set k _ _ _ 10#5 _
@@ -596,7 +585,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   · unfold sysLinkIpHeld; iframe; iframe #
   ihave Hir := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   have hdir : fnIsDir (eraNode dnd bmd datd) = true := by
-    unfold fnIsDir; rw [sys_link_era_type]; exact decide_eq_true hdtyz
+    unfold fnIsDir; rw [Xv6.cafEra_type]; exact decide_eq_true hdtyz
   rcases found with _ | _
   · -- ===== THE APPEND ARM =====
     simp only [Bool.false_eq_true, ite_false, if_false] at harms
@@ -612,9 +601,9 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       (fun hb => by simp only [decide_eq_true hb]; exact sys_link_wi16_credited _ _ _ _) hsp16 hn2a hn2b
     have hszb' : dn'.diSize.toNat ≤ MAXFILE * BSIZE := hok'.2.2.2.2.1
     have hdirEq : fnIsDir (eraNode dn' bm' data') = fnIsDir (eraNode dnd bmd datd) := by
-      unfold fnIsDir; rw [sys_link_era_type, sys_link_era_type, htyeq]
+      unfold fnIsDir; rw [Xv6.cafEra_type, Xv6.cafEra_type, htyeq]
     have hnlEq : fnNlink (eraNode dn' bm' data') = fnNlink (eraNode dnd bmd datd) := by
-      rw [sys_link_era_nlink, sys_link_era_nlink, hnleq]
+      rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]
     have hloc' := inodeLocal_ofOkRec dinum.toNat fscCov fscLogst dn' bm' data' hok' hrl' hduq' hddix'
     icases dlinks_open fscFs dinum.toNat dnd bmd datd $$ Hdld with ⟨%D, %⟨hDok, hDx⟩, Hetk⟩
     icases (show inodeMap (GF := GF) fscFs (ientry kd) bm' ⊢
@@ -662,7 +651,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
         tot rfl rfl ht16 (bname_length_le 14 nf) (cutNul_nonul _) hlow16nz hdtyz htyeq hnleq hnl0
         hszmax hrng hnone hholesd hholes' hszbd hszb'
       rw [sys_link_low16 inum h16] at hprow
-      have hnlp : fnNlink (eraNode dnd bmd datd) ≠ 0 := by rw [sys_link_era_nlink]; exact hnl0
+      have hnlp : fnNlink (eraNode dnd bmd datd) ≠ 0 := by rw [Xv6.cafEra_nlink]; exact hnl0
       iapply wpLoop_fupd
       imod (lfEnt_fire (hlc := hlc) fscFs ⊤ A.Fent dinum.toNat inum.toNat (bname 14 nf)
           (eraNode dnd bmd datd) (eraNode dn' bm' data') ufNd_top hloc' hdir hnlp hentnone hprow)
@@ -702,8 +691,8 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
         (nodeExact_cong _ _ D hdirEq hnlEq hDx) $$ Hetk
       -- ...and the era value with them, VIEW-PRESERVINGLY
       have habsd : absOf (eraNode dnd bmd datd) = absOf (eraNode dn' bm' data') :=
-        absOf_dir_same _ _ hdir (by rw [sys_link_era_type, sys_link_era_type, htyeq])
-          (by rw [sys_link_era_nlink, sys_link_era_nlink, hnleq]) heqent.symm
+        absOf_dir_same _ _ hdir (by rw [Xv6.cafEra_type, Xv6.cafEra_type, htyeq])
+          (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]) heqent.symm
       iapply wpLoop_fupd
       imod (iregTopRetag_same (hlc := hlc) ⊤ fscFs dinum.toNat (eraNode dnd bmd datd)
           (eraNode dn' bm' data') ufNd_top habsd hloc') $$ Hftop Happ Htd with Htd

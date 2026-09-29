@@ -110,7 +110,7 @@ Every item below: uses checked by `grep -rnw <name> /shared/xv6rocq/iris/*.v`
 
 `inodeDatQ`, `inodeDat`, `inodeDatQ_split`, `indOwnedQ`, `indOwned`,
 `InodeLocal`, `inodeLocal_beyondSize`, `fnData`, `fnNaddr`, `fnIsDir`,
-`fnNrec`, `fnNlink`, `fnOrphan`, `range_lookup` (Xv6/FsStateInode.lean);
+`fnNrec`, `fnNlink`, `fnOrphan`, `Xv6.rangeGetElem?` (Xv6/FsStateInode.lean);
 `inodeBlocksQ`, `inodeBlocks`, `indResQ`, `indRes`, `blkResQ`
 (Xv6/InodeInv.lean); `topFrag(Q)`, `topFragQ_split`, `topFragQ_agree`
 (Xv6/FsStateTop.lean); `dinodeAt` (Xv6/InodeRegion.lean); `fsGammaL`,
@@ -527,7 +527,7 @@ theorem inodeBlocksQ_dataExt (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
   unfold inodeBlocksQ
   refine BiEntails.of_eq (BigSepL.bigSepL_eq ?_)
   intro j k hj
-  obtain ⟨hkj, hjlt⟩ := range_lookup hj
+  obtain ⟨hkj, hjlt⟩ := Xv6.rangeGetElem? hj
   subst hkj
   rw [hext k hjlt]
 

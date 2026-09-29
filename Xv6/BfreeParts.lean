@@ -18,9 +18,9 @@ a one-screen ghost move; the instruction walks are in
   ProofBfree.v uses a `bf_` lemma (`grep -ln 'bf_[a-z]'
   /shared/xv6rocq/iris/*.v`; its other hits, BioFs.v and TsoLitmus.v, are
   unrelated identifiers).
-* `bf_test_val` / `bf_clear_val` are `BitmapEnc.bmBit_test_64` /
+* `bf_test_val` / `Xv6.bmBit_clear_64` are `BitmapEnc.bmBit_test_64` /
   `bmBit_clear_64` read at the `and`/`xori` the code performs
-  (`bf_test_val`, `bf_clear_val` below).
+  (`bf_test_val`, `Xv6.bmBit_clear_64` below).
 * Rocq's `bf_buf_byte` is `MachCSL.byteBuf_upd` on the handle's byte list
   (`bf_hold_bytes` opens the handle; `Xv6/ProofWriteHead.lean`'s
   `wh_hold_bytes` shape).
@@ -32,6 +32,8 @@ import Xv6.SpecBfree
 import Xv6.DinodeSlot
 import Xv6.SpecBrelse
 import Xv6.SpecLogWrite
+import Xv6.BallocParts
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -47,12 +49,6 @@ set_option linter.unusedSectionVars false
 theorem bf_srliw13 (bno : BitVec 32) (h : bno.toNat < 8192) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 bno) >>> 13) = 0#64 := by
   have : bno < 8192#32 := by rw [BitVec.lt_def]; simpa using h
-  bv_decide
-
-/-- `addw a1,a1,a5` with `a5 = 0`: `BBLOCK` collapses to `bmapstart`
-(Rocq's `bf_addw0`); after the normaliser drops the `+ 0`, what is left is
-the low word of the sign-extended `sb.bmapstart`, which is the word. -/
-theorem bf_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
   bv_decide
 
 theorem bf_msb (bno : BitVec 32) (h : bno.toNat < 8192) : bno.msb = false := by
@@ -94,24 +90,9 @@ theorem bf_test_val (u : BitSet) (bi : Nat) (hin : bi ∈ u) :
     (1#64 <<< (bi % 8)) &&& BitVec.setWidth 64 (bmByte u (bi / 8)) = 1#64 <<< (bi % 8) := by
   rw [BitVec.and_comm, bmBit_test_64 u bi, if_pos hin]
 
-/-- ...so the `beqz` at `+0x3a` falls through: the `unreachable` arm is
-never entered. -/
-theorem bf_beqz_false (bi : Nat) :
-    bcond bop.BEQ (1#64 <<< (bi % 8)) 0#64 = false := by
-  have : bi % 8 = 0 ∨ bi % 8 = 1 ∨ bi % 8 = 2 ∨ bi % 8 = 3 ∨ bi % 8 = 4 ∨ bi % 8 = 5 ∨
-      bi % 8 = 6 ∨ bi % 8 = 7 := by omega
-  rcases this with h | h | h | h | h | h | h | h <;> rw [h] <;> decide
-
 /-- `not a5,a5` is `xori a5,a5,-1`. -/
 theorem bf_xori_not (x : BitVec 64) : x ^^^ 0xFFFFFFFFFFFFFFFF#64 = ~~~x := by
   bv_decide
-
-/-- The CLEAR: `data[b/8] & ~m` is the byte of `u \ {b}` (Rocq's
-`bf_clear_val`, from `BitmapEnc.bm_bit_clear`). -/
-theorem bf_clear_val (u : BitSet) (bi : Nat) :
-    BitVec.setWidth 64 (bmByte u (bi / 8)) &&& ~~~(1#64 <<< (bi % 8))
-      = BitVec.setWidth 64 (bmByte (u \ {bi}) (bi / 8)) :=
-  bmBit_clear_64 u bi
 
 /-- `sb` stores the low byte of the register. -/
 theorem bf_sb_byte (x : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 x) = x := by

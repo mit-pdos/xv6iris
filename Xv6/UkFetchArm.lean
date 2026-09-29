@@ -92,7 +92,7 @@ theorem uk_zca_run (orc : UOrc) (s : UWSt) (hm : UcMisa ufFoot s) :
 
 theorem uk_readPC_run (orc : UOrc) (s : UWSt) :
     runRW ufFoot orc s (readReg .PC) = some (s.file .PC, s, orc) :=
-  ucRW_readReg_pure ufFoot orc s .PC (ufFoot_rd _ (by decide))
+  MachCSL.utr_readReg ufFoot orc s .PC (ufFoot_rd _ (by decide))
 
 theorem uk_writeNpc_run (orc : UOrc) (s : UWSt) (v : BitVec 64) :
     runRW ufFoot orc s (writeReg .nextPC v) = some ((), s.setR .nextPC v, orc) :=

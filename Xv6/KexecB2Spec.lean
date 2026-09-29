@@ -107,7 +107,7 @@ theorem kxcB2_sx32_inj (a b : Nat) (ha : a < 2 ^ 32) (hb : b < 2 ^ 32)
 
 /-- `kxcSx32` of a small value is the plain literal. -/
 theorem kxcB2_sx32_small (x : Nat) (h : x < 2 ^ 31) : kxcSx32 x = BitVec.ofNat 64 x :=
-  rd_arg32_small x h
+  MachCSL.signExtend_ofNat32 x h
 
 /-- The low word of an ABI word is the word. -/
 theorem kxcB2_sx32_lo (x : Nat) : BitVec.extractLsb' 0 32 (kxcSx32 x) = BitVec.ofNat 32 x := by

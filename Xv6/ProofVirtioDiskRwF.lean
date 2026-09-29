@@ -72,7 +72,7 @@ theorem vdrw6_infoB2 (i : Nat) :
     KA.«disk» + (BitVec.ofNat 64 (16 * i) + 40#64) = aInfoB i := by
   rw [aInfoB_eq]
   congr 1
-  rw [show (40#64 : BitVec 64) = BitVec.ofNat 64 40 from rfl, ← ofNat_add64]
+  rw [show (40#64 : BitVec 64) = BitVec.ofNat 64 40 from rfl, ← MachCSL.ofNat64_add]
   congr 1
   omega
 
@@ -379,7 +379,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_rw» + 0x20e#64) true 8166#13 9#5 0#5 (by decide)
       bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdrwK_sie, KCtx.rget_zero, vdrw6_bnez_1]
+    with [vdrwK_sie, KCtx.rget_zero, Xv6.vdrw2_bnez_1]
   iintro Hk Hpc
   -- turn two: the middle
   ihave Hopm := (show opsWin (GF := GF) curCtx c.md ⊢ opsWin curCtx c.md from by iintro H; iexact H)
@@ -410,7 +410,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_rw» + 0x20e#64) true 8166#13 9#5 0#5 (by decide)
       bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdrwK_sie, KCtx.rget_zero, vdrw6_bnez_1]
+    with [vdrwK_sie, KCtx.rget_zero, Xv6.vdrw2_bnez_1]
   iintro Hk Hpc
   -- turn three: the tail
   iapply (vdrw6_iter FD Γ cpu (vdrwK k) γ γl pd pav pu
@@ -439,7 +439,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_rw» + 0x20e#64) true 8166#13 9#5 0#5 (by decide)
       bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [vdrwK_sie, KCtx.rget_zero, vdrw6_bnez_0]
+    with [vdrwK_sie, KCtx.rget_zero, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- +0x210  auipc a0,0x1e ; +0x214  addi a0,a0,-1436 ; +0x218  jal release
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x210#64) false 0x1e#20 10#5 (by decide))

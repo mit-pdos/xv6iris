@@ -13,6 +13,7 @@ wait answer `signExtend 64 p` at `1 ≤ p.toNat ≤ PIDMAX` is a positive
 import Xv6.UkInitStubs
 import Xv6.UmodeArith
 import Xv6.UkRunBr
+import Xv6.ConsoleintrArms
 
 namespace Xv6
 
@@ -57,12 +58,6 @@ theorem kinit_pid_ne_0 (p : BitVec 32) (h1 : 1 ≤ p.toNat) (hp : p.toNat ≤ PI
   rw [kinit_pid_toInt p hp] at this
   have h2 : (0#64 : BitVec 64).toInt = 0 := by decide
   omega
-
-/-- The sign extension is injective (Rocq `sext64_32_inj`). -/
-theorem kinit_sext_inj (p q : BitVec 32) (h : BitVec.signExtend 64 p = BitVec.signExtend 64 q) : p = q := by
-  have := congrArg BitVec.toInt h
-  rw [BitVec.toInt_signExtend_of_le (by decide), BitVec.toInt_signExtend_of_le (by decide)] at this
-  exact BitVec.toInt_inj.mp this
 
 /-! ## §2 Registers -/
 

@@ -39,10 +39,6 @@ theorem kl_withLocks_self (k : KCtx) (m : Nat) (a b : Bool) :
 theorem kl_withLocks_self' (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
-/-- `push_off`'s exit does not see the pinned bits it overwrites. -/
-theorem kl_withSpie_pushOffAt (k : KCtx) (s p a b : Bool) :
-    (k.withSpie s p).pushOffAt a b = k.pushOffAt a b := rfl
-
 /-- The link registers of the calls. -/
 theorem kl_ret_216c : jumpPc (KA.«setkilled» + 0x10#64) = (KA.«setkilled» + 0x10#64) := by
   decide

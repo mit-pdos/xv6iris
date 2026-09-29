@@ -48,10 +48,6 @@ theorem ai_calleeSaved_mk (KR R : RegMap)
       | rfl
       | assumption
 
-/-- `withSpie` commutes with a frame push. -/
-theorem ai_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -182,7 +178,7 @@ theorem argint_proof (MP : MYPROC) (AR : ARGRAW) : ARGINT := ⟨
   unfold calleeSaved at hcsA
   k_norm_g at hcsA
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcsA
-  k_norm_g [ai_withSpie_pushed, ai_ret_2870]
+  k_norm_g [MachCSL.KCtx.withSpie_pushed, ai_ret_2870]
   have q0 : k.sie = false ∨ k.proc = 0#64 → cm = cpu :=
     fun h => (hpm h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
   -- c.sw a0,0(s1)

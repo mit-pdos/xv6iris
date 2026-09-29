@@ -15,6 +15,7 @@ import MachCSL.WpSmodeSret
 import Xv6.SpecKernelvec
 import Xv6.SpecKerneltrap
 import Xv6.CodeTactics
+import MachCSL.WpSmodeTrapCsr
 
 namespace Xv6
 
@@ -28,11 +29,6 @@ theorem imm_p256 : BitVec.signExtend 64 256#12 = 8#64 * BitVec.ofNat 64 32 := by
 theorem sp_restore256 (sp0 : BitVec 64) : sp0 + 0xFFFFFFFFFFFFFF00#64 + 8#64 * BitVec.ofNat 64 32 = sp0 := by
   bv_omega
 theorem ret_55e8 : jumpPc (KA.«kernelvec» + 0x28#64) = (KA.«kernelvec» + 0x28#64) := by decide
-
-/-- An even pc is its own `sret` target. -/
-theorem and_lsb_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFFFFFFFFFFFFFE#64 = pc := by
-  have h0 : pc.getLsbD 0 = false := (lsb0_iff_even pc).2 h
-  bv_decide
 
 theorem bv5_cases (i : BitVec 5) : i = 0#5 ∨ i = 1#5 ∨ i = 2#5 ∨ i = 3#5 ∨ i = 4#5 ∨ i = 5#5 ∨ i = 6#5 ∨ i = 7#5 ∨ i = 8#5 ∨ i = 9#5 ∨ i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5 ∨ i = 17#5 ∨ i = 18#5 ∨ i = 19#5 ∨ i = 20#5 ∨ i = 21#5 ∨ i = 22#5 ∨ i = 23#5 ∨ i = 24#5 ∨ i = 25#5 ∨ i = 26#5 ∨ i = 27#5 ∨ i = 28#5 ∨ i = 29#5 ∨ i = 30#5 ∨ i = 31#5 := by
   revert i; decide
@@ -278,7 +274,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   · iexact Hclaim
   inext
   iintro Hk Hpc
-  rw [KCtx.sretTo_withRegs, ← hkt, KCtx.trapped_sretTo k hs hi, and_lsb_of_even pc hpc]
+  rw [KCtx.sretTo_withRegs, ← hkt, KCtx.trapped_sretTo k hs hi, MachCSL.and_lsb0_of_even pc hpc]
   ihave Hk := kctx_regs_ext c1 k _ ?hR $$ Hk
   case hR =>
     intro i h0 h4

@@ -40,6 +40,7 @@ split on explicitly (premises on `t.getLsbD 0`/`t.getLsbD 1`, or an
 -/
 import MachCSL.UExecAluGpr
 import MachCSL.UDecode
+import MachCSL.UTranslate
 
 namespace MachCSL
 
@@ -187,11 +188,6 @@ theorem uxc_execAs_of {res : ExecutionResult} (orc : UOrc) (s s' : UWSt) (c : in
     runRW D orc s (uxaExecAs c) = some (res, s', orc) := by
   rw [uxaExecAs, runRW_bind, h]
   cases res <;> first | rfl | exact absurd rfl (hres _)
-
-/-- A register read on its own. -/
-theorem uxc_readReg (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    runRW D orc s (readReg r) = some (s.file r, s, orc) :=
-  (uxa_readReg_bind D orc s r (fun v => FreeM.pure v) h).trans rfl
 
 /-- `set_next_pc`: pins `nextPC`. -/
 theorem uxc_set_next_pc (orc : UOrc) (s : UWSt) (t : BitVec 64) (h : D.Dw .nextPC = true) :

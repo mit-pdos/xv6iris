@@ -17,6 +17,7 @@ import Xv6.CodeTactics
 import Xv6.SpecBalloc
 import Xv6.FsCallSites
 import Xv6.BallocParts
+import Xv6.BmapParts
 
 namespace Xv6
 
@@ -37,7 +38,6 @@ theorem ba_br_printk : KA.«balloc» + 0xffffffffffffd68c#64 = KA.«printk» := 
 theorem ba_ret_102 : jumpPc (KA.«balloc» + 0x102#64) = KA.«balloc» + 0x102#64 := by decide
 theorem ba_br_brelse : KA.«balloc» + 0xFFFFFFFFFFFFFF14#64 = KA.«brelse» := by decide
 theorem ba_ret_90 : jumpPc (KA.«balloc» + 0x90#64) = KA.«balloc» + 0x90#64 := by decide
-theorem ba_sext0_32 : BitVec.signExtend 64 (0#32) = 0#64 := by decide
 theorem ba_sz_addr : KA.«sb» + 4#64 = sbSizeAddr := rfl
 
 section
@@ -285,7 +285,7 @@ theorem ba_out (PK : PRINTK) (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : Re
     · rw [b26]; exact p26
     · rw [b27]; exact p27
   case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; rw [b2]; exact hR2
-  case e9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, ba_sext0_32]
+  case e9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, Xv6.bm_sext0]
   all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; assumption)
 
 set_option maxHeartbeats 8000000 in

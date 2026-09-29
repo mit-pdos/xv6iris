@@ -27,6 +27,7 @@ already are.  `pi` is 8-byte aligned (`lockAddrOk`: `pi+16` is), so the two
 This file is definitional (Spec-importable): it never touches a proof.
 -/
 import Xv6.PipeInvDefs
+import MachCSL.ByteWord4
 
 namespace Xv6
 
@@ -198,36 +199,6 @@ theorem p4_toNat_addN4 (a : BitVec 64) (j : Nat) (hj : j < 4) (hlt : a.toNat + j
     (a + BitVec.ofNat 64 j).toNat = a.toNat + j := by
   rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
 
-/-- One byte of a 4-aligned word's window is a word cell. -/
-theorem p4_byte4_of (a : BitVec 64) (dq : DFrac) (ppn : BitVec 44)
-    (v : BitVec 8) (j : Nat) (hj : j < 4) (hal : a.toNat % 4 = 0)
-    (hpin : tierPin curTier ppn a) (hlt : a.toNat < 2 ^ 38) (hram : inRam (paOf ppn a) 4) :
-    kmapAt (GF := GF) (vpnOf a) (kLeaf ppn .rw 0#1 0#1) ⊢
-      ctxByte curCtx (paOf ppn a + BitVec.ofNat 64 j) dq v -∗
-      wordPointsTo (a + BitVec.ofNat 64 j) 1 dq v := by
-  have hpa : paOf ppn (a + BitVec.ofNat 64 j) = paOf ppn a + BitVec.ofNat 64 j :=
-    p4_paOf_addN4 ppn a hal j hj
-  have hpl := paOf_toNat_lt ppn a
-  have ha : (a + BitVec.ofNat 64 j).toNat = a.toNat + j := p4_toNat_addN4 a j hj (by omega)
-  have hp : (paOf ppn a + BitVec.ofNat 64 j).toNat = (paOf ppn a).toNat + j :=
-    p4_toNat_addN4 _ j hj (by omega)
-  have hfacts : tierPin curTier ppn (a + BitVec.ofNat 64 j) ∧
-      (a + BitVec.ofNat 64 j).toNat < 2 ^ 38 ∧
-      inRam (paOf ppn (a + BitVec.ofNat 64 j)) 1 ∧ (a + BitVec.ofNat 64 j).toNat % 1 = 0 := by
-    refine ⟨p4_tierPin_addN4 curTier ppn a hal hpin j hj, by omega, ?_, by omega⟩
-    rw [hpa]
-    unfold inRam at hram ⊢
-    omega
-  rw [← p4_vpnOf_addN4 a hal j hj]
-  iintro #Hcl Hb
-  ihave Hw := wordPointsTo_intro (a + BitVec.ofNat 64 j) 1 dq v ppn hfacts $$ Hcl
-  iapply Hw
-  rw [hpa]
-  unfold bytesPointsTo ctxBytes
-  simp only [List.range_succ, List.range_zero, List.nil_append,
-    Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, nthByte_one, BitVec.add_zero]
-  iframe Hb
-
 /-- **A 4-aligned word forgets to its four bytes.** -/
 theorem word4_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 32) (hal : a.toNat % 4 = 0) :
     wordPointsTo (GF := GF) a 4 dq w ⊢ byteBuf a dq (word4Bytes w) := by
@@ -238,9 +209,9 @@ theorem word4_to_bytes (a : BitVec 64) (dq : DFrac) (w : BitVec 32) (hal : a.toN
   simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
     Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, BitVec.add_zero]
   icases Hb with ⟨Hb0, Hb1, Hb2, Hb3, _⟩
-  ihave H1 := p4_byte4_of a dq ppn (nthByte (n := 4) w 1) 1 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb1
-  ihave H2 := p4_byte4_of a dq ppn (nthByte (n := 4) w 2) 2 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb2
-  ihave H3 := p4_byte4_of a dq ppn (nthByte (n := 4) w 3) 3 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb3
+  ihave H1 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 1) 1 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb1
+  ihave H2 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 2) 2 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb2
+  ihave H3 := MachCSL.wordPointsTo_byte_of4 a dq ppn (nthByte (n := 4) w 3) 3 (by omega) hal hf.1 hf.2.1 hf.2.2.1 $$ Hcl Hb3
   ihave H0 := wordPointsTo_intro a 1 dq (nthByte (n := 4) w 0) ppn
     ⟨hf.1, hf.2.1, by unfold inRam at hf ⊢; omega, by omega⟩ $$ Hcl
   unfold byteBuf word4Bytes

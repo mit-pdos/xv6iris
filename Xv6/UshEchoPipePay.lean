@@ -81,14 +81,6 @@ variable (E : UshExecEnv (hlc := hlc) (GF := GF))
 
 /-! ## The landed parameter record's echo fields, discharged -/
 
-/-- `UshExecPinEcho.echo_node_img_of_cmd_x` at `echo_node_img :=
-echoNodeImg` (Rocq `UShEcho.echo_node_img_of_cmd_x`). -/
-theorem echoNodeImg_of_cmd_x_field :
-    ∀ (ws : List (List (BitVec 8))) (gt gd gs : GName) (M : ElfMem)
-      (pm : Nat → Option UPerm) (sz s0 t : Nat) (g : Nat → BitVec 8), execOk ws →
-      ⊢ uheap gt gd gs M pm sz -∗ E.ush_cmd gd t (ushEchoCmd E ws s0 g) -∗ ⌜echoNodeImg ws M s0 t g⌝ :=
-  echoNodeImg_of_cmd_x E
-
 /-- `UshExecPinEcho.sh_exec_path_of_x_holds` at `echo_node_img :=
 echoNodeImg` (Rocq `UShEcho.sh_exec_path_of_x_holds`). -/
 theorem shExecPathOfX_holds_field :
@@ -119,7 +111,7 @@ noncomputable def ushExecPinEchoMk (catSlot catSlotFs : IProp GF → IProp GF)
   sh_cat_slot_of_fs_pure := catSlotFs
   sh_cat_slot_of_fs_pure_unfold := hf
   echo_node_img := echoNodeImg
-  echo_node_img_of_cmd_x := echoNodeImg_of_cmd_x_field E
+  echo_node_img_of_cmd_x := Xv6.echoNodeImg_of_cmd_x E
   sh_exec_path_of_x_holds := shExecPathOfX_holds_field
   image_entry_pay_mono := imageEntryPayMono_field
 

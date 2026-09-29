@@ -5,6 +5,7 @@ count, the instruction rules chained -- no symbolic execution.
 -/
 import Xv6.SpecMemmove
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -67,20 +68,11 @@ theorem self_eq_add_ofNat_iff (s : BitVec 64) (a : Nat) (ha : a < 2 ^ 32) :
     omega
   · intro h; subst h; simp
 
-/-- `ofNat i + (-1) = ofNat (i - 1)` for `1 ≤ i`. -/
-theorem ofNat_add_neg1 (i : Nat) (hi : 1 ≤ i) (hi' : i < 2 ^ 32) :
-    BitVec.ofNat 64 i + 0xFFFFFFFFFFFFFFFF#64 = BitVec.ofNat 64 (i - 1) := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  rw [Nat.mod_eq_of_lt (by omega : i < 2 ^ 64), Nat.mod_eq_of_lt (by omega : i - 1 < 2 ^ 64)]
-  rw [Nat.mod_eq_of_lt (by omega : 0xFFFFFFFFFFFFFFFF < 2 ^ 64)]
-  omega
-
 /-- The backward copy's cursor: `~(zext32 (n - 1)) + (s + n) = s`. -/
 theorem bwd_a5 (s : BitVec 64) (n : Nat) (h1 : 1 ≤ n) (hn : n < 2 ^ 32) :
     ((BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64)) <<< 32) >>> 32 ^^^
       0xFFFFFFFFFFFFFFFF#64) + (s + BitVec.ofNat 64 n) = s := by
-  rw [ofNat_add_neg1 n h1 hn]
+  rw [Xv6.ofNat_add_neg1' n h1 hn]
   have hu : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (n - 1)) = BitVec.ofNat 32 (n - 1) := by
     apply BitVec.eq_of_toNat_eq
     rw [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.shiftRight_zero]
@@ -331,7 +323,7 @@ theorem memmove_bwd_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   iintro ⟨Hk, Hpc, Hsrc, Hdst, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   obtain ⟨o, ho⟩ := mixB_get_pred bs olds i hi1 (by omega) (by omega)
-  have hneg := ofNat_add_neg1 i hi1 (by omega)
+  have hneg := Xv6.ofNat_add_neg1' i hi1 (by omega)
   -- addi a4,a4,-1
   k_step_gen (wp_s_addi cpu _ (KA.«memmove» + 0x4e#64) true 4095#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     with [h14, hneg] next c1 hp1

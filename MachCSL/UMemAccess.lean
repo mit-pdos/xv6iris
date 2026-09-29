@@ -51,6 +51,7 @@ import MachCSL.UWalkRun
 import MachCSL.SailHooks
 import MachCSL.PlatformFacts
 import MachCSL.Tactics
+import MachCSL.UMemMisPlan
 
 namespace MachCSL
 
@@ -61,10 +62,6 @@ open LeanRV64D LeanRV64D.Functions
 /-! ## §0 The page split of an aligned access (Rocq `MemAccessGen`,
 `exec_split_on_page_boundary_aligned`) -/
 
-theorem uma_intra_bv (a wv : BitVec 64) (h1 : 1#64 ≤ wv) (h8 : wv ≤ 8#64) (hp : a % 4096#64 + wv ≤ 4096#64) :
-    (a &&& 0xFFFFFFFFFFFFF000#64) = (a + wv - 1#64) &&& 0xFFFFFFFFFFFFF000#64 := by
-  bv_decide
-
 /-- **An aligned access is not split at a page boundary.** -/
 theorem uma_split_on_page_boundary_al (va : BitVec 64) (w : Nat) (hw : umaW w) (hal : va.toNat % w = 0) :
     split_on_page_boundary va w = (pure ((w : Int), 0) : SailM (Int × Int)) := by
@@ -73,7 +70,7 @@ theorem uma_split_on_page_boundary_al (va : BitVec 64) (w : Nat) (hw : umaW w) (
     rw [BitVec.le_def]
     simp only [BitVec.toNat_add, BitVec.toNat_umod, BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod]
     rcases hw with rfl | rfl | rfl | rfl <;> omega
-  have hb := uma_intra_bv va (BitVec.ofNat 64 w) (by rcases hw with rfl | rfl | rfl | rfl <;> decide)
+  have hb := MachCSL.umm_intra_bv va (BitVec.ofNat 64 w) (by rcases hw with rfl | rfl | rfl | rfl <;> decide)
     (by rcases hw with rfl | rfl | rfl | rfl <;> decide) hp
   rcases hw with rfl | rfl | rfl | rfl <;> (
     unfold split_on_page_boundary
@@ -118,13 +115,6 @@ theorem uma_translateAddr_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : U
     runRW D orc s (translateAddr (.Virtaddr va) acc) =
       some (.Ok (.Physaddr (paOf ppn va), .PBMT_PMA, ()), s', orc') :=
   utr_translateAddr_ok D orc orc' s s' hp va acc hacc hc ppn .PBMT_PMA htr
-
-/-- **A faulting walk** (UTranslate's composition). -/
-theorem uma_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UtrPins D s) (va : BitVec 64)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hc : utrCanon va) (f : PTW_Error)
-    (htr : runRW D orc s (utrTranslate s va acc) = some (.Err (f, ()), s', orc')) :
-    runRW D orc s (translateAddr (.Virtaddr va) acc) = some (.Err (utrTexc acc f, ()), s', orc') :=
-  utr_translateAddr_err D orc orc' s s' hp va acc hacc hc f htr
 
 /-- **Lane U1-P1's TLB hit, in the shape the vmem arms take** (`UTlb.utlb_translate_of_hit`
 at the front's arguments; the hit itself is `utlb_hit_keep`/`_refresh`/`_denied`). -/

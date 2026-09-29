@@ -49,7 +49,6 @@ theorem ms_or_sie_self (ms : BitVec 64) (h : BitVec.extractLsb' 1 1 ms = 1#1) : 
 def spieOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 5 1 ms = 1#1)
 def sppOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 8 1 ms = 1#1)
 
-theorem bit1_cases (x : BitVec 1) : x = 0#1 ∨ x = 1#1 := by bv_decide
 
 theorem sretFacts_clear (ms : BitVec 64) :
     sretFacts (ms &&& 0xFFFFFFFFFFFFFFFD#64) false (spieOf ms) (sppOf ms) := by
@@ -59,8 +58,8 @@ theorem sretFacts_clear (ms : BitVec 64) :
   rw [e5, e8]
   unfold spieOf sppOf
   constructor
-  · rcases bit1_cases (BitVec.extractLsb' 5 1 ms) with h | h <;> simp [h]
-  · rcases bit1_cases (BitVec.extractLsb' 8 1 ms) with h | h <;> simp [h]
+  · rcases MachCSL.bv1_cases (BitVec.extractLsb' 5 1 ms) with h | h <;> simp [h]
+  · rcases MachCSL.bv1_cases (BitVec.extractLsb' 8 1 ms) with h | h <;> simp [h]
 
 /-- When interrupts were already off, the pinned bits are the context's. -/
 theorem sretFacts_pinned (ms : BitVec 64) (spie spp : Bool) (h : sretFacts ms false spie spp) :

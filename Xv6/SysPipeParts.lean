@@ -16,6 +16,11 @@ import Xv6.ArgLemmas
 import Xv6.UMemWindow
 import MachCSL.WpSmodeFrame8
 import Xv6.SpecCopyout
+import Xv6.CopyLemmas
+import Xv6.DinodeSlot
+import Xv6.SysFstatParts
+import Xv6.SysfileCalls
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -50,11 +55,8 @@ theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffbfe6#64 = KA.«cop
 theorem sys_pipe_br_fileclose : KA.«sys_pipe» + 0xffffffffffffec86#64 = KA.«fileclose» := by decide
 
 theorem sys_pipe_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem sys_pipe_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem sys_pipe_li4 : 0#64 + BitVec.signExtend 64 4#12 = 4#64 := by decide
-theorem sys_pipe_add0 (x : BitVec 64) : x + BitVec.signExtend 64 0#12 = x := by simp
 theorem sys_pipe_add0' (x : BitVec 64) : x + 0#64 = x := by simp
-theorem sys_pipe_mv (x : BitVec 64) : 0#64 + x = x := by simp
 
 theorem sys_pipe_a40 (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 theorem sys_pipe_a48 (x : BitVec 64) : x + BitVec.signExtend 64 4048#12 = x + 0xFFFFFFFFFFFFFFD0#64 := by bv_decide
@@ -69,7 +71,6 @@ theorem sys_pipe_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
 
 theorem sys_pipe_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sys_pipe_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
-theorem sys_pipe_bgez_0 : bcond bop.BGE 0#64 0#64 = true := by decide
 theorem sys_pipe_bgez_m1 : bcond bop.BGE 0xFFFFFFFFFFFFFFFF#64 0#64 = false := by decide
 theorem sys_pipe_bltz_m1' : bcond bop.BLT (-1#64) 0#64 = true := by decide
 theorem sys_pipe_bgez_m1' : bcond bop.BGE (-1#64) 0#64 = false := by decide
@@ -116,13 +117,6 @@ theorem sys_pipe_ofile_addr2 (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
 
 theorem sys_pipe_ofile_addr2' (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
     pa + (BitVec.ofNat 64 fd <<< 3 + 208#64) = pOfile pa fd := sys_pipe_ofile_addr' pa fd h
-
-theorem sys_pipe_withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d :=
-  rfl
-theorem sys_pipe_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sys_pipe_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 /-! ## The register pins -/
 
@@ -228,13 +222,6 @@ theorem sysPipeMem_one {sz : BitVec 64} {P P1 : UPtd} {M M1 : Nat → List (BitV
 
 /-! ## Stage facts: pin the ambient context -/
 
-theorem sys_pipe_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-/-- The block's kernel-tier view IS the ambient one once the tier is pinned. -/
-theorem sys_pipe_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_pipe_ctx inst hct).symm
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -245,7 +232,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem sys_pipe_wpt_cur (hct : curTier = KTier.kpt) (a : BitVec 64) (n : Nat) (dq : DFrac)
     (w : BitVec (8 * n)) :
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ a n dq w ⊣⊢ wordPointsTo a n dq w := by
-  rw [sys_pipe_cur_kpt hct]
+  rw [Xv6.sysfile_cur_kpt hct]
   exact .rfl
 
 /-- THE PID CELL, LENT OUT OF THE BLOCK for one call (Rocq's

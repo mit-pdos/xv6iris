@@ -92,6 +92,8 @@ Five groups, as in Rocq:
 import Xv6.InodeInv
 import Xv6.BcacheInv
 import Xv6.FsBytesMint
+import Xv6.ByteCursor
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -111,23 +113,12 @@ theorem dsSext_small (w : BitVec 32) (h : w.toNat < 2 ^ 31) :
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
 
-/-- The low half of a sign extension (Rocq's `iu_sub31_sext`). -/
-theorem dsSub31_sext (w : BitVec 32) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by bv_decide
-
-/-- Rocq's `iu_sub31_moi`. -/
-theorem dsSub31_ofNat (k : Nat) (h : k < 2 ^ 32) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 k) = BitVec.ofNat 32 k := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat]
-  omega
-
 /-- `srliw a5,a5,0x4`: an unsigned divide of a `uint` by `IPB` (Rocq's
 `iu_srliw4`). -/
 theorem dsSrliw4 (w : BitVec 32) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) >>> 4)
       = BitVec.ofNat 64 (w.toNat / 16) := by
-  rw [dsSub31_sext]
+  rw [Xv6.fw_ext32]
   have hsh : (w >>> 4).toNat = w.toNat / 16 := by
     rw [BitVec.toNat_ushiftRight, Nat.shiftRight_eq_div_pow]
   rw [dsSext_small (w >>> 4) (by rw [hsh]; have := w.isLt; omega), hsh]
@@ -154,7 +145,7 @@ theorem dsAddwIbl (inum : BitVec 32) (inodestart : Nat)
       = BitVec.ofNat 64 (IBLOCK inum inodestart) := by
   have hbnd := inum.isLt
   unfold IBLOCK at hib ⊢
-  rw [dsSub31_sext, dsSub31_ofNat _ (by omega)]
+  rw [Xv6.fw_ext32, Xv6.extractLsb'_ofNat64 _ (by omega)]
   have hadd : BitVec.ofNat 32 inodestart + BitVec.ofNat 32 (inum.toNat / 16)
       = BitVec.ofNat 32 (inum.toNat / 16 + inodestart) := by
     apply BitVec.eq_of_toNat_eq
@@ -233,20 +224,10 @@ theorem dsType_nonzero (w : BitVec 16) (h : w.toNat ≠ 0) :
 /-! ## The loop guards' branch predicates, at the two words the code
 compares (Rocq's `ds_uint64_moi` / `ds_bgeu_moi` / `ds_bltu_moi`) -/
 
-theorem dsOfNat64_toNat (z : Nat) (h : z < 2 ^ 64) : (BitVec.ofNat 64 z).toNat = z := by
-  rw [BitVec.toNat_ofNat]
-  omega
-
-theorem dsBgeu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    bcond bop.BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
-  show (!(BitVec.ofNat 64 x).ult (BitVec.ofNat 64 y)) = _
-  rw [BitVec.ult, dsOfNat64_toNat x hx, dsOfNat64_toNat y hy]
-  by_cases h : x < y <;> simp [h] <;> omega
-
 theorem dsBltu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     bcond bop.BLTU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x < y) := by
   show ((BitVec.ofNat 64 x).ult (BitVec.ofNat 64 y)) = _
-  rw [BitVec.ult, dsOfNat64_toNat x hx, dsOfNat64_toNat y hy]
+  rw [BitVec.ult, Xv6.bcOfNatToNat x hx, Xv6.bcOfNatToNat y hy]
 
 /-! # (2) The addresses -/
 

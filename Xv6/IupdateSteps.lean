@@ -33,7 +33,7 @@ literally `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at
 
 **Dropped/simplified vs Rocq.**
 * Rocq's `iui_*` instruction facts, `pcw`/`nz`/`regne` tactics and the
-  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`iu_disp`/`iu_off0` bridge
+  `iu_andi15`/`iu_slli6`/`iu_srliw4`/`iu_addw_ibl`/`Xv6.dsDisp`/`iu_off0` bridge
   lemmas are `Xv6.text_instr` and the `Xv6/DinodeSlot.lean` group-1/2
   lemmas (`dsSrliw4`, `dsAddwIbl`, `dsAndi15`, `dsSext_mod16`, `dsSlli6`,
   `dsDataAddr`, `dsDisp`, `dsOff0`, `dsAddrs0`, `dsAlign`) -- uses checked:
@@ -107,10 +107,6 @@ theorem iu_sext_bno (b : Nat) (h : b < 2 ^ 31) :
 theorem iu_andi (inum : BitVec 32) :
     BitVec.signExtend 64 inum &&& BitVec.signExtend 64 15#12 = BitVec.ofNat 64 (islot inum) := by
   rw [dsAndi15, dsSext_mod16]; rfl
-
-/-- The field cells' displacements, off the slot's base. -/
-theorem iu_disp (a : BitVec 64) (d : Nat) (h : d < 2048) :
-    a + BitVec.signExtend 64 (BitVec.ofNat 12 d) = a + BitVec.ofNat 64 d := dsDisp a d h
 
 /-! ## The region's ghost step, as a premise -/
 

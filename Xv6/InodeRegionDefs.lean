@@ -97,14 +97,6 @@ open Iris Iris.Std MachCSL
 
 /-! ## 1.  THE ENCODING IS INJECTIVE ON WELL-FORMED LISTS (§12.3) -/
 
-/-- A 16-bit field is determined by its two bytes. -/
-theorem halfBytes_inj (w1 w2 : BitVec 16) (h : halfBytes w1 = halfBytes w2) : w1 = w2 := by
-  apply bv_eq_of_bytes (n := 2) w1 w2
-  intro j hj
-  have L1 := halfBytes_lookup w1 j hj
-  have L2 := halfBytes_lookup w2 j hj
-  rw [h, L2] at L1
-  exact (Option.some.inj L1).symm
 
 /-- ...and a 32-bit one by its four. -/
 theorem wordBytes_inj (w1 w2 : BitVec 32) (h : wordToBytes4 w1 = wordToBytes4 w2) :
@@ -140,8 +132,8 @@ theorem dinodeBytes_inj (d1 d2 : Dinode) (h1 : dinodeWf d1) (h2 : dinodeWf d2)
   unfold dinodeWf at h1 h2
   cases d1; cases d2
   simp only at *
-  rw [halfBytes_inj _ _ hty, halfBytes_inj _ _ hmaj, halfBytes_inj _ _ hmin,
-    halfBytes_inj _ _ hnl, wordBytes_inj _ _ hsz, indBytes_inj _ _ (by omega) had]
+  rw [Xv6.deHalfBytes_inj _ _ hty, Xv6.deHalfBytes_inj _ _ hmaj, Xv6.deHalfBytes_inj _ _ hmin,
+    Xv6.deHalfBytes_inj _ _ hnl, wordBytes_inj _ _ hsz, indBytes_inj _ _ (by omega) had]
 
 theorem diblkBytes_inj_aux (ds1 ds2 : List Dinode) (hlen : ds1.length = ds2.length)
     (hw1 : ∀ d ∈ ds1, dinodeWf d) (hw2 : ∀ d ∈ ds2, dinodeWf d)

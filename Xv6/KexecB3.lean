@@ -65,7 +65,7 @@ Rocq's header, in short:
    step pre-applied), as is `kxcFramePh` (the frame with the 56-byte `ph`
    buffer NAMED, Rocq `kxc_ph_take`'s output held in the frame) with its
    accessors `kxcB3_B_Ph` / `kxcFramePh_acc` / `kxcFramePh_Bp`.
-   `KexecB.kxcB_win_phnum` is restated here (`kxcB3_win_phnum`) so this
+   `KexecB.kxcB_win_phnum` is restated here (`Xv6.kxcB_win_phnum`) so this
    stage does not import phase B1's.
 4. **The `bad:` tails' causes are Rocq's** (S5): the short header read and
    the three header tests pay `QF .notLoadable` through the premise
@@ -77,6 +77,8 @@ Rocq's header, in short:
    / `kxc_le8_unsigned` are `Nat` / `BitVec` rows here (`kxcB3_*`).
 -/
 import Xv6.KexecB2
+import Xv6.BallocParts
+import Xv6.KexecB
 
 namespace Xv6
 
@@ -101,27 +103,6 @@ theorem kxcB3_bge_small (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
   rw [kxcB2_bge, kxcB3_toInt_small a ha, kxcB3_toInt_small b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
 
-/-- `c.addiw s10,s10,1` on the header index. -/
-theorem kxcB3_addiw1 (i : Nat) (h : i + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 i + BitVec.signExtend 64 1#12)) =
-      BitVec.ofNat 64 (i + 1) := by
-  have e1 : BitVec.ofNat 64 i + BitVec.signExtend 64 1#12 = BitVec.setWidth 64 (BitVec.ofNat 32 (i + 1)) := by
-    apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_add]; omega
-  rw [e1]
-  have e2 : BitVec.ofNat 64 (i + 1) = BitVec.setWidth 64 (BitVec.ofNat 32 (i + 1)) := by
-    apply BitVec.eq_of_toNat_eq; simp; omega
-  rw [e2]
-  have hlt : BitVec.ofNat 32 (i + 1) < 0x80000000#32 := by
-    rw [BitVec.lt_def]; simp; omega
-  revert hlt
-  generalize BitVec.ofNat 32 (i + 1) = v
-  intro hlt
-  bv_decide
-
-theorem kxcB3_addiw1' (i : Nat) (h : i + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 i + 1#64)) = BitVec.ofNat 64 (i + 1) := by
-  have := kxcB3_addiw1 i h
-  simpa using this
 
 /-- `flags2perm` reads bits 0 and 1 only: the `lw`'s sign extension does not
 reach them (Rocq `kxc_w32_bit`). -/
@@ -278,17 +259,6 @@ theorem kxcB3_zero_beqz : bcond bop.BEQ 0#64 0#64 = true := by decide
 section Win
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- `elf.phnum`'s window, at the `lhu a5,-376(s0)` address (`KexecB`'s
-`kxcB_win_phnum`, restated so this stage does not import phase B1's). -/
-theorem kxcB3_win_phnum [CurCtx] (sp0 : BitVec 64) (ef : List (BitVec 8))
-    (hal : (kxcElfBuf sp0).toNat % 8 = 0) (hl : ef.length = 64) :
-    byteBuf (GF := GF) (kxcElfBuf sp0) (DFrac.own 1) ef ⊢
-      wordPointsTo (sp0 + 0xFFFFFFFFFFFFFE88#64) 2 (DFrac.own 1) (BitVec.ofNat 16 (leAt ef 56 2)) ∗
-      (wordPointsTo (sp0 + 0xFFFFFFFFFFFFFE88#64) 2 (DFrac.own 1) (BitVec.ofNat 16 (leAt ef 56 2)) -∗
-        byteBuf (kxcElfBuf sp0) (DFrac.own 1) ef) := by
-  have h := kxc_win2 (GF := GF) (kxcElfBuf sp0) ef 56 (by omega) (kxc_elf_align sp0 hal).2.2.2
-  rw [(kxc_elf_off sp0).2.2.2] at h
-  exact h
 
 end Win
 
@@ -493,7 +463,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
   -- +0x11a  c.addiw s10,s10,1
   k_step_e (wp_s_addiw cpu _ (KA.«kexec» + 0x11a#64) true 1#12 26#5 26#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h26, kxcB3_addiw1 i (by omega), kxcB3_addiw1' i (by omega)]
+      with [h26, Xv6.ba_addiw1 i (by omega), Xv6.addiw_succ i (by omega)]
   iintro Hk Hpc
   -- +0x11c  ld a5,-504(s0)
   k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x11c#64) false 3592#12 15#5 8#5 (by decide) (by decide)
@@ -505,7 +475,7 @@ theorem kxc_incr (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → P
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcOff_step, kxcB3_off_step]
   iintro Hk Hpc
   -- +0x124  lhu a5,-376(s0)
-  icases kxcB3_win_phnum (k.regs 2#5) ef hal hlen $$ He with ⟨Hw, Hwb⟩
+  icases Xv6.kxcB_win_phnum (k.regs 2#5) ef hal hlen $$ He with ⟨Hw, Hwb⟩
   k_step_e (wp_s_lhu cpu _ (KA.«kexec» + 0x124#64) false 3720#12 15#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 16 (leAt ef 56 2)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8]
@@ -661,7 +631,6 @@ theorem kxcB3_ret_170 : jumpPc (KA.«kexec» + 0x170#64 + 4#64) = KA.«kexec» +
 theorem kxcB3_br_uvma : KA.«kexec» + 0x17c#64 + BitVec.signExtend 64 2082998#21 = KA.«uvmalloc» := by
   decide
 theorem kxcB3_ret_17c : jumpPc (KA.«kexec» + 0x17c#64 + 4#64) = KA.«kexec» + 0x17c#64 + 4#64 := by decide
-
 
 
 set_option maxHeartbeats 32000000 in
@@ -896,7 +865,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   subst h67
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
-  rw [kxcB2_maxfile] at hsz
+  rw [Xv6.rd_maxbytes] at hsz
   have hflen : (kxcFb data dnf).length < 2 ^ 32 := by rw [kxcB3_fb_length]; omega
   icases UMemL.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1225,7 +1194,7 @@ theorem kxc_ph_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT)
     with ⟨Hpid, Hpriv⟩
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
-  rw [kxcB2_maxfile] at hsz
+  rw [Xv6.rd_maxbytes] at hsz
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hbs2⟩
   unfold kxcFrameBk
   icases kxcB3_B_Ph (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 10#5)

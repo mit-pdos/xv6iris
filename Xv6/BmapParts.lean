@@ -8,7 +8,7 @@ Iris-free.
   DEAD `unreachable` test) and the zero tests (`Xv6.bm_eqz_*` /
   `Xv6.bm_nez_*`, shared, in `Xv6/BlkmapBuf.lean`).  Rocq's `bm_sext32`
   (the uint argument), `bm_sext_zero` and the `sw` fact are the shared
-  `Xv6.fw_sext32` / `Xv6.fw_sext_zero` / `Xv6.fw_ext32` (`Xv6/FsWords.lean`).
+  `MachCSL.signExtend_ofNat32` / `Xv6.fw_sext_zero` / `Xv6.fw_ext32` (`Xv6/FsWords.lean`).
 * The address facts: the callee targets and return addresses, and the
   entry cell `aBufData (bnode kk) + 4q` (`bm_cell_addr`: Rocq's
   `bm_data_addr` / `bm_slot_addr` / `bm_off0` in the one shape the
@@ -56,7 +56,7 @@ theorem bm_addiw_m12 (x : Nat) (h1 : 12 ≤ x) (h2 : x < 2 ^ 31) :
     apply BitVec.eq_of_toNat_eq
     simp [BitVec.toNat_ofNat]
   rw [e2]
-  exact fw_sext32 (x - 12) (by omega)
+  exact MachCSL.signExtend_ofNat32 (x - 12) (by omega)
 
 /-- `addiw a5,a1,-12`, as the normaliser leaves it (the immediate reduced). -/
 theorem bm_addiw_m12' (x : Nat) (h1 : 12 ≤ x) (h2 : x < 2 ^ 31) :

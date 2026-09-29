@@ -12,21 +12,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-- Bytes determine the word. -/
-theorem nthByte_ext {n : Nat} (w1 w2 : BitVec (8 * n))
-    (h : ∀ j, j < n → nthByte w1 j = nthByte w2 j) : w1 = w2 := by
-  apply BitVec.eq_of_getLsbD_eq_iff.2
-  intro i hi
-  have hj : i / 8 < n := by omega
-  have hb := h (i / 8) hj
-  have h1 := congrArg (fun b : BitVec 8 => b.getLsbD (i % 8)) hb
-  simp only [nthByte, BitVec.getLsbD_extractLsb'] at h1
-  have hlt : i % 8 < 8 := Nat.mod_lt _ (by omega)
-  simp only [hlt, _root_.decide_true, Bool.true_and] at h1
-  have he : 8 * (i / 8) + i % 8 = i := Nat.div_add_mod i 8
-  rw [he] at h1
-  exact h1
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -80,7 +65,7 @@ theorem ctxBytes_merge (ξ : CtxId) (pa : PAddr) (n : Nat) (q1 q2 : Qp) (w1 w2 :
   ihave %hp := BigSepL.bigSepL_pure.1 $$ Hp
   iframe Hc
   ipureintro
-  apply nthByte_ext
+  apply MachCSL.bv_eq_of_bytes
   intro j hj
   exact hp j j (List.getElem?_range hj)
 

@@ -33,26 +33,6 @@ survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
 (and `BitVec.add_assoc` then re-associates).  These are the page-offset folds
 stated on the shapes the normaliser actually leaves. -/
 
-theorem ci_offB (A d : Nat) (hA64 : A + d < 2 ^ 64) :
-    BitVec.ofNat 64 A + BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096)
-      = BitVec.ofNat 64 ((A + d) % 4096) := by
-  rw [← BitVec.sub_eq_add_neg, ← BitVec.ofNat_add, co_ofNat_sub (A + d) _ (by omega) hA64]
-  congr 1
-  omega
-
-theorem ci_offB' (A d : Nat) (hA64 : A + d < 2 ^ 64) :
-    BitVec.ofNat 64 A + (BitVec.ofNat 64 d + -BitVec.ofNat 64 ((A + d) / 4096 * 4096))
-      = BitVec.ofNat 64 ((A + d) % 4096) := by
-  rw [← BitVec.add_assoc]; exact ci_offB A d hA64
-
-theorem ci_addSplit (b : BitVec 64) (x y : Nat) :
-    b + (BitVec.ofNat 64 x + BitVec.ofNat 64 y) = b + BitVec.ofNat 64 (x + y) := by
-  rw [co_ofNat_add]
-
-theorem ci_nval (A d : Nat) (hA64 : A + d < 2 ^ 64) :
-    BitVec.ofNat 64 ((A + d) / 4096 * 4096) + (-(BitVec.ofNat 64 A + BitVec.ofNat 64 d) + 4096#64)
-      = BitVec.ofNat 64 (4096 - (A + d) % 4096) := by
-  rw [← BitVec.ofNat_add]; exact co_n_val3 (A + d) hA64
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -104,7 +84,7 @@ theorem wp_prologueCi_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, #Hi14, #Hi16, #Hi18, #Hi20, #Hi22,
     #Hi24, #Hi26, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK ci_imm_m96) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK MachCSL.imm_m96) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -217,7 +197,7 @@ theorem wp_epilogueCi_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 12
     $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c12 _ (pc + 24#64) true 96#12 12 ci_imm_p96) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c12 _ (pc + 24#64) true 96#12 12 MachCSL.imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c13 hp13
   iintro Hk Hpc
   k_step_gen (wp_s_ret c13 _ (pc + 26#64) true 1#5) $$ [- $Hk $Hpc] next c14 hp14
@@ -345,7 +325,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   · -- not mapped: vmfault
     k_step_gen (wp_s_branch c5 _ (KA.«copyin» + 0x66#64) true 8138#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [co_bne_zero _ hz] next c6 hp6
+      with [Xv6.UPtAlloc.bne_neg _ hz] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_add c6 _ (KA.«copyin» + 0x68#64) true 13#5 0#5 26#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e26, h26] next c7 hp7
@@ -378,7 +358,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     have hpinB : k.sie = false ∨ k.proc = 0#64 → c12 = cur := fun h =>
       (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
         ((hp7 h).trans ((hp6 h).trans (hpinA h)))))))
-    k_norm_g [ci_ret_164e, co_withSpie_withSpie, co_withRegs_withSpie]
+    k_norm_g [ci_ret_164e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_withRegs]
     simp only [calleeSaved, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs3
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
     have hsp3' : k.sie = false → spie2 = spie ∧ spp2 = spp := hsp3
@@ -387,7 +367,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     · -- vmfault failed: return -1
       k_step_gen (wp_s_branch c12 _ (KA.«copyin» + 0x74#64) true 8124#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [co_bne_zero _ hr0] next c13 hp13
+        with [Xv6.UPtAlloc.bne_neg _ hr0] next c13 hp13
       iintro Hk Hpc
       k_step_gen (wp_s_addi c13 _ (KA.«copyin» + 0x76#64) true 4095#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c14 hp14
@@ -437,13 +417,13 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       have hext2 : P.extSz psz (P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R)) :=
         UMemL.extSz_trans hext1 (UMemL.extSz_insertLeaf psz P1 _ r hnone (by omega))
       have hpa2 : pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = r := by
-        rw [UMemL.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
-        exact UMemL.pageAddr_of_valid r hval
+        rw [Xv6.UPt.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
+        exact Xv6.Kvm.pageAddr_of_valid r hval
       -- fix HP's index and view, and the buffer content, on the goal
       rw [hvpn, ← hVF, hbufeq]
       k_step_gen (wp_s_branch c12 _ (KA.«copyin» + 0x74#64) true 8124#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [co_bne_ne _ hrne] next c13 hp13
+        with [Xv6.UPtAlloc.bne_pos _ hrne] next c13 hp13
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans (hpinB h)) $$ HΦ
       iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
@@ -458,7 +438,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   · -- the page is mapped already
     k_step_gen (wp_s_branch c5 _ (KA.«copyin» + 0x66#64) true 8138#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [co_bne_ne _ hz] next c6 hp6
+      with [Xv6.UPtAlloc.bne_pos _ hz] next c6 hp6
     iintro Hk Hpc
     simp only [walkaddrRet, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hret2
     rcases hret2 with ⟨hr0, -⟩ | ⟨w, hw, hvu, hlt38, hpa⟩
@@ -548,7 +528,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     rw [co_ofNat_sub (A + d) _ (by omega) hA64]; congr 1; omega
   have hsext : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n))
       = BitVec.ofNat 64 n := by
-    refine co_sext32 _ ?_; rw [BitVec.toNat_ofNat]; omega
+    refine Xv6.UPtAlloc.sextw_small _ ?_; rw [BitVec.toNat_ofNat]; omega
   have hcomm : BitVec.ofNat 64 ((A + d) % 4096) + pte2pa w
       = pte2pa w + BitVec.ofNat 64 ((A + d) % 4096) := BitVec.add_comm _ _
   have hdlen : d + n ≤ (umemRead (viewFaulted P P2 M) A d ++ old.drop d).length := by
@@ -573,7 +553,7 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
   rw [hbufmid, ← hcs_in]
   -- sub a1,s2,s3 ; addiw a2,s1,0 ; c.add a1,a0 ; c.mv a0,s5 ; jal memmove
   k_step_gen (wp_s_sub cur _ (KA.«copyin» + 0x3c#64) false 11#5 18#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h19, ci_offB A d hA64, ci_offB' A d hA64] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, h19, Xv6.co_offB A d hA64, Xv6.co_offB' A d hA64] next c1 hp1
   iintro Hk Hpc
   k_step_gen (wp_s_addiw c1 _ (KA.«copyin» + 0x40#64) false 0#12 12#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -754,7 +734,7 @@ theorem ci_nsel (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19, h18] next c1 hp1
   iintro Hk Hpc
   k_step_gen (wp_s_add c1 _ (KA.«copyin» + 0x34#64) true 9#5 9#5 22#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22, ci_nval A d hA64] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22, Xv6.co_nval A d hA64] next c2 hp2
   iintro Hk Hpc
   by_cases hge : 4096 - (A + d) % 4096 ≤ old.length - d
   · -- the whole rest of the page
@@ -959,7 +939,6 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
 /-! ## `copyin` meets its specification -/
 
 
-
 set_option maxHeartbeats 4000000 in
 /-- **`copyin` meets its specification.** -/
 theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
@@ -974,7 +953,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     have h0 : k.regs 14#5 = 0#64 := by rw [hlen, hnil]
     k_step_gen (wp_s_branch cpu _ KA.«copyin» true 152#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, co_beq_zero _ h0] next c1 hp1
+      with [KCtx.rget_eq, Xv6.UPtAlloc.beq_pos _ h0] next c1 hp1
     iintro Hk Hpc
     k_step_gen (wp_s_addi c1 _ (KA.«copyin» + 0x98#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -991,7 +970,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       · ipureintro
         refine ⟨UMemL.extSz_refl _ P, Or.inl ⟨?_, ?_, ?_⟩⟩
         · simp only [RegMap.set_apply, KCtx.rget_zero, BitVec.reduceEq, ite_true, ite_false]
-        · rw [UMemL.viewFaulted_self, hnil, ci_umemRead_zero, hbs]
+        · rw [UMemL.viewFaulted_self, hnil, Xv6.UMemL.umemRead_zero, hbs]
         · rw [hnil]; exact UMemL.umMapped_zero P _
       · isplitl [HP]
         · rw [UMemL.viewFaulted_self]; iexact HP
@@ -1009,7 +988,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       omega
     k_step_gen (wp_s_branch cpu _ KA.«copyin» true 152#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, co_beq_ne _ hlenne] next c0 hp0
+      with [KCtx.rget_eq, Xv6.UPtAlloc.beq_neg _ hlenne] next c0 hp0
     iintro Hk Hpc
     iapply (wp_prologueCi_gen c0 _ (KA.«copyin» + 0x2#64) (by k_norm_g; omega)) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -1061,7 +1040,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       (Or.inl rfl) P (UMemL.extSz_refl _ P) (UMemL.umMapped_zero P _) k.spie k.spp _
       ?hsp0 ?h18' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c10) $$ [- $Hk $Hpc]
     rotate_right 1
-    rw [UMemL.viewFaulted_self, List.drop_zero, ci_umemRead_zero, List.nil_append]
+    rw [UMemL.viewFaulted_self, List.drop_zero, Xv6.UMemL.umemRead_zero, List.nil_append]
     iframe #
     iframe HP Hdst
     case hsp0 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -1079,7 +1058,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     iapply wpNext_intro_pin
     iintro %c11 %hp11 %spie2 %spp2 %R2 %P3 %bs' %hsp2 Hk Hpc HP Hdst %hpost
     obtain ⟨hs2, hcip, h27fin⟩ := hpost
-    rw [co_pushed_withSpie] at *
+    rw [MachCSL.KCtx.withSpie_pushed] at *
     iapply (wp_epilogueCi_gen c11 (k.withSpie spie2 spp2) (KA.«copyin» + 0x7c#64)
       (by simp only [KCtx.withSpie_avail]; omega) R2 hs2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)
@@ -1104,7 +1083,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
         rcases hr with h | ⟨h1, h2, e, hel, heA, hn⟩
         · exact Or.inl h
         · refine Or.inr ⟨h1, h2, e, hel, ?_⟩
-          rwa [ci_addr_toNat _ _ heA]
+          rwa [Xv6.paAddToNat' _ _ heA]
       · isplitl [HP]
         · iexact HP
         · iexact Hdst

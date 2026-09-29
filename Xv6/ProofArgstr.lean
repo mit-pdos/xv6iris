@@ -34,12 +34,6 @@ theorem argstr_ret_1c : jumpPc (KA.«argstr» + 0x1c#64) = (KA.«argstr» + 0x1c
 theorem argstr_br_argraw : KA.«argstr» + 0xfffffffffffffedc#64 = KA.«argraw» := by decide
 theorem argstr_br_fetchstr : KA.«argstr» + 0xffffffffffffff86#64 = KA.«fetchstr» := by decide
 
-theorem argstr_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem argstr_withSpie_twice (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := by
-  cases k; rfl
-
 theorem argstr_calleeSaved_mk (KR R : RegMap)
     (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5)
     (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5)
@@ -259,7 +253,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
-  rw [argstr_withSpie_twice, argstr_pushed_withSpie]
+  rw [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   iapply (argstr_exit cpu c9 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
         ⌜V.upt.extSz V.sz Q' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old cs r⌝ ∗

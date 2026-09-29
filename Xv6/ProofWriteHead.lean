@@ -7,6 +7,12 @@ import Xv6.BcacheLock
 import Xv6.CodeTactics
 import Xv6.FsCallSites
 import Xv6.SpecBwrite
+import Xv6.BlkmapBuf
+import Xv6.EndOpDefs
+import Xv6.FileInv
+import Xv6.FsWords
+import Xv6.InitlogHead
+import Xv6.VirtioDiskRwDefs2
 
 namespace Xv6
 
@@ -50,18 +56,12 @@ theorem whBytes_length (n : Nat) (W : List (BitVec 32)) (t : Nat) (bs0 : List (B
     List.length_drop]
   omega
 
-theorem wh_leAssemble_wordToBytes4 (w : BitVec 32) : leAssemble (MachCSL.wordToBytes4 w) = w.toNat := by
-  have hw : w.toNat < 2 ^ 32 := w.isLt
-  simp only [MachCSL.wordToBytes4, leAssemble, nthByte, BitVec.extractLsb'_toNat,
-    Nat.shiftRight_eq_div_pow, Nat.reduceMul, Nat.reducePow]
-  omega
-
 theorem leWord_mid (pre : List (BitVec 8)) (w : BitVec 32) (post : List (BitVec 8)) (i : Nat)
     (h : pre.length = 4 * i) :
     leWord (pre ++ MachCSL.wordToBytes4 w ++ post) i = w.toNat := by
   unfold leWord
   rw [List.append_assoc, List.drop_left' h, List.take_left' (MachCSL.wordToBytes4_length w)]
-  exact wh_leAssemble_wordToBytes4 w
+  exact Xv6.leAssemble_wordToBytes4 w
 
 theorem wbytes_split (W : List (BitVec 32)) (i : Nat) (hi : i < W.length) :
     wbytes W = wbytes (W.take i) ++ (MachCSL.wordToBytes4 W[i] ++ wbytes (W.drop (i + 1))) := by
@@ -138,43 +138,6 @@ theorem whBytes_hdrDec (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8))
 
 /-! ## Arithmetic the code computes -/
 
-theorem wh_sext_ofNat (m : Nat) (h : m < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 m) = BitVec.ofNat 64 m := by
-  have hw : (BitVec.ofNat 32 m).toNat = m := by
-    simp only [BitVec.toNat_ofNat]; omega
-  have hmsb : (BitVec.ofNat 32 m).msb = false := by
-    rw [BitVec.msb_eq_decide, hw]
-    exact decide_eq_false (by omega)
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false hmsb]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, hw]
-
-theorem wh_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
-/-- `blez a2` with `n = 0`: taken. -/
-theorem wh_blez_zero : bcond bop.BGE 0#64 0#64 = true := by decide
-
-/-- `blez a2` with `n ≥ 1`: not taken. -/
-theorem wh_blez_pos (n : Nat) (h1 : 1 ≤ n) (h : n < 2 ^ 31) :
-    bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 n)) = false := by
-  show (!(0#64).slt (BitVec.signExtend 64 (BitVec.ofNat 32 n))) = false
-  have h2 : (BitVec.ofNat 32 n).toInt = n := by
-    rw [BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega), BitVec.toNat_ofNat,
-      Nat.mod_eq_of_lt (by omega)]
-  have hlt : (0#64).slt (BitVec.signExtend 64 (BitVec.ofNat 32 n)) = true := by
-    rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_signExtend_of_le (by omega), h2]
-    simp; omega
-  rw [hlt]; rfl
-
-/-- `slli a2,a2,2` on the loaded `log.lh.n`. -/
-theorem wh_slli2 (n : Nat) (h : n < 2 ^ 31) :
-    (BitVec.signExtend 64 (BitVec.ofNat 32 n)) <<< 2 = BitVec.ofNat 64 (4 * n) := by
-  rw [wh_sext_ofNat n h]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.shiftLeft_eq, Nat.reducePow]
-  omega
-
 /-- The loop cursor `a5 = buf + 4t` and the loop bound `a2 = buf + 4n`. -/
 def whCur (kk t : Nat) : BitVec 64 := bnode kk + BitVec.ofNat 64 (4 * t)
 
@@ -186,14 +149,6 @@ theorem whCur_comm (kk n : Nat) : BitVec.ofNat 64 (4 * n) + bnode kk = whCur kk 
 
 theorem whCur_step (kk t : Nat) : whCur kk t + 4#64 = whCur kk (t + 1) := by
   unfold whCur
-  rw [BitVec.add_assoc]
-  congr 1
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
-theorem lhBlock_step (i : Nat) : lhBlock i + 4#64 = lhBlock (i + 1) := by
-  unfold lhBlock
   rw [BitVec.add_assoc]
   congr 1
   apply BitVec.eq_of_toNat_eq
@@ -218,20 +173,6 @@ theorem whCur_bne (kk x y : Nat) (hx : x ≤ 30) (hy : y ≤ 30) :
   · have hne : whCur kk x ≠ whCur kk y := fun e => h (hiff.mp e)
     simp [hne, h]
 
-/-- `b->data` is four-byte aligned. -/
-theorem wh_bufdata_align (kk : Nat) (hkk : kk < NBUF) : (aBufData (bnode kk)).toNat % 4 = 0 := by
-  have h := bufData_toNat kk 0 hkk (by unfold BSIZE; omega)
-  have hz : aBufData (bnode kk) + BitVec.ofNat 64 0 = aBufData (bnode kk) := by simp
-  rw [hz] at h
-  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
-  rw [hbc] at h
-  omega
-
-theorem wh_hdr_addr (kk : Nat) :
-    aBufData (bnode kk) + BitVec.ofNat 64 (4 * 0) = bnode kk + 88#64 := by
-  unfold aBufData bOffData
-  simp
-
 theorem wh_slot_addr (kk t : Nat) :
     aBufData (bnode kk) + BitVec.ofNat 64 (4 * (t + 1)) = whCur kk t + 92#64 := by
   unfold aBufData bOffData whCur
@@ -255,8 +196,8 @@ theorem wh_hdr_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4 �
         byteBuf (aBufData (bnode kk)) (DFrac.own 1)
           (bs.take (4 * 0) ++ MachCSL.wordToBytes4 w' ++ bs.drop (4 * 0 + 4))) := by
   have h := byteBuf_word4_at (GF := GF) (aBufData (bnode kk)) bs 0 (by omega)
-    (wh_bufdata_align kk hkk)
-  rw [wh_hdr_addr kk] at h
+    (Xv6.bm_base_align4 kk hkk)
+  rw [Xv6.il_word0_addr kk] at h
   exact h
 
 /-- Word `t+1` of the header, at the address `c.sw a3,92(a5)` computes. -/
@@ -269,7 +210,7 @@ theorem wh_slot_acc (kk t : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8))
         byteBuf (aBufData (bnode kk)) (DFrac.own 1)
           (bs.take (4 * (t + 1)) ++ MachCSL.wordToBytes4 w' ++ bs.drop (4 * (t + 1) + 4))) := by
   have h := byteBuf_word4_at (GF := GF) (aBufData (bnode kk)) bs (t + 1) hl
-    (wh_bufdata_align kk hkk)
+    (Xv6.bm_base_align4 kk hkk)
   rw [wh_slot_addr kk t] at h
   exact h
 
@@ -363,10 +304,10 @@ theorem wh_loop_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
         MachCSL.wordToBytes4 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 W[t])) ++
         (whBytes n W t bs0).drop (4 * (t + 1) + 4)) ⊢
       byteBuf (aBufData (bnode kk)) (DFrac.own 1) (whBytes n W (t + 1) bs0) by
-    rw [wh_ext_sext W[t], whBytes_step n t W bs0 W[t] ht' hw]) $$ Hby
+    rw [Xv6.fw_ext32 W[t], whBytes_step n t W bs0 W[t] ht' hw]) $$ Hby
   -- +0x3e  c.addi a4,a4,4
   k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x3e#64) true 4#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h14, lhBlock_step t]
+    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h14, Xv6.il_lhBlock_step t]
   iintro Hk Hpc
   -- +0x40  c.addi a5,a5,4
   k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x40#64) true 4#12 15#5 15#5 (by decide))
@@ -470,8 +411,6 @@ theorem wh_log_addr : KA.«write_head» + 0x1ea34#64 = logAddr := by
 theorem wh_lhb0 : KA.«write_head» + 0x1ea64#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
-theorem wh_lStart : logAddr + 24#64 = lStart := rfl
-theorem wh_lDev : logAddr + 36#64 = lDev := rfl
 theorem wh_lhN : logAddr + 44#64 = lhNAddr := rfl
 
 /-! ## The three callees, at their call sites -/
@@ -761,24 +700,24 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   try (iframe #)
-  k_norm_g [wh_lStart]
+  k_norm_g [Xv6.eo_o_start]
   try (iframe #)
   try iframe
   inext
   k_next_e
-  k_norm_g [wh_lStart]
+  k_norm_g [Xv6.eo_o_start]
   iintro Hk Hpc -
   iapply (wp_s_lw cpu _ (KA.«write_head» + 0x18#64) false 36#12 10#5 18#5 (by decide) (by decide)
       DFrac.discard dev) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   try (iframe #)
-  k_norm_g [wh_lDev]
+  k_norm_g [Xv6.eo_o_dev]
   try (iframe #)
   try iframe
   inext
   k_next_e
-  k_norm_g [wh_lDev]
+  k_norm_g [Xv6.eo_o_dev]
   iintro Hk Hpc -
   -- +0x1c jal bread
   k_step_e (wp_s_jal cpu _ (KA.«write_head» + 0x1c#64) false 2093198#21 1#5 (by decide))
@@ -826,7 +765,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_step_e (wp_s_sw cpu _ (KA.«write_head» + 0x26#64) true 88#12 10#5 12#5 (by decide)
       (bytesToWord4 ((bs2.drop (4 * 0)).take 4)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [ha0kk, wh_ext_sext (BitVec.ofNat 32 n)]
+    with [ha0kk, Xv6.fw_ext32 (BitVec.ofNat 32 n)]
   iintro Hk Hpc Hword
   ihave Hby := Hwclose $$ %(BitVec.ofNat 32 n) Hword
   ihave Hby := (show byteBuf (GF := GF) (aBufData (bnode kk)) (DFrac.own 1)
@@ -844,7 +783,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   · -- the `blez` is taken: nothing to copy
     subst hn0
     k_step_e (wp_s_branch0 cpu _ (KA.«write_head» + 0x28#64) false 30#13 12#5 (by decide) bop.BGE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_blez_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.vdrw2_blez0]
     iintro Hk Hpc
     ihave Hhold := Hhclose $$ %(whBytes 0 W 0 bs2) %hbsl Hby
     iapply (wh_tail BW BE Γ cpu k spie2 spp2
@@ -873,7 +812,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
     have hn1 : 1 ≤ n := by omega
     k_step_e (wp_s_branch0 cpu _ (KA.«write_head» + 0x28#64) false 30#13 12#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [wh_blez_pos n hn1 (by unfold LOGBLOCKS at hnB; omega)]
+      with [Xv6.fd_bgtz n hn1 (by unfold LOGBLOCKS at hnB; omega)]
     iintro Hk Hpc
     -- +0x2c auipc a4,0x1f ; +0x30 addi a4,a4,-1970
     k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0x2c#64) false 0x1f#20 14#5 (by decide))
@@ -888,7 +827,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
     iintro Hk Hpc
     k_step_e (wp_s_slli cpu _ (KA.«write_head» + 0x36#64) true 2#6 12#5 12#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [wh_slli2 n (by unfold LOGBLOCKS at hnB; omega)]
+      with [Xv6.il_slli2 n (by unfold LOGBLOCKS at hnB; omega)]
     iintro Hk Hpc
     k_step_e (wp_s_add cpu _ (KA.«write_head» + 0x38#64) true 12#5 12#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0kk, whCur_comm kk n]

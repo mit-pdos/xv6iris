@@ -12,7 +12,7 @@ so the copies had multiplied the same way.  This definitional file holds
 them once.  Merged here (statement identical, only the name changed):
 
 * `fw_w32`       -- `ba_w32`, `ialloc_w32`
-* `fw_sext32`    -- `ba_sext32`, `bm_sext32`, `ialloc_sext32`
+* `MachCSL.signExtend_ofNat32`    -- `ba_sext32`, `bm_sext32`, `ialloc_sext32`
 * `fw_bgeu_nat`  -- `ba_bgeu_nat`, `ialloc_bgeu_nat`
 * `fw_succ64`    -- `ba_succ64`
 * `fw_sext_zero` -- `ba_sext_zero`, `bm_sext_zero`
@@ -35,14 +35,6 @@ theorem fw_w32 (a : Nat) (h : a < 2 ^ 31) :
   rw [BitVec.extractLsb'_toNat]
   simp only [Nat.shiftRight_zero, BitVec.toNat_ofNat]
   omega
-
-/-- A small `uint`, sign-extended by the RV64 ABI, is its own value (Rocq's
-`ba_sext32` / `bm_sext32`). -/
-theorem fw_sext32 (a : Nat) (h : a < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 a) = BitVec.ofNat 64 a := by
-  rw [BitVec.signExtend_eq_setWidth_of_msb_false
-    (by rw [BitVec.msb_eq_decide]; simp [BitVec.toNat_ofNat]; omega)]
-  bv_omega
 
 /-- `bgeu` between two small naturals. -/
 theorem fw_bgeu_nat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :

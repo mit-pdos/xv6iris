@@ -21,6 +21,7 @@ about `s2` is needed: either arm ends at +0xae).
 -/
 import Xv6.SpecYield
 import Xv6.UsertrapBlocks
+import Xv6.ConsoleintrParts
 
 namespace Xv6
 
@@ -43,12 +44,7 @@ theorem ut_fa_ret_106 : jumpPc (KA.«usertrap» + 0x106#64) = KA.«usertrap» + 
 
 theorem ut_bne_sext0 : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
-theorem ut_bne_sext_nz (kl : BitVec 32) (h : kl ≠ 0#32) : bcond bop.BNE (BitVec.signExtend 64 kl) 0#64 = true := by
-  have : BitVec.signExtend 64 kl ≠ 0#64 := by
-    intro he; apply h; bv_decide
-  simp [bcond, this]
 
-theorem ut_bne_ne (x y : BitVec 64) (h : x ≠ y) : bcond bop.BNE x y = true := by simp [bcond, h]
 theorem ut_bne_eq (x : BitVec 64) : bcond bop.BNE x x = false := by simp [bcond]
 
 
@@ -117,7 +113,7 @@ theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK :
     · exact absurd rfl hne
   · -- +0xac  c.bnez a0 : taken
     k_step_e (wp_s_branch cpu _ (KA.«usertrap» + 0xac#64) true 72#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext_nz kl hk0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bcond_bne_sext_ne kl hk0]
     iintro Hk Hpc
     unfold utKillRead
     icases Hrd with (⟨%he, -⟩ | ⟨-, #Hsh, #Hcr⟩)
@@ -203,7 +199,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
   rotate_right 1
   · k_next_e
     iintro %spie %spp %R' %kl %- Hk Hpc %⟨hcs, h10⟩ ⟨%hk0, Hqp, Hrg⟩
-    k_norm_g [ut_pushed_withSpie, ut_a6_ret_ac]
+    k_norm_g [MachCSL.KCtx.withSpie_pushed, ut_a6_ret_ac]
     ihave Hpriv := Hprivb $$ Hqp Hrg
     ihave Hown := Hownb $$ %V2 %M2 %sts2 %cs2 [Hpriv] Hfr Hch Hsy
     · rw [hok.pj]; iexact Hpriv
@@ -214,7 +210,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     -- +0xac  c.bnez a0 : taken
     k_step_e (wp_s_branch cpu _ (KA.«usertrap» + 0xac#64) true 72#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext_nz kl hk0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bcond_bne_sext_ne kl hk0]
     iintro Hk Hpc
     -- +0xf4  c.li s2,0 ; +0xf6  c.li a0,-1 ; +0xf8  jal kexit
     k_step_e (wp_s_addi cpu _ (KA.«usertrap» + 0xf4#64) true 0#12 18#5 0#5 (by decide))
@@ -309,7 +305,7 @@ theorem usertrap_a6_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HR : UT_RE
   rotate_right 1
   · k_next_e
     iintro %spie %spp %R' %kl %- Hk Hpc %⟨hcs, h10⟩ ⟨Hrd, Hqp, Hrg, Hmk⟩
-    k_norm_g [ut_pushed_withSpie, ut_a6_ret_ac]
+    k_norm_g [MachCSL.KCtx.withSpie_pushed, ut_a6_ret_ac]
     ihave Hpriv := Hprivb $$ Hqp Hrg Hmk
     ihave Hown := Hownb $$ %V2 %M2 %sts2 %cs2 [Hpriv] Hfr Hch Hsy
     · rw [hok.pj]; iexact Hpriv
@@ -363,7 +359,7 @@ theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET
       iframe Hce
       iapply wpNext_intro_pin
       iintro %c1 %hp1 %spie %spp %R' Hk Hpc Hts Hce Hir %hcs
-      k_norm_g [ut_pushed_withSpie, ut_fa_ret_106]
+      k_norm_g [MachCSL.KCtx.withSpie_pushed, ut_fa_ret_106]
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       -- +0x106  c.j +0xae
       k_step_gen (wp_s_j c1 _ (KA.«usertrap» + 0x106#64) true 2097064#21)
@@ -392,7 +388,7 @@ theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET
       | (k_norm_g; exact hsie)
   · -- +0xfe  bne s2,a5 : taken, straight to +0xae
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xfe#64) false 8112#13 18#5 15#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_bne_ne _ _ h2]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_bne_ne _ _ h2]
     iintro Hk Hpc
     have hpins' : utPins A (R.set 15#5 2#64) :=
       utPins_set A R 15#5 _ hpins (by decide) (by decide) (by decide)

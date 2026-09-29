@@ -133,21 +133,13 @@ theorem kgrep_setWidth_toNat (b : BitVec 8) : (BitVec.setWidth 64 b).toNat = b.t
   simp only [BitVec.toNat_setWidth]
   exact Nat.mod_eq_of_lt (Nat.lt_trans b.isLt (by decide))
 
-theorem kgrep_setWidth_inj (a b : BitVec 8) : BitVec.setWidth 64 a = BitVec.setWidth 64 b ↔ a = b := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    rwa [kgrep_setWidth_toNat, kgrep_setWidth_toNat] at this
-  · intro h; rw [h]
-
 /-- `beq` of two loaded bytes (Rocq `moi_byte_eq`). -/
 theorem kgrep_beq_byte (a b : BitVec 8) :
     ukBtaken .BEQ (BitVec.setWidth 64 a) (BitVec.setWidth 64 b) = decide (a = b) := by
   simp only [ukBtaken, beq_iff_eq]
   by_cases h : a = b
   · subst h; simp
-  · have : BitVec.setWidth 64 a ≠ BitVec.setWidth 64 b := fun e => h ((kgrep_setWidth_inj a b).1 e)
+  · have : BitVec.setWidth 64 a ≠ BitVec.setWidth 64 b := fun e => h ((Xv6.setWidth64_inj a b).1 e)
     simp [this, h]
 
 /-- `bne` of two loaded bytes. -/
@@ -289,7 +281,7 @@ theorem kgrep_not_add (x y : Nat) (hxy : x + 1 ≤ y) (hy : y < 2 ^ 64) :
 theorem kgrep_sp_back (sp : BitVec 64) (k : Nat) (hk : 8 * k ≤ sp.toNat) :
     sp + BitVec.ofInt 64 (-((8 * k : Nat) : Int)) + BitVec.ofNat 64 (8 * k) = sp := by
   apply BitVec.eq_of_toNat_eq
-  rw [uv_avi_pos _ _ (by rw [uv_avi_neg sp (8 * k) hk]; have := sp.isLt; omega), uv_avi_neg sp (8 * k) hk]
+  rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp (8 * k) hk]; have := sp.isLt; omega), uv_avi_neg sp (8 * k) hk]
   omega
 
 /-! ## §3 Register bookkeeping (Rocq §2, deviation 3) -/
@@ -593,7 +585,7 @@ theorem kgrep_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (sp0
     simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
-    rw [uv_avi_pos _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
+    rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
     omega
   ihave Hfr : ustack N.d (m2.get spIdx + BitVec.ofNat 64 (8 * 2)) 2 $$ [Hra Hs0]
   · rw [hsp2]

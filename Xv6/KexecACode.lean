@@ -72,6 +72,7 @@ import Xv6.SpecBeginOp
 import Xv6.SpecNamei
 import Xv6.SpecIlock
 import Xv6.FsCallSitesI
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -154,10 +155,6 @@ theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileName
 
 end Pid
 
-theorem kxcA_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
 
 theorem kxcA_bne (x y : BitVec 64) : bcond bop.BNE x y = decide (x ≠ y) := by
   simp only [bcond]; by_cases h : x = y
@@ -660,7 +657,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
     icases inodeHeld_zi ipv $$ Hheld with ⟨%zi, Hheld⟩
     have hd : decide (ipv = 0#64) = false := by simp [hnz]
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz, hd]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
     iintro Hk Hpc
     ihave Hpriv := Hpriv $$ Hpid Hcwd Hcwr
     iapply HK $$ %cpu %spie3 %spp3 %R3 %ipv %zi %n1 [- Hcl] Hcl

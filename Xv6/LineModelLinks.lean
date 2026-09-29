@@ -12,7 +12,7 @@ that the write links ask for.  Proved here ONCE over the model, from a
 record of HOOKS (`LmHooks`).
 
 Names: Rocq's, camelCased; `lm_hooks` is `LmHooks` (fields `lmh*`), the
-`ll_` list facts keep their prefix (`ll_app_snoc` → `ll_app_snoc`).  The
+`ll_` list facts keep their prefix (`Xv6.epuApp_snoc` → `Xv6.epuApp_snoc`).  The
 section's `(M : lmodel) (L : lm_laws M) (K : lm_hooks M)` are Lean section
 variables in the same order; a lemma whose Rocq proof is `Proof using L`
 (or `K`) without naming it in its statement takes it through `include`, so
@@ -39,49 +39,28 @@ Deviations from Rocq:
    reached but is a DU9 decider (deviation 1).)
 -/
 import Xv6.LineModel
+import Xv6.EchoLinks
+import Xv6.EchoOutPure
+import Xv6.PipeOutPure
 
 namespace Xv6
 
 /-! ## §0 Small list facts, and the prologue's -/
-
-theorem ll_app_snoc {A : Type} (pre : List A) (a : A) (l : List A) :
-    (pre ++ [a]) ++ l = pre ++ a :: l := by simp
-
-theorem ll_app_cons_ne {A : Type} (l : List A) (a : A) (r : List A) : l ≠ l ++ a :: r := by
-  intro h
-  have := congrArg List.length h
-  simp at this
-
-theorem ll_removelast_snoc {A : Type} (l : List A) (a : A) : (l ++ [a]).dropLast = l := by simp
 
 theorem ll_snoc_cases {A : Type} (l : List A) : l = [] ∨ ∃ u x, l = u ++ [x] := by
   induction l using lineSnocInd with
   | nil => exact Or.inl rfl
   | snoc u x _ => exact Or.inr ⟨u, x, rfl⟩
 
-theorem ll_removelast_take {A : Type} (l : List A) : l.dropLast = l.take (l.length - 1) :=
-  List.dropLast_eq_take
-
 theorem ll_removelast_prefix {A : Type} (l : List A) : l.dropLast <+: l := by
-  rw [ll_removelast_take]; exact List.take_prefix _ _
-
-theorem ll_prefix_of_removelast {A : Type} (l l' : List A) (hp : l <+: l') (hne : l ≠ l') :
-    l <+: l'.dropLast := by
-  have hlen := hp.length_le
-  have hlt : l.length < l'.length := by
-    rcases Nat.lt_or_ge l.length l'.length with h | h
-    · exact h
-    · exact absurd (hp.eq_of_length (by omega)) hne
-  have hl : l = l'.take l.length := List.prefix_iff_eq_take.mp hp
-  rw [ll_removelast_take, hl]
-  exact prefix_take_le _ _ _ (by omega)
+  rw [Xv6.pop_removelast_take]; exact List.take_prefix _ _
 
 theorem ll_nlines_removelast (I : List (BitVec 8)) (hr : restOf I = []) :
     nlines I.dropLast = nlines I - 1 := by
   rcases ll_snoc_cases I with rfl | ⟨u, x, rfl⟩
   · rfl
   · by_cases hx : x = wlNl
-    · subst hx; rw [ll_removelast_snoc, nlines_snoc_nl]; omega
+    · subst hx; rw [Xv6.epuRemovelast_snoc, nlines_snoc_nl]; omega
     · exfalso; rw [restOf_snoc_other u x hx] at hr; simp at hr
 
 theorem ll_nstarted_rest_nil (I : List (BitVec 8)) (hr : restOf I = []) : nstarted I = nlines I := by
@@ -100,13 +79,6 @@ theorem ll_lta_prefix (cs0 cs : List Nat) (i : Nat) (hp : cs0 <+: cs) (hi : i < 
 theorem ll_snoc_lookup_total (cs : List Nat) (a : Nat) : (cs ++ [a])[cs.length]! = a := by
   simp
 
-theorem ll_bodiesOf_app_nonl (I l : List (BitVec 8)) (hl : wlNl ∉ l) :
-    bodiesOf (I ++ l) = bodiesOf I := by
-  simp [bodiesOf, wlCut_app_nonl I l hl]
-
-theorem ll_nlines_app_nonl (I l : List (BitVec 8)) (hl : wlNl ∉ l) : nlines (I ++ l) = nlines I := by
-  simp [nlines, ll_bodiesOf_app_nonl I l hl]
-
 theorem ll_restOf_app_nonl (I l : List (BitVec 8)) (hr : restOf I = []) (hl : wlNl ∉ l) :
     restOf (I ++ l) = l := by
   have hc := wlCut_app_nonl I l hl
@@ -117,11 +89,7 @@ theorem ll_restOf_app_nonl (I l : List (BitVec 8)) (hr : restOf I = []) (hl : wl
 
 theorem ll_proRounds_one : proRounds [0] = 1 := rfl
 
-theorem ll_prompt_len : uPrompt.length = 2 := rfl
-
 theorem ll_proAlts_0 : proAlts[0]! = uPrompt := rfl
-
-theorem ll_prompt_tail : uPrompt[1]? = some (uPrompt[1]!) := rfl
 
 theorem ll_proOf_open_snoc_eq (ps : List Nat) (a : Nat) (hnd : ¬ proDone ps) :
     proOf (ps ++ [a]) = proOf ps ++ proAlts[a]! := by
@@ -317,7 +285,7 @@ theorem lmPendingAt_stage_ext (ps0 ps cs0 cs : List Nat) (s0 : M.lmSt) (I0 J : L
     (hn : nlines I0.dropLast ≤ cs0.length) (hJ : J <+: I0) (hne : J ≠ I0) :
     lmPendingAt M ps0 cs0 s0 J = lmPendingAt M ps cs s0 J := by
   have hjl : nlines J ≤ cs0.length :=
-    Nat.le_trans (nlines_prefix _ _ (ll_prefix_of_removelast J I0 hJ hne)) hn
+    Nat.le_trans (nlines_prefix _ _ (Xv6.pop_prefix_of_removelast J I0 hJ hne)) hn
   exact lmPendingAt_cs_prefix M ps0 ps cs0 cs s0 J hps hcs hjl (hpin _ (nstarted_strict J I0 hJ hne))
 
 theorem lmProcBeforeFrom_app (ps cs : List Nat) (s0 : M.lmSt) (pre I1 I2 : List (BitVec 8)) :
@@ -368,9 +336,9 @@ theorem lmProcBeforeFrom_ext (ps0 ps cs0 cs : List Nat) (s0 : M.lmSt) (pre I : L
   induction I generalizing pre with
   | nil => rfl
   | cons b I ih =>
-    have hshape : (pre ++ [b]) ++ I = pre ++ b :: I := ll_app_snoc pre b I
+    have hshape : (pre ++ [b]) ++ I = pre ++ b :: I := Xv6.epuApp_snoc pre b I
     have hhere : lmPendingAt M ps0 cs0 s0 pre = lmPendingAt M ps cs s0 pre :=
-      hj pre (List.prefix_refl _) (List.prefix_append _ _) (ll_app_cons_ne pre b I)
+      hj pre (List.prefix_refl _) (List.prefix_append _ _) (Xv6.epuApp_cons_ne pre b I)
     simp only [lmProcBeforeFrom]
     rw [hhere]
     congr 1
@@ -431,7 +399,7 @@ theorem lmProcBeforeFrom_gap (ps cs : List Nat) (s0 : M.lmSt) (pre k : List (Bit
     simp only [lmProcBeforeFrom, h0, List.nil_append]
     apply ih
     intro J hJ hne
-    rw [ll_app_snoc pre b J]
+    rw [Xv6.epuApp_snoc pre b J]
     apply hj
     · obtain ⟨z, rfl⟩ := hJ; exact ⟨z, rfl⟩
     · intro heq; apply hne; simpa using heq
@@ -448,11 +416,11 @@ theorem lmProcBefore_line (ps cs : List Nat) (s0 : M.lmSt) (I l : List (BitVec 8
       apply lmProcBeforeFrom_gap
       intro J hJ hne
       have hJl : J <+: l' := by
-        have := ll_prefix_of_removelast J (l' ++ [wlNl]) hJ hne
-        rwa [ll_removelast_snoc] at this
+        have := Xv6.pop_prefix_of_removelast J (l' ++ [wlNl]) hJ hne
+        rwa [Xv6.epuRemovelast_snoc] at this
       have hJn : wlNl ∉ J := by
         intro hin; obtain ⟨z, rfl⟩ := hJl; exact hl' (List.mem_append_left _ hin)
-      rw [ll_app_snoc I b J]
+      rw [Xv6.epuApp_snoc I b J]
       have h1 : I ++ b :: J ≠ [] := by simp
       have h2 : restOf (I ++ b :: J) ≠ [] := by
         rw [ll_restOf_app_nonl I (b :: J) hr (wlNonl_cons_2 b J hb hJn)]; simp
@@ -518,7 +486,7 @@ theorem lmAbs_prompt (s0 : M.lmSt) (cs : List Nat) (I : List (BitVec 8)) (a : Na
 theorem ll_prompt_tail_facts (x u : List (BitVec 8)) (h : x = u ++ uPrompt) :
     2 ≤ x.length ∧ x[x.length - 2]? = some (uPrompt[0]!) ∧ x[x.length - 1]? = some (uPrompt[1]!) := by
   subst h
-  rw [List.length_append, ll_prompt_len]
+  rw [List.length_append, Xv6.wrPrompt_len]
   refine ⟨by omega, ?_, ?_⟩
   · rw [show u.length + 2 - 2 = u.length + 0 by omega, lookup_app_shift]; rfl
   · rw [show u.length + 2 - 1 = u.length + 1 by omega, lookup_app_shift]; rfl
@@ -755,7 +723,7 @@ theorem lmWrPro_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P
     rw [lmProcStream, hlow, lmPendingAt_round_snoc M L ps cs s0 I 0 hm hr hnd hle, ll_proAlts_0,
       lmProcStream, List.append_assoc]
   have hlen : (lmProcStream M (ps ++ [0]) cs s0 I).length = P + 1 + 1 := by
-    rw [hup, List.length_append, ll_prompt_len, hP]
+    rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
   refine ⟨⟨lmProPin_mono M ps (ps ++ [0]) cs I hpre hpin, hm, hdv, ?_, hlen.symm⟩, ?_⟩
   · rw [proRounds_app, ll_proRounds_one]; omega
   · rw [hup, hP, lookup_app_shift]; rfl
@@ -775,7 +743,7 @@ theorem lmWrBlk_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P
       = lmProcBefore M ps cs s0 I ++ uPrompt := by
     rw [lmProcStream, hlow, hpend]
   have hlen : (lmProcStream M ps (cs ++ [K.lmhNoc (lmLineAt M I)]) s0 I).length = P + 1 + 1 := by
-    rw [hup, List.length_append, ll_prompt_len, hP]
+    rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
   refine ⟨⟨hpinS, hm, ?_, ?_, hlen.symm⟩, ?_⟩
   · rw [List.length_append, hdv]; rfl
   · rw [hdv, lmProIdx_snoc_ne M cs _ hnp]
@@ -791,7 +759,7 @@ theorem lmWrOpen_read (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P 
     (l : List (BitVec 8)) (h : lmWrOpen M ps cs s0 I P) (hl : wlNl ∉ l) :
     lmWrBlk M ps cs s0 (I ++ l ++ [wlNl]) P := by
   obtain ⟨hpin, hm, hdv, hrd, hP⟩ := h
-  have hnl : nlines (I ++ l) = nlines I := ll_nlines_app_nonl I l hl
+  have hnl : nlines (I ++ l) = nlines I := Xv6.nlines_app_nonl I l hl
   refine ⟨?_, restOf_snoc_nl (I ++ l), ?_, ?_⟩
   · intro q hq
     rw [ll_nstarted_snoc, hnl, hdv] at hq
@@ -943,7 +911,7 @@ theorem lmWrOwed_read_refute (ps cs ps0 cs0 : List Nat) (s0 : M.lmSt) (I I0 : Li
     (hle : (lmProcBefore M ps0 cs0 s0 I0).length ≤ P) : False := by
   obtain ⟨hFps0, hao0, hpin0, hbnd0⟩ := hrs
   have hqle : nlines I ≤ cs0.length :=
-    Nat.le_trans (nlines_prefix _ _ (ll_prefix_of_removelast I I0 hI hne)) hbnd0
+    Nat.le_trans (nlines_prefix _ _ (Xv6.pop_prefix_of_removelast I I0 hI hne)) hbnd0
   have hmono : (lmProcStream M ps0 cs0 s0 I).length ≤ (lmProcBefore M ps0 cs0 s0 I0).length :=
     (lmProcStream_before M ps0 cs0 s0 I I0 hI hne).length_le
   rcases hw with hw | hw

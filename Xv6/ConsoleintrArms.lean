@@ -9,6 +9,7 @@ OPEN (the three words, the bytes, the tag column and `ciGh`) and the
 byte's currency (`ConsoleintrGhost`), and ends in `ci_tail`.
 -/
 import Xv6.ConsoleintrParts
+import Xv6.FsWords
 
 namespace Xv6
 
@@ -23,8 +24,6 @@ set_option linter.unusedVariables false
 
 /-! ## Word and byte arithmetic of the arms -/
 
-theorem ci_lo32_sext (x : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x) = x := by
-  bv_decide
 
 theorem ci_inc32 (x : BitVec 32) :
     BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x + 1#64)))
@@ -41,7 +40,7 @@ theorem ci_dec32 (x : BitVec 32) :
 
 theorem ci_sext_inj (x y : BitVec 32) (h : BitVec.signExtend 64 x = BitVec.signExtend 64 y) : x = y := by
   have := congrArg (BitVec.extractLsb' 0 32) h
-  rwa [ci_lo32_sext, ci_lo32_sext] at this
+  rwa [Xv6.fw_ext32, Xv6.fw_ext32] at this
 
 theorem ci_byte_lo (c : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 c) = c := by
   bv_decide
@@ -54,7 +53,6 @@ theorem ci_cs_byte (c : BitVec 8) (h : c ≠ 13#8) : consputcCs (BitVec.setWidth
   have h1 : BitVec.setWidth 64 c ≠ cpBackspace := by unfold cpBackspace; bv_decide
   simp only [consputcCs, h1, if_false, echoOf, h, ci_byte_lo]
 
-theorem ci_echo_ne (c : BitVec 8) (h : c ≠ 13#8) : consXlate c = c := consXlate_other c h
 
 /-- The ring-space test `bltu 127, e - r` falling through: there is room. -/
 theorem ci_room (r e : BitVec 32)
@@ -62,7 +60,7 @@ theorem ci_room (r e : BitVec 32)
       (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 e) +
         -BitVec.extractLsb' 0 32 (BitVec.signExtend 64 r))) = false) :
     (e - r).toNat < INPUT_BUF_SIZE := by
-  rw [ci_lo32_sext, ci_lo32_sext] at h
+  rw [Xv6.fw_ext32, Xv6.fw_ext32] at h
   unfold INPUT_BUF_SIZE
   have h2 : e - r < 128#32 := by bv_decide
   have h3 := BitVec.lt_def.mp h2
@@ -76,7 +74,7 @@ theorem ci_nofit (r w e : BitVec 32) (hok : consOk r w e)
       (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 e) +
         -BitVec.extractLsb' 0 32 (BitVec.signExtend 64 r))) = true) :
     INPUT_BUF_SIZE ≤ (e - r).toNat := by
-  rw [ci_lo32_sext, ci_lo32_sext] at h
+  rw [Xv6.fw_ext32, Xv6.fw_ext32] at h
   have hle : (e - r).toNat ≤ 128 := hok.2
   have hle' : e - r ≤ 128#32 := by rw [BitVec.le_def]; simpa using hle
   unfold INPUT_BUF_SIZE
@@ -135,7 +133,7 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k : KC
   imodintro
   ihave Hres := ciGh_res cn r e e bs ts hlb hlt (consOk_set_w r w e hok) hrow
     $$ [Hr Hw He Hd Hts Hgh]
-  · rw [hR12, ci_lo32_sext]
+  · rw [hR12, Xv6.fw_ext32]
     iframe Hr Hw He Hd Hts Hgh
   -- auipc a0,0x12 ; addi a0,a0,-62 ; jal wakeup
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x15e#64) false 18#20 10#5 (by decide))
@@ -484,7 +482,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   · iframe Hinv Htag Hhi Hlgh Hap Hts Hgh
   imodintro
   have hbyte : BitVec.extractLsb' 0 8 (R2 9#5) = consXlate cb := by
-    rw [d9, hs1, ci_byte_lo, ci_echo_ne cb hc13]
+    rw [d9, hs1, ci_byte_lo, Xv6.consXlate_other cb hc13]
   have hlb' : (bs.set (BitVec.signExtend 64 e &&& 127#64).toNat (consXlate cb)).length =
       INPUT_BUF_SIZE := by rw [List.length_set]; exact hlb
   have hlt' : (ts.set (BitVec.signExtend 64 e &&& 127#64).toNat (some hb)).length =
@@ -803,7 +801,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
         (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
           (BitVec.signExtend 64 e + 18446744073709551615#64)))) ⊢
         wordPointsTo consEAddr 4 (DFrac.own 1) (e - 1#32) from by
-        rw [ci_lo32_sext, ci_dec32]) $$ He
+        rw [Xv6.fw_ext32, ci_dec32]) $$ He
     -- the erase character is OWED, and the ring POPS
     ihave ⟨Hhi, Hgh⟩ := ciGh_owe cn γ r w e bs ts hb cb hh hcn her hends hx $$ [Hhi Hgh]
     · iframe Hhi Hgh

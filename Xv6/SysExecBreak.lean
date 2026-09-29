@@ -255,7 +255,7 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   unfold wp_kexec_eb_body kexecK kxcBufs at h
   simp only [sysExecKA_γ, sysExecKA_pidv, sysExecKA_V, sysExecKA_M, sysExecKA_plen, sysExecKA_pfun, sysExecKA_na,
     sysExecKA_alen, sysExecKA_afun, sysExecKA_dqpv, sysExecKA_pd, sysExecKA_pav, sysExecKA_pu,
-    sysExecKA_cwi, sysExec_bview_path, h10, h11, hpj] at h
+    sysExecKA_cwi, Xv6.sys_mknod_bview_self, h10, h11, hpj] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hargv, Hpgs, Hbs, Hir, Hpay, Hau, HΦ⟩
   ihave Hpgs := (sysExecBreak_pages (GF := GF) A P pl i pg alen afun).1 $$ Hpgs
   iapply h
@@ -345,7 +345,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     refine sysExecPins_cs k _ R2 _ _ _ _ _ _ _ ?_ hcs
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
     exact ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩
-  k_norm_g [sys_exec_ret_ce, sysfile_ww, sysfile_psw, KCtx.withSpie_withRegs]
+  k_norm_g [sys_exec_ret_ce, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_withRegs]
   ihave Hce := (show cpuClaimExt (GF := GF) c2 k.sie (procAddr A.j) ⊢ cpuClaimExt c2 k.sie k.proc by
     rw [hS.hproc]) $$ Hce
   ihave Hcarry := Hcback $$ Hpath

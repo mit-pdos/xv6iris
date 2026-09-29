@@ -64,6 +64,7 @@ import Xv6.SpecDirlookup
 import Xv6.SpecWritei
 import Xv6.SpecIput
 import Xv6.FsWords
+import Xv6.DinodeSlot
 
 namespace Xv6
 
@@ -134,14 +135,6 @@ theorem sys_unlink_dots_only_scan (self : Nat) (dn : Dinode) (data : Nat → Lis
   | 0 => exact Or.inl hn0
   | 1 => exact Or.inr hn1
   | k' + 2 => exact absurd (hdead (k' + 2) (by omega) hk) hlive
-
-/-- the `lw` of `ip->size`, read at the literal the loop's compares want
-(Rocq's `su_size_sext`) -/
-theorem sys_unlink_size_sext (w : BitVec 32) (hw : w.toNat < 2 ^ 31) :
-    BitVec.signExtend 64 w = BitVec.ofNat 64 w.toNat := by
-  have e : w = BitVec.ofNat 32 w.toNat := by simp
-  conv => lhs; rw [e]
-  exact fw_sext32 _ hw
 
 /-- `rdClamp` at n = 16: never more (Rocq's `su_clamp_le16`) -/
 theorem sys_unlink_clamp_le16 (szw : BitVec 32) (off : Nat) : rdClamp szw off 16 ≤ 16 :=

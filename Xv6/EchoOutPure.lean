@@ -28,7 +28,7 @@ Name map (Rocq → Lean): `lines_bytes` → `linesBytes`, `lines_bytes_nlines`
 `histExt_nil_of_ends`, `no_echoed_between` → `noEchoed_between`,
 `read_window_prefix` → `readWindow_prefix`, `open_seg_ends_in` →
 `openSeg_ends_in`,
-`ins_prefix_of` → `consIns_prefix_of`; the `epu_` helpers keep the prefix
+`ins_prefix_of` → `Xv6.consIns_prefix`; the `epu_` helpers keep the prefix
 (`epuElem_of_rev_head`, `epuApp_snoc`, `epuApp_cons_ne`, `epuFmap_prefix`,
 `epuFilter_cons_T/F`, `epuRemovelast_snoc`).
 
@@ -321,8 +321,5 @@ theorem readWindow_prefix (pops : List LogEntry) (dl ws : List (List Obs × BitV
 
 theorem epuRemovelast_snoc {A : Type} (l : List A) (a : A) : (l ++ [a]).dropLast = l := by
   simp
-
-theorem consIns_prefix_of (s1 s2 : List Obs) (h : s1 <+: s2) : consIns s1 <+: consIns s2 :=
-  consIns_prefix s1 s2 h
 
 end Xv6

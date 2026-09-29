@@ -167,7 +167,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have hsp7 : m7.get spIdx + BitVec.ofNat 64 (8 * 8) = sp0 := by
     rw [show m7.get spIdx = m.get 2#5 from (by ureg; rfl), hsp]
     apply BitVec.eq_of_toNat_eq
-    rw [uv_avi_pos _ _ (by rw [uv_avi_neg sp0 64 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 64 hlo]
+    rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 64 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 64 hlo]
     omega
   ihave Hi := cat_uis N.t 0x66 true (.ITYPE (64#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc

@@ -45,7 +45,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«either_copyin» true 4048#12 6 (by omega) ec_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«either_copyin» true 4048#12 6 (by omega) MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -171,7 +171,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) $$ [Hs1 Hs2 Hs3 Hs4 Hs5 Hs6]
     case' _ => unfold ecFrame; iframe
     ihave HΦ := wpNext_shift _ _ _ _ _ hpin22 $$ HΦ
-    rw [ec_withSpie_twice, ec_pushed_withSpie]
+    rw [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     iapply (ei_ret c22 (k.withSpie spie2 spp2) ?hK6 R2 (k.regs 2#5) rfl ?hR2 (k.regs 1#5)
       (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)) $$ [- $Hk $Hpc $Hframe]
     rotate_right 1
@@ -277,7 +277,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) $$ [Hs1 Hs2 Hs3 Hs4 Hs5 Hs6]
     case' _ => unfold ecFrame; iframe
     ihave HΦ := wpNext_shift _ _ _ _ _ hpin22 $$ HΦ
-    rw [ec_pushed_withSpie]
+    rw [MachCSL.KCtx.withSpie_pushed]
     iapply (ei_ret c22 (k.withSpie spie1 spp1) ?hK6 (R2.set 10#5 (R2 9#5)) (k.regs 2#5) rfl ?hR2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5))
       $$ [- $Hk $Hpc $Hframe]

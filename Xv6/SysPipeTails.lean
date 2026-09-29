@@ -107,7 +107,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hu0 Hir Hcp0
   -- THE SECOND CLOSE'S PAYMENT: whatever the first handed back
   ihave Hcpay1 := sp_fc_cpay_of_cpost γp true false false true 1 _ $$ Hcp0
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨hpins2, -⟩ := sys_pipe_pins_call k R R2 hpins hcs2
@@ -135,7 +135,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   -- back from the second close (at any hart)
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hu1 Hir -
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨hpins3, -⟩ := sys_pipe_pins_call k R2 R3 hpins2 hcs3
@@ -214,7 +214,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hu0 Hir Hcp0
   -- THE SECOND CLOSE'S PAYMENT: whatever the first handed back
   ihave Hcpay1 := sp_fc_cpay_of_cpost γp true false false true 1 _ $$ Hcp0
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨hpins2, -⟩ := sys_pipe_pins_call k R R2 hpins hcs2
@@ -241,7 +241,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   case ha' => k_norm_g
   iapply wpNext_intro_pin
   iintro %c6 %hp6 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hu1 Hir -
-  k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨hpins3, -⟩ := sys_pipe_pins_call k R2 R3 hpins2 hcs3
@@ -317,7 +317,7 @@ theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   icases procOfilesOwe_close γ V.fdg pa (V.ofile.set fd0 (fnode k0)) [] fd0 (fnode k0) (by simp) hlk0 $$ Howe
     with ⟨Hc, Hcw⟩
   k_step_gen (wp_s_sd c5 _ (KA.«sys_pipe» + 0xc4#64) false 0#12 15#5 0#5 (by decide) (fnode k0))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_add0, sys_pipe_add0'] next c6 hp6
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.dsOff0, sys_pipe_add0'] next c6 hp6
   iintro Hk Hpc Hc
   have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h))))))
@@ -398,7 +398,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   icases procOfilesOwe_close γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1] fd0 (fnode k0)
       (by simp [hne]) hlk0 $$ Howe with ⟨Hc, Hcw⟩
   k_step_gen (wp_s_sd c4 _ (KA.«sys_pipe» + 0x8c#64) false 0#12 15#5 0#5 (by decide) (fnode k0))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_add0, sys_pipe_add0'] next c5 hp5
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.dsOff0, sys_pipe_add0'] next c5 hp5
   iintro Hk Hpc Hc
   ihave Howe := Hcw $$ Hc Hu0 Ha0
   -- p->ofile[fd1] = 0
@@ -424,7 +424,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   icases procOfilesOwe_close γ V.fdg pa (((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)).set fd0 0#64) [] fd1
       (fnode k1) (by simp) hlk1 $$ Howe with ⟨Hc, Hcw⟩
   k_step_gen (wp_s_sd c9 _ (KA.«sys_pipe» + 0x9c#64) false 0#12 9#5 0#5 (by decide) (fnode k1))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_add0, sys_pipe_add0'] next c10 hp10
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.dsOff0, sys_pipe_add0'] next c10 hp10
   iintro Hk Hpc Hc
   ihave Howe := Hcw $$ Hc Hu1 Ha1
   ihave Howe := (show procOfilesOwe (GF := GF) γ V.fdg pa

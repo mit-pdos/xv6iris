@@ -3,7 +3,7 @@
 the minted record, and the program entries they call** (Rocq
 `UkPipesEntries.v` §0–§2 head, 548 lines, pinned `1900b8a43`).
 
-CONE (reached, this file): `pe_line_len`, `pe_drop1_ne`, `pse_nodup0`,
+CONE (reached, this file): `Xv6.ush_line_len`, `Xv6.efe_drop1_ne`, `pse_nodup0`,
 `pse_nodup01`, `pse_dp0`, `pse_dp01`, `pse_iface_cat`, `pse_iface_grep`,
 `pse_iface_echo`.  Not reached, not ported: `T` (a local notation) and the
 three `pse_*_code_persistent` instances (inlined where the record needs
@@ -43,6 +43,8 @@ import Xv6.UkEchoTree
 import Xv6.ElfUser
 import Xv6.UshEchoPure
 import Xv6.UkTreeEntryStmt
+import Xv6.UkFileEntries
+import Xv6.UshFileRedir
 
 namespace Xv6
 
@@ -53,33 +55,6 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 
 /-! ## §0 The pure argv bridges -/
-
-/-- **Rocq `pe_line_len`**: the words' line after the command fits a C
-int. -/
-theorem pe_line_len (ws : List (List (BitVec 8))) (h : lineOk ws) :
-    ((wlLine (ws.drop 1)).length : Int) < 2 ^ 31 := by
-  have hl := lineOk_len ws h
-  have hle : (wlLine (ws.drop 1)).length ≤ (wlLine ws).length := by
-    cases ws with
-    | nil => exact Nat.le_refl _
-    | cons w r =>
-      simp only [List.drop_succ_cons, List.drop_zero]
-      cases r with
-      | nil => simp [wlLine, wlBody, wlTail]
-      | cons w' r' =>
-        rw [wlLine_length, wlLine_length, wlBody_cons, wlBody_cons, wlTail_cons, wlBody_cons]
-        simp only [List.length_append, List.length_cons]
-        omega
-  unfold lineMax at hl
-  omega
-
-/-- **Rocq `pe_drop1_ne`**. -/
-theorem pe_drop1_ne (ws : List (List (BitVec 8))) (h : lineOk ws) : ws.drop 1 ≠ [] := by
-  have h2 := lineOk_ge2 ws h
-  intro hd
-  have := congrArg List.length hd
-  simp at this
-  omega
 
 /-! ## §1 The protected devices' lists -/
 

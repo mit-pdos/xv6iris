@@ -13,10 +13,11 @@ text `uxTextOwn ξ K DT T` and the receipt `iviewLb cpu K`:
   window taken out of the text by `uxTextOwn_acc`;
 * every other node is a one-node `runRW` walk (`swp_runRW`).
 
-The local unfolding lemmas are `uxr_run_node` / `uxr_run_text`.
+The local unfolding lemmas are `uxr_run_node` / `MachCSL.uxw_text_some`.
 -/
 import MachCSL.UIcache
 import MachCSL.UFetchRun
+import MachCSL.URunXWalk
 
 namespace MachCSL
 
@@ -56,14 +57,6 @@ theorem uxr_run_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType ex
       simp only [uxrIsText] at hc
       simp only [uxRun, hc, Bool.false_eq_true, if_false]
     | _ => simp only [uxRun]
-
-/-- A text read: answered from `T`. -/
-theorem uxr_run_text {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hc : uxTextRead T req = true) (w : BitVec (8 * n)) (hw : bmRead T req.pa n = some w) :
-    uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = uxRun D T orc s (k (.Ok (w, none))) := by
-  simp only [uxRun, hc, if_true, hw]
 
 theorem uxr_run_text_none {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -123,7 +116,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
           rw [uxr_run_text_none D T _ s req k htx hr] at h
           cases h
       have hstep : ∀ o : UOrc, uxRun D T o s (FreeM.impure (.ok (.memRead n vasize req)) k) =
-          uxRun D T o s (k (.Ok (w, none))) := fun o => uxr_run_text D T o s req k htx w hw
+          uxRun D T o s (k (.Ok (w, none))) := fun o => MachCSL.uxw_text_some D T o s req k htx w hw
       have hok' : ∀ o, (uxRun D T o s (k (.Ok (w, none)))).isSome = true := fun o => by
         rw [← hstep o]; exact hok o
       show uFr RF BF s ∗ uxTextOwn ξ K DT T ∗ iviewLb cpu K ∗

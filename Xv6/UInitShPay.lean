@@ -247,7 +247,7 @@ theorem shRsh_of_window (γt γd γs : GName) (D0 : RegMapF (BitVec 8)) (sz : Na
     hin _ _ (by rw [eWs]; omega) (by rw [eWs]; omega) (sh_dat_img _ _ hws0)
   have hfpb : ∀ j, j < 8 → get? (PartialMap.filter (fun k _ => !decide (0x2000 ≤ k ∧ k < 0x2010)) D0)
       (0x2010 + j) = some (nthByte (n := 8) (0#64) j) := fun j hj => by
-    rw [nth_byte_zero64]; exact hD1 _ _ (by omega) (by omega) (sh_bss_img _ (by omega) (by omega))
+    rw [Xv6.ush_nthByte_zero]; exact hD1 _ _ (by omega) (by omega) (sh_bss_img _ (by omega) (by omega))
   have hbufb : ∀ j, j < shNbuf → get? (PartialMap.filter (fun k _ => !decide (0x2010 ≤ k ∧ k < 0x2018))
       (PartialMap.filter (fun k _ => !decide (0x2000 ≤ k ∧ k < 0x2010)) D0)) (shBuf + j) =
       some ((fun _ => ubyte0) j) := fun j hj =>

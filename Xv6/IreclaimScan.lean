@@ -101,7 +101,7 @@ theorem ireclaim_blk_open [Icfg] [Fscfg] [CurCtx] (kk : Nat) (pidv inum : BitVec
   · ipureintro; exact ⟨hwf, hkk⟩
   iintro H0 H6
   have hlen : islot inum < ds.length := by rw [hwf.1]; exact hk
-  ihave Hby := Hsback $$ %ds[islot inum]! %(ireclaim_slot_wf ds _ hwf hk) [H0 H2 H4 H6 H8 Ha]
+  ihave Hby := Hsback $$ %ds[islot inum]! %(Xv6.iregBlkSlot ds _ hwf hk) [H0 H2 H4 H6 H8 Ha]
   · iframe
   rw [dsSet_self ds (islot inum) hlen]
   ihave Hown := Hbyback $$ %ds %hwf Hby
@@ -142,7 +142,7 @@ theorem ireclaim_scan_body (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_O
     irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by
   have hn31' : n < 2 ^ 31 := by omega
-  have hnN : (BitVec.ofNat 32 n).toNat = n := ireclaim_inum_toNat n hn31'
+  have hnN : (BitVec.ofNat 32 n).toNat = n := Xv6.bf_bnoB n hn31'
   have hnib' : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by omega
   obtain ⟨hbnoN, hib, hhome⟩ := ireclaim_bno n hnib' hblk hgeom
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hlk, Hiref, Hboot⟩
@@ -263,7 +263,7 @@ theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) 
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hn31' : n < 2 ^ 31 := by omega
-  have hnN : (BitVec.ofNat 32 n).toNat = n := ireclaim_inum_toNat n hn31'
+  have hnN : (BitVec.ofNat 32 n).toNat = n := Xv6.bf_bnoB n hn31'
   have hnib' : (BitVec.ofNat 32 n).toNat < 16 * icfgNib := by omega
   obtain ⟨hbnoN, hib, hhome⟩ := ireclaim_bno n hnib' hblk hgeom
   obtain ⟨hb, h9⟩ := hr
@@ -314,7 +314,7 @@ theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) 
   case dbno => rw [hbnoN]; exact hib
   case dcov => rw [hbnoN]; exact hhome.1
   case da0 => k_norm_g; try exact a21
-  case da1 => k_norm_g; try exact ireclaim_sext_bno _ hib
+  case da1 => k_norm_g; try exact Xv6.iu_sext_bno _ hib
   -- back from bread (at any hart)
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie2 %spp2 %R2 %kk %bs2 %bsd2 %d2 %hcs2 Hk Hpc Hte Hce Hpid Hlocked

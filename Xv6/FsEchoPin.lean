@@ -56,7 +56,7 @@ theorem fsimgEchoNlinkNz : (fsDinode fsimgP fsimgSb ECHO_INO).diNlink.toNat ≠ 
 
 /-- Rocq `fsimg_echo_size_bound`. -/
 theorem fsimgEchoSizeBound : (fsDinode fsimgP fsimgSb ECHO_INO).diSize.toNat ≤ MAXFILE * BSIZE := by
-  rw [fsimgEchoSize, maxfileBytes]; decide
+  rw [fsimgEchoSize, Xv6.rd_maxbytes]; decide
 
 /-- Rocq `fsimg_echo_type_nz`. -/
 theorem fsimgEchoTypeNz : (fsDinode fsimgP fsimgSb ECHO_INO).diType.toNat ≠ 0 := by

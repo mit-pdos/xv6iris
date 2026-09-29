@@ -114,7 +114,7 @@ theorem wp_shRedircmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : C
   -- 0x234  sw a5,0(s1)
   iapply ushS_store UL N (k := 4) (ushI_234 N.t) 0x236 h8 m8 (10 + n) p (0#32) (Or.inr (Or.inr (Or.inl rfl)))
     (by rw [g _ (by decide), hs1]; exact ush_fld p 0 _ rfl hp64) (by omega) $$ Hc [Ht] Hrun
-  · iapply ush_ubytes_ext $$ Ht; intro j _; exact (ush_nthByte32_zero j).symm
+  · iapply Xv6.ubytes_ext $$ Ht; intro j _; exact (ush_nthByte32_zero j).symm
   iintro Ht %h9 Hrun
   -- 0x236  sd s2,8(s1) ; 0x23a  sd s3,16(s1) ; 0x23e  sd s4,24(s1)
   ihave Hc8 := ush_zero_word N.d _ $$ Hc8
@@ -133,12 +133,12 @@ theorem wp_shRedircmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : C
   iapply ushS_store UL N (k := 4) (ushI_242 N.t) 0x246 h12 m8 (10 + n) (p + 32) (0#32)
     (Or.inr (Or.inr (Or.inl rfl))) (by rw [g _ (by decide), hs1]; exact ush_fld p 32 _ rfl hp64) (by omega)
     $$ Hc [Hc32] Hrun
-  · iapply ush_ubytes_ext $$ Hc32; intro j _; exact (ush_nthByte32_zero j).symm
+  · iapply Xv6.ubytes_ext $$ Hc32; intro j _; exact (ush_nthByte32_zero j).symm
   iintro Hc32 %h13 Hrun
   iapply ushS_store UL N (k := 4) (ushI_246 N.t) 0x24a h13 m8 (10 + n) (p + 36) (0#32)
     (Or.inr (Or.inr (Or.inl rfl))) (by rw [g _ (by decide), hs1]; exact ush_fld p 36 _ rfl hp64) (by omega)
     $$ Hc [Hc36] Hrun
-  · iapply ush_ubytes_ext $$ Hc36; intro j _; exact (ush_nthByte32_zero j).symm
+  · iapply Xv6.ubytes_ext $$ Hc36; intro j _; exact (ush_nthByte32_zero j).symm
   iintro Hc36 %h14 Hrun
   -- 0x24a  mv a0,s1
   iapply ushS_mv UL N (ushI_24a N.t) 0x24c h14 m8 (10 + n) (BitVec.ofNat 64 p) (by rw [g _ (by decide), hs1])
@@ -174,7 +174,7 @@ theorem wp_shRedircmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : C
     isplitr; · ipureintro; omega
     isplitl [Ht Hpad]
     · isplitl [Ht]
-      · iapply ush_ubytes_ext $$ Ht
+      · iapply Xv6.ubytes_ext $$ Ht
         intro j _
         show nthByte (n := 8) ((ukWr m7 15#5 _).get 15#5) j = _
         rw [ukWr_get_same _ _ _ (by decide), show BitVec.ofInt 32 2 = BitVec.ofNat 32 2 by decide]
@@ -184,9 +184,9 @@ theorem wp_shRedircmd (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : C
     isplitl [Hc16]; · rw [g _ (by decide), h7_19]; iexact Hc16
     isplitl [Hc24]; · rw [g _ (by decide), h7_20]; iexact Hc24
     isplitl [Hc32]
-    · iapply ush_ubytes_ext $$ Hc32
+    · iapply Xv6.ubytes_ext $$ Hc32
       intro j _; rw [g _ (by decide), h7_21]; exact ush_nthByte_64_32i mode j hm0 hm1
-    · iapply ush_ubytes_ext $$ Hc36
+    · iapply Xv6.ubytes_ext $$ Hc36
       intro j _; rw [g _ (by decide), h7_22]; exact ush_nthByte_64_32i fd j hf0 hf1
 
 /-- **sh's `redircmd` holds** (at the engine `UL` and memset `MS`). -/

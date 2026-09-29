@@ -10,6 +10,7 @@ moves of an execute -- a GPR write (`uxaWr`), a `nextPC` write (`setR
 import Xv6.UkDefs
 import Xv6.SpecUkLeaves
 import MachCSL.URunXWalk
+import Xv6.UserClassifyLand
 
 namespace Xv6
 
@@ -40,15 +41,13 @@ theorem uke_uxRun_of_runRW {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLa
 
 /-! ## §2 `UkLand` under register-only moves -/
 
-theorem uke_ro_not_gpr : ∀ r ∈ ufRoList, r ∉ uxaGprs ∧ r ≠ .nextPC := by decide
-
 /-- **`UkLand` is kept by any move of the GPRs and `nextPC` alone.** -/
 theorem uke_land_congr {C : UCfg} {P : UPtd} {T : BMap} {s s' : UWSt} (h : UkLand C P T s)
     (hf : ∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) (hm : s'.mm = s.mm) :
     UkLand C P T s' := by
   obtain ⟨hc, hp, hms, ha, t, hk, ht⟩ := h
   refine ⟨ufCfg_of_ro C P s.file s'.file hc
-      (fun r hr => hf r (uke_ro_not_gpr r hr).1 (uke_ro_not_gpr r hr).2), ?_, ?_, ?_, t, hm ▸ hk, ?_⟩
+      (fun r hr => hf r (Xv6.ucl_ro_off r hr).1 (Xv6.ucl_ro_off r hr).2), ?_, ?_, ?_, t, hm ▸ hk, ?_⟩
   · rw [hf _ (by decide) (by decide)]; exact hp
   · rw [hf _ (by decide) (by decide)]; exact hms
   · rw [hf _ (by decide) (by decide)]; exact ha

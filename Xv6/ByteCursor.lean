@@ -36,7 +36,7 @@ PORTED HERE:
 | --- | --- | --- |
 | `pa_add_step` | `Xv6.paAddStep` | immediate passed as a premise, as in Rocq |
 | `pa_add_bump` | `Xv6.paAddBump` | |
-| `pa_add_assoc` | `Xv6.paAddAssoc` | `= paAddBump`, as in Rocq |
+| `pa_add_assoc` | `Xv6.paAddBump` | `= paAddBump`, as in Rocq |
 | `pa_add_comm` | `Xv6.paAddComm` | |
 | `pa_add_back1` | `Xv6.paAddBack1` | |
 | `pa_add_unsigned` | `Xv6.paAddToNat` | `bv_unsigned`/`bv_wrap` become `BitVec.toNat`/`% 2 ^ 64` |
@@ -111,14 +111,6 @@ loop moves the cursor by the chunk length, not by 1. -/
 theorem paAddBump (p : BitVec 64) (d n : Nat) :
     p + BitVec.ofNat 64 d + BitVec.ofNat 64 n = p + BitVec.ofNat 64 (d + n) := by
   rw [ofNat64_add, BitVec.add_assoc]
-
-/-- Two bumps off one base collapse into one.  A CHUNKED byte loop states its
-outer cursor as `p + done` and its inner one relative to THAT, while the
-caller's buffer is indexed from `p` -- so every address the inner loop forms
-has to be brought back to the caller's indexing through this. -/
-theorem paAddAssoc (p : BitVec 64) (a b : Nat) :
-    p + BitVec.ofNat 64 a + BitVec.ofNat 64 b = p + BitVec.ofNat 64 (a + b) :=
-  paAddBump p a b
 
 /-- ...with the operands the other way round, which is how the encoder spells
 it when the count register is rs1. -/

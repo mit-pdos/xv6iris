@@ -197,36 +197,17 @@ theorem uft_ptRep_setLeaf {t : PTree} {L : RegMapF (BitVec 64)} (hrep : ptRep t 
 
 /-! ## §3 The owned byte map holds the table -/
 
-/-- An entry of a valid page is an aligned RAM word. -/
-theorem uft_pteAddrOk (b : BitVec 44) (hb : pageValid (pageAddr b)) (i : BitVec 9) : pteAddrOk (pteAddr b i) := by
-  rw [pteAddr_eq_pageAddr_add]
-  have hi := i.isLt
-  refine ⟨ub_inRam_page b hb (8 * i.toNat) 8 (by omega), ?_⟩
-  have hal : (pageAddr b).toNat % 4096 = 0 := by
-    have h12 : BitVec.extractLsb' 0 12 (pageAddr b) = 0#12 := by
-      have hal0 := hb.1
-      revert hal0; generalize pageAddr b = x; intro hal0; bv_decide
-    have h := congrArg BitVec.toNat h12
-    simpa [BitVec.extractLsb'_toNat] using h
-  have hr := ub_inRam_page b hb (8 * i.toNat) 8 (by omega)
-  unfold inRam ramBase ramEnd at hr
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := 8 * i.toNat) (by omega)]
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := 8 * i.toNat) (by omega)] at hr
-  have hlt : (pageAddr b).toNat + 8 * i.toNat < 2 ^ 64 := by omega
-  rw [Nat.mod_eq_of_lt hlt] at hr ⊢
-  omega
-
 /-- **The walker's view of the table** (`UWalk.uwkTreeMem`) from the byte
 map's well-formedness. -/
 theorem uft_treeMem {P : UPtd} {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) : uwkTreeMem mm t := by
   unfold uwkTreeMem
   intro a v he
-  obtain ⟨b, hb, i, hi⟩ := ub_entries_page 2 t (a, v) he
+  obtain ⟨b, hb, i, hi⟩ := Xv6.entries_page 2 t (a, v) he
   have hi' : a = pteAddr b i := hi
   have hrd : bmRead mm a 8 = some v := ubMemWf_entry P t mm hwf (a, v) he
   refine ⟨?_, hrd⟩
   rw [hi']
-  exact uft_pteAddrOk b (hwf.rep.2.2.1 b hb) i
+  exact Xv6.uptPteAddrOk b (hwf.rep.2.2.1 b hb) i
 
 /-! ## §4 The page of a granting user leaf -/
 

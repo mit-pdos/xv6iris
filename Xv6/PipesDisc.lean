@@ -1051,7 +1051,7 @@ theorem prodContent_shape (fc : List (BitVec 8) → Option (List (BitVec 8))) (p
     (hfc : fcOk fc) (hp : prodOk p) : lshape (prodContent fc p) := by
   cases p with
   | PrEcho ws =>
-    exact pd_wlLine_shape' (ws.drop 1) (lbForall_drop _ 1 ws (lineOk_wf ws hp))
+    exact Xv6.wlLine_shape' (ws.drop 1) (lbForall_drop _ 1 ws (lineOk_wf ws hp))
   | PrCatF f =>
     simp only [prodContent]
     cases hf : fc f with
@@ -1136,9 +1136,9 @@ theorem dgExecCat_wf : wlWf dgExecCat := by
 /-- Rocq `pl_exfb_shape`. -/
 theorem plExfb_shape (l : Pline') : lshape (plExfb l) := by
   match l with
-  | LEcho' _ => exact pd_wlLine_shape' dgExec dgExec_wf
-  | LPipes (.PrEcho _) _ => exact pd_wlLine_shape' dgExec dgExec_wf
-  | LPipes (.PrCatF _) _ => exact pd_wlLine_shape' dgExecCat dgExecCat_wf
+  | LEcho' _ => exact Xv6.wlLine_shape' dgExec dgExec_wf
+  | LPipes (.PrEcho _) _ => exact Xv6.wlLine_shape' dgExec dgExec_wf
+  | LPipes (.PrCatF _) _ => exact Xv6.wlLine_shape' dgExecCat dgExecCat_wf
 
 theorem plBody_bytes (l : Pline') (hok : plOk l) : ∀ b ∈ plBody l, psbyte b := by
   cases l with
@@ -1229,8 +1229,8 @@ theorem echo_block_shape (fc : List (BitVec 8) → Option (List (BitVec 8)))
   cases hr with
   | echo =>
     rw [(mergeAll_one _ _).1 hm]
-    exact pd_wlLine_shape' (ws.drop 1) (lbForall_drop _ 1 ws hwf)
-  | echoExec => rw [(mergeAll_one _ _).1 hm]; exact pd_wlLine_shape' dgExec dgExec_wf
+    exact Xv6.wlLine_shape' (ws.drop 1) (lbForall_drop _ 1 ws hwf)
+  | echoExec => rw [(mergeAll_one _ _).1 hm]; exact Xv6.wlLine_shape' dgExec dgExec_wf
   | echoSilent => rw [(mergeAll_one _ _).1 hm]; exact ⟨by simp, Or.inl (by simp)⟩
 
 theorem pipes_block_nodollar (fc : List (BitVec 8) → Option (List (BitVec 8))) (l : Pline')

@@ -23,12 +23,13 @@ slot the postcondition names (Rocq's `dir_slot_char`): the break at the
 free record `i`, the exhaustion at `nrec`.
 
 **Deviations from Rocq.**  The loop invariant and the fuel are
-DirlinkDefs deviation 2.  `dirlink_rec_bytes` / `dirlink_delivered` are
+DirlinkDefs deviation 2.  `Xv6.dirlookup_rec_bytes` / `Xv6.dirlookup_delivered` are
 copies of `Xv6.dirlookup_rec_bytes` / `dirlookup_delivered`
 (DirlookupParts), promotion candidates (Rocq's shared
 `ProofDirlookupParts.dlk_de_view` / `dlk_rd_delivered`).
 -/
 import Xv6.DirlinkRec
+import Xv6.DirlookupParts
 
 namespace Xv6
 
@@ -40,32 +41,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-/-- readi's sixteen delivered bytes ARE the record's inum halfword and its
-fourteen name bytes (a copy of `Xv6.dirlookup_rec_bytes`). -/
-theorem dirlink_rec_bytes (data : Nat → List (BitVec 8)) (i : Nat) :
-    rdBytes data (16 * i) 16 = halfBytes (dirInum data i) ++ bview 14 (dirName data i) := by
-  rw [dirInum_halfBytes]
-  apply List.ext_getElem
-  · simp [rdBytes, bview_length]
-  · intro n h1 h2
-    simp only [rdBytes, List.getElem_map, List.getElem_range] at h1 ⊢
-    rw [List.length_map, List.length_range] at h1
-    by_cases hn : n < 2
-    · rw [List.getElem_append_left (by simp; omega)]
-      rcases (show n = 0 ∨ n = 1 by omega) with rfl | rfl <;> simp
-    · rw [List.getElem_append_right (by simp; omega)]
-      simp only [List.length_cons, List.length_nil, Nat.reduceAdd, bview, List.getElem_map,
-        List.getElem_range, dirName]
-      congr 1
-      omega
-
-/-- (a copy of `Xv6.dirlookup_delivered`) -/
-theorem dirlink_delivered (data : Nat → List (BitVec 8)) (i : Nat) (olds : List (BitVec 8))
-    (hl : olds.length = 16) :
-    rdDelivered data olds (16 * i) 16 = halfBytes (dirInum data i) ++ bview 14 (dirName data i) := by
-  unfold rdDelivered
-  rw [List.drop_eq_nil_of_le (by omega), List.append_nil, dirlink_rec_bytes]
 
 theorem dirlink_slots_readi (a : Nat) (h : dirlinkSlots ≤ a) : readiSlots ≤ a - 10 := by
   have h1 : readiSlots = 92 := by decide
@@ -145,10 +120,10 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb fuel
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlink_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
   have hsz31 : dn.diSize.toNat < 2 ^ 31 := hs.hsz31
-  have hbz := dirlink_beqz_half (dirInum data i)
+  have hbz := Xv6.dirlookup_beqz_half (dirInum data i)
   have hlivebelow := (dirFreeFirst_None data i).mp hfree
   have hnr := (dirNrec_range dn.diSize.toNat).1
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -203,7 +178,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, decide_eq_false hfr]
   iintro Hk Hpc
   -- +0x48  c.addiw s1,s1,16
-  have ha16 := dirlink_addiw16 (16 * i) (by omega)
+  have ha16 := Xv6.dirlookup_addiw16 (16 * i) (by omega)
   k_step_e (wp_s_addiw cpu _ (KA.«dirlink» + 0x48#64) true 16#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9, ha16]
   iintro Hk Hpc
@@ -216,14 +191,14 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
   iintro Hk Hpc Hsz
   ihave Hkeep := Hkcl $$ Hsz
   -- +0x4e  bltu s1,a5,+0x30
-  have hsx := dirlink_sext_small dn.diSize hsz31
+  have hsx := Xv6.dsSext_small dn.diSize hsz31
   have hbl : bcond bop.BLTU (BitVec.ofNat 64 (16 * i) + 16#64) (BitVec.ofNat 64 dn.diSize.toNat)
       = decide (16 * i + 16 < dn.diSize.toNat) := by
     have e : BitVec.ofNat 64 (16 * i) + 16#64 = BitVec.ofNat 64 (16 * i + 16) := by
       apply BitVec.eq_of_toNat_eq
       simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
       omega
-    rw [e]; exact dirlink_bltu_nat _ _ (by omega) (by omega)
+    rw [e]; exact Xv6.dsBltu _ _ (by omega) (by omega)
   by_cases hmore : 16 * i + 16 < dn.diSize.toNat
   · -- ---- another record: back to +0x30 with i + 1 ----
     k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x4e#64) false 8162#13 9#5 15#5 (by decide)

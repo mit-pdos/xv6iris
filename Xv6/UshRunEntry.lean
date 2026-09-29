@@ -70,7 +70,7 @@ theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (hlc := hlc) (G
   iintro #Hc #Hjt #Htree Hrun Hk
   ihave %hta := ushCmd_addr N.d t c $$ Htree
   obtain ⟨⟨ht0, ht38⟩, ht8⟩ := hta
-  have htn : (BitVec.ofNat 64 t).toNat = t := ush_toNat_ofNat t (by omega)
+  have htn : (BitVec.ofNat 64 t).toNat = t := Xv6.bcOfNatToNat t (by omega)
   have Hty0 : ushCmd (GF := GF) N.d t c ⊢
       ubytesq N.d DFrac.discard t 4 (nthByte (n := 4) (BitVec.ofInt 32 (ushTy c))) := ushCmd_type N.d t c
   ihave #Hty := Hty0 $$ Htree
@@ -94,7 +94,7 @@ theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (hlc := hlc) (G
   iintro %h2 Hrun
   -- 0x98  sd s1,24(sp) : into the frame's third word
   have hl2 : (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 2)).toNat = (m.get spIdx).toNat - 16 := by
-    rw [ush_toNat_ofNat _ (by have := (m.get spIdx).isLt; omega)]
+    rw [Xv6.bcOfNatToNat _ (by have := (m.get spIdx).isLt; omega)]
   have Hacc0 := ustack_acc (GF := GF) N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 2)) 4 0 (by decide)
   rw [hl2] at Hacc0
   icases Hacc0 $$ Hloc with ⟨⟨%w0, Hw0⟩, Hcl0⟩
@@ -156,7 +156,7 @@ theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (hlc := hlc) (G
     (ushJent (ushTy c).toNat) (BitVec.signExtend 64 (ushJent (ushTy c).toNat))
     (by rw [extend_value_false])
     (by show (((ukWr m7 15#5 _).get 15#5).toNat : Int) + _ = _
-        rw [ukWr_get_same _ _ _ (by decide), ush_toNat_ofNat _ F6]; rfl) F5 $$ Hc Hrw Hrun
+        rw [ukWr_get_same _ _ _ (by decide), Xv6.bcOfNatToNat _ F6]; rfl) F5 $$ Hc Hrw Hrun
   iintro %h12 Hrun
   let m9 := ukWr m8 15#5 (BitVec.signExtend 64 (ushJent (ushTy c).toNat))
   -- 0xb6  add a5,a5,a4

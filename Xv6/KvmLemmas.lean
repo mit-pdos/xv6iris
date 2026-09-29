@@ -86,9 +86,9 @@ theorem base_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (p
     rw [mapRun_succ_eq]
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
     · rw [if_pos hc]
-      simp only [ih _ _ _ _, PTree.base_setLeaf, base_fill]
+      simp only [ih _ _ _ _, PTree.base_setLeaf, MachCSL.PTree.base_fill]
     · rw [if_neg hc]
-      exact base_fill 2 t vpn fr
+      exact MachCSL.PTree.base_fill 2 t vpn fr
 
 theorem wf_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
     (fr : List (BitVec 44)) (hwf : t.wf 2) : (t.mapRun vpn ppn (permBits perm) n fr).1.wf 2 := by
@@ -98,9 +98,9 @@ theorem wf_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (per
     rw [mapRun_succ_eq]
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
     · rw [if_pos hc]
-      exact ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (wf_fill 2 t vpn fr hwf) hc)
+      exact ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (MachCSL.PTree.wf_fill 2 t vpn fr hwf) hc)
     · rw [if_neg hc]
-      exact wf_fill 2 t vpn fr hwf
+      exact MachCSL.PTree.wf_fill 2 t vpn fr hwf
 
 theorem mem_pages_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
     (fr : List (BitVec 44)) (b : BitVec 44) (hb : b ∈ (t.mapRun vpn ppn (permBits perm) n fr).1.pages 2) :
@@ -140,12 +140,12 @@ theorem walk_mapRun_outside (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVe
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
     · rw [if_pos hc]
       simp only
-      rw [ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (wf_fill 2 t vpn fr hwf) hc)
+      rw [ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (MachCSL.PTree.wf_fill 2 t vpn fr hwf) hc)
         (fun j hj => by rw [bv_succ_add]; exact hne (j+1) (by omega))]
       rw [walk_setLeaf_ne _ vpn w _ hc (fun he => h0 he.symm)]
-      exact walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
+      exact MachCSL.PTree.walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
     · rw [if_neg hc]
-      exact walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
+      exact MachCSL.PTree.walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
 
 /-- The composable form: a page outside every region mapped so far is still
 unmapped. -/
@@ -260,7 +260,7 @@ theorem complete_two_iff (t : PTree) (vpn : BitVec 27) :
     obtain ⟨d, hd, -⟩ := (complete_succ_iff 0 c vpn).mp h
     exact ⟨c, d, hc, hd⟩
   · rintro ⟨c, d, hc, hd⟩
-    exact ⟨c, hc, (complete_succ_iff 0 c vpn).mpr ⟨d, hd, complete_zero d vpn⟩⟩
+    exact ⟨c, hc, (complete_succ_iff 0 c vpn).mpr ⟨d, hd, MachCSL.PTree.complete_zero d vpn⟩⟩
 
 theorem complete_two_congr (t : PTree) (v w : BitVec 27) (h2 : vpnIdx v 2 = vpnIdx w 2)
     (h1 : vpnIdx v 1 = vpnIdx w 1) (h : t.complete 2 v) : t.complete 2 w := by
@@ -273,7 +273,7 @@ theorem complete_two_congr (t : PTree) (v w : BitVec 27) (h2 : vpnIdx v 2 = vpnI
 theorem complete_congr (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (h : sameShape lvl t u)
     (hc : t.complete lvl vpn) : u.complete lvl vpn := by
   induction lvl generalizing t u with
-  | zero => exact complete_zero u vpn
+  | zero => exact MachCSL.PTree.complete_zero u vpn
   | succ lvl ih =>
     obtain ⟨c, hk, hcc⟩ := (complete_succ_iff lvl t vpn).mp hc
     have hi := h (vpnIdx vpn (lvl+1))
@@ -328,8 +328,8 @@ theorem sameShape_fill' (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : Lis
             · rw [if_pos hj, if_pos hj]
               refine ih (PTree.zeroNode b) (PTree.zeroNode e) fr' gr'
                 (sameShape_zeroNode lvl b e) ?_ ?_
-              · rw [zeroNode_missingOn]; simp only [List.length_cons] at hf; omega
-              · rw [zeroNode_missingOn]; simp only [List.length_cons] at hg; omega
+              · rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at hf; omega
+              · rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at hg; omega
             · rw [if_neg hj, if_neg hj]; exact h j
 
 theorem missingRun_step' (t : PTree) (vpn : BitVec 27) (m : Nat) (fr : List (BitVec 44))
@@ -383,7 +383,7 @@ theorem mapsTo_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) 
       simp only at hfull ⊢
       have hfull := Nat.add_right_cancel hfull
       have hwf1 : ((t.fill 2 vpn fr).1.setLeaf 2 vpn (kLeaf ppn perm 0#1 0#1)).wf 2 :=
-        wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (wf_fill 2 t vpn fr hwf) hc
+        wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (MachCSL.PTree.wf_fill 2 t vpn fr hwf) hc
       cases i with
       | zero =>
         rw [bv_add_zero, bv_add_zero]
@@ -491,9 +491,6 @@ theorem pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
   simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
   revert h1 h3
   bv_decide
-
-theorem page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
 
 end Xv6.Kvm
 

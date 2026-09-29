@@ -23,6 +23,7 @@ the distance to that NUL (Rocq's echo-strlen mould).
 import Xv6.UshMainStubs
 import Xv6.UshMainCode
 import Xv6.UshMainBytes
+import Xv6.UshGettokScan
 
 namespace Xv6
 
@@ -33,11 +34,6 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 
 /-! ## §0 Pure helpers -/
-
-/-- A zero-extended byte is its value. -/
-theorem ushScan_zext (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofNat 64 b.toNat := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
 
 /-- `addi a4,a5,-d ; beqz a4` on a zero-extended byte, `d < 256`. -/
 theorem ushScan_eqz (b : BitVec 8) (d : Nat) (hd : 0 < d) (hd' : d < 256) (imm : BitVec 12)
@@ -110,7 +106,7 @@ theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (
       (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz32, h32]; rfl) $$ Hc Hrun
     iintro %h4 Hrun
     iapply Hk $$ Hb %h4 %_ %r3 %(e9 _ _ _) [] [Hrun]
-    · ipureintro; rw [e15, ushScan_zext]
+    · ipureintro; rw [e15, Xv6.ushG_zext]
     · rw [if_pos (Or.inl h32)]; iexact Hrun
   iapply ushS_brN UL N (ushMI_96e N.t) 0x970 h3 _ (16 + n)
     (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz32]; simpa using h32) $$ Hc Hrun
@@ -130,13 +126,13 @@ theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (
       (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz9, h9]; rfl) $$ Hc Hrun
     iintro %h6 Hrun
     iapply Hk $$ Hb %h6 %_ %r4 %(e9' _ _ _ _) [] [Hrun]
-    · ipureintro; rw [e15', ushScan_zext]
+    · ipureintro; rw [e15', Xv6.ushG_zext]
     · rw [if_pos (Or.inr h9)]; iexact Hrun
   iapply ushS_brN UL N (ushMI_974 N.t) 0x976 h5 _ (16 + n)
     (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz9]; simpa using h9) $$ Hc Hrun
   iintro %h6 Hrun
   iapply Hk $$ Hb %h6 %_ %r4 %(e9' _ _ _ _) [] [Hrun]
-  · ipureintro; rw [e15', ushScan_zext]
+  · ipureintro; rw [e15', Xv6.ushG_zext]
   · rw [if_neg (by omega)]; iexact Hrun
 
 /-- **Rocq `wp_ksh_scan`**: the scan as a whole, under the NUL's measure. -/

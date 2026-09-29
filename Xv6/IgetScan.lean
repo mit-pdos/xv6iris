@@ -185,10 +185,10 @@ theorem ig_free (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
     iexact Hcell
   -- +0x46 blez a5 : TAKEN ; +0x34 c.bnez a5 : falls through
   k_step (wp_s_branch0 c _ (KA.«iget» + 0x46#64) false 8174#13 15#5 (by decide) bop.BGE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_blez_zero, ig_blez_zero64]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.il_blez_z, ig_blez_zero64]
   iintro Hk Hpc
   k_step (wp_s_branch c _ (KA.«iget» + 0x34#64) true 8#13 15#5 0#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_bnez_a5zero, ig_bnez_zero]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_bnez_a5zero, MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   have hR1 := hR.set 15#5 0#64 (by decide)
   have h9' : (R.set 15#5 0#64) 9#5 = ientry j := by
@@ -196,7 +196,7 @@ theorem ig_free (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   rcases hs3 with hz | ⟨e, he, hse, hMe⟩
   · -- +0x36 bnez s3 : no candidate, falls through ; +0x3a c.mv s3,s1
     k_step (wp_s_branch c _ (KA.«iget» + 0x36#64) false 6#13 19#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, ig_bnez_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     k_step (wp_s_add c _ (KA.«iget» + 0x3a#64) true 19#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
@@ -382,7 +382,7 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   · -- +0x52 bne a4,s4 : TAKEN, a MISS
     k_step (wp_s_branch c _ (KA.«iget» + 0x52#64) false 8170#13 14#5 20#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hR.s4, ig_bne_sext_ne ij inum hij]
+      with [hR.s4, Xv6.bd_bne_of_ne ij inum hij]
     iintro Hk Hpc
     have hscan' : igScanInv M ci inum (j + 1) :=
       igScanInv_succ M ci inum j hscan (fun v hv p hp h => by

@@ -77,7 +77,7 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
       iframe
     isplitl [Hg]
     · iapply (uf_gprFile_cells cpu (ufFile C P _)).1
-      iapply uexec_gprFile_congr cpu m _ (fun i hi => by rw [ufFile_gpr _ _ _ i hi]) $$ Hg
+      iapply MachCSL.gprFile_ext cpu m _ (fun i hi => by rw [ufFile_gpr _ _ _ i hi]) $$ Hg
     isplitl [Hstvec Hmie Hmdl Hmedl Hmenv]
     · iapply (uf_cfgRo_cells cpu C.dqc (ufFile C P _)).2
       dsimp only [ufFile]
@@ -109,7 +109,7 @@ theorem uk_regs_close (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (m' : RegM
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
   icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
-  ihave Hg := uexec_gprFile_congr cpu (uxaXget f) m' (fun i hi => ukRegs_ne f m' hg i hi) $$ Hg
+  ihave Hg := MachCSL.gprFile_ext cpu (uxaXget f) m' (fun i hi => ukRegs_ne f m' hg i hi) $$ Hg
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
   icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
   rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc]

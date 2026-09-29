@@ -122,7 +122,7 @@ theorem kshW_of_link_prompt_fam (UL : UK_LEAVES) (N : UkNames GF) (F : Nat → I
   have hua : (m.get 11#5).toNat = shPromptPv := by rw [ha1]; decide
   have havi : ∀ j, j < 2 → (m.get 11#5 + BitVec.ofNat 64 j).toNat = shPromptPv + j := by
     intro j hj
-    rw [uint_avi_small _ _ (by rw [hua]; unfold shPromptPv; omega), hua]
+    rw [Xv6.paAddToNat' _ _ (by rw [hua]; unfold shPromptPv; omega), hua]
   -- the two literal bytes, off sh's own image
   have hbytes : ∀ j, j < 2 → User.Sh.code.byte ((m.get 11#5).toNat + j) = some uPrompt[j]! := by
     rw [hua]; decide

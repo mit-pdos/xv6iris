@@ -57,7 +57,7 @@ theorem sys_open_create_ne (vom : BitVec 64) (hc : omCreate vom = true) :
   simp [hc]
 
 theorem sys_open_beqz_ne (x : BitVec 64) (h : x ≠ 0#64) : bcond bop.BEQ x 0#64 = false := by
-  rw [sys_open_beqz]; exact decide_eq_false h
+  rw [Xv6.dirlookup_beqz]; exact decide_eq_false h
 
 theorem sys_open_beqz_eq : bcond bop.BEQ 0#64 0#64 = true := by decide
 

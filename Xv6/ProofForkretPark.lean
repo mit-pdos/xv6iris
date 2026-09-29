@@ -187,7 +187,7 @@ instance fkpPay_morph (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv) (M 
     CtxMorph (GF := GF) (fkpPay (hlc := hlc) (SG := SG) N rest V M sts cs steady) := by
   unfold fkpPay
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCtxCells _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphStackOwn _ _ _)
+    (@instCtxMorphSep hlc GF _ _ _ (MachCSL.instCtxMorphStackOwn _ _ _)
       (@instCtxMorphSep hlc GF _ _ _ (fkp_parkGlobals_morph _ _ _ _ _)
         (@instCtxMorphSep hlc GF _ _ _ (fkp_utSysParkRows_morph _)
           (@instCtxMorphSep hlc GF _ _ _ (fkp_parkBlock_morph steady N V M)

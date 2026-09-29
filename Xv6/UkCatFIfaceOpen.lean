@@ -18,11 +18,12 @@ CONE (reached, this file): `cif_ans_ok`, `cif_fresh_fd`, `cif_open_taint`,
    (`hdls_ext`).
 3. `bvs_moi_small` is UkFreeHandler's `fh_toInt_small`; `fdev_m1` is
    `fh_m1`.  `Qp.div_2` is `Qp.half_add_half` (the deed split in halves).
-4. `cif_om_create` is stated over Lean's `modeCreate` (ProgTree) and
+4. `Xv6.fif_om_create` is stated over Lean's `modeCreate` (ProgTree) and
    `omCreate` at `BitVec.ofInt 64 m` (lane hfp-F2's `fif_om_create`, the
    same statement and proof).
 -/
 import Xv6.UkCatFIfaceRead
+import Xv6.UkFileIfaceReg
 
 namespace Xv6
 
@@ -32,21 +33,6 @@ open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
 set_option linter.unusedSectionVars false
-
-/-- **Rocq `cif_om_create`**: a mode without `O_CREATE`, as the kernel reads
-it (deviation 4). -/
-theorem cif_om_create (m : Int) (hm : ¬ modeCreate m) : omCreate (BitVec.ofInt 64 m) = false := by
-  unfold modeCreate at hm
-  unfold omCreate omArg
-  rw [BitVec.toNat_ofInt]
-  have h64 : (((2 ^ 64 : Nat)) : Int) = 18446744073709551616 := by decide
-  rw [h64]
-  generalize hx : (m % 18446744073709551616).toNat = x
-  have h : x % 4294967296 / 512 % 2 = 0 := by omega
-  rw [Nat.testBit_eq_decide_div_mod_eq]
-  show decide ((x % 4294967296) / 2 ^ 9 % 2 = 1) = false
-  have e9 : (2 : Nat) ^ 9 = 512 := by decide
-  rw [e9, h]; rfl
 
 /-- The handle function after a standard slot's input joined. -/
 theorem cifHf_insert_std (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : List (BitVec 8)) (i : Nat)

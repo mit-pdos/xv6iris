@@ -119,7 +119,7 @@ theorem ume_vmem_write_addr_straddle (D : UFoot) (orc : UOrc) (s : UWSt) (hp : U
   simp only [umm_mem_write_value_U D o1 s1 _ pa1 _ v true _ hq.dms hq.dcp hq.mprv hq.cp hcw, Option.bind_some]
   generalize (BitVec.setWidth (8 * ((w : Int) - (p : Int)).toNat) (BitVec.extractLsb' _ _ data)) = v2
   dsimp only [ExceptT.run_pure, runRW_pure, Option.bind_some]
-  try simp only [runRW_bind, runRW_pure, Option.bind_some, umm_ofInt_nat]
+  try simp only [runRW_bind, runRW_pure, Option.bind_some, Xv6.umoi_natCast]
   refine ⟨m, v2, hm, fun r s4 o4 h => ⟨fun hr => ?_, fun e hr => ?_⟩⟩
   · subst hr
     simp only [h, Option.bind_some]

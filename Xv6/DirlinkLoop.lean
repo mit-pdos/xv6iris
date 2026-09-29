@@ -57,13 +57,13 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb fuel
     ⊢ wpLoop (GF := GF) cpu := by
-  have hmaxb := dirlink_maxbytes
+  have hmaxb := Xv6.rd_maxbytes
   have hszb := hs.hszb
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
-  have hbne := dirlink_bne16
+  have hbne := Xv6.dirlookup_bne16
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hbs, Hslot, Hlk, Hop, Htx, #Henv, Hpost, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -141,12 +141,12 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   have htot' : tot = 16 := by
     rw [htot]; unfold rdClamp; rw [if_neg (by omega)]
   subst htot'
-  have hrec := dirlink_full_lt _ i hshort
+  have hrec := Xv6.dirlookup_full_lt _ i hshort
   k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x3e#64) false 34#13 10#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hra0, b19, r19, (show bcond bop.BNE 16#64 16#64 = false by decide)]
   iintro Hk Hpc
-  rw [dirlink_delivered data i bs hbl]
+  rw [Xv6.dirlookup_delivered data i bs hbl]
   ihave Hde : dirlinkDe (k.regs 2#5) (halfBytes (dirInum data i) ++ bview 14 (dirName data i))
     $$ [Hbuf]
   · unfold dirlinkDe

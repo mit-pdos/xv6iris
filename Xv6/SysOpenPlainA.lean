@@ -55,6 +55,9 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
 import Xv6.SysOpenParts
 import Xv6.SysfileCalls
 import Xv6.ProcPrivAcc
+import Xv6.ReadiDefs
+import Xv6.SysLinkParts
+import Xv6.SysMknodFrame
 
 namespace Xv6
 
@@ -77,16 +80,6 @@ theorem sys_open_ret_12 : jumpPc (KA.«sys_open» + 0x12#64) = KA.«sys_open» +
 theorem sys_open_ret_20 : jumpPc (KA.«sys_open» + 0x20#64) = KA.«sys_open» + 0x20#64 := by decide
 theorem sys_open_ret_2e : jumpPc (KA.«sys_open» + 0x2e#64) = KA.«sys_open» + 0x2e#64 := by decide
 
-
-theorem sys_open_arg0 : 0 < NARG := by decide
-theorem sys_open_arg1 : 1 < NARG := by decide
-
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem sys_open_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The fetched path (argstr's buffer as a function) -/
 
@@ -170,18 +163,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The block's seams -/
 
-/-- The trapframe quarter and page, at the ambient tier (argint's premise;
-`ProcPrivAcc.procPrivFd_tf`). -/
-theorem sys_open_tf (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) ∗
-      tfPageAt V.upt.tfp V.tf ∗
-      (wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗
-        tfPageAt V.upt.tfp V.tf -∗ procPrivFd γ pa pid V M) := by
-  have h := procPrivFd_tf (GF := GF) γ pa pid V M
-  rw [sys_open_cur_kpt hct] at h
-  exact h
 
 /-! ## The call sites: the shared sysfile wrappers (`SysfileCalls`) -/
 
@@ -281,7 +262,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     -- +0x24  bltz a5 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x24#64) false 166#13 15#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr, sys_open_bltz_nat pl.length (by omega)]
+      with [hr, Xv6.sysfile_bltz_nat pl.length (by omega)]
     iintro Hk Hpc
     -- +0x28  c.sdsp s1,168(sp)
     unfold sysOpenCells
@@ -293,7 +274,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x2a#64) false 2091820#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_begin_op]
     iintro Hk Hpc
-    icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
+    icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
     ihave Hpid := (show wordPointsTo (GF := GF) (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
       wordPointsTo (pPid k.proc) 4 pidPriv A.pid from by rw [hS.hproc]) $$ Hpid
     ihave #Hfenv := sys_open_sysfileEnv Γ A $$ Henv
@@ -307,7 +288,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     case bn => k_norm_g; exact hS.hnoff
     case bt => k_norm_g; exact hS.htier
     iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
-    k_norm_g [sys_open_ret_2e, sysfile_ww, sysfile_psw]
+    k_norm_g [sys_open_ret_2e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv A.pid ⊢
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid from by rw [hS.hproc]) $$ Hpid
     ihave Hblk := Hback $$ Hpid
@@ -426,13 +407,13 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   icases sysOpenCells_om _ _ _ _ _ _ _ _ _ _ $$ Hcells with ⟨Hom, Hcback⟩
   ihave Hom := (show wordPointsTo (GF := GF) (sysOpenOmode (k.regs 2#5)) 4 (DFrac.own 1) om ⊢
     wordPointsTo (k.regs 2#5 + 18446744073709551436#64) 4 (DFrac.own 1) om from .rfl) $$ Hom
-  icases sys_open_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
+  icases Xv6.sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr A.j)) 8
       (DFrac.own (1 : Qp).half.half) (pageAddr A.V.upt.tfp) ⊢
     wordPointsTo (pTrapframe k.proc) 8 (DFrac.own (1 : Qp).half.half) (pageAddr A.V.upt.tfp)
     from by rw [hS.hproc]) $$ Htf
   iapply (sysfile_argint AI cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) 1
-      A.V.upt.tfp A.V.tf A.vom om _ sys_open_arg1 ?a0 hS.hv1 ?an ?aK)
+      A.V.upt.tfp A.V.tf A.vom om _ Xv6.sys_link_arg1_lt ?a0 hS.hv1 ?an ?aK)
     $$ [- $Hk $Hpc $Hte $Hce $Htf $Hpg]
   rotate_right 1
   k_norm_g [sys_open_ret_12]
@@ -441,7 +422,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   case an => k_norm_g; exact hS.hnoff
   case aK => k_norm_g; exact hKai
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Htf Hpg Hom
-  k_norm_g [sys_open_ret_12, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_ret_12, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8
       (DFrac.own (1 : Qp).half.half) (pageAddr A.V.upt.tfp) ⊢
     wordPointsTo (pTrapframe (procAddr A.j)) 8 (DFrac.own (1 : Qp).half.half) (pageAddr A.V.upt.tfp)
@@ -477,7 +458,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   ihave Hbuf := (show byteBuf (GF := GF) (sysOpenPath (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sys_open_argstr AS Γ A cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g)
-      (procAddr A.j) A.V A.M 0 A.v old sys_open_arg0 ?ga0 hS.hv0 ?gpr ?gt ?gn ?gK ?gmx
+      (procAddr A.j) A.V A.M 0 A.v old Xv6.sysfile_arg0_lt ?ga0 hS.hv0 ?gpr ?gt ?gn ?gK ?gmx
       (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare]
   rotate_right 1
@@ -490,7 +471,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_open_ret_20, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_open_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) bs ⊢
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare

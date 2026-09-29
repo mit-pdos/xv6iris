@@ -269,7 +269,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hft HQ Hxs]
   · unfold frdK filereadPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
-    ihave HK := wpNext_at true k.proc cpu c _ (frd_pin hj k hproc c cpu) $$ Hnext
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
@@ -304,7 +304,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   by_cases hrz : C.readable = 0#8
   · -- +0x0e  c.beqz a5 : taken, the `!readable` return
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_true hrz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.namex_beqz_byte, decide_eq_true hrz]
     iintro Hk Hpc
     iapply (frd_exit_m1 cpu k k.spie k.spp _ (k.regs 18#5) w1 w3 hK6 hr0) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
     rotate_right 1
@@ -318,7 +318,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     unfold frdK
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
     · ipureintro
-      exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
+      exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms
       rw [show R' 10#5 = -1#64 by rw [h10]; decide]
       isplitr
@@ -326,7 +326,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
       iapply filereadExtra_unreadable V.gen V.upt F Rd Rin P Rp Rpe inumC γoC omC γpC C st n M (k.regs 11#5) hok hrz $$ HP
   -- +0x0e  c.beqz a5 : falls (a readable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hrz]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.namex_beqz_byte, decide_eq_false hrz]
   iintro Hk Hpc
   -- +0x10  sd s1,24(sp) ; +0x12  sd s3,8(sp)
   iapply (frd_spill2 cpu (k.withSpie k.spie k.spp) _ (KA.«fileread» + 0x10#64) hr0.1 (k.regs 1#5)
@@ -392,7 +392,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     unfold frdK
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
     · ipureintro
-      exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
+      exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms
       rw [show R' 10#5 = -1#64 by rw [h10]; decide]
       isplitr

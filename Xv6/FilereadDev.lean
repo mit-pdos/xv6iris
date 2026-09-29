@@ -91,7 +91,7 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
   unfold frdK
   iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
   · ipureintro
-    exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
+    exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
   · unfold filereadArms
     rw [h10]
     isplitr
@@ -236,7 +236,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
       rw [← hmj]; intro hc; rw [hc, devswReadVal_console] at hnull; exact absurd hnull (by decide)
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x96#64) true 46#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [frd_beqz64, hnull, decide_eq_true]
+      with [Xv6.dirlookup_beqz, hnull, decide_eq_true]
     iintro Hk Hpc
     -- +0xc4  c.li a5,-1 ; +0xc6  c.mv s2,a5
     k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0xc4#64) true 4095#12 15#5 0#5 (by decide))
@@ -290,7 +290,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   have hmjc : mj = CONSOLE := by rw [← hmj]; exact devswReadVal_is_console _ hcr
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x96#64) true 46#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [frd_beqz64, hcr, frd_cr_nz, decide_false]
+    with [Xv6.dirlookup_beqz, hcr, frd_cr_nz, decide_false]
   iintro Hk Hpc
   -- +0x98  c.li a0,1
   k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x98#64) true 1#12 10#5 0#5 (by decide))
@@ -328,9 +328,9 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %dc %cur %bs %hs %sl
     %⟨hcs1, hext, hdle, hret, hM, hmap, hb1, hb4, htag⟩ Hks #Hts #Hlb Hwin Hout Hk Hpc Hte Hce
     Hpriv Hgen
-  k_norm_g [frd_ret_9c, frd_ww, frd_psw] at hM
-  k_norm_g [frd_ret_9c, frd_ww, frd_psw] at hmap
-  k_norm_g [frd_ret_9c, frd_ww, frd_psw]
+  k_norm_g [frd_ret_9c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hM
+  k_norm_g [frd_ret_9c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hmap
+  k_norm_g [frd_ret_9c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   rw [h11] at hM hmap
   try rw [h11]
   iapply wpLoop_fupd

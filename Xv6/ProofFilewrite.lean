@@ -330,7 +330,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hft HQ Hxs]
   · unfold fwrKG fwrK filewritePost
     iintro Hgen %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
-    ihave HK := wpNext_at true k.proc cpu c _ (fwr_pin hj k hproc c cpu) $$ Hnext
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' _).2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
@@ -380,7 +380,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
       iapply filewriteExtra_unwritable _ _ inumC γoC omC γpC C st n _ _ Q Qe _ hok hw
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hw]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.namex_beqz_byte, decide_eq_false hw]
   iintro Hk Hpc
   -- +0x08 .. +0x14  the prologue
   iapply (wp_prologue_filewrite cpu (k.withRegs (k.regs.set 15#5 (BitVec.setWidth 64 C.writable)))

@@ -137,7 +137,7 @@ theorem sys_unlink_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_e6, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_e6, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 s1v (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R s1v _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xe6  li a0,-1
@@ -213,7 +213,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ut => k_norm_g; exact ok.htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Htx Hslot
-  k_norm_g [sys_unlink_ret_160, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_160, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1
@@ -232,7 +232,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_164, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_164, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x164  li a0,-1
@@ -356,7 +356,7 @@ theorem sys_unlink_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, -, -, -, hlo, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop
     Hslot Hq
-  k_norm_g [sys_unlink_ret_17a, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_unlink_ret_17a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) s3v
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1

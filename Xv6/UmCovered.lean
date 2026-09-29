@@ -16,43 +16,12 @@ so the cursor cannot reach `TRAPFRAME`.
 A lemma file: it imports definitional and lemma files only.
 -/
 import Xv6.UPtAllocLemmas
+import Xv6.VirtioQueue
 
 namespace Xv6.UmCovered
 
 open MachCSL
 open Iris.Std (get?)
-
-/-- Distinct naturals below `n` are at most `n` (the pigeonhole; the same
-fact as `Xv6.nodup_lt_length_le`, which lives in a file this one may not
-import). -/
-theorem umcov_nodup_length_le : ∀ (n : Nat) (l : List Nat), l.Nodup → (∀ i ∈ l, i < n) →
-    l.length ≤ n := by
-  intro n
-  induction n with
-  | zero =>
-    intro l _ hb
-    cases l with
-    | nil => simp
-    | cons a t => exact absurd (hb a (List.mem_cons_self)) (Nat.not_lt_zero a)
-  | succ n ih =>
-    intro l hn hb
-    by_cases hmem : n ∈ l
-    · have hp : l.Perm (n :: l.erase n) := List.perm_cons_erase hmem
-      have hlen : l.length = (l.erase n).length + 1 := by rw [hp.length_eq]; rfl
-      have hb' : ∀ i ∈ l.erase n, i < n := by
-        intro i hi
-        have h1 := hb i (List.mem_of_mem_erase hi)
-        have hne : i ≠ n := by
-          intro e; subst e; exact hn.not_mem_erase hi
-        omega
-      have := ih _ (hn.erase n) hb'
-      omega
-    · have hb' : ∀ i ∈ l, i < n := fun i hi => by
-        have := hb i hi
-        have : i ≠ n := fun e => hmem (e ▸ hi)
-        omega
-      have := ih l hn hb'
-      omega
 
 /-- The keys `0 .. m-1` mapped by an injective `f` stay distinct. -/
 theorem umcov_range_map_nodup (f : Nat → Nat) (m : Nat)
@@ -105,7 +74,7 @@ theorem umCovered_bound (P : UPtd) (m : Nat) (hwf : uptWf P)
     obtain ⟨wa, hwa⟩ := hsome a (List.mem_range.1 ha)
     simp only [f, hwa, Option.getD_some]
     exact umcov_ppn_lt wa (hwf.1 a wa hwa).2.2
-  have := umcov_nodup_length_le 0x88000 _ (umcov_range_map_nodup f m hinj) hlt
+  have := Xv6.queue_nodup_length_le 0x88000 _ (umcov_range_map_nodup f m hinj) hlt
   simpa using this
 
 /-- **A covered table's size is bounded** (Rocq `proc_pt_covered_maxsz`):

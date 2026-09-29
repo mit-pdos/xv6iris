@@ -26,10 +26,11 @@ CONE: the bullets of `uHchild_redir` (Rocq inline; no Rocq names).
    `iDestruct ("Hx" $! N l …)`).  The tainted `-1` arm is read at
    `Hold := T` (Rocq: `emp`).
 3. The line's witness, the deed and the lend are opened through helpers:
-   `uredir_lend` (`uWcu_3_nw` + `uWcf_S3`), `uWcl_pin` (Rocq's `iAssert`
+   `Xv6.uWcu3_nw_open` (`uWcu_3_nw` + `uWcf_S3`), `uWcl_pin` (Rocq's `iAssert`
    of the era's pin off the lend).
 -/
 import Xv6.UshURoundRedirSup
+import Xv6.UshURoundEcho
 
 namespace Xv6
 
@@ -71,13 +72,6 @@ theorem uWcl_pin (I : List (BitVec 8)) (p : Nat) :
   · iapply hback
     iexists v
     iframe Hp Hl
-
-/-- The lend, opened at a line of a known kind (Rocq's `uWcu_3_nw` then
-`rewrite uWcf_S3`). -/
-theorem uredir_lend (I : List (BitVec 8)) (hnw : uwild (ul I) = false) :
-    ⊢ uWcu (hlc := hlc) (GF := GF) ug r s0 PT PD I 3 -∗
-      iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ ushPreAt (hlc := hlc) ug r s0 I) :=
-  uWcu_3_nw ug r s0 PT PD I hnw
 
 /-- The redirect child's fd rows: closing fd 1 leaves it the lowest closed
 slot (Rocq's `destruct ld` in the walk's premise). -/

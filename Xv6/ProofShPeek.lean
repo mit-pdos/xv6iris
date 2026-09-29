@@ -187,7 +187,7 @@ theorem wp_shPeek (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h : CPU) (
     iapply ushS_brT UL N (ushI_48c N.t) 0x4a0 h10 m8 (2 + n)
       (by show ukBtaken .BNE ((ukWr (ukWr mc 11#5 _) 10#5 _).get 11#5) (RegMap.get _ 0#5) = true
           rw [RegMap.get_zero]; ureg
-          rw [show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, ush_bne_zext]; simp [hnz]) $$ Hc Hrun
+          rw [show (0#64 : BitVec 64) = BitVec.setWidth 64 ubyte0 from rfl, Xv6.kgrep_bne_byte]; simp [hnz]) $$ Hc Hrun
     iintro %h11 Hrun
     -- 0x4a0  mv a0,s5
     iapply ushS_mv UL N (ushI_4a0 N.t) 0x4a2 h11 m8 (2 + n) (BitVec.ofNat 64 toks)

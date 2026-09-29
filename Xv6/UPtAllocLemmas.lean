@@ -13,6 +13,8 @@ import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 import Xv6.PtOwnLemmas
 import MachCSL.WpSmodeCtl
+import Xv6.ByteCursor
+import Xv6.CodeTactics
 
 namespace Xv6.UPtAlloc
 
@@ -123,9 +125,6 @@ theorem vpnOf_ofNat (m : Nat) (h : m < 2 ^ 38) :
     Nat.shiftRight_eq_div_pow]
   omega
 
-theorem toNat_ofNat_of_lt (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat, Nat.reducePow]
-  omega
 
 theorem ofNat_sub_ofNat (a b : Nat) (hb : b ≤ a) (ha : a < 2 ^ 64) :
     BitVec.ofNat 64 a - BitVec.ofNat 64 b = BitVec.ofNat 64 (a - b) := by
@@ -207,7 +206,7 @@ theorem leaves_insert_comm (P : UPtd) (vpn : Nat) (u : BitVec 64) (h : vpn < tfV
 theorem complete_of_walk (lvl : Nat) (t : PTree) (vpn : BitVec 27) (hwf : t.wfU lvl)
     (h : t.walk lvl vpn ≠ none) : t.complete lvl vpn := by
   induction lvl generalizing t with
-  | zero => exact PtRun.complete_zero t vpn
+  | zero => exact MachCSL.PTree.complete_zero t vpn
   | succ lvl ih =>
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
     | some c =>
@@ -236,7 +235,7 @@ theorem ptRep_fill (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27)
     (hfr : ∀ b ∈ fr, pageValid (pageAddr b) ∧ b ∉ t.pages 2) :
     ptRep (t.fill 2 vpn fr).1 L := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := hrep
-  refine ⟨PtRun.wfU_fill 2 t vpn fr h1, PtRun.pagesNodup_fill 2 t vpn fr h2 hnd
+  refine ⟨MachCSL.PTree.wfU_fill 2 t vpn fr h1, MachCSL.PTree.pagesNodup_fill 2 t vpn fr h2 hnd
     (fun b hb => (hfr b hb).2), ?_, ?_, ?_⟩
   · intro b hb
     rcases (PtRun.mem_pages_fill 2 t vpn fr b).mp hb with h | h
@@ -244,9 +243,9 @@ theorem ptRep_fill (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27)
     · exact (hfr b (List.mem_of_mem_take h)).1
   · intro v w hw
     obtain ⟨addr, pv, hwalk, had⟩ := h4 v w hw
-    exact ⟨addr, pv, by rw [PtRun.walk_fill 2 t vpn fr h1]; exact hwalk, had⟩
+    exact ⟨addr, pv, by rw [MachCSL.PTree.walk_fill 2 t vpn fr h1]; exact hwalk, had⟩
   · intro v hw
-    rw [PtRun.walk_fill 2 t vpn fr h1]
+    rw [MachCSL.PTree.walk_fill 2 t vpn fr h1]
     exact h5 v hw
 
 /-- Writing a valid leaf at the end of a complete path represents the leaf
@@ -514,9 +513,6 @@ theorem vpnOf_toNat_eq (x : BitVec 64) (h : x.toNat < 2 ^ 38) :
   simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
   omega
 
-theorem ofNat_toNat_self (x : BitVec 64) : BitVec.ofNat 64 x.toNat = x := by
-  apply BitVec.eq_of_toNat_eq
-  rw [toNat_ofNat_of_lt _ (by omega)]
 
 /-- A page-aligned address, from its numeric value. -/
 theorem aligned_of_toNat (x : BitVec 64) (h : 4096 ∣ x.toNat) : x &&& 0xfff#64 = 0#64 := by
@@ -524,7 +520,7 @@ theorem aligned_of_toNat (x : BitVec 64) (h : 4096 ∣ x.toNat) : x &&& 0xfff#64
   have hb : x.toNat < 2 ^ 64 := x.isLt
   have hx : x = BitVec.ofNat 64 (4096 * q) := by
     apply BitVec.eq_of_toNat_eq
-    rw [toNat_ofNat_of_lt _ (by omega), hq]
+    rw [Xv6.bcOfNatToNat _ (by omega), hq]
   rw [hx]
   exact ofNat_aligned _ ⟨q, rfl⟩
 
@@ -617,7 +613,7 @@ theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
 
 theorem uvmdVpn0_run (A : Nat) (h4 : 4096 ∣ A) (hlt : A < 2 ^ 64) :
     pgRoundUpN (BitVec.ofNat 64 A).toNat / 4096 = A / 4096 := by
-  rw [toNat_ofNat_of_lt _ hlt]
+  rw [Xv6.bcOfNatToNat _ hlt]
   obtain ⟨q, rfl⟩ := h4
   rw [pgRoundUpN_mul]
 
@@ -625,7 +621,7 @@ theorem uvmdNp_run (A i : Nat) (h4 : 4096 ∣ A) (hlt : A + 4096 * i < 2 ^ 64) :
     uvmdNp (BitVec.ofNat 64 (A + 4096 * i)) (BitVec.ofNat 64 A) = i := by
   obtain ⟨q, rfl⟩ := h4
   unfold uvmdNp
-  rw [toNat_ofNat_of_lt _ (by omega), toNat_ofNat_of_lt _ (by omega)]
+  rw [Xv6.bcOfNatToNat _ (by omega), Xv6.bcOfNatToNat _ (by omega)]
   by_cases h0 : i = 0
   · subst h0; rw [if_neg (by omega)]
   · rw [if_pos (by omega),

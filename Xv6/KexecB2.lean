@@ -73,6 +73,7 @@ import Xv6.KexecB2Spec
 import Xv6.KexecPtImage
 import Xv6.SpecWalkaddr
 import Xv6.FsCallSitesI
+import Xv6.ReadiParts
 
 namespace Xv6
 
@@ -102,9 +103,6 @@ theorem kxcB2_ret_e6 : jumpPc (KA.«kexec» + 0xe6#64 + 4#64) = KA.«kexec» + 0
   decide
 
 /-! ## Pure facts -/
-
-/-- `MAXFILE * BSIZE`. -/
-theorem kxcB2_maxfile : MAXFILE * BSIZE = 274432 := by decide
 
 /-- A valid physical page is not NULL (the `beqz a0` after walkaddr). -/
 theorem kxcB2_pte2pa_ne (w : BitVec 64) (h : pageValid (pte2pa w)) : pte2pa w ≠ 0#64 :=
@@ -292,7 +290,7 @@ theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hiok' := hiok
   obtain ⟨hwf, hcov, -, -, hsz, -, -⟩ := hiok
   have hjoint : off ≤ dnf.diSize.toNat → off + n < 2 ^ 32 := by
-    intro h; rw [kxcB2_maxfile] at hsz; omega
+    intro h; rw [Xv6.rd_maxbytes] at hsz; omega
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
   have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ cpu
@@ -607,7 +605,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
     with ⟨Hpid, Hpriv⟩
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
-  rw [kxcB2_maxfile] at hsz
+  rw [Xv6.rd_maxbytes] at hsz
   icases UMemL.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
   icases KexecPtImage.procPtAt_page_load_split P Mi kv w nn hkv hnn1 $$ Hpt with ⟨Hpg, Hrest, Hback⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hbs2⟩

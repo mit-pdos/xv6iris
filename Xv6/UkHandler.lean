@@ -518,13 +518,6 @@ theorem cfInv_intro (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeS
   · ipureintro; exact hdom
   iframe Hfds Hfiles Hdev
 
-/-- **Rocq `cf_inv_same`**: ...with nothing moved. -/
-theorem cfInv_same (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (t : Proc)
-    (hc : Conforms E t) (hs : SafeFds (fdDom E.fd) t) (hdp : dpIn Dp ds)
-    (hdom : ∀ fd d, E.fd fd = some d → d ∈ ds) :
-    ⊢ I.eiFds E.fd -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗ cfInv I t :=
-  cfInv_intro I E ds t hc hs hdp hdom
-
 /-- **Rocq `cf_inv_move`**: the invariant rebuilt after one device moved to
 a new spec, the rest of the environment unchanged. -/
 theorem cfInv_move (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (d : Nat)
@@ -620,7 +613,7 @@ theorem cfInv_step_open (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtT
       · iexact Hdev
     isplit
     · iintro Hfds Hfiles
-      iapply cfInv_same I E ds (k (-1)) hk1 hs.2 hdp hdom $$ Hfds Hfiles Hdev
+      iapply Xv6.cfInv_intro I E ds (k (-1)) hk1 hs.2 hdp hdom $$ Hfds Hfiles Hdev
     · iintro %x %hx Ht
       iapply cfInv_taint I _ (k x) (htaint x hx) $$ Ht
   · -- absent
@@ -628,7 +621,7 @@ theorem cfInv_step_open (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtT
     iapply I.eiOpenAbsent E.fd E.files E.paths p m _ hpath hnc hfile $$ Hfds Hfiles
     isplit
     · iintro Hfds Hfiles
-      iapply cfInv_same I E ds (k (-1)) hk1 hs.2 hdp hdom $$ Hfds Hfiles Hdev
+      iapply Xv6.cfInv_intro I E ds (k (-1)) hk1 hs.2 hdp hdom $$ Hfds Hfiles Hdev
     · iintro %x %hx Ht
       iapply cfInv_taint I _ (k x) (htaint x hx) $$ Ht
 
@@ -1009,7 +1002,7 @@ theorem cfInv_step_env (I : EpIfaceP (hlc := hlc) N P Dp) (E : Penv) (ds : ExtTr
   | tau t' =>
     simp only [treeFOf]
     iintro ⟨%hdom, Hfds, Hfiles, Hdev⟩
-    iapply cfInv_same I E ds t' hc' hs' hdp hdom $$ Hfds Hfiles Hdev
+    iapply Xv6.cfInv_intro I E ds t' hc' hs' hdp hdom $$ Hfds Hfiles Hdev
   | vis e k =>
     cases e with
     | EOpen p m =>

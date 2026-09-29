@@ -11,6 +11,8 @@ Kept in its own namespace (`Xv6.UMemL`).
 import Xv6.UMem
 import Xv6.PtOwnLemmas
 import Xv6.PtRunLemmas
+import Xv6.KvmLemmas
+import Xv6.UPtLemmas
 
 namespace Xv6.UMemL
 
@@ -450,21 +452,6 @@ end res
 
 /-! ## Page-table entries and the fixed leaves -/
 
-/-- `PTE2PA` of what `mappages` stores. -/
-theorem pte2pa_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& ~~~0x3FF#64 = 0#64) :
-    pte2pa (uLeaf ppn perm) = pageAddr ppn := by
-  simp only [pte2pa, uLeaf, pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h
-  bv_decide
-
-/-- A valid page is the page of its own page number. -/
-theorem pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
-    pageAddr (BitVec.extractLsb' 12 44 p) = p := by
-  obtain ⟨h1, -, h3⟩ := h
-  unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
-  revert h1 h3
-  bv_decide
 
 /-- The `A`/`D` bits the hardware sets do not disturb `R`/`W`/`X`/`U`/`V`. -/
 theorem pteAD_low (w v : BitVec 64) (h : pteAD w v) : v &&& 0x3F#64 = w &&& 0x3F#64 := by

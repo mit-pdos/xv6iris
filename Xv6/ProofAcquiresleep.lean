@@ -27,6 +27,10 @@ import Xv6.SpecRelease
 import Xv6.SpecMyproc
 import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
+import MachCSL.WpLock
+import Xv6.FsWords
+import Xv6.KilledDefs
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -53,34 +57,25 @@ theorem aslj_4008 : jumpPc (KA.«acquiresleep» + 0x48#64) = (KA.«acquiresleep�
 
 theorem asl_add0 (x : BitVec 64) : x + 0#64 = x := by simp
 
-theorem asl_ext_sext (x : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 x) = x := by
-  bv_decide
-
-theorem asl_ext_one : BitVec.extractLsb' 0 32 (1#64) = 1#32 := by decide
 
 theorem asl_sext_nz (v : BitVec 32) (h : v ≠ 0#32) : BitVec.signExtend 64 v ≠ 0#64 := by
   intro hc
   apply h
   have h2 : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 v) = BitVec.extractLsb' 0 32 (0#64) := by
     rw [hc]
-  rw [asl_ext_sext] at h2
+  rw [Xv6.fw_ext32] at h2
   exact h2.trans (by decide)
 
 theorem asl_beq_z : bcond bop.BEQ (BitVec.signExtend 64 (0#32)) 0#64 = true := by decide
 theorem asl_bne_z : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
 theorem asl_beq_zz : bcond bop.BEQ (0#64) (0#64) = true := by decide
-theorem asl_bne_zz : bcond bop.BNE (0#64) (0#64) = false := by decide
 
 theorem asl_beq_nz (v : BitVec 32) (h : v ≠ 0#32) :
     bcond bop.BEQ (BitVec.signExtend 64 v) 0#64 = false := by
   simp only [bcond, beq_eq_false_iff_ne, ne_eq]
   exact asl_sext_nz v h
 
-theorem asl_bne_nz (v : BitVec 32) (h : v ≠ 0#32) :
-    bcond bop.BNE (BitVec.signExtend 64 v) 0#64 = true := by
-  simp only [bcond, bne_iff_ne, ne_eq]
-  exact asl_sext_nz v h
 
 /-- The sleeplock's own address is nonzero: its inner spinlock sits in RAM. -/
 theorem asl_slk_nz (slk : BitVec 64) (h : lockAddrOk (slk + 8#64)) : slk ≠ 0#64 := by
@@ -91,12 +86,6 @@ theorem asl_slk_nz (slk : BitVec 64) (h : lockAddrOk (slk + 8#64)) : slk ≠ 0#6
 
 /-! ## Contexts -/
 
-theorem asl_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem asl_withSpie_pushOffAt (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
-theorem asl_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 theorem asl_withSpie_sec (kb : KCtx) (a b : Bool) (l : List String) :
     ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l :=
   KCtx.withSpie_self' _ a b rfl rfl
@@ -391,7 +380,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
   k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x38#64) true 0#12 9#5 15#5 (by decide) 0#32)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, Xv6.vdrw3_len1]
   iintro Hk Hpc Hw
   -- jal myproc
   k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087050#21 1#5 (by decide))
@@ -427,7 +416,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
         wordPointsTo (slk + 40#64) 4 (DFrac.own 1) 0#32 from by
       unfold slPid; iintro H; iexact H) $$ Hlkpid
     k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x40#64) true 40#12 9#5 15#5 (by decide) 0#32)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, asl_ext_sext]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, Xv6.fw_ext32]
     iintro Hk Hpc Hlkpid
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
         wordPointsTo (slPid slk) 4 (DFrac.own 1) pid from by
@@ -644,7 +633,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
         iapply wpNext_intro_pin
         iintro %cpu %_ %spieS %sppS %RS Hk Hpc Hte Hce %hcsS
         icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-        k_norm_g [asl_withSpie_withSpie]
+        k_norm_g [MachCSL.KCtx.withSpie_twice]
         have hpreS : aslPre k slk RS := aslPre_cs k slk _ RS
           (by unfold aslPre at hpre6 ⊢
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpre6) hcsS
@@ -659,7 +648,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
         iapply (asl_acquire AC cpu _ γl (slk + 8#64) (slBody γ slk Rp Hd) ?ha0a ?hna ?hKa ?hla)
           $$ [- $Hk $Hpc $Hlk]
         rotate_right 1
-        · k_norm_g [asl_withSpie_withSpie]
+        · k_norm_g [MachCSL.KCtx.withSpie_twice]
           k_next_e
           iintro %spieW %sppW %R7 %hspW Hk Hpc %hcsW Hlocked Hpay _ Harm
           icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -667,8 +656,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
           ihave Harm := (show sieArm (GF := GF) cpu kb.sie kb.proc ⊢ sieArm cpu k.sie k.proc from by
             rw [hsie, hb.proc]) $$ Harm
           icases armExt_join cpu k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-          k_norm_g [aslj_3ff2, asl_withSpie_withSpie, KCtx.pushOffAt_withRegs,
-            asl_withSpie_pushOffAt, KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
+          k_norm_g [aslj_3ff2, MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs,
+            MachCSL.KCtx.withSpie_pushOffAt, KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
           have hpreW : aslPre k slk R7 := aslPre_cs k slk _ R7
             (by unfold aslPre at hpreS ⊢
                 simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreS) hcsW
@@ -684,7 +673,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
             iintro Hk Hpc Hw
             k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x34#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-              with [asl_bne_z, asl_bne_zz]
+              with [asl_bne_z, MachCSL.bcond_bne_zero]
             iintro Hk Hpc
             k_norm_g
             iapply (asl_exit RE MP c0 cpu k kb hb γl γ Rp Hd q q0 slk j pid dqp hj hkproc
@@ -706,7 +695,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
             case' _ => iframe
             k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x34#64) true 8168#13 15#5 0#5 (by decide) bop.BNE)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-              with [asl_bne_nz v hvn]
+              with [MachCSL.bcond_bne_sext_ne v hvn]
             iintro Hk Hpc
             k_norm_g
             ihave IH' := aslLoop_elim c0 k kb γl γ Rp Hd q slk pid dqp $$ IH
@@ -907,8 +896,6 @@ theorem asl_filter_nb (l : List String) (h : "sleep lock" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem asl_withLocks_nb (k : KCtx) (m : Nat) (a b : Bool) :
-    ((k.pushed m).withSpie a b).withLocks k.locks = (k.pushed m).withSpie a b := rfl
 
 theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
     (k.pushed m).withSpie k.spie k.spp = k.pushed m := rfl
@@ -993,7 +980,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
   k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x38#64) true 0#12 9#5 15#5 (by decide) 0#32)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, Xv6.vdrw3_len1]
   iintro Hk Hpc Hw
   -- jal myproc
   k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087050#21 1#5 (by decide))
@@ -1028,7 +1015,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
         wordPointsTo (slk + 40#64) 4 (DFrac.own 1) 0#32 from by
       unfold slPid; iintro H; iexact H) $$ Hlkpid
     k_step (wp_s_sw cpu _ (KA.«acquiresleep» + 0x40#64) true 40#12 9#5 15#5 (by decide) 0#32)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, asl_ext_sext]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m9, Xv6.fw_ext32]
     iintro Hk Hpc Hlkpid
     ihave Hlkpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
         wordPointsTo (slPid slk) 4 (DFrac.own 1) pid from by
@@ -1052,7 +1039,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     · isplitl []
       · iempintro
       k_norm_g [hsie, asl_popExit_off (k.pushed 4) k.spie k.spp hwf hsie, asl_filter_nb k.locks hs,
-        aslj_4008, asl_withSpie_sec, asl_withLocks_nb k 4 k.spie k.spp, asl_pushed_spie_nb k 4]
+        aslj_4008, asl_withSpie_sec, Xv6.kl_withLocks_self k 4 k.spie k.spp, asl_pushed_spie_nb k 4]
       iapply wpNext_off_intro
       iintro %R5 Hk Hpc %hcs5
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

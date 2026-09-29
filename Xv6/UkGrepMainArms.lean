@@ -131,7 +131,7 @@ theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
   ihave %hbnd := urun_uword_bnd N h m _ _ _ _ _ $$ Hrun Hwd
   ihave #Hfmt := gm_str N.t $$ Hc
   -- the tree's three runs: the literal before the directive, the path, the newline
-  rw [grepDgOpen_lit, grepWriteBytes_app, grepWriteBytes_app]
+  rw [grepDgOpen_lit, Xv6.writeBytes_app, Xv6.writeBytes_app]
   -- 0x250  ld a1,0(s2) : argv[i]
   gfetch 0x250 false (.LOAD (0#12, .Regidx 18#5, .Regidx 11#5, false, 8))
   have hA : ((m.get 18#5).toNat : Int) + (0#12 : BitVec 12).toInt = ((av + 8 * i : Nat) : Int) := by

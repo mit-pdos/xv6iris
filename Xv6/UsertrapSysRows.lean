@@ -14,6 +14,7 @@ Pure.
 -/
 import Xv6.UsertrapParts
 import Xv6.UsysMemOkSpec
+import Xv6.UserretClosedDefs
 
 namespace Xv6
 
@@ -25,11 +26,6 @@ set_option linter.unusedSectionVars false
 section
 variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
 
-/-- The prologue's frame and the dispatcher's differ in the epc word. -/
-theorem ut_sysTf_arg (sep : BitVec 64) (V : ProcPriv) (i : Nat) (hi : i ≠ tfEpcIdx) :
-    tfW (utSysTf sep V) i = tfW (utProTf sep V) i := by
-  unfold utSysTf utProTf; rw [tfW_set_ne _ _ _ _ (Ne.symm hi), tfW_set_ne _ _ _ _ (Ne.symm hi)]
-
 theorem ut_sysNum_raw (sep : BitVec 64) (V : ProcPriv) :
     usysNum (utSysRec sep V).tf = usysNum (utProTf sep V) := by
   show usysNum (utSysTf sep V) = _
@@ -40,17 +36,6 @@ theorem ut_sysNum (sep : BitVec 64) (V : ProcPriv) :
   show usysEff V.pvSecc (utSysTf sep V) = _
   unfold utSysTf utProTf; rw [usysEff_epc, usysEff_epc]
 
-theorem ut_sysNum_V (sep : BitVec 64) (V : ProcPriv) :
-    syscNum (utSysRec sep V) = usysEff V.pvSecc V.tf := by
-  show usysEff V.pvSecc (utSysTf sep V) = _
-  unfold utSysTf; rw [usysEff_epc]
-
-/-- The dispatcher's a0 store IS the bump of the prologue's frame. -/
-theorem ut_sys_bump (sep : BitVec 64) (V : ProcPriv) (w : BitVec 64) (hl : V.tf.length = 36) :
-    (utSysTf sep V).set (tfArgIdx 0) w = bumpTf (utProTf sep V) w := by
-  unfold bumpTf utSysTf utProTf
-  rw [tfW_set_eq _ _ _ (by rw [hl]; decide), List.set_set]
-
 /-- **Rocq's ecall-arm rows** (ProofUsertrapSys `Hrda` / `Hfde` / `Hpipe` /
 `Hpidr`): the dispatcher's rows at `utSysRec` (their kstack row), the block's
 `umBelow`, are the round's at the entry record. -/
@@ -60,7 +45,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
     (hsc : A.sc = uecallScause)
     (hr : SyscRows (utSysRec A.sep A.V) A.M V2 M2 A.sts sts2 A.cs cs2 A.pid) :
     UtRows0 A V2 M2 sts2 cs2 := by
-  have hn : syscNum (utSysRec A.sep A.V) = usysEff A.V.pvSecc A.V.tf := ut_sysNum_V A.sep A.V
+  have hn : syscNum (utSysRec A.sep A.V) = usysEff A.V.pvSecc A.V.tf := Xv6.utSysRec_num A.sep A.V
   have hnp : usysEff A.V.pvSecc (utProTf A.sep A.V) = usysEff A.V.pvSecc A.V.tf := by
     unfold utProTf; rw [usysEff_epc]
   have hl1 : tfArgIdx 0 < (utSysTf A.sep A.V).length := by
@@ -82,7 +67,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
         rcases hr.tf with h7 | ⟨w, hw⟩
         · exact absurd h7 hx
         · exact ⟨w, hw⟩
-      have hbump : V2.tf = bumpTf (utProTf A.sep A.V) w := by rw [hw, ut_sys_bump _ _ _ hl]
+      have hbump : V2.tf = bumpTf (utProTf A.sep A.V) w := by rw [hw, Xv6.urc_sysTf_bump _ _ _ hl]
       have ha0 : syscA0 V2 = w := by
         show tfW V2.tf (tfArgIdx 0) = w
         rw [hw, tfW_set_eq _ _ _ hl1]
@@ -93,8 +78,8 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
       · -- the table
         rw [← ut_sysNum]
         refine usysMemOk_argCong (tf := utSysTf A.sep A.V)
-          (ut_sysTf_arg _ _ _ (by decide)) (ut_sysTf_arg _ _ _ (by decide))
-          (ut_sysTf_arg _ _ _ (by decide)) ?_
+          (Xv6.urc_sysTf_proTf _ _ _ (by decide)) (Xv6.urc_sysTf_proTf _ _ _ (by decide))
+          (Xv6.urc_sysTf_proTf _ _ _ (by decide)) ?_
         by_cases hs : syscNum (utSysRec A.sep A.V) = USYS_sbrk
         · have hrow := syscMemOk_sbrkRow hs hr.mem
           have hp := usysSbrkPerm_of_row hb hrow
@@ -140,7 +125,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
           split <;> first | (intro _; exact hc') | exact hc'
       · -- the mask
         rw [hnp, ← hn, ← ha0]
-        exact usysSeccOk_argCong (ut_sysTf_arg _ _ _ (by decide)) hr.secc
+        exact usysSeccOk_argCong (Xv6.urc_sysTf_proTf _ _ _ (by decide)) hr.secc
   · intro h; have := hr.ch; unfold syscChOk at this; rw [hn] at this
     exact this (fun hf => h ⟨hsc, Or.inl hf⟩) (fun hw => h ⟨hsc, Or.inr hw⟩)
   · exact hr.gen

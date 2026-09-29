@@ -14,7 +14,7 @@ carries (dev, inum).
   alternative cannot follow;
 * the iref-slot conservation law: the caller's unit joins the table's
   (`irefSlots_combine`), whose supply bound is the new count's membership
-  (`irefSlots_supply`);
+  (`Xv6.irefSlots_bound`);
 * (c) at `c ≥ 1`: the box mints the new reference's stamps
   (`icHitIncr`);
 * the count store: `wp_s_sw_au` over the accessor
@@ -70,14 +70,6 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   · subst h; simp [hMj]
   · simp only [h, if_false]
 
-/-- The `addiw a5,a5,1` of a loaded count, stored by `sw`: the low word is
-the successor (Rocq `moi32_storeval_succ`). -/
-theorem ig_addiw (n : Nat) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32
-      (BitVec.signExtend 64 (BitVec.ofNat 32 n) + 1#64))) = BitVec.ofNat 32 (n + 1) := by
-  rw [BitVec.ofNat_add]
-  generalize BitVec.ofNat 32 n = x
-  bv_decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
@@ -121,7 +113,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   ihave Hiu := irefSlots_combine nj.val 1 $$ [Hiu Hislot]
   · iframe Hiu; unfold irefSlot; iexact Hislot
   ihave %hno : ⌜nj.val + 1 ≤ IREFSLOTS⌝ $$ [Hiauth Hiu]
-  · iapply irefSlots_supply; iframe
+  · iapply Xv6.irefSlots_bound; iframe
   have hno' : nj.succ.val ≤ IREFSLOTS := by rw [PosNat.succ_val]; exact hno
   -- the slot's share authority, and its payload row (floored)
   icases islPool_acc_upd M j hj $$ Hipool with ⟨Hisl, Hislback⟩
@@ -250,7 +242,7 @@ theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (h
   k_step (wp_s_sw_au c _ ?hs (KA.«iget» + 0x58#64) true 8#12 9#5 15#5 (iRef (ientry j)) ?ha hram hal
       iprop(igRin curCtx ∗ inodeRefb (isClaim l) j qn icfgDev inum ∗
         iname fscIreg fscFs icfgIst inum l))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_addiw]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.bc_incr']
   case ha => k_norm [h9]; rfl
   iintro Hk Hpc ⟨HRin, Href, Hlic⟩
   -- +0x5a auipc a0 ; +0x5e addi a0 ; +0x62 jal release

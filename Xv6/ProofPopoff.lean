@@ -12,6 +12,7 @@ import Xv6.SpecPopoff
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
 import Xv6.StepLemmas
+import MachCSL.WpLock
 
 namespace Xv6
 
@@ -30,7 +31,6 @@ theorem sie0_and2 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &&& 2
 theorem sie0_shr_and1 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : (v >>> 1) &&& 1#64 = 0#64 := by
   bv_decide
 
-theorem bcond_bne_00 : bcond bop.BNE 0#64 0#64 = false := by decide
 theorem bcond_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#64 ↔ n = 0 := by
@@ -67,8 +67,6 @@ theorem bcond_bge_zero_pos (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :
 new depth is the popped one. -/
 theorem withCpu_popOff2 (k : KCtx) (R : RegMap) :
     ((k.pushed 2).withRegs R).withCpu R (k.noff - 1) k.intena = (k.popOff.pushed 2).withRegs R := rfl
-
-theorem bcond_beq_10 : bcond bop.BEQ 1#64 0#64 = false := by decide
 
 /-- The context in pop_off's re-enable window: depth 0 with the canonical
 `intena` (the cell, lent, holds the saved `1`). -/
@@ -144,7 +142,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
   iintro Hk Hpc
   -- bnez a5, c2a: not taken
   k_step (wp_s_branch cpu _ (KA.«pop_off» + 0x12#64) true 30#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [bcond_bne_00]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_zero]
   iintro Hk Hpc
   -- lw a5,120(a0)
   k_step (wp_s_lw_noff cpu _ ?hs (KA.«pop_off» + 0x14#64) true 120#12 15#5 10#5 (by decide) ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -187,7 +185,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       iintro Hk Hpc Hcell
       -- bnez a5, c22: not taken
       k_step (wp_s_branch cpu _ (KA.«pop_off» + 0x1e#64) true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-        $$ [- $Hk $Hpc] with [h0, bcond_bne_00, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
+        $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
       iintro Hk Hpc
       -- lw a5,124(a0): the lent cell, 1
       k_step (wp_s_lw cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal true)) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -195,7 +193,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       iintro Hk Hpc Hcell
       -- beqz a5, c22: not taken
       k_step (wp_s_branch cpu _ (KA.«pop_off» + 0x22#64) true 6#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-        $$ [- $Hk $Hpc] with [bcond_beq_10, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
+        $$ [- $Hk $Hpc] with [MachCSL.bcond_beq_one, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
       iintro Hk Hpc
       -- the cell goes back into the bundle
       rw [← hA]
@@ -254,7 +252,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iintro Hk Hpc Hcell
     -- bnez a5, c22: not taken
     k_step (wp_s_branch cpu _ (KA.«pop_off» + 0x1e#64) true 10#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [h0, bcond_bne_00]
+      $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- lw a5,124(a0): the lent cell, 0
     k_step (wp_s_lw cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal false)) from (text_instr _ _ _ _ rfl rfl) Htext

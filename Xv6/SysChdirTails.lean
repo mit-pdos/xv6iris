@@ -43,6 +43,7 @@ Rocq's header points, kept:
 -/
 import Xv6.SysChdirCalls
 import Xv6.SysChdirFrame
+import Xv6.SysLinkCalls
 
 namespace Xv6
 
@@ -87,9 +88,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The out bundle, assembled -/
-
-theorem sys_chdir_env_rdy (Γ : SchedNames) : sysfileEnv (hlc := hlc) (GF := GF) Γ ⊢ fsReady (hlc := hlc) := by
-  unfold sysfileEnv; iintro ⟨-, -, H⟩; iexact H
 
 /-- A held reference, opened (the old cwd, before its `iput`). -/
 theorem sys_chdir_held_open (v : BitVec 64) (z : Nat) :
@@ -195,7 +193,7 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_chdir_ret_6c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_6c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _ (sysChdirPins_set k R _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x6c  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_chdir» + 0x6c#64) true 4095#12 10#5 0#5 (by decide))
@@ -287,7 +285,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_chdir_ret_76, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_76, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -305,7 +303,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_chdir_ret_7a, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_7a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysChdirPins_cs k _ R2 _ _ (sysChdirPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x7a  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_chdir» + 0x7a#64) true 4095#12 10#5 0#5 (by decide))
@@ -390,7 +388,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   icases Hrows with ⟨Hpid, Hcwd, Hcwr⟩
   -- the OLD working directory's reference, taken apart
   icases sys_chdir_held_open _ _ $$ Hcwr with ⟨%kc, %qc, %inumc, %hcwe, %hkc, %hnibc, Hrefc⟩
-  ihave #Hrdy := sys_chdir_env_rdy Γ $$ Henv
+  ihave #Hrdy := Xv6.sys_link_env_ready Γ $$ Henv
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
   icases icSleeplocks_lookup fscIc kc hkc $$ Hslks with ⟨%γilc, %γislc, #Hslkc⟩
   -- +0x48  ld a0,336(s2)
@@ -413,7 +411,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   case pt => k_norm_g; exact htier
   case pa => k_norm_g; exact hcwe
   iintro %cpu %spie1 %spp1 %R1 %n1 %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_chdir_ret_50, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_50, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1
@@ -431,7 +429,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_chdir_ret_54, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_54, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysChdirPins_cs k _ R2 _ _ (sysChdirPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x54  sd s1,336(s2)  -- p->cwd = ip
   k_step_e (wp_s_sd cpu _ (KA.«sys_chdir» + 0x54#64) false 336#12 18#5 9#5 (by decide) A.V.cwd)
@@ -439,7 +437,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   iintro Hk Hpc Hcwd
   -- +0x58  li a0,0
   k_step_e (wp_s_addi cpu _ (KA.«sys_chdir» + 0x58#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero]
   iintro Hk Hpc
   -- +0x5a  ld s1,136(sp)
   unfold sysChdirCells
@@ -519,7 +517,7 @@ theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNa
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
-  k_norm_g [sys_chdir_ret_48, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_chdir_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
     hcs1

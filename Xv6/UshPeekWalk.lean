@@ -22,6 +22,7 @@ Deviations from Rocq: the scan's register file is stated by its facts
 interface `SH_STRCHR`.
 -/
 import Xv6.SpecShStrchr
+import Xv6.UkGrepDefs
 
 namespace Xv6
 
@@ -36,17 +37,6 @@ set_option linter.unusedSimpArgs false
 theorem ushPk_bgeu_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
   simp [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy]
-
-/-- `bne` on two `Nat` words. -/
-theorem ushPk_bne_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BNE (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = !decide (x = y) := by
-  simp only [ukBtaken, bne]
-  by_cases h : x = y
-  · subst h; simp
-  · have : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
-      intro he; apply h; have := congrArg BitVec.toNat he
-      simpa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] using this
-    simp [h, this]
 
 /-- **Rocq `ushp_snez_val`**: `snez` (`sltu rd, x0, rs`) of a `Nat` word. -/
 theorem ushPk_snez_nat (v : Nat) (hv : v < 2 ^ 64) :
@@ -152,7 +142,7 @@ theorem shPeek_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : 
       by_cases hj1 : j + 1 < len
       · -- 0x47c  bne s2,s1 : taken, back to 0x46e
         iapply ushS_brT UL N (ushI_47c N.t) 0x46e h6 m5 (2 + n)
-          (by rw [h518, h59, ushPk_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+          (by rw [h518, h59, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
         iintro %h7 Hrun
         iapply ih (j + 1) h7 m5 (by omega) hj1 hs64 h59 h518
           (by show (ukWr m4 9#5 _).get 19#5 = _; rw [ukWr_get_other _ _ _ _ (by decide), hk4 19#5 (by decide), h19])
@@ -167,7 +157,7 @@ theorem shPeek_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : 
       · -- 0x47c  bne s2,s1 : falls through; 0x480  mv s1,s2
         have hjl : j + 1 = len := by omega
         iapply ushS_brN UL N (ushI_47c N.t) 0x480 h6 m5 (2 + n)
-          (by rw [h518, h59, ushPk_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+          (by rw [h518, h59, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
         iintro %h7 Hrun
         iapply ushS_mv UL N (ushI_480 N.t) 0x482 h7 m5 (2 + n) (BitVec.ofNat 64 (s0 + len)) h518 $$ Hc Hrun
         iintro %h8 Hrun

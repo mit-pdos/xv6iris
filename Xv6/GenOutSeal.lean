@@ -113,7 +113,7 @@ theorem gclPure_step_echo (M : LModel) (L : LmLaws M) (K : LmHooks M) (B : LmByt
     lmStage_sess_pad M K B so.gsPs so.gsCs (gsState M sd so) so.gsE so.gsW hcsb' hrl hlast hbyte
       hpinf hwpre
   have hdi1 : lmDiscInput M (doneOf (consIns (openSeg h)).dropLast) :=
-    lmDiscInput_prefix B _ _ ((doneOf_prefix _).trans (gop_removelast_prefix _)) hdseg
+    lmDiscInput_prefix B _ _ ((doneOf_prefix _).trans (Xv6.ll_removelast_prefix _)) hdseg
   have hbelow : lmSess M ps' cs' sdd (doneOf (consIns (openSeg h)).dropLast)
       <+: lmSess M so.gsPs (lmAltsPad M K (so.gsE.map Prod.snd) so.gsCs) (gsState M sd so)
         (so.gsE.map Prod.snd) :=

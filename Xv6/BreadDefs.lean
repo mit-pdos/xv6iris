@@ -15,6 +15,10 @@ carry `Xv6.bdScan` and only the release path closes it.
 import Xv6.SpecAcquiresleep
 import Xv6.BcacheInv
 import Xv6.SpecPanic
+import Xv6.ConsoleintrArms
+import Xv6.ConsoleintrParts
+import Xv6.FsWords
+import Xv6.VirtioDiskRwDefs3
 
 namespace Xv6
 
@@ -96,11 +100,8 @@ theorem bd_setWidth_sext (a : BitVec 32) : BitVec.setWidth 32 (BitVec.signExtend
   intro h
   simp [h, show i < 64 by omega]
 
-theorem bd_sext_inj (a b : BitVec 32) (h : BitVec.signExtend 64 a = BitVec.signExtend 64 b) :
-    a = b := by rw [← bd_setWidth_sext a, ← bd_setWidth_sext b, h]
-
 theorem bd_sext_ne (a b : BitVec 32) (h : a ≠ b) :
-    BitVec.signExtend 64 a ≠ BitVec.signExtend 64 b := fun he => h (bd_sext_inj a b he)
+    BitVec.signExtend 64 a ≠ BitVec.signExtend 64 b := fun he => h (Xv6.ci_sext_inj a b he)
 
 theorem bd_toNat_inj (a b : BitVec 32) (h : a.toNat = b.toNat) : a = b :=
   BitVec.eq_of_toNat_eq h
@@ -335,16 +336,12 @@ theorem bd_dev_sext (a : BitVec 64) : a + BitVec.signExtend 64 8#12 = aBufDev a 
   unfold aBufDev bOffDev; congr 1
 theorem bd_bno_sext (a : BitVec 64) : a + BitVec.signExtend 64 12#12 = aBufBlockno a := by
   unfold aBufBlockno bOffBlockno; congr 1
-theorem bd_prev_sext (a : BitVec 64) : a + BitVec.signExtend 64 72#12 = bPrev a := by
-  unfold bPrev; congr 1
-theorem bd_next_sext (a : BitVec 64) : a + BitVec.signExtend 64 80#12 = bNext a := by
-  unfold bNext; congr 1
 
 /-- The `lw`'s sign extension is zero exactly when the word is. -/
 theorem bd_sext_zero (v : BitVec 32) : (BitVec.signExtend 64 v = 0#64) ↔ (v = 0#32) := by
   constructor
   · intro h
-    exact bd_sext_inj v 0#32 (by rw [h]; decide)
+    exact Xv6.ci_sext_inj v 0#32 (by rw [h]; decide)
   · intro h; rw [h]; decide
 
 theorem bd_dev_eq (a : BitVec 64) : aBufDev a = a + BitVec.signExtend 64 8#12 := by
@@ -371,9 +368,7 @@ theorem bd_bne_of_ne (a b : BitVec 32) (h : a ≠ b) :
   simp [bcond, bd_sext_ne a b h]
 
 theorem bd_bne_eq (a : BitVec 64) : bcond bop.BNE a a = false := by simp [bcond]
-theorem bd_bne_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BNE a b = true := by simp [bcond, h]
 theorem bd_beq_eq (a : BitVec 64) : bcond bop.BEQ a a = true := by simp [bcond]
-theorem bd_beq_ne (a b : BitVec 64) (h : a ≠ b) : bcond bop.BEQ a b = false := by simp [bcond, h]
 
 /-- `beqz a5` on a slot-backed count: taken exactly at zero. -/
 theorem bd_beqz_refcnt (m : Nat) (h : m < 2 ^ 31) :
@@ -393,16 +388,11 @@ theorem bd_blast_map (l : List Nat) (a : Nat) (d : BitVec 64) :
 
 theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d := rfl
 
-/-- What a `sw` of a sign-extended `uint` argument stores. -/
-theorem bd_ext_sext (a : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 a) = a := by
-  bv_decide
 theorem bd_ext_zero : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
 theorem bd_ext_one : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (1#12 : BitVec 12))
     = BitVec.ofNat 32 1 := by decide
-theorem bd_ext_one' : BitVec.extractLsb' 0 32 (1#64 : BitVec 64) = BitVec.ofNat 32 1 := by decide
 
 theorem bd_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
-theorem bd_beqz_one : bcond bop.BEQ 1#64 0#64 = false := by decide
 
 /-- A balanced call's context, renormalised: a callee's `push_off`/`pop_off`
 pair only moves `SPIE`/`SPP`. -/
@@ -415,9 +405,6 @@ theorem bd_push_withSpie (k : KCtx) (a b a' b' : Bool) (n : Nat) :
 
 theorem bd_ps_wl (k : KCtx) (a b : Bool) (n : Nat) :
     ((k.pushed n).withSpie a b).withLocks k.locks = (k.withSpie a b).pushed n := rfl
-
-theorem bd_withSpie_regs (k : KCtx) (a b : Bool) : (k.withSpie a b).regs = k.regs := rfl
-theorem bd_withSpie_proc (k : KCtx) (a b : Bool) : (k.withSpie a b).proc = k.proc := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]

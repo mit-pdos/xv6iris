@@ -40,6 +40,7 @@ Rocq's header points, kept:
 import Xv6.InodeLock
 import Xv6.FsImgUsed
 import Xv6.FsImgDir
+import Xv6.FsDurSnapBytes
 
 namespace Xv6
 
@@ -132,13 +133,6 @@ theorem imgBlkmap_noind (P : Nat → List (BitVec 8)) (dn : Dinode)
 
 /-! ## B.  THE GEOMETRY FACTS, from `FsSbOk` alone -/
 
-/-- Rocq's `log_region_bound` (deviation 2). -/
-theorem logRegion_bound (ls b : Nat) (h : logRegion ls b = true) :
-    ls ≤ b ∧ b ≤ ls + LOGBLOCKS := by
-  unfold logRegion logHdrBno at h
-  simp only [Bool.or_eq_true, beq_iff_eq, Bool.and_eq_true, decide_eq_true_eq] at h
-  omega
-
 /-- The data region starts ABOVE the log region (Rocq's
 `img_data_above_log`). -/
 theorem imgData_above_log (sb : FsSb) (hok : FsSbOk sb) :
@@ -176,7 +170,7 @@ theorem imgBlkmap_wf (P : Nat → List (BitVec 8)) (sb : FsSb) (cov : ExtTreeSet
     refine ⟨hcov _ hr.1 hr.2, ?_⟩
     cases hl : logRegion sb.sbLogstart (fsSlot P dn i)
     · rfl
-    · have := logRegion_bound _ _ hl; omega
+    · have := Xv6.logRegion_range _ _ hl; omega
   · intro i j hi hj hnz heq
     refine hinj i j hi hj ?_ ?_
     · rw [← imgBlkmap_slot P dn i hwf hi]; exact hnz

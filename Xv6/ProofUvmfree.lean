@@ -20,6 +20,7 @@ import Xv6.SpecUvmunmap
 import Xv6.SpecFreewalk
 import Xv6.UPtFreeLemmas
 import Xv6.CodeTactics
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -53,16 +54,6 @@ theorem uf_ite_bne {α : Type _} (x : BitVec 64) (p q : α) :
 theorem uf_vpn0 : (vpnOf (0#64)).toNat = 0 := by decide
 
 theorem uf_one_ne_zero : (1#64 : BitVec 64) ≠ 0#64 := by decide
-
-theorem uf_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem uf_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem uf_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-- The callee-saved registers the epilogue hands back. -/
 theorem uf_calleeSaved_mk (KR R : RegMap)
@@ -151,7 +142,7 @@ theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, ⟨F0, F1, F2, %w4, F3⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 4 ≤ (k.withSpie spie spp).avail := hK
-  simp only [uf_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   k_step_gen (wp_s_ld cur _ (KA.«uvmfree» + 0x14#64) true 24#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR2] next c1 hp1
@@ -234,7 +225,7 @@ theorem uvmfree_tail (FW : FREEWALK) [CurCtx] (cpu cur : CPU) (k : KCtx)
   case hrt => k_norm_g
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2
-  k_norm_g [uf_withSpie_withSpie, uf_ret_139a]
+  k_norm_g [MachCSL.KCtx.withSpie_twice, uf_ret_139a]
   unfold calleeSaved at hcs2
   k_norm_g [hR2, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27] at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
@@ -301,7 +292,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
       exact h
     ihave He := umPages_empty P M hempty $$ Hpages
     iclear He
-    rw [uf_pushed_spie_self k 4]
+    rw [Xv6.ua_pushed_spie_self k 4]
     iapply (uvmfree_tail FW cpu c3 k γl γk P.root P.um hpin3 hnoff hK hlk hempty
       k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?e2 ?e9 ?e18 ?e19 ?e20 ?e21 ?e22 ?e23 ?e24 ?e25
       ?e26 ?e27) $$ [- $Hk $Hpc $Htree $Hframe $HΦ]
@@ -362,7 +353,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     case hfr => k_norm_g; exact uf_one_ne_zero
     iapply wpNext_intro_pin
     iintro %c11 %hp11 %spie1 %spp1 %R1 %hsp1 Hk Hpc Htree Hpages %hcs1
-    k_norm_g [uf_withSpie_withSpie, uf_ret_13b6, uf_vpn0]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, uf_ret_13b6, uf_vpn0]
     unfold calleeSaved at hcs1
     k_norm_g [hroot] at hcs1
     obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1

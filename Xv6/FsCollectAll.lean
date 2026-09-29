@@ -40,7 +40,7 @@ view's `fsbN`.
    `colEscNs` is Rocq's `esc_ns` as a `foldr` of unions, `colEscNs_mem`
    its membership reading (which is what Rocq's `esc_ns_disjoint` /
    `esc_ns_still_open` / `esc_ns_still` are used for).
-4. **MASKS**: Rocq's `solve_ndisj` is `colSubDiff` over the
+4. **MASKS**: Rocq's `solve_ndisj` is `Xv6.iput_ofl_sub_diff` over the
    `ndot_ne_disjoint nroot (by decide)` facts (`sbN` sits under `logN`,
    `colSbN_disj`).
 5. The history camera is the bare `[MonoListG GF BlockMap]` (as
@@ -60,6 +60,7 @@ view's `fsbN`.
 import Xv6.FsCollectAllBodies
 import Xv6.AppDur
 import Xv6.IcacheEscrowPoolMove
+import Xv6.IputOfflockParts
 
 namespace Xv6
 
@@ -68,12 +69,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 set_option linter.unusedSectionVars false
 
 /-! ## 3.  THE NAMESPACE ARITHMETIC -/
-
-/-- `A ⊆ E ∖ B` off `A ⊆ E` and `A ## B` (deviation 4; helper). -/
-theorem colSubDiff {A B E : CoPset} (hA : A ⊆ E) (hd : A ## B) : A ⊆ E \ B := by
-  intro p hp
-  rw [CoPset.in_diff]
-  exact ⟨hA p hp, fun hb => hd p ⟨hp, hb⟩⟩
 
 /-- `sbN` sits under `logN` (helper). -/
 theorem colSbN_disj {X : CoPset} (h : (↑logN : CoPset) ## X) : (↑sbN : CoPset) ## X :=
@@ -288,12 +283,12 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   have dES : (↑icEscN : CoPset) ## ↑sbN := fun p ⟨h1, h2⟩ =>
     colSbN_disj (X := ↑icEscN) (ndot_ne_disjoint nroot (by decide)) p ⟨h2, h1⟩
   have dEP : (↑icEscN : CoPset) ## ↑ipoolN := ndot_ne_disjoint nroot (by decide)
-  have h1 := colSubDiff hft dFA
-  have h2 := colSubDiff (colSubDiff hir dIA) dIF
-  have h3 := colSubDiff (colSubDiff (colSubDiff hbm dBA) dBF) dBI
-  have h4 := colSubDiff (colSubDiff (colSubDiff (colSubDiff hsbn dSA) dSF) dSI) dSB
-  have h5 := colSubDiff (colSubDiff (colSubDiff (colSubDiff (colSubDiff hip dPA) dPF) dPI) dPB) dPS
-  have h6e := colSubDiff (colSubDiff (colSubDiff (colSubDiff (colSubDiff (colSubDiff hie dEA)
+  have h1 := Xv6.iput_ofl_sub_diff hft dFA
+  have h2 := Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff hir dIA) dIF
+  have h3 := Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff hbm dBA) dBF) dBI
+  have h4 := Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff hsbn dSA) dSF) dSI) dSB
+  have h5 := Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff hip dPA) dPF) dPI) dPB) dPS
+  have h6e := Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff (Xv6.iput_ofl_sub_diff hie dEA)
     dEF) dEI) dEB) dES) dEP
   have h6 : colEscNs (List.range NINODE) ⊆
       (((((E \ ↑appN) \ ↑ftopN) \ ↑iregN) \ ↑bitmapN) \ ↑sbN) \ ↑ipoolN :=

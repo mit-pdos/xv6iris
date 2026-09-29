@@ -1,11 +1,12 @@
 /-
 Xv6: small arithmetic, branch and context facts shared by several proofs --
 bytes compared as the code compares them (`setWidth64_inj`,
-`ite_beq_byte`, ...), the `addiw` counters, and `KCtx.withSpie_withSpie`.
+`ite_beq_byte`, ...), the `addiw` counters, and `MachCSL.KCtx.withSpie_twice`.
 One home for lemmas that `printk`, `strlen`, `memcmp`, `pop_off`,
 `kerneltrap` and `freerange` had each declared for themselves.
 -/
 import MachCSL.WpSmodeIntr
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -22,22 +23,17 @@ theorem setWidth64_inj (c d : BitVec 8) : BitVec.setWidth 64 c = BitVec.setWidth
 theorem bcond_beq_eq (v1 v2 : BitVec 64) : bcond bop.BEQ v1 v2 = (v1 == v2) := rfl
 theorem bcond_bne_eq (v1 v2 : BitVec 64) : bcond bop.BNE v1 v2 = (v1 != v2) := rfl
 
-theorem zext_eq_zero_iff (c : BitVec 8) : BitVec.setWidth 64 c = 0#64 ↔ c = 0#8 := by
-  rw [show (0#64 : BitVec 64) = BitVec.setWidth 64 (0#8) from rfl, setWidth64_inj]
-
 theorem ite_beq_zero {α : Type} (v : BitVec 64) (x y : α) :
     (if bcond bop.BEQ v 0#64 then x else y) = if v = 0#64 then x else y := by
   rw [bcond_beq_eq]
   by_cases h : v = 0#64 <;> simp [h]
-
-theorem setWidth64_eq_zero (b : BitVec 8) : (BitVec.setWidth 64 b = 0#64) ↔ b = 0#8 := zext_eq_zero_iff b
 
 /-- `bnez` on a zero-extended byte. -/
 theorem ite_bne_byte {α : Type} (b : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then y else x := by
   by_cases hb : b = 0#8
   · subst hb; simp [bcond]
-  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((setWidth64_eq_zero b).mp h)
+  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((Xv6.bcZext8EqZero b).mp h)
     simp [bcond, hb, this]
 
 /-- `beqz` on a zero-extended byte. -/
@@ -45,7 +41,7 @@ theorem ite_beq_byte {α : Type} (b : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
   by_cases hb : b = 0#8
   · subst hb; simp [bcond]
-  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((setWidth64_eq_zero b).mp h)
+  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((Xv6.bcZext8EqZero b).mp h)
     simp [bcond, hb, this]
 
 theorem bcond_bne_ofNat (n : Nat) (hn : n < 2 ^ 64) :
@@ -102,7 +98,5 @@ theorem addiw_pred (n : Nat) (h1 : 1 ≤ n) (hn : n < 2 ^ 31) :
   exact signExtend_ofNat32 _ (by omega)
 
 /-! ## Contexts -/
-
-theorem KCtx.withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 
 end Xv6

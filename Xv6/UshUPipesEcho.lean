@@ -150,7 +150,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
         ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 ∗ ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I) :=
     { ok := OK
       hkill := hkill
-      hL31 := pe_line_len ws hok
+      hL31 := Xv6.ush_line_len ws hok
       hline := rfl
       hLw := rfl
       hgate := hgate
@@ -159,7 +159,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
         (by iintro ⟨H, -⟩; iexact H)
       hRd := by show Timeless iprop(True); infer_instance }
   have K := uStgOk ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
-    iprop(True) γc γm P gF gG E r heq hkill OK (pe_line_len ws hok) (Hfire H)
+    iprop(True) γc γm P gF gG E r heq hkill OK (Xv6.ush_line_len ws hok) (Hfire H)
   have L : LawOk (uD (hlc := hlc) (GF := GF) ug v I (dstContent s) (LPipes (.PrEcho ws) (F :: fs')) (wlLine (ws.drop 1)) (.PrEcho ws)
       iprop(True) γc γm P gF gG) sa (uGS ws (F :: fs') len gb) (uSTG ws (F :: fs') len gb sa)
       (ushArgs sa (uGS ws (F :: fs') len gb) (ushEchoToks ws)) ld rb1 rb2 :=

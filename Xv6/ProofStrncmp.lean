@@ -18,6 +18,8 @@ rules chained -- no symbolic execution.  Modelled on `Xv6/ProofMemcmp.lean`.
 -/
 import Xv6.SpecStrncmp
 import Xv6.CodeTactics
+import Xv6.FsWords
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -33,29 +35,10 @@ theorem sn_E_add (x y : BitVec 64) :
     BitVec.extractLsb' 0 32 (x + y) = BitVec.extractLsb' 0 32 x + BitVec.extractLsb' 0 32 y := by
   bv_decide
 
-/-- Truncating a sign-extended word gives the word back. -/
-theorem sn_E_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
-/-- The truncation of a small count. -/
-theorem sn_E_ofNat (m : Nat) (hm : m < 2 ^ 32) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m) = BitVec.ofNat 32 m := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-  omega
-
-/-- Sign-extending a small count. -/
-theorem sn_sext_ofNat (m : Nat) (hm : m < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.ofNat 32 m) = BitVec.ofNat 64 m := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_signExtend, BitVec.msb_eq_decide]
-  simp only [BitVec.toNat_ofNat, BitVec.toNat_setWidth, Nat.reducePow]
-  split <;> rename_i hc <;> simp only [decide_eq_true_eq] at hc <;> omega
-
 /-- `sext.w` is the identity on a small count. -/
 theorem sn_sext32 (m : Nat) (hm : m < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 m)) = BitVec.ofNat 64 m := by
-  rw [sn_E_ofNat m (by omega), sn_sext_ofNat m hm]
+  rw [Xv6.extractLsb'_ofNat64 m (by omega), MachCSL.signExtend_ofNat32 m hm]
 
 /-- Subtracting one from a positive count. -/
 theorem sn_sub1 (m : Nat) (h0 : 0 < m) :
@@ -88,34 +71,13 @@ theorem sn_ite_bne_ofNat {α : Type} (n : Nat) (hn : n < 2 ^ 64) (x y : α) :
       rw [Nat.mod_eq_of_lt hn] at this; simp at this; exact h this
     simp [bcond, h, this]
 
-/-- `beqz` on a zero-extended byte. -/
-theorem sn_ite_beq_byte {α : Type} (b : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
-  have he : (BitVec.setWidth 64 b = 0#64) ↔ (b = 0#8) := by bv_decide
-  by_cases h : b = 0#8
-  · rw [if_pos h]; simp only [bcond, beq_iff_eq, he.mpr h, if_true]
-  · rw [if_neg h]
-    have : ¬ (BitVec.setWidth 64 b = 0#64) := fun hc => h (he.mp hc)
-    simp only [bcond, beq_iff_eq, this, if_false]
-
-theorem sn_setWidth64_inj (a b : BitVec 8) : BitVec.setWidth 64 a = BitVec.setWidth 64 b ↔ a = b := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_setWidth] at this
-    have ha := a.isLt; have hb := b.isLt
-    rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
-    exact this
-  · intro h; rw [h]
-
 /-- `bne` on two zero-extended bytes. -/
 theorem sn_ite_bne_bytes {α : Type} (a b : BitVec 8) (x y : α) :
     (if bcond bop.BNE (BitVec.setWidth 64 a) (BitVec.setWidth 64 b) then x else y) =
       if a = b then y else x := by
   by_cases h : a = b
   · subst h; simp [bcond]
-  · have : BitVec.setWidth 64 a ≠ BitVec.setWidth 64 b := fun h' => h ((sn_setWidth64_inj a b).mp h')
+  · have : BitVec.setWidth 64 a ≠ BitVec.setWidth 64 b := fun h' => h ((Xv6.setWidth64_inj a b).mp h')
     simp [bcond, h, this]
 
 /-- `subw a0,a0,a5` on two zero-extended bytes: their difference as a C `int`. -/
@@ -186,7 +148,7 @@ theorem strncmp_loop (kb : KCtx)
     -- beqz a5,e14
     k_step_gen (wp_s_branch c1 _ (KA.«strncmp» + 0xe#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sn_ite_beq_byte bs1[i]] next c2 hp2
+      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2
     iintro Hk Hpc
     by_cases hz : bs1[i] = 0#8
     · -- a NUL in p: stop here
@@ -286,7 +248,7 @@ theorem strncmp_loop (kb : KCtx)
     ihave Hbuf1 := Hclose1 $$ Hb1
     k_step_gen (wp_s_branch c1 _ (KA.«strncmp» + 0xe#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sn_ite_beq_byte bs1[i]] next c2 hp2
+      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2
     iintro Hk Hpc
     by_cases hz : bs1[i] = 0#8
     · ihave Hpc := (show pcIs (GF := GF) c2

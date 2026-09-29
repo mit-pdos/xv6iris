@@ -158,7 +158,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- +0x1a  c.bnez a0,+0x58 : TAKEN
   k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x1a#64) true 62#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [ha0, dirlink_bnez, decide_eq_true hne]
+    with [ha0, Xv6.dirlookup_bnez, decide_eq_true hne]
   iintro Hk Hpc
   -- +0x58  jal iput
   k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x58#64) false 2095432#21 1#5 (by decide))

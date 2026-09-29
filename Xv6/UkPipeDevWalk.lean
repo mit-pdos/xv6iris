@@ -34,12 +34,6 @@ open UexecSG
 
 set_option linter.unusedSectionVars false
 
-/-- The key's argument words are the caller's registers. -/
-theorem pdev_tfArg (m : RegMap) (pc : BitVec 64) (k : Nat) (hk : k < 8) :
-    tfW (tfOf m pc) (tfArgIdx k) = m.get (BitVec.ofNat 5 (10 + k)) := by
-  rw [tfOf_arg m pc k hk, RegMap.get_ne _ _ (by
-    intro h; have := congrArg BitVec.toNat h; simp at this; omega)]
-
 section Walk
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
@@ -133,15 +127,15 @@ theorem wp_pdev_write_std (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames G
     have hst : fdStOfKey (xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 0)
         (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd = .open rb true (.pipe γp) := by
       show fdStOfKey (tfW (tfOf m pc) (tfArgIdx 0)) fdv = _
-      rw [pdev_tfArg m pc 0 (by decide)]
+      rw [Xv6.tfOf_aget m pc 0 (by decide)]
       exact std_fd_st_of_key _ fdv l fd _ (by rw [← argZ_setWidth]; exact h0) hlt htake hl
     have hc : argZ (xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 2) = (nb : Int) := by
       show argZ (tfW (tfOf m pc) (tfArgIdx 2)) = _
-      rw [pdev_tfArg m pc 2 (by decide)]; exact hcnt
+      rw [Xv6.tfOf_aget m pc 2 (by decide)]; exact hcnt
     iapply DK.wpIntro Q Qe N.pay _ rb γp nb hst hc
     iintro %Mv %hag
     have e1 : xkA (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) 1 = m.get 11#5 :=
-      pdev_tfArg m pc 1 (by decide)
+      Xv6.tfOf_aget m pc 1 (by decide)
     rw [e1]
     iapply Hch $$ %Mv
     ipureintro

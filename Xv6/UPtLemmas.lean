@@ -384,15 +384,15 @@ theorem procPtAt_root_valid [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
 the table with no leaves at all. -/
 theorem ptOwnRep_zeroNode [CurCtx] (b : BitVec 44) (h : pageValid (pageAddr b)) :
     ptreeOwn (GF := GF) 2 (DFrac.own 1) (PTree.zeroNode b) ⊢ ptOwnRep b ∅ := by
-  refine ptOwnRep_intro b ∅ (PTree.zeroNode b) rfl ⟨PtRun.zeroNode_wfU b 2, ?_, ?_, ?_, ?_⟩
-  · unfold PTree.pagesNodup; rw [PtRun.zeroNode_pages]; simp
+  refine ptOwnRep_intro b ∅ (PTree.zeroNode b) rfl ⟨MachCSL.PTree.zeroNode_wfU b 2, ?_, ?_, ?_, ?_⟩
+  · unfold PTree.pagesNodup; rw [MachCSL.PTree.zeroNode_pages]; simp
   · intro b' hb'
-    rw [PtRun.zeroNode_pages] at hb'
+    rw [MachCSL.PTree.zeroNode_pages] at hb'
     cases hb' with
     | head => exact h
     | tail _ hx => cases hx
   · intro vpn w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
-  · intro vpn _; exact PtRun.zeroNode_walk b 2 vpn
+  · intro vpn _; exact MachCSL.PTree.zeroNode_walk b 2 vpn
 
 end
 

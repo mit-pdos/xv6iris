@@ -58,8 +58,6 @@ theorem sys_exec_head_br_argaddr : KA.«sys_exec» + 0xffffffffffffd46e#64 = KA.
 theorem sys_exec_head_br_argstr : KA.«sys_exec» + 0xffffffffffffd48a#64 = KA.«argstr» := by decide
 theorem sys_exec_head_ret_12 : jumpPc (KA.«sys_exec» + 0x12#64) = KA.«sys_exec» + 0x12#64 := by decide
 theorem sys_exec_head_ret_20 : jumpPc (KA.«sys_exec» + 0x20#64) = KA.«sys_exec» + 0x20#64 := by decide
-theorem sys_exec_head_rsw (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -237,7 +235,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_exec_head_ret_20, sysfile_ww, sysfile_psw, sys_exec_head_rsw]
+  k_norm_g [sys_exec_head_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF30#64) (DFrac.own 1) bs ⊢
     byteBuf (sysExecPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
@@ -307,7 +305,7 @@ theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) 
   case hna => k_norm_g; rw [hS.hnoff]; decide
   case hKa => k_norm_g; exact hKaa
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp H59
-  k_norm_g [sys_exec_head_ret_12, sysfile_ww, sysfile_psw, sys_exec_head_rsw]
+  k_norm_g [sys_exec_head_ret_12, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr A.V.upt.tfp) ⊢
       wordPointsTo (pTrapframe (procAddr A.j)) 8 (DFrac.own 1) A.V.trapframe from by
     rw [htf, hS.hproc]) $$ Htf

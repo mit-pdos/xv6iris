@@ -100,14 +100,6 @@ theorem ub_sepL_idx (Φ : Nat → BitVec 8 → IProp GF) : ∀ bs : List (BitVec
 
 end helpers
 
-theorem ub_flatMap_congr {X Y : Type} (l : List X) (f g : X → List Y) (h : ∀ x ∈ l, f x = g x) :
-    l.flatMap f = l.flatMap g := by
-  induction l with
-  | nil => rfl
-  | cons x l ih =>
-    simp only [List.flatMap_cons]
-    rw [h x List.mem_cons_self, ih (fun y hy => h y (List.mem_cons_of_mem _ hy))]
-
 /-- Pairs of a list with duplicate-free keys are determined by their key. -/
 theorem ub_eq_of_fst {X Y : Type} (l : List (X × Y)) (hnd : (l.map Prod.fst).Nodup) (p q : X × Y)
     (hp : p ∈ l) (hq : q ∈ l) (h : p.1 = q.1) : p = q := by
@@ -152,15 +144,6 @@ theorem ubWordBytes_read (mm : BMap) (a : PAddr) (w : BitVec 64)
   intro j hj
   exact h _ (List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩)
 
-/-- Every entry sits on one of the tree's pages. -/
-theorem ub_entries_page (lvl : Nat) (t : PTree) (e : BitVec 64 × BitVec 64) (he : e ∈ t.entries lvl) :
-    ∃ b ∈ t.pages lvl, ∃ i : BitVec 9, e.1 = pteAddr b i := by
-  have hm : e.1 ∈ (t.entries lvl).map Prod.fst := List.mem_map_of_mem he
-  rw [PTree.entries_addrs] at hm
-  obtain ⟨b, hb, hi⟩ := List.mem_flatMap.1 hm
-  obtain ⟨i, -, hi⟩ := List.mem_map.1 hi
-  exact ⟨b, hb, i, hi.symm⟩
-
 section tree
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -184,7 +167,7 @@ theorem ubTree_own_fwd [CurCtx] (lvl : Nat) (t : PTree) (hv : ∀ b ∈ t.pages 
   rw [ubOwnA_flatMap]
   iapply (ub_sepL_wand kmapStatic (t.entries lvl) _ _ ?_) $$ HS H
   intro e he
-  obtain ⟨b, hb, i, hi⟩ := ub_entries_page lvl t e he
+  obtain ⟨b, hb, i, hi⟩ := Xv6.entries_page lvl t e he
   obtain ⟨a, w⟩ := e
   simp only at hi
   subst hi
@@ -199,7 +182,7 @@ theorem ubTree_own_bwd [CurCtx] (lvl : Nat) (t : PTree) (hv : ∀ b ∈ t.pages 
   rw [ubOwnA_flatMap]
   iapply (ub_sepL_wand kmapStatic (t.entries lvl) _ _ ?_) $$ HS H
   intro e he
-  obtain ⟨b, hb, i, hi⟩ := ub_entries_page lvl t e he
+  obtain ⟨b, hb, i, hi⟩ := Xv6.entries_page lvl t e he
   obtain ⟨a, w⟩ := e
   simp only at hi
   subst hi
@@ -248,7 +231,7 @@ theorem ubDataBytes_fst (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8))
     (hl : ∀ kv ∈ toList um, (M kv.1).length = 4096) : (ubDataBytes um M).map Prod.fst = ubDataAddrs um := by
   unfold ubDataBytes ubDataAddrs
   rw [List.map_flatMap]
-  apply ub_flatMap_congr
+  apply Xv6.PtRun.flatMap_eq_of_mem
   intro kv hkv
   unfold ubPageBytes ubWin
   rw [List.map_map, hl kv hkv]
@@ -283,12 +266,6 @@ theorem ub_data_valid (P : UPtd) (hwf : uptWf P) (k : Nat) (w : BitVec 64) (h : 
   have he := UPtCopy.pte2pa_pageAddr w hv
   exact ⟨he, he ▸ hv⟩
 
-theorem ub_nthByte1 (x : BitVec 8) : nthByte (n := 1) x 0 = x := by
-  unfold nthByte
-  apply BitVec.eq_of_getLsbD_eq
-  intro i hi
-  simp [hi]
-
 section data
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
@@ -297,7 +274,7 @@ theorem ub_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (x : BitVec 8) :
   unfold ctxBytes
   simp only [List.range_one]
   refine BigSepL.bigSepL_singleton.trans ?_
-  rw [ub_nthByte1, show a + BitVec.ofNat 64 0 = a by simp]
+  rw [MachCSL.nthByte_one, show a + BitVec.ofNat 64 0 = a by simp]
   exact .rfl
 
 /-- One byte of a user page, physically. -/
@@ -592,8 +569,8 @@ theorem ubMemStep_setLeaf (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t 
     · exact hwf.tree _ hp'
     intro hin
     obtain ⟨j₂, hj₂, hjj⟩ := (ubWin_mem _ _ _).1 hin
-    obtain ⟨b, -, i, hbi⟩ := ub_entries_page 2 t e hold
-    obtain ⟨b', -, i', hbi'⟩ := ub_entries_page 2 t (addr, w) (PTree.walk_mem_entries 2 t vpn addr w hw)
+    obtain ⟨b, -, i, hbi⟩ := Xv6.entries_page 2 t e hold
+    obtain ⟨b', -, i', hbi'⟩ := Xv6.entries_page 2 t (addr, w) (PTree.walk_mem_entries 2 t vpn addr w hw)
     simp only at hbi'
     rw [hbi, hbi'] at hjj
     exact h1 (by rw [hbi, hbi']; exact ub_pteAddr_win b b' i i' j j₂ hj' hj₂ hjj)

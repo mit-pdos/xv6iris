@@ -43,9 +43,6 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-- Rocq `alt_panic_len5`. -/
-theorem altPanic_len5 : altPanic.length = 5 := lbPanic_len
-
 section FileLinksLine
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]

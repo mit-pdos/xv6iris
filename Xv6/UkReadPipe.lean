@@ -124,7 +124,7 @@ theorem udepwf_std_read_pipe (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l :
   iframe Hh Hf
   iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (readPipeFam N.pay Rp Rpe)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
-    (ukio_tfOf_arg0 m pc) (ukio_tfOf_arg2 m pc) rfl
+    (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [std_fd_st_of_key (m.get 10#5) fdv l fd _ h0 hlt htake hl]
   unfold filereadIn
   iintro HP

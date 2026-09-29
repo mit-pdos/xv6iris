@@ -183,11 +183,6 @@ theorem uwk_pmpRange (pa : BitVec 64) (w : Nat) (h : pmpOk pa w) :
     · rfl
     · rename_i h'; exfalso; simp at h'; omega
 
-/-- The read path's cast of a full-width value. -/
-theorem uwk_upd_full (x : BitVec 64) : Sail.BitVec.updateSubrange (0#64) 63 0 (x : BitVec (63 - 0 + 1)) = x := by
-  simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
-  bv_decide
-
 theorem uwk_add_ofInt0 (x : BitVec 64) : x + BitVec.ofInt 64 0 = x := by
   simp
 
@@ -213,7 +208,7 @@ theorem uwk_read_pte (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
   uwk_pins hp
   uwk_addr pa hok
   uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, uwk_upd_full]
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -225,7 +220,7 @@ theorem uwk_read_pte_excl (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.
   uwk_pins hp
   uwk_addr pa hok
   uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, uwk_upd_full]
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

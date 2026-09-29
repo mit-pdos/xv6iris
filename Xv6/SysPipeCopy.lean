@@ -81,12 +81,12 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc
   have hlt0 := (List.getElem?_eq_some_iff.mp hz0).1
   have hlt1 := (List.getElem?_eq_some_iff.mp hz1).1
   k_step_gen (wp_s_addi c _ (KA.«sys_pipe» + 0x7a#64) true 0#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_li0] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c1 hp1
   iintro Hk Hpc
   rcases hr2 with ⟨h10, hM2, hmap2⟩ | ⟨h10, d, hd, hM2, hmap2⟩
   · -- success: bgez taken to the exit
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x7c#64) false 94#13 10#5 0#5 (by decide) bop.BGE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bgez_0] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.vdrw2_blez0] next c2 hp2
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
     -- GHOST: both descriptors' rows move from `.closed` to their ends
@@ -255,7 +255,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hb1 ⟨%P2, %M2, %⟨hext2, hr2⟩, Hpt⟩ %hcs2
     icases UMemL.procPtAt_wf _ _ $$ Hpt with ⟨Hpt, %hwf2⟩
-    k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g [p8, sys_pipe_a64] at hr2
     k_norm_g at hsp2
     unfold calleeSaved at hcs2
@@ -408,7 +408,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     case hlen => k_norm_g; rfl
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hb0 ⟨%P1, %M1, %⟨hext1, hr1⟩, Hpt⟩ %hcs2
-    k_norm_g [sys_pipe_withSpie_withSpie, sys_pipe_pushed_withSpie, sys_pipe_withRegs_withSpie]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
     k_norm_g [p8, sys_pipe_a60] at hr1
     k_norm_g at hsp2
     unfold calleeSaved at hcs2

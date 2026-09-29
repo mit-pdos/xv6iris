@@ -26,7 +26,7 @@ cells at `sp₀-72`, `sp₀-64`, `sp₀-56`; the cell at `sp₀-80` is unused.
    list-based).  Rocq's `fst_pa_*` / `fst_aligned8_aligned2*` /
    `fst_nth_byte*` / `fst_bytes_w4` / `fst_bytes_w2` are the address and
    alignment arithmetic inside these (`MachCSL.ByteWord4`,
-   `MachCSL.wordPointsTo_of_bytes2`, `fstat_half_any`).
+   `MachCSL.wordPointsTo_of_bytes2`, `Xv6.halfBytes_surj`).
 2. The frame is `fstatFrame` (the four eager cells, the two lazy ones and
    the unused bottom cell) + the three buffer cells; no MachCSL frame
    covers this layout, so the two rules are proved here, by copy of
@@ -232,17 +232,6 @@ end
 
 /-! ## The stat buffer (Rocq `ProofFilestatParts.v`) -/
 
-/-- Any two bytes are a halfword (Rocq's `fst_bytes_w2`, at a list). -/
-theorem fstat_half_any (l : List (BitVec 8)) (hl : l.length = 2) :
-    ∃ w : BitVec 16, l = halfBytes w := by
-  match l, hl with
-  | [b0, b1], _ =>
-    refine ⟨b1 ++ b0, ?_⟩
-    unfold halfBytes nthByte
-    congr 1
-    · bv_decide
-    · congr 1; bv_decide
-
 /-- The 24 bytes copyout sends: stati's five fields and the hole, in
 `struct stat`'s order (4/4/2/2/4/8). -/
 def fstatBytes (dev ino : BitVec 32) (ty nl : BitVec 16) (h : BitVec 32) (sz : BitVec 64) :
@@ -305,8 +294,8 @@ theorem fstat_bytes_stat [CurCtx] (a : BitVec 64) (hal : a.toNat % 8 = 0)
   obtain ⟨l5, l6, h5, rfl⟩ : ∃ l5 l6 : List (BitVec 8), l5.length = 4 ∧ r4 = l5 ++ l6 :=
     ⟨r4.take 4, r4.drop 4, by rw [List.length_take]; omega, (List.take_append_drop 4 r4).symm⟩
   have h6 : l6.length = 8 := by rw [List.length_append] at hr4; omega
-  obtain ⟨w3, rfl⟩ := fstat_half_any l3 h3
-  obtain ⟨w4, rfl⟩ := fstat_half_any l4 h4
+  obtain ⟨w3, rfl⟩ := Xv6.halfBytes_surj l3 h3
+  obtain ⟨w4, rfl⟩ := Xv6.halfBytes_surj l4 h4
   iintro H
   icases (fstat_buf_at0 (GF := GF) a 4 _ _ h1).1 $$ H with ⟨B1, H⟩
   icases (fstat_buf_at (GF := GF) a 4 4 _ _ h2).1 $$ H with ⟨B2, H⟩

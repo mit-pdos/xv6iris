@@ -21,6 +21,7 @@ import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecVmfault
 import Xv6.UsysMemOkSpec
 import Xv6.UsertrapArms
+import Xv6.UsertrapDispatch
 
 namespace Xv6
 
@@ -104,9 +105,6 @@ end Calls
 
 theorem utD0_vmfault_tgt : KA.«usertrap» + 18446744073709547178#64 = KA.«vmfault» := by decide
 theorem utD0_ret : jumpPc (KA.«usertrap» + 0xe6#64) = KA.«usertrap» + 0xe6#64 := by decide
-theorem utD0_bne_z : bcond bop.BNE 0#64 0#64 = false := by decide
-theorem utD0_bne_nz (r : BitVec 64) (h : r ≠ 0#64) : bcond bop.BNE r 0#64 = true := by
-  simp [bcond, h]
 
 section ArmD0
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -216,7 +214,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     ihave Hpv := Hpvback $$ %(utV1 A).upt %A.M %(UMemL.extSz_refl _ _) Hsz Hpg Hpt
     ihave Hown := Hownback $$ %(utV1 A) %A.M %A.sts %A.cs Hpv Hfr Hch Hsy
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xe6#64) true 8128#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, utD0_bne_z]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     k_step (wp_s_j cpu _ (KA.«usertrap» + 0xe8#64) true 0x1fff6e#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -229,7 +227,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   · -- the fill: bnez taken, +0xa6
     have hr0 : r ≠ 0#64 := PtRun.pageValid_ne_zero r hval
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xe6#64) true 8128#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, utD0_bne_nz r hr0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, Xv6.utd_bne_ne r hr0]
     iintro Hk Hpc
     have hvpn := utD0_vpn_le t
     have hlt' : (vpnOf t).toNat * 4096 < A.V.sz.toNat := by omega

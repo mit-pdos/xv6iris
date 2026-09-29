@@ -47,12 +47,6 @@ open Std (ExtTreeSet)
 
 set_option linter.unusedSectionVars false
 
-/-- `[[], cat: write error]` is short (Rocq `cons_short_A2`, inline). -/
-theorem cfs_short_A2 : consShort [[], catDgWrite] := by
-  intro x hx
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
-  rcases hx with rfl | rfl <;> decide
-
 theorem cfs_short_nil : consShort [[]] := by
   intro x hx
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
@@ -152,7 +146,7 @@ theorem catf_lend_of (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
   have hcs : consShort ds ∧ consShort [catDgOpen f] := by
     refine ⟨?_, cfs_short_open f hf⟩
     rcases hds with ⟨rfl, _⟩ | rfl
-    · exact cfs_short_A2
+    · exact Xv6.UShPipesStage.cons_short_A2
     · exact cfs_short_nil
   have cPi : pipeInv (GF := GF) (D.P 0) γp D.L ⊢ pipeInv (D.P 0) γp D.toPns.L := .rfl
   have cCw : wcurN (GF := GF) D.γc (Wid.WLeft 0) (1 : Qp).half 0 ⊢ wcurN D.toPns.γc (Wid.WLeft 0) (1 : Qp).half 0 :=
@@ -200,7 +194,7 @@ theorem catf_lend_of (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
         iapply BigSepL.bigSepL_singleton.2
         iright
         isplitl []
-        · iapply catf_kit D E S hfire f catDgWrite γp hpr hn catDgWrite_ne_nil hfw $$ Hpi
+        · iapply catf_kit D E S hfire f catDgWrite γp hpr hn Xv6.catDgWrite_ne hfw $$ Hpi
         · iapply S.pdep_left_write 0 hh $$ [] HGs
           iapply cfs_shotsF_zero
       · iapply BigSepL.bigSepL_singleton.2

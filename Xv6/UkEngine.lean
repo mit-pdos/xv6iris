@@ -98,7 +98,7 @@ theorem uk_uvb_x0 [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
       uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m' pc := by
   unfold uvb uvbF
   iintro ⟨Ha, Hr, Hsz, Hp, Hf, Hc, Hg, Hpc, Hrut, Hk⟩
-  ihave Hg := uexec_gprFile_congr cpu m m' h $$ Hg
+  ihave Hg := MachCSL.gprFile_ext cpu m m' h $$ Hg
   iframe
 
 /-! ## §3 The goal and the engine -/

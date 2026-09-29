@@ -29,7 +29,7 @@ DROPPED from `UShPanic` (unreached): `ksh_w_of_link_prompt_post_at`,
 
 ## Deviations from Rocq
 
-1. **Names**: `alt_panic_len` / `alt_execfail_len` are `altPanic_len` /
+1. **Names**: `alt_panic_len` / `alt_execfail_len` are `Xv6.lbPanic_len` /
    `altExecfail_len` (decided on the literals, not read off
    `line_alts_len3/1`); Rocq `ubytesq_one` (`ubyteq ⊣⊢ ubytesq … 1 (fun _
    => b)`) is `ubyteq_run_one` (`UkRunMem.ubytesq_one` is its converse
@@ -71,8 +71,6 @@ set_option linter.unusedSectionVars false
 /-- **Rocq `shp_write`**: sh's `write` stub. -/
 theorem shp_write : User.Sh.Sym.«write» = 0xca6 := by decide
 
-/-- **Rocq `alt_panic_len`** (deviation 1): "fork\n". -/
-theorem altPanic_len : altPanic.length = 5 := by decide
 
 /-- **Rocq `alt_execfail_len`** (deviation 1): "exec echo failed\n$ ". -/
 theorem altExecfail_len : altExecfail.length = 19 := by decide

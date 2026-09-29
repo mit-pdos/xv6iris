@@ -57,7 +57,7 @@ theorem lmWrBlkSpRun (M : LModel) (ps cs : List Nat) (s0 : M.lmSt) (I : List (Bi
     (hnp : M.lmPanic (M.lmDec a) = false) (habs : lmAbs M s0 cs I a = pre ++ uPrompt) :
     lmWrSpT M ps (cs ++ [a]) s0 I (P + (pre.length + 1)) := by
   obtain ⟨hop, ht⟩ := lmWrBlk_open_s M ps cs s0 I P a hw hnp
-  rw [habs, List.length_append, ll_prompt_len] at hop
+  rw [habs, List.length_append, Xv6.wrPrompt_len] at hop
   refine ⟨⟨?_, ?_⟩, ht⟩
   · rw [show P + (pre.length + 1) + 1 = P + (pre.length + 2) by omega]
     exact hop

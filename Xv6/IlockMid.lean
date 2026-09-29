@@ -4,7 +4,7 @@ five field copies disk → inode, and the 52-byte `memmove` of the block map
 (Rocq `ProofIlock.v` 1396-1920).
 
 The slot arithmetic is `Xv6/DinodeSlot.lean`'s, read in the normal form the
-rules produce (`il_andi15`, `il_slli6`).  The four halfword copies go
+rules produce (`Xv6.iu_andi15`, `Xv6.iu_slli6`).  The four halfword copies go
 `lh`→`sh` (the `sh` stores `trunc16 ∘ sext64` = the halfword,
 `fw_ext16`), the size `lw`→`sw` (`fw_ext32`).  The buffer is only READ:
 the slot's six pieces go back unchanged (Rocq 1907-1920), which is what
@@ -14,6 +14,7 @@ import Xv6.IlockFin
 import Xv6.SpecMemmove
 import Xv6.FsWords
 import Xv6.IlockBlk
+import Xv6.IupdateMain
 
 namespace Xv6
 
@@ -25,19 +26,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-/-- `c.andi a5,15` on the sign-extended inum: the slot index. -/
-theorem il_andi15 (inum : BitVec 32) :
-    BitVec.signExtend 64 inum &&& 15#64 = BitVec.ofNat 64 (islot inum) := by
-  have h := dsAndi15 (BitVec.signExtend 64 inum)
-  have hc : BitVec.signExtend 64 15#12 = 15#64 := by decide
-  rw [hc, dsSext_mod16] at h
-  exact h
-
-/-- `c.slli a5,6`: the slot's byte offset. -/
-theorem il_slli6 (inum : BitVec 32) :
-    BitVec.ofNat 64 (islot inum) <<< 6 = BitVec.ofNat 64 (64 * islot inum) :=
-  dsSlli6 (islot inum) (islot_lt inum)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -116,10 +104,10 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, iInum]
   iintro Hk Hpc Hinum
   k_step_e (wp_s_andi cpu _ (KA.«ilock» + 0x56#64) true 15#12 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_andi15]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.iu_andi15]
   iintro Hk Hpc
   k_step_e (wp_s_slli cpu _ (KA.«ilock» + 0x58#64) true 6#6 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_slli6]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.iu_slli6]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«ilock» + 0x5a#64) true 11#5 11#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

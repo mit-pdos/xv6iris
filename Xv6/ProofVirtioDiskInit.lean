@@ -21,6 +21,10 @@ import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.CodeTactics
 import Xv6.DiskAcc
+import Xv6.FsStateBitmap
+import Xv6.FsWords
+import Xv6.KmemTier
+import Xv6.PtRunLemmas
 
 namespace Xv6
 
@@ -35,42 +39,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Pure facts about the pages `kalloc` returns -/
 
-/-- A valid page's identity mapping is a read-write static entry. -/
-theorem vdi_kmapClass (p : BitVec 64) (hb : pageValid p) (off : Nat) (hoff : off < 4096) :
-    kmapClass (vpnOf (p + BitVec.ofNat 64 off)).toNat = some .rw := by
-  obtain ⟨hal, hlo, hhi⟩ := hb
-  rw [show ∀ va : BitVec 64, (vpnOf va).toNat = va.toNat / 4096 % 2 ^ 27 from fun va => by
-      simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]]
-  have hlo' : ¬ p.toNat < kernelEndAddr.toNat := by
-    intro h; exact hlo (BitVec.ult_iff_lt.2 h)
-  have hhi' : p.toNat < physTop.toNat := BitVec.ult_iff_lt.1 hhi
-  simp only [kernelEndAddr, physTop, BitVec.toNat_ofNat, Nat.reducePow] at hlo' hhi'
-  have h12 : BitVec.extractLsb' 0 12 p = 0#12 := by
-    revert hal; generalize p = x; intro hal; bv_decide
-  have hal' : p.toNat % 4096 = 0 := by
-    have h := congrArg BitVec.toNat h12
-    simpa [BitVec.extractLsb'_toNat] using h
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat]
-  rw [Nat.mod_eq_of_lt (a := off) (by omega)]
-  rw [Nat.mod_eq_of_lt (by omega)]
-  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
-  have hend_lo : 0x80007 * 4096 ≤ KernelSyms.«end» := by decide
-  have hend_hi : KernelSyms.«end» < 0x88000 * 4096 := by decide
-  rw [hend] at hlo'
-  unfold kmapClass
-  split
-  · omega
-  · split
-    · rfl
-    · omega
-
 /-- **A `kalloc`'d page is a queue page.**  `Xv6.pageValid` gives the
 alignment and the two bounds; `Xv6.pageRw` asks for the same page as a
 `MachCSL.inRam` window and for its identity mapping, which is
-`vdi_kmapClass` at offset zero.  It is how `Xv6.diskFlipIn`'s page facts
+`Xv6.kt_kmapClass_page` at offset zero.  It is how `Xv6.diskFlipIn`'s page facts
 -- and so `Xv6.diskGeom`'s -- are established. -/
 theorem pageRw_of_pageValid (p : BitVec 64) (hb : pageValid p) : pageRw p := by
-  have hkm := vdi_kmapClass p hb 0 (by omega)
+  have hkm := Xv6.kt_kmapClass_page p hb 0 (by omega)
   rw [show (BitVec.ofNat 64 0) = 0#64 from rfl, BitVec.add_zero] at hkm
   obtain ⟨hal, hlo, hhi⟩ := hb
   have hlo' : ¬ p.toNat < kernelEndAddr.toNat := fun h => hlo (BitVec.ult_iff_lt.2 h)
@@ -114,13 +89,6 @@ theorem vdi_bigSepL_replicate {A : Type _} {PROP : Type _} [BI PROP] (n : Nat) (
     rw [List.map_const']; simp]
   exact BigSepL.bigSepL_map (fun _ => c)
 
-/-- The index of `List.range n` is its element. -/
-theorem vdi_range_get {n k x : Nat} (h : (List.range n)[k]? = some x) : x = k ∧ k < n := by
-  obtain ⟨hlt, he⟩ := List.getElem?_eq_some_iff.mp h
-  simp only [List.length_range] at hlt
-  refine ⟨?_, hlt⟩
-  rw [← he, List.getElem_range]
-
 /-- `n` zeroed bytes of a static read-write window are the `n`-byte zero
 word at the raw context tier. -/
 theorem vdi_zbuf [CurCtx] (a : BitVec 64) (n : Nat)
@@ -139,7 +107,7 @@ theorem vdi_zbuf [CurCtx] (a : BitVec 64) (n : Nat)
       ctxByte curCtx (a + BitVec.ofNat 64 x) (DFrac.own 1) (nthByte (n := n) 0 x))) $$ H
   imodintro
   iintro %k %x %hget Hb
-  obtain ⟨rfl, hk⟩ := vdi_range_get hget
+  obtain ⟨rfl, hk⟩ := Xv6.rangeGetElem? hget
   rw [hz x]
   ihave #Hid := kmapStatic_rw (a + BitVec.ofNat 64 x) (hkm x hk) $$ HS
   iapply vdi_byte_ctx (a + BitVec.ofNat 64 x) 0#8 $$ Hid Hb
@@ -349,7 +317,7 @@ theorem vdi_ops_wins :
     (Ψ := fun (_k : Nat) (i : Nat) => opsWin (GF := GF) curCtx i)) $$ H
   imodintro
   iintro %k %x %hget ⟨H1, H2⟩
-  obtain ⟨rfl, hk⟩ := vdi_range_get hget
+  obtain ⟨rfl, hk⟩ := Xv6.rangeGetElem? hget
   iapply vdi_ops_win x hk $$ HS H1 H2
 
 /-- All eight `disk.info[i]` windows, out of the two bss cells each.  No
@@ -373,7 +341,7 @@ theorem vdi_chunk (p : BitVec 64) (hpv : pageValid p) (base sz : Nat) (hb : base
       kmapClass (vpnOf (p + BitVec.ofNat 64 base + BitVec.ofNat 64 j)).toNat = some .rw := by
     intro j hj
     rw [BitVec.add_assoc, ← ofNat64_add]
-    exact vdi_kmapClass p hpv (base + j) (by omega)
+    exact Xv6.kt_kmapClass_page p hpv (base + j) (by omega)
   exact vdi_zbuf (p + BitVec.ofNat 64 base) sz hk
 
 /-- **The descriptor page**: the eight zeroed descriptors. -/
@@ -1200,12 +1168,8 @@ theorem vdi_aAvailPtr : aAvailPtr = KA.«disk» + 8#64 := by decide
 theorem vdi_aUsedPtr : aUsedPtr = KA.«disk» + 16#64 := by decide
 theorem vdi_aVdiskLock : aVdiskLock = KA.«disk» + 296#64 := by decide
 
-/-- A page of the allocator is above the kernel image, hence not `0`. -/
-theorem vdi_page_ne_zero (p : BitVec 64) (h : pageValid p) : p ≠ 0#64 := by
-  intro he; subst he; exact h.2.1 (by decide)
-
 theorem vdi_beqz_page (p : BitVec 64) (h : pageValid p) : bcond bop.BEQ p 0#64 = false := by
-  have hne : p ≠ 0#64 := vdi_page_ne_zero p h
+  have hne : p ≠ 0#64 := Xv6.PtRun.pageValid_ne_zero p h
   simp [bcond, hne]
 
 /-- `kalloc` cannot fail while the count is at least one. -/
@@ -1520,9 +1484,6 @@ end
 
 /-! ## The halves of a pointer, as the driver stores them -/
 
-theorem vdi_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 w) = w := by
-  bv_decide
-
 theorem vdi_ext_sra (w : BitVec 64) :
     BitVec.extractLsb' 0 32 (BitVec.sshiftRight w 32) = BitVec.extractLsb' 32 32 w := by
   bv_decide
@@ -1633,7 +1594,7 @@ theorem vdi_queue_regs (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
       (by decide) (by decide) Virtio.offQueueDescLow 0x10001080#64 ?hb2 (by decide) (by decide)
       (by decide) (diskCfgOwn γ
         (vdiCfg 11#32 8#32 false (Virtio.setLo 0#64 (BitVec.extractLsb' 0 32 pd)) 0#64 0#64)))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32]
   iintro Hk Hpc Htok
   case hb2 => k_norm
   -- +0x11e  lw a4,4(s1) ; +0x120  sw a4,132(a5)   QUEUE_DESC_HIGH
@@ -1652,7 +1613,7 @@ theorem vdi_queue_regs (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   k_step (vdi_sw_dev cpu _ (KA.«virtio_disk_init» + 0x120#64) false 132#12 15#5 14#5
       (by decide) (by decide) Virtio.offQueueDescHigh 0x10001084#64 ?hb3 (by decide) (by decide)
       (by decide) (diskCfgOwn γ (vdiCfg 11#32 8#32 false pd 0#64 0#64)))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32]
   iintro Hk Hpc Htok
   case hb3 => k_norm
   ihave Hd := vdi_word_join8 KA.«disk» (DFrac.own 1) pd vdi_disk_ram vdi_disk_al8
@@ -1683,7 +1644,7 @@ theorem vdi_queue_regs (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
       (by decide) (by decide) Virtio.offDriverDescLow 0x10001090#64 ?hb4 (by decide) (by decide)
       (by decide) (diskCfgOwn γ
         (vdiCfg 11#32 8#32 false pd (Virtio.setLo 0#64 (BitVec.extractLsb' 0 32 pav)) 0#64)))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32]
   iintro Hk Hpc Htok
   case hb4 => k_norm
   -- +0x132  srai a5,a5,0x20 ; +0x134  sw a5,148(a4)   DRIVER_DESC_HIGH
@@ -1722,7 +1683,7 @@ theorem vdi_queue_regs (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
       (by decide) (by decide) Virtio.offDeviceDescLow 0x100010a0#64 ?hb6 (by decide) (by decide)
       (by decide) (diskCfgOwn γ
         (vdiCfg 11#32 8#32 false pd pav (Virtio.setLo 0#64 (BitVec.extractLsb' 0 32 pu)))))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.fw_ext32]
   iintro Hk Hpc Htok
   case hb6 => k_norm
   -- +0x142  srai a5,a5,0x20 ; +0x144  sw a5,164(a4)   DEVICE_DESC_HIGH

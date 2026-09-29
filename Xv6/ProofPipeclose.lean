@@ -28,7 +28,7 @@ body, factored as whole lemmas (all checked, zero `sorry`):
                       quantify over (pinned back to the entry hart).
 
 THE CLOSE STEP OF THE BYTE QUEUE (Rocq ProofPipeclose.v): the payload now
-carries `pipeQres` last (`pc_res_elim` / `pc_res_intro`); at the flag store
+carries `pipeQres` last (`Xv6.pw_res_elim` / `Xv6.pw_res_intro`); at the flag store
 (`sw zero,544/548(s1)`) the queue's authority is stepped by the caller's
 close payment (`PipeQstep.pipeQres_close_w` / `_r`, one fupd beside the
 endstate's shut step), and the FIRED post is folded into the caller's
@@ -124,6 +124,7 @@ import Xv6.SpecKfree
 import Xv6.CodeTactics
 import Xv6.StepLemmas
 import Xv6.PipeQstep
+import Xv6.PipeRw
 
 namespace Xv6
 
@@ -335,30 +336,6 @@ theorem pc_bne_sext_closed (v : BitVec 32) (h : ¬ pflagOpen v) :
     bcond bop.BNE (BitVec.signExtend 64 v) 0#64 = false := by
   unfold pflagOpen at h; simp only [ne_eq] at h; rw [bcond_bne_eq]
   exact bne_eq_false_iff_eq.mpr (Classical.not_not.mp h)
-theorem pc_beq_sext_open (v : BitVec 32) (h : pflagOpen v) :
-    bcond bop.BEQ (BitVec.signExtend 64 v) 0#64 = false := by
-  unfold pflagOpen at h; rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr h
-theorem pc_beq_sext_closed (v : BitVec 32) (h : ¬ pflagOpen v) :
-    bcond bop.BEQ (BitVec.signExtend 64 v) 0#64 = true := by
-  unfold pflagOpen at h; simp only [ne_eq] at h; rw [bcond_beq_eq]
-  exact beq_iff_eq.mpr (Classical.not_not.mp h)
-
-/-- Reassembling the payload after a flag word has been rewritten. -/
-theorem pc_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32)
-    (vname : BitVec 64) (bs : List (BitVec 8)) (hcnt : pipeCountOk nr nw) (hlen : bs.length = PIPESIZE) :
-    wordAtN (GF := GF) curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
-    wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
-    wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
-    wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
-    wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
-    pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ⊢
-      pipeResAt γp pi curCtx := by
-  unfold pipeResAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10⟩
-  iexists nr, nw, ro, wo, vname, bs
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10
-  ipureintro; exact ⟨hcnt, hlen⟩
 
 /-- The destroy licence for the last closer: both receipts in hand, the
 free-state lock half and the payload become the dead certificate and the
@@ -577,12 +554,9 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
 
 /-! ## The flag words as the instruction rules address them -/
 
-theorem pc_addr_ro (pi : BitVec 64) : aPopen pi false = pi + BitVec.signExtend 64 544#12 := by
-  first | rfl | simp [aPopen, poffOf]
 theorem pc_addr_wo (pi : BitVec 64) : aPopen pi true = pi + BitVec.signExtend 64 548#12 := by
   first | rfl | simp [aPopen, poffOf]
 theorem pc_ext0 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
-theorem pc_sext544 : BitVec.signExtend 64 544#12 = 544#64 := by decide
 theorem pc_sext548 : BitVec.signExtend 64 548#12 = 548#64 := by decide
 
 theorem pc_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
@@ -591,20 +565,6 @@ theorem pc_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
 theorem pc_withSpie_tail (k : KCtx) (R : RegMap) (l : List String) (a b : Bool) :
     ((((k.pushOffAt a b).pushed 4).withRegs R).withLocks l).withSpie a b =
       (((k.pushOffAt a b).pushed 4).withRegs R).withLocks l := rfl
-
-/-- Opening the payload the acquire handed over. -/
-theorem pc_res_elim (γp : PipeNames) (pi : BitVec 64) :
-    pipeResAt (GF := GF) γp pi curCtx ⊢
-      ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
-        wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
-        wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
-        wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
-        wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
-        wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
-        pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-        ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗
-        pipeQres (hlc := hlc) γp nr nw ro wo bs := by
-  unfold pipeResAt; iintro H; iexact H
 
 /-- THE CLOSE STEP'S RECEIPT, folded into the caller's continuation: the
 continuation that takes the fired post, with the post in hand, is the plain
@@ -663,23 +623,23 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
   iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, Hlocked, HR, Hframe, #Hkl, Hav, Harm, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
-  icases pc_res_elim γp pi $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
+  icases Xv6.pw_res_elim γp pi $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
   ihave Hro := (show wordAtN (GF := GF) curCtx (aPopen pi false) 4 (DFrac.own 1) ro ⊢
       wordPointsTo (pi + BitVec.signExtend 64 544#12) 4 (DFrac.own 1) ro from by
-    rw [wordAtN_cur, pc_addr_ro]) $$ Hro
+    rw [wordAtN_cur, Xv6.pw_addr_ro']) $$ Hro
   -- lw a5,544(s1): readopen
   k_step (wp_s_lw c _ (KA.«pipeclose» + 0x24#64) false 544#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) ro)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc Hro
   ihave Hro := (show wordPointsTo (GF := GF) (pi + 544#64) 4 (DFrac.own 1) ro ⊢
       wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro from by
-    rw [wordAtN_cur, pc_addr_ro, pc_sext544]) $$ Hro
+    rw [wordAtN_cur, Xv6.pw_addr_ro', Xv6.pw_sext544]) $$ Hro
   by_cases hro : pflagOpen ro
   · -- readopen still set: c.bnez taken, the non-freeing arm
     k_step (wp_s_branch c _ (KA.«pipeclose» + 0x28#64) true 8#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_bne_sext_open ro hro]
     iintro Hk Hpc
-    ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
+    ihave HR := Xv6.pw_res_intro γp pi nr nw ro wo vname bs hcnt hlen
       $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     iapply (pc_nonfree Rel cpu c k γl γp pi γk on hwf hK hpipe spie spp hsp hpin (R2.set 15#5 (BitVec.signExtend 64 ro))
@@ -712,9 +672,9 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
     by_cases hwo : pflagOpen wo
     · -- writeopen still set: c.beqz not taken, the non-freeing arm
       k_step (wp_s_branch c _ (KA.«pipeclose» + 0x2e#64) true 34#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_beq_sext_open wo hwo]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.pw_beq_sext_open wo hwo]
       iintro Hk Hpc
-      ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
+      ihave HR := Xv6.pw_res_intro γp pi nr nw ro wo vname bs hcnt hlen
         $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
       case' _ => iframe
       iapply (pc_nonfree Rel cpu c k γl γp pi γk on hwf hK hpipe spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
@@ -733,11 +693,11 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
       iframe #
     · -- both ends closed: c.beqz taken, the freeing arm
       k_step (wp_s_branch c _ (KA.«pipeclose» + 0x2e#64) true 34#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_beq_sext_closed wo hwo]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.pw_beq_sext_closed wo hwo]
       iintro Hk Hpc
       icases pipeEndstate_closed γp false ro hro $$ Hst0 with ⟨Hst0, #Hs0⟩
       icases pipeEndstate_closed γp true wo hwo $$ Hst1 with ⟨Hst1, #Hs1⟩
-      ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
+      ihave HR := Xv6.pw_res_intro γp pi nr nw ro wo vname bs hcnt hlen
         $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
       case' _ => iframe
       iapply (pc_free RelC Kf cpu c k γl γp pi γkl γk on hwf hnoff hK hpipe hkmem hok hpv spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
@@ -814,7 +774,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
-  icases pc_res_elim γp (k.regs 10#5) $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
+  icases Xv6.pw_res_elim γp (k.regs 10#5) $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
   cases w with
   | true =>
     -- writable: beqz s2 not taken; sw zero,548(s1) closes writeopen
@@ -838,7 +798,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     imod pipeQres_close_w γp Φ nr nw ro wo 0#32 bs pflagBool_zero $$ Hcpay Hq with ⟨Hq, Hcp⟩
     ihave HPhi := pc_cont_fold cpu k γk on γp.pnQueue true Φ $$ HPhi Hcp
     imodintro
-    ihave HR := pc_res_intro γp (k.regs 10#5) nr nw ro 0#32 vname bs hcnt hlen
+    ihave HR := Xv6.pw_res_intro γp (k.regs 10#5) nr nw ro 0#32 vname bs hcnt hlen
       $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     -- addi a0,s1,536 ; jal wakeup(&pi->nread)
@@ -885,13 +845,13 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     iintro Hk Hpc
     ihave Hro := (show wordAtN (GF := GF) curCtx (aPopen (k.regs 10#5) false) 4 (DFrac.own 1) ro ⊢
         wordPointsTo (k.regs 10#5 + BitVec.signExtend 64 544#12) 4 (DFrac.own 1) ro from by
-      rw [wordAtN_cur, pc_addr_ro]) $$ Hro
+      rw [wordAtN_cur, Xv6.pw_addr_ro']) $$ Hro
     k_step (wp_s_sw c _ (KA.«pipeclose» + 0x42#64) false 544#12 9#5 0#5 (by decide) ro)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b9, KCtx.rget_zero, pc_ext0]
     iintro Hk Hpc Hro
     ihave Hro := (show wordPointsTo (GF := GF) (k.regs 10#5 + 544#64) 4 (DFrac.own 1) 0#32 ⊢
         wordAtN curCtx (aPopen (k.regs 10#5) false) 4 (DFrac.own 1) 0#32 from by
-      rw [wordAtN_cur, pc_addr_ro, pc_sext544]) $$ Hro
+      rw [wordAtN_cur, Xv6.pw_addr_ro', Xv6.pw_sext544]) $$ Hro
     iapply wpLoop_fupd
     ihave Hup := pipeEndstate_shut γp false ro $$ Hst0 Href
     imod Hup with ⟨Hst0, Hsh⟩
@@ -899,7 +859,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     imod pipeQres_close_r γp Φ nr nw ro 0#32 wo bs pflagBool_zero $$ Hcpay Hq with ⟨Hq, Hcp⟩
     ihave HPhi := pc_cont_fold cpu k γk on γp.pnQueue false Φ $$ HPhi Hcp
     imodintro
-    ihave HR := pc_res_intro γp (k.regs 10#5) nr nw 0#32 wo vname bs hcnt hlen
+    ihave HR := Xv6.pw_res_intro γp (k.regs 10#5) nr nw 0#32 wo vname bs hcnt hlen
       $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     -- addi a0,s1,540 ; jal wakeup(&pi->nwrite) ; j 0x457e

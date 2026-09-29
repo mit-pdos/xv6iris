@@ -254,11 +254,6 @@ def KCtx.setSp (k : KCtx) (v : BitVec 64) (n : Nat) : KCtx :=
   simp [KCtx.setSp, KCtx.sp, RegMap.set]
 @[simp] theorem KCtx.wf_setSp (k : KCtx) (v : BitVec 64) (n : Nat) : (k.setSp v n).wf = k.wf := rfl
 
-/-- A register write in the canonical `(base).withRegs R` form the
-normaliser wants (for a context that is not already in it). -/
-theorem KCtx.setReg_eq (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
-    k.setReg i v = k.withRegs (k.regs.set i v) := rfl
-
 /-- `setSp` in the canonical `(base).withRegs R` form the normaliser wants. -/
 theorem KCtx.setSp_eq (k : KCtx) (v : BitVec 64) (n : Nat) :
     k.setSp v n = (k.withAvail n).withRegs (k.regs.set 2#5 v) := rfl

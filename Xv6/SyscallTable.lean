@@ -208,7 +208,6 @@ theorem syscall_beqz_bit (b : Bool) :
     bcond bop.BEQ (if b then 1#64 else 0#64) 0#64 = !b := by
   cases b <;> decide
 
-theorem syscall_beq10 : bcond bop.BEQ 1#64 0#64 = false := by decide
 theorem syscall_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- The sign-extended number `a3`, in range, is the number as a word. -/

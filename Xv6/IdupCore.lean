@@ -34,8 +34,8 @@ may not import another -- `tools/check_layering.sh`; the
 1. (Resolved.) The landed `IcacheInvRef.irefPinRows_push` now binds the
    store's position `t` and author `h` inside the wand, the form a
    `MachCSL.writeAU` consumes; this file uses it directly.
-2. **The mint's two fraction facts** are Rocq's `id_frac_lt1` /
-   `id_frac_rest`, over `qpSub` (`Xv6/IcacheInvRef.lean` deviation 5).
+2. **The mint's two fraction facts** are Rocq's `Xv6.ig_frac_lt` /
+   `Xv6.ig_frac_rest`, over `qpSub` (`Xv6/IcacheInvRef.lean` deviation 5).
 3. Rocq's `wp_lw_au_rel_s_sconf` obligation and `wp_sw_au_dat_s_sconf`
    member-store obligation are gstate-level; here they are the `readAU` /
    `writeAU` accessors of `MachCSL.WpSmodeAuRules` (design note §3), so
@@ -49,6 +49,7 @@ import Xv6.IcacheInvStore
 import Xv6.IcacheBoxSites
 import Xv6.FsCfgDefs
 import Xv6.IcacheTable
+import Xv6.IgetParts
 
 namespace Xv6
 
@@ -57,24 +58,7 @@ open Iris.Algebra
 
 set_option linter.unusedSectionVars false
 
-/-! ## The mint's two fraction facts (Rocq `id_frac_lt1` / `id_frac_rest`) -/
-
-theorem id_frac_lt1 (qt qr : Qp) (h : qpSub (1 : Qp).half qt = some qr) :
-    qt + qr.half < (1 : Qp).half := by
-  have e := qpSub_some.mp h
-  apply Qp.lt_iff.mpr
-  rw [e]
-  show qt.val + qr.val / 2 < qt.val + qr.val
-  have := qr.2
-  grind
-
-theorem id_frac_rest (qt qr : Qp) (h : qpSub (1 : Qp).half qt = some qr) :
-    qpSub (1 : Qp).half (qt + qr.half) = some qr.half := by
-  apply qpSub_some.mpr
-  rw [qpSub_some.mp h]
-  apply Subtype.ext
-  show qt.val + qr.val = (qt.val + qr.val / 2) + qr.val / 2
-  grind
+/-! ## The mint's two fraction facts (Rocq `Xv6.ig_frac_lt` / `Xv6.ig_frac_rest`) -/
 
 /-- A proposition equation as an entailment. -/
 theorem id_ent_of_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q := h ▸ .rfl
@@ -183,7 +167,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   · rw [PosNat.succ_val]
     iapply irefSlots_combine n.val 1
     unfold irefSlot; iframe
-  icases persistent_entails_left (irefSlots_supply n.succ.val) $$ [Hiauth Hiu]
+  icases persistent_entails_left (Xv6.irefSlots_bound n.succ.val) $$ [Hiauth Hiu]
     with ⟨⟨Hiauth, Hiu⟩, %hno⟩
   · iframe
   -- the payload row (the exact-read credential) and the box's L1 row
@@ -203,7 +187,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   iexists M, qt, qr.half, n, g, lo, tst
   isplitr
   · ipureintro
-    exact ⟨hMk, id_frac_lt1 qt qr hqr, hno, hin⟩
+    exact ⟨hMk, Xv6.ig_frac_lt qt qr hqr, hno, hin⟩
   iframe Hhalf Hstk Hllbk Hflk Hrlive Hisl Hmir Hru Hicnt
   -- THE CLOSE (Rocq 670--729, 932--946)
   unfold idStoreOut idClosed
@@ -252,7 +236,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
     isplitl [Hid1]
     · iapply id_ent_of_eq (show islotRestAtCtx (GF := GF) curCtx k (qt + qr.half) icfgDev inum =
           inodeIdent k (.own qr.half) icfgDev inum by
-        unfold islotRestAtCtx islotRestAt; rw [id_frac_rest qt qr hqr]).symm
+        unfold islotRestAtCtx islotRestAt; rw [Xv6.ig_frac_rest qt qr hqr]).symm
       iexact Hid1
     iframe Hiu Hgid Hicnt
     iapply frzPark_intro_off k inum.toNat

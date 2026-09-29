@@ -207,7 +207,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   k_norm at hspw
   obtain ⟨ew1, ew2⟩ := hspw trivial
   subst sw pw
-  k_norm [eo_ret_60, eoK_spie, eoK_spp, eoK_ws, eo_withSpie2]
+  k_norm [eo_ret_60, eoK_spie, eoK_spp, eoK_ws, MachCSL.KCtx.withSpie_twice]
   have hR2 : eoPins k R2 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsw
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcsw

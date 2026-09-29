@@ -22,8 +22,6 @@ theorem sext_0 : BitVec.signExtend 64 (0#12) = 0#64 := by bv_decide
 theorem sext_16 : BitVec.signExtend 64 (16#12) = 16#64 := by bv_decide
 theorem add_0_64 (a : BitVec 64) : a + 0#64 = a := by bv_decide
 theorem extract_zero32 : BitVec.extractLsb' 0 32 (0#64) = (0 : BitVec (8 * 4)) := by bv_decide
-theorem rget_zero (c : CPU) (k : KCtx) : k.rget c 0#5 = 0#64 := by
-  simp [KCtx.rget, RegMap.get]
 
 /-! ## The proof -/
 
@@ -58,25 +56,25 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
   iapply (wp_s_sw_mint c2 _ (KA.«initlock» + 0xa#64) false 0#12 10#5 0#5 (by decide) vlock) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm_g [sext_0, add_0_64, rget_zero, extract_zero32]
+  k_norm_g [sext_0, add_0_64, MachCSL.KCtx.rget_zero, extract_zero32]
   iframe #
   iframe
   inext
   iapply wpNext_intro_pin
   iintro %c3 %hp3
-  k_norm_g [sext_0, add_0_64, rget_zero, extract_zero32]
+  k_norm_g [sext_0, add_0_64, MachCSL.KCtx.rget_zero, extract_zero32]
   iintro Hk Hpc Hlock
   -- sd zero,16(a0): mints the owner word
   iapply (wp_s_sd_mint c3 _ (KA.«initlock» + 0xe#64) false 16#12 10#5 0#5 (by decide) vcpu) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm_g [sext_16, rget_zero]
+  k_norm_g [sext_16, MachCSL.KCtx.rget_zero]
   iframe #
   iframe
   inext
   iapply wpNext_intro_pin
   iintro %c4 %hp4
-  k_norm_g [sext_16, rget_zero]
+  k_norm_g [sext_16, MachCSL.KCtx.rget_zero]
   iintro Hk Hpc Hcpu
   -- epilogue
   iapply (wp_epilogue2_gen c4 k (KA.«initlock» + 0x12#64) hK _ (by simp [RegMap.set_apply]) (k.regs 1#5) (k.regs 8#5))

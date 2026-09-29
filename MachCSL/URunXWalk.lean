@@ -14,6 +14,7 @@ MachCSL: **the pure toolkit of the text-map walker** `uxRun`
 -/
 import MachCSL.URunX
 import MachCSL.URunRWMono
+import MachCSL.UFetchRun
 
 namespace MachCSL
 
@@ -116,14 +117,6 @@ theorem uxw_runRW_text_none {X : Type} (orc : UOrc) (s : UWSt) (hd : UxwDisj T s
   simp only [runRW, hb]
   (repeat' split) <;> rfl
 
-/-- A node, for `runRW`: the one-node walk, then the continuation. -/
-theorem uxw_runRW_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
-    (k : ArchSem.Effect.ret c → SailM X) :
-    runRW D orc s (FreeM.impure c k) =
-      (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => runRW D r.2.2 r.2.1 (k r.1) := by
-  have e : (FreeM.impure c k : SailM X) = (FreeM.impure c FreeM.pure : SailM (ArchSem.Effect.ret c)) >>= k := rfl
-  rw [e, runRW_bind]
-
 /-- A walk keeps the disjointness (it keeps its map's domain). -/
 theorem uxwDisj_runRW {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X) (s' : UWSt) (orc' : UOrc)
     (h : runRW D orc s m = some (x, s', orc')) (hd : UxwDisj T s) : UxwDisj T s' := by
@@ -147,7 +140,7 @@ theorem uxw_of_runRW' {X : Type} (m : SailM X) :
       cases h
     | false =>
       rw [uxw_node D T orc s c k hc]
-      rw [uxw_runRW_node D orc s c k] at h
+      rw [MachCSL.uft_runRW_node D orc s c k] at h
       revert h
       cases hr : runRW D orc s (FreeM.impure c FreeM.pure) with
       | none => intro h; simp at h

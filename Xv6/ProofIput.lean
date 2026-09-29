@@ -46,6 +46,7 @@ import Xv6.IputTail
 import Xv6.IputOfflock
 import Xv6.IputLocked
 import Xv6.IputEntry
+import Xv6.IdupCore
 
 namespace Xv6
 
@@ -78,15 +79,9 @@ theorem iput_main_beq (n : Nat) (h2 : n < 2 ^ 31) :
       omega
     simp [h, this]
 
-theorem iput_main_one_val : PosNat.one.val = 1 := rfl
-
 theorem iput_main_beq_one :
     bcond bop.BEQ (BitVec.signExtend 64 (BitVec.ofNat 32 PosNat.one.val)) 1#64 = true := by
   decide
-
-/-- A proposition equation as an entailment. -/
-theorem iput_main_ent_of_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q :=
-  h ▸ .rfl
 
 theorem iput_main_irefWord (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) (n : PosNat)
     (h : PartialMap.get? M k = some (q, n)) : irefWord M k = BitVec.ofNat 32 n.val := by
@@ -205,7 +200,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   have hcntb := icMWf_count Mt kk qt cnt hMwf hMk
   -- the slot's exact-read stamp row (Rocq's `itable_slot_res_acc_upd`)
   icases itableSlotRes_acc_upd curCtx Mt ci kk hkk $$ Hstamps with ⟨Hsrow, Hstback⟩
-  ihave Hsrow := iput_main_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk) $$ Hsrow
+  ihave Hsrow := Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk) $$ Hsrow
   unfold itableSlotLive
   icases Hsrow with ⟨Hbrow, ⟨%tst, Hst, #Hllbk, #Hflk⟩⟩
   -- +0x18 c.lw a5,8(s1): THE EXACT READ
@@ -218,7 +213,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   subst hw
   -- the row goes back FLOORED (read-only here)
   ihave Hstamps := Hstback $$ %Mt %ci %(fun _ _ => rfl) %(fun _ _ => rfl) [Hbrow Hst]
-  · iapply iput_main_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk).symm
+  · iapply Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk).symm
     unfold itableSlotLive
     iframe Hbrow
     iexists tst

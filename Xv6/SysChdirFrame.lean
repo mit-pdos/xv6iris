@@ -35,7 +35,7 @@ is a `byteBuf` list (`Xv6/NamexParts.lean` deviation 4), not Rocq's
    quarter is what every pid-taking callee is lent (Rocq lends `1/4`).
 3. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers
-   (`sysfile_stack_bytes`, `sysfile_buf_split` / `_join`); the fold is the
+   (`Xv6.kxc_stackOwn_byteBuf`, `sysfile_buf_split` / `_join`); the fold is the
    landed `KstackMap.byteBuf_stackOwn`.
 -/
 import Xv6.SysfileCalls
@@ -44,6 +44,8 @@ import Xv6.ProcPrivAcc
 import Xv6.KstackMap
 import Xv6.SpecIunlock
 import Xv6.SpecIlock
+import Xv6.SysFstatParts
+import Xv6.SysMknodFrame
 
 namespace Xv6
 
@@ -57,11 +59,6 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-! ## Constants (Rocq `sc_push` / `sc_pop` / `sc_fp` / `sc_buf` / `sc_frm*`) -/
-
-theorem sys_chdir_imm_m160 : BitVec.signExtend 64 3936#12 = -(8#64 * BitVec.ofNat 64 20) := by
-  decide
-theorem sys_chdir_imm_p160 : BitVec.signExtend 64 160#12 = 8#64 * BitVec.ofNat 64 20 := by
-  decide
 
 /-- The path buffer's base, `s0 - 160` off the frame pointer (= the entry
 sp): the frame's lowest slot (Rocq `sc_buf`). -/
@@ -122,7 +119,6 @@ theorem sys_chdir_bne_tdir (t : BitVec 16) :
   · simp only [h, decide_true, ne_eq, not_false_eq_true]; rw [bne_iff_ne]; intro he; apply h
     bv_decide
 
-theorem sys_chdir_add0 (x : BitVec 64) : 0#64 + x = x := by simp
 theorem sys_chdir_pcwd (x : BitVec 64) : x + BitVec.signExtend 64 336#12 = pCwd x := by
   unfold pCwd; bv_decide
 theorem sys_chdir_pcwd' (x : BitVec 64) : x + 336#64 = pCwd x := rfl
@@ -145,7 +141,7 @@ theorem sys_chdir_carve [CurCtx] (sp0 : BitVec 64) :
     unfold sysChdirBuf; bv_omega
   rw [e]
   iintro H
-  icases sysfile_stack_bytes (sysChdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysChdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   isplitr
   · ipureintro; exact hal
   · unfold sysfileAny
@@ -193,7 +189,7 @@ theorem wp_prologue_sys_chdir [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 3936#12 20 hK sys_chdir_imm_m160) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 3936#12 20 hK Xv6.sys_mknod_imm_m160) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   icases stackOwn_split (k.regs 2#5) 4 16 $$ Hframe with ⟨H4, Hlow⟩
   icases sys_chdir_carve (k.regs 2#5) $$ Hlow with ⟨%hal, Hbuf⟩
@@ -251,7 +247,7 @@ theorem wp_epilogue_sys_chdir [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   ihave H4 : stackOwn (GF := GF) (k.regs 2#5) 4 $$ [Hf8 Hf16 Hf24 Hf32]
   case' _ => stack_cells; iframe
   ihave Hframe := stackOwn_join (k.regs 2#5) 4 16 $$ [$H4 $Hlow]
-  k_step_gen (wp_s_pop c3 _ (pc + 6#64) true 160#12 20 sys_chdir_imm_p160) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c3 _ (pc + 6#64) true 160#12 20 Xv6.sys_mknod_imm_p160) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_ret c4 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c5 hp5

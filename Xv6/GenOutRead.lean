@@ -53,9 +53,9 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
   obtain ⟨hpsb, hcsb', hpinf, hbd⟩ := hrd
   have hlen : (cs.take (nlines Iw)).length = min (nlines Iw) cs.length := List.length_take
   have hqle : nlines Iw.dropLast ≤ (cs.take (nlines Iw)).length := by
-    have h1 : nlines Iw.dropLast ≤ nlines Iw := nlines_prefix _ _ (gop_removelast_prefix _)
+    have h1 : nlines Iw.dropLast ≤ nlines Iw := nlines_prefix _ _ (Xv6.ll_removelast_prefix _)
     have h2 : nlines Iw.dropLast ≤ nlines E.dropLast :=
-      nlines_prefix _ _ (gopPrefix_removelast Iw E hpre)
+      nlines_prefix _ _ (Xv6.pop_prefix_removelast Iw E hpre)
     rw [hlen]; omega
   have hagree : ∀ j, j < nlines Iw → (cs.take (nlines Iw))[j]! = cs[j]! := by
     intro j hj
@@ -85,7 +85,7 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
   · apply lmProcBefore_ext
     intro J hJ hne
     apply lmPendingAt_cs_ext M ps _ cs s J (List.take_prefix _ _)
-    exact Nat.le_trans (nlines_prefix _ _ (ll_prefix_of_removelast J Iw hJ hne)) hqle
+    exact Nat.le_trans (nlines_prefix _ _ (Xv6.pop_prefix_of_removelast J Iw hJ hne)) hqle
 
 section read
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]

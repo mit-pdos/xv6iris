@@ -35,6 +35,7 @@ register bundle `nx_regs`).
 -/
 import Xv6.NamexFrame
 import Xv6.SpecNamex
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -90,13 +91,6 @@ structure NamexStatic [Fscfg] [Icfg] (k : KCtx) (A : NamexArgs) : Prop where
   hplen : A.plen < 2 ^ 31
   hnpar : if A.npar then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64
   hpd : descPageRw A.pd
-
-/-- The pinning fact every hart-free continuation needs: the process is
-not `0` (a `true` crossing at a process pins nothing). -/
-theorem namex_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-- The one NUL of the buffer is the terminator. -/
 theorem namex_nul_eq [Fscfg] [Icfg] {k : KCtx} {A : NamexArgs} (hs : NamexStatic k A) (i : Nat)
@@ -293,7 +287,7 @@ theorem namex_post_of_spec (k : KCtx) (A : NamexArgs) (cpu : CPU) (hj : A.j < NP
       A.dqp A.dqc A.dqb A.dqs A.dqpv) ⊢ ∀ c : CPU, namexPostA (GF := GF) k A c := by
   iintro H %c
   unfold namexPostA
-  iapply wpNext_at true k.proc cpu c _ (namex_pin hj k hproc c cpu) $$ H
+  iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
 
 /-! ## THE WALK'S STATEMENT at `+0xf4` (Rocq's `nx_loop_body`) -/
 

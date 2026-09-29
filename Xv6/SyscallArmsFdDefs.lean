@@ -168,10 +168,6 @@ theorem syscFdAgree_set {fs : List (BitVec 64)} {sts : List FdState} (ha : syscF
 
 /-! ## §2 Reading the agreement off the block -/
 
-/-- A pure consequence, the resource kept. -/
-theorem syscKeep {GF : BundledGFunctors} {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
-  (and_intro h .rfl).trans persistent_and_sep_mp
-
 section Agree
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -212,7 +208,7 @@ theorem syscFd_agree (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
     (M : Nat → List (BitVec 8)) (sts : List FdState) :
     procPrivFd (GF := GF) γ pa pid V M ∗ fdFrags V.fdg sts ⊢
       ⌜syscFdAgree V.ofile sts⌝ ∗ (procPrivFd γ pa pid V M ∗ fdFrags V.fdg sts) := by
-  apply syscKeep
+  apply Xv6.fsDurKeep
   unfold procPrivFd
   iintro ⟨⟨-, Ho⟩, Hf⟩
   unfold procOfiles
@@ -229,7 +225,7 @@ through the block; `UMemL.procPtAt_pageLen`). -/
 theorem syscFd_pageLen (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢ ⌜umPageLen V.upt M⌝ ∗ procPrivFd γ pa pid V M := by
-  apply syscKeep
+  apply Xv6.fsDurKeep
   iintro H
   icases procPrivFd_copy γ pa pid V M $$ H with ⟨-, -, Hpt, -⟩
   obtain ⟨ξ, t⟩ := (inferInstance : CurCtx)
@@ -286,7 +282,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 bound): six owned slots below it put `sp` at least 48. -/
 theorem syscKctx_sp (cpu : CPU) (K : KCtx) (hK : 6 ≤ K.avail) :
     kctx (GF := GF) cpu K ⊢ ⌜48 ≤ (K.regs 2#5).toNat⌝ ∗ kctx cpu K := by
-  apply syscKeep
+  apply Xv6.fsDurKeep
   iintro Hk
   icases kctx_cases _ _ $$ Hk with ⟨-, -, -, Hs, -⟩
   have e : trapRes K.sie + K.avail = 5 + (1 + (trapRes K.sie + K.avail - 6)) := by omega

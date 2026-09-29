@@ -32,7 +32,7 @@ is never taken at `T_DEVICE`), and the two arms read at the device type
 1. eb is GENERIC (SpecSysMknod deviation 1): Rocq DROPS the complement at
    the top and re-mints it at every callee under `eb = true`; here the
    function is one level-0 stretch (`k_step_e`), the contract's `true`
-   crossing is made hart-free once at entry (`sys_mknod_pin`), and each
+   crossing is made hart-free once at entry (`Xv6.rd_pin`), and each
    callee is entered through a wrapper that carries the complement
    (SysMknodCalls).
 2. STAGES (speed; the Rocq proof is one 1000-line lemma): `sys_mknod_main`,
@@ -51,6 +51,8 @@ import Xv6.SysMknodTails
 import MachCSL.WpSmodeLh
 import Xv6.ArgLemmas
 import Xv6.SysMknodCalls
+import Xv6.ReadiDefs
+import Xv6.SysLinkParts
 
 namespace Xv6
 
@@ -65,15 +67,6 @@ set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
 
-/-- The crossing of the contract is the literal `true` at a non-null
-process, so it pins nothing. -/
-theorem sys_mknod_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
-
-theorem sys_mknod_arg0 : 0 < NARG := by decide
-theorem sys_mknod_arg1 : 1 < NARG := by decide
 theorem sys_mknod_arg2 : 2 < NARG := by decide
 
 /-- The halfword create is handed: the low halfword of the `int` argint
@@ -199,7 +192,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     have hnz : ientry kk ≠ 0#64 := ientry_ne_zero kk (Nat.le_of_lt hkk)
     have hd : decide (ientry kk = 0#64) = false := by simp [hnz]
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
     iintro Hk Hpc
     ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
       A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl inum.toNat $$ Hcok
@@ -370,7 +363,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     unfold sysMknodCreateK createPost
     iintro %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc Hte Hce
       - - - - Hblk Hp Hbs %hns1 Hir %⟨-, -, hu1⟩ HopS Harm
-    k_norm_g [sys_mknod_ret_44, sysfile_ww, sysfile_psw]
+    k_norm_g [sys_mknod_ret_44, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1)
         (bview (pl.length + 1) (sysfilePfun pl)) ⊢
       byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1)
@@ -454,7 +447,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   ihave Hbuf := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
-      (procAddr A.j) A.pid A.V A.M 0 A.v0 old sys_mknod_arg0 ?ga0 hv0 ?gpr ?gt ?gn ?gK ?gmx
+      (procAddr A.j) A.pid A.V A.M 0 A.v0 old Xv6.sysfile_arg0_lt ?ga0 hv0 ?gpr ?gt ?gn ?gK ?gmx
       (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare]
   rotate_right 1
@@ -467,7 +460,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_mknod_ret_2e, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_2e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
@@ -512,7 +505,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
       (⟨γ, j, pid, V, M, ns, v0, v1, v2, P, Pmiss, Farm, Fun, Fok, Fex⟩ : SysMknodArgs GF) c)
     $$ [Hnext]
   · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (sys_mknod_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
   simp only [sysMknodAddr]
@@ -548,7 +541,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_mknod_ret_0c, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_0c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := Hback $$ Hpid
   have hp1 : sysMknodPins k R1 := by
     refine sysMknodPins_cs k _ R1 ?_ hcs1
@@ -570,7 +563,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   ihave Hmaj := (show wordPointsTo (GF := GF) (sysMknodMaj (k.regs 2#5)) 4 (DFrac.own 1) w1 ⊢
     wordPointsTo (k.regs 2#5 + 18446744073709551468#64) 4 (DFrac.own 1) w1 from .rfl) $$ Hmaj
   iapply (sysfile_argint AI cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc) 1
-      V.upt.tfp V.tf v1 w1 _ sys_mknod_arg1 ?a0 hv1 ?an ?aK)
+      V.upt.tfp V.tf v1 w1 _ Xv6.sys_link_arg1_lt ?a0 hv1 ?an ?aK)
     $$ [- $Hk $Hpc $Hte $Hce $Htf $Hpg]
   rotate_right 1
   k_norm_g [sys_mknod_ret_16]
@@ -579,7 +572,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case an => k_norm_g; exact hnoff
   case aK => k_norm_g; exact hKai
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Htf Hpg Hmaj
-  k_norm_g [sys_mknod_ret_16, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_16, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := Htfb $$ Htf Hpg
   have hp2 : sysMknodPins k R2 := by
     refine sysMknodPins_cs k _ R2 ?_ hcs2
@@ -610,7 +603,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case bn => k_norm_g; exact hnoff
   case bK => k_norm_g; exact hKai
   iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Htf Hpg Hmin
-  k_norm_g [sys_mknod_ret_20, sysfile_ww, sysfile_psw]
+  k_norm_g [sys_mknod_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := Htfb $$ Htf Hpg
   have hp3 : sysMknodPins k R3 := by
     refine sysMknodPins_cs k _ R3 ?_ hcs3

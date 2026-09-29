@@ -280,7 +280,7 @@ theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 0 ∗ wmodeN D.γm (WSh k) (1 : Qp).half none ∗ osP (D.gF k)
       ∗ osP (D.gG k))
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh k) (1 : Qp).half (some dgPipeB))
-    ld h' m' (2 + av) hfd2 ha0 (by decide) ushq_pipe_msg_fmt ushq_pipe_msg_len ushq_pipe_msg_byte
+    ld h' m' (2 + av) hfd2 ha0 (by decide) Xv6.ushLitOk_12d8 ushq_pipe_msg_len ushq_pipe_msg_byte
     ushq_pipe_msg_nl $$ [] Hcode Hstd [Hc Hm HF HG] [Hld Hws HL Hinp] Hrun
   · iapply exf_writer D H.ok UL (WSh k) dgPipeB dgPipeB 5
       (EXf D.fcR D.pr (lfilts D.lR) D.nc D.L (WSh k) dgPipeB) _ iprop(emp) _
@@ -325,13 +325,13 @@ theorem node_fork_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 0 ∗ wmodeN D.γm (WSh k) (1 : Qp).half none ∗ osP (D.gF k))
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh k) (1 : Qp).half (some altForkc)
       ∗ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1))
-    ld h' m' av hfd2 ha0 (by decide) ushq_fork_msg_fmt ushForkMsg_len ushForkMsg_byte ushForkMsg_nl
+    ld h' m' av hfd2 ha0 (by decide) Xv6.ushLitOk_12a8 Xv6.lbPanic_len ushForkMsg_byte ushForkMsg_nl
     $$ [] Hcode Hstd [Hc Hm HF] [Hsr] Hrun
   · iapply exf_writer D H.ok UL (WSh k) altForkc altPanic 5
       (EXf D.fcR D.pr (lfilts D.lR) D.nc D.L (WSh k) altForkc) _ iprop(emp) _
       hwS (by omega)
       (fun p b hp hb => by
-        rw [alt_forkc_panic, List.getElem?_append_left (by rw [ushForkMsg_len]; exact hp)]; exact hb)
+        rw [alt_forkc_panic, List.getElem?_append_left (by rw [Xv6.lbPanic_len]; exact hp)]; exact hb)
       (Hfire H (WSh k) altForkc hwS (Or.inr rfl))
       (fun c hc => cstepOkV_tok D.M D.V D.I D.sR D.lR H.ok.hlR H.ok.hadmit (WSh k) altForkc c hc.1
         (by rw [altForkc_len]; omega) (fun _ _ _ => by rw [dgForkB_len]; exact hc.2)) $$ Hfam [] [] []

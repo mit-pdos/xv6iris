@@ -64,7 +64,7 @@ around the commit's stores; the closed record is Rocq's `upd_exec`.
    length is a premise too -- `kxcAt1ae` carries both, `kxcAt21a` onward
    drop them), and of the path only its terminator `A.pfun A.plen = 0`
    (Rocq's `bb_cstr pfun plen`, whose other half the scan never uses).
-6. **`sz1 ≤ uvmMaxsz`** is derived locally (`kxd_covered_maxsz`, Rocq
+6. **`sz1 ≤ uvmMaxsz`** is derived locally (`Xv6.UmCovered.lazyFree_maxsz`, Rocq
    `UmCovered.proc_pt_covered_maxsz`: `lazyFree` + `uptWf`'s vpn bound).
 7. **The scan is two lemmas plus the induction**, split at the loop's two
    heads (`kxd_scan_head` at +0x2c4, `kxd_name_loop` at +0x2bc; Rocq:
@@ -85,6 +85,7 @@ around the commit's stores; the closed record is Rocq's `upd_exec`.
 import Xv6.KexecSeam
 import Xv6.ProcPrivAcc
 import Xv6.SpecSafestrcpySrc
+import Xv6.PrepareReturnStores
 
 namespace Xv6
 
@@ -150,23 +151,6 @@ theorem kxd_sext (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n)) = BitVec.ofNat 64 n := by
   have := kxd_addiw_id n h
   simpa using this
-
-/-- **Rocq `UmCovered.proc_pt_covered_maxsz`**: a covered space is at most
-`uvmMaxsz` (every mapped vpn is below the trapframe's). -/
-theorem kxd_covered_maxsz (P : UPtd) (sz : BitVec 64) (hwf : uptWf P) (hcov : lazyFree P.um sz) :
-    sz.toNat ≤ uvmMaxsz := by
-  unfold uvmMaxsz
-  rcases Nat.eq_zero_or_pos sz.toNat with h0 | hpos
-  · omega
-  have hk : ((sz.toNat + 4095) / 4096 - 1) * 4096 < pgRoundUpN sz.toNat := by
-    unfold pgRoundUpN
-    have : 1 ≤ (sz.toNat + 4095) / 4096 := by omega
-    omega
-  have hs := hcov _ hk
-  obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hs
-  have hlt := (hwf.1 _ w hw).1
-  have : tfVpn.toNat = 0x3fffffe := by decide
-  omega
 
 /-- `kxcTf`'s order vs the machine's (a1, epc, sp): distinct indices commute
 (Rocq `kxd_tf_swap`). -/
@@ -239,29 +223,6 @@ end Tier
 
 section Frame
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-/-- One trapframe word out, for a STORE, at the address the store rule sees
-(the `PrepareReturnRules.prepare_return_tf_store_at` shape). -/
-theorem kxd_tf_store (tfp : BitVec 44) (ws : List (BitVec 64)) (j : Nat) (hj : j < 36)
-    (a : BitVec 64) (ha : pageAddr tfp + BitVec.ofNat 64 (8 * j) = a) :
-    tfPageAt (GF := GF) tfp ws ⊢
-      (∃ w : BitVec 64, wordPointsTo a 8 (DFrac.own 1) w) ∗
-      (∀ w' : BitVec 64, wordPointsTo a 8 (DFrac.own 1) w' -∗ tfPageAt tfp (ws.set j w')) := by
-  subst ha
-  unfold tfPageAt
-  iintro ⟨%hlen, H, Htail⟩
-  have hlt : j < ws.length := by omega
-  have h : ws[j]? = some ws[j] := List.getElem?_eq_getElem hlt
-  icases (BigSepL.bigSepL_insert_acc (Φ := fun (i : Nat) (x : BitVec 64) =>
-      iprop(wordPointsTo (GF := GF) (pageAddr tfp + BitVec.ofNat 64 (8 * i)) 8 (DFrac.own 1) x)) h) $$ H
-    with ⟨Hc, Hw⟩
-  isplitl [Hc]
-  · iexists ws[j]; iexact Hc
-  iintro %w' Hc
-  iframe Htail
-  isplitl []
-  · ipureintro; rw [List.length_set]; exact hlen
-  iapply Hw $$ %w' Hc
 
 end Frame
 
@@ -593,7 +554,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have hct' : curTier = KTier.kpt := hct.symm.trans (by k_norm_g; exact htier)
   icases UMemL.procPtAt_wf P Mi $$ Hpt with ⟨Hpt, %hwf⟩
-  have hmax : sz1.toNat ≤ uvmMaxsz := kxd_covered_maxsz P sz1 hwf hcov
+  have hmax : sz1.toNat ≤ uvmMaxsz := Xv6.UmCovered.lazyFree_maxsz P sz1 hwf hcov
   icases kxd_newspace hct' A.γ k.proc A.pidv V A.M $$ Hpriv
     with ⟨%hszo, %hbo, Hsz, Hpg, Htf, Hpto, Htfp, Hback⟩
   simp only [pSz, pPagetable, pTrapframe]
@@ -633,7 +594,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
       from .rfl) $$ He
   ihave Helf := Heback $$ He
   -- +0x2f0  c.sd a4,24(a5) : trapframe->epc = elf.entry
-  icases kxd_tf_store V.upt.tfp V.tf tfEpcIdx (by decide) (pageAddr V.upt.tfp + 24#64) rfl $$ Htfp
+  icases Xv6.prepare_return_tf_store_at V.upt.tfp V.tf tfEpcIdx (by decide) (pageAddr V.upt.tfp + 24#64) rfl $$ Htfp
     with ⟨⟨%w3, Hw3⟩, Htfb⟩
   k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x2f0#64) true 24#12 15#5 14#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply]
@@ -645,7 +606,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h19]
   iintro Hk Hpc Htf
   -- +0x2f6  sd s7,48(a5) : trapframe->sp = sp
-  icases kxd_tf_store V.upt.tfp _ kxcTfSpIdx (by decide) (pageAddr V.upt.tfp + 48#64) rfl $$ Htfp
+  icases Xv6.prepare_return_tf_store_at V.upt.tfp _ kxcTfSpIdx (by decide) (pageAddr V.upt.tfp + 48#64) rfl $$ Htfp
     with ⟨⟨%w6, Hw6⟩, Htfb⟩
   k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x2f6#64) false 48#12 15#5 23#5 (by decide) w6)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h23]
@@ -974,7 +935,7 @@ theorem kxd_phaseD (SS : SAFESTRCPY_SRC) (PFP : PROC_FREEPAGETABLE) (Γ : SchedN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19]
   iintro Hk Hpc Htfc
   -- +0x2a0  sd s7,120(a5) : trapframe->a1 = sp
-  icases kxd_tf_store A.V.upt.tfp A.V.tf (tfArgIdx 1) (by decide) (pageAddr A.V.upt.tfp + 120#64) rfl
+  icases Xv6.prepare_return_tf_store_at A.V.upt.tfp A.V.tf (tfArgIdx 1) (by decide) (pageAddr A.V.upt.tfp + 120#64) rfl
     $$ Htfp with ⟨⟨%w15, Hw⟩, Htfb⟩
   k_step_e (wp_s_sd cpu _ (KA.«kexec» + 0x2a0#64) false 120#12 15#5 23#5 (by decide) w15)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h23]

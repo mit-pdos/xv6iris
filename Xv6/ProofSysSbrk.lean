@@ -38,6 +38,9 @@ import Xv6.SpecSysSbrk
 import Xv6.ArgLemmas
 import Xv6.ProcPrivAcc
 import Xv6.SpecArgint
+import Xv6.CopyLemmas
+import Xv6.ReadiMain
+import Xv6.UPtPptLemmas
 
 namespace Xv6
 
@@ -62,28 +65,16 @@ theorem sys_sbrk_ret_22 : jumpPc (KA.«sys_sbrk» + 0x22#64) = KA.«sys_sbrk» +
 theorem sys_sbrk_ret_4c : jumpPc (KA.«sys_sbrk» + 0x4c#64) = KA.«sys_sbrk» + 0x4c#64 := by decide
 theorem sys_sbrk_ret_60 : jumpPc (KA.«sys_sbrk» + 0x60#64) = KA.«sys_sbrk» + 0x60#64 := by decide
 
-theorem sys_sbrk_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sys_sbrk_li1 : 0#64 + BitVec.signExtend 64 1#12 = 1#64 := by decide
-theorem sys_sbrk_li1' : 0#64 + BitVec.signExtend 64 1#12 = BitVec.ofNat 64 1 := by decide
-theorem sys_sbrk_lim1 : 0#64 + BitVec.signExtend 64 4095#12 = -1#64 := by decide
 theorem sys_sbrk_n_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
   bv_decide
 theorem sys_sbrk_t_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
 theorem sys_sbrk_t_addr' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
-theorem sys_sbrk_lui_2000 : BitVec.signExtend 64 (8192#20 ++ 0#12) = 0x2000000#64 := by decide
 theorem sys_sbrk_trapframe : (0x2000000#64 + BitVec.signExtend 64 4095#12) <<< (13 : Nat) = 0x3FFFFFE000#64 := by
   decide
 theorem sys_sbrk_trapframe_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
 theorem sys_sbrk_sz_off (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
-
-theorem sys_sbrk_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem sys_sbrk_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-theorem sys_sbrk_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
-    (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 theorem sys_sbrk_beq_pos {α : Type _} (x y : BitVec 64) (h : x = y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = p := by
@@ -101,12 +92,6 @@ theorem sys_sbrk_bltz_neg {α : Type _} (x : BitVec 64) (h : ¬ x.toInt < 0) (p 
   refine if_neg ?_
   simp only [bcond, BitVec.slt, decide_eq_true_eq]
   simpa using h
-theorem sys_sbrk_bltu_pos {α : Type _} (x y : BitVec 64) (h : x.toNat < y.toNat) (p q : α) :
-    (if bcond bop.BLTU x y then p else q) = p := by
-  rw [if_pos (by simp [bcond, BitVec.ult]; omega)]
-theorem sys_sbrk_bltu_neg {α : Type _} (x y : BitVec 64) (h : ¬ (x.toNat < y.toNat)) (p q : α) :
-    (if bcond bop.BLTU x y then p else q) = q := by
-  rw [if_neg (by simp [bcond, BitVec.ult]; omega)]
 
 /-! ## The arithmetic of the lazy path -/
 
@@ -161,9 +146,6 @@ theorem sys_sbrk_gp_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r :
     · exact absurd h'.1 hm1
     · obtain ⟨h1, h2⟩ := h'; exact Or.inr ⟨rfl, h2⟩
   · obtain ⟨h1, h2⟩ := hn h; exact ⟨rfl, h2⟩
-
-theorem sys_sbrk_priv_eta (V : ProcPriv) : { V with sz := V.sz, pvLazy := V.pvLazy } = V := by
-  cases V; rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -221,7 +203,7 @@ theorem sys_sbrk_priv_same (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid { V with sz := V.sz, pvLazy := V.pvLazy } M ⊢
       procPrivFd γ pa pid V M := by
-  rw [sys_sbrk_priv_eta V]
+  rw [Xv6.rd_priv_eta V]
 
 /-! ## The frame -/
 
@@ -441,7 +423,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   case ht => k_norm_g; exact htier
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
-  k_norm_g [sys_sbrk_ret_60, sys_sbrk_withSpie_withSpie, sys_sbrk_pushed_withSpie, sys_sbrk_withRegs_withSpie, sys_sbrk_arg_def]
+  k_norm_g [sys_sbrk_ret_60, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, sys_sbrk_arg_def]
   ihave HΦ := wpNext_shift _ _ _ _ _ hp3 $$ HΦ
   have hspf : k.sie = false → spie2 = k.spie ∧ spp2 = k.spp := fun h =>
     ⟨((hsp2 h).1).trans (hsp h).1, ((hsp2 h).2).trans (hsp h).2⟩
@@ -569,7 +551,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, h9] next c3 hp3
     iintro Hk Hpc
     k_step_gen (wp_s_lui c3 _ (KA.«sys_sbrk» + 0x38#64) false 8192#20 14#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sys_sbrk_lui_2000] next c4 hp4
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [Xv6.UPtPpt.u20_2000] next c4 hp4
     iintro Hk Hpc
     k_step_gen (wp_s_addi c4 _ (KA.«sys_sbrk» + 0x3c#64) true 4095#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c5 hp5
@@ -584,7 +566,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       -- addr + n > TRAPFRAME: -1, nothing moved
       k_step_gen (wp_s_branch c6 _ (KA.«sys_sbrk» + 0x40#64) false 52#13 14#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, sys_sbrk_bltu_pos (0x3FFFFFE000#64) (sysSbrkArg v0 + V.sz)
+        with [KCtx.rget_eq, Xv6.UPtAlloc.bltu_pos (0x3FFFFFE000#64) (sysSbrkArg v0 + V.sz)
             (by rw [sys_sbrk_trapframe_toNat]; exact hbig)] next c7 hp7
       iintro Hk Hpc
       k_step_gen (wp_s_addi c7 _ (KA.«sys_sbrk» + 0x74#64) true 4095#12 9#5 0#5 (by decide))
@@ -614,13 +596,13 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
     case neg =>
       k_step_gen (wp_s_branch c6 _ (KA.«sys_sbrk» + 0x40#64) false 52#13 14#5 15#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, sys_sbrk_bltu_neg (0x3FFFFFE000#64) (sysSbrkArg v0 + V.sz)
+        with [KCtx.rget_eq, Xv6.UPtAlloc.bltu_neg (0x3FFFFFE000#64) (sysSbrkArg v0 + V.sz)
             (by rw [sys_sbrk_trapframe_toNat]; exact hbig)] next c7 hp7
       iintro Hk Hpc
       -- the wrap test: dead
       k_step_gen (wp_s_branch c7 _ (KA.«sys_sbrk» + 0x44#64) false 48#13 15#5 9#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, h9, sys_sbrk_bltu_neg (sysSbrkArg v0 + V.sz) V.sz (by omega)] next c8 hp8
+        with [KCtx.rget_eq, h9, Xv6.UPtAlloc.bltu_neg (sysSbrkArg v0 + V.sz) V.sz (by omega)] next c8 hp8
       iintro Hk Hpc
       -- jal myproc
       k_step_gen (wp_s_jal c8 _ (KA.«sys_sbrk» + 0x48#64) false 2092758#21 1#5 (by decide))
@@ -634,7 +616,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       case hKm => k_norm_g; unfold sysSbrkSlots growprocSlots at hK; omega
       iapply wpNext_intro_pin
       iintro %c10 %hp10 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hpost
-      k_norm_g [sys_sbrk_ret_4c, sys_sbrk_withSpie_withSpie, sys_sbrk_pushed_withSpie, sys_sbrk_withRegs_withSpie]
+      k_norm_g [sys_sbrk_ret_4c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
       ihave HΦ := wpNext_shift _ _ _ _ _ hp10 $$ HΦ
       obtain ⟨hcs2, h10⟩ := hpost
       k_norm_g at h10
@@ -742,7 +724,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_n_addr] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_sbrk» + 0xe#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_li0] next c3 hp3
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_jal c3 _ (KA.«sys_sbrk» + 0x10#64) false 2096808#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_br_argint] next c4 hp4
@@ -751,14 +733,14 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
     (hp1 h)))) $$ HΦ
   iapply (sys_sbrk_argint AI c4 _ 0 V.upt.tfp V.tf v0 n0 (by decide) ?ha0 hv0 ?hn ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sys_sbrk_ret_14, sys_sbrk_li0, sys_sbrk_n_addr]
+  k_norm_g [sys_sbrk_ret_14, Xv6.co_li_zero, sys_sbrk_n_addr]
   iframe Htf Htp Fn
-  case ha0 => k_norm_g [sys_sbrk_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; unfold sysSbrkSlots growprocSlots at hK; unfold argintSlots argrawSlots; omega
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Htf Htp Fn
-  k_norm_g [sys_sbrk_ret_14, sys_sbrk_pushed_withSpie, sys_sbrk_withRegs_withSpie, sys_sbrk_n_addr]
+  k_norm_g [sys_sbrk_ret_14, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, sys_sbrk_n_addr]
   ihave HΦ := wpNext_shift _ _ _ _ _ hp5 $$ HΦ
   k_norm_g at hsp1
   unfold calleeSaved at hcs1
@@ -779,12 +761,12 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   rotate_right 1
   k_norm_g [sys_sbrk_ret_1e, sys_sbrk_t_addr]
   iframe Htf Htp Ft
-  case ha1 => k_norm_g [sys_sbrk_li1']
+  case ha1 => k_norm_g [Xv6.ci_li_one]
   case hn1 => k_norm_g; omega
   case hKa1 => k_norm_g; unfold sysSbrkSlots growprocSlots at hK; unfold argintSlots argrawSlots; omega
   iapply wpNext_intro_pin
   iintro %c9 %hp9 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Htf Htp Ft
-  k_norm_g [sys_sbrk_ret_1e, sys_sbrk_withSpie_withSpie, sys_sbrk_pushed_withSpie, sys_sbrk_withRegs_withSpie, sys_sbrk_t_addr]
+  k_norm_g [sys_sbrk_ret_1e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, sys_sbrk_t_addr]
   ihave HΦ := wpNext_shift _ _ _ _ _ hp9 $$ HΦ
   k_norm_g at hsp2
   unfold calleeSaved at hcs2
@@ -802,7 +784,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   case hKm => k_norm_g; unfold sysSbrkSlots growprocSlots at hK; omega
   iapply wpNext_intro_pin
   iintro %c11 %hp11 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hpost3
-  k_norm_g [sys_sbrk_ret_22, sys_sbrk_withSpie_withSpie, sys_sbrk_pushed_withSpie, sys_sbrk_withRegs_withSpie]
+  k_norm_g [sys_sbrk_ret_22, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave HΦ := wpNext_shift _ _ _ _ _ hp11 $$ HΦ
   k_norm_g at hsp3
   obtain ⟨hcs3, h10⟩ := hpost3
@@ -828,7 +810,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   k_step_gen (wp_s_addi c13 _ (KA.«sys_sbrk» + 0x28#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
-  k_norm_g [sys_sbrk_arg_def, sys_sbrk_li1]
+  k_norm_g [sys_sbrk_arg_def, Xv6.ci_li_one]
   have hpinsR : sysSbrkPins k R3 := by
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [e2, e8, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27,

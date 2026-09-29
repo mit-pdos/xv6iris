@@ -15,6 +15,7 @@ Deviations from Rocq: as `SpecGrepMain`.
 -/
 import Xv6.SpecGrepMain
 import Xv6.UkGrepMainBody
+import Xv6.UshGetsLoop
 
 namespace Xv6
 
@@ -41,14 +42,6 @@ theorem grepMain_scale (L : Nat) (h3 : 3 ≤ L) (h31 : L < 2 ^ 31) :
   rw [show (32#6 : BitVec 6).toNat = 32 from rfl, show (29#6 : BitVec 6).toNat = 29 from rfl,
     umoi_shl32_shr29 (by omega) (by omega), show ((L : Int) + -3) * 8 = (((L - 3) * 8 : Nat) : Int) by omega,
     umoi_natCast]
-
-/-- `bge a5,a0` at a5 = c, a0 = argc. -/
-theorem grepMain_bge (c L : Nat) (hc : c < 2 ^ 31) (h31 : L < 2 ^ 31) :
-    ukBtaken .BGE (BitVec.ofNat 64 c) (BitVec.ofNat 64 L) = decide (L ≤ c) := by
-  have h1 : (BitVec.ofNat 64 c).toInt = c := by rw [← umoi_natCast]; exact umoi_toInt (by omega) (by omega)
-  have hL : (BitVec.ofNat 64 L).toInt = L := by rw [← umoi_natCast]; exact umoi_toInt (by omega) (by omega)
-  simp only [ukBtaken, zopz0zKzJ_s, h1, hL]
-  by_cases h : L ≤ c <;> simp [h] <;> omega
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -212,7 +205,7 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
     (fun _ => by decide) $$ Hi Hrun
   inext
   iintro %h10 Hrun
-  rw [show m3.get 15#5 = BitVec.ofNat 64 1 from by ureg, h3a0, grepMain_bge 1 _ (by decide) h31]
+  rw [show m3.get 15#5 = BitVec.ofNat 64 1 from by ureg, h3a0, Xv6.ushGets_bge 1 _ (by decide) h31]
   by_cases hL : args.length ≤ 1
   · -- NO PATTERN: the usage line
     rw [decide_eq_true hL, if_pos rfl,
@@ -258,7 +251,7 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
     (fun _ => by decide) $$ Hi Hrun
   inext
   iintro %h13 Hrun
-  rw [show m5.get 15#5 = BitVec.ofNat 64 2 from by ureg, h5a0, grepMain_bge 2 _ (by decide) h31]
+  rw [show m5.get 15#5 = BitVec.ofNat 64 2 from by ureg, h5a0, Xv6.ushGets_bge 2 _ (by decide) h31]
   by_cases hL2 : args.length ≤ 2
   · -- THE PATTERN ALONE: grep the standard input
     have hl2 : args.length = 2 := by omega

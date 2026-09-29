@@ -321,7 +321,7 @@ theorem bd_fwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       -- beq s1,a4 : the cursor is a real buffer, so the loop goes round
       k_step (wp_s_branch c _ (KA.«bread» + 0x38#64) false 44#13 9#5 14#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g14, bd_beq_ne _ _ (bnode_ne_bhead k2 hk2)]
+        with [g14, Xv6.ci_beq_ne _ _ (bnode_ne_bhead k2 hk2)]
       iintro Hk Hpc
       k_norm
       iapply (ih (o1 ++ [kk]) k2 _ (by rw [hsplit]; simp)
@@ -538,7 +538,7 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       -- bne s1,a4 : the cursor is a real buffer, so the loop goes round
       k_step (wp_s_branch c _ (KA.«bread» + 0x80#64) false 8186#13 9#5 14#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g14, bd_bne_ne _ _ (bnode_ne_bhead kj hkj), bd_t_bwd]
+        with [g14, Xv6.ci_bne_ne _ _ (bnode_ne_bhead kj hkj), bd_t_bwd]
       iintro Hk Hpc
       k_norm
       iapply (ih (kk :: o2) kj _ (by rw [hsplit]; simp)
@@ -722,7 +722,7 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   k_step_e (wp_s_jal cpu _ (KA.«bread» + 0x5e#64) false 5056#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
   iintro Hk Hpc
-  iapply (bd_aslp AS Γ cpu _ γ kk Tb j pidv dqp k0.sie k0.proc (by k_norm_g [bd_withSpie_proc])
+  iapply (bd_aslp AS Γ cpu _ γ kk Tb j pidv dqp k0.sie k0.proc (by k_norm_g [MachCSL.KCtx.withSpie_proc])
       (by k_norm_g) ?aa ?aj ?ap ?aK ?an ?atr)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hslk $Htb $Hpid]
   rotate_right 1
@@ -873,10 +873,10 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     rw [wordAtN_cur, aBufRefcnt_eq', List.length_nil]) $$ Hrefc
   -- sw s2,8(s1) ; sw s3,12(s1) ; sw zero,0(s1) ; li a5,1 ; sw a5,64(s1)
   k_step (wp_s_sw c _ (KA.«bread» + 0x90#64) false 8#12 9#5 18#5 (by decide) (devs kk))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h18, bd_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h18, Xv6.fw_ext32]
   iintro Hk Hpc Hdevf
   k_step (wp_s_sw c _ (KA.«bread» + 0x94#64) false 12#12 9#5 19#5 (by decide) (bnos kk))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h19, bd_ext_sext]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h19, Xv6.fw_ext32]
   iintro Hk Hpc Hbnof
   k_step (wp_s_sw c _ (KA.«bread» + 0x98#64) false 0#12 9#5 0#5 (by decide) v0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bd_ext_zero]
@@ -886,7 +886,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   iintro Hk Hpc
   k_step (wp_s_sw c _ (KA.«bread» + 0x9e#64) true 64#12 9#5 15#5 (by decide)
       (BitVec.ofNat 32 0))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bd_ext_one, bd_ext_one']
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, bd_ext_one, Xv6.vdrw3_len1]
   iintro Hk Hpc Hrefc
   -- **THE POOL EXCHANGE**
   have hmissB : ∀ i, i < NBUF → (bnos i).toNat ≠ bno.toNat :=
@@ -1046,7 +1046,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xb0#64) false 4974#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_aslp]
   iintro Hk Hpc
-  iapply (bd_aslp AS Γ cpu _ γ kk T' j pidv dqp k0.sie k0.proc (by k_norm_g [bd_withSpie_proc])
+  iapply (bd_aslp AS Γ cpu _ γ kk T' j pidv dqp k0.sie k0.proc (by k_norm_g [MachCSL.KCtx.withSpie_proc])
       (by k_norm_g) ?aa ?aj ?ap ?aK ?an ?atr)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hslk $Htb $Hpid]
   rotate_right 1

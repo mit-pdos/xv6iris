@@ -15,6 +15,7 @@ deviation 4; its former private copy `filewriteImg` and `FilewriteParts`'
 duplicate lemmas are gone).
 -/
 import Xv6.UMem
+import Xv6.UPtCopyLemmas
 
 namespace Xv6
 
@@ -59,15 +60,6 @@ theorem writerImg_back (Pv P' : UPtd) (M : Nat → List (BitVec 8)) (kp : Nat) (
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
-/-- `umPages` reads a view only on the mapped pages. -/
-theorem umPages_congr (P : UPtd) (M M' : Nat → List (BitVec 8))
-    (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
-    umPages (GF := GF) P M ⊢ umPages P M' := by
-  unfold umPages
-  apply BigSepM.bigSepM_mono
-  intro kp w hk
-  rw [h kp w hk]
-
 theorem procPtAt_congr (P : UPtd) (M M' : Nat → List (BitVec 8))
     (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
     procPtAt (GF := GF) P M ⊢ procPtAt P M' := by
@@ -76,7 +68,7 @@ theorem procPtAt_congr (P : UPtd) (M M' : Nat → List (BitVec 8))
   iframe Ht
   isplitr
   · ipureintro; exact hwf
-  iapply umPages_congr P M M' h $$ Hp
+  iapply Xv6.UPtCopy.umPages_congr P M M' h $$ Hp
 
 end
 

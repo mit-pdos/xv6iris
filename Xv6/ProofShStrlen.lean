@@ -74,7 +74,7 @@ theorem shStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (s
     simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
-    rw [uv_avi_pos _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
+    rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
     omega
   have hpop : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 0xa54) true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) :=
     ushI_a54 N.t

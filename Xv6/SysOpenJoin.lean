@@ -27,7 +27,7 @@ Rocq's header, kept (the reasons are the content):
 
 1. SysOpenParts deviations 1-7 (premise-passing bodies, eb-generic,
    hart-free, `fsReady`, the block's pieces -- PROCESS LAYER, flagged there:
-   ARM D's callee takes only the pid cell, lent by `sysOpen_pid_fd` where
+   ARM D's callee takes only the pid cell, lent by `Xv6.sys_mknod_pid` where
    Rocq lends `proc_priv_bare` through `proc_priv_bare_acc` -- the locked
    node's bundles, the machine).
 2. Rocq's `so_join_au` premises `qi = s` / `K_sys_open <= K` / the geometry
@@ -152,7 +152,7 @@ theorem sys_open_join (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (hS : Sy
       icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
       have hct : curTier = KTier.kpt := by
         simp only [k_norm_simps] at htk; exact htk.symm.trans hS.htier
-      icases sysOpen_pid_fd hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
+      icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
       ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
       iapply hTD $$ %cpu %spie %spp %_ %w4 %w5 %w6 %lo %(sysOpenOm A) %w24 %γil %γisl %loc %tlc
         %kk %s %g %inum %dn %bm %u %⟨hkk, hinb, hle, hiu⟩ %?hp %hal Hk Hpc Hte Hce Henv Hcells Hbuf

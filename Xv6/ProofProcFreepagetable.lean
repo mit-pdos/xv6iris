@@ -172,7 +172,7 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
       ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans (hpinA h))))))))
   have hpinF : k.sie = false ∨ k.proc = 0#64 → c22 = cpu := fun h =>
     (hp22 h).trans ((hp21 h).trans ((hp20 h).trans ((hp19 h).trans (hpinB h))))
-  simp only [pp_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   have hKe : 4 ≤ (k.withSpie spie spp).avail := by
     simp only [KCtx.withSpie_avail]; omega
   have hR2e : R3 2#5 = (k.withSpie spie spp).regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by

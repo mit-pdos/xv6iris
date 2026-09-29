@@ -125,7 +125,7 @@ witness that the pool premise is satisfiable.
 `inodeOwnedEra_1` (FsStateEraRes); `nodeShapeOk_ofInodeOk`,
 `inodeLocal_ofOkRec`, `inodeRecLocal`, `eraNode` (FsStateEraPure);
 `topFrag` (FsStateTop); `appInv` (AppInv); `fsBytesAt` / `fsBytesRow`
-(FsBytesMint); `range_lookup` (FsStateInode); iris-lean's
+(FsBytesMint); `Xv6.rangeGetElem?` (FsStateInode); iris-lean's
 `ghost_map_alloc`, `ghost_map_insert_big`, `inv_alloc`, `BigSepS` /
 `BigSepM` / `BigSepL`.
 
@@ -444,7 +444,7 @@ theorem iregSlots_ofSet [Icfg] (γfs : FsNames) (γi : GName) (dss : List (List 
         iregSlot γfs γi (16 * bi + i) dss[bi]![i]! := by
   refine (regionInums_bigSep nib _).1.trans ((seq16_flatten nib _).trans ?_)
   refine BigSepL.bigSepL_mono fun {_ bi} _ => BigSepL.bigSepL_mono fun {_ i} hi => ?_
-  obtain ⟨rfl, hlt⟩ := range_lookup hi
+  obtain ⟨rfl, hlt⟩ := Xv6.rangeGetElem? hi
   rw [imageDinode_slot dss bi _ hlt]
   try exact .rfl
 
@@ -676,7 +676,7 @@ theorem iregAlloc [Icfg] (E : CoPset) (γfs : FsNames) (inodestart nib : Nat)
     ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hblks Hslots]
     · iframe Hblks Hslots
     iapply (BigSepL.bigSepL_mono fun {_ bi} hbi => ?_) $$ H
-    obtain ⟨rfl, hidx⟩ := range_lookup hbi
+    obtain ⟨rfl, hidx⟩ := Xv6.rangeGetElem? hbi
     rw [he _ hidx]
     exact iregBlk_boot γi γfs inodestart dss nib _ hidx hl hwf
   imod (inv_alloc iregN E (iregBody (GF := GF) γi γfs inodestart nib)) $$ [Hbody] with #Hinv

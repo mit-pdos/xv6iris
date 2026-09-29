@@ -29,9 +29,6 @@ set_option linter.unusedSimpArgs false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem ua_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -115,7 +112,7 @@ theorem uvma_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro ⟨Hk, Hpc, Hframe, HQ, HΦ⟩
   icases uaFrame_split _ _ _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7, F8, F9⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  simp only [ua_pushed_withSpie]
+  simp only [MachCSL.KCtx.withSpie_pushed]
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
   k_step_gen (wp_s_ld cur _ (KA.«uvmalloc» + 0x78#64) true 72#12 1#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 1#5))
@@ -340,7 +337,6 @@ theorem uaSaved_join [CurCtx] (sp s1 s3 s6 : BitVec 64) :
   unfold uaSaved; iintro H; iexact H
 
 
-
 theorem ua_pageOwn_of [CurCtx] (p : BitVec 64) (bs : List (BitVec 8)) (h : bs.length = 4096) :
     byteBuf (GF := GF) p (DFrac.own 1) bs ⊢ pageOwn p := by
   unfold pageOwn
@@ -470,7 +466,7 @@ theorem uvma_rollB (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   case hp0 => k_norm_g; exact hr
   iapply wpNext_intro_pin
   iintro %c3 %hp3 %spie1 %spp1 %R1 %hsp1 Hk Hpc Hav %hcs0
-  k_norm_g [ua_ret_130e, ua_withSpie_withSpie]
+  k_norm_g [ua_ret_130e, MachCSL.KCtx.withSpie_twice]
   unfold calleeSaved at hcs0
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs0
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs0
@@ -499,7 +495,7 @@ theorem uvma_rollB (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   case ho1 => k_norm_g; rw [f18, g18]; exact hbound
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %spie2 %spp2 %R2 %hsp2 Hk Hpc HP %hcs
-  k_norm_g [ua_ret_1318, ua_withSpie_withSpie]
+  k_norm_g [ua_ret_1318, MachCSL.KCtx.withSpie_twice]
   rw [uvmdVpn0_run' (R1 23#5) A (by rw [f23]; exact g23) hA4,
     uvmdNp_run' (R1 18#5) (R1 23#5) A i (by rw [f18]; exact g18) (by rw [f23]; exact g23) hA4,
     uaInv_delRun P M perm (A / 4096) i Pi Mi hinv hfree,
@@ -546,7 +542,6 @@ theorem uvma_rollB (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
   · rw [e25, f25]; exact g25
   · rw [e26, f26]; exact g26
   · rw [e27, f27]; exact g27
-
 
 
 theorem uaRegs_cs (k : KCtx) (R R' : RegMap) (newsz : BitVec 64) (root : BitVec 44)
@@ -683,7 +678,7 @@ theorem uvma_rollA (UD : UVMDEALLOC) [CurCtx]
     exact hbound
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc HP %hcs
-  k_norm_g [ua_ret_12f0, ua_withSpie_withSpie]
+  k_norm_g [ua_ret_12f0, MachCSL.KCtx.withSpie_twice]
   rw [uvmdVpn0_run' (R 23#5) A g23 hA4, uvmdNp_run' (R 18#5) (R 23#5) A i g18 g23 hA4,
     uaInv_delRun P M perm (A / 4096) i Pi Mi hinv hfree,
     procPtAt_view_eq P Mi M (uaInv_view P M perm (A / 4096) i Pi Mi hinv hfree)]
@@ -790,7 +785,7 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
   case hl0 => k_norm_g; exact hlk
   iapply wpNext_intro_pin
   iintro %c2 %hp2 %spie1 %spp1 %R1 %hsp1 Hk Hpc HPost %hcs1
-  k_norm_g [ua_ret_12ba, ua_withSpie_withSpie]
+  k_norm_g [ua_ret_12ba, MachCSL.KCtx.withSpie_twice]
   have hcs1' : calleeSaved R R1 := by
     unfold calleeSaved at hcs1 ⊢
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs1
@@ -932,7 +927,7 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
         simpa using hwalk
     iapply wpNext_intro_pin
     iintro %c15 %hp15 %spie3 %spp3 %R5 %fresh %hsp3 Hk Hpc Htree Hav %hpost
-    k_norm_g [ua_ret_12d4, ua_withSpie_withSpie]
+    k_norm_g [ua_ret_12d4, MachCSL.KCtx.withSpie_twice]
     obtain ⟨hcs4, hsup, hfrnd, hfrpg, harm⟩ := hpost
     have hregs5 : uaRegs k R5 newsz P.root perm A i := by
       obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs4
@@ -982,7 +977,7 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
       have hbaseMap : (t.mapRun (vpnOf (R2 18#5))
           (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1.base
           = (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).root := by
-        rw [htree_eq, PTree.base_setLeaf, PtRun.base_fill]; exact hbase
+        rw [htree_eq, PTree.base_setLeaf, MachCSL.PTree.base_fill]; exact hbase
       ihave Htr := ptOwnRep_join (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).root
         (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm).leaves _ ⟨hbaseMap, hrepMap⟩ $$ Htree
       -- the new page joins the user pages and keeps the space well-formed
@@ -1017,7 +1012,7 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
         rw [htree_eq]; exact ptRep_fill t Pi.leaves (vpnOf (R2 18#5)) fresh hrep hfrnd hfrpg
       have hbaseMap : (t.mapRun (vpnOf (R2 18#5))
           (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1.base = Pi.root := by
-        rw [htree_eq, PtRun.base_fill]; exact hbase
+        rw [htree_eq, MachCSL.PTree.base_fill]; exact hbase
       ihave Htr := ptOwnRep_join Pi.root Pi.leaves _ ⟨hbaseMap, hrepMap⟩ $$ Htree
       ihave HPi := ua_mkProcPtAt Pi Mi hwfi $$ [Htr Hpages]
       case' _ => iframe
@@ -1387,7 +1382,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
     have hpinA : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h =>
       (hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))))))))))
     have hAt : (BitVec.ofNat 64 (pgRoundUpN (k.regs 11#5).toNat)).toNat
-        = pgRoundUpN (k.regs 11#5).toNat := toNat_ofNat_of_lt _ (by omega)
+        = pgRoundUpN (k.regs 11#5).toNat := Xv6.bcOfNatToNat _ (by omega)
     by_cases hrun : pgRoundUpN (k.regs 11#5).toNat < (k.regs 12#5).toNat
     case neg =>
       -- the run is empty: return `newsz`

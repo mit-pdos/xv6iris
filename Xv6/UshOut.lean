@@ -14,7 +14,7 @@ what the reached cone uses.
 CONE (re-walked on the pinned globs: 10/28 reached): `sh_prompt_pv`
 (abbrev; it is `UshMainPure.shPromptPv`, not restated), `sh_dollar_b`,
 `sh_space_b`, `sh_dollar_ro`, `sh_space_ro`, `sh_fd2_signed`, `sh_count2`,
-`uint_avi_small`, `ksh_fam`, `shk_rodata_byte`.
+`Xv6.paAddToNat'`, `ksh_fam`, `shk_rodata_byte`.
 DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
 `sh_space_stream`, `sh_pro_open`, `sh_pro_lines`, `sh_pro_rest`,
 `sh_pro_pin`, the notations `a0_idx`/`a1_idx`/`a2_idx`/`a7_idx`, `ushpr`
@@ -30,7 +30,7 @@ DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
 2. **Words**: `bv_signed (trunc32 w)` is `(BitVec.setWidth 32 w).toInt`,
    `sys_rw_count` is `argZ`, `mword_of_int (Z.of_nat n)` is
    `BitVec.ofNat 64 n`; `uint (add_vec_int a j)` is
-   `(a + BitVec.ofNat 64 j).toNat` (so `uint_avi_small`'s `0 ≤ j` is the
+   `(a + BitVec.ofNat 64 j).toNat` (so `Xv6.paAddToNat'`'s `0 ≤ j` is the
    type of `j : Nat`).
 3. `ksh_fam` is typed `Xfam GF` (`UkWriteClosed.kwcFam`'s mould; Rocq's
    `sfam` at the xv6 instance).
@@ -38,6 +38,7 @@ DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
 import Xv6.UshMainPure
 import Xv6.UshCode
 import Xv6.UkWriteLeaf
+import Xv6.ByteCursor
 
 namespace Xv6
 
@@ -62,13 +63,6 @@ theorem sh_fd2_signed : (BitVec.setWidth 32 (BitVec.ofNat 64 2)).toInt = ((2 : N
 
 /-- **Rocq `sh_count2`**: the count 2, as the kernel reads it. -/
 theorem sh_count2 : argZ (BitVec.ofNat 64 2) = ((2 : Nat) : Int) := by decide
-
-/-- **Rocq `uint_avi_small`**: a non-wrapping add, as the chain's key reads
-it (deviation 2). -/
-theorem uint_avi_small (a : BitVec 64) (j : Nat) (h : a.toNat + j < 2 ^ 64) :
-    (a + BitVec.ofNat 64 j).toNat = a.toNat + j := by
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (show j < 2 ^ 64 by omega),
-    Nat.mod_eq_of_lt h]
 
 /-! ## S4 THE CALL'S FAMILY AND ITS LITERALS -/
 

@@ -29,6 +29,10 @@ import Xv6.SpecIput
 import Xv6.FsWords
 import Xv6.SpecIlock
 import Xv6.SpecIget
+import MachCSL.WpSmodeFrame8
+import Xv6.BallocParts
+import Xv6.BfreeParts
+import Xv6.IupdateSteps
 
 namespace Xv6
 
@@ -75,10 +79,6 @@ theorem ireclaim_ret_b0 : jumpPc (KA.«ireclaim» + 0xb0#64) = KA.«ireclaim» +
 
 /-! ## The frame and the budget -/
 
-theorem ireclaim_imm_m64 : BitVec.signExtend 64 4032#12 = -(8#64 * BitVec.ofNat 64 8) := by
-  decide
-theorem ireclaim_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by decide
-
 /-- The frame's eight slots and every callee's reach, out of `ireclaimSlots`. -/
 theorem ireclaim_slots (a : Nat) (h : ireclaimSlots ≤ a) :
     8 ≤ a ∧ breadSlots ≤ a - 8 ∧ igetSlots ≤ a - 8 ∧ brelseSlots ≤ a - 8 ∧ 52 ≤ a - 8 ∧
@@ -90,9 +90,6 @@ theorem ireclaim_slots (a : Nat) (h : ireclaimSlots ≤ a) :
   omega
 
 /-! ## The scan's arithmetic (inum as a `Nat`, `s1 = ofNat 64 n`) -/
-
-theorem ireclaim_inum_toNat (n : Nat) (h : n < 2 ^ 31) : (BitVec.ofNat 32 n).toNat = n := by
-  simp only [BitVec.toNat_ofNat]; omega
 
 /-- `srli a1,s1,4` (64-bit). -/
 theorem ireclaim_srli4 (n : Nat) (h : n < 2 ^ 31) :
@@ -109,7 +106,7 @@ theorem ireclaim_addw_ibl (n ist : Nat) (hn : n < 2 ^ 31)
       (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 (n / 16))
         + BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.ofNat 32 ist)))
       = BitVec.ofNat 64 (IBLOCK (BitVec.ofNat 32 n) ist) := by
-  have h16 : (BitVec.ofNat 32 n).toNat / 16 = n / 16 := by rw [ireclaim_inum_toNat n hn]
+  have h16 : (BitVec.ofNat 32 n).toNat / 16 = n / 16 := by rw [Xv6.bf_bnoB n hn]
   rw [BitVec.add_comm, ← dsAddwIbl (BitVec.ofNat 32 n) ist hib, h16]
 
 /-- The block number fits the 31 bits bread's argument wants, and is a home. -/
@@ -123,16 +120,13 @@ theorem ireclaim_bno [Fscfg] [Icfg] (n : Nat) (hn : (BitVec.ofNat 32 n).toNat < 
   refine ⟨?_, h, hh⟩
   simp only [BitVec.toNat_ofNat]; omega
 
-theorem ireclaim_sext_bno (b : Nat) (h : b < 2 ^ 31) :
-    BitVec.ofNat 64 b = BitVec.signExtend 64 (BitVec.ofNat 32 b) := (fw_sext32 b h).symm
-
 /-- `andi a4,s3,15` (the BASE encoding): the slot index. -/
 theorem ireclaim_andi15 (n : Nat) (h : n < 2 ^ 31) :
     BitVec.ofNat 64 n &&& BitVec.signExtend 64 15#12 =
       BitVec.ofNat 64 (islot (BitVec.ofNat 32 n)) := by
   rw [dsAndi15]
   unfold islot
-  rw [ireclaim_inum_toNat n h, BitVec.toNat_ofNat]
+  rw [Xv6.bf_bnoB n h, BitVec.toNat_ofNat]
   congr 1
   omega
 
@@ -159,7 +153,7 @@ theorem ireclaim_succ' (n m : Nat) (hm : m = n + 1) (h : m < 2 ^ 64) :
 /-- `sext.w` of a small 64-bit value. -/
 theorem ireclaim_sextw (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n)) = BitVec.ofNat 64 n := by
-  rw [fw_w32 n h]; exact fw_sext32 n h
+  rw [fw_w32 n h]; exact MachCSL.signExtend_ofNat32 n h
 
 theorem ireclaim_sextw' (n : Nat) (h : n < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + BitVec.signExtend 64 0#12))
@@ -167,31 +161,12 @@ theorem ireclaim_sextw' (n : Nat) (h : n < 2 ^ 31) :
   rw [show BitVec.signExtend 64 0#12 = 0#64 from by decide, BitVec.add_zero]
   exact ireclaim_sextw n h
 
-/-- The inum iget is handed: `a1 = s3 = ofNat 64 n` IS the sign extension. -/
-theorem ireclaim_sext_inum (n : Nat) (h : n < 2 ^ 31) :
-    BitVec.ofNat 64 n = BitVec.signExtend 64 (BitVec.ofNat 32 n) := (fw_sext32 n h).symm
-
-/-- `bgeu a5,a4` at `+0x78`: out of the loop iff `ninodes ≤ inum + 1`. -/
-theorem ireclaim_bgeu (m nin : Nat) (hm : m < 2 ^ 31) (hnin : nin < 2 ^ 31) :
-    bcond bop.BGEU (BitVec.ofNat 64 m) (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) =
-      decide (nin ≤ m) := by
-  rw [fw_sext32 nin hnin]
-  exact fw_bgeu_nat m nin (by omega) (by omega)
-
 /-- `bgeu a5,a4` at `+0x0a`: NOT taken, from `1 < ninodes` (the dead
 empty-region arm that would return through the SECOND `ret` at `+0xc6`). -/
 theorem ireclaim_bgeu_dead (nin : Nat) (h1 : 1 < nin) (hnin : nin < 2 ^ 31) :
     bcond bop.BGEU 1#64 (BitVec.signExtend 64 (BitVec.ofNat 32 nin)) = false := by
-  rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, ireclaim_bgeu 1 nin (by omega) hnin]
+  rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, Xv6.ba_bgeu_scan 1 nin (by omega) hnin]
   simp; omega
-
-/-- Slot `k`'s record is well formed. -/
-theorem ireclaim_slot_wf (ds : List Dinode) (k : Nat) (hwf : diblkWf ds) (hk : k < 16) :
-    dinodeWf ds[k]! := by
-  have hlen : k < ds.length := by rw [hwf.1]; exact hk
-  apply hwf.2
-  rw [getElem!_of_getElem? (List.getElem?_eq_getElem hlen)]
-  exact List.getElem_mem hlen
 
 /-! ## The message (Rocq's `irc_msg`, `irc_msg_bytes`, `irc_msg_fmt`) -/
 

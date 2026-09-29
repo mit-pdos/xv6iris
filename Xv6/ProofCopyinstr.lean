@@ -12,6 +12,8 @@ frame, then the page loop by induction on the bytes left, each iteration one
 import Xv6.SpecCopyinstr
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
+import Xv6.ByteCursor
+import Xv6.PrintkDefs
 
 namespace Xv6
 
@@ -77,7 +79,7 @@ theorem wp_prologueCstr_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, #Hi14, #Hi16, #Hi18, #Hi20, #Hi22,
     #Hi24, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK ci_imm_m96) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4000#12 12 hK MachCSL.imm_m96) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -184,7 +186,7 @@ theorem wp_epilogueCstr_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 12
     $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c11 _ (pc + 22#64) true 96#12 12 ci_imm_p96) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c11 _ (pc + 22#64) true 96#12 12 MachCSL.imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c12 hp12
   iintro Hk Hpc
   k_step_gen (wp_s_ret c12 _ (pc + 24#64) true 1#5) $$ [- $Hk $Hpc] next c13 hp13
@@ -306,7 +308,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   · -- not mapped: vmfault
     k_step_gen (wp_s_branch c5 _ (KA.«copyinstr» + 0x88#64) true 8102#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [co_beq_zero _ hz] next c6 hp6
+      with [Xv6.UPtAlloc.beq_pos _ hz] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_add c6 _ (KA.«copyinstr» + 0x2e#64) true 13#5 0#5 25#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e25, h25] next c7 hp7
@@ -339,7 +341,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     have hpinB : k.sie = false ∨ k.proc = 0#64 → c12 = cur := fun h =>
       (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
         ((hp7 h).trans ((hp6 h).trans (hpinA h)))))))
-    k_norm_g [cs_ret_16b0, co_withSpie_withSpie, co_withRegs_withSpie]
+    k_norm_g [cs_ret_16b0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_withRegs]
     simp only [calleeSaved, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hcs3
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
     have hsp3' : k.sie = false → spie2 = spie ∧ spp2 = spp := hsp3
@@ -347,7 +349,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     · -- vmfault failed: return -1
       k_step_gen (wp_s_branch c12 _ (KA.«copyinstr» + 0x3a#64) true 80#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [co_bne_zero _ hr0] next c13 hp13
+        with [Xv6.UPtAlloc.bne_neg _ hr0] next c13 hp13
       iintro Hk Hpc
       k_step_gen (wp_s_addi c13 _ (KA.«copyinstr» + 0x3c#64) true 4095#12 10#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c14 hp14
@@ -390,12 +392,12 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       have hext2 : P.extSz psz (P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R)) :=
         UMemL.extSz_trans hext1 (UMemL.extSz_insertLeaf psz P1 _ r hnone (by omega))
       have hpa2 : pte2pa (uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) = r := by
-        rw [UMemL.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
-        exact UMemL.pageAddr_of_valid r hval
+        rw [Xv6.UPt.pte2pa_uLeaf _ _ (by simp only [PTE_W, PTE_U, PTE_R]; decide)]
+        exact Xv6.Kvm.pageAddr_of_valid r hval
       rw [hvpn, ← hVF, hbufeq]
       k_step_gen (wp_s_branch c12 _ (KA.«copyinstr» + 0x3a#64) true 80#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [co_bne_ne _ hrne] next c13 hp13
+        with [Xv6.UPtAlloc.bne_pos _ hrne] next c13 hp13
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans (hpinB h)) $$ HΦ
       iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
@@ -412,7 +414,7 @@ theorem cstr_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
   · -- the page is mapped already
     k_step_gen (wp_s_branch c5 _ (KA.«copyinstr» + 0x88#64) true 8102#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [co_beq_ne _ hz] next c6 hp6
+      with [Xv6.UPtAlloc.beq_neg _ hz] next c6 hp6
     iintro Hk Hpc
     simp only [walkaddrRet, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hret2
     rcases hret2 with ⟨hr0, -⟩ | ⟨w, hw, hvu, hlt38, hpa⟩
@@ -466,22 +468,12 @@ theorem cs_noNul_step (view : Nat → List (BitVec 8)) (A d j : Nat)
     subst this
     exact hb
 
-theorem cs_setw_zero (b : BitVec 8) : (BitVec.setWidth 64 b = 0#64) ↔ b = 0#8 := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.zero_mod] at this
-    have hb := b.isLt
-    rw [Nat.mod_eq_of_lt (by omega)] at this
-    simpa using this
-  · intro h; subst h; rfl
 
 theorem cs_ite_beq_byte {α : Type _} (b : BitVec 8) (x y : α) :
     (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
   by_cases hb : b = 0#8
   · subst hb; simp [bcond]
-  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((cs_setw_zero b).mp h)
+  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((Xv6.bcZext8EqZero b).mp h)
     simp [bcond, hb, this]
 
 theorem cs_a4 (pw dst0 : BitVec 64) (off d j : Nat) :
@@ -507,15 +499,12 @@ theorem cs_a5_step (dst0 : BitVec 64) (m : Nat) :
     dst0 + (BitVec.ofNat 64 m + 1#64) = dst0 + BitVec.ofNat 64 (m + 1) := by
   rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
 
-/-- `BitVec.ofNat 64 (m+1)` as `k_norm` leaves it (`BitVec.ofNat_add` splits the sum). -/
-theorem cs_a5_succ (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m + 1) := by
-  rw [show (1#64 : BitVec 64) = BitVec.ofNat 64 1 from rfl, co_ofNat_add]
 
 /-- `a5` after `addi a5,1`, in `k_norm_g`'s normal form. -/
 theorem cs_a5_split (dst0 : BitVec 64) (d j : Nat) :
     dst0 + (BitVec.ofNat 64 d + (BitVec.ofNat 64 j + 1#64))
       = dst0 + BitVec.ofNat 64 (d + (j + 1)) := by
-  rw [cs_a5_succ, co_ofNat_add]
+  rw [Xv6.ofNat_succ', co_ofNat_add]
 
 theorem cs_ofNat_ne (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : a ≠ b)
     (dst0 : BitVec 64) : dst0 + BitVec.ofNat 64 a ≠ dst0 + BitVec.ofNat 64 b := by
@@ -529,7 +518,7 @@ theorem cs_ofNat_ne (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : a ≠ b
 theorem cs_step_eq (dst0 : BitVec 64) (d j n : Nat) (h : j + 1 = n) :
     dst0 + (BitVec.ofNat 64 d + (BitVec.ofNat 64 j + 1#64))
       = dst0 + (BitVec.ofNat 64 d + BitVec.ofNat 64 n) := by
-  rw [cs_a5_succ, h]
+  rw [Xv6.ofNat_succ', h]
 
 theorem cs_step_ne (dst0 : BitVec 64) (d j n : Nat) (hj : d + (j + 1) < 2 ^ 64)
     (hn : d + n < 2 ^ 64) (h : d + (j + 1) ≠ d + n) :
@@ -946,8 +935,6 @@ theorem cstr_nsel [Xv6G GF] [CurCtx]
     case h272' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact h27
 
 
-
-
 /-! ## What `copyinstr` leaves behind -/
 
 /-- The final buffer `bs'`: either the NUL-terminated string (return 0) or a
@@ -1335,7 +1322,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
     have h0 : k.regs 14#5 = 0#64 := by rw [hmax, hnil]
     k_step_gen (wp_s_branch cpu _ KA.«copyinstr» true 202#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, co_beq_zero _ h0] next c1 hp1
+      with [KCtx.rget_eq, Xv6.UPtAlloc.beq_pos _ h0] next c1 hp1
     iintro Hk Hpc
     k_step_gen (wp_s_addi c1 _ (KA.«copyinstr» + 0xca#64) true 0#12 15#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1359,7 +1346,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
       · ipureintro
         refine ⟨UMemL.extSz_refl _ P, Or.inr ⟨?_, 0, by omega, ?_⟩⟩
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-        · rw [UMemL.viewFaulted_self, ci_umemRead_zero, List.drop_zero, List.nil_append]
+        · rw [UMemL.viewFaulted_self, Xv6.UMemL.umemRead_zero, List.drop_zero, List.nil_append]
       · isplitl [HP]
         · rw [UMemL.viewFaulted_self]; iexact HP
         · iexact Hdst
@@ -1376,7 +1363,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
       omega
     k_step_gen (wp_s_branch cpu _ KA.«copyinstr» true 202#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, co_beq_ne _ hlenne] next c0 hp0
+      with [KCtx.rget_eq, Xv6.UPtAlloc.beq_neg _ hlenne] next c0 hp0
     iintro Hk Hpc
     iapply (wp_prologueCstr_gen c0 _ (KA.«copyinstr» + 0x2#64) (by k_norm_g; omega)) $$ [- $Hk $Hpc]
     rotate_right 1
@@ -1427,7 +1414,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
       (Or.inl rfl) P (UMemL.extSz_refl _ P) ?csnn (UMemL.umMapped_zero P _) k.spie k.spp _
       ?hsp0 ?h9' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c10) $$ [- $Hk $Hpc]
     rotate_right 1
-    rw [UMemL.viewFaulted_self, List.drop_zero, ci_umemRead_zero, List.nil_append]
+    rw [UMemL.viewFaulted_self, List.drop_zero, Xv6.UMemL.umemRead_zero, List.nil_append]
     iframe #
     iframe HP Hdst
     case csnn => intro i hi; exact absurd hi (by omega)
@@ -1447,7 +1434,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
     iapply wpNext_intro_pin
     iintro %c11 %hp11 %spie2 %spp2 %R2 %P3 %bs' %hsp2 Hk Hpc HP Hdst %hpost
     obtain ⟨hs2, hcp, h26fin, h27fin⟩ := hpost
-    rw [co_pushed_withSpie] at *
+    rw [MachCSL.KCtx.withSpie_pushed] at *
     iapply (wp_epilogueCstr_gen c11 (k.withSpie spie2 spp2) (KA.«copyinstr» + 0x4e#64)
       (by simp only [KCtx.withSpie_avail]; omega) R2 hs2
       (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5)

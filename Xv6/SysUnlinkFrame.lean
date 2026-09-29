@@ -55,6 +55,7 @@ import Xv6.SysfileCalls
 import Xv6.SpecIlock
 import Xv6.SpecNamecmp
 import Xv6.SpecNamexEra
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -276,11 +277,11 @@ theorem sys_unlink_carve [CurCtx] (sp0 : BitVec 64) :
       ⌜(sysUnlinkDel sp0).toNat % 8 = 0⌝ ∗ sysUnlinkBufs sp0 := by
   refine (sys_unlink_low_split sp0).1.trans ?_
   iintro ⟨H6, Hde, Hnm, Hp, H27, Hdl, H30⟩
-  icases sysfile_stack_bytes (sysUnlinkDe sp0) 1 $$ Hde with ⟨%bde, ⟨%hde, -⟩, Bde⟩
-  icases sysfile_stack_bytes (sysUnlinkName sp0) 1 $$ Hnm with ⟨%bnm, ⟨%hnm, -⟩, Bnm⟩
-  icases sysfile_stack_bytes (sysUnlinkPath sp0) 15 $$ Hp with ⟨%bp, ⟨%hp, -⟩, Bp⟩
-  icases sysfile_stack_bytes (sysUnlinkLo27 sp0) 0 $$ H27 with ⟨%b27, ⟨%h27, %hal27⟩, B27⟩
-  icases sysfile_stack_bytes (sysUnlinkDel sp0) 1 $$ Hdl with ⟨%bdl, ⟨%hdl, %hal⟩, Bdl⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysUnlinkDe sp0) 1 $$ Hde with ⟨%bde, ⟨%hde, -⟩, Bde⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysUnlinkName sp0) 1 $$ Hnm with ⟨%bnm, ⟨%hnm, -⟩, Bnm⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysUnlinkPath sp0) 15 $$ Hp with ⟨%bp, ⟨%hp, -⟩, Bp⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysUnlinkLo27 sp0) 0 $$ H27 with ⟨%b27, ⟨%h27, %hal27⟩, B27⟩
+  icases Xv6.kxc_stackOwn_byteBuf (sysUnlinkDel sp0) 1 $$ Hdl with ⟨%bdl, ⟨%hdl, %hal⟩, Bdl⟩
   icases sys_unlink_slot27_open sp0 b27 (by omega) hal27 $$ B27 with ⟨Hlo, Hoff⟩
   isplitr
   · ipureintro; exact hal
@@ -500,13 +501,6 @@ theorem sysUnlinkPins_entry (k : KCtx) :
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
 /-! ## The ambient context, pinned at the kernel tier -/
-
-/-- The contract's hart-free pin: a `true` crossing at a process pins
-nothing. -/
-theorem sys_unlink_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 /-! ## The arguments, the out bundle, the block's pid seam -/
 

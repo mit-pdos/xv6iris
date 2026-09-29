@@ -23,6 +23,7 @@ CONE (reached): `γd`, `γfd`, the `aN_idx` (notations), `pns_writeU`,
    `(bs.length : Int)`; the answer `-1` is `-1`.
 -/
 import Xv6.UkPipeDevRead
+import Xv6.UkFileDevDefs
 
 namespace Xv6
 
@@ -93,7 +94,7 @@ theorem pns_writeU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
       icases HK with ⟨-, -, HK⟩
       iapply HK $$ Hstd Ht
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases Hobs with ⟨%k, %s, %hks, HQe⟩
       ihave H := pipeWQe_roShot pn L c k s hks.2 $$ HQe
       unfold pipeWQ
@@ -163,7 +164,7 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
       simp only [pdevQh]
       iexfalso; iexact HQ
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases HR with ⟨%k, -, -, HQ⟩
       cases k with
       | zero =>
@@ -174,7 +175,7 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
         simp only [pdevQh]
         iexfalso; iexact HQ
     · subst hr
-      rw [pdev_signed_m1]
+      rw [Xv6.fh_m1]
       icases Hobs with ⟨%k, %s, -, HQ⟩
       cases k with
       | zero =>
@@ -187,13 +188,6 @@ theorem pns_write_haltU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
     · icases HK with ⟨-, HK⟩
       iapply HK $$ Hstd Ht
 
-
-/-- a C `int` reading is below the sign bound -/
-theorem pns_int32_lt (v : BitVec 64) (n : Nat) (h : (BitVec.setWidth 32 v).toInt = (n : Int)) :
-    (n : Int) < 2 ^ 31 := by
-  rw [← h]
-  have := BitVec.toInt_lt (x := BitVec.setWidth 32 v)
-  simpa using this
 
 /-- **Rocq `pns_read_atU`**: THE READ AT AN EXACT CURSOR, at a flow
 parameter (`UkPipeDev.pipe_read_at` with `pipe_rpay_of_invU`). -/
@@ -215,7 +209,7 @@ theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
   · isplitl [Hrun]
     · iexact Hrun
     · iexact Hbuf
-  have hn31 : (n : Int) < 2 ^ 31 := pns_int32_lt _ n ha2
+  have hn31 : (n : Int) < 2 ^ 31 := Xv6.UkFileDev.fdev_cint_lt _ n ha2
   have hua : (BitVec.ofNat 64 a).toNat = a := by
     have := hab 0 hn
     have hc : uCap = 2 ^ 38 := rfl
@@ -231,9 +225,9 @@ theorem pns_read_atU (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha1
   have h12 : (ukWr m 17#5 (BitVec.ofInt 64 5)).get 12#5 = m.get 12#5 := ukWr_get_other _ _ _ _ (by decide)
   have h0 : argZ ((ukWr m 17#5 (BitVec.ofInt 64 5)).get 10#5) = (fd : Int) := by
-    rw [h10, pdev_argZ]; exact ha0
+    rw [h10, Xv6.argZ_setWidth]; exact ha0
   have h2 : argZ ((ukWr m 17#5 (BitVec.ofInt 64 5)).get 12#5) = (n : Int) := by
-    rw [h12, pdev_argZ]; exact ha2
+    rw [h12, Xv6.argZ_setWidth]; exact ha2
   have hal' : (BitVec.ofNat 64 (P.read + 2) + 4#64) &&& 1#64 = 0#64 := by rw [hpc]; exact fh_align _ hal
   ihave Hbuf : iprop(ubytes N.d (BitVec.ofNat 64 a).toNat n f) $$ [Hbuf]
   · rw [hua]; iexact Hbuf

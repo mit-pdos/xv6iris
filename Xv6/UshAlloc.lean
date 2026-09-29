@@ -132,7 +132,7 @@ theorem ush_alloc_core (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF)
       rw [hcs8 9#5 (by decide)]
       show (ukWr (ukWr (ukWr (ukWr m3 _ _) _ _) _ _) _ _).get _ = _
       ureg
-    · iapply ush_ubytes_ext N.d p sz _ _ (fun j _ => ?_) $$ Hbuf
+    · iapply Xv6.ubytes_ext N.d p sz _ _ (fun j _ => ?_) $$ Hbuf
       show nthByte (n := 8) (BitVec.ofNat 64 0) 0 = ubyte0
       exact ush_nthByte_zero 0
 

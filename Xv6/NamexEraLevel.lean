@@ -162,7 +162,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   imodintro
   ihave Hload := Hclose $$ Hdl Hdi Hmeta Hmap Hblk
   have hnpar := hs.hnpar
-  have hbz6 := namex_beqz (R 22#5)
+  have hbz6 := Xv6.dirlookup_beqz (R 22#5)
   have hf3 := namexLvlFacts_set hf2 (BitVec.signExtend 64 dn.diNlink)
   -- +0xd4  beqz s6,+0xde
   cases hnp : A.npar

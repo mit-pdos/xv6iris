@@ -218,7 +218,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
   -- INSTANT 1: the parent's row, at `dec = 0`
   ihave #Hftop := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Happ := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
-  have hipnd := sys_unlink_era_not_dir dni bmi dati htyi
+  have hipnd := Xv6.era_notDir dni bmi dati htyi
   have hloc := inodeLocal_ofOkRec dinum.toNat fscCov fscLogst dnW bmW datW hok' hrl' hduq' hddix'
   have habsp := sys_unlink_parent_row_era dnd dnW bmd bmW datd datW (dirBname datd kk) 0 htyz hZ.ty
     (by rw [Nat.sub_zero]; exact sys_unlink_era_nlink_eq dnd dnW bmd bmW datd datW hZ.nl)

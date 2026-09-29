@@ -14,6 +14,9 @@ and generic in the interrupt index, as `wakeup` is.
 import Xv6.SpecReparent
 import Xv6.SpecWakeup
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame6
+import Xv6.ByteCursor
+import Xv6.UvmallocDefs
 
 namespace Xv6
 
@@ -26,16 +29,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the six-slot frame. -/
-theorem rp_imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem rp_imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
-theorem rp_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
-  simp only [BitVec.toNat_ofNat]
-  omega
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem rp_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
@@ -105,16 +98,6 @@ theorem rp_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
 
 theorem rp_withLocks_self (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-
-theorem rp_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-
-theorem rp_withSpie_over (k : KCtx) (s p a b : Bool) :
-    (k.withSpie s p).withSpie a b = k.withSpie a b := rfl
-
-theorem rp_pushed_spie_self (k : KCtx) (m : Nat) :
-    k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
-  (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
 
 /-- What an iteration keeps of the registers (everything callee-saved but the
 cursor `s1`). -/
@@ -328,7 +311,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     iapply wpNext_intro_pin
     iintro %cW %hpW %spieW %sppW %RW %hspW Hk Hpc %hcsW
     have hret : jumpPc (KA.«reparent» + 0x44#64) = (KA.«reparent» + 0x44#64) := by decide
-    k_norm_g [rp_pushed_withSpie, rp_withSpie_over, hK6, hret]
+    k_norm_g [MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_twice, hK6, hret]
     unfold calleeSaved at hcsW
     k_norm_g at hcsW
     obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcsW
@@ -546,7 +529,7 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
   iintro Hk Hpc F5
   ihave Hstack : stackOwn (k.regs 2#5) 6 $$ [F0 F1 F2 F3 F4 F5]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ (KA.«reparent» + 0x52#64) true 48#12 6 rp_imm_p48)
+  k_step_gen (wp_s_pop c6 _ (KA.«reparent» + 0x52#64) true 48#12 6 MachCSL.imm_p48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c7 hq7
   iintro Hk Hpc
@@ -598,7 +581,7 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
   have hK6 : 6 ≤ k.avail := by unfold reparentSlots at hK; omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«reparent» true 4048#12 6 hK6 rp_imm_m48)
+  k_step_gen (wp_s_push cpu _ KA.«reparent» true 4048#12 6 hK6 MachCSL.imm_m48)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -658,7 +641,7 @@ theorem reparent_proof (WK : WAKEUP) : REPARENT :=
   ihave HW := waitResAt_eq curCtx parents _ (reparentedUpto_zero parents (k.regs 10#5) ip).symm
     $$ HW
   -- the scan
-  rw [rp_pushed_spie_self k 6, rp_pushed_withSpie]
+  rw [Xv6.ua_pushed_spie_self k 6, MachCSL.KCtx.withSpie_pushed]
   iapply (rp_loop WK Γ k parents (k.regs 10#5) ip hwf hnoff hK hlk htier 63 0 (by decide)
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 c16) $$ [- $Hk $Hpc $HW]
   rotate_right 1

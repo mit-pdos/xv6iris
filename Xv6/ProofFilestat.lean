@@ -47,6 +47,7 @@ epilogue with an ABSTRACT continuation.  The stage files are
    immediates differ from Rocq's comments by the 6-byte text shift.
 -/
 import Xv6.FilestatInode
+import Xv6.ReadiDefs
 
 namespace Xv6
 
@@ -58,11 +59,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-theorem filestat_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
-    (c cpu : CPU) : true = false ∨ k.proc = 0#64 → c = cpu := fun h =>
-  h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))
 
 theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (c : CPU) (k : KCtx) (R : RegMap) :
@@ -103,7 +99,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext Hcwd]
   · unfold fstatK filestatPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
-    ihave HK := wpNext_at true k.proc cpu c _ (filestat_pin hj k hproc c cpu) $$ Hnext
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
     · iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
@@ -137,7 +133,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   case hKm => k_norm_g; omega
   -- ===== back from myproc =====
   iintro %c1 %spie1 %spp1 %R1 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-  k_norm_g [filestat_ret_14, filestat_ww, filestat_psw]
+  k_norm_g [filestat_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

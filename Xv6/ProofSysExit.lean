@@ -19,6 +19,7 @@ import Xv6.SpecSysExit
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecArgint
+import Xv6.CopyLemmas
 
 namespace Xv6
 
@@ -35,7 +36,6 @@ set_option linter.unusedVariables false
 
 theorem sysx_ret_29f4 : jumpPc (KA.«sys_exit» + 0x12#64) = (KA.«sys_exit» + 0x12#64) := by decide
 
-theorem sysx_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem sysx_n_addr (x : BitVec 64) :
     x + BitVec.signExtend 64 4076#12 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 theorem sysx_hi (x : BitVec 64) :
@@ -277,7 +277,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     case hsp => k_norm_g; exact c2
     case hav => k_norm_g; omega
     case hst => k_norm_g; exact sysx_status v
-  case ha0 => k_norm_g [sysx_li0]
+  case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; rw [hnoff]; decide
   case hKa =>
     k_norm_g

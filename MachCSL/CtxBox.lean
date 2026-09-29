@@ -1812,19 +1812,6 @@ theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : 
     iframe Hrp0
     iexact Hllbh
 
-/-- Rocq's `box_checkout_split`: the hooked checkout, verbatim (the view
-shift at the box's mask; the icache's read arm refutes the header's frozen
-alternative inside it). -/
-theorem boxCheckoutSplit (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (cpu : CPU) (ξ : CtxId) (i : Id) (hdr' : Id → X → CtxId → IProp GF)
-    [∀ i x, CtxMorph (hdr' i x)] (Qc : IProp GF) (mh : StampMap Id) (s0 : L2Reg Id)
-    (Kt Kp : Nat) (E : CoPset) (hE : ↑N ⊆ E) (hs : s0.hold = none) (hKt : maxStamp mh ≤ Kt)
-    (hKp : s0.tp ≤ Kp)
-    (hhook : ∀ (x : X) (ξ' : CtxId), Qc ∗ P.hdr i x ξ' ⊢ |={E \ ↑N}=> (hdr' i x ξ' ∗ P.q2)) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗ reference γ i mh ∗ Qc ∗
-      slotpHalf γ s0 ⊢
-      |={E}=> (ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ l2Hold γ i mh) :=
-  boxCheckoutHook P N γ cpu ξ i hdr' Qc mh s0 Kt Kp E hE hs hKt hKp hhook
 
 /-- Rocq's `box_checkout` -- plain (e): the caller's `Q2` passes straight
 into the arm. -/

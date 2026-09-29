@@ -520,7 +520,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   try (case hs2 => k_norm)
   iintro Hk Hpc Hout
   case hb2 => k_norm [h9]; exact iRef_sext _
-  case hd2 => k_norm [iput_decr 1 (by decide) (by decide)]
+  case hd2 => k_norm [Xv6.bc_decr 1 (by decide) (by decide)]
   -- THE CLOSE: the retire glue, (b′), the pin, (d), the rows; the escrow and the park
   icases kctx_token_acc c _ $$ Hk with ⟨Hrun, Hkback⟩
   iapply wpLoop_fupd

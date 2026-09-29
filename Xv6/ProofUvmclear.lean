@@ -61,7 +61,7 @@ theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
   iintro Hk Hpc
   have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h =>
     (hp3 h).trans ((hp2 h).trans (hp1 h))
-  iapply (vf_walk_call W c3 _ (DFrac.own 1) t ?hKw ?hro ?hv ?hal hrep.1) $$ [- $Hk $Hpc]
+  iapply (Xv6.wa_walk_call W c3 _ (DFrac.own 1) t ?hKw ?hro ?hv ?hal hrep.1) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
   iframe Htree

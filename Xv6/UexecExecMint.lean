@@ -69,7 +69,7 @@ theorem uslotMint :
   ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
   imodintro
   iintro %W #Hpay
-  iapply (condEntrySlot (hlc := hlc) W) $$ Hs Hkc Hgen Hpay
+  iapply (Xv6.uexecWp_uslot_triv (hlc := hlc) W) $$ Hs Hkc Hgen Hpay
 
 /-- **Rocq `uslot_mint_pay`**: THE MINT AT A CONSTANT PAYLOAD (GENERIC-PAY),
 the payload as the persistent carrier `□ (killCred -∗ R)` (Rocq's
@@ -82,7 +82,7 @@ theorem uslotMint_pay (R : IProp GF) :
   ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
   imodintro
   iintro %W #Hpay #HR
-  iapply (condEntrySlot_pay (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
+  iapply (Xv6.uexecWp_uslot (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
 
 /-- **Rocq `uslot_mint_all`**: the same with the payload under the box. -/
 theorem uslotMint_all :
@@ -94,7 +94,7 @@ theorem uslotMint_all :
   ihave #Hs := xv6Ssupply_intro (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic
   imodintro
   iintro %R %W #Hpay #HR
-  iapply (condEntrySlot_pay (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
+  iapply (Xv6.uexecWp_uslot (hlc := hlc) R W) $$ Hs Hkc Hgen Hpay HR
 
 /-- **THE GENERIC APPLICATION'S BOOT BUNDLE** (deviation 4; Rocq
 `SystemAdequacy.init_boot_of_triv` over `init_boot_bundle_triv` and

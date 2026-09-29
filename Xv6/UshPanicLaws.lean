@@ -139,7 +139,7 @@ theorem ushPanicLaw_hold_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : List (
     have hd : ⊢ lkPanic L (genId (hlc := hlc) (GF := GF) + 1) v I 5 -∗
         L.lkBan (genId (hlc := hlc) (GF := GF) + 1) v I 0 := by
       have h := L.lkPanic_done (genId (hlc := hlc) (GF := GF) + 1) v I
-      rw [L.lkAb_pan, altPanic_len] at h
+      rw [L.lkAb_pan, Xv6.lbPanic_len] at h
       exact h
     iapply hd $$ Hp
 

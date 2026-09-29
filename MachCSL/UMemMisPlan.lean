@@ -29,6 +29,7 @@ a symbolic address (performance rule 2):
 import MachCSL.UTranslate
 import MachCSL.Tactics
 import MachCSL.BvEnumSatp
+import Xv6.UmodeArith
 
 namespace MachCSL
 
@@ -67,10 +68,6 @@ theorem umm_straddle_bv (a wv : BitVec 64) (h8 : wv ≤ 8#64) (hp : 4096#64 < a 
     (a &&& 0xFFFFFFFFFFFFF000#64) ≠ (a + wv - 1#64) &&& 0xFFFFFFFFFFFFF000#64 := by
   bv_decide
 
-theorem umm_ofInt_nat (w : Nat) : BitVec.ofInt 64 (w : Int) = BitVec.ofNat 64 w := by
-  apply BitVec.eq_of_toNat_eq
-  simp
-
 /-- **An in-page access is not split** (Rocq `exec_split_on_page_boundary_intra`). -/
 theorem umm_split_on_page_boundary_intra (a : BitVec 64) (w : Nat) (h0 : 0 < w) (h8 : w ≤ 8)
     (hp : ummInPage a w) : split_on_page_boundary a w = (pure ((w : Int), 0) : SailM (Int × Int)) := by
@@ -85,7 +82,7 @@ theorem umm_split_on_page_boundary_intra (a : BitVec 64) (w : Nat) (h0 : 0 < w) 
     generalize hm : Sail.BitVec.updateSubrange _ _ _ _ = M
     have hM : M = 0xFFFFFFFFFFFFF000#64 := by subst hm; exact umm_pageMask a
     subst hM
-    simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, umm_ofInt_nat, BitVec.ofInt_ofNat, ← hb,
+    simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, Xv6.umoi_natCast, BitVec.ofInt_ofNat, ← hb,
       beq_self_eq_true]
 
 /-- The bytes to the boundary, as the model computes them for an access of
@@ -115,7 +112,7 @@ theorem umm_split_on_page_boundary_straddle (a : BitVec 64) (w : Nat) (h8 : w �
     generalize hm : Sail.BitVec.updateSubrange _ _ _ _ = M at h
     have hM : M = 0xFFFFFFFFFFFFF000#64 := by subst hm; exact umm_pageMask a
     subst hM
-    simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, umm_ofInt_nat, BitVec.ofInt_ofNat,
+    simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, Xv6.umoi_natCast, BitVec.ofInt_ofNat,
       beq_iff_eq] at h
     exact hb h
   · generalize hn : (2 : Int) ^ (3 : Int) - Sail.BitVec.toNatInt (Sail.BitVec.extractLsb a ((3 : Int) - 1).toNat 0) = n

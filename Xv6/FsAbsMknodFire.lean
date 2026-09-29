@@ -55,11 +55,11 @@ Rocq's header, kept because the reasons are the content:
    dance as `Xv6/FsAbsCreateFire.lean` deviations 1, 3 and 4.  The `` `{XI
    : CurCtx} `` binder of section 7 is read by nothing and is dropped (the
    `FsAbsOpenFire` deviation 1 precedent).
-2. `mkf_era_is_dir` and `mkf_era_live` are `mkfEra_is_dir`/`mkfEra_live`
+2. `mkf_era_is_dir` and `mkf_era_live` are `mkfEra_is_dir`/`Xv6.eraNlink_nz`
    here, the ONE copy: `Xv6/FsAbsOpenFire.lean` (which imports this file,
    as Rocq's does via `SysOpenDefs`) calls them; its section-0-only
    landing's local copies `opfEra_is_dir`/`opfEra_live` were dropped at the
-   W-A append.  `mkfEra_live` is also `FsAbsEra.eraNlink_nz`'s statement
+   W-A append.  `Xv6.eraNlink_nz` is also `FsAbsEra.eraNlink_nz`'s statement
    (Rocq keeps both names; so does this port).
 3. **THE HALFWORD BRIDGE (section 4).**  Rocq states it over the byte
    spelling `Z_to_bv 16 (assemble_bytes [nth_byte w 0; nth_byte w 1])`
@@ -73,7 +73,7 @@ Rocq's header, kept because the reasons are the content:
 4. `bv_unsigned` is `.toNat`; `<[s := v]>` on an entry map is `.insert s
    v`; `T_FILE`/`T_DEVICE` (halfwords) are `T_FILE_w`/`T_DEVICE_w`
    (`FsAbsCreateFire` deviation 2).
-5. Names: `mkf_abs_of_dir` → `mkfAbs_of_dir`, `mkf_parent_row` →
+5. Names: `mkf_abs_of_dir` → `Xv6.absOf_dir`, `mkf_parent_row` →
    `mkfParent_row`, `mkf_dlookup_fire` → `mkfDlookup_fire`,
    `caf_acre_fire(_file)` → `cafAcre_fire(_file)`, `caf_made_row(_node)` →
    `cafMade_row(_node)`, `npar_walk_pre_era` → `nparWalkPreEra`,
@@ -109,27 +109,12 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-! ## 2.  The row readings -/
 
-/-- a LIVE directory's row (Rocq's `mkf_abs_of_dir`; the landed
-`absOf_dir`). -/
-theorem mkfAbs_of_dir (n : FsNode) (hd : fnIsDir n = true) (hnl : fnNlink n ≠ 0) :
-    absOf n = some ⟨.ADir (dirEntries n), fnNlink n⟩ :=
-  absOf_dir n hd hnl
-
 /-- Rocq's `mkf_era_is_dir` (deviation 2). -/
 theorem mkfEra_is_dir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hty : dn.diType.toNat = T_DIR_z) : fnIsDir (eraNode dn bm data) = true := by
   unfold fnIsDir fnType
   rw [eraNode_rec]
   exact decide_eq_true hty
-
-/-- Rocq's `mkf_era_nlink`. -/
-theorem mkfEra_nlink (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :
-    fnNlink (eraNode dn bm data) = dn.diNlink.toNat := rfl
-
-/-- ...and a nonzero record count is a nonzero `fnNlink` (Rocq's
-`mkf_era_live`; deviation 2). -/
-theorem mkfEra_live (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
-    (hnz : dn.diNlink.toNat ≠ 0) : fnNlink (eraNode dn bm data) ≠ 0 := hnz
 
 /-- ITEM 2: THE READING BRIDGE AT THE WRITE (Rocq's `mkf_parent_row`).
 dirlink keeps the TYPE (so the row stays an `ADir`) and the COUNT (so the
@@ -142,8 +127,8 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
     absOf (eraNode dn' bm' data') =
       some ⟨.ADir ((dirEntries (eraNode dn bm data)).insert s v), fnNlink (eraNode dn bm data)⟩ := by
   have hdir' : fnIsDir (eraNode dn' bm' data') = true := mkfEra_is_dir dn' bm' data' (by rw [hty']; exact hty)
-  rw [mkfAbs_of_dir _ hdir' (mkfEra_live dn' bm' data' (by rw [hnl']; exact hnl)), hents,
-    mkfEra_nlink, mkfEra_nlink, hnl']
+  rw [Xv6.absOf_dir _ hdir' (Xv6.eraNlink_nz dn' bm' data' (by rw [hnl']; exact hnl)), hents,
+    Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnl']
 
 /-- ITEM 4: THE MINTED CHILD'S ROW (Rocq's `mkf_child_dev`). -/
 theorem mkfChild_dev (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -182,7 +167,7 @@ theorem mkfDlookup_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   unfold topFragQ fsGammaL
   ihave %hlk := ghost_map_lookup $$ Ha Hf
   have hrow : PartialMap.get? (absView I) d = some ⟨.ADir (dirEntries n), fnNlink n⟩ := by
-    rw [absView_lookup_of I d n hlk, mkfAbs_of_dir n hdir hnl]
+    rw [absView_lookup_of I d n hlk, Xv6.absOf_dir n hdir hnl]
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   unfold dlookupCommitAt
   ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries n) %(fnNlink n) %hrow %hnm Ha
@@ -486,7 +471,7 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
   ihave %hlkp := ghost_map_lookup $$ Ha Hfp
   ihave %hlkc := ghost_map_lookup $$ Ha Hfc
   have hpre : crePre (absView I) d nm (dirEntries np) (fnNlink np) i (cf d i) :=
-    ⟨by rw [absView_lookup_of I d np hlkp, mkfAbs_of_dir np hdir hnl], hnone,
+    ⟨by rw [absView_lookup_of I d np hlkp, Xv6.absOf_dir np hdir hnl], hnone,
       by rw [absView_lookup_of I i nc hlkc, habsc]⟩
   -- the fused delta collapses to the ONE-ROW parent insert at the ARMED child
   have hdelta : absView (PartialMap.insert I d np') = deltaCreate d nm i (cf d i) (absView I) := by

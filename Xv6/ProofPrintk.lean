@@ -416,7 +416,7 @@ theorem printk_arm_d (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iintro Hk Hpc
   -- lw a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
-  icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
+  icases MachCSL.wordPointsTo_lo4_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lw cpu _ (KA.«printk» + 0xd8#64) true 0#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1)
     (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
@@ -665,7 +665,7 @@ theorem printk_arm_u (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iintro Hk Hpc
   -- lwu a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
-  icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
+  icases MachCSL.wordPointsTo_lo4_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lwu cpu _ (KA.«printk» + 0x116#64) false 0#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1)
     (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
@@ -914,7 +914,7 @@ theorem printk_arm_x (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFunctors} [Mach
   iintro Hk Hpc
   -- lwu a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
-  icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
+  icases MachCSL.wordPointsTo_lo4_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lwu cpu _ (KA.«printk» + 0x168#64) false 0#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1)
     (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
@@ -1154,7 +1154,7 @@ theorem printk_arm_c (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   ihave Hframe := Hfr $$ %_ Hap
   -- lw a0,0(a5)
   icases pkFrame_va_acc _ _ _ _ kk hk7 $$ Hframe with ⟨Hva, Hfr⟩
-  icases cell8_lo_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
+  icases MachCSL.wordPointsTo_lo4_acc _ _ _ $$ Hva with ⟨Hlo, Hvc⟩
   k_step (wp_s_lw cpu _ (KA.«printk» + 0x1fa#64) true 0#12 10#5 15#5 (by decide) (by decide) (DFrac.own 1)
     (BitVec.extractLsb' 0 32 (k.regs (BitVec.ofNat 5 (11 + kk))))) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc Hlo
