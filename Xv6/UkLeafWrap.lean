@@ -120,7 +120,9 @@ it (the pair). -/
 theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc : BitVec 64)
     (isRvc : Bool) (i : instruction) (fx : sfam GF)
     (hS : S.ok) (hfx : sexitPay fx = S.Qp) (hal : pc &&& 1#64 = 0#64) (hFD : UkFetchDec S.π S.sz M pc isRvc i)
-    (hX : ∀ (C : UCfg) (pt : UPtd) (T : BMap) (V : Nat → List (BitVec 8)),
+    (hX : ∀ (C : UCfg) (pt : UPtd) (T : BMap) (V : Nat → List (BitVec 8)), loopOk C pt →
+      permOf pt.um S.sz = S.π → lazyFree pt.um (BitVec.ofNat 64 S.sz) → uszOk S.sz → umemLazy pt S.sz V = M →
+      (∀ kv ∈ toList pt.um, (V kv.1).length = 4096) →
       UkExecTrap C pt T i (ukLen isRvc) m pc V (.E_SAMO_Page_Fault ())) :
     ⊢ ukUvb S K M m pc -∗ myPay K.gn S.Qp -∗ S.Qp (-1) -∗
       sbundleAt uslot USYS_exit fx (ukRunKey S K M m pc) -∗ wpLoop S.cpu := by
@@ -133,7 +135,7 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
     fr (ukLen isRvc) i hdec false m pc M (.E_SAMO_Page_Fault ())
     (fun C pt T V h1 h2 h3 h4 h5 h6 =>
       ⟨hF C pt T V h1 h2 h3 h4 h5 h6, ukExecOut_mono (fun _ h => h.elim) (fun _ h => ⟨rfl, h⟩)
-        (ukExecOut_trap rfl (hX C pt T V))⟩)
+        (ukExecOut_trap rfl (hX C pt T V h1 h2 h3 h4 h5 h6))⟩)
     (fun h => by cases h)
     (fun _ => by
       rw [show uexecRetF (GF := GF) uslot (utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64)
