@@ -41,3 +41,5 @@ USER INSTRUCTION (Sept 29): after cleanup, update the Lean proofs to match the L
 Cleanup A (97b85e825) and B (4f75d1ac5) LANDED. Drift wave 1 (themes A+B+SY1) started: see notes/coord/drift_prompt.txt, notes/rocq_drift.md.
 Drift wave 1 agents (session 354a8854): D1-fetch a64627531deb8d04f, D1-img a9890302dd730ad08, D1-spec a7ebbc664d939d42e
 (all worktree lanes). Then: C (sync line), D+E+F (durability, final shape), then I+J (NI ledgers/permit sweep) unless user says skip.
+Drift wave 1 LANDED ba83943d6 (A: d66e41c sh/fs.img + cmdalloc; B: page-boundary fetch; SY1 no-silent + ROom + demo_no_silent).
+Drift wave 2 agents: D2-sync (theme C) abb8735cb04a11faf; D2-dur (themes D+F, final shape) a43e5a6272fb47a89. Next: E (App fields/laws, UnionAdm, union_phi_sync, union_sync_cut_neg), then I+J.
