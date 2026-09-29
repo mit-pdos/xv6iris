@@ -57,7 +57,7 @@ lake env lean Xv6/SystemAdequacy.lean 2>&1 | tr ',' '\n' | grep -v '_native.bv_d
 lake env lean Xv6/SystemAdequacy.lean 2>&1 | tr ',' '\n' | grep -c '_native.bv_decide.ax_'
 ```
 
-## USER proved (Sept 26 2026, lane U4)
+## USER proved (Sept 26 2026, lane U4; `hZkr` removed Sept 29, see the last section)
 
 `Xv6.userProof (hZkr : ∀ C P, UclCsrZkr C P) : USER` (Xv6/ProofUser.lean) and the USER-free corollary
 `Xv6.xv6FsAdequacy_closed` (Xv6/LinkSystemAdequacyClosed.lean; a Link file because it imports ProofUser):
@@ -76,3 +76,27 @@ or the backend's short-circuit fix (upstream patch prepared in /shared/sail-upst
 BootReset phase 3 (Sept 29 2026): the `MachCSL.resetVal` register reset table is GONE. `bootFacts`' register
 clause is a run of `bootProg` from arbitrary power-on garbage (Rocq `boot_facts`); axioms of the three
 theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide certificates; 958 -> 962 lines).
+
+## `hZkr` gone: the model short-circuits `&`/`|` (Sept 29 2026, lane ZKR-SC)
+
+The model is regenerated with the short-circuit Sail Lean backend (sail 5745ea9e + the
+`lean-short-circuit` commit d0ef9371 of /shared/sail-upstream; see tools/regen_sail_model.sh). The
+hypothesis is discharged, not assumed: the CSR rows for every csr number (0x747/0x757 included) are plain
+walks of the model's `check_CSR_result`.
+
+    Xv6.userProof : Xv6.USER
+    Xv6.xv6FsAdequacy_closed : ∀ {hlc} (g : GState), g.gen = 0 → g.pow = false →
+      diskOf g.m.devs = fsImgDisk → ∀ n κs t2 g2, NSteps n ([Expr.power], g) κs (t2, g2) →
+        (∀ e2 ∈ t2, Reducible (e2, g2)) ∧ xv6TracePure fsimgCov fsimgSb.sbLogstart g2
+
+Measured on lean-v2 e3ba2e72e + the lane's commit (GCP full build, 2476 jobs):
+
+| theorem | besides propext / Classical.choice / Quot.sound |
+|---|---|
+| `Xv6.userProof` | 70 `_native.bv_decide.ax_*` |
+| `Xv6.xv6FsAdequacy_closed` | 484 `_native.bv_decide.ax_*` |
+| `Xv6.xv6FsAdequacy_xv6GF` | 428 `_native.bv_decide.ax_*` |
+
+No `sorryAx`, no plain `axiom` of Xv6/MachCSL. (The extra certificates are the per-branch `bv_decide`s of
+`UWalk.uwk_pte_is_invalid`, whose walk now splits on the entry's bits.) The model's `currentlyEnabled`
+still has no `Ext_Zkr` clause; no proved path reaches it (see notes/coord/user_residuals.md).
