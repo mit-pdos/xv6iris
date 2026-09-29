@@ -43,7 +43,7 @@ theorem shMalloc_find (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   iintro #Hc Hbn Hsz Hrun Hcont
   -- 0x1198  c.ld a5,0(a0) : p = prevp->s.ptr
   ihave Hi := ushm_uis N.t 0x1198 true (.LOAD (0#12, .Regidx 10#5, .Regidx 15#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h m (BitVec.ofNat 64 0x1198) true 0#12 10#5 15#5 (DFrac.own 1) ushmBase _ n
     (by unfold unotSp spIdx; decide) (ushm_adr ha0 (by rw [hB]; decide) _ _ (by rw [hB]; decide)) (by rw [hB])
     $$ Hi Hbn Hrun
@@ -55,7 +55,7 @@ theorem shMalloc_find (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   have f15 : m1.get 15#5 = BitVec.ofNat 64 c := e1 ▸ ukWr_get_same _ _ _ (by decide)
   -- 0x119a  c.lw a4,8(a5) : p->s.size
   ihave Hi := ushm_uis N.t 0x119a true (.LOAD (8#12, .Regidx 15#5, .Regidx 14#5, false, 4)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_lw UL N h1 m1 (BitVec.ofNat 64 0x119a) true 8#12 15#5 14#5 (DFrac.own 1) (c + 8) R n
     (by unfold unotSp spIdx; decide)
     (ushm_adr f15 (by omega) _ _ (by rw [show (8#12 : BitVec 12).toInt = 8 from by decide]; omega))
@@ -69,7 +69,7 @@ theorem shMalloc_find (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   have f19 : m2.get 19#5 = BitVec.ofNat 64 nu := by rw [k2 _ (by decide), k1 _ (by decide), hs3]
   -- 0x119c  bgeu a4,s3,0x1228 : TAKEN
   ihave Hi := ushm_uis N.t 0x119c false (.BTYPE (140#13, .Regidx 19#5, .Regidx 14#5, .BGEU)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_br UL N h2 m2 (BitVec.ofNat 64 0x119c) false 140#13 19#5 14#5 .BGEU n true
     (by rw [f14, f19, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp only [decide_eq_true_eq]; omega)
     (BitVec.ofNat 64 0x1228) (by decide) (fun _ => by decide) $$ Hi Hrun

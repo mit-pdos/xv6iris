@@ -82,10 +82,10 @@ variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVar
 cat's text tree finds and decodes at `pc`. -/
 theorem cat_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
     (h : ∃ i₀ n w, User.utextDecodeWith udrefU User.Cat.tree User.Cat.code.byte pc = some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     ukCode (GF := GF) γt User.Cat.code.byte ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   obtain ⟨i₀, n, w, e⟩ := h
-  exact uinstrIs_of_text γt User.Cat.textOk pc rvc i i₀ n w e hpc hpg
+  exact uinstrIs_of_text γt User.Cat.textOk pc rvc i i₀ n w e hpc
 
 /-- **Rocq `cat_lit_str`**: a directive-free literal of cat's `.rodata`, as
 the text string `fprintf` reads (deviation 1: out of `ukCode`). -/

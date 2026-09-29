@@ -52,10 +52,10 @@ variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVar
 echo's text tree finds and decodes at `pc`. -/
 theorem echo_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
     (h : ∃ i₀ n w, User.utextDecodeWith udrefU User.Echo.tree User.Echo.code.byte pc = some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     ukCode (GF := GF) γt User.Echo.code.byte ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   obtain ⟨i₀, n, w, e⟩ := h
-  exact uinstrIs_of_text γt User.Echo.textOk pc rvc i i₀ n w e hpc hpg
+  exact uinstrIs_of_text γt User.Echo.textOk pc rvc i i₀ n w e hpc
 
 end Code
 

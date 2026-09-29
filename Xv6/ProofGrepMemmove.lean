@@ -302,11 +302,11 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   -- 0x43e .. 0x444  THE FRAME
   gfetch 0x43e true (.ITYPE (4080#12, .Regidx spIdx, .Regidx spIdx, .ADDI))
   ihave I1 := grep_uis N.t 0x440 true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave I2 := grep_uis N.t 0x442 true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave I3 := grep_uis N.t 0x444 true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply kgrep_pro2 UL N h m 0x43e n $$ Hi I1 I2 I3 Hrun
   iintro %h1 %m1 %hal8 %hlo %hsp1 %hk1 Hwra Hws0 Hrun
   have ha01 : m1.get 10#5 = BitVec.ofNat 64 dst := by rw [hk1 10#5 (by decide)]; exact ha0
@@ -325,11 +325,11 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     iintro #Hc Hwra Hws0 Hrun Hk
     gfetch 0x468 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))
     ihave I1 := grep_uis N.t 0x46a true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     ihave I2 := grep_uis N.t 0x46c true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     ihave I3 := grep_uis N.t 0x46e true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply kgrep_epi2 UL N h5 mc (m.get spIdx) (m.get 1#5) (m.get 8#5) 0x468 n hspc hal8 hlo
       $$ Hi I1 I2 I3 Hwra Hws0 Hrun
     iintro %h6 %m6 %h62 %h68 %hk6 Hrun

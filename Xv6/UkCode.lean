@@ -10,7 +10,8 @@ catalogs `UCodeEcho`/`UCodeCat`/`UCodeGrep`/…, ~47k lines).  Lean does not
 turns an evaluation of the program's search tree and decode walk at the
 U-mode reference map (`SpecUkLeaves.udrefU`) into the instruction resource.
 A proof closes the evaluation premise by `rfl` (as the kernel's proofs do
-with `KernelText`), and the in-page premise by `decide`.
+with `KernelText`).  There is no in-page premise (Rocq `c5bce82eb`): an
+instruction may straddle a page boundary.
 
 Deviation from Rocq (DU3): no per-pc lemma; the catalog's `echo_code`/
 `cat_code`/`grep_code` are `ukCode γt <P>.code.byte`.
@@ -33,8 +34,8 @@ instruction the program's text tree finds and decodes at `pc`. -/
 theorem uinstrIs_of_text (γt : GName) {t : User.UTextTree} {m : ElfMem} (hok : User.UTextOk t m) (pc : Nat)
     (rvc : Bool) (i i₀ : instruction) (n w : Nat)
     (h : User.utextDecodeWith udrefU t m pc = some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     ukCode (GF := GF) γt m ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i :=
-  uinstrIs_of_facts γt m pc rvc i i₀ n w (User.utextDecode_facts udrefU hok pc rvc i i₀ n w h) hpc hpg
+  uinstrIs_of_facts γt m pc rvc i i₀ n w (User.utextDecode_facts udrefU hok pc rvc i i₀ n w h) hpc
 
 end Xv6

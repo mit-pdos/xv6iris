@@ -48,19 +48,19 @@ theorem kinit_die_tail (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N' :
       some (false, .JAL (je, .Regidx 1#5), i₀, n, w))
     (hjp : BitVec.ofNat 64 (pc + 8) + BitVec.signExtend 64 jp = BitVec.ofNat 64 User.Init.Sym.«printf»)
     (hje : BitVec.ofNat 64 (pc + 14) + BitVec.signExtend 64 je = BitVec.ofNat 64 User.Init.Sym.«exit»)
-    (hpg : pc % 4096 ≤ 4072) (hra : retPc (BitVec.ofNat 64 (pc + 12)) = BitVec.ofNat 64 (pc + 12)) :
+    (hra : retPc (BitVec.ofNat 64 (pc + 12)) = BitVec.ofNat 64 (pc + 12)) :
     ⊢ □ (∀ j : Nat, ⌜j < len⌝ -∗ kinitW1 (hlc := hlc) N' 1#64 (User.Init.initLit lit j) (Ch j) (Ch (j + 1))) -∗
       Ch 0 -∗ (Ch len -∗ N'.pay (-1)) -∗ initCode N'.t -∗
       urun (hlc := hlc) N' h m (BitVec.ofNat 64 pc) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hw HCh Hfin #Hc Hrun
   ihave #Hstr := kinit_lit_str (GF := GF) N'.t lit len hok (by omega) $$ Hc
   iapply kinit_la UL N' h m pc 10#5 imm lit _ (by unfold unotSp spIdx; decide) (by decide) hv $$ [] [] Hrun
-  · iapply init_uis N'.t pc false _ hUi (by omega) (by omega) $$ Hc
-  · iapply init_uis N'.t (pc + 4) false _ hIi (by omega) (by omega) $$ Hc
+  · iapply init_uis N'.t pc false _ hUi (by omega) $$ Hc
+  · iapply init_uis N'.t (pc + 4) false _ hIi (by omega) $$ Hc
   inext; inext
   iintro %h1 Hrun
   let m1 := ukWr m 10#5 (BitVec.ofNat 64 lit)
-  ihave Hi := init_uis N'.t (pc + 8) false _ hJi (by omega) (by omega) $$ Hc
+  ihave Hi := init_uis N'.t (pc + 8) false _ hJi (by omega) $$ Hc
   iapply wp_uk_jal UL N' h1 m1 (BitVec.ofNat 64 (pc + 8)) false jp 1#5 _ (by unfold unotSp spIdx; decide)
     (by rw [hjp]; decide) $$ Hi Hrun
   inext
@@ -75,13 +75,13 @@ theorem kinit_die_tail (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N' :
     have e : m2.get 1#5 = BitVec.ofNat 64 (pc + 8) + instrLen false := by ureg
     rw [e, ukPc (pc + 8) (pc + 12) false (by simp), hra]
   rw [hra']
-  ihave Hi := init_uis N'.t (pc + 12) true _ hLi (by omega) (by omega) $$ Hc
+  ihave Hi := init_uis N'.t (pc + 12) true _ hLi (by omega) $$ Hc
   iapply wp_uk_itype UL N' h3 m3 (BitVec.ofNat 64 (pc + 12)) true 1#12 0#5 10#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
   iintro %h4 Hrun
   rw [ukPc (pc + 12) (pc + 14) true (by simp)]
-  ihave Hi := init_uis N'.t (pc + 14) false _ hEi (by omega) (by omega) $$ Hc
+  ihave Hi := init_uis N'.t (pc + 14) false _ hEi (by omega) $$ Hc
   iapply wp_uk_jal UL N' h4 _ (BitVec.ofNat 64 (pc + 14)) false je 1#5 _ (by unfold unotSp spIdx; decide)
     (by rw [hje]; decide) $$ Hi Hrun
   inext
@@ -131,7 +131,7 @@ theorem wp_kinit_main_die_df (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   icases Hfam with ⟨%Ch, #Hw, HCh⟩
   iapply kinit_die_tail UL HS HP N' 0x84 0x9a0 18 0x91c#12 0x73c#21 0x2e0#21 Ch h m n User.Init.lit_fork_ok
     (by decide) (by decide) (by decide) (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ (by decide) (by decide) (by decide) (by decide) $$ Hw HCh [Hpay] Hc Hrun
+    ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ (by decide) (by decide) (by decide) $$ Hw HCh [Hpay] Hc Hrun
   iintro -
   iexact Hpay
 
@@ -204,7 +204,7 @@ theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   icases Hfam with ⟨%Ch, #Hw, HCh, Hfin⟩
   iapply kinit_die_tail UL HS HP N' 0xaa 0x9c0 21 0x916#12 0x716#21 0x2ba#21 Ch h m n User.Init.lit_exec_ok
     (by decide) (by decide) (by decide) (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ (by decide) (by decide) (by decide) (by decide) $$ Hw HCh Hfin Hc Hrun
+    ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ (by decide) (by decide) (by decide) $$ Hw HCh Hfin Hc Hrun
 
 /-- **Rocq `wp_kinit_main_child`**: THE CHILD ARM @0x96, `exec("sh",
 argv)`; a successful exec never comes back, the failure arm refunds the
@@ -225,23 +225,22 @@ theorem wp_kinit_main_child (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   -- 0x96 auipc a1 ; 0x9a addi a1 -- argv at 0x1000
   iapply kinit_la UL N' h m 0x96 11#5 0xf6a#12 0x1000 _ (by unfold unotSp spIdx; decide) (by decide) (by decide)
     $$ [] [] Hrun
-  · iapply init_uis N'.t 0x96 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  · iapply init_uis N'.t 0x96 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   · iapply init_uis N'.t (0x96 + 4) false (.ITYPE (0xf6a#12, .Regidx 11#5, .Regidx 11#5, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
   inext; inext
   iintro %h1 Hrun
   -- 0x9e auipc a0 ; 0xa2 addi a0 -- "sh" at 0x9b8
   iapply kinit_la UL N' h1 _ (0x96 + 8) 10#5 0x91a#12 0x9b8 _ (by unfold unotSp spIdx; decide) (by decide)
     (by decide) $$ [] [] Hrun
-  · iapply init_uis N'.t (0x96 + 8) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide)
-      (by decide) $$ Hc
+  · iapply init_uis N'.t (0x96 + 8) false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   · iapply init_uis N'.t (0x96 + 8 + 4) false (.ITYPE (0x91a#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
   inext; inext
   iintro %h2 Hrun
   -- 0xa6 jal exec
   let m2 := ukWr (ukWr m 11#5 (BitVec.ofNat 64 0x1000)) 10#5 (BitVec.ofNat 64 0x9b8)
-  ihave Hi := init_uis N'.t 0xa6 false (.JAL (0x304#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hi := init_uis N'.t 0xa6 false (.JAL (0x304#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply wp_uk_jal UL N' h2 m2 (BitVec.ofNat 64 (0x96 + 8 + 8)) false 0x304#21 1#5 _
     (by unfold unotSp spIdx; decide) (by decide) $$ Hi Hrun
   inext

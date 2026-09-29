@@ -2,8 +2,8 @@
 **The precise store** (lane LinkUkLeaves, WP-C, C4; the value-naming twin
 of `UserMemStore`).
 
-`ukRetire_store`: a STORE of width `k ∈ {1,2,4,8}`, aligned and inside one
-mapped user page with U and W (hence a DATA page): the translation (C1), the
+`ukRetire_store`: a STORE of width `k ∈ {1,2,4,8}`, aligned (hence inside
+one page, `ukAccess_page`) on a mapped user page with U and W (hence a DATA page): the translation (C1), the
 aligned write of the low `k` bytes of `rs2` into the walker's map
 (`uma_vmem_write_addr_store`, `ume_exec_store`), landing on an engine machine
 whose page view is `ukViewStore V va k (m.get rs2)` (`ukm_view_store`: the
@@ -143,12 +143,12 @@ theorem ukRetire_store (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 r
     (k : Nat) (len : Int) (m : RegMap) (pc : BitVec 64) (V : Nat → List (BitVec 8)) (lw : BitVec 64)
     (hW : ukWidth k)
     (hal : (m.get rs1 + BitVec.signExtend 64 imm).toNat % k = 0)
-    (hpg : (m.get rs1 + BitVec.signExtend 64 imm).toNat % 4096 + k ≤ 4096)
     (hk : get? P.um ((m.get rs1 + BitVec.signExtend 64 imm).toNat / 4096) = some lw)
     (hU : pteBit lw 4 = true) (hWb : pteBit lw 2 = true) :
     UkExecRetire C P T (.STORE (imm, .Regidx rs2, .Regidx rs1, (k : Int))) len m m pc (BitVec.addInt pc len) V
       (ukViewStore V (m.get rs1 + BitVec.signExtend 64 imm).toNat k (m.get rs2)) := by
   intro s hl hr hpc hv orc
+  have hpg := ukAccess_page _ k hW hal
   have hd : ukTextLeaf lw = false := by
     unfold ukTextLeaf; unfold pteBit at hWb; rw [hWb]; simp
   obtain ⟨hl0, hr0, -, hnpc0, hv0⟩ := uke_npc_land hl hr hpc hv len

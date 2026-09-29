@@ -65,7 +65,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x0  addi sp,sp,-32
   ihave Hi := init_uis N.t 0x0 true (.ITYPE (0xfe0#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_addi_sp_dn UL N h m (BitVec.ofNat 64 0x0) true 0xfe0#12 4 (12 + (12 + (4 + n))) (by decide)
     $$ Hi Hrun
   inext
@@ -78,7 +78,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     rw [this]; exact uv_avi_neg _ 32 (by omega)
   -- 0x2  sd ra,24(sp)
   ihave Hi := init_uis N.t 0x2 true (.STORE (24#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   have hA : ((m1.get 2#5).toNat : Int) + (24#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 8 : Nat) : Int) := by
     rw [hs32, show (24#12 : BitVec 12).toInt = 24 from by decide]; omega
   iapply wp_uk_sd UL N h1 m1 (BitVec.ofNat 64 0x2) true 24#12 2#5 1#5 _ v1 _ hA (by omega) $$ Hi Hw1 Hrun
@@ -87,7 +87,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   rw [ukPc 0x2 0x4 true rfl]
   -- 0x4  sd s0,16(sp)
   ihave Hi := init_uis N.t 0x4 true (.STORE (16#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   have hB : ((m1.get 2#5).toNat : Int) + (16#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 16 : Nat) : Int) := by
     rw [hs32, show (16#12 : BitVec 12).toInt = 16 from by decide]; omega
   iapply wp_uk_sd UL N h2 m1 (BitVec.ofNat 64 0x4) true 16#12 2#5 8#5 _ v2 _ hB (by omega) $$ Hi Hw2 Hrun
@@ -96,7 +96,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   rw [ukPc 0x4 0x6 true rfl]
   -- 0x6  sd s1,8(sp)
   ihave Hi := init_uis N.t 0x6 true (.STORE (8#12, .Regidx 9#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   have hC : ((m1.get 2#5).toNat : Int) + (8#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 24 : Nat) : Int) := by
     rw [hs32, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega
   iapply wp_uk_sd UL N h3 m1 (BitVec.ofNat 64 0x6) true 8#12 2#5 9#5 _ v3 _ hC (by omega) $$ Hi Hw3 Hrun
@@ -105,7 +105,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   rw [ukPc 0x6 0x8 true rfl]
   -- 0x8  sd s2,0(sp)
   ihave Hi := init_uis N.t 0x8 true (.STORE (0#12, .Regidx 18#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   have hD : ((m1.get 2#5).toNat : Int) + (0#12 : BitVec 12).toInt = (((m.get spIdx).toNat - 32 : Nat) : Int) := by
     rw [hs32, show (0#12 : BitVec 12).toInt = 0 from by decide]; omega
   iapply wp_uk_sd UL N h4 m1 (BitVec.ofNat 64 0x8) true 0#12 2#5 18#5 _ v4 _ hD (by omega) $$ Hi Hw4 Hrun
@@ -114,7 +114,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   rw [ukPc 0x8 0xa true rfl]
   -- 0xa  addi s0,sp,32
   ihave Hi := init_uis N.t 0xa true (.ITYPE (32#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h5 m1 (BitVec.ofNat 64 0xa) true 32#12 2#5 8#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -122,7 +122,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   rw [ukPc 0xa 0xc true rfl]
   -- 0xc  c.li a1,2
   ihave Hi := init_uis N.t 0xc true (.ITYPE (2#12, .Regidx 0#5, .Regidx 11#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h6 _ (BitVec.ofNat 64 0xc) true 2#12 0#5 11#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -131,16 +131,16 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   -- 0xe  auipc a0 ; 0x12  addi a0 -- "console"
   iapply kinit_la UL N h7 _ 0xe 10#5 0x972#12 0x980 _ (by unfold unotSp spIdx; decide) (by decide)
     (by decide) $$ [] [] Hrun
-  · iapply init_uis N.t 0xe false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide) (by decide)
+  · iapply init_uis N.t 0xe false (.UTYPE (1#20, .Regidx 10#5, .AUIPC)) ⟨_, _, _, rfl⟩ (by decide)
       $$ Hc
   · iapply init_uis N.t (0xe + 4) false (.ITYPE (0x972#12, .Regidx 10#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
   inext; inext
   iintro %h8 Hrun
   -- 0x16  jal open
   let m8 := ukWr (ukWr (ukWr m1 8#5 (ukItypeVal .ADDI (m1.get 2#5) 32#12)) 11#5 (BitVec.ofNat 64 2)) 10#5
     (BitVec.ofNat 64 0x980)
-  ihave Hi := init_uis N.t 0x16 false (.JAL (0x39c#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hi := init_uis N.t 0x16 false (.JAL (0x39c#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply wp_uk_jal UL N h8 m8 (BitVec.ofNat 64 (0xe + 8)) false 0x39c#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
@@ -160,7 +160,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
   have ha0 : m10.get 10#5 = ro := by show (stubRet m9 15 ro).get 10#5 = ro; unfold stubRet; ureg
   -- 0x1a  blt a0,x0,0x64
   ihave Hi := init_uis N.t 0x1a false (.BTYPE (0x4a#13, .Regidx 0#5, .Regidx 10#5, .BLT)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   unfold initConsSup
   icases Hxs with ⟨#Hw, #Ht⟩
   unfold ukiOpen1Out

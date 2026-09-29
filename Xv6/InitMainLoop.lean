@@ -82,14 +82,14 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     iintro %h %m %hs2 Hsz Hstd Hcwd Hch Htk Hrun
     -- 0x32  c.mv a0,s2
     ihave Hi := init_uis N.t 0x32 true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 10#5, .ADD)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_rtype UL N h m (BitVec.ofNat 64 0x32) true 18#5 0#5 10#5 .ADD _
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
     inext
     iintro %h1 Hrun
     rw [ukPc 0x32 0x34 true rfl, ukMv, hs2]
     -- 0x34  jal printf
-    ihave Hi := init_uis N.t 0x34 false (.JAL (0x794#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+    ihave Hi := init_uis N.t 0x34 false (.JAL (0x794#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
     iapply wp_uk_jal UL N h1 _ (BitVec.ofNat 64 0x34) false 0x794#21 1#5 _ (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
     inext
@@ -108,7 +108,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     unfold kinitLent
     icases Hlent with ⟨%l, Hstd, #Hrow, Htk⟩
     -- 0x38  jal fork
-    ihave Hi := init_uis N.t 0x38 false (.JAL (0x332#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+    ihave Hi := init_uis N.t 0x38 false (.JAL (0x332#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
     iapply wp_uk_jal UL N h3 m3 (BitVec.ofNat 64 0x38) false 0x332#21 1#5 _ (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
     inext
@@ -143,7 +143,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       iintro %hp %r %hrnz Hans - Hsz Hstd Hcwd Hrun
       -- 0x3c  c.mv s1,a0
       ihave Hi := init_uis N.t 0x3c true (.RTYPE (.Regidx 10#5, .Regidx 0#5, .Regidx 9#5, .ADD)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       iapply wp_uk_rtype UL N hp _ (BitVec.ofNat 64 0x3c) true 10#5 0#5 9#5 .ADD _
         (by unfold unotSp spIdx; decide) $$ Hi Hrun
       inext
@@ -154,7 +154,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       have hp1a0 : mp1.get 10#5 = r := by show (ukWr _ 9#5 r).get 10#5 = r; rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha0
       -- 0x3e  blt a0,x0,0x84
       ihave Hi := init_uis N.t 0x3e false (.BTYPE (0x46#13, .Regidx 0#5, .Regidx 10#5, .BLT)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       icases Hans with (⟨%hm1, -, -, -, Hcred⟩ | ⟨%γc, %pidv, %hrp, %hrng, Htok, Hch⟩)
       · -- fork FAILED: "init: fork failed", paid by the refund
         have hbt : ukBtaken .BLT (mp1.get 10#5) 0#64 = true := by rw [hp1a0, hm1]; decide
@@ -178,7 +178,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         rw [hbt, if_neg (by decide), ukPc 0x3e 0x42 false rfl]
         -- 0x42  c.beqz a0,0x96 -- not taken
         ihave Hi := init_uis N.t 0x42 true (.BTYPE (0x54#13, .Regidx 0#5, .Regidx 10#5, .BEQ)) ⟨_, _, _, rfl⟩
-          (by decide) (by decide) $$ Hc
+          (by decide) $$ Hc
         have hbz : ukBtaken .BEQ (mp1.get 10#5) 0#64 = false := by
           rw [hp1a0, hrp]
           simp only [ukBtaken, beq_eq_false_iff_ne, ne_eq]
@@ -206,7 +206,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       iintro %N' %hc %hpeq ⟨#Hc', #Hargv'⟩ Hsz Hstd #Hrow' Hcred Hpos HQ Hcwd Hch Hpid Hrun
       -- 0x3c  c.mv s1,a0
       ihave Hi := init_uis N'.t 0x3c true (.RTYPE (.Regidx 10#5, .Regidx 0#5, .Regidx 9#5, .ADD)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc'
+        (by decide) $$ Hc'
       iapply wp_uk_rtype UL N' hc _ (BitVec.ofNat 64 0x3c) true 10#5 0#5 9#5 .ADD _
         (by unfold unotSp spIdx; decide) $$ Hi Hrun
       inext
@@ -218,7 +218,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         show (ukWr _ 9#5 0#64).get 10#5 = _; rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha0
       -- 0x3e  blt a0,x0 -- not taken
       ihave Hi := init_uis N'.t 0x3e false (.BTYPE (0x46#13, .Regidx 0#5, .Regidx 10#5, .BLT)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc'
+        (by decide) $$ Hc'
       have hbt : ukBtaken .BLT (mc1.get 10#5) 0#64 = false := by rw [hc1a0]; decide
       iapply wp_uk_btype0 UL N' hc1 mc1 (BitVec.ofNat 64 0x3e) false 0x46#13 10#5 .BLT _
         (fun h => by rw [hbt] at h; exact absurd h (by decide)) $$ Hi Hrun
@@ -227,7 +227,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       rw [hbt, if_neg (by decide), ukPc 0x3e 0x42 false rfl]
       -- 0x42  c.beqz a0,0x96 -- TAKEN: this is the child
       ihave Hi := init_uis N'.t 0x42 true (.BTYPE (0x54#13, .Regidx 0#5, .Regidx 10#5, .BEQ)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc'
+        (by decide) $$ Hc'
       have hbz : ukBtaken .BEQ (mc1.get 10#5) 0#64 = true := by rw [hc1a0]; decide
       iapply wp_uk_btype0 UL N' hc2 mc1 (BitVec.ofNat 64 0x42) true 0x54#13 10#5 .BEQ _
         (fun _ => by decide) $$ Hi Hrun
@@ -242,14 +242,14 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     iintro %h %m %cs %γ %γsh %pidsh %hs2 %hs1 %hin %hpnz Hsz Hstd Hcwd Hch Htok Hrun
     -- 0x44  c.li a0,0 -- the NULL status pointer
     ihave Hi := init_uis N.t 0x44 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_itype UL N h m (BitVec.ofNat 64 0x44) true 0#12 0#5 10#5 .ADDI _
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
     inext
     iintro %h1 Hrun
     rw [ukPc 0x44 0x46 true rfl, ukLi m 0#12 0 (by decide)]
     -- 0x46  jal wait
-    ihave Hi := init_uis N.t 0x46 false (.JAL (0x334#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+    ihave Hi := init_uis N.t 0x46 false (.JAL (0x334#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
     iapply wp_uk_jal UL N h1 _ (BitVec.ofNat 64 0x46) false 0x334#21 1#5 _ (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
     inext
@@ -273,7 +273,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     icases Hans with ⟨%pidw, %gnw, %bnw, %rv, %xs, %hret, Hwa⟩
     -- 0x4a  beq a0,s1,0x32
     ihave Hi := init_uis N.t 0x4a false (.BTYPE (0x1fe8#13, .Regidx 10#5, .Regidx 9#5, .BEQ)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     by_cases heq : BitVec.signExtend 64 pidsh = ret
     · -- the shell we forked was reaped: round again from 0x32
       icases Hwa with (⟨⟨%hm1, -⟩, -⟩ | ⟨%γ', ⟨%hcseq, %hr1, %hr2⟩, -, Hesc, #Huq⟩)
@@ -320,7 +320,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       have hrvp : rv.toNat ≤ PIDMAX := by unfold genPidMax at hr2; unfold PIDMAX; omega
       -- 0x4e  bge a0,x0,0x44 -- an orphan: keep waiting
       ihave Hi := init_uis N.t 0x4e false (.BTYPE (0x1ff6#13, .Regidx 0#5, .Regidx 10#5, .BGE)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       have hbg : ukBtaken .BGE (mw3.get 10#5) 0#64 = true := by rw [hw3a0, hret]; exact kinit_pid_bge rv hrvp
       iapply wp_uk_btype0 UL N h4 mw3 (BitVec.ofNat 64 0x4e) false 0x1ff6#13 10#5 .BGE _
         (fun _ => by decide) $$ Hi Hrun

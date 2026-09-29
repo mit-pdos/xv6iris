@@ -31,10 +31,11 @@ Rocq leaf re-quantifies it (`∀ h'`), and nothing in the ulib cone names it;
 `Xv6.User.utextDecode_facts`).  The decode walk runs at the U-mode
 reference map `SpecUkLeaves.udrefU` and makes the address-free checks the
 real fetch lemma makes (`isRVC`, `instrWf`, a 16-bit encoding); the
-address geometry the real fetch needs -- `pc` even, the fetch inside one
-page, and a compressed instruction at a 4-aligned `pc` followed by another
-instruction (the fetch reads four bytes) -- is `uTextGeom`, decided on the
-tree.  With both, the real instance (`UlibRunUk.UlibRunP.ofUkRun`) proves
+address geometry the real fetch needs -- `pc` even, and a compressed
+instruction at a 4-aligned `pc` followed by another instruction (the fetch
+reads four bytes) -- is `uTextGeom`, decided on the tree.  There is no
+in-page check (Rocq `c5bce82eb`): an instruction may straddle a page.
+With both, the real instance (`UlibRunUk.UlibRunP.ofUkRun`) proves
 `utext_instr` from `UserHeap.uinstrIs_of_text`.
 
 The jump leaf carries the model's target-alignment premise (SpecUkLeaves
@@ -90,10 +91,10 @@ noncomputable def ulibDecodeEnc (w e : Nat) : Option (Bool × instruction) :=
   else none
 
 /-- The fetch geometry at `pc` for an encoding of width `w` (see the
-header): `pc` even, inside one page, and a compressed instruction at a
-4-aligned `pc` followed by an instruction of the text. -/
+header): `pc` even, and a compressed instruction at a 4-aligned `pc`
+followed by an instruction of the text. -/
 def uTextGeom (t : Xv6.User.UTextTree) (w pc : Nat) : Bool :=
-  pc % 2 == 0 && decide (pc % 4096 ≤ 4092) &&
+  pc % 2 == 0 &&
     (!(w == 2 && pc % 4 == 0) || (t.find? (pc + 2)).any (fun k => decide (2 ≤ k.width)))
 
 /-- What the program text (search tree `t`) says about `pc`. -/

@@ -49,7 +49,7 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
   iintro #Hc Hfp Hsz Hrun Hcont
   -- 0x1202  c.ld a4,0(s1) : freep
   ihave Hi := ushm_uis N.t 0x1202 true (.LOAD (0#12, .Regidx 9#5, .Regidx 14#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h m (BitVec.ofNat 64 0x1202) true 0#12 9#5 14#5 (DFrac.own 1) ushmFreep _ (2 + nn)
     (by unfold unotSp spIdx; decide) (ushm_adr hs1 (by decide) _ _ (by rw [hF]; decide)) (by rw [hF]) $$ Hi Hfp Hrun
   inext
@@ -61,7 +61,7 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
   have f15 : m1.get 15#5 = BitVec.ofNat 64 ushmBase := by rw [k1 _ (by decide), ha5]
   -- 0x1204  mv a0,a5
   ihave Hi := ushm_uis N.t 0x1204 true (.RTYPE (.Regidx 15#5, .Regidx 0#5, .Regidx 10#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h1 m1 (BitVec.ofNat 64 0x1204) true 15#5 0#5 10#5 .ADD (2 + nn)
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -73,14 +73,14 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
   have g15 : m2.get 15#5 = BitVec.ofNat 64 ushmBase := by rw [k2 _ (by decide), f15]
   -- 0x1206  bne a4,a5 : NOT taken, p == freep: morecore
   ihave Hi := ushm_uis N.t 0x1206 false (.BTYPE (8180#13, .Regidx 15#5, .Regidx 14#5, .BNE)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_br UL N h2 m2 (BitVec.ofNat 64 0x1206) false 8180#13 15#5 14#5 .BNE (2 + nn) false
     (by rw [g14, g15]; simp [ukBtaken]) (BitVec.ofNat 64 0x120a) (by decide) (by simp) $$ Hi Hrun
   inext
   iintro %h3 Hrun
   -- 0x120a  mv a0,s4
   ihave Hi := ushm_uis N.t 0x120a true (.RTYPE (.Regidx 20#5, .Regidx 0#5, .Regidx 10#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h3 m2 (BitVec.ofNat 64 0x120a) true 20#5 0#5 10#5 .ADD (2 + nn)
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -92,7 +92,7 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
   have f10 : m3.get 10#5 = BitVec.ofNat 64 65536 := e3 ▸ ukWr_get_same _ _ _ (by decide)
   -- 0x120c  jal ra,sbrk
   ihave Hi := ushm_uis N.t 0x120c false (.JAL (2095650#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_jal UL N h4 m3 (BitVec.ofNat 64 0x120c) false 2095650#21 1#5 (2 + nn)
     (by unfold unotSp spIdx; decide) (by decide) $$ Hi Hrun
   inext
@@ -111,7 +111,7 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
   -- 0x1210  bne a0,s5 : sbrk's -1 or not
   have j21 : m5.get 21#5 = BitVec.ofInt 64 (-1) := by rw [hcs 21#5 (by decide), i21]
   ihave Hi := ushm_uis N.t 0x1210 false (.BTYPE (8156#13, .Regidx 21#5, .Regidx 10#5, .BNE)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_br UL N h6 m5 (BitVec.ofNat 64 0x1210) false 8156#13 21#5 10#5 .BNE (2 + nn)
     (!decide (r = BitVec.ofInt 64 (-1))) (by rw [h10, j21]; rfl)
     (if r = BitVec.ofInt 64 (-1) then BitVec.ofNat 64 0x1214 else BitVec.ofNat 64 0x11ec)

@@ -68,12 +68,12 @@ theorem ulibUk_addNeg (a : BitVec 64) (x : Nat) :
 
 /-- The stand-in's geometry, unpacked. -/
 theorem uTextGeom_spec {t : User.UTextTree} {w pc : Nat} (h : uTextGeom t w pc = true) :
-    pc % 2 = 0 ∧ pc % 4096 ≤ 4092 ∧
+    pc % 2 = 0 ∧
       (w = 2 → pc % 4 = 0 → ∃ k, t.find? (pc + 2) = some k ∧ 2 ≤ k.width) := by
   unfold uTextGeom at h
   simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq, Bool.or_eq_true, Bool.not_eq_true'] at h
-  obtain ⟨⟨h1, h2⟩, h3⟩ := h
-  refine ⟨h1, h2, fun hw hp => ?_⟩
+  obtain ⟨h1, h3⟩ := h
+  refine ⟨h1, fun hw hp => ?_⟩
   rcases h3 with h3 | h3
   · simp [hw, hp] at h3
   · cases hf : t.find? (pc + 2) with
@@ -84,8 +84,7 @@ theorem uTextGeom_spec {t : User.UTextTree} {w pc : Nat} (h : uTextGeom t w pc =
 at `udrefU`), on a text tree that is the image's. -/
 theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk t img) (pc : BitVec 64)
     (rvc : Bool) (i : instruction) (h : uTextDecode t pc = some (rvc, i)) :
-    pc.toNat % 4096 ≤ 4092 ∧
-      ∃ i₀ n w, User.utextDecodeWith udrefU t img pc.toNat = some (rvc, i, i₀, n, w) := by
+    ∃ i₀ n w, User.utextDecodeWith udrefU t img pc.toNat = some (rvc, i, i₀, n, w) := by
   unfold uTextDecode at h
   cases hf : t.find? pc.toNat with
   | none => rw [hf] at h; cases h
@@ -95,8 +94,7 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
     by_cases hg : uTextGeom t k.width pc.toNat = true
     case neg => rw [if_neg hg] at h; cases h
     rw [if_pos hg] at h
-    obtain ⟨h2, hpg, hnext⟩ := uTextGeom_spec hg
-    refine ⟨hpg, ?_⟩
+    obtain ⟨h2, hnext⟩ := uTextGeom_spec hg
     unfold User.utextDecodeWith
     rw [hf]
     simp only
@@ -651,8 +649,8 @@ theorem ulibUk_utext_instr (t0 : User.UTextTree) (img : ElfMem) (hok : User.UTex
     iprop(⌜t = t0⌝ ∗ ukCode N.t img) ⊢ uinstrIs (GF := GF) N.t pc rvc i := by
   iintro ⟨%ht, #Hc⟩
   subst ht
-  obtain ⟨hpg, i₀, n, w, hd⟩ := uTextDecode_real hok pc rvc i h
-  have H := uinstrIs_of_text (GF := GF) N.t hok pc.toNat rvc i i₀ n w hd pc.isLt hpg
+  obtain ⟨i₀, n, w, hd⟩ := uTextDecode_real hok pc rvc i h
+  have H := uinstrIs_of_text (GF := GF) N.t hok pc.toNat rvc i i₀ n w hd pc.isLt
   rw [Xv6.ofNat_toNat_pc] at H
   iapply H $$ Hc
 

@@ -68,7 +68,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   icases (ubytes_app N.d (c + 16 + k + 8 + 4 + 4) nbytes r _).1 $$ Hb with ⟨Hq, -⟩
   -- 0x1228  beq s2,a4 : NOT taken, the chunk is not an exact fit
   ihave Hi := ushm_uis N.t 0x1228 false (.BTYPE (8126#13, .Regidx 14#5, .Regidx 18#5, .BEQ)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_br UL N h m (BitVec.ofNat 64 0x1228) false 8126#13 14#5 18#5 .BEQ n false
     (by rw [hs2, ha4, Xv6.beq_nat _ _ (by omega) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
     (BitVec.ofNat 64 0x122c) (by decide) (by simp) $$ Hi Hrun
@@ -76,7 +76,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   iintro %h1 Hrun
   -- 0x122c  subw a4,a4,s3 : R - nu
   ihave Hi := ushm_uis N.t 0x122c false (.RTYPEW (.Regidx 19#5, .Regidx 14#5, .Regidx 14#5, .SUBW)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtypew UL N h1 m (BitVec.ofNat 64 0x122c) false 19#5 14#5 14#5 .SUBW n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -88,7 +88,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   have f15 : m1.get 15#5 = BitVec.ofNat 64 c := by rw [k1 _ (by decide), ha5]
   -- 0x1230  c.sw a4,8(a5) : the chunk shrinks
   ihave Hi := ushm_uis N.t 0x1230 true (.STORE (8#12, .Regidx 14#5, .Regidx 15#5, 4)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_sw UL N h2 m1 (BitVec.ofNat 64 0x1230) true 8#12 15#5 14#5 (c + 8) (R - nu) n _
     (ushm_adr f15 (by omega) _ _ (by rw [show (8#12 : BitVec 12).toInt = 8 from by decide]; omega)) (by omega) f14
     $$ Hi Hsz Hrun
@@ -97,7 +97,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   rw [ukPc 0x1230 0x1232 true rfl]
   -- 0x1232  slli a3,a4,32 ; 0x1236  srli a4,a3,28 : (R - nu) * 16
   ihave Hi := ushm_uis N.t 0x1232 false (.SHIFTIOP (32#6, .Regidx 14#5, .Regidx 13#5, .SLLI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_shiftiop UL N h3 m1 (BitVec.ofNat 64 0x1232) false 32#6 14#5 13#5 .SLLI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -108,7 +108,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   have f13 : m2.get 13#5 = ukShiftiopVal .SLLI (BitVec.ofNat 64 (R - nu)) 32#6 :=
     e2 ▸ ukWr_get_same _ _ _ (by decide)
   ihave Hi := ushm_uis N.t 0x1236 false (.SHIFTIOP (28#6, .Regidx 13#5, .Regidx 14#5, .SRLI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_shiftiop UL N h4 m2 (BitVec.ofNat 64 0x1236) false 28#6 13#5 14#5 .SRLI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -120,7 +120,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   have g15 : m3.get 15#5 = BitVec.ofNat 64 c := by rw [k3 _ (by decide), k2 _ (by decide), f15]
   -- 0x123a  c.add a5,a5,a4 : p += p->s.size
   ihave Hi := ushm_uis N.t 0x123a true (.RTYPE (.Regidx 14#5, .Regidx 15#5, .Regidx 15#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h5 m3 (BitVec.ofNat 64 0x123a) true 14#5 15#5 15#5 .ADD n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -134,7 +134,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   have i19 : m4.get 19#5 = BitVec.ofNat 64 nu := by rw [k14 _ (by decide), hs3]
   -- 0x123c  sw s3,8(a5) : the new header's size
   ihave Hi := ushm_uis N.t 0x123c false (.STORE (8#12, .Regidx 19#5, .Regidx 15#5, 4)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_sw UL N h6 m4 (BitVec.ofNat 64 0x123c) false 8#12 15#5 19#5 (c + 16 + k + 8) nu n _
     (ushm_adr i15 (by omega) _ _ (by rw [show (8#12 : BitVec 12).toInt = 8 from by decide]; omega)) (by omega) i19
     $$ Hi Hx8 Hrun
@@ -143,7 +143,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   rw [ukPc 0x123c 0x1240 false rfl]
   -- 0x1240  auipc a4,0x1 ; 0x1244  sd a0,-596(a4) : freep = prevp
   ihave Hi := ushm_uis N.t 0x1240 false (.UTYPE (1#20, .Regidx 14#5, .AUIPC)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_utype UL N h7 m4 (BitVec.ofNat 64 0x1240) false 1#20 14#5 .AUIPC n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -156,7 +156,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   have j10 : m5.get 10#5 = BitVec.ofNat 64 ushmBase := by rw [k5 _ (by decide), k14 _ (by decide), ha0]
   have j15 : m5.get 15#5 = BitVec.ofNat 64 (c + (R - nu) * 16) := by rw [k5 _ (by decide), i15]
   ihave Hi := ushm_uis N.t 0x1244 false (.STORE (3536#12, .Regidx 10#5, .Regidx 14#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N h8 m5 (BitVec.ofNat 64 0x1244) false 3536#12 14#5 10#5 ushmFreep wf n
     (ushm_adr j14 (by decide) _ _ (by rw [hF]; decide)) (by rw [hF]) $$ Hi Hfp Hrun
   inext
@@ -164,7 +164,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   rw [ukPc 0x1244 0x1248 false rfl, j10]
   -- 0x1248  addi a0,a5,16 : return p + 1
   ihave Hi := ushm_uis N.t 0x1248 false (.ITYPE (16#12, .Regidx 15#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h9 m5 (BitVec.ofNat 64 0x1248) false 16#12 15#5 10#5 .ADDI n
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext

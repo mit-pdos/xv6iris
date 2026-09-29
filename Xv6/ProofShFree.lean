@@ -44,13 +44,13 @@ theorem wp_shFree (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p nu
   unfold ushmHdr
   iintro #Hc Hfp ⟨Hbn, Hbsz, Hbpad⟩ ⟨Hpn, Hpsz, Hppad⟩ Hrun Hcont
   ihave Hi0 := ushm_uis N.t 0x10ea true (.ITYPE (4080#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hi1 := ushm_uis N.t (0x10ea + 2) true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hi2 := ushm_uis N.t (0x10ea + 4) true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hi3 := ushm_uis N.t (0x10ea + 6) true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_pro2 UL N h m 0x10ea nn $$ Hi0 Hi1 Hi2 Hi3 Hrun
   iintro %h1 %m1 %hal8 %hlo %hsp1 %hk1 Hw8 Hw0 Hrun
   have ha0' : m1.get 10#5 = BitVec.ofNat 64 (p + 16) := by rw [hk1 _ (by decide), ha0]
@@ -62,13 +62,13 @@ theorem wp_shFree (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p nu
   have hsp3 : m3.get 2#5 = m.get 2#5 + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) := by
     rw [hk3 _ (by decide), hk2 _ (by decide), hsp1]
   ihave Hj0 := ushm_uis N.t 0x114c true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hj1 := ushm_uis N.t (0x114c + 2) true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hj2 := ushm_uis N.t (0x114c + 4) true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hj3 := ushm_uis N.t (0x114c + 6) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply ushm_epi2 UL N h3 m3 0x114c (m.get 2#5) (m.get 1#5) (m.get 8#5) nn hal8 hlo hsp3
     $$ Hj0 Hj1 Hj2 Hj3 Hw8 Hw0 Hrun
   iintro %h4 %m4 %hk4 %h42 %h48 Hrun

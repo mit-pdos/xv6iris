@@ -114,7 +114,7 @@ theorem grepMain_usage (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   rw [show retPc (m4.get 1#5) = BitVec.ofNat 64 0x23c by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   -- 0x23c  c.li a0,1 ; 0x23e  jal exit
   gfetch 0x23c true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
-  ihave Hj := grep_uis N.t 0x23e false (.JAL (734#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hj := grep_uis N.t 0x23e false (.JAL (734#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply grepMain_exitAt UL N h5 m5 _ 0x23c 1 1#12 734#21 (by decide) (by decide) (by decide) $$ Hi Hj Hc Hx Hrun
 
 /-- **Rocq `wp_kgrep_main_die`**: THE OPEN-FAILURE ARM, 0x250 -> exit. -/
@@ -195,7 +195,7 @@ theorem grepMain_die (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
   rw [show retPc (m4.get 1#5) = BitVec.ofNat 64 0x260 by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   -- 0x260  c.li a0,1 ; 0x262  jal exit
   gfetch 0x260 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
-  ihave Hj := grep_uis N.t 0x262 false (.JAL (698#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hj := grep_uis N.t 0x262 false (.JAL (698#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply grepMain_exitAt UL N h5 m5 _ 0x260 1 1#12 698#21 (by decide) (by decide) (by decide) $$ Hi Hj Hc Hx Hrun
 
 /-- **Rocq `wp_kgrep_main_stdin`**: THE STANDARD-INPUT ARM, 0x242 -> exit. -/
@@ -240,7 +240,7 @@ theorem grepMain_stdin (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : C
   rw [show retPc (m3.get 1#5) = BitVec.ofNat 64 0x24a by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   -- 0x24a  c.li a0,0 ; 0x24c  jal exit
   gfetch 0x24a true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
-  ihave Hj := grep_uis N.t 0x24c false (.JAL (720#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hj := grep_uis N.t 0x24c false (.JAL (720#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply grepMain_exitAt UL N h4 m4 _ 0x24a 0 0#12 720#21 (by decide) (by decide) (by decide) $$ Hi Hj Hc Hx Hrun
 
 end

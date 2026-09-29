@@ -1,7 +1,8 @@
 /-
 **The per-instruction leaves of the user-mode-on-kernel tier, as an
 interface** (Rocq `UkLeaf.v`, `UkLoad.v`, `UkStore.v`, `UkLoadText.v`,
-`UkBranch.v` and `UkStep.wp_uk_ecall`, pinned `1900b8a43`; union brief DU2).
+`UkBranch.v` and `UkStep.wp_uk_ecall`, pinned `1900b8a43`; the fetch and
+the LOAD/STORE geometry at `456141b5b`: no in-page clause; union brief DU2).
 
 Each leaf says: at the kernel's U-mode bundle `UexecRet.uvb` (the machine
 running user code at registers `m`, pc `pc` and image `M`), ONE instruction
@@ -133,12 +134,22 @@ def uMStore (M : ElfMem) (a k : Nat) (v : BitVec 64) : ElfMem :=
 
 /-- **Rocq `uk_instr`** (deviations 1, 6): the text at `pc` -- on a page of
 the key's projection that is executable and not writable -- holds `i`'s
-encoding (its expansion, if compressed), inside one page. -/
+encoding (its expansion, if compressed).
+
+There is NO in-page clause (Rocq `c5bce82eb`, `UmodeMem.uinstr`'s `ui_hi`
+in place of `ui_inpage`): every read of the fetch is naturally aligned (4
+bytes at a 4-aligned pc, 2 at a 2-aligned one), so no read leaves its page;
+a page crossing falls only between the two reads of the SPLIT fetch (a base
+instruction at a 2-mod-4 pc), whose second read, at `pc + 2`, is translated
+on its own.  `hi` names that read: `pc + 2` does not wrap and lies on a TEXT
+page of the key (Rocq's `uva_fetch_ok pt (pc+2)`, read on `π` as `text`
+is -- deviation 6). -/
 structure UkInstr (π : Nat → Option UPerm) (M : ElfMem) (pc : BitVec 64) (isRvc : Bool)
     (i : instruction) : Prop where
   al2 : pc.toNat % 2 = 0
-  inpage : pc.toNat % 4096 ≤ 4092
   text : upermAt π pc = some ⟨true, false⟩
+  hi : isRvc = false → pc.toNat % 4 ≠ 0 →
+    (pc + 2#64).toNat = pc.toNat + 2 ∧ upermAt π (pc + 2#64) = some ⟨true, false⟩
   code : if isRvc then
       ∃ h : BitVec 16, isRVC h = true ∧ uMBytes (n := 2) M pc.toNat 2 h ∧ udecode16 h i ∧
         (pc.toNat % 4 = 0 → (M (pc.toNat + 2)).isSome ∧ (M (pc.toNat + 3)).isSome)
@@ -266,10 +277,16 @@ def ukStoreDenied (π : Nat → Option UPerm) (va : BitVec 64) : Prop :=
 def ukTextOk (π : Nat → Option UPerm) (va : BitVec 64) : Prop :=
   ∃ q : UPerm, upermAt π va = some q ∧ q.X = true ∧ q.W = false
 
-/-- The access geometry every memory leaf takes: naturally aligned, inside
-one page, and the `k` bytes present in the image. -/
+/-- The access geometry every memory leaf takes: naturally aligned and the
+`k` bytes present in the image.  No in-page premise (Rocq `a9d9521fa`): an
+aligned access never crosses a page (`ukAccess_page`). -/
 def ukAccessOk (M : ElfMem) (va : BitVec 64) (k : Nat) : Prop :=
-  ukWidth k ∧ va.toNat % k = 0 ∧ va.toNat % 4096 + k ≤ 4096 ∧ ∀ j, j < k → (M (va.toNat + j)).isSome
+  ukWidth k ∧ va.toNat % k = 0 ∧ ∀ j, j < k → (M (va.toNat + j)).isSome
+
+/-- **Rocq `uinpage_of_aligned`**: AN ALIGNED ACCESS NEVER CROSSES A PAGE
+(the width divides the page). -/
+theorem ukAccess_page (a k : Nat) (hk : ukWidth k) (hal : a % k = 0) : a % 4096 + k ≤ 4096 := by
+  rcases hk with rfl | rfl | rfl | rfl <;> omega
 
 /-! ## §6 The section and the leaf shape -/
 
@@ -456,7 +473,6 @@ def wpUkStoreDeniedBody [CurCtx] : Prop :=
     UkInstr S.π M pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, (k : Int))) →
     ukStoreDenied S.π (m.get rs1 + BitVec.signExtend 64 imm) →
     ukWidth k → (m.get rs1 + BitVec.signExtend 64 imm).toNat % k = 0 →
-    (m.get rs1 + BitVec.signExtend 64 imm).toNat % 4096 + k ≤ 4096 →
     ⊢ ukUvb S K M m pc -∗ myPay K.gn S.Qp -∗ S.Qp (-1) -∗
       UexecSG.sbundleAt uslot USYS_exit fx (ukRunKey S K M m pc) -∗ wpLoop S.cpu
 

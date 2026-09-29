@@ -116,35 +116,38 @@ theorem ukLeaves_holds : UK_LEAVES where
   wp_uk_load := by
     intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rd u k hS hI hok hacc
     obtain ⟨q, hq, hqW⟩ := hok
-    obtain ⟨hW, hal, hpg, hpres⟩ := hacc
+    obtain ⟨hW, hal, hpres⟩ := hacc
+    have hpg := ukAccess_page _ k hW hal
     rw [← ukLen_pc]
     refine uk_leaf_retire S K M m pc isRvc _ M _ _ hS (ukInstr_al hI) (uk_fetchDec_of_instr hI)
       (fun C pt T V _ hpm hlf hsz hM _ => ⟨V, hM, ?_⟩)
     obtain ⟨lw, hk, hU, hR, -, hWb⟩ := uk_load_page hsz hlf hpm hq
-    exact ukRetire_load C pt T imm rs1 rd u k (ukLen isRvc) m pc V lw _ hW hal hpg hk hU hR
+    exact ukRetire_load C pt T imm rs1 rd u k (ukLen isRvc) m pc V lw _ hW hal hk hU hR
       (uk_text_of_W (hWb.trans hqW)) (uk_view_bytes hM hk hpg (uMWord_bytes M _ k hpres))
   wp_uk_load_text := by
     intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rd u k hS hI hok hacc
     obtain ⟨q, hq, hqX, hqW⟩ := hok
-    obtain ⟨hW, hal, hpg, hpres⟩ := hacc
+    obtain ⟨hW, hal, hpres⟩ := hacc
+    have hpg := ukAccess_page _ k hW hal
     rw [← ukLen_pc]
     refine uk_leaf_retire S K M m pc isRvc _ M _ _ hS (ukInstr_al hI) (uk_fetchDec_of_instr hI)
       (fun C pt T V _ hpm hlf hsz hM _ => ⟨V, hM, ?_⟩)
     obtain ⟨lw, hk, hU, hR, hXb, hWb⟩ := uk_load_page hsz hlf hpm hq
-    exact ukRetire_loadText C pt T imm rs1 rd u k (ukLen isRvc) m pc V lw _ hW hal hpg hk hU hR
+    exact ukRetire_loadText C pt T imm rs1 rd u k (ukLen isRvc) m pc V lw _ hW hal hk hU hR
       (uk_text_of_XnW (hXb.trans hqX) (hWb.trans hqW)) (uk_view_bytes hM hk hpg (uMWord_bytes M _ k hpres))
   wp_uk_store := by
     intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rs2 k hS hI hok hacc
     obtain ⟨q, hq, hqW⟩ := hok
-    obtain ⟨hW, hal, hpg, -⟩ := hacc
+    obtain ⟨hW, hal, -⟩ := hacc
+    have hpg := ukAccess_page _ k hW hal
     rw [← ukLen_pc]
     refine uk_leaf_retire S K M m pc isRvc _ _ _ _ hS (ukInstr_al hI) (uk_fetchDec_of_instr hI)
       (fun C pt T V _ hpm hlf hsz hM hlen => ?_)
     obtain ⟨lw, hk, hU, -, -, hWb⟩ := uk_load_page hsz hlf hpm hq
     exact ⟨_, uk_store_view hM hk (hlen _ (toList_get.2 hk)) hpg _,
-      ukRetire_store C pt T imm rs1 rs2 k (ukLen isRvc) m pc V lw hW hal hpg hk hU (hWb.trans hqW)⟩
+      ukRetire_store C pt T imm rs1 rs2 k (ukLen isRvc) m pc V lw hW hal hk hU (hWb.trans hqW)⟩
   wp_uk_store_denied := by
-    intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rs2 k fx hS hfx hI hden hW hal hpg
+    intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rs2 k fx hS hfx hI hden hW hal
     obtain ⟨q, hq, hqW⟩ := hden
     exact uk_leaf_storeDenied S K M m pc isRvc _ fx hS hfx (ukInstr_al hI) (uk_fetchDec_of_instr hI)
       (fun C pt T V _ hpm hlf hsz _ _ => by

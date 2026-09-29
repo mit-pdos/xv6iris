@@ -35,7 +35,7 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0xf6  c.addi sp,sp,-16
   ihave Hi := cat_uis N.t 0xf6 true (.ITYPE (0xff0#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_addi_sp_dn UL N h m (BitVec.ofNat 64 0xf6) true 0xff0#12 2 (6 + (8 + (10 + (12 + (4 + n)))))
     (by decide) $$ Hi Hrun
   inext
@@ -48,7 +48,7 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
     rw [this]; exact uv_avi_neg _ 16 (by omega)
   -- 0xf8  c.sdsp ra,8(sp)
   ihave Hi := cat_uis N.t 0xf8 true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N h1 m1 (BitVec.ofNat 64 0xf8) true 8#12 2#5 1#5 _ v8 _
     (by rw [hs16, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega) (by omega) $$ Hi Hw8 Hrun
   inext
@@ -56,7 +56,7 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
   rw [ukPc 0xf8 0xfa true rfl]
   -- 0xfa  c.sdsp s0,0(sp)
   ihave Hi := cat_uis N.t 0xfa true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N h2 m1 (BitVec.ofNat 64 0xfa) true 0#12 2#5 8#5 _ v0 _
     (by rw [hs16, show (0#12 : BitVec 12).toInt = 0 from by decide]; omega) (by omega) $$ Hi Hw0 Hrun
   inext
@@ -64,7 +64,7 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
   rw [ukPc 0xfa 0xfc true rfl]
   -- 0xfc  c.addi4spn s0,sp,16
   ihave Hi := cat_uis N.t 0xfc true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h3 m1 (BitVec.ofNat 64 0xfc) true 16#12 2#5 8#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -72,7 +72,7 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
   rw [ukPc 0xfc 0xfe true rfl]
   -- 0xfe  jal main
   ihave Hi := cat_uis N.t 0xfe false (.JAL (0x1fff80#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_jal UL N h4 _ (BitVec.ofNat 64 0xfe) false 0x1fff80#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext

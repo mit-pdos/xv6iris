@@ -31,7 +31,7 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem ushm_stub_sbrk (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Sh.code.byte) 12 User.Sh.Sym.«sys_sbrk» :=
   stub_of_text UL N User.Sh.textOk 12 _ 12#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 /-- **Rocq `wp_kshm_sys_sbrk`**. -/
 theorem wp_shSysSbrk (UL : UK_LEAVES) (SB : USHM_SBRK_LEAF)

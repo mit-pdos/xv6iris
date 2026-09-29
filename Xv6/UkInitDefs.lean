@@ -69,10 +69,10 @@ abbrev initCode (γt : GName) : IProp GF := ukCode γt User.Init.code.byte
 /-- **init's catalog, once** (Rocq `UCodeInit.uis_init_<pc>`). -/
 theorem init_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
     (h : ∃ i₀ n w, User.utextDecodeWith udrefU User.Init.tree User.Init.code.byte pc = some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     initCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   obtain ⟨i₀, n, w, e⟩ := h
-  exact uinstrIs_of_text γt User.Init.textOk pc rvc i i₀ n w e hpc hpg
+  exact uinstrIs_of_text γt User.Init.textOk pc rvc i i₀ n w e hpc
 
 /-- The sixteen `.data` bytes (deviation 3). -/
 def initArgvByte (j : Nat) : BitVec 8 := User.rowByte User.Init.data.rows j

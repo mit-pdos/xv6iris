@@ -193,19 +193,18 @@ theorem stub_of_text (UL : UK_LEAVES) (N : UkNames GF) {t : User.UTextTree} {mt 
     (h2 : ∃ i₀ n w, User.utextDecodeWith udrefU t mt (addr + 2) = some (false, .ECALL (), i₀, n, w))
     (h6 : ∃ i₀ n w, User.utextDecodeWith udrefU t mt (addr + 6) =
       some (true, .JALR (0#12, .Regidx 1#5, .Regidx 0#5), i₀, n, w))
-    (hal : addr % 2 = 0) (hlt : addr + 6 < 2 ^ 64) (hpg0 : addr % 4096 ≤ 4092) (hpg2 : (addr + 2) % 4096 ≤ 4092)
-    (hpg6 : (addr + 6) % 4096 ≤ 4092) :
+    (hal : addr % 2 = 0) (hlt : addr + 6 < 2 ^ 64) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t mt) num addr := by
   obtain ⟨a0, n0, w0, e0⟩ := h0
   obtain ⟨a2, n2, w2, e2⟩ := h2
   obtain ⟨a6, n6, w6, e6⟩ := h6
   iapply stub_run UL N (ukCode N.t mt) num addr imm himm hal
   · imodintro; iintro #Hc
-    iapply uinstrIs_of_text N.t hok addr _ _ _ _ _ e0 (by omega) hpg0 $$ Hc
+    iapply uinstrIs_of_text N.t hok addr _ _ _ _ _ e0 (by omega) $$ Hc
   · imodintro; iintro #Hc
-    iapply uinstrIs_of_text N.t hok (addr + 2) _ _ _ _ _ e2 (by omega) hpg2 $$ Hc
+    iapply uinstrIs_of_text N.t hok (addr + 2) _ _ _ _ _ e2 (by omega) $$ Hc
   · imodintro; iintro #Hc
-    iapply uinstrIs_of_text N.t hok (addr + 6) _ _ _ _ _ e6 (by omega) hpg6 $$ Hc
+    iapply uinstrIs_of_text N.t hok (addr + 6) _ _ _ _ _ e6 (by omega) $$ Hc
 
 /-- An exit stub's facts at a program's text, evaluated. -/
 theorem exit_stub_of_text (UL : UK_LEAVES) (N : UkNames GF) {t : User.UTextTree} {mt : ElfMem}
@@ -214,120 +213,120 @@ theorem exit_stub_of_text (UL : UK_LEAVES) (N : UkNames GF) {t : User.UTextTree}
     (h0 : ∃ i₀ n w, User.utextDecodeWith udrefU t mt addr =
       some (true, .ITYPE (imm, .Regidx 0#5, .Regidx 17#5, .ADDI), i₀, n, w))
     (h2 : ∃ i₀ n w, User.utextDecodeWith udrefU t mt (addr + 2) = some (false, .ECALL (), i₀, n, w))
-    (hlt : addr + 2 < 2 ^ 64) (hpg0 : addr % 4096 ≤ 4092) (hpg2 : (addr + 2) % 4096 ≤ 4092) :
+    (hlt : addr + 2 < 2 ^ 64) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t mt) addr := by
   obtain ⟨a0, n0, w0, e0⟩ := h0
   obtain ⟨a2, n2, w2, e2⟩ := h2
   iapply exit_stub_run UL N (ukCode N.t mt) addr imm himm
   · imodintro; iintro #Hc
-    iapply uinstrIs_of_text N.t hok addr _ _ _ _ _ e0 (by omega) hpg0 $$ Hc
+    iapply uinstrIs_of_text N.t hok addr _ _ _ _ _ e0 (by omega) $$ Hc
   · imodintro; iintro #Hc
-    iapply uinstrIs_of_text N.t hok (addr + 2) _ _ _ _ _ e2 (by omega) hpg2 $$ Hc
+    iapply uinstrIs_of_text N.t hok (addr + 2) _ _ _ _ _ e2 (by omega) $$ Hc
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_write`**. -/
 theorem echo_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 16 User.Echo.Sym.«write» :=
   stub_of_text UL N User.Echo.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_read`**. -/
 theorem echo_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 5 User.Echo.Sym.«read» :=
   stub_of_text UL N User.Echo.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_close`**. -/
 theorem echo_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 21 User.Echo.Sym.«close» :=
   stub_of_text UL N User.Echo.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_open`**. -/
 theorem echo_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) 15 User.Echo.Sym.«open» :=
   stub_of_text UL N User.Echo.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `echo_stub_exit`**. -/
 theorem echo_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Echo.code.byte) User.Echo.Sym.«exit» :=
   exit_stub_of_text UL N User.Echo.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide)
+    (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_write`**. -/
 theorem cat_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 16 User.Cat.Sym.«write» :=
   stub_of_text UL N User.Cat.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_read`**. -/
 theorem cat_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 5 User.Cat.Sym.«read» :=
   stub_of_text UL N User.Cat.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_close`**. -/
 theorem cat_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 21 User.Cat.Sym.«close» :=
   stub_of_text UL N User.Cat.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_open`**. -/
 theorem cat_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) 15 User.Cat.Sym.«open» :=
   stub_of_text UL N User.Cat.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `cat_stub_exit`**. -/
 theorem cat_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Cat.code.byte) User.Cat.Sym.«exit» :=
   exit_stub_of_text UL N User.Cat.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide)
+    (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_write`**. -/
 theorem grep_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 16 User.Grep.Sym.«write» :=
   stub_of_text UL N User.Grep.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_read`**. -/
 theorem grep_stub_read (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 5 User.Grep.Sym.«read» :=
   stub_of_text UL N User.Grep.textOk 5 _ 5#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_close`**. -/
 theorem grep_stub_close (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 21 User.Grep.Sym.«close» :=
   stub_of_text UL N User.Grep.textOk 21 _ 21#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_open`**. -/
 theorem grep_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) 15 User.Grep.Sym.«open» :=
   stub_of_text UL N User.Grep.textOk 15 _ 15#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **Rocq `grep_stub_exit`**. -/
 theorem grep_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Grep.code.byte) User.Grep.Sym.«exit» :=
   exit_stub_of_text UL N User.Grep.textOk _ 2#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide)
+    (by decide)
 
 end UkStub
 

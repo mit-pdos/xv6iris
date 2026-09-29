@@ -108,7 +108,6 @@ theorem ukRetire_loadText (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs
     (k : Nat) (len : Int) (m : RegMap) (pc : BitVec 64) (V : Nat → List (BitVec 8)) (lw : BitVec 64)
     (w : BitVec (8 * k)) (hW : ukWidth k)
     (hal : (m.get rs1 + BitVec.signExtend 64 imm).toNat % k = 0)
-    (hpg : (m.get rs1 + BitVec.signExtend 64 imm).toNat % 4096 + k ≤ 4096)
     (hk : get? P.um ((m.get rs1 + BitVec.signExtend 64 imm).toNat / 4096) = some lw)
     (hU : pteBit lw 4 = true) (hR : pteBit lw 1 = true) (ht : ukTextLeaf lw = true)
     (hw : ∀ j, j < k → (V ((m.get rs1 + BitVec.signExtend 64 imm).toNat / 4096))[
@@ -116,6 +115,7 @@ theorem ukRetire_loadText (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs
     UkExecRetire C P T (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) len m
       (ukWr m rd (extend_value u w)) pc (BitVec.addInt pc len) V V := by
   intro s hl hr hpc hv orc
+  have hpg := ukAccess_page _ k hW hal
   obtain ⟨hl0, hr0, -, hnpc0, hv0⟩ := uke_npc_land hl hr hpc hv len
   obtain ⟨s1, htr, hl1, hf1, hv1⟩ :=
     ukm_xlate_load (ucNpcS s len) hl0 (m.get rs1 + BitVec.signExtend 64 imm) lw hk hU hR

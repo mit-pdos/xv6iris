@@ -359,11 +359,11 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
     -- 0x52 .. 0x58  THE FRAME
     gfetch 0x52 true (.ITYPE (4080#12, .Regidx spIdx, .Regidx spIdx, .ADDI))
     ihave I1 := grep_uis N.t 0x54 true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     ihave I2 := grep_uis N.t 0x56 true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     ihave I3 := grep_uis N.t 0x58 true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply kgrep_pro2 UL N h2 m1 0x52 n1 $$ Hi I1 I2 I3 Hrun
     iintro %h3 %m2 %hal8 %hlo %hsp2 %hk2 Hwra Hws0 Hrun
     icases grepUstr_cons_split N.d dqr ar lr1 fr $$ Hre with ⟨Hr0, Hre1⟩
@@ -382,11 +382,11 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
       iintro #Hc Hwra Hws0 Hrun Hk
       gfetch 0x82 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))
       ihave I1 := grep_uis N.t 0x84 true (.LOAD (0#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       ihave I2 := grep_uis N.t 0x86 true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       ihave I3 := grep_uis N.t 0x88 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
-        (by decide) (by decide) $$ Hc
+        (by decide) $$ Hc
       iapply kgrep_epi2 UL N h' mc (m1.get spIdx) (m1.get 1#5) (m1.get 8#5) 0x82 n1 hspc hal8 hlo
         $$ Hi I1 I2 I3 Hwra Hws0 Hrun
       iintro %h6 %m6 %h62 %h68 %hk6 Hrun

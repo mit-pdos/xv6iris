@@ -82,7 +82,7 @@ theorem grepMain_loop (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
     simp only [List.map_nil, grepFiles]
     -- 0x228  c.li a0,0 ; 0x22a  jal exit
     gfetch 0x228 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
-    ihave Hj := grep_uis N.t 0x22a false (.JAL (754#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+    ihave Hj := grep_uis N.t 0x22a false (.JAL (754#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
     iapply grepMain_exitAt UL N h2 m1 _ 0x228 0 0#12 754#21 (by decide) (by decide) (by decide) $$ Hi Hj Hc Ht Hrun
   | succ k ih =>
     intro i h m f na hlen hwn h28 hinv

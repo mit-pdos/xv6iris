@@ -89,7 +89,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   iintro #Hc ⟨W1, W2, W3, W4, W5, W6, W7, W8⟩ Hrun Hcont
   -- 0x58  c.ldsp ra,56(sp)
   ihave Hi := cat_uis N.t 0x58 true (.LOAD (56#12, .Regidx 2#5, .Regidx 1#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h m (BitVec.ofNat 64 0x58) true 56#12 2#5 1#5 (DFrac.own 1) (sp0.toNat - 8) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [hs64, show (56#12 : BitVec 12).toInt = 56 from by decide]; omega) (by omega) $$ Hi W1 Hrun
@@ -100,7 +100,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e1 : m1.get 2#5 = m.get 2#5 := by ureg
   -- 0x5a  c.ldsp s0,48(sp)
   ihave Hi := cat_uis N.t 0x5a true (.LOAD (48#12, .Regidx 2#5, .Regidx 8#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h1 m1 (BitVec.ofNat 64 0x5a) true 48#12 2#5 8#5 (DFrac.own 1) (sp0.toNat - 16) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e1, hs64, show (48#12 : BitVec 12).toInt = 48 from by decide]; omega) (by omega) $$ Hi W2 Hrun
@@ -111,7 +111,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e2 : m2.get 2#5 = m.get 2#5 := by ureg
   -- 0x5c  c.ldsp s1,40(sp)
   ihave Hi := cat_uis N.t 0x5c true (.LOAD (40#12, .Regidx 2#5, .Regidx 9#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h2 m2 (BitVec.ofNat 64 0x5c) true 40#12 2#5 9#5 (DFrac.own 1) (sp0.toNat - 24) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e2, hs64, show (40#12 : BitVec 12).toInt = 40 from by decide]; omega) (by omega) $$ Hi W3 Hrun
@@ -122,7 +122,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e3 : m3.get 2#5 = m.get 2#5 := by ureg
   -- 0x5e  c.ldsp s2,32(sp)
   ihave Hi := cat_uis N.t 0x5e true (.LOAD (32#12, .Regidx 2#5, .Regidx 18#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h3 m3 (BitVec.ofNat 64 0x5e) true 32#12 2#5 18#5 (DFrac.own 1) (sp0.toNat - 32) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e3, hs64, show (32#12 : BitVec 12).toInt = 32 from by decide]; omega) (by omega) $$ Hi W4 Hrun
@@ -133,7 +133,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e4 : m4.get 2#5 = m.get 2#5 := by ureg
   -- 0x60  c.ldsp s3,24(sp)
   ihave Hi := cat_uis N.t 0x60 true (.LOAD (24#12, .Regidx 2#5, .Regidx 19#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h4 m4 (BitVec.ofNat 64 0x60) true 24#12 2#5 19#5 (DFrac.own 1) (sp0.toNat - 40) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e4, hs64, show (24#12 : BitVec 12).toInt = 24 from by decide]; omega) (by omega) $$ Hi W5 Hrun
@@ -144,7 +144,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e5 : m5.get 2#5 = m.get 2#5 := by ureg
   -- 0x62  c.ldsp s4,16(sp)
   ihave Hi := cat_uis N.t 0x62 true (.LOAD (16#12, .Regidx 2#5, .Regidx 20#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h5 m5 (BitVec.ofNat 64 0x62) true 16#12 2#5 20#5 (DFrac.own 1) (sp0.toNat - 48) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e5, hs64, show (16#12 : BitVec 12).toInt = 16 from by decide]; omega) (by omega) $$ Hi W6 Hrun
@@ -155,7 +155,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   have e6 : m6.get 2#5 = m.get 2#5 := by ureg
   -- 0x64  c.ldsp s5,8(sp)
   ihave Hi := cat_uis N.t 0x64 true (.LOAD (8#12, .Regidx 2#5, .Regidx 21#5, false, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ld UL N h6 m6 (BitVec.ofNat 64 0x64) true 8#12 2#5 21#5 (DFrac.own 1) (sp0.toNat - 56) _ _
     (by unfold unotSp spIdx; decide)
     (by rw [e6, hs64, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega) (by omega) $$ Hi W7 Hrun
@@ -170,7 +170,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 64 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 64 hlo]
     omega
   ihave Hi := cat_uis N.t 0x66 true (.ITYPE (64#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   ihave Hfr : ustack N.d (m7.get spIdx + BitVec.ofNat 64 (8 * 8)) 8 $$ [W1 W2 W3 W4 W5 W6 W7 W8]
   · rw [hsp7]
     iapply (kcatStack8 N.d sp0).2
@@ -198,7 +198,7 @@ theorem catCat_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (
   rw [ukPc 0x66 0x68 true rfl, hsp7]
   -- 0x68  ret
   ihave Hi := cat_uis N.t 0x68 true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_ret UL N h8 _ (BitVec.ofNat 64 0x68) true 1#5 _ $$ Hi Hrun
   inext
   iintro %h9 Hrun
@@ -243,7 +243,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
   obtain ⟨-, -, hs2, hs3, hs4, hs5, -⟩ := hinv'
   -- 0x22  c.mv a2,s4 -- the count
   ihave Hi := cat_uis N.t 0x22 true (.RTYPE (.Regidx 20#5, .Regidx 0#5, .Regidx 12#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h m (BitVec.ofNat 64 0x22) true 20#5 0#5 12#5 .ADD _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -251,7 +251,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
   rw [ukPc 0x22 0x24 true rfl, ukMv, hs4]
   -- 0x24  c.mv a1,s2 -- the buffer
   ihave Hi := cat_uis N.t 0x24 true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 11#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h1 _ (BitVec.ofNat 64 0x24) true 18#5 0#5 11#5 .ADD _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -260,7 +260,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     BitVec.ofNat 64 User.Cat.Sym.«buf» from by ureg; exact hs2]
   -- 0x26  c.mv a0,s3 -- the fd
   ihave Hi := cat_uis N.t 0x26 true (.RTYPE (.Regidx 19#5, .Regidx 0#5, .Regidx 10#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h2 _ (BitVec.ofNat 64 0x26) true 19#5 0#5 10#5 .ADD _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -269,7 +269,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     (BitVec.ofNat 64 User.Cat.Sym.«buf»)).get 19#5 = fdv from by ureg; exact hs3]
   -- 0x28  jal read
   ihave Hi := cat_uis N.t 0x28 false (.JAL (0x39c#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_jal UL N h3 _ (BitVec.ofNat 64 0x28) false 0x39c#21 1#5 _ (by unfold unotSp spIdx; decide)
     (by decide) $$ Hi Hrun
   inext
@@ -294,7 +294,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
   have h5a0 : m5.get 10#5 = ret := by simp only [m5, stubRet]; ureg
   -- 0x2c  c.mv s1,a0 -- n
   ihave Hi := cat_uis N.t 0x2c true (.RTYPE (.Regidx 10#5, .Regidx 0#5, .Regidx 9#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h5 m5 (BitVec.ofNat 64 0x2c) true 10#5 0#5 9#5 .ADD _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -307,7 +307,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
   have h6s1 : m6.get 9#5 = ret := ukWr_get_same _ _ _ (by decide)
   -- 0x2e  blez a0,0x54 -- n <= 0 leaves the loop
   ihave Hi := cat_uis N.t 0x2e false (.BTYPE (0x26#13, .Regidx 10#5, .Regidx 0#5, .BGE)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_btype0l UL N h6 m6 (BitVec.ofNat 64 0x2e) false 0x26#13 10#5 .BGE _ (fun _ => by decide)
     $$ Hi Hrun
   inext
@@ -318,7 +318,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
       show BitVec.ofNat 64 0x2e + BitVec.signExtend 64 0x26#13 = BitVec.ofNat 64 0x54 from by decide]
     -- 0x54  bltz a0,0x6a
     ihave Hi := cat_uis N.t 0x54 false (.BTYPE (0x16#13, .Regidx 0#5, .Regidx 10#5, .BLT)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_btype0 UL N h7 m6 (BitVec.ofNat 64 0x54) false 0x16#13 10#5 .BLT _ (fun _ => by decide)
       $$ Hi Hrun
     inext
@@ -348,7 +348,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     have hret : BitVec.ofNat 64 ret.toInt.toNat = ret := kcat_ofNat_of_toInt ret _ hnb
     -- 0x32  c.mv a2,s1
     ihave Hi := cat_uis N.t 0x32 true (.RTYPE (.Regidx 9#5, .Regidx 0#5, .Regidx 12#5, .ADD)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_rtype UL N h7 m6 (BitVec.ofNat 64 0x32) true 9#5 0#5 12#5 .ADD _
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
     inext
@@ -358,7 +358,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     have hinv6' := hinv6
     obtain ⟨-, -, hs2', -, -, hs5', -⟩ := hinv6'
     ihave Hi := cat_uis N.t 0x34 true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 11#5, .ADD)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_rtype UL N h8 _ (BitVec.ofNat 64 0x34) true 18#5 0#5 11#5 .ADD _
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
     inext
@@ -367,7 +367,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
       from by ureg; exact hs2']
     -- 0x36  c.mv a0,s5
     ihave Hi := cat_uis N.t 0x36 true (.RTYPE (.Regidx 21#5, .Regidx 0#5, .Regidx 10#5, .ADD)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_rtype UL N h9 _ (BitVec.ofNat 64 0x36) true 21#5 0#5 10#5 .ADD _
       (by unfold unotSp spIdx; decide) $$ Hi Hrun
     inext
@@ -376,7 +376,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
       (BitVec.ofNat 64 User.Cat.Sym.«buf»)).get 21#5 = BitVec.ofNat 64 1 from by ureg; exact hs5']
     -- 0x38  jal write
     ihave Hi := cat_uis N.t 0x38 false (.JAL (0x394#21, .Regidx 1#5)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_jal UL N h10 _ (BitVec.ofNat 64 0x38) false 0x394#21 1#5 _ (by unfold unotSp spIdx; decide)
       (by decide) $$ Hi Hrun
     inext
@@ -405,7 +405,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     have h11s1 : m11.get 9#5 = ret := by simp only [m11, stubRet, m10]; ureg
     -- 0x3c  beq a0,s1,0x22 -- THE BACK EDGE
     ihave Hi := cat_uis N.t 0x3c false (.BTYPE (0x1fe6#13, .Regidx 9#5, .Regidx 10#5, .BEQ)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     iapply wp_uk_btype UL N h12 m11 (BitVec.ofNat 64 0x3c) false 0x1fe6#13 9#5 10#5 .BEQ _ (fun _ => by decide)
       $$ Hi Hrun
     inext
@@ -442,7 +442,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x0  c.addi16sp sp,sp,-64 : THE PUSH
   ihave Hi := cat_uis N.t 0x0 true (.ITYPE (0xfc0#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_addi_sp_dn UL N h m (BitVec.ofNat 64 0x0) true 0xfc0#12 8 (10 + (12 + (4 + n))) (by decide)
     $$ Hi Hrun
   inext
@@ -456,7 +456,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
     rw [this]; exact uv_avi_neg _ 64 (by omega)
   -- 0x2  c.sdsp ra,56(sp)
   ihave Hi := cat_uis N.t 0x2 true (.STORE (56#12, .Regidx 1#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0x2) true 56#12 2#5 1#5 _ _ _
     (by rw [hsp1, show (56#12 : BitVec 12).toInt = 56 from by decide]; omega) (by omega) $$ Hi W0 Hrun
   inext
@@ -464,7 +464,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x2 0x4 true rfl]
   -- 0x4  c.sdsp s0,48(sp)
   ihave Hi := cat_uis N.t 0x4 true (.STORE (48#12, .Regidx 8#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0x4) true 48#12 2#5 8#5 _ _ _
     (by rw [hsp1, show (48#12 : BitVec 12).toInt = 48 from by decide]; omega) (by omega) $$ Hi W1 Hrun
   inext
@@ -472,7 +472,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x4 0x6 true rfl]
   -- 0x6  c.sdsp s1,40(sp)
   ihave Hi := cat_uis N.t 0x6 true (.STORE (40#12, .Regidx 9#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0x6) true 40#12 2#5 9#5 _ _ _
     (by rw [hsp1, show (40#12 : BitVec 12).toInt = 40 from by decide]; omega) (by omega) $$ Hi W2 Hrun
   inext
@@ -480,7 +480,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x6 0x8 true rfl]
   -- 0x8  c.sdsp s2,32(sp)
   ihave Hi := cat_uis N.t 0x8 true (.STORE (32#12, .Regidx 18#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0x8) true 32#12 2#5 18#5 _ _ _
     (by rw [hsp1, show (32#12 : BitVec 12).toInt = 32 from by decide]; omega) (by omega) $$ Hi W3 Hrun
   inext
@@ -488,7 +488,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x8 0xa true rfl]
   -- 0xa  c.sdsp s3,24(sp)
   ihave Hi := cat_uis N.t 0xa true (.STORE (24#12, .Regidx 19#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0xa) true 24#12 2#5 19#5 _ _ _
     (by rw [hsp1, show (24#12 : BitVec 12).toInt = 24 from by decide]; omega) (by omega) $$ Hi W4 Hrun
   inext
@@ -496,7 +496,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0xa 0xc true rfl]
   -- 0xc  c.sdsp s4,16(sp)
   ihave Hi := cat_uis N.t 0xc true (.STORE (16#12, .Regidx 20#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0xc) true 16#12 2#5 20#5 _ _ _
     (by rw [hsp1, show (16#12 : BitVec 12).toInt = 16 from by decide]; omega) (by omega) $$ Hi W5 Hrun
   inext
@@ -504,7 +504,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0xc 0xe true rfl]
   -- 0xe  c.sdsp s5,8(sp)
   ihave Hi := cat_uis N.t 0xe true (.STORE (8#12, .Regidx 21#5, .Regidx 2#5, 8)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_sd UL N _ m1 (BitVec.ofNat 64 0xe) true 8#12 2#5 21#5 _ _ _
     (by rw [hsp1, show (8#12 : BitVec 12).toInt = 8 from by decide]; omega) (by omega) $$ Hi W6 Hrun
   inext
@@ -512,7 +512,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0xe 0x10 true rfl]
   -- 0x10  c.addi4spn s0,sp,64
   ihave Hi := cat_uis N.t 0x10 true (.ITYPE (64#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h2 m1 (BitVec.ofNat 64 0x10) true 64#12 2#5 8#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -525,7 +525,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x10 0x12 true rfl, hs0v]
   -- 0x12  c.mv s3,a0
   ihave Hi := cat_uis N.t 0x12 true (.RTYPE (.Regidx 10#5, .Regidx 0#5, .Regidx 19#5, .ADD)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_rtype UL N h3 _ (BitVec.ofNat 64 0x12) true 10#5 0#5 19#5 .ADD _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -533,7 +533,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x12 0x14 true rfl, ukMv, show (ukWr m1 8#5 (m.get spIdx)).get 10#5 = fdv from by ureg; exact ha0]
   -- 0x14  li s4,512
   ihave Hi := cat_uis N.t 0x14 false (.ITYPE (0x200#12, .Regidx 0#5, .Regidx 20#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h4 _ (BitVec.ofNat 64 0x14) false 0x200#12 0#5 20#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -541,7 +541,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
   rw [ukPc 0x14 0x18 false rfl, ukLi _ _ 512 (by decide)]
   -- 0x18  auipc s2,0x1
   ihave Hi := cat_uis N.t 0x18 false (.UTYPE (1#20, .Regidx 18#5, .AUIPC)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_utype UL N h5 _ (BitVec.ofNat 64 0x18) false 1#20 18#5 .AUIPC _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -550,7 +550,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
     from by decide]
   -- 0x1c  addi s2,s2,-8
   ihave Hi := cat_uis N.t 0x1c false (.ITYPE (0xff8#12, .Regidx 18#5, .Regidx 18#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h6 _ (BitVec.ofNat 64 0x1c) false 0xff8#12 18#5 18#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext
@@ -560,7 +560,7 @@ theorem wp_catCat (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (fdv : Bi
     show ukItypeVal .ADDI (BitVec.ofNat 64 0x1018) 0xff8#12 = BitVec.ofNat 64 User.Cat.Sym.«buf» from by decide]
   -- 0x20  li s5,1
   ihave Hi := cat_uis N.t 0x20 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 21#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply wp_uk_itype UL N h7 _ (BitVec.ofNat 64 0x20) true 1#12 0#5 21#5 .ADDI _
     (by unfold unotSp spIdx; decide) $$ Hi Hrun
   inext

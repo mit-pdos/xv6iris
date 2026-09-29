@@ -30,8 +30,8 @@ header, point for point:
    `va.toNat`; an address word is `BitVec.ofNat 64 a` (Rocq `mword_of_int a`).
 2. `uva_canon` is replaced by the bound the clauses already carry (`a + n ≤
    2^38`, `SpecUkLeaves` deviation 6), and the readers hand back the leaves'
-   own `ukAccessOk` bundle (alignment, in-page, bytes present) in place of
-   Rocq's four separate conjuncts.
+   own `ukAccessOk` bundle (width, alignment, bytes present) in place of
+   Rocq's separate conjuncts.
 3. The stack budget's bottom and the callee's sp are spelled
    `BitVec.ofNat 64 (sp0.toNat - n)` (Rocq `add_vec_int sp0 (-n)`).
 4. Rocq's `zbound_dec`/`nbound_dec` are Lean's `Nat.decidableBallLT`; the
@@ -333,8 +333,8 @@ theorem ukArgs_slot {π : Nat → Option UPerm} {M : ElfMem} {av argc lo : Nat} 
   have hhi := h.rd.hi
   have hal := h.al
   have h8 : (av + 8 * i) % 8 = 0 := by omega
-  obtain ⟨hu, hpg, hali⟩ := uv_slot8_facts (av + 8 * i) va h8 (by omega) hva
-  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, by omega, fun j hj => ?_⟩, by rw [hu]; rfl⟩
+  obtain ⟨hu, -, hali⟩ := uv_slot8_facts (av + 8 * i) va h8 (by omega) hva
+  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, fun j hj => ?_⟩, by rw [hu]; rfl⟩
   · have hp := h.rd.page (8 * i) (by omega)
     subst hva; exact hp
   · rw [hu]
@@ -381,9 +381,9 @@ theorem ukArgvNull_slot {π : Nat → Option UPerm} {M : ElfMem} {av argc : Nat}
     va.toNat = av + 8 * argc ∧ ukLoadOk π va ∧ ukAccessOk M va 8 ∧ (0#64 : BitVec 64) = uMWord M va.toNat 8 := by
   have hhi := h.rd.hi
   have h8 : (av + 8 * argc) % 8 = 0 := by omega
-  obtain ⟨hu, hpg, hali⟩ := uv_slot8_facts (av + 8 * argc) va h8 (by omega) hva
+  obtain ⟨hu, -, hali⟩ := uv_slot8_facts (av + 8 * argc) va h8 (by omega) hva
   have hbytes : ∀ j, j < 8 → (M (av + 8 * argc + j)).isSome := fun j hj => h.rd.bytes j hj
-  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, by omega, fun j hj => by rw [hu]; exact hbytes j hj⟩, ?_⟩
+  refine ⟨hu, ?_, ⟨Or.inr (Or.inr (Or.inr rfl)), hali, fun j hj => by rw [hu]; exact hbytes j hj⟩, ?_⟩
   · have hp := h.rd.page 0 (by omega)
     simp only [Nat.add_zero] at hp; subst hva; exact hp
   · rw [hu]
@@ -461,8 +461,7 @@ theorem ukStack_slot {π : Nat → Option UPerm} {M : ElfMem} {sp0 : BitVec 64} 
   have hsp := sp0.isLt
   have hu : (BitVec.ofNat 64 (sp0.toNat - n + d)).toNat = sp0.toNat - n + d := by
     rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
-  refine ⟨hu, ?_, Or.inr (Or.inr (Or.inr rfl)), by rw [hu]; omega, by rw [hu]; omega,
-    fun j hj => ?_⟩
+  refine ⟨hu, ?_, Or.inr (Or.inr (Or.inr rfl)), by rw [hu]; omega, fun j hj => ?_⟩
   · have hl := h.leaf (by omega)
     unfold ukWpage ukStoreOk at hl ⊢
     rw [upermAt_samePage (b := sp0.toNat - n) (by omega) (by omega) (by omega)]

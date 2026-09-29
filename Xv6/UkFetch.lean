@@ -13,7 +13,7 @@ clear) and whose page view holds the instruction, `fetch ()` returns it:
   (`UFetch`'s, re-driven by `ukf_run`);
 * `ukFetch_base`, `ukFetch_rvc`: the engine contract `UkFetchFact` (the
   translations are C1's `ukm_xlate_fetch`; a 2-mod-4 base instruction's two
-  halves lie in the same page: `pc % 4096 ≤ 4092`).
+  halves are translated separately, the second possibly on the next page).
 -/
 import Xv6.UkLoadText
 

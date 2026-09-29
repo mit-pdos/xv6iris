@@ -4,8 +4,8 @@
 
 These are the leaves the whole `UserHeap` layer exists for.  An engine load
 or store leaf asks its caller for the machine facts -- the page is writable
-(or a text page), the access is aligned, inside one page, and the bytes are
-present in the image -- and the caller could only produce them by reasoning
+(or a text page), the access is aligned (so inside one page), and the bytes
+are present in the image -- and the caller could only produce them by reasoning
 about the permission map.  Here they come out of OWNERSHIP: hold the bytes
 (`ubytesq`/`uword`/`ubyte`, or the text half's `utext`) and they follow,
 because they are what `uheap` maintains (`ukAccess_of_data`,
@@ -31,7 +31,8 @@ THE ADDRESS IS A NUMBER: `(m.get rs1).toNat + imm.toInt = a` (Rocq `a = uint
 2. Rocq's compressed-offset readers `uoff_sdsp`/`uoff_c8`/`uoff_c4` are not
    needed: a compressed load/store is its expansion, whose 12-bit immediate
    is read with `BitVec.toInt` (`uoff_i12` is `imm.toInt`); `uwidth` is
-   SpecUkLeaves' `ukWidth`; `uaccess_arith` is `ukAccess_page`.
+   SpecUkLeaves' `ukWidth`; `uaccess_arith` is SpecUkLeaves' `ukAccess_page`
+   (Rocq `uinpage_of_aligned`), which the leaves now apply themselves.
 3. **Continuations under `▷`** (UkRunLeaf deviation 2).
 4. (Retired, U1-R: `wp_uk_sb_denied`'s exit deposit is minted off the run's
    own `udep` and rows, `UkRun.udep_exit_run`, as in Rocq.)  Rocq states it
@@ -67,9 +68,6 @@ theorem ukAddr_eq (x : BitVec 64) (imm : BitVec 12) (a : Nat) (ha : (x.toNat : I
   rw [ukSext12_ofInt, umoi_add_l, ha, ← umoi_natCast]
 
 /-- **Rocq `uaccess_arith`**: an aligned access does not cross a page. -/
-theorem ukAccess_page (a k : Nat) (hk : ukWidth k) (hal : a % k = 0) : a % 4096 + k ≤ 4096 := by
-  rcases hk with rfl | rfl | rfl | rfl <;> omega
-
 theorem ukWidth_pos {k : Nat} (hk : ukWidth k) : 0 < k := by
   rcases hk with rfl | rfl | rfl | rfl <;> decide
 
@@ -105,9 +103,8 @@ theorem ukAccess_of_data (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
   simp only [Nat.add_zero] at h0
   have hlt : a < 2 ^ 64 := Nat.lt_trans h0.2.2 uCap_lt64
   have hn : (BitVec.ofNat 64 a).toNat = a := by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hlt]
-  refine ⟨uwAddr_storeOk hlt h0.2.1, ⟨hk, ?_, ?_, fun j hj => ?_⟩, h0.2.2, fun j hj => (hall j hj).1⟩
+  refine ⟨uwAddr_storeOk hlt h0.2.1, ⟨hk, ?_, fun j hj => ?_⟩, h0.2.2, fun j hj => (hall j hj).1⟩
   · rw [hn]; exact hal
-  · rw [hn]; exact ukAccess_page a k hk hal
   · rw [hn, (hall j hj).1]; rfl
 
 /-- The pure facts a TEXT window gives the text-load leaf. -/
@@ -131,9 +128,8 @@ theorem ukAccess_of_text (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
   simp only [Nat.add_zero] at ht hnw
   have hlt : a < 2 ^ 64 := Nat.lt_trans ht.2.2 uCap_lt64
   have hn : (BitVec.ofNat 64 a).toNat = a := by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hlt]
-  refine ⟨uxAddr_textOk hlt ht.2.1 hnw, ⟨hk, ?_, ?_, fun j hj => ?_⟩, ht.2.2, hbs⟩
+  refine ⟨uxAddr_textOk hlt ht.2.1 hnw, ⟨hk, ?_, fun j hj => ?_⟩, ht.2.2, hbs⟩
   · rw [hn]; exact hal
-  · rw [hn]; exact ukAccess_page a k hk hal
   · rw [hn, hbs j hj]; rfl
 
 /-! ## §2 THE MEMORY STEP -/
@@ -413,7 +409,6 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
   ihave %hnw := uheap_text_nw N.t N.d N.s M pm sz a b0 $$ Hheap Ht
   have hlt : a < 2 ^ 64 := Nat.lt_trans htx.2.2 uCap_lt64
   have hva := ukAddr_eq (m.get rs1) imm a ha hlt
-  have hn : (BitVec.ofNat 64 a).toNat = a := by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hlt]
   have hden : ukStoreDenied pm (m.get rs1 + BitVec.signExtend 64 imm) := by
     rw [hva]
     have ht := uxAddr_textOk hlt htx.2.1 hnw
@@ -428,7 +423,7 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
   have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := UL.wp_uk_store_denied S K M m pc isRvc imm rs1 rs2 1 fx hS hfx hui hden (Or.inl rfl)
-    (Nat.mod_one _) (by rw [hva, hn]; have := Nat.mod_lt a (show 4096 > 0 by decide); omega)
+    (Nat.mod_one _)
   unfold ukUvb at H
   iapply H $$ Hb Hmy Hpay Hdepn
 

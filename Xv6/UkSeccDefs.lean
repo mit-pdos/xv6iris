@@ -80,10 +80,10 @@ variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVar
 theorem secc_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
     (h : ∃ i₀ n w, User.utextDecodeWith udrefU User.Seccomp.tree User.Seccomp.code.byte pc =
       some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     ukCode (GF := GF) γt User.Seccomp.code.byte ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   obtain ⟨i₀, n, w, e⟩ := h
-  exact uinstrIs_of_text γt User.Seccomp.textOk pc rvc i i₀ n w e hpc hpg
+  exact uinstrIs_of_text γt User.Seccomp.textOk pc rvc i i₀ n w e hpc
 
 /-- **Rocq `secc_lit_str`**: a literal of seccomp's image as the text string
 fprintf reads. -/

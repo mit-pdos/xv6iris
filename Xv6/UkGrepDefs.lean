@@ -65,10 +65,10 @@ abbrev grepCode (γt : GName) : IProp GF := ukCode γt User.Grep.code.byte
 /-- **grep's catalog, once** (Rocq `UCodeGrep.uis_grep_<pc>`). -/
 theorem grep_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
     (h : ∃ i₀ n w, User.utextDecodeWith udrefU User.Grep.tree User.Grep.code.byte pc = some (rvc, i, i₀, n, w))
-    (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (hpc : pc < 2 ^ 64) :
     grepCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   obtain ⟨i₀, n, w, e⟩ := h
-  exact uinstrIs_of_text γt User.Grep.textOk pc rvc i i₀ n w e hpc hpg
+  exact uinstrIs_of_text γt User.Grep.textOk pc rvc i i₀ n w e hpc
 
 end Code
 
@@ -78,7 +78,7 @@ syntax "gfetch " term:max term:max term:max : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| gfetch $pc $rvc $i) =>
-    `(tactic| ihave Hi := grep_uis N.t $pc $rvc $i ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc)
+    `(tactic| ihave Hi := grep_uis N.t $pc $rvc $i ⟨_, _, _, rfl⟩ (by decide) $$ Hc)
 
 /-! ## §1 Pure helpers -/
 

@@ -2,7 +2,7 @@
 **The precise load from a DATA page** (lane LinkUkLeaves, WP-C, C3; the
 value-naming twin of `UserMemLoad.ume_load`).
 
-At an engine machine, `execute (LOAD …)` of an aligned in-page access of
+At an engine machine, `execute (LOAD …)` of an aligned (hence in-page, `ukAccess_page`) access of
 width `k ∈ {1,2,4,8}` to a mapped user DATA page (U, R, not text) whose
 view holds the word `w` at the access: the translation (`ukm_xlate_load`,
 C1), the aligned read of the owned bytes (`uma_vmem_read_addr_al`,
@@ -52,7 +52,6 @@ theorem ukRetire_load (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 rd
     (k : Nat) (len : Int) (m : RegMap) (pc : BitVec 64) (V : Nat → List (BitVec 8)) (lw : BitVec 64)
     (w : BitVec (8 * k)) (hW : ukWidth k)
     (hal : (m.get rs1 + BitVec.signExtend 64 imm).toNat % k = 0)
-    (hpg : (m.get rs1 + BitVec.signExtend 64 imm).toNat % 4096 + k ≤ 4096)
     (hk : get? P.um ((m.get rs1 + BitVec.signExtend 64 imm).toNat / 4096) = some lw)
     (hU : pteBit lw 4 = true) (hR : pteBit lw 1 = true) (hd : ukTextLeaf lw = false)
     (hw : ∀ j, j < k → (V ((m.get rs1 + BitVec.signExtend 64 imm).toNat / 4096))[
@@ -60,6 +59,7 @@ theorem ukRetire_load (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 rd
     UkExecRetire C P T (.LOAD (imm, .Regidx rs1, .Regidx rd, u, (k : Int))) len m
       (ukWr m rd (extend_value u w)) pc (BitVec.addInt pc len) V V := by
   intro s hl hr hpc hv orc
+  have hpg := ukAccess_page _ k hW hal
   obtain ⟨hl0, hr0, -, hnpc0, hv0⟩ := uke_npc_land hl hr hpc hv len
   obtain ⟨s1, htr, hl1, hf1, hv1⟩ :=
     ukm_xlate_load (ucNpcS s len) hl0 (m.get rs1 + BitVec.signExtend 64 imm) lw hk hU hR

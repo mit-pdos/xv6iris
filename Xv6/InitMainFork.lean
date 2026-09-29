@@ -74,12 +74,12 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
   imodintro
   -- 0x36a  c.li a7,1
   ihave Hi := init_uis N.t User.Init.Sym.«fork» true (.ITYPE (1#12, .Regidx 0#5, .Regidx 17#5, .ADDI)) ⟨_, _, _, rfl⟩
-    (by decide) (by decide) $$ Hc
+    (by decide) $$ Hc
   iapply stub_li UL N h m User.Init.Sym.«fork» 1#12 1 avail (by decide) $$ Hi Hrun
   inext
   iintro %h1 Hrun
   -- 0x36c  ecall: the leaf that returns twice
-  ihave Hi := init_uis N.t (User.Init.Sym.«fork» + 2) false (.ECALL ()) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
+  ihave Hi := init_uis N.t (User.Init.Sym.«fork» + 2) false (.ECALL ()) ⟨_, _, _, rfl⟩ (by decide) $$ Hc
   iapply wp_uk_ecall_fork_at UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (User.Init.Sym.«fork» + 2))
     avail szv l ∅ ROOTINO vw Sc (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr)))
     iprop(upos (hlc := hlc) γ np ∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) ∗
@@ -99,7 +99,7 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
   · -- the PARENT resumes under the names it already had
     iintro %h2 %r %hr Hans ⟨#Hc2, #Hargv2⟩ Hsz Hstd - Hcwd Hrun
     ihave Hi := init_uis N.t (User.Init.Sym.«fork» + 6) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) ⟨_, _, _, rfl⟩
-      (by decide) (by decide) $$ Hc
+      (by decide) $$ Hc
     rw [show BitVec.ofNat 64 (User.Init.Sym.«fork» + 2) + 4#64 = BitVec.ofNat 64 (User.Init.Sym.«fork» + 6)
       from by decide]
     iapply wp_uk_ret UL N h2 _ (BitVec.ofNat 64 (User.Init.Sym.«fork» + 6)) true 1#5 avail $$ Hi Hrun
@@ -125,7 +125,7 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
   · -- ...and the CHILD under fresh ones
     iintro %N' %h2 %γ' %hpeq - ⟨Hpos, HQ, Hcred⟩ ⟨#Hc2, #Hargv2⟩ Hsz Hstd - Hcwd Hch Hpid Hrun
     ihave Hi := init_uis N'.t (User.Init.Sym.«fork» + 6) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5))
-      ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc2
+      ⟨_, _, _, rfl⟩ (by decide) $$ Hc2
     rw [show BitVec.ofNat 64 (User.Init.Sym.«fork» + 2) + 4#64 = BitVec.ofNat 64 (User.Init.Sym.«fork» + 6)
       from by decide]
     iapply wp_uk_ret UL N' h2 _ (BitVec.ofNat 64 (User.Init.Sym.«fork» + 6)) true 1#5 avail $$ Hi Hrun

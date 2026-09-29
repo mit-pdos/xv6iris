@@ -788,9 +788,11 @@ theorem uheap_stop (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm
 
 /-- **Rocq `uinstr_is`**: `UkInstr` as an iProp over the TEXT heap -- the
 kernel's `instr` shape with `utext` where it has the image bytes.  Persistent.
-Its `inpage` clause is kept for the leaves' `UkInstr.inpage`. -/
+No in-page clause (Rocq `c5bce82eb`): the split fetch's second read, at
+`pc + 2` (possibly the next page), gets its page's evidence off the fragment
+there (`uinstrIs_ukInstr`). -/
 def uinstrIs (γt : GName) (pc : BitVec 64) (isRvc : Bool) (i : instruction) : IProp GF :=
-  iprop(⌜pc.toNat % 2 = 0⌝ ∗ ⌜pc.toNat % 4096 ≤ 4092⌝ ∗
+  iprop(⌜pc.toNat % 2 = 0⌝ ∗
     if isRvc then
       ∃ h : BitVec 16, ⌜isRVC h = true⌝ ∗ ⌜udecode16 h i⌝ ∗
         (if pc.toNat % 4 = 0 then
@@ -829,22 +831,28 @@ theorem uheap_text_run {k : Nat} (γt γd γs : GName) (M : ElfMem) (pm : Nat �
     · subst hjn; exact hhi.1
     · exact hlo j (by omega)
 
-/-- The text-page permission at `pc` from a text fragment there. -/
-theorem uheap_text_pc (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (pc : BitVec 64)
+/-- The text-page permission of the page of `a`, from a text fragment there. -/
+theorem uheap_text_page (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz a : Nat)
     (b : BitVec 8) :
-    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ utext γt pc.toNat b -∗ ⌜upermAt pm pc = some ⟨true, false⟩⌝ := by
+    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ utext γt a b -∗ ⌜pm (a / 4096) = some ⟨true, false⟩⌝ := by
   iintro Hh Hb
-  ihave %h1 := uheap_text γt γd γs M pm sz pc.toNat b $$ Hh Hb
-  ihave %h2 := uheap_text_nw γt γd γs M pm sz pc.toNat b $$ Hh Hb
+  ihave %h1 := uheap_text γt γd γs M pm sz a b $$ Hh Hb
+  ihave %h2 := uheap_text_nw γt γd γs M pm sz a b $$ Hh Hb
   ipureintro
   obtain ⟨-, hx, -⟩ := h1
-  unfold uxAddr uxB at hx; unfold uwAddr uwB at h2; unfold upermAt
-  cases hq : pm (pc.toNat / 4096) with
+  unfold uxAddr uxB at hx; unfold uwAddr uwB at h2
+  cases hq : pm (a / 4096) with
   | none => rw [hq] at hx; cases hx
   | some q =>
     rw [hq] at hx h2
     simp only [Option.any_some] at hx h2
     cases q; simp_all
+
+/-- The text-page permission at `pc` from a text fragment there. -/
+theorem uheap_text_pc (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (pc : BitVec 64)
+    (b : BitVec 8) :
+    ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ utext γt pc.toNat b -∗ ⌜upermAt pm pc = some ⟨true, false⟩⌝ :=
+  uheap_text_page γt γd γs M pm sz pc.toNat b
 
 /-- **Rocq `uinstr_is_uk_instr`**: THE FETCH BRIDGE -- `uinstrIs` plus the
 heap gives the leaves' `UkInstr`. -/
@@ -852,7 +860,7 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
     (isRvc : Bool) (i : instruction) :
     ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ uinstrIs γt pc isRvc i -∗ ⌜UkInstr pm M pc isRvc i⌝ := by
   unfold uinstrIs
-  iintro Hh ⟨%hal, %hpg, Hc⟩
+  iintro Hh ⟨%hal, Hc⟩
   cases isRvc
   · simp only [Bool.false_eq_true, if_false]
     icases Hc with ⟨%w, %hn, %hdec, #Hbs⟩
@@ -860,8 +868,18 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
     ihave #H0 := BigSepL.bigSepL_lookup (Φ := fun _ j => utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j))
       (List.getElem?_range (show 0 < 4 by decide)) $$ Hbs
     ihave %ht := uheap_text_pc γt γd γs M pm sz pc _ $$ Hh H0
+    -- the split fetch's second read: `pc + 2`'s page, off the fragment there
+    ihave #H2 := BigSepL.bigSepL_lookup (Φ := fun _ j => utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j))
+      (List.getElem?_range (show 2 < 4 by decide)) $$ Hbs
+    ihave %hc2 := uheap_text γt γd γs M pm sz (pc.toNat + 2) _ $$ Hh H2
+    ihave %hp2 := uheap_text_page γt γd γs M pm sz (pc.toNat + 2) _ $$ Hh H2
     ipureintro
-    exact ⟨hal, hpg, ht, by simp only [Bool.false_eq_true, if_false]; exact ⟨w, hn, hb, hdec⟩⟩
+    have e2 : (pc + 2#64).toNat = pc.toNat + 2 := by
+      have := hc2.2.2; unfold uCap at this
+      rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
+    have ht2 : upermAt pm (pc + 2#64) = some ⟨true, false⟩ := by unfold upermAt; rw [e2]; exact hp2
+    exact ⟨hal, ht, fun _ _ => ⟨e2, ht2⟩,
+      by simp only [Bool.false_eq_true, if_false]; exact ⟨w, hn, hb, hdec⟩⟩
   · simp only [if_true]
     icases Hc with ⟨%h, %hrvc, %hdec, Hw⟩
     by_cases h4 : pc.toNat % 4 = 0
@@ -872,7 +890,7 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
         (List.getElem?_range (show 0 < 4 by decide)) $$ Hbs
       ihave %ht := uheap_text_pc γt γd γs M pm sz pc _ $$ Hh H0
       ipureintro
-      refine ⟨hal, hpg, ht, ?_⟩
+      refine ⟨hal, ht, fun e => absurd e (by decide), ?_⟩
       simp only [if_true]
       refine ⟨h, hrvc, fun j hj => ?_, hdec, fun _ => ⟨by rw [hb 2 (by decide)]; rfl, by rw [hb 3 (by decide)]; rfl⟩⟩
       rw [hb j (by omega), ← hlow]
@@ -886,7 +904,7 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
         (List.getElem?_range (show 0 < 2 by decide)) $$ Hbs
       ihave %ht := uheap_text_pc γt γd γs M pm sz pc _ $$ Hh H0
       ipureintro
-      refine ⟨hal, hpg, ht, ?_⟩
+      refine ⟨hal, ht, fun e => absurd e (by decide), ?_⟩
       simp only [if_true]
       exact ⟨h, hrvc, hb, hdec, fun h4' => absurd h4' h4⟩
 
@@ -951,10 +969,10 @@ theorem uwin_byte16 (w j : Nat) (hj : j < 2) :
 /-- **The catalog bridge, DU3's way** (the role of Rocq's
 `uinstr_is_of_uinstr`): U0-7's decode facts for `pc` (one evaluation of the
 program's text tree and the decode walk at the U-mode map `udrefU`) and the
-program's text image give the instruction resource.  `inpage` is the one
-clause the facts do not carry (a per-pc computation). -/
+program's text image give the instruction resource (no in-page premise:
+Rocq `c5bce82eb`'s `gen_ucode.py` dropped the in-page discharge). -/
 theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i i₀ : instruction) (n w : Nat)
-    (F : Xv6.User.UDecodeFacts udrefU m pc rvc i i₀ n w) (hpc : pc < 2 ^ 64) (hpg : pc % 4096 ≤ 4092) :
+    (F : Xv6.User.UDecodeFacts udrefU m pc rvc i i₀ n w) (hpc : pc < 2 ^ 64) :
     Xv6.User.utextImg (utext (GF := GF) γt) m ⊢ uinstrIs γt (BitVec.ofNat 64 pc) rvc i := by
   have hu : (BitVec.ofNat 64 pc).toNat = pc := by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hpc]
   unfold uinstrIs
@@ -962,8 +980,6 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
   iintro #H
   isplitr
   · ipureintro; exact F.even
-  isplitr
-  · ipureintro; exact hpg
   cases rvc
   · simp only [Bool.false_eq_true, if_false]
     obtain ⟨hn, -, hnr, hdec⟩ := F.base rfl
@@ -1000,7 +1016,7 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
 
 /-- Rocq `uinstr_is_base`. -/
 theorem uinstrIs_base (γt : GName) (pc : BitVec 64) (w : BitVec 32) (i : instruction)
-    (hal : pc.toNat % 2 = 0) (hpg : pc.toNat % 4096 ≤ 4092) (hn : isRVC (BitVec.extractLsb' 0 16 w) = false)
+    (hal : pc.toNat % 2 = 0) (hn : isRVC (BitVec.extractLsb' 0 16 w) = false)
     (hdec : udecode32 w i) :
     ([∗list] j ∈ List.range 4, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j)) ⊢
       uinstrIs γt pc false i := by
@@ -1008,7 +1024,6 @@ theorem uinstrIs_base (γt : GName) (pc : BitVec 64) (w : BitVec 32) (i : instru
   simp only [Bool.false_eq_true, if_false]
   iintro #Hbs
   isplitr; · ipureintro; exact hal
-  isplitr; · ipureintro; exact hpg
   iexists w
   isplitr; · ipureintro; exact hn
   isplitr; · ipureintro; exact hdec
@@ -1016,7 +1031,7 @@ theorem uinstrIs_base (γt : GName) (pc : BitVec 64) (w : BitVec 32) (i : instru
 
 /-- Rocq `uinstr_is_rvc4`: a compressed instruction at a 4-ALIGNED pc. -/
 theorem uinstrIs_rvc4 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (w : BitVec 32) (i : instruction)
-    (hal4 : pc.toNat % 4 = 0) (hpg : pc.toNat % 4096 ≤ 4092) (hrvc : isRVC h = true) (hdec : udecode16 h i)
+    (hal4 : pc.toNat % 4 = 0) (hrvc : isRVC h = true) (hdec : udecode16 h i)
     (hlow : BitVec.extractLsb' 0 16 w = h) :
     ([∗list] j ∈ List.range 4, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j)) ⊢
       uinstrIs γt pc true i := by
@@ -1024,7 +1039,6 @@ theorem uinstrIs_rvc4 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (w : BitVec
   simp only [if_true, hal4]
   iintro #Hbs
   isplitr; · ipureintro; omega
-  isplitr; · ipureintro; exact hpg
   iexists h
   isplitr; · ipureintro; exact hrvc
   isplitr; · ipureintro; exact hdec
@@ -1034,7 +1048,7 @@ theorem uinstrIs_rvc4 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (w : BitVec
 
 /-- Rocq `uinstr_is_rvc2`: at a 2-mod-4 pc, only the two bytes. -/
 theorem uinstrIs_rvc2 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (i : instruction)
-    (hal2 : pc.toNat % 2 = 0) (hne : pc.toNat % 4 ≠ 0) (hpg : pc.toNat % 4096 ≤ 4092) (hrvc : isRVC h = true)
+    (hal2 : pc.toNat % 2 = 0) (hne : pc.toNat % 4 ≠ 0) (hrvc : isRVC h = true)
     (hdec : udecode16 h i) :
     ([∗list] j ∈ List.range 2, utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 2) h j)) ⊢
       uinstrIs γt pc true i := by
@@ -1042,7 +1056,6 @@ theorem uinstrIs_rvc2 (γt : GName) (pc : BitVec 64) (h : BitVec 16) (i : instru
   simp only [if_true, hne, if_false]
   iintro #Hbs
   isplitr; · ipureintro; exact hal2
-  isplitr; · ipureintro; exact hpg
   iexists h
   isplitr; · ipureintro; exact hrvc
   isplitr; · ipureintro; exact hdec

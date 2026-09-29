@@ -55,7 +55,7 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem secc_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Seccomp.code.byte) 16 User.Seccomp.Sym.«write» :=
   stub_of_text UL N User.Seccomp.textOk 16 _ 16#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩
-    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by decide)
 
 /-- **Rocq `ksecc_wb_cons`'s walk** (deviation 1): one byte's
 `write(fdw, &b, 1)` through seccomp's write stub, at any deposit the caller
