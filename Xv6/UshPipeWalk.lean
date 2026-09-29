@@ -1,7 +1,7 @@
 /-
 **sh's `parsepipe`: the head and the tail** (stage file of
 `ProofShParsepipe`; Rocq `UkShParser.wp_ref_pp_head`, `wp_ref_pp_tail`,
-pinned `1900b8a43`).
+pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
     0x65e..0x66c  the prologue (six words: ra, s0..s4)
     0x66e  mv s2,a0 ; mv s4,a0 ; mv s1,a1 ; jal parseexec

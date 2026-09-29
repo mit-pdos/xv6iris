@@ -1,6 +1,6 @@
 /-
 **The `cat f` body at the pipe era's fork twin** (Rocq `UkShCatForkTwin.v`,
-pinned `1900b8a43`).  A stage file of main's body: `UshRedirBody`'s cat
+pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  A stage file of main's body: `UshRedirBody`'s cat
 walk (`wp_ushBodyCatWith`) at the fork law `UshForkTwin.wp_ushForkPipe`.
 
 Deviations from Rocq: `UshForkTwin`'s (the `UshCtx` record, sh-main's

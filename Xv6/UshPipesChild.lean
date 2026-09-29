@@ -1,6 +1,6 @@
 /-
 **THE CHILD WALK AT ANY NUMBER OF STAGES** (Rocq `UkShPipesRound.v` §1 and
-`ushq_um_usz`, pinned `1900b8a43`): sh's forked child, main's code
+`ushq_um_usz`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)): sh's forked child, main's code
 0x99c..0x9a2, on a pipeline line.
 
     0x99c  c.mv a0,s1        the line

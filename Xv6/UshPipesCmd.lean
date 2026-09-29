@@ -1,6 +1,6 @@
 /-
 **sh's parser on a pipeline of any length, re-pointed at the general walk**
-(Rocq `UkShPipesCmd.wp_kshp_parsecmd_pipes`, pinned `1900b8a43`; union DU8).
+(Rocq `UkShPipesCmd.wp_kshp_parsecmd_pipes`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img); union DU8).
 
 Rocq's N-stage layer is "an induction stacked on the one-bar shells"
 (`UkShPipeCm`, `UkShPipeParse`, `UkShPipePex`, … -- the DU8-dropped files).

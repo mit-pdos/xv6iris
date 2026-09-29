@@ -1,6 +1,6 @@
 /-
 **sh's FORK ARM: the payload, the lend and the laws** (Rocq `UkShFork.v`,
-the reached part, pinned `1900b8a43`).  Definitions and pure lemmas; the
+the reached part, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  Definitions and pure lemmas; the
 walks at the pipe/cat twins are `UshForkTwin*` (Rocq `UkShPipeForkTwin`,
 `UkShCatForkTwin`).
 

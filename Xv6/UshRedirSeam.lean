@@ -1,6 +1,6 @@
 /-
 **The child at the redirect shape** (Rocq `UkShRedirSeam.v`, pinned
-`1900b8a43`; reached declarations only).
+`1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img); reached declarations only).
 
 `w1 … wn > f`: the line parses (at the reference parser,
 `RefParseSym.refParsecmd_redir`) to ONE REDIR over ONE EXEC, its cut is the

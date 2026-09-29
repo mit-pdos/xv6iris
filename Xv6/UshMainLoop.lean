@@ -1,6 +1,6 @@
 /-
 **sh's main: the command loop** (stage file of `ProofShMain`; Rocq
-`UkSh.v`'s local `wp_ksh_loop`, pinned `1900b8a43`).
+`UkSh.v`'s local `wp_ksh_loop`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
     0x914  c.mv a1,s3 ; c.mv a0,s2 ; jal getcmd
     0x91c  bltz a0,0x9a6                       -- exit(0)

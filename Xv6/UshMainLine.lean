@@ -4,7 +4,7 @@
 `ush_uline_body_val`, `ush_uline_no_nul`, `ush_wl_body_pos`,
 `ush_uline_head_nonblank`, `ush_nl_of_val`, `ush_nl_ne_of_val`,
 `ush_elem_of_rev_head`, `ush_cycles_snoc_in`, and the file-level
-`ush_narrow_count_le`, pinned `1900b8a43`).  Pure.
+`ush_narrow_count_le`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  Pure.
 
 The command loop makes exactly three readings of the line it just read, at
 ANY constructor of the file discipline (Rocq lane LINK-GEN-6): a line is

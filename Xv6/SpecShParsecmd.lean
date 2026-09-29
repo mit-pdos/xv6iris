@@ -1,6 +1,6 @@
 /-
 **Specification of sh's `parsecmd`** (Rocq `UkShParser.wp_ref_parsecmd` and
-THE PARSER THEOREM `wp_ref_parser`, pinned `1900b8a43`; DU10: one user
+THE PARSER THEOREM `wp_ref_parser`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img); DU10: one user
 function per file).
 
     struct cmd* parsecmd(char *s)

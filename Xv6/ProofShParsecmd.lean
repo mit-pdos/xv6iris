@@ -1,7 +1,7 @@
 /-
 **Proof of sh's `parsecmd` and THE PARSER THEOREM** (Rocq
 `UkShParser.wp_ref_parsecmd`, `wp_ref_parser`, and `UkShParseCmd.ushp_ustr_bytes`,
-pinned `1900b8a43`).
+pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
     0x84a..0x856  the prologue: eight words, ra, s0..s3 spilled
     0x858  sd a0,-56(s0)            -- s, a LOCAL (the parser's cursor cell)

@@ -1,6 +1,6 @@
 /-
 **THE PIPE ERA'S FORK ARM, at a credential that need not be timeless**
-(Rocq `UkShPipeForkTwin.v`, pinned `1900b8a43`).  A stage file of main's
+(Rocq `UkShPipeForkTwin.v`, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  A stage file of main's
 body (sh-main's function):
 
     0x908  jal  ra,fork1

@@ -1,6 +1,6 @@
 /-
 **Specification of sh's `parseline`** (Rocq `UkShParser.wp_ref_parseline`, pinned
-`1900b8a43`; DU10: one user function per file).
+`1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img); DU10: one user function per file).
 
     struct cmd* parseline(char **ps, char *es)
     { cmd = parsepipe(ps, es);

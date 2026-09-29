@@ -1,6 +1,6 @@
 /-
 **sh's body at the redirect and cat lines** (Rocq `UkShRedirBody.v`, the
-reached part, pinned `1900b8a43`).  A stage file of main's body (sh-main's
+reached part, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  A stage file of main's body (sh-main's
 function): the line shapes the fork's child laws are stated at, the
 redirect child's law, and the `cat f` arm's two-instruction `cd` test in
 front of the fork, at an abstract fork law (`ushKshfForkLaw`, Rocq

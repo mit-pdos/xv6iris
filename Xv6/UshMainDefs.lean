@@ -1,7 +1,7 @@
 /-
 **sh's command loop: what its walks are stated over** (sh-main lane, union
 wave U2; the Iris half of Rocq `UkSh.v`'s section and `UkShLoop.v`, pinned
-`1900b8a43`).  The walks are one function per file (DU10):
+`1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).  The walks are one function per file (DU10):
 `SpecShGets`/`ProofShGets`, `SpecShGetcmd`/`ProofShGetcmd`,
 `SpecShMain`/`ProofShMain`, `SpecShStart`/`ProofShStart`; memset is
 `ProofShMemset` (the interface `UshTreeDefs.USH_MEMSET`); the stubs are

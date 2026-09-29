@@ -4,7 +4,7 @@ union wave U2; Rocq `UkShParse.v` §5 and `ushp_malloc_ty(_le)`,
 `UkShRedirCmd.ushp_redir_node`, `UkShPipeNode.ushp_pipe_node`,
 `UkShRedirs.ushp_malloc_chain`/`ushp_redirs_at`/`ushp_redirs_res`,
 `UkShArgs.ushp_pex_res`, `UkShParser.ushp_ptr`/`ushp_atree`/`ushp_otree`,
-pinned `1900b8a43`).
+pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
 THE TREE PREDICATE IS SH'S OWN STRUCT LAYOUT (Rocq §5):
 

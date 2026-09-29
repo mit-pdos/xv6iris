@@ -1,6 +1,6 @@
 /-
 **Proof of sh's `parseline`** (Rocq `UkShParser.wp_ref_parseline`, pinned
-`1900b8a43`).
+`1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
     0x6be..0x6cc  the prologue: six words, ra, s0..s4 spilled
     0x6ce..0x6d2  s2 := ps ; s3 := es ; jal parsepipe

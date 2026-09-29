@@ -1,6 +1,6 @@
 /-
 **sh's EXEC arm at a disciplined line: the vocabulary** (Rocq `UkShEcho.v`
-S1–S2 definitions and the node accessors, pinned `1900b8a43`; lane sh-exec
+S1–S2 definitions and the node accessors, pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img); lane sh-exec
 of union wave U2).
 
 The arm execs `argv[0]` of the ONE command the disciplined line spells

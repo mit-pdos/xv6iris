@@ -1,6 +1,6 @@
 /-
 **Proof of sh's `parseredirs`** (Rocq `UkShRedirs.wp_ref_parseredirs`,
-pinned `1900b8a43`).
+pinned `1900b8a43` (re-pointed to Rocq main, xv6 d66e41c, by lane D1-img)).
 
     0x488..0x4a0  the prologue: fourteen words, ra, s0..s9 spilled
     0x4a2..0x4bc  s4 := cmd ; s3 := ps ; s2 := es ; s6 := "<>" ;
