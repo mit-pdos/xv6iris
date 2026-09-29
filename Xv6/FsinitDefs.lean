@@ -45,7 +45,13 @@ def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
     [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
     (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8)) : IProp GF :=
   iprop(logMirrorBorn (hlc := hlc) M ∗
-    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst) ∗
+    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
+        (eraSyncTok (hlc := hlc) (GF := GF))) ∗
+    -- the ghost commit's hooked law and the crash invariant it opens (Rocq
+    -- sync K3-3), both parked into `logCtx` by initlog
+    □ (sbPark fscFs sbrec -∗ snapLawGhost (hlc := hlc) icfgLog fscFs fscCov fscLogst
+        (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
+    crashInv (hlc := hlc) (GF := GF) ∗
     fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Xv)
 
 /-- ...and their pure side, what `initlog` asks beside them: (g') the era's

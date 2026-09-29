@@ -228,7 +228,12 @@ def firstBootPersist [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   ⌜FsGeomOk⌝ ∗
   -- the crash seam and the era certificate (D38; LAST, as in `fsReady`)
   fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  genCert (hlc := hlc) (GF := GF))
+  genCert (hlc := hlc) (GF := GF) ∗
+  -- THE CRASH INVARIANT (Rocq sync K3-3), beside the certificate in spirit:
+  -- fixed-layer, persistent, minted once at adequacy; fsinit hands it to
+  -- initlog, which parks it into `logCtx` for the ghost commit to open.
+  -- LAST (Rocq: just before the pure row; position deviation 4)
+  crashInv (hlc := hlc) (GF := GF))
 
 instance firstBootPersist_persistent [Fscfg] [Icfg] [CurCtx] :
     Persistent (firstBootPersist (hlc := hlc) (GF := GF)) := by
@@ -326,7 +331,8 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         (vlock vStart vDev vNc vN : BitVec 32) (vname vcpu : BitVec 64)
         (sbOld : List (BitVec 8)),
         ⌜firstFsinitPures dk sb Pb⌝ ∗ ⌜sbOld.length = 32⌝ ∗
-        fsCrashSeamAt (hlc := hlc) appGuest fscCov fscLogst ∗ appXfer ∗
+        fsCrashSeamAt (hlc := hlc) appGuest fscCov fscLogst ∗ appMerge (hlc := hlc) ∗
+        appSyncRun (hlc := hlc) ∗
         logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
         logFreeTok icfgLog ∗
         fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
@@ -365,12 +371,13 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
     Hbsl⟩
   icases fsKitFsinitGhost_open (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) $$ Hkit
     with ⟨Hlog, Hboot, #Hireg, Hb1, Hauths, Hdty, Hhdr, Hslots, #Hbmres, Hrem, #Hbinv, Hxo, #Henv,
-      #Hseam, #Hxfer⟩
+      #Hseam, #Hmerge, #Hrun⟩
   iexists dk, sb, Rspent, Pb, vlock, vStart, vDev, vNc, vN, vname, vcpu, sbOld
   isplitr; · ipureintro; exact hp
   isplitr; · ipureintro; exact hold
   isplitr; · iexact Hseam
-  isplitr; · iexact Hxfer
+  isplitr; · iexact Hmerge
+  isplitr; · iexact Hrun
   iframe Hmir Hlog Hbinv Hb1 Hsb Hxo Hireg Hbmres Hboot Hk0 Hk16 Hlk Hnm Hcpu Hst Hdv Hout Hcmt
     Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem
   unfold fsabsEnv
@@ -549,7 +556,7 @@ theorem firstPersistPre [Fscfg] [Icfg] [CurCtx] :
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
       fsSbCells -∗ iregOpen -∗ fsReady (hlc := hlc) := by
   unfold firstBootPersist fsReady
-  iintro ⟨#Hp, #Hb, #Hd, #Hi, #Ht, #Hs, #Hr, #Hm, #Hk, %Hg, #Hseam, #Hcert⟩ #HK #HL #HC #HO
+  iintro ⟨#Hp, #Hb, #Hd, #Hi, #Ht, #Hs, #Hr, #Hm, #Hk, %Hg, #Hseam, #Hcert, -⟩ #HK #HL #HC #HO
   ihave #Hseal := logCtx_seal icfgLog fscBio fscFs fscCov fscLogst icfgDev $$ HL
   ihave #Hinv := iregInv_of (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hr Hseal
   ihave #Hbmi := bitmapInv_of fscFs fscBmapstart fscCov fscLogst fscSize $$ Hm Hseal

@@ -100,16 +100,28 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (Happ_boot : ∀ (c : CT) (k : Nat), ⊢@{IProp GF} appXferBootRaw (appFs c) (appBoot c k))
     (Happ_init : ∀ c : CT, ⊢@{IProp GF} |==> ∃ r : N,
       appFs c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
+    -- THE TWO SYNC SLOTS (Rocq sync K3-2, design/sync.md §4.2): the era's
+    -- opaque token and the family of a waiter's hooks, at the raw names and
+    -- the fixed part, minted at every era (`HTk`), and the application's one
+    -- law about what a hook means (`HHk`, the runner, K3-3) at any record
+    (Tk : GName → GName → GName → GName → CT → Nat → IProp GF)
+    (Hk : GName → GName → GName → GName → CT → Nat → IProp GF → IProp GF)
+    (HTk : ∀ (γd γsw γreg γst : GName) (c : CT) (k : Nat), ⊢@{IProp GF} |==> Tk γd γsw γreg γst c k)
+    (HHk : ∀ (F : MachFixedGS hlc GF) (γd γsw γreg γst : GName) (c : CT) (k : Nat),
+      ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Tk γd γsw γreg γst c k)
+        (Hk γd γsw γreg γst c k))
     (Pt : GName → CT → IProp GF)
     (Hinit_boot : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c))
+        γreg γd γsw γobs γhist c T (Pt γobs c)
+        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
       EraInitBoot (hlc := hlc) N appFs appBoot Tnn c)
     (Happ_echo : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c))
+        γreg γd γsw γobs γhist c T (Pt γobs c)
+        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
       EraEcho (hlc := hlc) (GF := GF))
     (HPt : ∀ (γobs : GName) (c : CT),
       Cl c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
@@ -124,13 +136,14 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c))
+        γreg γd γsw γobs γhist c T (Pt γobs c)
+        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
       EraPerm (hlc := hlc) (GF := GF))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
       @powerInterp hlc GF (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg γd γsw
-          γobs γhist c T (Pt γobs c)) g' ∗
+          γobs γhist c T (Pt γobs c) (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ xv6Slot N appFs cov sb.sbLogstart γd γsw γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF}
         ◇ ⌜phi g' h⌝)
@@ -143,6 +156,7 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
   refine riscvPowerAdequacy (hlc := hlc) (GF := GF) XV6_DISK_BYTES g CT Cl Hbirth
     (fun γd γsw γreg γst c => xv6Slot N appFs cov sb.sbLogstart γd γsw γreg γst c)
     (xv6Slot_alloc N appFs (diskOf g.m.devs) sb nib cov Himg Happ_init)
+    Tk Hk
     (fsBootPure cov sb.sbLogstart)
     (xv6Slot_project N appFs cov sb.sbLogstart)
     (fun dk => mirrorOf (fsBlocks dk))
@@ -156,9 +170,14 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (fun c k => (Ai c).rdwild_timeless k) Tnn
     HPt Hobs phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF E gen σ hbf hdv hpp
+  have hrun := fun k => HHk F γd γsw γreg γstart c k
   subst hF
   exact xv6BootEra N appFs appBoot Tnn sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
-    (Pt γobs c) (appXferRaw_ofBoot _ _ (Happ_boot c (gen + 1)))
+    (Pt γobs c) (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
+    -- every landed application's merge is its transport's (SY3-K2): the old
+    -- durable copy dropped, the running claim copied
+    (fun k => appMergeRaw_ofXfer _ _ (appXferRaw_ofBoot _ _ (Happ_boot c (gen + 1))))
+    (fun k => HTk γd γsw γreg γstart c k) hrun
     (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -181,12 +200,14 @@ enters (brief §0.1). -/
 theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
-      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
+      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv)
     EraInitBoot (hlc := hlc) (GF := GF) Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp))
       (fun _ _ => iprop(emp)) c := by
   intro E gen cP cI W HFd HBs HIr I Fc r
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   letI : Appcfg GF := ⟨Unit, fun _ _ => iprop(True), r⟩
   have hsup : ⊢@{IProp GF} appSup := appSup_of_triv (fun _ _ => .rfl)
@@ -208,11 +229,13 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
 theorem xv6Triv_echo (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
-      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
+      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv)
     EraEcho (hlc := hlc) (GF := GF) := by
   intro E gen cP cI
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact consEchoShift_triv rfl
 
@@ -220,11 +243,13 @@ theorem xv6Triv_echo (cov : ExtTreeSet Nat compare) (ls : Nat)
 theorem xv6Triv_perm (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
-      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
+      Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv)
     EraPerm (hlc := hlc) (GF := GF) := by
   intro E gen cP cI Fc i γ _
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact uartObsPermit_triv i γ rfl rfl
 
@@ -246,7 +271,8 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit)
         (T : List Obs) (g' : GState),
       @powerInterp hlc GF (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart
-          (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)) g' ∗
+          (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
+      syncTokTriv syncHookTriv) g' ∗
         ▷ xv6Slot Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart γd γsw γreg γstart c ⊢@{IProp GF}
         ◇ ⌜phi g'⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
@@ -260,6 +286,10 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun _ _ => iprop(emp))
     (fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl))
     (fun _ => by imodintro; iexists (); itrivial)
+    -- no sync ledger: the token is `True`, a hook is its own `Q`
+    (fun _ _ _ _ _ _ => syncTokTriv (GF := GF) 0) (fun _ _ _ _ _ _ => syncHookTriv (GF := GF) 0)
+    (fun _ _ _ _ _ _ => by imodintro; itrivial)
+    (fun _ _ _ _ _ _ _ => appSyncRunRaw_triv _ _ _ (fun _ => .rfl))
     (fun γobs _ => obsPredAt γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_initBoot US cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -296,7 +326,7 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
   xv6PowerAdequacy (hlc := hlc) (GF := GF) US g sb nib cov (xv6TracePure cov sb.sbLogstart)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
       xv6TraceHook Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart (appIfaceTriv GF) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) g')
+        γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) syncTokTriv syncHookTriv g')
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 include hlc GF in

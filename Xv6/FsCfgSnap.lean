@@ -278,7 +278,6 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
       (icfgReg ↪●MAP (∅ : RegMapF (GName × GName))) -∗
       (icfgLk ↪●MAP (∅ : RegMapF IregArmEnt)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appXfer -∗
       |={E}=> ∃ (γfs : FsNames) (γi : GName),
         iregReg (hlc := hlc) γi γfs S.fssSb.sbInodestart icfgNib ∗ iregBoot ∗
         ipoolRows γfs γi cov S.fssSb.sbLogstart (regionInums icfgNib) ∗
@@ -312,7 +311,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
     (mem_snapHomeSet cov _ 1).1 (snapPeel_one S Pb cov hb hcovmeta 1 (LawfulSet.mem_singleton.2 rfl))
       |> (mem_fsHomeList cov _ 1).2
   obtain ⟨fch, vroot, hfok, hfvalid⟩ := hb.skLinks
-  iintro Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim #Hxfer
+  iintro Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim
   -- 4. THE LINK FAMILY AT `skLinks`' SLACKED ELEMENT
   imod (fsBootAlloc_rootSlack (GF := GF) S.fssInodes fch (ROOTINO : Int) vroot hfok hfvalid)
     with ⟨%gl, %gt, Htopa, Htopf, Hlnk, Hkeep⟩
@@ -326,7 +325,7 @@ theorem fsCfgSnap_fs [Icfg] (E : CoPset) (γv : DiskNames) (dk : Nat → BitVec 
   -- THE TOP MAP: the kernel's half founds `ftopInv`, the other the application's
   ihave ⟨Htopa, Htopb⟩ := (fsSnapTop_halves γfs.top S.fssInodes).1 $$ Htopa
   imod (ftopAlloc E γfs S.fssInodes hloc) $$ Htopa Hlkauth with #Hftopi
-  imod (appInv_alloc γfs S.fssInodes E hdom) $$ Htopb Hclaim Hxfer with #Henv
+  imod (appInv_alloc γfs S.fssInodes E hdom) $$ Htopb Hclaim with #Henv
   ihave Htopf := BigSepM.bigSepM_mono (m := S.fssInodes)
     (Φ := fun i n => iprop(γfs.top ↪◯MAP[i] n))
     (Ψ := fun i n => topFrag (fsGammaL (GF := GF) γfs) i n) (fun _ => .rfl) $$ Htopf
@@ -409,19 +408,21 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     (hcovmeta : ∀ b, 1 ≤ b → b < fsDataStart S.fssSb → b ∈ cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appXfer -∗
+      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
       fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
+      eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb Xexc := by
   -- the WAL's own row (b): every block of the committed view is whole
   have hdf : dblkFull (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) := fun b bs h => by
     rw [← snapRestrict_val Pb _ b bs h]; exact hlPb b
-  iintro Hdisk Hclaim #Hxfer #Hseam Hsnap
+  iintro Hdisk Hclaim #Hmerge #Hrun #Hseam Hstok Hsnap
   -- THE TIE IS A READING
   ihave %hok := fsSnap_readOk gsn gln gtn _ S hdf $$ Hsnap
   -- 1. the log's gnames
-  imod (logGhostAlloc (GF := GF)) with ⟨%γlog, Hlogtok⟩
+  imod (logGhostAlloc (GF := GF)) $$ Hstok with ⟨%γlog, Hlogtok⟩
   -- 2. THE INODE CACHE'S RECORD
   imod (icfgAlloc (GF := GF) (BitVec.ofNat 32 ROOTDEV) nib (linkBootMap (regionInums nib))
       (icntBootMap (regionInums nib)) (frzmBootMap (regionInums nib)) γlog S.fssSb.sbInodestart
@@ -452,7 +453,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
   ihave Hboot := (show ityPending (GF := GF) I.icfgBoot ⊢ iregBoot from .rfl) $$ Hboot
   -- 4-7b. THE FILE SYSTEM
   imod (fsCfgSnap_fs E γv dk ndisk S cov Pb Xexc hlPb hXsub hX1 hagr hok hnibeq hnib32 hcovin
-      hcovmeta) $$ Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim Hxfer
+      hcovmeta) $$ Hdisk Hla Hoff HcntR HcntP HmirR HmirP Hep Hboot Hrauth Hlkauth Hclaim
     with ⟨%γfs, %γi, Hireg, Hboot, Hipool, Hb1, Hauths, Hdty, Hhdr, Hslots, Hbm, Hrem, #Hbinv,
       Hxo, #Henv, Hpoolb⟩
   -- 8. the gname-only mints
@@ -525,7 +526,8 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     isplitl [Hxo]; · iexact Hxo
     isplitr; · iexact Henv
     isplitr; · iexact Hseam
-    iexact Hxfer
+    isplitr; · iexact Hmerge
+    iexact Hrun
   -- the NINODE off-box set authorities, EMPTY
   iapply (BigSepL.bigSepL_mono (l := List.range NINODE)
     (Φ := fun _ k => iOwn (GF := GF) (F := constOF OffSetUR) (I.icfgOff k)
@@ -548,8 +550,10 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appXfer -∗
+      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
       fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
+      eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
@@ -590,8 +594,10 @@ theorem fsCfgAllocSnap [CurCtx]
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appXfer -∗
+      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
       fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
+      eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
       |={E}=> ∃ (I : Icfg) (F : Fscfg),
         fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb

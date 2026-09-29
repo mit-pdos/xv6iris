@@ -44,7 +44,7 @@ def bootPrimarySupply [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
-  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗
+  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
   initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗

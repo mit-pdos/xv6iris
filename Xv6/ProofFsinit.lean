@@ -91,7 +91,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_fsinit_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hseamg, #Hxfer, #Hcert, Hborn, Hfree,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hseamg, #Hmerge, #Hrun, #Hcert, #Hcinv, Hborn, Hfree,
     #Hbinv, Hfsb, Hold, Hxo, #Hreg, #Hbreg,
     Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
@@ -112,16 +112,30 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     $$ Hit2
   ihave #Hpool := isItable2_pool fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
     $$ Hit2
-  ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst) $$ []
+  unfold appMerge appSyncRun
+  ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
+      (eraSyncTok (hlc := hlc) (GF := GF))) $$ []
   · imodintro
     iintro #Hpark
-    iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec rfl rfl hcg'
-      $$ Hseamg Hxfer Hreg' Hbreg' Hesc Hpool Hpark
+    iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ rfl rfl hcg'
+      $$ Hseamg Hmerge Hreg' Hbreg' Hesc Hpool Hpark
+  -- ...AND THE GHOST COMMIT'S HOOKED LAW (Rocq sync K3-3), the same assembly
+  -- over the runner beside the merge, at the era's two fixed-record slots
+  ihave #Hlawg : □ (sbPark fscFs sbrec -∗ snapLawGhost (hlc := hlc) icfgLog fscFs fscCov fscLogst
+      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) $$ []
+  · imodintro
+    iintro #Hpark
+    iapply fsSnapLawGhostBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ _ rfl
+      rfl hcg' $$ Hseamg Hmerge Hrun Hreg' Hbreg' Hesc Hpool Hpark
   ihave Hcr : fsinitCrash (hlc := hlc) M sbrec Xv $$ [Hborn]
   · unfold fsinitCrash
     iframe Hborn
     isplitr
     · iexact Hlaw
+    isplitr
+    · iexact Hlawg
+    isplitr
+    · iexact Hcinv
     · iexact Hbinv
   have hcrash : fsinitCrashPure L M bsSb sbrec bsHdr Xv := ⟨hLM, hsbok, hsbparse, hxslot⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

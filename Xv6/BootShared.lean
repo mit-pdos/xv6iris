@@ -436,7 +436,7 @@ def bootSupplyCore [Fscfg] [Icfg] (X : CurCtx)
   fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
-  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗
+  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗
@@ -532,8 +532,9 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
     (hwf : fsBootSnapWf (diskOf σ.devs) ndisk S Pb sb nib cov) :
     powerBootRows (hlc := hlc) (GF := GF) (fun dk => mirrorOf (fsBlocks dk)) σ ∗
-      ▷ appPred appRun (absView S.fssInodes) ∗ appXfer ∗
+      ▷ appPred appRun (absView S.fssInodes) ∗ appMerge (hlc := hlc) ∗ appSyncRun (hlc := hlc) ∗
       fsCrashSeamAt (hlc := hlc) appGuest cov sb.sbLogstart ∗
+      eraSyncTok (hlc := hlc) (GF := GF) ∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S ⊢
       |={⊤}=> ∃ (ξ0 : CtxId) (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)
         (HIr : IrefslotG GF) (γc γl0 γl1 γt : GName) (γ0 γ1 : UartNames) (cn : ConsNames)
@@ -543,7 +544,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   unfold powerBootRows
   rw [hds] at hwf ⊢
   iintro ⟨⟨Hkpt, #Hcert, Hregs, Hmem, Htoks, Hlocks, Hkauth, #Hkst, #Hwire, Hdevs, Hch, Hmir, #Hsw,
-    #Hcinv⟩, Happ, #Hx, #Hseam, Hsnap⟩
+    #Hcinv⟩, Happ, #Hmerge, #Hrun, #Hseam, Hstok, Hsnap⟩
   -- the gname-only mints (the instances first)
   imod bootSharedDev_names (hlc := hlc) (GF := GF) with
     ⟨%Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt, Hn⟩
@@ -568,9 +569,10 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   -- the file system
   have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn
     (diskOf ds0.reset) ndisk S sb cov nib gsn gln gtn Pb hwf)
-  imod hF $$ Hblk Happ Hx Hseam Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert with ⟨%I, %F, Hfs⟩
+  imod hF $$ Hblk Happ Hmerge Hrun Hseam Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv
+    with ⟨%I, %F, Hfs⟩
   unfold bsfRows
-  icases Hfs with ⟨Hsup, Hmb, Hib, Hiau, Hbs, -, #Hcs⟩
+  icases Hfs with ⟨Hsup, Hmb, Hib, Hiau, Hbs, -, #Hcs, -⟩
   ihave Hsup := fsBootSupply_appInv (hlc := hlc) (GF := GF) _ _ _ _ _ _ _ _ _ _ $$ Hsup
   icases Hsup with ⟨#Hai, Hsup⟩
   -- the handover's stamped record context

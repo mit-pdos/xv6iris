@@ -477,11 +477,12 @@ theorem mn_firstPersist [Fscfg] [Icfg] [CurCtx] (hg : FsGeomOk) :
     iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
     bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
     isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF)
+    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    crashInv (hlc := hlc) (GF := GF)
     ⊢ firstBootPersist (hlc := hlc) := by
   unfold mnIcacheRows firstBootPersist
-  iintro ⟨#Hp, #Hb, #Hd, ⟨#Hit, #Hiti, -, #Hsl⟩, #Hr, #Hm, #Hk, #Hseam, #Hcert⟩
-  iframe Hp Hb Hd Hit Hiti Hsl Hr Hm Hk Hseam Hcert
+  iintro ⟨#Hp, #Hb, #Hd, ⟨#Hit, #Hiti, -, #Hsl⟩, #Hr, #Hm, #Hk, #Hseam, #Hcert, #Hcinv⟩
+  iframe Hp Hb Hd Hit Hiti Hsl Hr Hm Hk Hseam Hcert Hcinv
   ipureintro; exact hg
 
 set_option maxHeartbeats 4000000 in

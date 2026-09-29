@@ -149,7 +149,8 @@ material (the logged view IS `P` on the covered range), the dirty halves,
 the log header and slots, the bitmap at its PowerOn form, THE COVERAGE
 REMAINDER (every covered, unspent block at `Pb`), the byte view's row named
 at `Pb`, the WAL's exception handle, the application's invariant, and the
-crash seam at the application's guest with the transport (deviation 7). -/
+crash seam at the application's guest with the merge and the sync runner
+(deviation 7; sync K3-3). -/
 def fsKitFsinitGhost [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (Xexc : List Nat) :
     IProp GF := iprop(
@@ -170,7 +171,10 @@ def fsKitFsinitGhost [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
   excOwn fscFs.exc Xexc ∗
   appInv (hlc := hlc) fscFs ∗
   fsCrashSeamAt (hlc := hlc) appGuest fscCov fscLogst ∗
-  appXfer)
+  appMerge (hlc := hlc) (GF := GF) ∗
+  -- ...AND THE SYNC RUNNER (Rocq sync K3-3), beside the merge: fsinit builds the
+  -- ghost commit's hooked law from the two
+  appSyncRun (hlc := hlc) (GF := GF))
 
 /-- **Rocq `fs_kit_fsinit_ghost_open`**: the kit's rows by name. -/
 theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
@@ -193,7 +197,7 @@ theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
       excOwn fscFs.exc Xexc ∗
       appInv (hlc := hlc) fscFs ∗
       fsCrashSeamAt (hlc := hlc) appGuest fscCov fscLogst ∗
-      appXfer := by
+      appMerge (hlc := hlc) (GF := GF) ∗ appSyncRun (hlc := hlc) (GF := GF) := by
   unfold fsKitFsinitGhost
   iintro H
   iexact H

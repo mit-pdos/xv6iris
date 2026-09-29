@@ -63,7 +63,7 @@ def bsfRows [Fscfg] [Icfg] (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat)
   fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
-  genCert ∗ fsCrashSeam (hlc := hlc) cov sb.sbLogstart
+  genCert ∗ fsCrashSeam (hlc := hlc) cov sb.sbLogstart ∗ crashInv (hlc := hlc) (GF := GF)
 
 /-- **THE ERA'S FS MINT, ROUTED** (Rocq `boot_shared_alloc`'s
 `fs_cfg_alloc_snap` call and the fs rows of its post): the era's block
@@ -77,25 +77,27 @@ theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsName
     (hwf : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γd b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appXfer -∗
+      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
       fsCrashSeamAt (hlc := hlc) appGuest cov sb.sbLogstart -∗
+      eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S -∗
       logMirrorHalf (hlc := hlc) (mirrorOf (fsBlocks dk)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       irefSlots IREFBOOT -∗ irefSlotsAuth -∗ bslots mainBslotsFs -∗ genCert -∗
+      crashInv (hlc := hlc) (GF := GF) -∗
       |={⊤}=> ∃ (I : Icfg) (F : Fscfg),
         bsfRows (hlc := hlc) dk sb nib cov γ0 γd cn (snapSpent S nib) Pb := by
   have hsb : sb = S.fssSb := hwf.1
   subst hsb
-  iintro Hblk Happ #Hx #Hseam Hsnap Hmir #Hsw Hib Hia Hbs #Hcert
+  iintro Hblk Happ #Hmerge #Hrun #Hseam Hstok Hsnap Hmir #Hsw Hib Hia Hbs #Hcert #Hcinv
   imod fsCfgAllocSnap (hlc := hlc) (GF := GF) ⊤ γ0 γd cn dk ndisk S cov nib gsn gln gtn Pb hwf
-    $$ Hblk Happ Hx Hseam Hsnap with ⟨%I, %F, Hsup⟩
+    $$ Hblk Happ Hmerge Hrun Hseam Hstok Hsnap with ⟨%I, %F, Hsup⟩
   ihave #Hs := fsCrashSeam_ofAt (hlc := hlc) (GF := GF) appGuest cov S.fssSb.sbLogstart $$ Hseam
   imodintro
   iexists I, F
   unfold fsCfgSnapPost at *
   unfold bsfRows logMirrorBorn
-  iframe Hsup Hmir Hsw Hib Hia Hbs Hcert Hs
+  iframe Hsup Hmir Hsw Hib Hia Hbs Hcert Hs Hcinv
 
 end BootSharedFs
 

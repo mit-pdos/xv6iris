@@ -159,7 +159,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots,
     Hpool, Hcr, Hfsb, Hnext⟩
   unfold fsinitCrash
-  icases Hcr with ⟨Hborn, #Hlaw, #Hbinv⟩
+  icases Hcr with ⟨Hborn, #Hlaw, #Hlawg, #Hcinv, #Hbinv⟩
   have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»
     bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff
@@ -176,8 +176,13 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
   · iexact Hseam
   isplitr
   · iexact Hcert
-  imodintro
-  iexact Hlaw
+  isplitr
+  · imodintro
+    iexact Hlaw
+  isplitr
+  · imodintro
+    iexact Hlawg
+  iexact Hcinv
 
 end
 

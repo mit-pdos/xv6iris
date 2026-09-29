@@ -100,10 +100,10 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
   ihave Hpre := firstPersistPre (hlc := hlc) $$ Hbp Hka
   unfold firstBootPersist
   icases Hbp with ⟨#Hpe, ⟨%γl, #Hbio⟩, ⟨%pd, %pav, %pu, #Hdc⟩, #Hit2, #Hitb, #Hslk, #Hireg, #Hbm,
-    #Hkmem, %hg, #Hseam0, #Hcert⟩
+    #Hkmem, %hg, #Hseam0, #Hcert, #Hcinv⟩
   ihave %hpd := fsReady_descPage fscDisk fscDlock pd pav pu $$ Hdc
   icases firstFsinit_open (hlc := hlc) $$ Hfsi with ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev,
-    %vNc, %vN, %vname, %vcpu, %sbOld, %hp, %hold, Hseam, Hxfer, Hmir, Hlf, Hbinv, Hb1, Hsb, Hxo,
+    %vNc, %vN, %vname, %vcpu, %sbOld, %hp, %hold, Hseam, Hmerge, Hrun, Hmir, Hlf, Hbinv, Hb1, Hsb, Hxo,
     Hireg', Hbm', Hboot, Hk0, Hk16, Hlk, Hnm, Hcpu, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk,
     ⟨%L, %D, %hLdk, HL, HD⟩, Hdty, Hhdr, Hslots, Hbsl, Hirs, -, #Henv⟩
   obtain ⟨⟨vMagic, vNblocks, vNlog, himg, hmagic⟩, h1, hparse, hok, hcg, hbm, hsz, hlen, hnd, hhome,
@@ -127,7 +127,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
   unfold wp_fsinit_eb_body at h
   simp only [fsinitAddr] at h
   iapply h
-  iframe Hk Hpc Hpinv Hte Hce Hpe Hbio Hdc Hpid Hseam Hxfer Hcert Hmir Hlf Hbinv Hb1 Hsb Hxo Hireg'
+  iframe Hk Hpc Hpinv Hte Hce Hpe Hbio Hdc Hpid Hseam Hmerge Hrun Hcert Hcinv Hmir Hlf Hbinv Hb1 Hsb Hxo Hireg'
     Hbm' Hboot Hit2 Hitb Hslk Hk0 Hk16 Hlk Hnm Hcpu Hst Hdv Hout Hcmt Hnc Hn Hblk HL HD Hdty Hhdr
     Hslots Hbsl Hir1
   iapply wpNext_intro

@@ -340,7 +340,7 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
-  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗
+  genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
   -- THE FIRST PROCESS'S EXEC BUNDLE (Rocq `init_boot_bundle`), carried to userinit
   initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   -- the device fabric, from time 0, and the boot hart's tokens over it

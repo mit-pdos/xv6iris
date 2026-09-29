@@ -198,7 +198,8 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : A.fixed)
         (T : List Obs) (g' : GState) (h : List Obs),
       @powerInterp hlc GF (xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-          γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) g' ∗
+          γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
+        syncTokTriv syncHookTriv) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
         ▷ xv6Slot A.names A.pred cov sb.sbLogstart γd γsw γreg γstart c ∗
         ▷ obsLedgerAt (A.R c) γobs ⊢@{IProp GF}
@@ -212,13 +213,21 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     A.fixed A.cl AL.al_birth
     A.names A.pred A.boot A.ifc A.turn
     AL.al_xfer Happ_init
+    -- THE TWO SYNC SLOTS (Rocq sync K3-2): no application states a sync ledger
+    -- yet, so the token is `True` and a hook is its own `Q` (lane E gives the
+    -- record fields)
+    (fun _ _ _ _ _ _ => syncTokTriv (GF := GF) 0) (fun _ _ _ _ _ _ => syncHookTriv (GF := GF) 0)
+    (fun _ _ _ _ _ _ => by imodintro; itrivial)
+    (fun _ _ _ _ _ _ _ => appSyncRunRaw_triv _ _ _ (fun _ => .rfl))
     (fun γobs c => obsLedgerAt (A.R c) γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       AL.al_programs (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl rfl)
+        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
+        syncTokTriv syncHookTriv) c rfl rfl rfl rfl rfl rfl)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       AL.al_echo (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl rfl)
+        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
+        syncTokTriv syncHookTriv) c rfl rfl rfl rfl rfl rfl)
     (fun γobs c => obsLedgerAt_alloc_cl (A.R c) γobs (A.cl c) (AL.al_R0 c))
     (fun γd γobs c h on dk hs =>
       obsLedgerAt_step (A.R c) (A.cons c) (A.turn c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk
@@ -229,6 +238,7 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T => by
       letI : MachFixedGS hlc GF := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen
         γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
+        syncTokTriv syncHookTriv
       intro E gen cP cI Fc i γ hu
       letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
       exact uartObsPermit_ledger i (A.R c) (A.tag c) (A.cons c) γ rfl rfl rfl
