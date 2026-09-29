@@ -33,10 +33,10 @@
 (*  reads the content off the state the record's [lm_ok] is given.        *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
 Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
-Require Import StringBytes ProgTree ProgTreePipes PipesPair.
+Require Import ProgTree ProgTreePipes PipesPair.
 Require GrepTree GrepFilt.       (* the filter a grep stage applies (cut G3) *)
 Require FileDisc.                (* [producer], moved down (cut C9b) *)
 (* stdpp's list lemmas over the ones [ProgTree]'s Stdlib import re-exports *)

@@ -48,7 +48,6 @@ Require Import RiscvLang.
 Require Import ConsLog.
 Require Import RiscvPtsto.
 Require Import WpUart.
-Require Import PipesDisc.
 Require Import PipeBothNPure.
 (* stdpp's list names over the ones the Stdlib import above re-exports *)
 From stdpp Require Import list.

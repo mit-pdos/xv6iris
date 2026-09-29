@@ -87,7 +87,6 @@ Require Import SpecForkretPark.
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
-Require Import UhistDefs.   (* [uhist_auth] -- the incarnation's key history, born here *)
 Require Import SpecUsertrap.  (* [usertrap_res]'s instances: was reaching
                                  here through UsertrapRes.v's own import *)
 Require Import UexecSlot. (* [uvis] *)

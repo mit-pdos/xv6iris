@@ -66,7 +66,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import WpUmodeBranch.
 Require Import UmodeArith UmodeAbi.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UCodeShP.
@@ -78,7 +77,6 @@ Import Defs.
 Require Import UserFd.
 Require Import UkShParse.
 Require UkShCmdalloc.
-Require Import UkShParseSym.
 Require Import UkShParseLex.
 Require Import UkShParseTok.
 Require Import RefParse.

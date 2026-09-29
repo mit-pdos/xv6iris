@@ -40,7 +40,6 @@ Require Import WpUmodeBranch.
 Require Import UmodeArith UmodeAbi.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UCodeShP.
-Require Import UkSh.
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)

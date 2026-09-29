@@ -46,15 +46,12 @@ Require Import RiscvLang.
 Require Import ObsTrace.
 Require Import LineWords.
 Require Import EchoDisc.
-Require Import ConsLog.
+Require Import LogEntryDefs.
 Require Import FileDisc.
-Require Import FileDiscDec.   (* [disc_f_dec]: the ledger's counter *)
 Require Import FileOutPure.
 Require Import LineModelLinks.
-Require Import GenOutPure.
 Require Import FileHooks.        (* [file_hooks] *)
 Require Import EchoOut.          (* the ghost algebra, [ch_E] and its laws *)
-Require Import GenOutHist.
 Require Import GenOut.           (* the claim once: [gcl] and its steps *)
 Require Import AppEcho.          (* [echo_fixed] *)
 Require Import AppFile.          (* [file_fixed], [fl_auth], [f_bytes_typed] *)

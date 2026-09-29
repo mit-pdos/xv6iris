@@ -21,27 +21,13 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvModelBytes.
-Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
-Require Import UserHeap UkRun UkRunLeaf.
-Require Import FdSlots UserFd.
-Require Import UCodeShK UCodeShP.
-Require Import FileDisc.
-Require Import UkSh.
-Require Import UkShParse.
-Require Import UkShDiag.
-Require Import UkShMalloc.
-Require Import UkShLoop.
-Require Import UkShFork.
+Require Import RiscvLang RiscvPtsto.
+Require Import UkRun.
+Require Import UserFd.
 Require Import UkShPipeForkTwin.
 Require Import UkShRedirBody.
 Require Import CtxIdDefs.
 Require Import UexecSG.
-Require Import UserCwd.
-Require Import UserChildren.
-Require Import UserPerm.
-Require Import UserPtTree.
 Require Import Xv6Cameras.
 Local Open Scope Z_scope.
 Import Defs.

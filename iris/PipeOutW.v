@@ -55,7 +55,6 @@ Require Import GenOutHist.
 Require Import GenOutWild.
 Require Import GenOut.
 Require Import PipeOut.
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesView.
 Require Import PipeOutN.

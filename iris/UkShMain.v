@@ -57,12 +57,11 @@ Require Import RegFile.
 Require Import UserPtTree.
 Require Import UmodeArith UmodeAbi.
 Require Import UserPerm.
-Require Import UserHeap UkRun UkRunLeaf.
+Require Import UserHeap UkRun.
 Require Import FdSlots UserFd.
 Require Import UCodeShK.
 Require Import UCodeShP.
 Require Import UkShParse.
-Require Import UkShParseCmd.
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShMalloc.

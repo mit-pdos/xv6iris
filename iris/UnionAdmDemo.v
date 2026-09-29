@@ -22,10 +22,9 @@
 (*      [a] is admitted ([demo_sync_inflight]).                          *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import gmap list bitvector.definitions.
+From stdpp Require Import gmap bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
-Require Import StringBytes.
 Require Import FileState FileClass FileDisc.
 Require Import UnionDisc UnionDiscDec UnionAdm UnionOutPure.
 From stdpp Require Import list ssreflect.

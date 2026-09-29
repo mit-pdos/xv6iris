@@ -17,17 +17,14 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
+Require Import FdSlots.
 Require Import ProcGeom.          (* [NOFILE] *)
 Require Import UserPerm UexecSlot UexecRet.
-Require Import UserHeap UkRun.
-Require Import UserFd UserCwd.
-Require Import ChildTok.
+Require Import UserHeap.
 Require Import ElfFile ElfUser ElfLoadable.
 Require Import PageGeom.          (* [PGSIZE] *)
 Require Import UmodeArith UmodeAbi.
 Require Import FsAbsDefs.
-Require Import ArgPath.
 Require Import SpecKexec.
 Require Import UShKernel.
 Require Import KexecBuilt.
@@ -44,8 +41,6 @@ Require Import ExecWords.        (* [exec_ok]: [line_ok] without the command *)
 Require Import UShEcho.           (* the push's own lemmas, and the node
                                      reading [echo_args_det_holds] *)
 Require User.SyncSyms User.SyncInstrs User.SyncData.
-Require Import CtxIdDefs.     (* [GenId] / [CurCtx] -- the real classes, so
-                                 the section's binders are not fresh types *)
 Local Open Scope Z_scope.
 Import Defs.
 

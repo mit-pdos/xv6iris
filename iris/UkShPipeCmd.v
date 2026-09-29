@@ -46,9 +46,7 @@ Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Local Open Scope Z_scope.
 Require Import UserFd.
-Require Import UkSh.
 Require Import UkShParse.
-Require Import UkShParseLex.
 Require UkShCmdalloc.
 Require Import UkShPipeNode.
 Require Import UexecSG.

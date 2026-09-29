@@ -31,11 +31,6 @@ Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
 Require Import UserHeap.
-Require Import UserPerm.
-Require Import ProcPtOwn.
-Require Import UserPtTree.
-Require Import UmodeArith.
-Require Import ProcGeom.
 Require Import UexecSlot UexecRet UexecSG.
 Require Import UkRun UkRunLeaf UkRunSys.
 Require Import SpecConsolewrite.   (* [cons_out_chain] *)
@@ -49,26 +44,12 @@ Require Import UkShRun.       (* [wp_kshr_jal] -- the exit call's second half *)
 Require Import UkShDiag.
 Require Import UShOut.
 Require Import UShPanic.           (* the mould: [ksh_w1_of_link_blk_at] *)
-Require Import LinkRec.            (* the record the generic supplier reads *)
-Require Import PipeNames.
-Require Import PipeQueue.
-Require Import PipeReg.
 Require Import PipeProto.
-Require Import ObsTrace.
-Require Import ConsLog.
-Require Import LineWords.
 Require Import EchoDisc.
 Require Import PipeDisc.
-Require Import EchoOutPure.
 Require Import EchoOut.
-Require Import AppEcho.
 Require Import PipeOut.
-Require Import GenLinksLine.
-Require Import UkShFork.
 Require Import UkShPipe.           (* [ush_pipe_call] *)
-Require Import UShPipeCall.        (* [ush_pipe_call_paid]: the paid stub *)
-Require Import UEchoPipe.          (* [ep_pay] -- echo's own lend *)
-Require Import UexecExecInst.      (* THE INSTANCE: [uexecSG_xv6] *)
 Require Import CtxIdDefs.
 Require User.ShSyms.
 Local Open Scope list_scope.

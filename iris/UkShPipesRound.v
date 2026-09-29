@@ -48,11 +48,11 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
+Require Import UmodeArith.
 Require Import ProcGeom.     (* [PIDMAX] *)
-Require Import UserHeap UkRun UkRunLeaf.
+Require Import UserHeap UkRun.
 Require Import FdSlots UserFd.
 Require Import PipeNames.
 Require Import UserCwd.
@@ -62,10 +62,7 @@ Require Import UCodeShP.
 Require Import UkSh.
 Require Import UkShParse.
 Require Import UkShParseCmd.
-Require Import UkShMain.
 Require Import UkShMalloc.
-Require Import UserPtTree.
-Require Import UserPerm.     (* [usz_ok] *)
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShPipe.
@@ -74,7 +71,7 @@ Require Import UkShPipesParse.
 Require Import UkShPipesSeam.
 Require Import UkShPipesCmd.
 Require UkShCmdalloc.
-Require Import RefParse RefParseSym RefParseBridge.  (* [ref_parsecmd_bars], [ushq_ptree]'s facts *)
+Require Import RefParse RefParseBridge.  (* [ref_parsecmd_bars], [ushq_ptree]'s facts *)
 Require Import UkShRedirs.  (* [ushp_malloc_chain] *)
 Require Import UkShParser.  (* [ushp_room] *)
 Require Import UkShSeam.  (* [wp_ref_child]: THE CHILD, once *)
@@ -82,7 +79,6 @@ Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Require Import UexecSG.
-Require Import UexecRet.     (* [uwait_ans] *)
 Local Open Scope Z_scope.
 Import Defs.
 

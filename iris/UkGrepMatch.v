@@ -33,7 +33,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import WpUmodeBranch.
-Require Import UserBits UmodeArith UmodeAbi.
+Require Import UmodeArith UmodeAbi.
 Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunBr.
 Require Import UCodeGrep.
 Require Import UkGrepLib.

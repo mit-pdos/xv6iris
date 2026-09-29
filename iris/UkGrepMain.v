@@ -56,7 +56,6 @@ Require Import UkGrepPutc.
 Require Import UkGrepFprintf.
 Require Import UkRunBr.
 
-Require Import FdSlots.   (* [fdstate] -- what a handle names *)
 Require Import VcGen.     (* [trunc32_mword_of_int] -- a0 read as a C [int] *)
 Require Import RiscvExtras. (* [moi32_unsigned]/[bvw32_small] *)
 Require Import ProcGeom.  (* [NOFILE] *)
@@ -64,7 +63,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
-Require Import StringBytes LineWords ProgTree GrepTree.
+Require Import LineWords ProgTree GrepTree.
 Require Import UkTree.
 Require Import UkGrepLoop.
 Local Open Scope Z_scope.

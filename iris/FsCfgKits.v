@@ -67,8 +67,6 @@ Require Import AppCfg.         (* [appcfg]: the application's record, threaded b
 Require Import AppInv.         (* [app_inv]: kit 2's application row (app-instances.md section 2);
                                   [app_merge]: the merge, kit 2's last row (round C; SY3-K2) *)
 Require Import AppDur.         (* [app_dur_laws]: the crash seam at the guest and the merge, kit 2's last row (round C; SY3-A3b) *)
-Require FsCrash.               (* [fs_crash_seam_at]: the seam at the application's guest,
-                                  spelled QUALIFIED -- this file does not want FsCrash's exports *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CtxIdDefs.

@@ -34,10 +34,10 @@
 (*      of.                                                              *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
 Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
-Require Import ProgTree ProgTreePipes PipesPair PipesDisc.
+Require Import ProgTree PipesPair PipesDisc.
 Require Import PipesDiscDec.      (* [ptermb], the prefix test of a terminal block *)
 From stdpp Require Import list.
 

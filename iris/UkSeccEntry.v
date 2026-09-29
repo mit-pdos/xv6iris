@@ -32,23 +32,20 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
 Require Import ProcGeom ProcDefs.
-Require Import UsysMemOk UserPerm UexecSlot UexecRet UexecSG UexecWp.
-Require Import UserHeap UkRun.
-Require Import UserFd UserCwd UserChildren.
-Require Import ChildTok.
-Require Import ElfFile ElfUser.
-Require Import UmodeArith UmodeAbi.
+Require Import UsysMemOk UexecSlot UexecRet UexecSG UexecWp.
+Require Import UkRun.
+Require Import UserFd.
+Require Import ElfUser.
+Require Import UmodeArith.
 Require Import SpecKexec.
 Require Import ExecEntry.
 Require Import UexecExecInst.         (* THE INSTANCES: [uexecSG_xv6], [xfam_at] *)
 Require Import UkAbi.
-Require Import UShKernel.
 Require Import UEchoKernel.           (* [uvis_sp] / [uvis_argc] *)
-Require Import LineWords EchoDisc ExecWords.
+Require Import ExecWords.
 Require Import UkShEcho.
 Require Import UShEcho.
 Require Import ConsoleInv.            (* [CONSOLE] *)

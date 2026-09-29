@@ -30,36 +30,31 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
 Require Import WpUart.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs FdSlots UserFd.
-Require Import ProcGeom.
-Require Import UserHeap UkRun UkRunLeaf.
+Require Import UserHeap UkRun.
 Require Import UserCwd UserChildren.
-Require Import ChildTok.
 Require Import FsImg.
-Require Import UexecSlot UexecRet UexecSG UexecExecInst UexecExecMint.
-Require Import LineWords EchoDisc EchoOut AppEcho.
+Require Import UexecExecInst.
+Require Import LineWords EchoDisc EchoOut.
 Require Import LineModel.
 Require Import PipeOut PipeDisc.
 Require Import PipesPair PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeQueue PipeReg PipeProto.
-Require Import AppCfg AppInv.
-Require Import ProgTree.
+Require Import AppInv.
 Require Import CtxIdDefs.
 Require Import UCodeShK.
 Require Import UkSh UkShRun UkShMain UkShDiag.
-Require Import UkShEcho UkShCat.
+Require Import UkShEcho.
 Require Import UkShPipe UkShPipePaid UkShPipesRound.
-Require Import UShEcho UShEchoPipePay UShCatPay UShPipeCall.
+Require Import UShEcho UShPipeCall.
 Require Import UShPipeLeaves.
-Require Import UkConsOut.
-Require Import UkPipesIface UkPipesEntries.
+Require Import UkPipesIface.
 Require Import PipesFire UShPipesDefs UShPipesStage.
 Require Import ExecWords UkShPipesLex UShExecPin.
-Require FileDisc GrepFilt.
+Require GrepFilt.
 Require User.ShSyms.
 Local Open Scope Z_scope.
 

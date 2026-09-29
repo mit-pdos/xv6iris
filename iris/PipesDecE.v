@@ -18,8 +18,8 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list list_numbers bitvector.definitions.
-Require Import RiscvLang ObsTrace.
-Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
+Require Import RiscvLang.
+Require Import LineWords EchoDisc LineModel PipeDisc.
 Require Import ProgTree PipesPair PipesDisc PipesDiscDec LineModelLinks.
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.

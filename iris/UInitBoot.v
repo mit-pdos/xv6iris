@@ -61,7 +61,6 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
-Require Import WpUart.            (* [cons_licence]: the generic slot's output licence *)
 (* THE GHOST BINDER LIST'S DEFINING MODULES, each IMPORTED and not merely
    required ([PinnedExec.v]'s note: a field instance is inert wherever its
    module is not imported). *)
@@ -75,7 +74,6 @@ Require Import FileInvDefs.
 Require Import ChildTok.
 Require Import UexecSlot.
 Require Import UexecRet.          (* [uslot] -- REQUIRED DIRECTLY (the seal) *)
-Require Import UexecSG.
 Require Import PathElems.
 Require Import AppCfg.
 Require Import AppInv.
@@ -85,58 +83,13 @@ Require Import SpecKexec.         (* [exec_au_pre] / [kexec_image_ok] *)
 Require Import FsAbsDefs.
 Require Import FsAbsEra.
 Require Import PinnedExec.
-Require Import UexecExecInst.     (* the class INSTANCE: [uexecSG_xv6].  This
-                                     file is E2's assembly for THE xv6
-                                     application, so its [uexecSG] is the
-                                     kernel's own -- which is also what
-                                     [App.xv6_app_adequacy] instantiates
-                                     [InitBoot.init_boot_bundle]'s at, and
-                                     what [UexecExecMint]'s supply laws are
-                                     stated over. *)
-Require Import UkRun.             (* [udepw_law] -- the named deposits *)
-Require Import UkInit.            (* [init_deps] / [init_cons_sup] *)
-Require Import UexecExecMint.     (* [udepw_law_of_sup] / [udep_free] *)
-Require Import UkWriteClosed.     (* [kinit_w1_of_closed_l0]: init's write on a closed fd 1 (lane EXEC-SEAM, (D)) *)
 Require Import UInitKernel.       (* [init_slot_of_kexec] / the dance *)
-Require Import LineWords.         (* [wl_nl] / [rest_of] *)
-Require Import EchoLinks.         (* [echo_links] -- E5's four links as one
-                                     persistent law *)
-Require Import UInitDiag.         (* [kinit_pro] and the three laws /init's
-                                     walk is handed (lane M6b): the banner's
-                                     leaving the round-open credential, and
-                                     the two diagnostics paid from it *)
-Require Import UInitBanner.       (* [kinit_banner0_holds] -- the era's
-                                     credential as init's banner payment *)
-Require Import UInitCons.         (* [init_cons_fd] / [init_cons_cred] *)
-Require Import UInitConsK.        (* the two arms' discharges at echo's era *)
-Require Import UInitSh.           (* [init_cons_sup_of_sh_slot] *)
-Require Import UShPanic.          (* [sh_prompt_law_holds_line]: the prompt's law at the tight family (step 4) *)
-Require Import EchoLinksPro.      (* [ewc_pro]: the round-open shape /init lends *)
-Require Import EchoLinksLine.     (* [ewc_lcred]: the loop's tight credential family (step 4) *)
-Require Import EchoLinksBan.      (* [ewc_ban_line]: the banner-owed credential is a boundary credential *)
-Require Import UShLine.           (* sh's console read-leaf file.  Its
-                                     discharge [ush_read_recv_leaf_holds]
-                                     is GONE (lane ECHO-OUT part 5): the
-                                     leaf is a premise here now.  The
-                                     [Require] stays because the cone it
-                                     brings is what this file's own
-                                     statements elaborate against. *)
-Require Import AppEcho.           (* [echo_boot] / [echo_taint] *)
 Require Import EchoOut.            (* [echoOutG]: the class [AppEcho]'s claims
                                       and its ledger are stated at (lane
                                       ECHO-OUT part 5).  It CARRIES
                                       [mono_natG], so it is the taint's one
                                       instance here too. *)
-Require Import UserConsole.       (* [ucons_reader_eq] *)
 Require Import UserFd.            (* [NSTD] *)
-Require Import LinkUserinit.      (* [UG.uexec_wp_gen]: the generic user WP,
-                                     the module route SystemAdequacy uses --
-                                     the application tier does not Require a
-                                     Proof*.v *)
-Require Import UkSh.              (* [sh_deps] / [ush_tag_law] / the two
-                                     console leaves sh's entry is told *)
-Require Import UShConsK.          (* sh's two console leaf discharges at
-                                     echo's era (lane SH-OPEN) *)
 (* THE ADEQUACY LAYER IS DELIBERATELY NOT REQUIRED HERE.  This file is a
    proofmode-heavy u-tier assembly; pulling [RiscvAdequacy] /
    [SystemAdequacy] / [FsCfgBoot] into it -- which is what the B3 theorem

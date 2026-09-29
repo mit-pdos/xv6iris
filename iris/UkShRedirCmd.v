@@ -53,9 +53,7 @@ Require Import ChildTok.
 Local Open Scope Z_scope.
 Import Defs.
 Require Import UserFd.
-Require Import UkSh.
 Require Import UkShParse.
-Require Import UkShParseLex.
 Require UkShCmdalloc.
 
 Require Import UexecSG.

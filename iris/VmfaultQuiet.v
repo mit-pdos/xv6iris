@@ -23,7 +23,7 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import RiscvPtsto RiscvExtras.
-Require Import UserPtTree UserPerm ProcPtOwn.
+Require Import UserPerm ProcPtOwn.
 Local Open Scope Z_scope.
 
 (* the rounded fault address's page is live below the size *)

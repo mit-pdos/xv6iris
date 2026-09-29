@@ -95,37 +95,32 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import ProgTree UkTree UkStub.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi UserBits.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
 Require Import FdSlots UserFd UserCwd.
-Require Import UserHeap UserPerm UserPtTree.
 Require Import ProcGeom.
 Require Import CtxIdDefs.
-Require Import UexecSlot UexecRet UexecSG.
+Require Import UexecSlot UexecSG.
 Require Import UkRun UkRunSys.
-Require Import UexecExecInst UexecExecMint.
-Require Import UsysMemOk.
 Require Import SpecSysRead.            (* [sys_rw_count] *)
 Require Import SpecConsolewrite UkWriteLeaf.  (* [cons_out_chain], the console write rows *)
 Require Import ConsoleInv.             (* [CONSOLE] *)
 Require Import FsCfg.
 Require Import AppCfg AppInv.
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin FsSyncPin.
-Require Import EchoDisc EchoOut LineWords.
+Require Import EchoDisc EchoOut.
 Require Import FileState.              (* [echo_chunks] *)
 Require Import AppFile AppFileCons FileOpen.
 Require Import UserOff.
 Require Import UkFileOpen.
-Require Import FileWrite UEchoFile.
-Require Import FsImg FsImgCheck.
+Require Import UEchoFile.
+Require Import FsImg.
 Require Import SysOpenDefs.
-Require Import LineModel LineModelInst FileDisc GenOut FileOut.
-Require Import FileLinks FileLinksLine FileLinkGen.   (* [file_links], [f0w], [file_params] *)
+Require Import LineModel FileDisc FileOut.
+Require Import FileLinks FileLinkGen.   (* [file_links], [f0w], [file_params] *)
 Require Import UkConsOut UkFileDev.
-Require Import UkHandler UkFreeHandler ProgTreeFile.
-Require Import GenLinksLine LineModelLinks FileHooks.   (* [gwc_post], [lm_body], [fline] *)
-Require Import UCodeCat UkCatTree.
-Require Import UCodeEcho UkEchoTree.   (* echo's instance: [echo_prog] *)
+Require Import UkHandler UkFreeHandler.
+Require Import GenLinksLine.   (* [gwc_post], [lm_body], [fline] *)
+Require Import UkCatTree.
 Local Open Scope Z_scope.
 Import Defs.
 

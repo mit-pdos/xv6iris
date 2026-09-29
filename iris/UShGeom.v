@@ -46,12 +46,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
 Require Import ProcGeom.          (* [NOFILE] *)
 Require Import UserPerm UexecSlot UexecRet.
-Require Import UserHeap UkRun UkRunLeaf.
-Require Import FdSlots UserFd.       (* [fdstate] *)
-Require Import ElfFile ElfUser ElfLoadable.
+Require Import UserHeap.
+Require Import FdSlots.       (* [fdstate] *)
+Require Import ElfFile.
 Require Import PageGeom.          (* [PGSIZE] *)
 Require Import UmodeArith UmodeAbi.
 Require Import SpecKexec SpecCopyin.   (* [uimg_word_at] *)
@@ -63,7 +62,6 @@ Require Import WpUmodeLoad.       (* [uM_word] / [uM_word_bytes] *)
 Require Import KexecDefs.
 Require Import UkAbi.
 Require Import UEchoKernel.       (* [echo_arg]: the argument reading, which names no program *)
-Require Import LineWords.
 Require Import UkShEcho.          (* [echo_alen]: the caller's own argument lengths *)
 Require Import EchoDisc.
 Require Import ExecWords.         (* [exec_ok]: [line_ok] without the command *)

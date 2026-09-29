@@ -26,11 +26,9 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UsysMemOk UexecSlot UexecRet.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import ProcDefs.   (* [secc_all] *)
 Require Import UkStep.
 Require Import UserHeap.
-Require Import UserPerm.
 Require Import CtxIdDefs.
 Require Import ChildTok.
 Require Import UserFrame UserExecFacts.

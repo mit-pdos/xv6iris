@@ -17,9 +17,7 @@ From stdpp Require Import list bitvector.definitions.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import FileDisc.
-Require Import PipeDisc.
 Require Import FileOutPure.
-Require Import PipeOutPure.
 Require Import LineModel.
 From stdpp Require Import ssreflect.
 

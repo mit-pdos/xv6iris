@@ -23,7 +23,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import ObsTrace.
 Require Import CtxIdDefs.
 Require Import Xv6Cameras.
 Require Import Xv6G.
@@ -33,7 +32,6 @@ Require Import ProcAvail.
 Require Import FsAbsDefs.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import ConsoleInv.
 Require Import WpUart.
 Require Import UexecSlot.
 Require Import UexecRet.
@@ -46,30 +44,20 @@ Require Import FsCfg.
 Require Import FsInitPinBoot.      (* [era0_pins] *)
 Require Import AppEcho.
 Require Import EchoOut.
-Require Import UserConsole.
 Require Import FileFsPure.
 Require Import FileState.
 Require Import FileDisc.
-Require Import FileOutPure.
 Require Import AppFile.
 Require Import AppFileCons.        (* the claim's console readings *)
 Require Import FileOut.
-Require Import FileLinks.
 Require Import FileLinksLine.
-Require Import LinkRec.
 Require Import FileLinkGen.        (* [f0pre_at] *)
-Require Import GenLinksLine.
 Require Import UkRun.
 Require Import UkWriteClosed.      (* [kinit_w1_of_closed_l0] *)
 Require Import UkInit.
-Require Import UkInitMain.
 Require Import UkSh.
-Require Import UShLine.
 Require Import UShConsK.
-Require Import UInitDiag.
-Require Import UInitBanner.
 Require Import UInitCons.
-Require Import UInitSh.
 Require Import UInitConsFile.      (* the console's two open leaves at the file claim *)
 Require Import LinkUserinit.       (* [UG.uexec_wp_gen] *)
 Import Defs.

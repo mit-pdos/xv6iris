@@ -95,7 +95,6 @@ Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import LogQuiet.        (* [log_res_quiet_acc]: the guard's reader, with the quiescent loan *)
 Require Import LogGhostCommit.  (* [log_ghost_commit_loop]: the fast path's ghost commit (sync K3-4) *)
-Require Import WpSconfEngine.   (* [wp_btype_fall_s_sconf]: the loop exit's later (sync K3-4) *)
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecSysSync.
 Require Import CodeSysSync.

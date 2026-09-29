@@ -70,32 +70,28 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
-Require Import UkRun UkRunSys.
-Require Import UCodeEcho UCodeCat.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import UkRun.
 Require User.EchoSyms User.CatSyms.
-Require Import FdSlots ProcGeom UserFd UserCwd UserHeap.
-Require Import UexecSG UexecSlot UexecRet.
-Require Import UexecExecInst.
+Require Import FdSlots ProcGeom UserFd.
+Require Import UexecSG UexecRet.
 Require Import ConsoleInv.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
-Require Import LineWords LineBytes EchoDisc ExecWords.
-Require Import EchoOut AppEcho.
-Require Import LineModel LineModelLinks.
+Require Import LineWords EchoDisc ExecWords.
+Require Import EchoOut.
+Require Import LineModel.
 Require Import PipeOut.
-Require Import PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
+Require Import PipesDisc PipeBothNPure GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
-Require Import AppCfg AppInv.
+Require Import AppInv.
 Require Import CtxIdDefs.
-Require Import ExecArgs ExecEntry.
-Require Import ElfFile ElfUser.
+Require Import ExecEntry.
+Require Import ElfUser.
 Require Import ProgTree UkTree UkStub.
-Require Import UkEchoTree UkCatTree UkGrepLoop UkGrepTree.
+Require Import UkEchoTree UkCatTree UkGrepLoop.
 Require GrepTree GrepFilt.
 Require Import UkHandler.
-Require Import UkShMain UkShEcho UShEcho UkShCat.
+Require Import UkShEcho UShEcho.
 Require Import UkTreeEntry.
 Require Import UkPipesIface.
 Local Open Scope Z_scope.

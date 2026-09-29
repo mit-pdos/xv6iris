@@ -58,16 +58,12 @@ Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import PipeOut.
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesView.
 Require Import PipeBothNPure.
 Require Import PipeBothN.
 Require Import PipeOutN.
-Require Import PipeOutNEv.
-Require Import PipesOut.
 Require Import PipesLedPure.
-Require Import PipesLinksV.
 Require Import GenOutWild.
 Require Import PipeOutW.
 Require Import UnionDisc.

@@ -55,14 +55,11 @@ Require Import FsImgCheck.
 Require Import FsImgDisk.
 Require Import App.                (* [xv6_app_adequacy] and the record *)
 Require Import InodeInv.           (* [ROOTINO] *)
-Require Import FileDisc.
 Require Import AppFile.            (* [fileAppG] / [fileAppSig] *)
 Require Import EchoOut.            (* [echoOutG] / [echoOutSig] *)
 Require Import FileOut.            (* [fileOutG] / [fileOutSig] *)
 Require Import PipeOut.            (* [pipeOutG] / [pipeOutΣ] *)
-Require Import UnionDisc.
 Require Import UnionOutPure.       (* [union_phi_sync] -- the conclusion, spelled out *)
-Require Import UnionOut.
 Require Import AppUnionRec.        (* [app_union] and its ten discharged laws *)
 Require UkFileIface.               (* [fifRegΣ]: the file handler's registry *)
 Require UkPipesIface.              (* [pnsRegΣ] / [pipesNΣ] *)

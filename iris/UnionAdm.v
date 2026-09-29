@@ -41,7 +41,7 @@
 (*  durable copy's record into the ledger's.                             *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap list bitvector.definitions.
+From stdpp Require Import gmap bitvector.definitions.
 Require Import RiscvLang.
 Require Import ObsTrace.
 Require Import LineWords.

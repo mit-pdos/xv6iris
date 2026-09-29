@@ -43,8 +43,8 @@ Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import WpUmodeBranch.
-Require Import UserBits UmodeArith UmodeAbi.
-Require Import UserHeap UkStep UkRun UkRunLeaf UkRunMem UkRunBr UkRunSys.
+Require Import UmodeArith UmodeAbi.
+Require Import UserHeap UkStep UkRun UkRunLeaf UkRunMem UkRunBr.
 Require Import VcGen.        (* [trunc32_mword_of_int] *)
 Require Import UCodeGrep.
 Require Import UkGrepLib UkGrepMatch.
@@ -53,7 +53,7 @@ Require Import CtxIdDefs.
 Require User.GrepSyms User.GrepInstrs.
 Require Import ChildTok.
 Require Import UserFd.
-Require Import UexecSlot UexecRet UexecSG.
+Require Import UexecSG.
 Require Import UkTree.
 Local Open Scope Z_scope.
 Import Defs.

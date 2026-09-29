@@ -32,18 +32,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
-Require Import RegFile.
-Require Import ProcGeom.          (* [NOFILE] *)
 Require Import UexecSlot UexecRet.
-Require Import UkRun UkRunLeaf.
-Require Import UserHeap.
-Require Import UserFd UserCwd.
+Require Import UserFd.
 Require Import ChildTok.
-Require Import ByteBuf.
-Require Import ElfFile ElfUser ElfLoadable.
-Require Import PageGeom.          (* [PGSIZE] *)
-Require Import UserPtTree.
-Require Import UmodeArith UmodeAbi.
+Require Import ElfUser.
 Require Import PathElems ArgPath.
 Require Import FsCfg.
 Require Import FsImg FsImgCheck.
@@ -52,33 +44,9 @@ Require Import AppCfg AppInv.
 Require Import FsCatPin.
 Require Import FileFsPure.
 Require Import PinnedExec.
-Require Import ExecEntry.
-Require Import ExecArgs.
-Require Import ExecRun.
-Require Import SpecKexec SpecSysExec.
-Require Import KexecDefs.
-Require Import UexecExecInst.
 Require Import UexecSG.
 Require Import CtxIdDefs.
-Require Import UCodeShK.
-Require Import UkSh.
-Require Import UkShRun UkShMain.
-Require Import UkShDiag.
-Require Import PipeDisc.
-Require Import UserChildren.
 Require User.ShSyms.
-Require Import UShEcho.            (* [uargv_exec_of_cmd] / [uint_avi_moi] --
-                                      the two general steps, which name no
-                                      program and no word list *)
-Require Import UkAbi.
-Require Import UEchoKernel.   (* [uvis_argc] / [uvis_av] / [echo_arg] /
-                                 [echo_args] -- the argument reading, which
-                                 names no program *)
-Require Import UkCat UkCatCat UkCatMain.
-Require Import UShCat.             (* cat's image geometry, all of it
-                                      [line_ok]-free except two lemmas this
-                                      file replaces *)
-Require Import UCodeCat.
 Require Import UkShCat.            (* the (W) half this supply feeds *)
 Require User.CatSyms.
 Local Open Scope Z_scope.

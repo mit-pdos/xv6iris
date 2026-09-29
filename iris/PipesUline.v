@@ -18,7 +18,7 @@
 (*  command, so the command and the number of cats are the same.         *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import list bitvector.definitions.
+From stdpp Require Import bitvector.definitions.
 Require Import RiscvLang.
 Require Import LineWords.
 Require Import EchoDisc.

@@ -18,7 +18,7 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String FunctionalExtensionality.
 From stdpp Require Import list gmap bitvector.definitions.
-Require Import StringBytes LineWords ProgTree.
+Require Import LineWords ProgTree.
 
 Local Open Scope Z_scope.
 Local Open Scope string_scope.

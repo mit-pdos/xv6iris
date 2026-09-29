@@ -32,7 +32,7 @@ From iris.program_logic Require Import language lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -48,7 +48,6 @@ Require Import FileOut.
 Require Import PipeOut.
 Require Import App.                      (* [app_names] / [app_pred] / [app_boot] / [app_turn] *)
 Require Import UnionOutPure.             (* [union_phi_sync] *)
-Require Import UnionOut.
 Require Import UUnionBootAdequacy.       (* [union_prog_law], [unionΣ] *)
 Require Import AppUnionRec.              (* [app_union]'s projections *)
 Require Import UInitUnionBoot.           (* [union_Hinit_boot_at]: the assembly *)

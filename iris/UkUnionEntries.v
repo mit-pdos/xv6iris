@@ -34,52 +34,38 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
 Require Import ProcGeom.
-Require Import UserPerm UexecSlot UexecRet UexecSG.
-Require Import UserHeap UkRun.
+Require Import UexecRet UexecSG.
+Require Import UkRun.
 Require Import UserFd UserCwd.
-Require Import ChildTok.
-Require Import ElfFile ElfUser.
-Require Import UmodeArith UmodeAbi.
-Require Import SpecKexec.
+Require Import ElfUser.
 Require Import ExecEntry.
-Require Import UexecExecInst.
-Require Import UkAbi.
-Require Import UCodeEcho UCodeCat.
 From User Require EchoInstrs EchoData.
-Require Import UEchoKernel.
-Require Import UShKernel.
 Require Import LineWords EchoDisc ExecWords.
 Require Import UkShEcho.
 Require Import UShEcho.
-Require Import UEchoOut.
-Require Import UShEchoOut.
-Require Import UShCat.
-Require Import FsImgCheck.
 Require Import ProgTree UkTree UkStub UkHandler.
-Require Import UkEcho UkEchoTree.
-Require Import UkCatMain UkCatTree.
+Require Import UkEchoTree.
+Require Import UkCatTree.
 Require Import UkTreeEntry.
 Require Import CtxIdDefs.
 Require User.EchoSyms User.CatSyms.
 Require Import AppCfg AppInv AppFile AppFileCons FileOpen FsCfg FsImg.
 Require Import EchoOut.
 Require Import FileState FileDisc FileOut.
-Require Import LineModel LineModelInst LineModelLinks.
-Require Import FileLinks FileLinksLine FileLinkGen FileHooks.
+Require Import LineModel LineModelLinks.
 Require Import GenLinksLine.
 Require Import ConsoleInv.
 Require Import UkConsOut ProgTreeFile.
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin FsSyncPin.
-Require Import UkFileDev FileWrite UEchoFile.
+Require Import UkFileDev UEchoFile.
 Require Import UkFileIface.
 Require UkFileEntries.
 Require DirentEnc UNamePath.   (* the class laws: the name is shorter than DIRSIZ *)
 Require Import PipeOut.
-Require Import UnionDisc UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
+Require Import UnionDisc UnionOut UnionLinks UnionLinkInstAt.
 Local Open Scope Z_scope.
 Import Defs.
 

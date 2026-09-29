@@ -32,7 +32,7 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
 From stdpp Require Import list bitvector.definitions.
-Require Import StringBytes LineWords ProgTree ProgTreePipes GrepTree.
+Require Import LineWords ProgTree ProgTreePipes GrepTree.
 
 Local Open Scope string_scope.
 Local Open Scope list_scope.

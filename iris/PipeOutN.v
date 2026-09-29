@@ -50,7 +50,6 @@ Require Import EchoDisc.
 Require Import ConsLog.
 Require Import EchoOutPure.
 Require Import PipeDisc.
-Require Import PipeOutPure.
 Require Import EchoOut.
 Require Import LineModel.
 Require Import LineModelLinks.
@@ -66,7 +65,6 @@ Require Import PipesDiscDec.      (* [pipes_hooks] *)
 Require Import PipesView.
 Require Import PipeBothNPure.
 Require Import PipeBothN.
-Require Import PipeOutPure.         (* [pline_at] *)
 Require Import RiscvPtsto.
 Require Import WpUart.
 (* stdpp's list names over the ones the Stdlib import above re-exports *)

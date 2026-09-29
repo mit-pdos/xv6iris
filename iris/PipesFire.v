@@ -48,10 +48,10 @@
 (* stages.  It halts only where its file holds content ([prod_halts]).    *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
-Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
-Require Import ProgTree ProgTreePipes PipesPair PipesDisc.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
+Require Import PipeDisc.
+Require Import ProgTree PipesPair PipesDisc.
 Require Import PipeBothNPure.
 Require GrepFilt.
 From stdpp Require Import list.

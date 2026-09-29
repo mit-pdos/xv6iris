@@ -24,8 +24,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -33,35 +32,10 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import UserPerm.
-Require Import UserPtTree.
-Require Import UmodeArith.
-Require Import ProcGeom.
-Require Import ChildTok.
-Require Import UexecSlot UexecRet UexecSG.
-Require Import ExecEntry.               (* [image_entry] -- the exec channel *)
-Require Import SpecKexec.               (* [kexec_image_ok] *)
-Require Import UkRun UkRunSys.
-Require Import UexecExecInst.           (* THE INSTANCES: [uexecSG_xv6] etc. *)
-Require Import SpecSysRead.             (* [sys_rw_count] *)
+Require Import UexecSG.
 Require Import PipeQueue.               (* [pipe_wpay], [pipe_wpost], ... *)
 Require Import PipeReg.                 (* [pipe_reg] *)
 Require Import PipeProto.               (* THE PROTOCOL *)
-Require Import UkWriteLeaf.
-Require Import UkReadRows.              (* [std_fd_st_of_key] *)
-Require Import UkWritePipe.             (* the ledger-slot pipe deposit *)
-Require Import UkAbi.
-Require Import UserHeap.
-Require Import UCodeEcho.
-Require Import UkEcho.
-Require Import UEchoKernel.
-Require Import LineWords.
-Require Import EchoDisc.
-Require Import UEchoOut.                (* THE MOULD: [out_argv_at] etc. *)
-Require Import ElfUser.                 (* [echo_elf] *)
-Require Import UkShEcho.                (* [echo_argv_bytes] *)
-Require Import UShEcho.                 (* [echo_node_img], the room bound *)
-Require Import UShEchoOut.              (* [echo_out_argv_of_image] *)
 Require Import CtxIdDefs.
 Require User.EchoSyms.
 Local Open Scope Z_scope.

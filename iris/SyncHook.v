@@ -8,7 +8,7 @@
    [RiscvPtsto.riscv_sync_hook] alone, and not in the kernel spec. *)
 From iris.proofmode Require Import proofmode.
 From iris.base_logic Require Import iprop.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
 
 Section sync_hook.
   Context `{!riscvGS Σ}.

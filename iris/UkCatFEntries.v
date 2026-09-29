@@ -22,32 +22,28 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
-Require Import UkRun UkRunSys.
-Require Import UCodeCat.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import UkRun.
 Require User.CatSyms.
-Require Import FdSlots ProcGeom UserFd UserCwd UserHeap.
-Require Import UexecSG UexecSlot UexecRet.
-Require Import UexecExecInst.
+Require Import FdSlots ProcGeom UserFd.
+Require Import UexecSG UexecRet.
 Require Import ConsoleInv.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
-Require Import FsCfg AppCfg AppInv FsImg FsImgCheck.
-Require Import LineWords LineBytes EchoDisc ExecWords.
-Require Import EchoOut AppEcho.
-Require Import LineModel LineModelLinks.
+Require Import AppCfg AppInv FsImg.
+Require Import ExecWords.
+Require Import EchoOut.
+Require Import LineModel.
 Require Import GenOut FileDisc.
-Require Import AppFile AppFileCons FileOpen.
-Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN PipesView.
+Require Import AppFile.
+Require Import PipesDisc PipeBothNPure PipeOutN PipesView.
 Require Import PipeOut PipeNames PipeProto.
 Require Import CtxIdDefs.
-Require Import ExecArgs ExecEntry.
-Require Import ElfFile ElfUser.
+Require Import ExecEntry.
+Require Import ElfUser.
 Require Import ProgTree ProgTreePipes UkTree UkStub.
 Require Import UkCatTree.
 Require Import UkHandler.
-Require Import UkShMain UkShEcho UShEcho.
+Require Import UkShEcho UShEcho.
 Require Import UkTreeEntry.
 Require Import UkPipesIface UkCatFIface.
 Local Open Scope Z_scope.

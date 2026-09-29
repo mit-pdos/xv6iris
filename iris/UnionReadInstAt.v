@@ -30,13 +30,10 @@ Require Import ConsLog.
 Require Import EchoOut.
 Require Import LineModel.
 Require Import FileState.
-Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
-Require Import PipeOut.
 Require Import UnionDisc.
 Require Import UnionOut.
-Require Import UnionLinks.
 Require Import UnionLinkInst.
 Require Import UnionLinkInstAt.
 Require Import UnionReadInst.

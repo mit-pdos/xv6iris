@@ -44,12 +44,11 @@ Require Import RiscvExec.      (* [mWP], [thread_gen] *)
 Require Import HartCustody.    (* [wp_crash_fupd]: the crash invariant's second opener *)
 Require Import RiscvPtsto.     (* [crash_inv], [gen_cert], [riscv_sync_tok]/[riscv_sync_hook] *)
 Require Import FsBlocks.       (* [fsbN], [exc_sealed_empty], [bytes_tie_exc_empty] *)
-Require Import FsDurSnap.      (* [P_dur_at] *)
 Require Import FsCrash.        (* [fs_crash_seam_at], [P_fs_comp], [P_fs_any_at] *)
 Require Import LogSnapLaw.     (* [snap_law_ghost_run], [crashN_fsbN_disj] *)
 Require Import LogInv.
 Require Import LogQuiet.       (* [log_quiet], [P_fs_rec_quiet_acc], [eo_cache_body_sub] *)
-Require Import TsoCtx.
+Require Import CtxIdDefs.
 
 Local Open Scope Z_scope.
 

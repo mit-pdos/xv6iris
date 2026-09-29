@@ -14,16 +14,13 @@
 (*  any line model ([lm_disc_first_out]).                                 *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap list bitvector.definitions.
+From stdpp Require Import gmap bitvector.definitions.
 Require Import RiscvLang.
 Require Import ObsTrace.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import EchoOutPure.
 Require Import LineModel.
-Require Import LineModelLinks.
-Require Import GenOutPure.
-Require Import PipesLedPure.
 Require Import FileState.
 Require Import FileDisc.
 Require Import FileOutPure.

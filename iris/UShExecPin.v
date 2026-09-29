@@ -34,16 +34,15 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
-Require Import RegFile.
 Require Import ProcGeom.
-Require Import UexecSlot UexecRet UexecSG UexecExecInst.
-Require Import UkRun UkRunLeaf.
+Require Import UexecSlot UexecRet UexecExecInst.
+Require Import UkRun.
 Require Import UserHeap.
-Require Import UserFd UserCwd.
+Require Import UserFd.
 Require Import ChildTok.
-Require Import ElfFile ElfUser ElfLoadable.
-Require Import UmodeArith UmodeAbi.
-Require Import PathElems ArgPath.
+Require Import ElfFile ElfUser.
+Require Import UmodeAbi.
+Require Import PathElems.
 Require Import FsCfg.
 Require Import FsImg FsImgCheck.
 Require Import FsAbsDefs FsAbsEra.
@@ -51,15 +50,14 @@ Require Import AppCfg AppInv.
 Require Import FsCatPin FsGrepPin FsSeccPin FsSyncPin.
 Require Import FileFsPure.
 Require Import PinnedExec.
-Require Import ExecEntry ExecArgs ExecRun ExecWords.
+Require Import ExecEntry ExecRun ExecWords.
 Require Import SpecKexec.      (* [kexec_loadable] *)
 Require Import LineWords EchoDisc.
 Require Import PipeDisc PipesDisc.
-Require Import UkSh UkShRun UkShMain UkShDiag.
+Require Import UkShRun UkShMain UkShDiag.
 Require Import UkShEcho.
 Require Import UShEcho UShCatPay UShCat UShGrep.
 Require Import PipeNames FsEchoPin.
-Require UShSecc.
 Require Import UkShPipesLex.
 Require UkShDiagAt.
 Local Open Scope Z_scope.

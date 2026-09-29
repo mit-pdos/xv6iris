@@ -71,7 +71,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import ProgTree UkTree UkStub.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi UserBits.
+Require Import UmodeArith.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
 Require Import FdSlots UserFd UserCwd.
 Require Import UserHeap UserPerm UserPtTree.
@@ -91,24 +91,20 @@ Require Import FsBytesGamma FsCfg.
 Require Import FsAbsWriteFire.         (* [awrite_chain_adv] and its nodes *)
 Require Import AppCfg AppInv.
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin FsSyncPin.
-Require Import EchoDisc EchoOut LineWords.
+Require Import EchoDisc EchoOut.
 Require Import FileState.              (* [echo_chunks] *)
 Require Import AppFile AppFileCons FileOpen.
 Require Import UserOff.                (* [uoff], [foff_pub] *)
 Require Import UkFileOpen.             (* the deed's leaves *)
-Require Import FileWrite.
 Require Import UEchoFile.              (* [efany] / [efcur] / [ef_chain] *)
 Require UEchoOut.                      (* [UEchoOut.echo_count_is], used qualified *)
-Require Import ArgPath.                (* [arg_path_of] *)
-Require Import PathElems.              (* [path_elems] *)
 Require Import FsAbsEra.               (* [um_start_of] *)
 Require Import FsImg.                  (* [ROOTINO] *)
-Require Import FsImgCheck.
 Require UNamePath.                     (* the path facts off the class laws *)
 Require Import UStrImg.                (* the image of a path of any length *)
 Require Import SysOpenDefs.            (* [om_create] / [om_readable] *)
 Require Import SysReadDefs.            (* [ard_count] *)
-Require Import UCodeCat UkCatTree.     (* the vacuity witnesses: [cat_prog] *)
+Require Import UkCatTree.     (* the vacuity witnesses: [cat_prog] *)
 Require User.CatSyms.
 Local Open Scope Z_scope.
 Import Defs.

@@ -34,8 +34,6 @@ Require Import UexecExecInst.   (* the class INSTANCE [uexecSG_xv6]: [xv6_sbundl
 Require Import SyncHook.        (* [hook_opt]: row 22 of the point family *)
 Require Import FsAbsInvFire.    (* [fsabs_chdir_pre] / [fsabs_exec_half] *)
 Require FsAbsEra.               (* [ex_start] / [ax_hops_triv] *)
-Require Import SpecSysRead.     (* [sys_rw_count] *)
-Require Import SpecSysChdir.    (* [chdir_au_pre] *)
 Require Import WpUart.
 Require Import AppInv.
 Require Import SpecFileread.    (* [fileread_in] *)
@@ -49,14 +47,12 @@ Require Import PipeQueue.       (* [pipe_qfrag] and the links *)
 Require Import PipeReg.         (* [pipe_reg] / [pipe_row_reg] *)
 Require Import UsysMemOk.
 Require Import UserPerm.
-Require Import UserExec UserPtTree RegFile.
 Require Import UmodeRegs.       (* [uv_regs_u_regs] *)
 Require Import UmodeText.       (* [user_ptm_inv_x_pt] *)
 Require Import ConsoleInv.      (* [CONSOLE] *)
 Require Import ChildTok.
 Require Import ExecEntry.       (* [image_entry_taint] *)
 Require Import PieceFam.        (* [pfam_triv] *)
-Require Import FsAbsDefs.       (* LAST (FsAbs's own rule) *)
 Require Import FsBytesGamma.    (* [fs_gamma_L] *)
 Require Import ProcAvail.       (* [pavG] *)
 Require Import Xv6G.

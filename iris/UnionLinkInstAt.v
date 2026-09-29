@@ -25,31 +25,17 @@ Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import RiscvLang.
-Require Import ObsTrace.
-Require Import LineWords.
 Require Import EchoDisc.
-Require Import EchoOutPure.
 Require Import EchoOut.
-Require Import LineModel.
 Require Import LineModelLinks.
-Require Import GenOutPure.
-Require Import GenOut.
-Require Import AppEcho.
 Require Import FileState.
-Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import FileLinksLine.
 Require Import FileLinkGen.       (* [f0w_at], [fhead_at_boot], [fhead_at_cur] *)
 Require Import PipeOut.
-Require Import ProgTree.
-Require Import PipesDisc.
-Require Import PipesView.
-Require Import PipeOutN.
-Require Import PipesLinksV.
 Require Import UnionDisc.
 Require Import UnionDiscDec.
-Require Import UnionView.
 Require Import UnionOut.
 Require Import UnionLinks.
 Require Import UnionLinkInst.
@@ -59,7 +45,6 @@ Require Import RiscvPtsto.
 Require Import WpUart.
 Require Import FsCfg.             (* [fsc_cons] *)
 Require Import Xv6G.              (* the ring's cameras, at the kernel's own instance *)
-Require Import UserConsole.       (* [ucons_stored_lb] *)
 From stdpp Require Import list.
 Local Open Scope list_scope.
 

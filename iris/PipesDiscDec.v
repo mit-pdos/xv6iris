@@ -9,10 +9,10 @@
 (*  offers).  [line_blocksb_spec] is the reflection the demos spend.      *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
 Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
-Require Import StringBytes ProgTree ProgTreePipes PipesPair PipesDisc.
+Require Import ProgTree PipesPair PipesDisc.
 Require Import LineModelLinks.
 From stdpp Require Import list.
 

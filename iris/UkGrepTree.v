@@ -24,16 +24,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import WpUmodeBranch.
-Require Import UmodeArith UmodeAbi.
-Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys.
+Require Import UmodeAbi.
+Require Import UserHeap UkRun UkRunLeaf UkRunMem.
 Require Import UCodeGrep.
 Require Import CtxIdDefs.
 Require Import ChildTok.
-Require Import UexecSlot UexecRet UexecSG.
+Require Import UexecSG.
 Require User.GrepSyms.
-Require Import FdSlots UserFd.
-Require Import StringBytes LineWords.
+Require Import UserFd.
 Require Import ProgTree GrepTree UkTree.
 Require Import UkGrepLoop UkGrepMain.
 Require Import UkHandler.       (* [ep_iface] / [env_res] / [tree_pay_of_conforms] *)

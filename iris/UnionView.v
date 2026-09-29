@@ -14,12 +14,12 @@
 (* above this file reads the encoding.                                    *)
 (* ===================================================================== *)
 From Stdlib Require Import Lia List.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
 Require Import LineWords EchoDisc LineBytes LineModel.
-Require Import ProgTree ProgTreePipes PipesPair PipesDisc PipesView.
+Require Import PipesDisc PipesView.
 Require Import FileState FileDisc UnionDisc.
-Require GrepTree GrepFilt.
+Require GrepTree.
 From stdpp Require Import list.
 
 Local Open Scope nat_scope.

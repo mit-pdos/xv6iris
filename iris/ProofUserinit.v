@@ -118,7 +118,6 @@ Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intr
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the park borrows the running token (L8) *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
-Require Import UhistDefs.   (* [uhist_auth] -- the incarnation's key history, born here *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
 Require Import SpecDevintr.           (* [uart1_caps] -- [park_world]'s second-port row *)
 Require Import FsReady.               (* [fs_geom_ok] *)

@@ -37,47 +37,21 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs.
-Require Import ProcGeom.              (* [NOFILE] *)
-Require Import UserPerm UexecSlot UexecRet UexecSG.
-Require Import UserHeap UkRun.
-Require Import UserFd UserCwd.
-Require Import ChildTok.
-Require Import ElfFile ElfUser.
-Require Import UmodeArith UmodeAbi.
-Require Import SpecKexec.             (* [kexec_image_ok] and its readings *)
-Require Import ExecEntry.             (* [image_entry] / [image_entry_of_at] *)
-Require Import UexecExecInst.         (* THE INSTANCES: [uexecSG_xv6] *)
-Require Import UkAbi.                 (* [uka_argc] *)
-Require Import UCodeEcho UCodeCat.
+Require Import UexecSG.
+Require Import UkRun.
+Require Import UserFd.
 From User Require EchoInstrs EchoData.
-Require Import UEchoKernel.           (* [uvis_sp] / [uvis_av] / [uvis_argc], [echo_args] *)
-Require Import UShKernel.             (* [uimg_sub_union_l] *)
-Require Import LineWords EchoDisc ExecWords.
-Require Import UkShEcho.              (* [echo_argv_bytes] / [echo_alen] / [echo_off] *)
-Require Import UShEcho.               (* echo's key geometry *)
-Require Import UEchoOut.              (* [echo_out_argv] *)
-Require Import UShEchoOut.            (* [echo_out_argv_of_image] *)
-Require Import UShCat.                (* cat's key geometry and [cat_entry_run] *)
-Require Import FsImgCheck.            (* [fname_f] *)
-Require Import ProgTree UkTree UkStub UkHandler.
-Require Import UkEcho UkEchoTree.
-Require Import UkCatMain UkCatTree.
-Require Import UkTreeEntry.           (* the argv bridges, the .rodata fact *)
+Require Import LineWords EchoDisc.
+Require Import UkTree.
+Require Import UkEchoTree.
+Require Import UkCatTree.
 Require Import CtxIdDefs.
 Require User.EchoSyms User.CatSyms.
-Require Import AppCfg AppInv AppFile AppFileCons FileOpen FsCfg FsImg.
+Require Import AppFile.
 Require Import EchoOut.               (* [ps_lb] / [cs_lb] and their comparisons *)
-Require Import FileState FileDisc FileOut.
-Require Import LineModel LineModelInst LineModelLinks.
-Require Import FileLinks FileLinksLine FileLinkGen FileHooks.
-Require Import GenLinksLine.          (* [gwc_blk] / [gwc_post] *)
-Require Import ConsoleInv.             (* [CONSOLE] *)
-Require Import UkConsOut ProgTreeFile.
-Require Import FsInitPin FsShPin FsEchoPin FsCatPin.   (* the four image inodes *)
-Require Import UkFileDev FileWrite UEchoFile.         (* [file_out], [ef_pay], [ef_exit] *)
+Require Import FileState FileOut.
 Require Import UkFileIface.
 Local Open Scope Z_scope.
 Import Defs.

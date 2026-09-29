@@ -30,7 +30,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeAbi.
 Require Import UserPtTree.
 Require Import UserPerm.     (* [usz_ok] *)
 Require Import UserHeap UkRun.
@@ -39,16 +38,13 @@ Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Require Import UserFd.
 Require Import UkShParse.
-Require Import UkShParseCmd.
 Require Import UkShRun.
 Require Import UkShMain.
 Require Import UkShMalloc.
 Require Import UkShPipe.     (* [ush_pipes] *)
-Require Import UkShPipeNode.    (* the pipe node predicate *)
 Require Import UkShPipeSeam.
 Require Import UkShSeam.        (* [ush_cmd_of_ushp_tree]: THE seam, once *)
 Require Import RefParseBridge.  (* [ushq_ptree] *)
-Require Import UkShPipesParse.
 Require Import UexecSG.
 Local Open Scope Z_scope.
 Import Defs.

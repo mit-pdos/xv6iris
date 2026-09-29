@@ -17,39 +17,11 @@ Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import RiscvLang.
-Require Import LineWords.
 Require Import EchoDisc.
-Require Import EchoOut.
-Require Import AppEcho.
-Require Import LineModel.
-Require Import LineModelLinks.
-Require Import PipeOut.
 Require Import ProgTree.
-Require Import PipesDisc.
-Require Import PipesDiscDec.
 Require Import PipeBothNPure.
-Require Import PipeBothN.
-Require Import PipeOutN.
-Require Import PipeOutNEv.
-Require Import PipesOut.
-Require Import PipesFire.
-Require Import UkPipesIface.      (* [pnsN], [pipesNG] *)
-Require Import GenLinksLine.
-Require Import LinkRec.
-Require Import FdSlots UserFd.
-Require Import UkRun.
-Require Import UkSh.
-Require Import UkShFork.
-Require Import Xv6G Xv6Cameras.
-Require Import EchoOutPure.
-Require Import IrefSlots ProcAvail FileInvDefs.
-Require Import ConsoleInv.
-Require Import UCodeShK.
-Require Import UShPanic.
 Require Import RiscvPtsto.
 Require Import WpUart.
-Require Import UexecExecInst.
-Require Import CtxIdDefs.
 Local Open Scope list_scope.
 Require PipeDisc.
 Local Notation alt_forkc := PipeDisc.alt_forkc.

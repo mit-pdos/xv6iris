@@ -56,11 +56,10 @@ Require Import UserFd.
 Require Import UkShParse.
 Require UkShCmdalloc.
 Require Import UkShParseSym.
-Require Import UkShParseCmd.
 Require Import UkShPipeLex.
 Require Import UkShPipesLex.
 Require Import RefParseBridge.  (* [ushq_ptree], [ref_parsecmd_bars] *)
-Require Import RefParse RefParseSym.
+Require Import RefParseSym.
 Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
 Require Import UkShParser.      (* [wp_ref_parsepipe]: THE general parsepipe *)
 Require Import UexecSG.

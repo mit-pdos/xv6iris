@@ -57,7 +57,6 @@ Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShMain.
-Require Import UkShPipeLex.
 Require Import UkShPipeSeam.
 Require Import UkShPipesLex.
 Require Import UkShPipesParse.

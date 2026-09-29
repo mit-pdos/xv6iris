@@ -37,19 +37,17 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
-Require Import WpMmodeLeafBase.
-Require Import WpUmodeBranch.
-Require Import UmodeArith UmodeAbi.
-Require Import UserHeap UkRun UkRunLeaf UkRunMem UkRunSys.
+Require Import UmodeArith.
+Require Import UserHeap UkRun.
 Require Import UCodeCat.
 Require Import CtxIdDefs.
 Require Import ChildTok.
-Require Import UexecSlot UexecRet UexecSG.
+Require Import UexecSG.
 Require User.CatSyms.
-Require Import FdSlots UserFd.
+Require Import UserFd.
 Require Import ProcGeom.     (* [NOFILE] *)
 Require Import VcGen.        (* [trunc32_mword_of_int], [trunc32_subrange] *)
-Require Import StringBytes LineWords.
+Require Import LineWords.
 Require Import ProgTree UkTree.
 Require Import UkCat UkCatLit UkCatCat UkCatMain.
 Require Import UkHandler.       (* [ep_iface] / [env_res] / [tree_pay_of_conforms] *)

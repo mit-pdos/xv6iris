@@ -30,23 +30,16 @@ Require Import EchoOut.
 Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenOutPure.
-Require Import GenOut.
-Require Import AppEcho.
 Require Import FileState.
 Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import PipeOut.
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesView.
 Require Import PipeOutN.
 Require Import PipeOutNEv.
-Require Import PipesLinksV.
-Require Import GenOutWild.
-Require Import PipeOutW.         (* [rd_retV]/[rd_retW], the wild licence *)
 Require Import UnionDisc.
-Require Import UnionDiscDec.
 Require Import UnionView.
 Require Import UnionOutPure.
 Require Import UnionOut.

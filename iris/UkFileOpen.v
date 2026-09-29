@@ -72,12 +72,11 @@ Require Import AppCfg AppInv.
 Require Import FsCfg.
 Require Import PathElems.
 Require Import FsTree.
-Require Import FsImgCheck.         (* [fname_f] *)
 Require FileDisc.                  (* the class [FileDisc.uname] *)
 Require Import FsAbsEra.
 Require Import PinnedObs.
 Require Import EchoOut.
-Require Import AppEcho.
+Require Import EchoDisc.
 Require Import AppFile.
 Require Import AppFileCons.      (* [file_cons_cred]: the console credential over [option Z] *)
 Require Import FileOpen.

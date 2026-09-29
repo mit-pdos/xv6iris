@@ -63,30 +63,26 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
-Require Import UkRun UkRunSys UkRunLeaf.
+Require Import UkRun UkRunSys.
 Require Import SpecConsolewrite.
 Require Import SpecSysRead.
 Require Import WpUart.
 Require Import UkWriteLeaf.
 Require Import FdSlots ProcGeom UserFd UserCwd.
-Require Import UsysMemOk UexecSG UexecSlot UexecRet.
-Require Import UexecExecInst.
+Require Import UexecSG UexecSlot.
 Require Import ConsoleInv.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
 Require Import FsCfg AppCfg AppInv.
-Require Import FsImg FsImgCheck.
+Require Import FsImg.
 Require Import SysOpenDefs.
-Require Import LineWords LineBytes EchoDisc.
-Require Import EchoOut AppEcho.
-Require Import LineModel LineModelLinks.
-Require Import GenOutPure GenOut.
+Require Import EchoOut.
+Require Import LineModel.
+Require Import GenOut.
 Require Import FileDisc.
 Require Import AppFile AppFileCons FileOpen UserOff UkFileOpen.
-Require Import PipesPair PipesDisc PipeBothNPure PipeBothN PipeOutN PipesView.
-Require Import PipeOut PipeNames PipeQueue PipeReg PipeProto.
+Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN PipesView.
+Require Import PipeOut PipeNames PipeProto.
 Require Import CtxIdDefs.
-Require Import UserHeap.
 Require Import ProgTree ProgTreePipes UkTree UkStub.
 Require Import UkCatTree.   (* [bvs_moi_small] *)
 Require Import UkConsOut UkPipeDev UkFileDev.

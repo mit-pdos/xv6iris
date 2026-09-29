@@ -97,7 +97,6 @@ Require Import FsAbsCreateNm.      (* [acre_commit_at_nm], [npar_nm]: the create
 Require Import SpecSysMknod.       (* [mknod_au_at], [mknod_post_ok] *)
 Require Import ConsoleInv.         (* [CONSOLE] *)
 Require Import FsConsPin.          (* the console's two states, and its pin *)
-Require Import FsImgCheck.
 Require FileDisc.                  (* [uname] -- the class the FILE claim tracks *)
 Require Import PinnedObs.
 Require Import PinnedOpen.

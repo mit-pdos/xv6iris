@@ -13,9 +13,7 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
-Require Import RiscvModelBytes.
 Require Import UmodeAbi.        (* [ubyte0] *)
-Require Import UkShParse.
 Require Import UkShParseCmd.    (* [ushp_setb] / [ushp_nulfold] / [ushp_ext] *)
 Local Open Scope Z_scope.
 

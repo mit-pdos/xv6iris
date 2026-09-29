@@ -64,8 +64,7 @@ Require Import ExecArgs.         (* [uargv_exec] / [uargv_img] / [uargv_det]
                                     vector at ANY layout (lane EX-3) *)
 Require Import FsEchoPin.
 Require Import ArgPath.           (* [arg_path_shape] / [arg_path_of] *)
-Require Import SpecKexec SpecSysExec SpecCopyin.
-Require Import UImgWordDefs.  (* [img_word_of_bytes] / [uimg_word_det] *)
+Require Import SpecKexec SpecSysExec.
 Require Import EchoFsPure.    (* [echo_fs_pure] -- reached through [UInitSh] before *)
 Require Import UShGeom.           (* THE EXEC GEOMETRY, once (user-once C1):
                                      the push helpers, the room, the chain at
@@ -74,10 +73,7 @@ Require Import UShGeom.           (* THE EXEC GEOMETRY, once (user-once C1):
 Require Import UShKernel.         (* the entry geometry: [sh_page_perm],
                                      [udata_lo_is_Some], [kxc_sp_final_mod8],
                                      [csp_rs1_eq], [elf_segments_loads] *)
-Require Import KexecBuilt.        (* [kxc_sp_mono] / [kxc_sp_gap] /
-                                     [kxc_sp_final_gap] / [kexec_pg] *)
 Require Import UserPtTree.        (* [pgroundup] *)
-Require Import WpUmodeLoad.       (* [uM_word] / [uM_word_bytes] *)
 Require Import KexecDefs.
 Require Import UkAbi.
 Require Import UCodeEcho.

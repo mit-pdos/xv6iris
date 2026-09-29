@@ -38,7 +38,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -49,22 +48,9 @@ Require Import UserFd.
 Require Import UserPerm.
 Require Import ProcPtOwn.
 Require Import UserPtTree.
-Require Import UmodeArith UmodeAbi.
-Require Import ProcGeom.
-Require Import ChildTok.
-Require Import UexecSlot UexecRet UexecSG.
-Require Import UkRun UkRunSys.
-Require Import UexecExecInst.           (* THE INSTANCES: [uexecSG_xv6] etc. *)
-Require Import SpecSysRead.             (* [sys_rw_count] *)
+Require Import UkRunSys.
 Require Import SpecCopyin.              (* [ubytes_at] *)
 Require Import SysWriteDefs.            (* [wri_pre], [wchunks], [FW_MAX] *)
-Require Import SpecFilewrite.
-Require Import UkWriteLeaf.
-Require Import UkAbi.
-Require Import FsBlocks.
-Require Import FsNode.
-Require Import FsAbsDefs.
-Require Import FsAbsDelta.
 Require Import FsBytesGamma.
 Require Import FsCfg.
 Require Import AppCfg.
@@ -72,20 +58,13 @@ Require Import AppInv.
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin FsSyncPin.
 Require Import EchoDisc.
 Require Import EchoOut.
-Require Import LineWords.
 Require Import FileState.                (* [echo_chunks], [subseq], [sel_ok] *)
 Require Import AppFile.
 Require Import FsAbsWriteFire.           (* [awrite_chain] and its two nodes *)
-Require Import UserHeap.
-Require Import UCodeEcho.
-Require Import UkEcho.
-Require Import UEchoKernel.
-Require Import UEchoOut.                 (* THE MOULD *)
 Require Import CtxIdDefs.
 Require User.EchoSyms.
 Require Import FileWritePart.            (* [file_awrite_part_adv]: the partial arm, from the cursor *)
 Require Import FileWrite.                (* [file_wq], [file_awrite_node] *)
-Require Import UkWriteFile.              (* the two ledger-slot write leaves *)
 Local Open Scope Z_scope.
 Import Defs.
 

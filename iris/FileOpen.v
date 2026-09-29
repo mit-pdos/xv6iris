@@ -42,7 +42,6 @@ Require Import FileInvDefs.      (* [fileG], and its [appcfg] field [file_app] *
 Require Import FsCfg.            (* [fsc_fs] *)
 Require Import PathElems.        (* [path_elems] *)
 Require Import FsTree.           (* [fname] *)
-Require Import FsImgCheck.       (* [fname_f] *)
 Require Import FsBlocks.         (* [fs_names] *)
 Require Import FsBytesGamma.     (* [fs_gamma_L] *)
 Require Import OffGv.            (* [off_gv] *)

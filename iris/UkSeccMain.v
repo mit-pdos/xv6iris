@@ -43,8 +43,7 @@ Require Import UCodeSeccomp.
 Require Import CtxIdDefs.
 Require User.SeccompSyms User.SeccompInstrs.
 Require Import ChildTok.
-Require Import UsysMemOk UexecSlot UexecRet.
-Require Import UkProgAbi.
+Require Import UexecSlot UexecRet.
 Require Import UkFork.
 Require Import UkRunSecc.
 Require Import UkSeccPutc UkSeccFprintf UkSeccLit.

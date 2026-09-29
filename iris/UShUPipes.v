@@ -45,46 +45,41 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
-Require Import UmodeArith UmodeAbi.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import WpUart.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs FdSlots UserFd.
-Require Import ProcGeom UserPerm.
-Require Import UserHeap UkRun UkRunLeaf.
-Require Import UserCwd UserChildren.
+Require Import UserPerm.
+Require Import UserHeap UkRun.
 Require Import ChildTok.
-Require Import FsCfg FsImg.
-Require Import UexecSlot UexecRet UexecSG UexecExecInst UexecExecMint.
+Require Import UexecSlot UexecRet UexecExecInst.
 Require Import LineWords EchoDisc EchoOut AppEcho.
-Require Import LineModel LineModelLinks GenOut.
+Require Import LineModel GenOut.
 Require Import FileDisc FileState.
 Require Import AppCfg AppInv AppFile AppFileCons FileOpen FileOut FileLinksLine FileLinkGen.
 Require Import PipeOut.
 Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN PipesView.
-Require Import PipeNames PipeProto.
+Require Import PipeProto.
 Require Import ProgTree.
 Require Import CtxIdDefs.
-Require Import UCodeShK UCodeShP.
-Require Import UkSh UkShRun UkShMain UkShDiag UkShFork UkShMalloc.
-Require Import UkShEcho UkShCat.
-Require Import UkShPipe UkShPipeLex UkShPipesRound UkShPipesSeam UkShPipesLex UkShPipesCmd.
+Require Import UkSh UkShMain UkShDiag UkShFork.
+Require Import UkShEcho.
+Require Import UkShPipe UkShPipesRound UkShPipesSeam.
 Require Import UShEcho UShCatPay.
 Require Import UkPipesIface.
 Require Import GenLinksLine LinkRec.
-Require Import UShPipesDefs UShPipesStage UShPipesNode UShPipeLeaves.
+Require Import UShPipesDefs UShPipesNode UShPipeLeaves.
 Require Import UkShPipesFork.
 Require Import PipesUline PipesCut.
 Require Import UkCatFIface UShCatFStage UShExecPin.
 Require Import ExecWords UkShPipesLex.
-Require Import UnionDisc UnionView UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
+Require Import UnionDisc UnionView UnionOut UnionLinks UnionLinkInstAt.
 Require Import UShLine UShURoundDefs UShUModBase UShURoundShapes.
 Require Import UShUModSync.       (* the [sync] line's module *)
 Require Import UShUModSecc.       (* the [seccomp x] line's module *)
 Require Import UShUModCat.        (* the [cat f] line's module *)
 Require Import UShUModRedir.      (* the [echo ws > f] line's module *)
 Require Import UShUModEcho.       (* the [echo ws] line's module *)
-Require Import UkShPipeForkTwin UkShCatForkTwin UkShRedirBody.
+Require Import UkShPipeForkTwin UkShRedirBody.
 Require Import UkShShape.
 Require UShKernel UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
 Require User.ShSyms.

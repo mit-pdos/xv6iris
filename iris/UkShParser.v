@@ -93,7 +93,6 @@ Import Defs.
 Require Import UserFd.
 Require Import UkShParse.
 Require UkShCmdalloc.
-Require Import UkShParseSym.
 Require Import UkShParseLex.
 Require Import UkShParseTok.
 Require Import RefParse.

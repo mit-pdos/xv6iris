@@ -27,13 +27,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
-Require Import UmodeAbi UmodeArith.
+Require Import UmodeAbi.
 Require Import UserHeap.
 Require Import WpMmodeLeafBase. (* [luival] *)
 Require Import ProcDefs.        (* [secc_all] *)
 Require Import UexecSecc.       (* [secc_masked] *)
 Require Import UCodeSeccomp.
-Require Import StringBytes LineWords ProgTree.   (* [sb], [wl_nl] *)
+Require Import LineWords ProgTree.   (* [sb], [wl_nl] *)
 Require User.SeccompSyms User.SeccompInstrs.
 Local Open Scope Z_scope.
 Import Defs.

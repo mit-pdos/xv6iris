@@ -54,16 +54,9 @@ Require Import LineWords.
 Require Import EchoDisc.
 Require Import ConsLog.
 Require Import EchoOutPure.
-Require Import PipeDisc.
 Require Import PipeDisc.      (* [disc_p_dec]: the ledger's counter *)
-Require Import PipeOutPure.
-Require Import PipeOutPure.
 Require Import EchoOut.           (* the ghost algebra, [ch_E] and its laws *)
 Require Import LineModel.
-Require Import LineModelLinks.
-Require Import LineModelInst.     (* the stream equations at [pipe_lm] *)
-Require Import GenOutPure.
-Require Import GenOutHist.
 Require Import GenOut.            (* the claim once *)
 Require Import PipeOutPure.         (* [pipe_hooks] *)
 Require Import AppEcho.           (* [echo_fixed], [echo_taint], [echo_cl] *)

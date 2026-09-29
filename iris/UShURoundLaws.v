@@ -33,8 +33,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -46,8 +45,6 @@ Require Import UkRun.
 Require Import UexecExecInst.
 Require Import WpUart.
 Require Import ConsoleInv.
-Require Import AppCfg.
-Require Import AppInv.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import EchoOutPure.
@@ -64,8 +61,6 @@ Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenLinksLine.
 Require Import UkSh.
-Require Import UkShDiag.
-Require Import UkShFork.
 Require Import UCodeShK.
 Require Import UShLine.
 Require Import UShLineHold.
@@ -73,9 +68,6 @@ Require Import UShPanic.
 Require Import UShPanicHold.
 Require Import UShKernel.
 Require Import PipeOut.
-Require Import ProgTree.
-Require Import PipesDisc.
-Require Import PipesView.
 Require Import PipeBothNPure.
 Require Import PipeBothN.
 Require Import PipeOutN.
@@ -84,7 +76,6 @@ Require Import PipesFire.
 Require Import UkPipesIface.      (* [pnsN], [pipesNG] *)
 Require Import UkShPipesFork.     (* [big_sepL_exist_fun], [alt_forkc_prompt] *)
 Require Import UnionDisc.
-Require Import UnionDiscDec.
 Require Import UnionView.
 Require Import UnionOut.
 Require Import UnionLinks.

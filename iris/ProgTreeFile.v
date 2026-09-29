@@ -6,7 +6,7 @@
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
 From stdpp Require Import list bitvector.definitions.
-Require Import StringBytes LineWords FileState ProgTree.
+Require Import FileState ProgTree.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 

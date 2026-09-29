@@ -29,21 +29,16 @@ Require Import ObsTrace.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import ConsLog.
-Require Import EchoOutPure.
 Require Import EchoOut.
 Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenOutPure.
-Require Import GenOutHist.
 Require Import GenOut.
 Require Import AppEcho.
 Require Import PipeOut.            (* [pipe_gn], the byte ledger's ghosts *)
-Require Import ProgTree.
 Require Import PipesDisc.
-Require Import PipesDiscDec.       (* [pipes_hooksE] *)
 Require Import PipeOutN.
 Require Import PipeOutNEv.
-Require Import PipesLedPure.
 Require Import RiscvPtsto.
 Require Import WpUart.
 (* stdpp's list names over the ones the Stdlib import above re-exports *)

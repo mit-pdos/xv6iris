@@ -39,7 +39,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -47,26 +46,20 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import UmodeArith UmodeAbi.
-Require Import ProcGeom.
-Require Import ChildTok.
-Require Import ConsoleInv.         (* [CONSOLE] *)
+Require Import UmodeArith.
 (* ...and [UserHeap] LAST among the libraries: [UmodeAbi.uargs] has fields
    named [ua_ptr] and [ua_len] as well, and it is [UserHeap.uarg]'s that
    echo's argument vector is spelled with. *)
-Require Import UkRun.
 Require Import SpecSysRead.        (* [sys_rw_count] *)
 Require Import VcGen.
 Require Import WpUart.
 Require Import UserHeap.
 Require Import UCodeEcho.
 Require Import UkEcho.
-Require Import UEchoKernel.
 Require Import LineWords.   (* [wl_sp] / [wl_nl] / [wl_off] *)
 Require Import EchoDisc.
 Require Import EchoOut.
 Require Import EchoLinks.
-Require Import LinkRec.        (* the era's link record *)
 Require Import StageRec.       (* the cursor / stage record *)
 Require Import CtxIdDefs.
 Require User.EchoSyms.

@@ -23,8 +23,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -32,32 +31,17 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import UserChildren.
-Require Import UmodeAbi.
-Require Import ProcGeom.
 Require Import UexecRet.
 Require Import ExecEntry.
-Require Import UkRun UkRunSys.
-Require Import SyncHook.  (* [Q_opt]: the sync round's receipt *)
+Require Import UkRun.
 Require Import UexecExecInst.
 Require Import WpUart.
-Require Import FsCfg.
 Require Import FsImg.
-Require Import FsImgCheck.
 Require Import FsEchoPin.
-Require Import FsCatPin.
-Require Import FsGrepPin.
-Require Import FsInitPin FsShPin.
 Require Import AppCfg.
-Require Import AppInv.
 Require Import AppFileCons.
-Require Import FileOutPure.
-Require Import SysOpenDefs.
-Require Import UkRunLeaf.
 Require Import UserPerm.
 Require Import UserPtTree.
-Require SpecKexec.
-Require Import UShLine.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import EchoOut.
@@ -65,68 +49,31 @@ Require Import FileDisc.
 Require Import FileState.
 Require Import AppEcho.
 Require Import AppFile.
-Require UNamePath.                (* the path/argv facts off the class laws *)
-Require Import UNameBytes.        (* the diagnostic windows *)
 Require Import FileOut.
 Require Import FileOpen.
-Require Import FileWrite.
-Require Import UEchoFile.
-Require Import FsAbsDefs.
-Require Import ExecRun.
-Require Import UkShRedirBody.
-Require Import UkShRedirChild.
 Require Import ExecWords.
-Require Import UkShDiagAt.
-Require Import UShCat.
-Require Import UShCatPay.
-Require Import UserOff.
 Require Import ElfUser.
 Require Import UkSh.
 Require Import UkShDiag.
-Require Import UkShLoop.
-Require Import UCodeShK.
-Require Import UkShRedirAns.
 Require Import UkShEcho.
 Require Import UkShFork.
-Require Import UkFileOpen.
 Require Import LinkRec.
-Require Import FileLinksLine.
-Require Import FileLinkGen.
 Require Import FileHooks.
-Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenLinksLine.
 Require Import UShPanic.
 Require Import UShEcho.
-Require Import UShKernel.
-Require Import UInitSh.
-Require Import UkShPipeForkTwin.
-Require Import UkShCatForkTwin.
-Require Import UkConsOut.
 Require Import PipeOut.
-Require Import PipesDisc.
 Require Import UnionDisc.
 Require Import UnionDiscDec.
 Require Import UnionOut.
 Require Import UnionLinks.
-Require Import UnionLinkInst.
 Require Import UnionLinkInstAt.
 Require Import UkUnionEntries.
 Require Import UShURoundDefs.
 Require UkFileIface.
-Require UkFileEntries.
-Require FileDeltas.
 Require UShFileRedir.
-Require FsSeccPin.
-Require UexecSecc.
-Require UShSecc.
 Require UShExecPin.
-Require UkSeccEntry.
-Require FsSyncPin.
-Require UShSync.
-Require UkSyncEntry.
-Require UkSync.                   (* [sync_pay] *)
-Require LinkUserinit.            (* [UG.uexec_wp_gen]: the generic user WP *)
 Require Import CtxIdDefs.
 Require Import UShUModBase.       (* the pure preamble, shared with the shape modules *)
 Require Import UkShShape.

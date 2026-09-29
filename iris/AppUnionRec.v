@@ -53,15 +53,10 @@ Require Import InodeInv.
 Require Import RiscvAdequacy.
 Require Import EchoDisc.
 Require Import ConsLog.
-Require Import LineModel.
-Require Import FileState.
-Require Import FileDisc.
 Require Import EchoOut.
 Require Import AppFile.
 Require Import FileOut.
 Require Import PipeOut.
-Require Import PipeOutN.
-Require Import PipeOutNEv.
 Require Import UnionDisc.
 Require Import UnionOutPure.
 Require Import UnionOut.

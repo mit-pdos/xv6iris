@@ -55,7 +55,6 @@ Require Import EchoOut.
 Require Import UserConsole.
 Require Import UserFd.
 Require Import UkSh.
-Require Import UShConsK.
 Require Import UShKernel.
 Require Import LinkRec.
 Require Import GenLinksLine.
@@ -68,8 +67,6 @@ Require Import FileOut.
 Require Import FileLinksLine.
 Require Import FileLinkGen.
 Require Import PipeOut.
-Require Import PipeOutW.       (* [secc_tok_at]: the wild shape's token *)
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesUline.
 Require Import UkPipesIface.       (* [pipesNG] *)

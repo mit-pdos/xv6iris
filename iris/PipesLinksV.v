@@ -39,10 +39,8 @@ Require Import EchoOut.
 Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenOutPure.
-Require Import GenOutHist.
 Require Import GenOut.
 Require Import PipeOut.            (* [pipe_gn], [pext] *)
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesView.
 Require Import PipeOutN.

@@ -29,12 +29,7 @@ Require Import FileOutPure.
 Require Import EchoOut.
 Require Import AppFile.
 Require Import FileOut.
-Require Import LineModelInst.
-Require Import GenLinks.
 Require Import RiscvPtsto.
-Require Import WpUart.
-Require Import CtxIdDefs.
-Require Import SpecConsoleintr.
 Local Open Scope list_scope.
 
 Section file_links.

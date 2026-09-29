@@ -38,8 +38,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import Xv6Cameras.
 Require Import Xv6G.
 Require Import FdSlots.
@@ -47,11 +46,8 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import UkRun.
 Require Import UexecExecInst.
 Require Import WpUart.
-Require Import AppCfg.
-Require Import AppInv.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import EchoOut.
@@ -66,7 +62,6 @@ Require Import LinkRec.
 Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenLinksLine.
-Require Import UkSh.
 Require Import UkShDiag.
 Require Import UkShFork.
 Require Import UShPanic.

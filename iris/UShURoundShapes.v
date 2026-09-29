@@ -23,18 +23,13 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import RiscvLang.
 Require Import RiscvPtsto.
-Require Import WpUart.
 Require Import LineWords.
-Require Import EchoDisc.
 Require Import EchoOut.
-Require Import AppEcho.
-Require Import LineModel.
 Require Import FileState.
 Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import PipeOut.
-Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesView.
 Require Import PipeBothNPure.
@@ -44,7 +39,6 @@ Require Import UkPipesIface.      (* [pnsN], [pipesNG] *)
 Require Import UnionDisc.
 Require Import UnionView.
 Require Import UnionOut.
-Require Import CtxIdDefs.
 Require PipeDisc.
 Local Open Scope list_scope.
 

@@ -22,7 +22,6 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import list bitvector.definitions.
 Require Import LineWords.
 Require Import EchoDisc.
-Require Import LineBytes.
 Require Import LineModel.
 From stdpp Require Import ssreflect.
 

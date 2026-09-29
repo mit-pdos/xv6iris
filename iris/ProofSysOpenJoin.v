@@ -91,7 +91,6 @@ Require Import PathElems.
 Require Import FsBytesGamma.
 Require Import ArgPath.         (* [arg_path_of]: the reading of trapframe
                                    argument 0, which the walk is at *)
-Require Import SysOpenDefs.
 Require Import ProofSysOpenShared.
 Require Import ProofSysOpenAlloc.
 Require Import PieceFam.       (* [pfam]/[pf_at]: the one-shot piece's pair *)

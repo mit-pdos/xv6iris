@@ -66,9 +66,7 @@ Require Import FsAbsDefs.
 Require Import FsAbsDelta.         (* [cre_pre] / [delta_arm] / [delta_unarm] *)
 Require Import ConsoleInv.         (* [CONSOLE] *)
 Require Import FsConsPin.
-Require Import FsImgCheck.        (* [fname_f] *)
 Require FileDisc.                 (* the class [FileDisc.uname] *)
-Require Import FsFPin.            (* [f_absent] *)
 Require Import EchoFsPure.
 Require Import FileFsPure.
 Require Import FileDeltas.

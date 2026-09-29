@@ -93,14 +93,13 @@ Require Import UserFd.
 Require Import UserHeap.
 Require Import UserPerm.
 Require Import UserPtTree.
-Require Import UmodeArith UmodeAbi.
+Require Import UmodeArith.
 Require Import VcGen.                   (* [trunc32_subrange] *)
 Require Import ProcGeom.
 Require Import ChildTok.
 Require Import UsysMemOk UexecSlot UexecRet UexecSG.
 Require Import UkStep UserFrame UserExecFacts.   (* the write walk, section 2 *)
-Require Import UkRun UkRunLeaf UkRunSys.
-Require Import UexecExecInst.           (* THE INSTANCES *)
+Require Import UkRun UkRunSys.
 Require Import UexecExecMint.           (* [udepw_cl_of_reg_close] *)
 Require Import SpecFilewrite.           (* [filewrite_in] *)
 Require Import SpecSysRead.             (* [sys_rw_count] *)

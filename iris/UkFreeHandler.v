@@ -37,17 +37,15 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import ProgTree UkTree UkStub.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
 Require Import RegFile.
-Require Import UmodeArith UmodeAbi UserBits.
 Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs.
 Require Import FdSlots UserFd.
-Require Import UserHeap UserPerm UserPtTree.
 Require Import ProcGeom.
 Require Import CtxIdDefs.
-Require Import UexecSlot UexecRet UexecSG.
+Require Import UexecSG.
 Require Import UkRun UkRunSys.
-Require Import UexecExecInst UexecExecMint.
+Require Import UexecExecMint.
 Require Import UsysMemOk.
-Require Import AppCfg AppInv.
+Require Import AppInv.
 Require Import UkCatTree.                (* [bvs_moi_small] *)
 Local Open Scope Z_scope.
 Import Defs.

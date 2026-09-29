@@ -25,10 +25,9 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
-Require Import UserBits.
-Require Import UmodeArith UmodeAbi.
+Require Import UmodeAbi.
 Require Import UserHeap UkRun UkRunMem.
 Require Import UCodeShK.
 Require Import UkSh.
@@ -44,8 +43,6 @@ Require Import FdSlots.
 Require Import UserFd.
 Require Import UexecSG.
 Require Import ArgPath.            (* [arg_path_of] *)
-Require Import PathElems.          (* [path_elems] *)
-Require Import FsAbsEra.           (* [np_elems] / [um_start_of] *)
 Require Import FsImg.
 Require Import UNameBytes.         (* the diagnostic's windows around a name *)
 Require UNamePath.                 (* the path facts, off the class laws *)

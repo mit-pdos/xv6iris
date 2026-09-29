@@ -30,18 +30,13 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import FileInvDefs.
 Require Import UserFd.
-Require Import UserChildren.
 Require Import UmodeAbi.
-Require Import ProcGeom.
-Require Import UexecRet.
-Require Import ExecEntry.
 Require Import UkRun UkRunSys.
 Require Import UkRunLeaf.                (* [wp_uk_cli] / [wp_uk_cjr]: the stub *)
 Require Import UexecExecInst.            (* THE INSTANCES *)
 Require Import WpUart.
 Require Import FsCfg.
 Require Import FsImg.
-Require Import FsImgCheck.
 Require Import FsInitPin.                (* [INIT_INO] *)
 Require Import FsShPin.                  (* [SH_INO] *)
 Require Import FsEchoPin.                (* [ECHO_INO] *)
@@ -56,53 +51,16 @@ Require Import LineWords.
 Require Import EchoDisc.
 Require Import EchoOut.
 Require Import FileDisc.
-Require Import FileOutPure.
 Require Import FileState.
-Require Import AppEcho.
 Require Import AppFile.
 Require FileDisc.                        (* [uname] *)
 Require Import FileOut.
-Require Import FileLinks.
 Require Import FileOpen.                 (* [fdq], [file_open_pay] *)
-Require Import FileWrite.                (* [file_wq]: what the ran exit reads back *)
-Require Import UEchoFile.                (* [ef_pay] / [efq]: echo at a file *)
-Require Import FsAbsDefs.                (* [anode] / [MkAnode] / [AFile] *)
-Require Import ExecRun.                  (* [udepw_at_refR_of_sup]: the U-tier exec rule *)
-Require Import UkShRedirBody.            (* [ushs_fd1f], [sh_redir_child_law] *)
-Require Import UkShRedirChild.           (* the redirect child's walk, 0x99c to its exits *)
-Require Import ExecWords.                (* [exec_ok]: a word list sh can exec *)
-Require Import UkShDiagAt.               (* [ush_execfail_bytes] *)
-Require Import UShCat.                   (* [cat_elf_loadable] *)
-Require Import UShCatPay.                (* [sh_cat_slot], [cat_pl], [sh_cat_pin_resolves] *)
-Require Import UserOff.
-Require Import ElfUser.
-Require Import UkSh.
-Require Import UkShDiag.
-Require Import UkShLoop.
-Require Import UShLexRedir.  (* [ush_line_lexable_redir_holds] -- the
-                                redirect line's lexability, PROVED *)
 Require Import UCodeShK.
 Require Import UkShRedirAns.
-Require Import UkShEcho.
-Require Import UkShFork.
 Require Import UkFileOpen.
 Require Import SysOpenDefs.              (* [om_readable] / [om_writable] *)
-Require Import LinkRec.                  (* the era's link record *)
-Require Import FileLinksLine.            (* [fline] / [fexfb] -- the era's line *)
-Require Import FileHooks.         (* S0 of [FileLinksLine], moved *)
-Require Import StageRec.                 (* [ck_lineok] / [sk_apr0] *)
-Require Import LineModel.
-Require Import LineModelLinks.
-Require Import GenLinksLine.
-Require Import UShLineHold.              (* [ush_wb_inp_hold] *)
-Require Import UShPanicHold.             (* the prompt law with a frame; [ksh_w_mono] *)
-Require Import UShLine.
-Require Import UShEcho.
-Require Import UShPanic.          (* the panic and exec-failed laws at a record *)
-Require Import UShKernel.
-Require Import UInitSh.
 Require UkFileIface.                     (* [fifRegG]: the binder below needs it in scope *)
-Require FileDeltas.                      (* [f_bytes_typed_short] *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 Import Defs.

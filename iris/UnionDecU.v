@@ -51,7 +51,7 @@
 From Stdlib Require Import ZArith Lia List String.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
 Require Import RiscvLang ObsTrace.
-Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
+Require Import LineWords EchoDisc LineModel LineModelLinks.
 Require Import ProgTree PipesPair PipesDisc PipesDiscDec PipesDecE.
 Require PipeDisc.
 Require Import FileState FileDisc FileDiscDec.

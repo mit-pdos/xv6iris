@@ -25,32 +25,25 @@ Require Import ObsTrace.
 Require Import LineWords.
 Require Import EchoDisc.
 Require Import ConsLog.
-Require Import EchoOutPure.
 Require Import EchoOut.
 Require Import LineModel.
-Require Import LineModelLinks.
-Require Import FileState.
-Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import FileLinksLine.
 Require Import FileLineWit.        (* the consumed input's lines are its last byte's history's *)
 Require Import PipeOut.           (* [pipeOutG]: the section binds it *)
-Require Import PipesLinksV.
 Require Import UnionDisc.
 Require Import UnionOut.
 Require Import UnionAdm.           (* [ulines_of], [ulines_of_echof] *)
 Require Import UnionLinks.
 Require Import UnionLinkInst.
 Require Import GenLinksLine.
-Require Import LinkRec.
 Require Import ReadRec.
 Require Import RiscvPtsto.
 Require Import ConsoleInv.
 Require Import FsCfg.
 Require Import UserConsole.
 Require Import WpUart.
-Require Import Xv6Cameras.
 Require Import Xv6G.
 From stdpp Require Import list.
 Local Open Scope list_scope.

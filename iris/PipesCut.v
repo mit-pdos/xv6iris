@@ -21,7 +21,6 @@ From stdpp Require Import list bitvector.definitions ssreflect.
 Require Import LineWords.
 Require Import EchoDisc.
 Require FileDisc.
-Require Import UkShParse.
 Require UkShParseCmd.
 Require UkShMain.
 Require Import UkShWords.

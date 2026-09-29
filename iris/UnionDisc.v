@@ -52,13 +52,13 @@
 (*  beside the decision of the range condition it needs.                  *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import list countable bitvector.definitions.
-Require Import RiscvLang ObsTrace.
+From stdpp Require Import countable bitvector.definitions.
+Require Import RiscvLang.
 Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
-Require Import StringBytes ProgTree ProgTreePipes PipesPair PipesDisc.
+Require Import PipesDisc.
 Require PipeDisc.
 Require Import PipesUline.
-Require Import FileState FileDisc FileOutPure FileHooks.
+Require Import FileState FileDisc FileHooks.
 From stdpp Require Import list.
 
 Local Open Scope nat_scope.

@@ -170,12 +170,12 @@ Require Import Xv6Cameras.
 Require Import BioInv.
 Require Import BlockWords.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import BioDefs.
+Require Import LogDefs.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
-Require Import AppInv.       (* [app_merge]: the merge, off kit 2 (round C; SY3-K2) *)
 Require Import AppDur.       (* [app_dur_laws]: kit 2's crash seam and merge, one row (round C; SY3-A3b) *)
 (* the commit's collection geometry and the law it supports (durable-disk
    C-8): fsinit is what carries the law down to [initlog], which is the one

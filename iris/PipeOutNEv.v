@@ -33,21 +33,16 @@ Require Import LineWords.
 Require Import EchoDisc.
 Require Import ConsLog.
 Require Import EchoOutPure.
-Require Import PipeDisc.
-Require Import PipeOutPure.
-Require Import PipeOutPure.
+Require Import LineBytes.
 Require Import EchoOut.
 Require Import LineModel.
 Require Import LineModelLinks.
 Require Import GenOutPure.
 Require Import GenOutHist.
 Require Import GenOut.
-Require Import AppEcho.
 Require Import PipeOut.
 Require Import PipeOutPure.
-Require Import ProgTree.
 Require Import PipesDisc.
-Require Import PipesDiscDec.
 Require Import PipeOutN.
 Require Import PipesView.
 (* stdpp's list names over the ones the Stdlib import above re-exports *)

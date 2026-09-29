@@ -96,41 +96,31 @@ Require Import UserFd.
 Require Import UserPerm.
 Require Import ProcPtOwn.
 Require Import UserPtTree.
-Require Import UmodeArith UmodeAbi.
+Require Import UmodeArith.
 Require Import ProcGeom.
 Require Import VcGen.              (* [trunc32_subrange] *)
 Require Import KstackArith.        (* [bvsigned_moi_small] *)
-Require Import ChildTok.
 Require Import UexecSlot UexecRet UexecSG.
 Require Import UkRun UkRunSys.
-Require Import UexecExecInst.      (* THE INSTANCE: [uexecSG_xv6] *)
 Require Import SpecConsolewrite.   (* [cons_out_chain] *)
 Require Import SpecSysRead.        (* [sys_rw_count] *)
 Require Import ConsoleInv.         (* [CONSOLE] *)
 Require Import WpUart.             (* [out_link] *)
 Require Import UkWriteLeaf.        (* the supply and the post, at row 16 *)
-Require Import ObsTrace.
 Require Import LineWords.
-Require Import EchoDisc.
-Require Import ConsLog.
-Require Import EchoOutPure.
 Require Import LineModel.
 Require Import LineModelLinks.
-Require Import GenOutPure.
 Require Import EchoOut.
-Require Import GenOutHist.
-Require Import GenOut.
 Require Import GenLinksLine.       (* [gen_params], [gl_w]/[gl_blk]/[gl_taint] *)
 (* the file application's links, for S4's witnesses *)
-Require Import FileDisc FileOutPure AppFile FileOut FileLinks FileLinkGen.
+Require Import FileDisc AppFile FileOut FileLinks FileLinkGen.
 Require Import GenLinksGl.         (* [gcl_gl_taint_at]: the file taint's byte at the era *)
 Require Import CtxIdDefs.
-Require Import UCodeEcho UCodeCat.
 Require User.EchoSyms User.CatSyms.
 (* [UserHeap] LAST among the U-tier libraries, as [UEchoOut] has it:
    [UmodeAbi.uargs] has fields that shadow [UserHeap.uarg]'s. *)
 Require Import UserHeap.
-Require Import ProgTree UkTree UkStub.
+Require Import UkTree UkStub.
 Require Import UkEchoTree UkCatTree.
 Local Open Scope Z_scope.
 Import Defs.

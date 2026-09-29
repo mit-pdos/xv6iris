@@ -45,10 +45,10 @@
 (*  and [ulmG_hooks] at the union application's.                          *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import gmap list countable bitvector.definitions.
+From stdpp Require Import gmap countable bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
-Require Import StringBytes ProgTree ProgTreePipes PipesPair PipesDisc PipesDiscDec.
+Require Import ProgTree PipesDisc PipesDiscDec.
 Require PipeDisc.
 Require Import FileState FileDisc.
 Require Import UnionDisc.
