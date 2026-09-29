@@ -33,3 +33,4 @@ In flight (session 354a8854, stanford profile; transcripts under /root/.claude-s
 - U4 top: agent a6e72870d0b8146b8, worktree lane-u4union (was writing UInitUnionCC).
 - LinkUkLeaves: agent a84509f955ac87499, worktree agent-a84509f955ac87499 (branch worktree-agent-a84509f955ac87499).
 Both resumed after a session-limit cut-off. dead_lane_tail.py reads kmit-profile transcripts: point D at the stanford dir for these.
+LinkUkLeaves LANDED (ukLeaves_holds : UK_LEAVES; icache stamp in userPtInvX, minted at userret fence.i). Remaining: U4 only (agent a6e72870d0b8146b8, lane-u4union).
