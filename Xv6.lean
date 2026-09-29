@@ -1902,6 +1902,8 @@ import Xv6.UshURoundWide
 import Xv6.UshURoundShapes
 import Xv6.UshURoundBody
 import Xv6.UshURoundEcho
+import Xv6.UkSeccWdep
+import Xv6.UkSeccEntry
 import Xv6.UshURoundSecc
 import Xv6.UshURoundCat
 import Xv6.UshURoundRedirExit

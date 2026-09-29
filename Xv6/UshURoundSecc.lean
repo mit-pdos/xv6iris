@@ -18,12 +18,11 @@ lambda `fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld` (deviation 5).
 
 ## Parameters
 
-* `SE : UshSeccEntryP` -- Rocq `UkSeccEntry.secc_image_entry` (Rocq file
-  `UkSeccEntry.v`, not ported), Rocq's exact statement at Lean's vocabulary:
-  the key image a page view (`M`/`Mv` with `imgAgrees M Mv`, ExecRunSup
-  deviation 1), `free_num`/`psok` the program class's `freeNum`/`psok`,
-  `uexec_wp` `uexecWp`, `secc_rows` `seccRows`, `urun_nopipe`
-  `urunNopipe`, `riscv_wild`/`riscv_rdwild` `MachFixedGS.wild`/`.rdwild`.
+* (lane secc-entry) The former `SE : UshSeccEntryP` (Rocq
+  `UkSeccEntry.secc_image_entry`) is discharged: `usecc_exec_sup` reads it off
+  `UkSeccEntry.seccImageEntry_of_leaves UL`, its licence premise off the era's
+  token (`consLicenceAt_of_useccTok`, from `hwild`/`hcons`), so
+  `usecc_exec_sup` takes `UL` and `hcons` in its place.
 * `US : USER` -- Rocq's `LinkUserinit.UG.uexec_wp_gen` is
   `(UexecGen US).uexec_wp_gen`.
 * `UL`, `HF`, `SC`, `hps` as UshURoundEcho deviation 1.
@@ -49,6 +48,7 @@ import Xv6.UshURoundEcho
 import Xv6.UexecSecc
 import Xv6.UshSecc
 import Xv6.LinkUexecWp
+import Xv6.UkSeccEntry
 
 namespace Xv6
 
@@ -67,25 +67,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [WchG GF] [FileG GF] [CurCtx]
 
-/-- **Rocq `UkSeccEntry.secc_image_entry`, as a PARAMETER** (not ported;
-see the header): /seccomp's image entry at echo's argument node, its Pay the
-era's wild token, the reader-side credential and the key's rows. -/
-structure UshSeccEntryP : Prop where
-  secc_image_entry : ∀ (ws : List (List (BitVec 8))) (M : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
-    (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (Q : Int → IProp GF) (rb2 : Bool),
-    (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) → execOk ws → echoNodeImg ws M sv t gn →
-    imgAgrees M Mv → ushEchoArgvBytes ws gn → sts.length = NOFILE →
-    (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)) →
-    ⊢ □ (∀ s : Int, Q s) -∗ □ uexecWp (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) sts -∗
-      udep (hlc := hlc) -∗
-      imageEntry User.Seccomp.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        iprop(MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1)
-          ∗ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1)
-          ∗ seccRows (hlc := hlc) sts)
-        (uslot (hlc := hlc))
-
 /-! ## §0 helpers -/
+
+/-- The era's wild token buys the era's licence (Rocq reads
+`riscvF_app_iface`; `UkSeccEntry` deviation 1): at the union, the machine's
+wild slot is `useccTok` and its console claim `ucl`, whose wild law is
+`ucl_wild_lic`. -/
+theorem consLicenceAt_of_useccTok (ug : UnionGn)
+    (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug) (k : Nat) :
+    MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k := by
+  have hev : ∀ ev : ConsEv, wildEv ev → (∃ b, ev = .evOut b) ∨ (∃ ws, ev = .evRead ws) := by
+    intro ev h
+    cases ev <;> first | exact .inl ⟨_, rfl⟩ | exact .inr ⟨_, rfl⟩ | simp [wildEv] at h
+  unfold consLicenceAt
+  rw [hwild, hcons]
+  iintro #Ht
+  ihave #Hl := ucl_wild_lic ug k $$ Ht
+  imodintro
+  iintro %h %H %ev %hw %hok Hres
+  iapply Hl $$ %h %H %ev %(hev ev hw) %hok Hres
+
 
 /-- The file family at index 3, opened. -/
 theorem uWcf3_open (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
@@ -139,11 +141,12 @@ theorem usecc_execfail_law (UL : UK_LEAVES) (ug : UnionGn)
 
 /-- **Rocq `usecc_exec_sup`**: THE EXEC SUPPLY, `exec seccomp` at the
 parent's ok view. -/
-theorem usecc_exec_sup (US : USER) (SE : UshSeccEntryP (hlc := hlc) (GF := GF))
+theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
     (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
+    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (hrdw : ushRdwildOfShape (hlc := hlc) (GF := GF) ug)
     (I : List (BitVec 8)) (wsx : List (List (BitVec 8))) (vw : List FdState)
     (hok : seccOk wsx) (hvok : ushViewOk vw) {E : UshExecEnv (hlc := hlc) (GF := GF)} :
@@ -174,7 +177,7 @@ theorem usecc_exec_sup (US : USER) (SE : UshSeccEntryP (hlc := hlc) (GF := GF))
     iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hlen %hrows %htab #Hnp
     obtain ⟨-, -, rb2, hr2⟩ := hrows
     ihave #Hrows := ushViewSeccRows (hlc := hlc) (GF := GF) vw sts hvok htab
-    ihave He := SE.secc_image_entry (ulineWs (.LSecc wsx)) M Mv sa t gn sts ROOTINO cs pidv
+    ihave He := seccImageEntry_of_leaves UL (consLicenceAt_of_useccTok ug hwild hcons) (ulineWs (.LSecc wsx)) M Mv sa t gn sts ROOTINO cs pidv
       (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0)) rb2 hps
       (usecc_ws_exec_ok wsx hok) himg hag hbytes hlen hr2 $$ HQ Hwp Hnp Hdep
     iapply imageEntryPayMono _ _ _ _ _ _ _ _ _ _ _ _ $$ [] He
@@ -193,7 +196,6 @@ theorem usecc_exec_sup (US : USER) (SE : UshSeccEntryP (hlc := hlc) (GF := GF))
 
 /-- **Rocq `uHchild_secc`**: THE seccomp CHILD'S LAW. -/
 theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (US : USER)
-    (SE : UshSeccEntryP (hlc := hlc) (GF := GF))
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF) (γp : GName)
@@ -257,7 +259,7 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (U
     dsimp only [ushURoundEnv, ushExecEnvOf] at H
     rw [show 68 + (8 + (ushDg + n)) = 60 + (8 + (ushDg + (n + 8))) by omega]
     iapply H $$ Hcode [] [] [] [] Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM [] Hrun
-    · iapply usecc_exec_sup US SE hps ug r s0 PT PD hwild hrdw I wsx vw hsok hvok $$ Hdep Hslot Hsh
+    · iapply usecc_exec_sup UL US hps ug r s0 PT PD hwild hcons hrdw I wsx vw hsok hvok $$ Hdep Hslot Hsh
     · imodintro
       iintro -
       iright
