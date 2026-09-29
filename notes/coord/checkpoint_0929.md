@@ -38,3 +38,4 @@ Both resumed after a session-limit cut-off. dead_lane_tail.py reads kmit-profile
 LinkUkLeaves LANDED (ukLeaves_holds : UK_LEAVES; icache stamp in userPtInvX, minted at userret fence.i). Remaining: U4 only (agent a6e72870d0b8146b8, lane-u4union).
 Cleanup lanes (Sept 29): A cone re-audit (worktree), B duplicate merges (worktree), C Rocq drift survey (read-only -> notes/rocq_drift.md).
 USER INSTRUCTION (Sept 29): after cleanup, update the Lean proofs to match the LATEST Rocq (main is actively developed; moved past 1900b8a43). Use lane C's drift report as the plan.
+Cleanup A (97b85e825) and B (4f75d1ac5) LANDED. Drift wave 1 (themes A+B+SY1) started: see notes/coord/drift_prompt.txt, notes/rocq_drift.md.
