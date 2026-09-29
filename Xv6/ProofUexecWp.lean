@@ -37,6 +37,7 @@ anywhere a `UEXEC_GEN` is in scope.
 -/
 import Xv6.UexecWp
 import Xv6.SpecUser
+import Xv6.UkFrame
 
 namespace Xv6
 
@@ -80,8 +81,7 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
     · iexact Hregs
     isplitl [Hpt]
     · iapply @userPtAny_intro hlc GF _ xi h pt M
-      iapply @userPtInvX_forget hlc GF _ xi h pt M
-      iexact Hpt
+      iapply @userPtInvX_forget hlc GF _ xi h pt M $$ Hks Hpt
     isplitl [Hcfg]
     · iexact Hcfg
     · iexact Hrut

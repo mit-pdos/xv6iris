@@ -7,11 +7,11 @@ The safety tier opens `userInv` (existential values) into the walker frames
 (`UserFrame.uf_open`).  The engine opens the bundle's pieces at KNOWN values:
 `uvRegs` (hart ACTIVE, privilege User, a user `mstatus`), the register file
 `gprFile cpu m`, `pcIs cpu pc`, the config `userCfg`, and the translation
-registers `ubPtRegs` (from `uk_userPtInvXS_open`), into the register frame at
+registers `ubPtRegs` (from `uk_userPtInvX_open`), into the register frame at
 the reference file `ufFile C P v` whose GPRs ARE `m` and whose PC and nextPC
 ARE `pc` (`uk_regs_open`).  `uk_regs_close` / `uk_regs_close_trap` are the
 two re-assemblies at a landing file (Rocq `uv_land_close`, and the trapped
-frame's cells).  `ukPagesX_forget` / `userPtInvXS_forget` drop the stamps
+frame's cells).  `ukPagesX_forget` / `userPtInvX_forget` drop the stamps
 (Rocq `umem_x_forget`, `user_pt_inv_x_forget`: the trap back into the
 kernel), and `uk_frames` borrows the running token into the walker frames.
 -/
@@ -251,10 +251,10 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
 
 /-- **Rocq `user_pt_inv_x_forget`**. -/
-theorem userPtInvXS_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    kmapStatic (GF := GF) ⊢ userPtInvXS cpu P M -∗ userPtInv cpu P M := by
+theorem userPtInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
+    kmapStatic (GF := GF) ⊢ userPtInvX cpu P M -∗ userPtInv cpu P M := by
   iintro #HS H
-  unfold userPtInvXS userPtInv
+  unfold userPtInvX userPtInv
   icases H with ⟨Hs, Hp, %hwf, %t, %ht, Ho, Htlb, %K, -, Hum⟩
   ihave Hum := ukPagesX_forget K P hwf M $$ HS Hum
   iframe Hs Hp
@@ -265,13 +265,13 @@ theorem userPtInvXS_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   ipureintro; exact ht
 
 /-- **Rocq `user_ptm_inv_x_forget`**. -/
-theorem userPtmInvXS_forget [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
-    kmapStatic (GF := GF) ⊢ userPtmInvXS cpu P sz M -∗ userPtmInv cpu P sz M := by
+theorem userPtmInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
+    kmapStatic (GF := GF) ⊢ userPtmInvX cpu P sz M -∗ userPtmInv cpu P sz M := by
   iintro #HS H
-  unfold userPtmInvXS userPtmInv
+  unfold userPtmInvX userPtmInv
   icases H with ⟨%Mp, H, %hM⟩
   iexists Mp
-  ihave H := userPtInvXS_forget cpu P Mp $$ HS H
+  ihave H := userPtInvX_forget cpu P Mp $$ HS H
   iframe
   ipureintro; exact hM
 

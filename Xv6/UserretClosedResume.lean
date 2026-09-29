@@ -55,7 +55,7 @@ theorem urcLoop_ukb (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (
 /-- The user machine's image, at the lazy view the key reads. -/
 theorem urc_ptm (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) (sz : Nat) :
     userPtInvX (GF := GF) cpu P M ⊢ userPtmInvX cpu P sz (umemLazy P sz M) := by
-  unfold userPtmInvX userPtmInv userPtInvX
+  unfold userPtmInvX
   iintro H
   iexists M
   iframe H

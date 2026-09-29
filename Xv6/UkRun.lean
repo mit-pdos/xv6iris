@@ -911,7 +911,7 @@ theorem uvb_img_bound [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : Li
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (M : ElfMem) (m : RegMap)
     (pc : BitVec 64) (hwf : uptWf pt) :
     ⊢ uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc -∗ ⌜uszOk sz ∧ ∀ a, (M a).isSome → a < uCap⌝ := by
-  unfold uvb uvbF userPtmInvX userPtmInv
+  unfold uvb uvbF userPtmInvX
   iintro ⟨-, -, %hsz, ⟨%Mp, -, %hM⟩, -⟩
   ipureintro
   subst hM

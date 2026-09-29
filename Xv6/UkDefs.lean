@@ -17,13 +17,13 @@ lands on the known post state.  It runs on the same walker frames
   leaf with X set and W clear, `ukTextLeaf`, Rocq `uva_text`) are a fixed map
   `T` (`ukTextAddrs`) that `MachCSL.uxRun` answers fetches and plain loads
   from;
-* **the bundle's image is stamped** (`userPtInvXS`, Rocq
+* **the bundle's image is stamped** (`userPtInvX`, Rocq
   `UmodeText.user_pt_inv_x`): the text pages as physical stamped bytes at
   some `K` the hart's instruction view has passed.  It is minted at
   userret's `fence.i` and forgotten at the trap back into the kernel.
 
 §1 the page split; §2 the engine's machine shape (`UkMem`, `UkLand`,
-`ukView`); §3 the stamped address space (`userPtInvXS`, `userPtmInvXS`).
+`ukView`); §3 the stamped address space (`userPtInvX`, `userPtmInvX`).
 -/
 import Xv6.UserFrame
 import Xv6.UserPerm
@@ -39,10 +39,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 set_option linter.unusedSectionVars false
 
 /-! ## §1 The text pages, and the image split by them -/
-
-/-- **Rocq `uva_text`'s leaf test**: a TEXT page's leaf has X (bit 3) set
-and W (bit 2) clear. -/
-def ukTextLeaf (w : BitVec 64) : Bool := w.getLsbD 3 && !w.getLsbD 2
 
 /-- The physical addresses of the DATA pages (every mapped user page that is
 not text): what the walker's map owns beside the table. -/
@@ -140,35 +136,5 @@ def ukViewStore (V : Nat → List (BitVec 8)) (a n : Nat) (v : BitVec 64) : Nat 
       (V k).mapIdx (fun j b => if a % 4096 ≤ j ∧ j < a % 4096 + n then nthByte (n := 8) v (j - a % 4096) else b)
     else V k
 
-/-! ## §3 The stamped address space (Rocq `UmodeText` §3–§4) -/
-
-section stamped
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-
-/-- **Rocq `umem_text` on one page**: a text page's bytes, physical, stamped
-at `K`. -/
-def textPageX [CurCtx] (K : Nat) (pa : BitVec 64) (bs : List (BitVec 8)) : IProp GF :=
-  iprop([∗list] j ↦ b ∈ bs, ctxByteX curCtx K (pa + BitVec.ofNat 64 j) (DFrac.own 1) b)
-
-/-- **Rocq `umem_x`**: the user pages at the view `M`, the TEXT pages stamped
-at `K`, the data pages plain (as `umPages`). -/
-def umPagesX [CurCtx] (K : Nat) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF :=
-  iprop([∗map] k ↦ w ∈ P.um, ⌜(M k).length = 4096⌝ ∗
-    (if ukTextLeaf w then textPageX K (pte2pa w) (M k) else byteBuf (pte2pa w) (DFrac.own 1) (M k)))
-
-/-- **Rocq `UmodeText.user_pt_inv_x`**: `userPtInv` with the text pages
-stamped at some `K` the hart's instruction view has passed. -/
-def userPtInvXS [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
-  ⌜uptWf P⌝ ∗
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
-    (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
-    ∃ K : Nat, iviewLb cpu K ∗ umPagesX K P M
-
-/-- **Rocq `UmodeText.user_ptm_inv_x`**: the same at the LAZY view. -/
-def userPtmInvXS [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
-  iprop(∃ Mp : Nat → List (BitVec 8), userPtInvXS cpu P Mp ∗ ⌜umemLazy P sz Mp = M⌝)
-
-end stamped
 
 end Xv6

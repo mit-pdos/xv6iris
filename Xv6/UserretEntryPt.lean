@@ -25,6 +25,7 @@ import Xv6.UserretDefs
 import MachCSL.WpSmodeSatp
 import MachCSL.WpSmodeSfence
 import Xv6.TransPt
+import MachCSL.UIcacheFencei
 
 namespace Xv6
 
@@ -139,28 +140,51 @@ configuration at root `kroot`, the kernel slot, the parked user table and
 the user table, landing at `+0xac` with the same file. -/
 theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms mdl mepc stc : BitVec 64) (lf : SLeft)
     (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
-    (ha0 : R.get 10#5 = satpOf KTier.kpt P.root) :
+    (ha0 : R.get 10#5 = satpOf KTier.kpt P.root) (Pf : IProp GF) (Qf : Nat → IProp GF)
+    (hstep : ⊢ ifenceStep cpu iprop(ownCtx cpu curCtx ∗ Pf) (fun K => iprop(ownCtx cpu curCtx ∗ Qf K))) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗
     confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt kroot ms mdl mepc stc lf) ∗
     clockCells cpu ∗ pcIs cpu (urPc 0x9c#64) ∗ kptSlot cpu kroot ∗ ctxTok cpu curCtx ∗ gprFile cpu R ∗
-    uptFrame P ∗
-    ▷ (urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R -∗ wpLoop cpu)
+    uptFrame P ∗ Pf ∗
+    ▷ (urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R -∗
+        (∃ K, iviewLb cpu K ∗ Qf K) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hok0 : SConfKpt (GF := GF) (sConfOf KTier.kpt kroot ms mdl mepc stc lf) kroot false :=
     SConfAt_sConfOf KTier.kpt kroot ms mdl mepc stc lf false hsm hlf
   have hc1 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P :=
     urConfOk_sConfOf P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
-  iintro ⟨#Htext, #HS, #Hcl, HmConf, Hclock, Hpc, Hkpt, Htok, HR, Hfr, HΦ⟩
+  iintro ⟨#Htext, #HS, #Hcl, HmConf, Hclock, Hpc, Hkpt, Htok, HR, Hfr, HPf, HΦ⟩
   ihave Htt : transTok cpu KTier.kpt kroot $$ [Hkpt Htok]
   · rw [userret_transTok_kpt]; iframe
-  -- step 0: fence.i
+  -- step 0: fence.i, running the caller's stamping step on the running token
   iapply (userret_kstep cpu _ _ kroot hok0 hmdl rfl (urPc 0x9c#64) (urPc 0xa0#64) (by decide) (by decide)
-    urFencei (gprFile cpu R) iprop((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu R)
-    ((execSpecF_fencei cpu _ false hok0.phys _ _ 0#12 0#5 0#5 R).frameL _))
+    urFencei iprop(gprFile cpu R ∗ Pf)
+    iprop(((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu R) ∗ ∃ K, iviewLb cpu K ∗ Qf K)
+    (userret_exec_conseq
+      ((execSpecF_fencei_x cpu _ false hok0.phys _ _ 0#12 0#5 0#5 R iprop(ownCtx cpu curCtx ∗ Pf)
+        (fun K => iprop(ownCtx cpu curCtx ∗ Qf K))).frameL
+        iprop((transSlotAt cpu KTier.kpt kroot ∗ ∃ r : Option Resv, resvFragAny cpu r) ∗ urTrampCl))
+      (by
+        iintro ⟨⟨Htt, #Hc⟩, HR, HPf⟩
+        unfold transTok
+        icases Htt with ⟨Hsl, Htk⟩
+        icases ctxTok_cases cpu curCtx $$ Htk with ⟨Hown, Hrs⟩
+        ihave Hst := hstep
+        iframe Hsl Hrs Hc HR Hst Hown HPf)
+      (by
+        iintro ⟨⟨⟨Hsl, Hrs⟩, #Hc⟩, HR, %K, #HK, Hown, HQ⟩
+        icases Hrs with ⟨%r, Hrs⟩
+        ihave Htk := ctxTok_intro cpu curCtx r $$ [Hown Hrs]
+        · iframe
+        iframe HR Hc
+        isplitl [Hsl Htk]
+        · unfold transTok; iframe
+        iexists K
+        iframe HK HQ)))
   ihave HI := ui_fencei $$ Htext
-  iframe HI HmConf Hclock Hpc Htt HR Hcl
+  iframe HI HmConf Hclock Hpc Htt HR Hcl HPf
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Htt, _⟩, HR⟩
+  iintro HmConf Hclock Hpc ⟨⟨⟨Htt, _⟩, HR⟩, HKQ⟩
   -- step 1: sfence.vma under the kernel table
   iapply (userret_kstep cpu _ _ kroot hok0 hmdl rfl (urPc 0xa0#64) (urPc 0xa4#64) (by decide) (by decide)
     urSfence (gprFile cpu R) iprop(transTok cpu KTier.kpt kroot ∗ gprFile cpu R ∗ urTrampCl)
@@ -186,8 +210,10 @@ theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms md
   -- step 3: sfence.vma under the window
   iapply (userret_wstep cpu _ kroot P hc1 (urPc 0xa8#64) (urPc 0xac#64) (by decide) (by decide) R)
   ihave HI := ui_sfence2 $$ Htext
-  iframe HI HmConf Hclock Hpc Hwin Htok HR HΦ Hcl
-  iexact HS
+  iframe HI HmConf Hclock Hpc Hwin Htok HR Hcl HS
+  inext
+  iintro Hst
+  iapply HΦ $$ Hst HKQ
 
 end
 

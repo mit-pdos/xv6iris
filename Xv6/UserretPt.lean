@@ -189,16 +189,16 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
 cells, the installed user table over the pages, the loop's config cells. -/
 theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8))
     (ms mdl mepc stc pc epc sc tv : BitVec 64) (lf : SLeft) (hmm : MIE_S &&& ~~~mdl = 0#64) (g : RegMap) (hwf : uptWf P)
-    (hlf : lf.ok) :
+    (hlf : lf.ok) (K : Nat) :
     confCells cpu (DFrac.own 1) Privilege.User
         { sConfOf KTier.kpt P.root ms mdl mepc stc lf with
           mstatus := sretMs (sConfOf KTier.kpt P.root ms mdl mepc stc lf).mstatus } ∗
       clockCells cpu ∗ pcIs cpu pc ∗ gprFile cpu g ∗
       Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-      Register.stvec ↦ᵣ[cpu] TRAMPOLINE ∗ uptSlot cpu P ∗ umPages P M
+      Register.stvec ↦ᵣ[cpu] TRAMPOLINE ∗ uptSlot cpu P ∗ iviewLb cpu K ∗ umPagesX K P M
     ⊢ uRegs (GF := GF) cpu (HartState.HART_ACTIVE ()) (sretMs ms) sc tv epc pc pc g ∗ userPtInvX cpu P M ∗
       userCfg cpu (userretUcfg mdl hmm) := by
-  iintro ⟨HmConf, Hclock, Hpc, HF, Hsepc, Hscause, Hstval, Hstvec, Hslot, Hum⟩
+  iintro ⟨HmConf, Hclock, Hpc, HF, Hsepc, Hscause, Hstval, Hstvec, Hslot, #HK, Hum⟩
   conf_cases HmConf
   unfold pcIs
   icases Hpc with ⟨HPC, HnextPC⟩
@@ -207,11 +207,19 @@ theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   simp only [MIE_S, MEDELEG_S, MENVCFG_S]
   iframe Hhart_state Hcur_privilege Hmstatus Hscause Hstval Hsepc HPC HnextPC Hclock HF
   isplitl [Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum]
-  · iapply (userPtInv_uptSlot cpu P M).2
-    iframe Hsatp Hslot Hum
+  · unfold uptSlot
+    icases Hslot with ⟨%t, %ht, Ho, Htlb⟩
+    iframe Hsatp
     isplitl [Hpmpcfg_n Hpmpaddr_n]
     · iapply (userPmp_intro cpu _ _ hlf.2); iframe Hpmpcfg_n Hpmpaddr_n
-    ipureintro; exact hwf
+    isplitr
+    · ipureintro; exact hwf
+    iexists t
+    iframe Ho Htlb
+    isplitr
+    · ipureintro; exact ht
+    iexists K
+    iframe HK Hum
   iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg
   iapply (userHwCells_intro cpu _ _ mepc stc hlf.1)
   iframe Hmcounteren Hmtimecmp Hmepc Hstimecmp

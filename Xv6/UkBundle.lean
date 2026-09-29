@@ -4,7 +4,7 @@ Rocq `UkStep.uvb_elim` / `uvb_intro` / `trapped_of_uv_trap_frame`).
 
 `ukCore` is the part of the bundle `uvb` a cycle runs on (the rest -- the
 ambient, the descriptor resource, the kernel obligation -- only rides):
-`uvRegs`, the size bound, the STAMPED lazy address space `userPtmInvXS`, the
+`uvRegs`, the size bound, the STAMPED lazy address space `userPtmInvX`, the
 config, the register file at `m`, the pc and the residue.  After the stamped
 address space replaces `userPtmInvX` in `uvbF` (the userret mint), `uvbF`'s
 body is `uvAmb ∗ ukCore ∗ Rfd ∗ ukontF` up to reassociation.
@@ -60,7 +60,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- **The bundle's machine core** (see the header). -/
 def ukCore [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat) (M : ElfMem)
     (m : RegMap) (pc : BitVec 64) : IProp GF :=
-  iprop(uvRegs cpu ∗ ⌜uszOk sz⌝ ∗ userPtmInvXS cpu P sz M ∗ userCfg cpu C ∗ gprFile cpu m ∗ pcIs cpu pc ∗ Rut P)
+  iprop(uvRegs cpu ∗ ⌜uszOk sz⌝ ∗ userPtmInvX cpu P sz M ∗ userCfg cpu C ∗ gprFile cpu m ∗ pcIs cpu pc ∗ Rut P)
 
 set_option maxRecDepth 10000 in
 /-- **The core, opened into the engine's frames** (Rocq `uvb_elim`). -/
@@ -74,9 +74,9 @@ theorem uk_core_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → 
   iintro ⟨#Hhw, #HS, Hcore⟩
   unfold ukCore
   icases Hcore with ⟨Hregs, %hsz, Hpt, Hcfg, Hg, Hpc, Hrut⟩
-  unfold userPtmInvXS
+  unfold userPtmInvX
   icases Hpt with ⟨%Mp, Hpt, %hM⟩
-  icases uk_userPtInvXS_open cpu P Mp $$ HS Hpt with ⟨%t, %tlb, %mm, %T, %K, %hmem, %htlb, %hview, Hr, HB, HX, #HK⟩
+  icases uk_userPtInvX_open cpu P Mp $$ HS Hpt with ⟨%t, %tlb, %mm, %T, %K, %hmem, %htlb, %hview, Hr, HB, HX, #HK⟩
   icases uk_regs_open cpu C P m pc tlb $$ [Hregs Hg Hpc Hcfg Hr] with ⟨%v, %hv, HF, Ha⟩
   · iframe Hhw
     iframe
@@ -108,9 +108,9 @@ theorem uk_core_close [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd →
   icases uk_regs_close cpu C P s.file m' pc' h.land.cfg h.land.priv h.land.act h.land.ms h.pc h.npc h.regs
     $$ [HF Ha] with ⟨Hregs, Hg, Hpc, Hcfg, Hr⟩
   · iframe
-  ihave Hpt := uk_userPtInvXS_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
+  ihave Hpt := uk_userPtInvX_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
   rw [h.view]
-  unfold ukCore userPtmInvXS
+  unfold ukCore userPtmInvX
   iframe Hregs Hcfg Hg Hpc Hrut
   isplitr
   · ipureintro; exact hsz
@@ -140,8 +140,8 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
   icases uk_regs_close_trap cpu C P s.file h.cfg h.priv h.act hpc (h.npc) $$ [HF Ha]
     with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hcfg, Hr⟩
   · iframe
-  ihave Hpt := uk_userPtInvXS_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
-  ihave Hpt := userPtInvXS_forget cpu P _ $$ HS Hpt
+  ihave Hpt := uk_userPtInvX_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
+  ihave Hpt := userPtInvX_forget cpu P _ $$ HS Hpt
   rw [h.view]
   have hg : ∀ i, i ≠ 0#5 → uxaXget s.file i = tfResumeGpr0 (tfOf m (s.file .sepc)) i := by
     intro i hi

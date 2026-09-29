@@ -3,7 +3,7 @@
 LinkUkLeaves; Rocq `UmodeText.umem_x_bytes`, `WpUmodeFetch`'s byte map and
 `UkStep.uvb_elim`/`uvb_intro`'s page-table half).
 
-`userPtInvXS cpu P M` (Xv6/UkDefs) holds the table, the TLB, the data pages
+`userPtInvX cpu P M` (Xv6/UkDefs) holds the table, the TLB, the data pages
 as kernel-virtual cells and the TEXT pages as physical STAMPED bytes at some
 `K` with the hart's receipt `iviewLb cpu K`.  The engine runs it as
 
@@ -13,7 +13,7 @@ as kernel-virtual cells and the TEXT pages as physical STAMPED bytes at some
 * the stamped text map `uxTextOwn curCtx K (ukTextAddrs P.um) T`, which the
   walker `uxRun` answers fetches and text loads from;
 
-`uk_userPtInvXS_open` / `uk_userPtInvXS_close` are the two directions (the
+`uk_userPtInvX_open` / `uk_userPtInvX_close` are the two directions (the
 safety tier's `ub_userPtInv_open`/`_close` with the text split off); the
 close re-seals at the page view `ukView P.um mm' T` of the landing map.
 
@@ -318,6 +318,35 @@ theorem ukPagesX_bwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
     · simp only [if_true]
       exact (ukTextPage_eq K (pte2pa kv.2) (M kv.1)).2
 
+/-- **The plain pages, split** (for the mint at userret's `fence.i`): the
+data pages and the text pages as physical bytes. -/
+theorem umPages_split [CurCtx] (P : UPtd) (hwf : uptWf P) (M : Nat → List (BitVec 8)) :
+    kmapStatic (GF := GF) ⊢ umPages P M -∗
+      ⌜∀ kv ∈ toList P.um, (M kv.1).length = 4096⌝ ∗ ubOwnA curCtx (ukDataBytes P.um M) ∗
+        ubOwnA curCtx (ukTextBytes P.um M) := by
+  iintro #HS H
+  icases ubData_own_fwd P hwf M $$ HS H with ⟨%hl, H⟩
+  isplitr
+  · ipureintro; exact hl
+  unfold ubDataBytes ukDataBytes ukTextBytes
+  rw [ubOwnA_flatMap, ubOwnA_flatMap, ubOwnA_flatMap]
+  iapply BigSepL.bigSepL_sep_eqv.1
+  iapply BigSepL.bigSepL_mono _ $$ H
+  intro k kv _
+  cases ukTextLeaf kv.2
+  · simp only [Bool.false_eq_true, if_false]
+    iintro H
+    iframe H
+    unfold ubOwnA
+    simp only [Iris.Algebra.BigOpL.bigOpL_nil]
+    iempintro
+  · simp only [if_true]
+    iintro H
+    iframe H
+    unfold ubOwnA
+    simp only [Iris.Algebra.BigOpL.bigOpL_nil]
+    iempintro
+
 end pages
 
 /-! ## §3 Open and close -/
@@ -333,14 +362,14 @@ set_option maxRecDepth 10000 in
 stamped view, `umem_x_to_bytes`): the translation registers, the walker's
 byte frame over the tree and the DATA pages, the stamped TEXT map, and the
 receipt. -/
-theorem uk_userPtInvXS_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    kmapStatic (GF := GF) ⊢ userPtInvXS cpu P M -∗
+theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
+    kmapStatic (GF := GF) ⊢ userPtInvX cpu P M -∗
       ∃ (t : PTree) (tlb : Tlb) (mm T : BMap) (K : Nat), ⌜UkMem P t mm T⌝ ∗ ⌜utlbOk t tlb⌝ ∗
         ⌜∀ k w, get? P.um k = some w → ukView P.um mm T k = M k⌝ ∗
         ubPtRegs cpu P tlb ∗ (ubFrame curCtx (ubTreeAddrs 2 t ++ ukDataAddrs P.um)).B mm ∗
         uxTextOwn curCtx K (ukTextAddrs P.um) T ∗ iviewLb cpu K := by
   iintro #HS H
-  unfold userPtInvXS
+  unfold userPtInvX
   icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, %K, #HK, Hum⟩
   ihave HT := ubTree_own_fwd 2 t hrep.2.2.1 $$ HS Ho
   icases ukPagesX_fwd K P hwf M $$ HS Hum with ⟨%hl, HD, HX⟩
@@ -388,10 +417,10 @@ set_option maxRecDepth 10000 in
 sound for the landing tree, the walker's frame at the landing map (same
 domain), the unchanged text map and the receipt, the address space is back at
 the landing's page view. -/
-theorem uk_userPtInvXS_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t' : PTree) (mm' T : BMap) (K : Nat)
+theorem uk_userPtInvX_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t' : PTree) (mm' T : BMap) (K : Nat)
     (tlb' : Tlb) (hm' : UkMem P t' mm' T) (htlb : utlbOk t' tlb') :
     kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ubFrame curCtx D).B mm' -∗
-      uxTextOwn curCtx K (ukTextAddrs P.um) T -∗ iviewLb cpu K -∗ userPtInvXS cpu P (ukView P.um mm' T) := by
+      uxTextOwn curCtx K (ukTextAddrs P.um) T -∗ iviewLb cpu K -∗ userPtInvX cpu P (ukView P.um mm' T) := by
   have hl := ukView_length P.um mm' T
   iintro #HS Hr HB HX #HK
   icases ubFrame_elim curCtx _ mm' $$ HB with ⟨%⟨hnd, hdom⟩, HO⟩
@@ -419,7 +448,7 @@ theorem uk_userPtInvXS_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t
   ihave Hpg := ukPagesX_bwd K P hm'.wf (ukView P.um mm' T) hl $$ HS HD HL
   unfold ubPtRegs
   icases Hr with ⟨Hs, Hp, Htlb⟩
-  unfold userPtInvXS
+  unfold userPtInvX
   iframe Hs Hp
   isplitr
   · ipureintro; exact hm'.wf

@@ -66,17 +66,22 @@ userret).
 6. **The memory view is Lean's page view** `M : Nat → List (BitVec 8)`
    (`UPtDefs.umPages`, `UexecSlot.uvisOf`), not a va-keyed `gmap Z (bv 8)`;
    the pure `uva_pa_inj`/`upt_acc_wf` facts are `UPtDefs.uptWf`.
-7. **No icache stamp**: `userPtInvX` (Rocq `user_pt_inv_x`, the text bytes
-   stamped at userret's `fence.i`) is `userPtInv` -- MachCSL has no user
-   instruction-view model.  It is a separate name so the slot's body keeps
-   Rocq's shape, and wave 9 can add the stamp without touching its users'
-   statements beyond this definition.
+7. **The icache stamp** (Rocq `UmodeText.user_pt_inv_x`, lane LinkUkLeaves):
+   `userPtInvX` is `userPtInv` with the TEXT pages (a leaf with X set and W
+   clear, `ukTextLeaf`, Rocq `uva_text`) held as PHYSICAL stamped bytes
+   (`MachCSL.ctxByteX`) at some `K` the hart's instruction view has passed
+   (`iviewLb cpu K`).  Minted at userret's `fence.i` (`UserretEntryPt`,
+   MachCSL `ifenceStep_stamp`), forgotten at the trap back into the kernel
+   (`UkFrame.userPtInvX_forget`, which needs `kmapStatic`).  It is what makes
+   a user FETCH value-precise on the machine's non-coherent instruction cache
+   (the verified engine, `UK_LEAVES`).
 8. The user tier's `CurCtx` is the ambient class instance (`[CurCtx]`,
    Rocq's `XI`), its hart the explicit `cpu : CPU` (Rocq's `CID`).
 -/
 import Xv6.UPtDefs
 import Xv6.ElfFile
 import Xv6.KernelMap
+import MachCSL.CtxX
 
 namespace Xv6
 
@@ -259,13 +264,29 @@ preserves). -/
 def userPtAny [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF :=
   iprop(∃ M : Nat → List (BitVec 8), userPtInv cpu P M)
 
-/-- **Rocq `UmodeText.user_pt_inv_x`** (deviation 7: no stamp in MachCSL). -/
-def userPtInvX [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF :=
-  userPtInv cpu P M
+/-- **Rocq `uva_text`'s leaf test**: a TEXT page's leaf has X (bit 3) set
+and W (bit 2) clear (deviation 7). -/
+def ukTextLeaf (w : BitVec 64) : Bool := w.getLsbD 3 && !w.getLsbD 2
 
-/-- Rocq `user_pt_inv_x_forget`. -/
-theorem userPtInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    userPtInvX (GF := GF) cpu P M ⊢ userPtInv cpu P M := .rfl
+/-- **Rocq `umem_text` on one page**: a text page's bytes, physical, stamped
+at `K`. -/
+def textPageX [CurCtx] (K : Nat) (pa : BitVec 64) (bs : List (BitVec 8)) : IProp GF :=
+  iprop([∗list] j ↦ b ∈ bs, ctxByteX curCtx K (pa + BitVec.ofNat 64 j) (DFrac.own 1) b)
+
+/-- **Rocq `umem_x`**: the user pages at the view `M`, the TEXT pages stamped
+at `K`, the data pages plain (as `umPages`). -/
+def umPagesX [CurCtx] (K : Nat) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF :=
+  iprop([∗map] k ↦ w ∈ P.um, ⌜(M k).length = 4096⌝ ∗
+    (if ukTextLeaf w then textPageX K (pte2pa w) (M k) else byteBuf (pte2pa w) (DFrac.own 1) (M k)))
+
+/-- **Rocq `UmodeText.user_pt_inv_x`** (deviation 7): `userPtInv` with the
+text pages stamped at some `K` the hart's instruction view has passed. -/
+def userPtInvX [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
+  ⌜uptWf P⌝ ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+    (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
+    ∃ K : Nat, iviewLb cpu K ∗ umPagesX K P M
 
 /-- Rocq `user_pt_any_intro`. -/
 theorem userPtAny_intro [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
@@ -323,9 +344,10 @@ lazy view, deviation 3). -/
 def userPtmInv [xi : CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
   iprop(∃ Mp : Nat → List (BitVec 8), userPtInv cpu P Mp ∗ ⌜umemLazy P sz Mp = M⌝)
 
-/-- **Rocq `UmodeText.user_ptm_inv_x`** (no stamp, UserExec deviation 7). -/
+/-- **Rocq `UmodeText.user_ptm_inv_x`**: the stamped address space at the
+LAZY view (deviation 7). -/
 def userPtmInvX [xi : CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) : IProp GF :=
-  userPtmInv cpu P sz M
+  iprop(∃ Mp : Nat → List (BitVec 8), userPtInvX cpu P Mp ∗ ⌜umemLazy P sz Mp = M⌝)
 
 /-- Rocq `user_ptm_inv_any`. -/
 theorem userPtmInv_any [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
@@ -349,7 +371,7 @@ theorem userPtmInv_intro [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) :
 /-- Rocq `user_ptm_inv_x_pt`: the stamped lazy view forgets to the page view. -/
 theorem userPtmInvX_pt [CurCtx] (cpu : CPU) (P : UPtd) (sz : Nat) (M : ElfMem) :
     userPtmInvX (GF := GF) cpu P sz M ⊢ ∃ Mp, userPtInvX cpu P Mp := by
-  unfold userPtmInvX userPtmInv userPtInvX
+  unfold userPtmInvX
   iintro ⟨%Mp, H, -⟩
   iexists Mp
   iexact H

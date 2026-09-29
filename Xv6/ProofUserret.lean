@@ -22,6 +22,8 @@ slot before the switch consumed it) and the image.
 -/
 import Xv6.UserretEntryPt
 import Xv6.UserretPt
+import Xv6.UkOpen
+import MachCSL.UIcacheFence
 
 namespace Xv6
 
@@ -111,13 +113,18 @@ theorem userret_proof : USERRET :=
   unfold procPtAt
   icases Hppt with ⟨%hwfP, Hfr, Hum⟩
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
-  -- the switch
-  iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0))
-  iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF
+  -- the pages, the text half as physical bytes for the mint
+  icases umPages_split P hwfP M $$ HS Hum with ⟨%hl, HD, HT⟩
+  -- the switch (its fence.i stamps the text: UserExec deviation 7)
+  iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0)
+    (ubOwnA curCtx (ukTextBytes P.um M)) (fun K => ukOwnX curCtx K (ukTextBytes P.um M))
+    (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx (ukTextBytes P.um M)))
+  iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HT
   isplitl [Hfr]
   · unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
   inext
-  iintro Hst
+  iintro Hst ⟨%K, #HK, HX⟩
+  ihave Hum := ukPagesX_bwd K P hwfP M hl $$ HS HD HX
   -- the run under the user table
   iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep)
   iframe Htext HS Hst Hpage Hsepc
@@ -125,8 +132,9 @@ theorem userret_proof : USERRET :=
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged
   ihave HU := userret_user_state cpu P M ms mdl mepc stc (sep &&& 0xFFFFFFFFFFFFFFFE#64) sep sc tv lf hmdl
-    (tfResumeGpr0 ws) hwfP hlf $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum]
+    (tfResumeGpr0 ws) hwfP hlf K $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot HK Hum]
   · iframe
+    iexact HK
   icases HU with ⟨HU, Hpt, Hcfg⟩
   iapply HΦ $$ %(userretUcfg mdl hmdl) %(sretMs ms)
     %⟨userretUcfg_loopOk mdl hmdl P hwfP, userMstatusOk_sretMs ms hsm hspie'⟩ HU Hpt Hcfg Hpage
