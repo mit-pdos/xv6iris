@@ -97,7 +97,7 @@ theorem ushpi_mid (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP) (SF : S
       ushCldep (hlc := hlc) (.open true false (.pipe γp)) -∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) -∗
       □ (uKillCred (hlc := hlc) -∗ Qc (-1)) -∗ RcR -∗ Cx -∗ Wr -∗ ushWait0Law (hlc := hlc) N Wr Pw -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x14c) (2 + (Dg + av)) -∗
-      (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗
+      (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
         ushFork1Ans N S1 Qc RcR r -∗ ustd N.fd ld -∗ Cx -∗
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') -∗
       (∀ (N' : UkNames GF) (h' : CPU) (m' : RegMap) (γ' : GName) (q : Nat),
@@ -188,7 +188,7 @@ theorem wp_ushPipeArmG3 (UL : UK_LEAVES) (_SW : SH_SYS_WAIT) (SC : SH_SYS_CLOSE)
   · -- ============ pipe FAILED: panic("pipe") ============
     iapply ushS_brT UL N (ushRI_144 N.t) 0x172 h4 m4 _ (by rw [ha04, hm1, RegMap.get_zero]; decide) $$ HC Hrun
     iintro %h5 Hrun
-    iapply ushS_la UL N (ushRI_172 N.t) (ushRI_176 N.t) 0x12d8 h5 m4 _ $$ HC Hrun
+    iapply ushS_la UL N (ushRI_172 N.t) (ushRI_176 N.t) 0x12b8 h5 m4 _ $$ HC Hrun
     iintro %h6 Hrun
     iapply ushS_jal UL N (ushRI_17a N.t) User.Sh.Sym.«panic» 0x17e h6 _ _ $$ HC Hrun
     iintro %h7 Hrun

@@ -49,13 +49,13 @@ def ushNodeObl (Dg : Nat) (N : UkNames GF) (ld : List FdState) (szv cwdv : Nat) 
     □ (uKillCred (hlc := hlc) -∗ Qc (-1)) ∗ Cr ∗
     (∀ γp : PipeNames, Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ (Rk γp ∗ Cx γp))) ∗
     ushPipeCall (hlc := hlc) N ld R ∗ Wr ∗ ushWait0Law (hlc := hlc) N Wr Pw ∗
-    □ (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x12d8⌝ -∗ ustd N.fd ld -∗ Cr -∗
+    □ (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x12b8⌝ -∗ ustd N.fd ld -∗ Cr -∗
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + (2 + av)) -∗ wpLoop h') ∗
-    □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗
+    □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗
         ⌜r = -1#64⌝ -∗ ushFork1Ans N Sc Qc (RcL γp) r -∗ ustd N.fd ld -∗ RcR γp -∗ Cx γp -∗
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
     □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames) (S1 : ExtTreeSet GName compare),
-        ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗ ushFork1Ans N S1 Qc (RcR γp) r -∗ ustd N.fd ld -∗
+        ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗ ushFork1Ans N S1 Qc (RcR γp) r -∗ ustd N.fd ld -∗
         Cx γp -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') ∗
     (∀ (h' : CPU) (m' : RegMap) (γp : PipeNames) (r1 r2 rw1 rw2 : BitVec 64)
         (S1 S2 S3 S4 : ExtTreeSet GName compare),

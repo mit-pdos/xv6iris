@@ -138,7 +138,7 @@ theorem wp_ushChildRedirG (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) (
       ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ UM0 -∗
       ushOpenCallG (hlc := hlc) N cwdv (ushsFile s0 len f args gp fe) rrModeGt (ld.set 1 .closed) H K Kf -∗
       □ (Cr -∗ N.pay (-1)) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (Dg + n))) -∗
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       ((∀ (h' : CPU) (m' : RegMap) (q : Nat) (ty : FdType), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗
           ushCmd N.d q (.exec (ushArgs s0 (ushsNulcut args len f fe) args)) -∗
           ustd N.fd ((ld.set 1 .closed).set 1 (.open false true ty)) -∗ ucwd N.cwd cwdv -∗ K ty -∗ UM2 -∗ Cr' -∗
@@ -174,7 +174,7 @@ theorem wp_ushChildAllocRedirG (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNC
       ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ ushmFresh N sz -∗
       ushOpenCallG (hlc := hlc) N cwdv (ushsFile s0 len f args gp fe) rrModeGt (ld.set 1 .closed) H K Kf -∗
       □ (Cr -∗ N.pay (-1)) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (Dg + n))) -∗
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       ((∀ (h' : CPU) (m' : RegMap) (q : Nat) (ty : FdType), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗
           ushCmd N.d q (.exec (ushArgs s0 (ushsNulcut args len f fe) args)) -∗
           ustd N.fd ((ld.set 1 .closed).set 1 (.open false true ty)) -∗ ucwd N.cwd cwdv -∗ K ty -∗

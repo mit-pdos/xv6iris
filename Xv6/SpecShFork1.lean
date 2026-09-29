@@ -11,7 +11,7 @@ function per file).
 THE TWO-WORD FRAME CROSSES THE FORK: the child returns through the same
 epilogue, so the payload carries the two spilled words at their values.
 THE PANIC IS THE CALLER'S: fork returned `-1`, and the parent is handed the
-run at `panic`'s entry with "fork" (0x12a8) in a0, fork's answer and what it
+run at `panic`'s entry with "fork" (0x1288) in a0, fork's answer and what it
 borrowed (`Pex`); the returning arm knows `r ≠ 0` AND `r ≠ -1` (the `beq`
 is fork1's whole body).  `_any` is the index-free corollary whose panic is
 paid on the free law (`ushDiagLeaf`, deviation 2).
@@ -51,7 +51,7 @@ def wpShFork1AtBody : Prop :=
     ⊢ ushCode N.t -∗ P N.t N.d N.s -∗ usz N.s szv -∗ ustdAt N.fd l v -∗ ucwd N.cwd cw -∗ uch N.ch Sc -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ Rc -∗ □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«fork1») (2 + (Dg + n)) -∗
-      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗
+      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
           ushFork1Ans N Sc Q Rc r -∗ ustdAt N.fd l v -∗ Pex -∗
           urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + n) -∗ wpLoop h') ∗
         (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗ ⌜r ≠ -1#64⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗
@@ -75,7 +75,7 @@ def wpShFork1Body : Prop :=
     ⊢ ushCode N.t -∗ P N.t N.d N.s -∗ usz N.s szv -∗ ustd N.fd l -∗ ucwd N.cwd cw -∗ uch N.ch Sc -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ Rc -∗ □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«fork1») (2 + (Dg + n)) -∗
-      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗
+      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
           ushFork1Ans N Sc Q Rc r -∗ ustd N.fd l -∗ Pex -∗
           urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + n) -∗ wpLoop h') ∗
         (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗ ⌜r ≠ -1#64⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗

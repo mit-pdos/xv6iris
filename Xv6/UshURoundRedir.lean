@@ -7,7 +7,7 @@ The redirect child's law `shRedirChildLaw` at the union round's shell
 context (`UshURoundBody.ushURoundCtx`, room `ushDg`): the line read off the
 fork's words is `echo ws > f` at the union's parse, the lend opened (the wild
 arm refuted), the deed and the line's witness read (their taint arms are the
-generic continuation `urun_gen`), and the walk from 0x9c0
+generic continuation `urun_gen`), and the walk from 0x99c
 (`UshRedirChild.wp_kshm_child_file_redir`) given its open
 (`UshFileRedir.hopen_hand`), the receipt read (`redirK_inum`), the exec
 supply (`UshURoundRedirSup.uredir_exec_sup`), the two diagnostics and the
@@ -101,7 +101,7 @@ theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : US
       ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) sa len fb -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
       ustr N'.d dv ushSymA 7 ushpSymF -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uchAny N'.ch -∗
       ushmFresh N' sz -∗ uWcl (hlc := hlc) ug s0 I 3 -∗ fown r s -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
+      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
   obtain ⟨⟨wr0, hr0⟩, ⟨rb1, hr1⟩, hfd2⟩ := hrows
   have hokws : lineOk ws := hline.1
   have hlen := htie.1
@@ -224,9 +224,9 @@ theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : 
     · iapply uredir_walk ug r s0 PT PD UL HS HF MS HM hps hlic heq hkill N' h m dw dv sa len ws file fb sz ld n
         I jo cs s v' ls hpeq' hs1 hline hfile hs0 hs64 hs38 hszlo hszal hszok hrows hul hpos htie (hall _ hinl)
         hall $$ Hlk Hdep Hslot Hmade Hinv Hpin' Hcs Hty Hfl Hcode Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM Hc Hd Hrun
-    · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x9c0) _ (by decide)
+    · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c) _ (by decide)
         $$ Hgenw HT Hrun
-  · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x9c0) _ (by decide)
+  · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c) _ (by decide)
       $$ Hgenw HT Hrun
 
 end UShURoundRedir

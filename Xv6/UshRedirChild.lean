@@ -1,7 +1,7 @@
 /-
-**The redirect child's walk, 0x9c0 to its exits** (Rocq
+**The redirect child's walk, 0x99c to its exits** (Rocq
 `UkShRedirChild.wp_kshm_child_file_redir`, pinned `1900b8a43`).  A stage
-file (main's child code at 0x9c0 and runcmd's arms).
+file (main's child code at 0x99c and runcmd's arms).
 
 `UshRedirSeam.wp_ushChildAllocRedirG` (parse, close(1), the open as the
 application's call) with both of its continuations filled: `exec /echo` at
@@ -67,7 +67,7 @@ theorem wp_kshm_child_file_redir {A : Type} (UL : UK_LEAVES) (HS : UK_SYS_P) (HF
       (∀ ty : FdType, ushdExecfailLaw (hlc := hlc) iprop(Cr' ∗ K' ty) Cx) -∗ □ (Cx -∗ Q (-1)) -∗
       ushExecfailLawAt (hlc := hlc) (altOpenfailN file) (13 + file.length) iprop(Kf a ∗ Cr') Cd -∗
       □ (Cd -∗ Q (-1)) -∗ □ (Cr -∗ Q (-1)) -∗ (Cr -∗ Dd a ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
+      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
   obtain ⟨hred, htoks, hpos, htlen⟩ := ush_line_toks_holds_redir ws file fb 0 len hline
   have hok := hline.1
   have hlen1 : 1 < ld.length := by

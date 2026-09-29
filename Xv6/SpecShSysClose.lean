@@ -3,7 +3,7 @@
 `UkShPipe.wp_kshpi_close_h` and `UkShRedir.wp_kshx_close_std_d`, pinned
 `1900b8a43`; DU10: one user function per file).
 
-    close:  li a7, SYS_close ; ecall ; ret        (usys.S, at 0xcae)
+    close:  li a7, SYS_close ; ecall ; ret        (usys.S, at 0xc8a)
 
 Two readings of the same three instructions: shut a TAIL descriptor the
 caller holds a HANDLE for (the pipe arm's four closes; `wp_uk_ecall_close`

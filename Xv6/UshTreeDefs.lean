@@ -138,20 +138,58 @@ def ushRedirsAt (N : UkNames GF) (s0 : Nat) : Nat → Nat → List Rredir → IP
   | t, cmd, [] => iprop(⌜t = cmd⌝)
   | t, cmd, r :: rs => iprop(∃ p1 : Nat, ushRedirNode N s0 p1 cmd r.q r.eq r.mode r.fd ∗ ushRedirsAt N s0 t p1 rs)
 
-/-- **Rocq `UkShRedirs.ushp_redirs_res`**: what a redirect turn needs beyond
-the lexer's tables -- the symbol table and the exit lend -- lent only when a
-redirect is consumed. -/
-def ushRedirsRes (N : UkNames GF) (rs : List Rredir) (dv : DFrac) (Pex : IProp GF) : IProp GF :=
-  match rs with
-  | [] => iprop(emp)
-  | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ □ (Pex -∗ N.pay (-1)))
+/-! ## §1b The out-of-memory law (Rocq `UkShCmdalloc.ushp_oom`, main) -/
 
-/-- **Rocq `UkShArgs.ushp_pex_res`**: the exit lend, when redirects are
-consumed. -/
-def ushPexRes (N : UkNames GF) (rs : List Rredir) (Pex : IProp GF) : IProp GF :=
+/-- **Rocq `ushp_malloc_ok`'s answer tested** (upstream d66e41c): since
+xv6 d66e41c every constructor allocates through `cmdalloc`, which panics
+with this message when `malloc` returns NULL. -/
+def ushpOomStr : Nat := 0x12c0
+
+/-- **Rocq `ushp_oom`**: what the caller promises to do with a run at
+`panic`'s entry whose `a0` is the message, given the exit resource `Pex` it
+lent the walk -- at ANY budget from `K` up (so one copy serves every call
+depth, `ushpOom_mono`). -/
+def ushpOom (N : UkNames GF) (Pex : IProp GF) (K : Nat) : IProp GF :=
+  iprop(□ (∀ (h : CPU) (m : RegMap) (k : Nat), ⌜K ≤ k⌝ -∗ ⌜m.get 10#5 = BitVec.ofNat 64 ushpOomStr⌝ -∗ Pex -∗
+    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») k -∗ wpLoop h))
+
+instance ushpOom_persistent (N : UkNames GF) (Pex : IProp GF) (K : Nat) :
+    Persistent (ushpOom (hlc := hlc) N Pex K) := by
+  unfold ushpOom; infer_instance
+
+/-- **Rocq `ushp_oom_mono`**. -/
+theorem ushpOom_mono (N : UkNames GF) (Pex : IProp GF) (K K' : Nat) (hK : K ≤ K') :
+    ushpOom (hlc := hlc) N Pex K ⊢ ushpOom (hlc := hlc) N Pex K' := by
+  unfold ushpOom
+  iintro #H
+  imodintro
+  iintro %h %m %k %hk %ha Hp Hrun
+  iapply H $$ %h %m %k %(by omega) %ha Hp Hrun
+
+/-- **Rocq `ushp_oom_wand`**: contravariant in the lend. -/
+theorem ushpOom_wand (N : UkNames GF) (Pex Pex' : IProp GF) (K : Nat) :
+    ⊢ □ (Pex' -∗ Pex) -∗ ushpOom (hlc := hlc) N Pex K -∗ ushpOom (hlc := hlc) N Pex' K := by
+  unfold ushpOom
+  iintro #Hw #H
+  imodintro
+  iintro %h %m %k %hk %ha Hp Hrun
+  iapply H $$ %h %m %k %hk %ha [Hp] Hrun
+  iapply Hw $$ Hp
+
+/-- **Rocq `UkShRedirs.ushp_redirs_res`** (main): what a redirect turn needs
+beyond the lexer's tables -- the symbol table, the exit lend and its
+out-of-memory law at `K` -- lent only when a redirect is consumed. -/
+def ushRedirsRes (N : UkNames GF) (rs : List Rredir) (dv : DFrac) (Pex : IProp GF) (K : Nat) : IProp GF :=
   match rs with
   | [] => iprop(emp)
-  | _ :: _ => iprop(Pex ∗ □ (Pex -∗ N.pay (-1)))
+  | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ ushpOom (hlc := hlc) N Pex K)
+
+/-- **Rocq `UkShArgs.ushp_pex_res`** (main): the exit lend and its law, when
+redirects are consumed. -/
+def ushPexRes (N : UkNames GF) (rs : List Rredir) (Pex : IProp GF) (K : Nat) : IProp GF :=
+  match rs with
+  | [] => iprop(emp)
+  | _ :: _ => iprop(Pex ∗ ushpOom (hlc := hlc) N Pex K)
 
 /-- **Rocq `ushp_atree`**: the tree at `p` with every child pointer NAMED by
 `a` and the constructors' bounds kept. -/

@@ -77,19 +77,19 @@ function a string carries (off sh's R-X segment). -/
 def ushLit (base : Nat) : Nat → BitVec 8 := fun j => (User.Sh.code.byte (base + j)).getD ubyte0
 
 /-- Rocq `ushp_T_redir`: `"<>"`, parseredirs. -/
-def ushTRedir : Nat := 0x1300
+def ushTRedir : Nat := 0x12f0
 /-- Rocq `ushp_T_block`: `"("`, parseexec. -/
-def ushTBlock : Nat := 0x1308
+def ushTBlock : Nat := 0x12f8
 /-- Rocq `ushp_T_arg`: `"|)&;"`, parseexec's argument loop. -/
-def ushTArg : Nat := 0x1328
+def ushTArg : Nat := 0x1318
 /-- Rocq `ushp_T_pipe`: `"|"`, parsepipe. -/
-def ushTPipe : Nat := 0x1330
+def ushTPipe : Nat := 0x1320
 /-- Rocq `ushp_T_back`: `"&"`, parseline. -/
-def ushTBack : Nat := 0x1338
+def ushTBack : Nat := 0x1328
 /-- Rocq `ushp_T_list`: `";"`, parseline. -/
-def ushTList : Nat := 0x1340
+def ushTList : Nat := 0x1330
 /-- Rocq `ushp_T_none`: `""`, parsecmd. -/
-def ushTNone : Nat := 0x1298
+def ushTNone : Nat := 0x1278
 
 section UshParseDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

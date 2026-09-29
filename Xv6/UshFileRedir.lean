@@ -303,14 +303,14 @@ theorem hopen_hand (UL : UK_LEAVES) (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
   have htr : omTrunc ((ukWr m 17#5 (BitVec.ofInt 64 15)).get 11#5) = true := by rw [ha1r]; decide
   have hrd : omReadable ((ukWr m 17#5 (BitVec.ofInt 64 15)).get 11#5) = false := by rw [ha1r]; decide
   have hwr : omWritable ((ukWr m 17#5 (BitVec.ofInt 64 15)).get 11#5) = true := by rw [ha1r]; decide
-  -- 0xcc8  ecall: the DEED's create corollary at `OffHeld`
+  -- 0xca4  ecall: the DEED's create corollary at `OffHeld`
   iapply wp_uk_ecall_open_create_deed_d FO (UkFileOpenSysP.ofLanded UL) N .held h1 (ukWr m 17#5 (BitVec.ofInt 64 15))
     (BitVec.ofNat 64 (User.Sh.Sym.«open» + 2)) l av g.fgnCl r jo nm s0 ls ws ROOTINO (fun x => get? Img x)
     file pl hu heq hn (by rw [hpc]; decide) hpath' ha0r hcr htr hnp hst hlast hin hok
     (uimgView N (fun x => get? Img x)) .rfl $$ Hi Hv Hrun Hcwd Hstd Hinv Hmade Hlb Hown
   rw [hpc, hrd, hwr]
   iintro %h2 %rv Hans Hcwd Hrun
-  -- 0xccc  c.jr ra
+  -- 0xca8  c.jr ra
   iapply Hmid $$ %h2 %rv Hrun
   iintro %h3 Hrun
   iapply Hcont $$ %h3 %(ukWr (ukWr m 17#5 (BitVec.ofInt 64 15)) 10#5 rv) %rv %(ucallee_saved_a0a7 m rv) %(stubRet_a0 m 15 rv) Hcwd [Hans] Hrun

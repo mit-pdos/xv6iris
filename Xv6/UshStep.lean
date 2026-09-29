@@ -11,7 +11,7 @@ resource `C`).  The lemmas here are the `UkRunLeaf`/`UkRunMem`/`UkRunBr`
 leaves at such a pc, with
 
 * the instruction fact taken as an entailment `hi : C ⊢ uinstrIs …` (so a
-  call site is `iapply ushS_x UL N (ushI_356 _) 0x35a … $$ Hc Hrun`);
+  call site is `iapply ushS_x UL N (ushI_332 _) 0x336 … $$ Hc Hrun`);
 * the fall-through / target folded to a `Nat` pc (`ukPc`), the equation an
   auto-param `by decide`;
 * the written value named by the caller (`v`, with its equation `hv`), so

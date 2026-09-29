@@ -6,7 +6,7 @@ pinned `1900b8a43`; design app-pipe.md §4.3g, hole H1).
 abstract registration `R γp`.  Here it is DISCHARGED at the instance
 `uexecSGXv6`, walking the stub's three instructions
 
-    0xc96  c.li a7,4 ;  0xc98  ecall ;  0xc9c  c.jr ra
+    0xc72  c.li a7,4 ;  0xc74  ecall ;  0xc78  c.jr ra
 
 the middle one the PIPE leaf at the instance (`UkReadPipe.wp_uk_pipe_read_end`),
 whose registrar premise is fragment-shaped:
@@ -33,7 +33,7 @@ Lean register indices are literals `1#5`, `10#5`, `17#5`), `shpc_pipe`,
 3. The section binds no `UexecSG` variable: `ushPipeCall` resolves the
    class to the instance `uexecSGXv6` (Rocq's `(SG := uexecSG_xv6)`), the
    section being `UkReadPipe`'s `PipeEnd` binder list verbatim.
-4. The instruction facts are sh-run's `UshRunCode.ushRI_c96/c98/c9c` (DU3;
+4. The instruction facts are sh-run's `UshRunCode.ushRI_c72/c98/c9c` (DU3;
    Rocq's catalog `uis_shk_c96/…`); the steps are `UshStep.ushS_li`/`ushS_ret`.
 5. The eight bytes: Rocq's `ubytes_split`/`ubytes_ext` (Lean
    `UkRunSysWin.ubytes_split`/`ubytes_ext`), at `nthByte (n := 4)
@@ -55,8 +55,8 @@ open Std (ExtTreeSet)
 
 set_option linter.unusedSectionVars false
 
-/-- **Rocq `shpc_pipe`**: sh's `pipe` stub is at 0xc96. -/
-theorem shpc_pipe : User.Sh.Sym.«pipe» = 0xc96 := rfl
+/-- **Rocq `shpc_pipe`**: sh's `pipe` stub is at 0xc72. -/
+theorem shpc_pipe : User.Sh.Sym.«pipe» = 0xc72 := rfl
 
 /-- The stub's register file after `c.li a7,4 ; ecall` keeps the
 callee-saved set. -/
@@ -89,24 +89,24 @@ theorem ush_pipe_call_paid_gen (UL : UK_LEAVES) (hps : ∀ k : Int, freeNum k �
   iintro %h %m %av %dst %f %hdst #Hc Hstd Hbuf Hrun Hk
   subst hdst
   rw [shpc_pipe]
-  -- 0xc96  c.li a7,4
-  iapply ushS_li UL N (ushRI_c96 N.t) 0xc98 h m av 4 $$ Hc Hrun
+  -- 0xc72  c.li a7,4
+  iapply ushS_li UL N (ushRI_c72 N.t) 0xc74 h m av 4 $$ Hc Hrun
   iintro %h1 Hrun
-  -- 0xc98  ecall -- the PIPE leaf, AT THE INSTANCE
+  -- 0xc74  ecall -- the PIPE leaf, AT THE INSTANCE
   have hno : usysno (ukWr m 17#5 (BitVec.ofNat 64 4)) = USYS_pipe := by
     unfold usysno; rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]; decide
   have ha0 : (ukWr m 17#5 (BitVec.ofNat 64 4)).get 10#5 = m.get 10#5 :=
     ukWr_get_other _ _ _ _ (by decide)
-  ihave #Hi1 := ushRI_c98 N.t $$ Hc
-  iapply wp_uk_pipe_read_end UL N h1 (ukWr m 17#5 (BitVec.ofNat 64 4)) (BitVec.ofNat 64 0xc98) l f av
+  ihave #Hi1 := ushRI_c74 N.t $$ Hc
+  iapply wp_uk_pipe_read_end UL N h1 (ukWr m 17#5 (BitVec.ofNat 64 4)) (BitVec.ofNat 64 0xc74) l f av
     (fun γp => iprop(pipeReg (hlc := hlc) (GF := GF) γp ∗ R γp)) hno (by decide) hnone
     $$ Hi1 Hrun [] Hreg Hstd [Hbuf]
   · iapply udepw_of_psok N _ _ USYS_pipe (hps _ (by decide)) (by decide)
   · rw [ha0]; iexact Hbuf
-  rw [ha0, show BitVec.ofNat 64 0xc98 + 4#64 = BitVec.ofNat 64 0xc9c from by decide]
+  rw [ha0, show BitVec.ofNat 64 0xc74 + 4#64 = BitVec.ofNat 64 0xc78 from by decide]
   iintro %h2 %r %g Hans Hrun Hbuf
-  -- 0xc9c  c.jr ra
-  iapply ushS_ret UL N (ushRI_c9c N.t) h2 _ av $$ Hc Hrun
+  -- 0xc78  c.jr ra
+  iapply ushS_ret UL N (ushRI_c78 N.t) h2 _ av $$ Hc Hrun
   iintro %h3 Hrun
   rw [shpc_ra]
   iapply Hk $$ %h3 %_ %r %(shpc_cs m _ r) %(ukWr_get_same _ _ _ (by decide)) [Hans Hbuf] Hrun

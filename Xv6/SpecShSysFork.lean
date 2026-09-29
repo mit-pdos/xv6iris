@@ -2,10 +2,10 @@
 **Specification of sh's `fork` stub** (Rocq `UkShRun.wp_kshr_fork_at`,
 pinned `1900b8a43`; DU10: one user function per file).
 
-    fork:  li a7, SYS_fork ; ecall ; ret        (usys.S, at 0xc7e)
+    fork:  li a7, SYS_fork ; ecall ; ret        (usys.S, at 0xc5a)
 
 THE STUB THAT RETURNS TWICE: both arms come back through the same `c.jr ra`
-at 0xc84, the child's under FRESH names -- which is why the payload carries
+at 0xc60, the child's under FRESH names -- which is why the payload carries
 the CODE (`ushCode` crosses with `P`).  At a named table view (seccomp S4):
 the parent keeps its view and the child is handed it
 (`UkFork.wp_uk_ecall_fork_at`).  The three binders the leaf opens -- the

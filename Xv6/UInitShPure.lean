@@ -225,9 +225,9 @@ theorem elfUnion_r (m1 m2 : ElfMem) (a : Nat) (h : m1 a = none) : elfUnion m1 m2
   unfold elfUnion; rw [h]
 
 /-- sh's R-X segment stops below its .data. -/
-theorem shCode_none (a : Nat) (h : 0x1c64 ≤ a) : User.Sh.code.byte a = none := by
+theorem shCode_none (a : Nat) (h : 0x1c74 ≤ a) : User.Sh.code.byte a = none := by
   have hv : User.Sh.code.vaddr = 0 := rfl
-  have hs : User.Sh.code.size = 0x1c64 := rfl
+  have hs : User.Sh.code.size = 0x1c74 := rfl
   unfold User.USeg.byte
   rw [if_neg (by rw [hv, hs]; omega)]
 

@@ -101,11 +101,11 @@ theorem elfSegments_loads (f : ElfBytes) (segs : List (Nat × Nat × Nat × Nat)
     cases h
     rfl
 
-/-- **Rocq `sh_loads`** (deviation 3): sh's two PT_LOADs, `(0x0, 0x1c64,
+/-- **Rocq `sh_loads`** (deviation 3): sh's two PT_LOADs, `(0x0, 0x1c74,
 R-X)` and `(0x2000, 0x98, RW-)`. -/
 theorem shLoads :
     ∃ p0 p1 : ElfPhdr, elfLoads User.Sh.elf = [p0, p1] ∧
-      p0.vaddr = 0 ∧ p0.memsz = 0x1c64 ∧ p0.flags = 5 ∧
+      p0.vaddr = 0 ∧ p0.memsz = 0x1c74 ∧ p0.flags = 5 ∧
       p1.vaddr = 0x2000 ∧ p1.memsz = 0x98 ∧ p1.flags = 6 :=
   ⟨_, _, User.Sh.elf_loads, rfl, rfl, rfl, rfl, rfl, rfl⟩
 

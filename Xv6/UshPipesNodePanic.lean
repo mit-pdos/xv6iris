@@ -264,7 +264,7 @@ variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PANIC) (k : Nat)
     (st0 : FdState) (N : UkNames GF) [UknConst N] (ld : List FdState) (h' : CPU) (m' : RegMap) (av : Nat)
     (hk : k < D.nc) (hpeq : N.pay = fun _ : Int => npay D Qfin k) (hfd2 : ushFd2p ld)
-    (ha0 : (m'.get 10#5).toNat = 0x12d8) :
+    (ha0 : (m'.get 10#5).toNat = 0x12b8) :
     ⊢ D.FAM -∗ ushCode N.t -∗ ustd N.fd ld -∗ ncred D Rtop k st0 -∗
       urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + (2 + av)) -∗ wpLoop h' := by
   have hwS : WSh k ∈ D.wsN := (wids_elem _ _).2 hk
@@ -276,7 +276,7 @@ theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
   imod wfin_done (D := D) ⊤ (WLeft k) CoPset.subseteq_top hwL $$ Hfam Hl with Hld
   imod below_silence (D := D) k hk $$ Hfam Hbel with ⟨Hws, HL⟩
   imodintro
-  iapply wp_kshd_panic_paid_at SP N 0x12d8 dgPipeB
+  iapply wp_kshd_panic_paid_at SP N 0x12b8 dgPipeB
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 0 ∗ wmodeN D.γm (WSh k) (1 : Qp).half none ∗ osP (D.gF k)
       ∗ osP (D.gG k))
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh k) (1 : Qp).half (some dgPipeB))
@@ -314,14 +314,14 @@ the node's own writer, and that is the TERMINAL round. -/
 theorem node_fork_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PANIC) (k : Nat)
     (st0 : FdState) (N : UkNames GF) [UknConst N] (ld : List FdState) (h' : CPU) (m' : RegMap) (av : Nat)
     (γp : PipeNames) (hk : k < D.nc) (hpeq : N.pay = fun _ : Int => npay D Qfin k) (hfd2 : ushFd2p ld)
-    (ha0 : (m'.get 10#5).toNat = 0x12a8) :
+    (ha0 : (m'.get 10#5).toNat = 0x1288) :
     ⊢ D.FAM -∗ ushCode N.t -∗ ustd N.fd ld -∗ RcRf D k st0 γp -∗ Cxf D Rtop k γp -∗
       urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + av) -∗ wpLoop h' := by
   have hwS : WSh k ∈ D.wsN := (wids_elem _ _).2 hk
   unfold Cxf halvesN
   iintro #Hfam #Hcode Hstd HRc ⟨⟨Hc, Hm⟩, Hsr⟩ Hrun
   ihave ⟨HF, #Hsk⟩ := rcr_fork k st0 γp $$ HRc
-  iapply wp_kshd_panic_paid_at SP N 0x12a8 altPanic
+  iapply wp_kshd_panic_paid_at SP N 0x1288 altPanic
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 0 ∗ wmodeN D.γm (WSh k) (1 : Qp).half none ∗ osP (D.gF k))
     iprop(wcurN D.γc (WSh k) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh k) (1 : Qp).half (some altForkc)
       ∗ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1))

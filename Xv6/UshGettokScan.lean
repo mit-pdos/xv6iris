@@ -5,13 +5,13 @@
 
 * THE BLANK SKIP, TWICE (Rocq `wp_kshp_ws_scan`/`wp_kshp_ws_enter`):
   `while(s < es && strchr(whitespace, *s)) s++;` is compiled twice, at
-  0x336..0x34e (the lead skip, `bgeu s1,a1`) and at 0x398..0x3b0 (the
+  0x312..0x32a (the lead skip, `bgeu s1,a1`) and at 0x374..0x38c (the
   trailing skip, `bgeu s1,s2`), the same encodings but the `jal`'s offset;
   `shGtk_ws_scan`/`shGtk_ws_enter` are that loop once, the site a
   parameter (its instruction facts premises).
 * THE WORD SCAN (Rocq `wp_kshp_tok_scan`): the default arm's
   `while(s < es && !strchr(whitespace, *s) && !strchr(symbols, *s)) s++;`
-  at 0x400..0x424, exiting at 0x388 on a stop byte and at 0x424 at the
+  at 0x3dc..0x400, exiting at 0x364 on a stop byte and at 0x400 at the
   line's end (Rocq `ushp_tok_exit`).
 * THE STORES (Rocq `wp_kshp_gtk_qst`, `_388`, `_424`, `_eqst`, `_ws2`): the
   two out-pointer cells (`ushCell`, possibly NULL) and the trailing skip.
@@ -110,7 +110,7 @@ theorem shGtk_call (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Nat) 
     (hlbu : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 p) false (.LOAD (0#12, .Regidx 9#5, .Regidx 11#5, true, 1)))
     (hmv : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p + 4)) true (.RTYPE (.Regidx tr, .Regidx 0#5, .Regidx 10#5, .ADD)))
     (hjal : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p + 6)) false (.JAL (jimm, .Regidx 1#5)))
-    (hjt : BitVec.ofNat 64 (p + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa82)
+    (hjt : BitVec.ofNat 64 (p + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa5e)
     (hpe : p % 2 = 0) (hpb : p + 10 < 2 ^ 64)
     (dq dt : DFrac) (s0 len j ta tn : Nat) (f tf : Nat → BitVec 8) (n : Nat) (h : CPU) (mc : RegMap)
     (hj : j < len) (hs64 : s0 + len < 2 ^ 64) (hta : ta + tn < 2 ^ 64)
@@ -132,12 +132,12 @@ theorem shGtk_call (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Nat) 
   iapply ushS_mv UL N hmv (p + 6) h1 _ (2 + n) (BitVec.ofNat 64 ta)
     (by rw [ukWr_get_other _ _ _ _ htr11]; exact htr) (by simp) $$ Hc Hrun
   iintro %h2 Hrun
-  iapply ushS_jal UL N hjal 0xa82 (p + 10) h2 _ (2 + n) hjt (by simp) $$ Hc Hrun
+  iapply ushS_jal UL N hjal 0xa5e (p + 10) h2 _ (2 + n) hjt (by simp) $$ Hc Hrun
   iintro %h3 Hrun
   let m3 := ukWr (ukWr (ukWr mc 11#5 (BitVec.setWidth 64 (f j))) 10#5 (BitVec.ofNat 64 ta)) 1#5
     (BitVec.ofNat 64 (p + 10))
   ihave Ht := ushG_toS N dt ta tn tf $$ Ht
-  rw [show (0xa82 : Nat) = User.Sh.Sym.«strchr» from rfl]
+  rw [show (0xa5e : Nat) = User.Sh.Sym.«strchr» from rfl]
   iapply SC.wp_shStrchr N h3 m3 false dt ta tn tf (f j) n
     (by show (ukWr _ 1#5 _).get 10#5 = _; ureg) (by show (ukWr _ 1#5 _).get 11#5 = _; ureg) hta
     $$ Hc Ht Hrun
@@ -160,7 +160,7 @@ theorem shGtk_ws_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Na
     (haddi : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p + 12)) true (.ITYPE (1#12, .Regidx 9#5, .Regidx 9#5, .ADDI)))
     (hbne : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p + 14)) false (.BTYPE (8178#13, .Regidx 9#5, .Regidx 18#5, .BNE)))
     (hmv2 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p + 18)) true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 9#5, .ADD)))
-    (hjt : BitVec.ofNat 64 (p + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa82)
+    (hjt : BitVec.ofNat 64 (p + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa5e)
     (hbt : BitVec.ofNat 64 (p + 10) + BitVec.signExtend 64 (10#13) = BitVec.ofNat 64 (p + 20))
     (hnt : BitVec.ofNat 64 (p + 14) + BitVec.signExtend 64 (8178#13) = BitVec.ofNat 64 p)
     (hpe : p % 2 = 0) (hpb : p + 20 < 2 ^ 64)
@@ -247,7 +247,7 @@ theorem shGtk_ws_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (q : N
     (haddi : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (q + 4 + 12)) true (.ITYPE (1#12, .Regidx 9#5, .Regidx 9#5, .ADDI)))
     (hbne : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (q + 4 + 14)) false (.BTYPE (8178#13, .Regidx 9#5, .Regidx 18#5, .BNE)))
     (hmv2 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (q + 4 + 18)) true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 9#5, .ADD)))
-    (hjt : BitVec.ofNat 64 (q + 4 + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa82)
+    (hjt : BitVec.ofNat 64 (q + 4 + 6) + BitVec.signExtend 64 jimm = BitVec.ofNat 64 0xa5e)
     (hbt : BitVec.ofNat 64 (q + 4 + 10) + BitVec.signExtend 64 (10#13) = BitVec.ofNat 64 (q + 4 + 20))
     (hnt : BitVec.ofNat 64 (q + 4 + 14) + BitVec.signExtend 64 (8178#13) = BitVec.ofNat 64 (q + 4))
     (hgt : BitVec.ofNat 64 q + BitVec.signExtend 64 (24#13) = BitVec.ofNat 64 (q + 4 + 20))
@@ -282,11 +282,11 @@ theorem shGtk_ws_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (q : N
     iexact Hk
 
 /-- **Rocq `ushp_tok_exit`**: where the word scan leaves -- on a stop byte
-(0x388) or at the line's end (0x424). -/
+(0x364) or at the line's end (0x400). -/
 def ushTokExit (len : Nat) (f : Nat → BitVec 8) (j : Nat) : Nat :=
-  if j + ushpToklen (len - j) j f < len then 0x388 else 0x424
+  if j + ushpToklen (len - j) j f < len then 0x364 else 0x400
 
-/-- **Rocq `wp_kshp_tok_scan`**: the default arm's word scan at 0x400, `r`
+/-- **Rocq `wp_kshp_tok_scan`**: the default arm's word scan at 0x3dc, `r`
 bytes still to look at from `j < len`. -/
 theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv : DFrac) (s0 len : Nat)
     (f : Nat → BitVec 8) (n : Nat) :
@@ -294,7 +294,7 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
     mc.get 9#5 = BitVec.ofNat 64 (s0 + j) → mc.get 18#5 = BitVec.ofNat 64 (s0 + len) →
     mc.get 19#5 = BitVec.ofNat 64 ushWsA → mc.get 21#5 = BitVec.ofNat 64 ushSymA →
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x400) (2 + n) -∗
+      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x3dc) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q, ucalleeSavedIdx q = true → q ≠ 9#5 → q ≠ 21#5 → mc'.get q = mc.get q⌝ -∗
@@ -308,37 +308,37 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
   | succ r ih =>
     intro j h mc hr hj hs64 h9 h18 h19 h21
     iintro #Hc Hs Hws Hsy Hrun Hk
-    -- 0x400..0x406: strchr(whitespace, *s)
-    iapply shGtk_call UL SC N 0x400 19#5 (ushI_400 N.t) (ushI_404 N.t) (ushI_406 N.t) (by decide) (by decide)
+    -- 0x3dc..0x3e2: strchr(whitespace, *s)
+    iapply shGtk_call UL SC N 0x3dc 19#5 (ushI_3dc N.t) (ushI_3e0 N.t) (ushI_3e2 N.t) (by decide) (by decide)
       (by decide) dq dw s0 len j ushWsA 5 f ushpWsF n h mc hj hs64 (by decide) h9 h19 $$ Hc Hs Hws Hrun
     iintro Hs Hws %h1 %m1 %hcs1 %ha1 Hrun
     have e1 : ∀ q, ucalleeSavedIdx q = true → m1.get q = mc.get q := hcs1
     cases hws : ushpIsWs (f j) with
     | true =>
-      -- 0x40a  bnez a0,0x438 : a blank stops the word
+      -- 0x3e6  bnez a0,0x414 : a blank stops the word
       obtain ⟨k, hk, hchr⟩ := ushG_ws_hit ushWsA (f j) hws
-      iapply ushS_brT UL N (ushI_40a N.t) 0x438 h1 m1 (2 + n)
+      iapply ushS_brT UL N (ushI_3e6 N.t) 0x414 h1 m1 (2 + n)
         (by rw [ha1, RegMap.get_zero, hchr]; exact ushG_chr_nz' ushWsA k (by decide) (by unfold ushWsA; omega))
         $$ Hc Hrun
       iintro %h2 Hrun
-      iapply ushS_li UL N (ushI_438 N.t) 0x43c h2 m1 (2 + n) 97 $$ Hc Hrun
+      iapply ushS_li UL N (ushI_414 N.t) 0x418 h2 m1 (2 + n) 97 $$ Hc Hrun
       iintro %h3 Hrun
-      iapply ushS_j UL N (ushI_43c N.t) 0x388 h3 _ (2 + n) $$ Hc Hrun
+      iapply ushS_j UL N (ushI_418 N.t) 0x364 h3 _ (2 + n) $$ Hc Hrun
       iintro %h4 Hrun
       have hst : ushpToklen (len - j) j f = 0 := ushpToklen_stop _ _ _ (by simp [hws])
-      have hex : ushTokExit len f j = 0x388 := by unfold ushTokExit; rw [hst]; simp [hj]
+      have hex : ushTokExit len f j = 0x364 := by unfold ushTokExit; rw [hst]; simp [hj]
       rw [hex]
       iapply Hk $$ Hs Hws Hsy %h4 %_ [] [] [] Hrun
       · ipureintro; intro q hq _ h21'; rw [ukWr_get_other _ _ _ _ h21', e1 q hq]
       · ipureintro; rw [ukWr_get_other _ _ _ _ (by decide), e1 9#5 (by decide), h9, hst, Nat.add_zero]
       · ipureintro; rw [ukWr_get_same _ _ _ (by decide)]
     | false =>
-      iapply ushS_brN UL N (ushI_40a N.t) 0x40c h1 m1 (2 + n)
+      iapply ushS_brN UL N (ushI_3e6 N.t) 0x3e8 h1 m1 (2 + n)
         (by rw [ha1, RegMap.get_zero, show (ushWsA : Int) = ushpWhitespace from rfl, ushp_ws_chr_z _ hws]; rfl)
         $$ Hc Hrun
       iintro %h2 Hrun
-      -- 0x40c..0x412: strchr(symbols, *s)
-      iapply shGtk_call UL SC N 0x40c 21#5 (ushI_40c N.t) (ushI_410 N.t) (ushI_412 N.t) (by decide) (by decide)
+      -- 0x3e8..0x3ee: strchr(symbols, *s)
+      iapply shGtk_call UL SC N 0x3e8 21#5 (ushI_3e8 N.t) (ushI_3ec N.t) (ushI_3ee N.t) (by decide) (by decide)
         (by decide) dq dv s0 len j ushSymA 7 f ushpSymF n h2 m1 hj hs64 (by decide)
         (by rw [e1 9#5 (by decide), h9]) (by rw [e1 21#5 (by decide), h21]) $$ Hc Hs Hsy Hrun
       iintro Hs Hsy %h3 %m2 %hcs2 %ha2 Hrun
@@ -346,28 +346,28 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
       cases hsy : ushpIsSym (f j) with
       | true =>
         obtain ⟨k, hk, hchr⟩ := ushG_sym_hit ushSymA (f j) hsy
-        iapply ushS_brT UL N (ushI_416 N.t) 0x432 h3 m2 (2 + n)
+        iapply ushS_brT UL N (ushI_3f2 N.t) 0x40e h3 m2 (2 + n)
           (by rw [ha2, RegMap.get_zero, hchr]; exact ushG_chr_nz' ushSymA k (by decide) (by unfold ushSymA; omega))
           $$ Hc Hrun
         iintro %h4 Hrun
-        iapply ushS_li UL N (ushI_432 N.t) 0x436 h4 m2 (2 + n) 97 $$ Hc Hrun
+        iapply ushS_li UL N (ushI_40e N.t) 0x412 h4 m2 (2 + n) 97 $$ Hc Hrun
         iintro %h5 Hrun
-        iapply ushS_j UL N (ushI_436 N.t) 0x388 h5 _ (2 + n) $$ Hc Hrun
+        iapply ushS_j UL N (ushI_412 N.t) 0x364 h5 _ (2 + n) $$ Hc Hrun
         iintro %h6 Hrun
         have hst : ushpToklen (len - j) j f = 0 := ushpToklen_stop _ _ _ (by simp [hsy])
-        have hex : ushTokExit len f j = 0x388 := by unfold ushTokExit; rw [hst]; simp [hj]
+        have hex : ushTokExit len f j = 0x364 := by unfold ushTokExit; rw [hst]; simp [hj]
         rw [hex]
         iapply Hk $$ Hs Hws Hsy %h6 %_ [] [] [] Hrun
         · ipureintro; intro q hq _ h21'; rw [ukWr_get_other _ _ _ _ h21', e2 q hq]
         · ipureintro; rw [ukWr_get_other _ _ _ _ (by decide), e2 9#5 (by decide), h9, hst, Nat.add_zero]
         · ipureintro; rw [ukWr_get_same _ _ _ (by decide)]
       | false =>
-        iapply ushS_brN UL N (ushI_416 N.t) 0x418 h3 m2 (2 + n)
+        iapply ushS_brN UL N (ushI_3f2 N.t) 0x3f4 h3 m2 (2 + n)
           (by rw [ha2, RegMap.get_zero, show (ushSymA : Int) = ushpSymbols from rfl, ushp_sym_chr_z _ hsy]; rfl)
           $$ Hc Hrun
         iintro %h4 Hrun
-        -- 0x418  addi s1,s1,1
-        iapply ushS_itype UL N (ushI_418 N.t) 0x41a h4 m2 (2 + n) (BitVec.ofNat 64 (s0 + (j + 1)))
+        -- 0x3f4  addi s1,s1,1
+        iapply ushS_itype UL N (ushI_3f4 N.t) 0x3f6 h4 m2 (2 + n) (BitVec.ofNat 64 (s0 + (j + 1)))
           (by rw [e2 9#5 (by decide), h9, ukAddi (s0 + j) 1 1#12 (by decide)]; rfl) $$ Hc Hrun
         iintro %h5 Hrun
         let m3 := ukWr m2 9#5 (BitVec.ofNat 64 (s0 + (j + 1)))
@@ -379,8 +379,8 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
         have hstep : ushpToklen (len - j) j f = ushpToklen (len - (j + 1)) (j + 1) f + 1 := by
           rw [show len - j = (len - (j + 1)) + 1 by omega, ushpToklen_step _ _ _ (by simp [hws, hsy])]
         by_cases hj1 : j + 1 < len
-        · -- 0x41a  bne s2,s1,0x400 : back
-          iapply ushS_brT UL N (ushI_41a N.t) 0x400 h5 m3 (2 + n)
+        · -- 0x3f6  bne s2,s1,0x3dc : back
+          iapply ushS_brT UL N (ushI_3f6 N.t) 0x3dc h5 m3 (2 + n)
             (by rw [h3_18, h3_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
           iintro %h6 Hrun
           iapply ih (j + 1) h6 m3 (by omega) hj1 hs64 h3_9 h3_18 (by rw [e3 19#5 (by decide) (by decide), h19])
@@ -394,17 +394,17 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
           · ipureintro; intro q hq hq9 hq21; rw [hk' q hq hq9 hq21, e3 q hq hq9]
           · ipureintro; rw [h9', hstep]; congr 2; omega
           · ipureintro; exact h21'
-        · -- 0x41a  bne : the line's end
-          iapply ushS_brN UL N (ushI_41a N.t) 0x41e h5 m3 (2 + n)
+        · -- 0x3f6  bne : the line's end
+          iapply ushS_brN UL N (ushI_3f6 N.t) 0x3fa h5 m3 (2 + n)
             (by rw [h3_18, h3_9, Xv6.kgrep_bne_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
           iintro %h6 Hrun
-          iapply ushS_mv UL N (ushI_41e N.t) 0x420 h6 m3 (2 + n) (BitVec.ofNat 64 (s0 + len)) h3_18 $$ Hc Hrun
+          iapply ushS_mv UL N (ushI_3fa N.t) 0x3fc h6 m3 (2 + n) (BitVec.ofNat 64 (s0 + len)) h3_18 $$ Hc Hrun
           iintro %h7 Hrun
-          iapply ushS_li UL N (ushI_420 N.t) 0x424 h7 _ (2 + n) 97 $$ Hc Hrun
+          iapply ushS_li UL N (ushI_3fc N.t) 0x400 h7 _ (2 + n) 97 $$ Hc Hrun
           iintro %h8 Hrun
           have hst : ushpToklen (len - j) j f = 1 := by
             rw [hstep, show len - (j + 1) = 0 by omega, ushpToklen_zero]
-          have hex : ushTokExit len f j = 0x424 := by unfold ushTokExit; rw [hst]; simp; omega
+          have hex : ushTokExit len f j = 0x400 := by unfold ushTokExit; rw [hst]; simp; omega
           rw [hex]
           iapply Hk $$ Hs Hws Hsy %h8 %_ [] [] [] Hrun
           · ipureintro; intro q hq hq9 hq21
@@ -444,23 +444,23 @@ theorem shGtk_cell (UL : UK_LEAVES) (N : UkNames GF) (x : Nat) (rc : BitVec 5)
     iapply Hk $$ [Hw] %h2 Hrun
     iright; iframe; ipureintro; exact hq
 
-/-- **Rocq `wp_kshp_gtk_ws2`**: from 0x390 -- `s3 := whitespace`, the
-trailing blank skip -- to 0x3b0. -/
+/-- **Rocq `wp_kshp_gtk_ws2`**: from 0x36c -- `s3 := whitespace`, the
+trailing blank skip -- to 0x38c. -/
 theorem shGtk_390 (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DFrac) (s0 len j : Nat)
     (f : Nat → BitVec 8) (n : Nat) (h : CPU) (mc : RegMap) (hj : j ≤ len) (hs64 : s0 + len < 2 ^ 64)
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + j)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len)) :
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x390) (2 + n) -∗
+      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x36c) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x3b0) (2 + n) -∗ wpLoop h') -∗
+        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hs Hws Hrun Hk
-  iapply ushS_la UL N (ushI_390 N.t) (ushI_394 N.t) ushWsA h mc (2 + n) $$ Hc Hrun
+  iapply ushS_la UL N (ushI_36c N.t) (ushI_370 N.t) ushWsA h mc (2 + n) $$ Hc Hrun
   iintro %h1 Hrun
-  iapply shGtk_ws_enter UL SC N 0x398 18#5 (ushI_398 N.t) (ushI_39c N.t) (ushI_3a0 N.t) (ushI_3a2 N.t)
-    (ushI_3a6 N.t) (ushI_3a8 N.t) (ushI_3aa N.t) (ushI_3ae N.t) (by decide) (by decide) (by decide) (by decide)
+  iapply shGtk_ws_enter UL SC N 0x374 18#5 (ushI_374 N.t) (ushI_378 N.t) (ushI_37c N.t) (ushI_37e N.t)
+    (ushI_382 N.t) (ushI_384 N.t) (ushI_386 N.t) (ushI_38a N.t) (by decide) (by decide) (by decide) (by decide)
     (by decide) (by decide) dq dw s0 len j f n h1 _ hj hs64 (by ureg; exact h9) (by ureg; exact h18) (by ureg)
     (by ureg; exact h18) $$ Hc Hs Hws Hrun
   iintro Hs Hws %h2 %mc' %hk %h9' Hrun

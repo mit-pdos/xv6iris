@@ -61,8 +61,8 @@ theorem shNbuf_lineMax : shNbuf = lineMax := rfl
 
 /-! ## §2 The rows the console preamble establishes -/
 
-/-- **Rocq `sh_cons_pv`**: sh's own "console" literal, at 0x1388 in .rodata. -/
-def shConsPv : Nat := 0x1388
+/-- **Rocq `sh_cons_pv`**: sh's own "console" literal, at 0x1378 in .rodata. -/
+def shConsPv : Nat := 0x1378
 
 /-- **Rocq `ush_fd0p`**: fd 0 is the console device, or it is closed. -/
 def ushFd0p (l : List FdState) : Prop :=
@@ -108,8 +108,8 @@ theorem ushFd0p_cons (l : List FdState) (k : Nat) (hlen : l.length = NSTD)
   · rw [ushFd0p_scan l k hcl hk]
     exact Or.inl ⟨true, by rw [List.getElem?_set_self (by rw [hlen]; decide)]⟩
 
-/-- **Rocq `sh_prompt_pv`**: the prompt's "$ " in sh's .rodata, at 0x1290. -/
-def shPromptPv : Nat := 0x1290
+/-- **Rocq `sh_prompt_pv`**: the prompt's "$ " in sh's .rodata, at 0x1270. -/
+def shPromptPv : Nat := 0x1270
 
 /-- **Rocq `ush_fd2p`**: sh's fd 2 is the console, writable. -/
 def ushFd2p (l : List FdState) : Prop :=
@@ -181,15 +181,15 @@ theorem ushLineAt_echo (ws : List (List (BitVec 8))) (f : Nat → BitVec 8) (k l
 
 /-! ## §4 runcmd's jump table (deviation 3) -/
 
-/-- **Rocq `SH_JTAB`**: the jump table at 0x13a8 (.rodata). -/
-def ushJtabA : Nat := 0x13a8
+/-- **Rocq `SH_JTAB`**: the jump table at 0x1398 (.rodata). -/
+def ushJtabA : Nat := 0x1398
 
 /-- **Rocq `ush_jent`**: row `k`, a signed 32-bit displacement from the
 table's base. -/
 def ushJent (k : Nat) : BitVec 32 :=
   BitVec.ofNat 32
-    (if k = 1 then 0xffffed26 else if k = 2 then 0xffffed4e else if k = 3 then 0xffffed94
-     else if k = 4 then 0xffffed7c else if k = 5 then 0xffffee1c else 0xffffed1a)
+    (if k = 1 then 0xffffed36 else if k = 2 then 0xffffed5e else if k = 3 then 0xffffeda4
+     else if k = 4 then 0xffffed8c else if k = 5 then 0xffffee2c else 0xffffed2a)
 
 /-- **Rocq `ush_jrow_bytes_ok`**: row `k`'s four bytes are in sh's image. -/
 def ushJrowBytesOk (k : Nat) : Bool :=
@@ -207,7 +207,7 @@ theorem ushJrowBytes (k j : Nat) (hk : k ∈ [1, 2, 3, 4, 5]) (hj : j < 4) :
 
 /-! ## §5 The command loop's register constants and frames -/
 
-/-- **Rocq `ush_regs`**: the five constants 0x914..0x926 loads and the loop
+/-- **Rocq `ush_regs`**: the five constants 0x8f0..0x902 loads and the loop
 preserves (s2..s6). -/
 def ushRegs (m : RegMap) : Prop :=
   m.get 18#5 = BitVec.ofNat 64 shBuf ∧ m.get 19#5 = BitVec.ofNat 64 100 ∧

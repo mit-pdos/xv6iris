@@ -4,10 +4,10 @@ the reached part, pinned `1900b8a43`).  Definitions and pure lemmas; the
 walks at the pipe/cat twins are `UshForkTwin*` (Rocq `UkShPipeForkTwin`,
 `UkShCatForkTwin`).
 
-    0x92c  jal  ra,fork1
-    0x930  c.beqz a0,0x9c0        the CHILD -- parse and exec
-    0x932  c.li a0,0
-    0x934  jal  ra,wait           the PARENT -- reap, and round again
+    0x908  jal  ra,fork1
+    0x90c  c.beqz a0,0x99c        the CHILD -- parse and exec
+    0x90e  c.li a0,0
+    0x910  jal  ra,wait           the PARENT -- reap, and round again
 
 WHAT CROSSES: the text and its jump table, the loop's data half (the two
 lexer tables and the allocator's first-call state, sh-main's `ushlDat`) and
@@ -171,7 +171,7 @@ instance ushfKillLaw_persistent (X : UshCtx GF) : Persistent (ushfKillLaw (hlc :
   unfold ushfKillLaw; infer_instance
 
 /-- **Rocq `ushf_child_law_at`**: THE CHILD'S WALK at the paid payload, from
-0x9c0 to its exit, at a line shape `Lp` and a room `Dc`. -/
+0x99c to its exit, at a line shape `Lp` and a room `Dc`. -/
 def ushfChildLawAt (X : UshCtx GF) (Dg : Nat) (Lp : List (List (BitVec 8)) → (Nat → BitVec 8) → Nat → Nat → Prop)
     (Dc : Nat) : IProp GF :=
   iprop(□ ∀ (N' : UkNames GF) (h : CPU) (m : RegMap) (dw dv : DFrac) (s0 len : Nat)
@@ -184,7 +184,7 @@ def ushfChildLawAt (X : UshCtx GF) (Dg : Nat) (Lp : List (List (BitVec 8)) → (
     ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) s0 len g -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
     ustr N'.d dv ushSymA 7 ushpSymF -∗ ushStd N' X ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ ushPid N' -∗
     ushmFresh N' sz -∗ X.Wc I 3 -∗
-    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x9c0) (Dc + (8 + (Dg + n))) -∗ wpLoop h)
+    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (Dc + (8 + (Dg + n))) -∗ wpLoop h)
 
 instance ushfChildLawAt_persistent (X : UshCtx GF) (Dg : Nat)
     (Lp : List (List (BitVec 8)) → (Nat → BitVec 8) → Nat → Nat → Prop) (Dc : Nat) :
@@ -218,7 +218,7 @@ theorem ushf_wait_empty (Q : Int → IProp GF) (Rc : IProp GF) (Sw Sw' : ExtTree
 
 /-! ## The body, as a law over the lines an era admits -/
 
-/-- **Rocq `ushf_body_law`**: main's body from 0x97a, per admitted line
+/-- **Rocq `ushf_body_law`**: main's body from 0x956, per admitted line
 constructor. -/
 def ushfBodyLaw (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat) : IProp GF :=
   iprop(□ ∀ (lu : Uline) (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (k len : Nat) (l : List FdState) (n : Nat),
@@ -229,7 +229,7 @@ def ushfBodyLaw (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat)
     ⌜∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length⌝ -∗
     ⌜ushFd0p l⌝ -∗ ushGenSlot (hlc := hlc) N X -∗ ushCode N.t -∗ ushJtab N.t -∗ ushlHead (hlc := hlc) N X l sz -∗
     ushBstate (hlc := hlc) N X l (ulineWs lu) -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h)
+    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 instance ushfBodyLaw_persistent (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat) :
     Persistent (ushfBodyLaw (hlc := hlc) N X D sz) := by

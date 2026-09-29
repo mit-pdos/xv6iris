@@ -49,7 +49,7 @@ theorem wp_kshr_fork1_final_at (SF : SH_FORK1) :
     ⊢ ushCode N.t -∗ P N.t N.d N.s -∗ usz N.s szv -∗ ustdAt N.fd l v -∗ ucwd N.cwd cw -∗ uch N.ch Sc -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ Rc -∗ □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«fork1») (2 + (ushDg + n)) -∗
-      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗
+      ((∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
           ushFork1Ans N Sc Q Rc r -∗ ustdAt N.fd l v -∗ Pex -∗
           urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h') ∗
         (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗ ⌜r ≠ -1#64⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗

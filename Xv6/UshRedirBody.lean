@@ -6,9 +6,9 @@ redirect child's law, and the `cat f` arm's two-instruction `cd` test in
 front of the fork, at an abstract fork law (`ushKshfForkLaw`, Rocq
 `kshf_fork_law`; `UshForkTwin.wp_ushForkPipe` is its instance).
 
-    0x97a  bne a5,s5,92c   -- NOT taken ('c' IS s5)
-    0x97e  lbu a5,1(s1)    -- the line's second byte, 'a'
-    0x982  bne a5,s3,92c   -- TAKEN ('a' is not 'd')
+    0x956  bne a5,s5,92c   -- NOT taken ('c' IS s5)
+    0x95a  lbu a5,1(s1)    -- the line's second byte, 'a'
+    0x95e  bne a5,s3,92c   -- TAKEN ('a' is not 'd')
 
 ## Deviations from Rocq
 
@@ -129,7 +129,7 @@ def shRedirChildLaw (X : UshCtx GF) (Dg : Nat) : IProp GF :=
     ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) s0 len fb -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
     ustr N'.d dv ushSymA 7 ushpSymF -∗ ushStd N' X ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ ushPid N' -∗
     ushmFresh N' sz -∗ X.Wc I 3 -∗
-    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (Dg + n))) -∗ wpLoop h)
+    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗ wpLoop h)
 
 /-- **Rocq `ushf_child_law_at_of_redir`**: the two shapes, one step apart. -/
 theorem ushf_child_law_at_of_redir (X : UshCtx GF) (Dg : Nat) :
@@ -145,7 +145,7 @@ theorem ushf_child_law_at_of_redir (X : UshCtx GF) (Dg : Nat) :
 
 /-! ## §3c The fork, as a law, and the cat arm in front of it -/
 
-/-- **Rocq `kshf_fork_law`**: the fork arm from 0x92c, at any line shape
+/-- **Rocq `kshf_fork_law`**: the fork arm from 0x908, at any line shape
 `Lp` and child room `Dc`. -/
 def ushKshfForkLaw (N : UkNames GF) (X : UshCtx GF) : Prop :=
   ∀ (Lp : List (List (BitVec 8)) → (Nat → BitVec 8) → Nat → Nat → Prop) (Dc : Nat) (h : CPU) (m : RegMap)
@@ -159,7 +159,7 @@ def ushKshfForkLaw (N : UkNames GF) (X : UshCtx GF) : Prop :=
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x92c) (16 + (ushDbody + n)) -∗ wpLoop h
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x908) (16 + (ushDbody + n)) -∗ wpLoop h
 
 /-- **Rocq `wp_kshm_body_ca_with`**: the `cd` test at a line beginning "ca",
 then the fork. -/
@@ -177,20 +177,20 @@ theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfor
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h := by
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
   iintro #Hgen Hhead #HC #Hjt #Hkl #Hchl #Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
   obtain ⟨hs2, hs3, hs4, hs5, hs6⟩ := hregs
-  -- 0x97a  bne a5,s5 -- NOT taken: the first byte IS 'c'
+  -- 0x956  bne a5,s5 -- NOT taken: the first byte IS 'c'
   have hb97a : ukBtaken .BNE (m.get 15#5) (m.get 21#5) = false := by
     rw [ha5, hs5, hb0]; simp [ukBtaken]
-  iapply ushS_brN UL N (ushRI_97a N.t) 0x97e h m _ hb97a $$ HC Hrun
+  iapply ushS_brN UL N (ushRI_956 N.t) 0x95a h m _ hb97a $$ HC Hrun
   iintro %h1 Hrun
-  -- 0x97e  lbu a5,1(s1) -- the line's second byte
+  -- 0x95a  lbu a5,1(s1) -- the line's second byte
   have hbuf1 : k + 1 < shNbuf := by omega
   icases ubytesq_acc N.d (DFrac.own 1) shBuf shNbuf f (k + 1) hbuf1 $$ Hbuf with ⟨Hb, Hcl⟩
   have hs1n : (m.get 9#5).toNat = shBuf + k := by
     rw [hs1, BitVec.toNat_ofNat]; unfold shBuf shNbuf at *; omega
-  iapply ushS_lbu UL N (ushRI_97e N.t) 0x982 h1 m _ (DFrac.own 1) (shBuf + (k + 1)) (f (k + 1))
+  iapply ushS_lbu UL N (ushRI_95a N.t) 0x95e h1 m _ (DFrac.own 1) (shBuf + (k + 1)) (f (k + 1))
     (by rw [hs1n, show (1#12 : BitVec 12).toInt = 1 by decide]; push_cast; omega) $$ HC Hb Hrun
   iintro Hb %h2 Hrun
   ihave Hbuf := Hcl $$ Hb
@@ -199,7 +199,7 @@ theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfor
   have hs1_1 : m1.get 9#5 = BitVec.ofNat 64 (shBuf + k) := by
     show (ukWr m 15#5 _).get 9#5 = _
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact hs1
-  -- 0x982  bne a5,s3 -- TAKEN: the second byte is not 'd'
+  -- 0x95e  bne a5,s3 -- TAKEN: the second byte is not 'd'
   have hb982 : ukBtaken .BNE (m1.get 15#5) (m1.get 19#5) = true := by
     show ukBtaken .BNE ((ukWr m 15#5 _).get 15#5) ((ukWr m 15#5 _).get 19#5) = true
     rw [ukWr_get_same _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide), hs3]
@@ -207,9 +207,9 @@ theorem wp_ushBodyCaWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfor
       apply BitVec.eq_of_toNat_eq; simp
     rw [e]
     exact ush_bne_byte _ 100 (by decide) (by rw [hb1]; decide)
-  iapply ushS_brT UL N (ushRI_982 N.t) 0x92c h2 m1 _ hb982 $$ HC Hrun
+  iapply ushS_brT UL N (ushRI_95e N.t) 0x908 h2 m1 _ hb982 $$ HC Hrun
   iintro %h3 Hrun
-  -- 0x92c: the fork, at the line's own child law
+  -- 0x908: the fork, at the line's own child law
   iapply Hfork Lp Dc h3 m1 f k len ws sz l n hDc hregs1 hs1_1 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl
     $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
@@ -228,7 +228,7 @@ theorem wp_ushBodyCatWith (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Hfo
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg ushsLpCat Dc -∗
       ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗ ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l (ulineWs (.LCat nm)) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h := by
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
   have hb0 : (f k).toNat = 99 := by
     have := ushs_cat_byte nm f k len 0 hline (by decide)
     rw [Nat.add_zero] at this; rw [this]; decide

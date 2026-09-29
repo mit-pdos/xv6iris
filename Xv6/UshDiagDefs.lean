@@ -109,14 +109,14 @@ instance (p0 : Nat) (hi : BitVec 20) (lo : BitVec 12) (j3 j5 : BitVec 21) (fa fl
 
 /-! ## §2 The paid laws' byte lemmas (pure) -/
 
-/-- **Rocq `ush_fork_msg_byte`**: "fork" at 0x12a8 is the alternative's
+/-- **Rocq `ush_fork_msg_byte`**: "fork" at 0x1288 is the alternative's
 first four bytes. -/
-theorem ushForkMsg_byte (p : Nat) (hp : p < 4) : ushLit 0x12a8 p = altPanic[p]! := by
-  have h : (List.range 4).all (fun p => ushLit 0x12a8 p == altPanic[p]!) = true := by decide
+theorem ushForkMsg_byte (p : Nat) (hp : p < 4) : ushLit 0x1288 p = altPanic[p]! := by
+  have h : (List.range 4).all (fun p => ushLit 0x1288 p == altPanic[p]!) = true := by decide
   exact beq_iff_eq.1 (List.all_eq_true.1 h p (List.mem_range.2 hp))
 
 /-- **Rocq `ush_fork_msg_nl`**: the '\n' of panic's format "%s\n". -/
-theorem ushForkMsg_nl : ushLit 0x12a0 2 = altPanic[4]! := by decide
+theorem ushForkMsg_nl : ushLit 0x1280 2 = altPanic[4]! := by decide
 
 /-- **Rocq `ush_fork_msg_lookup`**. -/
 theorem ushForkMsg_lookup (p : Nat) (hp : p < 5) : altPanic[p]? = some altPanic[p]! := by
@@ -136,8 +136,8 @@ theorem ushBytes_of_forallb (f g : Nat → BitVec 8) (lo cnt : Nat)
 asks of an alternative's bytes -- "exec " ++ cmd ++ " failed\n". -/
 def ushExecfailBytes (dg cmd : List (BitVec 8)) : Prop :=
   2 ≤ cmd.length ∧ (∀ p, p < 13 + cmd.length → dg[p]? = some dg[p]!) ∧
-  (∀ p, p < 5 → ushLit 0x12b8 p = dg[p]!) ∧ (∀ j, j < cmd.length → cmd[j]! = dg[5 + j]!) ∧
-  (∀ p, 7 ≤ p → p < 15 → ushLit 0x12b8 p = dg[p + (cmd.length - 2)]!)
+  (∀ p, p < 5 → ushLit 0x1298 p = dg[p]!) ∧ (∀ j, j < cmd.length → cmd[j]! = dg[5 + j]!) ∧
+  (∀ p, 7 ≤ p → p < 15 → ushLit 0x1298 p = dg[p + (cmd.length - 2)]!)
 
 section UshDiagDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

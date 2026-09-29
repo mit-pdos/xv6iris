@@ -7,7 +7,7 @@ here one Spec and one Proof, the walks in stage files).
 
     void runcmd(struct cmd *cmd)       -- 0x8e, 102 instructions, never returns
       0x8e..0xcc   the six-word frame, the NULL test, the type bound, the
-                   jump through the table at 0x13a8
+                   jump through the table at 0x1398
       0xce  EXEC   exec(argv[0], argv) ; fprintf(2, "exec %s failed\n") ; exit
       0xf6  REDIR  close(fd) ; open(file, mode) < 0 → "open %s failed" ; runcmd(sub)
       0x124 LIST   if(fork1() == 0) runcmd(left) ; wait(0) ; runcmd(right)
@@ -123,13 +123,13 @@ def wpShPipeArmG3Body : Prop :=
       ushCldep (hlc := hlc) st0 -∗ ucwd N.cwd cwdv -∗ uch N.ch Sc -∗ □ (uKillCred (hlc := hlc) -∗ Qc (-1)) -∗
       Cr -∗ (∀ γp : PipeNames, Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ (Rk γp ∗ Cx γp))) -∗
       ushPipeCall (hlc := hlc) N ld R -∗ Wr -∗ ushWait0Law (hlc := hlc) N Wr Pw -∗
-      □ (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x12d8⌝ -∗ ustd N.fd ld -∗ Cr -∗
+      □ (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x12b8⌝ -∗ ustd N.fd ld -∗ Cr -∗
           urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + (2 + av)) -∗ wpLoop h') -∗
-      □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗
+      □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗
           ⌜r = -1#64⌝ -∗ ushFork1Ans N Sc Qc (RcL γp) r -∗ ustd N.fd ld -∗ RcR γp -∗ Cx γp -∗
           urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') -∗
       □ (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64) (γp : PipeNames) (S1 : ExtTreeSet GName compare),
-          ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗ ushFork1Ans N S1 Qc (RcR γp) r -∗ ustd N.fd ld -∗
+          ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗ ushFork1Ans N S1 Qc (RcR γp) r -∗ ustd N.fd ld -∗
           Cx γp -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (Dg + av))) -∗
       (∀ (N' : UkNames GF) (h' : CPU) (m' : RegMap) (γ' : GName) (γp : PipeNames) (q : Nat),

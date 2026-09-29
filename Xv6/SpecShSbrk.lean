@@ -2,7 +2,7 @@
 **Specification of sh's `sbrk` wrapper** (Rocq `UkShMalloc.wp_kshm_sbrk`,
 pinned `1900b8a43`; DU10: one user function per file).
 
-    char *sbrk(int n) { return sys_sbrk(n, SBRK_EAGER); }       (ulib.c, at 0xc52)
+    char *sbrk(int n) { return sys_sbrk(n, SBRK_EAGER); }       (ulib.c, at 0xc2e)
 
 Two words of frame around one call; the `li a1,1` between them is the EAGER
 flag.  The caller learns the row's answer in a0 and which arm it was

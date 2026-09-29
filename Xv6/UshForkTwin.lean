@@ -3,11 +3,11 @@
 (Rocq `UkShPipeForkTwin.v`, pinned `1900b8a43`).  A stage file of main's
 body (sh-main's function):
 
-    0x92c  jal  ra,fork1
-    0x930  c.beqz a0,0x9c0        the CHILD -- parse and exec
-    0x932  c.li a0,0
-    0x934  jal  ra,wait           the PARENT -- reap, and round again
-           ...returns to 0x938, the loop head
+    0x908  jal  ra,fork1
+    0x90c  c.beqz a0,0x99c        the CHILD -- parse and exec
+    0x90e  c.li a0,0
+    0x910  jal  ra,wait           the PARENT -- reap, and round again
+           ...returns to 0x914, the loop head
 
 `wp_ushForkCorePipe` is the arm at an abstract payload `Q`, lend `Rc` and
 panic borrow `Pex` (Rocq `wp_kshf_fork_core_pipe`): the wait is the one
@@ -17,7 +17,7 @@ redeemed with the plain `gen_pay`.  `wp_ushForkPipe` splits the body's slot
 into the console arm (lend the block credential, redeem the child's
 payload) and the taint (the generic slot) -- it is `UshRedirBody`'s fork law
 (Rocq `wp_kshf_fork_pipe`); `wp_ushBodyPipeNc`/`wp_ushBodyPipe` put the
-`bne` at 0x97a in front (Rocq `wp_kshm_body_pipe(_nc)`); the last two are
+`bne` at 0x956 in front (Rocq `wp_kshm_body_pipe(_nc)`); the last two are
 the echo era's body law and the rest-of-body obligation from a body law
 (Rocq `ushf_body_law_echo_pipe`, `ushf_rest_of_body_at_pipe`).
 
@@ -104,12 +104,12 @@ theorem ush_redeem_const (γ : GName) (pidc rv : BitVec 32) (xs : Int) (P : IPro
 /-- The loop's five constants survive the fork, the two instructions after
 it and the wait. -/
 theorem ushF_regs (m mA : RegMap) (ret : BitVec 64) (hregs : ushRegs m)
-    (hcs : ucalleeSaved (ukWr m 1#5 (BitVec.ofNat 64 0x930)) mA) :
-    ushRegs (stubRet (ukWr (ukWr mA 10#5 (BitVec.ofNat 64 0)) 1#5 (BitVec.ofNat 64 0x938)) 3 ret) := by
-  have h1 := ushRegs_upd m 1#5 (BitVec.ofNat 64 0x930) hregs (by decide)
+    (hcs : ucalleeSaved (ukWr m 1#5 (BitVec.ofNat 64 0x90c)) mA) :
+    ushRegs (stubRet (ukWr (ukWr mA 10#5 (BitVec.ofNat 64 0)) 1#5 (BitVec.ofNat 64 0x914)) 3 ret) := by
+  have h1 := ushRegs_upd m 1#5 (BitVec.ofNat 64 0x90c) hregs (by decide)
   have h2 := ushRegs_cs _ _ h1 hcs
   have h3 := ushRegs_upd _ 10#5 (BitVec.ofNat 64 0) h2 (by decide)
-  have h4 := ushRegs_upd _ 1#5 (BitVec.ofNat 64 0x938) h3 (by decide)
+  have h4 := ushRegs_upd _ 1#5 (BitVec.ofNat 64 0x914) h3 (by decide)
   unfold stubRet
   exact ushRegs_upd _ 10#5 ret (ushRegs_upd _ 17#5 _ h4 (by decide)) (by decide)
 
@@ -124,7 +124,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
     (hnn : ∀ j, j < len → f (k + j) ≠ ubyte0) (hnul : f (k + len) = ubyte0) (hkl : k + len < shNbuf) :
     ⊢ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗ ⌜ushFd0p l⌝ -∗ ushStd N X l -∗
       ucwd N.cwd ROOTINO -∗ uch N.ch ∅ -∗ ushPid N -∗ Rc -∗ □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ Pex -∗
-      (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x12a8⌝ -∗ ⌜r = -1#64⌝ -∗
+      (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
         ushFork1Ans N ∅ Q Rc r -∗ ustd N.fd l -∗ Pex -∗
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + (74 + (ushDpipe + n))) -∗
         wpLoop h') -∗
@@ -133,16 +133,16 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
         ustr N'.d (DFrac.own 1) (shBuf + k) len (fun j => f (k + j)) -∗ ustr N'.d .discard ushWsA 5 ushpWsF -∗
         ustr N'.d .discard ushSymA 7 ushpSymF -∗ ushStd N' X l -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
         ushPid N' -∗ ushmFresh N' sz -∗
-        urun (hlc := hlc) N' hB mA (BitVec.ofNat 64 0x9c0) (68 + (8 + (ushDg + (ushDpipe + n)))) -∗ wpLoop hB) -∗
+        urun (hlc := hlc) N' hB mA (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + (ushDpipe + n)))) -∗ wpLoop hB) -∗
       (∀ (Sw Sw' : ExtTreeSet GName compare) (ret : BitVec 64) (pidv : BitVec 32), ⌜pidv ≠ 1#32⌝ -∗
         ⌜ret = -1#64 → Sw' = ∅⌝ -∗ ushfFans ∅ Q Rc Sw -∗ uwaitAnsPid ret Sw Sw' pidv -∗ Pex -∗
         ▷ ushPosb (hlc := hlc) N X l 0) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x92c) (16 + (ushDbody + n)) -∗ wpLoop h := by
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x908) (16 + (ushDbody + n)) -∗ wpLoop h := by
   iintro Hhead #HC #Hjt %hfd0 Hstd Hcwd Hch Hpid HRc #Hkw HPex Hpan Hchild Hre Hdat Hsz Hbuf Hrun
   have hlen31 : len < 2 ^ 31 := by unfold shNbuf at hkl; omega
-  -- 0x92c  jal ra,fork1
-  iapply ushS_jal UL N (ushRI_92c N.t) User.Sh.Sym.«fork1» 0x930 h m _ $$ HC Hrun
+  -- 0x908  jal ra,fork1
+  iapply ushS_jal UL N (ushRI_908 N.t) User.Sh.Sym.«fork1» 0x90c h m _ $$ HC Hrun
   iintro %h1 Hrun
   rw [show 16 + (ushDbody + n) = 2 + (ushDg + (74 + (ushDpipe + n))) by unfold ushDbody ushDg ushDpipe; omega]
   unfold ushStd ustdOk
@@ -152,7 +152,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
   · unfold ushfPay; iframe HC Hjt Hdat Hbuf
   · iapply BigSepM.bigSepM_empty.2
     iempintro
-  rw [ushpi_ret m 0x930 (by decide) (by decide)]
+  rw [ushpi_ret m 0x90c (by decide) (by decide)]
   isplitl [Hpan]
   · -- THE PANIC: fork failed
     iintro %hA %mA %rA %hmsg %hr Hans Hustd HPex Hrun
@@ -164,15 +164,15 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
     unfold ushfPay
     icases HP with ⟨-, -, Hdat, Hbuf⟩
     icases ushf_fansOf N Q Rc rA $$ Hans with ⟨%Sw, Hch, Hfans⟩
-    -- 0x930  c.beqz a0 -- NOT taken
-    iapply ushS_brN UL N (ushRI_930 N.t) 0x932 hA mA _ (by rw [ha0, RegMap.get_zero]; simp [ukBtaken, hr0])
+    -- 0x90c  c.beqz a0 -- NOT taken
+    iapply ushS_brN UL N (ushRI_90c N.t) 0x90e hA mA _ (by rw [ha0, RegMap.get_zero]; simp [ukBtaken, hr0])
       $$ HC Hrun
     iintro %hB Hrun
-    -- 0x932  c.li a0,0
-    iapply ushS_li UL N (ushRI_932 N.t) 0x934 hB mA _ 0 $$ HC Hrun
+    -- 0x90e  c.li a0,0
+    iapply ushS_li UL N (ushRI_90e N.t) 0x910 hB mA _ 0 $$ HC Hrun
     iintro %hC Hrun
-    -- 0x934  jal ra,wait
-    iapply ushS_jal UL N (ushRI_934 N.t) User.Sh.Sym.«wait» 0x938 hC _ _ $$ HC Hrun
+    -- 0x910  jal ra,wait
+    iapply ushS_jal UL N (ushRI_910 N.t) User.Sh.Sym.«wait» 0x914 hC _ _ $$ HC Hrun
     iintro %hD Hrun
     unfold ushPid
     icases Hpid with ⟨%pid, %hpid1, Hpid⟩
@@ -186,7 +186,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
     ihave Hpos := Hre $$ %Sw %∅ %ret %pidv %hpv1 %hneg1 Hfans Hans HPex
     inext
     iintro %hE Hrun
-    rw [ushpi_ret (ukWr mA 10#5 (BitVec.ofNat 64 0)) 0x938 (by decide) (by decide),
+    rw [ushpi_ret (ukWr mA 10#5 (BitVec.ofNat 64 0)) 0x914 (by decide) (by decide),
       show 2 + (ushDg + (74 + (ushDpipe + n))) = 16 + (ushDbody + n) by unfold ushDbody ushDg ushDpipe; omega]
     unfold ushlHead
     iapply Hhead $$ %hE %_ %f %n %(ushF_regs m mA ret hregs hcs) %hfd0 [Hustd Hcwd Hch Hpid Hpos] Hdat Hsz Hbuf Hrun
@@ -202,8 +202,8 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
     iintro %N' %hA %mA %γ' %hpeq %hcs %ha0 Hmy HRc #HC' HP Hsz Hustd Hcwd Hch Hpid' - Hrun
     unfold ushfPay
     icases HP with ⟨-, #Hjt', Hdat, Hbuf⟩
-    -- 0x930  c.beqz a0 -- TAKEN
-    iapply ushS_brT UL N' (ushRI_930 N'.t) 0x9c0 hA mA _ (by rw [ha0, RegMap.get_zero]; simp [ukBtaken]) $$ HC' Hrun
+    -- 0x90c  c.beqz a0 -- TAKEN
+    iapply ushS_brT UL N' (ushRI_90c N'.t) 0x99c hA mA _ (by rw [ha0, RegMap.get_zero]; simp [ukBtaken]) $$ HC' Hrun
     iintro %hB Hrun
     -- the line, cut out of the child's own copy of the buffer
     icases ushcBytes_sub N'.d shBuf shNbuf f k (len + 1) (by omega) $$ Hbuf with ⟨Hsub, -⟩
@@ -304,7 +304,7 @@ theorem wp_ushForkPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
   · -- THE TAINT: sh's code is left here
     iapply ushGenRun N X h m _ _ (by decide) $$ Hgen HT Hrun
 
-/-! ## The body at 0x97a -/
+/-! ## The body at 0x956 -/
 
 /-- **Rocq `wp_kshm_body_pipe_nc`**: at any line whose first byte is not 'c'. -/
 theorem wp_ushBodyPipeNc (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
@@ -323,15 +323,15 @@ theorem wp_ushBodyPipeNc (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h := by
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h := by
   iintro #Hgen Hhead #HC #Hjt #Hkl #Hchl #Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
   have hnck : (f k).toNat ≠ 99 := by
     have := hlp0 ws (fun j => f (k + j)) 0 len hline
     simpa using this
-  -- 0x97a  bne a5,s5 -- TAKEN
+  -- 0x956  bne a5,s5 -- TAKEN
   have hb : ukBtaken .BNE (m.get 15#5) (m.get 21#5) = true := by
     rw [ha5, hregs.2.2.2.1]; exact ush_bne_byte _ 99 (by decide) hnck
-  iapply ushS_brT UL N (ushRI_97a N.t) 0x92c h m _ hb $$ HC Hrun
+  iapply ushS_brT UL N (ushRI_956 N.t) 0x908 h m _ hb $$ HC Hrun
   iintro %h1 Hrun
   iapply wp_ushForkPipe UL SF SP hps N X Lp Dc h1 m f k len ws sz l n hDc hregs hs1 hnn hnul hkl hline hszlo hszal
     hszok hpm1 hpmwb hwbl $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
@@ -353,7 +353,7 @@ theorem wp_ushBodyPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h :=
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h :=
   wp_ushBodyPipeNc UL SF SP hps N X Lp Dc h m f k len ws sz l n hDc
     (fun ws' g k' len' hl => by rw [hlp0 ws' g k' len' hl]; decide)
     hregs hs1 ha5 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl

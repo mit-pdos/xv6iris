@@ -4,9 +4,9 @@
 `wp_kshm_child_echo_holds`, pinned `1900b8a43`), RE-POINTED at the general
 parser (DU8, see `SpecShChildExec`).
 
-    0x9c0  mv  a0,s1        the line
-    0x9c2  jal ra,parsecmd  THE PARSER THEOREM at `refParsecmd … = some (.exec toks)`
-    0x9c6  jal ra,runcmd    the seam (`ush_cmd_of_ref`), then the EXEC arm
+    0x99c  mv  a0,s1        the line
+    0x99e  jal ra,parsecmd  THE PARSER THEOREM at `refParsecmd … = some (.exec toks)`
+    0x9a2  jal ra,runcmd    the seam (`ush_cmd_of_ref`), then the EXEC arm
 
 The parser's cut `ushZeroAt (refNulcut (.exec toks))` is the per-shape cut
 `ushpNulfold toks` (`ushEchoCut_eq`), so the arm's argv-bytes premise is
@@ -61,13 +61,13 @@ theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (
   ihave %hnn := ustr_nonul N.d _ s0 len f $$ Hline
   ihave %hlen31 := ustr_len N.d _ s0 len f $$ Hline
   have href := refParsecmd_nosym len f (ushEchoToks ws) hnn hns0 htoks0 htlen
-  -- 0x9c0  mv a0,s1
-  iapply ushS_mv UL N (ushEI_9c0 N.t) 0x9c2 h m _ (BitVec.ofNat 64 s0) hs1 $$ Hc Hrun
+  -- 0x99c  mv a0,s1
+  iapply ushS_mv UL N (ushEI_99c N.t) 0x99e h m _ (BitVec.ofNat 64 s0) hs1 $$ Hc Hrun
   iintro %h1 Hrun
-  -- 0x9c2  jal ra,parsecmd
-  iapply ushS_jal UL N (ushEI_9c2 N.t) 0x86e 0x9c6 h1 _ _ $$ Hc Hrun
+  -- 0x99e  jal ra,parsecmd
+  iapply ushS_jal UL N (ushEI_99e N.t) 0x84a 0x9a2 h1 _ _ $$ Hc Hrun
   iintro %h2 Hrun
-  rw [show (0x86e : Nat) = User.Sh.Sym.«parsecmd» from rfl,
+  rw [show (0x84a : Nat) = User.Sh.Sym.«parsecmd» from rfl,
     show 60 + (8 + (E.ush_Dg + n)) = ushRoom (.exec (ushEchoToks ws)) + (8 + (E.ush_Dg + n)) by
       rw [ushRoom_exec]]
   -- THE PARSER THEOREM, at the reference's EXEC answer
@@ -80,21 +80,21 @@ theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (
     rw [hpeq]
     iapply Hcq $$ Hc'
   iintro %p Htree Hcut %hcut Hws Hsy %h3 %m3 %hcs3 %ha03 HM' Hcr Hrun
-  rw [show (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9c6)).get 1#5 =
-      BitVec.ofNat 64 0x9c6 by ureg, ush_retPc 0x9c6 (by decide) (by decide)]
-  -- 0x9c6  jal ra,runcmd
-  iapply ushS_jal UL N (ushEI_9c6 N.t) 0x8e 0x9ca h3 m3 _ $$ Hc Hrun
+  rw [show (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9a2)).get 1#5 =
+      BitVec.ofNat 64 0x9a2 by ureg, ush_retPc 0x9a2 (by decide) (by decide)]
+  -- 0x9a2  jal ra,runcmd
+  iapply ushS_jal UL N (ushEI_9a2 N.t) 0x8e 0x9a6 h3 m3 _ $$ Hc Hrun
   iintro %h4 Hrun
   -- THE SEAM: the node the parser built is the tree runcmd walks
   iapply wpLoop_bupd
-  imod E.ush_cmd_of_ref N h4 (ukWr m3 1#5 (BitVec.ofNat 64 0x9ca)) (BitVec.ofNat 64 0x8e) _ s0 p len f
+  imod E.ush_cmd_of_ref N h4 (ukWr m3 1#5 (BitVec.ofNat 64 0x9a6)) (BitVec.ofNat 64 0x8e) _ s0 p len f
     (ushEchoToks ws) href hnn hlen31 hs0 hs38 $$ Hrun Htree Hcut with ⟨Hrun, #Hcmd⟩
   imodintro
   rw [ushEchoCut_eq]
   rw [ushRoom_exec, show 60 + (8 + (E.ush_Dg + n)) = 6 + (2 + (E.ush_Dg + (60 + n))) by omega,
     show (0x8e : Nat) = User.Sh.Sym.«runcmd» from rfl]
   -- THE PINNED EXEC ARM, at the ONE command the line spells
-  have harm := SE.wp_shExecXAtGen E TabF hTab Fd1 ws dg Q Cr Cd N hc h4 (ukWr m3 1#5 (BitVec.ofNat 64 0x9ca))
+  have harm := SE.wp_shExecXAtGen E TabF hTab Fd1 ws dg Q Cr Cd N hc h4 (ukWr m3 1#5 (BitVec.ofNat 64 0x9a6))
     p (sz + 65536) s0 (ushpNulfold (ushEchoToks ws) (ushpExt len f)) ld (60 + n) hok hdgb hpeq
     (by ureg; exact ha03) hbytes hfd1 hfd2
   rw [show ushEchoCmd E ws s0 (ushpNulfold (ushEchoToks ws) (ushpExt len f)) =

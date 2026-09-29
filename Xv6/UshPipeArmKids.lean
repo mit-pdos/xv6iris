@@ -267,12 +267,12 @@ theorem ushpi_parent (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
   iintro %h2 %m2 %hst2 _ _ Hrun
   -- 0x1b6..0x1bc  wait(0), twice
   unfold ushWait0Law
-  iapply Hwl $$ %h2 %m2 %0x1b6 %0x1b8 %0x1bc %2774#21 %S2 %av %rfl %(by decide) %rfl %(by decide) %(by decide)
+  iapply Hwl $$ %h2 %m2 %0x1b6 %0x1b8 %0x1bc %2738#21 %S2 %av %rfl %(by decide) %rfl %(by decide) %(by decide)
     HC [] [] Hrun Hch HWr
   · iapply ushRI_1b6 N.t $$ HC
   · iapply ushRI_1b8 N.t $$ HC
   iintro %h3 %m3 %rw1 %S3 %_ Hp1 Hrun Hch HWr
-  iapply Hwl $$ %h3 %m3 %0x1bc %0x1be %0x1c2 %2768#21 %S3 %av %rfl %(by decide) %rfl %(by decide) %(by decide)
+  iapply Hwl $$ %h3 %m3 %0x1bc %0x1be %0x1c2 %2732#21 %S3 %av %rfl %(by decide) %rfl %(by decide) %(by decide)
     HC [] [] Hrun Hch HWr
   · iapply ushRI_1bc N.t $$ HC
   · iapply ushRI_1be N.t $$ HC

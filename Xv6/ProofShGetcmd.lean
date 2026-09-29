@@ -130,9 +130,9 @@ theorem wp_shGetcmd (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH
   iintro %h5 Hrun
   iapply ushS_mv UL N (ushMI_01a N.t) 0x1c h5 _ _ (BitVec.ofNat 64 2) (by ureg) $$ Hc Hrun
   iintro %h6 Hrun
-  iapply ushS_jal UL N (ushMI_01c N.t) 0xca6 0x20 h6 _ _ $$ Hc Hrun
+  iapply ushS_jal UL N (ushMI_01c N.t) 0xc82 0x20 h6 _ _ $$ Hc Hrun
   iintro %h7 Hrun
-  rw [show (0xca6 : Nat) = User.Sh.Sym.«write» from rfl]
+  rw [show (0xc82 : Nat) = User.Sh.Sym.«write» from rfl]
   unfold kshW
   iapply Hw $$ %h7 %_ %(12 + nn) [] [] [] Hc Hstd Hrun
   · ipureintro; ureg
@@ -149,9 +149,9 @@ theorem wp_shGetcmd (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH
   iintro %h10 Hrun
   iapply ushS_mv UL N (ushMI_024 N.t) 0x26 h10 _ _ (BitVec.ofNat 64 a) (by ureg) $$ Hc Hrun
   iintro %h11 Hrun
-  iapply ushS_jal UL N (ushMI_026 N.t) 0xa5c 0x2a h11 _ _ $$ Hc Hrun
+  iapply ushS_jal UL N (ushMI_026 N.t) 0xa38 0x2a h11 _ _ $$ Hc Hrun
   iintro %h12 Hrun
-  rw [show (0xa5c : Nat) = User.Sh.Sym.«memset» from rfl, show 12 + nn = 2 + (10 + nn) by omega]
+  rw [show (0xa38 : Nat) = User.Sh.Sym.«memset» from rfl, show 12 + nn = 2 + (10 + nn) by omega]
   iapply MS.wp_ushMemset N h12 _ a Nb f (10 + nn) (by ureg) (by ureg) hN0 h31 $$ Hc Hbs Hrun
   iintro Hbs %h13 %m13 %hcs13 Hrun
   rw [show (ukWr _ 1#5 (BitVec.ofNat 64 0x2a)).get 1#5 = BitVec.ofNat 64 0x2a by ureg,
@@ -163,9 +163,9 @@ theorem wp_shGetcmd (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH
   iintro %h14 Hrun
   iapply ushS_mv UL N (ushMI_02c N.t) 0x2e h14 _ _ (BitVec.ofNat 64 a) (by ureg; exact k9) $$ Hc Hrun
   iintro %h15 Hrun
-  iapply ushS_jal UL N (ushMI_02e N.t) 0xaaa 0x32 h15 _ _ $$ Hc Hrun
+  iapply ushS_jal UL N (ushMI_02e N.t) 0xa86 0x32 h15 _ _ $$ Hc Hrun
   iintro %h16 Hrun
-  rw [show (0xaaa : Nat) = User.Sh.Sym.«gets» from rfl, show 2 + (10 + nn) = 12 + nn by omega]
+  rw [show (0xa86 : Nat) = User.Sh.Sym.«gets» from rfl, show 2 + (10 + nn) = 12 + nn by omega]
   iapply SGt.wp_shGets N X Dsc Dl cn L D HR h16 _ a Nb _ l nn (by ureg) (by ureg) hNb h31 hfd0
     $$ Hlaw Hc Hbs Hstd Hpos Hrun
   iintro ⟨%g, %i2, %hgi, Hbs, Hstd, Hdone⟩ %h17 %m17 %hcs17 Hrun

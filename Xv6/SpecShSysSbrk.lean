@@ -2,7 +2,7 @@
 **Specification of sh's `sys_sbrk` stub** (Rocq `UkShMalloc.wp_kshm_sys_sbrk`,
 pinned `1900b8a43`; DU10: one user function per file).
 
-    sys_sbrk:  li a7, SYS_sbrk ; ecall ; ret        (usys.S, at 0xd0e)
+    sys_sbrk:  li a7, SYS_sbrk ; ecall ; ret        (usys.S, at 0xcea)
 
 The quiet stubs' shape at a syscall that is anything but quiet: the row GROWS
 the image and the caller comes back owning the new bytes.  Both arms of the

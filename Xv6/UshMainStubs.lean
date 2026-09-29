@@ -234,7 +234,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
-/-- **Rocq `wp_ksh_read`**: read @0xc9e, the receipt-keeping read.
+/-- **Rocq `wp_ksh_read`**: read @0xc7a, the receipt-keeping read.
 DEPENDS ON `ush_read_leaf` (`HR`). -/
 theorem wp_ksh_read (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Prop)
     (cn : ConsNames) (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l)

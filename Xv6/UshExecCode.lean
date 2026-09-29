@@ -3,14 +3,14 @@
 role of Rocq's generated catalog `UCodeShK.uis_shk_<pc>` at the pcs
 `UkShEcho.v` walks, pinned `1900b8a43`; lane sh-exec).
 
-    0x9c0  mv   a0,s1           the child: the line
-    0x9c2  jal  ra,parsecmd
-    0x9c6  jal  ra,runcmd
+    0x99c  mv   a0,s1           the child: the line
+    0x99e  jal  ra,parsecmd
+    0x9a2  jal  ra,runcmd
     0xce   ld   a0,8(a0)        runcmd's EXEC arm: argv[0]
     0xd0   beqz a0,f0
     0xd2   addi a1,s1,8         &argv[0]
     0xd6   jal  ra,exec
-    0xcbe  li a7,7; ecall; ret  usys.S's exec stub (`UkStub.stubLaw`)
+    0xc9a  li a7,7; ecall; ret  usys.S's exec stub (`UkStub.stubLaw`)
 
 Each `ushEI_<pc>` is ONE evaluation of sh's text tree and the decode walk
 (`UkShMallocDefs.ushm_uis`), as `UshCode`'s parser facts are; the ASTs are
@@ -34,20 +34,20 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
-/-- `0x9c0  mv a0,s1` -/
-theorem ushEI_9c0 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x9c0) true (.RTYPE (.Regidx 9#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
-  ushm_uis γt 0x9c0 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
+/-- `0x99c  mv a0,s1` -/
+theorem ushEI_99c (γt : GName) :
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x99c) true (.RTYPE (.Regidx 9#5, .Regidx 0#5, .Regidx 10#5, .ADD)) :=
+  ushm_uis γt 0x99c _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
 
-/-- `0x9c2  jal 86e <parsecmd>` -/
-theorem ushEI_9c2 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x9c2) false (.JAL (2096812#21, .Regidx 1#5)) :=
-  ushm_uis γt 0x9c2 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
+/-- `0x99e  jal 84a <parsecmd>` -/
+theorem ushEI_99e (γt : GName) :
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x99e) false (.JAL (2096812#21, .Regidx 1#5)) :=
+  ushm_uis γt 0x99e _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
 
-/-- `0x9c6  jal 8e <runcmd>` -/
-theorem ushEI_9c6 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x9c6) false (.JAL (2094792#21, .Regidx 1#5)) :=
-  ushm_uis γt 0x9c6 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
+/-- `0x9a2  jal 8e <runcmd>` -/
+theorem ushEI_9a2 (γt : GName) :
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0x9a2) false (.JAL (2094828#21, .Regidx 1#5)) :=
+  ushm_uis γt 0x9a2 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
 
 /-- `0xce  ld a0,8(a0)` -/
 theorem ushEI_ce (γt : GName) :
@@ -64,9 +64,9 @@ theorem ushEI_d2 (γt : GName) :
     ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0xd2) false (.ITYPE (8#12, .Regidx 9#5, .Regidx 11#5, .ADDI)) :=
   ushm_uis γt 0xd2 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
 
-/-- `0xd6  jal cbe <exec>` -/
+/-- `0xd6  jal c9a <exec>` -/
 theorem ushEI_d6 (γt : GName) :
-    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0xd6) false (.JAL (3048#21, .Regidx 1#5)) :=
+    ushCode (GF := GF) γt ⊢ uinstrIs γt (BitVec.ofNat 64 0xd6) false (.JAL (3012#21, .Regidx 1#5)) :=
   ushm_uis γt 0xd6 _ _ ⟨_, _, _, rfl⟩ (by decide) (by decide)
 
 end Facts

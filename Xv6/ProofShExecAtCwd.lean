@@ -28,7 +28,7 @@ theorem shExecAtCwd_holds (UL : UK_LEAVES) (R : IProp GF) : wpShExecAtCwdBody (h
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
-  have e : BitVec.ofNat 64 (User.Sh.Sym.«exec» + 2) = BitVec.ofNat 64 0xcc0 := rfl
+  have e : BitVec.ofNat 64 (User.Sh.Sym.«exec» + 2) = BitVec.ofNat 64 0xc9c := rfl
   rw [e] at hpc
   rw [e]
   iapply wp_uk_ecall_exec_at_cwd_refR UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 7)) _ avail c R

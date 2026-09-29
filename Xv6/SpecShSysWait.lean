@@ -2,7 +2,7 @@
 **Specification of sh's `wait` stub** (Rocq `UkShRun.wp_kshr_wait`,
 `wp_kshr_wait_pid`, pinned `1900b8a43`; DU10: one user function per file).
 
-    wait:  li a7, SYS_wait ; ecall ; ret        (usys.S, at 0xc8e)
+    wait:  li a7, SYS_wait ; ecall ; ret        (usys.S, at 0xc6a)
 
 sh calls `wait` with a0 = 0 at all three of its sites, so the row's
 null-status arm fires and the heap crosses untouched.  sh's half of its

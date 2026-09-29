@@ -69,7 +69,7 @@ set_option linter.unusedSectionVars false
 /-! ## S0 THE PINS -/
 
 /-- **Rocq `shp_write`**: sh's `write` stub. -/
-theorem shp_write : User.Sh.Sym.«write» = 0xca6 := by decide
+theorem shp_write : User.Sh.Sym.«write» = 0xc82 := by decide
 
 
 /-- **Rocq `alt_execfail_len`** (deviation 1): "exec echo failed\n$ ". -/

@@ -5,7 +5,7 @@
 
 `ushDiagLeafHolds` discharges sh-run's `UshRunDefs.ushDiagLeaf ushDg` (Rocq
 `UkShRun`'s section hypothesis `ush_diag_leaf`): panic at one of its three
-messages ("fork", "pipe"-family literals at 0x12a8 / 0x12b0 / 0x12d8), or
+messages ("fork", "pipe"-family literals at 0x1288 / 0x1290 / 0x12b8), or
 runcmd's two failed tails -- `c.ld a2,8(s1)` (ecmd->argv[0]) at 0xda then
 "exec %s failed\n", `c.ld a2,16(s1)` (rcmd->file) at 0x10e then "open %s
 failed\n" -- each through `UshDiagDie`'s block.  `wp_kshd_execfail_paid_at`
@@ -35,14 +35,14 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 
 /-- The block's literals at 0xdc ("exec %s failed\n"), decided. -/
-theorem shdDieLits_dc : shdDieLits 0xdc 1#20 476#12 4044#21 2970#21 0x12b8 15 5 := by decide
+theorem shdDieLits_dc : shdDieLits 0xdc 1#20 444#12 4008#21 2934#21 0x1298 15 5 := by decide
 
 /-- The block's literals at 0x110 ("open %s failed\n"), decided. -/
-theorem shdDieLits_110 : shdDieLits 0x110 1#20 440#12 3992#21 2918#21 0x12c8 15 5 := by decide
+theorem shdDieLits_110 : shdDieLits 0x110 1#20 408#12 3956#21 2882#21 0x12a8 15 5 := by decide
 
-theorem ushLitOk_12a8 : ushLitOk 0x12a8 4 = true := by decide +kernel
-theorem ushLitOk_12b0 : ushLitOk 0x12b0 6 = true := by decide +kernel
-theorem ushLitOk_12d8 : ushLitOk 0x12d8 4 = true := by decide +kernel
+theorem ushLitOk_12a8 : ushLitOk 0x1288 4 = true := by decide +kernel
+theorem ushLitOk_12b0 : ushLitOk 0x1290 6 = true := by decide +kernel
+theorem ushLitOk_12d8 : ushLitOk 0x12b8 4 = true := by decide +kernel
 
 theorem ushDiag_a0 (m : RegMap) (z : Nat) (hz : (m.get 10#5).toNat = z) (hlt : z < 2 ^ 64) :
     m.get 10#5 = BitVec.ofNat 64 z := BitVec.eq_of_toNat_eq (by rw [hz, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hlt])
@@ -107,24 +107,24 @@ theorem ushDiagLeafHolds (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP
     iintro #Hdp #Hc - Hpay Hrun
     unfold ushPanicMsg at hmsg
     rcases hmsg with hz | hz | hz
-    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x12a8 4 hz ushLitOk_12a8 (by decide) (by decide) (by decide)
+    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x1288 4 hz ushLitOk_12a8 (by decide) (by decide) (by decide)
         $$ Hdp Hc Hpay Hrun
-    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x12b0 6 hz ushLitOk_12b0 (by decide) (by decide) (by decide)
+    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x1290 6 hz ushLitOk_12b0 (by decide) (by decide) (by decide)
         $$ Hdp Hc Hpay Hrun
-    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x12d8 4 hz ushLitOk_12d8 (by decide) (by decide) (by decide)
+    · iapply ushDiagLeaf_panic UL HS SP N h m n 0x12b8 4 hz ushLitOk_12d8 (by decide) (by decide) (by decide)
         $$ Hdp Hc Hpay Hrun
   · have er : ushDiagRes (GF := GF) N.d 0xda m =
         iprop(∃ x : UArg, ushPtr N.d ((m.get 9#5).toNat + 8) x.ptr ∗ ushStr N.d x) := by
       unfold ushDiagRes; rfl
     rw [er]
-    exact ushDiagLeaf_tail UL HS HF N h m n 0xda 8 8#12 1#20 476#12 4044#21 2970#21 0#12 0x12b8 (by decide)
+    exact ushDiagLeaf_tail UL HS HF N h m n 0xda 8 8#12 1#20 444#12 4008#21 2934#21 0#12 0x1298 (by decide)
       (by omega) shdDieLits_dc (by decide) (ushRI_0da N.t) (ushRI_0dc N.t) (ushRI_0e0 N.t) (ushRI_0e4 N.t)
       (ushRI_0e6 N.t) (ushRI_0ea N.t) (ushRI_0ec N.t)
   · have er : ushDiagRes (GF := GF) N.d 0x10e m =
         iprop(∃ x : UArg, ushPtr N.d ((m.get 9#5).toNat + 16) x.ptr ∗ ushStr N.d x) := by
       unfold ushDiagRes; rfl
     rw [er]
-    exact ushDiagLeaf_tail UL HS HF N h m n 0x10e 16 16#12 1#20 440#12 3992#21 2918#21 1#12 0x12c8 (by decide)
+    exact ushDiagLeaf_tail UL HS HF N h m n 0x10e 16 16#12 1#20 408#12 3956#21 2882#21 1#12 0x12a8 (by decide)
       (by omega) shdDieLits_110 (by decide) (ushRI_10e N.t) (ushRI_110 N.t) (ushRI_114 N.t) (ushRI_118 N.t)
       (ushRI_11a N.t) (ushRI_11e N.t) (ushRI_120 N.t)
 
@@ -136,9 +136,9 @@ theorem wp_kshd_execfail_paid_at (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRI
     (hfd2 : ushFd2p l) (hal : (m.get 9#5).toNat % 8 = 0) (hc2 : 2 ≤ cmd.length) (hxlen : x.len = cmd.length)
     (hxb : ∀ j, j < cmd.length → x.bytes j = cmd[j]!)
     (hdglk : ∀ p, p < 13 + cmd.length → dg[p]? = some dg[p]!)
-    (hw1 : ∀ p, p < 5 → ushLit 0x12b8 p = dg[p]!)
+    (hw1 : ∀ p, p < 5 → ushLit 0x1298 p = dg[p]!)
     (harg : ∀ j, j < cmd.length → cmd[j]! = dg[5 + j]!)
-    (hw2 : ∀ p, 7 ≤ p → p < 15 → ushLit 0x12b8 p = dg[p + (cmd.length - 2)]!) :
+    (hw2 : ∀ p, 7 ≤ p → p < 15 → ushLit 0x1298 p = dg[p + (cmd.length - 2)]!) :
     ⊢ ushExecfailLawAt (hlc := hlc) dg (13 + cmd.length) Cr Cd -∗ ushCode N.t -∗
       ushPtr N.d ((m.get 9#5).toNat + 8) x.ptr -∗ ushStr N.d x -∗ ustd N.fd l -∗ Cr -∗
       (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
@@ -158,7 +158,7 @@ theorem wp_kshd_execfail_paid_at (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRI
       (fun p => iprop(ustd N.fd l ∗ Pf (p + (cmd.length - 2)))) (5 + 2) := by
     simp only []
     rw [show 5 + x.len = 5 + 2 + (cmd.length - 2) by omega]
-  iapply wp_kshd_die_chain UL HS HF N false .discard 0xdc 1#20 476#12 4044#21 2970#21 0#12 0x12b8 15 5 x.ptr x.len
+  iapply wp_kshd_die_chain UL HS HF N false .discard 0xdc 1#20 444#12 4008#21 2934#21 0#12 0x1298 15 5 x.ptr x.len
     x.bytes (fun p => iprop(ustd N.fd l ∗ Pf p)) (fun p => iprop(ustd N.fd l ∗ Pf (5 + p)))
     (fun p => iprop(ustd N.fd l ∗ Pf (p + (cmd.length - 2)))) h1 (ukWr m 12#5 (BitVec.ofNat 64 x.ptr)) (n + 2)
     shdDieLits_dc (by omega) (by ureg) rfl e2

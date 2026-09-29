@@ -43,7 +43,7 @@ def wpShParsepipeBody : Prop :=
     refParsepipe len f (fuel + 1) off = some (t, fin) → ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM' →
     s0 + len < 2 ^ 64 → 0 < ps → ps % 8 = 0 → ps + 8 < 2 ^ 64 →
     ⊢ ushCode N.t -∗ uword N.d ps w0 -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ □ (Pex -∗ N.pay (-1)) -∗ Pex -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom (hlc := hlc) N Pex (ushPpRoom t + nn - ushPpDeep t) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsepipe») (ushPpRoom t + nn) -∗
       (∀ root : Nat, ushOTree N s0 root t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + fin)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗

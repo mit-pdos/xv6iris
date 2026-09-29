@@ -144,7 +144,7 @@ theorem f_bytes_typed_short (ls : List Fwline) (N : Fname) (bs : List (BitVec 8)
 theorem init_bytes_length : initBytes.length = 36024 := Xv6.User.Init.elf_length
 
 /-- Rocq `sh_bytes_length` (deviation 2). -/
-theorem sh_bytes_length : shBytes.length = 58360 := Xv6.User.Sh.elf_length
+theorem sh_bytes_length : shBytes.length = 58632 := Xv6.User.Sh.elf_length
 
 /-- Rocq `echo_bytes_length` (deviation 2). -/
 theorem echo_bytes_length : echoBytes.length = 35640 := Xv6.User.Echo.elf_length

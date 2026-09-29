@@ -27,7 +27,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
-/-- sh's `sys_sbrk` stub, as a law (`UkStub.stubLaw` at 0xd0e, number 12). -/
+/-- sh's `sys_sbrk` stub, as a law (`UkStub.stubLaw` at 0xcea, number 12). -/
 theorem ushm_stub_sbrk (UL : UK_LEAVES) (N : UkNames GF) :
     ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Sh.code.byte) 12 User.Sh.Sym.«sys_sbrk» :=
   stub_of_text UL N User.Sh.textOk 12 _ 12#12 (by decide) ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩ ⟨_, _, _, rfl⟩

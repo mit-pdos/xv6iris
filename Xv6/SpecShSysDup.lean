@@ -2,7 +2,7 @@
 **Specification of sh's `dup` stub** (Rocq `UkShPipe.wp_kshpi_dup`, pinned
 `1900b8a43`; DU10: one user function per file).
 
-    dup:  li a7, SYS_dup ; ecall ; ret        (usys.S, at 0xcfe)
+    dup:  li a7, SYS_dup ; ecall ; ret        (usys.S, at 0xcda)
 
 The TRACKED dup: the ledger decides where the copy lands (`ualloc`), and a
 claim on the source (`ufdOwn`) says what state is copied; or the table was

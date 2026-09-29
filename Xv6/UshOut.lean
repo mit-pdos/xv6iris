@@ -3,7 +3,7 @@
 pinned `1900b8a43`; app-echo.md E5, lane IO-LEAF M4a).
 
 sh writes "$ " at the head of every command loop -- `getcmd`'s
-`write(2, "$ ", 2)` -- from its `.rodata` at 0x1290 (`shPromptPv`), which
+`write(2, "$ ", 2)` -- from its `.rodata` at 0x1270 (`shPromptPv`), which
 is X-and-not-W, so the leaf that answers is the TEXT row
 (`UshMainStubs.wp_ksh_write_chain_txt_at`).  This file names the two
 literal bytes, reads them off sh's image, and gives the call's words; the

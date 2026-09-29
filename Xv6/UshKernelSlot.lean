@@ -65,8 +65,8 @@ theorem shCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub Use
     ∀ a b, User.Sh.code.byte a = some b → M a = some b ∧ uxAddr π a ∧ ¬ uwAddr π a ∧ a < uCap := by
   intro a b hab
   have hv : User.Sh.code.vaddr = 0 := rfl
-  have hs : User.Sh.code.size = 0x1c64 := rfl
-  have ha : a < 0x1c64 := by
+  have hs : User.Sh.code.size = 0x1c74 := rfl
+  have ha : a < 0x1c74 := by
     unfold User.USeg.byte at hab
     split at hab
     · omega

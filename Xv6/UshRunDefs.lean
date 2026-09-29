@@ -22,7 +22,7 @@ makes the jump table's default row dead.  The runner's tree is
    a 32-bit field is `nthByte (n := 4) (BitVec.ofInt 32 v)` and a pointer
    slot `BitVec.ofNat 64 p` (sh-parse's `UshTreeDefs` conventions).
 2. **sh's code and its `.rodata` are ONE resource** (DU3, `UshCode.ushCode`:
-   the R-X segment [0, 0x1c64) holds both): Rocq's `shk_code γt` and
+   the R-X segment [0, 0x1c74) holds both): Rocq's `shk_code γt` and
    `shk_rodata γt` are both `ushCode γt`, so a statement that names both
    names it once (the `UkInitDefs` precedent), and `ushJtab` carries
    `ushCode` where Rocq's carries `shk_rodata`.
@@ -348,7 +348,7 @@ theorem ushArgv0 (g : GName) (t : Nat) (args : List UArg) :
 /-! ## §5 The diagnostic cut (Rocq §5; deviation 4) -/
 
 /-- **Rocq `ush_panic_msg`**: the three `.rodata` messages panic is handed. -/
-def ushPanicMsg (z : Nat) : Prop := z = 0x12a8 ∨ z = 0x12b0 ∨ z = 0x12d8
+def ushPanicMsg (z : Nat) : Prop := z = 0x1288 ∨ z = 0x1290 ∨ z = 0x12b8
 
 /-- **Rocq `ush_diag_at`**: the three entries of sh's printer, with what
 each site knows. -/

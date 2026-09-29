@@ -8,7 +8,7 @@ pinned `1900b8a43`).
     0x96  beqz a0,0xba            -- not taken: the node is not NULL
     0x98  sd s1,24(sp) ; mv s1,a0
     0x9c  lw a4,0(a0) ; li a5,5 ; bltu a5,a4,0xc2   -- not taken: 1 ≤ type ≤ 5
-    0xa4  lwu a5,0(a0) ; slli a5,a5,2 ; la a4,0x13a8 ; add a5,a5,a4
+    0xa4  lwu a5,0(a0) ; slli a5,a5,2 ; la a4,0x1398 ; add a5,a5,a4
     0xb4  lw a5,0(a5)             -- THE JUMP TABLE ROW, from .rodata
     0xb6  add a5,a5,a4 ; jr a5    -- to the arm, `ushJarm c`
 
@@ -48,10 +48,10 @@ theorem ushRunRow_facts (c : Ushcmd) :
     BitVec.signExtend 64 (BitVec.ofInt 32 (ushTy c)) = BitVec.ofInt 64 (ushTy c) ∧
     ukBtaken .BLTU (BitVec.ofNat 64 5) (BitVec.ofInt 64 (ushTy c)) = false ∧
     BitVec.setWidth 64 (BitVec.ofInt 32 (ushTy c)) = BitVec.ofInt 64 (ushTy c) ∧
-    ukRtypeVal .ADD (ukShiftiopVal .SLLI (BitVec.ofInt 64 (ushTy c)) 2#6) (BitVec.ofNat 64 0x13a8) =
+    ukRtypeVal .ADD (ukShiftiopVal .SLLI (BitVec.ofInt 64 (ushTy c)) 2#6) (BitVec.ofNat 64 0x1398) =
       BitVec.ofNat 64 (ushJtabA + 4 * (ushTy c).toNat) ∧
     (ushJtabA + 4 * (ushTy c).toNat) % 4 = 0 ∧ ushJtabA + 4 * (ushTy c).toNat < 2 ^ 64 ∧
-    ukRtypeVal .ADD (BitVec.signExtend 64 (ushJent (ushTy c).toNat)) (BitVec.ofNat 64 0x13a8) =
+    ukRtypeVal .ADD (BitVec.signExtend 64 (ushJent (ushTy c).toNat)) (BitVec.ofNat 64 0x1398) =
       BitVec.ofNat 64 (ushJarm c) ∧
     ushJarm c % 2 = 0 ∧ ushJarm c < 2 ^ 64 := by
   cases c <;> simp only [ushTy, ushJarm] <;> exact ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide,
@@ -136,10 +136,10 @@ theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (hlc := hlc) (G
     (by show ukShiftiopVal .SLLI ((ukWr m4 15#5 _).get 15#5) 2#6 = _; ureg) $$ Hc Hrun
   iintro %h9 Hrun
   let m6 := ukWr m5 15#5 (ukShiftiopVal .SLLI (BitVec.ofInt 64 (ushTy c)) 2#6)
-  -- 0xaa..0xae  la a4,0x13a8
-  iapply ushS_la UL N (ushRI_0aa N.t) (ushRI_0ae N.t) 0x13a8 h9 m6 n $$ Hc Hrun
+  -- 0xaa..0xae  la a4,0x1398
+  iapply ushS_la UL N (ushRI_0aa N.t) (ushRI_0ae N.t) 0x1398 h9 m6 n $$ Hc Hrun
   iintro %h10 Hrun
-  let m7 := ukWr (ukWr m6 14#5 (ukUtypeVal .AUIPC (BitVec.ofNat 64 0xaa) 1#20)) 14#5 (BitVec.ofNat 64 0x13a8)
+  let m7 := ukWr (ukWr m6 14#5 (ukUtypeVal .AUIPC (BitVec.ofNat 64 0xaa) 1#20)) 14#5 (BitVec.ofNat 64 0x1398)
   -- 0xb2  add a5,a5,a4
   iapply ushS_rtype UL N (ushRI_0b2 N.t) 0xb4 h10 m7 n (BitVec.ofNat 64 (ushJtabA + 4 * (ushTy c).toNat))
     (by show ukRtypeVal .ADD ((ukWr (ukWr m6 14#5 _) 14#5 _).get 15#5)

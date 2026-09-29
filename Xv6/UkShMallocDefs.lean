@@ -7,8 +7,8 @@ part -- the walks themselves are one function per file, DU10:
 
 K&R `malloc`/`free` over `sbrk`, as user/umalloc.c compiles into sh's image:
 `morecore` is INLINED into `malloc`, so the walks are four functions --
-`malloc` (0x1194, 91 instructions), `free` (0x110e, 46), the C wrapper `sbrk`
-(0xc52, 10) and the usys.S stub `sys_sbrk` (0xd0e, 3).
+`malloc` (0x1170, 91 instructions), `free` (0x10ea, 46), the C wrapper `sbrk`
+(0xc2e, 10) and the usys.S stub `sys_sbrk` (0xcea, 3).
 
 THE SPEC IS THE NATURAL SEPARATION-LOGIC ONE (Rocq's header): malloc
 CONSUMES the allocator's state and HANDS BACK the request's bytes, owned,

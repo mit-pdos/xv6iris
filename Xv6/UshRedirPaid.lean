@@ -54,21 +54,21 @@ theorem ush_openfail_lookup (nm : List (BitVec 8)) (p : Nat) (hp : p < 13 + nm.l
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_eq_getElem (by omega)]; rfl
 
 /-- **Rocq `ush_openfail_lit1`**: the format's first window, "open ". -/
-theorem ush_openfail_lit1 (p : Nat) (hp : p < 5) : ushLit 0x12c8 p = openfailPre[p]! :=
-  ushBytes_of_forallb (ushLit 0x12c8) (fun q => openfailPre[q]!) 0 5 (by decide) p (by omega) (by omega)
+theorem ush_openfail_lit1 (p : Nat) (hp : p < 5) : ushLit 0x12a8 p = openfailPre[p]! :=
+  ushBytes_of_forallb (ushLit 0x12a8) (fun q => openfailPre[q]!) 0 5 (by decide) p (by omega) (by omega)
 
 /-- **Rocq `ush_openfail_lit2`**: the format's second window, " failed\n". -/
-theorem ush_openfail_lit2 (p : Nat) (h1 : 7 ≤ p) (h2 : p < 15) : ushLit 0x12c8 p = openfailSuf[p - 7]! :=
-  ushBytes_of_forallb (ushLit 0x12c8) (fun q => openfailSuf[q - 7]!) 7 8 (by decide) p h1 (by omega)
+theorem ush_openfail_lit2 (p : Nat) (h1 : 7 ≤ p) (h2 : p < 15) : ushLit 0x12a8 p = openfailSuf[p - 7]! :=
+  ushBytes_of_forallb (ushLit 0x12a8) (fun q => openfailSuf[q - 7]!) 7 8 (by decide) p h1 (by omega)
 
 /-- **Rocq `ush_openfail_w1`**. -/
 theorem ush_openfail_w1 (nm : List (BitVec 8)) (p : Nat) (hp : p < 5) :
-    ushLit 0x12c8 p = (altOpenfailN nm)[p]! := by
+    ushLit 0x12a8 p = (altOpenfailN nm)[p]! := by
   rw [ush_openfail_lit1 p hp, altOpenfailN_w1 nm p hp]
 
 /-- **Rocq `ush_openfail_w2`**. -/
 theorem ush_openfail_w2 (nm : List (BitVec 8)) (p : Nat) (h1 : 7 ≤ p) (h2 : p < 15) :
-    ushLit 0x12c8 p = (altOpenfailN nm)[p - 2 + nm.length]! := by
+    ushLit 0x12a8 p = (altOpenfailN nm)[p - 2 + nm.length]! := by
   rw [ush_openfail_lit2 p h1 h2, show p - 2 + nm.length = 5 + nm.length + (p - 7) by omega,
     altOpenfailN_w2 nm (p - 7) (by omega)]
 
@@ -107,7 +107,7 @@ theorem wp_kshd_openfail_paid (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF
       (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) (5 + 2) := by
     simp only []
     rw [show 5 + x.len = 5 + 2 - 2 + nm.length by omega]
-  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 440#12 3992#21 2918#21 1#12 0x12c8 15 5 x.ptr x.len
+  iapply wp_kshd_die_chain UL HS HF N false .discard 0x110 1#20 408#12 3956#21 2882#21 1#12 0x12a8 15 5 x.ptr x.len
     x.bytes (fun p => iprop(ustd N.fd l ∗ Pf p)) (fun p => iprop(ustd N.fd l ∗ Pf (5 + p)))
     (fun p => iprop(ustd N.fd l ∗ Pf (p - 2 + nm.length))) h1 (ukWr m 12#5 (BitVec.ofNat 64 x.ptr)) (n + 2)
     shdDieLits_110 (by omega) (by ureg) rfl e2

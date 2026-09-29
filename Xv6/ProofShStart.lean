@@ -32,13 +32,13 @@ theorem wp_shStart (UL : UK_LEAVES) (SM : SH_MAIN) : wpShStartBody (hlc := hlc) 
   iintro #Hdp #Hlaw #Hplaw #Hrest #Hc #Hjt #Hgen Hfd0 Hin Hstd Hcwd Hch Hpid Hpos HR Hbs Hrun
   unfold ushFd0
   icases Hfd0 with (%hfd0 | #HT)
-  · rw [show User.Sh.Sym.«start» = 0x9d0 from rfl]
-    -- 0x9d0..0x9d6  the prologue
-    iapply ush_frame_pro UL N 2 [1#5, 8#5] 0 0x9d0 0x9d8 (ushMI_9d0 N.t) ⟨ushMI_9d2 N.t, ushMI_9d4 N.t, trivial⟩
-      (ushMI_9d6 N.t) h m (8 + (16 + (ushDbody + n0))) $$ Hc Hrun
+  · rw [show User.Sh.Sym.«start» = 0x9ac from rfl]
+    -- 0x9ac..0x9b2  the prologue
+    iapply ush_frame_pro UL N 2 [1#5, 8#5] 0 0x9ac 0x9b4 (ushMI_9ac N.t) ⟨ushMI_9ae N.t, ushMI_9b0 N.t, trivial⟩
+      (ushMI_9b2 N.t) h m (8 + (16 + (ushDbody + n0))) $$ Hc Hrun
     iintro %_ - - %h1 Hrun
-    -- 0x9d8  jal main
-    iapply ushS_jal UL N (ushMI_9d8 N.t) User.Sh.Sym.«main» 0x9dc h1 _ _ $$ Hc Hrun
+    -- 0x9b4  jal main
+    iapply ushS_jal UL N (ushMI_9b4 N.t) User.Sh.Sym.«main» 0x9b8 h1 _ _ $$ Hc Hrun
     iintro %h2 Hrun
     iapply SM.wp_shMain N X Dsc Dl cn L D HR R K h2 _ f n0 l $$ Hdp Hlaw Hplaw Hrest Hc Hjt Hgen %hfd0 Hin Hstd
       Hcwd Hch Hpid Hpos HR Hbs Hrun

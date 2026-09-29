@@ -1,10 +1,10 @@
 /-
 **THE CHILD: parse the line, then hand runcmd the tree** (Rocq `UkShSeam.v`
-(C)–(C3), pinned `1900b8a43`): sh's forked child, main's code 0x9c0..0x9c6.
+(C)–(C3), pinned `1900b8a43`): sh's forked child, main's code 0x99c..0x9a2.
 
-    0x9c0  c.mv a0,s1        the line
-    0x9c2  jal  ra,parsecmd  -> the node, at the reference's answer
-    0x9c6  jal  ra,runcmd    -> the continuation: the shape's arm
+    0x99c  c.mv a0,s1        the line
+    0x99e  jal  ra,parsecmd  -> the node, at the reference's answer
+    0x9a2  jal  ra,runcmd    -> the continuation: the shape's arm
 
 `wp_ushRefChild` is the walk to `runcmd`'s entry with the runner's tree (the
 seam `UshSeam.ushCmd_of_ushp_tree` at the parser's cut) and the persisted
@@ -52,7 +52,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **Rocq `wp_ref_child`**: from 0x9c0 through `parsecmd` and the seam to
+/-- **Rocq `wp_ref_child`**: from 0x99c through `parsecmd` and the seam to
 `runcmd`'s entry. -/
 theorem wp_ushRefChild (UL : UK_LEAVES) (SP : SH_PARSECMD) (UM UM' : IProp GF) (N : UkNames GF) (h : CPU)
     (m : RegMap) (dw dv : DFrac) (s0 len : Nat) (f : Nat → BitVec 8) (t : UshpCmd) (k : Nat) (Cr : IProp GF)
@@ -61,7 +61,7 @@ theorem wp_ushRefChild (UL : UK_LEAVES) (SP : SH_PARSECMD) (UM UM' : IProp GF) (
     (hs64 : s0 + len + 1 < 2 ^ 64) (hs38 : s0 + len < 2 ^ 38) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ □ (Cr -∗ N.pay (-1)) -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (ushRoom t + k) -∗
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (ushRoom t + k) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗
         ushCmd N.d p (ushcmdOfTree s0 (ushZeroAt (refNulcut t) (ushpExt len f)) t) -∗
         ubytesq N.d DFrac.discard s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
@@ -71,27 +71,27 @@ theorem wp_ushRefChild (UL : UK_LEAVES) (SP : SH_PARSECMD) (UM UM' : IProp GF) (
   iintro #Hc Hline Hws Hsy HM #Hpx Hcr Hrun Hk
   ihave %hnn := ustr_nonul N.d _ s0 len f $$ Hline
   ihave %hlen := ustr_len N.d _ s0 len f $$ Hline
-  -- 0x9c0  c.mv a0,s1
-  iapply ushS_mv UL N (ushRI_9c0 N.t) 0x9c2 h m _ (BitVec.ofNat 64 s0) hs1 $$ Hc Hrun
+  -- 0x99c  c.mv a0,s1
+  iapply ushS_mv UL N (ushRI_99c N.t) 0x99e h m _ (BitVec.ofNat 64 s0) hs1 $$ Hc Hrun
   iintro %h1 Hrun
-  -- 0x9c2  jal ra,parsecmd
-  iapply ushS_jal UL N (ushRI_9c2 N.t) 0x86e 0x9c6 h1 _ _ $$ Hc Hrun
+  -- 0x99e  jal ra,parsecmd
+  iapply ushS_jal UL N (ushRI_99e N.t) 0x84a 0x9a2 h1 _ _ $$ Hc Hrun
   iintro %h2 Hrun
-  rw [show (0x86e : Nat) = User.Sh.Sym.«parsecmd» from rfl]
-  have hcs2 : ucalleeSaved m (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9c6)) :=
+  rw [show (0x84a : Nat) = User.Sh.Sym.«parsecmd» from rfl]
+  have hcs2 : ucalleeSaved m (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9a2)) :=
     ucalleeSaved_trans (ush_ucs_upd m 10#5 _ (by decide)) (ush_ucs_upd _ 1#5 _ (by decide))
   iapply SP.wp_shParser N h2 _ dw dv s0 len f t UM UM' Cr k (by ureg) hsc href hcat hch hs0 hs64
     $$ Hc Hline Hws Hsy HM Hpx Hcr Hrun
   iintro %p Htree Hcut %_ Hws Hsy %h3 %m3 %hcs3 %ha03 HM' Hcr Hrun
-  rw [show (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9c6)).get 1#5 =
-      BitVec.ofNat 64 0x9c6 by ureg, ush_retPc 0x9c6 (by decide) (by decide)]
-  -- 0x9c6  jal ra,runcmd
-  iapply ushS_jal UL N (ushRI_9c6 N.t) 0x8e 0x9ca h3 m3 _ $$ Hc Hrun
+  rw [show (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9a2)).get 1#5 =
+      BitVec.ofNat 64 0x9a2 by ureg, ush_retPc 0x9a2 (by decide) (by decide)]
+  -- 0x9a2  jal ra,runcmd
+  iapply ushS_jal UL N (ushRI_9a2 N.t) 0x8e 0x9a6 h3 m3 _ $$ Hc Hrun
   iintro %h4 Hrun
   rw [show (0x8e : Nat) = User.Sh.Sym.«runcmd» from rfl]
-  have hcs4 : ucalleeSaved m (ukWr m3 1#5 (BitVec.ofNat 64 0x9ca)) :=
+  have hcs4 : ucalleeSaved m (ukWr m3 1#5 (BitVec.ofNat 64 0x9a6)) :=
     ucalleeSaved_trans (ucalleeSaved_trans hcs2 hcs3) (ush_ucs_upd _ 1#5 _ (by decide))
-  have ha04 : (ukWr m3 1#5 (BitVec.ofNat 64 0x9ca)).get 10#5 = BitVec.ofNat 64 p := by
+  have ha04 : (ukWr m3 1#5 (BitVec.ofNat 64 0x9a6)).get 10#5 = BitVec.ofNat 64 p := by
     rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha03
   -- THE SEAM
   iapply wpLoop_bupd
@@ -114,7 +114,7 @@ theorem wp_ushRefChildExec (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) 
       □ (uKillCred (hlc := hlc) -∗ N.pay (-1)) -∗ ushJtab N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗
       ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwdAny N.cwd -∗
       uchAny N.ch -∗ UM -∗ (UM' -∗ usz N.s szv) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (60 + (8 + (Dg + n))) -∗ wpLoop h := by
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (Dg + n))) -∗ wpLoop h := by
   iintro #Hdp #Hc #Hxs #Hkw #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Husz Hrun
   rw [show 60 + (8 + (Dg + n)) = ushRoom (.exec toks) + (8 + (Dg + n)) from rfl]
   iapply wp_ushRefChild UL SP UM UM' N h m dw dv s0 len f (.exec toks) (8 + (Dg + n)) (N.pay (-1)) hs1 hsc href
@@ -146,7 +146,7 @@ theorem wp_ushRefChildRedir (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD)
       ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ UM -∗
       ushOpenCallG (hlc := hlc) N cwdv ⟨s0 + q, e - q, fun j => g (q + j)⟩ rrModeGt (ld.set 1 .closed) H K Kf -∗
       □ (Cr -∗ N.pay (-1)) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (Dg + n))) -∗
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       ((∀ (h' : CPU) (m' : RegMap) (p : Nat) (ty : FdType), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
           ushCmd N.d p (.exec (ushArgs s0 g toks)) -∗
           ustd N.fd ((ld.set 1 .closed).set 1 (.open false true ty)) -∗ ucwd N.cwd cwdv -∗ K ty -∗ UM' -∗ Cr' -∗
@@ -199,7 +199,7 @@ theorem wp_ushRefChildPipe (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) 
       ucwd N.cwd cwdv -∗ uch N.ch Sc -∗ UM -∗ Cr -∗ □ (uKillCred (hlc := hlc) -∗ Qc (-1)) -∗
       (∀ γp : PipeNames, UM' -∗ Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ Rk γp)) -∗
       ushPipeCall (hlc := hlc) N ld R -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (68 + (8 + (Dg + n))) -∗
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       (∀ (N' : UkNames GF) (h' : CPU) (m' : RegMap) (γ' : GName) (γp : PipeNames) (q : Nat),
         ⌜N'.pay = Qc⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ myPay γ' Qc -∗ ushCode N'.t -∗ ushJtab N'.t -∗
         ushCmd N'.d q (.exec (ushArgs s0 g toksl)) -∗ usz N'.s szv -∗

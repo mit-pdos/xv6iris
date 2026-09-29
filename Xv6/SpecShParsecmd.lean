@@ -38,7 +38,7 @@ def wpShParsecmdBody : Prop :=
     m.get 10#5 = BitVec.ofNat 64 s0 → refSymScope len f → refParsecmd len f = some t → ushpCat t →
     ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM' → 0 < s0 → s0 + len + 1 < 2 ^ 64 →
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ □ (Pex -∗ N.pay (-1)) -∗ Pex -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom (hlc := hlc) N Pex (ushRoom t + nn - ushDeep t) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsecmd») (ushRoom t + nn) -∗
       (∀ p : Nat, ushOTree N s0 p t -∗ ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
         ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
@@ -53,7 +53,7 @@ def wpShParserBody : Prop :=
     m.get 10#5 = BitVec.ofNat 64 s0 → refSymScope len f → refParsecmd len f = some t → ushpCat t →
     ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM' → 0 < s0 → s0 + len + 1 < 2 ^ 64 →
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ □ (Pex -∗ N.pay (-1)) -∗ Pex -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom (hlc := hlc) N Pex (ushRoom t + nn - ushDeep t) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsecmd») (ushRoom t + nn) -∗
       (∀ p : Nat, ushTree N s0 p t -∗ ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
         ⌜∀ j, j ∈ refNulcut t → ushZeroAt (refNulcut t) (ushpExt len f) j = ubyte0⌝ -∗

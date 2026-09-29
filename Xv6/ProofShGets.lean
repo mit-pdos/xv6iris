@@ -2,11 +2,11 @@
 **Proof of sh's `gets`** (Rocq `UkSh.wp_ksh_gets`, with `ush_stack_12_open`/
 `ush_stack_12_close` and `ucs_cases`, pinned `1900b8a43`).
 
-    0xaaa..0xac0  the prologue (twelve words: ra, s0..s8 spilled, two locals)
-    0xac2..0xace  s7 := buf; s4 := max; s2 := buf; s1 := 0; s6 := s0-81; s5 := 1
-    0xad0..0xafe  the byte loop (`UshGetsLoop.ushGets_loop`)
-    0xb00  add s8,s8,s7 ; sb zero,0(s8) ; mv a0,s7    -- buf[i] = '\0'
-    0xb08..0xb1e  the epilogue
+    0xa86..0xa9c  the prologue (twelve words: ra, s0..s8 spilled, two locals)
+    0xa9e..0xaaa  s7 := buf; s4 := max; s2 := buf; s1 := 0; s6 := s0-81; s5 := 1
+    0xaac..0xada  the byte loop (`UshGetsLoop.ushGets_loop`)
+    0xadc  add s8,s8,s7 ; sb zero,0(s8) ; mv a0,s7    -- buf[i] = '\0'
+    0xae4..0xafa  the epilogue
 
 The one local the loop owns is the byte `c` at s0-81, byte 7 of the frame
 word at sp0-88 (the word at sp0-96 is untouched).  DEPENDS ON
@@ -89,7 +89,7 @@ theorem ushGets_byteOpen (γd : GName) (spz : Nat) (h96 : 96 ≤ spz) :
   ihave Hbs := Hcl $$ %b Hb
   iapply uword_of_ubytes $$ Hbs
 
-/-- **The exit** (0xb00..0xb1e): the NUL at `buf[i2]`, `a0 := buf`, the
+/-- **The exit** (0xadc..0xafa): the NUL at `buf[i2]`, `a0 := buf`, the
 epilogue, gets' own continuation. -/
 theorem ushGets_epi (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState)
     (m mc0 : RegMap) (a Nb nn : Nat) (hbnd : a + Nb ≤ 2 ^ 38)
@@ -113,21 +113,21 @@ theorem ushGets_epi (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dl : Ulin
   iintro %h' %mc' %i2 %g %bc' %hi2 %h24 %hk Hbs Hb Hstd Hd Hrun
   let sp0 := m.get spIdx
   have h96 : 96 ≤ sp0.toNat := by show 96 ≤ (m.get spIdx).toNat; omega
-  -- 0xb00  add s8,s8,s7
+  -- 0xadc  add s8,s8,s7
   have hk23 : mc'.get 23#5 = BitVec.ofNat 64 a := by rw [hk 23#5 (by decide), h23]
-  iapply ushS_rtype UL N (ushMI_b00 N.t) 0xb02 h' mc' nn (BitVec.ofNat 64 (i2 + a))
+  iapply ushS_rtype UL N (ushMI_adc N.t) 0xade h' mc' nn (BitVec.ofNat 64 (i2 + a))
     (by show mc'.get 24#5 + mc'.get 23#5 = _; rw [h24, hk23, BitVec.ofNat_add]) $$ Hc Hrun
   iintro %h1 Hrun
-  -- 0xb02  sb zero,0(s8)
+  -- 0xade  sb zero,0(s8)
   icases ushBytes_upd N.d a Nb i2 g hi2 $$ Hbs with ⟨Hbi, Hcl⟩
-  iapply ushGets_sb UL N (ushMI_b02 N.t) 0xb06 h1 (ukWr mc' 24#5 (BitVec.ofNat 64 (i2 + a))) nn (a + i2) (g i2)
+  iapply ushGets_sb UL N (ushMI_ade N.t) 0xae2 h1 (ukWr mc' 24#5 (BitVec.ofNat 64 (i2 + a))) nn (a + i2) (g i2)
     (by rw [ukWr_get_same _ _ _ (by decide), BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega),
           show (0#12 : BitVec 12).toInt = 0 from by decide]; omega) $$ Hc Hbi Hrun
   iintro Hbi %h2' Hrun
   rw [RegMap.get_zero, show nthByte (n := 8) (0#64) 0 = ubyte0 from rfl]
   ihave Hbs := Hcl $$ %ubyte0 Hbi
-  -- 0xb06  mv a0,s7
-  iapply ushS_mv UL N (ushMI_b06 N.t) 0xb08 h2' _ nn (BitVec.ofNat 64 a)
+  -- 0xae2  mv a0,s7
+  iapply ushS_mv UL N (ushMI_ae2 N.t) 0xae4 h2' _ nn (BitVec.ofNat 64 a)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact hk23) $$ Hc Hrun
   iintro %h3 Hrun
   let me := ukWr (ukWr mc' 24#5 (BitVec.ofNat 64 (i2 + a))) 10#5 (BitVec.ofNat 64 a)
@@ -137,11 +137,11 @@ theorem ushGets_epi (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dl : Ulin
   ihave Hw88 := Hclose $$ %bc' Hb
   ihave Hloc := ushGets_locClose N.d (BitVec.ofNat 64 (sp0.toNat - 8 * 10)) sp0.toNat
     (by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by have := sp0.isLt; omega)]) h96 hal $$ Hw88 Hw96
-  -- 0xb08..0xb1e  the epilogue
+  -- 0xae4..0xafa  the epilogue
   let rs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5, 22#5, 23#5, 24#5]
-  iapply ush_frame_epi UL N 12 rs 2 0xb08 (rs.map m.get)
-    ⟨ushMI_b08 N.t, ushMI_b0a N.t, ushMI_b0c N.t, ushMI_b0e N.t, ushMI_b10 N.t, ushMI_b12 N.t, ushMI_b14 N.t,
-      ushMI_b16 N.t, ushMI_b18 N.t, ushMI_b1a N.t, trivial⟩ (ushMI_b1c N.t) (ushMI_b1e N.t) sp0 h3 me nn
+  iapply ush_frame_epi UL N 12 rs 2 0xae4 (rs.map m.get)
+    ⟨ushMI_ae4 N.t, ushMI_ae6 N.t, ushMI_ae8 N.t, ushMI_aea N.t, ushMI_aec N.t, ushMI_aee N.t, ushMI_af0 N.t,
+      ushMI_af2 N.t, ushMI_af4 N.t, ushMI_af6 N.t, trivial⟩ (ushMI_af8 N.t) (ushMI_afa N.t) sp0 h3 me nn
     (by show me.get 2#5 = _; rw [eme 2#5 (by decide), h2]) hal (by omega) rfl $$ Hc Hsv Hloc Hrun
   iintro %h4 Hrun
   rw [ush_ret_ra _ m rs (by simp [rs])]
@@ -163,12 +163,12 @@ theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (hlc := hlc) (GF := GF) := by
   iintro #Hlaw #Hc Hbs Hstd Hpos Hrun Hk
   have hNb100 : Nb = 100 := hNb
   ihave %hbnd := urun_ubytes_bnd N h m _ _ _ a Nb f (by omega) $$ Hrun Hbs
-  rw [show User.Sh.Sym.«gets» = 0xaaa from rfl]
-  -- 0xaaa..0xac0  the prologue
-  iapply ush_frame_pro UL N 12 [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5, 22#5, 23#5, 24#5] 2 0xaaa 0xac2
-    (ushMI_aaa N.t)
-    ⟨ushMI_aac N.t, ushMI_aae N.t, ushMI_ab0 N.t, ushMI_ab2 N.t, ushMI_ab4 N.t, ushMI_ab6 N.t, ushMI_ab8 N.t,
-      ushMI_aba N.t, ushMI_abc N.t, ushMI_abe N.t, trivial⟩ (ushMI_ac0 N.t) h m nn $$ Hc Hrun
+  rw [show User.Sh.Sym.«gets» = 0xa86 from rfl]
+  -- 0xa86..0xa9c  the prologue
+  iapply ush_frame_pro UL N 12 [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5, 22#5, 23#5, 24#5] 2 0xa86 0xa9e
+    (ushMI_a86 N.t)
+    ⟨ushMI_a88 N.t, ushMI_a8a N.t, ushMI_a8c N.t, ushMI_a8e N.t, ushMI_a90 N.t, ushMI_a92 N.t, ushMI_a94 N.t,
+      ushMI_a96 N.t, ushMI_a98 N.t, ushMI_a9a N.t, trivial⟩ (ushMI_a9c N.t) h m nn $$ Hc Hrun
   iintro %hst Hsv Hloc %h1 Hrun
   obtain ⟨hal, hroom⟩ := hst
   let sp0 := m.get spIdx
@@ -177,17 +177,17 @@ theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (hlc := hlc) (GF := GF) := by
   have hsp64 : sp0.toNat < 2 ^ 64 := sp0.isLt
   have hsp0 : sp0 = BitVec.ofNat 64 sp0.toNat := by simp
   let m1 := ukWr (ukWr m spIdx (sp0 + BitVec.ofInt 64 (-((8 * 12 : Nat) : Int)))) 8#5 sp0
-  -- 0xac2..0xace  the setup
-  iapply ushS_mv UL N (ushMI_ac2 N.t) 0xac4 h1 m1 nn (BitVec.ofNat 64 a) (by ureg; exact ha0) $$ Hc Hrun
+  -- 0xa9e..0xaaa  the setup
+  iapply ushS_mv UL N (ushMI_a9e N.t) 0xaa0 h1 m1 nn (BitVec.ofNat 64 a) (by ureg; exact ha0) $$ Hc Hrun
   iintro %h2 Hrun
-  iapply ushS_mv UL N (ushMI_ac4 N.t) 0xac6 h2 _ nn (BitVec.ofNat 64 Nb) (by ureg; exact ha1) $$ Hc Hrun
+  iapply ushS_mv UL N (ushMI_aa0 N.t) 0xaa2 h2 _ nn (BitVec.ofNat 64 Nb) (by ureg; exact ha1) $$ Hc Hrun
   iintro %h3 Hrun
-  iapply ushS_mv UL N (ushMI_ac6 N.t) 0xac8 h3 _ nn (BitVec.ofNat 64 a) (by ureg; exact ha0) $$ Hc Hrun
+  iapply ushS_mv UL N (ushMI_aa2 N.t) 0xaa4 h3 _ nn (BitVec.ofNat 64 a) (by ureg; exact ha0) $$ Hc Hrun
   iintro %h4 Hrun
-  iapply ushS_li UL N (ushMI_ac8 N.t) 0xaca h4 _ nn 0 $$ Hc Hrun
+  iapply ushS_li UL N (ushMI_aa4 N.t) 0xaa6 h4 _ nn 0 $$ Hc Hrun
   iintro %h5 Hrun
   have hm1_8 : m1.get 8#5 = sp0 := ukWr_get_same _ _ _ (by decide)
-  iapply ushS_itype UL N (ushMI_aca N.t) 0xace h5
+  iapply ushS_itype UL N (ushMI_aa6 N.t) 0xaaa h5
     (ukWr (ukWr (ukWr (ukWr m1 23#5 (BitVec.ofNat 64 a)) 20#5 (BitVec.ofNat 64 Nb)) 18#5 (BitVec.ofNat 64 a)) 9#5
       (BitVec.ofNat 64 0)) nn (BitVec.ofNat 64 (sp0.toNat - 81))
     (by rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide),
@@ -195,7 +195,7 @@ theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (hlc := hlc) (GF := GF) := by
         exact (congrArg (fun v => ukItypeVal .ADDI v 4015#12) hsp0).trans
           (ush_addi_neg sp0.toNat 81 4015#12 (by decide) (by omega))) $$ Hc Hrun
   iintro %h6 Hrun
-  iapply ushS_li UL N (ushMI_ace N.t) 0xad0 h6 _ nn 1 $$ Hc Hrun
+  iapply ushS_li UL N (ushMI_aaa N.t) 0xaac h6 _ nn 1 $$ Hc Hrun
   iintro %h7 Hrun
   let mc0 := ukWr (ukWr (ukWr (ukWr (ukWr (ukWr m1 23#5 (BitVec.ofNat 64 a)) 20#5 (BitVec.ofNat 64 Nb)) 18#5
     (BitVec.ofNat 64 a)) 9#5 (BitVec.ofNat 64 0)) 22#5 (BitVec.ofNat 64 (sp0.toNat - 81))) 21#5

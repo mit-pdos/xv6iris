@@ -5,7 +5,7 @@ pinned `1900b8a43`; lane sh-exec; DU10: this is `main`'s child block, the
 rest of `main` being sh-main's).
 
     if(fork1() == 0)
-      runcmd(parsecmd(buf));      -- 0x9c0 mv a0,s1 ; jal parsecmd ; jal runcmd
+      runcmd(parsecmd(buf));      -- 0x99c mv a0,s1 ; jal parsecmd ; jal runcmd
 
 The child parses the ONE line the discipline admits (`ushXlineIs ws f 0
 len`), and runcmd's EXEC arm execs it on the pinned supply.  The allocator
@@ -54,7 +54,7 @@ def wpShChildXGenBody (TabF : GName → List FdState → IProp GF) (Fd1 : List F
       E.ush_execfail_law_at dg (13 + (ws[0]!).length) Cr Cd -∗ □ (Cd -∗ Q (-1)) -∗ E.ush_jtab N.t -∗
       ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
       TabF N.fd ld -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ ushmFresh N sz -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
 
 /-- **Rocq `wp_kshm_child_x`**: at the ledger. -/
 abbrev wpShChildXBody (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8))) (dg : List (BitVec 8))
@@ -77,7 +77,7 @@ def wpShChildEchoBody (ws : List (List (BitVec 8))) (Q : Int → IProp GF) (Cr C
       □ (Cd -∗ Q (-1)) -∗ E.ush_jtab N.t -∗
       ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
       ustd N.fd ld -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ ushmFresh N sz -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x9c0) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (E.ush_Dg + n))) -∗ wpLoop h
 
 end
 

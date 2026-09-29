@@ -32,7 +32,7 @@ theorem wp_shSysExec (UL : UK_LEAVES) (HR : USH_RUN_SYS_P) : wpShSysExecBody (hl
   ihave Hs := Xv6.ush_stub_exec (hlc := hlc) UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
-  rw [show User.Sh.Sym.«exec» + 2 = 0xcc0 from rfl]
+  rw [show User.Sh.Sym.«exec» + 2 = 0xc9c from rfl]
   unfold stubRet
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   iapply HR.exec N h1 (ukWr m 17#5 (BitVec.ofInt 64 7)) _ avail (by rw [ushRS_usysno]; decide)

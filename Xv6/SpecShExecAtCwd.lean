@@ -3,7 +3,7 @@
 (Rocq `UkShEcho.wp_kshr_exec_at_cwd`, pinned `1900b8a43`; lane sh-exec;
 DU10: one user function per file).
 
-    exec:  li a7,7 ; ecall ; ret        (user/usys.S, at 0xcbe in sh)
+    exec:  li a7,7 ; ecall ; ret        (user/usys.S, at 0xc9a in sh)
 
 `UkShRun.wp_kshr_exec` (sh-run's) takes the ∀-cwd deposit `udepw`; a PINNED
 supply answers at ONE directory, so the pinned arm needs the stub at the
@@ -33,7 +33,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
 def wpShExecAtCwdBody (R : IProp GF) : Prop :=
   ∀ (N : UkNames GF) (_ : UknConst N) (h : CPU) (m : RegMap) (c avail : Nat),
     ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«exec») avail -∗ ucwd N.cwd c -∗
-      udepwAtRefR (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 7)) (BitVec.ofNat 64 0xcc0) c R -∗
+      udepwAtRefR (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 7)) (BitVec.ofNat 64 0xc9c) c R -∗
       (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
         urun (hlc := hlc) N h' (stubRet m 7 (-1#64)) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h

@@ -38,7 +38,7 @@ theorem wp_ushBodyCatPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg ushsLpCat Dc -∗
       ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗ ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l (ulineWs (.LCat nm)) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h :=
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h :=
   wp_ushBodyCatWith UL N X (Xv6.wp_ushForkPipe UL SF SP hps N X) Dc nm h m f k len sz l n hDc hregs hs1 ha5 hnn
     hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl
 

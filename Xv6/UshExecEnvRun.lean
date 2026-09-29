@@ -30,11 +30,11 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 
 /-- **Rocq `UkShEcho.echo_execfail_bytes`**: "exec echo failed\n" around
-"echo" is sh's `.rodata` format at 0x12b8. -/
+"echo" is sh's `.rodata` format at 0x1298. -/
 theorem ushEchoExecfailBytes : ushExecfailBytes altExecfail cmdEcho := by
   refine ⟨by decide, by decide, by decide, by decide, ?_⟩
   intro p h1 h2
-  exact ushBytes_of_forallb (ushLit 0x12b8) (fun q => altExecfail[q + (cmdEcho.length - 2)]!) 7 8 (by decide) p h1
+  exact ushBytes_of_forallb (ushLit 0x1298) (fun q => altExecfail[q + (cmdEcho.length - 2)]!) 7 8 (by decide) p h1
     (by omega)
 
 section UshExecEnvRun

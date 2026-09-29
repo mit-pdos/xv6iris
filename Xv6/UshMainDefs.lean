@@ -771,12 +771,12 @@ theorem ushPstate_of_bstate (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc :
   iapply ushPosb_blk_line N X L l
   iapply ushPosb_of_posw N X l ws $$ Hpos
 
-/-- **Rocq `ush_loop_head`**: the command loop's head at 0x938, over the
+/-- **Rocq `ush_loop_head`**: the command loop's head at 0x914, over the
 opaque `R` a turn carries. -/
 def ushLoopHead (N : UkNames GF) (X : UshCtx GF) (R : IProp GF) (l : List FdState) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat),
     ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate (hlc := hlc) N X l -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x938) (16 + (ushDbody + n)) -∗ wpLoop h)
+    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 /-- **Rocq `ush_rest_line_at`**: the first NUL at or after `k` ends a line
 the era admits with words `ws`, or the taint. -/
@@ -852,7 +852,7 @@ def ushRestLAt (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (R : IProp 
       ⌜ushRegs m⌝ -∗ ⌜m.get 9#5 = BitVec.ofNat 64 (shBuf + k)⌝ -∗ ⌜m.get 15#5 = BitVec.ofNat 64 (f k).toNat⌝ -∗
       ⌜k ≤ i2 ∧ i2 < shNbuf ∧ f i2 = ubyte0⌝ -∗ ⌜ushFd0p l⌝ -∗ ushRestLineAt X D ws f k -∗
       ushBstate (hlc := hlc) N X l ws -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x97a) (16 + (ushDbody + n)) -∗ wpLoop h)
+      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 instance ushRestLAt_persistent (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (R : IProp GF) :
     Persistent (ushRestLAt (hlc := hlc) N X D R) := by
@@ -880,7 +880,7 @@ def ushlHead (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (sz : Nat) : IP
   iprop(∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat),
     ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate (hlc := hlc) N X l -∗ ushlDat N.d -∗ usz N.s sz -∗
     ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x938) (16 + (ushDbody + n)) -∗ wpLoop h)
+    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 /-- **Rocq `ushl_R`**: the opaque `R` at this shell. -/
 def ushlR (N : UkNames GF) (sz : Nat) : IProp GF := iprop(ushlDat N.d ∗ usz N.s sz)

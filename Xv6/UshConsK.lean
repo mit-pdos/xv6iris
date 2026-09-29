@@ -7,8 +7,8 @@ LEAF BODIES over the taint `T` and an absence credential `K`
 (`ushOpenConsoleLeaf`, `ushOpenAbsentLeaf`), because the program tier names
 no application.  This file pays them out of the ingredients `UConsOpen`
 factored.  What is sh's OWN is one fact -- the eight bytes `"console\0"` at
-`shConsPv` (0x1388) in sh's read-only image -- and one walk, usys.S's
-three-instruction stub at `User.Sh.Sym.open` (0xcc6).  THE ASYMMETRY: the
+`shConsPv` (0x1378) in sh's read-only image -- and one walk, usys.S's
+three-instruction stub at `User.Sh.Sym.open` (0xca2).  THE ASYMMETRY: the
 PRESENT arm runs on the persistent flag `consMade r i`; the ABSENT arm must
 REFUTE the claim's present arms and so runs on a PERSISTENT absence
 credential `K` whose law is `shConsNeverLaw` (owner's ruling (A):
@@ -106,7 +106,7 @@ theorem shConsRo_nul_bool : User.Sh.code.byte (shConsPv + 7) = some 0#8 := by de
 
 /-- **Rocq `sh_open_pc`**: sh's own open stub, at the address its symbol
 table pins. -/
-theorem shOpen_pc : User.Sh.Sym.«open» = 0xcc6 := rfl
+theorem shOpen_pc : User.Sh.Sym.«open» = 0xca2 := rfl
 
 theorem fnameConsole_length : fnameConsole.length = 7 := rfl
 
@@ -256,13 +256,13 @@ theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShCons
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
   obtain ⟨hn, ha0, ha1⟩ := shOpen_regs m ha
-  -- 0xcc8  ecall: the receipt-keeping open at sh's own literal
+  -- 0xca4  ecall: the receipt-keeping open at sh's own literal
   iapply P.openConsoleCall N X.T K consAbsent r i User.Sh.code.byte shConsPv shConsPath_of (by decide) h1
     (ukWr m 17#5 (BitVec.ofInt 64 15)) _ l v avail hn ha0 ha1 (by rw [hpc]; decide)
     $$ Hlaws Hmade Hinv Hc Hi Hrun Hcwd Hstd
   rw [hpc]
   iintro %h2 %ret Hans Hcwd Hrun
-  -- 0xccc  c.jr ra
+  -- 0xca8  c.jr ra
   iapply Hmid $$ %h2 %ret Hrun
   iintro %h3 Hrun
   iapply Hcont $$ %h3 %ret Hans Hcwd Hrun
@@ -284,13 +284,13 @@ theorem sh_open_absent_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsO
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
   obtain ⟨hn, ha0, ha1⟩ := shOpen_regs m ha
-  -- 0xcc8  ecall: the dead walk hands the credential back
+  -- 0xca4  ecall: the dead walk hands the credential back
   iapply P.openAbsentCall N X.T K User.Sh.code.byte shConsPv shConsPath_of (by decide) h1
     (ukWr m 17#5 (BitVec.ofInt 64 15)) _ l v avail hn ha0 ha1 (by rw [hpc]; decide)
     $$ Habs Hinv Hc Hi Hrun Hcwd Hstd HK
   rw [hpc]
   iintro %h2 %ret Hans Hcwd Hrun
-  -- 0xccc  c.jr ra
+  -- 0xca8  c.jr ra
   iapply Hmid $$ %h2 %ret Hrun
   iintro %h3 Hrun
   iapply Hcont $$ %h3 %ret Hans Hcwd Hrun

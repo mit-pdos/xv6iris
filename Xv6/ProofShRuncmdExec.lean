@@ -71,9 +71,9 @@ theorem shExecXAtGen_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (TabF : GName 
   case hv => ureg; rw [hs1]; exact ukAddi t 8 8#12 (by decide)
   iintro %h4 Hrun
   -- 0xd6  jal ra,exec
-  iapply ushS_jal UL N (ushEI_d6 N.t) 0xcbe 0xda h4 _ _ $$ Hc Hrun
+  iapply ushS_jal UL N (ushEI_d6 N.t) 0xc9a 0xda h4 _ _ $$ Hc Hrun
   iintro %h5 Hrun
-  rw [show (0xcbe : Nat) = User.Sh.Sym.«exec» from rfl]
+  rw [show (0xc9a : Nat) = User.Sh.Sym.«exec» from rfl]
   -- THE PINNED EXEC, at the root: the deposit, built first
   iapply SX.wp_shExecAtCwd (hlc := hlc) iprop(TabF N.fd ld ∗ Cr) N hc h5 _ ROOTINO _
     $$ Hc Hrun Hcwd [Hstd Hcr]
