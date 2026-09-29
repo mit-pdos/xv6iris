@@ -547,7 +547,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      [gmap (mword 27)] with them; without pinning, this field would take
      stdpp's bv_eq_dec/bv_countable (RiscvPtsto does not import the Sail
      instance modules) and the ghost_mapG key-instance args would not unify. *)
-  riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+  riscvF_kmapGS :: @ghost_mapG _ Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_kptbGS :: inG Σ kptbR;
@@ -788,7 +788,7 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
    above already provide the unique resolution path), so a use site
    elaborates to the same projection chain resolution produces. *)
 Definition riscv_kmapGS `{!riscvGS Σ} :
-  @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+  @ghost_mapG _ Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
@@ -1577,7 +1577,7 @@ Definition svpn_of (a : mword 64) : mword 27 :=
    durable-notes leak), so we cannot rely on TC search resolving
    [EqDecision (mword 27)] here. *)
 Definition kmap_at `{!riscvGS Σ} (vpn : mword 27) (ppn : mword 44) (pc : kperm) : iProp Σ :=
-  @ghost_map_elem Σ (mword 27) (mword 44 * kperm)
+  @ghost_map_elem _ Σ (mword 27) (mword 44 * kperm)
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27)
     riscv_kmapGS kmap_name vpn DfracDiscarded (ppn, pc).

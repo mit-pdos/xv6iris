@@ -3665,8 +3665,8 @@ Section IputFreePath.
        freeze already travels and the deposit ties it region-side. *)
     (* the goal's fupd (from [fupd_wp]: [iris_invGS riscv_irisGS]) and the lemma's
        ([riscvF_invGS]) are the same instance up to unfolding; [iMod] needs them equal *)
-    change (@uPred_bi_fupd HasLc Σ (@iris_invGS HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ riscvGS0))))
-      with (@uPred_bi_fupd HasLc Σ (@riscvF_invGS Σ (@riscv_fixedGS Σ riscvGS0))).
+    change (@uPred_bi_fupd _ HasLc Σ (@iris_invGS _ HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ riscvGS0))))
+      with (@uPred_bi_fupd _ HasLc Σ (@riscvF_invGS Σ (@riscv_fixedGS Σ riscvGS0))).
     iMod (escA_alloc ⊤ fsc_fs (bv_unsigned inum) rg with "Hfzpost [Htop2]")
       as (ge gr gd) "(#Hescr & Htkr & Htkd)";
       [iExists (era_node dn bm data2);

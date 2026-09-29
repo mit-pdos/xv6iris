@@ -264,9 +264,9 @@ Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type} (HSt : mono_natG Σ)
     (A : N -> FsAbsDefs.aview -> iProp Σ) (Okc : N -> Prop) (B : N -> iProp Σ)
     (Tn Tn' : iProp Σ) (γst : gname) (gen : nat) : iProp Σ :=
   (□ (∀ (r : N) (av : FsAbsDefs.aview) (n : nat),
-        ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own Σ HSt γst (DfracOwn 1) n -∗
+        ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own _ Σ HSt γst (DfracOwn 1) n -∗
         ⌜Okc r⌝ -∗ Tn -∗ ▷ A r av ==∗
-        ◇ (@mono_nat_auth_own Σ HSt γst (DfracOwn 1) n ∗ Tn' ∗
+        ◇ (@mono_nat_auth_own _ Σ HSt γst (DfracOwn 1) n ∗ Tn' ∗
            ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r')))%I.
 
 Global Instance app_xfer_boot_raw_persistent {Σ} {N} (HSt : mono_natG Σ)

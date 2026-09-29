@@ -223,8 +223,8 @@ Definition esc_rec : Type := dst * gname.
    equation [riscvF_genGS = riscv_pre_genGS]) -- the union's top theorem
    BUILDS its instance with [fa_st := riscv_pre_genGS]
    ([UUnionBootAdequacy]).  [fa_pos] is the round position's camera
-   ([fpos]).  Every use is spelled [@mono_nat_auth_own Σ fa_st … (DfracOwn q) …] /
-   [@ghost_var Σ nat fa_pos … (DfracOwn q) …]: a scope has several [mono_natG] and
+   ([fpos]).  Every use is spelled [@mono_nat_auth_own _ Σ fa_st … (DfracOwn q) …] /
+   [@ghost_var _ Σ nat fa_pos … (DfracOwn q) …]: a scope has several [mono_natG] and
    [ghost_varG nat] instances ([echoOutG]'s among them), and a second one
    picked by resolution is the duplicate-class trap. *)
 Class fileAppG (Σ : gFunctors) := FileAppG {
@@ -331,7 +331,7 @@ Section FileClaim.
   Lemma file_birth (γst : gname) :
     ⊢ |==> ∃ c : file_fixed, ⌜ff_st c = γst⌝ ∗ file_cl c
         ∗ ghost_map_auth_frac (ff_reg c) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm c) (DfracOwn 1) 0%nat
+        ∗ @mono_nat_auth_own _ Σ fa_st (ff_cm c) (DfracOwn 1) 0%nat
         ∗ own (ff_hist c) (●ML ([] : list (leibnizO UnionAdm.srec)))
         ∗ ghost_map_auth_frac (ff_run c) 1 (∅ : gmap nat (gname * gname)).
   Proof using .
@@ -441,7 +441,7 @@ Section FileClaim.
      value the half is at.  Only all three together move the position
      ([fposf_update]). *)
   Definition fposf (r : file_names) (q : Qp) (n : nat) : iProp Σ :=
-    @ghost_var Σ nat fa_pos (fn_pos r) (DfracOwn q) n.
+    @ghost_var _ Σ nat fa_pos (fn_pos r) (DfracOwn q) n.
   Definition fpos (r : file_names) (n : nat) : iProp Σ :=
     (⌜fn_role r = false⌝ ∗ fposf r (1/2) n)%I.
   Definition fposq (r : file_names) (n : nat) : iProp Σ :=
@@ -531,8 +531,8 @@ Section FileClaim.
   (* a fresh position: the claim's quarter, the holder's half and quarter *)
   Lemma fpos_alloc (n : nat) :
     ⊢ |==> ∃ γp : gname,
-        @ghost_var Σ nat fa_pos γp (DfracOwn (1/4)) n ∗ @ghost_var Σ nat fa_pos γp (DfracOwn (1/2)) n
-        ∗ @ghost_var Σ nat fa_pos γp (DfracOwn (1/4)) n.
+        @ghost_var _ Σ nat fa_pos γp (DfracOwn (1/4)) n ∗ @ghost_var _ Σ nat fa_pos γp (DfracOwn (1/2)) n
+        ∗ @ghost_var _ Σ nat fa_pos γp (DfracOwn (1/4)) n.
   Proof using .
     iMod (ghost_var_alloc (ghost_varG0 := fa_pos) n) as (γp) "H".
     set (r := MkFileNames inhabitant inhabitant inhabitant inhabitant
@@ -1329,15 +1329,15 @@ Section sync.
 
   (* ---- the counters, at the machine's instance ---- *)
   Definition sync_cm_auth (c : file_fixed) (k : nat) : iProp Σ :=
-    @mono_nat_auth_own Σ fa_st (ff_cm c) (DfracOwn 1) k.
+    @mono_nat_auth_own _ Σ fa_st (ff_cm c) (DfracOwn 1) k.
   Definition sync_cm_lb (c : file_fixed) (k : nat) : iProp Σ :=
-    @mono_nat_lb_own Σ fa_st (ff_cm c) k.
+    @mono_nat_lb_own _ Σ fa_st (ff_cm c) k.
   Definition sync_st_lb (c : file_fixed) (k : nat) : iProp Σ :=
-    @mono_nat_lb_own Σ fa_st (ff_st c) k.
+    @mono_nat_lb_own _ Σ fa_st (ff_st c) k.
   (* the LOAN's shape: the machine's [start_auth n], at the union's copy of
      its gname ([App.app_born] identifies the two; sync SY3-A3b) *)
   Definition sync_st_auth (c : file_fixed) (n : nat) : iProp Σ :=
-    @mono_nat_auth_own Σ fa_st (ff_st c) (DfracOwn 1) n.
+    @mono_nat_auth_own _ Σ fa_st (ff_st c) (DfracOwn 1) n.
 
   Global Instance sync_cm_lb_persistent c k : Persistent (sync_cm_lb c k).
   Proof using . rewrite /sync_cm_lb. apply _. Qed.

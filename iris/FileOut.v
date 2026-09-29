@@ -803,7 +803,7 @@ Section file_birth.
   Lemma file_birth_all (γst : gname) :
     ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g
         ∗ ghost_map_auth_frac (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) (DfracOwn 1) 0%nat
+        ∗ @mono_nat_auth_own _ Σ fa_st (ff_cm (fgn_cl g)) (DfracOwn 1) 0%nat
         ∗ sl_auth (ff_hist (fgn_cl g)) 1 []
         ∗ run_auth (fgn_cl g) 0.
   Proof using .

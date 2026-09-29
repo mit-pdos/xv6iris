@@ -94,7 +94,7 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
      the client mints the auth with [kmap_alloc] when establishing the
      Bare translation slot *)
-  riscv_pre_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+  riscv_pre_kmapGS :: @ghost_mapG _ Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                         (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   (* the SHARED kernel page table's one-shot agreement (KptGhost.v):
      capacity only -- adequacy mints the UNSET token ([kpt_unset]) and the
@@ -503,12 +503,12 @@ Section power.
           (existT r (register_lookup r (g'.(gregs) c)))) ∗
      ([∗ map] a ↦ b ∈ g'.(gmem),
         pointsto (hG := era_memGS_of HE) a (DfracOwn 1) b) ∗
-     (@ghost_map_auth Σ (SailStdpp.Values.mword 27) _
+     (@ghost_map_auth _ Σ (SailStdpp.Values.mword 27) _
         (@SailStdpp.Instances.Decidable_eq_mword 27)
         (@SailStdpp.Instances.Countable_mword 27) _
         (era_kmap_name HE) (DfracOwn 1) kmap_M0) ∗
      ([∗ map] vpn ↦ pc ∈ kmap_M0,
-        @ghost_map_elem Σ (SailStdpp.Values.mword 27) _
+        @ghost_map_elem _ Σ (SailStdpp.Values.mword 27) _
           (@SailStdpp.Instances.Decidable_eq_mword 27)
           (@SailStdpp.Instances.Countable_mword 27) _
           (era_kmap_name HE) vpn (DfracOwn 1) pc) ∗
@@ -2042,7 +2042,7 @@ Proof.
        (@power_interp Σ F g' ∗ @obs_interp Σ F g' κs')%I),
     [fun _ : mval => True%I],
     (fun _ : mval => True%I),
-    (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
+    (@state_interp_mono _ HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
   iSplitL "Hgauth Hsauth HRauth HtieS HobA HobH".
   { iSplitL "Hgauth Hsauth HRauth HtieS".
