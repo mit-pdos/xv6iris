@@ -10,7 +10,7 @@ Reports every literal it could not classify.
 """
 import re, os, sys, glob, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from amap import OLDPC, NEWPC, amap, R
+from amap import OLDPC, NEWPC, amap, R, D
 from rvdec import decode
 from temps import TEMPS
 from oldfacts import paren_arg
