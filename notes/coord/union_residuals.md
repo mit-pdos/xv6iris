@@ -280,3 +280,10 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   equations (U4 / union top).
 - Deviation: udepwfK carries ⌜uszOk sz⌝ (BitVec lazyFree size); udepwfK_std one-way.
 - open_recv_img (non-_at), open_recv_dimg unported (check reach if needed).
+
+## R-prog (landed Sept 29, except UshCatFStage{Defs,,Sup} which import R-pipes' UshPipesDefs)
+- UshCatFStage* land with R-pipes; they take `UShPipesStageP D E` (R-pipes names; `prod_stage_law` not
+  yet written by R-pipes; `exf_writer` targets concrete ushExecfailLawAt vs E.ush_execfail_law_at).
+- Switch consumers' `HE` hypotheses (UkCatFEntries, UkPipesEntries, UkUnionEntriesDefs) to
+  echoImageEntryEnvC_of_leaves UL / catImageEntryEnvC_holds UL / grepImageEntryEnvC_of_leaves UL.
+- UshExecPinProg/Echo discharged by UshExecPinHolds.
