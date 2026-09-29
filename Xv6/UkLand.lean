@@ -178,13 +178,13 @@ theorem ukFinal_clock {m' : RegMap} {pc' : BitVec 64} {V' : Nat → List (BitVec
   · rw [hf _ (by decide) (by decide) (by decide)]; exact hn
   · rw [hmm]; exact hv
 
-/-- **Every arm's final landing** (by the step): the retire's final shape,
-or a trapped machine at the handler. -/
-theorem uk_land_of_q {m : RegMap} {pc : BitVec 64} {V : Nat → List (BitVec 8)} {m' : RegMap}
-    {pc' : BitVec 64} {V' : Nat → List (BitVec 8)} {Ex : sync_exception → Prop} (st : Step) (s2 : UWSt)
-    (hq : ukQ C P T m pc V (UkPost C P T m' pc' V') Ex st s2) :
+/-- **Every arm's final landing** (by the step): the retire's final shape
+(when the retire predicate is a post shape), or a trapped machine at the
+handler. -/
+theorem uk_land_of_q {m : RegMap} {pc : BitVec 64} {V : Nat → List (BitVec 8)} {Rt : UWSt → Prop}
+    {Ex : sync_exception → Prop} (st : Step) (s2 : UWSt) (hq : ukQ C P T m pc V Rt Ex st s2) :
     ((ucLand st s2).1 = false) ∧
-    (UkFinal C P T m' pc' V' (ucLand st s2).2 ∨
+    ((Rt s2 ∧ (ucLand st s2).2 = ucEpi true s2) ∨
       ∃ sc stv, UkTrapLand C P T m pc V sc stv (ucLand st s2).2 ∧
         (ucLand st s2).2.file .PC = stvecBase C.stvec ∧
         ((∃ i, (i = .I_S_Timer ∨ i = .I_S_External) ∧ sc = sCause i ∧ stv = 0#64) ∨
@@ -193,7 +193,7 @@ theorem uk_land_of_q {m : RegMap} {pc : BitVec 64} {V : Nat → List (BitVec 8)}
   | Step_Execute p =>
     obtain ⟨r, ib⟩ := p
     cases r with
-    | Retire_Success u => cases u; exact ⟨rfl, Or.inl (ukFinal_epi hq)⟩
+    | Retire_Success u => cases u; exact ⟨rfl, Or.inl ⟨hq, rfl⟩⟩
     | Trap x =>
       obtain ⟨pr, exc, pc0⟩ := x
       obtain ⟨hx, ht⟩ := hq

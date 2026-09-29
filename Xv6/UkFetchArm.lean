@@ -38,27 +38,26 @@ retire and trap facts): from every engine machine at `m`, `pc`, `V` with
 or traps at User at `pc` with a payload-free delegable cause admitted by
 `Ex`, landing on an engine machine at `m` and `V`. -/
 def UkExecOut (C : UCfg) (P : UPtd) (T : BMap) (i : instruction) (len : Int) (m : RegMap) (pc : BitVec 64)
-    (V : Nat → List (BitVec 8)) (m' : RegMap) (pc' : BitVec 64) (V' : Nat → List (BitVec 8))
-    (Ex : sync_exception → Prop) : Prop :=
+    (V : Nat → List (BitVec 8)) (Rt : UWSt → Prop) (Ex : sync_exception → Prop) : Prop :=
   ∀ s : UWSt, UkLand C P T s → ukRegs s.file m → s.file .PC = pc → ukView P.um s.mm T = V →
     ∀ orc : UOrc, ∃ (r : ExecutionResult) (s' : UWSt) (orc' : UOrc),
       uxRun ufFoot T orc (ucNpcS s len) (execute i) = some (r, s', orc') ∧
-      ((r = RETIRE_SUCCESS ∧ UkPost C P T m' pc' V' s') ∨
+      ((r = RETIRE_SUCCESS ∧ Rt s') ∨
        (∃ exc : sync_exception, r = .Trap (Privilege.User, exc, pc) ∧ Ex exc ∧ exc.ext = none ∧
           userExc exc.trap = true ∧ UkLand C P T s' ∧ ukRegs s'.file m ∧ ukView P.um s'.mm T = V))
 
 theorem ukExecOut_retire {C : UCfg} {P : UPtd} {T : BMap} {i : instruction} {len : Int} {m m' : RegMap}
     {pc pc' : BitVec 64} {V V' : Nat → List (BitVec 8)} (Ex : sync_exception → Prop)
-    (h : UkExecRetire C P T i len m m' pc pc' V V') : UkExecOut C P T i len m pc V m' pc' V' Ex := by
+    (h : UkExecRetire C P T i len m m' pc pc' V V') :
+    UkExecOut C P T i len m pc V (UkPost C P T m' pc' V') Ex := by
   intro s hl hr hp hv orc
   obtain ⟨s', orc', hw, hpost⟩ := h s hl hr hp hv orc
   exact ⟨_, s', orc', hw, Or.inl ⟨rfl, hpost⟩⟩
 
 theorem ukExecOut_trap {C : UCfg} {P : UPtd} {T : BMap} {i : instruction} {len : Int} {m : RegMap}
-    {pc : BitVec 64} {V : Nat → List (BitVec 8)} {e : ExceptionType} (m' : RegMap) (pc' : BitVec 64)
-    (V' : Nat → List (BitVec 8)) (he : userExc e = true)
+    {pc : BitVec 64} {V : Nat → List (BitVec 8)} {e : ExceptionType} (he : userExc e = true)
     (h : UkExecTrap C P T i len m pc V e) :
-    UkExecOut C P T i len m pc V m' pc' V' (fun exc => exc.trap = e) := by
+    UkExecOut C P T i len m pc V (fun _ => False) (fun exc => exc.trap = e) := by
   intro s hl hr hp hv orc
   obtain ⟨exc, s', orc', hw, ht, hext, hl', hr', -, hv'⟩ := h s hl hr hp hv orc
   exact ⟨_, s', orc', hw, Or.inr ⟨exc, rfl, ht, hext, ht ▸ he, hl', hr', hv'⟩⟩
@@ -177,12 +176,12 @@ execute's outcome, the stamped text riding every arm. -/
 theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap) (K : Nat)
     (m : RegMap) (pc : BitVec 64) (V : Nat → List (BitVec 8)) (s : UWSt) (hop : UkOpened C P T m pc V s)
     (fr : FetchResult) (len : Int) (i : instruction) (hF : UkFetchFact C P T pc V fr) (hdec : UkDecodes fr len i)
-    (m' : RegMap) (pc' : BitVec 64) (V' : Nat → List (BitVec 8)) (Ex : sync_exception → Prop)
-    (hX : UkExecOut C P T i len m pc V m' pc' V' Ex) :
+    (Rt : UWSt → Prop) (hRt : ∀ s', Rt s' → s'.file .hart_state = .HART_ACTIVE ()) (Ex : sync_exception → Prop)
+    (hX : UkExecOut C P T i len m pc V Rt Ex) :
     hwConfig (GF := GF) cpu ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T ⊢
       swp cpu (fetch () >>= ucAfterFetch)
-        (ucArmOb (ufRegF cpu C) (ubFrame curCtx D) (ukQ C P T m pc V (UkPost C P T m' pc' V') Ex)
+        (ucArmOb (ufRegF cpu C) (ubFrame curCtx D) (ukQ C P T m pc V Rt Ex)
           (fun _ _ => uxTextOwn curCtx K (ukTextAddrs P.um) T)) := by
   iintro ⟨#Hhw, #HK, Hfr, HX⟩
   iapply swp_bind
@@ -203,7 +202,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
   have htail : ∀ orc, ∃ (st : Step) (s2 : UWSt) (orc2 : UOrc),
       uxRun ufFoot T orc s1 (ucAfterFetch fr') = some (st, s2, orc2) ∧
       ∃ (r : ExecutionResult) (ib : BitVec 32), st = Step_Execute (r, ib) ∧
-        ((r = RETIRE_SUCCESS ∧ UkPost C P T m' pc' V' s2) ∨
+        ((r = RETIRE_SUCCESS ∧ Rt s2) ∨
          (∃ exc : sync_exception, r = .Trap (Privilege.User, exc, pc) ∧ Ex exc ∧ exc.ext = none ∧
             userExc exc.trap = true ∧ UkLand C P T s2 ∧ ukRegs s2.file m ∧ ukView P.um s2.mm T = V)) := by
     intro orc
@@ -222,7 +221,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
         ((uk_execAs_redirect orc _ i₀ i hexa).trans hw), r, _, rfl, hout⟩
   iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1
     (fun st s2 => ∃ (r : ExecutionResult) (ib : BitVec 32), st = Step_Execute (r, ib) ∧
-        ((r = RETIRE_SUCCESS ∧ UkPost C P T m' pc' V' s2) ∨
+        ((r = RETIRE_SUCCESS ∧ Rt s2) ∨
          (∃ exc : sync_exception, r = .Trap (Privilege.User, exc, pc) ∧ Ex exc ∧ exc.ext = none ∧
             userExc exc.trap = true ∧ UkLand C P T s2 ∧ ukRegs s2.file m ∧ ukView P.um s2.mm T = V)))
     (fun orc => by
@@ -234,9 +233,9 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
   · have e : RETIRE_SUCCESS = ExecutionResult.Retire_Success () := rfl
     rw [e]
     iapply uk_armOb_retire cpu C D (uxTextOwn curCtx K (ukTextAddrs P.um) T)
-      (ukQ C P T m pc V (UkPost C P T m' pc' V') Ex) s2 ib hpost.1.act hpost
+      (ukQ C P T m pc V Rt Ex) s2 ib (hRt s2 hpost) hpost
     iframe
-  · have hq : ukQ C P T m pc V (UkPost C P T m' pc' V') Ex (Step_Execute (.Trap (Privilege.User, exc, pc), ib))
+  · have hq : ukQ C P T m pc V Rt Ex (Step_Execute (.Trap (Privilege.User, exc, pc), ib))
         (ustTrapS s2 (utrapMs 0#1 (s2.file .mstatus)) (utrapScause (.Exception exc.trap) (s2.file .scause))
           (tval exc.excinfo) pc C.stvec) := by
       refine ⟨hx, ?_⟩
