@@ -1360,9 +1360,12 @@ Section KexecAExit.
               with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
-    - left. split_and!; [| reflexivity |].
+    - left. split; [| split].
       + rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
         exact Hmta0.
+      + (* nothing further was lent here: the count row at the block's
+           own record (permit sweep) *)
+        apply ev_rose_refl.
       + destruct Hqf as [c Hc]. exists c. split; [exact Hc | reflexivity].
   Qed.
 
@@ -1946,14 +1949,19 @@ Section KexecCBad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+    (* the block's event counter, lent to the frees (permit sweep L1b) *)
+    iDestruct (proc_priv_ev_lend with "Hpriv") as "[Hlend Hpback]".
     iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc B3 P (K - 68)%nat eb
-              (proc_addr jp) 0%nat eb lks
+              (proc_addr jp) 0%nat eb lks (pv_ev (us_V U))
               ltac:(lia) ltac:(lia) HB3a0
               ltac:(rewrite HB3a1 uint_unsigned; exact Hmax)
               ltac:(rewrite HB3a1; exact Hbelow)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpt Hka").
-    iIntros (CID4 Hsc4 M1) "Hcg Hcnt Hpc %Hcs1".
+              with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
+    iIntros (CID4 Hsc4 M1) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcs1".
+    iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uev) "[%HUev Hpriv]"; [exact Hkl|].
+    iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uev with "Hcont") as "Hcont";
+      [exact HUev|].
     assert (Hpc1de : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXA + 0x1de))
       by (rewrite HB3ra; pcw).
     iEval (rewrite Hpc1de) in "Hpc".
@@ -2219,7 +2227,7 @@ Section KexecCBad.
     iDestruct (cpu_claim_ext_transport CID3 CIDj eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (T.kxc_exit_m1 Q QF (proc_addr jp) gf
- plen pfun na avf alen aslen afun pidv U
+ plen pfun na avf alen aslen afun pidv Uev
               dqb dqs dqa dqpv dqas m B13 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               Hqf ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv

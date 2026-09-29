@@ -481,9 +481,13 @@ Definition wp_sys_chdir_frame
   (* THE IMAGE DOES NOT MOVE (the header): only the descriptor
      grows, so the binders are [(mf, P')] and the block returns at
      [us_upt U P'] -- no [M']. *)
-  ∀ (mf : regfile) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): argstr lends the block's
+         counter to copyinstr, which may step it, so the block comes back
+         at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -496,7 +500,7 @@ Definition wp_sys_chdir_frame
       iref_slots 2 -∗
       (* the armed post on the final process state and the returned a0
          (implies [sys_chdir_post], through [chdir_arms_landed]) *)
-      ARMS (us_upt U P') (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      ARMS (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

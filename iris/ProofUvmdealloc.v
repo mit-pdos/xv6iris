@@ -71,6 +71,7 @@ Require Import SpecUvmunmap.
 Require Import SpecUvmdealloc.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -83,7 +84,7 @@ Import Defs.
 Module UvmdeallocProof (Uvmunmap : UVMUNMAP) : UVMDEALLOC.
 
 Section ProofUvmdealloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -118,7 +119,7 @@ Section ProofUvmdealloc.
   Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
       (mm mj : regfile) (P : uptd) (Res : iProp Σ)
       (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) :
+      (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) (kl : nat) :
     (4 <= K)%nat ->
     (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
     ret_tgt = ret_pc (mm !!! Regidx Rra) ->
@@ -145,6 +146,8 @@ Section ProofUvmdealloc.
     add_vec (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] (mm !!! Regidx Rs1) -∗
     (∃ v, pa_stk (mm !!! Regidx csp_rs1) 4 ↦₈[KT1] v) -∗
+    (* the lend (permit sweep L2), at whatever count the arm left it *)
+    (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k') -∗
     Res -∗
     (* [wp_next]'s OWN implicit "entry hart" argument must be pinned to the
        WHOLE FUNCTION's entry hart [CID] (the section's own, ambient here
@@ -157,6 +160,7 @@ Section ProofUvmdealloc.
       ∀ (mr : regfile),
       sie_cap_gpr KT1 mr K b p -∗
       cpu_own 0%nat eb p b lks -∗
+      (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k') -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ ((uint newsz >= uint oldsz)%Z /\ mr !!! Regidx Ra0 = oldsz)
@@ -168,7 +172,7 @@ Section ProofUvmdealloc.
     intros HK4 Hcross Hrettgt Hjsp Hjs1 Hjthr Hpay.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc Hr24 Hr16 Hr8 Hgape Hpt Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hr24 Hr16 Hr8 Hgape Hlend Hpt Hcont".
     iDestruct "Hgape" as (vgap) "Hgap".
     assert (Hspd4 : pa_stk sp0 4 = spd).
     { rewrite /spd. unfold pa_stk, add_vec_int. apply f_equal.
@@ -329,7 +333,7 @@ Section ProofUvmdealloc.
     iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID6 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! E4 with "Hcg Hcpu Hpc [%] [%] Hpt").
+    iApply ("Hcont" $! E4 with "Hcg Hcpu Hlend Hpc [%] [%] Hpt").
     { unfold callee_saved. split_and!;
         first [ exact HE4sp | exact HE4s0 | exact HE4s1
               | apply HE4thr; vm_compute; first [reflexivity | discriminate] ]. }
@@ -339,14 +343,17 @@ Section ProofUvmdealloc.
   Lemma wp_uvmdealloc_mem_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
-    : wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks.
+      (b : bool) (lks : gset string) (kl : nat)
+    : wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks kl.
   Proof using .
     cbv beta delta [wp_uvmdealloc_mem_sconf_body].
     intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2) in the shape every arm hands back *)
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists kl. iFrame "Hlend". done. }
 
     (* ================================================================= *)
     (* §A  The pure PGROUNDUP arithmetic, once and for all.               *)
@@ -552,10 +559,10 @@ Section ProofUvmdealloc.
       iEval (rewrite Htgt26) in "Hpc".
       iDestruct (cpu_own_transport CID CID7a 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A2 P _ K eb p b oldsz newsz oldsz ret_tgt lks
+      iApply (wp_uvmdealloc_epi mm A2 P _ K eb p b oldsz newsz oldsz ret_tgt lks kl
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA2sp HA2s1 HA2thr
                 ltac:(left; split; [apply Z.le_ge; exact Hge | reflexivity])
-                with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
+                with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hlend Hpt Hcont").
       { iExists _. iExact "Hgap". } }
 
     (* ---- FALLS: newsz < oldsz ---- *)
@@ -863,10 +870,10 @@ Section ProofUvmdealloc.
       iEval (rewrite Hpc26) in "Hpc".
       iDestruct (cpu_own_transport CID CID16 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A10 P _ K eb p b oldsz newsz newsz ret_tgt lks
+      iApply (wp_uvmdealloc_epi mm A10 P _ K eb p b oldsz newsz newsz ret_tgt lks kl
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA10sp HA10s1 HA10thr
                 ltac:(right; split; [exact Hlt | reflexivity])
-                with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
+                with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hlend Hpt Hcont").
       { iExists _. iExact "Hgap". } }
 
     (* ---- TAKEN: PGROUNDUP(newsz) < PGROUNDUP(oldsz) ---- *)
@@ -1113,13 +1120,17 @@ Section ProofUvmdealloc.
       rewrite (pgroundup_live oldsz ltac:(apply z_maxsz_no_wrap; exact Hobz)).
       rewrite (pgroundup_live newsz ltac:(apply z_maxsz_no_wrap; exact Hnbz)).
       lia. }
+    iDestruct "Hlend" as (k0 Hk0) "Hlend".
     iApply (Uvmunmap.wp_uvmunmap_mem_sconf γa B6 P (uint oldsz) (uint newsz) M
-              (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks
+              (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks k0
               ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree
               Hrange Hlvrun
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID24 Hs24 mr) "Hcg Hcpu Hpc %Hcs Hpt".
+    iIntros (CID24 Hs24 mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
+    iDestruct "Hlend" as (k1 Hk1) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists k1. iFrame "Hlend". iPureIntro. lia. }
     assert (Hrszn : uvmd_rsz oldsz newsz = newsz)
       by (apply uvmd_rsz_lt; rewrite -!uint_unsigned; exact Hlt).
     iEval (rewrite HB6a1) in "Hpt".
@@ -1159,10 +1170,10 @@ Section ProofUvmdealloc.
     iEval (rewrite Htgt26') in "Hpc".
     iDestruct (cpu_own_transport CID24 CID25 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (wp_uvmdealloc_epi mm mr P _ K eb p b oldsz newsz newsz ret_tgt lks
+    iApply (wp_uvmdealloc_epi mm mr P _ K eb p b oldsz newsz newsz ret_tgt lks kl
               ltac:(lia) ltac:(wp_next_chain) eq_refl Hmrsp Hmrs1 Hmrthr
               ltac:(right; split; [exact Hlt | reflexivity])
-              with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
+              with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hlend Hpt Hcont").
     { iExists _. iExact "Hgap". }
   Qed.
 

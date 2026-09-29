@@ -244,10 +244,13 @@ Section KexecAUTail.
               Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
-    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid) "Hst2a6 Hcont".
+    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid U2) "%HU2 Hst2a6 Hcont".
+    (* the pointer vector's copyout took the block's counter (permit sweep
+       L1b): phase D runs at the record it came back at *)
+    destruct HU2 as (k2 & Hk2 & ->).
     iApply (PD.kxd_phaseD (CID0 := CIDd) Q QF jp gf
  plen pfun na avf alen aslen afun
-              pidv U eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
+              pidv (upd_usV U (upd_ev (us_V U) k2)) eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef Pd Mid sz1 c
               HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
@@ -328,7 +331,11 @@ Section KexecAUTail.
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
-    iIntros (CID1) "%Hs1". iIntros (M1 P1 Mim1 sz1) "%Hsz1ge Hdisj Hcont".
+    iIntros (CID1) "%Hs1". iIntros (M1 P1 Mim1 sz1 U1) "%HU1 %Hsz1ge Hdisj Hcont".
+    (* phase C's uvmalloc took the block's counter (permit sweep L1b): the
+       rest of the run is at the record it came back at *)
+    destruct HU1 as (k1 & Hk1 & ->).
+    set (Uc := upd_usV U (upd_ev (us_V U) k1)).
     iDestruct "Hdisj" as "[Hloop | Hskip]".
     - rewrite /kxc_at_21a.
       iDestruct "Hloop" as "(%Hq1 & %Hq2 & %Hq3 & %Hq4 & Hrest2)".
@@ -337,9 +344,9 @@ Section KexecAUTail.
         destruct (Nat.eq_dec 0 na) as [Heq | Hne];
           [ exfalso; apply Hnz; rewrite Heq; exact Havf_na | lia ]. }
       iAssert (kxc_at_21a jp gf
- plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+ plen pfun na avf alen aslen afun pidv Uc eb dqb dqs dqa dqpv dqas
                  M1 K sp0 ra0 s00 s10 s20 pv av
-                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) 0)
+                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 (pv_sz (us_V Uc)) sz1 (m !!! Regidx Rs11) 0)
         with "[Hrest2]" as "Hloop".
       { rewrite /kxc_at_21a.
         iSplitR; [iPureIntro; exact Hq1 |].
@@ -349,23 +356,26 @@ Section KexecAUTail.
         iExact "Hrest2". }
       iApply (PC.kxc_argv_loop (CID0 := CID1) Q QF jp gf
  plen pfun na avf alen aslen
-                afun pidv U eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
-                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef (pv_sz (us_V U)) sz1
+                afun pidv Uc eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
+                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef (pv_sz (us_V Uc)) sz1
                 Hqfnm Hqfaf HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
-      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2) "Hst272 Hcont".
+      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2 U2) "%HU2 Hst272 Hcont".
+      (* the argv loop's copyouts took the block's counter (permit sweep
+         L1b): the tail runs at the record it came back at *)
+      destruct HU2 as (k2 & Hk2 & ->).
       iApply (kxc_d_tail (CID0 := CID2) Q QF jp gf
- plen pfun na avf alen aslen afun pidv U eb
+ plen pfun na avf alen aslen afun pidv (upd_usV Uc (upd_ev (us_V Uc) k2)) eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P2 Mim2 sz1 c2
                 (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 with "Htext Hst272 Hcont").
     - iApply (kxc_d_tail (CID0 := CID1) Q QF jp gf
- plen pfun na avf alen aslen afun pidv U eb
+ plen pfun na avf alen aslen afun pidv Uc eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 fb ef P1 Mim1 sz1 0
                 (HQe sz1) Hqfnm Hqfaf HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
@@ -987,11 +997,13 @@ Section KexecAUMain.
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z) "Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z Uz) "%HUz Hst1a2 Hcont".
+      (* proc_pagetable took the block's counter (permit sweep L2) *)
+      destruct HUz as (kz & Hkz & ->).
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
-                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv (upd_usV U (upd_ev (us_V U) kz)) eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz Miz
@@ -1005,7 +1017,7 @@ Section KexecAUMain.
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
-                pidv U eb dqb dqs dqa dqpv dqas m My K
+                pidv (upd_usV U (upd_ev (us_V U) kz)) eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
@@ -1022,14 +1034,15 @@ Section KexecAUMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
-      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil) "Hst12c Hcont".
+      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil Ul) "%HUl Hst12c Hcont".
+      destruct HUl as (kl0 & Hkl0 & ->).
       iApply (PB3.kxc_b2 (CID0 := CIDl)
                 (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl n2
-                plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv (upd_usV U (upd_ev (us_V U) kl0)) eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
@@ -1039,13 +1052,15 @@ Section KexecAUMain.
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
-      iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy) "Hst1ae Hcont".
+      iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy Ub) "%HUb Hst1ae Hcont".
+      (* phase B's uvmallocs took the block's counter (permit sweep L1b) *)
+      destruct HUb as (kb & Hkb & ->).
       iApply (kxc_cd (CID0 := CIDy)
                 (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
                 (kxau_QFp (kxc_fb datl dnf) na alen)
                 jp gf
  plen pfun na avf alen aslen afun
-                pidv U eb dqb dqs dqa dqpv dqas m My K
+                pidv (upd_usV (upd_usV U (upd_ev (us_V U) kl0)) (upd_ev (us_V (upd_usV U (upd_ev (us_V U) kl0))) kb)) eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)

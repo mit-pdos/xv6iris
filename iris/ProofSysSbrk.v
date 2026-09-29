@@ -332,7 +332,7 @@ Section ProofSysSbrk.
     wp_next (CID0 := CID0) b p (fun (CID1 : CpuId) =>
       (* growproc's whole effect on user memory is [p->sz] moving; the
          image equation is [growproc_ok]'s, forwarded on the nose. *)
-      ∀ (Mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)) (szv' rv : mword 64),
+      ∀ (Mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)) (szv' rv : mword 64) (k' : nat),
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
         ⌜Mf !!! Regidx Rs1 = rv⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -342,10 +342,13 @@ Section ProofSysSbrk.
                        (mword_of_int 0 : mword 64) (us_M U) M')
           \/ (rv = (mword_of_int (-1) : mword 64) /\
               P' = pv_upt (us_V U) /\ szv' = pv_sz (us_V U) /\ M' = us_M U) ⌝ -∗
+        (* growproc's event count (permit sweep L1a) *)
+        ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
         sie_cap_gpr KT1 Mf (av - 6)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
-        proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
+        proc_priv γf p pid
+          (upd_usM (upd_usV U (upd_ev (upd_sz (upd_upt (us_V U) P') szv') k')) M') -∗
         ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) nw -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
@@ -407,7 +410,7 @@ Section ProofSysSbrk.
     iApply (Growproc.wp_growproc_sconf γa γf G2 (av - 6)%nat eb p pid U b lks
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv Henv").
-    iIntros (CIDg Hsg mg P' szv' M') "%Hcsg %Hok Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDg Hsg mg P' szv' M' k') "%Hcsg %Hok %Hk' Hcg Hcpu Hpc Hpriv".
     rewrite HG2a0 in Hok.
     assert (Hpc60 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x60))
       by (rewrite HG2ra; apply bv_eq; vm_compute; reflexivity).
@@ -464,13 +467,14 @@ Section ProofSysSbrk.
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct (cpu_own_transport CIDg CIDv 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! X1 P' M' szv' (mword_of_int (-1) : mword 64)
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
+      iApply ("Hcont" $! X1 P' M' szv' (mword_of_int (-1) : mword 64) k'
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
       - rewrite /X1 upd_ne; [exact Hgsp | reg_neq].
       - rewrite /X1 upd_eq. reflexivity.
       - intros r Hr Ncsp N8 N9.
         rewrite /X1 upd_ne; [| congruence]. apply Hthrg; assumption.
-      - right. split; [reflexivity | split; [exact Hp1 | split; [exact Hs1' | exact Hm1']]]. }
+      - right. split; [reflexivity | split; [exact Hp1 | split; [exact Hs1' | exact Hm1']]].
+      - exact Hk'. }
     (* growproc returned 0: fall through to the epilogue with s1 = addr *)
     assert (Hr0 : mg !!! Regidx Ra0 = (mword_of_int 0 : mword 64)).
     { destruct Hok0 as [(H & _) | [(H & _) | (H & _)]]; exact H. }
@@ -489,13 +493,14 @@ Section ProofSysSbrk.
     iEval (rewrite Hpp64) in "Hpc".
     iDestruct (cpu_own_transport CIDg CIDw 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDw with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mg P' M' szv' (pv_sz (us_V U))
-              with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
+    iApply ("Hcont" $! mg P' M' szv' (pv_sz (us_V U)) k'
+              with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hnw").
     - exact Hgsp.
     - exact Hgs1.
     - exact Hthrg.
     - left. split; [reflexivity |].
       rewrite <- Hr0. right. exact Hok0.
+    - exact Hk'.
   Qed.
 
   (* =================================================================== *)
@@ -935,7 +940,8 @@ Section ProofSysSbrk.
        arms reaches +0x64 at a different point in the crossing chain -- and
        carries the chain fact back to [CID] so [Hcont] can be discharged. *)
     iAssert (∀ (CIDx : CpuId) (Mf : regfile) (P' : uptd) (M' : gmap Z (bv 8))
-               (szv' rv : mword 64) (lz' : bool),
+               (szv' rv : mword 64) (lz' : bool) (k' : nat),
+        ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
         ⌜b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)⌝ -∗
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
         ⌜Mf !!! Regidx Rs1 = rv⌝ -∗
@@ -947,11 +953,11 @@ Section ProofSysSbrk.
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid
           (upd_usM (upd_usV U
-                      (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M') -∗
+                      (upd_ev (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz') k')) M') -∗
         (∃ w5 : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5) -∗
         mWP (Loop : expr riscv_lang))%I
       with "[Hcont Hs1 Hs2 Hs3 Hs4 Hs6]" as "EXIT".
-    { iIntros (CIDx Mf P' M' szv' rv lz') "%Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".
+    { iIntros (CIDx Mf P' M' szv' rv lz' k') "%Hk' %Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".
       iDestruct "Hw5" as (w5) "Hs5".
       iApply (ss_tail (CID0 := CIDx) m Mf av b p rv sp0 ra0 s00 s10 u4 w5 u6
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hfsp Hfs1 Hfthr
@@ -959,9 +965,10 @@ Section ProofSysSbrk.
       iIntros (CIDy Hqy mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' szv' lz' M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
+      iApply ("Hcont" $! mf P' szv' lz' M' k' with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
-      { rewrite Hmfa0. exact Hok. } }
+      { rewrite Hmfa0. exact Hok. }
+      { exact Hk'. } }
     (* ================================================================= *)
     (*  +0x2a  beq a4,a5 : t == SBRK_EAGER ?                              *)
     (* ================================================================= *)
@@ -991,9 +998,10 @@ Section ProofSysSbrk.
       iApply (ss_eager (CID0 := CIDs16) γa γf m D3 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD3sp HD3s0 HD3s1 HthrD3
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
-      iIntros (CIDe Hqe Mf P' M' szv' rv) "%Hfsp %Hfs1 %Hfthr %Hres Hcg Hcpu Hpc Hpriv Hs5lo".
-      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U))
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      iIntros (CIDe Hqe Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
+      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U)) k'
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      - exact Hk'.
       - wp_next_chain.
       - exact Hfsp.
       - exact Hfs1.
@@ -1083,9 +1091,10 @@ Section ProofSysSbrk.
       iApply (ss_eager (CID0 := CIDs19) γa γf m D4 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD4sp HD4s0 HD4s1 HthrD4
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
-      iIntros (CIDe Hqe Mf P' M' szv' rv) "%Hfsp %Hfs1 %Hfthr %Hres Hcg Hcpu Hpc Hpriv Hs5lo".
-      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U))
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      iIntros (CIDe Hqe Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
+      iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U)) k'
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      - exact Hk'.
       - wp_next_chain.
       - exact Hfsp.
       - exact Hfs1.
@@ -1249,8 +1258,9 @@ Section ProofSysSbrk.
                     | exact Hlz0 |].
       iDestruct (cpu_own_transport CIDD CIDs27 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply ("EXIT" $! CIDs27 Y1 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U))
-                (mword_of_int (-1) : mword 64) (pv_lazy (us_V U))
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+                (mword_of_int (-1) : mword 64) (pv_lazy (us_V U)) (pv_ev (us_V U))
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+      - exact (le_n _).
       - wp_next_chain.
       - rewrite /Y1 upd_ne; [exact HL4sp | reg_neq].
       - rewrite /Y1 upd_eq. reflexivity.
@@ -1475,8 +1485,9 @@ Section ProofSysSbrk.
     iDestruct (cpu_own_transport CIDE CIDs35 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply ("EXIT" $! CIDs35 E3 (pv_upt (us_V U))
               (umem_grow (us_M U) (uint (add_vec (pv_sz (us_V U)) (sbrk_arg v0))))
-              (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) (pv_sz (us_V U)) true
-              with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+              (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) (pv_sz (us_V U)) true (pv_ev (us_V U))
+              with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
+    - exact (le_n _).
     - wp_next_chain.
     - exact HE3sp.
     - exact HE3s1.

@@ -61,6 +61,7 @@ Require Import ProcInv.
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import SpecFreeproc.
+Require Import SlotGen.   (* [act_lend] *)
 Require Import PidLock.   (* freeproc now takes <pid_lock> *)
 Require Import SpecRelease.
 Require Import CodeKfork.
@@ -122,7 +123,7 @@ Section KforkB1Proof.
       (V : pprivate) (g : gname) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
-      (pme : mword 64) (eb b : bool) (lvl : nat) (lks : gset string) :
+      (pme : mword 64) (eb b : bool) (lvl : nat) (lks : gset string) (kev : nat) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (* a real slot -- freeproc's pid store wants it (SpecFreeproc) *)
@@ -196,19 +197,23 @@ Section KforkB1Proof.
     pid_reg_rest pid g -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
     fp_tf (proc_addr j) (Some (ud_tfp P, ws)) -∗
+    (* the forking process's event counter, lent to freeproc (permit sweep
+       L1b): the actor of the undone slot's release is the parent *)
+    act_lend pme kev -∗
     wp_next (match lvl with O => eb | S _ => false end) pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr KT1 mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
         cpu_own lvl eb pme (match lvl with O => eb | S _ => false end) lks -∗
+        (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k') -∗
         kalloc_env_at γa γk None -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros HK Hlvl Hj Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfprow Hfpxb Hfpsg Hfppr Hfppt Hfptf Hcont".
+              Hheld Hhaa #Hislock #Hpidlk #Henv Hfprest Hfprow Hfpxb Hfpsg Hfppr Hfppt Hfptf Hlend Hcont".
     (* freeproc is stated at the ANONYMOUS bundle ([kalloc_env], count
        existentially quantified), so hand it the projection; both forms are
        persistent at [None], so "Henv" survives for our own postcondition. *)
@@ -247,12 +252,12 @@ Section KforkB1Proof.
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
     iApply (FP.wp_freeproc_sconf γp γa T1 j γl V g pid USED ch (Some P) (Some (ud_tfp P, ws))
-              (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
+              (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks) kev
               ltac:(pose proof (kfkb1_K44 K HK); lia) Hj (kfkb1_lvlS lvl Hlvl) HT1a0
-              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfprow Hfpsg Hfppr Hfpxb Hfppt Hfptf Henvb").
+              with "Hcg Hcpu Htext Hpc Hpidlk Hheld Hfprest Hfprow Hfpsg Hfppr Hfpxb Hfppt Hfptf Henvb Hlend").
     all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
+    iIntros (mfp) "Hcg Hcpu Hlend Hpc %Hcsfp Hheld Hdorm".
     assert (Hp82 : ret_pc (T1 !!! Regidx Rra) = mword_of_int (KF + 0x82))
       by (rewrite HT1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp82) in "Hpc".
@@ -422,7 +427,7 @@ Section KforkB1Proof.
                 (match lvl with O => eb | S _ => false end)
                 ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mf with "[%] Hcg Hpc Hcpu Henv"). exact Hpost.
+    iApply ("Hcont" $! mf with "[%] Hcg Hpc Hcpu Hlend Henv"). exact Hpost.
   Qed.
 
 End KforkB1Proof.

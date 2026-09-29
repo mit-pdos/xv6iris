@@ -22,11 +22,12 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [wchG]: mappages' lend, the permit sweep L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 
 
-Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
@@ -60,6 +61,10 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   (exists nb, on = Some nb /\ (pt_missing t vpn0 npages < nb)%nat) ->
   (* order premise at the lowest rank this cone reaches: kvmmap -> mappages
      -> walk -> kalloc ("kmem", 13). *)
+  (* THE BOOT HART HAS NO CURRENT PROC (permit sweep L2): the kernel page
+     table is built at [c->proc = 0], so mappages' lend is the left
+     disjunct ([SlotGen.act_lend_zero]) -- the boot lends nothing. *)
+  p = (zero_reg : mword 64) ->
   locks_below lks "kmem" ->
   sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
@@ -84,7 +89,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmap_sconf_body γa γk mm t m npages perm lvl K eb p on b lks.
 End KVMMAP.

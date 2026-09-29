@@ -276,7 +276,7 @@ Definition wp_consolewrite_sconf_body
      caller's own payload at that count. ---- *)
   cons_out_chain (S gen_id) (us_M U) uaddr Q 0%nat (Z.to_nat n) -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (r : Z) (P' : uptd),
+  ∀ (mf : regfile) (r : Z) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
@@ -296,10 +296,13 @@ Definition wp_consolewrite_sconf_body
          ~ uva_rmapped (pv_upt (us_V U))
              (uint (add_vec_int uaddr (Z.of_nat d)))⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the loop lends the block's counter to either_copyin, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv_core pj pid (us_upt U P') -∗
+      proc_priv_core pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       (* THE RECEIPT, at the returned count: [r] bytes accepted, in order,
          after the seed, AND THEY ARE THE BYTES AT [a1] in the image the
          caller lent (RULING A).  Persistent -- the caller keeps it forever.

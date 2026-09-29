@@ -45,6 +45,7 @@ Require Import PipeQueue.   (* [pipe_cpay] / [pipe_cpost]: the close step of the
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Import Defs.
@@ -58,7 +59,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
     (b : bool) (lks : gset string)
     (* THE CLOSER'S PAYLOAD (design/pipe.md, "The byte queue"): what its
        close link hands back once the ghost flag of end [w] is cleared *)
-    (Φ : iProp Σ) :=
+    (Φ : iProp Σ) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipeclose in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -96,12 +97,15 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   (* kfree's resources: the kmem lock and the page count *)
   is_lock γkl klk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk kfl) -∗
   kalloc_avail γk on -∗
+  (* THE LEND (permit sweep L1b): the caller's event counter, for kfree *)
+  act_lend pme k -∗
   (* wakeup's *)
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
     sie_cap_gpr KT1 mr av b pme -∗
     cpu_own n eb pme b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* the page came back iff this was the LAST reference; the caller cannot
@@ -119,6 +123,6 @@ Module Type PIPECLOSE.
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
-      (b : bool) (lks : gset string) (Φ : iProp Σ),
-      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks Φ.
+      (b : bool) (lks : gset string) (Φ : iProp Σ) (k : nat),
+      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks Φ k.
 End PIPECLOSE.

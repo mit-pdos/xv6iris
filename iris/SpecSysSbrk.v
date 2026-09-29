@@ -173,16 +173,20 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (* sys_sbrk's whole effect on user memory is [p->sz] moving, on either
        path; see [sys_sbrk_ok]'s header. *)
   ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (lz' : bool)
-      (M' : gmap Z (bv 8)),
+      (M' : gmap Z (bv 8)) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok (us_V U) v0 v1 P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5)) lz' (us_M U) M'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1a): the eager path's growproc
+         lends the block's counter to uvmalloc, so the block comes back at
+         a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid
         (upd_usM (upd_usV U
-                    (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz')) M') -∗
+                    (upd_ev (upd_lazy (upd_sz (upd_upt (us_V U) P') szv') lz') k')) M') -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

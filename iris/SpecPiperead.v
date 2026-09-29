@@ -153,7 +153,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
      the pipe, which no contract at this tier can name: the ring's contents
      are the existential half of [PipeInvDefs]'s invariant and the loop sleeps
      inside the read. *)
-  ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+  ∀ (mf : regfile) (P' : uptd) (d : nat) (bs : nat -> bv 8) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
@@ -168,6 +168,9 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
            = (mword_of_int (-1) : mword 64) /\ d = 0%nat)
         \/ mf !!! Regidx (mword_of_int 10 : mword 5)
            = (mword_of_int (Z.of_nat d) : mword 64) ⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the copy loop lends the block's counter to copyout, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
@@ -186,7 +189,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
       pipe_rpost (pv_upt (us_V U)) (pn_queue γp) addr Q Qe (kill_shot (pv_gen (us_V U)) ∗ app_taint)%I
         (Z.to_nat n) d bs (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       proc_priv_core pj pid
-        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) addr d bs)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

@@ -529,11 +529,15 @@ Section ProofSysOpenWalk.
                                            Hpbare".
       iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf ns with "[%] [%] Hcg Hown Htce Hcce Hpc
+      (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+      iSpecialize ("Hcont" $! mf ns (pv_ev (us_V U))).
+      iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+      iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbsl Hisl
                 [Hpriv Hfds Hfrag Hdead Hoc Htc]").
       { exact Hcsf. }
       { unfold sys_open_slots, create_slots in *. lia. }
+      { lia. }
       { (* ARM B-FAIL: the walk died at some hop, so NOTHING was observed
            and both commits come home beside the era refund. *)
         iApply (so_arm_dead omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _
@@ -787,13 +791,14 @@ Section ProofSysOpenWalk.
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
-        iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
+        iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
-        { unfold sys_open_slots, create_slots in *. lia. } }
+        { unfold sys_open_slots, create_slots in *. lia. }
+        { exact Hk2. } }
       (* THE PERMIT, PAID: the walk's terminal cursor keys the piece at the
          inode namei reached, and what the arms keep of the cursor is
          [SpecSysOpen.cur_kept]. *)
@@ -882,13 +887,14 @@ Section ProofSysOpenWalk.
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
-        iEval (rewrite /so_cont_au). iIntros (mf ns2) "%Hcsf %Hns2".
+        iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf ns2 k2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hsbn Hsbi Hsbs Hsbb Hbsl Hisl Hpost").
         { exact Hcsf. }
-        { unfold sys_open_slots, create_slots in *. lia. } }
+        { unfold sys_open_slots, create_slots in *. lia. }
+        { exact Hk2. } }
       (* a DIRECTORY at O_RDONLY, so the device arm is unreachable and the
          major bound is vacuous *)
       (* THE PERMIT, PAID: the walk's terminal cursor keys the piece at the
@@ -964,10 +970,14 @@ Section ProofSysOpenWalk.
     assert (Hnsc : (1 + (ns - 1))%nat = ns) by lia.
     iEval (rewrite Hnsc) in "Hisl".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf ns with "[%] [%] Hcg Hown Htce Hcce Hpc
+    (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+    iSpecialize ("Hcont" $! mf ns (pv_ev (us_V U))).
+    iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+    iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
               Hsbn Hsbi Hsbs Hsbb Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
     { exact Hcsf. }
     { unfold sys_open_slots, create_slots in *. lia. }
+    { lia. }
     { (* ARM C-FAIL: a directory opened for writing.  The observation HAS
          fired -- this refusal is inside the child's lock window. *)
       iDestruct (plain_trunc_key (fs_gamma_L fsc_fs) vom (bview plen bp) P

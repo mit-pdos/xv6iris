@@ -153,13 +153,16 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
        it either ([SpecCopyin.wp_copyin_sconf_mem] is same-[M]).  Only the
        DESCRIPTOR grows, and the block comes back at the image it was
        handed. *)
-    ∀ (mf : regfile) (P' : uptd),
+    ∀ (mf : regfile) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): fetchaddr lends the block's counter to copyin, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (us_upt U P') -∗
+      proc_priv γf p pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       fetchaddr_post (us_M U) ip oldv addr (pv_sz (us_V U))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗

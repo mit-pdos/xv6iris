@@ -219,6 +219,7 @@ Section ProofSysFork.
                     Hpchrow").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & Hrv)".
+    iDestruct "Hpriv" as (kev) "[%Hkev Hpriv]".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
@@ -325,7 +326,7 @@ Section ProofSysFork.
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
     iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Hpfrag Henv [Hrv]").
+    iApply ("Hcont" $! E10 kev with "[%] Hcg Hcpu Hpc [%] Hpriv Hpfrag Henv [Hrv]").
     - unfold callee_saved.
       split_and!.
       + exact HE10csp.
@@ -341,6 +342,8 @@ Section ProofSysFork.
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
       + apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - (* the parent's event count only rose (permit sweep L1b) *)
+      exact Hkev.
     - (* the return value's two arms, relayed VERBATIM -- the pid arm
          carries the child token now, so this is a resource and no longer a
          pure fact ([SpecKfork.kfork_post]). *)

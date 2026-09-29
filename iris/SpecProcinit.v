@@ -208,17 +208,20 @@ Section ProcinitSeals.
     (* ...AND THE SLOT'S GENERATION WHOLE, on the row's route
        ([SlotGen.slot_gen], minted with the rows) *)
     slot_gen (proc_addr i) (DfracOwn 1) g -∗
+    (* ...AND THE SLOT'S EVENT COUNTER at 0, on the same route
+       ([SlotGen.act_cnt], design ni-strong-instance.md §7) *)
+    act_cnt (proc_addr i) 0 -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
     proc_lock_res γs γl (proc_addr i).
   Proof using .
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst Hrow Hsg".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst Hrow Hsg Hev".
     iFrame "Hlk Hks".
     rewrite /proc_lock_res /proc_lock_res_at.
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
     change (proc_slots_at γs cur_ctx (proc_addr i) UNUSED) with (proc_slots γs (proc_addr i) UNUSED).
-    iApply (proc_slots_unused_intro with "[Hdorm Hkst Hrow Hsg] Hpark").
-    iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg").
+    iApply (proc_slots_unused_intro with "[Hdorm Hkst Hrow Hsg Hev] Hpark").
+    iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg Hev").
   Qed.
 
 End ProcinitSeals.
@@ -272,7 +275,8 @@ Section ProcinitProcsInv.
      (* ...AND THE SLOT'S GENERATION WHOLE, on the row's own route and for
         its reason ([SlotGen.slot_gen], minted with the rows). *)
      (∃ γ0 g : gname,
-        ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g) ∗
+        ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g ∗
+        act_cnt (proc_addr i) 0) ∗
      hart_at_any (proc_addr i) ∗
      pstate_lock (proc_addr i) UNUSED ∗
      (* the slot's kernel stack, still spelled at [kstack_va i] because
@@ -285,13 +289,14 @@ Section ProcinitProcsInv.
     hart_at_any (proc_addr i) -∗ pstate_lock (proc_addr i) UNUSED -∗
     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV -∗
     ch_frag γ0 (proc_addr i) ∅ -∗ slot_gen (proc_addr i) (DfracOwn 1) g -∗
+    act_cnt (proc_addr i) 0 -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof using .
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk Hrow Hsg".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hstk Hrow Hsg Hev".
     iFrame "Hks Hst Hpub Hdorm Hpark Hg Hstk".
-    iSplitR "Hrow Hsg"; [iExists ch; iExact "Hch" |].
-    iExists γ0, g. iFrame "Hrow Hsg".
+    iSplitR "Hrow Hsg Hev"; [iExists ch; iExact "Hch" |].
+    iExists γ0, g. iFrame "Hrow Hsg Hev".
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -352,7 +357,8 @@ Section ProcinitProcsInv.
        pstate_full i UNUSED) -∗
     ([∗ list] i ∈ seq 0 NPROC,
        ∃ γ0 g : gname,
-         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g) -∗
+         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g ∗
+         act_cnt (proc_addr i) 0) -∗
     kstack_bank -∗
     own_context cur_ctx
     ={E}=∗ own_context cur_ctx ∗ ∃ γs : list gname, procs_inv γs.
@@ -371,13 +377,14 @@ Section ProcinitProcsInv.
                               stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV) ∗
                               (∃ γ0 g : gname,
                                  ch_frag γ0 (proc_addr i) ∅ ∗
-                                 slot_gen (proc_addr i) (DfracOwn 1) g))%I)
+                                 slot_gen (proc_addr i) (DfracOwn 1) g ∗
+                                 act_cnt (proc_addr i) 0))%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "[[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk] (%γ0 & %g & Hrow & Hsg)]".
+    { iIntros "!>" (k i Hk) "[[(((Hrdy & Hch & Hpub) & Hpark) & Hg) Hstk] (%γ0 & %g & Hrow & Hsg & Hev)]".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk Hrow Hsg").
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg] Hstk Hrow Hsg Hev").
       { iApply (hart_at_any_intro k (0%fin : CPU) Hlt with "Hpark"). }
       (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
       rewrite /pstate_lock unclaimed_UNUSED.
@@ -402,7 +409,7 @@ Section ProcinitProcsInv.
                   (proc_lock_pay γs g (proc_addr i)) ∗
                 ∃ ks : mword 64, is_kstack (proc_addr i) ks))%I as "Hstep".
     { iApply big_sepL_intro.
-      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & (%γ0 & %gg & Hrow & Hsg) & Hpark & Hg & Hstk)]".
+      iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & (%γ0 & %gg & Hrow & Hsg & Hev) & Hpark & Hg & Hstk)]".
       iMod (ctx_word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       (* THE DEPOSIT: the persisted cell is [is_kstack], and with the words
@@ -411,12 +418,12 @@ Section ProcinitProcsInv.
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
       iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
-              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hrow Hsg Hpark Hkst]") as "[Hrun #Hlk]".
+              with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hrow Hsg Hev Hpark Hkst]") as "[Hrun #Hlk]".
       { apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
-                  with "Hst Hg Hch Hpub [Hdorm Hrow Hsg Hpark Hkst]").
-        iApply (proc_slots_unused_intro with "[Hdorm Hrow Hsg Hkst] Hpark").
-        iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg"). }
+                  with "Hst Hg Hch Hpub [Hdorm Hrow Hsg Hev Hpark Hkst]").
+        iApply (proc_slots_unused_intro with "[Hdorm Hrow Hsg Hev Hkst] Hpark").
+        iApply (proc_dormant_prestk_seal with "Hdorm Hkst Hrow Hsg Hev"). }
       iModIntro. iFrame "Hrun Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd_thread E (own_context cur_ctx)
             with "Hrun Hstep Hmk") as "[Hrun Hmk]".

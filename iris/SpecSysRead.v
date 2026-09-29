@@ -483,7 +483,8 @@ Definition wp_sys_read_sconf_body
      existential.  A caller that wants its own untouched bytes back reads
      them with [UserPtTree.umem_wr_lookup_out], exactly as a caller of
      fileread does. *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8)
+      (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
@@ -495,10 +496,13 @@ Definition wp_sys_read_sconf_body
       ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
        \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): fileread lends the block's counter to a copy, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
+      proc_priv γf pj pidv (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) v1 d bs)) -∗
       fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  fileread's own postcondition returns the

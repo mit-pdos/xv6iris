@@ -32,6 +32,7 @@ Require Import SpecWalk.
 Require Import SpecMappages.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Set Printing Depth 40.
@@ -40,7 +41,7 @@ Local Open Scope Z_scope.
 Module MappagesProof (Walk : WALK) : MAPPAGES.
 
 Section ProofMappages.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -1160,12 +1161,29 @@ Section ProofMappages.
                     Hptree Henv Hcont").
   Qed.
 
+  (* THE LEND, FRAMED THROUGH (permit sweep L2): the walk inside does not
+     take it yet, so it is handed back at entry's count.
+     [SlotGen.act_lend_cont_frame] for a continuation with four binders. *)
+  Lemma act_lend_cont_frame4 {R1 R2 R3 R4 : Type}
+      (b0 : bool) (p0 p' : mword 64) (k : nat)
+      (A B C : CpuId -> R1 -> R2 -> R3 -> R4 -> iProp Σ) :
+    wp_next b0 p0 (fun CID => ∀ (x : R1) (y : R2) (z : R3) (w : R4),
+       A CID x y z w -∗ B CID x y z w -∗
+       (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p' k') -∗ C CID x y z w) -∗
+    act_lend p' k -∗
+    wp_next b0 p0 (fun CID => ∀ (x : R1) (y : R2) (z : R3) (w : R4),
+       A CID x y z w -∗ B CID x y z w -∗ C CID x y z w).
+  Proof using .
+    iIntros "H Hl" (CID0 Hs x y z w) "HA HB".
+    iApply ("H" $! CID0 Hs x y z w with "HA HB"). iExists k. iFrame "Hl". done.
+  Qed.
+
   Lemma wp_mappages_sconf
       (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_mappages_sconf_body kt γa γk mm t m npages perm lvl K eb p on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_mappages_sconf_body kt γa γk mm t m npages perm lvl K eb p on b lks kl.
   Proof using .
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1177,7 +1195,10 @@ Section ProofMappages.
     assert (Hsp1 : W1 !!! Regidx csp_rs1 = pa_stk (mm !!! Regidx csp_rs1) 10).
     { rewrite /W1 upd_eq. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hlend Hcont".
+    (* the lend (permit sweep L2), framed through: no callee takes it yet *)
+    iDestruct (act_lend_cont_frame4 with "Hcont Hlend") as "Hcont".
+    iEval (cbv beta) in "Hcont".
     pose proof (bv_unsigned_in_range _ va) as Hvarange.
     unfold bv_modulus in Hvarange.
     change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64)) with 18446744073709551616 in Hvarange.

@@ -118,8 +118,12 @@ Section SpecEitherCopyin.
         [SpecCopyin.wp_copyin_sconf_mem] relays that).  What grows is the
         DESCRIPTOR, and only that: the block comes back at the image it
         was handed. *)
-          (∃ P' : uptd,
-             ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (us_upt U P')) ∗
+          (∃ (P' : uptd) (k' : nat),
+             ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗
+             (* THE EVENT COUNTER (permit sweep L1b): the block's counter is
+                lent to copyin, which may step it *)
+             ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗
+             proc_priv_core p pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P')) ∗
           (∃ dst_new : nat -> bv 8,
              (* THE CONTENT SEAM, guarded by the SUCCESS exit: byte [j] of
                 the destination IS the byte the process has at user va

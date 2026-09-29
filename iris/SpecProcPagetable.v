@@ -23,6 +23,7 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import ProcPt.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 
@@ -95,8 +96,8 @@ Definition ppt_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID 
    ERROR TAILS -- which the counted premise makes unreachable.  The bound is
    charged anyway: a stack budget is a property of the code, not of the path
    a particular caller proves it takes. *)
-Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -112,10 +113,14 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env_at γa γk on -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
     ptree_own 2 (DfracOwn 1) t -∗
@@ -134,8 +139,8 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
    is stated at an ARBITRARY [on] -- including [None], which is where
    allocproc's own failure tails (and anything else outside the counted
    regime) have to call it. *)
-Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -150,10 +155,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env_at γa γk on -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
     ppt_post γa γk on tfp (mr !!! Regidx (mword_of_int 10)) -∗
@@ -163,14 +172,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type PROC_PAGETABLE_GEN.
   Parameter wp_proc_pagetable_core :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks.
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat),
+      wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks k.
 End PROC_PAGETABLE_GEN.
 
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks.
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (k : nat),
+      wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks k.
 End PROC_PAGETABLE.

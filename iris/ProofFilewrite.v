@@ -1922,7 +1922,10 @@ Section ProofFilewrite.
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     (* the ROUND'S image: writei's user arm faults pages in, so the block
        comes back at a fresh one and [MI] is carried like [PI]. *)
-    forall (W : nat) (iz t : Z) (p : nat) (PI : uptd) (M : regfile),
+    (* ...AND THE ROUND'S EVENT COUNT (permit sweep L1b): writei lends the
+       block's counter to either_copyin, so each round hands the block back
+       at a count no lower, and [kI] is carried like [PI]. *)
+    forall (W : nat) (iz t : Z) (p : nat) (PI : uptd) (M : regfile) (kI : nat),
     (n - iz <= Z.of_nat W)%Z ->
     (0 <= iz < n)%Z ->
     (* AU EDIT (difference 2): THE ENTRY TIE.  [t] bytes have been FIRED in
@@ -1934,6 +1937,7 @@ Section ProofFilewrite.
     t = iz ->
     t = (SysWriteDefs.FW_MAX * Z.of_nat p)%Z ->
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
+    (pv_ev (us_V U) <= kI)%nat ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
     M !!! Regidx Rs2 = fnode kx ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
@@ -1972,7 +1976,7 @@ Section ProofFilewrite.
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
     ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     file_ref gf kx qx stx -∗
-    proc_priv_core pj pidv (us_upt U PI) -∗
+    proc_priv_core pj pidv (us_upt (upd_usV U (upd_ev (us_V U) kI)) PI) -∗
     KvmSpec.kalloc_env fsc_kalloc None -∗
     (* THE DESCRIPTOR'S OFFSET ROW IS NOT A HYPOTHESIS ANY MORE (lane
        OFF-LINK-5): at mode park it rides inside the carrier as
@@ -2016,17 +2020,18 @@ Section ProofFilewrite.
     wp_next true pj (fun (CID : CpuId) =>
       (* the image moves: writei writes user memory -- verbatim from
          [SpecFilewrite]'s ∃-weakened post, so the two spellings match *)
-      ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+      ∀ (mf : regfile) (r : mword 64) (P' : uptd) (k' : nat),
         ⌜callee_saved m mf⌝ -∗
         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
         (* AU EDIT: [⌜filewrite_ret n r⌝] is GONE -- each arm of
            [write_arms_at] pins [r], so the landed blanket is implied. *)
         ⌜mf !!! Regidx Ra0 = r⌝ -∗
+        ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
         sie_cap_gpr KT1 mf K b pj -∗
         cpu_own 0%nat eb pj b lks -∗
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
         file_ref gf kx qx stx -∗
-        proc_priv_core pj pidv (us_upt U P') -∗
+        proc_priv_core pj pidv (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
         filewrite_env_out fn stx -∗
         write_arms_at (fs_gamma_L fsc_fs) nx γx (pv_upt (us_V U)) n (us_M U)
           (m !!! Regidx Ra1) Q r -∗
@@ -2042,7 +2047,7 @@ Section ProofFilewrite.
     subst pj.
     intro W. revert CID0.
     induction W as [| W IH];
-      intros CID0 iz t p PI M Hfuel Hiz Htiz Hmul Hext
+      intros CID0 iz t p PI M kI Hfuel Hiz Htiz Hmul Hext HkI
              HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr Hbelow.
     { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
          least one and the zero case is vacuous. *)
@@ -2052,6 +2057,8 @@ Section ProofFilewrite.
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hclaimsfw #Hescs #Hireg
              #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hau Hcont".
+    (* the block at this round's count (permit sweep L1b) *)
+    set (UI := upd_usV U (upd_ev (us_V U) kI)).
     (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
        The loop reads [f->type] and [f->writable] off the field cells, so it
        needs equations about the [fcontent] the reference carries -- but not
@@ -2256,14 +2263,14 @@ Section ProofFilewrite.
     assert (HD1cs : forall r : mword 5, is_cs_idx r = true ->
               D1 !!! Regidx r = B0 !!! Regidx r).
     { intros r Hr. rewrite /D1 upd_ne; [reflexivity | regne]. }
-    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (us_upt U PI) with "Hpriv")
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (us_upt UI PI) with "Hpriv")
       as "[Hppid Hpbk1]".
    iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fsc_bio) icfg_log
               fsc_fs fsc_cov fsc_logst icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb b
-              _ (us_upt U PI) (fw_av_begin_op K HK) Hjp Hgsj
+              _ (us_upt UI PI) (fw_av_begin_op K HK) Hjp Hgsj
               Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hlog Hppid Hprocs").
     all: try lkbelow.
@@ -2337,7 +2344,7 @@ Section ProofFilewrite.
     iDestruct "Hshr" as "[Hshrk Hshrl]".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
-    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (us_upt U PI) with "Hpriv")
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (us_upt UI PI) with "Hpriv")
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2353,7 +2360,7 @@ Section ProofFilewrite.
  ik (sh / 2)%Qp g lox tlx (ShotK ty)
  inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
-              D3 (K - 12)%nat eb b lks (us_upt U PI)
+              D3 (K - 12)%nat eb b lks (us_upt UI PI)
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
               ltac:(rewrite HD3a0; exact P8)
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
@@ -2608,7 +2615,7 @@ Section ProofFilewrite.
               bml datal dnl dnl
               true (Z.to_nat (bv_unsigned v)) (Z.to_nat c)
               (fun _ => (mword_of_int 0 : mword 8))
-              (us_upt U PI) MAXOPBLOCKS SbF
+              (us_upt UI PI) MAXOPBLOCKS SbF
               pidv (DfracOwn 1) (DfracOwn (1/2)) (DfracOwn (1/2))
               (fwn_dqs fn) (fwn_dqb fn) (fwn_dqbs fn)
               Q6 (K - 12)%nat eb b lks
@@ -2650,6 +2657,16 @@ Section ProofFilewrite.
        %HSbsub %Hwi16p %Hwi16sp %Hwi16at %Hupt
        Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb
        Hdnat Hpriv Hbsl HlogS".
+    (* writei's user arm: the block at the count it came back at, restated
+       at this walk's spelling (permit sweep L1b) *)
+    iDestruct "Hpriv" as (kw) "[%Hkw Hpriv]".
+    change (kI <= kw)%nat in Hkw.
+    assert (Hkw2 : (pv_ev (us_V U) <= kw)%nat) by (clear -HkI Hkw; lia).
+    set (UW := upd_usV U (upd_ev (us_V U) kw)).
+    iAssert (proc_priv_core (proc_addr jx) pidv
+               (upd_usV UW (upd_upt (upd_upt (us_V UW) PI) P')))%I
+      with "[Hpriv]" as "Hpriv".
+    { iExact "Hpriv". }
     assert (Hpca4 : ret_pc (Q6 !!! Regidx Rra) = mword_of_int (FW + 0xac)).
     { rewrite HQ6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca4) in "Hpc".
@@ -3321,7 +3338,7 @@ Section ProofFilewrite.
     { rewrite /X2 upd_ne; [| vm_compute; discriminate].
       rewrite /X1 upd_ne; [exact HX0s1 | vm_compute; discriminate]. }
     iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv
-                 (upd_usV U (upd_upt (upd_upt (us_V U) PI) P')) with "Hpriv") as "[Hppid Hpbk3]".
+                 (upd_usV UW (upd_upt (upd_upt (us_V UW) PI) P')) with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_tx_sconf gs
@@ -3329,7 +3346,7 @@ Section ProofFilewrite.
               ik (sh / 2)%Qp g lox tlx icfg_dev
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) b lks
-              (upd_usV U (upd_upt (upd_upt (us_V U) PI) P')) (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
+              (upd_usV UW (upd_upt (upd_upt (us_V UW) PI) P')) (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
               (* iunlock's bound is "sleep lock"(6); fw_loop's own is
                  "log"(3), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -3389,14 +3406,14 @@ Section ProofFilewrite.
     assert (HX3s1 : X3 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite /X3 upd_ne; [exact Hius1 | vm_compute; discriminate]).
     iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv
-                 (upd_usV U (upd_upt (upd_upt (us_V U) PI) P')) with "Hpriv") as "[Hppid Hpbk4]".
+                 (upd_usV UW (upd_upt (upd_upt (us_V UW) PI) P')) with "Hpriv") as "[Hppid Hpbk4]".
     iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jx glp (fsc_uart) (fsc_disk)
               (fsc_dlock) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fsc_bio) icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev n'
-              pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks (upd_usV U (upd_upt (upd_upt (us_V U) PI) P'))
+              pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks (upd_usV UW (upd_upt (upd_upt (us_V UW) PI) P'))
               (fw_av_end_op K HK) P1 Hjp Hgsj
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hcrash Hgc
@@ -3440,7 +3457,7 @@ Section ProofFilewrite.
     { rewrite /filewrite_fs_out.
       iFrame "Hsbi Hsbsz Hsbb Hbsl". }
     (* the page-table descriptor, re-based on the contract's own [V] *)
-    iEval (rewrite (fw_upd_upt_upd (us_V U) PI P')) in "Hpriv".
+    iEval (rewrite (fw_upd_upt_upd (us_V UW) PI P')) in "Hpriv".
     assert (Hupt2 : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P').
     { apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U)) PI P'); [exact Hext |].
       rewrite -(fw_pv_upt_upd (us_V U) PI). exact Hupt. }
@@ -3560,11 +3577,12 @@ Section ProofFilewrite.
         iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mfin rv P'
-                  with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
+        iApply ("Hcont" $! mfin rv P' kw
+                  with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
         { exact Hcsf. }
         { exact Hupt2. }
         { exact Hrv. }
+        { exact Hkw2. }
         { iApply (fw_env_out_fs fn stx Cf inumx _ _ _ Hokx Htyi). iExact "Hout". }
         { (* THE ARMS, AT THE EXHAUSTED EXIT.  The chunk that reached it was
              FULL ([Hcrz]), so it FIRED, so [tf = t + c = iz + c = n]: this
@@ -3630,9 +3648,9 @@ Section ProofFilewrite.
         { destruct Hfire as [(_ & _ & _ & E4) | [(_ & _ & _ & E4) | (_ & _ & E3 & _)]];
             [exfalso; zlia E4 Hcrz Hcrange | exfalso; zlia E4 Hcrz | exact E3]. }
         subst xf.
-        iApply (IH CIDc3 (iz + c)%Z tf pf P' Y1
+        iApply (IH CIDc3 (iz + c)%Z tf pf P' Y1 kw
                   Hfuel2 Hiz2 Htiz2 Hmul2
-                  Hupt2
+                  Hupt2 Hkw2
                   HY1sp
                   ltac:(rewrite (HY1cs Rs2 ltac:(vm_compute; reflexivity)
                                   ltac:(vm_compute; discriminate)
@@ -3703,11 +3721,12 @@ Section ProofFilewrite.
       iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mfin rv P'
-                with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
+      iApply ("Hcont" $! mfin rv P' kw
+                with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout] [Hau]").
       { exact Hcsf. }
       { exact Hupt2. }
       { exact Hrv. }
+      { exact Hkw2. }
       { iApply (fw_env_out_fs fn stx Cf inumx _ _ _ Hokx Htyi). iExact "Hout". }
       { rewrite /write_arms_at. iRight.
         iSplitR; [iPureIntro; exact Hrvm1 |].
@@ -3838,17 +3857,18 @@ Section ProofFilewrite.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
       assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
-      iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt (us_V U))
-                with "[%] [%] [%] Hcg Hcnt [Hpc]
+      iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
+                with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv] []").
       { exact Hcs1. }
       { apply uptd_ext_sz_refl. }
       { exact HA1a0. }
+      { lia. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-      { rewrite HVid. iExact "Hpriv". }
+      { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
       { by iApply filewrite_env_out_of_env. }
       { (* THE ARMED POST at the [f->writable == 0] exit: the landed
            blanket, and NO arm -- every armed arm of [filewrite_extra] is a
@@ -4058,17 +4078,18 @@ Section ProofFilewrite.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
-        iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                  with "[%] [%] [%] Hcg Hcnt [Hpc]
+        iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
+                  with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv] [Hfin]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
         { exact Hrv. }
+        { lia. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-        { rewrite HVid. iExact "Hpriv". }
+        { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
         { by iApply filewrite_env_out_of_env. }
         { (* THE SIGN GUARD'S EXIT, before the type dispatch: every arm at
              once ([SpecFilewrite.filewrite_extra_neg]).  At [n < 0] the
@@ -4270,8 +4291,8 @@ Section ProofFilewrite.
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpay Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HP2a0). iExact "Hpipe". }
-        iIntros (CIDpw Hspw mf P')
-          "%Hcspw %Hupt %Hretpw Hcg Hcnt Hpc Hpref Hwpost Hpriv".
+        iIntros (CIDpw Hspw mf P' kpw)
+          "%Hcspw %Hupt %Hretpw %Hkpw Hcg Hcnt Hpc Hpref Hwpost Hpriv".
         assert (Hpc5a : ret_pc (P2 !!! Regidx Rra) = mword_of_int (FW + 0x62)).
         { rewrite HP2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc5a) in "Hpc".
@@ -4312,13 +4333,14 @@ Section ProofFilewrite.
         iDestruct (cpu_own_transport CIDpw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
-                  with "[%] [%] [%] Hcg Hcnt [Hpc]
+        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' kpw
+                  with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
                         Hpriv [Henv] [Hwpost]").
         { exact Hcsf. }
         { exact Hupt. }
         { exact Hrv. }
+        { exact Hkpw. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields /file_pay_st.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
@@ -4635,17 +4657,18 @@ Section ProofFilewrite.
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
-                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                          with "[%] [%] [%] Hcg Hcnt [Hpc]
+                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
+                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot] []").
                 { exact Hcsf. }
                 { apply uptd_ext_sz_refl. }
                 { exact Hrv. }
+                { lia. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                { rewrite HVid. iExact "Hpriv". }
+                { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
                 { iApply (fw_env_out_dev fn st Cf inumx _ _ _ Hok Htyd).
                   iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk Hupin").
                   by left. }
@@ -4769,8 +4792,8 @@ Section ProofFilewrite.
                 (* consolewrite copies FROM user memory, so its post hands
                    the block back at a fresh image -- and the CALLER'S OWN
                    CURSOR at the count it pushed (lane OUT-FUPD). *)
-                iIntros (CIDcw Hscw mf r P')
-                  "%Hcscw %Hupt %Hrr %Hshort %Hra0 Hcg Hcnt Hpc Hpriv Hrcpt".
+                iIntros (CIDcw Hscw mf r P' kcw)
+                  "%Hcscw %Hupt %Hrr %Hshort %Hra0 %Hkcw Hcg Hcnt Hpc Hpriv Hrcpt".
                 (* the short-write reason arrives at the CALLEE's register
                    file; [HE2a1] is the same buffer this contract names *)
                 rewrite HE2a1 in Hshort.
@@ -4814,13 +4837,14 @@ Section ProofFilewrite.
                 iDestruct (cpu_own_transport CIDcw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                iApply ("Hcont" $! mfin (mword_of_int r) P'
-                          with "[%] [%] [%] Hcg Hcnt [Hpc]
+                iApply ("Hcont" $! mfin (mword_of_int r) P' kcw
+                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv [Hslot] [Hrcpt]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hrv. }
+                { exact Hkcw. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -4909,17 +4933,18 @@ Section ProofFilewrite.
                           with "Hcnt") as "Hcnt".
              iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
              assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
-             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U))
-                       with "[%] [%] [%] Hcg Hcnt [Hpc]
+             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (pv_ev (us_V U))
+                       with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv] []").
              { exact Hcsf. }
              { apply uptd_ext_sz_refl. }
              { exact Hrv. }
+             { lia. }
              { iEval (rewrite /ret_tgt). iExact "Hpc". }
              { rewrite /file_ref /file_fields.
                iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-             { rewrite HVid. iExact "Hpriv". }
+             { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
              { by iApply (fw_env_out_dev fn st Cf inumx _ _ _ Hok Htyd). }
              { rewrite /filewrite_arms.
                iSplitR; [iPureIntro; apply filewrite_ret_m1 |].
@@ -5116,17 +5141,18 @@ Section ProofFilewrite.
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                  iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                  assert (HVid : us_upt U (pv_upt (us_V U)) = U) by (apply us_upt_id).
-                 iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt (us_V U))
-                           with "[%] [%] [%] Hcg Hcnt [Hpc]
+                 iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt (us_V U)) (pv_ev (us_V U))
+                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] [Henv] [Hfin]").
                  { exact Hcsf. }
                  { apply uptd_ext_sz_refl. }
                  { exact Hrv. }
+                 { lia. }
                  { iEval (rewrite /ret_tgt). iExact "Hpc". }
                  { rewrite /file_ref /file_fields.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                 { rewrite HVid. iExact "Hpriv". }
+                 { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
                  { by iApply filewrite_env_out_of_env. }
                  { (* THE ZERO TRIP.  [n = 0], so the write is complete
                       before it starts: no chunks ([wchunks 0 = 0]), the
@@ -5532,12 +5558,13 @@ Section ProofFilewrite.
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Hstx Hspm
                            ltac:(reflexivity)
                            E1 E2 E3 E4 E5
-                           (Z.to_nat n) 0%Z 0%Z 0%nat (pv_upt (us_V U)) L7
+                           (Z.to_nat n) 0%Z 0%Z 0%nat (pv_upt (us_V U)) L7 (pv_ev (us_V U))
                            ltac:(rewrite (Z2Nat.id n Hn0); lia)
                            ltac:(lia)
                            ltac:(lia)
                            ltac:(lia)
                            ltac:(apply uptd_ext_sz_refl)
+                           ltac:(lia)
                            HL7sp HL7s2 HL7s4 HL7s5 HL7s6 HL7s7 HL7s8 HL7s9
                            ltac:(intros r Hr A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11;
                                  exact (HL7thr r Hr A1 A2 A4 A6 A7 A8 A9 A10 A11))
@@ -5550,7 +5577,7 @@ Section ProofFilewrite.
                                  E22 E23 E24 E21 [E18 E19 E20 E25] [Hfin]").
                  { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                 { rewrite HVid. iExact "Hpriv". }
+                 { rewrite upd_ev_id upd_usV_id HVid. iExact "Hpriv". }
                  { rewrite /filewrite_fs_out.
                    iFrame "E18 E19 E20 E25". }
                  { (* the chain, at the loop's entry state, beside the row
@@ -5563,15 +5590,16 @@ Section ProofFilewrite.
                    iApply (filewrite_in_inode_any rx omfx (bv_unsigned inumx) γox n
                              (us_M U) uaddr Q Qe with "[Hfin]").
                    rewrite Hstx. iExact "Hfin". }
-                 iIntros (CIDx Hsx mf rv P')
-                   "%Hcs %Hup %Hra Hcg Hcnt Hpc Href Hpriv Henvo Harms".
+                 iIntros (CIDx Hsx mf rv P' kx')
+                   "%Hcs %Hup %Hra %Hkx' Hcg Hcnt Hpc Href Hpriv Henvo Harms".
                  iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
-                 iApply ("Hcont" $! mf rv P'
-                           with "[%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo
+                 iApply ("Hcont" $! mf rv P' kx'
+                           with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo
                                  [Harms]").
                  { exact Hcs. }
                  { exact Hup. }
                  { exact Hra. }
+                 { exact Hkx'. }
                  { (* the loop hands back [write_arms_at]; the contract's
                       post is that under the landed blanket, which each arm
                       implies ([write_arms_at_ret] -- an [as %] destruct, so

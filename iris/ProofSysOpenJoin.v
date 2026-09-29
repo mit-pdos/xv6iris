@@ -508,10 +508,14 @@ Section ProofSysOpenJoin.
       iDestruct (iref_slots_combine nsj 1 with "Hisl Hislot") as "Hisl".
       replace (nsj + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
+      (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+      iSpecialize ("Hcont" $! mf (S nsj) (pv_ev (us_V U))).
+      iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+      iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
+      { lia. }
       { iApply (so_arm_fail omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }

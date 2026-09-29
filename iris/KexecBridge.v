@@ -100,7 +100,7 @@ Lemma exec_kexec_ok_q_fail (Q : mword 64 -> Prop) (V V' : pprivate)
     (r entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) :
   r = (mword_of_int (-1) : mword 64) -> V' = V ->
   kexec_ok_q Q V V' r entry spv szv' na alen.
-Proof. intros Hr Hv. by left. Qed.
+Proof. intros Hr ->. left. split; [exact Hr | apply ev_rose_refl]. Qed.
 
 (* ===================================================================== *)
 (*  2.  THE CLOSER                                                        *)

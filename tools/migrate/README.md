@@ -44,7 +44,12 @@ tools/migrate/migrate.sh iris/MyNew.v     # in place; once
 What it does NOT do, and what you will fix by hand (the patterns seen on the whole tree, in
 `claude-notes/durable-notes.md` "Build" and the fork's notes): section variables Rocq now counts
 as used → `clear V.` at the proof start (never add them to `Proof using`: that changes the closed
-statement); proof-mode instance resolution needing an explicit `(KTR := …)`/`(CID := …)`; `iFrame`
+statement); proof-mode instance resolution needing an explicit `(KTR := …)`/`(CID := …)` -- Iris master
+resolves a lemma's unconstrained instance evar EAGERLY to the newest instance in context, where
+Iris 4.4 left it for the `with "H"` unification to fill, so `iDestruct (lem … with "H")` fails with
+`iSpecialize: cannot instantiate` on two terms that print identically; name the OUTER instance,
+the one `H` is stated at (`Set Printing Implicit. Show.` tells which), not the one an `iIntros (CID1 …)`
+just introduced (2026-09-29: `kexec_closer_after_next (CID0 := CID0)`, `kfork_cont_ev (CIDa := CID0)`); `iFrame`
 of a persistent hypothesis now frames every occurrence and fails where it made no progress;
 dfrac validity (`rewrite dfrac_op_own dfrac_valid_own in H`); stdpp's `set_to_map` takes the value
 function. None of these change a statement.

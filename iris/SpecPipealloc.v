@@ -220,15 +220,18 @@ Definition wp_pipealloc_sconf_body
      return on another hart; the cost is the CALLER's, which must supply its
      continuation hart-generically. *)
   wp_next true p (fun (CID : CpuId) =>
-    ∀ mr,
+    ∀ mr (k' : nat),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
+    (* THE EVENT COUNTER (permit sweep L1b): the error paths lend the block's counter to fileclose, which may step it,
+       so the block comes back at a count at least the one it left at *)
+    ⌜(pv_ev (us_V Upr) <= k')%nat⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    proc_priv_bare p pidv Upr -∗
+    proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')) -∗
     iref_slot -∗
     mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).

@@ -97,6 +97,7 @@ Require Import SpecIsmapped SpecKalloc SpecMemsetPage SpecMappages SpecKfree.
 Require Import SpecVmfault.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -145,7 +146,7 @@ Module VmfaultProof (Ismapped : ISMAPPED) (Kalloc : KALLOC)
   : VMFAULT.
 
 Section ProofVmfault.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -179,13 +180,16 @@ Section ProofVmfault.
   Lemma wp_vmfault_sconf_mem
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
-      (p : mword 64) (b : bool) (lks : gset string)
-    : wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks.
+      (p : mword 64) (b : bool) (lks : gset string) (kl : nat)
+    : wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks kl.
   Proof using .
     cbv beta delta [wp_vmfault_sconf_mem_body].
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hlend Hcont".
+    (* the lend (permit sweep L2) in the shape every arm hands back *)
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists kl. iFrame "Hlend". done. }
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     set (spr := add_vec (mm !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -364,6 +368,7 @@ Section ProofVmfault.
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr KT1 mj (K - 6)%nat b p -∗
         cpu_own lvl eb p b lks -∗
+        (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k') -∗
         pc_is (mword_of_int (KernelSyms.vmfault + 0x10) : mword 64) -∗
         (∃ w3 w4 w5 : mword 64,
            pa_stk sp0 3 ↦₈[KT1] w3 ∗ pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
@@ -371,7 +376,7 @@ Section ProofVmfault.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hk1 Hk2 Hk6]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDe Hbe mj res) "(%Hjsp & %Hjs4 & %Hjthr) Hcg Hcnt Hpc Hjunk Hpost".
+      iIntros (CIDe Hbe mj res) "(%Hjsp & %Hjs4 & %Hjthr) Hcg Hcnt Hlend Hpc Hjunk Hpost".
       iDestruct "Hjunk" as (w3 w4 w5) "(Hk3 & Hk4 & Hk5)".
       (* +0x10 c.mv a0,s4 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.vmfault + 0x10)) Ra0 Rs4
@@ -502,7 +507,7 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport CIDe Eret lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! Eret with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] [Hpost]").
+      iApply ("Hcont" $! E4 with "Hcg Hcnt Hlend Hpc [%] [Hpost]").
       2:{ rewrite /PAY. rewrite HE4a0.
           iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".
           - iLeft. iSplitR; [iPureIntro; exact Hz | iExact "Hp"].
@@ -543,7 +548,7 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport CID C10 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10 with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! R3 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
+      iApply ("Hepi" $! R3 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
       { split_and!.
         - exact HR3sp.
         - exact HR3s4.
@@ -966,7 +971,7 @@ Section ProofVmfault.
         iDestruct (cpu_own_transport Ckr C10A lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10A with "[%]"); [wp_next_chain|].
-        iApply ("Hepi" $! B3 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
+        iApply ("Hepi" $! B3 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
         { split_and!.
           - rewrite /B3. rewrite upd_ne; [exact HB2sp | reg_neq].
           - rewrite /B3. rewrite upd_ne; [| reg_neq].
@@ -1299,13 +1304,17 @@ Section ProofVmfault.
          exactly the int-range fact their kalloc needs. *)
       iDestruct (cpu_own_transport Ckr Cmg lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
+      iDestruct "Hlend" as (kl0 Hkl0) "Hlend".
       iApply (Mappages.wp_mappages_sconf KT1 γa γk G6 t m_ad 1%nat 22 lvl (K - 6)%nat
-                eb p None b _
+                eb p None b _ kl0
                 Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh
-                with "Hcg Hcnt Htext Hpc Hptree Henv2").
+                with "Hcg Hcnt Htext Hpc Hptree Henv2 Hlend").
       all: try lkbelow.
-      iIntros (Cgr Hsgr mg t' k g) "Hcg Hcnt Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
+      iIntros (Cgr Hsgr mg t' k g) "Hcg Hcnt Hlend Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
+      iDestruct "Hlend" as (kl1 Hkl1) "Hlend".
+      iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+      { iExists kl1. iFrame "Hlend". iPureIntro. lia. }
       rewrite HG6a1 in Hrep'. rewrite HG6a3 in Hrep'.
       assert (Hret5a : ret_pc (G6 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x5a)).
       { rewrite HG6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1430,7 +1439,7 @@ Section ProofVmfault.
         iDestruct (cpu_own_transport Cgr C10B lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10B with "[%]"); [wp_next_chain|].
-        iApply ("Hepi" $! S3 r with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
+        iApply ("Hepi" $! S3 r with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
         { split_and!.
           - rewrite /S3. rewrite upd_ne; [exact HS2sp | reg_neq].
           - rewrite /S3. rewrite upd_ne; [| reg_neq].
@@ -1618,7 +1627,7 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport Cfr C10C lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10C with "[%]"); [wp_next_chain|].
-      iApply ("Hepi" $! F6 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
+      iApply ("Hepi" $! F6 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
       { split_and!.
         - rewrite /F6. rewrite upd_ne; [exact HF5sp | reg_neq].
         - rewrite /F6. rewrite upd_ne; [| reg_neq].
@@ -1701,7 +1710,7 @@ Section ProofVmfault.
     iDestruct (cpu_own_transport CID C10D lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hepi" $! C10D with "[%]"); [wp_next_chain|].
-    iApply ("Hepi" $! D2 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
+    iApply ("Hepi" $! D2 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
     { split_and!.
       - rewrite /D2. rewrite upd_ne; [exact HD1sp | reg_neq].
       - rewrite /D2. rewrite upd_ne; [| reg_neq].

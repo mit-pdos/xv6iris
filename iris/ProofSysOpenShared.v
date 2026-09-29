@@ -298,9 +298,12 @@ Section ProofSysOpenShared.
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
-      (∀ (mf : regfile) (ns' : nat),
+      (∀ (mf : regfile) (ns' : nat) (k' : nat),
          ⌜callee_saved m mf⌝ -∗
          ⌜ns' = S nsj⌝ -∗
+         (* the block at a raised count: a failing arm's fileclose lends
+            its counter to pipeclose (permit sweep L1b) *)
+         ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
          sie_cap_gpr KT1 mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
          trap_csrs_ext KT1 eb -∗
@@ -312,7 +315,7 @@ Section ProofSysOpenShared.
          iref_slots ns' -∗
          open_arms_plain omo (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
-           P Pmiss Fo Ft sts U (mf !!! Regidx Ra0 : mword 64) -∗
+           P Pmiss Fo Ft sts (upd_usV U (upd_ev (us_V U) k')) (mf !!! Regidx Ra0 : mword 64) -∗
          mWP (Loop : expr riscv_lang))%I.
 
   Definition so_cont0_au `{GEN : GenId}
@@ -328,9 +331,12 @@ Section ProofSysOpenShared.
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string)
       : CpuId -> iProp Σ :=
     fun (CIDx : CpuId) =>
-      (∀ (mf : regfile) (ns' : nat),
+      (∀ (mf : regfile) (ns' : nat) (k' : nat),
          ⌜callee_saved m mf⌝ -∗
          ⌜ns' = ns⌝ -∗
+         (* the block at a raised count: a failing arm's fileclose lends
+            its counter to pipeclose (permit sweep L1b) *)
+         ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
          sie_cap_gpr KT1 mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
          trap_csrs_ext KT1 eb -∗
@@ -344,7 +350,7 @@ Section ProofSysOpenShared.
          iref_slots ns' -∗
          open_arms_plain omo (fs_gamma_L fsc_fs) fsc_fs (pv_cwi (us_V U)) gf pj pidv
            Mim pvv vom
-           P Pmiss Fo Ft sts U (mf !!! Regidx Ra0 : mword 64) -∗
+           P Pmiss Fo Ft sts (upd_usV U (upd_ev (us_V U) k')) (mf !!! Regidx Ra0 : mword 64) -∗
          mWP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)

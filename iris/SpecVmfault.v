@@ -65,6 +65,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import CtxIdDefs.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
@@ -95,10 +96,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* way; [ProcPtOwn.proc_pt_ptm] IS the equivalence and derives one back  *)
 (* in five lines.                                                        *)
 (* ===================================================================== *)
-Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
-    (p : mword 64) (b : bool) (lks : gset string) :=
+    (p : mword 64) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   let va := mm !!! Regidx (mword_of_int 12) in
   let va0 : mword 64 := and_vec va (mword_of_int (-4096)) in
@@ -116,10 +117,14 @@ Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   pc_is pcE -∗
   proc_ptm P (uint szv) M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗
@@ -135,9 +140,9 @@ Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
-      (p : mword 64) (b : bool) (lks : gset string),
-      wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks.
+      (p : mword 64) (b : bool) (lks : gset string) (k : nat),
+      wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks k.
 End VMFAULT.

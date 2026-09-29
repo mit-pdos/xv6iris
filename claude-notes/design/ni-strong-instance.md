@@ -241,3 +241,144 @@ of the ledger.
 - **R4 land now**: `vmfault_quiet` (pure, ~30 lines, `SpecVmfault`-side
   or a new `VmfaultQuiet.v`) and the functor inventory check
   (recommended, both) — or neither until P.
+
+## 7. The permit sweep, as planned (2026-09-29; owner: "go ahead")
+
+Re-read against the tree after M1 closed.  Three changes from §3:
+
+- **The permit is a COUNTER, exclusive, per slot, with no authority and
+  no tie.**  §3 tied `act_permit pa k` to a per-actor count in the
+  allocator ledger.  With four ledgers that tie would need a shared
+  authority opened under three different locks.  It is not needed for
+  the theorem: what the rows state is the DELTA (`ev' = ev` on the quiet
+  arms), and what the theorem needs is that every labelled append
+  consumes the actor's counter.  So `act_cnt pa k := own wact_name
+  {[pa := to_dfrac_agree (DfracOwn 1) k]}` (the `slot_gen` camera shape,
+  `gmapUR addr (dfrac_agreeR natO)` at a new `wchG` name), stepped by its
+  holder, born at 0 for the 64 slots in `children_boot_rows`, parked in
+  the dormant block, carried by `proc_priv_core` as `act_cnt pa (pv_ev
+  V)` — `pv_ev : nat` a new last field of `pprivate` (precedent
+  `pv_lazy`; 29 `MkPPriv` spellings), so the kernel-tier row relation
+  can name it.  The count's meaning ("appends made with this permit")
+  is by construction, like the labels.
+- **The lend** `act_lend (p : mword 64) (k : nat) := ⌜p = zero_reg⌝ ∨
+  act_cnt p k`, in and out of every contract on the cone; kalloc's and
+  kfree's led forms take it and step it; the pid and zombie appends
+  (allocproc, freeproc, kexit, kwait) take it too, so one permit covers
+  every actor-labelled event.  The boot chains pass the left disjunct.
+- **TOP-DOWN layering keeps the tree green at every landing.**  A
+  callee cannot gain the premise before its callers supply it, but a
+  caller can gain it and merely frame it through callees that do not
+  take it yet.  So the order is: **G** the ground (this addendum's
+  ghost, field and block homes; additive); **L1** usertrap's three
+  allocating arms lend the block's counter (through
+  `ProcInv.proc_priv_ev_acc`) to `syscall`, `vmfault` and `kexit`;
+  **L2** the dispatcher and the sixteen `sys_*` entries; **L3** the
+  process/VM layer (kfork, kexec, kexit, kwait, growproc, allocproc,
+  freeproc, proc_pagetable/freepagetable, uvm*, freewalk, mappages,
+  walk, vmfault); **L4** the copy layer; **L5** the fs/file layer;
+  **L6** kalloc/kfree and the four ledger appends REQUIRE it, the
+  token-free led forms are deleted, the landed `wp_kalloc_sconf` /
+  `wp_kfree_sconf` survive only with the premise `p = zero_reg` for the
+  seven boot contracts; **T** the theorem: `uround_ok` and `ut_round`
+  gain `ev ev'` with `ev' = ev` on the non-ecall rows (discharged by
+  framing, by `vmfault_quiet` at lazy = false, and by kexit's own
+  append being the one exception the statement names), and
+  `ut_round_quiet` as the in-logic strong instance.  Each layer is one
+  Opus task plus the gate and audits; L2-L5 are mechanical threading.
+- **The statement's exception.**  A quiet process that is KILLED exits
+  in its own context and appends `ZExit A`.  The strong instance is
+  therefore stated for a quiet process that is not killed, or with the
+  exit counted as the killer's; `kkill` has no event yet.  The plan
+  states the former and leaves the `Kill` event to M3's no-kill
+  corollary.
+
+### 7.1 G as landed (2026-09-29, 9fb1d089c)
+
+18 files, +331 / -115.  As planned, with three adjustments the attempt
+found: (i) `proc_dormant_nofd` / `_prestk` (procinit's outputs) cannot
+hold the counter — it is born in main's `children_boot_rows`, after
+procinit — so it follows the generation's route: the two seals take
+`act_cnt pa 0` as a premise and write `upd_ev _ 0` into the block, and
+`SpecProcinit.procs_inv_alloc`'s boot big-sep spells the counter (a
+boot-side helper, not a `wp_*` contract); (ii) the DEFICIT block
+carries it too (`proc_priv_nocwd`, `proc_priv_nopt`; `proc_priv_intro`
+/ `_nocwd_intro` take it; `proc_priv_nocwd_bare`'s shape changed, two
+callers touched), so allocproc's post and kexit's ZOMBIE park need no
+statement change; (iii) `SpecFreeproc.fp_rest` carries it back to the
+slot.  The four files outside the plan's list that destructure the
+changed shapes: `ProofKforkParts`, `ProofForkret`, `PipeKillMark`,
+`ProofKexit`.  Gate 882 files, 0 errors; audits 13/13/14.  Next: L1.
+
+### 7.2 L1a as landed (2026-09-29, f344a089a) — and the sweep's real footprint
+
+The attempt found the sweep smaller than §3 counted, for one reason:
+the fs and syscall contracts (`namex`, `dirlookup`, `fileclose`,
+`pipealloc`, `readi`, `writei`, `fileread`, `piperead`, the `either_copy*`
+pair, …) already take the block — `proc_priv`, `_core` or `_bare` —
+IN AND OUT.  With the counter moved into `proc_priv_bare` (G': the bare
+block is unfolded in exactly one file), it travels with every form of
+the block, so those contracts need no lend premise at all.  The lend
+has to be threaded only through the BLOCK-LESS layers: the VM and copy
+functions (`uvmalloc`, `uvmdealloc`, `uvmcopy`, `uvmcreate`, the four
+`uvmunmap`s, `uvmfree`, `freewalk`, `walk`, `mappages`,
+`proc_pagetable`, `proc_freepagetable`, `vmfault`, `copyin`, `copyout`,
+`copyinstr`, `pipeclose`; `allocproc` and `freeproc` for the caller's
+counter), then `kalloc`/`kfree` and the ledger appends: about 22
+contracts in three rings, 15 of which also gain the `wchG` binder, plus
+the block-holders' posts at the ring's top, which expose the raised
+count (`∀ k' ≥ pv_ev`, the record at `upd_ev`) — the growproc pattern.
+
+L1a (48 files, +1089 / -385): G'; `act_lend` and its four lemmas; ring
+one (`uvmalloc`, `uvmcopy`, `proc_freepagetable`, `allocproc`,
+`freeproc`, all forms); the block-holders above them — `growproc` /
+`sys_sbrk`, kfork's parent block / `sys_fork`, `kwait` / `sys_wait`,
+and `kexec`'s failure arm (`kexec_ok`/`_q`/`_qf`, `exec_arms`,
+`sys_exec_arms`: `V' = upd_ev V k'` with `pv_ev V ≤ k'`, the
+intermediate phases at an abstract record bounded by `ev_after`);
+`SpecSyscall` untouched (∀-general).  Boot: `userinit` takes `pj =
+zero_reg` (main supplies it).  Forced extras: `SpecHoldingsleep` gains
+the binder (the bare block now names the counter).  Clean gate from
+scratch 1759/0; audits 13/13/14.  Next: L1b, the copy ring (`copyin`,
+`copyout`, `copyinstr`, `pipeclose`) and its block-holding callers
+(`either_copy*`, `fetchaddr/str`, `argstr`, `filestat`, `piperead`,
+`pipewrite`, `sys_pipe`, `kwait`, `kexec`, `fileclose`); then L2 the
+inner VM ring (`vmfault`, `uvmdealloc`, `proc_pagetable`, `uvmfree`,
+`uvmunmap`, `mappages`); L3 `walk`, `freewalk`, `uvmcreate`, `kalloc`,
+`kfree` and the appends; T.
+
+### 7.3 L1b as landed (2026-09-29, b69bd0fab)
+
+The copy ring and every block-holding chain above it: 84 files, +1958
+/ -1094 (31 Spec, 51 Proof, `ProcInv`, `FsSyscalls`).  Two findings:
+(i) `readi`/`writei` lend only on their USER arm (the kernel arm copies
+through no user page), so the name-lookup chain — `dirlookup`,
+`dirlink`, unlink's walk, kexec's reads — needed nothing; (ii) the
+posts cascade as one component through the file layer up to the
+sixteen syscall entries, all of which now expose the raised count, and
+the dispatcher (`SpecSyscall`, ∀-general) absorbs it internally.  Boot
+untouched.  Clean gate from scratch 1759/0; audits 13/13/14.  What
+remains of the sweep: L2 the inner VM ring (`vmfault` and the fault
+arm, `uvmdealloc`, `proc_pagetable`, `uvmfree`, the four `uvmunmap`s,
+`mappages`) — every caller of it is lend-aware now; L3 `walk`,
+`freewalk`, `uvmcreate`, `kalloc`/`kfree` and the four ledger appends
+requiring the lend, the token-free led forms deleted, the boot chains
+at `p = 0`; T the rows and the theorem.
+
+### 7.4 L2 as landed (2026-09-29, 78f9234b8)
+
+The inner VM ring (32 files, +707 / -451): `vmfault`, `uvmdealloc`,
+`proc_pagetable` (both forms), `uvmfree`, the four `uvmunmap`s and
+`mappages` take the lend; the fault arm lends the block's counter to
+vmfault and closes at `upd_ev` (`wp_usertrap` unchanged — its post
+quantifies the record and `uround_ok` does not name `pv_ev`); the boot
+chain `kvmmap`/`kvmmake`/`proc_mapstacks`/`kvminit` takes `p = zero_reg`
+from main; kexec's phase B outputs at `ev_after`.  Clean gate from
+scratch 1759/0; audits 13/13/14.  What remains: L3 — `walk` (the
+allocating form), `freewalk`, `uvmcreate`, `kalloc`/`kfree`'s led forms
+and the four ledger appends REQUIRING the permit and stepping it, the
+token-free `wp_kalloc_sconf`/`wp_kfree_sconf` deleted (every site holds
+a lend or runs at `p = 0`: `kinit`, `freerange`, `virtio_disk_init` take
+the boot premise), `wp_ap_pidsec`, freeproc's and kwait's appends, and
+kexit's exit append from its own block; then T.
+

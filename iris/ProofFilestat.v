@@ -110,6 +110,7 @@ Require Import SpecFilestat.
 Require Import CodeFilestat ProofFilestatParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import SlotGen.   (* [act_lend_borrow]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import CtxIdDefs.
@@ -1102,7 +1103,9 @@ Section ProofFilestat.
       (* THE BORROW STAYS AT THE LAZY VIEW: tier 3 calls copyout's
           MEMORY-INDEXED contract, which NAMES the window it writes, so the
           image never goes anonymous. *)
-      iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+      iDestruct (proc_priv_core_copy_ev with "Hpriv") as "(Hszc & Hptc & Hpt & Hev & Hpback)".
+      (* the lend (permit sweep L1b): the block's counter, borrowed for copyout *)
+      iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
       (* +0x42 ld a1,72(s2) -- a1 := p->sz, copyout's NEW [psz] argument.
          The two cells are read HERE and nowhere else: the contract itself no
          longer mentions [p_sz] / [p_pagetable] (SpecCopyout.v's header), so
@@ -1215,11 +1218,12 @@ Section ProofFilestat.
         rewrite /U2 upd_ne; [| vm_compute; discriminate].
         rewrite /U1 upd_ne; [exact Hmius4 | vm_compute; discriminate]. }
       iApply (Copyout.wp_copyout_sconf_mem KT1 fsc_kalloc U6 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U)) 24%nat fbytes (DfracOwn 1)
-                (K - 10)%nat 0%nat eb pj b lks
+                (K - 10)%nat 0%nat eb pj b lks (pv_ev (us_V U))
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
-                with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
+                with "Hcg Hcnt Htext Hpc Hpt Hkenv Hlend Hbuf").
       all: try lkbelow.
-      iIntros (CID32 Hs32 mco P' Mo) "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hwrote".
+      iIntros (CID32 Hs32 mco P' Mo) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsco %Hext %Hwrote".
+      iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       iEval (rewrite HU6a3) in "Hbuf".
       (* WHAT THE WINDOW IS: copyout's own disjunction, read as "a prefix of
          the 24 struct bytes landed at [addr]" plus the return value.  The
@@ -1236,7 +1240,7 @@ Section ProofFilestat.
                         = (mword_of_int (-1) : mword 64)).
       { destruct Hwrote as [[Hr _] | [Hr _]]; [by left | by right]. }
       destruct Hdw as (dwr & Hdwle & Hmo).
-      iDestruct ("Hpback" $! P' Mo ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".
+      iDestruct ("Hpback" $! P' Mo kc2 ltac:(exact Hext) with "Hszc Hptc Hpt Hev") as "Hpriv".
       assert (Hpc4e : ret_pc (U6 !!! Regidx Rra) = mword_of_int (FST + 0x4e)).
       { rewrite HU6ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc4e) in "Hpc".
@@ -1355,8 +1359,8 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mfin RV P' dwr fbytes
-                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+      iApply ("Hcont" $! mfin RV P' dwr fbytes kc2
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] [Hpriv]
                 [Hsb Hbslot]").
       { exact Hcsf. }
@@ -1364,6 +1368,7 @@ Section ProofFilestat.
       { exact Hrvok. }
       { exact Hdwle. }
       { exact Hrv. }
+      { exact Hkc2. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -1438,11 +1443,12 @@ Section ProofFilestat.
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       (* this arm never reaches copyout, so the window is EMPTY and the
          image is the one it came in at *)
-      assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
-          by (rewrite us_upt_id; apply upd_usM_id).
+      assert (HVid : upd_usM (us_upt (upd_usV U (upd_ev (us_V U) (pv_ev (us_V U))))
+                                (pv_upt (us_V U))) (us_M U) = U)
+          by (rewrite upd_ev_id upd_usV_id us_upt_id; apply upd_usM_id).
       iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat
-                (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                (fun _ => bv_0 8) (pv_ev (us_V U))
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
@@ -1450,6 +1456,7 @@ Section ProofFilestat.
       { exact fst_ret_m1. }
       { lia. }
       { exact Hrv. }
+      { lia. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }

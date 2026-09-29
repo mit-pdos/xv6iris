@@ -76,6 +76,7 @@ Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1a *)
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
@@ -145,6 +146,10 @@ Section SpecFreeproc.
         through untouched -- which is what makes a reclaimed slot usable by
         the next allocproc. *)
      kstack_free pa ∗
+     (* ...AND THE SLOT'S EVENT COUNTER ([SlotGen.act_cnt], design
+        ni-strong-instance.md §7) at the block's [pv_ev], likewise carried
+        through untouched. *)
+     act_cnt pa (pv_ev V) ∗
      own_ctx (p_context pa))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -180,12 +185,12 @@ Section SpecFreeproc.
         fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
   Proof using .
     rewrite /proc_dormant fp_unused_not_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & Hpg & Htf)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hev & Hgh & Hxs & Hctx & Hpg & Htf)".
     iDestruct "Hxs" as (xsv) "[Hxc _]".
     rewrite /gen_halves_dorm fp_unused_not_zombie.
     iDestruct "Hgh" as "[%Hpid0 Hsg]".
     iExists V, pid, xsv. rewrite /fp_rest /fp_pt /fp_tf.
-    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hsg Hxc Hctx Hpg Htf".
+    iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hev Hch Hsg Hxc Hctx Hpg Htf".
     iSplitR;
       [iPureIntro; exact (conj (proj1 Hpure)
                             (conj (proj1 (proj2 Hpure))
@@ -209,12 +214,12 @@ Section SpecFreeproc.
     proc_dormant pa UNUSED.
   Proof using .
     intros Hpid0 Hlz.
-    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hctx) Hch Hsg Hxc Hpg Htf".
+    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hev & Hctx) Hch Hsg Hxc Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
     iAssert (gen_halves_dorm pa pid (pv_gen V) UNUSED) with "[Hsg]" as "Hgh".
     { rewrite /gen_halves_dorm fp_unused_not_zombie.
       iSplitR; [iPureIntro; exact Hpid0 | iExact "Hsg"]. }
-    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hgh Hctx Hpg Htf".
+    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hch Hev Hgh Hctx Hpg Htf".
     iSplitR;
       [iPureIntro; exact (conj (proj1 Hpure)
                             (conj (proj1 (proj2 Hpure))
@@ -266,7 +271,7 @@ Section SpecFreeproc.
         fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof using .
     rewrite /proc_dormant fp_zombie_is_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & %Hbel & Hpt & Htfp)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hbs & Hkst & Hch & Hev & Hgh & Hxs & Hctx & %Hbel & Hpt & Htfp)".
     iDestruct "Hxs" as (xsv) "[Hxc Hesc]".
     rewrite /gen_halves_dorm fp_zombie_is_zombie.
     iExists V, pid, xsv.
@@ -277,8 +282,8 @@ Section SpecFreeproc.
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
     rewrite /fp_rest /fp_pt /fp_tf.
-    iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
-    { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro.
+    iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hev Hctx".
+    { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hev Hctx". iPureIntro.
       exact (conj (proj1 Hpure)
                (conj (proj1 (proj2 Hpure)) (proj1 (proj2 (proj2 Hpure))))). }
     iSplitL "Hch"; [iExact "Hch" |].
@@ -318,7 +323,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string) :=
+      (ilvl : nat) (lks : gset string) (k : nat) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -378,10 +383,12 @@ Section SpecFreeproc.
     fp_pt pa (pv_sz V) opt -∗
     fp_tf pa otf -∗
     kalloc_env γa None -∗
+    act_lend pme k -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr KT1 mr K false pme -∗
       cpu_own ilvl eb pme false lks -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
@@ -400,7 +407,7 @@ Section SpecFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string) :=
+      (ilvl : nat) (lks : gset string) (k : nat) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -460,10 +467,12 @@ Section SpecFreeproc.
     fp_pt pa (pv_sz V) opt -∗
     fp_tf pa otf -∗
     kalloc_env γa None -∗
+    act_lend pme k -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr KT1 mr K false pme -∗
       cpu_own ilvl eb pme false lks -∗
+      (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend pme k') -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       (∃ h, pid_receipt h (PFree pme pid)) -∗
@@ -484,14 +493,14 @@ Module Type FREEPROC.
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+      (ilvl : nat) (lks : gset string) (k : nat),
+      wp_freeproc_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks k.
   Parameter wp_freeproc_led_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (g : gname) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64)
-      (ilvl : nat) (lks : gset string),
-      wp_freeproc_led_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks.
+      (ilvl : nat) (lks : gset string) (k : nat),
+      wp_freeproc_led_sconf_body γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks k.
 End FREEPROC.

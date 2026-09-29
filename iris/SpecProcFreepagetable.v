@@ -69,16 +69,17 @@ Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1a *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Import Defs.
 
 
-Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.proc_freepagetable in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -104,10 +105,12 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
   pc_is pcE -∗
   (∃ M : gmap Z (bv 8), proc_pt P M) -∗
   kalloc_env γa None -∗
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     mWP (Loop : expr riscv_lang)) -∗
@@ -130,11 +133,11 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
    caller once the ∃-[M] tier is retired.  It is therefore a corollary of
    the contract above ([ProcPtOwn.proc_ptm_pt] on the way in), not a
    refinement of it. *)
-Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : Z) (M : gmap Z (bv 8))
     (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.proc_freepagetable in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -150,10 +153,12 @@ Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslo
   pc_is pcE -∗
   proc_ptm P szv M -∗
   kalloc_env γa None -∗
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     mWP (Loop : expr riscv_lang)) -∗
@@ -161,16 +166,16 @@ Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslo
 
 Module Type PROC_FREEPAGETABLE.
   Parameter wp_proc_freepagetable_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : Z) (M : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks k.
   Parameter wp_proc_freepagetable_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks k.
 End PROC_FREEPAGETABLE.

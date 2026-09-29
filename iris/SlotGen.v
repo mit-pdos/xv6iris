@@ -66,6 +66,7 @@ Require Import ProcGeom.
    bundle. *)
 Require Import Xv6Cameras.
 Require Import PidEv.   (* [pev]: the pid ledger's events *)
+Require Import RiscvLang WpNext.   (* [act_lend_cont_frame]: the lend framed through a callee *)
 Local Open Scope Z_scope.
 
 (* AN EIGHTH.  [Qp_scope]'s numerals stop at 4 (stdpp's [Qp.notations]
@@ -111,6 +112,45 @@ Fixpoint sg_boot_map (g0 : gname) (k n : nat) : sgen_map :=
   | S n' => <[ proc_addr k := to_dfrac_agree (DfracOwn 1) (g0 : leibnizO gname) ]>
               (sg_boot_map g0 (S k) n')
   end.
+
+(* THE EVENT COUNTER'S ELEMENT (design ni-strong-instance.md §7): one slot
+   at count [k], owned whole -- [act_cnt] is exclusive. *)
+Definition act_one (pa : mword 64) (k : nat) : act_map :=
+  {[ pa := to_dfrac_agree (DfracOwn 1) (k : natO) ]}.
+
+Lemma act_el_valid (k : nat) : ✓ (to_dfrac_agree (DfracOwn 1) (k : natO)).
+Proof.
+  rewrite /to_dfrac_agree pair_valid. split; [apply dfrac_valid_own_1 |].
+  rewrite -(agree_idemp (to_agree (k : natO))).
+  rewrite to_agree_op_valid. reflexivity.
+Qed.
+
+Fixpoint act_boot_map (k n : nat) : act_map :=
+  match n with
+  | O => ∅
+  | S n' => <[ proc_addr k := to_dfrac_agree (DfracOwn 1) (0%nat : natO) ]>
+              (act_boot_map (S k) n')
+  end.
+
+Lemma act_boot_map_lookup_None (j n i : nat) :
+  (j + n <= NPROC)%nat -> (i < j)%nat ->
+  act_boot_map j n !! proc_addr i = None.
+Proof.
+  revert j. induction n as [|n IH]; intros j Hjn Hij; cbn [act_boot_map].
+  - apply lookup_empty.
+  - rewrite lookup_insert_None. split.
+    + apply IH; lia.
+    + intro Hpa.
+      assert (Hje : j = i) by (apply proc_addr_inj; [lia | lia | exact Hpa]).
+      lia.
+Qed.
+
+Lemma act_boot_map_valid (j n : nat) : ✓ (act_boot_map j n : actUR).
+Proof.
+  revert j. induction n as [|n IH]; intros j; cbn [act_boot_map].
+  - assert (H0 : ✓ (ε : actUR)) by apply ucmra_unit_valid. exact H0.
+  - apply insert_valid; [ apply act_el_valid | apply IH ].
+Qed.
 
 (* two fractions of one slot's entry compose into one *)
 Lemma sg_one_op (pa : mword 64) (dq dq' : dfrac) (g : gname) :
@@ -230,6 +270,92 @@ Section SlotGen.
     rewrite /slot_gen. iApply own_update.
     rewrite /sg_one. apply singleton_update, cmra_update_exclusive.
     apply sg_el_valid, dfrac_valid_own_1.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SLOT'S EVENT COUNTER (design ni-strong-instance.md §7).          *)
+  (* ------------------------------------------------------------------ *)
+  (* An exclusive [nat] per slot, with no authority and no tie: the
+     permit an actor-labelled ledger append consumes, stepped by its
+     holder.  Born at 0 for every slot ([act_rows_alloc]), parked in the
+     dormant block ([ProcDefs.proc_dormant]) and carried by the running
+     process's block ([ProcInv.proc_priv_core]) at [pv_ev]. *)
+  Definition act_cnt (pa : mword 64) (k : nat) : iProp Σ :=
+    own wact_name (act_one pa k : actUR).
+
+  Global Instance act_cnt_timeless pa k : Timeless (act_cnt pa k).
+  Proof using . apply _. Qed.
+
+  Lemma act_cnt_excl pa k k' : act_cnt pa k -∗ act_cnt pa k' -∗ False.
+  Proof using .
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite /act_one singleton_op singleton_valid in Hv.
+    iPureIntro. exact (exclusive_l _ _ Hv).
+  Qed.
+
+  Lemma act_cnt_update pa k k' : act_cnt pa k ==∗ act_cnt pa k'.
+  Proof using .
+    rewrite /act_cnt. iApply own_update.
+    rewrite /act_one. apply singleton_update, cmra_update_exclusive.
+    apply act_el_valid.
+  Qed.
+
+  Lemma act_cnt_step pa k : act_cnt pa k ==∗ act_cnt pa (S k).
+  Proof using . apply act_cnt_update. Qed.
+
+  (* THE LEND (design ni-strong-instance.md §7).  What a contract on the
+     permit cone takes from its caller, keyed by the running proc word
+     [p] ([CpuOwn.cpu_own]'s): the actor's counter, OR the fact that there
+     is no actor.  The actor's permit as a callee takes it: the boot's hart
+     runs at [c->proc = 0] and lends nothing ([act_lend_zero]); a process
+     lends its block's counter ([act_lend_of_cnt]) and takes it back at the
+     returned count ([act_lend_back], at [p <> 0]). *)
+  Definition act_lend (p : mword 64) (k : nat) : iProp Σ :=
+    (⌜p = (zero_reg : mword 64)⌝ ∨ act_cnt p k)%I.
+
+  Lemma act_lend_zero k : ⊢ act_lend (zero_reg : mword 64) k.
+  Proof using . iLeft. done. Qed.
+
+  Lemma act_lend_of_cnt p k : act_cnt p k -∗ act_lend p k.
+  Proof using . iIntros "H". iRight. iExact "H". Qed.
+
+  Lemma act_lend_back p k : p <> (zero_reg : mword 64) -> act_lend p k -∗ act_cnt p k.
+  Proof using . iIntros (Hp) "[%Hz | H]"; [done | iExact "H"]. Qed.
+
+  (* THE BORROW A BLOCK-HOLDER MAKES, with no fact about [p] needed: at
+     [p = 0] it lends the left disjunct and KEEPS its counter; otherwise it
+     lends the counter and takes it back at the returned count
+     ([act_lend_back]).  Either way the counter comes home at a count at
+     least the one it left at. *)
+  Lemma act_lend_borrow p k :
+    act_cnt p k -∗ act_lend p k ∗
+      (∀ k' : nat, ⌜(k <= k')%nat⌝ -∗ act_lend p k' -∗
+         ∃ k'' : nat, ⌜(k <= k'')%nat⌝ ∗ act_cnt p k'').
+  Proof using .
+    iIntros "Hc". destruct (decide (p = (zero_reg : mword 64))) as [Hz | Hnz].
+    - iSplitR; [iLeft; done|]. iIntros (k' Hk') "_". iExists k. iFrame "Hc". done.
+    - iSplitL "Hc"; [iRight; iExact "Hc"|]. iIntros (k' Hk') "Hl".
+      iExists k'. iSplit; [done|]. iApply (act_lend_back with "Hl"). exact Hnz.
+  Qed.
+
+  (* THE LEND, FRAMED THROUGH.  A contract on the cone takes [act_lend p k]
+     and hands back [∃ k', ⌜k <= k'⌝ ∗ act_lend p k'] as the THIRD premise
+     of its continuation; a body whose callees do not take the lend yet
+     frames it here, once, at entry, and is then left with the
+     continuation it had before the premise existed (the lend comes back
+     at [k' := k]).  Stated over the continuation's first two premises and
+     its tail as higher-order patterns, so one lemma serves every shape. *)
+  Lemma act_lend_cont_frame `{GEN : GenId} `{CID0 : CpuId} {R : Type}
+      (b : bool) (p p' : mword 64) (k : nat)
+      (A B C : CpuId -> R -> iProp Σ) :
+    wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗
+       (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p' k') -∗ C CID mr) -∗
+    act_lend p' k -∗
+    wp_next b p (fun CID => ∀ mr : R, A CID mr -∗ B CID mr -∗ C CID mr).
+  Proof using .
+    iIntros "H Hl" (CID Hs mr) "HA HB".
+    iApply ("H" $! CID Hs mr with "HA HB"). iExists k. iFrame "Hl". done.
   Qed.
 
   (* ...AND THE ONE-WAY DISCARD, WHICH <INIT> ALONE TAKES (lane
@@ -935,6 +1061,35 @@ Section SlotGenBoot.
       [ apply sg_boot_map_valid |].
     iModIntro. iExists γ.
     iApply (sg_boot_split γ g0 0 NPROC ltac:(lia) with "H").
+  Qed.
+
+  Lemma act_boot_split (γ : gname) (j n : nat) :
+    (j + n <= NPROC)%nat ->
+    own γ (act_boot_map j n : actUR) ⊢
+    [∗ list] i ∈ seq j n, own γ (act_one (proc_addr i) 0 : actUR).
+  Proof using .
+    revert j. induction n as [|n IH]; intros j Hjn.
+    - iIntros "_". done.
+    - iIntros "H". cbn [act_boot_map].
+      rewrite insert_singleton_op;
+        [| apply (act_boot_map_lookup_None (S j) n j); lia].
+      rewrite own_op. iDestruct "H" as "[Hhd Htl]".
+      replace (seq j (S n)) with (j :: seq (S j) n) by reflexivity.
+      rewrite big_sepL_cons.
+      iSplitL "Hhd"; [ iExact "Hhd" |].
+      iApply (IH (S j) ltac:(lia) with "Htl").
+  Qed.
+
+  (* the NPROC event counters, each at 0, at a fresh name which
+     [WaitInv.children_res_alloc] installs as [wact_name]. *)
+  Lemma act_rows_alloc :
+    ⊢ |==> ∃ γ : gname,
+        [∗ list] i ∈ seq 0 NPROC, own γ (act_one (proc_addr i) 0 : actUR).
+  Proof using .
+    iMod (own_alloc (act_boot_map 0 NPROC : actUR)) as (γ) "H";
+      [ apply act_boot_map_valid |].
+    iModIntro. iExists γ.
+    iApply (act_boot_split γ 0 NPROC ltac:(lia) with "H").
   Qed.
 
 End SlotGenBoot.

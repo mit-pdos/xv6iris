@@ -104,7 +104,12 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
     (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
   (* FAILED: nothing moved -- and, in particular, nothing is claimed about
      [entry], which is why every [bad:] tail is generic for free. *)
-  (r = (mword_of_int (-1) : mword 64) /\ V' = V)
+  (r = (mword_of_int (-1) : mword 64) /\
+   (* ...AND THE EVENT COUNT ONLY ROSE (permit sweep, design
+      ni-strong-instance.md §7): a failed exec may have freed the pages it
+      had built, each an actor-labelled event, so the block comes back at
+      its own record with [pv_ev] at least where it was. *)
+   exists k' : nat, (pv_ev V <= k')%nat /\ V' = upd_ev V k')
   \/
   (* SUCCEEDED: the landed arm, plus the caller's claim on the entry PC. *)
   (Q entry /\
@@ -220,7 +225,8 @@ Inductive kxf_cause :=
 Definition kexec_ok_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
     (V V' : pprivate) (r : mword 64)
     (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
-  (r = (mword_of_int (-1) : mword 64) /\ V' = V /\ (exists c, QF c))
+  (r = (mword_of_int (-1) : mword 64) /\
+   (exists k' : nat, (pv_ev V <= k')%nat /\ V' = upd_ev V k') /\ (exists c, QF c))
   \/
   (Q entry /\
    r = (mword_of_int (Z.of_nat na) : mword 64) /\
@@ -389,6 +395,98 @@ Definition kexec_closer `{XI : CtxIdDefs.CurCtx}
       bslots 3 -∗
       iref_slots 2 -∗
       mWP (Loop : expr riscv_lang))%I.
+
+(* ===================================================================== *)
+(*  1c.  THE CLOSER AT A LATER COUNT (permit sweep L1b)                   *)
+(* ===================================================================== *)
+(*  The kexec cone lends the block's event counter to proc_freepagetable
+    and uvmalloc, so a phase that ran one of them holds the block at the
+    record [upd_ev V k] with [k >= pv_ev V].  The exit it was handed is at
+    [V]; this is the one conversion it needs: a relation proved against
+    the LATER record is one against the earlier (the failure arm's count
+    only rose further; the success arm does not name [pv_ev], so its rows
+    are the same by conversion). *)
+Lemma kexec_ok_qf_ev (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
+    (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) (k : nat) :
+  (pv_ev V <= k)%nat ->
+  kexec_ok_qf Q QF (upd_ev V k) V' r entry spv szv' na alen ->
+  kexec_ok_qf Q QF V V' r entry spv szv' na alen.
+Proof.
+  intros Hk [(Hr & (k' & Hk' & HV) & Hc) | (Hq & H)].
+  - left. split; [exact Hr|]. split; [|exact Hc].
+    exists k'. split; [cbn in Hk'; lia|]. rewrite HV. destruct V; reflexivity.
+  - right. split; [exact Hq | exact H].
+Qed.
+
+Lemma kexec_closer_ev (k : nat) `{XI : CtxIdDefs.CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Q : mword 64 -> ustate -> Prop) (QF : kxf_cause -> Prop)
+    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
+    (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
+    (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
+    (na : nat) (alen : nat -> nat)
+    (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
+    (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
+    (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8) :
+  (pv_ev (us_V U) <= k)%nat ->
+  kexec_closer Q QF gf ga pj pidv U m ret_tgt K b eb lks dqb dqs bmapstart na alen
+    plen pv dqpv pfun av dqa avf aslen dqas afun -∗
+  kexec_closer Q QF gf ga pj pidv (upd_usV U (upd_ev (us_V U) k)) m ret_tgt K b eb
+    lks dqb dqs bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun.
+Proof.
+  iIntros (Hk) "H". iIntros (mf U' entry spv szv') "%Hcs %Hok".
+  iApply ("H" $! mf U' entry spv szv' with "[%] [%]"); [exact Hcs|].
+  exact (kexec_ok_qf_ev _ _ (us_V U) (us_V U') _ _ _ _ _ _ k Hk Hok).
+Qed.
+
+(* ...and under the [wp_next] every phase lemma receives it in *)
+Lemma kexec_closer_ev_next (k : nat) `{XI : CtxIdDefs.CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}
+    `{GEN : GenId} `{CID0 : CpuId} (bn : bool) (pn : mword 64)
+    (Q : mword 64 -> ustate -> Prop) (QF : kxf_cause -> Prop)
+    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
+    (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
+    (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
+    (na : nat) (alen : nat -> nat)
+    (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
+    (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
+    (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8) :
+  (pv_ev (us_V U) <= k)%nat ->
+  wp_next bn pn (fun CID : CpuId =>
+    kexec_closer Q QF gf ga pj pidv U m ret_tgt K b eb lks dqb dqs bmapstart na alen
+      plen pv dqpv pfun av dqa avf aslen dqas afun) -∗
+  wp_next bn pn (fun CID : CpuId =>
+    kexec_closer Q QF gf ga pj pidv (upd_usV U (upd_ev (us_V U) k)) m ret_tgt K b eb
+      lks dqb dqs bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun).
+Proof.
+  iIntros (Hk) "H". iIntros (CIDx Hs).
+  iApply (kexec_closer_ev k with "[H]"); [exact Hk|]. iApply ("H" $! CIDx Hs).
+Qed.
+
+(* ...and at the [ProcInv.ev_after] spelling the phases carry *)
+Lemma kexec_closer_after_next `{XI : CtxIdDefs.CurCtx}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !wchG Σ}
+    `{GEN : GenId} `{CID0 : CpuId} (U' : ustate) (bn : bool) (pn : mword 64)
+    (Q : mword 64 -> ustate -> Prop) (QF : kxf_cause -> Prop)
+    (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
+    (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
+    (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
+    (na : nat) (alen : nat -> nat)
+    (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
+    (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
+    (aslen : nat -> nat) (dqas : dfrac) (afun : nat -> nat -> bv 8) :
+  ev_after U U' ->
+  wp_next bn pn (fun CID : CpuId =>
+    kexec_closer Q QF gf ga pj pidv U m ret_tgt K b eb lks dqb dqs bmapstart na alen
+      plen pv dqpv pfun av dqa avf aslen dqas afun) -∗
+  wp_next bn pn (fun CID : CpuId =>
+    kexec_closer Q QF gf ga pj pidv U' m ret_tgt K b eb
+      lks dqb dqs bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun).
+Proof.
+  intros (k & Hk & ->). iIntros "H". iApply (kexec_closer_ev_next k with "H"). exact Hk.
+Qed.
 
 (* ===================================================================== *)
 (*  2.  THE ONE VALUE THE HOLE IS EVER PLUGGED WITH                       *)

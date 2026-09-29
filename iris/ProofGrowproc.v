@@ -47,6 +47,7 @@ Require Import ProcGeom CpuOwn.
 Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend_borrow] *)
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodeGrowproc.
@@ -602,7 +603,12 @@ Section ProofGrowproc.
        AT THE NEW TABLE AND BREAK, and each of growproc's four arms pays it
        from this one. *)
     iDestruct (proc_priv_lazy with "Hpriv") as %Hlz0.
-    iDestruct (proc_priv_addrspace with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+    (* ...WITH THE EVENT COUNTER BESIDE IT (permit sweep L1a): the grow arm
+       lends it to uvmalloc, and every arm hands it to the exit at a count
+       at least the one it left at *)
+    iDestruct (proc_priv_addrspace_ev with "Hpriv") as "(Hszc & Hptc & Hpt & Hcnt & Hpback)".
+    iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
+    { iExists (pv_ev (us_V U)). iFrame "Hcnt". done. }
     (* uvmalloc/uvmdealloc are now stated at this same real image ([Hpt] is
        already [proc_ptm _ _ (us_M U)]) -- no existential is invented. *)
     assert (Hszmaxz : (bv_unsigned (pv_sz (us_V U)) <= 274877898752)%Z).
@@ -685,6 +691,7 @@ Section ProofGrowproc.
         p_sz p ↦₈ szv' -∗
         p_pagetable p ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
         proc_ptm P' (uint szv') M' -∗
+        (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k') -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
@@ -692,9 +699,10 @@ Section ProofGrowproc.
         mWP (Loop : expr riscv_lang))%I
       with "[Hpback Hcont]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv M')
-        "%Hchain %Hfsp %Hfa0 %Hfthr %Hroot %Htfp %Hszb %Hbel' %Hok Hcg Hcpu Hpc Hszc Hptc Hpt Hb1 Hb2 Hb3 Hb4".
-      iDestruct ("Hpback" $! P' szv' M' (pv_lazy (us_V U))
-                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt") as "Hpriv";
+        "%Hchain %Hfsp %Hfa0 %Hfthr %Hroot %Htfp %Hszb %Hbel' %Hok Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hb1 Hb2 Hb3 Hb4".
+      iDestruct "Hcnt" as (k') "[%Hk' Hcnt]".
+      iDestruct ("Hpback" $! P' szv' M' (pv_lazy (us_V U)) k'
+                   with "[%] [%] [%] [%] [%] Hszc Hptc Hpt Hcnt") as "Hpriv";
         [exact Hroot | exact Htfp | exact Hszb | exact Hbel' | | ].
       (* WHAT THE LAZY BIT CLAIMS, RE-ESTABLISHED AT THE ARM'S OWN TABLE AND
          BREAK (lane LAZY-FLAG, K2).  Four arms, and only two of them move
@@ -759,9 +767,10 @@ Section ProofGrowproc.
       iDestruct (cpu_own_transport CIDx CIDf 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' szv' M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
+      iApply ("Hcont" $! mf P' szv' M' k' with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
       { exact Hcsf. }
-      { rewrite Hmfa0. exact Hok. } }
+      { rewrite Hmfa0. exact Hok. }
+      { exact Hk'. } }
 
     (* ================================================================= *)
     (*  §4a  +0x16  bge x0,s1 : the [n > 0] test, SIGNED.                  *)
@@ -918,7 +927,7 @@ Section ProofGrowproc.
                      with "Hcpu") as "Hcpu".
         iApply ("EXIT" $! CID19 X1 (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int (-1) : mword 64)
                   (us_M U)
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hs1 Hs2 Hs3 Hs4").
         - wp_next_chain.
         - rewrite /X1 upd_ne; [exact HB4sp | reg_neq].
         - rewrite /X1 upd_eq. reflexivity.
@@ -1098,7 +1107,10 @@ Section ProofGrowproc.
          SAME size read back out of [C3p]'s a1 slot, so the crossing is the
          same equation ([HC3pa1]) every other premise below already uses. *)
       iEval (rewrite -HC3pa1) in "Hpt".
-      iApply (Uvmalloc.wp_uvmalloc_mem_sconf γa C3p (pv_upt (us_V U)) (us_M U) 4 (av - 4)%nat eb p b lks
+      (* the lend (permit sweep L1a): the block's counter, borrowed *)
+      iDestruct "Hcnt" as (kc0) "[%Hkc0 Hcnt]".
+      iDestruct (act_lend_borrow with "Hcnt") as "[Hlend Hlback]".
+      iApply (Uvmalloc.wp_uvmalloc_mem_sconf γa C3p (pv_upt (us_V U)) (us_M U) 4 (av - 4)%nat eb p b lks kc0
                 ltac:(lia) HC3ptp HC3pa0 HC3pa3 gp_xperm_rng gp_perm_ok
                 ltac:(rewrite HC3pa1 uint_unsigned uvm_maxsz_val; exact Hszmaxz)
                 (* growproc TESTS the bound ([sz + n > TRAPFRAME] returns -1),
@@ -1107,9 +1119,12 @@ Section ProofGrowproc.
                 ltac:(left; rewrite HC3pa2 uint_unsigned uvm_maxsz_val;
                       exact Hnewle)
                 ltac:(rewrite HC3pa1 HC3pa2; exact Hfresh)
-                with "Hcg Hcpu Htext Hpc Hpt Henv").
+                with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
       all: try lkbelow.
-      iIntros (CID21 Hn21 mr) "Hcg Hcpu Hpc %Hcsr Hpost".
+      iIntros (CID21 Hn21 mr) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc %Hcsr Hpost".
+      iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hcnt]"; [exact Hkc1|].
+      iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
+      { iExists kc2. iFrame "Hcnt". iPureIntro; lia. }
       assert (Hpc32 : ret_pc (C3p !!! Regidx Rra) = mword_of_int (KernelSyms.growproc + 0x32))
         by (rewrite HC3pra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc32) in "Hpc".
@@ -1194,7 +1209,7 @@ Section ProofGrowproc.
                      with "Hcpu") as "Hcpu".
         iApply ("EXIT" $! CID25 X2 (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int (-1) : mword 64)
                   (us_M U)
-                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
+                  with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hs1 Hs2 Hs3 Hs4").
         - wp_next_chain.
         - rewrite /X2 upd_ne; [exact HD1sp | reg_neq].
         - rewrite /X2 upd_eq. reflexivity.
@@ -1246,7 +1261,7 @@ Section ProofGrowproc.
                    with "Hcpu") as "Hcpu".
       iApply ("EXIT" $! CID24 Ms' P' (add_vec (pv_sz (us_V U)) nv) (mword_of_int 0 : mword 64)
                 (umem_grow (us_M U) (uint (add_vec (pv_sz (us_V U)) nv)))
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hs1 Hs2 Hs3 Hs4").
       - wp_next_chain.
       - rewrite (Hs'thr csp_rs1 ltac:(reg_neq)). exact HD1sp.
       - exact Hs'a0.
@@ -1332,7 +1347,7 @@ Section ProofGrowproc.
                    with "Hcpu") as "Hcpu".
       iApply ("EXIT" $! CID14 Ms' (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int 0 : mword 64)
                 (us_M U)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hs1 Hs2 Hs3 Hs4").
       - wp_next_chain.
       - rewrite (Hs'thr csp_rs1 ltac:(reg_neq)). exact HA2sp.
       - exact Hs'a0.
@@ -1439,12 +1454,18 @@ Section ProofGrowproc.
                  with "Hcpu") as "Hcpu".
     (* [Hpt] is indexed at [pv_sz (us_V U)]; the same crossing as uvmalloc's. *)
     iEval (rewrite -HE3a1) in "Hpt".
-    iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa E3 (pv_upt (us_V U)) (us_M U) (av - 4)%nat eb p b lks
+    (* the lend (permit sweep L2): the block's counter, borrowed *)
+    iDestruct "Hcnt" as (kd0) "[%Hkd0 Hcnt]".
+    iDestruct (act_lend_borrow with "Hcnt") as "[Hlend Hlback]".
+    iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa E3 (pv_upt (us_V U)) (us_M U) (av - 4)%nat eb p b lks kd0
               ltac:(lia) HE3a0
               ltac:(rewrite HE3a1; exact Hszmax)
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID17 Hn17 md) "Hcg Hcpu Hpc %Hcsd %Hdret Hpt".
+    iIntros (CID17 Hn17 md) "Hcg Hcpu (%kd1 & %Hkd1 & Hlend) Hpc %Hcsd %Hdret Hpt".
+    iDestruct ("Hlback" $! kd1 with "[%] Hlend") as (kd2) "[%Hkd2 Hcnt]"; [exact Hkd1|].
+    iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
+    { iExists kd2. iFrame "Hcnt". iPureIntro; lia. }
     rewrite HE3a1 HE3a2 in Hdret.
     iEval (rewrite HE3a1 HE3a2) in "Hpt".
     (* uvmdealloc's own contract indexes its block at [uvmd_rsz oldsz newsz];
@@ -1534,7 +1555,7 @@ Section ProofGrowproc.
               (md !!! Regidx Ra0) (mword_of_int 0 : mword 64)
               (umem_del (us_M U) (uint (pgroundup (add_vec (pv_sz (us_V U)) nv)))
                  (4096 * uvmd_np (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv)))
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hs1 Hs2 Hs3 Hs4").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hszc Hptc Hpt Hcnt Hs1 Hs2 Hs3 Hs4").
     - wp_next_chain.
     - rewrite (Hs'thr csp_rs1 ltac:(reg_neq)). exact HF2sp.
     - exact Hs'a0.

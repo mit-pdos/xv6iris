@@ -1495,7 +1495,7 @@ Section ProofSysMknodBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM13a1). iExact "Hbuf". }
-    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
+    iIntros (CID19 Hq19 mas P' bf kA) "%Hcsas %Hupt %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     iEval (rewrite HM13a1) in "Hbuf".
     assert (Hpc2e : ret_pc (M13 !!! Regidx Rra : mword 64)
                     = mword_of_int (MN + 0x2e)) by (rewrite HM13ra; pcw).
@@ -1742,7 +1742,7 @@ Section ProofSysMknodBody.
       gf
       pk bf
                      FsAbsCreateFire.T_DEVICE (hw_lo (arg_int32 v1)) (hw_lo (arg_int32 v2))
-                     (upd_usM (us_upt U P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
+                     (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') _) MAXOPBLOCKS Sb0 ns pid dqb dqs dqbs dqn
                      N4 (K - 20)%nat eb b lks
                      (npar_nm (us_M U) v0)
                      (fun c : absnode =>
@@ -1857,7 +1857,7 @@ Section ProofSysMknodBody.
              retires the descriptor in the ghost step that parks the payload
              and hands the whole token back. *)
           destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
-          iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
+          iDestruct (proc_priv_bare_acc gf pj pid (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') with "Hpriv")
             as "[Hpbare Hpback]".
           iDestruct (cpu_own_transport CID26 CID28 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1866,7 +1866,7 @@ Section ProofSysMknodBody.
                     pd pav pu gil gisl
    kk qi ss gy loc tlc inum dn bm un1
                     pid (DfracOwn (1/4)) dqb dqs P0 (K - 20)%nat eb b lks
-                    (us_upt U P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+                    (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hibcov Hiblog ltac:(lia) Hcovb
                     ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                     (Hlb "log"%string)
@@ -1918,7 +1918,7 @@ Section ProofSysMknodBody.
           iApply (EndOp.wp_end_op_sconf (CID := CID30) gs j gl fsc_uart fsc_disk fsc_dlock pd pav pu
                     fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pid (DfracOwn (1/4))
                     P1 (K - 20)%nat eb b lks
-                    (us_upt U P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
+                    (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpbare Hprocs Hdev Hgeo Hdlk Hop").
           { rewrite Heb /trap_csrs_ext. done. }
@@ -1968,11 +1968,12 @@ Section ProofSysMknodBody.
           iDestruct (cpu_own_transport CID32 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-          iApply ("Hcont" $! mf (ns1 + 1)%nat P' with "[%] [%] Hcg Hown
+          iApply ("Hcont" $! mf (ns1 + 1)%nat P' kA with "[%] [%] [%] Hcg Hown
                      [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv
                      [Hcauok]").
           { exact Hcsf. }
           { exact Hupt. }
+          { exact HkA. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { cbn in Hns1. lia. }
@@ -2003,14 +2004,14 @@ Section ProofSysMknodBody.
           iDestruct (mn_buf_join (pa_stk sp0 18) bf pk Hpk with "Hbufk Hbufrest")
             as "Hbytes2".
           iDestruct (mn_bytes_name (pa_stk sp0 18) 128 with "Hbytes2") as (bf1) "Hbuf".
-          iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
+          iDestruct (proc_priv_bare_acc gf pj pid (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') with "Hpriv")
             as "[Hpbare Hpback]".
           iDestruct (cpu_own_transport CID26 CID27 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (mn_m1_tail (CID0 := CID27) gs j gl pd pav pu fsc_fs
    un1 pid (DfracOwn (1/4))
                     m mcr sp0 K eb b lks _ _ bf1
-                    (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                    (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                     ltac:(reflexivity) Hcrsp Hcrthr Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpbare Hprocs Hdev Hgeo Hdlk [HopS Htx] Hf1 Hf2 Hf19 Hf20
@@ -2023,10 +2024,11 @@ Section ProofSysMknodBody.
           iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
           iDestruct ("Hpback" with "Hpbare") as "Hpriv".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-          iApply ("Hcont" $! mf ns1 P' with "[%] [%] Hcg Hown
+          iApply ("Hcont" $! mf ns1 P' kA with "[%] [%] [%] Hcg Hown
                      [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv [Hcf]").
           { exact Hcsf. }
           { exact Hupt. }
+          { exact HkA. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { cbn in Hns1. exact Hns1. }
@@ -2049,14 +2051,14 @@ Section ProofSysMknodBody.
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
       iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
-      iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
+      iDestruct (proc_priv_bare_acc gf pj pid (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (mn_m1_tail (CID0 := CID20) gs j gl pd pav pu fsc_fs
  MAXOPBLOCKS pid (DfracOwn (1/4))
                 m mas sp0 K eb b lks _ _ bf
-                (us_upt U P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
+                (us_upt (upd_usV U (upd_ev (us_V U) kA)) P') ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf19 Hf20 Hbuf
@@ -2068,11 +2070,12 @@ Section ProofSysMknodBody.
       iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf ns P' with "[%] [%] Hcg Hown
+      iApply ("Hcont" $! mf ns P' kA with "[%] [%] [%] Hcg Hown
                 [] [] Hpc Hbsl Hsbn Hsbi Hsbs Hsbb [%] Hir Hpriv
                 [Hwp Hacre Hdlkc Hchild]").
       { exact Hcsf. }
       { exact Hupt. }
+      { exact HkA. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { reflexivity. }
@@ -2530,15 +2533,16 @@ Section MknodStableWp.
         + (* the child's legs go down unenriched: they name an inum, not a
              run *)
           iExact "Hchild". }
-    iIntros (CID' Hch mf ns' P')
-      "%Hcs %Hupt Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs Hsbb
+    iIntros (CID' Hch mf ns' P' kA)
+      "%Hcs %Hupt %HkA Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs Hsbb
        %Hns Hiref Hpriv Harms".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hch |].
-    iApply ("Hcont" $! mf ns' P'
-              with "[%] [%] Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs
+    iApply ("Hcont" $! mf ns' P' kA
+              with "[%] [%] [%] Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs
                     Hsbb [%] Hiref Hpriv [Harms]").
     { exact Hcs. }
     { exact Hupt. }
+    { exact HkA. }
     { exact Hns. }
     (* ---- THE ONLY REAL STEP AT THIS ALTITUDE ---- *)
     iApply (mkr_arms with "Harms").

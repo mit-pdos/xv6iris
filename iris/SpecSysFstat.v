@@ -245,16 +245,22 @@ Definition wp_sys_fstat_sconf_body
        ran, so [d] is instantiated to [0] and the window is empty.  A
        caller reads its own untouched bytes back with
        [UserPtTree.umem_wr_lookup_out]. *)
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8)
+      (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_fstat_ret (us_V U) v r⌝ -∗
       ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): filestat lends the block's
+         counter to copyout, so the block comes back at a count at least
+         the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
+      proc_priv γf pj pidv
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) v1 d bs)) -∗
       kalloc_env fsc_kalloc None -∗
       (* the file system, back.  filestat's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle

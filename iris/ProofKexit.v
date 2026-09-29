@@ -552,8 +552,12 @@ Section KexitLoop.
     pv_ofile (us_V U) !! fd = Some v ->
     proc_priv_unmarked γf pa pid U -∗
     proc_priv_bare pa pid U ∗ ofile_slot γf (pv_fdg (us_V U)) pa fd v ∗
-    (∀ v', proc_priv_bare pa pid U -∗ ofile_slot γf (pv_fdg (us_V U)) pa fd v' -∗
-           proc_priv_unmarked γf pa pid (us_ofile U fd v')).
+    (* the bare block back AT ANY EVENT COUNT (permit sweep L1b): fileclose
+       lends its counter to pipeclose *)
+    (∀ (v' : mword 64) (k : nat),
+           proc_priv_bare pa pid (upd_usV U (upd_ev (us_V U) k)) -∗
+           ofile_slot γf (pv_fdg (us_V U)) pa fd v' -∗
+           proc_priv_unmarked γf pa pid (us_ofile (upd_usV U (upd_ev (us_V U) k)) fd v')).
   Proof using .
     iIntros (Hfd) "(Hn & Hrest)".
     iDestruct (proc_priv_nocwd_lazy with "Hn") as %Hlz.
@@ -561,17 +565,17 @@ Section KexitLoop.
     iDestruct "Hn" as "[Hb [%Hlen Ho]]".
     iFrame "Hb".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
-    iIntros (v') "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    iIntros (v' k) "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv_unmarked.
-    cbn [us_ofile upd_usV us_V upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd
-         pv_name pv_fdg pv_lazy pv_secc pv_gen pv_cwi pv_chg].
+    cbn [us_ofile upd_usV us_V upd_ofile upd_ev pv_sz pv_upt pv_tf pv_ofile pv_cwd
+         pv_name pv_fdg pv_lazy pv_secc pv_gen pv_cwi pv_chg pv_ev].
     iSplitR "Hrest"; [ | iExact "Hrest" ].
     rewrite (proc_priv_nocwd_bare γf pa pid
-               (us_ofile U fd v')
-               ltac:(cbn [us_ofile upd_usV us_V upd_ofile pv_lazy pv_secc pv_upt pv_sz];
+               (us_ofile (upd_usV U (upd_ev (us_V U) k)) fd v')
+               ltac:(cbn [us_ofile upd_usV us_V upd_ofile upd_ev pv_lazy pv_secc pv_upt pv_sz];
                      exact Hlz)).
-    cbn [us_ofile upd_usV us_V upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd
-         pv_name pv_fdg pv_lazy pv_secc].
+    cbn [us_ofile upd_usV us_V upd_ofile upd_ev pv_sz pv_upt pv_tf pv_ofile pv_cwd
+         pv_name pv_fdg pv_lazy pv_secc pv_ev].
     iSplitL "Hb"; [ iExact "Hb" | ].
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
@@ -882,8 +886,10 @@ Section KexitLoop.
                          = mword_of_int (KX + 0x38))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt38) in "Hpc".
-        iDestruct ("Hback" $! v with "Hpbare [Hcell Hpay]") as "Hpriv".
+        iDestruct ("Hback" $! v (pv_ev (us_V U)) with "[Hpbare] [Hcell Hpay]") as "Hpriv".
+        { rewrite upd_ev_id upd_usV_id. iExact "Hpbare". }
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell" | iExact "Hpay"]. }
+        iEval (rewrite upd_ev_id upd_usV_id) in "Hpriv".
         iEval (rewrite (us_ofile_id U fd v Hv)) in "Hpriv".
         iDestruct (cpu_own_transport CIDk CIDm 0 eb pj b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
@@ -965,7 +971,7 @@ Section KexitLoop.
                   with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hiru Hfcenv Hcpay").
         all: try lkbelow.
         { iExact "Hpbare". }
-        iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hiru Hout _ Hpbare".
+        iIntros (CIDo Hso mr kev) "Hcg Hown Htce Hcce Hpc %Hcs %Hkev Hfdslot Hiru Hout _ Hpbare".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
         assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KX + 0x46))
@@ -1017,7 +1023,7 @@ Section KexitLoop.
         iAssert (kx_fdpay (pv_fdg (us_V U)))%I with "[Hfrs Hcpays]" as "Hfrag".
         { iExists (<[fd := FdClosed]> sts). rewrite /fileclose_cpays.
           iSplitL "Hfrs"; [iExact "Hfrs" | iExact "Hcpays"]. }
-        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]") as "Hpriv".
+        iDestruct ("Hback" $! (zero_reg : mword 64) kev with "Hpbare [Hcell Hfdslot Hst]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell"|].
           iLeft. iFrame "Hfdslot Hst". done. }
         (* +0x4a c.j -> +0x38 *)
@@ -1040,12 +1046,13 @@ Section KexitLoop.
         iDestruct (cpu_claim_ext_transport CIDo CIDr eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
         iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! mr (us_ofile U fd (zero_reg : mword 64))
+        iApply ("Htail" $! mr (us_ofile (upd_usV U (upd_ev (us_V U) kev)) fd (zero_reg : mword 64))
                   with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru").
         + split; [exact Hmr9|]. split; [exact Hmr18|]. split; [exact Hmr19|].
           split; [exact Hmr20|]. split; [exact Hmrsp|].
           intro r; apply rf_to_gmap_dom.
-        + apply (kx_nulled_close gch ggen tfv cwdv); [exact Hnul|]. rewrite Hlen. exact Hfd. }
+        + apply (kx_nulled_close gch ggen tfv cwdv); [exact Hnul|].
+          cbn [us_V upd_usV upd_ev pv_ofile]. rewrite Hlen. exact Hfd. }
     iIntros (fd M U) "%Hfd %Hregs %Hnul Hcg Hown Htce Hcce Hpc Hpriv".
     iSpecialize ("Hloop" $! (NOFILE - fd)%nat).
     iSpecialize ("Hloop" $! CID0 with "[%]"); [by intros|].

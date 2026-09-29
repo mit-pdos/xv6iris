@@ -62,15 +62,16 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import BarePt.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Import Defs.
 
 
-Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-    (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string) :=
+    (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmfree in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -104,10 +105,14 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : 
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     mWP (Loop : expr riscv_lang)) -∗
@@ -115,9 +120,9 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : 
 
 Module Type UVMFREE.
   Parameter wp_uvmfree_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmfree_sconf_body γa mm uroot um K eb p ilvl b lks.
+      (K : nat) (eb : bool) (p : mword 64) (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_uvmfree_sconf_body γa mm uroot um K eb p ilvl b lks k.
 End UVMFREE.

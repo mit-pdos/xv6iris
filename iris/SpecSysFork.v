@@ -215,13 +215,16 @@ Definition wp_sys_fork_sconf_body
      row comes back below. *)
   ch_frag (pv_chg (us_V U)) p csP -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ mf : regfile,
+    ∀ (mf : regfile) (k' : nat),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
-      (* the caller's block comes back verbatim: kfork only reads it *)
-      proc_priv γf p pid U -∗
+      (* the caller's block comes back as kfork left it: verbatim but for
+         its event count, which only rose (permit sweep: allocproc, uvmcopy
+         and the failure path's freeproc take the caller's counter) *)
+      ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
+      proc_priv γf p pid (upd_usV U (upd_ev (us_V U) k')) -∗
       fd_frags (pv_fdg (us_V U)) sts -∗
       kalloc_env_at fsc_kalloc fsc_kpages None -∗
       (* ... and the return value is kfork's own, unchanged -- including the

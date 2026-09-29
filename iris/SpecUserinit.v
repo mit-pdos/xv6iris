@@ -166,6 +166,10 @@ Definition wp_userinit_sconf_body
      side goal. *)
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
+  (* THE BOOT HART HAS NO CURRENT PROC (permit sweep L1a): main runs at
+     [c->proc = 0], so allocproc's lend is the left disjunct
+     ([SlotGen.act_lend_zero]) -- the boot lends nothing. *)
+  pj = (zero_reg : mword 64) ->
   locks_below lks "proc" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0%nat eb pj b lks -∗
