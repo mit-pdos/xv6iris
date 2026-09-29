@@ -169,4 +169,29 @@ theorem upls_fs_le (p : Producer) (fs : List Filt) (h : ulineOk (.LPipe p fs)) :
   simp only [lineMax] at hlm
   omega
 
+/-- **Rocq `prod_body_len3`** (DRIFT SY1, Rocq `UShUPipes`, 7adb0cba2): every
+producer's body is at least three bytes (`echo` and `cat` both). -/
+theorem prod_body_len3 (p : Producer) (h : prodOk p) : 3 ≤ (wlBody (prodWords p)).length := by
+  cases p with
+  | PrEcho ws =>
+    have hh := lineOk_head ws h
+    cases ws with
+    | nil => cases hh
+    | cons w r =>
+      cases hh
+      simp [prodWords, wlBody_cons, cmdEcho]
+  | PrCatF f => simp [prodWords, wlBody_cons, fdWCat]
+
+/-- **Rocq `upls_fs_le15`**: AT MOST FIFTEEN STAGES AFTER THE PRODUCER --
+every producer's body is at least three bytes, every stage's suffix at least
+six, and the line is under `lineMax`.  What the node-0 child's out-of-memory
+walk needs of the parse's depth. -/
+theorem upls_fs_le15 (p : Producer) (fs : List Filt) (h : ulineOk (.LPipe p fs)) : fs.length ≤ 15 := by
+  have hlm := h.2.2.2
+  rw [lineBytes_pipe_length_fs] at hlm
+  have := sufFilts_len_ge fs
+  have hb := prod_body_len3 p h.1
+  simp only [lineMax] at hlm
+  omega
+
 end Xv6
