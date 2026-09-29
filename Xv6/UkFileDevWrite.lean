@@ -196,7 +196,7 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
     (hjx : jx < (echoChunks ws).length) (hb : b ≤ jx) (hch : (echoChunks ws).getD jx [] = bs)
     (hnb0 : 0 < bs.length) (hnbm : bs.length ≤ lineMax)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO) (hi5 : i ≠ GREP_INO)
-    (hi6 : i ≠ SECC_INO) :
+    (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
     ⊢ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗ appInv (hlc := hlc) fscFs -∗
       ustd N.fd l -∗ fileOut c r sf nm i γo ws b -∗
       ((ustd N.fd l -∗ fileOut c r sf nm i γo ws (jx + 1) -∗ K (bs.length : Int)) ∧
@@ -251,7 +251,7 @@ theorem file_write (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
     have hgd : (echoChunks ws)[jx]! = (echoChunks ws).getD jx [] := fdev_getElem!_getD (echoChunks ws) jx
     have hchain := efChain c r nm sf heq i γo ws sel jx M Mv pm sz Pt ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5)
       bs.length f (bs.length : Int) hsrc hwf hpm (hlf rfl) rfl hnb0 hfw hnbm hjx hlt (hgd ▸ hby) (hgd ▸ hlen')
-      hi1 hi2 hi3 hi4 hi5 hi6
+      hi1 hi2 hi3 hi4 hi5 hi6 hi7
     ihave Hc := hchain $$ Hbr Hinv Hq
     iapply fdev_chain_adv_frame i γo Mv ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 11#5) Pt (bs.length : Int)
       (efcur (hlc := hlc) c r nm sf i γo ws sel jx) (usrcAt N tx dq2 ua bs.length f) (wchunks (bs.length : Int)) 0 $$ Hc Hs2

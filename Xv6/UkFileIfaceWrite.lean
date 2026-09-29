@@ -109,7 +109,7 @@ theorem fif_write_m (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP
   ihave Hout := X.fifOutm_open d (bs :: rest) $$ Hout
   icases Hout with ⟨%nm, %i, %γo, %ws, Htk, %b, %hch, %hwok, Hout⟩
   obtain ⟨hb, hbs, hrest⟩ := fif_drop_cons _ _ _ _ hch.symm
-  obtain ⟨hi1, hi2, hi3, hi4, hi5, hi6, hlm⟩ := hwok
+  obtain ⟨hi1, hi2, hi3, hi4, hi5, hi6, hi7, hlm⟩ := hwok
   have hbl : bs.length ≤ lineMax := by
     apply hlm
     rw [← hbs, getElem!_pos (echoChunks ws) b hb]
@@ -131,7 +131,7 @@ theorem fif_write_m (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP
   have hlen : 0 < bs.length := by cases bs with | nil => exact absurd rfl hne | cons _ _ => simp
   ihave Hout := (show efany (hlc := hlc) X.c X.r nm X.sf i γo ws b ⊢ fileOut X.c X.r X.sf nm i γo ws b from .rfl) $$ Hout
   iapply UkFileDev.file_write DP.SYSD X.c X.r X.sf nm heq X.N X.P STB fd.toNat l rb i γo ws b b bs K (by omega) hrow hb
-    (Nat.le_refl b) hbs' hlen hbl hi1 hi2 hi3 hi4 hi5 hi6 $$ Hbr Hinv Hstd Hout
+    (Nat.le_refl b) hbs' hlen hbl hi1 hi2 hi3 hi4 hi5 hi6 hi7 $$ Hbr Hinv Hstd Hout
   isplit
   · iintro Hstd Hout
     ihave Hout := (show fileOut X.c X.r X.sf nm i γo ws (b + 1) ⊢ efany (hlc := hlc) X.c X.r nm X.sf i γo ws (b + 1)
@@ -145,7 +145,7 @@ theorem fif_write_m (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP
       iexists (b + 1)
       iframe Hout
       ipureintro
-      exact ⟨hrest, hi1, hi2, hi3, hi4, hi5, hi6, hlm⟩
+      exact ⟨hrest, hi1, hi2, hi3, hi4, hi5, hi6, hi7, hlm⟩
   · iintro Hstd Hout
     ihave Hout := (show fileOut X.c X.r X.sf nm i γo ws (b + 1) ⊢ efany (hlc := hlc) X.c X.r nm X.sf i γo ws (b + 1)
       from .rfl) $$ Hout
@@ -158,7 +158,7 @@ theorem fif_write_m (DP : FifDevP (hlc := hlc) (GF := GF)) (heq : HfpFileClaimsP
       iexists (b + 1)
       iframe Hout
       ipureintro
-      exact ⟨hrest, hi1, hi2, hi3, hi4, hi5, hi6, hlm⟩
+      exact ⟨hrest, hi1, hi2, hi3, hi4, hi5, hi6, hi7, hlm⟩
 
 /-- **Rocq `fif_nil_in`**: THE INPUT'S ZERO-LENGTH WRITE -- at the
 read-only standard slot (`FDIn true`) or tail handle (`FDIn false`), 0 or -1,

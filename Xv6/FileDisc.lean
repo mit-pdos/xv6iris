@@ -222,6 +222,12 @@ def dgOom : List (List (BitVec 8)) :=
   [[111#8, 117#8, 116#8], [111#8, 102#8], [109#8, 101#8, 109#8, 111#8, 114#8, 121#8]]
 def altOom : List (BitVec 8) := wlLine dgOom ++ uPrompt
 
+/-- `["exec", "sync", "failed"]`: sh's exec failure at the `sync` line
+(Rocq `dg_exec_sync`, drift SY2) -/
+def dgExecSync : List (List (BitVec 8)) :=
+  [[101#8, 120#8, 101#8, 99#8], cmdSync, [102#8, 97#8, 105#8, 108#8, 101#8, 100#8]]
+def altExecsync : List (BitVec 8) := wlLine dgExecSync ++ uPrompt
+
 /-- ONE ALTERNATIVE DECIDES A ROUND: what the console shows and what becomes
 of the named file.  `REcho` is the echo application's four, with no file
 effect (a line admits three of them: never the silent index 2, see
@@ -257,6 +263,12 @@ inductive Ralt where
   /-- "out of memory\n$ "; files unchanged -- the child died in `parsecmd`,
   before any open -/
   | ROom
+  /-- "$ "; files unchanged -- /sync ran and returned (it prints nothing on
+  success).  NOT a silent alternative: sh forked and exec'd /sync, and no other
+  alternative of the line shows the bare prompt (drift SY2) -/
+  | RSyncRan
+  /-- "exec sync failed\n$ " -/
+  | RSyncExec
   deriving DecidableEq
 
 instance : Inhabited Ralt := ⟨.REcho 0⟩
@@ -341,6 +353,9 @@ def raltEnc : Ralt → Nat
   | .RSExec => 17
   -- 18 is 6 mod 12: clear of `RFRan`'s class (3) and `REcho`'s (4)
   | .ROom => 18
+  -- 19 and 20 are 7 and 8 mod 12: clear the same way
+  | .RSyncRan => 19
+  | .RSyncExec => 20
 
 def raltDec (n : Nat) : Ralt :=
   if n < 4 then .REcho n
@@ -355,6 +370,8 @@ def raltDec (n : Nat) : Ralt :=
   else if n % 12 = 3 then .RFRan (fdDecList ((n - 15) / 12) ((n - 15) / 12))
   else if n = 17 then .RSExec
   else if n = 18 then .ROom
+  else if n = 19 then .RSyncRan
+  else if n = 20 then .RSyncExec
   else .REcho (4 + (n - 4) / 12)
 
 theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
@@ -368,7 +385,8 @@ theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
       simp only [raltDec]
       rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
         if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega)]
+        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
+        if_neg (by omega), if_neg (by omega)]
       congr 1; omega
   | RFRan sel =>
     simp only [raltEnc, raltDec]
@@ -413,6 +431,11 @@ def raltOk : Uline → Ralt → Prop
   | .LPipe _ _, _ => False
   | .LSecc _, .RCFork | .LSecc _, .RSExec | .LSecc _, .ROom => True
   | .LSecc _, _ => False
+  -- THE `sync` LINE (drift SY2): /sync ran (the bare prompt -- it prints
+  -- nothing on success), the exec failed, the fork panic, and the child's
+  -- out-of-memory death.  All four move nothing.
+  | .LSync, .RSyncRan | .LSync, .RSyncExec | .LSync, .RCFork | .LSync, .ROom => True
+  | .LSync, _ => False
 
 /-- THE FILE EFFECT.  `RFOpenM` is guarded at an ABSENT file (xv6's
 `sys_open` truncates only after `filealloc` has succeeded); `ROom`'s effect
@@ -433,6 +456,7 @@ def lineFile : Uline → Option (List (BitVec 8))
   | .LPipe (.PrEcho _) _ => none
   | .LPipe (.PrCatF g) _ => some g
   | .LSecc _ => none
+  | .LSync => none
 
 /-- the name a round's own diagnostics print -/
 def lname (l : Uline) : List (BitVec 8) := (lineFile l).getD fnameF
@@ -455,6 +479,8 @@ def cont (s : Fstate) (l : Uline) : Ralt → List (BitVec 8)
   | .RCFork => altPanic
   | .RSExec => altExecsecc
   | .ROom => altOom
+  | .RSyncRan => uPrompt
+  | .RSyncExec => altExecsync
 
 theorem fstateOk_fsm (s : Fstate) (l : Uline) (a : Ralt) (hs : fstateOk s) (hl : ulineOk l)
     (ha : raltOk l a) : fstateOk (fsm s l a) := by
@@ -507,6 +533,7 @@ theorem lname_fn (l : Uline) (hl : ulineOk l) : fnWord (lname l) := by
     | PrEcho ws => exact hf
     | PrCatF g => exact hl.1
   | LSecc ws => exact hf
+  | LSync => exact hf
 
 /-- a word line of name words: '$'-free, one newline, at its end -/
 theorem fn_nodollar_nonl (b : BitVec 8) (hb : fnByte b) : nodollar b ∧ b ≠ wlNl := by
@@ -569,6 +596,9 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
   have hoom : wlWf dgOom := by
     intro w hw; simp [dgOom] at hw
     rcases hw with rfl | rfl | rfl <;> exact ⟨by simp, by simp [wlAlnum]⟩
+  have hey : wlWf dgExecSync := by
+    intro w hw; simp [dgExecSync, cmdSync] at hw
+    rcases hw with rfl | rfl | rfl <;> exact ⟨by simp, by simp [wlAlnum]⟩
   have hpr : ∃ u : List (BitVec 8), uPrompt = u ++ uPrompt ∧ (∀ b ∈ u, nodollar b)
       ∧ (wlNl ∉ u ∨ ∃ v, wlNl ∉ v ∧ u = v ++ [wlNl]) :=
     ⟨[], rfl, by simp, Or.inl (by simp)⟩
@@ -606,6 +636,8 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
   | RCFork => simp [raltPanic] at hp
   | RSExec => exact ⟨wlLine dgExecSecc, rfl, wlLine_shape' _ hes⟩
   | ROom => exact ⟨wlLine dgOom, rfl, wlLine_shape' _ hoom⟩
+  | RSyncRan => exact hpr
+  | RSyncExec => exact ⟨wlLine dgExecSync, rfl, wlLine_shape' _ hey⟩
 
 /-! ## 4.  THE SESSION, WITH THE FILE STATE THREADED -/
 
@@ -788,5 +820,11 @@ theorem flineOk_echo (b : List (BitVec 8)) (hf : flineOk b) (hok : lineOk (wlWor
     have hh := lineOk_head _ hok
     simp [ulineWs] at hh
     exact cmdSeccomp_ne_echo hh
+  | LSync =>
+    exfalso
+    rw [ulineWs_body _ hlok] at hok
+    have hh := lineOk_head _ hok
+    simp [ulineWs] at hh
+    exact cmdSync_ne_echo hh
 
 end Xv6

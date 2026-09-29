@@ -36,6 +36,7 @@ import Xv6.UshURoundEcho
 import Xv6.UshURoundCat
 import Xv6.UshURoundRedir
 import Xv6.UshURoundSecc
+import Xv6.UshURoundSync
 import Xv6.LinkShRun
 import Xv6.LinkShParse
 import Xv6.LinkShExec

@@ -9,7 +9,8 @@ premise (discharged in `UShUPipes`): `echo` by the echo fork twin
 (`UshForkTwin.ushf_body_law_echo_pipe`), `echo … > f` by the redirect body
 at `ushsLp` (`wp_ushBodyPipe` at the redirect child's law), `cat f` by the cat
 body twin (`UshCatForkTwin.ushf_body_law_cat_pipe`), `seccomp x` by the
-generic body twin at `useccLp` (`wp_ushBodyPipeNc`), a pipeline by the
+generic body twin at `useccLp` (`wp_ushBodyPipeNc`), `sync` by the same twin
+at `usyncLp` (drift SY2), a pipeline by the
 premise.
 
 CONE (UShURound S4, reached): `ushq_body_law_union` (and the section's
@@ -87,6 +88,7 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
       shRedirChildLaw (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg -∗
       ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg ushsLpCat 68 -∗
       ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg useccLp 68 -∗
+      ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg usyncLp 68 -∗
       ushPanicLaw (hlc := hlc) (uWcu (hlc := hlc) ug r s0 PT PD) (uWbf (hlc := hlc) ug r s0) -∗
       ushfBodyLaw (hlc := hlc) N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushLineUpipe sz -∗
       ushfBodyLaw (hlc := hlc) N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushLineUnion sz := by
@@ -95,7 +97,7 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
       ushPanicLaw (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wc
         (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wb := rfl
   rw [hpl]
-  iintro #Hkl #Hchl #Hred #Hcatl #Hsecl #Hplaw #Hpipes
+  iintro #Hkl #Hchl #Hred #Hcatl #Hsecl #Hsyncl #Hplaw #Hpipes
   ihave #Hecho := ushf_body_law_echo_pipe UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) sz
     hszlo hszal hszok $$ Hkl Hchl Hplaw
   ihave #Hcat := ushf_body_law_cat_pipe UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) sz
@@ -130,6 +132,12 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
       (ulineWs (.LSecc ws)) sz l n (by unfold ushDpipe; omega) usecc_lp0 hregs hs1 ha5 hnn hnul hkl
       (usecc_lp_of_at ws f k len hlat) hszlo hszal hszok hpm1 hpmwb
       $$ Hgen Hhead HC Hjt Hkl Hsecl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
+  | LSync =>
+    -- `sync` -- the sync child, at the generic body twin (drift SY2)
+    iapply wp_ushBodyPipeNc UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) usyncLp 68 h m f k len
+      (ulineWs .LSync) sz l n (by unfold ushDpipe; omega) usync_lp0 hregs hs1 ha5 hnn hnul hkl
+      (usync_lp_of_at f k len hlat) hszlo hszal hszok hpm1 hpmwb
+      $$ Hgen Hhead HC Hjt Hkl Hsyncl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 end UShURoundBody
 

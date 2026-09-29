@@ -125,7 +125,7 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (hjx : jx < (echoChunks ws).length)
     (hlt : ∀ q ∈ sel, q < jx)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
-    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) :
+    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileWq (hlc := hlc) c r N s i ws sel off -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
       |={appE}=> (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
@@ -201,7 +201,7 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   · iexact Hka
   isplitl [Hd]
   · iapply fileAppStep_park (hlc := hlc) c r i I _ _ _ heq
-      (fileFsPure_write i offk bs (absView I) hi1 hi2 hi3 hi4 hi5 hi6)
+      (fileFsPure_write i offk bs (absView I) hi1 hi2 hi3 hi4 hi5 hi6 hi7)
       (consAbsent_write i offk bs (absView I))
       (fun jc => consPresent_write jc i offk bs (absView I)) hstep $$ Hd Hty'
   -- PHASE 2
@@ -240,7 +240,7 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (hjx : jx < (echoChunks ws).length)
     (hlt : ∀ q ∈ sel, q < jx)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
-    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO)
+    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO)
     (hbsk : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) ((echoChunks ws)[jx]!))
     (hlenk : (((echoChunks ws)[jx]!).length : Int) = wchunkAt nn k) :
     ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
@@ -339,7 +339,7 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   -- the cursor goes back together for the phase lemma
   ihave Hq := fileWq_intro (hlc := hlc) c r N s i ws sel _ ls hoff0 hline hsel hin $$ Hd Htk Hlb
   imod fileAwritePhases (hlc := hlc) γfs c r N s i ws sel jx _ _ I bs bs0 nl heq hpre hnode
-      rfl hbs hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 $$ Hinv Hq Hka with ⟨Hka, Hstep, Hph2⟩
+      rfl hbs hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 $$ Hinv Hq Hka with ⟨Hka, Hstep, Hph2⟩
   imod uoff_advance γo _ bs.length $$ Hu Hk with ⟨Hk, Hu⟩
   imodintro
   isplitl [Hka]

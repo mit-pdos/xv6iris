@@ -63,3 +63,20 @@ and U1-T/U1-R/U1-P/U1-F follow-ups, and the camera slots (`UnionGF.lean`).  For 
   (the `consOpen_post_pre` pattern).
 - Run walks generic in the class and read the post at the instance in a separate lemma.  Never let the
   kernel evaluate a literal ELF: state size lemmas over an arbitrary file.
+
+## Drift SY2 (the `sync` line, Rocq b23e6791f): ported in the pre-hook shape
+
+- Ported: `LSync`/`RSyncRan`/`RSyncExec`/`usyncOk` and their arms (FileDiscLine, FileDisc, FileHooks,
+  FileOutPure, PipesUline, UnionDisc, UshURoundPure, UkUnionEntriesPure, UInitUnionDisc, UshMainLine),
+  /sync's image (User/Sync*, ElfUser, FsImgFiles/Names), `FsSyncPin` (the seventh pin, threaded as
+  `i ≠ SYNC_INO`), the program (UkSyncDefs/Stubs, Spec/ProofSyncMain, Spec/ProofSyncStart, LinkSync),
+  `UshSync`, `UkSyncEntry`, `UshURoundSync.uHchild_sync`, the dispatch at `LSync` (UshURoundBody), the
+  slot (`shSyncSlot`, UshUPipesBody, UInitUnionBoot), the sync demos of UnionDiscDec §6 (UnionDemo;
+  the `I_sy` trace demos are not ported).
+- **Left for the durability lanes (D2-dur / E)**: Rocq main's hook form.  `syncPay P R := P -∗ R` is
+  b23e6791f's; main's is `sync_pay P Qr R := P -∗ Qr -∗ R` with `Qr := Q_opt oQ`, the ecall at 0x36a a
+  parameter `ksync_leaf oQ` (discharged by `ksync_leaf_none` / `UkSyncEntry.ksync_leaf_xv6`), the
+  entry's Pay `P ∗ hook_opt gen_id oQ`, and `uHchild_sync`'s lend split (`usync_q`/`usync_lend`,
+  `Hhk`).  Lean walks the ecall with the CURRENT quiet leaf (`UK_SYS_P.quiet`, 22 ∈ `freeNum`).
+- Not ported (unreached, as at DU1): `USyncKernel` (the generic entry's sync gate), `UCodeSync` as a
+  catalog (DU3: text evaluations), the deciders (`FileDiscDec`, `UnionDecU`), `FileOutPure.ralt_def`.

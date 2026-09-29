@@ -250,6 +250,16 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     isplitl []
     · iexact Hfs
     · iexact Hmint
+  -- /sync's, the same way (drift SY2)
+  ihave #Hsync : shSyncSlot (hlc := hlc) (fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl) $$ []
+  · unfold shSyncSlot
+    iapply (shPinSlot_mono (hlc := hlc) (GF := GF) fileFsPure era0SyncPins _ fileFsPure_sync)
+    unfold shPinSlot
+    isplitl []
+    · iexact Hinv
+    isplitl []
+    · iexact Hfs
+    · iexact Hmint
   -- the shell's slot, under the console's flag
   ihave #Hsh : iprop(□ ∀ jo : Option Nat, fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo -∗
       initShSlot (hlc := hlc) (fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl)
@@ -271,7 +281,7 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     · iintro %γp %N
       rw [← Xu_initShCtx]
       iapply (sh_round_holds_union_closed (hlc := hlc) (GF := GF) E ug r s0 γp heq hcons hkill hwild hrdws
-        shRsh (fun _ _ _ => rfl) N) $$ Hlks Hdep Hslot Hcat Hgrep Hsecc Hpine [Hcred]
+        shRsh (fun _ _ _ => rfl) N) $$ Hlks Hdep Hslot Hcat Hgrep Hsecc Hsync Hpine [Hcred]
       iexists jo
       iexact Hcred
     ihave #Htg : iprop(∀ γp : GName, ushTagLaw (hlc := hlc)

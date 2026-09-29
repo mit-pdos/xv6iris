@@ -286,7 +286,8 @@ theorem uok_echo_st (adm : Pline' → Bool) (s s' : Fstate) (ws : List (List (Bi
   | UR r => exact h
   | _ => cases h
 
-/-! ## 2.  THE LINES: the file's parser, then the pipeline's, then the seccomp line's -/
+/-! ## 2.  THE LINES: the file's parser, then the pipeline's, then the seccomp line's,
+then the sync line's (drift SY2) -/
 
 /-- **Rocq `uline_of_u`**. -/
 noncomputable def ulineOfU (b : List (BitVec 8)) : Uline :=
@@ -298,7 +299,7 @@ noncomputable def ulineOfU (b : List (BitVec 8)) : Uline :=
     | _ =>
       match seccParse b with
       | some ws => .LSecc ws
-      | none => default
+      | none => if syncParse b then .LSync else default
 
 /-- **Rocq `upipe_ok`**: a body the admission lets through as a pipeline. -/
 noncomputable def upipeOk (adm : Pline' → Bool) (b : List (BitVec 8)) : Prop :=
@@ -313,10 +314,14 @@ noncomputable def useccOk (admS : List (List (BitVec 8)) → Bool) (b : List (Bi
   | some ws => admS ws = true
   | none => False
 
+/-- **Rocq `usync_ok`** (drift SY2): THE SYNC LINE is admitted outright -- it
+names no file and reads nothing. -/
+def usyncOk (b : List (BitVec 8)) : Prop := syncParse b = true
+
 /-- **Rocq `ubody_ok`**. -/
 noncomputable def ubodyOk (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool)
     (b : List (BitVec 8)) : Prop :=
-  fbodyOk b ∨ upipeOk adm b ∨ useccOk admS b
+  fbodyOk b ∨ upipeOk adm b ∨ useccOk admS b ∨ usyncOk b
 
 /-- **Rocq `usecc_adm`**: a seccomp line is well formed at the model only
 when admitted. -/
@@ -441,6 +446,36 @@ theorem ulineOfU_secc (ws : List (List (BitVec 8))) (hok : seccOk ws) :
     ulineOfU (lineBody (.LSecc ws)) = .LSecc ws :=
   ulineOfU_secc_parse _ ws (seccParse_body ws hok)
 
+/-- **Rocq `pl_parse_not_sync`**: a pipeline's body is not `sync`. -/
+theorem plParse_not_sync (b : List (BitVec 8)) (l : Pline') (hq : plParse b = some l) :
+    syncParse b = false := by
+  obtain ⟨hok, hb⟩ := plParse_some b l hq
+  unfold syncParse
+  rw [decide_eq_false_iff_not]
+  intro hs
+  have hw := ulineWs_ofPl_all l hok
+  rw [← hb, hs, show wlWords cmdSync = [cmdSync] by decide] at hw
+  have hl := ulineWs_sync (ulineOfPl l) (ulineOk_ofPl_all l hok) hw
+  cases l <;> cases hl
+
+/-- **Rocq `uline_of_u_sync_parse`**. -/
+theorem ulineOfU_sync_parse (b : List (BitVec 8)) (hs : syncParse b = true) :
+    ulineOfU b = .LSync := by
+  unfold ulineOfU
+  cases hp : parseLine b with
+  | some l => rw [syncParse_fbody b ⟨l, hp⟩] at hs; cases hs
+  | none =>
+    cases hq : plParse b with
+    | some l => rw [plParse_not_sync b l hq] at hs; cases hs
+    | none =>
+      cases hc : seccParse b with
+      | some ws => rw [syncParse_secc b ws hc] at hs; cases hs
+      | none => simp only [hs, if_true]
+
+/-- **Rocq `uline_of_u_sync`**. -/
+theorem ulineOfU_sync : ulineOfU (lineBody .LSync) = .LSync :=
+  ulineOfU_sync_parse _ syncParse_body
+
 theorem ulineOfU_ok (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool)
     (b : List (BitVec 8)) (hb : ubodyOk adm admS b) : ulineOkU admS (ulineOfU b) := by
   unfold ulineOfU
@@ -451,7 +486,7 @@ theorem ulineOfU_ok (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → B
     | LSecc ws => exact absurd hp (parseLine_not_secc b ws)
     | _ => trivial
   | none =>
-    rcases hb with ⟨l, hl⟩ | hpipe | hsecc
+    rcases hb with ⟨l, hl⟩ | hpipe | hsecc | hsync
     · rw [hp] at hl; cases hl
     · unfold upipeOk at hpipe
       cases hq : plParse b with
@@ -472,6 +507,15 @@ theorem ulineOfU_ok (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → B
         | none => exact ⟨hok, hsecc⟩
         | some l =>
           rw [plParse_not_secc b l hq] at hs; cases hs
+    · unfold usyncOk at hsync
+      cases hq : plParse b with
+      | some l => rw [plParse_not_sync b l hq] at hsync; cases hsync
+      | none =>
+        cases hc : seccParse b with
+        | some ws => rw [syncParse_secc b ws hc] at hsync; cases hsync
+        | none =>
+          simp only [hsync, if_true]
+          exact ⟨trivial, trivial⟩
 
 /-- **Rocq `sfx_term_pos`**: a terminal run proves its line has a stage. -/
 theorem sfxTerm_pos (fc : List (BitVec 8) → Option (List (BitVec 8))) (L : List (BitVec 8))
@@ -508,6 +552,15 @@ theorem secc_body_short (b : List (BitVec 8)) (ws : List (List (BitVec 8)))
   obtain ⟨⟨_, _, _, hl⟩, rfl⟩ := seccParse_some b ws hs
   rw [wlLine_length] at hl
   exact hl
+
+/-- **Rocq `sync_body_bytes`**: the sync body's bytes, as a line's. -/
+theorem sync_body_bytes (b : List (BitVec 8)) (hs : syncParse b = true) : ∀ x ∈ b, fbodyByte x := by
+  rw [syncParse_true b hs]
+  exact fun x hx => Or.inl (Or.inl (cmdSync_word.2 x hx))
+
+/-- **Rocq `sync_body_short`**. -/
+theorem sync_body_short (b : List (BitVec 8)) (hs : syncParse b = true) : b.length + 1 < lineMax := by
+  rw [syncParse_true b hs]; decide
 
 section laws
 variable (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool)
@@ -626,7 +679,7 @@ theorem ulm_laws : LmLaws (ulm adm admS) where
 
 theorem ulm_body_bytes (b : List (BitVec 8)) (hb : ubodyOk adm admS b) :
     ∀ x ∈ b, ubodyByte x := by
-  rcases hb with hb | hb | hb
+  rcases hb with hb | hb | hb | hb
   · exact fun x hx => Or.inl (fbodyOk_bytes b hb x hx)
   · unfold upipeOk at hb
     split at hb
@@ -643,10 +696,11 @@ theorem ulm_body_bytes (b : List (BitVec 8)) (hb : ubodyOk adm admS b) :
     · rename_i ws hs
       exact fun x hx => Or.inl (secc_body_bytes b ws hs x hx)
     · cases hb
+  · exact fun x hx => Or.inl (sync_body_bytes b hb x hx)
 
 theorem ulm_body_short (b : List (BitVec 8)) (hb : ubodyOk adm admS b) :
     b.length + 1 < lineMax := by
-  rcases hb with hb | hb | hb
+  rcases hb with hb | hb | hb | hb
   · exact fbodyOk_short b hb
   · unfold upipeOk at hb
     split at hb
@@ -659,6 +713,7 @@ theorem ulm_body_short (b : List (BitVec 8)) (hb : ubodyOk adm admS b) :
     · rename_i ws hs
       exact secc_body_short b ws hs
     · cases hb
+  · exact sync_body_short b hb
 
 /-- **Rocq `ulm_byte_laws`**. -/
 theorem ulm_byte_laws : LmByteLaws (ulm adm admS) where

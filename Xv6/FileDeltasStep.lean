@@ -51,10 +51,10 @@ theorem f_inum_not_pinned (av : Aview) (i : Nat) (bs : List (BitVec 8))
     (hp : fileFsPure av) (hrow : PartialMap.get? av i = some ⟨.AFile bs, 1⟩)
     (hlen : bs.length < lineMax) :
     i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO
-    ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO := by
-  obtain ⟨⟨_, R1⟩, ⟨_, R2⟩, ⟨_, R3⟩, ⟨_, R4⟩, ⟨_, R5⟩, ⟨_, R6⟩⟩ := fileFsPure_pins av hp
+    ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO := by
+  obtain ⟨⟨_, R1⟩, ⟨_, R2⟩, ⟨_, R3⟩, ⟨_, R4⟩, ⟨_, R5⟩, ⟨_, R6⟩, ⟨_, R7⟩⟩ := fileFsPure_pins av hp
   have hl : bs.length < 100 := hlen
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro heq <;> rw [heq] at hrow
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro heq <;> rw [heq] at hrow
   · have := rowFlen_eq av _ bs initBytes 1 1 hrow R1
     rw [init_bytes_length] at this; omega
   · have := rowFlen_eq av _ bs shBytes 1 1 hrow R2
@@ -67,6 +67,8 @@ theorem f_inum_not_pinned (av : Aview) (i : Nat) (bs : List (BitVec 8))
     rw [grep_bytes_length] at this; omega
   · have := rowFlen_eq av _ bs seccBytes 1 1 hrow R6
     rw [secc_bytes_length] at this; omega
+  · have := rowFlen_eq av _ bs syncfBytes 1 1 hrow R7
+    rw [syncf_bytes_length] at this; omega
 
 /-! ## 5d. The composite create -/
 

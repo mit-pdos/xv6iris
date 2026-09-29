@@ -205,6 +205,22 @@ theorem seccOk_wf (ws : List (List (BitVec 8))) (h : seccOk ws) : fnWf (cmdSecco
   · exact wlWord_fn _ cmdSeccomp_word
   · exact h.1 w hw
 
+/-- THE SYNC LINE (Rocq `cmd_sync`, drift SY2): `sync` -- the command word
+alone, the image's /sync (`sync(); exit(0)`, prints nothing).  Like `LSecc`
+the constructor is ADDITIVE: `parseLine` never answers it (the union's parser
+`UnionDisc.ulineOfU` reads it through `syncParse`). -/
+def cmdSync : List (BitVec 8) := [115#8, 121#8, 110#8, 99#8]
+
+/-- Rocq `cmd_sync_word`. -/
+theorem cmdSync_word : wlWord cmdSync :=
+  ⟨by simp [cmdSync], by simp [cmdSync, wlAlnum]⟩
+
+theorem cmdSync_ne_echo : cmdSync ≠ cmdEcho := by decide
+
+theorem cmdSync_ne_cat : cmdSync ≠ fdWCat := by decide
+
+theorem cmdSync_ne_secc : cmdSync ≠ cmdSeccomp := by decide
+
 /-- `'>'` is not a file-name word -/
 theorem fdWGt_not_fn : ¬ fnWord fdWGt := by
   rintro ⟨_, h⟩
@@ -220,6 +236,7 @@ inductive Uline where
   | LCat (N : List (BitVec 8))
   | LPipe (p : Producer) (fs : List Filt)
   | LSecc (ws : List (List (BitVec 8)))
+  | LSync
   deriving DecidableEq
 
 instance : Inhabited Uline := ⟨.LEcho []⟩
@@ -233,6 +250,7 @@ def ulineWs : Uline → List (List (BitVec 8))
   | .LCat N => [fdWCat, N]
   | .LPipe p fs => prodWords p ++ wFilts fs
   | .LSecc ws => cmdSeccomp :: ws
+  | .LSync => [cmdSync]
 
 /-- THE BODY the console cut keeps. -/
 def lineBody : Uline → List (BitVec 8)
@@ -241,6 +259,7 @@ def lineBody : Uline → List (BitVec 8)
   | .LCat N => cmdCat N
   | .LPipe p fs => prodBody p ++ sufFilts fs
   | .LSecc ws => wlBody (cmdSeccomp :: ws)
+  | .LSync => cmdSync
 
 /-- ...and the LINE the user typed: the body and the newline `gets` stops at. -/
 def lineBytes (l : Uline) : List (BitVec 8) := lineBody l ++ [wlNl]
@@ -256,6 +275,7 @@ def ulineOk : Uline → Prop
   | .LPipe p fs =>
     prodOk p ∧ fs ≠ [] ∧ (∀ F ∈ fs, filtOk F) ∧ (lineBytes (.LPipe p fs)).length < lineMax
   | .LSecc ws => seccOk ws
+  | .LSync => True
 
 /-! ### The pipe line's words are its body's parse -/
 
@@ -431,19 +451,20 @@ noncomputable def ulineOf (b : List (BitVec 8)) : Uline := (parseLine b).getD de
 /-- the lines of an input, in order -/
 noncomputable def linesOf (I : List (BitVec 8)) : List Uline := (bodiesOf I).map ulineOf
 
-/-! ### `LPipe` and `LSecc` are out of the parser's range -/
+/-! ### `LPipe`, `LSecc` and `LSync` are out of the parser's range -/
 
-/-- a line of the PARSER's range: the guard the round-trip lemmas carry -/
+/-- a line of the PARSER's range: the guard the round-trip lemmas carry
+(drift SY2: `LSync` is out of the range the same way) -/
 def ulineNopipe (l : Uline) : Prop :=
-  (∀ ws n, l ≠ .LPipe ws n) ∧ (∀ ws, l ≠ .LSecc ws)
+  (∀ ws n, l ≠ .LPipe ws n) ∧ (∀ ws, l ≠ .LSecc ws) ∧ l ≠ .LSync
 
 theorem ulineNopipe_echo (ws : List (List (BitVec 8))) : ulineNopipe (.LEcho ws) :=
-  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
+  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h), fun h => (by cases h)⟩
 theorem ulineNopipe_echof (ws : List (List (BitVec 8))) (N : List (BitVec 8)) :
     ulineNopipe (.LEchoF ws N) :=
-  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
+  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h), fun h => (by cases h)⟩
 theorem ulineNopipe_cat (N : List (BitVec 8)) : ulineNopipe (.LCat N) :=
-  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
+  ⟨fun _ _ h => (by cases h), fun _ h => (by cases h), fun h => (by cases h)⟩
 
 /-- every answer of the parser is one of its three constructors -/
 theorem parseLine_cases (b : List (BitVec 8)) (l : Uline) (h : parseLine b = some l) :
@@ -473,12 +494,19 @@ theorem parseLine_not_secc (b : List (BitVec 8)) (ws : List (List (BitVec 8))) :
   intro h
   rcases parseLine_cases b _ h with ⟨_, h'⟩ | ⟨_, _, h'⟩ | ⟨_, h'⟩ <;> cases h'
 
+/-- Rocq `parse_line_not_sync`. -/
+theorem parseLine_not_sync (b : List (BitVec 8)) : parseLine b ≠ some .LSync := by
+  intro h
+  rcases parseLine_cases b _ h with ⟨_, h'⟩ | ⟨_, _, h'⟩ | ⟨_, h'⟩ <;> cases h'
+
 theorem ulineOf_nopipe (b : List (BitVec 8)) : ulineNopipe (ulineOf b) := by
   unfold ulineOf
   cases hp : parseLine b with
   | none => exact ulineNopipe_echo []
   | some l =>
-    refine ⟨fun ws n he => parseLine_not_pipe b ws n ?_, fun ws he => parseLine_not_secc b ws ?_⟩
+    refine ⟨fun ws n he => parseLine_not_pipe b ws n ?_, fun ws he => parseLine_not_secc b ws ?_,
+      fun he => parseLine_not_sync b ?_⟩
+    · simp only [Option.getD_some] at he; rw [hp, he]
     · simp only [Option.getD_some] at he; rw [hp, he]
     · simp only [Option.getD_some] at he; rw [hp, he]
 
@@ -591,7 +619,8 @@ theorem parseLine_body (l : Uline) (hnp : ulineNopipe l) (hok : ulineOk l) :
     parseLine (lineBody l) = some l := by
   cases l with
   | LPipe p fs => exact absurd rfl (hnp.1 p fs)
-  | LSecc ws => exact absurd rfl (hnp.2 ws)
+  | LSecc ws => exact absurd rfl (hnp.2.1 ws)
+  | LSync => exact absurd rfl hnp.2.2
   | LEcho ws =>
     have hbo := bodyOk_of_lineOk ws hok
     have hw := wlWords_body ws (lineOk_wf _ hok)
@@ -656,6 +685,7 @@ theorem ulineWs_body (l : Uline) (hok : ulineOk l) : wlWords (lineBody l) = ulin
   | LCat N => exact catWords_N N (uname_lex N hok)
   | LPipe p fs => exact ulineWs_pipe p fs hok.1 hok.2.2.1
   | LSecc ws => exact wlWords_body_fn _ (seccOk_wf ws hok)
+  | LSync => decide
 
 /-- THE TYPED LINE'S WORDS ARE THE BODY'S PARSE, at every constructor
 (RULING SLOT-WS, option B). -/
@@ -718,6 +748,7 @@ theorem ulineWs_head_secc (l : Uline) (hok : ulineOk l)
     | PrCatF g =>
       simp [ulineWs, prodWords] at hh; exact absurd hh.symm cmdSeccomp_ne_cat
   | LSecc ws => exact ⟨ws, rfl⟩
+  | LSync => simp [ulineWs] at hh; exact absurd hh cmdSync_ne_secc
 
 /-- a body in `parseLine`'s range is not a seccomp body -/
 theorem fbodyOk_not_secc (b : List (BitVec 8)) (hf : fbodyOk b) : ¬ seccBody b := by
@@ -725,10 +756,69 @@ theorem fbodyOk_not_secc (b : List (BitVec 8)) (hf : fbodyOk b) : ¬ seccBody b 
   obtain ⟨hok, _⟩ := fbodyOk_line b hf
   rw [← ulineWs_words b hf] at hh
   obtain ⟨ws, hws⟩ := ulineWs_head_secc _ hok hh
-  exact (ulineOf_nopipe b).2 ws hws
+  exact (ulineOf_nopipe b).2.1 ws hws
 
 theorem seccParse_fbody (b : List (BitVec 8)) (hf : fbodyOk b) : seccParse b = none := by
   unfold seccParse; rw [if_neg (fbodyOk_not_secc b hf)]
+
+/-! ### The sync line's parse (Rocq b23e6791f, drift SY2)
+
+`parseLine` never answers `LSync` (`parseLine_not_sync`); the union reads the
+one body `sync` through `syncParse`, after the seccomp line's parser. -/
+
+/-- Rocq `sync_parse`. -/
+def syncParse (b : List (BitVec 8)) : Bool := decide (b = cmdSync)
+
+theorem syncParse_true (b : List (BitVec 8)) (h : syncParse b = true) : b = lineBody .LSync := by
+  unfold syncParse at h; exact of_decide_eq_true h
+
+theorem syncParse_body : syncParse (lineBody .LSync) = true := by decide
+
+/-- ONLY THE SYNC LINE HAS THE WORDS `sync` (Rocq `uline_ws_sync`). -/
+theorem ulineWs_sync (l : Uline) (hok : ulineOk l) (hw : ulineWs l = [cmdSync]) : l = .LSync := by
+  cases l with
+  | LEcho ws =>
+    exfalso
+    have hh := lineOk_head ws hok
+    simp only [ulineWs] at hw; rw [hw] at hh
+    simp at hh; exact cmdSync_ne_echo hh
+  | LEchoF ws N =>
+    exfalso
+    have h2 := lineOk_ge2 ws hok.1
+    have := congrArg List.length hw
+    simp only [ulineWs, List.length_append, List.length_cons, List.length_nil] at this; omega
+  | LCat N => simp [ulineWs] at hw
+  | LPipe p fs =>
+    exfalso
+    cases p with
+    | PrEcho ws =>
+      have h2 := prodWords_ge2 (.PrEcho ws) hok.1
+      have := congrArg List.length hw
+      simp only [ulineWs, List.length_append, List.length_cons, List.length_nil] at this; omega
+    | PrCatF g => simp [ulineWs, prodWords] at hw
+  | LSecc ws => simp [ulineWs] at hw; exact absurd hw.1.symm cmdSync_ne_secc
+  | LSync => rfl
+
+/-- a body in `parseLine`'s range is not `sync` (Rocq `sync_parse_fbody`). -/
+theorem syncParse_fbody (b : List (BitVec 8)) (hf : fbodyOk b) : syncParse b = false := by
+  unfold syncParse
+  rw [decide_eq_false_iff_not]
+  intro hb
+  obtain ⟨hok, _⟩ := fbodyOk_line b hf
+  have hw : ulineWs (ulineOf b) = [cmdSync] := by rw [ulineWs_words b hf, hb]; decide
+  exact (ulineOf_nopipe b).2.2 (ulineWs_sync _ hok hw)
+
+/-- a seccomp body is not `sync` (Rocq `sync_parse_secc`). -/
+theorem syncParse_secc (b : List (BitVec 8)) (ws : List (List (BitVec 8)))
+    (hs : seccParse b = some ws) : syncParse b = false := by
+  obtain ⟨_, rfl⟩ := seccParse_some b ws hs
+  unfold syncParse
+  rw [decide_eq_false_iff_not]
+  intro hq
+  -- the second byte: `e` against `y`
+  have h1 := congrArg (fun l => l[1]?) hq
+  simp only [lineBody, wlBody_cons, cmdSeccomp, cmdSync] at h1
+  simp at h1
 
 /-! ### ...and the reading that survives the fourth constructor -/
 
@@ -766,6 +856,10 @@ theorem flineOk_cat_words (b N : List (BitVec 8)) (hf : flineOk b)
   | LSecc ws =>
     exfalso
     simp [ulineWs] at hw; exact cmdSeccomp_ne_cat hw.1
+  | LSync =>
+    -- one word
+    exfalso
+    simp [ulineWs] at hw
 
 /-- ...AND THE `seccomp x` WORD LIST -/
 theorem flineOk_secc_words (b : List (BitVec 8)) (ws : List (List (BitVec 8))) (hf : flineOk b)
@@ -775,6 +869,13 @@ theorem flineOk_secc_words (b : List (BitVec 8)) (ws : List (List (BitVec 8))) (
   obtain ⟨ws', rfl⟩ := ulineWs_head_secc l hok (by rw [hw]; rfl)
   simp [ulineWs] at hw; subst hw
   exact ⟨hok, rfl⟩
+
+/-- ...AND THE `sync` WORD LIST (Rocq `fline_ok_sync_words`). -/
+theorem flineOk_sync_words (b : List (BitVec 8)) (hf : flineOk b) (hw : wlWords b = [cmdSync]) :
+    b = lineBody .LSync := by
+  obtain ⟨l, hok, rfl⟩ := hf
+  rw [ulineWs_body l hok] at hw
+  rw [ulineWs_sync l hok hw]
 
 /-- WHICH LINE A REDIRECT WORD LIST IS (RULING SLOT-WS, option B) -/
 theorem flineOk_redir_words (b : List (BitVec 8)) (ws : List (List (BitVec 8)))
@@ -826,6 +927,11 @@ theorem flineOk_redir_words (b : List (BitVec 8)) (ws : List (List (BitVec 8)))
     have hwf := seccOk_wf ws' hok
     have hmem : fdWGt ∈ ulineWs (.LSecc ws') := by rw [hw]; simp
     exact fdWGt_not_fn (hwf _ hmem)
+  | LSync =>
+    -- one word
+    exfalso
+    have := congrArg List.length hw
+    simp only [ulineWs, List.length_append, List.length_cons, List.length_nil] at this; omega
 
 /-- an admissible body is made of body bytes and fits `getcmd`'s buffer --
 the two facts the snoc law needs when a newline closes a line -/
@@ -836,7 +942,8 @@ theorem fbodyOk_bytes (b : List (BitVec 8)) (hb : fbodyOk b) : ∀ x ∈ b, fbod
   generalize ulineOf b = l at hok hnp
   cases l with
   | LPipe p fs => exact absurd rfl (hnp.1 p fs)
-  | LSecc ws => exact absurd rfl (hnp.2 ws)
+  | LSecc ws => exact absurd rfl (hnp.2.1 ws)
+  | LSync => exact absurd rfl hnp.2.2
   | LEcho ws =>
     exact fun x hx => fbodyByte_of_body x (wlBody_bytes ws (lineOk_wf _ hok) x hx)
   | LEchoF ws N =>
@@ -853,7 +960,8 @@ theorem fbodyOk_short (b : List (BitVec 8)) (hb : fbodyOk b) : b.length + 1 < li
   generalize ulineOf b = l at hok hnp
   cases l with
   | LPipe p fs => exact absurd rfl (hnp.1 p fs)
-  | LSecc ws => exact absurd rfl (hnp.2 ws)
+  | LSecc ws => exact absurd rfl (hnp.2.1 ws)
+  | LSync => exact absurd rfl hnp.2.2
   | LEcho ws =>
     have := lineOk_len ws hok
     rw [wlLine_length] at this; exact this
@@ -903,6 +1011,7 @@ theorem lineBytes_bytes (l : Uline) (hok : ulineOk l) :
         · exact Or.inl h
         · exact Or.inr (Or.inl h)
     | LSecc ws => exact Or.inl (fbodyByte_of_fn b (wlBody_bytes_fn _ (seccOk_wf ws hok) b hb))
+    | LSync => exact Or.inl (Or.inl (Or.inl (cmdSync_word.2 b hb)))
   · simp at hb; exact Or.inr (Or.inr hb)
 
 /-- D3: every COMPLETE body parses to an admissible line, and the partial

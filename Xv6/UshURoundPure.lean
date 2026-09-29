@@ -63,6 +63,7 @@ theorem ulm_ok_R (s : Fstate) (l : Uline) (a : Ralt) (hnp : ulineNopipe l) :
   | LEchoF _ _ => exact Iff.rfl
   | LCat _ => exact Iff.rfl
   | LSecc _ => exact Iff.rfl
+  | LSync => exact Iff.rfl
 
 /-- **Rocq `ulm_cont_R`**. -/
 theorem ulm_cont_R (s : Fstate) (l : Uline) (a : Ralt) :
@@ -113,6 +114,31 @@ theorem ulm_ab_R (I : List (BitVec 8)) (a : Ralt) (hnp : ulineNopipe (ul I))
     lmAb ulmG ulmGHooks I (ualtCode (.UR a)) = cont ∅ (ul I) a := by
   unfold lmAb
   rw [if_pos ⟨(ulm_ok_R (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
+  exact ulm_cont_R ∅ (ul I) a
+
+/-- **Rocq `ulm_ok_R'`**: at any line that is no pipeline (the seccomp and
+sync lines included; drift SY2 reaches it at `LSync`). -/
+theorem ulm_ok_R' (s : Fstate) (l : Uline) (a : Ralt) (hnp : ∀ p n, l ≠ .LPipe p n) :
+    ulmG.lmOk s l (ulmG.lmDec (ualtCode (.UR a))) ↔ raltOk l a := by
+  show uok admUG s l (ualtDec (ualtCode (.UR a))) ↔ raltOk l a
+  rw [ualtDec_code]
+  cases l with
+  | LPipe p n => exact absurd rfl (hnp p n)
+  | _ => exact Iff.rfl
+
+/-- **Rocq `ulm_apr_R'`**. -/
+theorem ulm_apr_R' (I : List (BitVec 8)) (a : Ralt) (hnp : ∀ p n, ul I ≠ .LPipe p n)
+    (hok : raltOk (ul I) a) (hfr : fstateFree a = true) (hp : raltPanic a = false) :
+    lmApr ulmG ulmGHooks I (ualtCode (.UR a)) :=
+  ⟨(ulm_ok_R' (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr,
+    by rw [ulm_panic_R]; exact hp⟩
+
+/-- **Rocq `ulm_ab_R'`**. -/
+theorem ulm_ab_R' (I : List (BitVec 8)) (a : Ralt) (hnp : ∀ p n, ul I ≠ .LPipe p n)
+    (hok : raltOk (ul I) a) (hfr : fstateFree a = true) :
+    lmAb ulmG ulmGHooks I (ualtCode (.UR a)) = cont ∅ (ul I) a := by
+  unfold lmAb
+  rw [if_pos ⟨(ulm_ok_R' (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
   exact ulm_cont_R ∅ (ul I) a
 
 /-- **Rocq `uline_of_u_eq`**: the union's parse agrees with the file's
@@ -220,6 +246,58 @@ theorem usecc_execfail_bytes (wsx : List (List (BitVec 8))) :
     ushExecfailBytes altExecsecc ((ulineWs (.LSecc wsx))[0]!) := by
   have h : (ulineWs (.LSecc wsx))[0]! = cmdSeccomp := by simp [ulineWs]
   rw [h]; exact usecc_execfail_bytes0
+
+/-! ### the `sync` line's words and bytes (drift SY2, Rocq b23e6791f) -/
+
+/-- **Rocq `usync_lp`**. -/
+def usyncLp (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (k len : Nat) : Prop :=
+  ws = ulineWs .LSync ∧ ushLineAt .LSync g k len
+
+/-- **Rocq `usync_ws_exec_ok`**. -/
+theorem usync_ws_exec_ok : execOk (ulineWs .LSync) := by
+  refine ⟨?_, by decide, by decide, by decide⟩
+  intro w hw
+  simp only [ulineWs, List.mem_singleton] at hw
+  subst hw
+  exact wlWord_fn _ cmdSync_word
+
+/-- **Rocq `usync_line`**. -/
+theorem usync_line : wlLine (ulineWs .LSync) = lineBytes .LSync := by decide
+
+/-- **Rocq `usync_xline`**. -/
+theorem usync_xline (gb : Nat → BitVec 8) (len : Nat) (h : ushLineAt .LSync gb 0 len) :
+    ushXlineIs (ulineWs .LSync) gb 0 len :=
+  ⟨usync_ws_exec_ok, by rw [usync_line]; exact h.2.1, by rw [usync_line]; exact h.2.2⟩
+
+/-- **Rocq `usync_lp0`**: its first byte is `'s'`, not the `'c'` of a `cd`. -/
+theorem usync_lp0 (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (k len : Nat)
+    (h : usyncLp ws g k len) : (g k).toNat ≠ 99 := by
+  obtain ⟨_, _, hlen, hby⟩ := h
+  have hb0 : (lineBytes .LSync)[0]! = 115#8 := by decide
+  have hpos : 0 < len := by rw [hlen]; decide
+  have h0 := hby 0 hpos
+  rw [Nat.add_zero, hb0] at h0
+  rw [h0]
+  decide
+
+/-- **Rocq `usync_lp_of_at`**. -/
+theorem usync_lp_of_at (f : Nat → BitVec 8) (k len : Nat) (h : ushLineAt .LSync f k len) :
+    usyncLp (ulineWs .LSync) (fun j => f (k + j)) 0 len :=
+  ⟨rfl, h.1, h.2.1, fun j hj => by
+    show f (k + (0 + j)) = _
+    rw [Nat.zero_add]; exact h.2.2 j hj⟩
+
+/-- **Rocq `usync_execfail_bytes0`**: sh's `exec sync failed`. -/
+theorem usync_execfail_bytes0 : ushExecfailBytes altExecsync cmdSync := by
+  refine ⟨by decide, by decide, by decide, by decide, ?_⟩
+  intro p h1 h2
+  exact ushBytes_of_forallb (ushLit 0x1298) (fun q => altExecsync[q + (cmdSync.length - 2)]!) 7 8
+    (by decide) p h1 (by omega)
+
+/-- **Rocq `usync_execfail_bytes`**. -/
+theorem usync_execfail_bytes : ushExecfailBytes altExecsync ((ulineWs .LSync)[0]!) := by
+  have h : (ulineWs .LSync)[0]! = cmdSync := by simp [ulineWs]
+  rw [h]; exact usync_execfail_bytes0
 
 /-! ### the union's admitted line shapes -/
 

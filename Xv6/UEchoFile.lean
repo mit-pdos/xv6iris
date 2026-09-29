@@ -133,7 +133,7 @@ theorem efNode [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname)
     (ua : BitVec 64) (n : Int) (k : Nat)
     (hjx : jx < (echoChunks ws).length) (hlt : ∀ q ∈ sel, q < jx)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
-    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO)
+    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO)
     (hbsk : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) ((echoChunks ws)[jx]!))
     (hlenk : (((echoChunks ws)[jx]!).length : Int) = wchunkAt n k) :
     ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
@@ -141,7 +141,7 @@ theorem efNode [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname)
       awriteFullAdv (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n k
         (efq (hlc := hlc) c r N s i γo ws (sel ++ [jx])) := by
   unfold efq
-  exact fileAwriteNode_adv fscFs c r N s i ws sel jx γo M ua n k heq hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hbsk hlenk
+  exact fileAwriteNode_adv fscFs c r N s i ws sel jx γo M ua n k heq hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 hbsk hlenk
 
 /-- **Rocq `ef_chain`**: the whole call's chain, at the ONE node echo's
 chunk needs (`wchunks n = 1`: a chunk is a word of a line or a single blank,
@@ -159,7 +159,7 @@ theorem efChain [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname
     (hjx : jx < (echoChunks ws).length) (hlt : ∀ q ∈ sel, q < jx)
     (hby : ubytesAt M ua ((echoChunks ws)[jx]!)) (hlenb : ((echoChunks ws)[jx]!).length = nb)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
-    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) :
+    (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
     ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
       appInv (hlc := hlc) fscFs -∗ efq (hlc := hlc) c r N s i γo ws sel -∗
       awriteChainAdv (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P n
@@ -186,7 +186,7 @@ theorem efChain [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname
     iexact Hq
   isplit
   · -- THE ONE NODE, and what it leaves IS the chain's cursor at node 1
-    iapply efNode c r N s heq i γo ws sel jx M ua n 0 hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hby0 hlen0 $$ Hbr Hinv Hq
+    iapply efNode c r N s heq i γo ws sel jx M ua n 0 hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 hby0 hlen0 $$ Hbr Hinv Hq
   · -- THE PARTIAL ARM, FROM THE SAME CURSOR
     unfold efq
     iapply fileAwritePart_adv fscFs c r N s i ws sel (sel ++ [jx]) γo M ua P n 0 heq hmap hpos hle $$ Hbr Hq

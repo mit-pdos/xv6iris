@@ -72,8 +72,9 @@ def fpanOf : Uline → Nat
   | .LCat _ => raltEnc .RCFork
   -- the DEAD arm: `raltOk` gives `LPipe` exactly `LCat`'s five
   | .LPipe _ _ => raltEnc .RCFork
-  -- a `seccomp` line: the shell's own fork panic
+  -- a `seccomp` line and the `sync` line: the shell's own fork panic
   | .LSecc _ => raltEnc .RCFork
+  | .LSync => raltEnc .RCFork
 
 /-- ...and of the exec failure (whose bytes name the command) -/
 def fexfOf : Uline → Nat
@@ -82,6 +83,7 @@ def fexfOf : Uline → Nat
   | .LCat _ => raltEnc .RCExec
   | .LPipe _ _ => raltEnc .RCExec
   | .LSecc _ => raltEnc .RSExec
+  | .LSync => raltEnc .RSyncExec
 
 /-- the bytes the exec-failed child prints, per line -/
 def fexfb : Uline → List (BitVec 8)
@@ -90,6 +92,7 @@ def fexfb : Uline → List (BitVec 8)
   | .LCat _ => altExeccat
   | .LPipe _ _ => altExeccat
   | .LSecc _ => altExecsecc
+  | .LSync => altExecsync
 
 /-! ### The two per-line alternatives, and the "nobody chose" one -/
 
@@ -150,6 +153,8 @@ theorem cont_prompt (s : Fstate) (l : Uline) (a : Ralt) (hok : raltOk l a)
   | RCExec => exact ⟨_, rfl⟩
   | RSExec => exact ⟨_, rfl⟩
   | ROom => exact ⟨_, rfl⟩
+  | RSyncRan => exact ⟨[], rfl⟩
+  | RSyncExec => exact ⟨_, rfl⟩
 
 theorem cont_nonnil_dec (s : Fstate) (l : Uline) (a : Ralt) (h : raltOk l a ∨ a = raltDec 0) :
     cont s l a ≠ [] := by

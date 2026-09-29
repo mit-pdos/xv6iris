@@ -223,7 +223,7 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
     ⊢ appInv (hlc := hlc) (GF := GF) fscFs -∗ redirK (hlc := hlc) (GF := GF) g r nm s ty -∗
       |={E}=> (redirK (hlc := hlc) (GF := GF) g r nm s ty ∗
         ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
-            ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO⌝)
+            ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
           ∨ fileTaint (hlc := hlc) g.fgnCl)) := by
   iintro #Hinv HK
   unfold redirK UkFileOpen.redirK fileOpenFdK
@@ -237,7 +237,7 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
   icases Hown with ⟨Hd, Htk⟩
   ihave Hup := appClaimUpdate (hlc := hlc) (GF := GF) E fscFs (fdeed r (s.insert nm (i, [])))
     iprop(fdeed r (s.insert nm (i, [])) ∗
-      (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO⌝
+      (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝
         ∨ fileTaint (hlc := hlc) g.fgnCl)) hE $$ Hinv
   imod Hup $$ [] Hd with ⟨Hd, Hres⟩
   · imodintro
@@ -333,7 +333,7 @@ claim's fact that `f`'s inode is none of the image's. -/
 def redirK' (g : FileGn) (r : FileAppNames) (nm : List (BitVec 8)) (s : Dst) (ty : FdType) : IProp GF :=
   iprop(redirK (hlc := hlc) g r nm s ty ∗
     ((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo .held⌝ ∗
-        ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO⌝)
+        ⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝)
       ∨ fileTaint (hlc := hlc) g.fgnCl))
 
 end UshFileRedir

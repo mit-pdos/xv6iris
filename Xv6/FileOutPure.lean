@@ -63,5 +63,7 @@ theorem cont_nonnil (s : Fstate) (l : Uline) (a : Ralt) (ha : raltOk l a ∨ a =
   | RCExec => exact hsuf _
   | RSExec => exact hsuf _
   | ROom => exact hsuf _
+  | RSyncRan => simp [cont, uPrompt]
+  | RSyncExec => exact hsuf _
 
 end Xv6

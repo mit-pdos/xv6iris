@@ -77,6 +77,7 @@ theorem ulineOfU_body (l : Uline) (hok : ulineOk l) : ulineOfU (lineBody l) = l 
     unfold ulineOfU
     rw [parseLine_pipe_none p fs hok, plParse_pipe_body p fs hok]
   | LSecc ws => exact ulineOfU_secc ws hok
+  | LSync => exact ulineOfU_sync
   | LEcho ws =>
     unfold ulineOfU
     rw [parseLine_body _ (ulineNopipe_echo ws) hok]
@@ -680,6 +681,63 @@ theorem demo_no_silent (s : Fstate) (hs : fstateOk s) : ¬ lmGoodOut ulmG s segA
   cases a2 with
   | UR r => exact ab_cat_head _ r sel _ _ hok2 hsel hst2 hg rfl
   | _ => cases hok2
+
+/-! ## THE SYNC LINE (Rocq `UnionDiscDec` section 6, drift SY2, b23e6791f)
+
+POSITIVE: `sync` is a line the union admits; /sync's run prints the bare
+prompt (it prints nothing on success) and moves nothing; its exec failure
+prints `exec sync failed`.  NEGATIVE: the line admits the four alternatives
+and no other, so a sync round printing anything but the prompt, the exec
+diagnostic, the fork panic or the out-of-memory diagnostic is refuted.
+(Rocq's `I_sy` trace demos -- `demo_sync_upto2`, `demo_sync_ok`,
+`demo_sync_cat` -- are not ported.) -/
+
+/-- `sync` -/
+def bSync : List (BitVec 8) := [115#8, 121#8, 110#8, 99#8]
+
+/-- **Rocq `demo_sync_parse`**. -/
+theorem demo_sync_parse : ulineOfU bSync = .LSync ∧ ubodyOk admUG admSOn bSync :=
+  ⟨ulineOfU_sync, Or.inr (Or.inr (Or.inr (by unfold usyncOk; decide)))⟩
+
+/-- **Rocq `demo_sync_ran`**: /sync RAN -- the bare prompt, the state as the
+round found it. -/
+theorem demo_sync_ran (s : Fstate) :
+    ulmG.lmOk s .LSync (UR .RSyncRan) ∧ ulmG.lmCont s .LSync (UR .RSyncRan) = uPrompt
+    ∧ ulmG.lmStep s .LSync (UR .RSyncRan) = s ∧ ulmG.lmTerm (UR .RSyncRan) = false :=
+  ⟨trivial, rfl, rfl, rfl⟩
+
+/-- **Rocq `demo_sync_execfail`**: the exec FAILED -- sh says so. -/
+theorem demo_sync_execfail (s : Fstate) :
+    ulmG.lmOk s .LSync (UR .RSyncExec) ∧
+    ulmG.lmCont s .LSync (UR .RSyncExec) =
+      [101#8, 120#8, 101#8, 99#8, 32#8, 115#8, 121#8, 110#8, 99#8, 32#8,
+        102#8, 97#8, 105#8, 108#8, 101#8, 100#8, wlNl] ++ uPrompt :=
+  ⟨trivial, by show altExecsync = _; decide⟩
+
+/-- **Rocq `demo_sync_only`** -- NEGATIVE: the sync line admits its four
+alternatives and nothing else, at every state. -/
+theorem demo_sync_only (s : Fstate) (a : Ualt) (h : ulmG.lmOk s .LSync a) :
+    a = UR .RSyncRan ∨ a = UR .RSyncExec ∨ a = UR .RCFork ∨ a = UR .ROom := by
+  change uok admUG s .LSync a at h
+  cases a with
+  | UR r => cases r <;> first | exact absurd h id | simp
+  | _ => exact absurd h id
+
+/-- **Rocq `demo_sync_neg`**: ...so a sync round's block is the prompt, the
+exec diagnostic, sh's panic line or the out-of-memory diagnostic. -/
+theorem demo_sync_neg (s : Fstate) (a : Ualt) (h : ulmG.lmOk s .LSync a) :
+    ulmG.lmCont s .LSync a ∈ [uPrompt, altExecsync, altPanic, altOom] := by
+  rcases demo_sync_only s a h with rfl | rfl | rfl | rfl <;> simp [ulmG, ulm, ucont, cont]
+
+/-- **Rocq `demo_sync_neg_x`**: e.g. a transcript showing `sync` answered by
+`x` and the prompt. -/
+theorem demo_sync_neg_x (s : Fstate) (a : Ualt) (h : ulmG.lmOk s .LSync a) :
+    ulmG.lmCont s .LSync a ≠ [120#8, wlNl] ++ uPrompt := by
+  intro hc
+  have hin := demo_sync_neg s a h
+  rw [hc] at hin
+  revert hin
+  decide
 
 end UnionDemo
 

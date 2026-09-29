@@ -191,6 +191,11 @@ theorem uline_pipes_words (l : Uline) (p : Producer) (fs : List Filt) (hok : uli
     exfalso
     rw [ulineWs_body _ hok] at hin
     exact fn_word_ne_bar _ (seccOk_wf ws' hok _ hin) rfl
+  | LSync =>
+    -- its one word is `sync`
+    exfalso
+    rw [ulineWs_body _ hok] at hin
+    simp [ulineWs, cmdSync, fdWBar] at hin
   | LEcho ws' =>
     exfalso
     simp only [lineBody] at hin

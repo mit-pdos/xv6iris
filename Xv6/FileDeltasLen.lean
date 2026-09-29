@@ -41,6 +41,7 @@ import Xv6.FsEchoPin
 import Xv6.FsCatPin
 import Xv6.FsGrepPin
 import Xv6.FsSeccPin
+import Xv6.FsSyncPin
 import Batteries.Data.List.Perm
 
 namespace Xv6
@@ -157,5 +158,8 @@ theorem grep_bytes_length : grepBytes.length = 44496 := Xv6.User.Grep.elf_length
 
 /-- Rocq `secc_bytes_length` (deviation 2). -/
 theorem secc_bytes_length : seccBytes.length = 36144 := Xv6.User.Seccomp.elf_length
+
+/-- Rocq `syncf_bytes_length` (deviation 2; drift SY2). -/
+theorem syncf_bytes_length : syncfBytes.length = 34992 := Xv6.User.Sync.elf_length
 
 end Xv6

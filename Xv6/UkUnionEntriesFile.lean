@@ -49,7 +49,7 @@ theorem uefile_image_entry (UL : UK_LEAVES)
     (hfdl : sts.length = NOFILE) (hcw : cw = ROOTINO)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.inode i γo .held)))
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO) (hi5 : i ≠ GREP_INO)
-    (hi6 : i ≠ SECC_INO) :
+    (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
     ⊢ □ (efExit (hlc := hlc) ug.ugnFile.fgnCl r nm s Wq i γo ws -∗ Q (-1)) -∗
       □ (uKillCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       □ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ uKillCred (hlc := hlc) (GF := GF)) -∗
@@ -61,7 +61,7 @@ theorem uefile_image_entry (UL : UK_LEAVES)
         (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc))) := by
   have hne := efe_drop1_ne ws hline
   have hnn := efe_words_nn ws hline
-  have hwok : FifCtx.fifOutOk i ws := ⟨hi1, hi2, hi3, hi4, hi5, hi6, efe_chunks_short ws hline⟩
+  have hwok : FifCtx.fifOutOk i ws := ⟨hi1, hi2, hi3, hi4, hi5, hi6, hi7, efe_chunks_short ws hline⟩
   let w0 : Nat → Fdev := fun _ => .FDFile nm i γo ws
   have hw0 : ∀ d, d ∈ [0] → ∀ nm' i' γo', w0 d ≠ .FDIn false nm' i' γo' := by
     intro _ _ _ _ _ h; cases h

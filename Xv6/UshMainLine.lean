@@ -90,7 +90,7 @@ theorem ushLineOk_cons (ws : List (List (BitVec 8))) (hok : lineOk ws) : ∃ r, 
   | cons w r => simp at h; exact ⟨r, by rw [h]⟩
 
 /-- **Rocq `ush_uline_head_val`**: the head byte itself -- [e]cho, [c]at, or
-[s]eccomp. -/
+[s]eccomp / [s]ync. -/
 theorem ushUline_head_val (lu : Uline) (hok : ulineOk lu) :
     (lineBytes lu)[0]!.toNat = 101 ∨ (lineBytes lu)[0]!.toNat = 99 ∨ (lineBytes lu)[0]!.toNat = 115 := by
     cases lu with
@@ -123,6 +123,10 @@ theorem ushUline_head_val (lu : Uline) (hok : ulineOk lu) :
       right; right
       rw [lineBytes_body]; simp only [lineBody]
       rw [ushWlBody_head _ _ (by simp [cmdSeccomp])]; rfl
+    | LSync =>
+      -- the sync line: `sync` itself (drift SY2)
+      right; right
+      rfl
 
 /-- **Rocq `ush_uline_head_nonblank`**: a line's first byte is not a blank
 (it is `e`, `c` or `s`). -/

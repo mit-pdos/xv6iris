@@ -161,7 +161,7 @@ def fifOut (d : Nat) (alts : List (List (BitVec 8))) : IProp GF :=
 /-- **Rocq `fif_out_ok`**: the file a redirect holds is none of the
 image's binaries, and the line's chunks fit a write. -/
 def fifOutOk (i : Nat) (ws : Wordline) : Prop :=
-  i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧
+  i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO ∧
     ∀ ch ∈ echoChunks ws, ch.length ≤ lineMax
 
 /-- **Rocq `fif_outm`**: the file a redirect holds, the line's chunks from

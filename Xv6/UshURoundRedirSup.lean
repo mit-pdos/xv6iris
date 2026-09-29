@@ -161,11 +161,11 @@ theorem uredir_entry (UL : UK_LEAVES)
     icases HK with (⟨%i1, %γo1, %hty1, Hd, Hpub⟩ | #HT)
     · subst hty
       cases hty1
-      obtain ⟨hi1, hi2, hi3, hi4, hi5, hi6⟩ := hi
+      obtain ⟨hi1, hi2, hi3, hi4, hi5, hi6, hi7⟩ := hi
       ihave Hu := foffPub_of_held γo $$ Hpub
       ihave #He := uefile_image_entry UL hlic ug s0 nm ws M Mv sa t gb sts ROOTINO cs' pidv r sp
         (uWcl (hlc := hlc) ug s0 I 3) i γo false (fun _ => uredirWq (hlc := hlc) ug r s0 PT PD I)
-        (fun _ _ => rfl) heq hokws himg hbytes hag hfdl rfl hfd1 hi1 hi2 hi3 hi4 hi5 hi6
+        (fun _ _ => rfl) heq hokws himg hbytes hag hfdl rfl hfd1 hi1 hi2 hi3 hi4 hi5 hi6 hi7
         $$ [] [] [] [] Hinv Hnp Hdep
       · imodintro
         iintro Hx

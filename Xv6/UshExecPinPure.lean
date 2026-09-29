@@ -38,6 +38,7 @@ The Iris half is `Xv6/UshExecPin.lean`.
 import Xv6.FsCatPin
 import Xv6.FsGrepPin
 import Xv6.FsSeccPin
+import Xv6.FsSyncPin
 import Xv6.PinnedExec
 import Xv6.KexecLoad
 import Xv6.PipeDisc
@@ -92,6 +93,22 @@ theorem shSeccPinResolves :
   · rw [seccPathElems]; rfl
   · intro v ⟨_, hnode, hrun⟩
     rw [seccPathElems]
+    exact ⟨hrun, hnode⟩
+
+/-- **Rocq `sync_pl`** (drift SY2): /sync's path is its command word. -/
+def syncPl : List (BitVec 8) := cmdSync
+
+/-- **Rocq `sync_path_elems`**. -/
+theorem syncPathElems : pathElems syncPl = syncPath := by decide
+
+/-- **Rocq `sh_sync_pin_resolves`**. -/
+theorem shSyncPinResolves :
+    pinResolves era0SyncPins ROOTINO syncPl [ROOTINO, SYNC_INO] SYNC_INO User.Sync.elf 1 := by
+  refine ⟨?_, ?_, ?_⟩
+  · unfold umStartOf; split <;> rfl
+  · rw [syncPathElems]; rfl
+  · intro v ⟨_, hnode, hrun⟩
+    rw [syncPathElems]
     exact ⟨hrun, hnode⟩
 
 /-- **Rocq `filt_elf`**: a stage's program image. -/

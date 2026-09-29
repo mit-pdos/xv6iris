@@ -113,12 +113,13 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
       shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       shGrepSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       shSeccSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
+      shSyncSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v) -∗
       (∃ jo : Option Nat, fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo) -∗
       ushRestLAt (hlc := hlc) N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushLineUnion (shRsh N.t N.d N.s) := by
   rw [hRsh, show iprop(ushlDat N.d ∗ usz N.s (kexecSz User.Sh.elf)) = ushlR N (kexecSz User.Sh.elf)
     from rfl]
-  iintro #Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc ⟨%v, #Hp⟩ #Hmade
+  iintro #Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hsync ⟨%v, #Hp⟩ #Hmade
   ihave #Hkl := ush_kill_law_u ug r s0 (uptermShape ug) (updoneShape ug) hkill v (Xu (hlc := hlc) (GF := GF) ug r s0 γp) rfl $$ Hp
   ihave #Hchl := ush_child_law_union E.UL E.HF E.SP E.SC E.hps E.hlic ug r s0 (uptermShape ug) (updoneShape ug) γp heq hcons hkill
     $$ Hlk Hdep Hslot Hmade
@@ -128,6 +129,8 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
     $$ Hlk Hdep Hcat Hmade
   ihave #Hsecl := uHchild_secc E.UL E.HF E.SP E.SC E.US E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hwild hrdw hkill hcons
     $$ Hdep Hsecc
+  ihave #Hsyncl := uHchild_sync E.UL E.HF E.SP E.SC E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hkill
+    $$ Hlk Hdep Hsync
   ihave #Hplaw := uHpanic ug r s0 (uptermShape ug) (updoneShape ug) E.UL $$ Hlk
   ihave #Hche := upipes_child_law_echo E ug r s0 γp heq hcons hkill $$ Hlk Hslot Hcat Hgrep
   ihave #Hchc := upipes_child_law_catf E ug r s0 γp heq hcons hkill $$ Hlk Hslot Hcat Hgrep Hmade
@@ -137,7 +140,7 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
   ihave #Hpipes := ushq_body_law_upipes E ug r s0 γp N (kexecSz User.Sh.elf) shSz_lo shSz_al shSz_ok
     $$ Hkl Hche Hchc Hplaw
   ihave #Hbody := ushq_body_law_union E.UL E.SP E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp N (kexecSz User.Sh.elf)
-    shSz_lo shSz_al shSz_ok $$ Hkl Hchl Hred Hcatl Hsecl Hplaw Hpipes
+    shSz_lo shSz_al shSz_ok $$ Hkl Hchl Hred Hcatl Hsecl Hsyncl Hplaw Hpipes
   ihave #Hb := ushf_rest_of_body_at_pipe N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushLineUnion (kexecSz User.Sh.elf) shSz_lo shSz_al
     shSz_ok $$ Hbody
   unfold ushRestLAt

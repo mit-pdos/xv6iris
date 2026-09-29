@@ -107,15 +107,16 @@ theorem consAbsent_write (i off : Nat) (new : List (BitVec 8)) (av : Aview)
 /-- Rocq `file_fs_pure_write`. -/
 theorem fileFsPure_write (i off : Nat) (new : List (BitVec 8)) (av : Aview)
     (hi : i ≠ INIT_INO) (hs : i ≠ SH_INO) (he : i ≠ ECHO_INO) (hc : i ≠ CAT_INO)
-    (hg : i ≠ GREP_INO) (hsc : i ≠ SECC_INO) (hp : fileFsPure av) :
+    (hg : i ≠ GREP_INO) (hsc : i ≠ SECC_INO) (hsy : i ≠ SYNC_INO) (hp : fileFsPure av) :
     fileFsPure (deltaWrite i off new av) := by
-  obtain ⟨⟨hin, hsh, hec⟩, hcat, hgrep, hsecc⟩ := hp
+  obtain ⟨⟨hin, hsh, hec⟩, hcat, hgrep, hsecc, hsync⟩ := hp
   exact ⟨⟨(filePin_init _).mp (filePin_write _ _ _ i off new av hi ((filePin_init av).mpr hin)),
       (filePin_sh _).mp (filePin_write _ _ _ i off new av hs ((filePin_sh av).mpr hsh)),
       (filePin_echo _).mp (filePin_write _ _ _ i off new av he ((filePin_echo av).mpr hec))⟩,
     (filePin_cat _).mp (filePin_write _ _ _ i off new av hc ((filePin_cat av).mpr hcat)),
     (filePin_grep _).mp (filePin_write _ _ _ i off new av hg ((filePin_grep av).mpr hgrep)),
-    (filePin_secc _).mp (filePin_write _ _ _ i off new av hsc ((filePin_secc av).mpr hsecc))⟩
+    (filePin_secc _).mp (filePin_write _ _ _ i off new av hsc ((filePin_secc av).mpr hsecc)),
+    (filePin_sync _).mp (filePin_write _ _ _ i off new av hsy ((filePin_sync av).mpr hsync))⟩
 
 /-! ## 3. The splice at the end -/
 

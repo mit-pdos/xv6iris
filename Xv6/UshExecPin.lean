@@ -234,6 +234,22 @@ theorem shSeccSlotOfFsPureHolds (T : IProp GF) :
   unfold shSeccSlot
   iapply shPinSlot_mono fileFsPure era0SeccPins T fileFsPure_secc $$ H
 
+/-- **Rocq `sh_sync_slot`** (drift SY2): /sync's -- the claim's fixed part
+pins it too. -/
+def shSyncSlot (T : IProp GF) : IProp GF := shPinSlot (hlc := hlc) era0SyncPins T
+
+/-- Rocq `sh_sync_slot_persistent`. -/
+instance shSyncSlot_persistent (T : IProp GF) : Persistent (shSyncSlot (hlc := hlc) T) := by
+  unfold shSyncSlot; infer_instance
+
+/-- **Rocq `sh_sync_slot_of_fs_pure_holds`**. -/
+theorem shSyncSlotOfFsPureHolds (T : IProp GF) :
+    ⊢ P.sh_cat_slot_of_fs_pure T -∗ shSyncSlot (hlc := hlc) T := by
+  iintro H
+  ihave H := (P.sh_cat_slot_of_fs_pure_unfold T).1 $$ H
+  unfold shSyncSlot
+  iapply shPinSlot_mono fileFsPure era0SyncPins T fileFsPure_sync $$ H
+
 /-- `sh_filt_slot` at the two pins' slots. -/
 theorem shFiltSlot_pin (F : Filt) (T : IProp GF) :
     ⊢ shPinSlot (hlc := hlc) era0CatPins T -∗ shPinSlot (hlc := hlc) era0GrepPins T -∗

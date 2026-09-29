@@ -78,6 +78,7 @@ theorem ulm_cons_adm_R (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (a : 
   | LCat N => exact hok
   | LPipe p n => exact absurd rfl (hnp.1 p n)
   | LSecc ws => exact hok
+  | LSync => exact hok
 
 /-- **Rocq `ulm_echo_body`**: echo's body at the console, at code 0. -/
 theorem ulm_echo_body (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (ws : List (List (BitVec 8)))

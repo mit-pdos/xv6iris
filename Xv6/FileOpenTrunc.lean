@@ -42,9 +42,9 @@ theorem fileTrunc_free (av0 av : Aview) (i : Nat) (s : Dst)
     ∧ (consAbsent av → consAbsent (deltaTrunc i av))
     ∧ (∀ j, consPresentAt j av → consPresentAt j (deltaTrunc i av))
     ∧ fOk (deltaTrunc i av) s := by
-  obtain ⟨n1, n2, n3, n4, n5, n6⟩ :=
+  obtain ⟨n1, n2, n3, n4, n5, n6, n7⟩ :=
     f_inum_not_pinned av0 i [] hpure0 hrow0 (by simp [lineMax])
-  refine ⟨fileFsPure_trunc_ne i av n1 n2 n3 n4 n5 n6 hpure, consAbsent_trunc_any i av,
+  refine ⟨fileFsPure_trunc_ne i av n1 n2 n3 n4 n5 n6 n7 hpure, consAbsent_trunc_any i av,
     fun j => consPresent_trunc_any j i av, fOk_trunc_keep i av s ?_ hok⟩
   intro N j bs hs hji
   subst hji
@@ -131,7 +131,7 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   · icases Hval with (%hokx | #Hsp)
     · obtain ⟨hpurex, hrowf⟩ := hfree
       obtain ⟨bsx, hrowi, hlenx⟩ := hrowf N i hN hstx
-      obtain ⟨n1, n2, n3, n4, n5, n6⟩ := f_inum_not_pinned avx i bsx hpurex hrowi hlenx
+      obtain ⟨n1, n2, n3, n4, n5, n6, n7⟩ := f_inum_not_pinned avx i bsx hpurex hrowi hlenx
       cases hsN : s[N]? with
       | none =>
         have hf : False := by
@@ -151,7 +151,7 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
           with ⟨Hka, Htok, Hc⟩
         icases Hc with (⟨%hf, #Hty⟩ | #HT)
         · obtain ⟨hok, hpure, _⟩ := hf
-          have hp1 := fileFsPure_trunc_ne i (absView I) n1 n2 n3 n4 n5 n6 hpure
+          have hp1 := fileFsPure_trunc_ne i (absView I) n1 n2 n3 n4 n5 n6 n7 hpure
           have hp2 := consAbsent_trunc_any i (absView I)
           have hp3 := fun j => consPresent_trunc_any j i (absView I)
           by_cases hbs : bs = []

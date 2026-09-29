@@ -88,7 +88,7 @@ theorem file_fs_pure_unarm_dev (i : Nat) (av : Aview) (cn : Absnode) (hroot : i 
     subst hij
     rw [hrow, hcn] at h
     simp at h
-  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := fileFsPure_pins av hp
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := fileFsPure_pins av hp
   exact fileFsPure_of_pins _
     (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h1) h1)
     (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h2) h2)
@@ -96,6 +96,7 @@ theorem file_fs_pure_unarm_dev (i : Nat) (av : Aview) (cn : Absnode) (hroot : i 
     (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h4) h4)
     (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h5) h5)
     (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h6) h6)
+    (nodePin_unarm _ _ _ i av hroot (hne _ _ _ h7) h7)
 
 /-- **Rocq `cre_pre_astep_none`**: the created name does not resolve in the
 OLD view. -/

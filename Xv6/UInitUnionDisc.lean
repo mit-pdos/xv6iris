@@ -40,8 +40,8 @@ theorem unionDisc_main (J : List (BitVec 8)) (hJ : ulmG.lmBodyOk J) :
     split
     · rename_i p n he; exact absurd he (hnp p n)
     · trivial
-  · have hJ' : fbodyOk J ∨ upipeOk admUG J ∨ useccOk admSOn J := hJ
-    rcases hJ' with hf' | hp | hs
+  · have hJ' : fbodyOk J ∨ upipeOk admUG J ∨ useccOk admSOn J ∨ usyncOk J := hJ
+    rcases hJ' with hf' | hp | hs | hy
     · exact absurd hf' hf
     · unfold upipeOk at hp
       split at hp
@@ -59,6 +59,10 @@ theorem unionDisc_main (J : List (BitVec 8)) (hJ : ulmG.lmBodyOk J) :
         refine ⟨.LSecc ws, trivial, hu, hb, ?_⟩
         rw [hb]; exact (ulineWs_body (.LSecc ws) hu).symm
       · exact hs.elim
+    · -- the `sync` body (drift SY2)
+      have hb := syncParse_true J hy
+      refine ⟨.LSync, trivial, trivial, hb, ?_⟩
+      rw [hb]; decide
 
 /-- **Rocq `union_disc_line`**: a newline closes an admissible body, which is
 one of the union's line shapes at the three projections `ush_line_at`

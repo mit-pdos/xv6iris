@@ -112,7 +112,7 @@ theorem fileDeedInum_acc (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Ds
     ⊢@{IProp GF} fdeed r s -∗ filePred (hlc := hlc) c r av -∗
       filePred (hlc := hlc) c r av ∗ fdeed r s ∗
       (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧
-        i ≠ SECC_INO⌝ ∨ fileTaint (hlc := hlc) c) := by
+        i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝ ∨ fileTaint (hlc := hlc) c) := by
   iintro Hd Hp
   ihave #Hlaw := fileDeed_law (hlc := hlc) (GF := GF) c r
   ihave ⟨Hp, Hpure⟩ := fileFsPure_acc c r av $$ Hp
