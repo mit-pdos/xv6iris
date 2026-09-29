@@ -293,3 +293,20 @@ Re-read against the tree after M1 closed.  Three changes from §3:
   states the former and leaves the `Kill` event to M3's no-kill
   corollary.
 
+### 7.1 G as landed (2026-09-29, 9fb1d089c)
+
+18 files, +331 / -115.  As planned, with three adjustments the attempt
+found: (i) `proc_dormant_nofd` / `_prestk` (procinit's outputs) cannot
+hold the counter — it is born in main's `children_boot_rows`, after
+procinit — so it follows the generation's route: the two seals take
+`act_cnt pa 0` as a premise and write `upd_ev _ 0` into the block, and
+`SpecProcinit.procs_inv_alloc`'s boot big-sep spells the counter (a
+boot-side helper, not a `wp_*` contract); (ii) the DEFICIT block
+carries it too (`proc_priv_nocwd`, `proc_priv_nopt`; `proc_priv_intro`
+/ `_nocwd_intro` take it; `proc_priv_nocwd_bare`'s shape changed, two
+callers touched), so allocproc's post and kexit's ZOMBIE park need no
+statement change; (iii) `SpecFreeproc.fp_rest` carries it back to the
+slot.  The four files outside the plan's list that destructure the
+changed shapes: `ProofKforkParts`, `ProofForkret`, `PipeKillMark`,
+`ProofKexit`.  Gate 882 files, 0 errors; audits 13/13/14.  Next: L1.
+
