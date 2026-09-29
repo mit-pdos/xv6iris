@@ -16,7 +16,7 @@ CONE (UkFileIface.v, reached, this file): `fdev` (+ `FDCons`/`FDFile`/`FDIn`),
 `fifRegR`, `fifRegG`, `fif_row`, `fdev_wr`, `fif_wr`, `fif_wr_0`,
 `fif_slot_ne`, `fif_ok`, `fif_ok_lookup`, `fif_ok_D0`, `fif_ok_reg_insert`,
 `fif_ok_open`, `fif_ok_closed_fresh`, `fif_ok_ledger`, `fif_ok_open_std`,
-`fif_not_shared`, `fif_ok_close`, `fif_ok_close_shared`, `fif_ok_entry`,
+`Xv6.not_shared`, `fif_ok_close`, `fif_ok_close_shared`, `fif_ok_entry`,
 `fif_drop_cons`, `fif_om_create`, `dst_some_of_snd`, `dst_none_of_snd`,
 `fif_tok`.  THE REGISTRY'S ALGEBRA is `HfpReg` at `Fdev` (the three union
 registries' shared shape, stated once): `fif_pool` = `HfpReg.pool`,
@@ -320,18 +320,13 @@ theorem fif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) 
     rw [LawfulPartialMap.get?_insert, if_neg (fun e => hD (by rw [e]; exact hd'))]
     exact h6 d' hd'
 
-/-- **Rocq `fif_not_shared`**. -/
-theorem fif_not_shared (fdm : Fdmap) (fd : Int) (d : Nat) (hns : ¬ fdShared fdm fd d) :
-    ∀ fd', fd' ≠ fd → fdm fd' ≠ some d :=
-  fun fd' hne h => hns ⟨fd', hne, h⟩
-
 /-- **Rocq `fif_ok_close`**: the close of an UNPROTECTED device's last
 descriptor unregisters it. -/
 theorem fif_ok_close (fdm : Fdmap) (l : List FdState) (vs : FifVs) (fd : Int) (d : Nat)
     (hok : fifOk D0 w0 fdm l vs) (hfd : fdm fd = some d) (hns : ¬ fdShared fdm fd d) (hD : d ∉ D0) :
     fifOk D0 w0 (fdDelete fdm fd) l (delete vs d) := by
   obtain ⟨h1, h2, h3, h4, h5, h6⟩ := hok
-  have hn := fif_not_shared fdm fd d hns
+  have hn := Xv6.not_shared fdm fd d hns
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · intro fd' d' h
     unfold fdDelete at h

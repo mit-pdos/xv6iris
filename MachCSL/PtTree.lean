@@ -909,4 +909,10 @@ theorem tlbOk_setPte (t : PTree) (tlb : Tlb) (hok : tlbOk t tlb) (i : Nat) (hi :
     rw [← Option.some.inj h, tlb_set_pte_tlbEntryOf]
   · exact hok j hj ent' h
 
+/-- A subtree's pages are pages of the whole tree. -/
+theorem kid_mem_pages (lvl : Nat) (t c : PTree) (i : BitVec 9) (h : t.kids i = some c)
+    (b : BitVec 44) (hb : b ∈ c.pages lvl) : b ∈ t.pages (lvl + 1) := by
+  simp only [PTree.pages, List.mem_cons, List.mem_flatMap]
+  exact Or.inr ⟨i, mem_allIdx i, by rw [h]; exact hb⟩
+
 end MachCSL

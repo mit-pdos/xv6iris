@@ -473,7 +473,7 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
       iapply (grepUbytesq_ext N.d (DFrac.own 1) dst len _ _ (fun j _ => (grepMmPost_d0 len f j).symm)).1 $$ Hw
   · -- ================= dst < src: the forward arm =================
     have h38 := hbnd (by omega)
-    rw [ha01, ha11, kgrep_bgeu_nat _ _ (by omega) (by omega)]
+    rw [ha01, ha11, Xv6.bgeu_nat _ _ (by omega) (by omega)]
     rw [decide_eq_false (show ¬ dst + d ≤ dst by omega)]
     simp only [Bool.false_eq_true, if_false]
     rw [ukPc 0x446 0x44a false rfl]

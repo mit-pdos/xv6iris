@@ -20,6 +20,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.UvmCallSites
 import Xv6.WalkaddrDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -62,14 +63,6 @@ theorem vf_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
 
-theorem vf_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem vf_bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
-
 theorem vf_bne_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = p := by
   rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
@@ -100,11 +93,7 @@ theorem vf_bltu_ge {α : Type} (x y : BitVec 64) (h : ¬ x.toNat < y.toNat) (p q
 theorem vf_vpn_round (va : BitVec 64) : vpnOf (va &&& 0xFFFFFFFFFFFFF000#64) = vpnOf va := by
   unfold vpnOf; bv_decide
 
-theorem vf_lui_mask : BitVec.signExtend 64 (1048575#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
-
 theorem vf_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
-
-theorem vf_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
 theorem vf_perm_mask : (22#64 : BitVec 64) &&& ~~~0x3FF#64 = 0#64 := by decide
 

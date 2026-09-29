@@ -142,7 +142,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     rcases Nat.lt_or_ge (i + k) mv with h | h
     · exact h
     · exfalso; rw [show i + k = mv by omega, hFm] at hnl; exact absurd hnl (by decide)
-  rw [if_pos hnl, kgrep_beq_nat _ 0 (by omega) (by decide), decide_eq_false (by omega), if_neg (by decide),
+  rw [if_pos hnl, Xv6.beq_nat _ 0 (by omega) (by decide), decide_eq_false (by omega), if_neg (by decide),
     ukPc 0x140 0x142 true rfl]
   have hs1_5' : m5.get 9#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i + k) := by rw [hs1_5, ha04, if_pos hnl]
   icases grepUbytes_snoc_open N.d (User.Grep.Sym.«buf» + i) k (fun j => F (i + j)) $$ HM with ⟨HM, Hb⟩

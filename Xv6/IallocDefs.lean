@@ -122,21 +122,6 @@ theorem iallocBody_callee [Icfg] (k : KCtx) (ty : BitVec 16) (R R' : RegMap)
   exact ⟨h2.trans a2, h20.trans a20, h21.trans a21, h22.trans a22, h23.trans a23, h24.trans a24,
     h25.trans a25, h26.trans a26, h27.trans a27⟩
 
-/-- The epilogue's `calleeSaved`: ialloc restores `ra`, `s0`..`s6` and `sp`,
-so only s7..s11 have to have come back from the callees. -/
-theorem ialloc_calleeSaved_epi (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 /-! ## The two arms, as ONE resource (Rocq's `ia_arms`), and the
 continuation (Rocq's `ia_cont`) -/
 

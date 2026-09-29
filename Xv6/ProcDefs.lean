@@ -404,4 +404,11 @@ theorem cpuCells_curProc [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat)
   iintro Hp
   iframe
 
+/-- Setting one byte of a 16-byte buffer to `0` makes it a well-formed name. -/
+theorem pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16) (hp : p ≤ 15) :
+    pnameWf (cur.set p 0#8) := by
+  refine ⟨?_, p, by unfold PNAMELEN; omega, ?_⟩
+  · rw [List.length_set]; rw [hlen]; rfl
+  · rw [List.getElem?_set_self (by rw [hlen]; omega)]
+
 end Xv6

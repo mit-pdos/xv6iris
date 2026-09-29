@@ -97,14 +97,14 @@ theorem namexEra_found_heldAt (data : Nat → List (BitVec 8)) (dn : Dinode) (kd
   have hlt := dirFirst_lt _ _ _ _ hf
   have hlive := dirFirst_live _ _ _ _ hf
   have hnib : (BitVec.setWidth 32 (dirInum data kd)).toNat < 16 * icfgNib := by
-    rw [namex_zext32_toNat]; exact hinums kd hlt hlive
+    rw [MachCSL.zext32_toNat]; exact hinums kd hlt hlive
   have hpos := Xv6.dirlookup_live_pos data kd hlive
   iintro ⟨Href, Hru⟩
   unfold inodeHeldAt inodeRefp
   iexists kslot, qq, BitVec.setWidth 32 (dirInum data kd)
   iframe Href Hru
   ipureintro
-  exact ⟨rfl, hks, hnib, hpos, namex_zext32_toNat _⟩
+  exact ⟨rfl, hks, hnib, hpos, MachCSL.zext32_toNat _⟩
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xde .. +0xf2`: THE LOOKUP AND THE FIRE**, the miss exit (`L_miss`,

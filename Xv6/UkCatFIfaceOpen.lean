@@ -16,7 +16,7 @@ CONE (reached, this file): `cif_ans_ok`, `cif_fresh_fd`, `cif_open_taint`,
 2. The handles are `CifEnv.hdls` (UkCatFIfaceEnv deviation 3): a fresh tail
    handle joins its map (`hdls_insert`), a standard slot leaves it as is
    (`hdls_ext`).
-3. `bvs_moi_small` is UkFreeHandler's `fh_toInt_small`; `fdev_m1` is
+3. `bvs_moi_small` is UkFreeHandler's `MachCSL.toInt_ofNat`; `fdev_m1` is
    `fh_m1`.  `Qp.div_2` is `Qp.half_add_half` (the deed split in halves).
 4. `Xv6.fif_om_create` is stated over Lean's `modeCreate` (ProgTree) and
    `omCreate` at `BitVec.ofInt 64 m` (lane hfp-F2's `fif_om_create`, the
@@ -94,7 +94,7 @@ theorem ans_ok (l : List FdState) (ret : BitVec 64) :
   · obtain ⟨hr, hlt, -⟩ := hb
     ipureintro
     right
-    rw [hr, fh_toInt_small fd (by unfold NOFILE at hlt; omega)]
+    rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hlt; omega)]
     omega
   · ipureintro
     left
@@ -152,7 +152,7 @@ theorem open_taint (l : List FdState) (ret : BitVec 64) (fdm : Fdmap) (vs : RegM
   icases Hof with (⟨%fd, %rd, %wr, %t, %hb, Hal⟩ | ⟨%hr, Hstd⟩)
   · obtain ⟨hr, hfdlt, -⟩ := hb
     have hsig : ret.toInt = (fd : Int) := by
-      rw [hr, fh_toInt_small fd (by unfold NOFILE at hfdlt; omega)]
+      rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)]
     rw [hsig]
     unfold openHeld
     rw [if_pos (Int.natCast_nonneg fd)]

@@ -29,11 +29,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic and address facts -/
 
-/-- `beqz` on a word. -/
-theorem ka_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
-  by_cases h : x = 0#64 <;> simp [bcond, h]
-
 /-- `auipc a0,0x12 ; addi a0,a0,-1922` at `0x80000b88`: `&kmem.lock`. -/
 theorem ka_lock_aea :
     KA.«kalloc» + 0x118c2#64 = kmemLockAddr := by
@@ -81,15 +76,6 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
   have h8' := congrArg BitVec.toNat h8
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow] at h8'
   omega
-
-/-- `pcIs` at a branch that was taken / not taken. -/
-theorem ka_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [if_pos h]
-
-theorem ka_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬ p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
 
 /-! ## Curried forms of the allocator's ghost steps -/
 
@@ -362,7 +348,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kalloc_br_118da, ka_free_af6]
   iintro Hk Hpc Hfl
   k_step (wp_s_branch c _ (KA.«kalloc» + 0x1e#64) true 46#13 9#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ka_ite_beq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.ite_beq]
   iintro Hk Hpc
   cases pages with
   | nil =>
@@ -370,7 +356,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     simp only [chainAt_nil]
     icases Hchain with %hhead
     subst hhead
-    ihave Hpc := ka_pcIs_pos c _ _ _ (rfl : (0#64 : BitVec 64) = 0#64) $$ Hpc
+    ihave Hpc := MachCSL.pcIs_pos c _ _ _ (rfl : (0#64 : BitVec 64) = 0#64) $$ Hpc
     k_step (wp_s_auipc c _ (KA.«kalloc» + 0x4c#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
@@ -448,7 +434,7 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     obtain ⟨hhead, hvalid⟩ := hhd
     have hhead' : pg = head := hhead.symm
     subst hhead'
-    ihave Hpc := ka_pcIs_neg c _ _ _ (Xv6.PtRun.pageValid_ne_zero pg hvalid) $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg c _ _ _ (Xv6.PtRun.pageValid_ne_zero pg hvalid) $$ Hpc
     simp only [wordAtN_cur, pageRestAt_cur]
     -- c.ld a5,0(s1) : r->next
     k_step (wp_s_ld c _ (KA.«kalloc» + 0x20#64) true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) nxt)

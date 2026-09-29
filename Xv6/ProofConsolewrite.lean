@@ -47,6 +47,7 @@ import MachCSL.WpSmodeFrame16
 import Xv6.SpecUartwrite
 import Xv6.FsWords
 import Xv6.UmodeArith
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -108,10 +109,6 @@ theorem cw_sext_id (a : Nat) (h : a < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 a)) = BitVec.ofNat 64 a := by
   rw [Xv6.fw_w32 a h]; exact MachCSL.signExtend_ofNat32 a h
 
-theorem cw_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
-  rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
-  simp [BitVec.toNat_ofNat]; omega
-
 theorem cw_toInt_ofInt (i : Int) (h : -2 ^ 63 ≤ i ∧ i < 2 ^ 63) : (BitVec.ofInt 64 i).toInt = i := by
   rw [BitVec.toInt_ofInt_eq_self] <;> omega
 
@@ -119,7 +116,7 @@ theorem cw_toInt_ofInt (i : Int) (h : -2 ^ 63 ≤ i ∧ i < 2 ^ 63) : (BitVec.of
 theorem cw_bge_nat (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
   show (!(BitVec.ofNat 64 a).slt (BitVec.ofNat 64 b)) = decide (b ≤ a)
-  simp only [BitVec.slt, cw_toInt_ofNat a ha, cw_toInt_ofNat b hb]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
 
 /-- `blez a2` (`bge x0,a2`) at the entry, on the signed argument. -/
@@ -563,11 +560,6 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- Context normalisation inside the frame. -/
-theorem cw_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
-theorem cw_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 /-- The prologue's context, in the shape the loop lemmas take. -/
 theorem cw_ctx_spie_intro (k : KCtx) (m : Nat) (R : RegMap) :
     (k.pushed m).withRegs R = ((k.withSpie k.spie k.spp).pushed m).withRegs R := rfl

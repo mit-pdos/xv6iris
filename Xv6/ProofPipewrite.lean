@@ -701,11 +701,8 @@ theorem pw_ofNat_succ (m : Nat) : BitVec.ofNat 64 m + 1#64 = BitVec.ofNat 64 (m 
 
 theorem pw_withLocks_self (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-theorem pw_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 theorem pw_withSpie_pushOffAt (k : KCtx) (a b c d : Bool) :
     (k.withSpie a b).pushOffAt c d = k.pushOffAt c d := rfl
-theorem pw_filter_pipe : (["pipe"].filter (fun x => x ≠ "pipe")) = ([] : List String) := by decide
 theorem pw_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
   cases k0; simp only [KCtx.withLocks]; simp only at h; rw [h]
 /-- The loop's context after a `withSpie` from `sleep` and the re-acquire. -/
@@ -828,7 +825,7 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   iapply (pw_release RE c _ γl γp (k.regs 10#5) w q ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0)
     $$ [- $Hk $Hpc $Hlocked $HR $Href]
   rotate_right 1
-  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, pw_filter_pipe, pwj_46ce, pw_withSpie_sec,
+  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, MachCSL.filter_pipe, pwj_46ce, pw_withSpie_sec,
     pw_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
   iframe #
   isplitl [Harm]
@@ -942,7 +939,7 @@ theorem pw_minus1 (RE : RELEASE_GEN)
   iapply (pw_release RE c _ γl γp (k.regs 10#5) w q ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0)
     $$ [- $Hk $Hpc $Hlocked $HR $Href]
   rotate_right 1
-  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, pw_filter_pipe, pwj_4604,
+  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, MachCSL.filter_pipe, pwj_4604,
     pw_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
   iframe #
   isplitl [Harm]
@@ -1143,8 +1140,6 @@ theorem pw_cs18 (R R' : RegMap) (v w : BitVec 64) (hcs : calleeSaved ((R.set 10#
 theorem pw_cs18' (R R' : RegMap) (w : BitVec 64) (hcs : calleeSaved (R.set 1#5 w) R') :
     R' 18#5 = R 18#5 := by
   rw [hcs.2.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
-theorem pw_withSpie_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
-    (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
 
 /-! ## The loop invariant at the guard `(KernelSyms.«pipewrite» + 0x88)` -/
 
@@ -1307,7 +1302,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   iapply (pw_release RE c _ γl γp (k.regs 10#5) w q ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0)
     $$ [- $Hk $Hpc $Hlocked $HR $Href]
   rotate_right 1
-  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, pw_filter_pipe, pwj_4636, pw_withSpie_sec,
+  k_norm_g [pw_popExit_off kb a b hb.wf k.sie hsie, MachCSL.filter_pipe, pwj_4636, pw_withSpie_sec,
     pw_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
   iframe #
   isplitl [Harm]
@@ -1345,7 +1340,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   -- past sleep: at whichever hart, at the caller's index
   iapply wpNext_intro_pin
   iintro %c %_ %spieS %sppS %RS Hk Hpc Hte Hce %hcsS
-  k_norm_g [pw_withSpie_collapse, hb.proc]
+  k_norm_g [MachCSL.withSpie_collapse, hb.proc]
   have hfixS : pwFix k j n RS := pwFix_cs k j n _ RS (pwFix_call' k j n R6 hfix6 _) hcsS
   have h18_S : RS 18#5 = BitVec.ofNat 64 m := (pw_cs18' _ _ _ hcsS).trans h18_6
   obtain ⟨s2, s8, s9, s19, s20, s21, s22, s23, s24, s25, s26, s27⟩ := id hfixS
@@ -1358,7 +1353,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   iintro Hk Hpc
   iapply (pw_acquire AC c _ γl γp (k.regs 10#5) w q ?hna ?hKa ?hla ?ha0) $$ [- $Hk $Hpc $Href]
   rotate_right 1
-  k_norm_g [pwj_4640, hsie, hb.proc, pw_withSpie_withSpie]
+  k_norm_g [pwj_4640, hsie, hb.proc, MachCSL.withSpie_withSpie]
   iframe #
   case hna => k_norm_g; rw [hb.noff]; decide
   case hKa => k_norm_g; unfold pipewriteSlots at hK; omega
@@ -1368,7 +1363,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   iintro %spie7 %spp7 %R7 %hsp7 Hk Hpc %hcs7 Hlocked HR _ Harm Href
   -- the acquire's arm and the complement: the whole bundle again
   icases armExt_join c k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-  k_norm_g [pw_withSpie_withSpie, KCtx.pushOffAt_withRegs, pw_withSpie_pushOffAt,
+  k_norm_g [MachCSL.withSpie_withSpie, KCtx.pushOffAt_withRegs, pw_withSpie_pushOffAt,
     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
   have hfix7 : pwFix k j n R7 := pwFix_cs k j n _ R7 (pwFix_call k j n RS hfixS _ _) hcs7
   have h18_7 : R7 18#5 = BitVec.ofNat 64 m := (pw_cs18 _ _ _ _ hcs7).trans h18_S

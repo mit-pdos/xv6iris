@@ -165,7 +165,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     icases Harm with ⟨%h10, Htx, Hcf⟩
     simp only [Bool.false_eq_true, if_false] at hns
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs (devArg A.v1) (devArg A.v2)
@@ -385,7 +385,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
       $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Harm]
   · -- ===== the string did not fetch: the -1 tail =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x2e#64) false 42#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sysfile_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hbuf : sysfileAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysfileAny; iexists bs; iframe; ipureintro; omega

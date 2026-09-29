@@ -45,30 +45,15 @@ theorem fw_ret_136c : jumpPc (KA.«freewalk» + 0x42#64) = (KA.«freewalk» + 0x
 theorem fw_ret_1378 : jumpPc (KA.«freewalk» + 0x4e#64) = (KA.«freewalk» + 0x4e#64) := by
   decide
 
-/-- The `V` bit of a pointer entry: set. -/
-theorem fw_kPtr_valid (b : BitVec 44) : kPtr b &&& 1#64 = 1#64 := by
-  simp only [kPtr, mkPte, ptrFlags]; bv_decide
-
 /-- Its `R`/`W`/`X` bits: clear, so the `panic` arm is not taken. -/
 theorem fw_kPtr_nonleaf (b : BitVec 44) : kPtr b &&& 14#64 = 0#64 := by
   simp only [kPtr, mkPte, ptrFlags]; bv_decide
 
 theorem fw_kPtr_ne_zero (b : BitVec 44) : kPtr b ≠ 0#64 := by
   intro h
-  have h1 := fw_kPtr_valid b
+  have h1 := MachCSL.kPtr_valid b
   rw [h] at h1
   exact absurd h1 (by decide)
-
-/-- `PTE2PA` of a pointer entry. -/
-theorem fw_ptr_page (b : BitVec 44) : ((kPtr b >>> 10) <<< 12) = pageAddr b := by
-  simp only [kPtr, mkPte, ptrFlags, pageAddr, pteAddr, LeanRV64D.zero_extend,
-    Sail.BitVec.zeroExtend]
-  bv_decide
-
-/-- `beqz` / `bnez` as conditionals. -/
-theorem fw_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
-  by_cases h : x = 0#64 <;> simp [bcond, h]
 
 theorem fw_ite_bne {α : Type _} (x : BitVec 64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = if x = 0#64 then q else p := by
@@ -428,7 +413,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_branch c2 _ (KA.«freewalk» + 0x30#64) true 8180#13 14#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_ite_beq] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.ite_beq] next c3 hp3
     iintro Hk Hpc
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur :=
       fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))
@@ -451,17 +436,17 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
     rw [kidsAt_some l' t u _ hkid, hent]
     icases ptreeOwn_pagesNodup' l' u $$ Hkid with ⟨%hnd2, Hkid⟩
     have hupg : ∀ b ∈ u.pages l', pageValid (pageAddr b) :=
-      fun b hb => hpg b (kid_mem_pages l' t u _ hkid b hb)
+      fun b hb => hpg b (MachCSL.kid_mem_pages l' t u _ hkid b hb)
     k_step_gen (wp_s_ld cur _ (KA.«freewalk» + 0x2a#64) true 0#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (kPtr u.base))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
     iintro Hk Hpc Hw
     k_step_gen (wp_s_andi c1 _ (KA.«freewalk» + 0x2c#64) false 1#12 14#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_kPtr_valid] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.kPtr_valid] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_branch c2 _ (KA.«freewalk» + 0x30#64) true 8180#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [fw_ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c3 hp3
+      with [MachCSL.ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c3 hp3
     iintro Hk Hpc
     k_step_gen (wp_s_andi c3 _ (KA.«freewalk» + 0x32#64) false 14#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_kPtr_nonleaf] next c4 hp4
@@ -474,7 +459,7 @@ theorem freewalk_iter [CurCtx] (lvl : Nat) (t : PTree)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_slli c6 _ (KA.«freewalk» + 0x3a#64) false 12#6 10#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_ptr_page] next c7 hp7
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ptr_page] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_jal c7 _ (KA.«freewalk» + 0x3e#64) false 2097090#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freewalk_br_0] next c8 hp8

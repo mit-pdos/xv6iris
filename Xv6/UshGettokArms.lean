@@ -138,7 +138,7 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
   have h2_18 : m2.get 18#5 = BitVec.ofNat 64 (s0 + len) := by rw [e2 _ (by decide) (by decide), h18]
   -- 0x3fc  bgeu s1,s2 : not at the end
   iapply ushS_brN UL N (ushI_3fc N.t) 0x400 h2 m2 (2 + n)
-    (by rw [h2_9, h2_18, ushG_bgeu _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+    (by rw [h2_9, h2_18, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
   iintro %h3 Hrun
   iapply shGtk_tok_scan UL SC N dq dw dv s0 len f n (len - k) k h3 m2 rfl hk hs64 h2_9 h2_18
     (by show (ukWr (ukWr (ukWr (ukWr mc _ _) _ _) _ _) _ _).get _ = _; ureg)
@@ -261,7 +261,7 @@ theorem shGtk_bar (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DF
   iintro %h4 Hrun
   iapply ushS_brT UL N (ushI_3e8 N.t) 0x386 h4 _ (2 + n)
     (by rw [ukWr_get_same _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide),
-      h15, ushG_beq_nat _ _ (by decide) (by decide)]; decide) $$ Hc Hrun
+      h15, Xv6.beq_nat _ _ (by decide) (by decide)]; decide) $$ Hc Hrun
   iintro %h5 Hrun
   iapply ushS_itype UL N (ushI_386 N.t) 0x388 h5 _ (2 + n) (BitVec.ofNat 64 (s0 + (k + 1)))
     (by ureg; rw [h9, ukAddi (s0 + k) 1 1#12 (by decide)]; rfl) $$ Hc Hrun
@@ -317,7 +317,7 @@ theorem shGtk_gt (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DFr
   iintro %h5 Hrun
   iapply ushS_brN UL N (ushI_3da N.t) 0x3de h5 _ (2 + n)
     (by rw [ukWr_get_same _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide), ukWr_get_same _ _ _ (by decide),
-      ushG_beq_nat _ _ (by omega) (by decide)]; simp [hw]) $$ Hc Hrun
+      Xv6.beq_nat _ _ (by omega) (by decide)]; simp [hw]) $$ Hc Hrun
   iintro %h6 Hrun
   iapply ushS_itype UL N (ushI_3de N.t) 0x3e0 h6 _ (2 + n) (BitVec.ofNat 64 (s0 + (k + 1)))
     (by ureg; rw [h9, ukAddi (s0 + k) 1 1#12 (by decide)]; rfl) $$ Hc Hrun
@@ -362,7 +362,7 @@ theorem shGtk_wordent (UL : UK_LEAVES) (N : UkNames GF) (v : Nat) (h : CPU) (mc 
     iintro %h4 Hrun
     iapply ushS_brN UL N (ushI_3e8 N.t) 0x3ec h4 _ av
       (by rw [ukWr_get_same _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide),
-        h15, ushG_beq_nat _ _ (by omega) (by decide)]; simp; omega) $$ Hc Hrun
+        h15, Xv6.beq_nat _ _ (by omega) (by decide)]; simp; omega) $$ Hc Hrun
     iintro %h5 Hrun
     iapply Hk $$ %h5 %_ [] Hrun
     ipureintro; intro r r14 r15; rw [ukWr_get_other _ _ _ _ r14, ukWr_get_other _ _ _ _ r14]
@@ -383,7 +383,7 @@ theorem shGtk_wordent (UL : UK_LEAVES) (N : UkNames GF) (v : Nat) (h : CPU) (mc 
     iintro %h5 Hrun
     iapply ushS_brN UL N (ushI_374 N.t) 0x378 h5 _ av
       (by rw [ukWr_get_same _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide),
-        h15, ushG_beq_nat _ _ (by omega) (by decide)]; simp; omega) $$ Hc Hrun
+        h15, Xv6.beq_nat _ _ (by omega) (by decide)]; simp; omega) $$ Hc Hrun
     iintro %h6 Hrun
     iapply ushS_addiw UL N (ushI_378 N.t) 0x37c h6 _ av _ rfl $$ Hc Hrun
     iintro %h7 Hrun

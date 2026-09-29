@@ -246,4 +246,8 @@ theorem kLeaf_inj {ppn ppn' : BitVec 44} {perm perm' : KPerm} {a d a' d' : BitVe
   refine ⟨h1, ?_⟩
   cases perm <;> cases perm' <;> first | rfl | (exfalso; clear h h1; revert h2; revert a d a' d'; decide)
 
+/-- The `V` bit of a pointer entry: set. -/
+theorem kPtr_valid (b : BitVec 44) : kPtr b &&& 1#64 = 1#64 := by
+  simp only [kPtr, mkPte, ptrFlags]; bv_decide
+
 end MachCSL

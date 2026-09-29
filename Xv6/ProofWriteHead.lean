@@ -411,8 +411,6 @@ theorem wh_log_addr : KA.«write_head» + 0x1ea34#64 = logAddr := by
 theorem wh_lhb0 : KA.«write_head» + 0x1ea64#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
-theorem wh_lhN : logAddr + 44#64 = lhNAddr := rfl
-
 /-! ## The three callees, at their call sites -/
 
 section
@@ -758,7 +756,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   -- +0x22 lw a2,44(s2)
   k_step_e (wp_s_lw cpu _ (KA.«write_head» + 0x22#64) false 44#12 12#5 18#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, wh_lhN]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, Xv6.lhn_addr]
   iintro Hk Hpc HlhN
   -- +0x26 c.sw a2,88(a0)
   icases wh_hdr_acc kk hkk bs2 (by rw [hlen]; unfold BSIZE; omega) $$ Hby with ⟨Hword, Hwclose⟩

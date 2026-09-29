@@ -111,9 +111,6 @@ set_option linter.unusedVariables false
 /-- `+0xce`'s `lw a2,4(s3)` reads the child's `inum` cell. -/
 theorem create_alloc_iinum (x : Nat) : ientry x + 4#64 = iInum (ientry x) := rfl
 
-/-- `+0xdc`'s `bltz a0` at dirlink's `-1`, in the literal form `k_norm` leaves. -/
-theorem create_alloc_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
 section Tx
 variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
@@ -1084,7 +1081,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     have htot0 : tot = 0 := by rcases hatom with h | h <;> omega
     -- +0xdc  bltz a0 : TAKEN, to +0x146
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xdc#64) false 106#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, create_bltz_m1, create_alloc_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, create_bltz_m1, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hbare := Hpw $$ Hpid
     ihave Hfb := hF $$ Henv

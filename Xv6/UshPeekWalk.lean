@@ -33,11 +33,6 @@ open Std (ExtTreeSet)
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
-/-- `bgeu` on two `Nat` words (Rocq `moi_ge_u`). -/
-theorem ushPk_bgeu_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
-  simp [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy]
-
 /-- **Rocq `ushp_snez_val`**: `snez` (`sltu rd, x0, rs`) of a `Nat` word. -/
 theorem ushPk_snez_nat (v : Nat) (hv : v < 2 ^ 64) :
     ukRtypeVal .SLTU 0#64 (BitVec.ofNat 64 v) = BitVec.ofNat 64 (if v = 0 then 0 else 1) := by
@@ -185,13 +180,13 @@ theorem shPeek_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw :
   by_cases hjl : j = len
   · subst hjl
     iapply ushS_brT UL N (ushI_46a N.t) 0x482 h mc (2 + n)
-      (by rw [h9, h11, ushPk_bgeu_nat _ _ (by omega) (by omega)]; simp) $$ Hc Hrun
+      (by rw [h9, h11, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp) $$ Hc Hrun
     iintro %h1 Hrun
     iapply Hk $$ Hs Hws %h1 %mc [] [] Hrun
     · ipureintro; intro q _ _; rfl
     · ipureintro; rw [h9, Nat.sub_self, ushpSkipws_zero, Nat.add_zero]
   · iapply ushS_brN UL N (ushI_46a N.t) 0x46e h mc (2 + n)
-      (by rw [h9, h11, ushPk_bgeu_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
+      (by rw [h9, h11, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp; omega) $$ Hc Hrun
     iintro %h1 Hrun
     iapply shPeek_scan UL SC N dq dw s0 len f n (len - j) j h1 mc rfl (by omega) hs64 h9 h18 h19
       $$ Hc Hs Hws Hrun Hk

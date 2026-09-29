@@ -472,4 +472,8 @@ instance isSleeplockTok_persistent [CurCtx] (γl γ γt : GName) (slk : BitVec 6
 
 end
 
+theorem slPid_eq (x : BitVec 64) : slPid x = x + 40#64 := rfl
+
+theorem slLk_eq (x : BitVec 64) : slLk x = x + 8#64 := rfl
+
 end Xv6

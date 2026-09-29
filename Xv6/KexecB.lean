@@ -127,7 +127,6 @@ theorem kxcB_root_beqz (root : BitVec 44) (h : pageValid (pageAddr root)) :
   simp only [bcond]
   simpa using this
 
-theorem kxcB_zero_beqz : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- Nothing is covered at size 0. -/
 theorem kxcB_lazyFree_0 (um : RegMapF (BitVec 64)) : lazyFree um 0#64 := by
@@ -618,7 +617,7 @@ theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
   iintro Hk Hpc
   -- +0x09a  beqz a0 TAKEN
   k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x9a#64) false 636#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, kxcB_zero_beqz]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, MachCSL.beqz_zero]
   iintro Hk Hpc
   -- +0x316  c.ldsp s6,480(sp)
   k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x316#64) true 480#12 22#5 2#5 (by decide) (by decide)

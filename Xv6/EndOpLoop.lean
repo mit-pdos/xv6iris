@@ -387,7 +387,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case qa1 => k_norm_g
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp1 %pp1 %R1 %kkL %bsL %bsdL %dL %hcs1 Hk Hpc Hte Hce Hpid HlockL
-  k_norm_g [eo_ret_c6, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_c6, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs1a, hcs1b⟩ := hcs1
   have hfix1 : eoPins k R1 s9 (BitVec.ofNat 64 t) s19 logAddr (lhBlock t) := by
     k_norm_g at hcs1a
@@ -435,7 +435,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case ra1 => k_norm_g
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp2 %pp2 %R2 %kkD %bsD %bsdD %dD %hcs2 Hk Hpc Hte Hce Hpid HlockD
-  k_norm_g [eo_ret_d4, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_d4, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs2a, hcs2b⟩ := hcs2
   have hfix3 : eoPins k R2 (bnode kkL) (BitVec.ofNat 64 t) s19 logAddr (lhBlock t) := by
     k_norm_g at hcs2a
@@ -539,7 +539,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case wbno => rw [hbnoS]; exact hbs
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp3 %pp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid HbufL Hmir
-  k_norm_g [eo_ret_ec, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_ec, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix5 : eoPins k R3 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
     k_norm_g at hcs3
@@ -579,7 +579,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case ea0 => k_norm_g
   k_next_e
   iintro %sp4 %pp4 %R4 %hsp4 Hk Hpc %hcs4 Hpid Hu2
-  k_norm_g [eo_ret_f2, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_f2, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix6 : eoPins k R4 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
     k_norm_g at hcs4
@@ -610,7 +610,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case fa0 => k_norm_g
   k_next_e
   iintro %sp5 %pp5 %R5 %hsp5 Hk Hpc %hcs5 Hpid Hu1
-  k_norm_g [eo_ret_f8, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_f8, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix7 : eoPins k R5 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
     k_norm_g at hcs5
@@ -665,7 +665,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     D (eoExt Lw t bsD) (t + 1) $$ Hopen with ⟨HlhN, HlhNback⟩
   k_step_e (wp_s_lw cpu _ (KA.«end_op» + 0xfc#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20, eo_o_lhn]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20, Xv6.lhn_addr]
   iintro Hk Hpc HlhN
   ihave Hopen := HlhNback $$ HlhN
   have hfix8 : eoPins k (((R5.set 18#5 (BitVec.ofNat 64 t + 1#64)).set 21#5

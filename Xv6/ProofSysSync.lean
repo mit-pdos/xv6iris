@@ -96,8 +96,6 @@ theorem ss_ret_4e : jumpPc (KA.«sys_sync» + 0x4e#64) = KA.«sys_sync» + 0x4e#
 theorem ss_ret_54 : jumpPc (KA.«sys_sync» + 0x54#64) = KA.«sys_sync» + 0x54#64 := by decide
 theorem ss_ret_6a : jumpPc (KA.«sys_sync» + 0x6a#64) = KA.«sys_sync» + 0x6a#64 := by decide
 
-theorem ss_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
-
 
 /-! ## The context and the register pins -/
 
@@ -207,21 +205,6 @@ theorem ssRegs_set (k : KCtx) (nv : BitVec 64) (R : RegMap) (h : ssRegs k nv R)
   · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
   · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
 
-/-- The epilogue's register map is callee-saved against the entry's, and
-carries `a0 = 0`. -/
-theorem ss_calleeSaved_epi (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5)
-    (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 /-- The pins at the EXIT: `s1` and `s2` are back at the caller's values
 (the fast arm never wrote them; the loop arm restored them at `+0x5a`). -/
@@ -293,26 +276,6 @@ theorem ss_cs_trans (R R' R'' : RegMap) (h1 : calleeSaved R R') (h2 : calleeSave
     b21.trans a21, b22.trans a22, b23.trans a23, b24.trans a24, b25.trans a25, b26.trans a26,
     b27.trans a27⟩
 
-theorem ss_cs_set (R R' : RegMap) (h : calleeSaved R R') (i : BitVec 5) (v : BitVec 64)
-    (hi : i ≠ 2#5 ∧ i ≠ 8#5 ∧ i ≠ 9#5 ∧ i ≠ 18#5 ∧ i ≠ 19#5 ∧ i ≠ 20#5 ∧ i ≠ 21#5 ∧
-      i ≠ 22#5 ∧ i ≠ 23#5 ∧ i ≠ 24#5 ∧ i ≠ 25#5 ∧ i ≠ 26#5 ∧ i ≠ 27#5) :
-    calleeSaved R (R'.set i v) := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
-  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
-  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
-  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
-  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
-  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
-  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
-  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
-  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
-  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
-  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
-  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
-  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
 
 theorem ss_a0_epi (KR R : RegMap) (h10 : R 10#5 = 0#64) :
     (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) 10#5 = 0#64 := by
@@ -664,7 +627,7 @@ theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   ihave Hk := ss_kctx_ws cpu k _ $$ Hk
   iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce Hfs Hpid
   · ipureintro
-    exact ⟨ss_calleeSaved_epi k.regs _ d9 d18 d19 d20 d21 d22 d23 d24 d25 d26 d27,
+    exact ⟨MachCSL.calleeSaved_mk k.regs _ d9 d18 d19 d20 d21 d22 d23 d24 d25 d26 d27,
       ss_a0_epi k.regs _ h10⟩
 
 end
@@ -722,7 +685,7 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   k_norm [ssK_sie k, ss_ret_44]
   iframe #
   case hp1 => k_norm [ssK_proc k, hproc]
-  case hc1 => k_norm; exact ss_log_nz
+  case hc1 => k_norm; exact Xv6.log_nz
   case hn1 => k_norm [ssK_noff k, hnoff]; omega
   case hK1 =>
     k_norm [ssK_avail k]

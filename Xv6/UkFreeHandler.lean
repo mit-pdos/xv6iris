@@ -56,6 +56,7 @@ The four free leaves are the application-generic ones: the QUIET write
 -/
 import Xv6.UkHandler
 import Xv6.UkSysP
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -152,14 +153,6 @@ theorem fh_align (a : Nat) (h : a % 2 = 0) : BitVec.ofNat 64 a &&& 1#64 = 0#64 :
   show a % 2 ^ 64 &&& 1 = 0
   rw [Nat.and_one_is_mod]
   omega
-
-/-- A small descriptor, as the signed word. -/
-theorem fh_toInt_small (n : Nat) (h : n < 2 ^ 63) : (BitVec.ofNat 64 n).toInt = (n : Int) := by
-  rw [BitVec.toInt_eq_toNat_cond]
-  have h1 : (BitVec.ofNat 64 n).toNat = n := by
-    rw [BitVec.toNat_ofNat]; omega
-  rw [h1]
-  split <;> omega
 
 /-- **Rocq `fh_held_ok`**: every held descriptor is an open standard slot of
 the ledger `l` or a handle of `hm`. -/
@@ -398,7 +391,7 @@ theorem fh_t_open (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (
   icases Hans with (⟨%fd, %rd, %wr, %t, %hb, Hal⟩ | ⟨%hr, Hstd⟩)
   · obtain ⟨hr, hfdlt, _⟩ := hb
     have hsig : r.toInt = (fd : Int) := by
-      rw [hr]; exact fh_toInt_small fd (by unfold NOFILE at hfdlt; omega)
+      rw [hr]; exact MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)
     iapply Hcont $$ %h3 %r %(Or.inr ⟨by rw [hsig]; omega, by rw [hsig]; exact_mod_cast hfdlt⟩)
       [HK Hpay Hal Hhm] Hp Hrun
     rw [hsig]

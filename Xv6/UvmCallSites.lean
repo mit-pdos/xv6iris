@@ -12,11 +12,6 @@ open LeanRV64D
 
 set_option linter.unusedSectionVars false
 
-/-- A branch on a value known to be zero: taken. -/
-theorem uc_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
 /-- A branch on a value known to be nonzero: not taken. -/
 theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by

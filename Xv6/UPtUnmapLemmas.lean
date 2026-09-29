@@ -36,13 +36,6 @@ theorem delete_empty {V : Type} (i : Nat) :
 
 /-! ## `delRunL`: a run of keys removed -/
 
-theorem delRunL_zero (L : RegMapF (BitVec 64)) (v0 : Nat) : delRunL L v0 0 = L := rfl
-
-theorem delRunL_succ (L : RegMapF (BitVec 64)) (v0 i : Nat) :
-    delRunL L v0 (i + 1) = delete (delRunL L v0 i) (v0 + i) := by
-  unfold delRunL
-  rw [List.range_succ, List.foldl_append]
-  rfl
 
 /-- A key past the deleted prefix is untouched. -/
 theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (v0 i j : Nat) (h : i ≤ j) :
@@ -50,24 +43,17 @@ theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (v0 i j : Nat) (h : i ≤ j) :
   induction i with
   | zero => rfl
   | succ i ih =>
-    rw [delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
+    rw [Xv6.delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
 
 /-! ## `ptRep`: reading and clearing a level-0 entry -/
 
-/-- A leaf of `L` is what the walk finds, up to `A`/`D`. -/
-theorem ptRep_entAt {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
-    (w : BitVec 64) (hw : get? L vpn.toNat = some w) :
-    t.walk 2 vpn ≠ none ∧ pteAD w (t.entAt 2 vpn) := by
-  obtain ⟨addr, v, hwalk, had⟩ := h.2.2.2.1 vpn w hw
-  have he := (PTree.walk_addr 2 t vpn addr v hwalk).2
-  exact ⟨by rw [hwalk]; simp, by rw [he]; exact had⟩
 
 /-- A blocked walk means no leaf. -/
 theorem ptRep_none_of_walk {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
     (hw : t.walk 2 vpn = none) : get? L vpn.toNat = none := by
   cases hg : get? L vpn.toNat with
   | none => rfl
-  | some w => exact absurd hw (ptRep_entAt h vpn w hg).1
+  | some w => exact absurd hw (Xv6.ptRep_entAt h vpn w hg).1
 
 /-- An incomplete path in a well-formed tree is a blocked walk: a childless
 slot above level 0 carries a zero entry. -/
@@ -214,7 +200,7 @@ theorem delRunL_insert (L : RegMapF (BitVec 64)) (v0 n k : Nat) (v : BitVec 64)
   induction n with
   | zero => rfl
   | succ n ih =>
-    rw [delRunL_succ, delRunL_succ, ih (fun j hj => h j (by omega)),
+    rw [Xv6.delRunL_succ, Xv6.delRunL_succ, ih (fun j hj => h j (by omega)),
       delete_insert_ne _ _ _ _ (fun hc => h n (by omega) hc.symm)]
 
 theorem delRunL_get_some (L : RegMapF (BitVec 64)) (v0 n k : Nat) (w : BitVec 64)
@@ -222,7 +208,7 @@ theorem delRunL_get_some (L : RegMapF (BitVec 64)) (v0 n k : Nat) (w : BitVec 64
   induction n with
   | zero => exact h
   | succ n ih =>
-    rw [delRunL_succ] at h
+    rw [Xv6.delRunL_succ] at h
     by_cases hk : v0 + n = k
     · rw [get?_delete_eq hk] at h; exact absurd h (by simp)
     · exact ih (by rw [← get?_delete_ne (m := delRunL L v0 n) hk]; exact h)

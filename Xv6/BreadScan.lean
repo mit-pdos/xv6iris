@@ -391,7 +391,7 @@ theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     k_norm
     iapply Hcont $$ %_ %_ %true [] Hk Hpc Hscan
     ipureintro
-    refine ⟨⟨fun _ => List.eq_nil_of_length_eq_zero hz, fun _ => rfl⟩, by simp [hz, bd_beqz_zero],
+    refine ⟨⟨fun _ => List.eq_nil_of_length_eq_zero hz, fun _ => rfl⟩, by simp [hz, MachCSL.beqz_zero],
       ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
       first
         | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
@@ -404,7 +404,7 @@ theorem bd_bwd_step (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
     k_norm
     iapply Hcont $$ %_ %_ %false [] Hk Hpc Hscan
     ipureintro
-    refine ⟨⟨fun h => absurd h (by decide), fun he => absurd (by rw [he]; rfl) hz⟩, by simp [hz, bd_beqz_zero],
+    refine ⟨⟨fun h => absurd h (by decide), fun he => absurd (by rw [he]; rfl) hz⟩, by simp [hz, MachCSL.beqz_zero],
       ⟨?_, ?_, ?_, ?_⟩, ?_⟩ <;>
       first
         | exact bdOther_set R0 Rc hoth 15#5 _ (Or.inr (Or.inr rfl))
@@ -481,7 +481,7 @@ theorem bd_bwd (c : CPU) (kc : KCtx) (hsie : kc.sie = false)
       case' _ => iframe Ha Hlru Hpool Hkey Hs
       -- bne s1,a4 : the cursor is the sentinel, so every buffer is pinned
       k_step (wp_s_branch c _ (KA.«bread» + 0x80#64) false 8186#13 9#5 14#5 (by decide) bop.BNE)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g14, bd_bne_eq]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g14, MachCSL.bne_eq]
       iintro Hk Hpc
       k_norm
       iapply Hcont2 $$ %kk %_ %(KA.«bread» + 0x84#64) %false [] Hk Hpc Hscan

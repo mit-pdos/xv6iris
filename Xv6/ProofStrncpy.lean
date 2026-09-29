@@ -23,6 +23,7 @@ import Xv6.SpecStrncpy
 import Xv6.CodeTactics
 import Xv6.FsWords
 import Xv6.StepLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -57,19 +58,11 @@ theorem sy_addiw_dec (m : Nat) (h0 : 0 < m) (hm : m < 2 ^ 31) :
       = BitVec.ofNat 64 (m - 1) := by
   rw [sy_sub1 m h0, sy_sext32 (m - 1) (by omega)]
 
-/-- The signed reading of a small count. -/
-theorem sy_toInt_ofNat (m : Nat) (hm : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = (m : Int) := by
-  rw [BitVec.toInt_eq_toNat_bmod]
-  simp only [BitVec.toNat_ofNat, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega)]
-  simp only [Int.bmod]
-  split <;> omega
-
 /-- `0 < n` as the machine sees it. -/
 theorem sy_slt_zero (m : Nat) (hm : m < 2 ^ 63) :
     BitVec.slt 0#64 (BitVec.ofNat 64 m) = decide (0 < m) := by
   have h0 : (0#64 : BitVec 64).toInt = 0 := by decide
-  simp only [BitVec.slt, sy_toInt_ofNat m hm, h0, decide_eq_decide]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat m hm, h0, decide_eq_decide]
   omega
 
 /-- `blez` on a small count. -/
@@ -92,9 +85,6 @@ theorem sy_ite_bgtz {α : Type} (m : Nat) (hm : m < 2 ^ 63) (x y : α) :
 
 /-- The low byte of the zero-extended byte is the byte. -/
 theorem sy_extract (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 b) = b := by bv_decide
-
-/-- The store `sb zero` writes the byte `0`. -/
-theorem sy_extract_zero : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by bv_decide
 
 /-- `addi rs,+1` on a cursor, as `k_norm` leaves it. -/
 theorem sy_succ' (b : BitVec 64) (k : Nat) :
@@ -212,7 +202,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
     icases byteBuf_upd dst cur j oj hcj $$ Hdst with ⟨Ho, Hclosed⟩
     k_step_gen (wp_s_sb c1 _ (KA.«strncpy» + 0x32#64) false 4095#12 14#5 0#5 (by decide) oj)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sy_pred dst j, sy_extract_zero] next c2 hp2
+      with [RegMap.set_apply, sy_pred dst j, MachCSL.extract_zero] next c2 hp2
     iintro Hk Hpc Ho
     ihave Hdst := Hclosed $$ %_ Ho
     -- subw a3,a5,a4
@@ -259,7 +249,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
     icases byteBuf_upd dst cur j oj hcj $$ Hdst with ⟨Ho, Hclosed⟩
     k_step_gen (wp_s_sb c1 _ (KA.«strncpy» + 0x32#64) false 4095#12 14#5 0#5 (by decide) oj)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sy_pred dst j, sy_extract_zero] next c2 hp2
+      with [RegMap.set_apply, sy_pred dst j, MachCSL.extract_zero] next c2 hp2
     iintro Hk Hpc Ho
     ihave Hdst := Hclosed $$ %_ Ho
     k_step_gen (wp_s_subw c2 _ (KA.«strncpy» + 0x36#64) false 13#5 15#5 14#5 (by decide))

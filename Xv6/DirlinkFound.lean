@@ -19,6 +19,7 @@ directory UNCHANGED, `tot = 0`.
 -/
 import Xv6.DirlinkTail
 import Xv6.DirlinkDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -30,12 +31,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-/-- Rocq's `dlk_zext32_unsigned`. -/
-theorem dirlink_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  have := w.isLt
-  omega
 
 theorem dirlink_slots_iput (a : Nat) (h : dirlinkSlots ≤ a) : iputSlots ≤ a - 10 := by
   have h1 : iputSlots = 78 := by decide
@@ -147,7 +142,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   have hklt := dirFirst_lt _ _ _ _ hfound
   have hlive := dirFirst_live _ _ _ _ hfound
   have hnib : (BitVec.setWidth 32 (dirInum data kk)).toNat < 16 * icfgNib := by
-    rw [dirlink_zext32_toNat]; exact hs.hinums kk hklt hlive
+    rw [MachCSL.zext32_toNat]; exact hs.hinums kk hklt hlive
   obtain ⟨hcov, hlog⟩ := hs.hiregb _ hnib
   have hn3 := dirlink_3le _ _ _ hs.hneed
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr

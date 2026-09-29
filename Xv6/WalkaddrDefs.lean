@@ -34,10 +34,6 @@ theorem wa_bgeu_fall (va : BitVec 64) (h : ¬ va.toNat < 2 ^ 38) :
     BitVec.toNat_ofNat, Nat.reducePow]
   omega
 
-theorem wa_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
 theorem wa_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]

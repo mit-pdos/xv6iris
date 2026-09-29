@@ -47,7 +47,6 @@ theorem fa_s1_40d0 : KA.«filealloc» + 0x1e5d2#64 = fnode 0 := by
   rw [fnode_zero]; decide
 theorem fa_end_40d8 : KA.«filealloc» + 0x1f572#64 = fnode NFILE := by
   rw [fnode_end]; decide
-theorem fa_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem fa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
 theorem fa_sext4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
@@ -189,7 +188,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     simp only [List.length_nil] at hn
     subst hn
     k_step (wp_s_branch c _ (KA.«filealloc» + 0x28#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_zero, Xv6.bm_sext0, fa_beq_00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_zero, Xv6.bm_sext0, MachCSL.beqz_zero]
     iintro Hk Hpc
     icases Hor with ⟨⟨%hfree, Hf, Hn, Hc⟩ | ⟨%hne, -⟩⟩
     rotate_left 1

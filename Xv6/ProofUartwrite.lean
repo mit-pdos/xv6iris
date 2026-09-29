@@ -38,6 +38,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8b
 import Xv6.PrintkDefs
 import Xv6.StepLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -86,15 +87,11 @@ theorem uw_thr_io (i : UartId) : devByteOk (uartBaseAddr i) := by cases i <;> de
 
 /-! ## Branch conditions and the counter -/
 
-theorem uw_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
-  rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
-  simp [BitVec.toNat_ofNat]; omega
-
 /-- `bge s1,s3` with both counters non-negative. -/
 theorem uw_bge (m n : Nat) (hm : m < 2 ^ 63) (hn : n < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 m) (BitVec.ofNat 64 n) = decide (n ≤ m) := by
   show (!(BitVec.ofNat 64 m).slt (BitVec.ofNat 64 n)) = decide (n ≤ m)
-  simp only [BitVec.slt, uw_toInt_ofNat m hm, uw_toInt_ofNat n hn]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat m hm, MachCSL.toInt_ofNat n hn]
   by_cases h : n ≤ m <;> simp [h] <;> omega
 
 /-- `blez a2` (`bge x0,a2`) with `a2 = n ≥ 0`. -/
@@ -105,8 +102,6 @@ theorem uw_blez (n : Nat) (hn : n < 2 ^ 63) :
   · subst h0; simp
   · have : ¬ n ≤ 0 := by omega
     simp [h0, this]
-
-theorem uw_beq_true : bcond bop.BEQ (0#64) 0#64 = true := by decide
 
 theorem uw_beq_false (v : BitVec 64) (h : ¬ v = 0#64) : bcond bop.BEQ v 0#64 = false := by
   show (v == 0#64) = false
@@ -133,20 +128,8 @@ theorem uwj_74 : jumpPc (KA.«uartwrite» + 0x74#64) = KA.«uartwrite» + 0x74#6
 
 theorem uw_ws_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
     (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
-theorem uw_sec_ws (kb : KCtx) (a b : Bool) (l : List String) :
-    ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l := rfl
-theorem uw_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
-  cases k0; simp only [KCtx.withLocks]; simp only at h; rw [h]
 theorem uw_filter_self (s : String) : ([s].filter (fun x => x ≠ s)) = ([] : List String) := by
   simp
-theorem uw_popExit_off (kb : KCtx) (a b : Bool) (hwf : kb.wf) (hs : kb.sie = false) :
-    (kb.pushOffAt a b).popExit false = kb.withSpie a b := by
-  have h := KCtx.pushOffAt_popExit kb a b hwf
-  rw [hs] at h; exact h
-theorem uw_epi_ctx (k : KCtx) (s0 s1b a b : Bool) (Rb R : RegMap) :
-    ((((k.pushed 8).withSpie s0 s1b).withRegs Rb).withSpie a b).withRegs R =
-      ((k.withSpie a b).pushed 8).withRegs R := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k; rfl
 theorem uw_ctx_self (k : KCtx) : (k.withSpie k.spie k.spp).withRegs k.regs = k := by
   cases k; rfl
 
@@ -400,7 +383,7 @@ theorem uw_epi (c0 cpu : CPU) (k kb : KCtx) (hb : UwBase k kb)
   obtain ⟨s0, s1b, Rb, hkb⟩ := hb.struct
   obtain ⟨g2, g8, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := id hfix
   have hctx : (kb.withSpie a b).withRegs R = ((k.withSpie a b).pushed 8).withRegs R := by
-    rw [hkb]; exact uw_epi_ctx k s0 s1b a b Rb R
+    rw [hkb]; exact MachCSL.epi_ctx k s0 s1b a b Rb R
   rw [hctx]
   have hK8 : 8 ≤ (k.withSpie a b).avail := by
     simp only [KCtx.withSpie_avail]; unfold uartwriteSlots sleepSlots at hK; omega
@@ -633,7 +616,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     -- the transmitter is busy: release, sleep, back to the guard
     have hz : BitVec.setWidth 64 (Uart.lsr u) &&& 32#64 = 0#64 := (lsr_thre_bit u).mpr htv
     k_step (wp_s_branch cpu _ (KA.«uartwrite» + 0x60#64) true 8154#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, uw_beq_true]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, MachCSL.beqz_zero]
     iintro Hk Hpc
     -- c.mv a0,s2 ; jal release
     k_step (wp_s_add cpu _ (KA.«uartwrite» + 0x3a#64) true 10#5 0#5 18#5 (by decide))
@@ -646,8 +629,8 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iapply (uw_release RE cpu _ kb.sie k.proc i γl γ ?hsr ?hnr ?hKr ?hpr ?hrr ?hor ?ha0r)
       $$ [- $Hk $Hpc $Hlocked $HR $Harm]
     rotate_right 1
-    k_norm_g [KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self, uwj_40, uw_sec_ws,
-      uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks])]
+    k_norm_g [KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self, uwj_40, MachCSL.withSpie_sec,
+      MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks])]
     iframe #
     case hsr => k_norm_g
     case hnr => k_norm_g [hbb.noff]; try omega
@@ -663,7 +646,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     k_next_e
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_40, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
-      uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
+      MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
       MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
@@ -759,8 +742,8 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iapply (uw_release RE cpu _ kb.sie k.proc i γl γ ?hsr ?hnr ?hKr ?hpr ?hrr ?hor ?ha0r)
       $$ [- $Hk $Hpc $Hlocked $HR $Harm]
     rotate_right 1
-    k_norm_g [KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self, uwj_74, uw_sec_ws,
-      uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks])]
+    k_norm_g [KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self, uwj_74, MachCSL.withSpie_sec,
+      MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks])]
     iframe #
     case hsr => k_norm_g
     case hnr => k_norm_g [hbb.noff]; try omega
@@ -776,7 +759,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     k_next_e
     iintro %R3 Hk Hpc %hcs3
     k_norm_g [uwj_74, KCtx.pushOffAt_popExit kb sp2 spp2 hbb.wf, uw_filter_self,
-      uw_strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
+      MachCSL.strip_locks (kb.withSpie sp2 spp2) (by simp only [KCtx.withSpie_locks, hbb.locks]),
       MachCSL.KCtx.withSpie_twice, uw_ws_collapse]
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2

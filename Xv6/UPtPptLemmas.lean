@@ -56,15 +56,6 @@ theorem perm_rw : (PTE_R ||| PTE_W) = 6#64 := by decide
 
 /-! ## The allocator count -/
 
-theorem availSub_zero (on : Option Nat) : availSub on 0 = on := by
-  cases on <;> rfl
-
-theorem availSub_availSub (on : Option Nat) (a b : Nat) :
-    availSub (availSub on a) b = availSub on (a + b) := by
-  cases on with
-  | none => rfl
-  | some n => simp only [availSub, Option.map]; exact congrArg some (Nat.sub_sub n a b)
-
 theorem availDec_eq (on : Option Nat) : availDec on = availSub on 1 := by
   cases on <;> rfl
 
@@ -138,10 +129,6 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 /-! ## A one-page run -/
 
-theorem missingRun_one (t : PTree) (vpn : BitVec 27) :
-    t.missingRun vpn 1 = t.missingOn 2 vpn := by
-  simp only [PTree.missingRun, Nat.add_zero]
-
 /-- A single-page `mappages` run that mapped its page: the tree is the
 filled path with the leaf written, and the supply was exactly the nodes
 the path was missing. -/
@@ -153,7 +140,7 @@ theorem mapRun_one_eq (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : Bi
   by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
   · have hlen : fr.length = t.missingRun vpn 1 :=
       mapRun_len_full 1 t vpn ppn perm fr (Prod.ext hsup hfull)
-    rw [missingRun_one] at hlen
+    rw [Xv6.missingRun_one] at hlen
     refine ⟨hc, hlen, ?_⟩
     rw [mapRun_one t vpn ppn perm fr hlen hc]
   · rw [mapRun_fail t vpn ppn perm 0 fr hc] at hfull
@@ -166,7 +153,7 @@ theorem mapRun_one_fail (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : 
     (hfail : (t.mapRun vpn ppn perm 1 fr).2.2 < 1) :
     fr.length ≤ t.missingOn 2 vpn ∧ (t.mapRun vpn ppn perm 1 fr).1 = (t.fill 2 vpn fr).1 := by
   have hle : fr.length ≤ t.missingRun vpn 1 := mapRun_len_le 1 t vpn ppn perm fr hsup
-  rw [missingRun_one] at hle
+  rw [Xv6.missingRun_one] at hle
   refine ⟨hle, ?_⟩
   by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
   · have hlen : fr.length = t.missingOn 2 vpn := by
@@ -211,7 +198,7 @@ theorem leaves_of_empty (root tfp : BitVec 44) :
   intro j
   by_cases hj : j = trampVpn.toNat
   · subst hj
-    rw [get?_insert_ne (by rw [tfVpn_toNat, trampVpn_toNat]; omega), get?_insert_eq rfl,
+    rw [get?_insert_ne (by rw [Xv6.tfVpn_toNat, Xv6.trampVpn_toNat]; omega), get?_insert_eq rfl,
       get?_insert_eq rfl]
   · by_cases hj' : j = tfVpn.toNat
     · subst hj'

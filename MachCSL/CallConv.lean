@@ -292,4 +292,48 @@ theorem KCtx.eq_withRegs (k k' : KCtx) (hsie : k'.sie = k.sie) (hspie : k'.spie 
   simp only [KCtx.withRegs] at *
   simp_all
 
+theorem calleeSaved_mk (KR R : RegMap)
+    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
+    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
+    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
+    (h27 : R 27#5 = KR 27#5) :
+    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
+  unfold calleeSaved
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
+    first
+      | rfl
+      | assumption
+
+theorem cs_set (R R' : RegMap) (h : calleeSaved R R') (i : BitVec 5) (v : BitVec 64)
+    (hi : i ≠ 2#5 ∧ i ≠ 8#5 ∧ i ≠ 9#5 ∧ i ≠ 18#5 ∧ i ≠ 19#5 ∧ i ≠ 20#5 ∧ i ≠ 21#5 ∧
+      i ≠ 22#5 ∧ i ≠ 23#5 ∧ i ≠ 24#5 ∧ i ≠ 25#5 ∧ i ≠ 26#5 ∧ i ≠ 27#5) :
+    calleeSaved R (R'.set i v) := by
+  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
+  obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
+  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
+  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
+  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
+  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
+  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
+  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
+  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
+  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
+  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
+  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
+  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
+  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
+
+theorem strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
+  rw [← h]; exact KCtx.withLocks_self k0
+
+theorem calleeSaved_set (R R2 : RegMap) (i : BitVec 5) (v : BitVec 64)
+    (hi : i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5)
+    (h : calleeSaved R R2) : calleeSaved R (R2.set i v) := by
+  unfold calleeSaved at h ⊢
+  rcases hi with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h)
+
 end MachCSL

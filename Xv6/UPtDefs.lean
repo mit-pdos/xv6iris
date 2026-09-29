@@ -307,4 +307,42 @@ def tfPageAt (tfp : BitVec 44) (ws : List (BitVec 64)) : IProp GF := iprop%
 
 end
 
+theorem delRun_zero (P : UPtd) (v0 : Nat) : P.delRun v0 0 = P := rfl
+
+theorem delRunL_zero (L : RegMapF (BitVec 64)) (v0 : Nat) : delRunL L v0 0 = L := rfl
+
+theorem trampVpn_toNat : trampVpn.toNat = 67108863 := rfl
+
+/-- The trampoline leaf. -/
+theorem leaves_get_tramp (P : UPtd) : get? P.leaves trampVpn.toNat = some trampLeaf := by
+  unfold UPtd.leaves; exact get?_insert_eq rfl
+
+theorem delRunL_succ (L : RegMapF (BitVec 64)) (v0 n : Nat) :
+    delRunL L v0 (n + 1) = delete (delRunL L v0 n) (v0 + n) := by
+  unfold delRunL
+  rw [List.range_succ, List.foldl_append]
+  rfl
+
+/-- `PGROUNDUP` over a page-aligned base. -/
+theorem pgRoundUpN_split (a n q : Nat) (ha : a = 4096 * q) (h : a ≤ n) :
+    pgRoundUpN n = a + (n - a + 4095) / 4096 * 4096 := by
+  unfold pgRoundUpN; subst ha; omega
+
+theorem isLeafPte_iff (w : BitVec 64) :
+    isLeafPte w ↔ (w.getLsbD 0 = true ∧ w &&& 0xE#64 ≠ 0#64) := by
+  unfold isLeafPte PTE_V
+  constructor
+  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
+  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
+
+/-- A leaf of `L` is what the walk finds, up to `A`/`D`. -/
+theorem ptRep_entAt {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
+    (w : BitVec 64) (hw : get? L vpn.toNat = some w) :
+    t.walk 2 vpn ≠ none ∧ pteAD w (t.entAt 2 vpn) := by
+  obtain ⟨addr, v, hwalk, had⟩ := h.2.2.2.1 vpn w hw
+  have he := (PTree.walk_addr 2 t vpn addr v hwalk).2
+  exact ⟨by rw [hwalk]; simp, by rw [he]; exact had⟩
+
+theorem tfVpn_toNat : tfVpn.toNat = 67108862 := rfl
+
 end Xv6

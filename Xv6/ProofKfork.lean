@@ -224,11 +224,6 @@ theorem kf_j_failtail : (KA.«kfork» + 0x8c#64) + BitVec.signExtend 64 (120#21)
 theorem kf_j_allocfail : (KA.«kfork» + 0x114#64) + BitVec.signExtend 64 (-16#21) = (KA.«kfork» + 0x104#64) := by decide
 
 
-/-- The `bne` back-edge FALLS THROUGH once the src cursor reaches the end. -/
-theorem kf_bne_false (a5 : BitVec 64) : bcond bop.BNE a5 a5 = false := by
-  unfold bcond; simp
-
-
 /-! ## Trapframe-copy arithmetic (the 9-chunk word loop)
 
 The loop's cursors `a5`/`a4` run `base + 32·i` over the parent/child
@@ -721,7 +716,7 @@ theorem kf_tf_loop [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (BitV
     have haeq : kf.rget cpu 15#5 = kf.rget cpu 13#5 := by
       rw [h15, h13, ha3]
     iapply (kf_step_bne cpu kf hsf (KA.«kfork» + 0x62#64) false (-24#13) 15#5 13#5 (by decide)
-        false (by rw [haeq]; exact kf_bne_false (kf.rget cpu 13#5)) (KA.«kfork» + 0x66#64) (by decide))
+        false (by rw [haeq]; exact MachCSL.bne_eq (kf.rget cpu 13#5)) (KA.«kfork» + 0x66#64) (by decide))
     iframe Hk Hpc
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext

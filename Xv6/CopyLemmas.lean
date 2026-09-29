@@ -13,6 +13,7 @@ import Xv6.UMemLemmas
 import MachCSL.WpSmodeFrame12
 import Xv6.ByteCursor
 import Xv6.UPtAllocLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -62,8 +63,6 @@ theorem co_ult_ofNat (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) :
   simp only [BitVec.ult, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hb]
 
 theorem co_lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
-
-theorem co_lui_mask : BitVec.signExtend 64 (0xfffff#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
 
 
 theorem co_li_neg1 : (0#64 : BitVec 64) + BitVec.signExtend 64 4095#12 = -1#64 := by decide
@@ -164,11 +163,6 @@ theorem co_n_val3 (a : Nat) (ha : a < 2 ^ 64) :
     co_ofNat_sub 4096 _ (by omega) (by omega)]
 
 
-theorem co_kctx_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :
-    kctx (GF := GF) c (k.withRegs R) ⊢ kctx c ((k.withSpie k.spie k.spp).withRegs R) := by
-  rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
-
-
 theorem ci_li_one : (0#64 : BitVec 64) + BitVec.signExtend 64 1#12 = 1#64 := by decide
 
 
@@ -244,7 +238,7 @@ theorem ci_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
   rintro ⟨vpn, w, j, hl, hvu, hj, hxe⟩
   have hl1 := hext.2.2 _ _ hl
   have hk : vpn < tfVpn.toNat := (hwf.1 _ _ hl1).1
-  rw [UMemL.tfVpn_toNat] at hk
+  rw [Xv6.tfVpn_toNat] at hk
   have hdiv : x / 4096 * 4096 = vpn * 4096 := by omega
   have hlt : vpn * 4096 < 2 ^ 38 := by omega
   have hnat : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat = vpn * 4096 := by
@@ -276,7 +270,7 @@ theorem co_fault_maxva (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1
     (hmax : ¬ x / 4096 * 4096 < 2 ^ 38) : ¬ uvaWmapped P x := by
   rintro ⟨vpn, w, j, hl, -, -, hj, hxe⟩
   have hk : vpn < tfVpn.toNat := (hwf.1 _ _ (hext.2.2 _ _ hl)).1
-  rw [UMemL.tfVpn_toNat] at hk
+  rw [Xv6.tfVpn_toNat] at hk
   omega
 
 /-- copyout's `PTE_W` re-walk: the page's leaf (in the grown table) has no

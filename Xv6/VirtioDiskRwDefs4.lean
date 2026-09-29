@@ -289,10 +289,6 @@ bits, in the shape the park's `k_norm` meets. -/
 theorem vdrwK_withSpie' (k : KCtx) (a b : Bool) :
     (vdrwK (k.withSpie a b)).withSpie a b = vdrwK (k.withSpie a b) := rfl
 
-/-- Two pin-updates collapse. -/
-theorem vdrw5_withSpie2 (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
-
 /-- The lock list `release` leaves behind. -/
 theorem vdrw5_filter :
     (["virtio_disk"] : List String).filter (fun x => x ≠ "virtio_disk") = [] := by decide

@@ -7,6 +7,7 @@ import Xv6.SpecMemcmp
 import Xv6.CodeTactics
 import Xv6.StepLemmas
 import Xv6.ByteCursor
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -36,16 +37,6 @@ theorem ptr_next_eq (s : BitVec 64) (i n : Nat) (hi : i + 1 < 2 ^ 64) (hn : n < 
   rw [← BitVec.ofNat_add]
   exact Xv6.paAddEq s (i + 1) n hi hn
 
-/-- `beqz` on a small count. -/
-theorem ite_beq_ofNat {α : Type} (n : Nat) (hn : n < 2 ^ 64) (x y : α) :
-    (if bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 then x else y) = if n = 0 then x else y := by
-  by_cases h : n = 0
-  · subst h; simp [bcond]
-  · have : BitVec.ofNat 64 n ≠ 0#64 := by
-      intro h'; have := congrArg BitVec.toNat h'; simp only [BitVec.toNat_ofNat] at this
-      rw [Nat.mod_eq_of_lt hn] at this; simp at this; exact h this
-    simp [bcond, h, this]
-
 /-- The `slli`/`srli` round trip that truncates the count to 32 bits. -/
 theorem shl_shr32 (n : Nat) (hn : n < 2 ^ 32) : (BitVec.ofNat 64 n <<< 32) >>> 32 = BitVec.ofNat 64 n := by
   apply BitVec.eq_of_toNat_eq
@@ -54,18 +45,6 @@ theorem shl_shr32 (n : Nat) (hn : n < 2 ^ 32) : (BitVec.ofNat 64 n <<< 32) >>> 3
   rw [Nat.shiftLeft_eq, Nat.mod_eq_of_lt (by omega)]
   rw [Nat.shiftRight_eq_div_pow]
   omega
-
-/-- `subw a0, a5, a4` on two zero-extended bytes: their difference as a C `int`. -/
-theorem subw_bytes (a b : BitVec 8) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 a) + -BitVec.extractLsb' 0 32 (BitVec.setWidth 64 b)) =
-      BitVec.ofInt 64 ((a.toNat : Int) - b.toNat) := by
-  rw [← BitVec.sub_eq_add_neg]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_signExtend, BitVec.msb_eq_decide]
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_sub, BitVec.extractLsb'_toNat, BitVec.toNat_setWidth,
-    BitVec.toNat_ofInt, Nat.shiftRight_zero, Nat.reducePow, Nat.reduceSub]
-  have ha := a.isLt; have hb := b.isLt
-  split <;> rename_i hc <;> simp only [decide_eq_true_eq] at hc <;> omega
 
 /-! ## The loop -/
 
@@ -304,7 +283,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
       exact hres
   -- beqz a2,cd6
   k_step_gen (wp_s_branch c1 _ (KA.«memcmp» + 0x8#64) true 46#13 12#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [hn, ite_beq_ofNat n (by omega)] next c2 hp2
+    $$ [- $Hk $Hpc] with [hn, MachCSL.ite_beq_ofNat n (by omega)] next c2 hp2
   iintro Hk Hpc
   by_cases hn0 : n = 0
   · -- n = 0: a0 := 0, jump to the epilogue
@@ -362,7 +341,7 @@ theorem memcmp_proof : MEMCMP := ⟨fun {hlc GF} _ _ cpu k bs1 bs2 n dq1 dq2 hK 
     · -- the differing pair: subw a0,a5,a4, epilogue
       obtain ⟨j, a, b, hj, hpre, ha, hb, hab, h15, h14⟩ := hdiff
       k_step_gen (wp_s_subw c6 _ (KA.«memcmp» + 0x2a#64) false 10#5 15#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [h15, h14, subw_bytes a b] next c7 hp7
+        with [h15, h14, MachCSL.subw_bytes a b] next c7 hp7
       iintro Hk Hpc
       iapply (hexit c7 (fun h => (hp7 h).trans (hpin6 h)) _ ?hR2 ?hcs ?hres) $$ [- $Hk $Hpc]
       rotate_right 1

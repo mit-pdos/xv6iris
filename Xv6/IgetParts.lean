@@ -20,7 +20,7 @@ literal, and the lock/panic call wrappers.
    `InodeLock.inodeRef_spos`; `ig_ref_bge_zero` / `ig_ref_neqz_zero` are
    `Xv6.il_blez_z` / `MachCSL.bcond_bne_zero`; `ig_entry_nonzero` / `ig_entry_neqz` /
    `ig_zero_eqz` / `ig_zero_neqz` are `ig_beqz_entry` / `ig_bnez_entry` /
-   `ig_beqz_zero` / `ig_bnez_zero'`.
+   `MachCSL.beqz_zero` / `ig_bnez_zero'`.
 3. **The recycle's set step** (`ig_ci_inums_insert` + `ig_pool_set`) is
    `ig_pool_insert`, over `ExtTreeSet Nat compare` (the pool's key type).
 4. **Fractions**: Rocq's `1/2/2` is `Qp.quarter`; `ig_frac_valid` is not
@@ -218,9 +218,6 @@ theorem ig_sent_eq : bcond bop.BEQ KA.«log» KA.«log» = true := by
 /-- `beqz s3` on a candidate entry (Rocq `ig_entry_nonzero`). -/
 theorem ig_beqz_entry (e : Nat) (he : e ≤ NINODE) : bcond bop.BEQ (ientry e) 0#64 = false := by
   rw [bcond_beq_eq]; exact beq_eq_false_iff_ne.mpr (ientry_ne_zero e he)
-
-/-- ...on no candidate (Rocq `ig_zero_eqz`). -/
-theorem ig_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- `bnez s3` on a candidate entry (Rocq `ig_entry_neqz`). -/
 theorem ig_bnez_entry (e : Nat) (he : e ≤ NINODE) : bcond bop.BNE (ientry e) 0#64 = true := by

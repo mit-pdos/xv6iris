@@ -408,7 +408,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     ihave Hfail := Hwd $$ [Hdead Hau]
     · iframe
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz0, kxcA_br_30]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero, kxcA_br_30]
     iintro Hk Hpc
     -- +0x088  jal end_op
     icases kctx_tier _ _ $$ Hk with ⟨%hct', Hk⟩

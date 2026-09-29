@@ -35,11 +35,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Pure facts -/
 
-/-- `beqz` on a word. -/
-theorem sp_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
-  by_cases h : x = 0#64 <;> simp [bcond, h]
-
 theorem sp_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl
 
 theorem sp_ret_f3a : jumpPc (KA.«sleep_prepare» + 0x12#64) = (KA.«sleep_prepare» + 0x12#64) := by
@@ -48,10 +43,6 @@ theorem sp_ret_f40 : jumpPc (KA.«sleep_prepare» + 0x18#64) = (KA.«sleep_prepa
   decide
 theorem sp_ret_f4c : jumpPc (KA.«sleep_prepare» + 0x24#64) = (KA.«sleep_prepare» + 0x24#64) := by
   decide
-
-theorem sp_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬ p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
 
 /-- The epilogue's register map is callee-saved. -/
 theorem sp_calleeSaved_mk (KR R : RegMap)
@@ -186,9 +177,9 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     ⟨%st, %ch, Hstate, Hpstl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   -- beqz s1: chan ≠ 0, so the panic is dead code
   k_step (wp_s_branch c _ (KA.«sleep_prepare» + 0x18#64) true 24#13 9#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9, sp_ite_beq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e9, MachCSL.ite_beq]
   iintro Hk Hpc
-  ihave Hpc := sp_pcIs_neg c _ _ _ hchan $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg c _ _ _ hchan $$ Hpc
   -- sd s1,32(s2): p->chan = chan
   k_step (wp_s_sd c _ (KA.«sleep_prepare» + 0x1a#64) false 32#12 18#5 9#5 (by decide) ch)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18, sp_pChan]

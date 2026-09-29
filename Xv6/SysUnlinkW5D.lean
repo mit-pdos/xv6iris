@@ -220,7 +220,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   ihave Htokb := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) ((dirInum datd kk).toNat : Int)
       vkk ⊢ FsStateLink.linkTok (fsGammaL fscFs)
         ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int) vkk from by
-    rw [sys_unlink_zext32]) $$ Htokb
+    rw [MachCSL.zext32_toNat]) $$ Htokb
   imod (iregInv_toks_agree ⊤ fscIreg fscFs icfgIst icfgNib (BitVec.setWidth 32 (dirInum datd kk)) dni
       vkk vdot CoPset.subseteq_top (by omega)) $$ Hinv Hdii Htokb Hdott
     with ⟨%⟨hvag, hvok⟩, Hdii, Htokb, Hdott⟩
@@ -246,7 +246,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   ihave Htokb := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs)
       ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int) vkk ⊢
       FsStateLink.linkTok (fsGammaL fscFs) ((dirInum datd kk).toNat : Int) vkk from by
-    rw [sys_unlink_zext32]) $$ Htokb
+    rw [MachCSL.zext32_toNat]) $$ Htokb
   ihave Hetkd := Hbackd $$ [Htokb]
   · iexists vkk; iframe Htokb; ipureintro; exact hvkk
   ihave Hetki := Hbacki $$ [Hdott]
@@ -276,7 +276,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
     show (sysUnlinkDec16 dni.diNlink).toNat = 0; omega
   have hinum0 : (dirInum dati 0).toNat = (BitVec.setWidth 32 (dirInum datd kk)).toNat := hself0i
   have hne2 : dinum.toNat ≠ (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
-    rw [sys_unlink_zext32]; exact fun h => hne' h.symm
+    rw [MachCSL.zext32_toNat]; exact fun h => hne' h.symm
   icases entToks_eraOrphan (fsGammaL fscFs) _ dni (sysUnlinkDni2 dni) bmi dati dinum.toNat ∅
       (sysfile_setnl_type dni _) (sysfile_setnl_size dni _) hnli hnl2z htyi hhi hbi (hduqi htyi)
       hnr2i hlv1i hname1i hpar hlv0i hname0i hinum0 hne2 $$ Hetki
@@ -284,7 +284,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   ihave Htoken := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) ((dirInum datd kk).toNat : Int)
       uty ⊢ FsStateLink.linkTok (fsGammaL fscFs)
         ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int) uty from by
-    rw [sys_unlink_zext32]) $$ Htoken
+    rw [MachCSL.zext32_toNat]) $$ Htoken
   imod (iregInv_toks_agree ⊤ fscIreg fscFs icfgIst icfgNib (BitVec.setWidth 32 (dirInum datd kk)) dni
       uty tydot CoPset.subseteq_top (by omega)) $$ Hinv Hdii Htoken Hdotf
     with ⟨%⟨hagd, -⟩, Hdii, Htoken, Hdotf⟩
@@ -348,15 +348,15 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   obtain ⟨hoki, hrli, hdoki, -, -, -⟩ := hopi0
   have htyz : dnd.diType.toNat = T_DIR_z := by rw [hty]; rfl
   have hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib := by
-    rw [sys_unlink_zext32]
+    rw [MachCSL.zext32_toNat]
     exact dirOk_dir icfgNib dnd datd hty hop.2.2.1 kk (dirFirst_lt _ _ _ _ hfn)
       (dirFirst_live _ _ _ _ hfn)
   have hposi : 0 < (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
-    rw [sys_unlink_zext32]; exact sys_unlink_inum_pos datd kk (dirFirst_live _ _ _ _ hfn)
+    rw [MachCSL.zext32_toNat]; exact sys_unlink_inum_pos datd kk (dirFirst_live _ _ _ _ hfn)
   icases sys_unlink_dinode_ne fscIreg dinum (BitVec.setWidth 32 (dirInum datd kk)) dnW dni
     $$ [$Hdi $Hdii] with ⟨%hne, Hdi, Hdii⟩
   have hne' : (dirInum datd kk).toNat ≠ dinum.toNat := by
-    rw [← sys_unlink_zext32]; exact fun h => hne h.symm
+    rw [← MachCSL.zext32_toNat]; exact fun h => hne h.symm
   -- the arm's whole link-RA ledger
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩

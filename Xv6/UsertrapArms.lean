@@ -51,7 +51,6 @@ theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName comp
     (hne : A.sc ≠ uecallScause) : utLive A V2 cs2 :=
   utLiveOut_ne _ _ _ _ _ _ hne
 
-theorem utA_bcond_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem utA_decide_False : (decide False = true) = False := by simp
 
 theorem utA_bcond_bne_sext (kl : BitVec 32) :
@@ -192,7 +191,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   · -- not killed: beqz taken, +0xfc
     subst hk0
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xf0#64) true 12#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.sys_open_walk_beqz_om, utA_bcond_beq_00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.sys_open_walk_beqz_om, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hko := utA_killOut_slot A.sc A.Wk hne $$ Hslot
     iapply (HF A cpu R1 (utV1 A) A.M A.sts A.cs hok hpins1 (utA_rows_entry A hok hne)

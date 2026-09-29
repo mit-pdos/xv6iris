@@ -99,7 +99,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, hproc, Xv6.sfs_add0] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_addi c4 _ (KA.«sys_pipe» + 0x10#64) false 4056#12 11#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a40] next c5 hp5
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, MachCSL.add_sext_4056] next c5 hp5
   iintro Hk Hpc
   k_step_gen (wp_s_addi c5 _ (KA.«sys_pipe» + 0x14#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c6 hp6
@@ -114,7 +114,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   iapply (sysfile_argaddr_wp AA c7 _ 0 V.upt.tfp V.tf v fa (DFrac.own 1) (by decide) ?ha0 hv ?hna ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sys_pipe_ret_1a, p8, sys_pipe_a40]
+  k_norm_g [sys_pipe_ret_1a, p8, MachCSL.add_sext_4056]
   iframe Hfa Htf Htfp
   case ha0 => k_norm_g
   case hna => k_norm_g; omega

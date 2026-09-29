@@ -25,6 +25,7 @@ import Xv6.EitherDefs
 import Xv6.SpecStrlen
 import MachCSL.WpSmodeFrame6c
 import Xv6.SpecCopyinstr
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -60,8 +61,6 @@ theorem fetchstr_ret_26 : jumpPc (KA.«fetchstr» + 0x26#64) = (KA.«fetchstr» 
 theorem fetchstr_ret_30 : jumpPc (KA.«fetchstr» + 0x30#64) = (KA.«fetchstr» + 0x30#64) := by decide
 
 theorem fetchstr_blt_zero : bcond bop.BLT 0#64 0#64 = false := by decide
-theorem fetchstr_blt_neg1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-theorem fetchstr_li_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
 theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff0a8#64 = KA.«myproc» := by decide
 theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee44#64 = KA.«copyinstr» := by decide
@@ -297,7 +296,7 @@ theorem fetchstr_tail_fail (cpu c : CPU) (k : KCtx) (Q : BitVec 64 → IProp GF)
   iintro ⟨Hk, Hpc, Hframe, HQ, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step_gen (wp_s_branch c _ (KA.«fetchstr» + 0x26#64) false 24#13 10#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, fetchstr_blt_neg1] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] next c1 hp1
   iintro Hk Hpc
   k_step_gen (wp_s_addi c1 _ (KA.«fetchstr» + 0x3e#64) true 4095#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
@@ -315,7 +314,7 @@ theorem fetchstr_tail_fail (cpu c : CPU) (k : KCtx) (Q : BitVec 64 → IProp GF)
   case hpins' =>
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, fetchstr_li_m1]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, MachCSL.li_m1]
   iexact HQ
 
 end

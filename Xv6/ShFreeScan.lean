@@ -96,7 +96,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   ihave Hi := ushm_uis N.t 0x1130 false (.BTYPE (8180#13, .Regidx 13#5, .Regidx 15#5, .BGEU)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc
   iapply ushm_br UL N h4 m3 (BitVec.ofNat 64 0x1130) false 8180#13 13#5 15#5 .BGEU n false
-    (by rw [g15, g13, ushm_bgeu _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
+    (by rw [g15, g13, Xv6.bgeu_nat _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
     (BitVec.ofNat 64 0x1134) (by decide) (by simp) $$ Hi Hrun
   inext
   iintro %h5 Hrun
@@ -198,7 +198,7 @@ theorem shFree_scan (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   ihave Hi := ushm_uis N.t 0x114e false (.BTYPE (42#13, .Regidx 14#5, .Regidx 12#5, .BEQ)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc
   iapply ushm_br UL N h13 m9 (BitVec.ofNat 64 0x114e) false 42#13 14#5 12#5 .BEQ n false
-    (by rw [o12, o14, ushm_beq _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
+    (by rw [o12, o14, Xv6.beq_nat _ _ (by rw [hB]; decide) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
     (BitVec.ofNat 64 0x1152) (by decide) (by simp) $$ Hi Hrun
   inext
   iintro %h14 Hrun

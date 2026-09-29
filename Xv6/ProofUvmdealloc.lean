@@ -118,7 +118,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       iintro %c' HΦ %R'' Hk Hpc %hpost
       have hnp : uvmdNp (k.regs 11#5) (k.regs 12#5) = 0 := by
         unfold uvmdNp; rw [if_neg hge]
-      rw [hnp, delRun_zero]
+      rw [hnp, Xv6.delRun_zero]
       have hrsz : uvmdRsz (k.regs 11#5) (k.regs 12#5) = k.regs 11#5 := by
         unfold uvmdRsz; rw [if_neg hge]
       iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP
@@ -149,7 +149,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_lui c7 _ (KA.«uvmdealloc» + 0x1a#64) true 1048575#20 13#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lui_mask] next c8 hp8
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c8 hp8
     iintro Hk Hpc
     k_step_gen (wp_s_and c8 _ (KA.«uvmdealloc» + 0x1c#64) true 14#5 14#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
@@ -207,7 +207,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       · ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
         iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %c' HΦ %R'' Hk Hpc %hpost
-        rw [hnp0, delRun_zero]
+        rw [hnp0, Xv6.delRun_zero]
         iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP
         ipureintro
         exact ⟨hpost.2, by rw [hrsz]; exact hpost.1⟩

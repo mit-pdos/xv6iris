@@ -149,4 +149,25 @@ theorem pContext_inj {j j' : Nat} (hj : j < NPROC) (hj' : j' < NPROC)
     (h : pContext (procAddr j) 0 = pContext (procAddr j') 0) : j = j' :=
   procAddr_inj hj hj' (pContext_addr_cancel _ _ h)
 
+theorem procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«tickslock» := by
+  intro he
+  have h1 := procAddr_toNat m h
+  rw [he] at h1
+  have h2 : (KA.«tickslock» : BitVec 64).toNat = KernelSyms.«tickslock» := by decide
+  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
+  rw [h2, h3] at h1
+  unfold NPROC at h
+  omega
+
+theorem secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 360#12 = pSecc x := by
+  unfold pSecc; rfl
+
+/-- A state cell whose sign-extension is `2` holds SLEEPING. -/
+theorem sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by
+  unfold SLEEPING
+  revert h
+  bv_decide
+
+theorem sz_off (x : BitVec 64) : x + 72#64 = pSz x := rfl
+
 end Xv6

@@ -89,11 +89,6 @@ theorem sysExecFree_bne (sp0 : BitVec 64) (m : Nat) (hm : m < 32) :
       omega
     simp [hne, h]
 
-theorem sysExecFree_beq0 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
-theorem sysExecFree_beq (w : BitVec 64) (h : w ≠ 0#64) : bcond bop.BEQ w 0#64 = false := by
-  simp [bcond, h]
-
 /-- Every callee-saved register but `s1`: reflexive and transitive. -/
 theorem sysExecKeepS1_trans (R R2 R3 : RegMap) (h1 : sysExecKeepS1 R R2) (h2 : sysExecKeepS1 R2 R3) :
     sysExecKeepS1 R R3 := by
@@ -252,7 +247,7 @@ theorem sys_exec_free_exit (k : KCtx) (p pe : BitVec 64) (ci : BitVec 13)
   iintro Hk Hpc Hcell
   -- +2 c.beqz a0: TAKEN
   k_step_e (wp_s_branch cpu _ (p + 2#64) true ci 10#5 0#5 (by decide) bop.BEQ)
-    from hi2 Htext $$ [- $Hk $Hpc] with [sysExecFree_beq0, hce]
+    from hi2 Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero, hce]
   iintro Hk Hpc
   ihave Harr := Hback $$ %0#64 Hcell
   ihave Harr := sysExecFree_arr_free (GF := GF) (k.regs 2#5) ws t 0#64 hl $$ Harr
@@ -317,7 +312,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
     iintro Hk Hpc Hcell
     -- +2 c.beqz a0: not taken, the page is live
     k_step_e (wp_s_branch cpu _ (p + 2#64) true ci 10#5 0#5 (by decide) bop.BEQ)
-      from hi2 Htext $$ [- $Hk $Hpc] with [sysExecFree_beq (pg m) hnz]
+      from hi2 Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne (pg m) hnz]
     iintro Hk Hpc
     -- +4 jal kfree
     k_step_e (wp_s_jal cpu _ (p + 4#64) false ji 1#5 (by decide))

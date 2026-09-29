@@ -25,6 +25,7 @@ import MachCSL.WpSmodeFrame8
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -62,24 +63,10 @@ theorem un_page_add (va : BitVec 64) (i : Nat) :
     va + BitVec.ofNat 64 (4096 * i) + 4096#64 = va + BitVec.ofNat 64 (4096 * (i + 1)) := by
   rw [show 4096 * (i + 1) = 4096 * i + 4096 from by omega, BitVec.ofNat_add, BitVec.add_assoc]
 
-theorem un_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
-  BitVec.add_zero x
-
 /-- A branch on a value known to be zero / nonzero. -/
 theorem un_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem un_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem un_bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
-
-theorem un_va_aligned (va : BitVec 64) (h : va &&& 0xfff#64 = 0#64) : va <<< 52 = 0#64 := by
-  revert h; bv_decide
 
 /-- The entry test `bgeu a1,s3`: taken exactly on an empty run. -/
 theorem un_bgeu0 (va : BitVec 64) (n : Nat) (hr : va.toNat + 4096 * n ≤ 2 ^ 38) :
@@ -134,8 +121,6 @@ theorem unKept_trans {R R' R'' : RegMap} (h : unKept R R') (h' : unKept R' R'') 
     h'.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.1.trans h.2.2.2.2.2.2.2.2.2.1,
     h'.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2⟩
-
-theorem un_availInc_none : availInc none = none := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -342,7 +327,7 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     have h13 : k.regs 13#5 = 0#64 := hdf0 rfl
     k_step_gen (wp_s_branch cur _ (KA.«uvmunmap» + 0x66#64) false 8160#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h21, un_beq_zero _ h13] next c1 hp1
+      with [h21, MachCSL.beq_zero _ h13] next c1 hp1
     iintro Hk Hpc
     rw [delete_id Qm key (hQ0 rfl)]
     ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
@@ -379,7 +364,7 @@ theorem uvmunmap_free_page (KF : KFREE) [CurCtx]
     case hpv2 => k_norm_g; exact hpv rfl
     iapply wpNext_intro_pin
     iintro %c5 %hp5 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hav %hcs2
-    k_norm_g [MachCSL.KCtx.withSpie_twice, un_ret_1226, un_availInc_none]
+    k_norm_g [MachCSL.KCtx.withSpie_twice, un_ret_1226, Xv6.availInc_none]
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
     k_step_gen (wp_s_j c5 _ (KA.«uvmunmap» + 0x74#64) true 2097106#21)
       from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c6 hp6
@@ -544,7 +529,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c6 _ (KA.«uvmunmap» + 0x5c#64) true 8174#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [un_beq_zero _ hz] next c7 hp7
+      with [MachCSL.beq_zero _ hz] next c7 hp7
     iintro Hk Hpc
     ihave Htree := ptOwnRep_intro root Lm t htb hrep $$ Hpt
     iapply (uvmunmap_tail k va n i hi hr spie spp _ ?g18 ?g19 ?g22 _ _ _ c7)
@@ -601,7 +586,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       rw [delete_id Lm _ hLn, delete_id Qm _ hQn]
       k_step_gen (wp_s_branch c9 _ (KA.«uvmunmap» + 0x64#64) true 8166#13 14#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [un_beq_zero _ hv] next c10 hp10
+        with [MachCSL.beq_zero _ hv] next c10 hp10
       iintro Hk Hpc
       ihave Hpt := Hclose $$ %(t.entAt 2 vi) Hcell
       rw [setLeaf_entAt_self 2 t vi]
@@ -632,7 +617,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
         cases hg : get? Lm vi.toNat with
         | some w => exact ⟨w, rfl⟩
         | none => exact absurd (hrep.2.2.2.2 vi hg) (by rw [hwalk]; simp)
-      have hp2 : pte2pa (t.entAt 2 vi) = pte2pa w := pteAD_pte2pa (ptRep_entAt hrep vi w hw).2
+      have hp2 : pte2pa (t.entAt 2 vi) = pte2pa w := pteAD_pte2pa (Xv6.ptRep_entAt hrep vi w hw).2
       k_step_gen (wp_s_branch c9 _ (KA.«uvmunmap» + 0x64#64) true 8166#13 14#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [un_beq_ne _ hv] next c10 hp10
@@ -742,9 +727,9 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     have hkey : (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat = vpn0 + i := by
       rw [hvpn0]; exact vpn_step_toNat va i (by omega)
     have hLd : delete (delRunL L vpn0 i) (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat
-        = delRunL L vpn0 n := by rw [hkey, ← delRunL_succ, hlast]
+        = delRunL L vpn0 n := by rw [hkey, ← Xv6.delRunL_succ, hlast]
     have hQd : delete (delRunL Q vpn0 i) (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat
-        = delRunL Q vpn0 n := by rw [hkey, ← delRunL_succ, hlast]
+        = delRunL Q vpn0 n := by rw [hkey, ← Xv6.delRunL_succ, hlast]
     iintro ⟨Hk, Hpc, Htree, Hum, Hfree, Hframe, HΦ⟩
     iapply (uvmunmap_iter W KF k df γl γk root _ _ M va n hnoff hK hlk hr i hi _ rfl ?a1 ?a0 ?av
       hdf hdf0 spie spp R h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
@@ -809,9 +794,9 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     have hkey : (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat = vpn0 + i := by
       rw [hvpn0]; exact vpn_step_toNat va i (by omega)
     have hLd : delete (delRunL L vpn0 i) (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat
-        = delRunL L vpn0 (i + 1) := by rw [hkey, ← delRunL_succ]
+        = delRunL L vpn0 (i + 1) := by rw [hkey, ← Xv6.delRunL_succ]
     have hQd : delete (delRunL Q vpn0 i) (vpnOf (va + BitVec.ofNat 64 (4096 * i))).toNat
-        = delRunL Q vpn0 (i + 1) := by rw [hkey, ← delRunL_succ]
+        = delRunL Q vpn0 (i + 1) := by rw [hkey, ← Xv6.delRunL_succ]
     iintro ⟨Hk, Hpc, Htree, Hum, Hfree, Hframe, HΦ⟩
     iapply (uvmunmap_iter W KF k df γl γk root _ _ M va n hnoff hK hlk hr i hi _ rfl ?b1 ?b0 ?bv
       hdf hdf0 spie spp R h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Htree $Hum $Hfree]
@@ -884,7 +869,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [uvmunmapAddr]
   have hK8 : 8 ≤ k.avail := by simp only [uvmunmapSlots] at hK; omega
-  have hvash : k.regs 11#5 <<< 52 = 0#64 := un_va_aligned _ hal
+  have hvash : k.regs 11#5 <<< 52 = 0#64 := MachCSL.va_aligned _ hal
   k_norm_g
   -- the prologue
   k_step_gen (wp_s_push cpu _ KA.«uvmunmap» true 4032#12 8 hK8 MachCSL.imm_m64)
@@ -908,7 +893,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   iintro Hk Hpc
   k_step_gen (wp_s_branch c5 _ (KA.«uvmunmap» + 0xc#64) true 34#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [un_bne_zero _ hvash] next c6 hp6
+    with [MachCSL.bne_zero _ hvash] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_sd c6 _ (KA.«uvmunmap» + 0xe#64) true 32#12 2#5 18#5 (by decide) w3)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
@@ -957,7 +942,7 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   · -- an empty run: straight to the epilogue
     subst hn0
     rw [if_pos rfl]
-    simp only [delRunL_zero]
+    simp only [Xv6.delRunL_zero]
     ihave Hframe := unFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) $$ [F0 F1 F2 F3 F4 F5 F6 F7]
     case' _ => iframe
@@ -996,11 +981,11 @@ theorem uvmunmap_gen (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
       0 (by omega) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?g2 ?g18 ?g19 ?g20 ?g21 ?g22
       ?g23 ?g24 ?g25 ?g26 ?g27 c20) $$ [- $Hk $Hpc $Hframe $HΦ]
     rotate_right 1
-    simp only [delRunL_zero]
+    simp only [Xv6.delRunL_zero]
     iframe
     case g2 => simp [RegMap.set_apply]
     case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, Nat.mul_zero,
-                  un_add_ofNat_zero]
+                  MachCSL.add_ofNat_zero]
     case g19 => simp [RegMap.set_apply]
     case g20 => simp [RegMap.set_apply]
     case g21 => simp [RegMap.set_apply]

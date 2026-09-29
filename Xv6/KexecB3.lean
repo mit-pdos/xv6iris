@@ -79,6 +79,7 @@ Rocq's header, in short:
 import Xv6.KexecB2
 import Xv6.BallocParts
 import Xv6.KexecB
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -94,13 +95,11 @@ set_option linter.unusedVariables false
 
 /-! ## PURE ARITHMETIC -/
 
-theorem kxcB3_toInt_small (a : Nat) (h : a < 2 ^ 63) : (BitVec.ofNat 64 a).toInt = a := by
-  rw [BitVec.toInt_eq_toNat_cond]; simp; rw [Nat.mod_eq_of_lt (by omega)]; split <;> omega
 
 /-- `bge` of two small counters. -/
 theorem kxcB3_bge_small (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
-  rw [kxcB2_bge, kxcB3_toInt_small a ha, kxcB3_toInt_small b hb]
+  rw [kxcB2_bge, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
 
 
@@ -254,7 +253,6 @@ theorem kxcB3_off_step (ef : List (BitVec 8)) (i : Nat) :
   have := kxcOff_step ef i
   simpa using this
 
-theorem kxcB3_zero_beqz : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 section Win
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -1063,7 +1061,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   icases Hres with ⟨⟨%hr0, Hpt⟩ | ⟨%P', %M', %⟨hok, hret⟩, Hpt⟩⟩
   · -- ---- uvmalloc FAILED: +0x184 beqz taken, the +0x34c stub (cause: no memory) ----
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x184#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, kxcB3_zero_beqz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67
     iapply (kxcB3_stub IUP EO PFP Γ Q QF cpu k A spie2 spp2 _ kf qf sf gyf loyf tlyf inumf dnf bmf data
@@ -1101,7 +1099,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
         rw [hz]
         exact BitVec.eq_of_toNat_eq (by rw [h1]; rfl)
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x184#64) false 456#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, kxcB3_zero_beqz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, MachCSL.beqz_zero]
     iintro Hk Hpc
     rw [hsz0] at hbelow' hcov'
     ihave Hfr := Hfb $$ %(0#64) Hg F65 F67

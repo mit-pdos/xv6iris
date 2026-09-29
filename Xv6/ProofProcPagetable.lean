@@ -165,7 +165,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
         isplitl []
         · ipureintro
           refine ⟨hpost.1, 0, by unfold procPagetableNodes; omega, ?_⟩
-          rw [availSub_zero]; exact hzero
+          rw [Xv6.availSub_zero]; exact hzero
         · iexact Hav
       · ipureintro; exact hpost.2
     case hR2a =>
@@ -603,7 +603,7 @@ theorem proc_pagetable_proof (UC : UVMCREATE) (MP : MAPPAGES_ANY) (UM : UVMUNMAP
           isplitl []
           · ipureintro
             refine ⟨hpost.1, 1 + fresh1.length, by unfold procPagetableNodes; omega, ?_⟩
-            rw [← availSub_availSub, ← availDec_eq]
+            rw [← Xv6.availSub_availSub, ← availDec_eq]
             exact hz1
           · iexact Hav
         · ipureintro; exact hpost.2

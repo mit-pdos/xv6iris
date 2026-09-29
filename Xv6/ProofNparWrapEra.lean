@@ -41,9 +41,6 @@ theorem nparWrapEra_ret_10 :
 theorem nparWrapEra_slots_2 (a : Nat) (h : nameiparentSlots ≤ a) : 2 ≤ a := by
   unfold nameiparentSlots at h; omega
 
-theorem nparWrapEra_slots_namex (a : Nat) (h : nameiparentSlots ≤ a) : namexSlots ≤ a - 2 := by
-  unfold nameiparentSlots at h; omega
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -113,7 +110,7 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
       (((((k.regs.set (2#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set (8#5) (k.regs 2#5)).set (12#5)
         (k.regs 11#5)).set 11#5 1#64).set (1#5) (KA.«nameiparent» + 16#64)))
     γl pd pav pu j γkl γk plen pfun nfun n Sb P Pmiss pid V M dqb dqs dqpv
-    hj hproc (by show namexSlots ≤ k.avail - 2; exact nparWrapEra_slots_namex _ hK)
+    hj hproc (by show namexSlots ≤ k.avail - 2; exact Xv6.slots_namex _ hK)
     hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud
     (by simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
         decide)

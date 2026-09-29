@@ -18,6 +18,7 @@ import Xv6.SpecBalloc
 import Xv6.FsCallSites
 import Xv6.BallocParts
 import Xv6.BmapParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -29,8 +30,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
-
-theorem ba_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by decide
 
 /-- `auipc a0,0x4 ; addi a0,a0,1190` at `+0xf6`: the format string. -/
 theorem ba_a_fmt : KA.«balloc» + 0x4556#64 = KStr.«balloc: out of blocks\n» := by decide
@@ -91,7 +90,7 @@ theorem ba_epilogue (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv
   -- +0x86  addi sp,sp,80
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_e (wp_s_pop cpu _ (KA.«balloc» + 0x86#64) true 80#12 10 ba_imm_p80)
+  k_step_e (wp_s_pop cpu _ (KA.«balloc» + 0x86#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2]
   iintro Hk Hpc

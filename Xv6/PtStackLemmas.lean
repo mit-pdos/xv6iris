@@ -23,25 +23,7 @@ set_option linter.unusedSectionVars false
 
 /-! ## The stack page numbers -/
 
-theorem kstackVpn_toNat (i : Nat) (hi : i < 64) : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := by
-  unfold kstackVpn
-  simp only [BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
-theorem kstackVpn_ne (i j : Nat) (hi : i < 64) (hj : j < 64) (h : i ≠ j) :
-    kstackVpn i ≠ kstackVpn j := by
-  intro he
-  have := congrArg BitVec.toNat he
-  rw [kstackVpn_toNat i hi, kstackVpn_toNat j hj] at this
-  omega
-
 /-! ## `mapStacks` -/
-
-theorem mapStacks_succ (t : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44)) :
-    t.mapStacks pas (i+1) fr =
-      (((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits .rw) 1 (t.mapStacks pas i fr).2).1,
-       ((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits .rw) 1 (t.mapStacks pas i fr).2).2.1) :=
-  rfl
 
 theorem mapStacks_congr (t : PTree) (pas pas' : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44))
     (h : ∀ j, j < i → pas j = pas' j) : t.mapStacks pas i fr = t.mapStacks pas' i fr := by
@@ -50,11 +32,7 @@ theorem mapStacks_congr (t : PTree) (pas pas' : Nat → BitVec 44) (i : Nat) (fr
   | succ i ih =>
     have h1 : t.mapStacks pas i fr = t.mapStacks pas' i fr := ih fr (fun j hj => h j (by omega))
     have h2 : pas i = pas' i := h i (by omega)
-    rw [mapStacks_succ, mapStacks_succ, h1, h2]
-
-/-- The one-page run of one stack. -/
-theorem missingRun_one (t : PTree) (vpn : BitVec 27) : t.missingRun vpn 1 = t.missingOn 2 vpn := by
-  simp only [PTree.missingRun, Nat.add_zero]
+    rw [Xv6.mapStacks_succ, Xv6.mapStacks_succ, h1, h2]
 
 theorem complete_of_mapRun_one (T : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : BitVec 64)
     (fresh : List (BitVec 44)) (h : (T.mapRun vpn ppn perm 1 fresh).2.2 = 1) :
@@ -79,7 +57,7 @@ theorem missingStacks_succ (t : PTree) (i : Nat) :
 
 theorem missingStacks_succ' (t : PTree) (i : Nat) :
     t.missingStacks (i+1) = t.missingStacks i + dummyGap t i := by
-  rw [missingStacks_succ, missingRun_one, dummyGap]
+  rw [missingStacks_succ, Xv6.missingRun_one, dummyGap]
 
 theorem missingStacks_le (t : PTree) (i j : Nat) (h : i ≤ j) :
     t.missingStacks i ≤ t.missingStacks j := by
@@ -128,7 +106,7 @@ theorem dummy_key (t : PTree) (i : Nat)
       t.mapStacks (fun _ => 0#44) (i+1) (List.replicate (t.missingStacks (i+1)) 0#44 ++ gr)
         = (dummyStep t i, gr) := by
   intro gr
-  rw [replicate_missingStacks_succ t i, List.append_assoc, mapStacks_succ, ih _, dummy_step t i gr]
+  rw [replicate_missingStacks_succ t i, List.append_assoc, Xv6.mapStacks_succ, ih _, dummy_step t i gr]
 
 /-- The dummy run consumes exactly `missingStacks i` pages. -/
 theorem dummy_supply (t : PTree) (i : Nat) : ∀ gr : List (BitVec 44),
@@ -212,7 +190,7 @@ theorem stackInv_init (t : PTree) (pas : Nat → BitVec 44) (hwf : t.wfU 2) (hnd
 /-- The nodes the `i`-th stack needs, counted on the real tree. -/
 theorem gap_eq (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44))
     (hinv : StackInv t T pas i fr) : T.missingRun (kstackVpn i) 1 = dummyGap t i := by
-  rw [PtRun.missingRun_congr 1 T (dummyTree t i) (kstackVpn i) hinv.shape, missingRun_one, dummyGap]
+  rw [PtRun.missingRun_congr 1 T (dummyTree t i) (kstackVpn i) hinv.shape, Xv6.missingRun_one, dummyGap]
 
 /-- The count of the whole run, split at the `i`-th stack. -/
 theorem missingStacks_step (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44))
@@ -231,7 +209,7 @@ theorem stackInv_step (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr fres
     (hpnd : ((List.range (i+1)).map (pasUpd pas i p)).Nodup)
     (hpnm : ∀ j, j < i+1 → pasUpd pas i p j ∉ (T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh).1.pages 2) :
     StackInv t (T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh).1 (pasUpd pas i p) (i+1) (fr ++ fresh) := by
-  have hlen0 : fresh.length = T.missingOn 2 (kstackVpn i) := by rw [hflen, missingRun_one]
+  have hlen0 : fresh.length = T.missingOn 2 (kstackVpn i) := by rw [hflen, Xv6.missingRun_one]
   have hc : (T.fill 2 (kstackVpn i) fresh).1.complete 2 (kstackVpn i) :=
     complete_of_mapRun_one T (kstackVpn i) p (permBits .rw) fresh (by rw [hrun])
   have hone : T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh
@@ -285,7 +263,7 @@ theorem stackInv_step (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr fres
         = ((T.mapRun (kstackVpn i) p (permBits .rw) 1 fresh).1, gr, 1) := by
       rw [PtRun.mapRun_succ T (kstackVpn i) p (permBits .rw) 0 fresh gr hlen0 hc, hTT]
       simp only [PTree.mapRun]
-    rw [mapStacks_succ, hcg, hsp, pasUpd_self, hstep]
+    rw [Xv6.mapStacks_succ, hcg, hsp, pasUpd_self, hstep]
   · -- shape
     have hlens : fresh.length = (List.replicate (dummyGap t i) 0#44).length := by
       rw [List.length_replicate, hflen, gap_eq t T pas i fr hinv]
@@ -308,7 +286,7 @@ theorem stackInv_step (t T : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr fres
       (MachCSL.PTree.pagesNodup_fill 2 T (kstackVpn i) fresh hinv.ndp hfnd (fun b hb => (hfv b hb).2))
   · -- unmapped
     intro j hj hj64
-    rw [hTT, PtRun.walk_setLeaf_ne _ _ _ _ hc (kstackVpn_ne i j hi hj64 (by omega)),
+    rw [hTT, PtRun.walk_setLeaf_ne _ _ _ _ hc (Xv6.kstackVpn_ne i j hi hj64 (by omega)),
       MachCSL.PTree.walk_fill 2 T (kstackVpn i) fresh hinv.wf]
     exact hinv.unm j (by omega) hj64
   · -- Nodup

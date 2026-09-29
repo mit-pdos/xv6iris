@@ -39,6 +39,7 @@ import Xv6.SpecFilestat
 import Xv6.DinodeSlot
 import Xv6.EitherDefs
 import Xv6.SpecStati
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -120,11 +121,6 @@ def fstatCells [CurCtx] (sp : BitVec 64) : IProp GF := iprop%
   (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) w) ∗
   (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) w)
 
-theorem filestat_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem filestat_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 set_option maxHeartbeats 4000000 in
 /-- filestat's prologue `+0x00 .. +0x0a` at `pc`, at either `SIE`: the
 10-slot frame, the four EAGER saves, `s0 := sp₀`. -/
@@ -147,7 +143,7 @@ theorem wp_prologue_filestat [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4016#12 10 hK filestat_imm_m80) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4016#12 10 hK MachCSL.imm_m80) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -217,7 +213,7 @@ theorem wp_epilogue_filestat [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 10
     $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c4 _ (pc + 8#64) true 80#12 10 filestat_imm_p80) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c4 _ (pc + 8#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
   k_step_gen (wp_s_ret c5 _ (pc + 10#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6

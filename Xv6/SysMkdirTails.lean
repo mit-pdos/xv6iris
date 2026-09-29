@@ -158,7 +158,7 @@ theorem sys_mkdir_tail_40 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   have hp1 := sysMkdirPins_cs k _ R1 (sysMkdirPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x44  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_mkdir» + 0x44#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x46  c.j +0x38
   k_step_e (wp_s_j cpu _ (KA.«sys_mkdir» + 0x46#64) true 2097138#21)

@@ -1154,4 +1154,10 @@ theorem fsPay_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
 
 end
 
+theorem lhn_addr : logAddr + 44#64 = lhNAddr := rfl
+
+theorem log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
+
+theorem out_addr : logAddr + 28#64 = lOut := rfl
+
 end Xv6

@@ -154,7 +154,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x5c  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x5c#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x5e  j +0x50
   k_step_e (wp_s_j cpu _ (KA.«sys_mknod» + 0x5e#64) true 2097138#21)

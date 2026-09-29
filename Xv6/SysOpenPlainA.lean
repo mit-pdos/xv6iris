@@ -338,7 +338,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       Hbs Hir Hfd Hfr Hx HΦ
   · -- ===== ARM 0: the string did not fetch =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x24#64) false 166#13 15#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sys_open_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hbuf : sysOpenAny (GF := GF) (sysOpenPath (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysOpenAny; iexists bs; iframe; ipureintro; omega

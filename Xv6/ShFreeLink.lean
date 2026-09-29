@@ -108,7 +108,7 @@ theorem shFree_link (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p 
   ihave Hi := ushm_uis N.t 0x1162 false (.BTYPE (36#13, .Regidx 14#5, .Regidx 13#5, .BEQ)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc
   iapply ushm_br UL N h5 m4 (BitVec.ofNat 64 0x1162) false 36#13 14#5 13#5 .BEQ n false
-    (by rw [i13, i14, ushm_beq _ _ (by omega) (by rw [hB]; decide)]; simp only [decide_eq_false_iff_not]; omega)
+    (by rw [i13, i14, Xv6.beq_nat _ _ (by omega) (by rw [hB]; decide)]; simp only [decide_eq_false_iff_not]; omega)
     (BitVec.ofNat 64 0x1166) (by decide) (by simp) $$ Hi Hrun
   inext
   iintro %h6 Hrun

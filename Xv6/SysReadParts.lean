@@ -24,6 +24,7 @@ import Xv6.SpecFileread
 import Xv6.CopyLemmas
 import Xv6.ReadiDefs
 import Xv6.SysFstatParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -49,15 +50,11 @@ theorem srd_ret_28 : jumpPc (KA.«sys_read» + 0x28#64) = (KA.«sys_read» + 0x2
 theorem srd_ret_40 : jumpPc (KA.«sys_read» + 0x40#64) = (KA.«sys_read» + 0x40#64) := by decide
 
 theorem srd_li2 : 0#64 + BitVec.signExtend 64 2#12 = 2#64 := by decide
-/-- `addi a1,s0,-40` / `ld a1,-40(s0)`: `&p`, frame slot 5. -/
-theorem srd_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
-  bv_decide
 /-- `addi a1,s0,-28` / `lw a2,-28(s0)`: `&n`, the upper word of slot 4. -/
 theorem srd_n_addr (x : BitVec 64) : x + BitVec.signExtend 64 4068#12 = x + 0xFFFFFFFFFFFFFFE4#64 := by
   bv_decide
 theorem srd_n_hi (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFE0#64 + 4#64 = x + 0xFFFFFFFFFFFFFFE4#64 := by
   bv_decide
-theorem srd_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem srd_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
 /-- `&f` is not null (the frame's own bound). -/

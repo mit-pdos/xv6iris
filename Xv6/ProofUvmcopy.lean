@@ -27,6 +27,7 @@ import Xv6.UvmCallSites
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -41,12 +42,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the ten-slot frame. -/
-theorem uc_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem uc_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `ret` lands on the instruction after each `jal`. -/
 theorem uc_ret_13ec : jumpPc (KA.«uvmcopy» + 0x34#64) = (KA.«uvmcopy» + 0x34#64) := by
@@ -374,7 +369,7 @@ theorem uvmcopy_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (Q : IProp GF)
   iintro Hk Hpc F8
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ (KA.«uvmcopy» + 0x92#64) true 80#12 10 uc_imm_p80)
+  k_step_gen (wp_s_pop c9 _ (KA.«uvmcopy» + 0x92#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hp10
   iintro Hk Hpc
@@ -582,8 +577,6 @@ theorem uc_mapRun_one (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : Bi
       else ((t.fill 2 vpn fr).1, (t.fill 2 vpn fr).2, 0) := by
   simp only [PTree.mapRun]
 
-theorem uc_tfVpn : tfVpn.toNat = 67108862 := by decide
-theorem uc_trampVpn : trampVpn.toNat = 67108863 := by decide
 theorem uc_uvmMaxsz : uvmMaxsz = 274877898752 := by unfold uvmMaxsz; decide
 
 /-- `andi a5,s3,1`. -/
@@ -603,8 +596,6 @@ theorem uc_pteFlags_rwx_self {w : BitVec 64} (h : isLeafPte w) : pteFlags w &&& 
   rw [he]; exact h.2
 
 theorem uc_availSub_none (g : Nat) : availSub none g = none := rfl
-theorem uc_availDec_none : availDec (none : Option Nat) = none := rfl
-theorem uc_availInc_none : availInc (none : Option Nat) = none := rfl
 
 /-- Writing back the value a level-0 entry already holds. -/
 theorem uc_setLeaf_entAt_self : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
@@ -710,8 +701,8 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
   have hi38 : 4096 * i < 2 ^ 38 := by omega
   have hivt : (BitVec.ofNat 64 (4096 * i)).toNat = 4096 * i := Xv6.bcOfNatToNat _ (by omega)
   have hvpni : (vpnOf (BitVec.ofNat 64 (4096 * i))).toNat = i := uc_vpnOf i hi38
-  have hne_tf : i ≠ tfVpn.toNat := by rw [uc_tfVpn]; omega
-  have hne_tr : i ≠ trampVpn.toNat := by rw [uc_trampVpn]; omega
+  have hne_tf : i ≠ tfVpn.toNat := by rw [Xv6.tfVpn_toNat]; omega
+  have hne_tr : i ≠ trampVpn.toNat := by rw [Xv6.trampVpn_toNat]; omega
   have hPum : get? P.um i = none := by
     rw [hinv.2.2.1 i (by omega)]; exact hfree i hi
   have hPleaves : get? P.leaves i = none := by
@@ -764,7 +755,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
       rw [← UPtCopy.leaves_get Pold i hne_tf hne_tr]
       exact h
     k_step_gen (wp_s_branch c5 _ (KA.«uvmcopy» + 0x34#64) true 8176#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uc_beq_zero _ hz] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_zero _ hz] next c6 hp6
     iintro Hk Hpc
     ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
     case' _ => iframe
@@ -810,7 +801,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
         rw [← UPtCopy.leaves_get Pold i hne_tf hne_tr]
         exact h
       k_step_gen (wp_s_branch c8 _ (KA.«uvmcopy» + 0x3e#64) true 8166#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv1, uc_beq_zero _ rfl]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv1, MachCSL.beq_zero _ rfl]
         next c9 hp9
       iintro Hk Hpc
       ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
@@ -846,7 +837,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
       have hwl : get? Pold.leaves i = some w := by
         rw [UPtCopy.leaves_get Pold i hne_tf hne_tr]; exact hw
       have hAD : pteAD w (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))) :=
-        (UPtCopy.ptRep_entAt hrepo (vpnOf (BitVec.ofNat 64 (4096 * i))) w
+        (Xv6.ptRep_entAt hrepo (vpnOf (BitVec.ofNat 64 (4096 * i))) w
           (by rw [hvpni]; exact hwl)).2
       have hleafw : isLeafPte w := (hwfo.1 i w hw).2.1
       have hpvw : pageValid (pte2pa w) := (hwfo.1 i w hw).2.2
@@ -898,7 +889,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
         iintro Hk Hpc
         k_step_gen (wp_s_branch c12 _ (KA.«uvmcopy» + 0x46#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [uc_beq_zero _ hz0.1] next c13 hp13
+          with [MachCSL.beq_zero _ hz0.1] next c13 hp13
         iintro Hk Hpc
         ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
         case' _ => iframe
@@ -912,7 +903,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
         unfold ucKept
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, and_true, true_and]
       · -- the page: `memmove` then `mappages`
-        rw [uc_availDec_none]
+        rw [Xv6.availDec_none]
         have hmemne : R3 10#5 ≠ 0#64 := PtRun.pageValid_ne_zero _ hpv
         have hmemal : R3 10#5 &&& 0xfff#64 = 0#64 := hpv.1
         have hmemtop : (R3 10#5).toNat < 2281701376 := by
@@ -1084,7 +1075,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
               (UPtCopy.leafOf_isLeafPte _ _ hflagsrwx)
           rw [hvpni] at hrep2
           have hwf2 : uptWf { P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
-            refine uptWf_insert P i _ hwfc (by rw [uc_tfVpn]; omega)
+            refine uptWf_insert P i _ hwfc (by rw [Xv6.tfVpn_toNat]; omega)
               (UPtCopy.leafOf_isLeafPte _ _ (uc_pteFlags_rwx_self hleafw)) ?_ ?_ ?_ ?_
             · rw [hleafpa]; exact hpv
             · exact uLeafPins_uLeaf _ _ (pteFlags_pinMask w (hwfo.2.2.2.1 i w hw))
@@ -1117,7 +1108,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
           iintro Hk Hpc
-          k_norm_g [uc_beq_zero _ h0]
+          k_norm_g [MachCSL.beq_zero _ h0]
           have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = cur := fun h =>
             (hp26 h).trans (hpin25 h)
           ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
@@ -1168,7 +1159,7 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
           iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hav %hcs5
           have hpin29 : k.sie = false ∨ k.proc = 0#64 → c29 = cur := fun h =>
             (hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans (hpin25 h))))
-          k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1424, uc_availInc_none]
+          k_norm_g [MachCSL.KCtx.withSpie_twice, uc_ret_1424, Xv6.availInc_none]
           ihave Hchild := UPtCopy.procPtAt_intro P (UPtCopy.ucView Mold Mnew n) _ hwfc hbf hrf
             $$ [Htreec Hpagesc]
           case' _ => iframe
@@ -1358,7 +1349,7 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
     k_step_gen (wp_s_branch cpu _ KA.«uvmcopy» true 150#13 12#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
     iintro Hk Hpc
-    rw [KCtx.rget_ne c1 k 12#5 (by decide) (by decide), KCtx.rget_zero, uc_beq_zero _ hsz0]
+    rw [KCtx.rget_ne c1 k 12#5 (by decide) (by decide), KCtx.rget_zero, MachCSL.beq_zero _ hsz0]
     k_step_gen (wp_s_addi c1 _ (KA.«uvmcopy» + 0x96#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc
@@ -1399,7 +1390,7 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
     iintro Hk Hpc
     rw [KCtx.rget_ne c1 k 12#5 (by decide) (by decide), KCtx.rget_zero, uc_beq_ne _ hsz0]
-    k_step_gen (wp_s_push c1 _ (KA.«uvmcopy» + 0x2#64) true 4016#12 10 hK10 uc_imm_m80)
+    k_step_gen (wp_s_push c1 _ (KA.«uvmcopy» + 0x2#64) true 4016#12 10 hK10 MachCSL.imm_m80)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc Hframe
     irevert Hframe

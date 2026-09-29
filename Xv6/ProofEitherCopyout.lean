@@ -253,7 +253,7 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     have hl31 : bs.length < 2 ^ 31 := hlen'
     k_step_gen (wp_s_branch c14 _ (KA.«either_copyout» + 0x1c#64) true 32#13 9#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [e9, ec_beq_zero _ huser] next c15 hp15
+      with [e9, MachCSL.beq_zero _ huser] next c15 hp15
     iintro Hk Hpc
     k_step_gen (wp_s_addiw c15 _ (KA.«either_copyout» + 0x3c#64) false 0#12 12#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16

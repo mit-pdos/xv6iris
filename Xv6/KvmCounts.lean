@@ -528,7 +528,7 @@ theorem mapsTo_stacks_out (T : PTree) (pas : Nat → BitVec 44) (fs : List (BitV
   case ne =>
     intro j hj he
     have h1 := congrArg BitVec.toNat he
-    rw [vpn_add_toNat w i (by omega), kstackVpn_toNat j hj] at h1
+    rw [vpn_add_toNat w i (by omega), Xv6.kstackVpn_toNat j hj] at h1
     omega
 
 

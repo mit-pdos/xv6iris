@@ -59,6 +59,7 @@ import Xv6.UkTree
 import Xv6.GenLinksLine
 import Xv6.UEchoOut
 import Xv6.UkFreeHandler
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -81,13 +82,6 @@ theorem dqHalf_op (dq : DFrac) : dqHalf dq • dqHalf dq = dq := by
   | own q => show DFrac.own (q.half + q.half) = _; rw [Qp.half_add_half]
   | discard => rfl
   | ownDiscard q => show DFrac.ownDiscard (q.half + q.half) = _; rw [Qp.half_add_half]
-
-/-- A small count, as the signed word (Rocq `bvsigned_moi_small`). -/
-theorem ukco_toInt_small (n : Nat) (h : n < 2 ^ 63) : (BitVec.ofNat 64 n).toInt = (n : Int) := by
-  rw [BitVec.toInt_eq_toNat_cond]
-  have h1 : (BitVec.ofNat 64 n).toNat = n := by rw [BitVec.toNat_ofNat]; omega
-  rw [h1]
-  split <;> omega
 
 /-- **Rocq `cons_short`**: every alternative a console write can answer the
 length of. -/
@@ -412,7 +406,7 @@ theorem consWrite (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) [HPc : Persis
   iapply Hmid $$ %h' %ret Hrun
   iintro %h3 Hrun
   iapply Hcont $$ %h3 %ret [HK Hstd Hd] [Hs1 Hs2] Hrun
-  · rw [hret, ukco_toInt_small bs.length (by omega)]
+  · rw [hret, MachCSL.toInt_ofNat bs.length (by omega)]
     iapply HK $$ Hstd Hd
   · rw [e1]
     iapply (usrcAt_rebase N tx dq ua (m.get 11#5).toNat bs.length f hua).mpr

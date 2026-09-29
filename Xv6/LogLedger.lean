@@ -25,6 +25,7 @@ proofs) reads the ledger through.
 import Xv6.LogInv
 import Xv6.BallocParts
 import Xv6.FsWords
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -294,15 +295,11 @@ theorem bo_addw (a b : Nat) (h : a + b < 2 ^ 31) :
       omega]
   exact MachCSL.signExtend_ofNat32 _ h
 
-theorem bo_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
-  rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
-  simp [BitVec.toNat_ofNat]; omega
-
 /-- `bge s2,a5` between two small naturals. -/
 theorem bo_bge_nat (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
   show (!(BitVec.ofNat 64 a).slt (BitVec.ofNat 64 b)) = decide (b ≤ a)
-  simp only [BitVec.slt, bo_toInt_ofNat a ha, bo_toInt_ofNat b hb]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
 
 /-- `bge s2,a5` at `+0x50`, with `s2` the literal `30` the `li` left. -/

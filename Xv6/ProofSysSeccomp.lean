@@ -46,8 +46,6 @@ theorem ssc_br_argaddr : KA.«sys_seccomp» + 0xfffffffffffffd4c#64 = KA.«argad
 theorem ssc_br_myproc : KA.«sys_seccomp» + 0xffffffffffffed96#64 = KA.«myproc» := by decide
 theorem ssc_ret_12 : jumpPc (KA.«sys_seccomp» + 0x12#64) = KA.«sys_seccomp» + 0x12#64 := by decide
 theorem ssc_ret_16 : jumpPc (KA.«sys_seccomp» + 0x16#64) = KA.«sys_seccomp» + 0x16#64 := by decide
-theorem ssc_secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 360#12 = pSecc x := by
-  unfold pSecc; rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

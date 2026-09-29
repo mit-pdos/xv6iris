@@ -94,9 +94,6 @@ theorem sys_exec_bne_back (i : Nat) (h : i + 1 < 32) :
     bcond bop.BNE (BitVec.ofNat 64 i + 1#64) 32#64 = true := by
   rw [sys_exec_bne1 i (by omega)]; simp; omega
 
-theorem sys_exec_beqz_ne (x : BitVec 64) (h : x ≠ 0#64) : bcond bop.BEQ x 0#64 = false := by
-  rw [Xv6.dirlookup_beqz]; simp [h]
-
 theorem sys_exec_bltz0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
 /-- The back edge's two increments: the pins at `i + 1`. -/
@@ -266,7 +263,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
   · -- ===== fetchstr failed: bad:, the page kept unread =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x86#64) false 12#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr, sysfile_bltz_m1]
+      with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
     rw [List.length_replicate] at hbl
     ihave Hpgs := sysExecPages_push pg afun i p (sysfilePfun bs) $$ [Hpgs Hbuf]
@@ -355,7 +352,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     have hr0 : R1 10#5 = 0#64 := hr.1
     rw [hr0, sysExecArgvL_set0]
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x7a#64) true 24#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, sysfile_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     unfold sysExecStepOut
     iapply HΦ $$ %cpu %spie1 %spp1 %_ %P %i %pg %alen %afun %uvf
@@ -373,7 +370,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     have hnz : R1 10#5 ≠ 0#64 := PtRun.pageValid_ne_zero _ hpv
     rw [sysExecArgvL_set]
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x7a#64) true 24#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_beqz_ne _ hnz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ hnz]
     iintro Hk Hpc
     iapply (sys_exec_step_str FS Γ k A hS cpu spie1 spp1 _ P i pg alen afun uvf pl rest u (R1 10#5)
       hi hext hok hav hp2 hal hu hunz hpv (by simp only [RegMap.set_apply, ite_true]))
@@ -464,7 +461,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   rcases hans' with hm1 | ⟨h0, hw⟩
   · -- ===== fetchaddr answered -1: bad: =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x66#64) false 44#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hm1, sysfile_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hm1, MachCSL.bltz_m1]
     iintro Hk Hpc
     iapply HΦ $$ %cpu %spie1 %spp1 %R1 %P2 %i %pg %alen %afun %uvf
     iright
@@ -499,7 +496,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
     by_cases hwz : w = 0#64
     · -- +0x6e  c.beqz a5 : THE NULL, the break
       k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x6e#64) true 72#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwz, sysfile_beq00]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwz, MachCSL.beqz_zero]
       iintro Hk Hpc
       iapply HΦ $$ %cpu %spie1 %spp1 %(R1.set 15#5 w) %P2 %i %pg %alen %afun %uvf
       iright
@@ -518,7 +515,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
       iexact H60
     · -- +0x6e  c.beqz a5 : a real pointer, on to kalloc
       k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x6e#64) true 72#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_beqz_ne _ hwz]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ hwz]
       iintro Hk Hpc
       iapply (sys_exec_step_kalloc KL FS Γ k A hS cpu spie1 spp1 (R1.set 15#5 w) P2 i pg alen afun uvf
         pl rest w hi hext2 hok hav hp2 hal hw.symm hwz)

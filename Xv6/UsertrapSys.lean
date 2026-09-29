@@ -344,7 +344,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
   · subst hk0
     -- +0x94  c.bnez a0 : not taken
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x94#64) true 52#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext0, ut_bne_eq]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext0, MachCSL.bne_eq]
     iintro Hk Hpc
     iapply (ut90_bump PT Γ SY hPT0 hW HA A hok hsc cpu R hpins)
     iframe Hk Hpc Hframe Hte Hce Hcaps Hown Hsi Hfi Hpi Hkont

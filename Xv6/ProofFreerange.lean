@@ -16,6 +16,7 @@ import Xv6.StepLemmas
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -31,14 +32,10 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- The two `lui` constants of the rounding. -/
 theorem lui_1k : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
-theorem lui_top : BitVec.signExtend 64 (0xfffff#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
 
 /-- `ret` out of `kfree` lands on the instruction after the `jal`. -/
 theorem ret_a96 : jumpPc (KA.«freerange» + 0x32#64) = (KA.«freerange» + 0x32#64) := by
   decide
-
-theorem physTop_toNat : physTop.toNat = 0x88000000 := rfl
-theorem kernelEnd_toNat : kernelEndAddr.toNat = KernelSyms.«end» := rfl
 
 theorem ofNat_mul4096 (i : Nat) : BitVec.ofNat 64 (4096 * i) = 4096#64 * BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
@@ -67,7 +64,7 @@ theorem fr_bltu (stop base : BitVec 64) (n : Nat)
     (hb1 : base.toNat + 4096 * n ≤ stop.toNat) (hb2 : stop.toNat < base.toNat + 4096 * (n + 1))
     (hb4 : stop.toNat ≤ physTop.toNat) :
     bcond bop.BLTU stop (base + 4096#64) = decide (n = 0) := by
-  rw [physTop_toNat] at hb4
+  rw [Xv6.physTop_toNat] at hb4
   have he : (base + 4096#64).toNat = base.toNat + 4096 := Xv6.paAddToNat' base 4096 (by omega)
   simp only [bcond, BitVec.ult, he, decide_eq_decide]
   omega
@@ -77,7 +74,7 @@ theorem fr_bgeu (stop base : BitVec 64) (n i : Nat) (hi : i + 1 ≤ n)
     (hb1 : base.toNat + 4096 * n ≤ stop.toNat) (hb2 : stop.toNat < base.toNat + 4096 * (n + 1))
     (hb4 : stop.toNat ≤ physTop.toNat) :
     bcond bop.BGEU stop (base + BitVec.ofNat 64 (4096 * (i + 2))) = decide (i + 1 < n) := by
-  rw [physTop_toNat] at hb4
+  rw [Xv6.physTop_toNat] at hb4
   have he : (base + BitVec.ofNat 64 (4096 * (i + 2))).toNat = base.toNat + 4096 * (i + 2) :=
     Xv6.paAddToNat' base _ (by omega)
   simp only [bcond, BitVec.ult, he, ← decide_not, decide_eq_decide]
@@ -89,7 +86,7 @@ theorem fr_pageValid (stop base : BitVec 64) (n i : Nat) (hi : i < n)
     (hb1 : base.toNat + 4096 * n ≤ stop.toNat) (hb3 : kernelEndAddr.toNat ≤ base.toNat)
     (hb4 : stop.toNat ≤ physTop.toNat) :
     pageValid (base + BitVec.ofNat 64 (4096 * i)) := by
-  rw [physTop_toNat] at hb4
+  rw [Xv6.physTop_toNat] at hb4
   have he : (base + BitVec.ofNat 64 (4096 * i)).toNat = base.toNat + 4096 * i :=
     Xv6.paAddToNat' base _ (by omega)
   refine ⟨?_, ?_, ?_⟩
@@ -98,10 +95,10 @@ theorem fr_pageValid (stop base : BitVec 64) (n i : Nat) (hi : i < n)
     generalize BitVec.ofNat 64 i = q
     revert base
     bv_decide
-  · simp only [BitVec.ult, kernelEnd_toNat, he, decide_eq_true_eq, Nat.not_lt]
-    rw [kernelEnd_toNat] at hb3
+  · simp only [BitVec.ult, Xv6.kernelEnd_toNat, he, decide_eq_true_eq, Nat.not_lt]
+    rw [Xv6.kernelEnd_toNat] at hb3
     omega
-  · simp only [BitVec.ult, physTop_toNat, he, decide_eq_true_eq]
+  · simp only [BitVec.ult, Xv6.physTop_toNat, he, decide_eq_true_eq]
     omega
 
 /-- `PGROUNDUP` is page aligned. -/
@@ -488,7 +485,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
   k_step_gen (wp_s_lui c8 _ (KA.«freerange» + 0x14#64) true 0xfffff#20 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lui_top] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c9 hp9
   iintro Hk Hpc
   k_step_gen (wp_s_and c9 _ (KA.«freerange» + 0x16#64) true 9#5 9#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hrnd] next c10 hp10

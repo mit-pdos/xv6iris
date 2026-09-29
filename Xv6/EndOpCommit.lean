@@ -133,12 +133,6 @@ end
 
 /-! ## Context normalisation inside the frame -/
 
-theorem eo_spie_pushed (k : KCtx) (m : Nat) (a b c d : Bool) :
-    ((k.withSpie a b).pushed m).withSpie c d = (k.withSpie c d).pushed m := rfl
-theorem eo_ctx_collapse (k : KCtx) (m : Nat) (a b c d : Bool) (R R' : RegMap) :
-    ((((k.withSpie a b).pushed m).withRegs R).withSpie c d).withRegs R' =
-      ((k.withSpie c d).pushed m).withRegs R' := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
@@ -246,7 +240,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp1 %pp1 %R1 %bs1 %hcs1 Hk Hpc Hte Hce Hpid HlhN Hblk Hauth Hhdr %hbs1 Hu1
     HQ1
-  k_norm_g [eo_ret_108, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_108, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix1 : eoPins k R1 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
     k_norm_g at hcs1
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcs1
@@ -313,7 +307,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp2 %pp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid HlhN Hblk - Hauth Hdirty Hrows
     Hu12 HRn
-  k_norm_g [eo_ret_10e, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_10e, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix2 : eoPins k R2 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
     k_norm_g at hcs2
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcs2
@@ -374,7 +368,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   iapply wpNext_intro_pin
   iintro %cpu %_ %sp3 %pp3 %R3 %bs2 %hcs3 Hk Hpc Hte Hce Hpid HlhN Hblk0 Hauth Hhdr %hbs2 Hu3
     HQ3
-  k_norm_g [eo_ret_11a, eo_ctx_collapse, eo_spie_pushed]
+  k_norm_g [eo_ret_11a, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix3 : eoPins k R3 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
     k_norm_g at hcs3
     refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcs3

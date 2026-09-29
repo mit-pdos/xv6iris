@@ -43,6 +43,7 @@ import Xv6.IcacheEscrowPool
 import Xv6.InitlogHead
 import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -67,9 +68,6 @@ theorem it_a_fmt :
 /-- `auipc s4,0x1e ; addi s4,s4,1972` at `+0x38`. -/
 theorem it_a_log : KA.«install_trans» + 0x1e9d6#64 = logAddr := by decide
 
-/-- `lw a5,44(s4)`. -/
-theorem it_o_lhn : logAddr + 44#64 = lhNAddr := rfl
-
 theorem it_br_printk :
     KA.«install_trans» + 0xffffffffffffc8cc#64 = KA.«printk» := by decide
 theorem it_br_brelse :
@@ -92,22 +90,13 @@ theorem it_ret_5a : jumpPc (KA.«install_trans» + 0x5a#64) = KA.«install_trans
 theorem it_ret_60 : jumpPc (KA.«install_trans» + 0x60#64) = KA.«install_trans» + 0x60#64 := by decide
 theorem it_ret_b0 : jumpPc (KA.«install_trans» + 0xb0#64) = KA.«install_trans» + 0xb0#64 := by decide
 
-theorem it_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem it_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 /-! ## The 32-bit arithmetic -/
-
-theorem it_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
-  rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
-  simp [BitVec.toNat_ofNat]; omega
 
 /-- `bge` between two small naturals. -/
 theorem it_bge_nat (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BGE (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (b ≤ a) := by
   show (!(BitVec.ofNat 64 a).slt (BitVec.ofNat 64 b)) = decide (b ≤ a)
-  simp only [BitVec.slt, it_toInt_ofNat a ha, it_toInt_ofNat b hb]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : b ≤ a <;> simp [h] <;> omega
 
 /-- `blez a5` at `+0x08`, on `log.lh.n`. -/
@@ -218,7 +207,7 @@ theorem it_prologue (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) :
             (k.regs 24#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hi0, #Hi1, #Hi2, #Hi3, #Hi4, #Hi5, #Hi6, #Hi7, #Hi8, #Hi9, #Hi10, #Hi11, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ (KA.«install_trans» + 0xc#64) true 4016#12 10 hK it_imm_m80) $$ [- $Hk $Hpc] next c0 hp0
+  k_step_gen (wp_s_push cpu _ (KA.«install_trans» + 0xc#64) true 4016#12 10 hK MachCSL.imm_m80) $$ [- $Hk $Hpc] next c0 hp0
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -298,7 +287,7 @@ theorem it_epilogue (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) (R : RegMap)
   iintro Hk Hpc F9
   ihave Hstack : stackOwn (GF := GF) (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop d10 _ (KA.«install_trans» + 0xc6#64) true 80#12 10 it_imm_p80) $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hK, hR2] next d11 hq11
+  k_step_gen (wp_s_pop d10 _ (KA.«install_trans» + 0xc6#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hK, hR2] next d11 hq11
   iintro Hk Hpc
   k_step_gen (wp_s_ret d11 _ (KA.«install_trans» + 0xc8#64) true 1#5) $$ [- $Hk $Hpc] next d12 hq12
   iintro Hk Hpc
@@ -864,16 +853,11 @@ end
 
 /-! ## Context normalisation inside the frame -/
 
-theorem it_spie_pushed (k : KCtx) (m : Nat) (a b c d : Bool) :
-    ((k.withSpie a b).pushed m).withSpie c d = (k.withSpie c d).pushed m := rfl
 theorem it_ctx_spie0 (k : KCtx) (R : RegMap) :
     k.withRegs R = (k.withSpie k.spie k.spp).withRegs R := rfl
 theorem it_ctx_pushed0 (k : KCtx) (m : Nat) (R0 R1 : RegMap) :
     ((k.withRegs R0).pushed m).withRegs R1 = ((k.withSpie k.spie k.spp).pushed m).withRegs R1 :=
   rfl
-theorem it_ctx_collapse (k : KCtx) (m : Nat) (a b c d : Bool) (R R' : RegMap) :
-    ((((k.withSpie a b).pushed m).withRegs R).withSpie c d).withRegs R' =
-      ((k.withSpie c d).pushed m).withRegs R' := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -1071,7 +1055,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   iintro %cpu %_ %spie1 %spp1 %R1 %kkL %bsL %bsdL %dL %hcs1 Hk Hpc Hte Hce Hpid HlockL
   icases (bioLocked_split γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
     bsL bsdL dL).1 $$ HlockL with ⟨HbufL, HpayL⟩
-  k_norm_g [it_ret_82, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_82, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs1a, hcs1b⟩ := hcs1
   have hfix1 : itFix k true t R1 := itFix_cs k true t _ R1
     (by refine itFix_set k true t _ (itFix_set k true t _ (itFix_set k true t _ (itFix_set k true t _ hfixP 11#5 _
@@ -1126,7 +1110,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie2 %spp2 %R2 %kkD %bsD %bsdD %dD %hcs2 Hk Hpc Hte Hce Hpid HlockD
   icases (bioLocked_split γb V kkD pidv dev wt bsD bsdD dD).1 $$ HlockD with ⟨HbufD, HpayD⟩
-  k_norm_g [it_ret_90, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_90, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs2a, hcs2b⟩ := hcs2
   have hfix2 : itFix k true t R2 := itFix_cs k true t _ R2
     (by refine itFix_set k true t _ (itFix_set k true t _ (itFix_set k true t _ (itFix_set k true t _ hfix1 18#5 _
@@ -1263,7 +1247,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   case wa0 => k_norm_g
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid HbufD HRt
-  k_norm_g [it_ret_a6, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_a6, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix3 : itFix k true t R3 := itFix_cs k true t _ R3
     (by refine itFix_set k true t _ (itFix_set k true t _ hfixM 10#5 _ (by decide)) 1#5 _ (by decide)) hcs3
   obtain ⟨s2', s8', s19, s20, s21, s22, s23, s24, s25, s26, s27⟩ := id hfix3
@@ -1310,7 +1294,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   case ea0 => k_norm_g
   k_next_e
   iintro %spie4 %spp4 %R4 %hsp4 Hk Hpc %hcs4 Hpid Hsl1
-  k_norm_g [it_ret_5a, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_5a, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix4 : itFix k true t R4 := itFix_cs k true t _ R4
     (by refine itFix_set k true t _ (itFix_set k true t _ hfix3 10#5 _ (by decide)) 1#5 _ (by decide)) hcs4
   obtain ⟨u2, u8, u19, u20, u21, u22, u23, u24, u25, u26, u27⟩ := id hfix4
@@ -1341,7 +1325,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   case fa0 => k_norm_g
   k_next_e
   iintro %spie5 %spp5 %R5 %hsp5 Hk Hpc %hcs5 Hpid Hsl2
-  k_norm_g [it_ret_60, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_60, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix5 : itFix k true t R5 := itFix_cs k true t _ R5
     (by refine itFix_set k true t _ (itFix_set k true t _ hfix4 10#5 _ (by decide)) 1#5 _ (by decide)) hcs5
   obtain ⟨v2, v8, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hfix5
@@ -1365,7 +1349,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   iintro Hk Hpc
   k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x64#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v20, it_o_lhn]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v20, Xv6.lhn_addr]
   iintro Hk Hpc HlhN
   have hfix6 : itFix k true (t + 1) (((R5.set 19#5 (BitVec.ofNat 64 t + 1#64)).set 21#5
       (lhBlock (t + 1))).set 15#5 (BitVec.ofNat 64 n)) := by
@@ -1571,7 +1555,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   iintro %cpu %_ %spie1 %spp1 %R1 %kkL %bsL %bsdL %dL %hcs1 Hk Hpc Hte Hce Hpid HlockL
   icases (bioLocked_split γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno logstart t))
     bsL bsdL dL).1 $$ HlockL with ⟨HbufL, HpayL⟩
-  k_norm_g [it_ret_82, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_82, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs1a, hcs1b⟩ := hcs1
   have hfix1 : itFix k false t R1 := itFix_cs k false t _ R1
     (by refine itFix_set k false t _ (itFix_set k false t _ (itFix_set k false t _ (itFix_set k false t _ hfixP 11#5 _
@@ -1626,7 +1610,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie2 %spp2 %R2 %kkD %bsD %bsdD %dD %hcs2 Hk Hpc Hte Hce Hpid HlockD
   icases (bioLocked_split γb V kkD pidv dev wt bsD bsdD dD).1 $$ HlockD with ⟨HbufD, HpayD⟩
-  k_norm_g [it_ret_90, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_90, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   obtain ⟨hcs2a, hcs2b⟩ := hcs2
   have hfix2 : itFix k false t R2 := itFix_cs k false t _ R2
     (by refine itFix_set k false t _ (itFix_set k false t _ (itFix_set k false t _ (itFix_set k false t _ hfix1 18#5 _
@@ -1735,7 +1719,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   case wa0 => k_norm_g
   iapply wpNext_intro_pin
   iintro %cpu %_ %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid HbufD HRt
-  k_norm_g [it_ret_a6, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_a6, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix3 : itFix k false t R3 := itFix_cs k false t _ R3
     (by refine itFix_set k false t _ (itFix_set k false t _ hfixM 10#5 _ (by decide)) 1#5 _ (by decide)) hcs3
   obtain ⟨s2', s8', s19, s20, s21, s22, s23, s24, s25, s26, s27⟩ := id hfix3
@@ -1777,7 +1761,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   case ua0 => k_norm_g
   k_next_e
   iintro %spieU %sppU %RU %hspU Hk Hpc %hcsU Hsl3
-  k_norm_g [it_ret_b0, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_b0, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfixU : itFix k false t RU := itFix_cs k false t _ RU
     (by refine itFix_set k false t _ (itFix_set k false t _ hfix3 10#5 _ (by decide)) 1#5 _ (by decide)) hcsU
   have h9DU : RU 9#5 = bnode kkD := by
@@ -1815,7 +1799,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   case ea0 => k_norm_g
   k_next_e
   iintro %spie4 %spp4 %R4 %hsp4 Hk Hpc %hcs4 Hpid Hsl1
-  k_norm_g [it_ret_5a, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_5a, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix4 : itFix k false t R4 := itFix_cs k false t _ R4
     (by refine itFix_set k false t _ (itFix_set k false t _ hfixU 10#5 _ (by decide)) 1#5 _ (by decide)) hcs4
   obtain ⟨u2, u8, u19, u20, u21, u22, u23, u24, u25, u26, u27⟩ := id hfix4
@@ -1846,7 +1830,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   case fa0 => k_norm_g
   k_next_e
   iintro %spie5 %spp5 %R5 %hsp5 Hk Hpc %hcs5 Hpid Hsl2
-  k_norm_g [it_ret_60, it_ctx_collapse, it_spie_pushed]
+  k_norm_g [it_ret_60, MachCSL.ctx_collapse, MachCSL.spie_pushed]
   have hfix5 : itFix k false t R5 := itFix_cs k false t _ R5
     (by refine itFix_set k false t _ (itFix_set k false t _ hfix4 10#5 _ (by decide)) 1#5 _ (by decide)) hcs5
   obtain ⟨v2, v8, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hfix5
@@ -1874,7 +1858,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   iintro Hk Hpc
   k_step_e (wp_s_lw cpu _ (KA.«install_trans» + 0x64#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v20, it_o_lhn]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [v20, Xv6.lhn_addr]
   iintro Hk Hpc HlhN
   have hfix6 : itFix k false (t + 1) (((R5.set 19#5 (BitVec.ofNat 64 t + 1#64)).set 21#5
       (lhBlock (t + 1))).set 15#5 (BitVec.ofNat 64 n)) := by

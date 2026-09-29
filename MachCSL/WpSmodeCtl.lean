@@ -387,4 +387,53 @@ theorem execSpecF_addw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC HF
 
+theorem beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
+  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
+
+theorem bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
+    (if bcond bop.BNE a b then p else q) = p := by
+  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
+
+theorem bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
+    (if bcond bop.BNE x 0#64 then p else q) = q := by
+  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
+
+/-- `blez a2,dfc` with `a2 = 16` is not taken. -/
+theorem blez_ite {α : Type} (p q : α) :
+    (if bcond bop.BGE 0#64 16#64 then p else q) = q := by
+  rw [show bcond bop.BGE 0#64 16#64 = false from by decide]; rfl
+
+theorem bne_eq (a : BitVec 64) : bcond bop.BNE a a = false := by simp [bcond]
+
+/-- `beqz` on a small count. -/
+theorem ite_beq_ofNat {α : Type} (n : Nat) (hn : n < 2 ^ 64) (x y : α) :
+    (if bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 then x else y) = if n = 0 then x else y := by
+  by_cases h : n = 0
+  · subst h; simp [bcond]
+  · have : BitVec.ofNat 64 n ≠ 0#64 := by
+      intro h'; have := congrArg BitVec.toNat h'; simp only [BitVec.toNat_ofNat] at this
+      rw [Nat.mod_eq_of_lt hn] at this; simp at this; exact h this
+    simp [bcond, h, this]
+
+theorem beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
+
+theorem bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
+
+theorem beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
+    (if bcond bop.BEQ x 0#64 then p else q) = p := by
+  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
+
+theorem bltz_nat (n : Nat) (h : n < 16) : bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
+  show (BitVec.ofNat 64 n).slt 0#64 = false
+  apply Bool.eq_false_iff.2
+  intro hlt
+  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
+  simp only [BitVec.toNat_ofNat, Nat.reducePow, BitVec.toInt_zero] at hlt
+  omega
+
+/-- `beqz` / `bnez` as conditionals. -/
+theorem ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
+    (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
+  by_cases h : x = 0#64 <;> simp [bcond, h]
+
 end MachCSL

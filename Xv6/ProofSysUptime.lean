@@ -70,10 +70,6 @@ theorem su_filter_time (l : List String) (h : "time" ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-/-- Dropping a redundant lock list. -/
-theorem su_withLocks_self' (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
@@ -198,7 +194,7 @@ theorem sys_uptime_proof (AC : ACQUIRE) (RE : RELEASE) : SYSUPTIME :=
   iapply (su_release RE _ _ γt ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hpay]
   rotate_right 1
-  k_norm_g [su_withLocks_self', su_filter_time k.locks hlk,
+  k_norm_g [MachCSL.withLocks_self', su_filter_time k.locks hlk,
     KCtx.pushOffAt_popExit k spie spp hwf, su_ret_2c]
   iframe #
   case ha0r => k_norm_g

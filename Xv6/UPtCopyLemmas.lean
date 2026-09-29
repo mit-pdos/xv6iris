@@ -71,20 +71,8 @@ theorem pteAD_leafOf (ppn : BitVec 44) {w v : BitVec 64} (h : pteAD w v) :
     Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
-/-- A leaf with some of `R`/`W`/`X` is a `wfU` level-0 entry. -/
-theorem isLeafPte_iff (w : BitVec 64) :
-    isLeafPte w ↔ (w.getLsbD 0 = true ∧ w &&& 0xE#64 ≠ 0#64) := by
-  unfold isLeafPte PTE_V
-  constructor
-  · rintro ⟨h1, h2⟩
-    refine ⟨?_, h2⟩
-    revert h1; generalize w = x; intro h1; revert h1; bv_decide
-  · rintro ⟨h1, h2⟩
-    refine ⟨?_, h2⟩
-    revert h1; generalize w = x; intro h1; revert h1; bv_decide
-
 theorem leafOf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (leafOf ppn perm) := (isLeafPte_iff _).mpr (leafOf_valid ppn perm h)
+    isLeafPte (leafOf ppn perm) := (Xv6.isLeafPte_iff _).mpr (leafOf_valid ppn perm h)
 
 /-- An aligned address below `2 ^ 56` is the base of its page. -/
 theorem pageAddr_of_aligned (p : BitVec 64) (hal : p &&& 0xfff#64 = 0#64)
@@ -175,20 +163,12 @@ theorem leaves_insert (P : UPtd) (k : Nat) (leaf : BitVec 64)
 
 /-! ## `ptRep`: reading a leaf, filling, writing a leaf -/
 
-/-- A leaf of `L` is what the walk finds, up to `A`/`D`. -/
-theorem ptRep_entAt {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
-    (w : BitVec 64) (hw : get? L vpn.toNat = some w) :
-    t.walk 2 vpn ≠ none ∧ pteAD w (t.entAt 2 vpn) := by
-  obtain ⟨addr, v, hwalk, had⟩ := h.2.2.2.1 vpn w hw
-  have he := (PTree.walk_addr 2 t vpn addr v hwalk).2
-  exact ⟨by rw [hwalk]; simp, by rw [he]; exact had⟩
-
 /-- A blocked walk means no leaf. -/
 theorem ptRep_none_of_walk {t : PTree} {L : RegMapF (BitVec 64)} (h : ptRep t L) (vpn : BitVec 27)
     (hw : t.walk 2 vpn = none) : get? L vpn.toNat = none := by
   cases hg : get? L vpn.toNat with
   | none => rfl
-  | some w => exact absurd hw (ptRep_entAt h vpn w hg).1
+  | some w => exact absurd hw (Xv6.ptRep_entAt h vpn w hg).1
 
 /-- An incomplete path in a well-formed tree is a blocked walk. -/
 theorem walk_none_of_not_complete : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
@@ -252,7 +232,7 @@ theorem ptRep_setLeaf_insert {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec
     (hnone : get? L vpn.toNat = none) (hv : pteAD c v) (hlf : isLeafPte v) :
     ptRep (t.setLeaf 2 vpn v) (insert L vpn.toNat c) := by
   obtain ⟨hwf, hnd, hpg, hsome, hnone'⟩ := h
-  have hval : v.getLsbD 0 = true ∧ v &&& 0xE#64 ≠ 0#64 := (isLeafPte_iff v).mp hlf
+  have hval : v.getLsbD 0 = true ∧ v &&& 0xE#64 ≠ 0#64 := (Xv6.isLeafPte_iff v).mp hlf
   have hvne : v ≠ 0#64 := by
     intro he
     rw [he] at hval
@@ -287,27 +267,19 @@ theorem ptRep_setLeaf_insert {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec
 
 /-! ## `delRunL`: the rollback -/
 
-theorem delRunL_zero (L : RegMapF (BitVec 64)) (v0 : Nat) : delRunL L v0 0 = L := rfl
-
-theorem delRunL_succ (L : RegMapF (BitVec 64)) (v0 i : Nat) :
-    delRunL L v0 (i + 1) = delete (delRunL L v0 i) (v0 + i) := by
-  unfold delRunL
-  rw [List.range_succ, List.foldl_append]
-  rfl
-
 theorem delRunL_get_ge (L : RegMapF (BitVec 64)) (i j : Nat) (h : i ≤ j) :
     get? (delRunL L 0 i) j = get? L j := by
   induction i with
   | zero => rfl
   | succ i ih =>
-    rw [delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
+    rw [Xv6.delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
 
 theorem delRunL_get_lt (L : RegMapF (BitVec 64)) (i j : Nat) (h : j < i) :
     get? (delRunL L 0 i) j = none := by
   induction i with
   | zero => omega
   | succ i ih =>
-    rw [delRunL_succ]
+    rw [Xv6.delRunL_succ]
     by_cases he : j = i
     · rw [get?_delete_eq (by omega)]
     · rw [get?_delete_ne (by omega)]

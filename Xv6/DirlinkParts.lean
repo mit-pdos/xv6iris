@@ -47,6 +47,7 @@ import Xv6.DirlookupParts
 import Xv6.IcacheBootDecode
 import Xv6.ReadiParts
 import Xv6.SysUnlinkPure
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -366,11 +367,6 @@ theorem dirlink_de_half [CurCtx] (sp : BitVec 64) (w : BitVec 16) (nm : List (Bi
   iframe B2
   iapply wordPointsTo_of_bytes2 _ (DFrac.own 1) w (by omega) $$ B1
 
-theorem dirlink_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem dirlink_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 set_option maxHeartbeats 4000000 in
 /-- dirlink's prologue `+0x00 .. +0x0c` at `pc`, at either `SIE`: the
 10-slot frame, the five EAGER saves, `s0 := sp₀`. -/
@@ -396,7 +392,7 @@ theorem wp_prologue_dirlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, #Hi10, #Hi12, Hk, Hpc, HΦ⟩
-  k_step_gen (wp_s_push cpu _ pc true 4016#12 10 hK dirlink_imm_m80) $$ [- $Hk $Hpc] next c1 hp1
+  k_step_gen (wp_s_push cpu _ pc true 4016#12 10 hK MachCSL.imm_m80) $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
   stack_cells
@@ -468,7 +464,7 @@ theorem wp_epilogue_dirlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5) 10
     $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c5 _ (pc + 10#64) true 80#12 10 dirlink_imm_p80) $$ [- $Hk $Hpc]
+  k_step_gen (wp_s_pop c5 _ (pc + 10#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_ret c6 _ (pc + 12#64) true 1#5) $$ [- $Hk $Hpc] next c7 hp7

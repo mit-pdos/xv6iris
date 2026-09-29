@@ -321,8 +321,6 @@ theorem pc_withLocks_self' (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 theorem pc_withSpie_pushOffAt (k : KCtx) (s p a b : Bool) :
     (k.withSpie s p).pushOffAt a b = k.pushOffAt a b := rfl
-theorem pc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 /-! ## Branch conditions: the flag words, sign-extended -/
 
@@ -426,9 +424,6 @@ theorem pc_nonfree (Rel : RELEASE_REFUTE) (cpu c : CPU) (k : KCtx)
   · ileft; iexact Hav
   iexact HPhi
 
-theorem pc_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
 /-! ## The freeing arm: destroy the lock, reassemble the page, kfree it -/
 
 set_option maxHeartbeats 8000000 in
@@ -528,7 +523,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
   -- past kfree: `j 0x4590`, the epilogue, page count incremented
   iapply wpNext_intro_pin
   iintro %cF %hpF %spie3 %spp3 %R5 %hsp3 Hk Hpc Hav %hcs5
-  k_norm_g [pc_withSpie_withSpie, pc_pushed_withSpie]
+  k_norm_g [MachCSL.withSpie_withSpie, MachCSL.pushed_withSpie]
   k_norm_g at hsp3
   unfold calleeSaved at hcs5
   k_norm_g at hcs5

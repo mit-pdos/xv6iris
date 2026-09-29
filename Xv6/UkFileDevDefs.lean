@@ -87,6 +87,7 @@ import Xv6.UNamePath
 import Xv6.UkHandler
 import Xv6.UshMainBytes
 import Xv6.UkGrepTreeDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -177,14 +178,6 @@ as itself. -/
 theorem fdev_toInt_ofInt_nat (n : Nat) (h : n < 2 ^ 31) : (BitVec.ofInt 64 (n : Int)).toInt = (n : Int) := by
   rw [BitVec.toInt_ofInt]
   rw [Int.bmod_eq_of_le] <;> omega
-
-/-- A small word's C reading is its number. -/
-theorem fdev_ofNat_toInt (n : Nat) (h : n < 2 ^ 63) : (BitVec.ofNat 64 n).toInt = (n : Int) := by
-  rw [BitVec.toInt_eq_toNat_cond]
-  have h1 : (BitVec.ofNat 64 n).toNat = n := by
-    rw [BitVec.toNat_ofNat]; omega
-  rw [h1]
-  split <;> omega
 
 end UkFileDev
 

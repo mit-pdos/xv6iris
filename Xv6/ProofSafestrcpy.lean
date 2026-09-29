@@ -24,6 +24,7 @@ copies, so the destination comes back `pnameWf` (16 bytes, NUL within).
 import Xv6.SpecSafestrcpy
 import Xv6.CodeTactics
 import Xv6.StepLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -50,16 +51,6 @@ theorem ss_succ' (b : BitVec 64) (k : Nat) :
 theorem ss_pred (b : BitVec 64) (k : Nat) :
     b + (BitVec.ofNat 64 (k + 1) + 18446744073709551615#64) = b + BitVec.ofNat 64 k := by bv_omega
 
-/-- Adding small counts to a base is injective. -/
-theorem ss_add_inj (s : BitVec 64) (a b : Nat) (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    (s + BitVec.ofNat 64 a = s + BitVec.ofNat 64 b) ↔ a = b := by
-  constructor
-  · intro h
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow] at this
-    omega
-  · intro h; rw [h]
-
 /-- The loop test `beq a1,a3`: the cursor `src + k` meets the end `src + 15`
 exactly at `k = 15`. -/
 theorem ss_beq_ite {α : Type} (src : BitVec 64) (k : Nat) (hk : k ≤ 15) (p q : α) :
@@ -67,7 +58,7 @@ theorem ss_beq_ite {α : Type} (src : BitVec 64) (k : Nat) (hk : k ≤ 15) (p q 
       if k = 15 then p else q := by
   have he : (src + BitVec.ofNat 64 k = src + 15#64) ↔ k = 15 := by
     rw [show (15#64 : BitVec 64) = BitVec.ofNat 64 15 from rfl]
-    exact ss_add_inj src k 15 (by omega) (by omega)
+    exact MachCSL.add_inj src k 15 (by omega) (by omega)
   by_cases h : k = 15
   · rw [if_pos h]
     simp only [bcond, beq_iff_eq, he.mpr h, if_true]
@@ -79,14 +70,6 @@ theorem ss_beq_ite {α : Type} (src : BitVec 64) (k : Nat) (hk : k ≤ 15) (p q 
 theorem ss_extract (b : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 b) = b := by
   bv_decide
 
-/-- The store `sb zero` writes the byte `0`. -/
-theorem ss_extract_zero : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
-
-/-- `blez a2,dfc` with `a2 = 16` is not taken. -/
-theorem ss_blez_ite {α : Type} (p q : α) :
-    (if bcond bop.BGE 0#64 16#64 then p else q) = q := by
-  rw [show bcond bop.BGE 0#64 16#64 = false from by decide]; rfl
-
 /-- `addiw a3,a2,-1` with `a2 = 16` yields `15`. -/
 theorem ss_addiw :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (16#64 + BitVec.signExtend 64 (4095#12))) = 15#64 := by
@@ -94,10 +77,6 @@ theorem ss_addiw :
 
 /-- `slli a3,a3,32 ; srli a3,a3,32` zero-extends `15`. -/
 theorem ss_a3 : (15#64 <<< (32#6).toNat) >>> (32#6).toNat = 15#64 := by decide
-
-/-- The end cursor `a3 = 15 + src`, as `add a3,a3,a1` leaves it, is `src + 15`. -/
-theorem ss_a3_comm (src : BitVec 64) : 15#64 + src = src + 15#64 := by
-  rw [BitVec.add_comm]
 
 /-- The initial cursor `src + ofNat 0 = src`. -/
 theorem ss_base0 (b : BitVec 64) : b = b + BitVec.ofNat 64 0 := by simp
@@ -123,13 +102,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-! ## The pnameWf of the result -/
-
-/-- Setting one byte of a 16-byte buffer to `0` makes it a well-formed name. -/
-theorem ss_pnameWf_set (cur : List (BitVec 8)) (p : Nat) (hlen : cur.length = 16) (hp : p ≤ 15) :
-    pnameWf (cur.set p 0#8) := by
-  refine ⟨?_, p, by unfold PNAMELEN; omega, ?_⟩
-  · rw [List.length_set]; rw [hlen]; rfl
-  · rw [List.getElem?_set_self (by rw [hlen]; omega)]
 
 /-! ## The copy loop -/
 
@@ -264,7 +236,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
   iintro %c1 %hp1 Hk Hpc Hframe
   -- blez a2,dfc : not taken
   k_step_gen (wp_s_branch0 c1 _ (KA.«safestrcpy» + 0x8#64) false 38#13 12#5 (by decide) bop.BGE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn, ss_blez_ite] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn, MachCSL.blez_ite] next c2 hp2
   iintro Hk Hpc
   -- addiw a3,a2,-1 : a3 = 15
   k_step_gen (wp_s_addiw c2 _ (KA.«safestrcpy» + 0xc#64) false 4095#12 13#5 12#5 (by decide))
@@ -311,7 +283,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
   icases byteBuf_upd (k.regs 10#5) cur' p op hcp $$ Hdst with ⟨Ho, Hclosed⟩
   k_step_gen (wp_s_sb c8 _ (KA.«safestrcpy» + 0x2a#64) false 0#12 15#5 0#5 (by decide) op)
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
-    with [h15', BitVec.add_zero, ss_extract_zero] next c9 hp9
+    with [h15', BitVec.add_zero, MachCSL.extract_zero] next c9 hp9
   iintro Hk Hpc Ho
   ihave Hdst := Hclosed $$ %_ Ho
   -- the result is a well-formed name
@@ -319,7 +291,7 @@ theorem safestrcpy_proof : SAFESTRCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss dq hK
       byteBuf (k.regs 10#5) (DFrac.own 1) bs') $$ [Hdst]
   · iexists (cur'.set p 0#8)
     isplitl []
-    · ipureintro; exact ss_pnameWf_set cur' p hlen' hpp
+    · ipureintro; exact Xv6.pnameWf_set cur' p hlen' hpp
     · iexact Hdst
   have hpinF : k.sie = false ∨ k.proc = 0#64 → c9 = cpu :=
     fun h => (hp9 h).trans ((hp8 h).trans (hpinD h))

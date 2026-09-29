@@ -84,8 +84,6 @@ theorem il_log_addr : KA.«initlog» + 0x1e90a#64 = logAddr := by
 theorem il_lhn_reloc : KA.«initlog» + 0x1e936#64 = lhNAddr := by
   unfold lhNAddr logAddr; decide
 
-theorem il_lhN : logAddr + 44#64 = lhNAddr := rfl
-
 theorem il_br_initlock : KA.«initlog» + 0xffffffffffffceb2#64 = KA.«initlock» := by decide
 theorem il_br_bread : KA.«initlog» + 0xFFFFFFFFFFFFEF80#64 = KA.«bread» := by decide
 theorem il_br_brelse : KA.«initlog» + 0xFFFFFFFFFFFFF088#64 = KA.«brelse» := by decide

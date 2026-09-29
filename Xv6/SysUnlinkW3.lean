@@ -462,7 +462,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   have hnm : (dirEntries (eraNode dnd bmd datd))[bname 14 nf]? =
       some (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
     rw [dirEntries_eraNode dnd bmd datd hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz]
-    exact (dirView_lookup_Some _ _ _ _).2 ⟨kk, hfn, (sys_unlink_zext32 _).symm⟩
+    exact (dirView_lookup_Some _ _ _ _).2 ⟨kk, hfn, (MachCSL.zext32_toNat _).symm⟩
   have hne := ufNot_dots_only _ dni bmi dati jj hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hnli hddixi
     (hduqi htyi) h2 hjj hlive
   unfold sysfileEnv
@@ -503,7 +503,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   ihave Hbufs : sysUnlinkBufs (k.regs 2#5) $$ [Hjunk Hde Hnm Hpath Hoff Hdel]
   · unfold sysUnlinkBufs; iframe
   have hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib := by
-    rw [sys_unlink_zext32]
+    rw [MachCSL.zext32_toNat]
     exact dirOk_dir icfgNib dnd datd hty hdok kk (dirFirst_lt _ _ _ _ hfn) (dirFirst_live _ _ _ _ hfn)
   iapply (sys_unlink_tail_e IUP EO Γ cpu k A ok P2 spie spp R _ kd q g lo tl dinum dnd bmd γil γisl
       ks qi gi loi tli _ dni bmi γili γisli t n Sb hpins hkd hnib hle hks hnibi hlei
@@ -762,7 +762,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
       unfold sysUnlinkOpen; iintro ⟨%h, H⟩; isplitr; · ipureintro; exact h.2.2.1
       iframe H; ipureintro; exact h) $$ Hopd with ⟨%hdokd, Hopd⟩
   have hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib := by
-    rw [sys_unlink_zext32]
+    rw [MachCSL.zext32_toNat]
     exact dirOk_dir icfgNib dnd datd hty hdokd kk (dirFirst_lt _ _ _ _ hfn) (dirFirst_live _ _ _ _ hfn)
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (sys_unlink_ilock_dep IL Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid ks qq

@@ -17,6 +17,7 @@ import Xv6.SpecInitlock
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 import Xv6.ByteCursor
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -36,7 +37,6 @@ set_option maxRecDepth 8000
 theorem pi_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by bv_decide
 theorem pi_u11 : BitVec.signExtend 64 (0x11#20 ++ 0#12) = 0x11000#64 := by bv_decide
 theorem pi_u17 : BitVec.signExtend 64 (0x17#20 ++ 0#12) = 0x17000#64 := by bv_decide
-theorem pi_lui_ff4df : BitVec.signExtend 64 (0xff4df#20 ++ 0#12) = 0xffffffffff4df000#64 := by bv_decide
 theorem pi_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
@@ -694,7 +694,7 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
   k_step_gen (wp_s_lui c16 _ (KA.«procinit» + 0x4e#64) false 0xff4df#20 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_ff4df] next c17 hp17
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_ff4df] next c17 hp17
   iintro Hk Hpc
   k_step_gen (wp_s_addi c17 _ (KA.«procinit» + 0x52#64) false 2493#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18

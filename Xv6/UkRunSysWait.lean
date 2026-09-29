@@ -84,7 +84,7 @@ theorem wp_uk_ecall_wait_null_gen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
     hal4).2
   rw [← ukWr_ne0 m 10#5 r (by decide)]
   iapply ukcq_ukc N.pay
-  iapply urun_close_wr N M pm m 10#5 r sz fdv cw gn cs' pidv (pc + 4#64) avail ukSys_a0_ns hx0
+  iapply urun_close_wr N M pm m 10#5 r sz fdv cw gn cs' pidv (pc + 4#64) avail Xv6.a0_ns hx0
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
   have hA : ((fun r cs' => uwaitAnsPid (GF := GF) r (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).ch cs'

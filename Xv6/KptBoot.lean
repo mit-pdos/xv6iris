@@ -37,8 +37,6 @@ and the trampoline. -/
 def kvmMapT (pas : Nat → BitVec 44) : RegMapF (BitVec 64) :=
   Iris.Std.PartialMap.insert (kvmMap pas) trampVpn.toNat kptTrampLeaf
 
-theorem kptBoot_trampVpn_toNat : trampVpn.toNat = 0x3FFFFFF := by decide
-
 /-- The trampoline's page is not in the static map (it is not an identity
 page) nor a stack's. -/
 theorem kvmMap_tramp_none (pas : Nat → BitVec 44) :
@@ -49,14 +47,14 @@ theorem kvmMap_tramp_none (pas : Nat → BitVec 44) :
     exfalso
     rcases get?_kvmMapN pas 64 _ v hget with h | ⟨i, hi, hk, -⟩
     · obtain ⟨perm, hc, -⟩ := kmapStaticMap_get_inv _ v h
-      rw [kptBoot_trampVpn_toNat] at hc
+      rw [Xv6.trampVpn_toNat] at hc
       unfold kmapClass at hc
       split at hc
       · omega
       · split at hc
         · omega
         · cases hc
-    · rw [kptBoot_trampVpn_toNat, kstackVpn_toNat' i hi] at hk
+    · rw [Xv6.trampVpn_toNat, Xv6.kstackVpn_toNat i hi] at hk
       omega
 
 /-- `kvmmake`'s table maps the trampoline (its seventh region). -/

@@ -14,31 +14,10 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-/-- The hart id, sign-extended from its low 32 bits and scaled by the size
-of a `struct cpu`: `128 * hartid`. -/
-theorem hart_shift (cpu : CPU) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = BitVec.ofNat 64 (128 * cpu.val) := by
-  have hv : cpu.val < 8 := cpu.isLt
-  have h32 : BitVec.extractLsb' 0 32 (hartId cpu) = BitVec.ofNat 32 cpu.val := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [hartId, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  rw [h32]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, BitVec.toNat_signExtend]
-  have hmsb : (BitVec.ofNat 32 cpu.val).msb = false := by
-    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega)]; simp; omega
-  rw [hmsb]
-  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.add_zero,
-    Nat.shiftLeft_eq]
-  rw [Nat.mod_eq_of_lt (by omega : cpu.val < 4294967296), Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  omega
-
 /-- `&cpus[hartid]` as the code computes it. -/
 theorem mycpu_addr (cpu : CPU) :
     KA.«cpus» + BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = cpuAddr cpu := by
-  rw [hart_shift]
+  rw [MachCSL.hart_shift]
   rfl
 
 theorem mycpu_br_10b28 : KA.«mycpu» + 0x10b28#64 = KA.«cpus» := by decide

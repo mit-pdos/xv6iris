@@ -71,7 +71,7 @@ theorem shMalloc_find (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   ihave Hi := ushm_uis N.t 0x11c0 false (.BTYPE (140#13, .Regidx 19#5, .Regidx 14#5, .BGEU)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc
   iapply ushm_br UL N h2 m2 (BitVec.ofNat 64 0x11c0) false 140#13 19#5 14#5 .BGEU n true
-    (by rw [f14, f19, ushm_bgeu _ _ (by omega) (by omega)]; simp only [decide_eq_true_eq]; omega)
+    (by rw [f14, f19, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp only [decide_eq_true_eq]; omega)
     (BitVec.ofNat 64 0x124c) (by decide) (fun _ => by decide) $$ Hi Hrun
   inext
   iintro %h3 Hrun

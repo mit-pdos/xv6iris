@@ -228,10 +228,6 @@ theorem missingOn_of_complete (lvl : Nat) (t : PTree) (vpn : BitVec 27) (h : t.c
     simp only [PTree.missingOn, hk]
     exact ih c hc
 
-theorem missingRun_one (t : PTree) (vpn : BitVec 27) :
-    t.missingRun vpn 1 = t.missingOn 2 vpn := by
-  simp only [PTree.missingRun, Nat.add_zero]
-
 theorem mapRun_one_of_complete (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
     (fr : List (BitVec 44)) (h : t.complete 2 vpn) :
     t.mapRun vpn ppn (permBits perm) 1 fr = (t.setLeaf 2 vpn (kLeaf ppn perm 0#1 0#1), fr, 1) := by
@@ -411,24 +407,6 @@ theorem mapsTo_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) 
 
 /-! ## The kernel stacks -/
 
-theorem kstackVpn_toNat (i : Nat) (h : i < 64) : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := by
-  simp only [kstackVpn, BitVec.toNat_ofNat]
-  omega
-
-theorem kstackVpn_ne (i j : Nat) (hi : i < 64) (hj : j < 64) (h : i ≠ j) :
-    kstackVpn i ≠ kstackVpn j := by
-  intro he
-  have := congrArg BitVec.toNat he
-  rw [kstackVpn_toNat i hi, kstackVpn_toNat j hj] at this
-  omega
-
-theorem mapStacks_succ (t : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44)) :
-    t.mapStacks pas (i+1) fr =
-      (((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits KPerm.rw) 1
-          (t.mapStacks pas i fr).2).1,
-       ((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits KPerm.rw) 1
-          (t.mapStacks pas i fr).2).2.1) := rfl
-
 /-- `proc_mapstacks` on a tree whose stack paths are already complete: the
 supply is untouched, every stack is mapped, and nothing else moves. -/
 theorem mapStacks_ok (i : Nat) (t : PTree) (pas : Nat → BitVec 44) (fr : List (BitVec 44))
@@ -448,7 +426,7 @@ theorem mapStacks_ok (i : Nat) (t : PTree) (pas : Nat → BitVec 44) (fr : List 
     obtain ⟨hs, hp, hw, hb, hpg, hm, hwk⟩ := ih (by omega) (fun j hj => hc j (by omega))
     have hci : (t.mapStacks pas i fr).1.complete 2 (kstackVpn i) :=
       complete_of_path_eq 2 t _ _ (hp _) (hc i (by omega))
-    rw [mapStacks_succ]
+    rw [Xv6.mapStacks_succ]
     rw [mapRun_one_of_complete _ _ _ _ _ hci]
     simp only
     refine ⟨hs, ?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -462,7 +440,7 @@ theorem mapStacks_ok (i : Nat) (t : PTree) (pas : Nat → BitVec 44) (fr : List 
       · obtain ⟨addr, a, d, hmm⟩ := hm j (by omega) hj64
         refine ⟨addr, a, d, ?_⟩
         rw [walk_setLeaf_ne _ (kstackVpn i) (kstackVpn j) _ hci
-          (kstackVpn_ne i j (by omega) hj64 (fun h => he h.symm))]
+          (Xv6.kstackVpn_ne i j (by omega) hj64 (fun h => he h.symm))]
         exact hmm
     · intro w hw'
       rw [walk_setLeaf_ne _ (kstackVpn i) w _ hci (fun he => (hw' i (by omega)) he.symm)]
@@ -480,7 +458,7 @@ theorem missingStacks_zero (t : PTree) (n : Nat) (hwf : t.wf 2) (hn64 : n ≤ 64
       (fun j hj => hc j (by omega))
     have hcn : (t.mapStacks (fun _ => 0#44) n []).1.complete 2 (kstackVpn n) :=
       complete_of_path_eq 2 t _ _ (hp _) (hc n (by omega))
-    rw [missingRun_one, missingOn_of_complete 2 _ _ hcn]
+    rw [Xv6.missingRun_one, missingOn_of_complete 2 _ _ hcn]
 
 /-! ## The page of a valid address -/
 
@@ -504,14 +482,14 @@ open Xv6.PtRun
 
 theorem kstackVpn_idx2 (i : Nat) (h : i < 64) : vpnIdx (kstackVpn i) 2 = vpnIdx 0x3FFFFFF#27 2 := by
   apply BitVec.eq_of_toNat_eq
-  have h1 : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := kstackVpn_toNat i h
+  have h1 : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := Xv6.kstackVpn_toNat i h
   have h2 : (0x3FFFFFF#27 : BitVec 27).toNat = 0x3FFFFFF := by decide
   simp only [vpnIdx, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, h1, h2]
   omega
 
 theorem kstackVpn_idx1 (i : Nat) (h : i < 64) : vpnIdx (kstackVpn i) 1 = vpnIdx 0x3FFFFFF#27 1 := by
   apply BitVec.eq_of_toNat_eq
-  have h1 : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := kstackVpn_toNat i h
+  have h1 : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := Xv6.kstackVpn_toNat i h
   have h2 : (0x3FFFFFF#27 : BitVec 27).toNat = 0x3FFFFFF := by decide
   simp only [vpnIdx, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, h1, h2]
   omega

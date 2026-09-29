@@ -20,42 +20,29 @@ set_option linter.unusedSectionVars false
 
 /-! ## The two fixed virtual page numbers -/
 
-theorem tfVpn_toNat : tfVpn.toNat = 67108862 := by decide
-theorem trampVpn_toNat : trampVpn.toNat = 67108863 := by decide
-
-/-- The page number of an address below `MAXVA`. -/
-theorem vpnOf_toNat_lt (va : BitVec 64) (h : va.toNat < 2 ^ 38) : (vpnOf va).toNat < 67108864 := by
-  simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
-  omega
-
 /-! ## `UPtd.leaves` against `UPtd.um` -/
 
 theorem leaves_get_of_lt (P : UPtd) (k : Nat) (h : k < tfVpn.toNat) :
     Iris.Std.PartialMap.get? P.leaves k = Iris.Std.PartialMap.get? P.um k := by
   unfold UPtd.leaves
-  rw [Iris.Std.get?_insert_ne (by rw [trampVpn_toNat]; rw [tfVpn_toNat] at h; omega),
+  rw [Iris.Std.get?_insert_ne (by rw [Xv6.trampVpn_toNat]; rw [Xv6.tfVpn_toNat] at h; omega),
     Iris.Std.get?_insert_ne (by omega)]
 
 theorem leaves_get_tf (P : UPtd) :
     Iris.Std.PartialMap.get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
   unfold UPtd.leaves
-  rw [Iris.Std.get?_insert_ne (by rw [trampVpn_toNat, tfVpn_toNat]; omega),
+  rw [Iris.Std.get?_insert_ne (by rw [Xv6.trampVpn_toNat, Xv6.tfVpn_toNat]; omega),
     Iris.Std.get?_insert_eq rfl]
-
-theorem leaves_get_tramp (P : UPtd) :
-    Iris.Std.PartialMap.get? P.leaves trampVpn.toNat = some trampLeaf := by
-  unfold UPtd.leaves
-  rw [Iris.Std.get?_insert_eq rfl]
 
 /-- A page number the whole table does not map is a user page number
 (below the trapframe): the two fixed mappings are always there. -/
 theorem lt_tfVpn_of_leaves_none (P : UPtd) (vpn : BitVec 27) (hlt : vpn.toNat < 67108864)
     (h : Iris.Std.PartialMap.get? P.leaves vpn.toNat = none) : vpn.toNat < tfVpn.toNat := by
-  rw [tfVpn_toNat]
+  rw [Xv6.tfVpn_toNat]
   by_cases h1 : vpn.toNat = 67108863
-  · rw [← trampVpn_toNat] at h1; rw [h1, leaves_get_tramp] at h; exact absurd h (by simp)
+  · rw [← Xv6.trampVpn_toNat] at h1; rw [h1, Xv6.leaves_get_tramp] at h; exact absurd h (by simp)
   · by_cases h2 : vpn.toNat = 67108862
-    · rw [← tfVpn_toNat] at h2; rw [h2, leaves_get_tf] at h; exact absurd h (by simp)
+    · rw [← Xv6.tfVpn_toNat] at h2; rw [h2, leaves_get_tf] at h; exact absurd h (by simp)
     · omega
 
 theorem um_none_of_leaves_none (P : UPtd) (vpn : BitVec 27) (hlt : vpn.toNat < 67108864)
@@ -214,14 +201,6 @@ theorem pteAD_refl_of_ad (c : BitVec 64) (h : c &&& 0xC0#64 = 0#64) : pteAD c c 
 
 end
 
-/-- `isLeafPte` in the spelling `PTree.wfU` uses. -/
-theorem isLeafPte_iff (w : BitVec 64) :
-    isLeafPte w ↔ (w.getLsbD 0 = true ∧ w &&& 0xE#64 ≠ 0#64) := by
-  unfold isLeafPte PTE_V
-  constructor
-  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
-  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
-
 theorem isLeafPte_andNotU (w : BitVec 64) (h : isLeafPte w) : isLeafPte (w &&& ~~~PTE_U) := by
   simp only [isLeafPte, PTE_V, PTE_U] at h ⊢
   obtain ⟨h1, h2⟩ := h
@@ -244,7 +223,7 @@ theorem uLeaf_isLeafPte (ppn : BitVec 44) : isLeafPte (uLeaf ppn 0x16#64) := by
 
 theorem uLeaf_valid (ppn : BitVec 44) :
     (uLeaf ppn 0x16#64).getLsbD 0 = true ∧ (uLeaf ppn 0x16#64) &&& 0xE#64 ≠ 0#64 :=
-  (isLeafPte_iff _).mp (uLeaf_isLeafPte ppn)
+  (Xv6.isLeafPte_iff _).mp (uLeaf_isLeafPte ppn)
 
 theorem uLeaf_ad (ppn : BitVec 44) : (uLeaf ppn 0x16#64) &&& 0xC0#64 = 0#64 := by
   unfold uLeaf; bv_decide
@@ -309,8 +288,8 @@ theorem leaves_insert_comm (P Q : UPtd) (vpn : Nat) (u : BitVec 64)
     rw [hum, htf]
   rw [hQ]
   unfold UPtd.leaves
-  rw [tfVpn_toNat] at h
-  simp only [tfVpn_toNat, trampVpn_toNat]
+  rw [Xv6.tfVpn_toNat] at h
+  simp only [Xv6.tfVpn_toNat, Xv6.trampVpn_toNat]
   by_cases h3 : k = 67108863
   · subst h3
     rw [Iris.Std.get?_insert_eq rfl, Iris.Std.get?_insert_ne (by omega : vpn ≠ 67108863),

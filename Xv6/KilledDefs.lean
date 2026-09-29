@@ -36,9 +36,6 @@ theorem kl_filter_proc (l : List String) (h : "proc" ∉ l) :
 theorem kl_withLocks_self (k : KCtx) (m : Nat) (a b : Bool) :
     ((k.pushed m).withSpie a b).withLocks k.locks = (k.pushed m).withSpie a b := rfl
 
-theorem kl_withLocks_self' (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-
 /-- The link registers of the calls. -/
 theorem kl_ret_216c : jumpPc (KA.«setkilled» + 0x10#64) = (KA.«setkilled» + 0x10#64) := by
   decide

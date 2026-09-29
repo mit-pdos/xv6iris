@@ -211,7 +211,7 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   · -- **THE FILL ARM**: `virtio_disk_rw(b, 0)` then `b->valid = 1`
     subst hv
     k_step_e (wp_s_branch cpu _ (KA.«bread» + 0xb6#64) true 18#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_beqz_zero, bd_t_fill]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero, bd_t_fill]
     iintro Hk Hpc
     icases bufPay_invalid γ V kk dev bno 0#32 bs hcov rfl $$ Hpay with ⟨-, Hpool⟩
     icases (show poolBlk (GF := GF) V bno.toNat ⊢

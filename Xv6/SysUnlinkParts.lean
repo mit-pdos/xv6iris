@@ -276,7 +276,4 @@ theorem sys_unlink_nlink_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :
 
 /-! ## The record either flush writes (Rocq's `su_setnl` family) -/
 
-theorem sys_unlink_setnl_nlink (dn : Dinode) (nl : BitVec 16) :
-    (sysfileSetnl dn nl).diNlink = nl := rfl
-
 end Xv6

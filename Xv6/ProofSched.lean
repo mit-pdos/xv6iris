@@ -79,27 +79,6 @@ theorem sched_prologue [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (h
 
 /-! ## The `tp` arithmetic -/
 
-/-- The hart id, sign-extended from its low 32 bits and scaled by the size
-of a `struct cpu` (a copy of `ProofMycpu.hart_shift`: a `Proof` file may not
-import another). -/
-theorem sched_hart_shift (cpu : CPU) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = BitVec.ofNat 64 (128 * cpu.val) := by
-  have hv : cpu.val < 8 := cpu.isLt
-  have h32 : BitVec.extractLsb' 0 32 (hartId cpu) = BitVec.ofNat 32 cpu.val := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [hartId, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  rw [h32]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, BitVec.toNat_signExtend]
-  have hmsb : (BitVec.ofNat 32 cpu.val).msb = false := by
-    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega)]; simp; omega
-  rw [hmsb]
-  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow,
-    Nat.add_zero, Nat.shiftLeft_eq]
-  rw [Nat.mod_eq_of_lt (by omega : cpu.val < 4294967296), Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  omega
 
 theorem sched_br_10574 : KA.«sched» + 0x10574#64 = KA.«pid_lock» := by decide
 
@@ -130,7 +109,7 @@ theorem sched_tp_noff [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_10574]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«sched» + 0x28#64) true 15#5 15#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ %_ [] Hk Hpc
@@ -169,7 +148,7 @@ theorem sched_tp_intena [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«sched» + 0x52#64) true 15#5 15#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   k_norm
   iapply HΦ $$ %_ [] Hk Hpc
@@ -202,7 +181,7 @@ theorem sched_tp_ctx [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_slli cpu _ (KA.«sched» + 0x5c#64) true 7#6 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   k_step (wp_s_addi cpu _ (KA.«sched» + 0x5e#64) true 8#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -250,7 +229,7 @@ theorem sched_tp_back [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_slli cpu _ (KA.«sched» + 0x76#64) true 7#6 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«sched» + 0x78#64) true 18#5 18#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -366,26 +345,6 @@ theorem sched_aCpuIntena' (h : CPU) :
 
 theorem sched_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
 
-/-- The callee-saved image, componentwise. -/
-theorem calleeImg_eq {R R' : RegMap} (h : calleeImg R = calleeImg R') :
-    R 1#5 = R' 1#5 ∧ R 2#5 = R' 2#5 ∧ R 8#5 = R' 8#5 ∧ R 9#5 = R' 9#5 ∧ R 18#5 = R' 18#5 ∧
-      R 19#5 = R' 19#5 ∧ R 20#5 = R' 20#5 ∧ R 21#5 = R' 21#5 ∧ R 22#5 = R' 22#5 ∧
-      R 23#5 = R' 23#5 ∧ R 24#5 = R' 24#5 ∧ R 25#5 = R' 25#5 ∧ R 26#5 = R' 26#5 ∧
-      R 27#5 = R' 27#5 := by
-  unfold calleeImg at h
-  simp only [List.cons.injEq, and_true] at h
-  exact h
-
-/-- The length clause of a save area, kept. -/
-theorem ctxCells_dup [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) :
-    ctxCells (GF := GF) c vs ⊢ ⌜vs.length = 14⌝ ∗ ctxCells c vs := by
-  unfold ctxCells
-  iintro ⟨%h, H⟩
-  isplitl []
-  · ipureintro; exact h
-  isplitl []
-  · ipureintro; exact h
-  · iexact H
 
 /-- `sched`'s frame, as a stack region. -/
 theorem schedFrame_stack [CurCtx] (sp ra s0 s1 s2 s3 : BitVec 64) :
@@ -652,7 +611,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
     exact h
   -- the proc's save area and this hart's parked scheduler record
   icases ownCtxCells_cases (pContext (procAddr j) 0) $$ Hcells with ⟨%vs, Hcells⟩
-  icases ctxCells_dup (pContext (procAddr j) 0) vs $$ Hcells with ⟨%hvlen, Hcells⟩
+  icases MachCSL.ctxCells_dup (pContext (procAddr j) 0) vs $$ Hcells with ⟨%hvlen, Hcells⟩
   icases schedVcAt_cases Γ cpu (cpuCtxAddr cpu) (procAddr j) $$ Hvc with ⟨%ξs, Hown, Hrec⟩
   ihave Hheld := procHeldAt_intro Γ ξ0 cpu j st ch kl xs pid
     $$ [$Hlocked $Hpst $Hstate $Hchan $Hrest]
@@ -712,7 +671,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
     -- the resume wand: this is the caller's own record
     simp only [reduceIte]
     iintro %h %R %spie %spp %eb' %root %_ %hcimg Hk Hpc Hcells Hres
-    obtain ⟨g1, g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := calleeImg_eq hcimg
+    obtain ⟨g1, g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := MachCSL.calleeImg_eq hcimg
     k_norm at g1
     k_norm at g2
     k_norm at g8

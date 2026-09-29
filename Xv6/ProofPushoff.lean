@@ -23,8 +23,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Facts (also in ProofPopoff; kept local so the two proofs build independently) -/
 
 
-theorem bcond_beq_00' : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 theorem ofNat64_eq_zero_iff' (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#64 ↔ n = 0 := by
   constructor
   · intro h
@@ -216,7 +214,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
   by_cases hn0 : k.noff = 0
   · -- depth 0: `c->intena := old` (= 0, as the context already has it)
     k_step (wp_s_branch cpu _ (KA.«push_off» + 0x16#64) true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [hn0, bcond_beq_00']
+      $$ [- $Hk $Hpc] with [hn0, MachCSL.beqz_zero]
     iintro Hk Hpc
     -- jal mycpu
     k_step (wp_s_jal cpu _ (KA.«push_off» + 0x2c#64) false 3358#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [push_off_br_d4a]

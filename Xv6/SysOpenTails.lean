@@ -305,7 +305,7 @@ theorem sys_open_tail_a (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xd6  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0xd6#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0xd8  ld s1,168(sp)
   unfold sysOpenCells
@@ -362,7 +362,7 @@ theorem sys_open_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x110  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x110#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x112  ld s1,168(sp)
   unfold sysOpenCells
@@ -443,7 +443,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x106  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x106#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- 0x108  ld s1,168(sp)
   unfold sysOpenCells
@@ -521,7 +521,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x120  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x120#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- 0x122  ld s1,168(sp)
   unfold sysOpenCells
@@ -603,7 +603,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x138  li a0,-1
   k_step_e (wp_s_addi cpu _ (sysOpenAddr + 0x138#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   have hp3 := sysOpenPins_set k R2 _ _ _ 10#5 0xFFFFFFFFFFFFFFFF#64 hp2 (by decide)
   -- +0x13a  ld s1,168(sp)

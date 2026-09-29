@@ -131,8 +131,6 @@ theorem ba_mask_ne (bi : Nat) : bcond bop.BEQ (1#64 <<< (bi % 8)) 0#64 = false :
     r = 6 ∨ r = 7 := by omega
   all_goals (subst h; decide)
 
-theorem ba_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 /-- `addiw a4,a4,1` / `addiw s1,s1,1`. -/
 theorem ba_addiw1 (t : Nat) (h : t + 1 < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 t + BitVec.signExtend 64 1#12)) =

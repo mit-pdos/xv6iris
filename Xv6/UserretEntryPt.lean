@@ -103,7 +103,7 @@ theorem userret_wstep [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44) (P : 
   have hl : ∀ va : BitVec 64, vpnOf va = trampVpn →
       Iris.Std.PartialMap.get? P.leaves (vpnOf va).toNat = some (kLeaf trampPpn .rx 0#1 0#1) := by
     intro va h
-    rw [h, uptLeaves_tramp, uptTrampLeaf_kLeaf]
+    rw [h, Xv6.leaves_get_tramp, uptTrampLeaf_kLeaf]
   have htr := pt2Trans (GF := GF) cpu c false kroot P.root P (Or.inr rfl) hok pc hlt
     (MemoryAccessType.InstructionFetch ()) (Or.inl rfl) trampPpn .rx rfl (hl pc hv)
   rw [hv] at htr

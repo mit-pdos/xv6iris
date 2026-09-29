@@ -70,7 +70,7 @@ theorem shMalloc_cut (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (c
   ihave Hi := ushm_uis N.t 0x124c false (.BTYPE (8126#13, .Regidx 14#5, .Regidx 18#5, .BEQ)) ⟨_, _, _, rfl⟩
     (by decide) (by decide) $$ Hc
   iapply ushm_br UL N h m (BitVec.ofNat 64 0x124c) false 8126#13 14#5 18#5 .BEQ n false
-    (by rw [hs2, ha4, ushm_beq _ _ (by omega) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
+    (by rw [hs2, ha4, Xv6.beq_nat _ _ (by omega) (by omega)]; simp only [decide_eq_false_iff_not]; omega)
     (BitVec.ofNat 64 0x1250) (by decide) (by simp) $$ Hi Hrun
   inext
   iintro %h1 Hrun

@@ -14,6 +14,7 @@ import Xv6.PtRunLemmas
 import Xv6.CodeTactics
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -26,12 +27,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the ten-slot frame. -/
-theorem mp_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem mp_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `ret` out of `walk` lands on the instruction after the `jal`. -/
 theorem mp_ret_102c : jumpPc (KA.«mappages» + 0x48#64) = (KA.«mappages» + 0x48#64) := by
@@ -89,22 +84,6 @@ theorem mp_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
-theorem mp_bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
-
-/-- A branch on a value known to be zero: taken. -/
-theorem mp_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
-
-/-- The supply after two runs. -/
-theorem mp_availSub_add (on : Option Nat) (a b : Nat) :
-    availSub (availSub on a) b = availSub on (a + b) := by
-  cases on with
-  | none => rfl
-  | some m => simp only [availSub, Option.map_some]; rw [Nat.sub_sub]
-
 /-- The loop test `beq s1,s2`: taken exactly on the last page. -/
 theorem mp_beq_last {α : Type} (va : BitVec 64) (n i : Nat) (hi : i < n)
     (hr : va.toNat + 4096 * n ≤ 2 ^ 38) (p q : α) :
@@ -143,9 +122,6 @@ theorem mp_size_aligned (n : Nat) : (BitVec.ofNat 64 (4096 * n)) <<< 52 = 0#64 :
   rw [mp_ofNat_mul4096]
   generalize BitVec.ofNat 64 n = q
   bv_decide
-
-theorem mp_va_aligned (va : BitVec 64) (h : va &&& 0xfff#64 = 0#64) : va <<< 52 = 0#64 := by
-  revert h; bv_decide
 
 /-- The cursor one page on. -/
 theorem mp_page_add (va : BitVec 64) (i : Nat) :
@@ -335,7 +311,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
     -- c.beqz a0 : taken, to the `li a0,-1`
     k_step_gen (wp_s_branch c5 _ (KA.«mappages» + 0x48#64) true 82#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [mp_beq_zero _ hz] next c6 hp6
+      with [MachCSL.beq_zero _ hz] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_addi c6 _ (KA.«mappages» + 0x9a#64) true 4095#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
@@ -406,7 +382,7 @@ theorem mappages_iter (W : WALK) [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c8 _ (KA.«mappages» + 0x4e#64) true 64#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [mp_bne_zero (0#64) rfl] next c9 hp9
+      with [MachCSL.bne_zero (0#64) rfl] next c9 hp9
     iintro Hk Hpc
     -- *pte = PA2PTE(a + (pa - va)) | perm | PTE_V
     k_step_gen (wp_s_add c9 _ (KA.«mappages» + 0x50#64) false 15#5 9#5 19#5 (by decide))
@@ -693,7 +669,7 @@ theorem mappages_loop (W : WALK) [CurCtx]
           exact h
         have hsupeq : availSub on (fresh ++ fresh2).length
             = availSub (availSub on fresh.length) fresh2.length := by
-          rw [List.length_append, mp_availSub_add]
+          rw [List.length_append, Xv6.availSub_availSub]
         have hmp1 : (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
               (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm (n - i) (fresh ++ fresh2)).1
             = (((t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2
@@ -796,9 +772,6 @@ theorem mpFrame_join [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 : BitVec 64) :
     mpFrame (GF := GF) sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 := by
   unfold mpFrame; iintro H; iexact H
 
-theorem mp_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
-  BitVec.add_zero x
-
 set_option maxHeartbeats 4000000 in
 /-- The epilogue at `0x8000111e`: restore `ra`, `s0`..`s7`, pop the frame,
 return to the caller. -/
@@ -861,7 +834,7 @@ theorem mappages_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (γk : KmemNames)
   iintro Hk Hpc F8
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ (KA.«mappages» + 0xae#64) true 80#12 10 mp_imm_p80)
+  k_step_gen (wp_s_pop c9 _ (KA.«mappages» + 0xae#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hp10
   iintro Hk Hpc
@@ -893,12 +866,12 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by omega
-  have hvash : k.regs 11#5 <<< 52 = 0#64 := mp_va_aligned _ hvaal
+  have hvash : k.regs 11#5 <<< 52 = 0#64 := MachCSL.va_aligned _ hvaal
   have hszsh : k.regs 12#5 <<< 52 = 0#64 := by rw [hsize]; exact mp_size_aligned n
   have hszne : k.regs 12#5 ≠ 0#64 := by rw [hsize]; exact mp_size_ne_zero n hn1 (by omega)
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«mappages» true 4016#12 10 hK10 mp_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«mappages» true 4016#12 10 hK10 MachCSL.imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -941,7 +914,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
   iintro Hk Hpc
   k_step_gen (wp_s_branch c12 _ (KA.«mappages» + 0x1a#64) true 80#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [mp_bne_zero _ hvash] next c13 hp13
+    with [MachCSL.bne_zero _ hvash] next c13 hp13
   iintro Hk Hpc
   k_step_gen (wp_s_add c13 _ (KA.«mappages» + 0x1c#64) true 20#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hroot] next c14 hp14
@@ -954,7 +927,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
   iintro Hk Hpc
   k_step_gen (wp_s_branch c16 _ (KA.«mappages» + 0x24#64) true 82#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [mp_bne_zero _ hszsh] next c17 hp17
+    with [MachCSL.bne_zero _ hszsh] next c17 hp17
   iintro Hk Hpc
   k_step_gen (wp_s_branch c17 _ (KA.«mappages» + 0x26#64) true 92#13 12#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1039,7 +1012,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
       rotate_right 1
       · iapply wpNext_mono _ _ _ _ _ $$ HΦ
         iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc Htree Hav %hpure
-        simp only [Nat.sub_zero, mp_add_ofNat_zero] at *
+        simp only [Nat.sub_zero, MachCSL.add_ofNat_zero] at *
         iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Htree Hav
         ipureintro
         refine ⟨hpure.1, hsupF, hndF, hpgF, Or.inl ⟨?_, hfull⟩⟩
@@ -1063,7 +1036,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
         _ _ w9) $$ [- $Hk $Hpc $Hframe $Htree $Hav]
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %cX HΦ %spie3 %spp3 %R3 %hsp3 Hk Hpc Htree Hav %hpure
-      simp only [Nat.sub_zero, mp_add_ofNat_zero] at *
+      simp only [Nat.sub_zero, MachCSL.add_ofNat_zero] at *
       iapply HΦ $$ %spie3 %spp3 %R3 %fresh %hsp3 Hk Hpc Htree Hav
       ipureintro
       exact ⟨hpure.1, hsupF, hndF, hpgF, Or.inr ⟨hpure.2.trans hm1, hlt, hzz⟩⟩
@@ -1073,7 +1046,7 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
     exact hblk j hj
   case g9 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, Nat.mul_zero,
-      mp_add_ofNat_zero]
+      MachCSL.add_ofNat_zero]
   case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g19 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

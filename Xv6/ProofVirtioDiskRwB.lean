@@ -937,9 +937,6 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
 
 /-! ## The phase: three turns, and the Löb back edge -/
 
-theorem KCtx.withSpie_withSpie' (k : KCtx) (a b a' b' : Bool) :
-    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
-
 theorem iterPcNext (i : Nat) (hne : ¬ (i + 1 = 3)) :
     (if i + 1 = 3 then KA.«virtio_disk_rw» + 0xc4#64 else KA.«virtio_disk_rw» + 0x5c#64) =
       KA.«virtio_disk_rw» + 0x5c#64 := if_neg hne
@@ -1031,7 +1028,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [KCtx.withSpie_withSpie'] at HLq
+    isimp only [MachCSL.withSpie_withSpie] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %0xffffffff#32 %x1 %x2 %y HLq
   -- turn 1
   iapply (vdrw_iter c (vdrwK (k.withSpie a b)) γ pd pav pu (vdrwK_sie _)
@@ -1065,7 +1062,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [KCtx.withSpie_withSpie'] at HLq
+    isimp only [MachCSL.withSpie_withSpie] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %(BitVec.ofNat 32 n0) %0xffffffff#32 %x2 %y HLq
   -- turn 2
   have hne10 : n1 ≠ n0 := by
@@ -1101,7 +1098,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hout1 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
-    isimp only [KCtx.withSpie_withSpie'] at HLq
+    isimp only [MachCSL.withSpie_withSpie] at HLq
     iapply IH $$ HΦ %cq %aq %bq %Rq %(BitVec.ofNat 32 n0) %(BitVec.ofNat 32 n1) %0xffffffff#32
       %y HLq
   -- three descriptors: the seam

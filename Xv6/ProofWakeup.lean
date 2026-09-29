@@ -80,16 +80,6 @@ theorem wk_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
       simp only [bcond, beq_iff_eq]
       exact fun hc => he ((wk_cursor_eq i hi).mp hc))]
 
-/-- A state cell whose sign-extension is `2` holds SLEEPING. -/
-theorem wk_sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by
-  unfold SLEEPING
-  revert h
-  bv_decide
-
-/-- Dropping a redundant lock list. -/
-theorem wk_withLocks_self (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
-
 /-- What an iteration keeps of the registers (everything callee-saved but the
 cursor `s1`). -/
 def wkKept (R R' : RegMap) : Prop :=
@@ -151,10 +141,6 @@ theorem wk_bne_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = q := by
   rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
-theorem wk_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BNE a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
@@ -205,7 +191,7 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   iapply (Xv6.kl_release RE c2 _ (Γ.lock i) (procLockPay Γ i) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1
-  k_norm_g [wk_withLocks_self, Xv6.kl_filter_proc k.locks hlk,
+  k_norm_g [MachCSL.withLocks_self', Xv6.kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK8, h9]
   iframe #
   case hsr => k_norm_g
@@ -227,7 +213,7 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   iapply wpNext_intro_pin
   iintro %c3 %hq3 %R3 Hk Hpc %hcs3
   have hret : jumpPc (KA.«wakeup» + 0x30#64) = (KA.«wakeup» + 0x30#64) := by decide
-  k_norm_g [wk_withLocks_self, Xv6.kl_filter_proc k.locks hlk,
+  k_norm_g [MachCSL.withLocks_self', Xv6.kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK8, hret]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -363,7 +349,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
       iintro Hk Hpc
       have e8 : c8 = c7 := hp8 (Or.inl rfl)
       subst e8
-      have hsl : st = SLEEPING := wk_sext_sleeping st hst
+      have hsl : st = SLEEPING := Xv6.sext_sleeping st hst
       subst hsl
       -- sw s5,24(s1): p->state := RUNNABLE
       k_step_gen (wp_s_sw c8 _ (KA.«wakeup» + 0x4e#64) false 24#12 9#5 21#5 (by decide) SLEEPING)
@@ -398,7 +384,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     · -- not SLEEPING: the flag is cleared, the state stands
       k_step_gen (wp_s_branch c7 _ (KA.«wakeup» + 0x4a#64) false 8160#13 15#5 20#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [g20, wk_bne_ne (BitVec.signExtend 64 st) 2#64 hst] next c8 hp8
+        with [g20, MachCSL.bne_ne (BitVec.signExtend 64 st) 2#64 hst] next c8 hp8
       iintro Hk Hpc
       have e8 : c8 = c7 := hp8 (Or.inl rfl)
       subst e8
@@ -419,7 +405,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   · -- the channel does not match: nothing changes
     k_step_gen (wp_s_branch c4 _ (KA.«wakeup» + 0x40#64) false 8170#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [g18, wk_bne_ne ch chan hcm] next c5 hp5
+      with [g18, MachCSL.bne_ne ch chan hcm] next c5 hp5
     iintro Hk Hpc
     have e5 : c5 = c4 := hp5 (Or.inl rfl)
     subst e5

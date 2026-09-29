@@ -732,4 +732,40 @@ theorem armExt_popArm (cpu : CPU) (k k' : KCtx) (hp : k'.proc = k.proc) :
 
 end
 
+theorem withSpie_withSpie (k : KCtx) (a b a' b' : Bool) :
+    (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
+
+theorem popExit_off (kb : KCtx) (a b : Bool) (hwf : kb.wf) (hs : kb.sie = false) :
+    (kb.pushOffAt a b).popExit false = kb.withSpie a b := by
+  have h := KCtx.pushOffAt_popExit kb a b hwf
+  rw [hs] at h; exact h
+
+theorem pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
+    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
+
+theorem withSpie_sec (kb : KCtx) (a b : Bool) (l : List String) :
+    ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l := rfl
+
+theorem ctx_collapse (k : KCtx) (m : Nat) (a b c d : Bool) (R R' : RegMap) :
+    ((((k.withSpie a b).pushed m).withRegs R).withSpie c d).withRegs R' =
+      ((k.withSpie c d).pushed m).withRegs R' := rfl
+
+theorem spie_pushed (k : KCtx) (m : Nat) (a b c d : Bool) :
+    ((k.withSpie a b).pushed m).withSpie c d = (k.withSpie c d).pushed m := rfl
+
+theorem epi_ctx (k : KCtx) (s0 s1b a b : Bool) (Rb R : RegMap) :
+    ((((k.pushed 8).withSpie s0 s1b).withRegs Rb).withSpie a b).withRegs R =
+      ((k.withSpie a b).pushed 8).withRegs R := by
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k; rfl
+
+theorem withLocks_self' (k : KCtx) (a b : Bool) :
+    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
+
+theorem withSpie_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
+    (((kb.withSpie a b).withRegs R).withSpie s s').withRegs R' = (kb.withSpie s s').withRegs R' := rfl
+
+theorem kctx_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :
+    kctx (GF := GF) c (k.withRegs R) ⊢ kctx c ((k.withSpie k.spie k.spp).withRegs R) := by
+  rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
+
 end MachCSL

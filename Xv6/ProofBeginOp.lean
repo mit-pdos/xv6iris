@@ -84,8 +84,6 @@ theorem bo_log : KA.«begin_op» + 0x1e888#64 = logAddr := by unfold logAddr; de
 theorem bo_lout : KA.«begin_op» + 0x1e8a4#64 = lOut := by unfold lOut logAddr; decide
 
 theorem bo_cmt_addr : logAddr + 32#64 = lCmt := rfl
-theorem bo_out_addr : logAddr + 28#64 = lOut := rfl
-theorem bo_lhn_addr : logAddr + 44#64 = lhNAddr := rfl
 
 
 theorem bo_br_acq : KA.«begin_op» + 0xffffffffffffceb0#64 = KA.«acquire» := by decide
@@ -103,8 +101,6 @@ theorem bo_ret_60 : jumpPc (KA.«begin_op» + 0x60#64) = KA.«begin_op» + 0x60#
 theorem bo_ret_64 : jumpPc (KA.«begin_op» + 0x64#64) = KA.«begin_op» + 0x64#64 := by decide
 theorem bo_ret_6a : jumpPc (KA.«begin_op» + 0x6a#64) = KA.«begin_op» + 0x6a#64 := by decide
 theorem bo_ret_80 : jumpPc (KA.«begin_op» + 0x80#64) = KA.«begin_op» + 0x80#64 := by decide
-
-theorem bo_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
 
 
 /-! ## The context and the register pins -/
@@ -783,7 +779,7 @@ theorem bo_park1 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   k_norm [boK_sie k, bo_ret_2a]
   iframe #
   case hp1 => k_norm [boK_proc k, hproc]
-  case hc1 => k_norm; exact bo_log_nz
+  case hc1 => k_norm; exact Xv6.log_nz
   case hn1 => k_norm [boK_noff k, hnoff]; omega
   case hK1 =>
     k_norm [boK_avail k]
@@ -934,7 +930,7 @@ theorem bo_park2 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   k_norm [boK_sie k, bo_ret_5a]
   iframe #
   case hp1 => k_norm [boK_proc k, hproc]
-  case hc1 => k_norm; exact bo_log_nz
+  case hc1 => k_norm; exact Xv6.log_nz
   case hn1 => k_norm [boK_noff k, hnoff]; omega
   case hK1 =>
     k_norm [boK_avail k]
@@ -1191,7 +1187,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     k_step (wp_s_lw c _ (KA.«begin_op» + 0x3e#64) true 28#12 14#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.ofNat 32 out))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [boK_sie (k.withSpie a b), q9, bo_out_addr]
+      with [boK_sie (k.withSpie a b), q9, Xv6.out_addr]
     iintro Hk Hpc Hout
     k_step (wp_s_addiw c _ (KA.«begin_op» + 0x40#64) true 1#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1216,7 +1212,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     k_step (wp_s_lw c _ (KA.«begin_op» + 0x4c#64) true 44#12 13#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.ofNat 32 n))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [boK_sie (k.withSpie a b), q9, bo_lhn_addr, bo_step1 out hout3, bo_step1' out hout3,
+      with [boK_sie (k.withSpie a b), q9, Xv6.lhn_addr, bo_step1 out hout3, bo_step1' out hout3,
         bo_step2 out hout3, bo_step3 out hout3, bo_step4 out hout3]
     iintro Hk Hpc Hn
     k_step (wp_s_addw c _ (KA.«begin_op» + 0x4e#64) true 15#5 15#5 13#5 (by decide))

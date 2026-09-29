@@ -139,7 +139,7 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   -- past release: the epilogue
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %R2 Hk Hpc %hcs2
-  k_norm_g [kl_withLocks_self']
+  k_norm_g [MachCSL.withLocks_self']
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
@@ -148,7 +148,7 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)) $$ [- $Hk $Hpc $Hframe]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm_g [kl_withLocks_self']
+  k_norm_g [MachCSL.withLocks_self']
   iframe
   case hKe => k_norm_g; omega
   case hR2 => k_norm_g; rw [e2, b2]

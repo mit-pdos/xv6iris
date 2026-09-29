@@ -101,22 +101,13 @@ theorem ap_procAddr_end : procAddr NPROC = KA.«tickslock» := by
   unfold procAddr procsAddr procSize NPROC
   decide
 
-theorem ap_procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«tickslock» := by
-  intro he
-  have h1 := procAddr_toNat m h
-  rw [he] at h1
-  have h2 : (KA.«tickslock» : BitVec 64).toNat = KernelSyms.«tickslock» := by decide
-  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
-  rw [h2, h3] at h1
-  unfold NPROC at h
-  omega
 
 /-- The scan's loop test `bne s1,s2`. -/
 theorem ap_bcond_bne_end {m : Nat} (h : m < NPROC) :
     bcond bop.BNE (procAddr m) KA.«tickslock» = true := by
   unfold bcond
   simp only [bne_iff_ne, ne_eq]
-  exact ap_procAddr_ne_end h
+  exact Xv6.procAddr_ne_end h
 
 theorem ap_bcond_bne_end_last {m : Nat} (h : m = NPROC) :
     bcond bop.BNE (procAddr m) KA.«tickslock» = false := by
@@ -130,7 +121,7 @@ theorem ap_bcond_beq_end {m : Nat} (h : m < NPROC) :
     bcond bop.BEQ (procAddr m) KA.«tickslock» = false := by
   unfold bcond
   simp only [beq_eq_false_iff_ne, ne_eq]
-  exact ap_procAddr_ne_end h
+  exact Xv6.procAddr_ne_end h
 
 
 /-- The context a balanced `acquire`/`release` pair leaves. -/
@@ -143,13 +134,6 @@ theorem ap_pushed_withSpie (k : KCtx) (a b : Bool) (m : Nat) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 
-/-- A scratch register is not callee-saved. -/
-theorem ap_calleeSaved_set (R R2 : RegMap) (i : BitVec 5) (v : BitVec 64)
-    (hi : i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5)
-    (h : calleeSaved R R2) : calleeSaved R (R2.set i v) := by
-  unfold calleeSaved at h ⊢
-  rcases hi with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-    (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h)
 
 /-- `c.beqz a5` on the state word. -/
 theorem ap_bcond_state (st : BitVec 32) :
@@ -195,14 +179,7 @@ theorem ap_filter_cons (s : String) (l : List String) (h : s ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-/-- `pcIs` at a branch that was taken / not taken. -/
-theorem ap_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [if_pos h]
 
-theorem ap_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬ p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
 
 /-- Assembling `calleeSaved` past the four-slot frame (`sp`, `s0`, `s1`,
 `s2` are the restored ones). -/
@@ -221,14 +198,9 @@ theorem ap_calleeSaved_mk (KR R : RegMap)
 
 /-! ## `availSub` -/
 
-theorem ap_availSub_zero (on : Option Nat) : availSub on 0 = on := by
-  cases on <;> simp [availSub]
 
 theorem ap_availSub_one (on : Option Nat) : availSub on 1 = availDec on := rfl
 
-theorem ap_availSub_availSub (on : Option Nat) (a b : Nat) :
-    availSub (availSub on a) b = availSub on (a + b) := by
-  cases on <;> simp [availSub, Nat.sub_sub]
 
 
 /-! ## Fractions of a word cell
@@ -779,7 +751,7 @@ theorem ap_scan_acq (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
   iapply HΦ $$ %spie2 %spp2 %(R2.set 15#5 (BitVec.signExtend 64 st)) %st %ch %kl %xs %pid0 []
     Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm
   ipureintro
-  exact ⟨fun h => hsp2 h, ap_calleeSaved_set R R2 15#5 _ (by decide) hcs2'⟩
+  exact ⟨fun h => hsp2 h, MachCSL.calleeSaved_set R R2 15#5 _ (by decide) hcs2'⟩
 
 theorem allocproc_br_fffffffffffff162 : KA.«allocproc» + 0xfffffffffffff162#64 = KA.«release» := by decide
 
@@ -2117,7 +2089,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   · -- kalloc failed (a0 = trapframe = 0): failure tail 1
     -- why the `0`: the page allocator, not the proc table
     have hfail : ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g) :=
-      ⟨0, by omega, by rw [ap_availSub_zero]; exact havz⟩
+      ⟨0, by omega, by rw [Xv6.availSub_zero]; exact havz⟩
     -- 0x80001c22 c.beqz a0,0x80001c5e (taken)
     k_step (wp_s_branch c _ (KA.«allocproc» + 0xa4#64) true 60#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2643,7 +2615,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         -- normalise the free-page count to availSub on 4
         have hgeq : availSub on 4 = availSub (availDec on) procPagetableNodes := by
           unfold procPagetableNodes
-          rw [← ap_availSub_one on, ap_availSub_availSub on 1 3]
+          rw [← ap_availSub_one on, Xv6.availSub_availSub on 1 3]
         ihave Hav4 : kallocAvail γk (availSub on 4) $$ [Havpp]
         case _ => rw [hgeq]; iexact Havpp
         -- pin: cg = c (interrupts off throughout)
@@ -2799,7 +2771,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       have hfail : ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g) := by
         obtain ⟨nn, hnn, hz⟩ := hppz
         refine ⟨1 + nn, by omega, ?_⟩
-        rw [← ap_availSub_availSub on 1 nn, ap_availSub_one]
+        rw [← Xv6.availSub_availSub on 1 nn, ap_availSub_one]
         exact hz
       -- 0x80001c2e c.beqz a0 (taken)
       k_step (wp_s_branch c _ (KA.«allocproc» + 0xb0#64) true 64#13 10#5 0#5 (by decide) bop.BEQ)

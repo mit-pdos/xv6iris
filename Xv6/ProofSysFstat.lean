@@ -152,11 +152,11 @@ theorem sfs_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0x20#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x22  bltz a5 : taken
   k_step_e (wp_s_branch cpu _ (KA.«sys_fstat» + 0x22#64) false 16#13 15#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sfs_bltz_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1]
   iintro Hk Hpc
   ihave Hframe := sfs_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ $$ [Hra Hs0 Hcf Hcs]
   · iframe
@@ -295,7 +295,7 @@ theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0x20#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x22  bltz a5 : falls through
   k_step_e (wp_s_branch cpu _ (KA.«sys_fstat» + 0x22#64) false 16#13 15#5 0#5 (by decide) bop.BLT)

@@ -105,16 +105,7 @@ theorem sp_subw_val' (x y : BitVec 32) :
 
 /-! ## Contexts -/
 
-theorem sp_withSpie_sec (kb : KCtx) (a b : Bool) (l : List String) :
-    ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l :=
-  KCtx.withSpie_self' _ a b rfl rfl
 theorem sp_filter_time : (["time"].filter (fun x => x ≠ "time")) = ([] : List String) := by decide
-theorem sp_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
-  rw [← h]; exact KCtx.withLocks_self k0
-theorem sp_epi_ctx (k : KCtx) (s0 s1b a b : Bool) (Rb R : RegMap) :
-    ((((k.pushed 8).withSpie s0 s1b).withRegs Rb).withSpie a b).withRegs R =
-      ((k.withSpie a b).pushed 8).withRegs R := by
-  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k; rfl
 
 /-- `s1..s11`, pinned to the entry map (`s1`, `s2`, `s3` aside: they are the
 loop's own and come back off the stack). -/
@@ -139,19 +130,6 @@ theorem spSaved_cs (k : KCtx) (R R' : RegMap) (h : spSaved k R) (hcs : calleeSav
   obtain ⟨a9, a18, a19⟩ := h
   obtain ⟨c2, c8, c9, c18, c19, -⟩ := hcs
   exact ⟨c9.trans a9, c18.trans a18, c19.trans a19⟩
-
-theorem sysp_calleeSaved_mk (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5)
-    (h20 : R 20#5 = KR 20#5) (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5)
-    (h23 : R 23#5 = KR 23#5) (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5)
-    (h26 : R 26#5 = KR 26#5) (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 /-- The loop's base context `kb`: depth 0, no lock held, at the caller's
 `SIE`, just after the prologue's `argint` (so the frame is pushed). -/
@@ -460,7 +438,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hk := (show kctx (GF := GF) cpu ((kb.withSpie a b).withRegs R)
       ⊢ kctx cpu (((k.withSpie a b).pushed 8).withRegs R) from by
-    rw [hstruct, sp_epi_ctx]) $$ Hk
+    rw [hstruct, MachCSL.epi_ctx]) $$ Hk
   ihave Hframe := (show frame8s0 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
       ⊢ frame8s0 ((k.withSpie a b).regs 2#5) (k.regs 1#5) (k.regs 8#5) from .rfl) $$ Hframe
   iapply (wp_epilogue8s0_gen cpu (k.withSpie a b) (KA.«sys_pause» + 0x8e#64) hK R
@@ -478,7 +456,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
   k_norm_g
   iapply HΦ $$ %a %b %_ [] Hk Hpc Hte Hce Htf Htp
   ipureintro
-  refine ⟨sysp_calleeSaved_mk _ _ q9 q18 q19 p20 p21 p22 p23 p24 p25 p26 p27, ?_⟩
+  refine ⟨MachCSL.calleeSaved_mk _ _ q9 q18 q19 p20 p21 p22 p23 p24 p25 p26 p27, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   rw [h10]; exact hr
 
@@ -525,8 +503,8 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
   iapply (sp_release RE cpu _ γt ?ha0 ?hsr ?hnr ?hKr kb.sie k.proc ?hpr ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Harm]
   rotate_right 1
-  · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2a98, sp_withSpie_sec,
-      sp_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
+  · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2a98, MachCSL.withSpie_sec,
+      MachCSL.strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
     k_next_e
     iintro %R5 Hk Hpc %hcs5
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -598,8 +576,8 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
   iapply (sp_release RE cpu _ γt ?ha0 ?hsr ?hnr ?hKr kb.sie k.proc ?hpr ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Harm]
   rotate_right 1
-  · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2ab4, sp_withSpie_sec,
-      sp_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
+  · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2ab4, MachCSL.withSpie_sec,
+      MachCSL.strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
     k_next_e
     iintro %R5 Hk Hpc %hcs5
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -768,7 +746,7 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
     k_norm_g at hspP
     obtain ⟨e1, e2⟩ := hspP trivial
     subst spieP; subst sppP
-    k_norm_g [sp_withSpie_sec]
+    k_norm_g [MachCSL.withSpie_sec]
     have hpreP : spPre k RP := spPre_cs k _ RP
       (by unfold spPre at hpre ⊢
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact hpre) hcsP
@@ -796,8 +774,8 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
     iapply (sp_release RE cpu _ γt ?ha0 ?hsr ?hnr ?hKr kb.sie k.proc ?hpr ?hrr ?hor)
       $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Harm]
     rotate_right 1
-    · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2a6c, sp_withSpie_sec,
-        sp_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
+    · k_norm_g [MachCSL.KCtx.pushOffAt_popExit kb a b hb.wf, sp_filter_time, spj_2a6c, MachCSL.withSpie_sec,
+        MachCSL.strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
       -- level 0: no lock held, interrupts at the caller's index
       k_next_e
       iintro %R6 Hk Hpc %hcs6
@@ -1026,7 +1004,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     k_norm_g at hspM
     obtain ⟨e1, e2⟩ := hspM trivial
     subst spieM; subst sppM
-    k_norm_g [sp_withSpie_sec]
+    k_norm_g [MachCSL.withSpie_sec]
     k_norm_g at hM10
     have hM10' : RM 10#5 = procAddr j := by rw [hM10, hb.proc]; exact hkproc
     have hpreM : spPre k RM := spPre_cs k _ RM
@@ -1057,7 +1035,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       k_norm_g at hspK
       obtain ⟨f1, f2⟩ := hspK trivial
       subst spieK; subst sppK
-      k_norm_g [sp_withSpie_sec]
+      k_norm_g [MachCSL.withSpie_sec]
       have hpreK : spPre k RK := spPre_cs k _ RK
         (by unfold spPre at hpreM ⊢
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreM) hcsK

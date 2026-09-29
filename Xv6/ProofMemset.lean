@@ -6,6 +6,7 @@ instruction rules chained -- no symbolic execution.
 import Xv6.SpecMemset
 import Xv6.CodeTactics
 import MachCSL.WpStoreFree
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -43,21 +44,11 @@ theorem shl_shr32_ms (n : Nat) (hn : n < 2 ^ 32) :
   rw [Nat.mod_eq_of_lt (by omega)]
   omega
 
-/-- Adding small counts to a base is injective. -/
-theorem add_ofNat_eq_iff_ms (s : BitVec 64) (a b : Nat) (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    (s + BitVec.ofNat 64 a = s + BitVec.ofNat 64 b) ↔ a = b := by
-  constructor
-  · intro h
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow] at this
-    omega
-  · intro h; rw [h]
-
 /-- The loop test: the cursor `d + i + 1` meets the end `d + n` exactly at `i + 1 = n`. -/
 theorem add_succ_eq_iff_ms (s : BitVec 64) (i n : Nat) (hi : i + 1 < 2 ^ 32) (hn : n < 2 ^ 32) :
     (s + (BitVec.ofNat 64 i + 1#64) = s + BitVec.ofNat 64 n) ↔ i + 1 = n := by
   rw [← BitVec.ofNat_add]
-  exact add_ofNat_eq_iff_ms s (i + 1) n hi hn
+  exact MachCSL.add_inj s (i + 1) n hi hn
 
 /-! ## The destination during a fill -/
 

@@ -180,4 +180,7 @@ structure NAMEIPARENT : Prop where
       nfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hpd
 
+theorem slots_namex (a : Nat) (h : nameiparentSlots ≤ a) : namexSlots ≤ a - 2 := by
+  unfold nameiparentSlots at h; omega
+
 end Xv6

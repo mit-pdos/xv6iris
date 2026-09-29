@@ -246,10 +246,6 @@ namespace GrowProc
 
 open Iris.Std Iris.Std.PartialMap Iris.Std.LawfulPartialMap Xv6.UPt
 
-/-- `PGROUNDUP` over a page-aligned base. -/
-theorem pgRoundUpN_split (a n q : Nat) (ha : a = 4096 * q) (h : a â‰¤ n) :
-    pgRoundUpN n = a + (n - a + 4095) / 4096 * 4096 := by
-  unfold pgRoundUpN; subst ha; omega
 
 /-- Above `PGROUNDUP(sz)` nothing is mapped: what `uvmalloc` demands. -/
 theorem um_free_above (sz newsz : BitVec 64) (P : UPtd) (h : umBelow sz P) (i : Nat)
@@ -284,7 +280,7 @@ theorem umBelow_grow (oldsz newsz xperm : BitVec 64) (P P' : UPtd) (M M' : Nat â
       omega
     have hnpe : uvmaNp oldsz newsz = (newsz.toNat - pgRoundUpN oldsz.toNat + 4095) / 4096 := by
       unfold uvmaNp; rw [if_neg hne]
-    have hup := pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
+    have hup := Xv6.pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
     rw [hnpe, hq] at h2
     rw [hq] at hup
     omega
@@ -303,7 +299,7 @@ theorem umBelow_shrink (oldsz newsz : BitVec 64) (P : UPtd) (h : umBelow oldsz P
   case neg =>
     have hnp : uvmdNp oldsz newsz = 0 := by unfold uvmdNp; rw [if_neg hlt]
     have hrs : uvmdRsz oldsz newsz = oldsz := by unfold uvmdRsz; rw [if_neg hlt]
-    rw [hnp, hrs, delRun_zero]; exact h
+    rw [hnp, hrs, Xv6.delRun_zero]; exact h
   case pos =>
     have hnp : uvmdNp oldsz newsz
         = (pgRoundUpN oldsz.toNat - pgRoundUpN newsz.toNat) / 4096 := by

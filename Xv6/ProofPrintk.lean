@@ -1635,7 +1635,7 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     $$ [- $Hk $Hpc] with [h21, h27, ite_beq_zext_p]
   iintro Hk Hpc
   by_cases hp : c0 = chP
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hp $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hp $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1a8#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hp]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1643,14 +1643,14 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hp $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hp $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2d2#64) false 99#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2d6#64) false 7960#13 21#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h21, ite_beq_zext_c]
   iintro Hk Hpc
   by_cases hc : c0 = chC
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x1ee#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1658,14 +1658,14 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2da#64) false 115#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2de#64) false 7972#13 21#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h21, ite_beq_zext_s]
   iintro Hk Hpc
   by_cases hs : c0 = chS
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hs $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hs $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x202#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hs]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1673,14 +1673,14 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hs $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hs $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2e2#64) false 37#12 15#5 0#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2e6#64) false 8020#13 21#5 15#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h21, ite_beq_zext_pct]
   iintro Hk Hpc
   by_cases hpct : c0 = chPct
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hpct $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpct $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x23a#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hpct]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1688,12 +1688,12 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hpct $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpct $$ Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2ea#64) false 20#13 21#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [h21, ite_beq_byte]
   iintro Hk Hpc
   by_cases h0 : c0 = 0#8
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ h0 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ h0 $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x2fe#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, h0]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1701,7 +1701,7 @@ theorem printk_dispatch_7d0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ h0 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ h0 $$ Hpc
   have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x2ee#64) := by simp [dispatch7a0, eq_false hu, eq_false hlu, eq_false hllu, eq_false hx, eq_false hlx, eq_false hllx, eq_false hp, eq_false hc, eq_false hs, eq_false hpct, eq_false h0]
   simp only [htgt]
   iapply HΦ $$ %_ Hk Hpc
@@ -1730,12 +1730,12 @@ theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     $$ [- $Hk $Hpc] with [ite_bne_sub_x]
   iintro Hk Hpc
   by_cases hc2 : c2 = chX
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc2 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc2 $$ Hpc
     k_step (wp_s_branch cpu _ (KA.«printk» + 0x2ca#64) false 7874#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [h15, ite_bne_bit]
     iintro Hk Hpc
     by_cases hll : c1 = chL ∧ c0 = chL
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hll $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hll $$ Hpc
       have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x18c#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc2, hll.1, hll.2]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
@@ -1743,7 +1743,7 @@ theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hll $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
     iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) hu hlu hllu hx hlx ?Hllxa) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
@@ -1752,7 +1752,7 @@ theorem printk_dispatch_7c6 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc2 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2 $$ Hpc
   iapply (printk_dispatch_7d0 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) hu hlu hllu hx hlx ?Hllxb) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
@@ -1781,7 +1781,7 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     $$ [- $Hk $Hpc] with [h21, h26, ite_beq_zext_x]
   iintro Hk Hpc
   by_cases hx : c0 = chX
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hx $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hx $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x158#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hx]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1789,19 +1789,19 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hx $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hx $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2ba#64) false 3976#12 12#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h12]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2be#64) true 6#13 12#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [ite_bne_sub_x]
   iintro Hk Hpc
   by_cases hc1 : c1 = chX
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc1 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc1 $$ Hpc
     k_step (wp_s_branch cpu _ (KA.«printk» + 0x2c0#64) false 7858#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [h14, ite_bne_bit]
     iintro Hk Hpc
     by_cases hl : c0 = chL
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hl $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hl $$ Hpc
       have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x172#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc1, hl]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
@@ -1809,7 +1809,7 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hl $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
     iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu hllu hx ?Hlxa) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
@@ -1818,7 +1818,7 @@ theorem printk_dispatch_7b8 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc1 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1 $$ Hpc
   iapply (printk_dispatch_7c6 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu hllu hx ?Hlxb) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
@@ -1848,12 +1848,12 @@ theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     $$ [- $Hk $Hpc] with [ite_bne_sub_u]
   iintro Hk Hpc
   by_cases hc2 : c2 = chU
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc2 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc2 $$ Hpc
     k_step (wp_s_branch cpu _ (KA.«printk» + 0x2b2#64) false 7818#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [h15, ite_bne_bit]
     iintro Hk Hpc
     by_cases hll : c1 = chL ∧ c0 = chL
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hll $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hll $$ Hpc
       have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x13c#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc2, hll.1, hll.2]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
@@ -1861,7 +1861,7 @@ theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hll $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
     iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu ?Hllua) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
@@ -1870,7 +1870,7 @@ theorem printk_dispatch_7ae {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc2 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2 $$ Hpc
   iapply (printk_dispatch_7b8 cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu hlu ?Hllub) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
@@ -1898,7 +1898,7 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     $$ [- $Hk $Hpc] with [h21, h24, ite_beq_zext_u]
   iintro Hk Hpc
   by_cases hu : c0 = chU
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hu $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hu $$ Hpc
     have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x106#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hu]
     simp only [htgt]
     iapply HΦ $$ %_ Hk Hpc
@@ -1906,19 +1906,19 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     refine ⟨?_, ?_, ?_, ?_⟩
     · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hu $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hu $$ Hpc
   k_step (wp_s_addi cpu _ (KA.«printk» + 0x2a2#64) false 3979#12 11#5 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h12]
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«printk» + 0x2a6#64) true 6#13 11#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
     $$ [- $Hk $Hpc] with [ite_bne_sub_u]
   iintro Hk Hpc
   by_cases hc1 : c1 = chU
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc1 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc1 $$ Hpc
     k_step (wp_s_branch cpu _ (KA.«printk» + 0x2a8#64) false 7800#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [h14, ite_bne_bit]
     iintro Hk Hpc
     by_cases hl : c0 = chL
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hl $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hl $$ Hpc
       have htgt : dispatch7a0 c0 c1 c2 = (KA.«printk» + 0x120#64) := by simp [dispatch7a0, chD, chU, chX, chP, chC, chS, chL, chPct, hc1, hl]
       simp only [htgt]
       iapply HΦ $$ %_ Hk Hpc
@@ -1926,7 +1926,7 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       all_goals simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hl $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
     iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu ?Hlua) $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
@@ -1935,7 +1935,7 @@ theorem printk_dispatch_7a0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     iapply HΦ $$ %_ Hk Hpc
     ipureintro
     refine ⟨h''.1, ?_, ?_, ?_⟩ <;> simp only [h''.2.1, h''.2.2.1, h''.2.2.2, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc1 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1 $$ Hpc
   iapply (printk_dispatch_7ae cpu k hsie c0 c1 c2 _ (pkRegs_set _ _ _ _ hR (by decide)) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h21]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h12]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h13]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h14]) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, h15]) hu ?Hlub) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
@@ -2180,7 +2180,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     rcases Nat.eq_zero_or_pos s.length with hs0 | hspos
     · -- the empty string
       have hz : fmtByte s 0 = 0#8 := by have := fmtByte_end s; rw [hs0] at this; exact this
-      ihave Hpc := pcIs_ite_pos _ _ _ _ hz $$ Hpc
+      ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hz $$ Hpc
       ihave Hd := Hdcl' $$ Hbs
       ihave Hdescs := Hdcl $$ Hd
       ihave Hsent := (show uartSentSub γd bs ⊢ uartSentSub γd (bs ++ []) from by rw [List.append_nil]) $$ Hsent
@@ -2192,7 +2192,7 @@ theorem printk_arm_s (PP : PRPUTC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
       · repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9
     · have hnz : fmtByte s 0 ≠ 0#8 := fmtByte_ne_zero s hs 0 hspos
-      ihave Hpc := pcIs_ite_neg _ _ _ _ hnz $$ Hpc
+      ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hnz $$ Hpc
       iapply (printk_str_loop PP cpu k γl γd hsie hK hnoff huart (k.regs (11#5 + BitVec.ofNat 5 kk)) dq s
         (s.length - 1) 0 _ bs (by omega) ?hRs ?h20s ?h10s) $$ [- $Hk $Hpc $Hbs $Hsent]
       rotate_right 1
@@ -2235,7 +2235,7 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
   have h' : pkRegs k.regs R ∧ R 9#5 = R 9#5 ∧ R 20#5 = R 20#5 ∧ R 21#5 = R 21#5 := ⟨hR, rfl, rfl, rfl⟩
   unfold dispatch7a0
   by_cases hu : c0 = chU
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hu $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hu $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hu]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 0 (by omega) (by rw [hu]; exact pkDir_u c1 c2)
     rw [hk] at hkinds
@@ -2248,9 +2248,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20u => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9u => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hu $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hu $$ Hpc
   by_cases hlu : c1 = chU ∧ c0 = chL
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hlu $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hlu $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hlu.2]; decide)
     have hp2 : i + 2 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc1, hlu.1]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 1 (by omega) (by rw [hlu.1, hlu.2]; exact pkDir_lu c2)
@@ -2264,9 +2264,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRlu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20lu => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9lu => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hlu $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hlu $$ Hpc
   by_cases hllu : c2 = chU ∧ (c1 = chL ∧ c0 = chL)
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hllu $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hllu $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hllu.2.2]; decide)
     have hp2 : i + 2 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc1, hllu.2.1]; decide)
     have hp3 : i + 3 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc2, hllu.1]; decide)
@@ -2281,9 +2281,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRllu => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20llu => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9llu => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hllu $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hllu $$ Hpc
   by_cases hx : c0 = chX
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hx $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hx $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hx]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 0 (by omega) (by rw [hx]; exact pkDir_x c1 c2)
     rw [hk] at hkinds
@@ -2296,9 +2296,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20x => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9x => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hx $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hx $$ Hpc
   by_cases hlx : c1 = chX ∧ c0 = chL
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hlx $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hlx $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hlx.2]; decide)
     have hp2 : i + 2 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc1, hlx.1]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 1 (by omega) (by rw [hlx.1, hlx.2]; exact pkDir_lx c2)
@@ -2312,9 +2312,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRlx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20lx => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9lx => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hlx $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hlx $$ Hpc
   by_cases hllx : c2 = chX ∧ (c1 = chL ∧ c0 = chL)
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hllx $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hllx $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hllx.2.2]; decide)
     have hp2 : i + 2 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc1, hllx.2.1]; decide)
     have hp3 : i + 3 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc2, hllx.1]; decide)
@@ -2329,9 +2329,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRllx => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20llx => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9llx => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hllx $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hllx $$ Hpc
   by_cases hpp : c0 = chP
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hpp $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpp $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hpp]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 0 (by omega) (by rw [hpp]; exact pkDir_p c1 c2)
     rw [hk] at hkinds
@@ -2344,9 +2344,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRp => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20p => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9p => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hpp $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpp $$ Hpc
   by_cases hc : c0 = chC
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hc]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 0 (by omega) (by rw [hc]; exact pkDir_c c1 c2)
     rw [hk] at hkinds
@@ -2359,9 +2359,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRc => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20c => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9c => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc $$ Hpc
   by_cases hs : c0 = chS
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hs $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hs $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hs]; decide)
     have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .str 0 (by omega) (by rw [hs]; exact pkDir_s c1 c2)
     rw [hk] at hkinds
@@ -2373,9 +2373,9 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRs => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20s => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9s => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hs $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hs $$ Hpc
   by_cases hpct : c0 = chPct
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hpct $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hpct $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0, hpct]; decide)
     have hk := pkKinds_at_none f i hi hp c0 c1 c2 hc0 hc1 hc2 (by rw [hpct]; exact pkDir_pct c1 c2)
     rw [hk] at hkinds
@@ -2386,14 +2386,14 @@ theorem printk_pct_tail (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundle
     case HRpct => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
     case H20pct => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR20]
     case H9pct => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hpct $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hpct $$ Hpc
   by_cases h0 : c0 = 0#8
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ h0 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ h0 $$ Hpc
     ihave Hexit := pkCont_exit _ _ _ _ _ _ _ _ _ _ $$ Hcont
     iapply Hexit $$ %_ %_ Hk Hpc Hbuf Hdescs Hframe Hsent Hlocked
     ipureintro
     exact hR
-  ihave Hpc := pcIs_ite_neg _ _ _ _ h0 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ h0 $$ Hpc
   -- the default arm
   have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0]; exact h0)
   have hnone : pkDir c0 c1 c2 = (none, 0) := by
@@ -2481,13 +2481,13 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
     $$ [- $Hk $Hpc] with [ite_bne_sub_d]
   iintro Hk Hpc
   by_cases hc2d : c2 = chD
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc2d $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc2d $$ Hpc
     k_step_noite (wp_s_branch cpu _ (KA.«printk» + 0x29a#64) false 7760#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Hpc := pcIs_bne_bit _ _ _ _ _ hb15' $$ Hpc
     by_cases hll : c1 = chL ∧ c0 = chL
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hll $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hll $$ Hpc
       have hp3 : i + 3 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc2, hc2d]; decide)
       have h' : pkRegs k.regs R ∧ R 9#5 = R 9#5 ∧ R 20#5 = R 20#5 ∧ R 21#5 = R 21#5 := ⟨hR, rfl, rfl, rfl⟩
       have hk := pkKinds_at_dir f i hi hp c0 c1 c2 hc0 hc1 hc2 .num 2 (by omega) (by rw [hll.2, hll.1, hc2d]; exact pkDir_lld)
@@ -2501,7 +2501,7 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
       case HRlld => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
       case H20lld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
       case H9lld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hll $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hll $$ Hpc
     iapply (printk_dispatch_7a0 cpu k hsie c0 c1 c2 _ ?HRa ?H21a ?H12a ?H13a ?H14a ?H15a)
       $$ [- $Hk $Hpc]
     rotate_right 1
@@ -2520,7 +2520,7 @@ theorem printk_pct_5e2 (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : Bundled
     case HAa => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
     case HBa => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR9
     case HCa => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR21]
-  ihave Hpc := pcIs_ite_neg _ _ _ _ hc2d $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc2d $$ Hpc
   iapply (printk_dispatch_7a0 cpu k hsie c0 c1 c2 _ ?HRb ?H21b ?H12b ?H13b ?H14b ?H15b)
     $$ [- $Hk $Hpc]
   rotate_right 1
@@ -2585,7 +2585,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
     $$ [- $Hk $Hpc] with [ite_beq_byte]
   iintro Hk Hpc
   by_cases hc00 : c0 = 0#8
-  · ihave Hpc := pcIs_ite_pos _ _ _ _ hc00 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc00 $$ Hpc
     have hend : i + 1 = f.length := (fmtByte_zero_iff f hnonul (i + 1) (by omega)).1 (by rw [← hc0]; exact hc00)
     have hc1z : fmtByte f (i + 2) = 0#8 := fmtByte_ge f _ (by omega)
     have hc2z : fmtByte f (i + 3) = 0#8 := fmtByte_ge f _ (by omega)
@@ -2617,7 +2617,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
     k_step_noite (wp_s_branch cpu _ (KA.«printk» + 0x298#64) true 6#13 11#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
       $$ [- $Hk $Hpc] with [ite_bne_sub_d]
     iintro Hk Hpc
-    ihave Hpc := pcIs_ite_neg _ _ _ _ (by rw [hc00]; decide) $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ (by rw [hc00]; decide) $$ Hpc
     iapply (printk_dispatch_7a0 cpu k hsie c0 (fmtByte f (i + 2)) (fmtByte f (i + 3)) _ ?HRz ?H21z ?H12z ?H13z ?H14z ?H15z)
       $$ [- $Hk $Hpc]
     rotate_right 1
@@ -2638,7 +2638,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
     case HAz => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
     case HBz => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
     case HCz => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-  · ihave Hpc := pcIs_ite_neg _ _ _ _ hc00 $$ Hpc
+  · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc00 $$ Hpc
     have hp1 : i + 1 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc0]; exact hc00)
     -- lbu a3,1(a4): the second byte
     obtain ⟨c1, hc1⟩ : ∃ c, c = fmtByte f (i + 2) := ⟨_, rfl⟩
@@ -2652,14 +2652,14 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
       $$ [- $Hk $Hpc] with [ite_beq_byte]
     iintro Hk Hpc
     by_cases hc10 : c1 = 0#8
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hc10 $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc10 $$ Hpc
       have hend : i + 2 = f.length := (fmtByte_zero_iff f hnonul (i + 2) (by omega)).1 (by rw [← hc1]; exact hc10)
       have hc2z : fmtByte f (i + 3) = 0#8 := fmtByte_ge f _ (by omega)
       k_step_noite (wp_s_branch cpu _ (KA.«printk» + 0x26c#64) false 7772#13 21#5 23#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
         $$ [- $Hk $Hpc] with [hR23, ite_beq_zext_d]
       iintro Hk Hpc
       by_cases hd : c0 = chD
-      · ihave Hpc := pcIs_ite_pos _ _ _ _ hd $$ Hpc
+      · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hd $$ Hpc
         have h' : pkRegs k.regs R ∧ R 9#5 = R 9#5 ∧ R 20#5 = R 20#5 ∧ R 21#5 = R 21#5 := ⟨hR, rfl, rfl, rfl⟩
         have hk := pkKinds_at_dir f i hi hp c0 c1 (fmtByte f (i + 3)) hc0 hc1 rfl .num 0 (by omega) (by rw [hd]; exact pkDir_d c1 (fmtByte f (i + 3)))
         rw [hk] at hkinds
@@ -2672,7 +2672,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         case HRd1 => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
         case H20d1 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
         case H9d1 => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-      · ihave Hpc := pcIs_ite_neg _ _ _ _ hd $$ Hpc
+      · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hd $$ Hpc
         k_step_noite (wp_s_addi cpu _ (KA.«printk» + 0x270#64) false 3988#12 14#5 21#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         iintro Hk Hpc
         k_step_noite (wp_s_sltiu cpu _ (KA.«printk» + 0x274#64) false 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sltiu_zext_l]
@@ -2707,13 +2707,13 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         case HAy => rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]; exact hR20
         case HBy => rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
         case HCy => rw [h'.2.2.2]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-    · ihave Hpc := pcIs_ite_neg _ _ _ _ hc10 $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc10 $$ Hpc
       have hp2 : i + 2 < f.length := fmt_lt_of_ne f _ (by omega) (by rw [← hc1]; exact hc10)
       k_step_noite (wp_s_branch cpu _ (KA.«printk» + 0x98#64) false 48#13 21#5 23#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
         $$ [- $Hk $Hpc] with [hR23, ite_beq_zext_d]
       iintro Hk Hpc
       by_cases hd : c0 = chD
-      · ihave Hpc := pcIs_ite_pos _ _ _ _ hd $$ Hpc
+      · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hd $$ Hpc
         have h' : pkRegs k.regs R ∧ R 9#5 = R 9#5 ∧ R 20#5 = R 20#5 ∧ R 21#5 = R 21#5 := ⟨hR, rfl, rfl, rfl⟩
         have hk := pkKinds_at_dir f i hi hp c0 c1 (fmtByte f (i + 3)) hc0 hc1 rfl .num 0 (by omega) (by rw [hd]; exact pkDir_d c1 (fmtByte f (i + 3)))
         rw [hk] at hkinds
@@ -2726,7 +2726,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
         case HRd2 => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
         case H20d2 => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
         case H9d2 => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-      · ihave Hpc := pcIs_ite_neg _ _ _ _ hd $$ Hpc
+      · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hd $$ Hpc
         k_step_noite (wp_s_addi cpu _ (KA.«printk» + 0x9c#64) false 3988#12 14#5 21#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
         iintro Hk Hpc
         k_step_noite (wp_s_sltiu cpu _ (KA.«printk» + 0xa0#64) false 1#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [sltiu_zext_l]
@@ -2739,13 +2739,13 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
           $$ [- $Hk $Hpc] with [ite_bne_sub_d]
         iintro Hk Hpc
         by_cases hc1d : c1 = chD
-        · ihave Hpc := pcIs_ite_pos _ _ _ _ hc1d $$ Hpc
+        · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hc1d $$ Hpc
           k_step_noite (wp_s_branch cpu _ (KA.«printk» + 0xaa#64) true 54#13 14#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) HT
             $$ [- $Hk $Hpc]
           iintro Hk Hpc
           ihave Hpc := pcIs_beq_bit _ _ _ _ _ hb14 $$ Hpc
           by_cases hl : c0 = chL
-          · ihave Hpc := pcIs_ite_pos _ _ _ _ hl $$ Hpc
+          · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hl $$ Hpc
             have h' : pkRegs k.regs R ∧ R 9#5 = R 9#5 ∧ R 20#5 = R 20#5 ∧ R 21#5 = R 21#5 := ⟨hR, rfl, rfl, rfl⟩
             have hk := pkKinds_at_dir f i hi hp c0 c1 (fmtByte f (i + 3)) hc0 hc1 rfl .num 1 (by omega) (by rw [hl, hc1d]; exact pkDir_ld (fmtByte f (i + 3)))
             rw [hk] at hkinds
@@ -2758,7 +2758,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
             case HRld => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
             case H20ld => first | (rw [h'.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR20]
             case H9ld => first | (rw [h'.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9]) | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true, hR9] | simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-          · ihave Hpc := pcIs_ite_neg _ _ _ _ hl $$ Hpc
+          · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hl $$ Hpc
             iapply (printk_pct_5e2 PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk _ w18
               ?HRa ?H20a ?H9a ?H15a c0 c1 hc0 hc1 hp1 hc00 hc10 hd (fun h => hl h.2) ?H13a ?H14a ?H21a hi hp hkinds)
               $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
@@ -2771,7 +2771,7 @@ theorem printk_pct (PP : PRPUTC) (PI : PRINTINT) {hlc : HasLC} {GF : BundledGFun
             case H13a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
             case H14a => simp only [KCtx.rget_withRegs', KCtx.setReg_withRegs, RegMap.set_apply, BitVec.reduceEq]; exact hb14
             case H21a => simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
-        · ihave Hpc := pcIs_ite_neg _ _ _ _ hc1d $$ Hpc
+        · ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hc1d $$ Hpc
           iapply (printk_pct_5e2 PP PI cpu k γpr γl γd bs dqf f descs hsie hK hnoff huart hflen hnonul hdlen i kk _ w18
             ?HRb ?H20b ?H9b ?H15b c0 c1 hc0 hc1 hp1 hc00 hc10 hd (fun h => hc1d h.1) ?H13b ?H14b ?H21b hi hp hkinds)
             $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked $Hcont]
@@ -2861,13 +2861,13 @@ theorem printk_loop (PP : PRPUTC) (PI : PRINTINT) (RE : RELEASE) {hlc : HasLC} {
       $$ [- $Hk $Hpc] with [ite_beq_byte]
     iintro Hk Hpc
     by_cases hz : fmtByte f (p + 1) = 0#8
-    · ihave Hpc := pcIs_ite_pos _ _ _ _ hz $$ Hpc
+    · ihave Hpc := MachCSL.pcIs_pos _ _ _ _ hz $$ Hpc
       iapply (printk_exit RE cpu k γpr γd bs0 cs0 dqf f descs hsie hK hpr (KA.«printk» + 0x242#64) (Or.inl rfl) _ ?HRe _ w18)
         $$ [- $Hk $Hpc $Hlocked $Hframe $Hbuf $Hdescs $Hsent $HΦ]
       rotate_right 1
       iframe #
       case HRe => repeat (first | exact hR | refine pkRegs_set _ _ _ _ ?_ (by decide))
-    ihave Hpc := pcIs_ite_neg _ _ _ _ hz $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg _ _ _ _ hz $$ Hpc
     have hlt : p + 1 < f.length := fmt_lt_of_ne f (p + 1) (by omega) hz
     iapply (printk_turn PP PI cpu k γpr γl γd (bs0 ++ cs0) dqf f descs hsie hK hnoff huart hflen hnonul hdlen
       (p + 1) kk _ w18 ?HRt ?H20t ?H10t hlt hkinds) $$ [- $Hk $Hpc $Hbuf $Hdescs $Hframe $Hsent $Hlocked]
@@ -3034,7 +3034,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
   iintro Hk Hpc
   by_cases h0 : fmtByte f 0 = 0#8
   · -- the empty format: release and return
-    ihave Hpc := pcIs_ite_pos _ _ _ _ h0 $$ Hpc
+    ihave Hpc := MachCSL.pcIs_pos _ _ _ _ h0 $$ Hpc
     ihave Hexit := pkFrameExit_intro (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5)
       (k.regs 17#5) (k.regs 16#5) (k.regs 15#5) (k.regs 14#5) (k.regs 13#5) (k.regs 12#5) (k.regs 11#5) w7
       w10 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) w23
@@ -3049,7 +3049,7 @@ theorem printk_proof (AC : ACQUIRE) (RE : RELEASE) (PP : PRPUTC) (PI : PRINTINT)
     case hcs =>
       simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
       exact ⟨h2_9, h2_19, h2_20, h2_21, h2_22, h2_23, h2_24, h2_25, h2_26, h2_27⟩
-  ihave Hpc := pcIs_ite_neg _ _ _ _ h0 $$ Hpc
+  ihave Hpc := MachCSL.pcIs_neg _ _ _ _ h0 $$ Hpc
   have hi : 0 < f.length := fmt_lt_of_ne f 0 (Nat.zero_le _) h0
   k_step (wp_s_sd cpu _ (KA.«printk» + 0x3a#64) true 104#12 2#5 9#5 (by decide) w10) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2_2, h2_9]
   iintro Hk Hpc C10

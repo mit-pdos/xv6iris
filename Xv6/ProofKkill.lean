@@ -88,12 +88,6 @@ theorem kk_bne_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
       exact fun hc => he ((kk_cursor_eq i hi).mp hc))]
 
 
-/-- A state cell whose sign-extension is `2` holds SLEEPING. -/
-theorem kk_sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) : st = SLEEPING := by
-  unfold SLEEPING
-  revert h
-  bv_decide
-
 /-- `&proc`, folded out of `auipc s1,0x10 ; addi s1,s1,1714`. -/
 theorem kk_proc0_addr :
     KA.«kkill» + 0x106ee#64 = KA.«proc» := by decide
@@ -251,7 +245,7 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   iapply (kl_release RE c2 _ (Γ.lock i) (procLockPay Γ i) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1
-  k_norm_g [kl_withLocks_self, kl_withLocks_self', kl_filter_proc k.locks hlk,
+  k_norm_g [kl_withLocks_self, MachCSL.withLocks_self', kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK6, h9]
   iframe #
   case hsr => k_norm_g
@@ -271,7 +265,7 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   -- past release: the cursor step and the test
   iapply wpNext_intro_pin
   iintro %c3 %hq3 %R3 Hk Hpc %hcs3
-  k_norm_g [kl_withLocks_self, kl_withLocks_self', kl_filter_proc k.locks hlk,
+  k_norm_g [kl_withLocks_self, MachCSL.withLocks_self', kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK6, kl_ret_2128]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -352,7 +346,7 @@ theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   iapply (kl_release RE c2 _ (Γ.lock i) (procLockPay Γ i) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1
-  k_norm_g [kl_withLocks_self, kl_withLocks_self', kl_filter_proc k.locks hlk,
+  k_norm_g [kl_withLocks_self, MachCSL.withLocks_self', kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK6, h9]
   iframe #
   case hsr => k_norm_g
@@ -372,7 +366,7 @@ theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   -- past release: `li a0,0`
   iapply wpNext_intro_pin
   iintro %c3 %hq3 %R3 Hk Hpc %hcs3
-  k_norm_g [kl_withLocks_self, kl_withLocks_self', kl_filter_proc k.locks hlk,
+  k_norm_g [kl_withLocks_self, MachCSL.withLocks_self', kl_filter_proc k.locks hlk,
     KCtx.pushOffAt_popExit k spie1 spp1 hwf, hK6, kl_ret_2146]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -471,7 +465,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [Xv6.wa_beq_eq (BitVec.signExtend 64 st) 2#64 hst]
     iintro Hk Hpc
-    have hsl : st = SLEEPING := kk_sext_sleeping st hst
+    have hsl : st = SLEEPING := Xv6.sext_sleeping st hst
     subst hsl
     -- c.li a5,3
     k_step (wp_s_addi c _ (KA.«kkill» + 0x62#64) true 3#12 15#5 0#5 (by decide))

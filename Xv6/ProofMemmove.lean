@@ -6,6 +6,7 @@ count, the instruction rules chained -- no symbolic execution.
 import Xv6.SpecMemmove
 import Xv6.CodeTactics
 import Xv6.StepLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -44,20 +45,10 @@ theorem shl_shr_32 (x : BitVec 64) (hx : x.toNat < 2 ^ 32) : (x <<< 32) >>> 32 =
 theorem shl_shr_32_ofNat (n : Nat) (hn : n < 2 ^ 32) : (BitVec.ofNat 64 n <<< 32) >>> 32 = BitVec.ofNat 64 n :=
   shl_shr_32 _ (by simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega)
 
-/-- Adding small counts to a base is injective. -/
-theorem add_ofNat_eq_iff (s : BitVec 64) (a b : Nat) (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    (s + BitVec.ofNat 64 a = s + BitVec.ofNat 64 b) ↔ a = b := by
-  constructor
-  · intro h
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow] at this
-    omega
-  · intro h; rw [h]
-
 theorem add_ofNat_succ_eq_iff (s : BitVec 64) (a b : Nat) (ha : a < 2 ^ 32) (hb : b + 1 < 2 ^ 32) :
     (s + BitVec.ofNat 64 a = s + (BitVec.ofNat 64 b + 1#64)) ↔ a = b + 1 := by
   rw [← BitVec.ofNat_add]
-  exact add_ofNat_eq_iff s a (b + 1) ha hb
+  exact MachCSL.add_inj s a (b + 1) ha hb
 
 theorem self_eq_add_ofNat_iff (s : BitVec 64) (a : Nat) (ha : a < 2 ^ 32) :
     (s = s + BitVec.ofNat 64 a) ↔ a = 0 := by

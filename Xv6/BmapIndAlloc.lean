@@ -79,7 +79,7 @@ theorem bm_ind_alloc_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCt
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc
   bm_step (wp_s_branch c _ (KA.«bmap» + 0xa4#64) true 8158#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, bm_beq00]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
   iintro Hk Hpc
   -- the borrowed word goes back unchanged; the handle and the map are whole again
   ihave Hhold := bm_held_close γb V kk pidv dev bmI.bmInd bmI.bmEnt bsd q hlen hq $$ Hcell Hcb

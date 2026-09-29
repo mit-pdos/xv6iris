@@ -267,7 +267,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   iintro Hk Hpc
   -- ===== +0xe6 c.beqz a0 -> +0x10c: taken =====
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0xe6#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
   iintro Hk Hpc
   icases Xv6.sys_mknod_pid hct _ _ _ _ _ $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hop := logOpS_op icfgLog n' Sb' $$ HopS Htx

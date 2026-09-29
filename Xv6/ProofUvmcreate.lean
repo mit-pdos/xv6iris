@@ -13,6 +13,7 @@ import Xv6.CodeTactics
 import Xv6.UvmCallSites
 import Xv6.KvmLemmas
 import Xv6.PtRunLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -27,8 +28,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- `c.lui a2,0x1` is `4096`. -/
 theorem uc_u1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
-
-theorem uc_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
 /-- `ret` out of `kalloc` lands on the `c.mv s1,a0`. -/
 theorem uc_ret_119a : jumpPc (KA.«uvmcreate» + 0xe#64) = (KA.«uvmcreate» + 0xe#64) := by
@@ -112,7 +111,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
     obtain ⟨hz0, hzero⟩ := hz
     k_step_gen (wp_s_branch c4 _ (KA.«uvmcreate» + 0x10#64) true 10#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [uc_beq_zero _ hz0] next c5 hp5
+      with [MachCSL.beq_zero _ hz0] next c5 hp5
     iintro Hk Hpc
     -- c.mv a0,s1
     k_step_gen (wp_s_add c5 _ (KA.«uvmcreate» + 0x1a#64) true 10#5 0#5 9#5 (by decide))
@@ -176,7 +175,7 @@ theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
     case hK2 => k_norm_g; omega
     case hn2 => k_norm_g
     case hl2 => exact List.length_replicate
-    k_norm_g [uc_ret_11a6, uc_extract0]
+    k_norm_g [uc_ret_11a6, MachCSL.extract_zero]
     iapply wpNext_intro_pin
     iintro %c9 %hp9 %R2 Hk Hpc Hbuf %hpost2
     obtain ⟨hcs2, h10_2⟩ := hpost2

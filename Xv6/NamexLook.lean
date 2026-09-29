@@ -83,7 +83,7 @@ theorem namex_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (kd kslo
   have hlt := dirFirst_lt _ _ _ _ hf
   have hlive := dirFirst_live _ _ _ _ hf
   have hnib : (BitVec.setWidth 32 (dirInum data kd)).toNat < 16 * icfgNib := by
-    rw [namex_zext32_toNat]; exact hinums kd hlt hlive
+    rw [MachCSL.zext32_toNat]; exact hinums kd hlt hlive
   have hpos := Xv6.dirlookup_live_pos data kd hlive
   iintro ⟨Href, Hru⟩
   unfold inodeHeld inodeRefp

@@ -70,4 +70,21 @@ def kvmmakeNodes : Nat := 102
 /-- The pages `kvmmake` takes from the allocator: the nodes and the 64 stacks. -/
 def kvmmakeCount : Nat := kvmmakeNodes + 64
 
+theorem kstackVpn_toNat (i : Nat) (h : i < 64) : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := by
+  simp only [kstackVpn, BitVec.toNat_ofNat]
+  omega
+
+theorem mapStacks_succ (t : PTree) (pas : Nat → BitVec 44) (i : Nat) (fr : List (BitVec 44)) :
+    t.mapStacks pas (i+1) fr =
+      (((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits .rw) 1 (t.mapStacks pas i fr).2).1,
+       ((t.mapStacks pas i fr).1.mapRun (kstackVpn i) (pas i) (permBits .rw) 1 (t.mapStacks pas i fr).2).2.1) :=
+  rfl
+
+theorem kstackVpn_ne (i j : Nat) (hi : i < 64) (hj : j < 64) (h : i ≠ j) :
+    kstackVpn i ≠ kstackVpn j := by
+  intro he
+  have := congrArg BitVec.toNat he
+  rw [kstackVpn_toNat i hi, kstackVpn_toNat j hj] at this
+  omega
+
 end Xv6

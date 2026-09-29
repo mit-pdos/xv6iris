@@ -27,6 +27,7 @@ import Xv6.IcacheEscrowPool
 import Xv6.InitlogHead
 import Xv6.VirtioDiskRwDefs2
 import Xv6.VirtioDiskRwDefs3
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -51,11 +52,9 @@ theorem eo_lhb0 : KA.«end_op» + 0x1e82c#64 = lhBlock 0 := by decide
 theorem eo_lhn : KA.«end_op» + 0x1e828#64 = lhNAddr := by decide
 
 theorem eo_o_start : logAddr + 24#64 = lStart := rfl
-theorem eo_o_out : logAddr + 28#64 = lOut := rfl
 theorem eo_o_cmt : logAddr + 32#64 = lCmt := rfl
 theorem eo_o_dev : logAddr + 36#64 = lDev := rfl
 theorem eo_o_nc : logAddr + 40#64 = lNcommit := rfl
-theorem eo_o_lhn : logAddr + 44#64 = lhNAddr := rfl
 
 theorem eo_br_acq : KA.«end_op» + 0xffffffffffffce24#64 = KA.«acquire» := by decide
 theorem eo_br_rel : KA.«end_op» + 0xffffffffffffceac#64 = KA.«release» := by decide
@@ -84,19 +83,13 @@ theorem eo_ret_108 : jumpPc (KA.«end_op» + 0x108#64) = KA.«end_op» + 0x108#6
 theorem eo_ret_10e : jumpPc (KA.«end_op» + 0x10e#64) = KA.«end_op» + 0x10e#64 := by decide
 theorem eo_ret_11a : jumpPc (KA.«end_op» + 0x11a#64) = KA.«end_op» + 0x11a#64 := by decide
 
-theorem eo_log_nz : logAddr ≠ 0#64 := by unfold logAddr; decide
-
 /-! ## The 32-bit arithmetic -/
-
-theorem eo_toInt_ofNat (m : Nat) (h : m < 2 ^ 63) : (BitVec.ofNat 64 m).toInt = m := by
-  rw [BitVec.toInt_eq_toNat_of_lt (by simp [BitVec.toNat_ofNat]; omega)]
-  simp [BitVec.toNat_ofNat]; omega
 
 /-- `blt`/`bge` between two small naturals. -/
 theorem eo_blt_nat (a b : Nat) (ha : a < 2 ^ 63) (hb : b < 2 ^ 63) :
     bcond bop.BLT (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) = decide (a < b) := by
   show (BitVec.ofNat 64 a).slt (BitVec.ofNat 64 b) = decide (a < b)
-  simp only [BitVec.slt, eo_toInt_ofNat a ha, eo_toInt_ofNat b hb]
+  simp only [BitVec.slt, MachCSL.toInt_ofNat a ha, MachCSL.toInt_ofNat b hb]
   by_cases h : a < b <;> simp [h] <;> omega
 
 /-- `bgtz a5` at `+0x3e` is `blt zero, a5`. -/

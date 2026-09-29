@@ -109,7 +109,7 @@ theorem fdev_open_ans_ok (gf : GName) (l : List FdState) (rv : BitVec 64) :
   · ipureintro
     obtain ⟨hr, hlt, -⟩ := hb
     have hsig : rv.toInt = (fd : Int) := by
-      rw [hr]; exact fdev_ofNat_toInt fd (by unfold NOFILE at hlt; omega)
+      rw [hr]; exact MachCSL.toInt_ofNat fd (by unfold NOFILE at hlt; omega)
     right; rw [hsig]; unfold NOFILE at hlt ⊢; omega
   · ipureintro
     left; rw [hr]; exact fdev_m1
@@ -183,7 +183,7 @@ theorem file_open_present (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fn
   · -- a descriptor, wherever the ledger says it landed, on the deed's inum
     obtain ⟨hr, hfdlt⟩ := hr
     have hsig : rv.toInt = (fd : Int) := by
-      rw [hr]; exact fdev_ofNat_toInt fd (by unfold NOFILE at hfdlt; omega)
+      rw [hr]; exact MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)
     have hok : openAnsOk rv := Or.inr (by rw [hsig]; unfold NOFILE at hfdlt ⊢; omega)
     icases HK with ⟨HK, -⟩
     iapply wpLoop_fupd

@@ -111,9 +111,6 @@ theorem create_beqz_ientry (k : Nat) (hk : k < NINODE) :
   rw [bcond_beq_eq]
   exact beq_eq_false_iff_ne.mpr (ientry_ne_zero k (Nat.le_of_lt hk))
 
-/-- `c.beqz a0` at `+0xae`: TAKEN on ialloc's null. -/
-theorem create_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 /-- The claim licence does not read its generation. -/
 theorem create_lic_regen [Icfg] {GF : BundledGFunctors} [IcacheG GF] (ty : BitVec 16) (t : Nat)
     (q : Qp) (g1 g2 : GName) (z : Nat) :
@@ -401,7 +398,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     simp only [Bool.false_eq_true, if_false]
     icases Harm with ⟨%ha0, Hisl, Htc, Hop⟩
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xae#64) true 62#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, create_beqz_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hk := kctx_eq_mono cpu _ ((k.withSpie spie1 spp1).withRegs (R1.set 19#5 0#64))
       (by kctx_ext) $$ Hk

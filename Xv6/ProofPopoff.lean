@@ -31,8 +31,6 @@ theorem sie0_and2 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : v &&& 2
 theorem sie0_shr_and1 (v : BitVec 64) (h : BitVec.extractLsb' 1 1 v = 0#1) : (v >>> 1) &&& 1#64 = 0#64 := by
   bv_decide
 
-theorem bcond_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#64 ↔ n = 0 := by
   constructor
   · intro h
@@ -260,7 +258,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
     iintro Hk Hpc Hcell
     -- beqz a5, c22: taken
     k_step (wp_s_branch cpu _ (KA.«pop_off» + 0x22#64) true 6#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [bcond_beq_00]
+      $$ [- $Hk $Hpc] with [MachCSL.beqz_zero]
     iintro Hk Hpc
     -- the cell goes back into the bundle
     rw [← hA]

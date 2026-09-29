@@ -96,7 +96,7 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
         UPtWalkaddr.ptRep_get_none hrep _ (UPtWalkaddr.wfU_walk_none 2 t _ hrep.1 hnc)
       k_step_gen (wp_s_branch c7 _ (KA.«walkaddr» + 0x1a#64) true 16#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [wa_beq_zero _ hz] next c8 hp8
+        with [MachCSL.beq_zero _ hz] next c8 hp8
       iintro Hk Hpc
       have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h => (hp8 h).trans (hpinW h)
       iapply (wp_epilogue2_gen c8 (k.withRegs ((k.regs.set 15#5 18446744073709551615#64).set 15#5 274877906943#64)) (KA.«walkaddr» + 0x2a#64)

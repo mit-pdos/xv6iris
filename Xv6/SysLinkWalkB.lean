@@ -82,9 +82,6 @@ theorem sys_link_low16 (inum : BitVec 32) (h : inum.toNat < 2 ^ 16) :
     (BitVec.setWidth 16 inum).toNat = inum.toNat := by
   rw [BitVec.toNat_setWidth]; exact Nat.mod_eq_of_lt h
 
-theorem sys_link_neq_refl (x : BitVec 64) : bcond bop.BNE x x = false := by
-  simp [bcond]
-
 /-- The parent walk's count, after dirlink spent `sp` of it (at most four,
 at most three with the bitmap block credited): enough for dp's
 `iunlockput` and the `bad:` tail, or for dp's `iunlockput` and `iput(ip)`. -/
@@ -511,7 +508,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1, Xv6.iDev_eq]
   iintro Hk Hpc Hipdev
   -- +0x92  bne a4,a5 -- REFUTED: ONE DEVICE
-  have hne := sys_link_neq_refl (BitVec.signExtend 64 icfgDev)
+  have hne := MachCSL.bne_eq (BitVec.signExtend 64 icfgDev)
   k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x92#64) false 92#13 14#5 15#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hne]
   iintro Hk Hpc
@@ -677,7 +674,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     · -- ===== ARM F-0: the EMPTY append =====
       have htot0 : tot = 0 := by rcases hatom with h | h <;> omega
       k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0xa0#64) false 78#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, sysfile_bltz_m1]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, MachCSL.bltz_m1]
       iintro Hk Hpc
       -- THE ENTRY UNITS RIDE WITH IT: nothing was written
       have heqent := dirEntries_dirlinkNopEq dnd dn' bmd bm' datd data'
@@ -719,7 +716,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     subst bm' data' dn' dn0'
     have hn3 := sys_link_n3 n2 n3 iputUnits Sb2 (by decide) (fun _ => by decide) (hfnd rfl) hn2a hn2b
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0xa0#64) false 78#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, sysfile_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, MachCSL.bltz_m1]
     iintro Hk Hpc
     -- dirlink handed the ledger half back verbatim and moved no record
     icases (show inodeMap (GF := GF) fscFs (ientry kd) bmd ⊢

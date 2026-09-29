@@ -105,8 +105,6 @@ theorem bm_cell_addr (p : BitVec 64) (q : Nat) :
   unfold aBufData bOffData
   rw [BitVec.add_assoc]
 
-/-- The zero tests on a literal zero (balloc's failure return). -/
-theorem bm_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem bm_sext0 : BitVec.signExtend 64 (0#32) = 0#64 := by decide
 
 /-! ## The ledger's arithmetic, proved over small contexts

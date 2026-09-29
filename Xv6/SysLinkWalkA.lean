@@ -332,11 +332,11 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   have hdaI : (sysLinkInc dn).diAddrs = bmCells bm := by rw [sysfile_setnl_addrs]; exact hda
   have hbump := iregNlink_bump dn.diNlink hrl.2.1 hmx
   have hnlI : (sysLinkInc dn).diNlink.toNat = dn.diNlink.toNat + 1 := by
-    rw [sys_link_setnl_nlink]; exact hbump.1
+    rw [Xv6.setnl_nlink]; exact hbump.1
   have hokI : inodeOk fscCov fscLogst (sysLinkInc dn) bm data :=
     sysfile_setnl_inodeOk fscCov fscLogst dn bm data _ ⟨hwf, hcov, hda, htynz, hszb, hholes, hsized⟩
   have hrlI : inodeRecLocal (sysLinkInc dn) :=
-    inodeRecLocal_sameType dn _ hrl htyI (by rw [sys_link_setnl_nlink]; exact hbump.2)
+    inodeRecLocal_sameType dn _ hrl htyI (by rw [Xv6.setnl_nlink]; exact hbump.2)
       (fun h => absurd h hndI)
   have hdokI : dirOk icfgNib (sysLinkInc dn) data := sysfile_setnl_dirOk _ dn data _ hdok
   have hddixI : dirDotsIx inum.toNat (sysLinkInc dn) data := dirDotsIx_not_dir _ _ _ hndI
@@ -360,7 +360,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (sys_link_iupdate_link IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kk inum
       (sysLinkInc dn) dn bm (n1 - 1) Sb1 false true A.pid hj ?up ?uK ?un ?ut (fun h => by cases h) hnib
-      (sysfile_setnl_type_stable dn _) htynzI (sys_link_setnl_nlink dn _) hmx hdaI
+      (sysfile_setnl_type_stable dn _) htynzI (Xv6.setnl_nlink dn _) hmx hdaI
       (blkmapWf_dir_len hwf) ?ua)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hinum $Hmeta $Hmap $Hdi $Hpin $Hpid $Hb2 $Hop]
   rotate_right 1
@@ -764,7 +764,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case inr =>
     -- ===== ARM A (argstr 0) =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x18#64) false 258#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, sysfile_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hold : sysfileAny (sysLinkOld (k.regs 2#5)) 128 $$ [Hold]
     · unfold sysfileAny; iexists bs1; iframe; ipureintro; omega
@@ -836,7 +836,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case inr =>
     -- ===== ARM A (argstr 1) =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x2c#64) false 238#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, sysfile_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hnew : sysfileAny (sysLinkNew (k.regs 2#5)) 128 $$ [Hnew]
     · unfold sysfileAny; iexists bs2; iframe; ipureintro; omega

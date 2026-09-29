@@ -486,8 +486,6 @@ theorem trampLeaf_not_vu : ¬ pteVU trampLeaf := by
   simp only [trampLeaf, uLeaf, PTE_U, PTE_R, PTE_X, trampPpn]
   bv_decide
 
-theorem trampVpn_toNat : trampVpn.toNat = 67108863 := rfl
-theorem tfVpn_toNat : tfVpn.toNat = 67108862 := rfl
 theorem tfVpn_ne_trampVpn : trampVpn.toNat ≠ tfVpn.toNat := by decide
 
 /-- A leaf of the table with `U` set is a user leaf. -/
@@ -510,10 +508,10 @@ theorem um_of_leaves_vu (P : UPtd) (k : Nat) (w : BitVec 64)
 theorem leaves_of_um (P : UPtd) (hwf : uptWf P) (k : Nat) (w : BitVec 64)
     (h : get? P.um k = some w) : get? P.leaves k = some w := by
   have hk : k < tfVpn.toNat := (hwf.1 k w h).1
-  rw [tfVpn_toNat] at hk
+  rw [Xv6.tfVpn_toNat] at hk
   unfold UPtd.leaves
-  rw [LawfulPartialMap.get?_insert_ne (by rw [trampVpn_toNat]; omega),
-    LawfulPartialMap.get?_insert_ne (by rw [tfVpn_toNat]; omega)]
+  rw [LawfulPartialMap.get?_insert_ne (by rw [Xv6.trampVpn_toNat]; omega),
+    LawfulPartialMap.get?_insert_ne (by rw [Xv6.tfVpn_toNat]; omega)]
   exact h
 
 /-- Nothing is mapped where the table has no leaf. -/
@@ -694,7 +692,7 @@ theorem umMapped_bound {P : UPtd} {va n : Nat} (hwf : uptWf P) (h : umMapped P v
   | none => rw [h0] at h1; cases h1
   | some w =>
     have := (hwf.1 _ w h0).1
-    rw [tfVpn_toNat] at this
+    rw [Xv6.tfVpn_toNat] at this
     unfold uvmMaxsz
     omega
 

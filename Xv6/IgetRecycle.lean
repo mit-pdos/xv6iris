@@ -634,7 +634,7 @@ theorem ig_panic_arm (PA : PANIC) (c : CPU) (k : KCtx) (spie spp : Bool)
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hmsg := ig_cstr_msg $$ HS HD
   k_step (wp_s_branch c _ (KA.«iget» + 0x6a#64) false 52#13 19#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, ig_beqz_zero]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs3, MachCSL.beqz_zero]
   iintro Hk Hpc
   k_step (wp_s_auipc c _ (KA.«iget» + 0x9e#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

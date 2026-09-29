@@ -65,6 +65,7 @@ import Xv6.SpecWritei
 import Xv6.SpecIput
 import Xv6.FsWords
 import Xv6.DinodeSlot
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -164,12 +165,6 @@ theorem sys_unlink_half_bytes_eq (data : Nat → List (BitVec 8)) (i j : Nat) (h
 theorem sys_unlink_name_shift (data : Nat → List (BitVec 8)) (i j : Nat) :
     fileByte data (16 * i + (2 + j)) = dirName data i j := by
   unfold dirName; congr 1; omega
-
-/-- the `setWidth 32` dirlookup's iget wraps the halfword inum in is
-value-transparent (Rocq's `su_zext32_unsigned`) -/
-theorem sys_unlink_zext32 (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.toNat := by
-  have := w.isLt
-  simp only [BitVec.toNat_setWidth]; omega
 
 /-- readi's delivered byte at `tot = 16` is the file's byte (Rocq's
 `su_rdd_eq`) -/

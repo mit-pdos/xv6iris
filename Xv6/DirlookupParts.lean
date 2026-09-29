@@ -48,6 +48,7 @@ import Xv6.SpecDirlookup
 import Xv6.FsWords
 import Xv6.DinodeSlot
 import Xv6.ReadiParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -175,16 +176,10 @@ theorem dirlookup_sext_zext (w : BitVec 16) :
     BitVec.setWidth 64 w = BitVec.signExtend 64 (BitVec.setWidth 32 w) := by
   bv_decide
 
-/-- Rocq's `dlk_zext32_unsigned`. -/
-theorem dirlookup_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  have := w.isLt
-  omega
-
 /-- Rocq's `dlk_live_pos`: a live record's inum is positive. -/
 theorem dirlookup_live_pos (data : Nat → List (BitVec 8)) (k : Nat) (h : dirLive data k) :
     0 < (BitVec.setWidth 32 (dirInum data k)).toNat := by
-  rw [dirlookup_zext32_toNat]
+  rw [MachCSL.zext32_toNat]
   unfold dirLive at h
   rcases Nat.eq_zero_or_pos (dirInum data k).toNat with h0 | h0
   · exact absurd (BitVec.eq_of_toNat_eq (by simpa using h0)) h

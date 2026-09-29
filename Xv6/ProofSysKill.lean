@@ -39,19 +39,6 @@ theorem sk_pid_addr (x : BitVec 64) :
 theorem sk_ec (x : BitVec 64) :
     x + 0xFFFFFFFFFFFFFFE8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 
-theorem sk_calleeSaved_mk (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffd8e#64 = KA.«argint» := by decide
 theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff60e#64 = KA.«kkill» := by decide
 
@@ -236,7 +223,7 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
   case' _ => iframe
   iapply (sk_tail c8 (k.withSpie spie2 spp2) (by simp only [KCtx.withSpie_avail]; exact hK4)
       k.regs rfl R2 (f2.trans b2)
-      (sk_calleeSaved_mk _ _
+      (MachCSL.calleeSaved_mk _ _
         (f9.trans b9) (f18.trans b18) (f19.trans b19) (f20.trans b20) (f21.trans b21)
         (f22.trans b22) (f23.trans b23) (f24.trans b24) (f25.trans b25) (f26.trans b26)
         (f27.trans b27))

@@ -18,6 +18,7 @@ import Xv6.ByteCursor
 import Xv6.KvmLemmas
 import Xv6.UvmCallSites
 import Xv6.UvmallocDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -31,11 +32,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic facts -/
 
-/-- The immediates of the ten-slot frame. -/
-theorem pms_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem pms_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- `ret` out of `kalloc` lands on the `mv a2,a0` after the `jal`. -/
 theorem pms_ret_17a2 : jumpPc (KA.«proc_mapstacks» + 0x56#64) = (KA.«proc_mapstacks» + 0x56#64) := by
@@ -155,7 +151,6 @@ theorem pms_va_range (i : Nat) (hi : i < 64) : (pmsVa i).toNat + 4096 ≤ 2 ^ 38
 /-- The `lui`/`auipc` constants of the cursor set-up. -/
 theorem pms_auipc_11 : BitVec.signExtend 64 (0x11#20 ++ 0#12) = 0x11000#64 := by bv_decide
 theorem pms_auipc_17 : BitVec.signExtend 64 (0x17#20 ++ 0#12) = 0x17000#64 := by bv_decide
-theorem pms_lui_ff4df : BitVec.signExtend 64 (0xff4df#20 ++ 0#12) = 0xffffffffff4df000#64 := by bv_decide
 theorem pms_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 theorem pms_lui_1 : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by bv_decide
 
@@ -706,7 +701,7 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F9
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c10 _ (KA.«proc_mapstacks» + 0x94#64) true 80#12 10 pms_imm_p80)
+  k_step_gen (wp_s_pop c10 _ (KA.«proc_mapstacks» + 0x94#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c11 hp11
   iintro Hk Hpc
@@ -728,8 +723,6 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 
 /-! ## The function -/
 
-theorem pms_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
-  BitVec.add_zero x
 
 theorem proc_mapstacks_br_16c96 : KA.«proc_mapstacks» + 0x16c96#64 = KA.«tickslock» := by decide
 
@@ -745,7 +738,7 @@ theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
   have hK10 : 10 ≤ k.avail := by omega
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«proc_mapstacks» true 4016#12 10 hK10 pms_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«proc_mapstacks» true 4016#12 10 hK10 MachCSL.imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe
@@ -802,7 +795,7 @@ theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
   k_step_gen (wp_s_lui c16 _ (KA.«proc_mapstacks» + 0x24#64) false 0xff4df#20 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pms_lui_ff4df] next c17 hp17
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_ff4df] next c17 hp17
   iintro Hk Hpc
   k_step_gen (wp_s_addi c17 _ (KA.«proc_mapstacks» + 0x28#64) false 2493#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
@@ -909,7 +902,7 @@ theorem proc_mapstacks_proof (KAL : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS :=
           rw [hsup]
   case g9 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, Nat.mul_zero,
-      pms_add_ofNat_zero]
+      MachCSL.add_ofNat_zero]
   case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case g20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

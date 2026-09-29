@@ -45,9 +45,6 @@ theorem ut_fa_ret_106 : jumpPc (KA.«usertrap» + 0x106#64) = KA.«usertrap» + 
 theorem ut_bne_sext0 : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
 
-theorem ut_bne_eq (x : BitVec 64) : bcond bop.BNE x x = false := by simp [bcond]
-
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -104,7 +101,7 @@ theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK :
   · subst hk0
     -- +0xac  c.bnez a0 : not taken
     k_step_e (wp_s_branch cpu _ (KA.«usertrap» + 0xac#64) true 72#13 10#5 0#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext0, ut_bne_eq]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext0, MachCSL.bne_eq]
     iintro Hk Hpc
     unfold utKillRead
     icases Hrd with (⟨-, Hko, %hlive⟩ | ⟨%hne, -⟩)
@@ -342,7 +339,7 @@ theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET
   by_cases h2 : R 18#5 = 2#64
   · -- +0xfe  bne s2,a5 : not taken ; +0x102 jal yield
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xfe#64) false 8112#13 18#5 15#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2, ut_bne_eq]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h2, MachCSL.bne_eq]
     iintro Hk Hpc
     k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x102#64) false 2095114#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_fa_yield_tgt]

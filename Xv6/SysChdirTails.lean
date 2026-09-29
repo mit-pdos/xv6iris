@@ -197,7 +197,7 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   have hp1 := sysChdirPins_cs k _ R1 _ _ (sysChdirPins_set k R _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x6c  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_chdir» + 0x6c#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x6e  j +0x5c
   k_step_e (wp_s_j cpu _ (KA.«sys_chdir» + 0x6e#64) true 2097134#21)
@@ -307,7 +307,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
   have hp2 := sysChdirPins_cs k _ R2 _ _ (sysChdirPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x7a  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_chdir» + 0x7a#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x7c  ld s1,136(sp)
   unfold sysChdirCells

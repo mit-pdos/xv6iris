@@ -21,6 +21,7 @@ import Xv6.DinodeSlot
 import Xv6.SysFstatParts
 import Xv6.SysfileCalls
 import Xv6.VirtioDiskRwDefs2
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -54,11 +55,9 @@ theorem sys_pipe_br_fdalloc : KA.«sys_pipe» + 0xfffffffffffff6d4#64 = KA.«fda
 theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffbfe6#64 = KA.«copyout» := by decide
 theorem sys_pipe_br_fileclose : KA.«sys_pipe» + 0xffffffffffffec86#64 = KA.«fileclose» := by decide
 
-theorem sys_pipe_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sys_pipe_li4 : 0#64 + BitVec.signExtend 64 4#12 = 4#64 := by decide
 theorem sys_pipe_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 
-theorem sys_pipe_a40 (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 theorem sys_pipe_a48 (x : BitVec 64) : x + BitVec.signExtend 64 4048#12 = x + 0xFFFFFFFFFFFFFFD0#64 := by bv_decide
 theorem sys_pipe_a56 (x : BitVec 64) : x + BitVec.signExtend 64 4040#12 = x + 0xFFFFFFFFFFFFFFC8#64 := by bv_decide
 theorem sys_pipe_a60 (x : BitVec 64) : x + BitVec.signExtend 64 4036#12 = x + 0xFFFFFFFFFFFFFFC4#64 := by bv_decide
@@ -66,21 +65,12 @@ theorem sys_pipe_a64 (x : BitVec 64) : x + BitVec.signExtend 64 4032#12 = x + 0x
 theorem sys_pipe_a60' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFC0#64 + 4#64 = x + 0xFFFFFFFFFFFFFFC4#64 := by bv_decide
 theorem sys_pipe_sz (x : BitVec 64) : x + BitVec.signExtend 64 72#12 = pSz x := by unfold pSz; bv_decide
 theorem sys_pipe_pt (x : BitVec 64) : x + BitVec.signExtend 64 80#12 = pPagetable x := by unfold pPagetable; bv_decide
-theorem sys_pipe_sz' (x : BitVec 64) : x + 72#64 = pSz x := rfl
 theorem sys_pipe_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
 
-theorem sys_pipe_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sys_pipe_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 theorem sys_pipe_bgez_m1 : bcond bop.BGE 0xFFFFFFFFFFFFFFFF#64 0#64 = false := by decide
 theorem sys_pipe_bltz_m1' : bcond bop.BLT (-1#64) 0#64 = true := by decide
 theorem sys_pipe_bgez_m1' : bcond bop.BGE (-1#64) 0#64 = false := by decide
-theorem sys_pipe_bltz_nat (n : Nat) (h : n < 16) : bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, Nat.reducePow, BitVec.toInt_zero] at hlt
-  omega
 
 /-- `sw` of `-1`: the low word. -/
 theorem sys_pipe_trunc_m1 : BitVec.extractLsb' 0 32 0xFFFFFFFFFFFFFFFF#64 = 0xFFFFFFFF#32 := by decide

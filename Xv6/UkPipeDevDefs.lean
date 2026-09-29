@@ -96,7 +96,7 @@ set_option linter.unusedSectionVars false
 
 /-- **Rocq `pdev_signed_nat`**. -/
 theorem pdev_signed_nat (n : Nat) (h : (n : Int) < 2 ^ 31) : (BitVec.ofNat 64 n).toInt = (n : Int) :=
-  fh_toInt_small n (by omega)
+  MachCSL.toInt_ofNat n (by omega)
 
 /-- **Rocq `pdev_signed_uint0`**. -/
 theorem pdev_signed_uint0 (r : BitVec 64) (h : r.toNat = 0) : r.toInt = 0 := by

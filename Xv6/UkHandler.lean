@@ -1061,4 +1061,8 @@ theorem treePay_of_conforms {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     ⊢ envRes I E ds -∗ treePay (hlc := hlc) N P t :=
   treePay_of_conforms_p I E ds t hc hs (fun _ h => absurd h (List.not_mem_nil))
 
+/-- **Rocq `cif_not_shared`**. -/
+theorem not_shared (fdm : Fdmap) (fd : Int) (d : Nat) (hns : ¬ fdShared fdm fd d) :
+    ∀ fd', fd' ≠ fd → fdm fd' ≠ some d := fun fd' hne h => hns ⟨fd', hne, h⟩
+
 end Xv6

@@ -69,7 +69,6 @@ theorem asl_sext_nz (v : BitVec 32) (h : v ≠ 0#32) : BitVec.signExtend 64 v �
 theorem asl_beq_z : bcond bop.BEQ (BitVec.signExtend 64 (0#32)) 0#64 = true := by decide
 theorem asl_bne_z : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
-theorem asl_beq_zz : bcond bop.BEQ (0#64) (0#64) = true := by decide
 
 theorem asl_beq_nz (v : BitVec 32) (h : v ≠ 0#32) :
     bcond bop.BEQ (BitVec.signExtend 64 v) 0#64 = false := by
@@ -86,17 +85,8 @@ theorem asl_slk_nz (slk : BitVec 64) (h : lockAddrOk (slk + 8#64)) : slk ≠ 0#6
 
 /-! ## Contexts -/
 
-theorem asl_withSpie_sec (kb : KCtx) (a b : Bool) (l : List String) :
-    ((kb.pushOffAt a b).withLocks l).withSpie a b = (kb.pushOffAt a b).withLocks l :=
-  KCtx.withSpie_self' _ a b rfl rfl
 theorem asl_filter_sl : (["sleep lock"].filter (fun x => x ≠ "sleep lock")) = ([] : List String) := by
   decide
-theorem asl_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
-  rw [← h]; exact KCtx.withLocks_self k0
-theorem asl_popExit_off (kb : KCtx) (a b : Bool) (hwf : kb.wf) (hs : kb.sie = false) :
-    (kb.pushOffAt a b).popExit false = kb.withSpie a b := by
-  have h := KCtx.pushOffAt_popExit kb a b hwf
-  rw [hs] at h; exact h
 theorem asl_epi_ctx (k : KCtx) (Rb R : RegMap) (a b : Bool) :
     ((((k.pushed 4).withRegs Rb).withSpie a b).withRegs R) =
       ((k.withSpie a b).pushed 4).withRegs R := by
@@ -395,7 +385,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
     k_norm_g at hspM
     obtain ⟨e1, e2⟩ := hspM trivial
     subst spieM; subst sppM
-    k_norm_g [asl_withSpie_sec]
+    k_norm_g [MachCSL.withSpie_sec]
     k_norm_g at hM10
     have hM10' : RM 10#5 = k.proc := by rw [hM10, hb.proc]
     have hpreM : aslPre k slk RM := aslPre_cs k slk _ RM
@@ -443,8 +433,8 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
       · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
         case hpp => k_norm_g [hb.proc]
       k_norm_g [asl_popExit kb k.sie a b hb.wf hsie, asl_filter_sl, aslj_4008,
-        asl_withSpie_sec,
-        asl_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
+        MachCSL.withSpie_sec,
+        MachCSL.strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
       k_next_e
       iintro %R5 Hk Hpc %hcs5
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -592,7 +582,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
     k_norm_g at hspP
     obtain ⟨e1, e2⟩ := hspP trivial
     subst spieP; subst sppP
-    k_norm_g [asl_withSpie_sec]
+    k_norm_g [MachCSL.withSpie_sec]
     have hpreP : aslPre k slk RP := aslPre_cs k slk _ RP
       (by unfold aslPre at hpre ⊢
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpre) hcsP
@@ -613,8 +603,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
       · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
         case hpp => k_norm_g [hb.proc]
       k_norm_g [asl_popExit kb k.sie a b hb.wf hsie, asl_filter_sl, aslj_3fe8,
-        asl_withSpie_sec,
-        asl_strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
+        MachCSL.withSpie_sec,
+        MachCSL.strip_locks (kb.withSpie a b) (by simp only [KCtx.withSpie_locks, hb.locks])]
       k_next_e
       iintro %R6 Hk Hpc %hcs6
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -843,7 +833,7 @@ theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) 
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
       iintro Hk Hpc Hw
       k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x1a#64) true 28#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, asl_beq_zz]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, MachCSL.beqz_zero]
       iintro Hk Hpc
       k_norm_g
       iapply (asl_exit RE MP c0 cpu k (k.pushed 4) hb γl γ Rp Hd q q0 (k.regs 10#5) j pid dqp
@@ -995,7 +985,7 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     k_norm_g at hspM
     obtain ⟨e1, e2⟩ := hspM trivial
     subst spieM; subst sppM
-    k_norm_g [asl_withSpie_sec]
+    k_norm_g [MachCSL.withSpie_sec]
     k_norm_g at hM10
     have hpreM : aslPre k slk RM := aslPre_cs k slk _ RM
       (by unfold aslPre at hpre ⊢
@@ -1038,8 +1028,8 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     rotate_right 1
     · isplitl []
       · iempintro
-      k_norm_g [hsie, asl_popExit_off (k.pushed 4) k.spie k.spp hwf hsie, asl_filter_nb k.locks hs,
-        aslj_4008, asl_withSpie_sec, Xv6.kl_withLocks_self k 4 k.spie k.spp, asl_pushed_spie_nb k 4]
+      k_norm_g [hsie, MachCSL.popExit_off (k.pushed 4) k.spie k.spp hwf hsie, asl_filter_nb k.locks hs,
+        aslj_4008, MachCSL.withSpie_sec, Xv6.kl_withLocks_self k 4 k.spie k.spp, asl_pushed_spie_nb k 4]
       iapply wpNext_off_intro
       iintro %R5 Hk Hpc %hcs5
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1143,7 +1133,7 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, asl_add0]
       iintro Hk Hpc Hw
       k_step (wp_s_branch cpu _ (KA.«acquiresleep» + 0x1a#64) true 28#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, asl_beq_zz]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [asl_beq_z, MachCSL.beqz_zero]
       iintro Hk Hpc
       k_norm_g
       iapply (asl_exit_nb RE MP cpu k γl γ γt Rp q q0 (k.regs 10#5) pid dqp hwf hsie hnoff hs hK

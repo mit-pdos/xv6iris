@@ -367,7 +367,6 @@ theorem bd_bne_of_ne (a b : BitVec 32) (h : a ≠ b) :
     bcond bop.BNE (BitVec.signExtend 64 a) (BitVec.signExtend 64 b) = true := by
   simp [bcond, bd_sext_ne a b h]
 
-theorem bd_bne_eq (a : BitVec 64) : bcond bop.BNE a a = false := by simp [bcond]
 theorem bd_beq_eq (a : BitVec 64) : bcond bop.BEQ a a = true := by simp [bcond]
 
 /-- `beqz a5` on a slot-backed count: taken exactly at zero. -/
@@ -391,8 +390,6 @@ theorem bd_blast_nil (d : BitVec 64) : blast (([] : List Nat).map bnode) d = d :
 theorem bd_ext_zero : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
 theorem bd_ext_one : BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (1#12 : BitVec 12))
     = BitVec.ofNat 32 1 := by decide
-
-theorem bd_beqz_zero : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- A balanced call's context, renormalised: a callee's `push_off`/`pop_off`
 pair only moves `SPIE`/`SPP`. -/

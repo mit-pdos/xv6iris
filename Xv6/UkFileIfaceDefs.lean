@@ -333,7 +333,7 @@ theorem fif_ans_ok (l : List FdState) (ret : BitVec 64) :
   · ipureintro
     right
     obtain ⟨hr, hlt, -⟩ := hb
-    rw [hr, fh_toInt_small fd (by unfold NOFILE at hlt; omega)]
+    rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hlt; omega)]
     omega
   · ipureintro
     left
@@ -404,7 +404,7 @@ theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X
   icases Hof with (⟨%fd, %rd, %wr, %t, %hb, Hal⟩ | ⟨%hr, Hstd⟩)
   · obtain ⟨hr, hfdlt, -⟩ := hb
     have hsig : ret.toInt = (fd : Int) := by
-      rw [hr, fh_toInt_small fd (by unfold NOFILE at hfdlt; omega)]
+      rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)]
     rw [hsig]
     have hoh : openHeld fdm (fd : Int) = fun y => y = (fd : Int) ∨ fdDom fdm y := by
       unfold openHeld; rw [if_pos (by omega)]

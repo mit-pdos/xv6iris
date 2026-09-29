@@ -408,22 +408,6 @@ theorem ushm_bltu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     ukBtaken .BLTU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x < y) := by
   simp [ukBtaken, zopz0zI_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy]
 
-/-- `bgeu` at two small values. -/
-theorem ushm_bgeu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
-  simp [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy]
-
-/-- `beq` at two small values. -/
-theorem ushm_beq (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BEQ (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x = y) := by
-  simp only [ukBtaken]
-  by_cases hxy : x = y
-  · subst hxy; simp
-  · have : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
-      intro he; have := congrArg BitVec.toNat he
-      simp [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] at this; exact hxy this
-    simp [this, hxy]
-
 /-- A jump through x0 writes nothing. -/
 theorem ushm_wr0 (m : RegMap) (v : BitVec 64) : ukWr m 0#5 v = m := by
   unfold ukWr; rw [if_pos rfl]

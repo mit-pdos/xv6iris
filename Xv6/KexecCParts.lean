@@ -74,7 +74,7 @@ theorem kxcC_pgru (x : BitVec 64) (h : x.toNat + 4095 < 2 ^ 64) :
   have e1 : BitVec.signExtend 64 (1#20 ++ 0#12) + BitVec.signExtend 64 4095#12 + x = x + 4095#64 := by
     have : BitVec.signExtend 64 (1#20 ++ 0#12) + BitVec.signExtend 64 4095#12 = 4095#64 := by decide
     rw [this, BitVec.add_comm]
-  rw [e1, UPtAlloc.lui_mask, UPtAlloc.pgRoundUp_bv x h]
+  rw [e1, MachCSL.lui_mask, UPtAlloc.pgRoundUp_bv x h]
 
 theorem kxcC_pgru_lt (n : Nat) (h : n ≤ uvmMaxsz) : pgRoundUpN n ≤ uvmMaxsz := by
   have := UPtAlloc.pgRoundUpN_le h

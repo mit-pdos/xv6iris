@@ -62,12 +62,6 @@ theorem pteAddr_ofNat (b : BitVec 44) (i : Nat) (hi : i < 512) :
 theorem base_mem_pages (lvl : Nat) (t : PTree) : t.base ∈ t.pages lvl := by
   cases lvl <;> simp only [PTree.pages, List.mem_cons, true_or]
 
-/-- A subtree's pages are pages of the whole tree. -/
-theorem kid_mem_pages (lvl : Nat) (t c : PTree) (i : BitVec 9) (h : t.kids i = some c)
-    (b : BitVec 44) (hb : b ∈ c.pages lvl) : b ∈ t.pages (lvl + 1) := by
-  simp only [PTree.pages, List.mem_cons, List.mem_flatMap]
-  exact Or.inr ⟨i, mem_allIdx i, by rw [h]; exact hb⟩
-
 /-- In a leaf-free well-formed table a nonzero entry is a pointer to a
 child, which is itself leaf-free (so the level is a successor). -/
 theorem nonzero_kid (lvl : Nat) (t : PTree) (hwf : t.wfU lvl) (hnl : t.noLeaves lvl)
@@ -271,19 +265,13 @@ end
 
 /-! ## Deleting a whole run of leaves -/
 
-theorem delRunL_succ (L : RegMapF (BitVec 64)) (vpn0 n : Nat) :
-    delRunL L vpn0 (n + 1) = Iris.Std.PartialMap.delete (delRunL L vpn0 n) (vpn0 + n) := by
-  unfold delRunL
-  rw [List.range_succ, List.foldl_append]
-  rfl
-
 theorem get?_delRunL_mem (L : RegMapF (BitVec 64)) (vpn0 n k i : Nat)
     (hk : k = vpn0 + i) (hi : i < n) :
     Iris.Std.PartialMap.get? (delRunL L vpn0 n) k = none := by
   induction n with
   | zero => omega
   | succ n ih =>
-    rw [delRunL_succ]
+    rw [Xv6.delRunL_succ]
     by_cases hc : k = vpn0 + n
     · exact Iris.Std.LawfulPartialMap.get?_delete_eq hc.symm
     · rw [Iris.Std.LawfulPartialMap.get?_delete_ne (fun h => hc h.symm)]
@@ -295,7 +283,7 @@ theorem get?_delRunL_not_mem (L : RegMapF (BitVec 64)) (vpn0 n k : Nat)
   induction n with
   | zero => rfl
   | succ n ih =>
-    rw [delRunL_succ,
+    rw [Xv6.delRunL_succ,
       Iris.Std.LawfulPartialMap.get?_delete_ne (fun hc => h n (by omega) hc.symm)]
     exact ih (fun i hi => h i (by omega))
 

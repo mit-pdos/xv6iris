@@ -538,4 +538,20 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- `ret` (`c.jr ra`, 0x8082) expands to `jalr x0, 0(ra)` at User. -/
 example : udecode16 0x8082#16 (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) := ⟨_, true, by rfl, by rfl⟩
 
+theorem beq_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
+    ukBtaken .BEQ (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x = y) := by
+  simp only [ukBtaken]
+  by_cases h : x = y
+  · subst h; simp
+  · have : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
+      intro he; apply h
+      have := congrArg BitVec.toNat he
+      simpa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] using this
+    simp [h, this]
+
+/-- `bgeu` on two `Nat` words (Rocq `moi_ge_u`). -/
+theorem bgeu_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
+    ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
+  simp [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy]
+
 end Xv6

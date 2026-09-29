@@ -64,9 +64,6 @@ set_option linter.unusedVariables false
 
 /-! ## §1 Addresses and the pure steps -/
 
-/-- `ld a5,360(a0)`'s address is the mask cell. -/
-theorem syscall_head_secc_addr (x : BitVec 64) : x + BitVec.signExtend 64 360#12 = pSecc x := by
-  unfold pSecc; rfl
 
 /-- `jal myproc` at `+0x0c`. -/
 theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547526#64 = KA.«myproc» := by
@@ -276,7 +273,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     · -- ALLOWED: +0x42  beqz a5 falls through, +0x44  jalr a4, INTO THE ARM
       have hnum : syscNum V = ((n : Nat) : Int) := syscall_eff_allowed V n hraw hb
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, syscall_beq00, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       k_step_e (wp_s_jalr cpu _ (KA.«syscall» + 0x44#64) true 14#5 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_jump n hn1' hn22']
@@ -301,7 +298,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       have hb' : V.pvSecc.getLsbD n = false := by simpa using hb
       have hblk : syscNum V = 0 := syscall_eff_blocked V n hraw hb'
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, syscall_beq00, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       have hbl : KA.«syscall» + 76#64 = syscallBlocked := rfl
       rw [hbl]

@@ -702,9 +702,6 @@ theorem vdi_read_qnummax (st qn : BitVec 32) (rdy : Bool) (d a u : PAddr) (v : V
     Virtio.read v Virtio.offQueueNumMax = some 1024#32 := by
   rw [vread_queueNumMax, hv]; rfl
 
-/-- A branch on two equal words is not taken. -/
-theorem vdi_bne_self (x : BitVec 64) : bcond bop.BNE x x = false := by simp [bcond]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
@@ -752,7 +749,7 @@ theorem vdi_ident (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 : Vir
   -- +0x30  bne a4,a5 : the magic matches, so the panic is dead
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_init» + 0x30#64) false 336#13 14#5 15#5
       (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_bne_self]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bne_eq]
   iintro Hk Hpc
   -- +0x34  lui a5,0x10001 ; +0x38  lw a5,4(a5)   VERSION
   k_step (wp_s_lui cpu _ (KA.«virtio_disk_init» + 0x34#64) false 0x10001#20 15#5 (by decide))
@@ -778,7 +775,7 @@ theorem vdi_ident (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 : Vir
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_init» + 0x3e#64) false 322#13 15#5 14#5
       (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_bne_self]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bne_eq]
   iintro Hk Hpc
   -- +0x42  lui a5,0x10001 ; +0x46  lw a5,8(a5)   DEVICE_ID
   k_step (wp_s_lui cpu _ (KA.«virtio_disk_init» + 0x42#64) false 0x10001#20 15#5 (by decide))
@@ -800,7 +797,7 @@ theorem vdi_ident (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 : Vir
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_init» + 0x4a#64) false 310#13 15#5 14#5
       (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_bne_self]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bne_eq]
   iintro Hk Hpc
   -- +0x4e  lui a5,0x10001 ; +0x52  lw a4,12(a5)   VENDOR_ID
   k_step (wp_s_lui cpu _ (KA.«virtio_disk_init» + 0x4e#64) false 0x10001#20 15#5 (by decide))
@@ -828,7 +825,7 @@ theorem vdi_ident (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 : Vir
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_init» + 0x5e#64) false 290#13 14#5 15#5
       (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_bne_self]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bne_eq]
   iintro Hk Hpc
   iapply HΦ $$ %_ Hk Hpc Htok
   ipureintro
@@ -1060,7 +1057,7 @@ theorem vdi_qcheck (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   iintro Hk Hpc
   k_step (wp_s_branch cpu _ (KA.«virtio_disk_init» + 0xa8#64) false 240#13 15#5 0#5
       (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdi_bne_self]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bne_eq]
   iintro Hk Hpc
   -- +0xac  lui a5,0x10001 ; +0xb0  lw a5,52(a5)   QUEUE_NUM_MAX = 1024
   k_step (wp_s_lui cpu _ (KA.«virtio_disk_init» + 0xac#64) false 0x10001#20 15#5 (by decide))

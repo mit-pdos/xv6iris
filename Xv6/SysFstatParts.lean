@@ -25,6 +25,7 @@ import MachCSL.StackOwnBounds
 import Xv6.SpecFilestat
 import Xv6.CopyLemmas
 import Xv6.ReadiDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -47,7 +48,6 @@ theorem sfs_ret_12 : jumpPc (KA.«sys_fstat» + 0x12#64) = (KA.«sys_fstat» + 0
 theorem sfs_ret_1e : jumpPc (KA.«sys_fstat» + 0x1e#64) = (KA.«sys_fstat» + 0x1e#64) := by decide
 theorem sfs_ret_32 : jumpPc (KA.«sys_fstat» + 0x32#64) = (KA.«sys_fstat» + 0x32#64) := by decide
 
-theorem sfs_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sfs_add0 (x : BitVec 64) : 0#64 + x = x := by simp
 /-- `addi a1,s0,-32` / `ld a1,-32(s0)`: `&st`, frame slot 4. -/
 theorem sfs_st_addr (x : BitVec 64) : x + BitVec.signExtend 64 4064#12 = x + 0xFFFFFFFFFFFFFFE0#64 := by
@@ -55,7 +55,6 @@ theorem sfs_st_addr (x : BitVec 64) : x + BitVec.signExtend 64 4064#12 = x + 0xF
 /-- `addi a2,s0,-24` / `ld a0,-24(s0)`: `&f`, frame slot 3. -/
 theorem sfs_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
   bv_decide
-theorem sfs_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sfs_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
 /-- `&f` is not null (Rocq's `stack_own_sp_nonzero` reading, off the

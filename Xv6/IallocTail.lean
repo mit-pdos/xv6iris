@@ -86,7 +86,7 @@ theorem ialloc_epilogue [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCtx) (spie 
   have hcs : calleeSaved k.regs (((R.set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 2#5
       (k.regs 2#5)) := by
     obtain ⟨p23, p24, p25, p26, p27⟩ := hp
-    exact ialloc_calleeSaved_epi k.regs R h9 h18 h19 h20 h21 h22 p23 p24 p25 p26 p27
+    exact MachCSL.calleeSaved_mk k.regs R h9 h18 h19 h20 h21 h22 p23 p24 p25 p26 p27
   have ha0 : (((R.set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 2#5 (k.regs 2#5)) 10#5
       = R 10#5 := by
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

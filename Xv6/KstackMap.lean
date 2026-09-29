@@ -46,11 +46,6 @@ def kvmMapN (pas : Nat → BitVec 44) : Nat → RegMapF (BitVec 64)
 /-- The kernel map: the static entries and the 64 stack leaves. -/
 def kvmMap (pas : Nat → BitVec 44) : RegMapF (BitVec 64) := kvmMapN pas 64
 
-theorem kstackVpn_toNat' (i : Nat) (hi : i < 64) : (kstackVpn i).toNat = 0x3FFFFFF - 2 * (i + 1) := by
-  unfold kstackVpn
-  simp only [BitVec.toNat_ofNat, Nat.reducePow]
-  omega
-
 /-- The static map has no stack page. -/
 theorem static_stack_none (i : Nat) (hi : i < 64) :
     Iris.Std.PartialMap.get? (M := RegMapF) KernelMap.static (kstackVpn i).toNat = none := by
@@ -59,7 +54,7 @@ theorem static_stack_none (i : Nat) (hi : i < 64) :
   | some v =>
     exfalso
     obtain ⟨perm, hc, -⟩ := kmapStaticMap_get_inv _ v hget
-    rw [kstackVpn_toNat' i hi] at hc
+    rw [Xv6.kstackVpn_toNat i hi] at hc
     unfold kmapClass at hc
     split at hc
     · omega
@@ -91,7 +86,7 @@ theorem kvmMapN_fresh (pas : Nat → BitVec 44) (n : Nat) (hn : n < 64) :
     exfalso
     rcases get?_kvmMapN pas n _ v hget with h | ⟨i, hi, hk, -⟩
     · rw [static_stack_none n hn] at h; cases h
-    · rw [kstackVpn_toNat' n hn, kstackVpn_toNat' i (by omega)] at hk
+    · rw [Xv6.kstackVpn_toNat n hn, Xv6.kstackVpn_toNat i (by omega)] at hk
       omega
 
 /-- `kvmmake`'s table satisfies the installed-table facts for the map with

@@ -638,8 +638,6 @@ theorem fp_filter_nextpid (l : List String) (h : "nextpid" ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem fp_withLocks_self (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -647,7 +645,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-! ## The address of a field, folded back after a store -/
 
 theorem fp_addr_pid (pa : BitVec 64) : pa + 48#64 = pPid pa := rfl
-theorem fp_addr_sz (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
 theorem fp_addr_pagetable (pa : BitVec 64) : pa + 80#64 = pPagetable pa := rfl
 theorem fp_addr_trapframe (pa : BitVec 64) : pa + 88#64 = pTrapframe pa := rfl
 
@@ -823,9 +820,6 @@ theorem fp_ret_a90 : jumpPc (KA.«freeproc» + 0x14#64) = (KA.«freeproc» + 0x1
 theorem fp_ret_a9e : jumpPc (KA.«freeproc» + 0x22#64) = (KA.«freeproc» + 0x22#64) := by decide
 theorem fp_beq_taken (p : BitVec 64) (h : p = 0#64) : bcond bop.BEQ p 0#64 = true := by
   subst h; decide
-theorem fp_beq_nottaken (p : BitVec 64) (h : p ≠ 0#64) : bcond bop.BEQ p 0#64 = false := by
-  show (p == 0#64) = false
-  simp only [beq_eq_false_iff_ne]; exact h
 
 /-- The pagetable arm of `freeprocIn`, when the pagetable is present. -/
 theorem fp_ptarm_neg [CurCtx] (V : ProcPriv) (M : Nat → List (BitVec 8)) (h : V.pagetable ≠ 0#64) :
@@ -877,7 +871,7 @@ theorem fp_after_pt (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   -- sd zero,72(s1) : p->sz = 0
   k_step (wp_s_sd cpu _ (KA.«freeproc» + 0x26#64) false 72#12 9#5 0#5 (by decide) szv)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hR9, KCtx.rget_zero, fp_addr_sz]
+    with [hR9, KCtx.rget_zero, Xv6.sz_off]
   iintro Hk Hpc Hsz
   iapply (fp_pid AC RE Γ cpu k γp j hj st ch kl xs pid pidb V nm g hof hcwd hnm hwf hsie
     hnoff hK hlp htier R hR9 hkept)
@@ -949,13 +943,13 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
   · -- not taken: proc_freepagetable(p->pagetable, p->sz)
     k_step (wp_s_branch cpu _ (KA.«freeproc» + 0x1a#64) true 8#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [fp_beq_nottaken V.pagetable hpt0]
+      with [MachCSL.beq_ne V.pagetable hpt0]
     iintro Hk Hpc
     -- ld a1,72(s1) : a1 = p->sz
     k_step (wp_s_ld cpu _ (KA.«freeproc» + 0x1c#64) true 72#12 11#5 9#5 (by decide) (by decide)
         (DFrac.own 1) V.sz)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hR9, fp_addr_sz]
+      with [hR9, Xv6.sz_off]
     iintro Hk Hpc Hsz
     -- jal ra, proc_freepagetable
     k_step (wp_s_jal cpu _ (KA.«freeproc» + 0x1e#64) false 2097052#21 1#5 (by decide))
@@ -1086,7 +1080,7 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
     · -- not taken: kfree(p->trapframe)
       k_step (wp_s_branch cpu _ (KA.«freeproc» + 0xe#64) true 6#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [fp_beq_nottaken V.trapframe htf]
+        with [MachCSL.beq_ne V.trapframe htf]
       iintro Hk Hpc
       -- jal ra, kfree
       k_step (wp_s_jal cpu _ (KA.«freeproc» + 0x10#64) false 2092908#21 1#5 (by decide))

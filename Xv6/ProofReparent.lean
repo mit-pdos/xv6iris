@@ -90,14 +90,7 @@ theorem rp_bne_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = q := by
   rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
-theorem rp_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BNE a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
-
 /-! ## Context reshaping -/
-
-theorem rp_withLocks_self (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
 /-- What an iteration keeps of the registers (everything callee-saved but the
 cursor `s1`). -/
@@ -349,7 +342,7 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     -- bne a5,s2 (taken)
     k_step_gen (wp_s_branch c1 _ (KA.«reparent» + 0x36#64) false 8182#13 15#5 18#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h18, rp_bne_ne (reparentedUpto parents p ip i i) p hnevp] next c2 hp2
+      with [h18, MachCSL.bne_ne (reparentedUpto parents p ip i i) p hnevp] next c2 hp2
     iintro Hk Hpc
     -- put the word back unchanged
     ihave Hword := wp_to_wordAtN (pParent (procAddr i)) 8 (DFrac.own 1)

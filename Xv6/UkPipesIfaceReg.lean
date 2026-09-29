@@ -147,7 +147,7 @@ theorem pns_ok_close (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs : RegM
     pnsOk Dp (fdDelete fdm (k : Int)) (l.set k .closed) (delete vs d) := by
   obtain ⟨h1, h2, h3, h4⟩ := hok
   have hns : ¬ fdShared fdm (k : Int) d := fun h => hnsp ((fdSharedP_iff _ _ _ _).mpr (.inr h))
-  have hn := pns_not_shared fdm (k : Int) d hns
+  have hn := Xv6.not_shared fdm (k : Int) d hns
   refine ⟨?_, ?_, ?_, ?_⟩
   · intro fd' d' hf
     unfold fdDelete at hf

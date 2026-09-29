@@ -14,6 +14,7 @@ import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import Xv6.ByteCursor
 import Xv6.PrintkDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -982,7 +983,6 @@ theorem cs_s4adv (dst0 : BitVec 64) (L D2 : Nat) (h1 : 1 ≤ D2) (hD2 : D2 ≤ L
 theorem cs_s1adv (v : Nat) : BitVec.ofNat 64 v + 4096#64 = BitVec.ofNat 64 (v + 4096) := by
   rw [show (4096#64 : BitVec 64) = BitVec.ofNat 64 4096 from rfl, co_ofNat_add]
 
-theorem cs_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
 theorem cs_xori_01 : (0#64 : BitVec 64) ^^^ BitVec.signExtend 64 (1#12) = 1#64 := by decide
 
@@ -1337,7 +1337,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
     k_step_gen (wp_s_ret c4 _ (KA.«copyinstr» + 0xd4#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
-    ihave Hk := co_kctx_self c5 k _ $$ Hk
+    ihave Hk := MachCSL.kctx_self c5 k _ $$ Hk
     ihave HΦ' := wpNext_at _ _ _ c5 _ (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans
       ((hp2 h).trans (hp1 h))))) $$ HΦ
     iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc [HP Hdst]
@@ -1390,7 +1390,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hmax] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_lui c6 _ (KA.«copyinstr» + 0x26#64) true 0xfffff#20 23#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_mask] next c7 hp7
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_addi c7 _ (KA.«copyinstr» + 0x28#64) true 1#12 25#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_li_one] next c8 hp8
@@ -1406,7 +1406,7 @@ theorem copyinstr_proof (WA : WALKADDR) (VF : VMFAULT) : COPYINSTR :=
         ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))))))))
     ihave Hk := (show kctx (GF := GF) c10 (((k.pushed 12)).withRegs _) ⊢
         kctx c10 (((k.pushed 12).withSpie k.spie k.spp).withRegs _) from
-      co_kctx_self c10 (k.pushed 12) _) $$ Hk
+      MachCSL.kctx_self c10 (k.pushed 12) _) $$ Hk
     iapply (cstr_loop WA VF k γl γk P M old (k.regs 13#5).toNat (k.regs 12#5)
       (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64) (k.regs 26#5) (k.regs 27#5)
       hnoff hK hlk hsz hmax' old.length

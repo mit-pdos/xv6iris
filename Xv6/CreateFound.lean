@@ -109,6 +109,7 @@ import Xv6.SpecNparWrapEra
 import Xv6.DirlookupParts
 import Xv6.KexecTail
 import Xv6.NamexParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -130,11 +131,6 @@ theorem createFound_caller11 : createCaller 11#5 := by unfold createCaller; deci
 theorem createFound_caller12 : createCaller 12#5 := by unfold createCaller; decide
 theorem createFound_caller14 : createCaller 14#5 := by unfold createCaller; decide
 theorem createFound_caller15 : createCaller 15#5 := by unfold createCaller; decide
-
-theorem createFound_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  have := w.isLt
-  omega
 
 
 /-- +0x6c: the `bltu 1,a5` on the word the three ALU leaves leave, at the
@@ -922,7 +918,7 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
     $$ Hdead Hdl Hcre
   -- +0x22  beqz a0 TAKEN
   k_step_e (wp_s_branch cpu _ (KA.«create» + 0x22#64) false 318#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, create_beqz_zero]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
   iintro Hk Hpc
   -- +0x160  c.mv s2,a0
   k_step_e (wp_s_add cpu _ (KA.«create» + 0x160#64) true 18#5 0#5 10#5 (by decide))
@@ -1383,7 +1379,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
     iintro Hk Hpc
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0x4c#64) true 86#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, create_beqz_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hk := kctx_eq_mono cpu _ (((k.withSpie spie1 spp1).pushed 10).withRegs
       (R1.set 18#5 0#64)) (by kctx_ext) $$ Hk
@@ -1418,12 +1414,12 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     have hlt := dirFirst_lt _ _ _ _ hsome
     have hlive := dirFirst_live _ _ _ _ hsome
     have hcnib : (BitVec.setWidth 32 (dirInum data kk)).toNat < 16 * icfgNib := by
-      rw [createFound_zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
+      rw [MachCSL.zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
     have hcpos := Xv6.dirlookup_live_pos data kk hlive
     have hents : (dirEntries (eraNode dn bm data))[bname 14 nf]? =
         some (BitVec.setWidth 32 (dirInum data kk)).toNat := by
       rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz,
-        createFound_zext32_toNat]
+        MachCSL.zext32_toNat]
       exact dv_lookup_found _ data _ _ kk rfl hsome
     ihave #Hft := createFound_env_ftop Γ A $$ Henv
     iapply wpLoop_fupd

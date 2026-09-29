@@ -141,7 +141,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   obtain ⟨hpins3, -⟩ := sys_pipe_pins_call k R2 R3 hpins2 hcs3
   -- li a5,-1 ; the exit
   k_step_gen (wp_s_addi c6 _ (KA.«sys_pipe» + 0xd8#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_m1] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c7 hp7
   iintro Hk Hpc
   ihave Hnext := sys_pipe_cont_shift cpu c6 k γ V.fdg k.proc pid V M sts v
     (fun e => (hp6 (Or.inr e)).trans ((hpin5 (Or.inr e)).trans
@@ -247,7 +247,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   obtain ⟨hpins3, -⟩ := sys_pipe_pins_call k R2 R3 hpins2 hcs3
   -- li a5,-1 ; j +0xda ; the exit
   k_step_gen (wp_s_addi c6 _ (KA.«sys_pipe» + 0xb0#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_m1] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_j c7 _ (KA.«sys_pipe» + 0xb2#64) true 40#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
@@ -299,7 +299,7 @@ theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     next c1 hp1
   iintro Hk Hpc Hc0
   k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0xb8#64) false 16#13 15#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_bltz_nat fd0 hfd0] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.bltz_nat fd0 hfd0] next c2 hp2
   iintro Hk Hpc
   -- a5 = &p->ofile[fd0] ; sd zero,0(a5)
   k_step_gen (wp_s_slli c2 _ (KA.«sys_pipe» + 0xbc#64) true 3#6 15#5 15#5 (by decide))

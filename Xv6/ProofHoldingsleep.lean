@@ -46,8 +46,6 @@ theorem hsl_ret_4064 : jumpPc (KA.«holdingsleep» + 0x18#64) = (KA.«holdingsle
 theorem hsl_ret_4070 : jumpPc (KA.«holdingsleep» + 0x24#64) = (KA.«holdingsleep» + 0x24#64) := by decide
 theorem hsl_ret_4088 : jumpPc (KA.«holdingsleep» + 0x3c#64) = (KA.«holdingsleep» + 0x3c#64) := by decide
 
-theorem hsl_slLk_eq (x : BitVec 64) : slLk x = x + 8#64 := rfl
-theorem hsl_slPid_eq (x : BitVec 64) : slPid x = x + 40#64 := rfl
 theorem hsl_pPid_eq (x : BitVec 64) : pPid x = x + 48#64 := rfl
 
 theorem hsl_sp40 (x : BitVec 64) :
@@ -68,8 +66,6 @@ theorem hsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem hsl_withLocks_self' (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 theorem hsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 6).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 6 := rfl
 
@@ -271,7 +267,7 @@ theorem hsl_join (RE : RELEASE) (cpu c : CPU) (k : KCtx) (P Q : IProp GF)
   -- past release: the tail
   iapply wpNext_intro_pin
   iintro %cE %hpE %R3 Hk Hpc %hcs3
-  k_norm_g [hsl_withLocks_self']
+  k_norm_g [MachCSL.withLocks_self']
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs3
@@ -326,7 +322,7 @@ theorem hsl_taken (MP : MYPROC) (RE : RELEASE) (cpu c : CPU) (k : KCtx)
     with ⟨Fra, Fs0, Fs1, Fs2, ⟨%w1, F40⟩, ⟨%w2, F48⟩⟩
   icases sleeplockedQ_pid γ q slk pid $$ Ht with ⟨Hpid, Hcl⟩
   ihave Hpid := (show wordPointsTo (GF := GF) (slPid slk) 4 (DFrac.own 1) pid ⊢
-      wordPointsTo (slk + 40#64) 4 (DFrac.own 1) pid from by rw [hsl_slPid_eq]) $$ Hpid
+      wordPointsTo (slk + 40#64) 4 (DFrac.own 1) pid from by rw [Xv6.slPid_eq]) $$ Hpid
   ihave Hpp := (show wordPointsTo (GF := GF) (pPid k.proc) 4 dqp pid ⊢
       wordPointsTo (k.proc + 48#64) 4 dqp pid from by rw [hsl_pPid_eq]) $$ Hpp
   -- c.sd s3,8(sp)
@@ -386,7 +382,7 @@ theorem hsl_taken (MP : MYPROC) (RE : RELEASE) (cpu c : CPU) (k : KCtx)
     (k.regs 19#5) w2 $$ [Fra Fs0 Fs1 Fs2 F40 F48]
   case' _ => iframe
   ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) pid ⊢
-      wordPointsTo (slPid slk) 4 (DFrac.own 1) pid from by rw [hsl_slPid_eq]) $$ Hpid
+      wordPointsTo (slPid slk) 4 (DFrac.own 1) pid from by rw [Xv6.slPid_eq]) $$ Hpid
   ihave Ht := Hcl $$ %pid Hpid
   ihave Hpp := (show wordPointsTo (GF := GF) (k.proc + 48#64) 4 dqp pid ⊢
       wordPointsTo (pPid k.proc) 4 dqp pid from by rw [hsl_pPid_eq]) $$ Hpp

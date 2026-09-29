@@ -62,9 +62,6 @@ theorem kf_align8 (p : BitVec 64) (h : pageValid p) : p.toNat % 8 = 0 := by
 
 theorem kf_c4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
-/-- Dropping a redundant lock list. -/
-theorem kf_withLocks_self' (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
 section
 set_option linter.unusedSectionVars false
@@ -290,7 +287,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   iapply (kf_release RE _ _ γl (kmemRes γk) ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1
-  k_norm_g [kf_withLocks_self', filter_kmem_cons k.locks hlk, KCtx.pushOffAt_popExit k spie spp hwf]
+  k_norm_g [MachCSL.withLocks_self', filter_kmem_cons k.locks hlk, KCtx.pushOffAt_popExit k spie spp hwf]
   iframe #
   case hsr => k_norm_g
   case hnr => k_norm_g; omega

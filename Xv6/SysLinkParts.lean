@@ -26,7 +26,7 @@ uses (never Rocq's comments):
    `wp_s_addiw`; `wp_s_sh`: `extractLsb' 0 16`; `wp_s_lui`; the branch
    conditions as `bcond`), as `Xv6/NamexParts.lean`.  So:
    * the sign cluster (`sl_sint_moi`, `sl_nonneg`, `sl_m1_neg`,
-     `sl_zero_nonneg`) is `sysfile_bltz_nat` / `sysfile_bltz_m1` /
+     `sl_zero_nonneg`) is `sysfile_bltz_nat` / `MachCSL.bltz_m1` /
      `sys_link_bltz_0`; `sl_len_range` / `sl_plen_lt` / `sl_maxpath_lt` /
      `sl_noff0` are `Z` bookkeeping the `Nat` statements do not need;
      `sl_arg0_lt` / `sl_arg1_lt` are kept;
@@ -197,9 +197,6 @@ theorem sys_link_ndec_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :
 Both flushes move ONE halfword, so the new record is the old one with
 `diNlink` replaced -- and every pure clause a re-park owes (`inodeOk`,
 `dirOk`) reads only the type, the size and the addrs. -/
-
-theorem sys_link_setnl_nlink (dn : Dinode) (nl : BitVec 16) :
-    (sysfileSetnl dn nl).diNlink = nl := rfl
 
 /-- the ".." index clause across the same store (Rocq's `sl_setnl_ddix`):
 `dirDotsIx` is guarded on the COUNT, so the congruence needs the home live. -/

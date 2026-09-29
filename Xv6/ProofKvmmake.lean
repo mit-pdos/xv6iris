@@ -17,6 +17,7 @@ import Xv6.SpecKvmmap
 import Xv6.KvmCounts
 import Xv6.CodeTactics
 import Xv6.UvmCallSites
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -69,7 +70,6 @@ theorem km_ret_120c : jumpPc (KA.«kvmmake» + 0xac#64) = (KA.«kvmmake» + 0xac
 theorem km_ret_1212 : jumpPc (KA.«kvmmake» + 0xb2#64) = (KA.«kvmmake» + 0xb2#64) := by
   decide
 
-theorem km_extract0 : BitVec.extractLsb' 0 8 (0#64) = 0#8 := by decide
 
 /-- The virtual page numbers of the seven regions. -/
 theorem km_v1 : vpnOf (0x10000000#64) = 0x10000#27 := by decide
@@ -811,7 +811,7 @@ theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPS
   case hK2 => k_norm_g; omega
   case hn2 => k_norm_g
   case hl2 => exact List.length_replicate
-  k_norm_g [km_ret_1178, km_extract0]
+  k_norm_g [km_ret_1178, MachCSL.extract_zero]
   iapply wpNext_intro_pin
   iintro %c8 %hp8 %R2 Hk Hpc Hbuf %hpost2
   -- the zeroed page is the root node

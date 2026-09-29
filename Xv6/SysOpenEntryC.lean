@@ -293,7 +293,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
   iintro Hk Hpc
   -- +0x48  c.beqz a0 : taken (ARM A-FAIL)
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x48#64) true 138#13 10#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
   iintro Hk Hpc
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 210#64) ⊢
     pcIs cpu (sysOpenAddr + 0xd2#64) from .rfl) $$ Hpc

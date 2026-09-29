@@ -89,7 +89,6 @@ theorem kxcC_br_uvmclear : KA.«kexec» + 0x1fc#64 + BitVec.signExtend 64 208333
   decide
 theorem kxcC_ret_1fc : jumpPc (KA.«kexec» + 0x1fc#64 + 4#64) = KA.«kexec» + 0x1fc#64 + 4#64 := by
   decide
-theorem kxcC_sz_off (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
 
 /-- The guard page's address: `lui a1,0xffffe ; add a1,a1,a0` at `a0 = s + 8192`. -/
 theorem kxcC_guard (x : BitVec 64) : 18446744073709543424#64 + (8192#64 + x) = x := by bv_omega
@@ -470,7 +469,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   icases kxcC_priv_sz hct' A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨%hVsz, Hsz, Hpriv⟩
   k_step_e (wp_s_ld cpu _ (KA.«kexec» + 0x1b4#64) false 72#12 21#5 10#5 (by decide) (by decide)
       (DFrac.own 1) A.V.sz)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, kxcC_sz_off]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a10, Xv6.sz_off]
   iintro Hk Hpc Hsz
   ihave Hpriv := Hpriv $$ Hsz
   -- +0x1b8 .. +0x1c0  s8 = PGROUNDUP(sz)

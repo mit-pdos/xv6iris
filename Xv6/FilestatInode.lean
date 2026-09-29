@@ -39,7 +39,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem filestat_sz' (x : BitVec 64) : x + 72#64 = pSz x := rfl
 theorem filestat_pt' (x : BitVec 64) : x + 80#64 = pPagetable x := rfl
 
 
@@ -93,7 +92,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   -- +0x42  ld a1,72(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x42#64) false 72#12 11#5 18#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_sz, filestat_sz']
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, Xv6.sys_pipe_sz, Xv6.sz_off]
   iintro Hk Hpc Hsz
   -- +0x46  ld a0,80(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x46#64) false 80#12 10#5 18#5 (by decide) (by decide)

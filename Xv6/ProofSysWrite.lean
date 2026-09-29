@@ -224,7 +224,7 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0x2a#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x2c  bltz a5 : falls through
   k_step_e (wp_s_branch cpu _ (KA.«sys_write» + 0x2c#64) false 20#13 15#5 0#5 (by decide) bop.BLT)
@@ -237,7 +237,7 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro Hk Hpc Hn
   k_step_e (wp_s_ld cpu _ (KA.«sys_write» + 0x34#64) false 4056#12 11#5 8#5 (by decide) (by decide)
       (DFrac.own 1) v1)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, swr_p_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, MachCSL.add_sext_4056]
   iintro Hk Hpc Hp
   k_step_e (wp_s_ld cpu _ (KA.«sys_write» + 0x38#64) false 4072#12 10#5 8#5 (by decide) (by decide)
       (DFrac.own 1) fv)
@@ -284,11 +284,11 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.sfs_add0]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0x2a#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1]
   iintro Hk Hpc
   -- +0x2c  bltz a5 : taken
   k_step_e (wp_s_branch cpu _ (KA.«sys_write» + 0x2c#64) false 20#13 15#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_bltz_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1]
   iintro Hk Hpc
   ihave Hframe := swr_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ _ $$ [Hra Hs0 Hcells]
   · iframe
@@ -512,7 +512,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   icases Hcells with ⟨%hal, Hf, Hlo, Hn, Hp, Hu⟩
   -- +0x08  addi a1,s0,-40 ; +0x0c  c.li a0,1 ; +0x0e  jal argaddr
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0x8#64) false 4056#12 11#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [swr_p_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.add_sext_4056]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_write» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.ci_li_one]
@@ -527,14 +527,14 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   iapply (sysfile_argaddr AA cpu _ 1 V.upt.tfp V.tf v1 wp (DFrac.own 1) (by decide) ?ha0 hv1 ?hna ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [swr_ret_12, swr_p_addr]
+  k_norm_g [swr_ret_12, MachCSL.add_sext_4056]
   iframe
   case ha0 => k_norm_g [Xv6.ci_li_one]
   case hna => k_norm_g; omega
   case hKa => k_norm_g; unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
-  k_norm_g [swr_ret_12, swr_p_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
+  k_norm_g [swr_ret_12, MachCSL.add_sext_4056, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : swrRegs k R1 := by
     refine swrRegs_cs _ _ _ ?_ hcs1
     repeat (refine swrRegs_set _ _ _ _ ?_ (by decide))

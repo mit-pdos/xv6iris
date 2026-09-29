@@ -513,4 +513,16 @@ theorem imgBytes_ctx (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
 
 end ambient
 
+theorem addr_succ (a : BitVec 64) (m : Nat) :
+    a + BitVec.ofNat 64 m + 1#64 = a + BitVec.ofNat 64 (m + 1) := by
+  rw [BitVec.add_assoc]
+  congr 1
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
+theorem filter_pipe : (["pipe"].filter (fun x => x ≠ "pipe")) = ([] : List String) := by decide
+
+theorem addr_zero (a : BitVec 64) : a = a + BitVec.ofNat 64 0 := by simp
+
 end MachCSL

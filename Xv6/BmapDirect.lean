@@ -223,7 +223,7 @@ theorem bm_direct_alloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0]
     iintro Hk Hpc
     bm_step (wp_s_branch c _ (KA.«bmap» + 0x30#64) true 90#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, bm_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Haddrs := Hback $$ %(blkmapGet bm fbn) Hcell
     rw [bm_cells_restore_dir bm fbn hlen hdir]

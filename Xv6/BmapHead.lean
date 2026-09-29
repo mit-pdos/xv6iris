@@ -271,7 +271,7 @@ theorem bm_head_alloc (BA : BALLOC) (LW : LOG_WRITE) (BR : BREAD) (BE : BRELSE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0]
     iintro Hk Hpc
     bm_step (wp_s_branch c _ (KA.«bmap» + 0x56#64) true 52#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, bm_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h0, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Haddrs := Hback $$ %bm.bmInd Hcell
     rw [bm_cells_restore_ind bm hlen]

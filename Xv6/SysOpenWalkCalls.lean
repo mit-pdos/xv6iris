@@ -25,7 +25,7 @@ walk's constants and the path buffer's cut.
 4. The superblock cells are `fsReady`'s persistent `DFrac.discard` ones.
 
 Reused from `SysfileCalls` (the shared sysfile call sites): `sysfile_ww`,
-`sysfile_psw`, `sysfile_beq00`.  Its `sysfile_buf_split` / `_join` cut a
+`sysfile_psw`, `MachCSL.beqz_zero`.  Its `sysfile_buf_split` / `_join` cut a
 `pl ++ 0 :: rest` list; the walk's buffer arrives as `bview 128 bp`, so the
 cut here is `sys_open_walk_buf_split` / `_join`.
 -/

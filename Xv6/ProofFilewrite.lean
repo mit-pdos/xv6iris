@@ -57,7 +57,6 @@ set_option linter.unusedVariables false
 
 /-! ## The dispatch's readings -/
 
-theorem fwr_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 theorem fwr_blez (n : Int) (hn : 0 ≤ n ∧ n < 2 ^ 31) :
     bcond bop.BGE 0#64 (BitVec.ofInt 64 n) = decide (n = 0) := by
@@ -352,7 +351,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   by_cases hw : C.writable = 0#8
   · -- +0x04  beqz a5 : taken, the `!writable` return before any frame
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hw, fwr_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hw, MachCSL.beqz_zero]
     iintro Hk Hpc
     -- +0x13a  c.li a0,-1
     k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x13a#64) true 4095#12 10#5 0#5 (by decide))

@@ -115,13 +115,7 @@ theorem pteAD_ne_zero {c v : BitVec 64} (h : pteAD c v) (hc : isLeafPte c) : v �
 
 /-! ## The leaf map of a table -/
 
-theorem tfVpn_toNat : tfVpn.toNat = 67108862 := by decide
-theorem trampVpn_toNat : trampVpn.toNat = 67108863 := by decide
 theorem tf_ne_tramp : tfVpn.toNat ≠ trampVpn.toNat := by decide
-
-/-- The trampoline leaf. -/
-theorem leaves_get_tramp (P : UPtd) : get? P.leaves trampVpn.toNat = some trampLeaf := by
-  unfold UPtd.leaves; exact get?_insert_eq rfl
 
 /-- The trapframe leaf. -/
 theorem leaves_get_tf (P : UPtd) : get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
@@ -137,7 +131,7 @@ theorem leaves_get_um (P : UPtd) (k : Nat) (h1 : k ≠ tfVpn.toNat) (h2 : k ≠ 
 /-- A key below `TRAPFRAME` is a user leaf. -/
 theorem leaves_get_of_lt (P : UPtd) (k : Nat) (h : k < tfVpn.toNat) :
     get? P.leaves k = get? P.um k :=
-  leaves_get_um P k (by omega) (by rw [tfVpn_toNat] at h; rw [trampVpn_toNat]; omega)
+  leaves_get_um P k (by omega) (by rw [Xv6.tfVpn_toNat] at h; rw [Xv6.trampVpn_toNat]; omega)
 
 /-- **The fixed leaves removed**: what `proc_freepagetable` leaves behind is
 exactly the user leaves (`uptWf` keeps every user key below `TRAPFRAME`). -/
@@ -157,7 +151,7 @@ theorem leaves_delete_tramp_tf (P : UPtd) (hwf : uptWf P) :
       | none => rfl
       | some w =>
         have := (hwf.1 _ _ hg).1
-        rw [trampVpn_toNat] at this; rw [tfVpn_toNat] at this; omega
+        rw [Xv6.trampVpn_toNat] at this; rw [Xv6.tfVpn_toNat] at this; omega
     · rw [get?_delete_ne (Ne.symm hj'), leaves_get_um P j hj hj']
 
 /-! ## `ptRep`: the tree's walks are the leaves -/
@@ -185,21 +179,13 @@ theorem ptRep_congr {t : PTree} {L L' : RegMapF (BitVec 64)} (h : ptRep t L)
 
 /-! ## `delRunL`: a run of keys removed -/
 
-theorem delRunL_zero (L : RegMapF (BitVec 64)) (v0 : Nat) : delRunL L v0 0 = L := rfl
-
-theorem delRunL_succ (L : RegMapF (BitVec 64)) (v0 n : Nat) :
-    delRunL L v0 (n + 1) = delete (delRunL L v0 n) (v0 + n) := by
-  unfold delRunL
-  rw [List.range_succ, List.foldl_append]
-  rfl
-
 /-- A key in the run is gone. -/
 theorem delRunL_get_mem (L : RegMapF (BitVec 64)) (v0 n k : Nat) (h1 : v0 ≤ k) (h2 : k < v0 + n) :
     get? (delRunL L v0 n) k = none := by
   induction n with
   | zero => omega
   | succ n ih =>
-    rw [delRunL_succ]
+    rw [Xv6.delRunL_succ]
     by_cases hk : v0 + n = k
     · exact get?_delete_eq hk
     · rw [get?_delete_ne hk]; exact ih (by omega)
@@ -210,9 +196,7 @@ theorem delRunL_get_not_mem (L : RegMapF (BitVec 64)) (v0 n k : Nat) (h : k < v0
   induction n with
   | zero => rfl
   | succ n ih =>
-    rw [delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
-
-theorem UPtd.delRun_zero (P : UPtd) (v0 : Nat) : P.delRun v0 0 = P := rfl
+    rw [Xv6.delRunL_succ, get?_delete_ne (by omega), ih (by omega)]
 
 theorem delRun_get_mem (P : UPtd) (v0 n k : Nat) (h1 : v0 ≤ k) (h2 : k < v0 + n) :
     get? (P.delRun v0 n).um k = none := delRunL_get_mem P.um v0 n k h1 h2

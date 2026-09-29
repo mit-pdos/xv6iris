@@ -1203,4 +1203,24 @@ theorem kctx_trap_resume [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   iintro %cpu' %hpin Hk Hpc
   iapply IH $$ %cpu' %(fun h0 => hpin (Or.inr h0)) HI Hk Hpc
 
+/-- The hart id, sign-extended from 32 bits and scaled by `sizeof (struct cpu)`. -/
+theorem hart_shift (cpu : CPU) :
+    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = BitVec.ofNat 64 (128 * cpu.val) := by
+  have hv : cpu.val < 8 := cpu.isLt
+  have h32 : BitVec.extractLsb' 0 32 (hartId cpu) = BitVec.ofNat 32 cpu.val := by
+    apply BitVec.eq_of_toNat_eq
+    simp only [hartId, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
+    rw [Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
+  rw [h32]
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_shiftLeft, BitVec.toNat_signExtend]
+  have hmsb : (BitVec.ofNat 32 cpu.val).msb = false := by
+    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]
+    rw [Nat.mod_eq_of_lt (by omega)]; simp; omega
+  rw [hmsb]
+  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.add_zero,
+    Nat.shiftLeft_eq]
+  rw [Nat.mod_eq_of_lt (by omega : cpu.val < 4294967296), Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
+  omega
+
 end MachCSL

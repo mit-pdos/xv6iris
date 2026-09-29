@@ -86,6 +86,7 @@ import Xv6.SpecBpin
 import Xv6.FsWords
 import Xv6.InitlogHead
 import Xv6.PrintkDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -117,9 +118,6 @@ theorem lw_lhn : KA.«log_write» + 0x1e706#64 = lhNAddr := by unfold lhNAddr lo
 theorem lw_lout : KA.«log_write» + 0x1e6f6#64 = lOut := by unfold lOut logAddr; decide
 theorem lw_blk0 : KA.«log_write» + 0x1e70a#64 = lhBlock 0 := by unfold lhBlock logAddr; decide
 
-theorem lw_lhn_addr : logAddr + 44#64 = lhNAddr := rfl
-theorem lw_out_addr : logAddr + 28#64 = lOut := rfl
-
 
 /-- **The scan's index, as the machine holds it**: a 64-bit word the
 normaliser does not take apart (`BitVec.ofNat_add` would split every
@@ -137,10 +135,6 @@ theorem lw_shl2 (i : Nat) (h : i ≤ LOGBLOCKS) :
   simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.shiftLeft_eq, Nat.reducePow]
   omega
 
-/-- `b->blockno`'s address, as `lw a1,12(s1)` computes it. -/
-theorem lw_bno_addr (a : BitVec 64) : a + 12#64 = aBufBlockno a := by
-  unfold aBufBlockno
-  rfl
 
 /-- `&log.lh.block[i]`, as the `slli`/`addi`/`add`/`sw` chain computes it. -/
 theorem lw_blk_addr (i : Nat) :
@@ -200,11 +194,6 @@ theorem lw_bne_nat (a b : Nat) (ha : a ≤ LOGBLOCKS) (hb : b ≤ LOGBLOCKS) :
   rw [show ((lwIx a == lwIx b) = bcond bop.BEQ (lwIx a) (lwIx b)) from rfl,
     lw_beq_nat a b ha hb, ← decide_not]
 
-theorem lw_toInt_small (a : Nat) (h : a < 2 ^ 63) : (BitVec.ofNat 64 a).toInt = (a : Int) := by
-  rw [BitVec.toInt_eq_toNat_cond]
-  simp only [BitVec.toNat_ofNat]
-  rw [if_pos (by omega)]
-  omega
 
 /-- `blt a5,a2` at `+0x22`: the "too big a transaction" guard, `29` against
 `lh.n`. -/
@@ -214,7 +203,7 @@ theorem lw_blt29 (n : Nat) (h : n ≤ LOGBLOCKS) :
   unfold lwIx
   show BitVec.slt _ _ = _
   rw [BitVec.slt]
-  rw [lw_toInt_small 29 (by omega), lw_toInt_small n (by omega)]
+  rw [MachCSL.toInt_ofNat 29 (by omega), MachCSL.toInt_ofNat n (by omega)]
   by_cases hn : 29 < n <;> simp [hn] <;> omega
 
 /-- `blez a5` at `+0x2e` (`log.outstanding`) and `blez a2` at `+0x34`
@@ -225,7 +214,7 @@ theorem lw_blez (m : Nat) (h : m ≤ LOGBLOCKS) :
   unfold lwIx
   show (!(BitVec.slt _ _)) = _
   rw [BitVec.slt]
-  rw [show ((0#64 : BitVec 64).toInt = 0) from by decide, lw_toInt_small m (by omega)]
+  rw [show ((0#64 : BitVec 64).toInt = 0) from by decide, MachCSL.toInt_ofNat m (by omega)]
   by_cases hm : m = 0 <;> simp [hm] <;> omega
 
 /-! ## The context and the register pins -/
@@ -308,30 +297,6 @@ theorem lwPins_set (kR : RegMap) (kk : Nat) (R : RegMap) (h : lwPins kR kk R)
       | (rw [if_neg (Ne.symm n26)]; exact a26)
       | (rw [if_neg (Ne.symm n27)]; exact a27)
 
-
-/-- The callee-saved bundle survives a write to a caller-saved register. -/
-theorem lw_cs_set (kR R : RegMap) (h : calleeSaved kR R) (i : BitVec 5) (v : BitVec 64)
-    (hi : i ≠ 2#5 ∧ i ≠ 8#5 ∧ i ≠ 9#5 ∧ i ≠ 18#5 ∧ i ≠ 19#5 ∧ i ≠ 20#5 ∧ i ≠ 21#5 ∧
-      i ≠ 22#5 ∧ i ≠ 23#5 ∧ i ≠ 24#5 ∧ i ≠ 25#5 ∧ i ≠ 26#5 ∧ i ≠ 27#5) :
-    calleeSaved kR (R.set i v) := by
-  obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
-  obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply] <;>
-    first
-      | (rw [if_neg (Ne.symm n2)]; exact a2)
-      | (rw [if_neg (Ne.symm n8)]; exact a8)
-      | (rw [if_neg (Ne.symm n9)]; exact a9)
-      | (rw [if_neg (Ne.symm n18)]; exact a18)
-      | (rw [if_neg (Ne.symm n19)]; exact a19)
-      | (rw [if_neg (Ne.symm n20)]; exact a20)
-      | (rw [if_neg (Ne.symm n21)]; exact a21)
-      | (rw [if_neg (Ne.symm n22)]; exact a22)
-      | (rw [if_neg (Ne.symm n23)]; exact a23)
-      | (rw [if_neg (Ne.symm n24)]; exact a24)
-      | (rw [if_neg (Ne.symm n25)]; exact a25)
-      | (rw [if_neg (Ne.symm n26)]; exact a26)
-      | (rw [if_neg (Ne.symm n27)]; exact a27)
 
 theorem lw_cs_refl (R : RegMap) : calleeSaved R R :=
   ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
@@ -911,7 +876,7 @@ theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
       iapply HC $$ %i %_ [] Hk Hpc Hblk
       ipureintro
       refine ⟨?_, ?_, ?_, by omega, Or.inl ⟨hi, ?_⟩⟩
-      · repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+      · repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
         exact hcs
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h12
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h15
@@ -942,7 +907,7 @@ theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
           exact hmatch (Option.some.inj hc)
       have hcs' : calleeSaved kR (((R.set 13#5 (BitVec.signExtend 64 (W[i]'hiW))).set 15#5
           (lwIx (i + 1))).set 14#5 (lhBlock (i + 1))) := by
-        repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+        repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
         exact hcs
       by_cases hend : i + 1 = n
       · -- the APPEND fall-through
@@ -1031,7 +996,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
   ihave Hbno := (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4
         (DFrac.own (1 : Qp).half) bno ⊢
       wordPointsTo (bnode kk + 12#64) 4 (DFrac.own (1 : Qp).half) bno from by
-    rw [lw_bno_addr]) $$ Hbno
+    rw [Xv6.bno_addr]) $$ Hbno
   k_step (wp_s_lw c _ (KA.«log_write» + 0xa6#64) true 12#12 13#5 9#5 (by decide) (by decide)
       (DFrac.own (1 : Qp).half) bno)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
@@ -1039,7 +1004,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
   ihave Hbno := (show wordPointsTo (GF := GF) (bnode kk + 12#64) 4
         (DFrac.own (1 : Qp).half) bno ⊢
       wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
-    rw [lw_bno_addr]) $$ Hbno
+    rw [Xv6.bno_addr]) $$ Hbno
   k_step (wp_s_sw c _ (KA.«log_write» + 0xa8#64) true 16#12 14#5 13#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [lw_blk_addr i, Xv6.fw_ext32 bno]
@@ -1055,7 +1020,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
       unfold lwStoreExit; rw [if_pos heq]]
     iapply HC $$ %_ [] Hk Hpc Hbno Hcell
     ipureintro
-    repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+    repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
     exact lw_cs_refl R
   · have hcond : bcond bop.BEQ (lwIx n) (lwIx i) = false := by
       rw [lw_beq_nat n i hn30 hi30]
@@ -1067,7 +1032,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
       unfold lwStoreExit; rw [if_neg heq]]
     iapply HC $$ %_ [] Hk Hpc Hbno Hcell
     ipureintro
-    repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+    repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
     exact lw_cs_refl R
 
 /-! ## The scan's fall-through: `log.lh.block[n] = b->blockno` (`+0x52 .. +0x64`) -/
@@ -1107,7 +1072,7 @@ theorem lw_miss (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk n : Nat)
   ihave Hbno := (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4
         (DFrac.own (1 : Qp).half) bno ⊢
       wordPointsTo (bnode kk + 12#64) 4 (DFrac.own (1 : Qp).half) bno from by
-    rw [lw_bno_addr]) $$ Hbno
+    rw [Xv6.bno_addr]) $$ Hbno
   k_step (wp_s_lw c _ (KA.«log_write» + 0x62#64) true 12#12 14#5 9#5 (by decide) (by decide)
       (DFrac.own (1 : Qp).half) bno)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
@@ -1115,14 +1080,14 @@ theorem lw_miss (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk n : Nat)
   ihave Hbno := (show wordPointsTo (GF := GF) (bnode kk + 12#64) 4
         (DFrac.own (1 : Qp).half) bno ⊢
       wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
-    rw [lw_bno_addr]) $$ Hbno
+    rw [Xv6.bno_addr]) $$ Hbno
   k_step (wp_s_sw c _ (KA.«log_write» + 0x64#64) true 16#12 15#5 14#5 (by decide) old)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [lw_blk_addr n, Xv6.fw_ext32 bno]
   iintro Hk Hpc Hcell
   iapply HC $$ %_ [] Hk Hpc Hbno Hcell
   ipureintro
-  repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+  repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
   exact lw_cs_refl R
 
 
@@ -1189,7 +1154,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   -- +0x74 lw a5,44(a4) ; +0x76 addiw a5,a5,1 ; +0x78 sw a5,44(a4)
   k_step (wp_s_lw c _ (KA.«log_write» + 0x74#64) true 44#12 15#5 14#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lw_lhn_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.lhn_addr]
   iintro Hk Hpc Hn
   k_step (wp_s_addiw c _ (KA.«log_write» + 0x76#64) true 1#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1197,7 +1162,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   k_step (wp_s_sw c _ (KA.«log_write» + 0x78#64) true 44#12 14#5 15#5 (by decide)
       (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [lw_lhn_addr, bc_incr n, bc_incr' n]
+    with [Xv6.lhn_addr, bc_incr n, bc_incr' n]
   iintro Hk Hpc Hn
   ihave Hn := (show wordPointsTo (GF := GF) lhNAddr 4 (DFrac.own 1)
         (BitVec.ofNat 32 n + 1#32) ⊢
@@ -1210,7 +1175,7 @@ theorem lw_append (BP : BPIN) (c : CPU) (k : KCtx) (a b : Bool) (R : RegMap) (kk
   k_norm
   iapply HC $$ %_ [] Hk Hpc Hdevc Hbnoc Hn Hbr
   ipureintro
-  repeat refine lw_cs_set _ _ ?_ _ _ (by decide)
+  repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
   exact ⟨g2, g8, g9, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩
 
 /-- The held buffer's width, off the handle (what `Xv6.fsblock_update_any`
@@ -2036,7 +2001,7 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     ihave Hbnoc := (show wordPointsTo (GF := GF) (aBufBlockno (bnode kk)) 4
           (DFrac.own (1 : Qp).half) bno ⊢
         wordPointsTo (bnode kk + 12#64) 4 (DFrac.own (1 : Qp).half) bno from by
-      rw [lw_bno_addr]) $$ Hbnoc
+      rw [Xv6.bno_addr]) $$ Hbnoc
     k_step (wp_s_lw c _ (KA.«log_write» + 0x38#64) true 12#12 11#5 9#5 (by decide) (by decide)
         (DFrac.own (1 : Qp).half) bno)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2045,7 +2010,7 @@ theorem logWrite_au_range (AC : ACQUIRE) (RE : RELEASE) (BP : BPIN) :
     ihave Hbnoc := (show wordPointsTo (GF := GF) (bnode kk + 12#64) 4
           (DFrac.own (1 : Qp).half) bno ⊢
         wordPointsTo (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
-      rw [lw_bno_addr]) $$ Hbnoc
+      rw [Xv6.bno_addr]) $$ Hbnoc
     -- +0x3a auipc a4,0x1e ; +0x3e addi a4,a4,1254 ; +0x42 li a5,0
     k_step (wp_s_auipc c _ (KA.«log_write» + 0x3a#64) false 0x1e#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

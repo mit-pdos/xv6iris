@@ -45,11 +45,6 @@ set_option linter.unusedSectionVars false
 
 /-! ## Pure facts -/
 
-/-- `beqz` on a word. -/
-theorem sl_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by
-  by_cases h : x = 0#64 <;> simp [bcond, h]
-
 theorem sl_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl
 theorem sl_pState (pa : BitVec 64) : pa + 24#64 = pState pa := rfl
 
@@ -61,14 +56,6 @@ theorem sl_ret_f84 : jumpPc (KA.«sleep» + 0x20#64) = (KA.«sleep» + 0x20#64) 
   decide
 theorem sl_ret_f8a : jumpPc (KA.«sleep» + 0x26#64) = (KA.«sleep» + 0x26#64) := by
   decide
-
-theorem sl_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [if_pos h]
-
-theorem sl_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬ p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
 
 /-- SLEEPING as the `sw` writes it. -/
 theorem sl_sleeping : BitVec.extractLsb' 0 32 (2#64 : BitVec 64) = SLEEPING := by decide
@@ -415,11 +402,11 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   iintro Hk Hpc Hchan
   -- beqz a5
   k_step (wp_s_branch cpu _ (KA.«sleep» + 0x16#64) true 10#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sl_ite_beq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.ite_beq]
   iintro Hk Hpc
   by_cases hch : ch = 0#64
   · -- THE CHANNEL IS GONE: a wakeup got here first, so release and return
-    ihave Hpc := sl_pcIs_pos cpu _ _ _ hch $$ Hpc
+    ihave Hpc := MachCSL.pcIs_pos cpu _ _ _ hch $$ Hpc
     have g2 : (R3.set 15#5 ch) 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e2
     have g9 : (R3.set 15#5 ch) 9#5 = procAddr j := by
@@ -435,7 +422,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     iintro %c' %R' Hk Hpc Hte Hce %hcs
     iapply HΦ $$ %c' %a %b %R' Hk Hpc Hte Hce %hcs
   · -- THE PARK: p->state = SLEEPING and into the scheduler
-    ihave Hpc := sl_pcIs_neg cpu _ _ _ hch $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg cpu _ _ _ hch $$ Hpc
     -- li a5,2
     k_step (wp_s_addi cpu _ (KA.«sleep» + 0x18#64) true 2#12 15#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

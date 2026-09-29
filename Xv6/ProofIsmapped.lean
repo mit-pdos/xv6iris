@@ -81,7 +81,7 @@ theorem ismapped_proof (W : WALK_NOALLOC) : ISMAPPED :=
       UPtWalkaddr.ptRep_get_none hrep _ (UPtWalkaddr.wfU_walk_none 2 t _ hrep.1 hnc)
     k_step_gen (wp_s_branch c4 _ (KA.«ismapped» + 0xe#64) true 6#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [wa_beq_zero _ hz] next c5 hp5
+      with [MachCSL.beq_zero _ hz] next c5 hp5
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h => (hp5 h).trans (hpinW h)
     iapply (wp_epilogue2_gen c5 k (KA.«ismapped» + 0x14#64) (by omega) R1 a2 (k.regs 1#5) (k.regs 8#5))

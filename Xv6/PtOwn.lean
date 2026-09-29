@@ -161,4 +161,21 @@ def _root_.MachCSL.PTree.missingRun : PTree → BitVec 27 → Nat → Nat
       let t1 := (t.fill 2 vpn (List.replicate m 0#44)).1.setLeaf 2 vpn (kLeaf 0#44 .rw 0#1 0#1)
       m + t1.missingRun (vpn + 1#27) n
 
+/-- `PTE2PA` of a pointer entry. -/
+theorem ptr_page (b : BitVec 44) : ((kPtr b >>> 10) <<< 12) = pageAddr b := by
+  simp only [kPtr, mkPte, ptrFlags, pageAddr, pteAddr, LeanRV64D.zero_extend,
+    Sail.BitVec.zeroExtend]
+  bv_decide
+
+theorem availSub_availSub (on : Option Nat) (a b : Nat) :
+    availSub (availSub on a) b = availSub on (a + b) := by
+  cases on <;> simp [availSub, Nat.sub_sub]
+
+theorem missingRun_one (t : PTree) (vpn : BitVec 27) :
+    t.missingRun vpn 1 = t.missingOn 2 vpn := by
+  simp only [PTree.missingRun, Nat.add_zero]
+
+theorem availSub_zero (on : Option Nat) : availSub on 0 = on := by
+  cases on <;> rfl
+
 end Xv6

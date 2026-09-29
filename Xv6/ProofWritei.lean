@@ -62,11 +62,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem writei_kctx_self {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R : RegMap) :
-    kctx (GF := GF) c (k.withRegs R) ⊢ kctx c ((k.withSpie k.spie k.spp).withRegs R) := by
-  rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
-
 theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R0 R1 : RegMap) (m : Nat) :
     kctx (GF := GF) c (((k.withRegs R0).pushed m).withRegs R1) ⊢
@@ -218,7 +213,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     unfold wiContEb
-    ihave Hk := writei_kctx_self cpu k _ $$ Hk
+    ihave Hk := MachCSL.kctx_self cpu k _ $$ Hk
     iapply Hnext $$ %cpu %k.spie %k.spp %_ %0 %A.bm %A.data %A.dn %A.dn0 %A.ncount %(fun _ => 0#8) %0
       %(fun _ => 0#8) %A.V.upt %A.Sb [] [] Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
     · ipureintro

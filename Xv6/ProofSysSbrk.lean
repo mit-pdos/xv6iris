@@ -41,6 +41,7 @@ import Xv6.SpecArgint
 import Xv6.CopyLemmas
 import Xv6.ReadiMain
 import Xv6.UPtPptLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -65,8 +66,6 @@ theorem sys_sbrk_ret_22 : jumpPc (KA.«sys_sbrk» + 0x22#64) = KA.«sys_sbrk» +
 theorem sys_sbrk_ret_4c : jumpPc (KA.«sys_sbrk» + 0x4c#64) = KA.«sys_sbrk» + 0x4c#64 := by decide
 theorem sys_sbrk_ret_60 : jumpPc (KA.«sys_sbrk» + 0x60#64) = KA.«sys_sbrk» + 0x60#64 := by decide
 
-theorem sys_sbrk_n_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
-  bv_decide
 theorem sys_sbrk_t_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
 theorem sys_sbrk_t_addr' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFDC#64 := by
@@ -74,7 +73,6 @@ theorem sys_sbrk_t_addr' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x 
 theorem sys_sbrk_trapframe : (0x2000000#64 + BitVec.signExtend 64 4095#12) <<< (13 : Nat) = 0x3FFFFFE000#64 := by
   decide
 theorem sys_sbrk_trapframe_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
-theorem sys_sbrk_sz_off (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
 
 theorem sys_sbrk_beq_pos {α : Type _} (x y : BitVec 64) (h : x = y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = p := by
@@ -404,7 +402,7 @@ theorem sys_sbrk_eager (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : GName) (γk :
   -- lw a0,-40(s0)
   k_step_gen (wp_s_lw c _ (KA.«sys_sbrk» + 0x58#64) false 4056#12 10#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.extractLsb' 0 32 v0))
-    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, a8, sys_sbrk_n_addr] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, a8, MachCSL.add_sext_4056] next c1 hp1
   iintro Hk Hpc Fn
   -- jal growproc
   k_step_gen (wp_s_jal c1 _ (KA.«sys_sbrk» + 0x5c#64) false 2093562#21 1#5 (by decide))
@@ -514,7 +512,7 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
   -- lw a5,-40(s0)
   k_step_gen (wp_s_lw c _ (KA.«sys_sbrk» + 0x2e#64) false 4056#12 15#5 8#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.extractLsb' 0 32 v0))
-    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, a8, sys_sbrk_n_addr] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, a8, MachCSL.add_sext_4056] next c1 hp1
   iintro Hk Hpc Fn
   k_norm_g [sys_sbrk_arg_def]
   by_cases hneg : (sysSbrkArg v0).toInt < 0
@@ -630,19 +628,19 @@ theorem sys_sbrk_lazy (MP : MYPROC) (GP : GROWPROC) (c : CPU) (k : KCtx) (γl : 
       k_step_gen (wp_s_lw c10 _ (KA.«sys_sbrk» + 0x4c#64) false 4056#12 14#5 8#5 (by decide) (by decide)
           (DFrac.own 1) (BitVec.extractLsb' 0 32 v0))
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, e8, a8, sys_sbrk_n_addr] next c11 hp11
+        with [KCtx.rget_eq, e8, a8, MachCSL.add_sext_4056] next c11 hp11
       iintro Hk Hpc Fn
       k_step_gen (wp_s_ld c11 _ (KA.«sys_sbrk» + 0x50#64) true 72#12 15#5 10#5 (by decide) (by decide)
           (DFrac.own 1) V.sz)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, h10', sys_sbrk_sz_off] next c12 hp12
+        with [KCtx.rget_eq, h10', Xv6.sz_off] next c12 hp12
       iintro Hk Hpc Hsz
       k_step_gen (wp_s_add c12 _ (KA.«sys_sbrk» + 0x52#64) true 15#5 15#5 14#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [KCtx.rget_eq, sys_sbrk_arg_def] next c13 hp13
       iintro Hk Hpc
       k_step_gen (wp_s_sd c13 _ (KA.«sys_sbrk» + 0x54#64) true 72#12 10#5 15#5 (by decide) V.sz)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [KCtx.rget_eq, h10', sys_sbrk_sz_off] next c14 hp14
+        with [KCtx.rget_eq, h10', Xv6.sz_off] next c14 hp14
       iintro Hk Hpc Hsz
       k_step_gen (wp_s_j c14 _ (KA.«sys_sbrk» + 0x56#64) true 14#21)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] next c15 hp15
@@ -721,7 +719,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   icases Hframe with ⟨F0, F1, F2, F3, Fn, Ft, F5⟩
   -- addi a1,s0,-40 ; li a0,0 ; jal argint
   k_step_gen (wp_s_addi c1 _ (KA.«sys_sbrk» + 0xa#64) false 4056#12 11#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_sbrk_n_addr] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.add_sext_4056] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_sbrk» + 0xe#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
@@ -733,14 +731,14 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
     (hp1 h)))) $$ HΦ
   iapply (sys_sbrk_argint AI c4 _ 0 V.upt.tfp V.tf v0 n0 (by decide) ?ha0 hv0 ?hn ?hKa) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sys_sbrk_ret_14, Xv6.co_li_zero, sys_sbrk_n_addr]
+  k_norm_g [sys_sbrk_ret_14, Xv6.co_li_zero, MachCSL.add_sext_4056]
   iframe Htf Htp Fn
   case ha0 => k_norm_g [Xv6.co_li_zero]
   case hn => k_norm_g; omega
   case hKa => k_norm_g; unfold sysSbrkSlots growprocSlots at hK; unfold argintSlots argrawSlots; omega
   iapply wpNext_intro_pin
   iintro %c5 %hp5 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Htf Htp Fn
-  k_norm_g [sys_sbrk_ret_14, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, sys_sbrk_n_addr]
+  k_norm_g [sys_sbrk_ret_14, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs, MachCSL.add_sext_4056]
   ihave HΦ := wpNext_shift _ _ _ _ _ hp5 $$ HΦ
   k_norm_g at hsp1
   unfold calleeSaved at hcs1
@@ -799,7 +797,7 @@ theorem sys_sbrk_proof (AI : ARGINT) (MP : MYPROC) (GP : GROWPROC) : SYSSBRK :=
   k_step_gen (wp_s_ld c11 _ (KA.«sys_sbrk» + 0x22#64) true 72#12 9#5 10#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, h10', sys_sbrk_sz_off] next c12 hp12
+    with [KCtx.rget_eq, h10', Xv6.sz_off] next c12 hp12
   iintro Hk Hpc Hsz
   -- lw a4,-36(s0) ; li a5,1 ; beq a4,a5
   k_step_gen (wp_s_lw c12 _ (KA.«sys_sbrk» + 0x24#64) false 4060#12 14#5 8#5 (by decide) (by decide)

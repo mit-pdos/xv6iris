@@ -1104,4 +1104,7 @@ theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
 
 end UkEntry
 
+/-- a0 is not sp. -/
+theorem a0_ns : unotSp 10#5 := by unfold unotSp spIdx; decide
+
 end Xv6

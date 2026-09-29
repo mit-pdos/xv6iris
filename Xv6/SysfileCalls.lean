@@ -29,9 +29,9 @@ the frames' layouts, pins and cells).
   `sys_link_bytes_stack` / `sys_unlink_bytes_stack` copies restated);
 * the one-halfword `nlink` store (Rocq's `sl_setnl` / `su_setnl` family):
   `sysfileSetnl` and its eight projections (sys_link / sys_unlink);
-* instruction constants and `KCtx` identities (`sysfile_beq00`,
-  `sysfile_bltz_nat`, `sysfile_bltz_m1`, `Xv6.dirlookup_beqz`, `Xv6.co_li_zero`,
-  `sysfile_li_m1`, `sysfile_sext_m1`, `sysfile_li128`, `sysfile_arg0_lt`,
+* instruction constants and `KCtx` identities (`MachCSL.beqz_zero`,
+  `sysfile_bltz_nat`, `MachCSL.bltz_m1`, `Xv6.dirlookup_beqz`, `Xv6.co_li_zero`,
+  `MachCSL.li_m1`, `sysfile_sext_m1`, `sysfile_li128`, `sysfile_arg0_lt`,
   `sysfile_beq_tdir`, `MachCSL.KCtx.withSpie_twice`, `MachCSL.KCtx.withSpie_pushed`, `sysfile_ctx`,
   `sysfile_cur_kpt`, `sysfilePidQ`).
 
@@ -47,6 +47,7 @@ import Xv6.SpecIunlockput
 import Xv6.CopyLemmas
 import Xv6.DirlookupParts
 import Xv6.KexecParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -59,8 +60,6 @@ set_option linter.unusedVariables false
 
 /-! ## Pure: instruction constants, `KCtx` identities, the path as a function, the `nlink` store -/
 
-theorem sysfile_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 theorem sysfile_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
     bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
   show (BitVec.ofNat 64 n).slt 0#64 = false
@@ -69,10 +68,6 @@ theorem sysfile_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
   rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
   simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
   omega
-
-theorem sysfile_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
-theorem sysfile_li_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
 theorem sysfile_sext_m1 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
@@ -640,5 +635,8 @@ theorem sysfile_argfd_wp (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa
   exact h
 
 end
+
+theorem setnl_nlink (dn : Dinode) (nl : BitVec 16) :
+    (sysfileSetnl dn nl).diNlink = nl := rfl
 
 end Xv6

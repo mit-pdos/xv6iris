@@ -26,11 +26,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem kvm_ret_10ac : jumpPc (KA.«kvmmap» + 0x12#64) = (KA.«kvmmap» + 0x12#64) := by
   decide
 
-/-- The `bnez a0` is not taken: `mappages` returned `0` in the counted mode. -/
-theorem kvm_bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -131,7 +126,7 @@ theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
   -- c.bnez a0 : not taken
   k_step_gen (wp_s_branch c6 _ (KA.«kvmmap» + 0x12#64) true 10#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kvm_bne_zero _ hzero] next c7 hp7
+    with [MachCSL.bne_zero _ hzero] next c7 hp7
   iintro Hk Hpc
   -- the epilogue
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>

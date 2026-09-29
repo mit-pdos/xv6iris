@@ -181,4 +181,8 @@ theorem kmapStatic_at (vpn : BitVec 27) (v : BitVec 64)
 
 end ambient
 
+theorem vpnOf_toNat_lt (va : BitVec 64) (h : va.toNat < 2 ^ 38) : (vpnOf va).toNat < 67108864 := by
+  simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
+  omega
+
 end MachCSL

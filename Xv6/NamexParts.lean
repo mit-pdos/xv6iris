@@ -43,6 +43,7 @@ import Xv6.SpecIlock
 import Xv6.SpecIdup
 import Xv6.DinodeSlot
 import Xv6.DirlookupParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -433,14 +434,8 @@ theorem namex_sub_trans (A B C : List Nat) (h1 : ∀ x ∈ A, x ∈ B) (h2 : ∀
 
 /-! ## dirlookup's found arm, read by the walk
 
-Copies of `Xv6.dirlookup_zext32_toNat` / `Xv6.dirlookup_live_pos`
+Copies of `MachCSL.zext32_toNat` / `Xv6.dirlookup_live_pos`
 (DirlookupParts, a stage file of another function; promotion candidates). -/
-
-/-- Rocq's `dlk_zext32_unsigned`. -/
-theorem namex_zext32_toNat (w : BitVec 16) : (BitVec.setWidth 32 w).toNat = w.toNat := by
-  simp only [BitVec.toNat_setWidth]
-  have := w.isLt
-  omega
 
 /-! ## The buffers, split for the two memmoves -/
 

@@ -73,9 +73,6 @@ theorem ukSys_numW (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Opti
     uvisNum (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) = n :=
   ukSys_numE m pc n hn h0 h1
 
-/-- a0 is not sp. -/
-theorem ukSys_a0_ns : unotSp 10#5 := by unfold unotSp spIdx; decide
-
 section UkRunSysDefs
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -187,7 +184,7 @@ theorem uslot_bump_closeG (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (M M' :
     hal4).2
   rw [← ukWr_ne0 m 10#5 r (by decide)]
   iapply ukcq_ukc N.pay
-  iapply urun_close_wr N M' pm' m 10#5 r sz' fdv' cw' gn cs pidv (pc + 4#64) avail ukSys_a0_ns hx0
+  iapply urun_close_wr N M' pm' m 10#5 r sz' fdv' cw' gn cs pidv (pc + 4#64) avail Xv6.a0_ns hx0
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
   iapply Hcont $$ %h' Hrun

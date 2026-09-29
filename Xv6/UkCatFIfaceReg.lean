@@ -14,7 +14,7 @@ CONE (UkCatFIface.v, reached, this file): `cfdev` (+ `UDIn`/`UDProd`),
 `cif_pool_valid`, `cif_pool_take`, `cif_pool_ext`, `cif_pool_update`,
 `cif_reg_alloc` (all eight: `HfpReg` at `CfDev`), `cif_row`, `cif_ok`,
 `cif_slot_ne`, `cif_ok_lookup`, `cif_ok_reg_insert`, `cif_ok_open`,
-`cif_ok_closed_fresh`, `cif_ok_ledger`, `cif_ok_open_std`, `cif_not_shared`,
+`cif_ok_closed_fresh`, `cif_ok_ledger`, `cif_ok_open_std`, `Xv6.not_shared`,
 `cif_ok_close`, `cif_ok_close_shared`, `cif_dst_some`, `cif_dst_none`,
 `cif_om_create`, `cif_tok`, `cif_tok_agree`, `cif_tok_halves`,
 `cif_pool_own_take`, `cif_pool_give`, `cif_toks_agree`.  Not ported: the
@@ -308,10 +308,6 @@ theorem cif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (k
     · subst hdd; rw [LawfulPartialMap.get?_insert_eq rfl] at hv; cases hv; exact hu
     · rw [LawfulPartialMap.get?_insert_ne hdd] at hv; exact H7 d' s' nm' i' γo' hv
 
-/-- **Rocq `cif_not_shared`**. -/
-theorem cif_not_shared (fdm : Fdmap) (fd : Int) (d : Nat) (hns : ¬ fdShared fdm fd d) :
-    ∀ fd', fd' ≠ fd → fdm fd' ≠ some d := fun fd' hne h => hns ⟨fd', hne, h⟩
-
 /-- **Rocq `cif_ok_close`**: the last descriptor of an unprotected device
 closed, the device dropped. -/
 theorem cif_ok_close (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (fd : Int) (d : Nat)
@@ -319,7 +315,7 @@ theorem cif_ok_close (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (fd :
     (hD : d ∉ kds.map Prod.fst) :
     cifOk kds (fdDelete fdm fd) l (delete vs d) := by
   obtain ⟨H1, H2, H3, H4, H5, H6, H7⟩ := hok
-  have hn := cif_not_shared fdm fd d hns
+  have hn := Xv6.not_shared fdm fd d hns
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · intro fd' d' h
     unfold fdDelete at h; split at h

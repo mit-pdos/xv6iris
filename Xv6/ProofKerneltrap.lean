@@ -54,9 +54,6 @@ theorem devintrRet_timer (sc : BitVec 64) (hsc : sCauseOk sc) (h : ¬ sc = sCaus
   · exact absurd rfl h
 theorem bcond_beq_12 : bcond bop.BEQ 1#64 2#64 = false := by decide
 theorem bcond_beq_22 : bcond bop.BEQ 2#64 2#64 = true := by decide
-theorem bcond_beq_ne0 (p : BitVec 64) (h : p ≠ 0#64) : bcond bop.BEQ p 0#64 = false := by
-  simp [bcond, h]
-theorem bcond_beq_00_kt : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 /-- A context is itself with its own pinned bits. -/
 theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] {lent : Bool}
@@ -291,7 +288,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     · -- no process: back to the tail
       have h10'' : R2 10#5 = 0#64 := h10'.trans hp0
       k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x8a#64) true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-        $$ [- $Hk $Hpc] with [h10'', bcond_beq_00_kt]
+        $$ [- $Hk $Hpc] with [h10'', MachCSL.beqz_zero]
       iintro Hk Pc
       ihave Hk := kctx_withSpie_of cpu (k.pushed 6) _ k.spie k.spp rfl rfl $$ Hk
       iapply (htail cpu (fun _ => rfl) k.spie k.spp _ epc sc 0#64 w5 v hv' ?hR2b ?hR9b ?hR18b ?hcsb)
@@ -316,7 +313,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
         exact ⟨c1_20, c1_21, c1_22, c1_23, c1_24, c1_25, c1_26, c1_27⟩
     · -- a process: yield, then the tail at whichever hart the thread resumes on
       k_step (wp_s_branch cpu _ (KA.«kerneltrap» + 0x8a#64) true 8108#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-        $$ [- $Hk $Hpc] with [h10', bcond_beq_ne0 k.proc hp0]
+        $$ [- $Hk $Hpc] with [h10', MachCSL.beq_ne k.proc hp0]
       iintro Hk Hpc
       k_step (wp_s_jal cpu _ (KA.«kerneltrap» + 0x8c#64) false 2094968#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kerneltrap_br_fffffffffffff804]
       iintro Hk Hpc

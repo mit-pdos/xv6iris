@@ -180,7 +180,6 @@ theorem kxcA_tot64 (tot : Nat) (h : tot ≤ 64) : (BitVec.ofNat 64 tot = 64#64) 
     simpa using this
   · rintro rfl; rfl
 
-theorem kxcA_beqz0 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 theorem kxcA_br_30 : KA.«kexec» + 0x30#64 + BitVec.signExtend 64 88#13 = KA.«kexec» + 0x88#64 := by
   decide
@@ -671,7 +670,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
     ihave Harm := kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hirs⟩
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz0, kxcA_br_30]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero, kxcA_br_30]
     iintro Hk Hpc
     -- +0x088  jal end_op
     iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094256#21 kxcA_br_eo_88

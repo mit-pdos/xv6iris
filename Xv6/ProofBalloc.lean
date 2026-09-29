@@ -32,6 +32,7 @@ Spec file's `BALLOC.wp_balloc_sconf`.  The rest is the stage decomposition
 of `Xv6/BallocDefs.lean`'s header.
 -/
 import Xv6.BallocMain
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -44,7 +45,6 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem ba_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by decide
 /-- `auipc a5,0x1e ; lw a5,-1314(a5)` at `+0x0a`: `sb.size`. -/
 theorem ba_a_size : KA.«balloc» + 0x1dcd2#64 = sbSizeAddr := by unfold sbSizeAddr; decide
 /-- `beqz a5` at `+0x12` on `sb.size`: NOT taken, from `0 < size` (Rocq's
@@ -107,7 +107,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   simp only [ballocAddr]
   -- +0x00  addi sp,sp,-80 ; +0x02 .. +0x06  sd ra, s0, s1 ; +0x08  addi s0,sp,80
-  k_step_e (wp_s_push c0 _ (KA.«balloc») true 4016#12 10 hK10 ba_imm_m80)
+  k_step_e (wp_s_push c0 _ (KA.«balloc») true 4016#12 10 hK10 MachCSL.imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hframe
   irevert Hframe

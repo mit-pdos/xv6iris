@@ -267,7 +267,7 @@ theorem ba_scan_step (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (
     case n10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h10
   · -- the bit is CLEAR: the alloc arm
     k_step_e (wp_s_branch cpu _ (KA.«balloc» + 0xdc#64) true 8028#13 11#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hu, if_false, ba_beq_00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hu, if_false, MachCSL.beqz_zero]
     iintro Hk Hpc
     iapply (ba_alloc BR LW BE MS Γ cpu c0 k spie spp _ γl γb V γdl pd pav pu j γ γfs logstart
         bmapstart size dev u cr Sb used bi kk bsd d pidv dqp dqb dqs hj hproc hK hnoff

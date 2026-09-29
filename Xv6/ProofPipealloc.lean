@@ -48,6 +48,7 @@ import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.KmemTier
 import Xv6.VirtioDiskRwDefs3
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -70,15 +71,10 @@ theorem pa_ret_453a : jumpPc (KA.«pipealloc» + 0xa8#64) = (KA.«pipealloc» + 
 theorem pa_ret_4548 : jumpPc (KA.«pipealloc» + 0xb6#64) = (KA.«pipealloc» + 0xb6#64) := by decide
 
 theorem pa_add0' (x : BitVec 64) : x + 0#64 = x := by simp
-theorem pa_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem pa_ext1 : BitVec.extractLsb' 0 32 (0#64 + BitVec.signExtend 64 1#12) = 1#32 := by decide
 theorem pa_ext0 : BitVec.extractLsb' 0 32 (0#64 : BitVec 64) = 0#32 := by decide
 theorem pa_ext8_1 : BitVec.extractLsb' 0 8 (0#64 + BitVec.signExtend 64 1#12) = 1#8 := by decide
 theorem pa_ext8_1' : BitVec.extractLsb' 0 8 (1#64 : BitVec 64) = 1#8 := by decide
-theorem pa_ext8_0 : BitVec.extractLsb' 0 8 (0#64 : BitVec 64) = 0#8 := by decide
-theorem pa_beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
-  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
-theorem pa_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 theorem pa_sp16 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + BitVec.signExtend 64 16#12 = x + 0xFFFFFFFFFFFFFFE0#64 := by
   bv_decide
@@ -373,7 +369,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   · -- *f1 == 0: beqz taken, exit with -1
     subst hz
     k_step_gen (wp_s_branch c2 _ (KA.«pipealloc» + 0xae#64) true 10#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_beq_00] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero] next c3 hp3
     iintro Hk Hpc
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = c := fun h =>
       (hp3 h).trans ((hp2 h).trans (hp1 h))
@@ -394,12 +390,12 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
         0xFFFFFFFFFFFFFFFF#64
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, pa_m1]))
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, MachCSL.li_m1]))
       $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
   · -- *f1 = fnode k1: beqz not taken ; mv a0,a5 ; jal fileclose ; li a0,-1 ; exit
     subst hv1
     k_step_gen (wp_s_branch c2 _ (KA.«pipealloc» + 0xae#64) true 10#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_beq_ne _ (fnode_nonzero k1 hk1)] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (fnode_nonzero k1 hk1)] next c3 hp3
     iintro Hk Hpc
     k_step_gen (wp_s_add c3 _ (KA.«pipealloc» + 0xb0#64) true 10#5 0#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
@@ -460,7 +456,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
               | exact e26.trans p26
               | exact e27.trans p27)
         0xFFFFFFFFFFFFFFFF#64
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, pa_m1]))
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, MachCSL.li_m1]))
       $$ [$Hk $Hpc $Hframe $Hte $Hce $Hpost $Hpid $Hir $Hnext]
 
 /-! ## The success arm, from `(KernelSyms.«pipealloc» + 0x34)` -/
@@ -624,7 +620,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9A, Xv6.dsOff0, pa_add0'] next cF hpF
   iintro Hk Hpc Hc0
   k_step_gen (wp_s_sb cF _ (KA.«pipealloc» + 0x62#64) false 9#12 15#5 0#5 (by decide) C0.writable)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_ext8_0] next cG hpG
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.extract_zero] next cG hpG
   iintro Hk Hpc Hwr0
   k_step_gen (wp_s_ld cG _ (KA.«pipealloc» + 0x66#64) true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (fnode k0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9A, Xv6.dsOff0, pa_add0'] next cH hpH
@@ -643,7 +639,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20A, Xv6.dsOff0, pa_add0'] next cL hpL
   iintro Hk Hpc Hc1
   k_step_gen (wp_s_sb cL _ (KA.«pipealloc» + 0x78#64) false 8#12 15#5 0#5 (by decide) C1.readable)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_ext8_0] next cM hpM
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.extract_zero] next cM hpM
   iintro Hk Hpc Hrd1
   k_step_gen (wp_s_ld cM _ (KA.«pipealloc» + 0x7c#64) false 0#12 15#5 20#5 (by decide) (by decide) (DFrac.own 1) (fnode k1))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20A, Xv6.dsOff0, pa_add0'] next cN hpN
@@ -848,7 +844,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
   icases Hpost0 with ⟨⟨%hz, Hfd⟩ | ⟨%k0, %⟨hk0, hr0⟩, Href0⟩⟩
   · -- the first filealloc failed: beqz taken to 453a
     k_step_gen (wp_s_branch c8 _ (KA.«pipealloc» + 0x1e#64) true 138#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, pa_beq_00] next c9 hp9
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz, MachCSL.beqz_zero] next c9 hp9
     iintro Hk Hpc
     have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h => (hp9 h).trans (hpin8 h)
     ihave Hframe := pa_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) _ _
@@ -864,7 +860,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
   · -- *f0 = fnode k0: beqz not taken ; jal filealloc
     k_step_gen (wp_s_branch c8 _ (KA.«pipealloc» + 0x1e#64) true 138#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, pa_beq_ne _ (fnode_nonzero k0 hk0)] next c9 hp9
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beq_ne _ (fnode_nonzero k0 hk0)] next c9 hp9
     iintro Hk Hpc
     k_step_gen (wp_s_jal c9 _ (KA.«pipealloc» + 0x20#64) false 2096136#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_fffffffffffffc28] next c10 hp10
@@ -902,13 +898,13 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
     icases Hpost1 with ⟨⟨%hz1, Hfd⟩ | ⟨%k1, %⟨hk1, hr1⟩, Href1⟩⟩
     · -- the second filealloc failed: beqz taken to 4532 ; ld a0,*f0 ; beqz (dead) ; jal fileclose
       k_step_gen (wp_s_branch c12 _ (KA.«pipealloc» + 0x28#64) true 120#13 10#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz1, pa_beq_00] next c13 hp13
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz1, MachCSL.beqz_zero] next c13 hp13
       iintro Hk Hpc
       k_step_gen (wp_s_ld c13 _ (KA.«pipealloc» + 0xa0#64) true 0#12 10#5 9#5 (by decide) (by decide) (DFrac.own 1) (fnode k0))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d9', Xv6.dsOff0, pa_add0'] next c14 hp14
       iintro Hk Hpc Hc0
       k_step_gen (wp_s_branch c14 _ (KA.«pipealloc» + 0xa2#64) true 34#13 10#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_beq_ne _ (fnode_nonzero k0 hk0)] next c15 hp15
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (fnode_nonzero k0 hk0)] next c15 hp15
       iintro Hk Hpc
       k_step_gen (wp_s_jal c15 _ (KA.«pipealloc» + 0xa4#64) false 2096168#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_fffffffffffffccc] next c16 hp16
@@ -948,7 +944,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
         $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
     · -- *f1 = fnode k1: beqz not taken ; sd s2,16(sp) ; jal kalloc
       k_step_gen (wp_s_branch c12 _ (KA.«pipealloc» + 0x28#64) true 120#13 10#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, pa_beq_ne _ (fnode_nonzero k1 hk1)] next c13 hp13
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, MachCSL.beq_ne _ (fnode_nonzero k1 hk1)] next c13 hp13
       iintro Hk Hpc
       k_step_gen (wp_s_sd c13 _ (KA.«pipealloc» + 0x2a#64) true 16#12 2#5 18#5 (by decide) w1)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d2', pa_sp16, pa_sp16'] next c14 hp14
@@ -993,13 +989,13 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
       icases Hkp with ⟨⟨%⟨hz3, -⟩, Hav⟩ | ⟨%hpv, Hpage, Hav⟩⟩
       · -- kalloc failed: beqz taken to 4526 ; ld a0,*f0 ; beqz (dead) ; ld s2 ; j 4536 ; fileclose
         k_step_gen (wp_s_branch c17 _ (KA.«pipealloc» + 0x32#64) true 98#13 10#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz3, pa_beq_00] next c18 hp18
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hz3, MachCSL.beqz_zero] next c18 hp18
         iintro Hk Hpc
         k_step_gen (wp_s_ld c18 _ (KA.«pipealloc» + 0x94#64) true 0#12 10#5 9#5 (by decide) (by decide) (DFrac.own 1) (fnode k0))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9', Xv6.dsOff0, pa_add0'] next c19 hp19
         iintro Hk Hpc Hc0
         k_step_gen (wp_s_branch c19 _ (KA.«pipealloc» + 0x96#64) true 6#13 10#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_beq_ne _ (fnode_nonzero k0 hk0)] next c20 hp20
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (fnode_nonzero k0 hk0)] next c20 hp20
         iintro Hk Hpc
         k_step_gen (wp_s_ld c20 _ (KA.«pipealloc» + 0x98#64) true 16#12 18#5 2#5 (by decide) (by decide) (DFrac.own 1) (k.regs 18#5))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g2', pa_sp16, pa_sp16'] next c21 hp21
@@ -1047,7 +1043,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
           $$ [$Hk $Hpc $Hte $Hce $Hft $Hpe $Hav $Hfd' $Hc0 $Hc1 $Hpost1 $Hframe $Hpid $Hir $Hnext]
       · -- a page: beqz not taken ; the success arm
         k_step_gen (wp_s_branch c17 _ (KA.«pipealloc» + 0x32#64) true 98#13 10#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pa_beq_ne _ (Xv6.PtRun.pageValid_ne_zero _ hpv)] next c18 hp18
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (Xv6.PtRun.pageValid_ne_zero _ hpv)] next c18 hp18
         iintro Hk Hpc
         have hpin18 : k.sie = false ∨ k.proc = 0#64 → c18 = cpu := fun h => (hp18 h).trans (hpin17 h)
         iapply (pa_success IL cpu c18 k γ γk on pidv dqp k0 k1 hk0 hk1 (R3 10#5) hpv hwf hK spie3 spp3 hsp3' hpin18 _

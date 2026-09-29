@@ -87,7 +87,7 @@ theorem fif_close_in (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStubs (hl
       ((X.fifFds (fdDelete fdm fd) -∗ X.fifFilesr files paths -∗ K 0) ∧
        (∀ y, X.fifTaint (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗
       clObl (hlc := hlc) X.N X.P fd K := by
-  have hn := fif_not_shared fdm fd d hns
+  have hn := Xv6.not_shared fdm fd d hns
   iintro Hfds #Hfiles Hin HK
   ihave Hfds := X.fifFds_open fdm $$ Hfds
   icases Hfds with ⟨%l, %vs, %w, ⟨Hstd, Hcwd, %hok, Hpool, Htoks, Hhs, Hdq, #He⟩, Hk⟩
@@ -144,7 +144,7 @@ theorem fif_close_std_dev (DP : FifDevP (hlc := hlc) (GF := GF)) (STB : FdevStub
       fifHdls X.N.fd fdm vs -∗ X.fifDq -∗ X.fifEnv -∗ X.fifExitK -∗
       (X.fifFds (fdDelete fdm fd) -∗ K 0) -∗
       clObl (hlc := hlc) X.N X.P fd K := by
-  have hn := fif_not_shared fdm fd d hns
+  have hn := Xv6.not_shared fdm fd d hns
   iintro Hstd Hcwd Hpool Htoks Htk Hhs Hdq #He Hk HK
   ihave Hhs := fifHdls_delete X.N.fd fdm vs (delete vs d) fd d hfd
     (fun fd' d' hne h => fifHf_delete_ne vs d d' (fun e => hn fd' hne (e ▸ h))) $$ Hhs

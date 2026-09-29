@@ -41,23 +41,6 @@ set_option linter.unusedVariables false
 theorem ushG_lsb (t : Nat) (h : t % 2 = 0) : (BitVec.ofNat 64 t).getLsbD 0 = false := by
   rw [BitVec.getLsbD_ofNat]; simp [Nat.testBit_zero]; omega
 
-theorem ushG_bgeu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
-  simp only [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx,
-    Nat.mod_eq_of_lt hy]
-  simp [GE.ge]
-
-theorem ushG_beq_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BEQ (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x = y) := by
-  simp only [ukBtaken]
-  by_cases h : x = y
-  · subst h; simp
-  · have : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
-      intro he; apply h
-      have := congrArg BitVec.toNat he
-      simpa [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] using this
-    simp [h, this]
-
 theorem ushG_zext (b : BitVec 8) : BitVec.setWidth 64 b = BitVec.ofNat 64 b.toNat := by
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
@@ -284,14 +267,14 @@ theorem shGtk_ws_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (q : N
   by_cases hjl : j = len
   · subst hjl
     iapply ushS_brT UL N hbgeu (q + 4 + 20) h mc (2 + n)
-      (by rw [h9, hre, ushG_bgeu _ _ (by omega) (by omega)]; simp) hgt
+      (by rw [h9, hre, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp) hgt
       (by rw [hgt]; exact ushG_lsb _ (by omega)) $$ Hc Hrun
     iintro %h1 Hrun
     iapply Hk $$ Hs Hws %h1 %mc [] [] Hrun
     · ipureintro; intro _ _ _; rfl
     · ipureintro; rw [h9, Nat.sub_self, ushpSkipws_zero, Nat.add_zero]
   · iapply ushS_brN UL N hbgeu (q + 4) h mc (2 + n)
-      (by rw [h9, hre, ushG_bgeu _ _ (by omega) (by omega)]; simp; omega) (by ushG_pc)
+      (by rw [h9, hre, Xv6.bgeu_nat _ _ (by omega) (by omega)]; simp; omega) (by ushG_pc)
       (by rw [hgt]; exact ushG_lsb _ (by omega)) $$ Hc Hrun
     iintro %h1 Hrun
     iapply shGtk_ws_scan UL SC N (q + 4) hlbu hmv hjal hbeqz haddi hbne hmv2 hjt hbt hnt (by omega) (by omega)

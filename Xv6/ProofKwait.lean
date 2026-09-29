@@ -98,6 +98,7 @@ import Xv6.SpecRelease
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import Xv6.PipeInv
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -904,11 +905,6 @@ end
 
 /-! ## The ten-slot frame and the epilogue -/
 
-theorem kw_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem kw_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
@@ -1013,7 +1009,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
   -- reassemble the frame and pop
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ (KA.«kwait» + 0x90#64) true 80#12 10 kw_imm_p80)
+  k_step_gen (wp_s_pop c9 _ (KA.«kwait» + 0x90#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hq10
   iintro Hk Hpc
@@ -1055,7 +1051,6 @@ theorem kw_pChan (pa : BitVec 64) : pa + 32#64 = pChan pa := rfl
 theorem kw_pXstate (pa : BitVec 64) : pa + 44#64 = pXstate pa := rfl
 theorem kw_pPid (pa : BitVec 64) : pa + 48#64 = pPid pa := rfl
 theorem kw_pParent (pa : BitVec 64) : pa + 56#64 = pParent pa := rfl
-theorem kw_pSz (pa : BitVec 64) : pa + 72#64 = pSz pa := rfl
 theorem kw_pPagetable (pa : BitVec 64) : pa + 80#64 = pPagetable pa := rfl
 
 /-! ### Branch-condition folds -/
@@ -1084,16 +1079,10 @@ theorem kwj_221a : jumpPc (KA.«kwait» + 0x70#64) = (KA.«kwait» + 0x70#64) :=
 theorem kwj_2226 : jumpPc (KA.«kwait» + 0x7c#64) = (KA.«kwait» + 0x7c#64) := by decide
 theorem kw_filter_proc : (["proc", "wait_lock"].filter (fun x => x ≠ "proc")) = ["wait_lock"] := by decide
 theorem kw_filter_wait : (["wait_lock"].filter (fun x => x ≠ "wait_lock")) = ([] : List String) := by decide
-theorem kw_wspie (k0 : KCtx) (a b : Bool) (L : List String) :
-    ((k0.pushOffAt a b).withLocks L).withSpie a b = (k0.pushOffAt a b).withLocks L :=
-  KCtx.withSpie_self' _ a b rfl rfl
 theorem kw_pushOffAt_withSpie (k0 : KCtx) (a b c d : Bool) :
     (k0.pushOffAt a b).withSpie c d = k0.pushOffAt c d := rfl
-theorem kw_strip_locks (k0 : KCtx) (h : k0.locks = []) : k0.withLocks [] = k0 := by
-  rw [← h]; exact KCtx.withLocks_self k0
 theorem kw_blt_zero_false : bcond bop.BLT 0#64 0#64 = false := by decide
 theorem kw_blt_neg1_true : bcond bop.BLT (-1#64) 0#64 = true := by decide
-theorem kw_blt_neg1_true' : bcond bop.BLT 18446744073709551615#64 0#64 = true := by decide
 theorem kwj_2206' : jumpPc (KA.«kwait» + 0x5c#64) = (KA.«kwait» + 0x5c#64) := by decide
 theorem kwj_2244 : jumpPc (KA.«kwait» + 0x9a#64) = (KA.«kwait» + 0x9a#64) := by decide
 theorem kwj_2250 : jumpPc (KA.«kwait» + 0xa6#64) = (KA.«kwait» + 0xa6#64) := by decide
@@ -1314,7 +1303,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           rw [← hkhsie]; exact KCtx.pushOffAt_popExit kh spie3 spp3 hkhwf
         have hfilt : List.filter (fun x => decide (x ≠ "proc")) ("proc" :: kh.locks) = ["wait_lock"] := by
           rw [hkhlocks]; decide
-        k_norm_g [kw_wspie kh spie3 spp3 ("proc" :: kh.locks), hpe, hfilt]
+        k_norm_g [MachCSL.withSpie_sec kh spie3 spp3 ("proc" :: kh.locks), hpe, hfilt]
         -- context now `((kh.withSpie spie3 spp3).withLocks ["wait_lock"]).withRegs R4` at 0x800022cc
         -- concretize kh so its `sie` reduces to a literal for the remaining steps
         have hkh2 : kh.withSpie spie3 spp3 = (kb.pushOffAt spie3 spp3).withLocks ["wait_lock"] := by
@@ -1381,7 +1370,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             rw [hkbstruct, KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice, kw_pushed_withSpie]
           subst hM
           k_norm_g [hpe2, hkbws, kwj_2226, kw_filter_wait,
-            kw_strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
+            MachCSL.strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
           iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M cs hj hkproc (by omega) spie3 spp3 R5
               pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap)
             $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $Hans $HΦ]
@@ -1448,7 +1437,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     iintro Hk Hpc
     -- ld a1,72(s2)  (a1 = p->sz)
     k_step (wp_s_ld cur _ (KA.«kwait» + 0x50#64) false 72#12 11#5 18#5 (by decide) (by decide) (DFrac.own 1) V.sz)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, kw_pSz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18, Xv6.sz_off]
     iintro Hk Hpc Hsz
     -- ld a0,80(s2)  (a0 = p->pagetable)
     k_step (wp_s_ld cur _ (KA.«kwait» + 0x54#64) false 80#12 10#5 18#5 (by decide) (by decide) (DFrac.own 1) V.pagetable)
@@ -1481,7 +1470,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       ihave Hk := (show kctx (GF := GF) cur
           ((((kh.pushOffAt spie2 spp2).withLocks ("proc" :: kh.locks)).withSpie spieC sppC).withRegs RC)
           ⊢ kctx cur (((kh.pushOffAt spie2 spp2).withLocks ("proc" :: kh.locks)).withRegs RC)
-          from by rw [hsp2.1, hsp2.2, kw_wspie]) $$ Hk
+          from by rw [hsp2.1, hsp2.2, MachCSL.withSpie_sec]) $$ Hk
       -- fold the return pc
       ihave Hpc := (show pcIs (GF := GF) cur (jumpPc (KA.«kwait» + 0x5c#64)) ⊢ pcIs cur (KA.«kwait» + 0x5c#64)
         from by rw [kwj_2206]) $$ Hpc
@@ -1568,7 +1557,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         -- blt taken -> the fail block at 0x800022f0
         k_step (wp_s_branch cur _ (KA.«kwait» + 0x5c#64) false 56#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [KCtx.rget_eq, KCtx.withRegs_regs, h10, KCtx.rget_zero, kw_blt_neg1_true, kw_blt_neg1_true', KCtx.withRegs_sie, KCtx.withRegs_proc]
+          with [KCtx.rget_eq, KCtx.withRegs_regs, h10, KCtx.rget_zero, kw_blt_neg1_true, MachCSL.bltz_m1, KCtx.withRegs_sie, KCtx.withRegs_proc]
         iintro Hk Hpc
         -- c.mv a0,s1  (a0 = pp)
         k_step (wp_s_add cur _ (KA.«kwait» + 0x94#64) true 10#5 0#5 9#5 (by decide))
@@ -1595,7 +1584,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             rw [← hkhsie]; exact KCtx.pushOffAt_popExit kh spie2 spp2 hkhwf
           have hfilt : List.filter (fun x => decide (x ≠ "proc")) ("proc" :: kh.locks) = ["wait_lock"] := by
             rw [hkhlocks]; decide
-          k_norm_g [kw_wspie kh spie2 spp2 ("proc" :: kh.locks), hpe, hfilt]
+          k_norm_g [MachCSL.withSpie_sec kh spie2 spp2 ("proc" :: kh.locks), hpe, hfilt]
           have hkh2 : kh.withSpie spie2 spp2 = (kb.pushOffAt spie2 spp2).withLocks ["wait_lock"] := by
             rw [hkhstruct, MachCSL.KCtx.withSpie_withLocks, kw_pushOffAt_withSpie]
           ihave Hk := (show kctx (GF := GF) cur
@@ -1632,7 +1621,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
                 = ((k.withSpie spie2 spp2).pushed 10).withRegs Rb := by
               rw [hkbstruct, KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice, kw_pushed_withSpie]
             k_norm_g [hpe2, hkbws, kw_filter_wait, kwj_2250,
-              kw_strip_locks (k.withSpie spie2 spp2) (by simp only [KCtx.withSpie_locks, hklocks0])]
+              MachCSL.strip_locks (k.withSpie spie2 spp2) (by simp only [KCtx.withSpie_locks, hklocks0])]
             -- context now `((k.withSpie spie2 spp2).pushed 10).withRegs R5` at 0x80002302
             -- c.li s3,-1
             k_step_gen (wp_s_addi cur _ (KA.«kwait» + 0xa6#64) true 4095#12 19#5 0#5 (by decide))
@@ -1731,13 +1720,6 @@ theorem kw_bcond_zombie (st : BitVec 32) :
     simp only [beq_eq_false_iff_ne, ne_eq]
     intro he
     exact h (by revert he; bv_decide)
-
-theorem kw_calleeSaved_set (R R2 : RegMap) (i : BitVec 5) (v : BitVec 64)
-    (hi : i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5)
-    (h : calleeSaved R R2) : calleeSaved R (R2.set i v) := by
-  unfold calleeSaved at h ⊢
-  rcases hi with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-    (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h)
 
 theorem kwj_2268 : jumpPc (KA.«kwait» + 0xbe#64) = (KA.«kwait» + 0xbe#64) := by decide
 theorem kwj_2274 : jumpPc (KA.«kwait» + 0xca#64) = (KA.«kwait» + 0xca#64) := by decide
@@ -1881,7 +1863,7 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
   iapply HΦ $$ %spie2 %spp2 %(R2.set 15#5 (BitVec.signExtend 64 st)) %st %ch %kl %xs %pid0 []
     Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm
   ipureintro
-  refine ⟨(hsp2 hsie).1, (hsp2 hsie).2, kw_calleeSaved_set R R2 15#5 _ (by decide) hcs2'⟩
+  refine ⟨(hsp2 hsie).1, (hsp2 hsie).2, MachCSL.calleeSaved_set R R2 15#5 _ (by decide) hcs2'⟩
 
 set_option maxHeartbeats 8000000 in
 /-- **One slot** of the scan, from `0x8000230e`. -/
@@ -2020,7 +2002,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
             rw [← hkhsie]; exact KCtx.pushOffAt_popExit kh spie2 spp2 hkhwf
           have hfilt : List.filter (fun x => decide (x ≠ "proc")) ("proc" :: kh.locks) = ["wait_lock"] := by
             rw [hkhlocks]; decide
-          k_norm_g [kw_wspie kh spie2 spp2 ("proc" :: kh.locks), hpe, hfilt]
+          k_norm_g [MachCSL.withSpie_sec kh spie2 spp2 ("proc" :: kh.locks), hpe, hfilt]
           have hcollapse : kh.withSpie spie2 spp2 = kh :=
             KCtx.withSpie_self' kh spie2 spp2 hspie2 hspp2
           ihave Hk := (show kctx (GF := GF) cur (((kh.withSpie spie2 spp2).withLocks ["wait_lock"]).withRegs R4)
@@ -2310,7 +2292,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       have hkbws : kb.withSpie spieW sppW = ((k.withSpie spieW sppW).pushed 10).withRegs Rb := by
         rw [hkbstruct, KCtx.withSpie_withRegs, MachCSL.KCtx.withSpie_twice, kw_pushed_withSpie]
       k_norm_g [hpe2, hkbws, kw_filter_wait, kwj_22b0,
-        kw_strip_locks (k.withSpie spieW sppW) (by simp only [KCtx.withSpie_locks, hklocks0])]
+        MachCSL.strip_locks (k.withSpie spieW sppW) (by simp only [KCtx.withSpie_locks, hklocks0])]
       have hR5_2 : R5 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 := hcs5.1.trans hfixA.1
       have hR5_24 : R5 24#5 = k.regs 24#5 := hcs5.2.2.2.2.2.2.2.2.2.1.trans hfixA.2.2.2.2.2.2.2.1
       have hR5_25 : R5 25#5 = k.regs 25#5 := hcs5.2.2.2.2.2.2.2.2.2.2.1.trans hfixA.2.2.2.2.2.2.2.2.1
@@ -2483,7 +2465,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
             have hpe3 : (kb.pushOffAt spieW sppW).popExit k.sie = kb.withSpie spieW sppW := by
               rw [← hkbsie]; exact KCtx.pushOffAt_popExit kb spieW sppW hkbwf
             k_norm_g [hpe3, kw_filter_wait,
-              kw_strip_locks (kb.withSpie spieW sppW) (by simp only [KCtx.withSpie_locks, hkblocks])]
+              MachCSL.strip_locks (kb.withSpie spieW sppW) (by simp only [KCtx.withSpie_locks, hkblocks])]
             have hfixR6 : kwFix k R6 := kwFix_cs k RP R6 hfixP hcs6
             have hR6_22 : R6 22#5 = waitLockAddr := hcs6.2.2.2.2.2.2.2.1.trans hRP22
             -- jal sleep()  (level 0, at the entry SIE)
@@ -2726,7 +2708,7 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by unfold kwaitSlots at hK; omega
   -- prologue: c.addi16sp sp,-80
-  k_step_gen (wp_s_push cpu _ KA.«kwait» true 4016#12 10 (by omega) kw_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«kwait» true 4016#12 10 (by omega) MachCSL.imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe

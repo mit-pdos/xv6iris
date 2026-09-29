@@ -271,4 +271,12 @@ theorem filter_kmem_cons (l : List String) (h : "kmem" ∉ l) :
   simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
+theorem kernelEnd_toNat : kernelEndAddr.toNat = KernelSyms.«end» := rfl
+
+theorem availInc_none : availInc (none : Option Nat) = none := rfl
+
+theorem physTop_toNat : physTop.toNat = 0x88000000 := rfl
+
+theorem availDec_none : availDec (none : Option Nat) = none := rfl
+
 end Xv6

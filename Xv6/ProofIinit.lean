@@ -16,6 +16,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.ByteCursor
 import Xv6.UPtPptLemmas
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -38,9 +39,6 @@ theorem ii_ret_3094 : jumpPc (KA.«iinit» + 0x22#64) = (KA.«iinit» + 0x22#64)
 /-- `ret` out of `initsleeplock` lands on the cursor step after the `jal`. -/
 theorem ii_ret_30b4 : jumpPc (KA.«iinit» + 0x42#64) = (KA.«iinit» + 0x42#64) := by
   decide
-
-theorem ii_add_ofNat_zero (w : Nat) (x : BitVec w) : x + BitVec.ofNat w 0 = x :=
-  BitVec.add_zero x
 
 /-- `&itable.inode[i]`, unfolded. -/
 theorem ii_inodeAddr_eq (i : Nat) :
@@ -564,7 +562,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
           exact hcs
   case g9 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, Nat.mul_zero,
-      ii_add_ofNat_zero]
+      MachCSL.add_ofNat_zero]
   case g18 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rfl
   case g19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]⟩
 

@@ -242,7 +242,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_lw cpu _ (KA.«end_op» + 0x1a#64) true 28#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 out))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie, p9, eo_o_out]
+    with [eoK_sie, p9, Xv6.out_addr]
   iintro Hk Hpc Hout
   k_step (wp_s_addiw cpu _ (KA.«end_op» + 0x1c#64) true 4095#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -254,7 +254,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_sw cpu _ (KA.«end_op» + 0x20#64) true 28#12 9#5 15#5 (by decide)
       (BitVec.ofNat 32 out))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie, p9, eo_o_out, eo_dec32 out hout1 hout3]
+    with [eoK_sie, p9, Xv6.out_addr, eo_dec32 out hout1 hout3]
   iintro Hk Hpc Hout
   -- ===== THE LEDGER RETIRES =====
   iapply wpLoop_bupd
@@ -412,7 +412,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     icases eoOpen_lhn γb γfs V.cov ls n W L D eoNullLw 0 $$ Hopen with ⟨HlhN, HlhNback⟩
     k_step_e (wp_s_lw cpu _ (KA.«end_op» + 0x3c#64) true 44#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.ofNat 32 n))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d9, eo_o_lhn]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d9, Xv6.lhn_addr]
     iintro Hk Hpc HlhN
     ihave Hopen := HlhNback $$ HlhN
     have hn31 : n < 2 ^ 31 := by unfold LOGBLOCKS at hnL; omega

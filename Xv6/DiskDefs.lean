@@ -415,4 +415,7 @@ theorem chain_parse (c : Chain) :
   rw [chain_hdr_type, chain_hdr_sector, chain_d1_wr, chain_d1, chain_d2]
   rfl
 
+/-- `&b->blockno`. -/
+theorem bno_addr (b : BitVec 64) : b + 12#64 = aBufBlockno b := rfl
+
 end Xv6

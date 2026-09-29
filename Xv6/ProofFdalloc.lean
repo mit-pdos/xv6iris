@@ -33,6 +33,7 @@ import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.PrintkDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -100,12 +101,7 @@ theorem fdFrees_eq_nil (fs : List (BitVec 64))
 theorem fda_ret_4bbc : jumpPc (KA.«fdalloc» + 0x10#64) = (KA.«fdalloc» + 0x10#64) := by decide
 
 theorem fda_add0' (x : BitVec 64) : x + 0#64 = x := by simp
-theorem fda_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem fda_li16 : 0#64 + BitVec.signExtend 64 16#12 = 16#64 := by decide
-
-theorem fda_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-theorem fda_beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
-  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
 
 /-- The counter is an `int`: `addiw a0,a0,1` on `fd < NOFILE`. -/
 theorem fda_incr_bv (x : BitVec 64) (h : x.ult 2147483647#64 = true) :
@@ -337,7 +333,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
   · -- null: the branch is taken to 0x80004ce2, the install arm
     subst hv0
     k_step_gen (wp_s_branch c1 _ (KA.«fdalloc» + 0x1c#64) true 22#13 14#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_beq_00] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero] next c2 hp2
     iintro Hk Hpc
     icases procOfilesOwe_install γ γd k.proc fs D fd (fnode kk) hv (fnode_nonzero kk hkk) $$ Howe
       with ⟨%hnin, Hcell, Hfds, Hauth, Hw⟩
@@ -382,7 +378,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
       $$ [- $Hk $Hpc $Hframe $Hpost $Hnext]
   · -- non-null: the branch is not taken; step the cursor
     k_step_gen (wp_s_branch c1 _ (KA.«fdalloc» + 0x1c#64) true 22#13 14#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_beq_ne v hv0] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne v hv0] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_addiw c2 _ (KA.«fdalloc» + 0x1e#64) true 1#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -410,7 +406,7 @@ theorem fda_body (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : N
       iintro Hk Hpc
       -- c.li a0,-1
       k_step_gen (wp_s_addi c5 _ (KA.«fdalloc» + 0x26#64) true 4095#12 10#5 0#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fda_m1] next c6 hp6
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c6 hp6
       iintro Hk Hpc
       have hnil : fdFrees fs = [] := by
         refine fdFrees_eq_nil fs (fun j hj => hbel' j ?_)

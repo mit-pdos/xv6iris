@@ -136,7 +136,7 @@ theorem uptTransSpecX_tramp [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (P : U
     transSpecX (GF := GF) cpu c iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) va (paOf trampPpn va) := by
   intro Φ
   exact uptTransSpec cpu c sie P hok va hlt (MemoryAccessType.InstructionFetch ()) (Or.inl rfl) trampPpn .rx rfl
-    (by rw [hvpn, uptLeaves_tramp, uptTrampLeaf_kLeaf]) Φ
+    (by rw [hvpn, Xv6.leaves_get_tramp, uptTrampLeaf_kLeaf]) Φ
 
 set_option maxHeartbeats 1000000 in
 /-- **userret's `sret`, handed to user mode** (Rocq `wp_usret_pt` +

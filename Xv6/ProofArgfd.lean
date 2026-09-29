@@ -22,6 +22,7 @@ import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.FsWords
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -39,24 +40,18 @@ set_option linter.unusedVariables false
 theorem af_ret_4b6a : jumpPc (KA.«argfd» + 0x18#64) = (KA.«argfd» + 0x18#64) := by decide
 theorem af_ret_4b78 : jumpPc (KA.«argfd» + 0x26#64) = (KA.«argfd» + 0x26#64) := by decide
 
-theorem af_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem af_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem af_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4060#12 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
 theorem af_dc (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFDC#64 := by
   bv_decide
-theorem af_beq_00 : bcond bop.BEQ 0#64 0#64 = true := by decide
 theorem af_beq_z (x : BitVec 64) (h : x = 0#64) : bcond bop.BEQ x 0#64 = true := by subst h; decide
-theorem af_beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false := by
-  simp only [bcond, beq_iff_eq]; exact decide_eq_false h
 
-theorem af_msb_false (w : BitVec 32) (h0 : 0 ≤ w.toInt) : w.msb = false := by
-  rw [BitVec.msb_eq_toInt]; simp only [decide_eq_false_iff_not, Int.not_lt]; exact h0
 
 /-- In range: the unsigned compare against 15 falls through. -/
 theorem af_bltu_in (w : BitVec 32) (h0 : 0 ≤ w.toInt) (h16 : w.toInt < 16) :
     bcond bop.BLTU 15#64 (BitVec.signExtend 64 w) = false := by
-  have hmsb := af_msb_false w h0
+  have hmsb := MachCSL.msb_false w h0
   have hint : w.toInt = w.toNat := BitVec.toInt_eq_toNat_of_msb hmsb
   show (15#64).ult (BitVec.signExtend 64 w) = false
   apply Bool.eq_false_iff.2
@@ -80,7 +75,7 @@ theorem af_bltu_out (w : BitVec 32) (h : ¬ (0 ≤ w.toInt ∧ w.toInt < 16)) :
 /-- In range, the sign-extended `int` is the descriptor index. -/
 theorem af_sext_nat (w : BitVec 32) (h0 : 0 ≤ w.toInt) :
     BitVec.signExtend 64 w = BitVec.ofNat 64 w.toInt.toNat := by
-  have hmsb := af_msb_false w h0
+  have hmsb := MachCSL.msb_false w h0
   have hint : w.toInt = w.toNat := BitVec.toInt_eq_toNat_of_msb hmsb
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_signExtend, hmsb, hint]
@@ -256,7 +251,7 @@ theorem af_pf_tail (cpu c : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   k_step_gen (wp_s_branch c1 _ (KA.«argfd» + 0x42#64) true 4#13 9#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, af_beq_ne _ hpf] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, MachCSL.beq_ne _ hpf] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_sd c2 _ (KA.«argfd» + 0x44#64) true 0#12 9#5 15#5 (by decide) oldf)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, h15, Xv6.dsOff0, af_add0'] next c3 hp3
@@ -490,13 +485,13 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
             refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
           0xFFFFFFFFFFFFFFFF#64
-          (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, af_m1]))
+          (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, MachCSL.li_m1]))
         $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpost $Hnext]
     · -- a file: beqz not taken ; the two conditional stores ; li a0,0
       have hsome : argFd v V.ofile = some (fd, fv) := by
         unfold argFd; rw [if_pos (by unfold NOFILE; exact_mod_cast hr), hfd, hfv]; dsimp only; rw [if_neg hz]
       k_step_gen (wp_s_branch c16 _ (KA.«argfd» + 0x36#64) true 32#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_beq_ne fv hz] next c17 hp17
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne fv hz] next c17 hp17
       iintro Hk Hpc
       have hpin17 : k.sie = false ∨ k.proc = 0#64 → c17 = cpu := fun h => (hp17 h).trans (hpin16 h)
       have hext : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 fd) = BitVec.extractLsb' 0 32 v := by
@@ -531,7 +526,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
           $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpfd $Hpf $Hnext]
       · -- pfd != 0: sw a4,0(s2)
         k_step_gen (wp_s_branch c17 _ (KA.«argfd» + 0x38#64) false 8#13 18#5 0#5 (by decide) bop.BEQ)
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', af_beq_ne _ hpfd] next c18 hp18
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', MachCSL.beq_ne _ hpfd] next c18 hp18
         iintro Hk Hpc
         ihave Hpfd := (show ofdOut (GF := GF) (k.regs 11#5) oldfd ⊢ wordPointsTo (k.regs 11#5) 4 (DFrac.own 1) oldfd from by
           unfold ofdOut; rw [if_neg hpfd]) $$ Hpfd
@@ -588,7 +583,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
         0xFFFFFFFFFFFFFFFF#64
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, af_m1]))
+        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, MachCSL.li_m1]))
       $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpost $Hnext]⟩
 
 end Xv6

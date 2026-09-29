@@ -222,14 +222,14 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iintro Hk Hpc
     icases sys_pipe_frame_fa _ _ _ _ _ _ _ $$ Hfr with ⟨Hfa, Hfrw⟩
     k_step_gen (wp_s_ld c3 _ (KA.«sys_pipe» + 0x6c#64) false 4056#12 12#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a40] next c4 hp4
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, MachCSL.add_sext_4056] next c4 hp4
     iintro Hk Hpc Hfa
     ihave Hfr := Hfrw $$ Hfa
     k_step_gen (wp_s_add c4 _ (KA.«sys_pipe» + 0x70#64) true 12#5 12#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
     iintro Hk Hpc
     k_step_gen (wp_s_ld c5 _ (KA.«sys_pipe» + 0x72#64) true 72#12 11#5 9#5 (by decide) (by decide) (DFrac.own 1) V.sz)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_sz, sys_pipe_sz'] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_sz, Xv6.sz_off] next c6 hp6
     iintro Hk Hpc Hsz
     k_step_gen (wp_s_ld c6 _ (KA.«sys_pipe» + 0x74#64) true 80#12 10#5 9#5 (by decide) (by decide) (DFrac.own 1)
         V.pagetable)
@@ -278,7 +278,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iframe #
   · -- the first copyout failed: the tail at +0x80
     k_step_gen (wp_s_branch c _ (KA.«sys_pipe» + 0x62#64) false 30#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_m1, sys_pipe_bltz_m1'] next c1 hp1
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1, sys_pipe_bltz_m1'] next c1 hp1
     iintro Hk Hpc
     have hpin1 : k.sie = false ∨ k.proc = 0#64 → c1 = cpu := fun h => (hp1 h).trans (hpin h)
     ihave Hcore := sys_pipe_core_ext pa pid V P1 M1 hext1 hf $$ [Hsz Hpg Hpt Hrest]
@@ -343,7 +343,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
       rw [h10, sys_pipe_trunc_m1]) $$ Hc1
     ihave Hfr := Hfrw $$ %(0xFFFFFFFF#32) Hc1
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x4c#64) false 104#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_m1] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] next c2 hp2
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
     iapply (sys_pipe_unfd0 FC Γ cpu c2 k γl γ pa pid V M sts v γkl γk spie spp R k0 k1 fd0 γp hk0 hk1 hfd0 hz0
@@ -368,7 +368,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
       rw [h10, sys_pipe_trunc_nat]) $$ Hc1
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd1) Hc1
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x4c#64) false 104#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_nat fd1 hfd1] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_nat fd1 hfd1] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_addi c2 _ (KA.«sys_pipe» + 0x50#64) true 4#12 14#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_li4] next c3 hp3
@@ -378,12 +378,12 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     iintro Hk Hpc
     icases sys_pipe_frame_fa _ _ _ _ _ _ _ $$ Hfr with ⟨Hfa, Hfrw⟩
     k_step_gen (wp_s_ld c4 _ (KA.«sys_pipe» + 0x56#64) false 4056#12 12#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, sys_pipe_a40] next c5 hp5
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p8, MachCSL.add_sext_4056] next c5 hp5
     iintro Hk Hpc Hfa
     ihave Hfr := Hfrw $$ Hfa
     icases sys_pipe_core_split pa pid V M $$ Hcore with ⟨%hf, Hsz, Hpg, Hpt, Hrest⟩
     k_step_gen (wp_s_ld c5 _ (KA.«sys_pipe» + 0x5a#64) true 72#12 11#5 9#5 (by decide) (by decide) (DFrac.own 1) V.sz)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_sz, sys_pipe_sz'] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_sz, Xv6.sz_off] next c6 hp6
     iintro Hk Hpc Hsz
     k_step_gen (wp_s_ld c6 _ (KA.«sys_pipe» + 0x5c#64) true 80#12 10#5 9#5 (by decide) (by decide) (DFrac.own 1)
         V.pagetable)

@@ -26,6 +26,7 @@ import Xv6.CopyLemmas
 import Xv6.ReadiDefs
 import Xv6.SysFstatParts
 import Xv6.SysReadParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -52,9 +53,6 @@ theorem swr_ret_40 : jumpPc (KA.«sys_write» + 0x40#64) = (KA.«sys_write» + 0
 
 theorem swr_li2 : 0#64 + BitVec.signExtend 64 2#12 = 2#64 := by decide
 theorem swr_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
-/-- `addi a1,s0,-40` / `ld a1,-40(s0)`: `&p`, frame slot 5. -/
-theorem swr_p_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by
-  bv_decide
 
 /-- `&f` is not null (Rocq's `stack_own_sp_nonzero` reading, off the
 frame's own bound `swr_sp_bound`). -/

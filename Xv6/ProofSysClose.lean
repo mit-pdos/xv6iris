@@ -33,6 +33,7 @@ import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 import Xv6.SysFstatParts
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -51,11 +52,9 @@ theorem sc_ret_4e42 : jumpPc (KA.«sys_close» + 0x16#64) = (KA.«sys_close» + 
 theorem sc_ret_4e4c : jumpPc (KA.«sys_close» + 0x20#64) = (KA.«sys_close» + 0x20#64) := by decide
 theorem sc_ret_4e64 : jumpPc (KA.«sys_close» + 0x38#64) = (KA.«sys_close» + 0x38#64) := by decide
 
-theorem sc_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sc_add0' (x : BitVec 64) : x + 0#64 = x := by simp
 theorem sc_fd_addr (x : BitVec 64) : x + BitVec.signExtend 64 4076#12 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
 theorem sc_ec (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFE8#64 + 4#64 = x + 0xFFFFFFFFFFFFFFEC#64 := by bv_decide
-theorem sc_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sc_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
 theorem sc_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFFFFFFE0#64 ≠ 0#64 := by
@@ -74,12 +73,9 @@ theorem sc_fd_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFF
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
 
-theorem sc_msb_false (w : BitVec 32) (h0 : 0 ≤ w.toInt) : w.msb = false := by
-  rw [BitVec.msb_eq_toInt]; simp only [decide_eq_false_iff_not, Int.not_lt]; exact h0
-
 theorem sc_sext_nat (w : BitVec 32) (h0 : 0 ≤ w.toInt) :
     BitVec.signExtend 64 w = BitVec.ofNat 64 w.toInt.toNat := by
-  have hmsb := sc_msb_false w h0
+  have hmsb := MachCSL.msb_false w h0
   have hint : w.toInt = w.toNat := BitVec.toInt_eq_toNat_of_msb hmsb
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_signExtend, hmsb, hint]
@@ -92,19 +88,6 @@ theorem sc_ofile_addr (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
   apply BitVec.eq_of_toNat_eq
   simp only [BitVec.toNat_add, BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.reducePow, Nat.shiftLeft_eq]
   omega
-
-theorem sc_calleeSaved_mk (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 /-- `s1..s11`, pinned to the entry map. -/
 def scPins (k : KCtx) (R : RegMap) : Prop :=
@@ -239,7 +222,7 @@ theorem sc_exit (Γ : SchedNames) (cr : CPU) (k : KCtx) (γ : FileNames) (γd : 
   obtain ⟨p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply (sc_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2 r h15
-      (sc_calleeSaved_mk _ _
+      (MachCSL.calleeSaved_mk _ _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p18)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p19)
@@ -384,14 +367,14 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
   have hpins1 : scPins k R1 := ⟨b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   k_step_gen (wp_s_addi c6 _ (KA.«sys_close» + 0x16#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_m1] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h => (hp7 h).trans (hpin6 h)
   unfold argfdPost
   icases Hpost1 with ⟨⟨%⟨hr, hnone⟩, Hpfd, Hcf⟩ | ⟨%fd0, %fv, %⟨hr, hsome⟩, Hpfd, Hcf⟩⟩
   · -- no such descriptor: bltz taken
     k_step_gen (wp_s_branch c7 _ (KA.«sys_close» + 0x18#64) false 34#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sc_bltz_m1] next c8 hp8
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1] next c8 hp8
     iintro Hk Hpc
     have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h => (hp8 h).trans (hpin7 h)
     ihave Hfd := sc_ofdOut_elim afd oldfd hafd_nz $$ Hpfd

@@ -101,7 +101,7 @@ theorem dirlookup_licence (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List
         iname fscIreg fscFs icfgIst (BitVec.setWidth 32 (dirInum data i)) l ∗
         (iname fscIreg fscFs icfgIst (BitVec.setWidth 32 (dirInum data i)) l -∗
           dlinks fscFs dinum.toNat dn bm data ∗ dinodeAt fscIreg dinum dr) := by
-  have hzu := dirlookup_zext32_toNat (dirInum data i)
+  have hzu := MachCSL.zext32_toNat (dirInum data i)
   by_cases hself : (dirInum data i).toNat = dinum.toNat
   · -- the SELF record: licence (c)
     have hii : BitVec.setWidth 32 (dirInum data i) = dinum :=
@@ -188,7 +188,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
   have hfirst : dirFirst data (dirNrec dn.diSize.toNat) (dirBname data i) = some i := by
     unfold dirBname; rw [dirFirst_name _ _ _ _ hsome]; exact hsome
   have hnib : (BitVec.setWidth 32 (dirInum data i)).toNat < 16 * icfgNib := by
-    rw [dirlookup_zext32_toNat]; exact hs.hinums i (dirFirst_lt _ _ _ _ hsome) hlive
+    rw [MachCSL.zext32_toNat]; exact hs.hinums i (dirFirst_lt _ _ _ _ hsome) hlive
   have hpos := dirlookup_live_pos data i hlive
   have hsx := dirlookup_sext_zext (dirInum data i)
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr

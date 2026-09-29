@@ -56,11 +56,6 @@ theorem sys_open_create_ne (vom : BitVec 64) (hc : omCreate vom = true) :
   unfold omCreate at hc
   simp [hc]
 
-theorem sys_open_beqz_ne (x : BitVec 64) (h : x ≠ 0#64) : bcond bop.BEQ x 0#64 = false := by
-  rw [Xv6.dirlookup_beqz]; exact decide_eq_false h
-
-theorem sys_open_beqz_eq : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -131,7 +126,7 @@ theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
   have hz := sys_open_create_zero A.vom hc
   -- +0x36  c.beqz a5 : taken (no O_CREATE)
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x36#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, hz, sys_open_beqz_eq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, hz, MachCSL.beqz_zero]
   iintro Hk Hpc
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 220#64) ⊢
     pcIs cpu (sysOpenAddr + 0xdc#64) from .rfl) $$ Hpc
@@ -167,7 +162,7 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
     %⟨hpins, h15⟩ %hal Hk Hpc Hte Hce #Henv Hcells Hbuf Hblk HopS Htx Hbs Hir Hfd Hfr Hx HΦ
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [sysOpenAddr]
-  have hnz := sys_open_beqz_ne _ (sys_open_create_ne A.vom hc)
+  have hnz := MachCSL.beq_ne _ (sys_open_create_ne A.vom hc)
   -- +0x36  c.beqz a5 : falls through (O_CREATE)
   k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x36#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, hnz]

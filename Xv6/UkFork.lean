@@ -65,9 +65,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 theorem ukFork_num (m : RegMap) (pc : BitVec 64) (hn : usysno m = USYS_fork) :
     usysNum (tfOf m pc) = USYS_fork := by rw [tfOf_num]; exact hn
 
-/-- a0 is not sp. -/
-theorem ukFork_a0_ns : unotSp 10#5 := by unfold unotSp spIdx; decide
-
 /-- **Rocq `wp_uk_ecall_fork_at`**: THE FORK LEAF, at the ledger's TABLE VIEW
 (seccomp S3 ruling G2): the child's is the parent's, so a parent that knows its
 whole table hands its child the same knowledge. -/
@@ -173,7 +170,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
       iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc Sc pidv false false seccAll seccAll r hx0 hal4).2
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
-      iapply urun_close_wr N M pm m 10#5 r sz fdv c gn Sc pidv (pc + 4#64) avail ukFork_a0_ns hx0
+      iapply urun_close_wr N M pm m 10#5 r sz fdv c gn Sc pidv (pc + 4#64) avail Xv6.a0_ns hx0
         $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
       iintro %h' Hrun
       unfold urun
@@ -197,7 +194,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
         hal4).2
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
-      iapply urun_close_wr N M pm m 10#5 r sz fdv c gn (Sc ∪ {γ}) pidv (pc + 4#64) avail ukFork_a0_ns hx0
+      iapply urun_close_wr N M pm m 10#5 r sz fdv c gn (Sc ∪ {γ}) pidv (pc + 4#64) avail Xv6.a0_ns hx0
         $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
       iintro %h' Hrun
       unfold urun
@@ -233,7 +230,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     ihave Hids' := urunIds_intro N' ∅ pidc $$ [Hcha' Hpida']
     · iframe Hcha' Hpida'
     ihave #Hrows' := (show urunRows (hlc := hlc) N fdv ⊢ urunRows (hlc := hlc) N' fdv from .rfl) $$ Hrows
-    iapply urun_close_wr N' M pm m 10#5 0#64 sz fdv c g' ∅ pidc (pc + 4#64) avail ukFork_a0_ns hx0
+    iapply urun_close_wr N' M pm m 10#5 0#64 sz fdv c g' ∅ pidc (pc + 4#64) avail Xv6.a0_ns hx0
       $$ Hheap' Hstk' Hufd' Hcwa' Hids' Hmp Hdep Hrows'
     iintro %h' Hrun
     unfold urun

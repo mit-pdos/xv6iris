@@ -111,8 +111,8 @@ theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
   have hleaf : isLeafPte (t.entAt 2 (vpnOf (k.regs 11#5))) := by
     rcases UPtFault.wfU_entAt 2 t _ hrep.1 hcomp with h | h
     · exact absurd h hz
-    · exact (UPtFault.isLeafPte_iff _).mpr h
-  have hv := (UPtFault.isLeafPte_iff _).mp (UPtFault.isLeafPte_andNotU _ hleaf)
+    · exact (Xv6.isLeafPte_iff _).mpr h
+  have hv := (Xv6.isLeafPte_iff _).mp (UPtFault.isLeafPte_andNotU _ hleaf)
   have hrep' : ptRep (t.setLeaf 2 (vpnOf (k.regs 11#5))
       (t.entAt 2 (vpnOf (k.regs 11#5)) &&& ~~~PTE_U))
       (P.clearU (vpnOf (k.regs 11#5)).toNat w).leaves := by

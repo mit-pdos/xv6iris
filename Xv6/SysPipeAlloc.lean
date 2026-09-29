@@ -69,7 +69,7 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
       rw [h10, sys_pipe_trunc_m1]) $$ Hc0
     ihave Hfr := Hfrw $$ %(0xFFFFFFFF#32) Hc0
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x3c#64) false 140#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_m1] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] next c2 hp2
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
     icases sys_pipe_core_pid pa pid V M $$ Hcore with ⟨Hpid, Hcw⟩
@@ -99,7 +99,7 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
       rw [h10, sys_pipe_trunc_nat]) $$ Hc0
     ihave Hfr := Hfrw $$ %(BitVec.ofNat 32 fd0) Hc0
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x3c#64) false 140#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_nat fd0 hfd0] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_nat fd0 hfd0] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_ld c2 _ (KA.«sys_pipe» + 0x40#64) false 4040#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1)
         (fnode k1))
@@ -163,13 +163,13 @@ theorem sys_pipe_stage_b (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
   have hK8 : 8 ≤ k.avail := by rw [sysPipeSlots_eq] at hK; omega
   have p8 : R 8#5 = k.regs 2#5 := hpins.2.1
   k_step_gen (wp_s_addi c _ (KA.«sys_pipe» + 0x26#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_m1] next c1 hp1
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c1 hp1
   iintro Hk Hpc
   unfold pipeallocPost
   icases Hpost with ⟨⟨%h10, -, Hu0, Hu1, ⟨%rf, %wf, Hrf, Hwf⟩⟩ | ⟨%h10, -, %k0, %k1, %γp, %⟨hk0, hk1⟩, Hrf, Hwf, Hr0, Hr1, Hqf⟩⟩
   · -- pipealloc failed: bltz taken to the exit with -1
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x28#64) false 178#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_m1] next c2 hp2
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] next c2 hp2
     iintro Hk Hpc
     have hpin2 : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans ((hp1 h).trans (hpin h))
     ihave Hpost : sysPipePost (GF := GF) γ V.fdg pa pid V M sts v 0xFFFFFFFFFFFFFFFF#64 $$ [Hcore Howe Hfrag]

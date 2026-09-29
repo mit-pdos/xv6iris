@@ -48,9 +48,6 @@ theorem vdrw_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb254#64 = KA.«a
 theorem vdrw_ret_36 :
     jumpPc (KA.«virtio_disk_rw» + 0x36#64) = KA.«virtio_disk_rw» + 0x36#64 := by decide
 
-/-- `&b->blockno`. -/
-theorem vdrw_bno_addr (b : BitVec 64) : b + 12#64 = aBufBlockno b := rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
@@ -133,7 +130,7 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   -- lw s7,12(a0)
   k_step_e (wp_s_lw cpu _ (KA.«virtio_disk_rw» + 0x1c#64) false 12#12 23#5 10#5 (by decide)
       (by decide) (DFrac.own (1 : Qp).half) bno)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw_bno_addr (k.regs 10#5)]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.bno_addr (k.regs 10#5)]
   iintro Hk Hpc Hbno
   -- slliw s7,s7,1 ; slli s7,s7,32 ; srli s7,s7,32
   k_step_e (wp_s_slliw cpu _ (KA.«virtio_disk_rw» + 0x20#64) false 1#5 23#5 23#5 (by decide))

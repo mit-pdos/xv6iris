@@ -19,6 +19,7 @@ import MachCSL.ByteWord
 import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -230,17 +231,6 @@ theorem pd_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
 
 /-- `&proc[0].name`. -/
 theorem pd_cursor_zero : pName (procAddr 0) = (KA.«proc» + 0x158#64) := by decide
-
-/-- The immediates of the ten-slot frame. -/
-theorem pd_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem pd_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
-
-/-- A taken/untaken `bne`. -/
-theorem pd_bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
-    (if bcond bop.BNE a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 theorem pd_bltu_true {α : Type} (a b : BitVec 64) (h : a.ult b = true) (p q : α) :
     (if bcond bop.BLTU a b then p else q) = p := by
@@ -723,7 +713,7 @@ theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : U
   -- c.bnez a2
   k_step_gen (wp_s_branch c4 _ (KA.«procdump» + 0x88#64) true 8142#13 12#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [pd_bne_ne ptr 0#64 hptr] next c5 hq5
+    with [MachCSL.bne_ne ptr 0#64 hptr] next c5 hq5
   iintro Hk Hpc
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cur := fun h =>
     (hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans ((hq1 h).trans (hpin h)))))
@@ -1108,7 +1098,7 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F8
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c9 _ (KA.«procdump» + 0xa0#64) true 80#12 10 pd_imm_p80)
+  k_step_gen (wp_s_pop c9 _ (KA.«procdump» + 0xa0#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hq10
   iintro Hk Hpc
@@ -1161,7 +1151,7 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   have hret0 : jumpPc (KA.«procdump» + 0x22#64) = (KA.«procdump» + 0x22#64) := by decide
   k_norm_g
   -- the prologue
-  k_step_gen (wp_s_push cpu _ KA.«procdump» true 4016#12 10 hK10 pd_imm_m80)
+  k_step_gen (wp_s_push cpu _ KA.«procdump» true 4016#12 10 hK10 MachCSL.imm_m80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc Hframe
   irevert Hframe

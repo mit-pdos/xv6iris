@@ -329,4 +329,24 @@ theorem kctx_cross (tier : KTier) (ξ ξ' : CtxId) [KernelGeom] [KernelImage GF]
     iframe Hk
     iexact Hξ
 
+theorem ctxCells_dup [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) :
+    ctxCells (GF := GF) c vs ⊢ ⌜vs.length = 14⌝ ∗ ctxCells c vs := by
+  unfold ctxCells
+  iintro ⟨%h, H⟩
+  isplitl []
+  · ipureintro; exact h
+  isplitl []
+  · ipureintro; exact h
+  · iexact H
+
+/-- The callee-saved image, componentwise. -/
+theorem calleeImg_eq {R R' : RegMap} (h : calleeImg R = calleeImg R') :
+    R 1#5 = R' 1#5 ∧ R 2#5 = R' 2#5 ∧ R 8#5 = R' 8#5 ∧ R 9#5 = R' 9#5 ∧ R 18#5 = R' 18#5 ∧
+      R 19#5 = R' 19#5 ∧ R 20#5 = R' 20#5 ∧ R 21#5 = R' 21#5 ∧ R 22#5 = R' 22#5 ∧
+      R 23#5 = R' 23#5 ∧ R 24#5 = R' 24#5 ∧ R 25#5 = R' 25#5 ∧ R 26#5 = R' 26#5 ∧
+      R 27#5 = R' 27#5 := by
+  unfold calleeImg at h
+  simp only [List.cons.injEq, and_true] at h
+  exact h
+
 end MachCSL

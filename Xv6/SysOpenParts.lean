@@ -162,6 +162,7 @@ import Xv6.PrintkDefs
 import Xv6.SysChdirFrame
 import Xv6.SysMknodFrame
 import Xv6.SysfileCalls
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -223,15 +224,11 @@ theorem sys_open_K (a : Nat) (h : sysOpenSlots ≤ a) :
 /-! ### The sign cluster: the two `bltz`s (+0x24 argstr, +0x70 fdalloc) -/
 
 
-theorem sys_open_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
 /-- The descriptor fdalloc returns is signed-nonneg (Rocq `so_fd_range`). -/
 theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
     bcond bop.BLT (BitVec.ofNat 64 fd) 0#64 = false :=
   Xv6.sysfile_bltz_nat fd (by unfold NOFILE at h; omega)
 
-
-theorem sys_open_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
 /-! ### The sixteen-bit compare cluster: the three type tests
 

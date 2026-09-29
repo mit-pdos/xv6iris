@@ -100,7 +100,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
     iintro Hk Hpc
     k_step_gen (wp_s_and c11 _ (KA.«vmfault» + 0x24#64) false 19#5 12#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vf_lui_mask] next c12 hp12
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c12 hp12
     iintro Hk Hpc
     k_step_gen (wp_s_add c12 _ (KA.«vmfault» + 0x28#64) true 11#5 0#5 19#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
@@ -138,7 +138,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     · -- unmapped: allocate
       k_step_gen (wp_s_branch c16 _ (KA.«vmfault» + 0x30#64) true 8#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [vf_beq_zero _ hz] next c17 hp17
+        with [MachCSL.beq_zero _ hz] next c17 hp17
       iintro Hk Hpc
       -- c.sdsp s2,16(sp) ; jal ra, kalloc
       k_step_gen (wp_s_sd c17 _ (KA.«vmfault» + 0x38#64) true 16#12 2#5 18#5 (by decide) w4)
@@ -180,7 +180,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
       · -- `kalloc` failed: return 0
         k_step_gen (wp_s_branch c21 _ (KA.«vmfault» + 0x40#64) true 52#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [vf_beq_zero _ hzero.1] next c22 hp22
+          with [MachCSL.beq_zero _ hzero.1] next c22 hp22
         iintro Hk Hpc
         k_step_gen (wp_s_ld c22 _ (KA.«vmfault» + 0x74#64) true 24#12 9#5 2#5 (by decide) (by decide)
             (DFrac.own 1) (k.regs 9#5))
@@ -260,7 +260,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
         case hnm => k_norm_g [vf_lui_4096]
         iapply wpNext_intro_pin
         iintro %c27 %hp27 %R4 Hk Hpc Hbuf %hpost4
-        k_norm_g [vf_ret_14e4, vf_extract0]
+        k_norm_g [vf_ret_14e4, MachCSL.extract_zero]
         obtain ⟨hcs4, hr4⟩ := hpost4
         unfold calleeSaved at hcs4
         k_norm_g at hcs4
@@ -335,7 +335,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
         have hvpn : vpnOf (R4 19#5) = vpnOf (k.regs 12#5) := by
           rw [e19]; exact vf_vpn_round _
         have hlt26 : (vpnOf (k.regs 12#5)).toNat < 67108864 :=
-          UPtFault.vpnOf_toNat_lt _ hva12
+          MachCSL.vpnOf_toNat_lt _ hva12
         have hnone' : Iris.Std.PartialMap.get? P.leaves (vpnOf (k.regs 12#5)).toNat = none := by
           rw [← vf_vpn_round (k.regs 12#5)]; exact hnone
         have hltf : (vpnOf (k.regs 12#5)).toNat < tfVpn.toNat :=
@@ -381,7 +381,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
           -- c.bnez a0 : not taken
           k_step_gen (wp_s_branch c34 _ (KA.«vmfault» + 0x5a#64) true 10#13 10#5 0#5 (by decide) bop.BNE)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-            with [vf_bne_zero _ hok] next c35 hp35
+            with [MachCSL.bne_zero _ hok] next c35 hp35
           iintro Hk Hpc
           k_step_gen (wp_s_ld c35 _ (KA.«vmfault» + 0x5c#64) true 24#12 9#5 2#5 (by decide) (by decide)
               (DFrac.own 1) (k.regs 9#5))

@@ -29,6 +29,7 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -47,9 +48,7 @@ theorem sd_ret_4d64 : jumpPc (KA.«sys_dup» + 0x14#64) = (KA.«sys_dup» + 0x14
 theorem sd_ret_4d78 : jumpPc (KA.«sys_dup» + 0x28#64) = (KA.«sys_dup» + 0x28#64) := by decide
 theorem sd_ret_4d86 : jumpPc (KA.«sys_dup» + 0x36#64) = (KA.«sys_dup» + 0x36#64) := by decide
 
-theorem sd_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sd_add0' (x : BitVec 64) : x + 0#64 = x := by simp
-theorem sd_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4056#12 = x + 0xFFFFFFFFFFFFFFD8#64 := by bv_decide
 theorem sd_sp24 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + BitVec.signExtend 64 24#12 = x + 0xFFFFFFFFFFFFFFE8#64 := by
   bv_decide
 theorem sd_sp24' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + 24#64 = x + 0xFFFFFFFFFFFFFFE8#64 := by bv_decide
@@ -57,15 +56,7 @@ theorem sd_sp16 (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + BitVec.signExtend 
   bv_decide
 theorem sd_sp16' (x : BitVec 64) : x + 0xFFFFFFFFFFFFFFD0#64 + 16#64 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 
-theorem sd_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sd_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
-theorem sd_bltz_nat (n : Nat) (h : n < 16) : bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, Nat.reducePow, BitVec.toInt_zero] at hlt
-  omega
 
 /-- The `&f` local is non-null: the frame fits below `sp`. -/
 theorem sd_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFFFFFFD8#64 ≠ 0#64 := by
@@ -75,19 +66,6 @@ theorem sd_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFFF
   simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
   have : sp.toNat < 2 ^ 64 := sp.isLt
   omega
-
-theorem sd_calleeSaved_mk (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
 
 /-- `s1..s11`, pinned to the entry map (the epilogue restores only `ra`, `s0`, `sp`). -/
 def sdPins (k : KCtx) (R : RegMap) : Prop :=
@@ -183,7 +161,7 @@ theorem sd_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : B
   obtain ⟨p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply (sd_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2 r h15
-      (sd_calleeSaved_mk _ _
+      (MachCSL.calleeSaved_mk _ _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p18)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p19)
@@ -277,7 +255,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   iintro %c1 %hp1 Hk Hpc Hframe
   icases sd_frame_open _ _ _ $$ Hframe with ⟨Hra, Hs0, ⟨%w1, Hc24⟩, ⟨%w2, Hc16⟩, ⟨%wf, Hcf⟩, Hc0⟩
   k_step_gen (wp_s_addi c1 _ (KA.«sys_dup» + 0x8#64) false 4056#12 12#5 8#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_f_addr] next c2 hp2
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.add_sext_4056] next c2 hp2
   iintro Hk Hpc
   k_step_gen (wp_s_addi c2 _ (KA.«sys_dup» + 0xc#64) true 0#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.co_li_zero] next c3 hp3
@@ -293,11 +271,11 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm_g [sd_ret_4d64, Xv6.co_li_zero, sd_f_addr]
+  k_norm_g [sd_ret_4d64, Xv6.co_li_zero, MachCSL.add_sext_4056]
   iframe Hcore Howe Hpfd Hcf
   iframe #
   case ha0 => k_norm_g [Xv6.co_li_zero]
-  case hpf => k_norm_g [sd_f_addr]; exact sd_f_nonnull _ hsp
+  case hpf => k_norm_g [MachCSL.add_sext_4056]; exact sd_f_nonnull _ hsp
   case hpr => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
   case hn => k_norm_g; omega
@@ -313,14 +291,14 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
   have hpins1 : sdPins k R1 := ⟨b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   k_step_gen (wp_s_addi c6 _ (KA.«sys_dup» + 0x14#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_m1] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h => (hp7 h).trans (hpin6 h)
   unfold argfdPost
   icases Hpost1 with ⟨⟨%⟨hr, hnone⟩, Hpfd, Hcf⟩ | ⟨%fd0, %fv, %⟨hr, hsome⟩, Hpfd, Hcf⟩⟩
   · -- no such descriptor: bltz taken to 4d8c
     k_step_gen (wp_s_branch c7 _ (KA.«sys_dup» + 0x16#64) false 38#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sd_bltz_m1] next c8 hp8
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1] next c8 hp8
     iintro Hk Hpc
     have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h => (hp8 h).trans (hpin7 h)
     ihave Hframe := sd_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1 w2 wf $$ [Hra Hs0 Hc24 Hc16 Hcf Hc0]
@@ -354,7 +332,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b2, sd_sp16, sd_sp16'] next c10 hp10
     iintro Hk Hpc Hc16
     k_step_gen (wp_s_ld c10 _ (KA.«sys_dup» + 0x1e#64) false 4056#12 9#5 8#5 (by decide) (by decide) (DFrac.own 1) fv)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, sd_f_addr] next c11 hp11
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, MachCSL.add_sext_4056] next c11 hp11
     iintro Hk Hpc Hcf
     k_step_gen (wp_s_add c11 _ (KA.«sys_dup» + 0x22#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
@@ -401,7 +379,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
     iintro Hk Hpc
     k_step_gen (wp_s_addi c15 _ (KA.«sys_dup» + 0x2a#64) true 4095#12 15#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sd_m1] next c16 hp16
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.li_m1] next c16 hp16
     iintro Hk Hpc
     have hpin16 : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
       (hp16 h).trans ((hp15 h).trans (hpin14 h))
@@ -411,7 +389,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     icases Hpost2 with ⟨⟨%⟨hr2, hfull⟩, Howe⟩ | ⟨%fd1, %l, %⟨hr2, hfrees⟩, Howe, Hfd, Hauth1⟩⟩
     · -- the table is full: bltz taken to 4d96 ; restore s1/s2 ; j 4d8c
       k_step_gen (wp_s_branch c16 _ (KA.«sys_dup» + 0x2c#64) false 26#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, sd_bltz_m1] next c17 hp17
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, MachCSL.bltz_m1] next c17 hp17
       iintro Hk Hpc
       k_step_gen (wp_s_ld c17 _ (KA.«sys_dup» + 0x46#64) true 24#12 9#5 2#5 (by decide) (by decide) (DFrac.own 1) (R1 9#5))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d2', sd_sp24, sd_sp24'] next c18 hp18
@@ -465,7 +443,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
       have hne : fd0 ≠ fd1 := by
         intro h; subst h; rw [hfv'] at hfd1z; exact fnode_nonzero kk hkk (Option.some.inj hfd1z)
       k_step_gen (wp_s_branch c16 _ (KA.«sys_dup» + 0x2c#64) false 26#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, sd_bltz_nat fd1 hfd1lt] next c17 hp17
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, MachCSL.bltz_nat fd1 hfd1lt] next c17 hp17
       iintro Hk Hpc
       k_step_gen (wp_s_add c17 _ (KA.«sys_dup» + 0x30#64) true 10#5 0#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18

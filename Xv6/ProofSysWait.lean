@@ -37,19 +37,6 @@ set_option linter.unusedVariables false
 theorem sw_ret_2984 : jumpPc (KA.«sys_wait» + 0x12#64) = (KA.«sys_wait» + 0x12#64) := by decide
 theorem sw_ret_298c : jumpPc (KA.«sys_wait» + 0x1a#64) = (KA.«sys_wait» + 0x1a#64) := by decide
 
-theorem sw_calleeSaved_mk (KR R : RegMap)
-    (h9 : R 9#5 = KR 9#5) (h18 : R 18#5 = KR 18#5) (h19 : R 19#5 = KR 19#5) (h20 : R 20#5 = KR 20#5)
-    (h21 : R 21#5 = KR 21#5) (h22 : R 22#5 = KR 22#5) (h23 : R 23#5 = KR 23#5)
-    (h24 : R 24#5 = KR 24#5) (h25 : R 25#5 = KR 25#5) (h26 : R 26#5 = KR 26#5)
-    (h27 : R 27#5 = KR 27#5) :
-    calleeSaved KR (((R.set 1#5 (KR 1#5)).set 8#5 (KR 8#5)).set 2#5 (KR 2#5)) := by
-  unfold calleeSaved
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
-    first
-      | rfl
-      | assumption
-
 /-- `s1..s11`, pinned to the entry map. -/
 def swPins (k : KCtx) (R : RegMap) : Prop :=
   R 9#5 = k.regs 9#5 ∧ R 18#5 = k.regs 18#5 ∧ R 19#5 = k.regs 19#5 ∧ R 20#5 = k.regs 20#5 ∧
@@ -197,7 +184,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
   iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hch Hk Hpc Hte Hce Hblk
   ipureintro
-  refine ⟨sw_calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans, hmap⟩
+  refine ⟨MachCSL.calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans, hmap⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
   exact h10
 

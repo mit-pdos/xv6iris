@@ -17,6 +17,7 @@ import Xv6.SpecMappages
 import Xv6.UmCovered
 import Xv6.UvmallocDefs
 import Xv6.CodeTactics
+import MachCSL.BvLemmas
 
 namespace Xv6
 
@@ -39,11 +40,6 @@ theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
 
 /-! ## `uvmalloc`: the ten-slot frame -/
 
-/-- The immediates of the ten-slot frame. -/
-theorem ua_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem ua_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -140,7 +136,7 @@ theorem uvma_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
   iintro Hk Hpc F8
   ihave Hstack : stackOwn (k.regs 2#5) 10 $$ [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   case' _ => stack_cells; iframe
-  k_step_gen (wp_s_pop c6 _ (KA.«uvmalloc» + 0x84#64) true 80#12 10 ua_imm_p80)
+  k_step_gen (wp_s_pop c6 _ (KA.«uvmalloc» + 0x84#64) true 80#12 10 MachCSL.imm_p80)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c7 hp7
   iintro Hk Hpc
@@ -346,7 +342,6 @@ theorem ua_pageOwn_of [CurCtx] (p : BitVec 64) (bs : List (BitVec 8)) (h : bs.le
   · ipureintro; exact h
   · iexact H
 
-theorem ua_availDec_none : availDec (none : Option Nat) = none := rfl
 
 /-- `mappages` of a single page: either the path completes (the leaf is
 written) or it does not (the tree is only the filled prefix). -/
@@ -870,14 +865,14 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     have hpin8 : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
       (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
         ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h))))))))
-    rw [ua_availDec_none]
+    rw [Xv6.availDec_none]
     -- open the space to get the tree
     icases procPtAt_split Pi Mi $$ HP with ⟨%hwfi, Htree, Hpages⟩
     icases ptOwnRep_split Pi.root Pi.leaves $$ Htree with ⟨%t, %hbr, Htree⟩
     obtain ⟨hbase, hrep⟩ := hbr
     have hvpni : (vpnOf (R2 18#5)).toNat = A / 4096 + i := hvpn0 (R2 18#5) q18
     have hltf : A / 4096 + i < tfVpn.toNat := by
-      rw [tfVpn_toNat]
+      rw [Xv6.tfVpn_toNat]
       have huv : uvmMaxsz = 274877898752 := by unfold uvmMaxsz; decide
       omega
     have hwalk : t.walk 2 (vpnOf (R2 18#5)) = none :=
@@ -1275,7 +1270,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       | none => rfl
       | some w =>
         have h1 := (hwfP.1 _ w hg).1
-        rw [tfVpn_toNat] at h1
+        rw [Xv6.tfVpn_toNat] at h1
         obtain ⟨q, hq⟩ := pgRoundUpN_dvd (k.regs 11#5).toNat
         unfold uvmaVpn0 at h1
         unfold uvmMaxsz at hb
@@ -1323,7 +1318,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       with [KCtx.rget_eq, bltu_neg _ _ hlt] next c1 hp1
     iintro Hk Hpc
     -- the prologue
-    k_step_gen (wp_s_push c1 _ (KA.«uvmalloc» + 0x4#64) true 4016#12 10 hK10 ua_imm_m80)
+    k_step_gen (wp_s_push c1 _ (KA.«uvmalloc» + 0x4#64) true 4016#12 10 hK10 MachCSL.imm_m80)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc Hframe
     irevert Hframe
@@ -1368,7 +1363,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
     iintro Hk Hpc
     k_step_gen (wp_s_lui c14 _ (KA.«uvmalloc» + 0x1e#64) true 1048575#20 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [lui_mask] next c15 hp15
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c15 hp15
     iintro Hk Hpc
     have hpgu : (k.regs 11#5 + 4095#64) &&& 0xFFFFFFFFFFFFF000#64
         = BitVec.ofNat 64 (pgRoundUpN (k.regs 11#5).toNat) :=

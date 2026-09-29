@@ -56,11 +56,6 @@ theorem uptPtePpn_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) :
       _update_PTE_Flags_A, _update_PTE_Flags_D] <;>
     bv_decide
 
-/-- Rocq `upt_full_map_tramp`. -/
-theorem uptLeaves_tramp (P : UPtd) : get? P.leaves trampVpn.toNat = some trampLeaf := by
-  unfold UPtd.leaves
-  exact get?_insert_eq rfl
-
 /-- Rocq `upt_full_map_tf`. -/
 theorem uptLeaves_tf (P : UPtd) : get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
   unfold UPtd.leaves

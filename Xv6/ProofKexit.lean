@@ -294,14 +294,6 @@ theorem kx_succ8 (pa : BitVec 64) (fd : Nat) :
   rw [show BitVec.signExtend 64 8#12 = 8#64 from by simp]
   exact kx_pOfile_succ pa fd
 
-theorem kx_pcIs_pos {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [if_pos h]
-
-theorem kx_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬ p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -433,13 +425,13 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h9]
     by_cases hz : L[fd]'hfdlt2 = 0#64
     · -- already null: the slot owns its unit already; jump to the increment
-      ihave Hpc := kx_pcIs_pos cpu _ _ _ hz $$ Hpc
+      ihave Hpc := MachCSL.pcIs_pos cpu _ _ _ hz $$ Hpc
       iapply (TT cpu (k.setReg 10#5 (L[fd]'hfdlt2)) L hkframe10 h9_10 hlen
         (kx_keep_inv L fd hfdlt2 hz hinv))
       iframe Hk Hpc Hte Hce Hft Hpe Hcore Hofs Hpenv Hfenv Hir HΨ
       iexists sts; iframe Hfr Hcps
     · -- open file: lend its reference, fileclose, then null the slot
-      ihave Hpc := kx_pcIs_neg cpu _ _ _ hz $$ Hpc
+      ihave Hpc := MachCSL.pcIs_neg cpu _ _ _ hz $$ Hpc
       ihave Hofs := (show procOfiles (GF := GF) γ V.fdg (procAddr j) L ⊢
         procOfilesOwe γ V.fdg (procAddr j) L [] from .rfl) $$ Hofs
       icases procOfilesOwe_lend γ V.fdg (procAddr j) L [] fd _ (by simp) hget hz $$ Hofs
@@ -545,7 +537,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
-    ihave Hpc := kx_pcIs_pos cpu _ _ _
+    ihave Hpc := MachCSL.pcIs_pos cpu _ _ _
       (show pOfile (procAddr j) (fd + 1) = pCwd (procAddr j) from by
         rw [hfd1]; exact kx_pOfile_end (procAddr j)) $$ Hpc
     have hall : L' = List.replicate NOFILE 0#64 :=
@@ -576,7 +568,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [Xv6.co_ite_beq, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h9'', kx_pOfile_succ, h18, KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
-    ihave Hpc := kx_pcIs_neg cpu _ _ _
+    ihave Hpc := MachCSL.pcIs_neg cpu _ _ _
       (kx_pOfile_ne_cwd (procAddr j) (fd + 1) hfdlt1) $$ Hpc
     have hkf : kxFrame (k''.setReg 9#5 (pOfile (procAddr j) (fd + 1))) j k''.sie status spval availval :=
       kx_setReg_frame k'' j status spval 9#5 _ hf0
@@ -1623,12 +1615,12 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   iintro Hk Hpc
   by_cases hinit : ip = procAddr j
   · -- p IS initproc: panic("init exiting") -- NOT ruled out (Rocq SpecKexit.v's header)
-    ihave Hpc := kx_pcIs_neg cpu _ _ _ (fun h => h hinit) $$ Hpc
+    ihave Hpc := MachCSL.pcIs_neg cpu _ _ _ (fun h => h hinit) $$ Hpc
     iapply (kx_init_panic PN cpu _ ?pK ?pn ?pl) $$ [$Hk $Hpc $Hpe]
     case pK => k_norm_g; exact kx_slots_panic _ hK
     case pn => k_norm_g; exact hnoff
     case pl => k_norm_g; exact hlocks
-  ihave Hpc := kx_pcIs_pos cpu _ _ _ hinit $$ Hpc
+  ihave Hpc := MachCSL.pcIs_pos cpu _ _ _ hinit $$ Hpc
   -- reassemble the 6-slot frame and re-shape the stack closer
   ihave Hframe : stackOwn (GF := GF) (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6 + 48#64) 6
     $$ [F0 F1 F2 F3 F4 F5]

@@ -42,10 +42,8 @@ theorem rsl_ret_402c : jumpPc (KA.«releasesleep» + 0x18#64) = (KA.«releasesle
 theorem rsl_ret_403a : jumpPc (KA.«releasesleep» + 0x26#64) = (KA.«releasesleep» + 0x26#64) := by decide
 theorem rsl_ret_4040 : jumpPc (KA.«releasesleep» + 0x2c#64) = (KA.«releasesleep» + 0x2c#64) := by decide
 
-theorem rsl_slLk_eq (x : BitVec 64) : slLk x = x + 8#64 := rfl
-theorem rsl_slPid_eq (x : BitVec 64) : slPid x = x + 40#64 := rfl
 theorem rsl_slk_sext (x : BitVec 64) : x + BitVec.signExtend 64 8#12 = slLk x := by
-  rw [rsl_slLk_eq]; bv_decide
+  rw [Xv6.slLk_eq]; bv_decide
 theorem rsl_ext0 : BitVec.extractLsb' 0 32 (0#64) = 0#32 := by decide
 
 theorem rsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
@@ -53,8 +51,6 @@ theorem rsl_filter_sleep (l : List String) (h : "sleep lock" ∉ l) :
   rw [List.filter_cons_of_neg (by simp)]
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
-theorem rsl_withLocks_self' (k : KCtx) (a b : Bool) :
-    (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 theorem rsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 4).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 4 := rfl
 
@@ -228,7 +224,7 @@ theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
   -- past release: the epilogue
   iapply wpNext_intro_pin
   iintro %cE %hpE %R3 Hk Hpc %hcs3
-  k_norm_g [rsl_withLocks_self']
+  k_norm_g [MachCSL.withLocks_self']
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs3
@@ -279,7 +275,7 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE_HOOK) (Γ : SchedNames) (cpu c : CPU
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   icases sleeplockedQ_pid γ q slk pid $$ Ht with ⟨Hpid, Hcl⟩
   ihave Hpid := (show wordPointsTo (GF := GF) (slPid slk) 4 (DFrac.own 1) pid ⊢
-      wordPointsTo (slk + 40#64) 4 (DFrac.own 1) pid from by rw [rsl_slPid_eq]) $$ Hpid
+      wordPointsTo (slk + 40#64) 4 (DFrac.own 1) pid from by rw [Xv6.slPid_eq]) $$ Hpid
   -- sw zero,0(s1)
   k_step (wp_s_sw c _ (KA.«releasesleep» + 0x18#64) false 0#12 9#5 0#5 (by decide) v)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9, KCtx.rget_zero, rsl_ext0]
@@ -289,7 +285,7 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE_HOOK) (Γ : SchedNames) (cpu c : CPU
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9, KCtx.rget_zero, rsl_ext0]
   iintro Hk Hpc Hpid
   ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
-      wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by rw [rsl_slPid_eq]) $$ Hpid
+      wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by rw [Xv6.slPid_eq]) $$ Hpid
   ihave Ht := Hcl $$ %(0#32) Hpid
   ihave Hbody := slBody_intro_free γ slk Rin H vln vn q $$ [H1 H2 H3 Ht Ha HR]
   case' _ => iframe

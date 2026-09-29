@@ -98,8 +98,6 @@ theorem sys_open_alloc_beqz_f (kf : Nat) (hkf : kf < NFILE) :
     bcond bop.BEQ (fnode kf) 0#64 = false := by
   rw [Xv6.dirlookup_beqz]; exact decide_eq_false (fnode_nonzero kf hkf)
 
-theorem sys_open_alloc_beqz_0 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
 /-- the +0x7a `beq a4,a5` against `c.li a5,3` (T_DEVICE). -/
 theorem sys_open_alloc_beq_dev (t : BitVec 16) :
     bcond bop.BEQ (BitVec.signExtend 64 t) 3#64 = decide (t.toNat = T_DEVICE) := by
@@ -488,7 +486,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     iintro Hk Hpc
     -- +0x70 bltz a0 -> +0x126
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x70#64) false 182#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sys_open_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hpriv := (procPrivFd_split A.γ (procAddr A.j) A.pid (sysOpenV2 A P2)
       (sysOpenM2 A P2)).2 $$ [$Hcore $Howe]
@@ -580,7 +578,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
     iintro Hk Hpc
     -- +0x66 c.beqz a0 -> +0x12e
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0x66#64) true 200#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sys_open_alloc_beqz_0]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.beqz_zero]
     iintro Hk Hpc
     icases kctx_tier _ _ $$ Hk with ⟨%htk, Hk⟩
     have hct : curTier = KTier.kpt := by

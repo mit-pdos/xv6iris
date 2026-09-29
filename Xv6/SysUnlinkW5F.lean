@@ -89,7 +89,7 @@ theorem sys_unlink_ent_at [Fscfg] [Icfg] (inum : Nat) (dnd : Dinode) (bmd : Blkm
       some (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
   have htyz : dnd.diType.toNat = T_DIR_z := by rw [hty]; rfl
   rw [dirEntries_eraNode dnd bmd datd hop.1.2.2.2.2.2.1 hop.1.2.2.2.2.1, if_pos htyz,
-    sys_unlink_zext32]
+    MachCSL.zext32_toNat]
   exact dirView_live datd _ kk (hop.2.2.2.2.2 htyz) (dirFirst_lt _ _ _ _ hfn)
     (dirFirst_live _ _ _ _ hfn)
 
@@ -110,7 +110,7 @@ theorem sys_unlink_open2_file [Fscfg] [Icfg] (inum : Nat) (dni : Dinode) (bmi : 
     sysfile_setnl_dirOk _ dni dati _ hdok, fun hd => absurd hd htyT,
     dirOrphanClean_not_dir _ _ htyT, dirUniq_not_dir _ _ htyT⟩
   exact inodeRecLocal_sameType dni _ hrl (sysfile_setnl_type dni _)
-    (by rw [sys_unlink_setnl_nlink]; have := hrl.2.1; omega) (fun hd => absurd hd htyT)
+    (by rw [Xv6.setnl_nlink]; have := hrl.2.1; omega) (fun hd => absurd hd htyT)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -192,7 +192,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
   icases sys_unlink_dinode_ne fscIreg dinum (BitVec.setWidth 32 (dirInum datd kk)) dnW dni
     $$ [$Hdi $Hdii] with ⟨%hne, Hdi, Hdii⟩
   have hne' : (dirInum datd kk).toNat ≠ dinum.toNat := by
-    rw [← sys_unlink_zext32]; exact fun h => hne h.symm
+    rw [← MachCSL.zext32_toNat]; exact fun h => hne h.symm
   icases dlinks_open fscFs dinum.toNat dnd bmd datd $$ Hdl with ⟨%D, %⟨hDok, hDx⟩, Hetk⟩
   icases entToks_unlink (fsGammaL fscFs) dinum.toNat dnd dnW bmd bmW datd datW kk D hklt hklive hne'
     hnD hnDD (hduq htyz) hZ.zer htyz hlive hnlW hZ.ty hZ.sz hok.2.2.2.2.2.1 hok'.2.2.2.2.2.1
@@ -200,7 +200,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
   ihave Htok := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) ((dirInum datd kk).toNat : Int)
       uty ⊢ FsStateLink.linkTok (fsGammaL fscFs)
         ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int) uty from by
-    rw [sys_unlink_zext32]) $$ Htok
+    rw [MachCSL.zext32_toNat]) $$ Htok
   imod (iregInv_tok_nz ⊤ fscIreg fscFs icfgIst icfgNib (BitVec.setWidth 32 (dirInum datd kk)) dni uty
       CoPset.subseteq_top (by omega)) $$ Hinv Hdii Htok with ⟨%⟨-, hokty⟩, Hdii, Htok⟩
   have hnotD : dirBname datd kk ∉ D := by
@@ -274,11 +274,11 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   icases Hopi with ⟨%hopi, Hdli, Hdii, Hmetai, Haddi, Hindi, Hblki, Htopi⟩
   obtain ⟨hoki, hrli, hdoki, -, -, -⟩ := hopi
   have hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib := by
-    rw [sys_unlink_zext32]
+    rw [MachCSL.zext32_toNat]
     exact dirOk_dir icfgNib dnd datd hty hop.2.2.1 kk (dirFirst_lt _ _ _ _ hfn)
       (dirFirst_live _ _ _ _ hfn)
   have hposi : 0 < (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
-    rw [sys_unlink_zext32]; exact sys_unlink_inum_pos datd kk (dirFirst_live _ _ _ _ hfn)
+    rw [MachCSL.zext32_toNat]; exact sys_unlink_inum_pos datd kk (dirFirst_live _ _ _ _ hfn)
   -- INSTANT 1
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩

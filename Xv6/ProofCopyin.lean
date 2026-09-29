@@ -962,7 +962,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     k_step_gen (wp_s_ret c2 _ (KA.«copyin» + 0x9a#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
     iintro Hk Hpc
-    ihave Hk := co_kctx_self c3 k _ $$ Hk
+    ihave Hk := MachCSL.kctx_self c3 k _ $$ Hk
     ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
     iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc [HP Hdst]
     · iexists P, old
@@ -1016,7 +1016,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hlen] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_lui c6 _ (KA.«copyin» + 0x28#64) true 0xfffff#20 24#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_lui_mask] next c7 hp7
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.lui_mask] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_addi c7 _ (KA.«copyin» + 0x2a#64) true 1#12 26#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_li_one] next c8 hp8
@@ -1032,7 +1032,7 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
         ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))))))))
     ihave Hk := (show kctx (GF := GF) c10 (((k.pushed 12)).withRegs _) ⊢
         kctx c10 (((k.pushed 12).withSpie k.spie k.spp).withRegs _) from
-      co_kctx_self c10 (k.pushed 12) _) $$ Hk
+      MachCSL.kctx_self c10 (k.pushed 12) _) $$ Hk
     iapply (ci_loop WA VF MM k γl γk P M old (k.regs 13#5).toNat (k.regs 12#5)
       (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64) (k.regs 27#5)
       hnoff hK hlk hsz hlen' old.length

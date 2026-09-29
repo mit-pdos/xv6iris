@@ -164,7 +164,6 @@ theorem ms_clear_val :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 startedClear)) = 0#64 := by decide
 theorem ms_set_val :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 startedSet)) = 1#64 := by decide
-theorem ms_beq_clear : bcond bop.BEQ 0#64 0#64 = true := by decide
 
 theorem ms_spin_back : KA.«main» + 30#64 + BitVec.signExtend 64 8184#13 = KA.«main» + 22#64 := by decide
 
@@ -208,7 +207,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
     k_norm [KCtx.rget_setReg_same cpu k 15#5 _ (by decide) (by decide), KCtx.setReg_setReg_same,
-      ms_clear_val, KCtx.rget_zero, ms_beq_clear, ms_spin_back]
+      ms_clear_val, KCtx.rget_zero, MachCSL.beqz_zero, ms_spin_back]
     iapply IH $$ %(k.setReg 15#5 0#64) %⟨by simp [hsie], by simp [KCtx.setReg, RegMap.set, ha4]⟩ Hk Hpc
     iintro %v Hk Hpc HP
     rw [KCtx.setReg_setReg_same]

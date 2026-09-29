@@ -204,32 +204,12 @@ theorem kgrep_dot_eqz (b : BitVec 8) :
 theorem kgrep_nth_setWidth (b : BitVec 8) : nthByte (n := 8) (BitVec.setWidth 64 b) 0 = b :=
   kgrep_byte_all (fun b => nthByte (n := 8) (BitVec.setWidth 64 b) 0 = b) (by decide +kernel) b
 
-/-- `beq` of two small words (Rocq `moi_eq_vec`). -/
-theorem kgrep_beq_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BEQ (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (x = y) := by
-  unfold ukBtaken
-  by_cases h : x = y
-  · subst h; simp
-  · have hne : BitVec.ofNat 64 x ≠ BitVec.ofNat 64 y := by
-      intro e
-      have := congrArg BitVec.toNat e
-      rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy] at this
-      exact h this
-    simp [hne, h]
-
 /-- `bne` of two small words (Rocq `moi_neq_vec`). -/
 theorem kgrep_bne_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
     ukBtaken .BNE (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = !decide (x = y) := by
-  have e := kgrep_beq_nat x y hx hy
+  have e := Xv6.beq_nat x y hx hy
   simp only [ukBtaken, bne] at e ⊢
   rw [e]
-
-/-- `bgeu` of two small words (Rocq `moi_ge_u`). -/
-theorem kgrep_bgeu_nat (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
-    ukBtaken .BGEU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = decide (y ≤ x) := by
-  simp only [ukBtaken, zopz0zKzJ_u, Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hx,
-    Nat.mod_eq_of_lt hy]
-  by_cases h : y ≤ x <;> simp [h] <;> omega
 
 /-- `blez rs` = `bge x0, rs` on a count (Rocq `blez_count`). -/
 theorem kgrep_blez (L : Nat) (h31 : L < 2 ^ 31) :

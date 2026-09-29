@@ -63,8 +63,6 @@ theorem ups_decode0 (i : UartId) : devDecode (uartBaseAddr i) = some (.uart i, 0
 theorem ups_byteOk0 (i : UartId) : devByteOk (uartBaseAddr i) := by
   cases i <;> decide
 
-/-- The held set of a balanced pair, back where it started. -/
-theorem ups_withLocks_self (k : KCtx) (a b : Bool) : (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl
 
 /-- The low byte of `x & 0xff` is the low byte of `x` (`zext.b`). -/
 theorem ups_zext_b (x : BitVec 64) :
@@ -387,7 +385,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iapply (ups_release RE cpu _ i γl γ ?hsr ?hnr ?hKr false ?hrr ?hor ?haddrr)
     $$ [- $Hk $Hpc $Hlocked $HRes]
   rotate_right 1
-  k_norm [ups_withLocks_self, ups_filter_cons (txLockName i) k.locks hlk,
+  k_norm [MachCSL.withLocks_self', ups_filter_cons (txLockName i) k.locks hlk,
     hpe, KCtx.withSpie_self' k spie spp hspie hspp]
   iframe #
   case hsr => k_norm

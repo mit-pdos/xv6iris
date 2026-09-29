@@ -15,6 +15,7 @@ import Xv6.PtOwnLemmas
 import MachCSL.WpSmodeCtl
 import Xv6.ByteCursor
 import Xv6.CodeTactics
+import MachCSL.BvLemmas
 
 namespace Xv6.UPtAlloc
 
@@ -102,7 +103,6 @@ theorem bne_neg {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
 /-! ## Immediates -/
 
 theorem lui_4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = 4096#64 := by decide
-theorem lui_mask : BitVec.signExtend 64 (1048575#20 ++ 0#12) = 0xFFFFFFFFFFFFF000#64 := by decide
 
 /-- `sext.w` of a small non-negative word. -/
 theorem sextw_small (x : BitVec 64) (h : x.toNat < 2 ^ 31) :
@@ -114,9 +114,6 @@ theorem sextw_small (x : BitVec 64) (h : x.toNat < 2 ^ 31) :
 
 /-! ## The run `uvmdealloc` removes -/
 
-theorem delRunL_zero (L : RegMapF (BitVec 64)) (v : Nat) : delRunL L v 0 = L := rfl
-
-theorem delRun_zero (P : UPtd) (v : Nat) : P.delRun v 0 = P := rfl
 
 /-- The page number of an aligned size below `MAXVA`. -/
 theorem vpnOf_ofNat (m : Nat) (h : m < 2 ^ 38) :
@@ -155,28 +152,19 @@ theorem ofNat_aligned (m : Nat) (h : 4096 ∣ m) : (BitVec.ofNat 64 m) &&& 0xfff
 
 /-! ## The two fixed virtual page numbers -/
 
-theorem tfVpn_toNat : tfVpn.toNat = 67108862 := by decide
-theorem trampVpn_toNat : trampVpn.toNat = 67108863 := by decide
-
-theorem vpnOf_toNat_lt (va : BitVec 64) (h : va.toNat < 2 ^ 38) : (vpnOf va).toNat < 67108864 := by
-  simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
-  omega
 
 /-! ## `UPtd.leaves` against `UPtd.um` -/
 
 theorem leaves_get_of_lt (P : UPtd) (k : Nat) (h : k < tfVpn.toNat) :
     get? P.leaves k = get? P.um k := by
   unfold UPtd.leaves
-  rw [get?_insert_ne (by rw [trampVpn_toNat]; rw [tfVpn_toNat] at h; omega),
+  rw [get?_insert_ne (by rw [Xv6.trampVpn_toNat]; rw [Xv6.tfVpn_toNat] at h; omega),
     get?_insert_ne (by omega)]
 
 theorem leaves_get_tf (P : UPtd) : get? P.leaves tfVpn.toNat = some (tfLeaf P.tfp) := by
   unfold UPtd.leaves
-  rw [get?_insert_ne (by rw [trampVpn_toNat, tfVpn_toNat]; omega), get?_insert_eq rfl]
+  rw [get?_insert_ne (by rw [Xv6.trampVpn_toNat, Xv6.tfVpn_toNat]; omega), get?_insert_eq rfl]
 
-theorem leaves_get_tramp (P : UPtd) : get? P.leaves trampVpn.toNat = some trampLeaf := by
-  unfold UPtd.leaves
-  rw [get?_insert_eq rfl]
 
 /-- The leaf map has nothing at an unmapped user page number. -/
 theorem leaves_none_of_um_none (P : UPtd) (k : Nat) (hlt : k < tfVpn.toNat)
@@ -284,12 +272,6 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 /-! ## The leaf `uvmalloc` writes -/
 
-theorem isLeafPte_iff (w : BitVec 64) :
-    isLeafPte w ↔ (w.getLsbD 0 = true ∧ w &&& 0xE#64 ≠ 0#64) := by
-  unfold isLeafPte PTE_V
-  constructor
-  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
-  · rintro ⟨h1, h2⟩; exact ⟨by revert h1; bv_decide, h2⟩
 
 theorem uLeaf_valid (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
     (uLeaf ppn perm).getLsbD 0 = true ∧ (uLeaf ppn perm) &&& 0xE#64 ≠ 0#64 := by
@@ -301,7 +283,7 @@ theorem uLeaf_valid (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 �
   exact hr
 
 theorem uLeaf_isLeafPte (ppn : BitVec 44) (perm : BitVec 64) (hr : perm &&& 0xE#64 ≠ 0#64) :
-    isLeafPte (uLeaf ppn perm) := (isLeafPte_iff _).mpr (uLeaf_valid ppn perm hr)
+    isLeafPte (uLeaf ppn perm) := (Xv6.isLeafPte_iff _).mpr (uLeaf_valid ppn perm hr)
 
 theorem ptePpn_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3FF#64 = 0#64) :
     ptePpn (uLeaf ppn perm) = ppn := by
@@ -345,18 +327,13 @@ theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 6
 
 /-! ## The run of keys `uvmdealloc` removes -/
 
-theorem delRunL_succ (L : RegMapF (BitVec 64)) (v0 i : Nat) :
-    delRunL L v0 (i + 1) = delete (delRunL L v0 i) (v0 + i) := by
-  unfold delRunL
-  rw [List.range_succ, List.foldl_append]
-  rfl
 
 theorem delRunL_get_mem (L : RegMapF (BitVec 64)) (v0 n j : Nat) (hj : j < n) :
     get? (delRunL L v0 n) (v0 + j) = none := by
   induction n with
   | zero => omega
   | succ n ih =>
-    rw [delRunL_succ]
+    rw [Xv6.delRunL_succ]
     by_cases he : j = n
     · subst he; rw [get?_delete_eq rfl]
     · rw [get?_delete_ne (by omega)]; exact ih (by omega)
@@ -366,7 +343,7 @@ theorem delRunL_get_out (L : RegMapF (BitVec 64)) (v0 n x : Nat)
   induction n with
   | zero => rfl
   | succ n ih =>
-    rw [delRunL_succ, get?_delete_ne (fun he => h n (by omega) he.symm)]
+    rw [Xv6.delRunL_succ, get?_delete_ne (fun he => h n (by omega) he.symm)]
     exact ih (fun j hj => h j (by omega))
 
 theorem UPtd.ext' {P Q : UPtd} (h1 : P.root = Q.root) (h2 : P.tfp = Q.tfp) (h3 : P.um = Q.um) :

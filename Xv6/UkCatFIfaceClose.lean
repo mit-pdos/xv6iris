@@ -130,7 +130,7 @@ theorem close (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (files : List (BitV
       clObl (hlc := hlc) E.N E.P fd K := by
   have hD : d ∉ E.Dp := fun h => hnsp ((fdSharedP_iff E.Dp fdm fd d).2 (Or.inl h))
   have hns : ¬ fdShared fdm fd d := fun h => hnsp ((fdSharedP_iff E.Dp fdm fd d).2 (Or.inr h))
-  have hn := cif_not_shared fdm fd d hns
+  have hn := Xv6.not_shared fdm fd d hns
   iintro Hfds #Hfiles Hd HK
   ihave ⟨%kd, Htk, -⟩ := E.dev_tok d x $$ Hd
   ihave ⟨%l, %vs, %wv, %hh, Hstd, Hcwd, Hpool, Htoks, Hhs, Hdq, #He, Hxk, Htk⟩ :=

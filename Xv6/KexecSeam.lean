@@ -150,11 +150,6 @@ theorem kxc_um_free_above (sz newsz : BitVec 64) (P : UPtd) (h : umBelow sz P) (
   rw [hq, Nat.mul_div_cancel_left q (by omega : 0 < 4096)] at hlt
   omega
 
-/-- `GrowProc.pgRoundUpN_split`, restated: `PGROUNDUP` over a page-aligned base. -/
-theorem kxc_pgRoundUpN_split (a n q : Nat) (ha : a = 4096 * q) (h : a ≤ n) :
-    pgRoundUpN n = a + (n - a + 4095) / 4096 * 4096 := by
-  unfold pgRoundUpN; subst ha; omega
-
 /-- `GrowProc.umBelow_grow`, restated (deviation 7): `uvmalloc` keeps every
 leaf below the new size. -/
 theorem kxc_umBelow_grow (oldsz newsz xperm : BitVec 64) (P P' : UPtd) (M M' : Nat → List (BitVec 8))
@@ -176,7 +171,7 @@ theorem kxc_umBelow_grow (oldsz newsz xperm : BitVec 64) (P P' : UPtd) (M M' : N
       omega
     have hnpe : uvmaNp oldsz newsz = (newsz.toNat - pgRoundUpN oldsz.toNat + 4095) / 4096 := by
       unfold uvmaNp; rw [if_neg hne]
-    have hup := kxc_pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
+    have hup := Xv6.pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
     rw [hnpe, hq] at h2
     rw [hq] at hup
     omega

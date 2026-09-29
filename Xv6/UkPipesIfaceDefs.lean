@@ -22,7 +22,7 @@ This file is §0 of the Rocq file: the two value types, the registry camera
 CONE (reached, §0): `csink`, `pdev`, `pns_sink_h`, `pns_sink_ty`, `pnsRegR`,
 `pnsRegG`, `pnsRegΣ` (not ported: Lean has no Σ), `pipesNG`, `pipesNΣ` (not
 ported), `pns_pool`, `pns_single`, `pns_pool_valid`, `pns_pool_take`,
-`pns_pool_ext`, `pns_reg_alloc` (all `HfpReg` at `Pdev`), `pns_not_shared`,
+`pns_pool_ext`, `pns_reg_alloc` (all `HfpReg` at `Pdev`), `Xv6.not_shared`,
 `pns_drop_nil_le`, `pns_read_grow`, `pns_fpending_grow`, `pns_fdrained_eq`,
 `pns_fpending_prefix`, `pns_fowed_pos`, `pns_take_prefix`, `pns_short_drop`,
 `pnsN`, `pnsN_uart`, `pnsN_pipeN`, `pns_pipeN_uart`, `pns_cmode`, and (from
@@ -41,7 +41,7 @@ the end of §1) `pns_short`, `pns_admV`.
    instance.
 3. `pnames` is `PNames` (U1-P's landed `PipeProto`), `wid`
    is `Wid`, `filt` is `Filt`, `gset`/`gmap` as in `HfpReg`/`UkHandler`.
-4. `pns_not_shared` is stated over `UkHandler.fdShared` (Lean's `fd_shared`,
+4. `Xv6.not_shared` is stated over `UkHandler.fdShared` (Lean's `fd_shared`,
    whose `dom (delete fd fdm)` is unfolded there).
 5. `cons_short` is H-io's `UkConsOut.consShort`.
 -/
@@ -97,11 +97,6 @@ class PipesNG (GF : BundledGFunctors) where
 attribute [reducible, instance] PipesNG.modeG
 
 /-! ## §0'' Descriptor maps -/
-
-/-- **Rocq `pns_not_shared`** (deviation 4). -/
-theorem pns_not_shared (fdm : Fdmap) (fd : Int) (d : Nat) (h : ¬ fdShared fdm fd d) :
-    ∀ fd', fd' ≠ fd → fdm fd' ≠ some d :=
-  fun fd' hne hfd => h ⟨fd', hne, hfd⟩
 
 /-! ## §0''' Small list facts -/
 

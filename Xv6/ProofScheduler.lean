@@ -62,29 +62,6 @@ theorem sc_cpuCtxAddr (cpu : CPU) :
 theorem sc_schedBase (cpu : CPU) :
     scPidLockAddr + BitVec.ofNat 64 (128 * cpu.val) = schedBase cpu := rfl
 
-/-- The hart id, sign-extended from its low 32 bits and scaled by the size
-of a `struct cpu` (a copy of `ProofSched.sched_hart_shift`: a `Proof` file
-may not import another). -/
-theorem sc_hart_shift (cpu : CPU) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 = BitVec.ofNat 64 (128 * cpu.val) := by
-  have hv : cpu.val < 8 := cpu.isLt
-  have h32 : BitVec.extractLsb' 0 32 (hartId cpu) = BitVec.ofNat 32 cpu.val := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [hartId, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  rw [h32]
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_shiftLeft, BitVec.toNat_signExtend]
-  have hmsb : (BitVec.ofNat 32 cpu.val).msb = false := by
-    rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega)]; simp; omega
-  rw [hmsb]
-  simp only [Bool.false_eq_true, ite_false, BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow,
-    Nat.add_zero, Nat.shiftLeft_eq]
-  rw [Nat.mod_eq_of_lt (by omega : cpu.val < 4294967296),
-    Nat.mod_eq_of_lt (by omega : cpu.val < 18446744073709551616)]
-  omega
-
 /-- The constants `scheduler` sets up before its loop and keeps in
 callee-saved registers: `s4`, `s5`, `s6`, `s7`, `s8`. -/
 def headRegs (cpu : CPU) (R : RegMap) : Prop :=
@@ -194,7 +171,7 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iintro Hk Hpc
   -- slli s5,a5,7
   k_step (wp_s_slli cpu _ (KA.«scheduler» + 0x1e#64) false 7#6 21#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   -- auipc a4,0x10; addi a4,a4,1498; add a4,a4,s5
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0x22#64) false 16#20 14#5 (by decide))
@@ -245,7 +222,7 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   iintro Hk Hpc
   -- slli a5,a5,7; add s4,s6,a5
   k_step (wp_s_slli cpu _ (KA.«scheduler» + 0x44#64) true 7#6 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sc_hart_shift]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.hart_shift]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«scheduler» + 0x46#64) false 20#5 22#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -432,16 +409,6 @@ theorem procAddr_end : procAddr NPROC = KA.«tickslock» := by
   unfold procAddr procsAddr procSize NPROC
   decide
 
-theorem procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«tickslock» := by
-  intro he
-  have h1 := procAddr_toNat m h
-  rw [he] at h1
-  have h2 : (KA.«tickslock» : BitVec 64).toNat = KernelSyms.«tickslock» := rfl
-  have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
-  rw [h2] at h1
-  unfold NPROC at h
-  omega
-
 /-! ## The release and the cursor step -/
 
 theorem scheduler_br_ffffffffffffeea8 : KA.«scheduler» + 0xffffffffffffeea8#64 = KA.«release» := by decide
@@ -534,7 +501,7 @@ theorem sc_bcond_end_ne {m : Nat} (h : m < NPROC) :
     bcond bop.BEQ (procAddr m) KA.«tickslock» = false := by
   unfold bcond
   simp only [beq_eq_false_iff_ne, ne_eq]
-  exact procAddr_ne_end h
+  exact Xv6.procAddr_ne_end h
 
 theorem sc_bcond_end_eq {m : Nat} (h : m = NPROC) :
     bcond bop.BEQ (procAddr m) KA.«tickslock» = true := by
@@ -630,26 +597,6 @@ theorem sc_needsCtx_RUNNABLE : needsCtx RUNNABLE := Or.inl rfl
 theorem sc_parkOk_RUNNABLE : parkOk RUNNABLE := ⟨Or.inl sc_needsCtx_RUNNABLE, by decide⟩
 
 theorem sc_unclaimed_RUNNABLE : unclaimed RUNNABLE := ⟨by decide, by decide⟩
-
-/-- The callee-saved image, componentwise (a copy of `ProofSched.calleeImg_eq`). -/
-theorem sc_calleeImg_eq {R R' : RegMap} (h : calleeImg R = calleeImg R') :
-    R 1#5 = R' 1#5 ∧ R 2#5 = R' 2#5 ∧ R 8#5 = R' 8#5 ∧ R 9#5 = R' 9#5 ∧ R 18#5 = R' 18#5 ∧
-      R 19#5 = R' 19#5 ∧ R 20#5 = R' 20#5 ∧ R 21#5 = R' 21#5 ∧ R 22#5 = R' 22#5 ∧
-      R 23#5 = R' 23#5 ∧ R 24#5 = R' 24#5 ∧ R 25#5 = R' 25#5 ∧ R 26#5 = R' 26#5 ∧
-      R 27#5 = R' 27#5 := by
-  unfold calleeImg at h
-  simp only [List.cons.injEq, and_true] at h
-  exact h
-
-theorem sc_ctxCells_dup [CurCtx] (c : BitVec 64) (vs : List (BitVec 64)) :
-    ctxCells (GF := GF) c vs ⊢ ⌜vs.length = 14⌝ ∗ ctxCells c vs := by
-  unfold ctxCells
-  iintro ⟨%h, H⟩
-  isplitl []
-  · ipureintro; exact h
-  isplitl []
-  · ipureintro; exact h
-  · iexact H
 
 theorem sc_pContext (pa : BitVec 64) : pa + 96#64 = pContext pa 0 := by
   unfold pContext
@@ -757,7 +704,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     simp only [swtchAddr, resumeTok_none, hproc', reduceIte] at hx
     exact hx
   icases ownCtxCells_cases (cpuCtxAddr cpu) $$ Hcells with ⟨%vs, Hcells⟩
-  icases sc_ctxCells_dup (cpuCtxAddr cpu) vs $$ Hcells with ⟨%hvlen, Hcells⟩
+  icases MachCSL.ctxCells_dup (cpuCtxAddr cpu) vs $$ Hcells with ⟨%hvlen, Hcells⟩
   ihave Hheld := procHeldAt_intro Γ curCtx cpu n RUNNING ch kl xs pid
     $$ [$Hlocked $Hpw $Hstate $Hchan $Hrest]
   ihave HP := pSched_to_proc Γ curCtx cpu n ch hn $$ [$Htc $Hir $Hheld $Htag]
@@ -786,7 +733,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   have hh : h = cpu := adm_pin_inv cpu h hadm
   subst h
   obtain ⟨f1, f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ :=
-    sc_calleeImg_eq hcimg
+    MachCSL.calleeImg_eq hcimg
   simp only [KCtx.withRegs_regs, KCtx.withProc_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at f1 f2 f8 f9 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27
   icases Hres with ⟨%A', %cret, %back', Hrec', HP'⟩
   icases pSched_at_cpu Γ ξ0 cpu A' n cret (hartId cpu) back' hn $$ HP' with
@@ -816,7 +763,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
   iintro Hk Hpc
   k_step (wp_s_slli cpu _ (KA.«scheduler» + 0x7e#64) true 7#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
-    with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, sc_hart_shift, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
+    with [MachCSL.KCtx.setReg_eq_withRegs, KCtx.rget_eq, MachCSL.hart_shift, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«scheduler» + 0x80#64) true 15#5 15#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
