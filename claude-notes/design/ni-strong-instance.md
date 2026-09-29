@@ -310,3 +310,40 @@ slot.  The four files outside the plan's list that destructure the
 changed shapes: `ProofKforkParts`, `ProofForkret`, `PipeKillMark`,
 `ProofKexit`.  Gate 882 files, 0 errors; audits 13/13/14.  Next: L1.
 
+### 7.2 L1a as landed (2026-09-29, f344a089a) — and the sweep's real footprint
+
+The attempt found the sweep smaller than §3 counted, for one reason:
+the fs and syscall contracts (`namex`, `dirlookup`, `fileclose`,
+`pipealloc`, `readi`, `writei`, `fileread`, `piperead`, the `either_copy*`
+pair, …) already take the block — `proc_priv`, `_core` or `_bare` —
+IN AND OUT.  With the counter moved into `proc_priv_bare` (G': the bare
+block is unfolded in exactly one file), it travels with every form of
+the block, so those contracts need no lend premise at all.  The lend
+has to be threaded only through the BLOCK-LESS layers: the VM and copy
+functions (`uvmalloc`, `uvmdealloc`, `uvmcopy`, `uvmcreate`, the four
+`uvmunmap`s, `uvmfree`, `freewalk`, `walk`, `mappages`,
+`proc_pagetable`, `proc_freepagetable`, `vmfault`, `copyin`, `copyout`,
+`copyinstr`, `pipeclose`; `allocproc` and `freeproc` for the caller's
+counter), then `kalloc`/`kfree` and the ledger appends: about 22
+contracts in three rings, 15 of which also gain the `wchG` binder, plus
+the block-holders' posts at the ring's top, which expose the raised
+count (`∀ k' ≥ pv_ev`, the record at `upd_ev`) — the growproc pattern.
+
+L1a (48 files, +1089 / -385): G'; `act_lend` and its four lemmas; ring
+one (`uvmalloc`, `uvmcopy`, `proc_freepagetable`, `allocproc`,
+`freeproc`, all forms); the block-holders above them — `growproc` /
+`sys_sbrk`, kfork's parent block / `sys_fork`, `kwait` / `sys_wait`,
+and `kexec`'s failure arm (`kexec_ok`/`_q`/`_qf`, `exec_arms`,
+`sys_exec_arms`: `V' = upd_ev V k'` with `pv_ev V ≤ k'`, the
+intermediate phases at an abstract record bounded by `ev_after`);
+`SpecSyscall` untouched (∀-general).  Boot: `userinit` takes `pj =
+zero_reg` (main supplies it).  Forced extras: `SpecHoldingsleep` gains
+the binder (the bare block now names the counter).  Clean gate from
+scratch 1759/0; audits 13/13/14.  Next: L1b, the copy ring (`copyin`,
+`copyout`, `copyinstr`, `pipeclose`) and its block-holding callers
+(`either_copy*`, `fetchaddr/str`, `argstr`, `filestat`, `piperead`,
+`pipewrite`, `sys_pipe`, `kwait`, `kexec`, `fileclose`); then L2 the
+inner VM ring (`vmfault`, `uvmdealloc`, `proc_pagetable`, `uvmfree`,
+`uvmunmap`, `mappages`); L3 `walk`, `freewalk`, `uvmcreate`, `kalloc`,
+`kfree` and the appends; T.
+

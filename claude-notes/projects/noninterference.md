@@ -78,8 +78,12 @@ M1's ledgers are fresh ground and go first.
   appends no events.  PERMIT SWEEP OPENED 2026-09-29 (owner's word;
   plan in `design/ni-strong-instance.md` §7: an exclusive per-slot
   counter `act_cnt`, `pv_ev` in the record, top-down layers G, L1-L6,
-  T).  G LANDED 2026-09-29 (9fb1d089c; §7.1 of the design note).  L1 next:
-  usertrap's three allocating arms lend the block's counter.  DESIGN PASS 2026-09-28,
+  T).  G LANDED 2026-09-29 (9fb1d089c; §7.1).  L1a LANDED 2026-09-29
+  (f344a089a; §7.2: the counter in the bare block travels with the fs/syscall
+  contracts for free, so the sweep is ~22 block-less contracts in three
+  rings; ring one and the block-holders' posts above it are in).  Next:
+  L1b the copy ring, L2 the inner VM ring, L3 the allocator and the
+  appends, then T.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
   a free consequence of the ledger — absence is ownership, and kalloc's
   premises do not distinguish a quiet round from a syscall, so the
