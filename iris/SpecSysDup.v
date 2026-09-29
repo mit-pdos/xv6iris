@@ -172,7 +172,7 @@ Proof.
                 = <[fd1 := fv]> (pv_ofile (us_V U))) by reflexivity.
   rewrite Hpv. split.
   - rewrite list_lookup_insert_ne; [exact Hlk0 | congruence].
-  - apply list_lookup_insert. eapply lookup_lt_Some. exact Hlk1.
+  - apply list_lookup_insert_eq. eapply lookup_lt_Some. exact Hlk1.
 Qed.
 
 (* the ghost-level echo, at the bundle's state list: writing the source's
@@ -187,7 +187,7 @@ Lemma dup_frags_rows (sts : list fdstate) (fd0 fd1 : nat)
 Proof.
   intros H0 H1 Hne. split.
   - rewrite list_lookup_insert_ne; [exact H0 | congruence].
-  - apply list_lookup_insert. eapply lookup_lt_Some. exact H1.
+  - apply list_lookup_insert_eq. eapply lookup_lt_Some. exact H1.
 Qed.
 
 Lemma dup_rows_both (sts : list fdstate) (fd0 fd1 : nat)

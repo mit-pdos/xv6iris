@@ -1725,18 +1725,20 @@ Section BootCarveMain.
                  (KernelSyms.log + 48 + 4 * Z.of_nat LOGBLOCKS)
                  eq_refl ltac:(unfold LOGBLOCKS; vm_compute; reflexivity)
                  with "H") as "H".
+    (* the per-cell premise is proved as a side goal: as an [ltac:] argument
+       it is now elaborated before the term's instances are resolved *)
     iDestruct (boot_cran_stride_family_seq g
                  (fun a => ∃ w : mword 32,
                     TsoCtx.ctx_word4_pointsto XI a (DfracOwn 1) w)%I
                  (KernelSyms.log + 48) 4 LOGBLOCKS ltac:(lia)
-                 ltac:(intros i A Hi HA HA1 HA2;
-                       iIntros "#Hcl2 Hb";
-                       iApply (boot_cran_cell4 g A Hmem ltac:(lia) ltac:(lia)
-                                 ltac:(rewrite HA;
-                                       apply (z_mod_mul 4 (KernelSyms.log + 48) 4);
-                                       [vm_compute; reflexivity | reflexivity])
-                                 with "Hcl2 Hb"))
                  with "Hcl H") as "Hblk".
+    { intros i A Hi HA HA1 HA2.
+      iIntros "#Hcl2 Hb".
+      iApply (boot_cran_cell4 g A Hmem ltac:(lia) ltac:(lia)
+                ltac:(rewrite HA;
+                      apply (z_mod_mul 4 (KernelSyms.log + 48) 4);
+                      [vm_compute; reflexivity | reflexivity])
+                with "Hcl2 Hb"). }
     (* ---- assemble, every address in [pa_of_z]'s spelling ---- *)
     rewrite /main_log_raw.
     iExists vlock, v_start, v_dev, v_nc, v_n, vname, vcpu.

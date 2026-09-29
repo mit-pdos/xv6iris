@@ -2092,10 +2092,10 @@ Section WpSconfCsr.
     iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hstv".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -2144,7 +2144,7 @@ Section WpSconfCsr.
         iApply (swp_write_CSR_stvec_S (DfracOwn 1) tv0 wval Hmode
                   with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hstv)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hstv Hpc'"). done.
   Qed.
 
@@ -2239,10 +2239,10 @@ Section WpSconfCsr.
       iDestruct (strans_inv_acc_bare with "Hbit Htr")
         as "(Hbit & Hbit2 & Hbare & Hstv)".
       iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -2328,7 +2328,7 @@ Section WpSconfCsr.
           iModIntro. iFrame "Hgh Hint Hctx HQ". }
         { iFrame "Hctx HP". }
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
   Qed.
 
@@ -2375,10 +2375,10 @@ Section WpSconfCsr.
       iDestruct (strans_inv_acc_bare with "Hbit Htr")
         as "(Hbit & Hbit2 & Hbare & Hstv)".
       iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -2443,7 +2443,7 @@ Section WpSconfCsr.
         iApply (swp_write_CSR_satp_S (DfracOwn 1) (DfracOwn 1) satp0 ms0 wval
                   Hok HSXL with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hout)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hout Hpc'"). done.
   Qed.
 
@@ -2544,10 +2544,10 @@ Section WpSconfCsr.
     iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hsepc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -2597,7 +2597,7 @@ Section WpSconfCsr.
         iApply (swp_write_CSR_sepc_S (DfracOwn 1) ep0 wval
                   with "Hcert Hrw Hro").
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hsepc)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hsepc Hpc'"). done.
   Qed.
 
@@ -2719,10 +2719,10 @@ Section WpSconfCsr.
     iSplitL "Hrdcsr Hcell".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hsie & Hsret & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -2782,7 +2782,7 @@ Section WpSconfCsr.
           | apply (pw_rs_sec Supervisor (R_bitvector_64 rg) v Hfresh) ].
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Hcell)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! cpu_id with "[%] Hcg' Hcell Hpc'"). done.
   Qed.
 
@@ -2980,10 +2980,10 @@ Section WpSconfCsr.
     iSplitR "Hcont".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -3081,7 +3081,7 @@ Section WpSconfCsr.
                                 ltac:(by vm_compute) with "Hf").
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
       iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
       iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
@@ -3120,10 +3120,10 @@ Section WpSconfCsr.
     iSplitR "Hcont".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -3292,10 +3292,10 @@ Section WpSconfCsr.
     iSplitL "Hsppc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -3510,10 +3510,10 @@ Section WpSconfCsr.
       iDestruct (tlb_res_pt_kpt_inv with "Htlb") as "#Hkinv".
       iDestruct (tlb_res_pt_satp_acc with "Htlb")
         as (v) "(Hcell & %Hmode & %Hasid & %Hppn & Htlbback)".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hsie & Hsret & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -3588,7 +3588,7 @@ Section WpSconfCsr.
         iIntros (x) "[-> Hcell]". iFrame "Hrw Hro Hcell". done.
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & Hex)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iDestruct "Hex" as (sp0 root) "(%Hex & #Hkinv)".
       destruct Hex as (-> & Hmode & Hasid & Hppn).
       iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
@@ -3652,10 +3652,10 @@ Section WpSconfCsr.
     iSplitR "Hcont".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -3774,7 +3774,7 @@ Section WpSconfCsr.
                                 ltac:(by vm_compute) with "Hf").
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
       iDestruct (wp_next_here with "Hcont") as "Hcont".
       iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
@@ -3901,7 +3901,7 @@ Section WpSconfCsr.
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -4077,7 +4077,7 @@ Section WpSconfCsr.
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
         "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
           Hmdl & Hmenv)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -4091,7 +4091,7 @@ Section WpSconfCsr.
          hart. *)
       iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx &
                             Hsppc & Hclmx & (Hcells & Hc1))".
-      iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
+      iDestruct (intr_count_get_on (CID := CID) 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       (* the handler resource: take the quarter out, flip, re-form.  This used
          to open [intrN] across the step and re-seal it. *)
@@ -4151,7 +4151,7 @@ Section WpSconfCsr.
           as "(Hms & Hpriv & _ & _)".
         iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
           as "(Hhalf & Hq & Htok & Hqi)".
-        iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+        iDestruct (intr_res_intro (CID := CID) Ehx handler _ Htvd Hsb
                    with "Hqi Hstv Hspec HEhx HEhxmv")
           as "Hintr".
         iEval (rewrite -Hsie') in "Hhalf".
@@ -4275,7 +4275,7 @@ Section WpSconfCsr.
         iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
             Hmdl & Hmenv)".
-        iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+        iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
         iPoseProof "Hhw" as "#Hhwc".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -4290,7 +4290,7 @@ Section WpSconfCsr.
         iDestruct "Harm" as "(Hq1 & Hhx & Hkptr & Hsepcx & Hscausex & Hstvalx &
                               Hsppc & Hclmx & (Hcells & Hc1))".
         iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-        iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
+        iDestruct (intr_count_get_on (CID := CID) 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt2)".
         destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
         iEval (rewrite /intr_res /intr_res_at) in "Hhx".
         iDestruct "Hhx" as (Ehx) "(Hhxat & #HEhx & #HEhxmv)".
@@ -4349,7 +4349,7 @@ Section WpSconfCsr.
             as "(Hms & Hpriv & _ & _)".
           iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt2 Hqi")
             as "(Hhalf & Hq & Htok & Hqi)".
-          iDestruct (intr_res_intro Ehx handler _ Htvd Hsb
+          iDestruct (intr_res_intro (CID := CID) Ehx handler _ Htvd Hsb
                    with "Hqi Hstv Hspec HEhx HEhxmv")
             as "Hintr".
           iEval (rewrite -Hsie') in "Hhalf".
@@ -4378,7 +4378,7 @@ Section WpSconfCsr.
           iSplitR.
           { iPureIntro. exists ms0. split_and!;
               [ reflexivity | exact Hmsf | intros _; cbn [sie_bit]; exact Hb1 ]. }
-          iSplitL "Htok". { iApply (intr_count_pack_S_on with "Htok"). }
+          iSplitL "Htok". { iApply (intr_count_pack_S_on (CID := CID) with "Htok"). }
           iSplitL "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr".
           { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr Hkptr". }
           iSplitL "Hclmx". { rewrite /cpu_claim_pay. iExact "Hclmx". }
@@ -4435,10 +4435,10 @@ Section WpSconfCsr.
       iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
       iSplitR "Hcont".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-        iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
+        iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
             Hmdl & Hmenv)".
-        iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+        iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
         iPoseProof "Hhw" as "#Hhwc".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
           "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
@@ -4559,7 +4559,7 @@ Section WpSconfCsr.
                     with "Hcert Hf").
       + iIntros (npc ms' m' n')
           "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
-        iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+        iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
         destruct Hex as (ms & -> & Hmsf & Hsie).
         iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
         iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");

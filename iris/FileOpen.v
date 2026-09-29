@@ -96,7 +96,7 @@ Section FileOpen.
      it with the claim's to make [fdeed_whole]); a READ needs only a
      positive fraction, and that is the whole content of this section. *)
   Definition fdq (r : file_names) (q : Qp) (s : dst) : iProp Σ :=
-    ghost_var (fn_deed r) q s.
+    ghost_var_frac (fn_deed r) q s.
 
   Global Instance fdq_timeless r q s : Timeless (fdq r q s).
   Proof using . rewrite /fdq. apply _. Qed.
@@ -128,7 +128,7 @@ Section FileOpen.
     fdq r q s -∗ fdeed_whole r s' -∗ False.
   Proof using .
     rewrite /fdq /fdeed_whole. iIntros "H1 H2".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
+    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _]. rewrite dfrac_op_own dfrac_valid_own in Hq.
     iPureIntro. rewrite Qp.add_comm in Hq. exact (Qp.not_add_le_l _ _ Hq).
   Qed.
 
@@ -206,8 +206,8 @@ Section FileOpen.
       (jo : option Z) (s : dst) (q : Qp) (I : gmap Z fs_node) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ fdq r q s -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗ fdq r q s ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗ fdq r q s ∗
       (⌜fclaim_facts jo s (abs_view I)⌝ ∨ file_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv #Hm Hd Hka".
@@ -252,8 +252,8 @@ Section FileOpen.
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     esc_tok g -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗ esc_tok g ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗ esc_tok g ∗
       ((⌜fclaim_facts jo s (abs_view I)⌝ ∗ f_typed c s) ∨ file_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv #Hm #Hwit Htok Hka".
@@ -294,8 +294,8 @@ Section FileOpen.
       (n : nat) (s : dst) (g : gname) (I : gmap Z fs_node) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗ esc_key c r n s g -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       (⌜f_ok (abs_view I) s⌝ ∨ esc_spent g ∨ file_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv #Hwit Hka".
@@ -509,7 +509,7 @@ Section FileOpen.
     FileDisc.uname N ->
     (* the writer's round list ENDS at its line, and its position is the
        list's length (sync SY3-A3bc) *)
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     acre_commit_at_gen_nm (fs_gamma_L γfs) appE (fun _ _ => AFile [])
@@ -560,7 +560,7 @@ Section FileOpen.
     iIntros (I') "%Hav Hka'".
     assert (Hne : s <> <[N := (i, [])]> s).
     { intros He. apply (f_equal (fun m : dst => m !! N)) in He.
-      rewrite lookup_insert HsN in He. discriminate He. }
+      rewrite lookup_insert_eq HsN in He. discriminate He. }
     iMod (file_resync γfs c r s (<[N := (i, [])]> s) np I' appE
             ltac:(set_solver) Heq
             ltac:(rewrite -(f_ok_fcontent (abs_view I') (<[N := (i, [])]> s));
@@ -627,8 +627,8 @@ Section FileOpen.
       (I : gmap Z fs_node) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       (⌜fclaim_free (abs_view I)⌝ ∨ file_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv Hka".
@@ -841,7 +841,7 @@ Section FileOpen.
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       rewrite /file_trunc_recv. iRight. iExact "HT". }
     destruct Hf as (Hok & Hpure & Hcons).
-    pose proof (proj2 (f_ok_pin (abs_view I) _ N i [] Hok (lookup_insert _ _ _)))
+    pose proof (proj2 (f_ok_pin (abs_view I) _ N i [] Hok (lookup_insert_eq _ _ _)))
       as HrowI.
     destruct (file_trunc_free (abs_view I) (abs_view I) i (<[N := (i, [])]> s)
                 HrowI Hpure Hok Hpure Hok)
@@ -885,7 +885,7 @@ Section FileOpen.
     FileDisc.uname N ->
     avx !! FsImg.ROOTINO = Some (MkAnode (ADir entsx) nlx) ->
     entsx !! N = Some i ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     ((⌜fclaim_free avx⌝ ∗ (⌜f_ok avx s⌝ ∨ esc_spent g)) ∨ file_taint c) -∗
@@ -978,7 +978,7 @@ Section FileOpen.
     iIntros (I') "%Hav Hka'".
     assert (Hne : s <> <[N := (i, [])]> s).
     { intros He. apply (f_equal (fun m : dst => m !! N)) in He.
-      rewrite lookup_insert HsN in He. congruence. }
+      rewrite lookup_insert_eq HsN in He. congruence. }
     iMod (file_resync γfs c r s (<[N := (i, [])]> s) np I' appE
             ltac:(set_solver) Heq
             ltac:(rewrite -(f_ok_fcontent (abs_view I') (<[N := (i, [])]> s));
@@ -999,8 +999,8 @@ Section FileOpen.
     file_app = MkAppcfg file_names (file_pred c) r ->
     FileDisc.uname N ->
     arg_path_of M pv pl ->
-    list_basics.last (path_elems pl) = Some N ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some N ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ esc_key c r n s g -∗
     fl_lb c ls -∗
     pf_at (atrunc_of_permit (fs_gamma_L γfs) appE
@@ -1070,8 +1070,8 @@ Section FileOpen.
     arg_path_of M pv pl ->
     np_elems pl = [] ->
     um_start_of cw pl = ROOTINO ->
-    list_basics.last (path_elems pl) = Some N ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some N ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g np -∗
     open_au_create_at (fs_gamma_L γfs) γfs cw M pv vom
@@ -1151,9 +1151,9 @@ Section FileOpen.
     arg_path_of M pv pl ->
     np_elems pl = [] ->
     um_start_of cw pl = ROOTINO ->
-    list_basics.last (path_elems pl) = Some N ->
+    list_basics.list.last (path_elems pl) = Some N ->
     om_trunc vom = false ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv γfs -∗ file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g np -∗
     open_au_create_at (fs_gamma_L γfs) γfs cw M pv vom
@@ -1271,7 +1271,7 @@ Section FileOpen.
   Lemma file_permit_tied (c : file_fixed) (r : file_names) (n : nat)
       (N : fname) (s : dst) (g : gname) (np : nat) (jo : option Z) (pl : list (bv 8)) (i : Z)
       (Γ : fs_view_names Σ) :
-    list_basics.last (path_elems pl) = Some N ->
+    list_basics.list.last (path_elems pl) = Some N ->
     trunc_permit_ex Γ
       (trunc_tie_at pl (fun (_ : nat) (d : Z) => ⌜d = ROOTINO⌝%I))
       (file_arm_fam c r jo s g np) (file_dlk_fam c r n s g) i -∗
@@ -1369,7 +1369,7 @@ Section FileOpen.
       (N : fname) (s : dst) (g : gname) (np : nat)
       (γfs : fs_names) (vom : mword 64) (pl : list (bv 8)) (i : Z) :
     om_trunc vom = true ->
-    list_basics.last (path_elems pl) = Some N ->
+    list_basics.list.last (path_elems pl) = Some N ->
     cre_trunc_kept_ex (fs_gamma_L γfs) vom pl
       (fun (_ : nat) (d : Z) => ⌜d = ROOTINO⌝%I)
       (file_arm_fam c r jo s g np) (file_dlk_fam c r n s g)
@@ -1490,7 +1490,7 @@ Section FileOpen.
     om_trunc vom = true ->
     FileDisc.uname N ->
     arg_path_of M pv pl ->
-    list_basics.last (path_elems pl) = Some N ->
+    list_basics.list.last (path_elems pl) = Some N ->
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗ esc_key c r n s g -∗
     open_receipt_create omo (fs_gamma_L γfs) γfs cw M pv vom
@@ -2277,7 +2277,7 @@ Section FileOpen.
   Lemma file_escrow_mask_blocked (N : namespace) :
     (↑N : coPset) ⊆ appE ∖ ↑appN -> False.
   Proof using .
-    intros HN. apply (nclose_infinite N). exists nil. intros x Hx.
+    intros HN. apply (nclose_not_finite N). exists nil. intros x Hx.
     exfalso. apply HN in Hx. rewrite /appE in Hx.
     assert (Hem : x ∈ (∅ : coPset)) by (revert Hx; set_solver).
     revert Hem. set_solver.

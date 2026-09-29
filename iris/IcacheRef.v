@@ -878,7 +878,7 @@ Section IcacheRefGhost.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     iPureIntro. specialize (Hv k).
-    rewrite singleton_op lookup_singleton -pair_op in Hv.
+    rewrite singleton_op lookup_singleton_eq -pair_op in Hv.
     apply Some_valid, pair_valid in Hv as [_ Hag].
     pose proof (to_agree_op_inv_L _ _ Hag) as Heq.
     injection Heq as <- <-. done.
@@ -948,7 +948,7 @@ Section IcacheRefGhost.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     iPureIntro. specialize (Hv k).
-    rewrite singleton_op lookup_singleton -pair_op in Hv.
+    rewrite singleton_op lookup_singleton_eq -pair_op in Hv.
     apply Some_valid, pair_valid in Hv as [Hfr _].
     by apply frac_valid in Hfr.
   Qed.
@@ -1522,7 +1522,7 @@ Section IcacheRef.
   Lemma live_genlo_le1 k (s : Qp) g lo : live_genlo k s g lo -∗ ⌜(s ≤ 1)%Qp⌝.
   Proof using .
     iIntros "H". iDestruct (own_valid with "H") as %Hv. iPureIntro.
-    specialize (Hv k). rewrite lookup_singleton in Hv.
+    specialize (Hv k). rewrite lookup_singleton_eq in Hv.
     apply Some_valid, pair_valid in Hv as [Hs _]. exact Hs.
   Qed.
   Lemma live_fracc_le1 k (s : Qp) : live_fracc k s -∗ ⌜(s ≤ 1)%Qp⌝.

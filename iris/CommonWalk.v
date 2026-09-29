@@ -118,7 +118,7 @@ Lemma u_sext45_inj (x y : mword 27) :
 Proof.
   intros H.
   apply (f_equal bv_signed) in H.
-  cbv [sign_extend' Operators_mwords.sign_extend exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend exts_vec 
        MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H; [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.

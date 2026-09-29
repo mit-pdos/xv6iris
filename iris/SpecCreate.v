@@ -803,7 +803,7 @@ Section CreateSpec.
       (Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (made : bool) (i : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝
        ∗ P (length (npar_elems pl)) d
        ∗ (if made
           then (cre_dots_fired Fdots i d true ∨ cre_dots_leg Γ tyz Fdots)
@@ -838,7 +838,7 @@ Section CreateSpec.
      ∨ (∃ d : Z,
           P (length (npar_elems pl)) d
           ∗ ((∃ (nm : fname) (i : Z),
-                ⌜list_basics.last (path_elems pl) = Some nm⌝
+                ⌜list_basics.list.last (path_elems pl) = Some nm⌝
                 ∗ cre_ex_fired Fex d nm i)
              ∨ pf_at (dlookup_commit_at Γ appE) Fex)
           ∗ pf_at (acre_commit_at_gen_nm Γ appE (cre_child tyz ma mi) Nm
@@ -1007,7 +1007,7 @@ Section CreateSpec.
     cre_ok_arms Γ (bv_unsigned T_DEVICE) ma mi Nm Nd P Farm Fdots Fun Fok Fex pl
       true i ⊢
       ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
-        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
         ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
         P (length (npar_elems pl)) d ∗
         pf_at (dlookup_commit_at Γ appE) Fex ∗
@@ -1046,7 +1046,7 @@ Section CreateSpec.
                        (P (length (npar_elems pl))) Farm) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
-                  ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                  ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                   ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                   ⌜ents !! nm = Some i⌝ ∗
                   Fex.(pf_recv) av d nm i)
@@ -1087,7 +1087,7 @@ Section CreateSpec.
     cre_ok_arms Γ (bv_unsigned T_FILE) ma mi Nm Nd P Farm Fdots Fun Fok Fex pl
       made i ⊢
       ∃ (d : Z) (nm : fname),
-        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
         P (length (npar_elems pl)) d ∗
         ((∃ (av : aview) (ents : gmap fname Z) (nl : nat),
             ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
@@ -1134,7 +1134,7 @@ Section CreateSpec.
     cre_ok_arms Γ (bv_unsigned T_FILE) ma mi Nm Nd P Farm Fdots Fun Fok Fex pl
       true i ⊢
       ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
-        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
         ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
         P (length (npar_elems pl)) d ∗
         Fok.(pf_recv) av d nm i ∗
@@ -1161,7 +1161,7 @@ Section CreateSpec.
     cre_ok_arms Γ (bv_unsigned T_FILE) ma mi Nm Nd P Farm Fdots Fun Fok Fex pl
       false i ⊢
       ∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
-        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
         ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
         ⌜ents !! nm = Some i⌝ ∗
         P (length (npar_elems pl)) d ∗
@@ -1212,7 +1212,7 @@ Section CreateSpec.
                        (P (length (npar_elems pl))) Farm) Fok
             ∗ ((∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
                   (nl : nat),
-                  ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                  ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                   ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                   ⌜ents !! nm = Some i⌝ ∗
                   Fex.(pf_recv) av d nm i)
@@ -1284,7 +1284,7 @@ Definition wp_create_sconf_body
      exactly that this path's last element is one of them.  sys_mknod
      discharges it from [FsAbsCreateNm.npar_nm_intro]; every caller at
      [Nm := fun _ => True] discharges it by [I]. *)
-  (forall nm : fname, list_basics.last (path_elems pl) = Some nm -> Nm nm) ->
+  (forall nm : fname, list_basics.list.last (path_elems pl) = Some nm -> Nm nm) ->
   (* THE NODE PREDICATE'S TWO PURE PREMISES (lane INIT-FILE, the UNARM
      ruling): create's unarm fires on the row ITS OWN ARM placed, so the
      node that disappears is [cre_c0 tyz ma mi] -- EXCEPT on mkdir's

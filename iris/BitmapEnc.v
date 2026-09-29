@@ -288,7 +288,7 @@ Lemma bm_bytes_upd (n : nat) (u u' : gset Z) (j : Z) :
 Proof.
   intros Hj Hjn Hag. apply list_eq. intros i.
   destruct (Nat.eq_dec i (Z.to_nat j)) as [->|Hne].
-  - rewrite list_lookup_insert by (rewrite bm_bytes_length; exact Hjn).
+  - rewrite list_lookup_insert_eq by (rewrite bm_bytes_length; exact Hjn).
     rewrite bm_bytes_lookup by exact Hjn.
     rewrite Z2Nat.id by exact Hj. reflexivity.
   - rewrite list_lookup_insert_ne by congruence.

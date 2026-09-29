@@ -421,7 +421,7 @@ Proof.
   intros Hb. unfold read_bytes.
   case_match eqn:Hm; [congruence|].
   exfalso.
-  apply stdpp.list_monad.mapM_None_1, List.Exists_exists in Hm.
+  apply stdpp.list_monad.list.mapM_None_1, List.Exists_exists in Hm.
   destruct Hm as (j & Hj & Hnone).
   apply List.in_seq in Hj.
   assert (Hjn : (N.of_nat j < n)%N) by lia.

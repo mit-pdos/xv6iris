@@ -1730,7 +1730,7 @@ Section ProofUvmcopy.
         by (exact (uptd_ext_trans Pnew Pj Pk Hext
                      (uptd_ext_insert_perm Pj (pte_flags10 w0) (vpn_at vpn0 j) r Hpjnone))).
       assert (Hpklook : Pk.(ud_um) !! vpn_at vpn0 j = Some (uvm_pte (pte_flags10 w0) r)).
-      { rewrite /Pk /uptd_insert_perm. cbn [ud_um]. apply lookup_insert. }
+      { rewrite /Pk /uptd_insert_perm. cbn [ud_um]. apply lookup_insert_eq. }
       assert (Hpkne : forall v, v <> vpn_at vpn0 j -> Pk.(ud_um) !! v = Pj.(ud_um) !! v).
       { intros v Hv. rewrite /Pk /uptd_insert_perm. cbn [ud_um].
         apply lookup_insert_ne. exact (not_eq_sym Hv). }

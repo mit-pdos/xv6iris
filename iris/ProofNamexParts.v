@@ -508,7 +508,7 @@ Lemma nx_sext16_inj (x y : mword 16) :
 Proof.
   intros H. apply (f_equal bv_signed) in H.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+       MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H;
     [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.
@@ -574,7 +574,7 @@ Lemma nx_zext8_unsigned (x : mword 8) :
   bv_unsigned (zero_extend' 64 x : mword 64) = bv_unsigned x.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   apply bv_zero_extend_unsigned. vm_compute. discriminate.
 Qed.
 
@@ -880,7 +880,7 @@ Lemma nx_take14_lookup (u : list (bv 8)) (jj : nat) :
   (jj < 14)%nat -> take 14 u !!! jj = u !!! jj.
 Proof.
   intro Hj. rewrite !list_lookup_total_alt.
-  assert (Ht : take 14 u !! jj = u !! jj) by (apply lookup_take; lia).
+  assert (Ht : take 14 u !! jj = u !! jj) by (apply lookup_take_lt; lia).
   rewrite Ht. reflexivity.
 Qed.
 

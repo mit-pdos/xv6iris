@@ -212,7 +212,7 @@ Proof.
   split; [by cbn [upd_ofile pv_cwd pv_fdg]|].
   intros i Hi. cbn [upd_ofile pv_ofile pv_fdg].
   destruct (Nat.eq_dec i fd) as [-> | Hne].
-  - by apply list_lookup_insert.
+  - by apply list_lookup_insert_eq.
   - rewrite list_lookup_insert_ne; [| congruence]. apply Hn. lia.
 Qed.
 

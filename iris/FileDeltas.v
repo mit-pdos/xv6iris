@@ -195,7 +195,7 @@ Lemma name_absent_arm (nm : fname) (i : Z) (c : absnode) (av : aview) :
 Proof using .
   intros Hnd. rewrite /name_absent /astep /aents /delta_arm. intros Habs.
   destruct (decide (i = ROOTINO)) as [-> | Hne].
-  - rewrite lookup_insert /= /anode_ents /=.
+  - rewrite lookup_insert_eq /= /anode_ents /=.
     destruct c as [bs | e | ma mi]; [reflexivity | | reflexivity].
     exfalso. exact (Hnd e eq_refl).
   - rewrite lookup_insert_ne; [exact Habs | congruence].
@@ -225,7 +225,7 @@ Lemma name_absent_unarm (nm : fname) (i : Z) (av : aview) :
 Proof using .
   rewrite /name_absent /astep /aents /delta_unarm. intros Habs.
   destruct (decide (i = ROOTINO)) as [-> | Hne].
-  - by rewrite lookup_delete /=.
+  - by rewrite lookup_delete_eq /=.
   - rewrite lookup_delete_ne; [exact Habs | congruence].
 Qed.
 
@@ -290,7 +290,7 @@ Proof using .
   rewrite (delta_create_nd av d nmn ents nl i c Hpre Hnd).
   rewrite /name_absent /astep /aents.
   destruct (decide (d = ROOTINO)) as [-> | Hdne].
-  - rewrite lookup_insert /= /anode_ents /=.
+  - rewrite lookup_insert_eq /= /anode_ents /=.
     rewrite /name_absent /astep /aents Hd /= /anode_ents /= in Habs.
     rewrite lookup_insert_ne; [exact Habs |].
     intros ->. destruct Hother as [Hc | Hc];
@@ -316,7 +316,7 @@ Proof using .
   apply node_pin_of_parts.
   - rewrite /astep /aents.
     destruct (decide (d = ROOTINO)) as [-> | Hdne].
-    + rewrite lookup_insert /= /anode_ents /=.
+    + rewrite lookup_insert_eq /= /anode_ents /=.
       rewrite Hroot in Hd. injection Hd as Hents Hnl. subst rents.
       rewrite lookup_insert_ne; [exact Hnm |].
       intros <-. by rewrite Hnm in Hfresh.
@@ -337,7 +337,7 @@ Proof using .
   assert (Hne : ROOTINO <> i) by (eapply cre_pre_ne; [exact Hpre | exact Hnd]).
   rewrite (delta_create_nd av ROOTINO nmn ents nl i c Hpre Hnd).
   apply node_pin_of_parts.
-  - rewrite /astep /aents lookup_insert /= /anode_ents /=. apply lookup_insert.
+  - rewrite /astep /aents lookup_insert_eq /= /anode_ents /=. apply lookup_insert_eq.
   - rewrite lookup_insert_ne; [exact Hchild | congruence].
 Qed.
 
@@ -352,7 +352,7 @@ Proof using .
   rewrite (dots_delta_fresh av i d full Hi).
   rewrite /name_absent /astep /aents.
   destruct (decide (i = ROOTINO)) as [-> | Hne].
-  - rewrite lookup_insert /= /anode_ents /= /dots_ents.
+  - rewrite lookup_insert_eq /= /anode_ents /= /dots_ents.
     destruct full.
     + rewrite lookup_insert_ne; [| congruence].
       rewrite lookup_insert_ne; [| congruence]. apply lookup_empty.
@@ -452,7 +452,7 @@ Proof using .
   destruct (av !! j) as [a |] eqn:Hj; last first.
   { left. rewrite /delta_write Hj. reflexivity. }
   destruct a as [n nl]. destruct n as [bs | e | ma mi].
-  - right. rewrite /aents /delta_write Hj /= lookup_insert /= /anode_ents /=.
+  - right. rewrite /aents /delta_write Hj /= lookup_insert_eq /= /anode_ents /=.
     reflexivity.
   - left. rewrite /delta_write Hj /=. reflexivity.
   - left. rewrite /delta_write Hj /=. reflexivity.
@@ -546,16 +546,16 @@ Lemma f_ok_move (av av' : aview) (s : dst) (N : fname) (i : Z)
 Proof using .
   intros HN Hfresh Hr Hpin (Hrow & Hdom & Hinj). split_and!.
   - intros M HM. destruct (decide (M = N)) as [-> | Hne].
-    + rewrite lookup_insert. exact Hpin.
+    + rewrite lookup_insert_eq. exact Hpin.
     + rewrite lookup_insert_ne; [| congruence]. exact (Hr M HM Hne (Hrow M HM)).
   - apply map_Forall_insert_2; [exact HN | exact Hdom].
   - intros M1 M2 j b1 b2 H1 H2.
     destruct (decide (M1 = N)) as [-> | Hn1];
       destruct (decide (M2 = N)) as [-> | Hn2]; [reflexivity | | |].
-    + rewrite lookup_insert in H1. injection H1 as <- <-.
+    + rewrite lookup_insert_eq in H1. injection H1 as <- <-.
       rewrite lookup_insert_ne in H2; [| congruence].
       exfalso. exact (Hfresh M2 i b2 Hn2 H2 eq_refl).
-    + rewrite lookup_insert in H2. injection H2 as <- <-.
+    + rewrite lookup_insert_eq in H2. injection H2 as <- <-.
       rewrite lookup_insert_ne in H1; [| congruence].
       exfalso. exact (Hfresh M1 i b1 Hn1 H1 eq_refl).
     + rewrite lookup_insert_ne in H1; [| congruence].

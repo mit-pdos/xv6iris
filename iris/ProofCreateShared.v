@@ -537,7 +537,7 @@ Qed.
    hoisting pure obligations out of a large proofmode goal). *)
 Lemma cr_last_of_npar (pl : list (bv 8)) (nf : nat -> bv 8) :
   (exists es e, nameiparent_of pl es e /\ bname 14 nf = e) ->
-  list_basics.last (path_elems pl) = Some (bname 14 nf).
+  list_basics.list.last (path_elems pl) = Some (bname 14 nf).
 Proof.
   intros (es & e & Hnp & Hb). rewrite /nameiparent_of in Hnp.
   rewrite Hnp Hb. apply last_snoc.
@@ -647,7 +647,7 @@ Lemma cr_zext64_16_unsigned (h : mword 16) :
   bv_unsigned (zero_extend' 64 h : mword 64) = bv_unsigned h.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
 Qed.
 
@@ -690,7 +690,7 @@ Proof.
   assert (Hhm32 : bv_half_modulus (MachineWord.MachineWord.Z_idx 32) = 2^31)
     by reflexivity.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   unfold bv_signed.
@@ -1946,7 +1946,7 @@ Section ProofCreateMain.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     P (length (npar_elems pl)) d -∗
     cre_ex_fired Fex d nm i -∗
     cre_commits (fs_gamma_L fsc_fs) tyz ma mi Nm Nd (P (length (npar_elems pl)))
@@ -1997,7 +1997,7 @@ Section ProofCreateMain.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     P (length (npar_elems pl)) d -∗
     cre_ex_fired Fex d nm i -∗
     cre_commits (fs_gamma_L fsc_fs) tyz ma mi Nm Nd (P (length (npar_elems pl)))
@@ -2019,7 +2019,7 @@ Section ProofCreateMain.
       (Fun : pfam Σ (aview -> Z -> iProp Σ))
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (d : Z) (nm : fname) (i : Z) :
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     P (length (npar_elems pl)) d -∗
     (cre_dots_fired Fdots i d true
      ∨ cre_dots_leg (fs_gamma_L fsc_fs) tyz Fdots) -∗
@@ -2282,7 +2282,7 @@ Section ProofCreateMain.
     iEval (rewrite HT6) in "Hb6". iEval (rewrite HT7) in "Hb7".
     iEval (rewrite HT8) in "Hb8".
     (* the [name] local goes back to being two frame slots *)
-    iDestruct (dlk_name_bytes with "Hnb") as "Hnbb".
+    iDestruct (dlk_name_bytes (KTR := KT1) with "Hnb") as "Hnbb".
     iDestruct (cr_bytes_slots sp0 Hal10 Hal9 with "Hnbb") as (w10 w9) "[Hc10 Hc9]".
     iAssert (stack_own (KTR := KT1) sp0 10) with
       "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".
@@ -3341,8 +3341,8 @@ Section ProofCreateMain.
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
-    iDestruct (ctx_word_pointsto_aligned_p with "H9") as %Ha9.
-    iDestruct (ctx_word_pointsto_aligned_p with "H10") as %Ha10.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "H9") as %Ha9.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "H10") as %Ha10.
     iPureIntro. split; [exact Ha10 | exact Ha9].
   Qed.
 

@@ -419,9 +419,9 @@ Section UInitTreeCons.
                                    (om_writable (m !!! Regidx a1_idx))
                                    (FdDevice ma)]> (uvis_fd W))
           by exact (eq_trans (eq_sym Hfdv1) Hfdv0).
-        pose proof (list_lookup_insert (uvis_fd W) fd (FdOpen rd wr ty) Hfdlt)
+        pose proof (list_lookup_insert_eq (uvis_fd W) fd (FdOpen rd wr ty) Hfdlt)
           as Hl1.
-        pose proof (list_lookup_insert (uvis_fd W) fd
+        pose proof (list_lookup_insert_eq (uvis_fd W) fd
                       (FdOpen (om_readable (m !!! Regidx a1_idx))
                          (om_writable (m !!! Regidx a1_idx))
                          (FdDevice ma)) Hfdlt) as Hl2.
@@ -604,13 +604,13 @@ Section UInitTreeCons.
                                      (ADev CONSOLE 0) t))
                    FsImg.ROOTINO fname_console = Some i).
     { rewrite /nstep /nents (tree_top_ins_root t e i Hd Hne) /=.
-      apply lookup_insert. }
+      apply lookup_insert_eq. }
     assert (Hi : tv_nodes (top_ins FsImg.ROOTINO fname_console i
                              (ADev CONSOLE 0) t) !! i
                  = Some (ADev CONSOLE 0)).
     { cbn [tv_nodes top_ins].
       rewrite (tedge_ins_lookup_ne _ FsImg.ROOTINO fname_console i i Hne).
-      apply lookup_insert. }
+      apply lookup_insert_eq. }
     rewrite /resolves_from init_cons_path_elems /cons_path npath_cons Hs.
     cbn [npath]. by rewrite Hi.
   Qed.

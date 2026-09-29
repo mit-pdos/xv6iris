@@ -200,7 +200,7 @@ Proof. u_fix. Qed.
 (* [u_fix_named] sits inside [u_rw_named], which is what lets the GPR
    exclusion below borrow [u_rw_nodup]. *)
 Lemma u_fix_named_sub (r : register) : r ∈ u_fix_named -> r ∈ u_rw_named.
-Proof. rewrite /u_fix_named /u_rw_named !elem_of_list_In. cbn [In]. tauto. Qed.
+Proof. rewrite /u_fix_named /u_rw_named !list_elem_of_In. cbn [In]. tauto. Qed.
 
 (* ...and the GPRs.  This is the ONE exclusion a computation cannot do: an
    operand index arrives as [gpr_of_Z (uint i)] at a SYMBOLIC [i], so
@@ -222,7 +222,7 @@ Proof.
     (* stdpp's [NoDup_app], NOT [List.NoDup_app] -- the two share a short
        name and the wrong one is an introduction rule, so the [apply] fails
        with a type that prints almost identically. *)
-    apply (proj1 (stdpp.list_relations.NoDup_app u_rw_named u_gpr_list)) in Hnd.
+    apply (proj1 (stdpp.list_relations.list.NoDup_app u_rw_named u_gpr_list)) in Hnd.
     destruct Hnd as (_ & Hdisj & _).
     apply (Hdisj _ (u_fix_named_sub _ Hnamed) Hg).
   - (* or a read-only cell -- refuted by [u_disj] *)

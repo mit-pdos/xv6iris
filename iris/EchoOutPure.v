@@ -61,7 +61,7 @@ Local Open Scope nat_scope.
    [UkSh.ush_cycles_snoc_in] for the same reason (that file is above this
    one; the fact is [ObsTrace]'s and belongs there). *)
 Lemma epu_elem_of_rev_head {A} (x : A) (l : list A) : x ∈ rev (x :: l).
-Proof. cbn. apply elem_of_app. right. by apply elem_of_list_singleton. Qed.
+Proof. cbn. apply elem_of_app. right. by apply list_elem_of_singleton. Qed.
 
 Lemma epu_cycles_snoc_in (h : list mobs) (b : bv 8) :
   exists s0 : list mobs,
@@ -135,7 +135,7 @@ Lemma disc_seg_last_in (h : list mobs) (c : bv 8) :
   disc_seg h -> obs_ends_in Uart0 h c -> c ∈ ins h.
 Proof.
   intros _ [h0 ->]. rewrite ins_app ins_in.
-  apply elem_of_app. right. apply elem_of_list_here.
+  apply elem_of_app. right. apply list_elem_of_here.
 Qed.
 
 (* the refutation the read contract's erase disjunct needs *)
@@ -162,7 +162,7 @@ Lemma disc_no_erase (h : list mobs) (c : bv 8) :
 Proof.
   intros Hdisc [h0 ->].
   destruct (epu_cycles_snoc_in h0 c) as (s0 & Hin).
-  apply elem_of_list_lookup in Hin as [i Hi].
+  apply list_elem_of_lookup in Hin as [i Hi].
   pose proof (disc_seg'_proj _ (Forall_lookup_1 _ _ _ _ Hdisc Hi)) as Hseg.
   eapply disc_seg_no_erase; [exact Hseg | apply obs_ends_in_snoc].
 Qed.
@@ -176,7 +176,7 @@ Proof.
   destruct (trace_shape_cycles h Hsh) as (cs & Hcs).
   assert (Hin : open_seg h ∈ cycles_of h)
     by (rewrite /cycles_of Hcs; apply epu_elem_of_rev_head).
-  apply elem_of_list_lookup in Hin as [i Hi].
+  apply list_elem_of_lookup in Hin as [i Hi].
   exact (disc_seg'_proj _ (Forall_lookup_1 _ _ _ _ Hd Hi)).
 Qed.
 
@@ -560,7 +560,7 @@ Lemma E_disc_echo (E : list (list mobs * bv 8)) (j : nat)
   E_disc E -> E !! j = Some x -> echo_of x.2 = x.2.
 Proof.
   intros HE Hx. apply (echo_of_disc (snd <$> E) x.2 HE).
-  apply elem_of_list_lookup_2 with j. by rewrite list_lookup_fmap Hx.
+  apply list_elem_of_lookup_2 with j. by rewrite list_lookup_fmap Hx.
 Qed.
 
 (* ...AND WHERE IT COMES FROM.  E's histories are snapshots of ONE cycle
@@ -589,7 +589,7 @@ Proof.
   { rewrite list_lookup_fmap (lookup_ge_None_2 E j ltac:(lia)) /=.
     symmetry. apply lookup_ge_None_2. rewrite length_take. lia. }
   destruct (lookup_lt_is_Some_2 E j Hj) as [x Hx].
-  rewrite list_lookup_fmap Hx /= lookup_take; [| exact Hj].
+  rewrite list_lookup_fmap Hx /= lookup_take_lt; [| exact Hj].
   destruct (Hidx j x Hx) as [[h0 Hh0] Hlx].
   rewrite Hh0 ins_app ins_in (length_app (ins h0) [x.2]) in Hlx.
   cbn [length] in Hlx.
@@ -764,7 +764,7 @@ Lemma next_input_of_complete (ps cs : list nat) (E : list (list mobs * bv 8))
 Proof.
   intros HEb HEi Hnew Hends Hm HlenE Hw Hlow Hup.
   assert (Hprefix : forall j x, E !! j = Some x -> x.1 `prefix_of` h).
-  { intros j x Hx. apply (Hnew x). by eapply elem_of_list_lookup_2. }
+  { intros j x Hx. apply (Hnew x). by eapply list_elem_of_lookup_2. }
   pose proof (E_length_le_hist E h HEi Hprefix) as Hle.
   pose proof (E_bytes_of_hist E h HEi Hprefix Hle) as HEq.
   rewrite HlenE in HEq.
@@ -882,15 +882,15 @@ Lemma echoed_lookup (pops : list log_entry) (j : nat) (x : list mobs * bv 8) :
 Proof.
   rewrite /echoed list_lookup_fmap fmap_Some.
   intros (e & He & ->). exists e. split; [|split; [|reflexivity]].
-  - apply elem_of_list_lookup_2 in He. by apply elem_of_list_filter in He as [_ ?].
-  - apply elem_of_list_lookup_2 in He. by apply elem_of_list_filter in He as [? _].
+  - apply list_elem_of_lookup_2 in He. by apply list_elem_of_filter in He as [_ ?].
+  - apply list_elem_of_lookup_2 in He. by apply list_elem_of_filter in He as [? _].
 Qed.
 
 Lemma echoed_elem (pops : list log_entry) (e : log_entry) :
   e ∈ pops -> log_echoed e -> (le_hist e, le_byte e) ∈ echoed pops.
 Proof.
-  intros Hin Hec. rewrite /echoed. apply elem_of_list_fmap.
-  exists e. split; [reflexivity|]. by apply elem_of_list_filter.
+  intros Hin Hec. rewrite /echoed. apply list_elem_of_fmap.
+  exists e. split; [reflexivity|]. by apply list_elem_of_filter.
 Qed.
 
 (* A FILTER KEEPS A STRICT ORDER ON THE INDICES.  The general step behind
@@ -919,9 +919,9 @@ Proof.
     + cbn in Hx. simplify_eq.
       destruct j as [|j]; [lia|]. cbn in Hy.
       assert (Hin : y ∈ l).
-      { apply elem_of_list_lookup_2 in Hy.
-        by apply elem_of_list_filter in Hy as [_ ?]. }
-      apply elem_of_list_lookup in Hin as [n Hn].
+      { apply list_elem_of_lookup_2 in Hy.
+        by apply list_elem_of_filter in Hy as [_ ?]. }
+      apply list_elem_of_lookup in Hin as [n Hn].
       by eapply (Hl 0%nat (S n)); [lia| |].
     + destruct j as [|j]; [lia|]. cbn in Hx, Hy.
       apply (IH Hl' i j x y); [lia|exact Hx|exact Hy].
@@ -958,8 +958,8 @@ Lemma echoed_elem_inv (pops : list log_entry) (y : list mobs * bv 8) :
   y ∈ echoed pops ->
   exists e, e ∈ pops /\ log_echoed e /\ (le_hist e, le_byte e) = y.
 Proof.
-  rewrite /echoed. intros Hy. apply elem_of_list_fmap in Hy as (e & -> & He).
-  apply elem_of_list_filter in He as [Hec Hin]. by exists e.
+  rewrite /echoed. intros Hy. apply list_elem_of_fmap in Hy as (e & -> & He).
+  apply list_elem_of_filter in He as [Hec Hin]. by exists e.
 Qed.
 
 (* NO LOGGED BYTE IS AN ERASE CHARACTER, under the discipline -- which
@@ -1043,11 +1043,11 @@ Proof.
       rewrite lookup_app_l in Hp; last exact Hkl. exact Hp. }
     (* at or above [dl]: [p] is an entry of [ws], hence an echoed entry *)
     assert (Hpin : p ∈ ws).
-    { rewrite lookup_app_r in Hp; [|lia]. by eapply elem_of_list_lookup_2. }
+    { rewrite lookup_app_r in Hp; [|lia]. by eapply list_elem_of_lookup_2. }
     destruct (Hin p Hpin) as (ep & Hepin & Hepeq & Hepech).
     assert (HpE : p ∈ echoed pops).
     { rewrite -Hepeq. by apply echoed_elem. }
-    apply elem_of_list_lookup in HpE as [n Hn].
+    apply list_elem_of_lookup in HpE as [n Hn].
     assert (Hnk : n = k).
     { destruct (decide (n < k)) as [Hlt|Hge].
       - (* the same entry twice in the consumed list: the chain forbids it *)
@@ -1062,7 +1062,7 @@ Proof.
         destruct Hy as [y Hy].
         assert (Hyp : hist_ext y.1 p.1)
           by (eapply echoed_order; [exact Hlog|exact Hlt|exact Hy|exact Hn]).
-        assert (HyE : y ∈ echoed pops) by (by eapply elem_of_list_lookup_2).
+        assert (HyE : y ∈ echoed pops) by (by eapply list_elem_of_lookup_2).
         destruct k as [|k'].
         + destruct p as [hp cp].
           eapply (no_echoed_between pops [] hp y);
@@ -1092,7 +1092,7 @@ Proof.
   assert (Heq : take (length (dl ++ ws)) (echoed pops) = dl ++ ws).
   { apply list_eq. intros k.
     destruct (decide (k < length (dl ++ ws))) as [Hk|Hk].
-    - rewrite lookup_take; [|exact Hk]. by eapply (Hpt (S k)); [lia|].
+    - rewrite lookup_take_lt; [|exact Hk]. by eapply (Hpt (S k)); [lia|].
     - rewrite lookup_take_ge; [|lia]. symmetry. apply lookup_ge_None_2. lia. }
   exists (drop (length (dl ++ ws)) (echoed pops)).
   by rewrite -{1}(take_drop (length (dl ++ ws)) (echoed pops)) Heq.
@@ -1255,7 +1255,7 @@ Proof.
   destruct (lookup_lt_is_Some_2 bs i ltac:(lia)) as [l Hl].
   rewrite (list_lookup_total_correct bs i l Hl).
   assert (Htk : take q bs !! i = Some l)
-    by (rewrite lookup_take; [exact Hl | exact Hi]).
+    by (rewrite lookup_take_lt; [exact Hl | exact Hi]).
   exact (Forall_lookup_1 (fun l0 => wl_wf (drop 1 (wl_words l0)))
            (take q bs) i l HF Htk).
 Qed.
@@ -1272,9 +1272,9 @@ Lemma lta_of_take_eq (bs bs' : list (list (bv 8))) (q j : nat) :
 Proof.
   intros Heq Hj.
   assert (H1 : bs' !! j = take q bs' !! j)
-    by (symmetry; rewrite lookup_take; [done | lia]).
+    by (symmetry; rewrite lookup_take_lt; [done | lia]).
   assert (H2 : bs !! j = take q bs !! j)
-    by (symmetry; rewrite lookup_take; [done | lia]).
+    by (symmetry; rewrite lookup_take_lt; [done | lia]).
   by rewrite !list_lookup_total_alt H1 H2 Heq.
 Qed.
 
@@ -1528,7 +1528,7 @@ Proof.
     apply lookup_take_Some in Hx as [Hx Hi].
     rewrite lookup_drop in Hx.
     assert (Htk : take (S p) bs !! (1 + i)%nat = Some x)
-      by (rewrite lookup_take; [exact Hx | lia]).
+      by (rewrite lookup_take_lt; [exact Hx | lia]).
     exact (Forall_lookup_1 (fun l0 => wl_wf (drop 1 (wl_words l0)))
              (take (S p) bs) (1 + i)%nat x Hwf Htk). }
   { by apply epu_Forall_drop. }
@@ -1640,7 +1640,7 @@ Proof.
   destruct (trace_shape_cycles h Hsh) as (cs & Hcs).
   assert (Hin : open_seg h ∈ cycles_of h)
     by (rewrite /cycles_of Hcs; apply epu_elem_of_rev_head).
-  apply elem_of_list_lookup in Hin as [i Hi].
+  apply list_elem_of_lookup in Hin as [i Hi].
   exact (Forall_lookup_1 _ _ _ _ Hd Hi).
 Qed.
 
@@ -1673,7 +1673,7 @@ Proof.
   intros [Hd (ps & cs & Hlen & Hf & Hall)] [seg0 ->].
   exists ps, cs.
   assert (Hip : seg0 ∈ in_pres (seg0 ++ [ObsUartIn Uart0 c])).
-  { rewrite in_pres_in. apply elem_of_app. right. apply elem_of_list_here. }
+  { rewrite in_pres_in. apply elem_of_app. right. apply list_elem_of_here. }
   destruct (Hall _ Hip) as [Hok Hpt]. rewrite /disc_pt in Hpt.
   rewrite ins_app ins_in epu_removelast_snoc.
   split; [exact Hok |]. split; [exact Hf |].
@@ -1771,7 +1771,7 @@ Proof.
     by (apply nil_length_inv; exact (in_pres_lookup_ins sf 0%nat p0 Hp0)).
   (* it is one of the SEGMENT's pre-histories, and its wire is empty *)
   assert (Hp0seg : p0 ∈ in_pres seg).
-  { apply elem_of_list_lookup_2 with 0%nat.
+  { apply list_elem_of_lookup_2 with 0%nat.
     destruct (in_pres_mono sf seg Hpre) as [z Hz].
     rewrite Hz lookup_app_l; [exact Hp0 | lia]. }
   assert (Hw0 : obs_wire Uart0 p0 = []).

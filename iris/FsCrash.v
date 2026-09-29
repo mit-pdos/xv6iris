@@ -17,7 +17,7 @@
 (* home blocks of [P] with [W[i]] overwritten by log slot [i]; at [n = 0]  *)
 (* it is just the home blocks.  [P_fs] is an escrow over a pure record     *)
 (* (P, D, the committed history) asserting exactly that, plus the halves   *)
-(* of the ghosts that make it usable: a [ghost_var] TIE whose other half   *)
+(* of the ghosts that make it usable: a [ghost_var_frac] TIE whose other half   *)
 (* mirrors the machine's [v_disk] from inside [state_interp], and a        *)
 (* MONO-LIST of committed [D]s whose persistent lower bounds are the       *)
 (* durability receipts [sys_sync] will hand out.                          *)
@@ -174,7 +174,7 @@ Proof.
   destruct (decide (k < o)%nat) as [Hbef|Hge].
   - (* before the write *)
     assert (Hk1 : (k < length (take o (fs_blocks dk b)))%nat) by lia.
-    rewrite (lookup_app_l _ _ _ Hk1) (lookup_take _ _ _ Hbef)
+    rewrite (lookup_app_l _ _ _ Hk1) (lookup_take_lt _ _ _ Hbef)
             (fs_blocks_lookup _ b k Hk).
     f_equal. apply disk_write_out. lia.
   - assert (Hk1 : (length (take o (fs_blocks dk b)) <= k)%nat) by lia.
@@ -545,7 +545,7 @@ Lemma log_slot_in_region (ls : Z) (i : nat) :
   (i < LOGBLOCKS)%nat -> log_slot_bno ls i ∈ log_region_set ls.
 Proof.
   intros Hi. rewrite /log_region_set elem_of_union. left.
-  rewrite elem_of_list_to_set elem_of_list_fmap. exists i.
+  rewrite elem_of_list_to_set list_elem_of_fmap. exists i.
   split; [reflexivity|]. apply elem_of_seq. lia.
 Qed.
 
@@ -650,7 +650,7 @@ Proof.
   destruct (W !! i) as [c|] eqn:Hi.
   - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi).
     rewrite lookup_insert_ne; [exact IH|].
-    intros ->. apply Hb. eapply elem_of_list_lookup_2. exact Hi.
+    intros ->. apply Hb. eapply list_elem_of_lookup_2. exact Hi.
   - rewrite (fs_install_step_None _ _ _ _ _ Hi). exact IH.
 Qed.
 
@@ -661,12 +661,12 @@ Local Lemma fs_install_fold_hit (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
 Proof.
   intros Hnd Hi. induction l as [|j l IH]; [by rewrite elem_of_nil|].
   rewrite elem_of_cons. intros [->|Hin]; cbn [foldr].
-  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi) lookup_insert //.
+  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi) lookup_insert_eq //.
   - destruct (W !! j) as [c|] eqn:Hj.
     + rewrite (fs_install_step_Some _ _ _ _ _ _ Hj).
       destruct (decide (c = b)) as [->|Hne].
       * assert (Hji : j = i) by (eapply NoDup_lookup; [exact Hnd|exact Hj|exact Hi]).
-        subst j. rewrite lookup_insert //.
+        subst j. rewrite lookup_insert_eq //.
       * rewrite lookup_insert_ne //. by apply IH.
     + rewrite (fs_install_step_None _ _ _ _ _ Hj). by apply IH.
 Qed.
@@ -710,7 +710,7 @@ Proof.
   induction l as [| a l IH]; simpl; [exact HD |].
   rewrite /fs_install_step. destruct (W !! a) as [b0 |] eqn:Hb0; [| exact IH].
   intros b bs Hbs. destruct (decide (b = b0)) as [-> | Hne].
-  - rewrite lookup_insert in Hbs. injection Hbs as <-. exact (HP _).
+  - rewrite lookup_insert_eq in Hbs. injection Hbs as <-. exact (HP _).
   - rewrite lookup_insert_ne in Hbs; [| exact (not_eq_sym Hne)].
     exact (IH b bs Hbs).
 Qed.
@@ -743,7 +743,7 @@ Lemma fs_install_idem (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
 Proof.
   intros Hnd Hall. apply map_eq. intros b.
   destruct (decide (b ∈ W)) as [Hin|Hout].
-  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+  - apply list_elem_of_lookup_1 in Hin as [i Hi].
     rewrite (fs_install_hit P ls W D i b Hnd Hi). by rewrite (Hall i b Hi).
   - by rewrite fs_install_miss.
 Qed.
@@ -880,10 +880,10 @@ Lemma fs_recovery_dom (P : Z -> list (bv 8)) (D : gmap Z (list (bv 8)))
 Proof.
   intros -> Hwf.
   destruct (decide (b ∈ (hdr_dec (P (log_hdr_bno ls))).2)) as [Hin | Hout].
-  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+  - apply list_elem_of_lookup_1 in Hin as [i Hi].
     rewrite (fs_install_hit P ls _ _ i b (proj1 (proj2 Hwf)) Hi).
     split; [intros _ | intros _; by eexists].
-    destruct (proj2 (proj2 Hwf) b (elem_of_list_lookup_2 _ i _ Hi))
+    destruct (proj2 (proj2 Hwf) b (list_elem_of_lookup_2 _ i _ Hi))
       as (Hc & Hl & _).
     rewrite /fs_home_set elem_of_difference. split; assumption.
   - rewrite (fs_install_miss P ls _ _ b Hout) fs_restrict_lookup.
@@ -955,11 +955,11 @@ Proof.
   induction l as [|j l IH]; [reflexivity|]. intros Hj.
   assert (Heq : foldr (fs_install_step P' ls W) D l
                 = foldr (fs_install_step P ls W) D l).
-  { apply IH. intros k Hk. apply Hj. by apply elem_of_list_further. }
+  { apply IH. intros k Hk. apply Hj. by apply list_elem_of_further. }
   cbn [foldr]. rewrite Heq.
   destruct (W !! j) as [b|] eqn:Hb.
   - rewrite !(fs_install_step_Some _ _ _ _ _ _ Hb).
-    rewrite (Hj j (elem_of_list_here _ _)) //.
+    rewrite (Hj j (list_elem_of_here _ _)) //.
   - rewrite !(fs_install_step_None _ _ _ _ _ Hb) //.
 Qed.
 
@@ -982,7 +982,7 @@ Lemma fs_install_ext (P P' : Z -> list (bv 8)) (ls : Z) (W : list Z)
 Proof.
   intros Hnd HP HD. apply map_eq. intros k.
   destruct (decide (k ∈ W)) as [Hin|Hout].
-  - apply elem_of_list_lookup_1 in Hin as [j Hj].
+  - apply list_elem_of_lookup_1 in Hin as [j Hj].
     rewrite (fs_install_hit P' ls W D' j k Hnd Hj)
             (fs_install_hit P ls W D j k Hnd Hj).
     by rewrite (HP j k Hj).
@@ -1024,7 +1024,7 @@ Proof.
       by (apply fs_restrict_lookup_Some; done).
     rewrite Hrb.
     destruct (decide (b ∈ Ws)) as [Hbw|Hbw].
-    + apply elem_of_list_lookup_1 in Hbw as [i Hi].
+    + apply list_elem_of_lookup_1 in Hbw as [i Hi].
       rewrite (fs_install_hit V ls Ws (fs_restrict V (fs_home_set cov ls))
                  i b Hnd Hi).
       rewrite /dv_of_D (Hhit i b Hi) //.
@@ -1114,7 +1114,7 @@ Proof.
   - intros k Hk. rewrite !fs_restrict_lookup.
     destruct (decide (k ∈ fs_home_set cov ls)) as [Hin|Hin]; [|reflexivity].
     rewrite Hmiss; [reflexivity|]. intros ->. apply Hk.
-    eapply elem_of_list_lookup_2. exact Hi.
+    eapply list_elem_of_lookup_2. exact Hi.
 Qed.
 
 (* (4) CLEAR -- write_head storing a header with n = 0 once every logged
@@ -1826,18 +1826,18 @@ Section fs_crash.
       (dk : Z -> bv 8) (g'' : nat) : iProp Σ :=
     (∃ (E'' : riscvEraGS) (M : log_mirror),
        fs_era_reg γs g'' E'' ∗ fs_started γs g'' ∗
-       ghost_var (era_mirror_name E'') (1/2) M ∗
+       ghost_var_frac (era_mirror_name E'') (1/2) M ∗
        ⌜log_mirror_ok M (fs_blocks dk) cov ls⌝)%I.
 
   Definition fs_arm (γs : fs_crash_names) (cov : gset Z) (ls : Z)
       (dk : Z -> bv 8) : iProp Σ :=
     (∃ c : nat,
-       mono_nat_auth_own (fcn_swap γs) 1 c ∗
+       mono_nat_auth_own_frac (fcn_swap γs) 1 c ∗
        (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs cov ls dk g''))%I.
 
   (* the at-rest arm, as adequacy mints it *)
   Lemma fs_arm_at_rest γs cov ls dk :
-    mono_nat_auth_own (fcn_swap γs) 1 0%nat ⊢ fs_arm γs cov ls dk.
+    mono_nat_auth_own_frac (fcn_swap γs) 1 0%nat ⊢ fs_arm γs cov ls dk.
   Proof using .
     iIntros "Ha". rewrite /fs_arm. iExists 0%nat. iFrame "Ha". by iLeft.
   Qed.
@@ -1858,9 +1858,9 @@ Section fs_crash.
 
   Local Lemma fs_arm_le γs cov ls dk (g n c : nat) :
     n = (g + 1)%nat ->
-    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    mono_nat_auth_own_frac (fcn_start γs) 1 n -∗
     (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs cov ls dk g'') -∗
-    ⌜(c <= S g)%nat⌝ ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+    ⌜(c <= S g)%nat⌝ ∗ mono_nat_auth_own_frac (fcn_start γs) 1 n ∗
     (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs cov ls dk g'').
   Proof using .
     intros ->. iIntros "Hsa Hd".
@@ -1869,7 +1869,7 @@ Section fs_crash.
     iDestruct "Hc" as (g'') "[%Hc Hcust]".
     iDestruct (fs_custody_started with "Hcust") as "[#Hst Hcust]".
     rewrite /fs_started.
-    iDestruct (mono_nat_lb_own_valid with "Hsa Hst") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsa Hst") as %[_ Hle].
     iFrame "Hsa". iSplitR; [iPureIntro; lia|].
     iRight. iExists g''. iSplitR; [done|]. iExact "Hcust".
   Qed.
@@ -1891,10 +1891,10 @@ Section fs_crash.
     n = (g + 1)%nat ->
     log_mirror_ok M (fs_blocks dk') cov ls ->
     fs_era_reg γs g E -∗ fs_started γs g -∗
-    mono_nat_auth_own (fcn_start γs) 1 n -∗
-    ghost_var (era_mirror_name E) (1/2) M -∗
+    mono_nat_auth_own_frac (fcn_start γs) 1 n -∗
+    ghost_var_frac (era_mirror_name E) (1/2) M -∗
     fs_arm γs cov ls dk ==∗
-      fs_arm γs cov ls dk' ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+      fs_arm γs cov ls dk' ∗ mono_nat_auth_own_frac (fcn_start γs) 1 n ∗
       mono_nat_lb_own (fcn_swap γs) (S g).
   Proof using .
     intros Hn Hok. iIntros "#Hreg #Hst Hsa Hmir Harm".
@@ -1919,14 +1919,14 @@ Section fs_crash.
       (g : nat) (E : riscvEraGS) (n : nat) (M0 : log_mirror) :
     n = (g + 1)%nat ->
     fs_era_reg γs g E -∗ mono_nat_lb_own (fcn_swap γs) (S g) -∗
-    mono_nat_auth_own (fcn_start γs) 1 n -∗
-    ghost_var (era_mirror_name E) (1/2) M0 -∗
+    mono_nat_auth_own_frac (fcn_start γs) 1 n -∗
+    ghost_var_frac (era_mirror_name E) (1/2) M0 -∗
     fs_arm γs cov ls dk -∗
       ⌜log_mirror_ok M0 (fs_blocks dk) cov ls⌝ ∗
-      mono_nat_auth_own (fcn_start γs) 1 n ∗
+      mono_nat_auth_own_frac (fcn_start γs) 1 n ∗
       (∀ (dk' : Z -> bv 8) (M' : log_mirror),
          ⌜log_mirror_ok M' (fs_blocks dk') cov ls⌝ ==∗
-           fs_arm γs cov ls dk' ∗ ghost_var (era_mirror_name E) (1/2) M').
+           fs_arm γs cov ls dk' ∗ ghost_var_frac (era_mirror_name E) (1/2) M').
   Proof using .
     intros Hn. iIntros "#Hreg #Hswlb Hsa Hmir Harm".
     rewrite {1}/fs_arm. iDestruct "Harm" as (c) "[Hc Hrest]".
@@ -1934,7 +1934,7 @@ Section fs_crash.
     iDestruct (fs_arm_le γs cov ls dk g n c Hn with "Hsa Hrest")
       as "(%Hup & Hsa & Hrest)".
     (* BELOW: our own swap receipt says it is at least ours *)
-    iDestruct (mono_nat_lb_own_valid with "Hc Hswlb") as %[_ Hlow].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hc Hswlb") as %[_ Hlow].
     (* so the at-rest arm is refuted and the generations coincide *)
     destruct c as [|c']; [exfalso; lia|].
     iDestruct "Hrest" as "[%Hc0 | Hc2]"; [discriminate|].
@@ -2108,7 +2108,7 @@ Section fs_crash.
       apply elem_of_singleton. reflexivity. }
     assert (Hslot : forall i, (i < LOGBLOCKS)%nat -> log_slot_bno ls i ∈ log_region_set ls).
     { intros i Hi. rewrite /log_region_set. apply elem_of_union. left.
-      apply elem_of_list_to_set. apply elem_of_list_fmap. exists i.
+      apply elem_of_list_to_set. apply list_elem_of_fmap. exists i.
       split; [reflexivity |]. apply elem_of_seq. lia. }
     rewrite /P_fs_rec_named_at. iIntros "H". iDestruct "H" as (γs) "[%Hseq H]".
     iExists γs. iSplitR; [iPureIntro; exact Hseq|].
@@ -2176,7 +2176,7 @@ Section fs_crash.
     iDestruct (fs_hist_valid with "Hauth Hlb") as %[k Hk].
     iPureIntro. exists r. split; [exact Hwf|].
     rewrite Hk -app_assoc elem_of_app elem_of_app.
-    right. left. apply elem_of_list_singleton. reflexivity.
+    right. left. apply list_elem_of_singleton. reflexivity.
   Qed.
 
   (* ==================================================================== *)
@@ -2393,15 +2393,15 @@ Section fs_crash.
       (E : riscvEraGS) (gen : nat) (I : gmap Z FsNode.fs_node) :
     gen ↪[γreg]□ E -∗
     mono_nat_lb_own γst (S gen) -∗
-    mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+    mono_nat_auth_own_frac γst 1 (gen + 1)%nat -∗
     disk_img_auth_sized γd N dk -∗
-    ghost_var (era_mirror_name E) 1 (mirror_of (fs_blocks dk)) -∗
+    ghost_var_frac (era_mirror_name E) 1 (mirror_of (fs_blocks dk)) -∗
     snap_guest gt I -∗
     ▷ P_fs_named_at gt γd N γsw γreg γst cov ls ==∗
-      ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+      ◇ (mono_nat_auth_own_frac γst 1 (gen + 1)%nat ∗
          disk_img_auth_sized γd N dk ∗
          ▷ P_fs_named_at gt γd N γsw γreg γst cov ls ∗
-         ghost_var (era_mirror_name E) (1/2) (mirror_of (fs_blocks dk)) ∗
+         ghost_var_frac (era_mirror_name E) (1/2) (mirror_of (fs_blocks dk)) ∗
          mono_nat_lb_own γsw (S gen) ∗
          snap_guest gt I ∗
          (* ...AND THE EPOCH, LENT (durable-disk BT-2).  The record keeps
@@ -2522,7 +2522,7 @@ Section fs_crash.
        the one producer that can build one from bytes (the image), with the
        guest half of its map *)
     (⊢ |==> ∃ gt : gname, P_dur_at gt D0 ∗ snap_guest gt (fss_inodes S0)) ->
-    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ (γs : fs_crash_names) (gt : gname),
+    mono_nat_auth_own_frac γsw 1 0%nat ⊢ |==> ∃ (γs : fs_crash_names) (gt : gname),
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
       P_fs_at gt γs cov logstart dk0 ∗ snap_guest gt (fss_inodes S0) ∗
       fs_receipt γs D0.
@@ -2785,7 +2785,7 @@ Section fs_crash_seam.
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
     { rewrite Hsw. iExact "Hswlb". }
-    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    iAssert (mono_nat_auth_own_frac (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
     { rewrite Hstn. iExact "Hsa". }
     iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
                  with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
@@ -2855,7 +2855,7 @@ Section fs_crash_seam.
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
     { rewrite Hsw. iExact "Hswlb". }
-    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    iAssert (mono_nat_auth_own_frac (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
     { rewrite Hstn. iExact "Hsa". }
     iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
                  with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
@@ -2988,7 +2988,7 @@ Section fs_crash_seam.
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
     { rewrite Hsw. iExact "Hswlb". }
-    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    iAssert (mono_nat_auth_own_frac (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
     { rewrite Hstn. iExact "Hsa". }
     iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
                  with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
@@ -3130,7 +3130,7 @@ Section fs_crash_seam.
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
     { rewrite Hsw. iExact "Hswlb". }
-    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    iAssert (mono_nat_auth_own_frac (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
     { rewrite Hstn. iExact "Hsa". }
     iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M0 Hn1
                  with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
@@ -3168,7 +3168,7 @@ Section fs_crash_seam.
         intros j b Hjb. rewrite Hdkh /= in Hjb.
         assert (Hbc : b ∈ cov /\ b ∉ log_region_set ls /\ b <> FsImg.SB_BNO).
         { apply Hhome. rewrite Hdkh /=.
-          exact (elem_of_list_lookup_2 _ _ _ Hjb). }
+          exact (list_elem_of_lookup_2 _ _ _ Hjb). }
         assert (Hbhome : b ∈ fs_home_set cov ls)
           by (rewrite /fs_home_set elem_of_difference; tauto).
         apply fs_restrict_lookup_Some. split; [exact Hbhome|].

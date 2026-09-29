@@ -90,7 +90,7 @@ Section perm.
      die unconsumed. *)
   Definition perm_inv_body (gd : nat) (γP : gname) : iProp Σ :=
     (∃ m : gmap nat (bool * gname * (disk_wr * gset nat)),
-       ghost_map_auth γP 1 m ∗
+       ghost_map_auth_frac γP 1 m ∗
        [∗ map] k ↦ x ∈ m, perm_slot gd x.1.1 x.1.2 x.2.1 x.2.2)%I.
 
   (* Disjoint from [crashN] (= [nroot .@ "crash"]) and from every

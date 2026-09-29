@@ -347,7 +347,7 @@ Section ProofFdalloc.
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HT3sp).
-    iDestruct (stack_own_4_intro sp0 ra0 s00 s10 gapv with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 s10 gapv with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x2e))
               (mword_of_int 2 : mword 6) T3 (av - 4)%nat 4 b Hpop

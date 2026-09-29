@@ -368,7 +368,7 @@ Proof.
      the resumer's own record ("Hrec") is that hart's parked scheduler --
      and a dispatching scheduler always leaves one, so [backr] is [true] and
      "Hrec" is a record rather than bare cells. *)
-  iDestruct (p_sched_at_proc γs h A' j cret _ (proc_addr j) backr Hj with "Hpay")
+  iDestruct (p_sched_at_proc (XI := XIc) γs h A' j cret _ (proc_addr j) backr Hj with "Hpay")
     as "(%Htp & %Hcret & %Hpj & %HA & %Hbackr & Htc & Hrest)".
   iDestruct "Hrest" as (γl ch) "(%Hgl & Hheld & Htag)".
   subst cret A' backr.

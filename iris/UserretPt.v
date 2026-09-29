@@ -53,13 +53,13 @@ Proof.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12 in Hx.
   unfold zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (44 + 12)) (44 + 12)) as [e | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e)).
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.

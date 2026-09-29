@@ -401,7 +401,7 @@ Definition lelem (c : ctyUR) (r : nat) : linkElemUR := lelemf c r None.
 
    The repair is to make the ENTRY SLEEPLOCK's own resource carry the answer.
    [IcacheEscrow.ic_tok] used to be [WpLock.lock_tok_excl]; it becomes
-   [ghost_var _ 1 DepNone], still exclusive at fraction one (so the sleeplock
+   [ghost_var_frac _ 1 DepNone], still exclusive at fraction one (so the sleeplock
    and its [ic_tok_exclusive] are unchanged), and the checkout UPDATES it to
    the descriptor of what it is depositing and splits ½ into the arm, keeping
    ½.  At the park the two halves meet and [ghost_var_agree] pins the KIND,
@@ -757,7 +757,7 @@ Class icfg := MkIcfg {
      no threaded name could reach both ends.  The AUTHORITY is a conjunct of
      [IcacheEscrow.ipool_body]; the element ALONE locates the row, which is
      the whole reason the ledger is a [ghost_map] and not [ipool_tkey]'s
-     paired [ghost_var] (the deposit holds neither half of
+     paired [ghost_var_frac] (the deposit holds neither half of
      [icfg_pext]). *)
   icfg_pcrp : gname;
   (* A6.145 (tso-flip, the icache pinw restructure): two per-slot [mono_nat]
@@ -924,7 +924,7 @@ Proof. apply hpn_seq_valid. Qed.
    result lands on [InodeRegion]'s own key. *)
 Lemma iep_fun_alloc `{!riscvGS Σ} (n j : nat) :
   ⊢ |==> ∃ f : Z -> gname,
-    [∗ list] k ∈ seq j n, mono_nat_auth_own (f (Z.of_nat k)) 1 0.
+    [∗ list] k ∈ seq j n, mono_nat_auth_own_frac (f (Z.of_nat k)) 1 0.
 Proof.
   iInduction n as [|n IH] forall (j).
   { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
@@ -942,7 +942,7 @@ Qed.
 (* the A6.145 slot families: [iep_fun_alloc] at [nat] keys *)
 Lemma mono_slot_fun_alloc `{!riscvGS Σ} (n j : nat) :
   ⊢ |==> ∃ f : nat -> gname,
-    [∗ list] k ∈ seq j n, mono_nat_auth_own (f k) 1 0.
+    [∗ list] k ∈ seq j n, mono_nat_auth_own_frac (f k) 1 0.
 Proof.
   iInduction n as [|n IH] forall (j).
   { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
@@ -1001,9 +1001,9 @@ Local Lemma icfg_box_fun_alloc {Σ} `{!icboxG Σ, !kallocG Σ} (n j : nat) :
   ⊢ |==> ∃ f : nat -> box_names,
       [∗ list] k ∈ seq j n,
         own (bx_stamps (f k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (f k)) 1 0%nat ∗
-        ghost_var (bx_slotd (f k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-        ghost_var (bx_slotp (f k)) 1 (inhabitant : l2_reg ic_bid).
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (f k)) (DfracOwn 1) 0%nat ∗
+        ghost_var_frac (bx_slotd (f k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var_frac (bx_slotp (f k)) 1 (inhabitant : l2_reg ic_bid).
 Proof.
   iInduction n as [|n IH] forall (j).
   { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
@@ -1050,37 +1050,37 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !offbox
          holds [g0] only as a [to_agree] VALUE inside [live_boot_map]). *)
       own icfg_boot (Cinl (Excl ()) : ityR) ∗
       ([∗ list] k ∈ seq 0 (16 * nib),
-         mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0) ∗
+         mono_nat_auth_own_frac (icfg_iep (Z.of_nat k)) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       (* A6.145: the epoch floors and cell stamps, at 0 (no slot armed) *)
-      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_ieplo k) 1 0) ∗
-      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_ieplo k) 1 0) ∗
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) ∗
       (* R3: the box ghosts, whole, at their boot values -- IcacheBoot builds
          the boxes into them (CtxBox.box_alloc_at) *)
       ([∗ list] k ∈ seq 0 NINODE,
          own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-         ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-         ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-         ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
+         ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+         ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+         ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) ∗
       (* OPTION A (option 1, in-body registry): the escrow registry's auth,
          handed out EMPTY.  [ireg_alloc] populates it over every inum (dummy
          escrow gnames; the reordered-iput walk re-mints real ones at deposit)
          and parks the whole thing inside [ireg_body], where [reg_full]
          refutes [ireg_claim_au]'s pending arm with no premise. *)
-      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)) ∗
+      ghost_map_auth_frac icfg_reg 1 (∅ : gmap Z (gname * gname)) ∗
       (* THE LOCKED REGISTRY's auth, handed out EMPTY: at boot no
          transaction exists, so no inum's row is suspended (durable-disk
          lane A).  [InodeRegion.ftop_alloc] takes it. *)
-      ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ∗
+      ghost_map_auth_frac icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ∗
       (* THE FREE POOL'S RESIDENCY KEY, WHOLE and at the empty set: at this
          altitude no pool exists yet.  [IcacheBoot.icache_boot_at] is what
          updates it to the region's inums, splits it, and puts one half
          inside the pool invariant it allocates. *)
-      ghost_var icfg_pool 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pool 1 (∅ : gset Z) ∗
       (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), WHOLE and empty:
          at this altitude no pool exists, so nothing is in transit either. *)
-      ghost_var icfg_pext 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pext 1 (∅ : gset Z) ∗
       (* THE LOCK-WINDOW PIN's boot map (durable-disk B''-tx5), minted here
          and NOT an argument: its contents are a fact this file knows in full
          -- one whole element per SLOT at [None], "no slot is inside one of
@@ -1089,12 +1089,12 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ, !icboxG Σ, !offbox
       own icfg_hpn hpn_boot_map ∗
       (* ...AND THE TRANSIT LEDGER (durable-disk C-4), WHOLE and empty: no
          walk exists yet, so nothing is in transit. *)
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
       (* ...AND THE CORPSE LEDGER (durable-disk C-7), WHOLE and EMPTY: no
          walk exists yet, so no inum's deposit is outstanding.  The image has
          no corpses either -- [IcacheBoot.icache_boot_at] hands this straight
          to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
       (* the off box's set names, empty (r25 shapes): the auths go into
          [ic_slp] at IcacheBoot *)
       ([∗ list] k ∈ seq 0 NINODE, own (icfg_off k) (● (∅ : gsetUR box_names))).

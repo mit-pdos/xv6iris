@@ -175,7 +175,7 @@ Lemma uM_fold_is_Some (a : Z) (v : mword 64) (l : list nat)
 Proof.
   induction l as [ | x xs IH ]; cbn [foldr]; [ tauto | ].
   intro H. destruct (decide (k = a + Z.of_nat x)) as [-> | Hne].
-  - rewrite lookup_insert. exact (mk_is_Some _ _ eq_refl).
+  - rewrite lookup_insert_eq. exact (mk_is_Some _ _ eq_refl).
   - rewrite lookup_insert_ne; [ apply IH; exact H | congruence ].
 Qed.
 
@@ -197,7 +197,7 @@ Lemma uM_fold_lookup (a : Z) (v : mword 64) (l : list nat)
 Proof.
   induction l as [ | x xs IH ]; cbn [foldr]; [ intros [] | ].
   intro Hin. destruct (decide (j = x)) as [-> | Hne].
-  - apply lookup_insert.
+  - apply lookup_insert_eq.
   - rewrite lookup_insert_ne; [ | intro He; apply Hne; lia ].
     apply IH. destruct Hin as [-> | Hin]; [ exfalso; exact (Hne eq_refl) | exact Hin ].
 Qed.
@@ -272,7 +272,7 @@ Proof.
   unfold uM_store8, uM_store. change (Z.to_nat 8) with 8%nat. cbn [seq foldr].
   split_and!;
     repeat (rewrite lookup_insert_ne; [ | lia ]);
-    apply lookup_insert.
+    apply lookup_insert_eq.
 Qed.
 
 Lemma uM_store8_bytes (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
@@ -440,8 +440,8 @@ Proof.
   pose proof (uva_inj_dom pt M (<[key := b]> M) (eq_sym Hd) Hinj) as Hinj'.
   apply map_eq. intro x.
   destruct (decide (x = uva_pa pt key)) as [-> | Hne].
-  - rewrite lookup_insert.
-    exact (upa_map_lookup pt (<[key := b]> M) key b Hinj' (lookup_insert _ _ _)).
+  - rewrite lookup_insert_eq.
+    exact (upa_map_lookup pt (<[key := b]> M) key b Hinj' (lookup_insert_eq _ _ _)).
   - rewrite (lookup_insert_ne _ _ x b (fun H => Hne (eq_sym H))).
     destruct (upa_map pt M !! x) as [c | ] eqn:Hx2.
     + rewrite Hx2.

@@ -172,14 +172,14 @@ Lemma wl_line_byte_val (ws : list (list (bv 8))) (b : bv 8) :
 Proof.
   intros Hwf Hb. rewrite /wl_line in Hb.
   apply elem_of_app in Hb as [Hb | Hb].
-  - apply elem_of_list_lookup_1 in Hb as [i Hi].
+  - apply list_elem_of_lookup_1 in Hb as [i Hi].
     destruct (Forall_lookup_1 _ _ _ _ (wl_body_bytes ws Hwf) Hi)
       as [[H | [H | H]] | ->].
     + right. right. by left.
     + right. right. right. by left.
     + right. right. right. by right.
     + right. left. exact wl_sp_val.
-  - apply elem_of_list_singleton in Hb as ->. left. exact wl_nl_val.
+  - apply list_elem_of_singleton in Hb as ->. left. exact wl_nl_val.
 Qed.
 
 (* ...AND ITS POSITIONAL HALF: the ONLY newline is the last byte, which is
@@ -827,7 +827,7 @@ Qed.
 Lemma wl_nonl_of_body_bytes (l : list (bv 8)) :
   Forall wl_body_byte l -> wl_nl ∉ l.
 Proof.
-  intros Hl Hin. apply elem_of_list_lookup_1 in Hin as [i Hi].
+  intros Hl Hin. apply list_elem_of_lookup_1 in Hin as [i Hi].
   exact (wl_body_byte_not_nl (Forall_lookup_1 _ _ _ _ Hl Hi)).
 Qed.
 
@@ -1142,7 +1142,7 @@ Proof. rewrite /nlines. apply prefix_length, bodies_of_app. Qed.
 Lemma nlines_app_nl_lt (I k : list (bv 8)) :
   wl_nl ∈ k -> nlines I < nlines (I ++ k).
 Proof.
-  intro Hin. apply elem_of_list_split in Hin as (k1 & k2 & ->).
+  intro Hin. apply list_elem_of_split in Hin as (k1 & k2 & ->).
   assert (Hs : I ++ k1 ++ wl_nl :: k2 = ((I ++ k1) ++ [wl_nl]) ++ k2)
     by (rewrite -!app_assoc; reflexivity).
   rewrite Hs.
@@ -1473,7 +1473,7 @@ Lemma wl_raw_line_not_prefix_nonl (l t r : list (bv 8)) :
   wl_nl ∉ r -> l ++ wl_nl :: t `prefix_of` r -> False.
 Proof.
   intros Hr [k Hk]. rewrite Hk in Hr. apply Hr.
-  apply elem_of_app. left. apply elem_of_app. right. apply elem_of_list_here.
+  apply elem_of_app. left. apply elem_of_app. right. apply list_elem_of_here.
 Qed.
 
 (* ...so a newline-free prefix of a line stops inside the body *)
@@ -1485,7 +1485,7 @@ Proof.
     destruct r as [| b r']; [apply prefix_nil |].
     exfalso. apply Hr.
     assert (Hba : b = wl_nl) by (apply prefix_cons_inv_1 in Hp; exact Hp).
-    rewrite Hba. apply elem_of_list_here.
+    rewrite Hba. apply list_elem_of_here.
   - change ((a :: l') ++ wl_nl :: t) with (a :: (l' ++ wl_nl :: t)) in Hp.
     destruct r as [| b r']; [apply prefix_nil |].
     assert (Hba : b = a) by (apply prefix_cons_inv_1 in Hp; exact Hp).
@@ -1754,9 +1754,9 @@ Lemma wl_line_byte_val_fn (ws : list (list (bv 8))) (b : bv 8) :
 Proof.
   intros Hwf Hin. rewrite /wl_line in Hin.
   apply elem_of_app in Hin as [Hin | Hin].
-  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+  - apply list_elem_of_lookup_1 in Hin as [i Hi].
     destruct (Forall_lookup_1 _ _ _ _ (wl_body_bytes_fn ws Hwf) Hi) as [Hb | ->].
     + apply fn_byte_val in Hb. tauto.
     + rewrite wl_sp_val. tauto.
-  - apply elem_of_list_singleton in Hin as ->. rewrite wl_nl_val. tauto.
+  - apply list_elem_of_singleton in Hin as ->. rewrite wl_nl_val. tauto.
 Qed.

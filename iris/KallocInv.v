@@ -28,14 +28,14 @@
 
      kalloc_avail γk (Some n)  -- boot mode: an EXCLUSIVE token asserting the
         free list holds exactly [n] pages.  It is a one-shot "pending" token
-        [kalloc_pending] plus half of a ghost_var whose other half sits inside
+        [kalloc_pending] plus half of a ghost_var_frac whose other half sits inside
         the lock invariant.  While anyone holds it, NO other thread can call
         kalloc/kfree at all (a [None]-mode call needs the sealed witness below,
         which cannot coexist with pending) -- formalizing "no concurrency
         during early boot".  With [Some (S k)], kalloc CANNOT return null.
      kalloc_avail γk None      -- steady state: the one-shot has fired; a
         PERSISTENT witness [kalloc_sealed] with no count.  The lock invariant
-        drops its ghost_var half at the next lock acquisition (the auth is a
+        drops its ghost_var_frac half at the next lock acquisition (the auth is a
         disjunction), the exact count is forgotten forever, and kalloc may
         fail.  [kalloc_avail_seal] converts [Some n ==∗ None]; there is no way
         back.
@@ -66,6 +66,7 @@ From iris.algebra.lib Require Import mono_list.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_var.
 From iris.program_logic Require Import weakestpre.
+From iris.program_logic Require Import language.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.
@@ -383,13 +384,13 @@ Section Kalloc.
      witness (steady state). *)
   Definition kalloc_avail (γk : gname * gname) (on : option nat) : iProp Σ :=
     match on with
-    | Some n => kalloc_pending γk.2 ∗ ghost_var γk.1 (1/2)%Qp n
+    | Some n => kalloc_pending γk.2 ∗ ghost_var_frac γk.1 (1/2)%Qp n
     | None   => kalloc_sealed γk.2
     end%I.
   Global Instance kalloc_avail_None_persistent γk : Persistent (kalloc_avail γk None).
   Proof using . apply _. Qed.
 
-  (* the invariant-side authority: while counting, the ghost_var's other half
+  (* the invariant-side authority: while counting, the ghost_var_frac's other half
      (tied to [length pages]); once the seal has fired, any lock holder may
      reclose into the count-free [sealed] arm -- and after the first such
      reclose the count is gone for good.
@@ -402,7 +403,7 @@ Section Kalloc.
     (∃ (γe : gname) (h : list kev),
         kalloc_ledname γk γe ∗ led_auth γe h ∗ ⌜(npages + allocs h = frees h)%nat⌝)%I.
   Definition kmem_avail_auth (γk : gname * gname) (npages : nat) : iProp Σ :=
-    ((ghost_var γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2) ∗ kmem_ledger γk npages)%I.
+    ((ghost_var_frac γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2) ∗ kmem_ledger γk npages)%I.
 
   Lemma kalloc_avail_alloc n :
     ⊢ |==> ∃ γk, kalloc_avail γk (Some n) ∗ kmem_avail_auth γk n.
@@ -464,7 +465,7 @@ Section Kalloc.
     iIntros "Hav [Hauth (%γe & %h & #Hn & Hled & %Htie)]".
     iMod (led_auth_grow γe h (KAlloc act) with "Hled") as "[Hled #Hlb]".
     iAssert (|==> kalloc_avail γk (avail_dec on) ∗
-               (ghost_var γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2))%I
+               (ghost_var_frac γk.1 (1/2)%Qp npages ∨ kalloc_sealed γk.2))%I
       with "[Hav Hauth]" as ">[Hav Hauth]".
     { destruct on as [n|]; cbn.
       - iDestruct "Hav" as "[Hp Hv]".
@@ -505,7 +506,7 @@ Section Kalloc.
     iIntros "Hav [Hauth (%γe & %h & #Hn & Hled & %Htie)]".
     iMod (led_auth_grow γe h (KFree act) with "Hled") as "[Hled #Hlb]".
     iAssert (|==> kalloc_avail γk (avail_inc on) ∗
-               (ghost_var γk.1 (1/2)%Qp (S npages) ∨ kalloc_sealed γk.2))%I
+               (ghost_var_frac γk.1 (1/2)%Qp (S npages) ∨ kalloc_sealed γk.2))%I
       with "[Hav Hauth]" as ">[Hav Hauth]".
     { destruct on as [n|]; cbn.
       - iDestruct "Hav" as "[Hp Hv]".

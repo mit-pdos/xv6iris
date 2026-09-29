@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# main only: when the commit went through with INTEGRITY_ALLOW=<fingerprint>, append the
+# approval and the approved BLOCKING findings to the message, so the history says what was waived.
+s="$(git rev-parse --show-toplevel)/tools/integrity/integrity.py"
+# a worktree of a commit that predates the tool (an upstream checkout, an old tag): nothing to gate
+[ -f "$s" ] || exit 0
+exec python3 "$s" hook commit-msg "$1"

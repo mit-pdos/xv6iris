@@ -139,7 +139,7 @@ Proof.
   apply bv_eq.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0%Z.
   rewrite Z.shiftr_0_r.
@@ -461,9 +461,9 @@ Proof using .
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -495,7 +495,7 @@ Proof using .
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
     iDestruct "Hpay" as (w) "(-> & -> & -> & HS)".
-    iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+    iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
     iSpecialize ("Hcont" $! CID with "[%]"); [ exact Hs | ].
     iApply ("Hcont" $! w with "Hcg' Hpc' HS").
 Qed.
@@ -744,9 +744,9 @@ Proof using .
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -770,7 +770,7 @@ Proof using .
     iFrame "Hfile HS". iPureIntro. split_and!; reflexivity.
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
-    iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+    iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
     iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
 Qed.
 

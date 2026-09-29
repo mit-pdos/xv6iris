@@ -766,7 +766,7 @@ Section WpSconfEngine.
     - (* the instruction *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       (* THE ONE RECONCILIATION, and the reason this engine exists: the walk
          answers the two source reads at the REBOUND hart, while [Hwval] names
          them at the entry hart.  At [b = true] [ops_ok] says neither source is
@@ -801,7 +801,7 @@ Section WpSconfEngine.
       iFrame "HP". done.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
       iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
   Qed.
 
@@ -1050,7 +1050,7 @@ Section WpSconfEngine.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iDestruct ("Hcmp" $! CID with "Hfile") as "[%Hc0 Hfile]".
       iApply (swp_mono (CID := CID) with "[Hsc Hcap HPC HnPC Hresv] [Hfile]");
         [| iApply (swp_execute_BTYPE_fall (CID := CID) imm rs2 rs1
@@ -1063,7 +1063,7 @@ Section WpSconfEngine.
       iExists (add_vec_int pc (if c then 2 else 4)), ms', m, n.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
     - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
@@ -1096,8 +1096,8 @@ Section WpSconfEngine.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-      iDestruct (hw_config_misa with "Hhw") as "#Hmisa".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
+      iDestruct (hw_config_misa (CID := CID) with "Hhw") as "#Hmisa".
       iDestruct ("Hcmp" $! CID with "Hfile") as "[%Hc0 Hfile]".
       iApply (swp_mono (CID := CID) with "[Hsc Hcap Hresv] [Hfile HPC HnPC]");
         [| iApply (swp_execute_BTYPE_taken (CID := CID) imm rs2 rs1
@@ -1111,7 +1111,7 @@ Section WpSconfEngine.
       iExists (add_vec pc (sign_extend' 64 imm)), ms', m, n.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
     - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 
@@ -1162,7 +1162,7 @@ Section WpSconfEngine.
       iExists npc, ms', m', n'.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile HP". done.
     - iIntros (npc2 ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
   Qed.
 
@@ -1174,7 +1174,7 @@ Section WpSconfEngine.
       (cur_privilege ↦ᵣ Supervisor -∗ menvcfg ↦ᵣ MENVCFG_S -∗ sconf).
   Proof using .
     iIntros "(#Hhw & #Hminv & Hpriv & Hms & Hmie & Hmenvx)".
-    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     iDestruct (hw_config_misa with "Hhw") as "#Hmisa".
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hval)".

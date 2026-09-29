@@ -93,8 +93,7 @@ Lemma bal_sraiw_div (w : mword 32) (sh : mword 5) (k : Z) :
 Proof.
   intros Hsh Hk Hw. pose proof (bal_unsigned32 w) as Hr.
   apply bv_eq.
-  unfold shift_bits_right_arith, arith_shiftr, SailStdpp.Values.with_word,
-         get_word, MachineWord.MachineWord.arith_shift_right.
+  unfold shift_bits_right_arith, arith_shiftr, MachineWord.MachineWord.arith_shift_right.
   rewrite bv_ashiftr_unsigned.
   assert (Hn : bv_unsigned (MachineWord.MachineWord.N_to_word
                  (MachineWord.MachineWord.Z_idx 32)
@@ -251,7 +250,7 @@ Lemma bal_zext8_unsigned (v : mword 8) :
   bv_unsigned (zero_extend' 64 v : mword 64) = bv_unsigned v.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Values.to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned. reflexivity.
   first [ lia | vm_compute; discriminate | done ].
 Qed.
@@ -303,8 +302,8 @@ Proof.
   intro Hbi. apply bv_eq.
   unfold trunc8. rewrite autocast_id.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   rewrite or_vec64_unsigned bal_zext8_unsigned (bal_mask_unsigned bi Hbi).

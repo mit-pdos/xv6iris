@@ -94,7 +94,7 @@ Lemma union_disc_snoc_ncr (I : list (bv 8)) (b : bv 8) :
 Proof using.
   intros Hd.
   assert (Hin : b ∈ (I ++ [b])%list).
-  { apply elem_of_app. right. by apply elem_of_list_singleton. }
+  { apply elem_of_app. right. by apply list_elem_of_singleton. }
   pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_on) (I ++ [b])%list b Hd Hin)
     as Hv.
   lia.

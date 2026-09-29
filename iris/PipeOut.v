@@ -85,7 +85,7 @@ Local Open Scope list_scope.
 Record pipe_era := MkPEra {
   pe_blk : gname;   (* mono_list (bv 8), carried at [EchoOut.eo_El]'s camera:
                        the era's process bytes in wire order *)
-  pe_cur : gname;   (* ghost_var (nat * gname * bool): THE ROUND IN PROGRESS
+  pe_cur : gname;   (* ghost_var_frac (nat * gname * bool): THE ROUND IN PROGRESS
                        -- its index, its own block ledger's gname, and the
                        TERMINAL FLAG (lane PIPE-STAGE-4, design SS4.3m).  One half is
                        in the claim and one in the round's family, so
@@ -394,7 +394,7 @@ Section pipe_ledger.
      at a terminal round (the filer has to present [tm = false]) and so
      makes the claim's resolution FREEZABLE there. *)
   Definition cur_half (w : pipe_era) (q : Qp) (r : nat) (gb : gname)
-      (tm : bool) : iProp Σ := ghost_var (pe_cur w) q (r, gb, tm).
+      (tm : bool) : iProp Σ := ghost_var_frac (pe_cur w) q (r, gb, tm).
 
   Global Instance cur_half_timeless w q r gb tm :
     Timeless (cur_half w q r gb tm).
@@ -468,7 +468,7 @@ Section pipe_ledger.
   (* the map, and its two moves -- [FileOut.f0_map] verbatim *)
   Definition pera_map (h : list mobs) : iProp Σ :=
     (∃ M : gmap nat pipe_era,
-       ghost_map_auth (pgn_era g) 1 M ∗ ⌜pin_dom M (obs_boots h)⌝)%I.
+       ghost_map_auth_frac (pgn_era g) 1 M ∗ ⌜pin_dom M (obs_boots h)⌝)%I.
 
   Global Instance pera_map_timeless h : Timeless (pera_map h).
   Proof using . rewrite /pera_map. apply _. Qed.
@@ -759,7 +759,7 @@ Section pipe_out.
   (* ====================================================================== *)
 
   Definition pipe_led (h : list mobs) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint γ) 1
+    (mono_nat_auth_own_frac (eg_taint γ) 1
        (if decide (disc_p h) then 0%nat else 1%nat)
      ∗ pin_map γ h
      ∗ pera_map g h

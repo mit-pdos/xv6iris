@@ -2084,7 +2084,7 @@ Section SealUvmunmap.
           assert (Habs : um_del_run P.(ud_um) vpn0 k !! vpn_at vpn0 k = None).
           { assert (Hd : delete (vpn_at vpn0 k) (um_del_run P.(ud_um) vpn0 k)
                          = um_del_run P.(ud_um) vpn0 k) by exact Heq.
-            rewrite <- Hd. apply lookup_delete. }
+            rewrite <- Hd. apply lookup_delete_eq. }
           rewrite Hveq in Hl0. rewrite Habs in Hl0. discriminate.
         - apply HliveZ. rewrite Nat2Z.inj_mul. lia. }
       assert (Hid : umem_write M (bv_unsigned va) (4096 * S k)%nat

@@ -183,7 +183,7 @@ Section KexecDName.
     bv_unsigned (zero_extend' 64 v : mword 64) = bv_unsigned v.
   Proof using .
     cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-         Values.to_word get_word MachineWord.MachineWord.zero_extend].
+         MachineWord.MachineWord.zero_extend].
     rewrite bv_zero_extend_unsigned. reflexivity.
     first [ lia | vm_compute; discriminate | done ].
   Qed.
@@ -670,7 +670,7 @@ Section KexecDCommit.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word_pointsto_bytes (KTR := KT1) with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
@@ -715,7 +715,7 @@ Section KexecDCommit.
   Lemma kxd_tf_swap (ws : list (mword 64)) (a b : mword 64) :
     <[kxc_tf_sp_idx := b]> (<[tf_epc_idx := a]> ws)
     = <[tf_epc_idx := a]> (<[kxc_tf_sp_idx := b]> ws).
-  Proof using . apply list_insert_commute. unfold kxc_tf_sp_idx, tf_epc_idx. lia. Qed.
+  Proof using . apply list_insert_insert_ne. unfold kxc_tf_sp_idx, tf_epc_idx. lia. Qed.
 
   (* the two accessor closes that touch only the trapframe words, folded to
      the one-field update [upd_tf] the commit block reasons over. *)
@@ -887,6 +887,7 @@ Section KexecDCommit.
   Lemma kxd_sp_le_top (top : Z) (len : nat -> nat) (i : nat) :
     kxc_sp top len i <= top.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     induction i as [| i IH].
     - change (kxc_sp top len 0) with top. lia.
     - rewrite kxd_sp_S. unfold kxc_round16.

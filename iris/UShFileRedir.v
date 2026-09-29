@@ -186,7 +186,7 @@ Section UShFileRedir.
     iDestruct "Hp" as ">Hp".
     iDestruct (AppFileCons.file_deed_inum_acc (fgn_cl g) r _
                  (<[nm := (i, [])]> s) nm i []
-                 (lookup_insert _ _ _)
+                 (lookup_insert_eq _ _ _)
                  ltac:(cbn [length]; rewrite /EchoDisc.line_max; lia)
                  with "Hd Hp") as "(Hp & Hd & Hres)".
     iMod ("Hclose" with "[Hka Hp]") as "_".
@@ -273,7 +273,7 @@ Section UShFileRedir.
       (np : nat)
       (ls : list fl_line) (ws : wordline) (jo : option Z) (nm : list (bv 8)) :
     FileDisc.uname nm ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws nm) -> np = length ls -> EchoDisc.line_ok ws ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws nm) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ file_cons_cred (fgn_cl g) r jo -∗ fl_lb (fgn_cl g) ls -∗
     (* ...AND THE CWD'S CAMERA IS PINNED TOO (the PROGRAM STREAM's rule,
        one class further out than the deposit): [UserCwd.ucwd] takes a

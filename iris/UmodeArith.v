@@ -173,7 +173,7 @@ Proof.
   intro Hlt.
   apply bv_eq.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   unfold bv_signed, bv_swrap, bv_wrap.
   assert (Eh32 : bv_half_modulus 32 = Z31) by (vm_compute; reflexivity).
@@ -251,7 +251,7 @@ Proof.
   change (Z.sub log2_xlen 1) with 5.
   rewrite (subrange_dec_unsigned_lo0 (mword_of_int sh : mword 6) 5 64
              ltac:(lia) ltac:(vm_compute; reflexivity)).
-  unfold mword_of_int, Values.to_word, get_word. cbn.
+  unfold mword_of_int. cbn.
   rewrite Z_to_bv_unsigned. unfold bv_wrap.
   assert (E6 : bv_modulus 6 = 64) by (vm_compute; reflexivity).
   rewrite E6. rewrite (Z.mod_small sh 64 H). apply Z.mod_small. exact H.
@@ -293,8 +293,7 @@ Proof.
   unfold shift_bits_left.
   rewrite (shift_amount sh Hsh).
   apply bv_eq.
-  unfold shiftl, SailStdpp.Values.with_word,
-    SailStdpp.Values.get_word, MachineWord.MachineWord.logical_shift_left.
+  unfold shiftl, MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   rewrite (nw_unsigned sh Hsh).
   rewrite !moi_unsigned. unfold bv_wrap. rewrite Zmod64.
@@ -312,8 +311,7 @@ Proof.
   unfold shift_bits_right.
   rewrite (shift_amount sh Hsh).
   apply bv_eq.
-  unfold shiftr, SailStdpp.Values.with_word,
-    SailStdpp.Values.get_word, MachineWord.MachineWord.logical_shift_right.
+  unfold shiftr, MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   rewrite (nw_unsigned sh Hsh).
   rewrite !moi_unsigned.
@@ -394,10 +392,10 @@ Lemma zext8_unsigned (b : mword 8) :
 Proof.
   unfold zero_extend'.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.
@@ -473,7 +471,7 @@ Lemma sext6_12_64 (imm : mword 6) :
 Proof.
   apply bv_eq.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite !bv_sign_extend_unsigned.
   rewrite (bv_sign_extend_signed 12 imm ltac:(vm_compute; discriminate)).
   reflexivity.

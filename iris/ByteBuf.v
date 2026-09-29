@@ -277,7 +277,7 @@ Qed.
 Lemma bb_uint32 (a : mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -537,7 +537,7 @@ Section ByteBuf.
       + destruct (Nat.eq_dec start start) as [_ | Hne]; [iExact "Hh" | done].
       + iApply (big_sepL_impl with "Ht"). iIntros "!>" (k y Hy) "H".
         destruct (Nat.eq_dec y start) as [He | _].
-        * exfalso. apply elem_of_list_lookup_2 in Hy. apply elem_of_seq in Hy. lia.
+        * exfalso. apply list_elem_of_lookup_2 in Hy. apply elem_of_seq in Hy. lia.
         * iExact "H".
   Qed.
 

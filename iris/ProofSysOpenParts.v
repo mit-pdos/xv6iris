@@ -345,7 +345,7 @@ Lemma so_sext16_inj `{XI : CurCtx} (x y : mword 16) :
 Proof.
   intros H. apply (f_equal bv_signed) in H.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+       MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H;
     [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.
@@ -358,7 +358,7 @@ Proof.
   intro Hn.
   apply bv_eq.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   assert (Hs : bv_signed (mword_of_int n : mword 16) = n).
   { unfold bv_signed.
@@ -412,10 +412,10 @@ Proof.
   rewrite uint_unsigned.
   unfold zero_extend'.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word SailStdpp.Values.with_word
+       
        autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.
@@ -502,7 +502,7 @@ Lemma so_sext32_inj `{XI : CurCtx} (x y : mword 32) :
 Proof.
   intros H. apply (f_equal bv_signed) in H.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+       MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H;
     [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.
@@ -1267,7 +1267,7 @@ Section ProofSysOpenFrame.
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
   Proof using .
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iIntros "H".    iDestruct (ctx_word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iIntros "H".    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "H") as "[Hlo Hhi]".
     iFrame "Hlo Hhi".
   Qed.
 
@@ -1277,7 +1277,7 @@ Section ProofSysOpenFrame.
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
   Proof using .
     intro Hal. iIntros "Hlo Hhi".
-    iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal with "Hlo Hhi").
+    iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal with "Hlo Hhi").
   Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak

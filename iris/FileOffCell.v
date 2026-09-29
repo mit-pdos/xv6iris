@@ -109,7 +109,7 @@ Section FileOffCell.
      or -- once a fire has run at a HELD row with no link -- the
      application's taint and NO GHOST AT ALL, permanently.  The CELL is
      kept in both arms (the store [f->off += r] needs it); only the tie to
-     the shadow is dropped, and a [ghost_var] half cannot be re-minted at
+     the shadow is dropped, and a [ghost_var_frac] half cannot be re-minted at
      an existing name. *)
   Definition off_resident (γo : gname) (k : nat) : iProp Σ :=
     (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝ ∗ off_link γo (bv_unsigned v))%I.

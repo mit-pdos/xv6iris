@@ -628,7 +628,7 @@ Section ProofMainSecondary.
     pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs_raw -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□

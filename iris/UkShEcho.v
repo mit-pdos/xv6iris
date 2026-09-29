@@ -537,6 +537,7 @@ Section UkShEcho.
     ∗ ush_str gd (UArg (s0 + Z.of_nat (echo_off ws 0%nat)) (echo_alen ws 0%nat)
                     (fun j : nat => g (echo_off ws 0%nat + j)%nat)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intro Hok. iIntros "#Hc". iSplit.
     - iDestruct (echo_cmd_word_x ws gd t s0 g 0%nat Hok
                    ltac:(exact (exec_ok_pos ws Hok)) with "Hc") as "#Hw".

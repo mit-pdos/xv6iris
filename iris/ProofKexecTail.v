@@ -633,7 +633,7 @@ Section KexecA.
               A12 & A13 & Aust & Aelf & Aph & A64 & A65 & A66 & A67 & A68)".
     iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Aelf]" as "Aelf".
     { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-      rewrite /bytes_own. iApply (bb_named_any with "Aelf"). }
+      rewrite /bytes_own. iApply (bb_named_any (KTR := KT1) with "Aelf"). }
     iDestruct (kxc_mid_join sp0 with "Aust Aelf Aph") as "Amid".
     iFrame "A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 Amid A64 A65 A66 A67 A68".
   Qed.

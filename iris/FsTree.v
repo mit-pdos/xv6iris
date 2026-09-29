@@ -231,7 +231,7 @@ Proof.
   destruct (dir_wins data n) eqn:Hw; cbn [andb].
   - destruct (decide (dir_bname data n = s)) as [Heq | Hne].
     + rewrite (bool_decide_eq_true_2 (dir_bname data n = s) Heq).
-      rewrite Heq. rewrite lookup_insert.
+      rewrite Heq. rewrite lookup_insert_eq.
       destruct (dir_view data n !! s) as [z |]; reflexivity.
     + rewrite lookup_insert_ne by exact Hne. rewrite lookup_empty.
       rewrite (bool_decide_eq_false_2 (dir_bname data n = s) Hne).
@@ -569,7 +569,7 @@ Proof.
   apply map_eq. intros s.
   destruct (decide (s = dir_bname data k0)) as [-> | Hne].
   - (* the deleted name: NOTHING is left matching it *)
-    rewrite lookup_delete.
+    rewrite lookup_delete_eq.
     apply dir_view_lookup_None_match. intros k Hk [Hlk Hnk].
     assert (Hkk0 : k <> k0) by (intros ->; exact (Hlk Hz)).
     assert (Hlk' : dir_live data k)
@@ -813,10 +813,10 @@ Lemma path_chain_last (t : fstree) (i j : Z) (p : list fname) :
   path_at t i p = Some j -> j ∈ path_chain t i p.
 Proof.
   revert i. induction p as [| f p IH]; intros i H.
-  - cbn in H. injection H as ->. cbn. apply elem_of_list_here.
+  - cbn in H. injection H as ->. cbn. apply list_elem_of_here.
   - rewrite path_at_cons in H. cbn [path_chain].
     destruct (tree_ent t i f) as [k |]; [| discriminate].
-    apply elem_of_list_further. exact (IH k H).
+    apply list_elem_of_further. exact (IH k H).
 Qed.
 
 (* ====================================================================== *)
@@ -1074,7 +1074,7 @@ Proof.
   apply map_eq. intros x.
   destruct (decide (x = s)) as [-> | Hne].
   - (* the written name: the scan stops AT [k0] *)
-    rewrite lookup_insert. rewrite dir_view_lookup.
+    rewrite lookup_insert_eq. rewrite dir_view_lookup.
     assert (Hf : dir_first data' nrec' s = Some k0).
     { unfold dir_first. apply dfirst_Some_2; [exact Hk0 | |].
       - apply dir_matchb_true. split; [exact Hl0 | exact Hbname0].

@@ -120,16 +120,16 @@ Proof.
   assert (Hb3 : ((4*k+3)%nat < length (<[(4*k+2)%nat:=w2]> (<[(4*k+1)%nat:=w1]> (<[(4*k+0)%nat:=w0]> cur))))%nat)
     by (rewrite length_insert length_insert length_insert Hlen; exact (kfk_idx_lt36_3 k Hk9)).
   destruct (decide (i = (4*k+3)%nat)%nat) as [-> | Ne3].
-  { rewrite (list_lookup_insert _ _ _ Hb3). congruence. }
+  { rewrite (list_lookup_insert_eq _ _ _ Hb3). congruence. }
   rewrite (list_lookup_insert_ne _ _ _ _ (not_eq_sym Ne3)).
   destruct (decide (i = (4*k+2)%nat)%nat) as [-> | Ne2].
-  { rewrite (list_lookup_insert _ _ _ Hb2). congruence. }
+  { rewrite (list_lookup_insert_eq _ _ _ Hb2). congruence. }
   rewrite (list_lookup_insert_ne _ _ _ _ (not_eq_sym Ne2)).
   destruct (decide (i = (4*k+1)%nat)%nat) as [-> | Ne1].
-  { rewrite (list_lookup_insert _ _ _ Hb1). congruence. }
+  { rewrite (list_lookup_insert_eq _ _ _ Hb1). congruence. }
   rewrite (list_lookup_insert_ne _ _ _ _ (not_eq_sym Ne1)).
   destruct (decide (i = (4*k+0)%nat)%nat) as [-> | Ne0].
-  { rewrite (list_lookup_insert _ _ _ Hb0). congruence. }
+  { rewrite (list_lookup_insert_eq _ _ _ Hb0). congruence. }
   rewrite (list_lookup_insert_ne _ _ _ _ (not_eq_sym Ne0)).
   apply Hagree. lia.
 Qed.

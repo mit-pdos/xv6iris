@@ -499,7 +499,7 @@ Section ProofFileclose.
       iDestruct ("Hback" $! (<[k := (qr, n')]> Mg) with "[%] [Hcell Hrest Hfd]")
         as "Hslots".
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | congruence]. }
-      { rewrite /fslot lookup_insert. iFrame "Hcell Hrest Hfd". iPureIntro. exact Hn'lt. }
+      { rewrite /fslot lookup_insert_eq. iFrame "Hcell Hrest Hfd". iPureIntro. exact Hn'lt. }
       iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
       { iExists (<[k := (qr, n')]> Mg). iFrame "Hauth Hfdauth Hslots".
         iPureIntro. intros j Hj.
@@ -876,7 +876,7 @@ Section ProofFileclose.
       iDestruct ("Hback" $! (delete k Mg) with "[%] [Hcell Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpy0]")
         as "Hslots".
       { intros j Hj. rewrite lookup_delete_ne; [reflexivity | congruence]. }
-      { rewrite /fslot lookup_delete. iFrame "Hcell". iExists C0.
+      { rewrite /fslot lookup_delete_eq. iFrame "Hcell". iExists C0.
         iSplitR; [iPureIntro; rewrite /C0 /FD_NONE; reflexivity|].
         rewrite /file_fields /C0;
           cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
@@ -885,7 +885,7 @@ Section ProofFileclose.
       { iExists (delete k Mg). iFrame "Hauth Hfdauth Hslots".
         iPureIntro. intros j Hj.
         destruct (decide (j = k)) as [->|Hne];
-          [rewrite lookup_delete in Hj; by destruct Hj as [? Hx]|].
+          [rewrite lookup_delete_eq in Hj; by destruct Hj as [? Hx]|].
         apply Hdom. by rewrite lookup_delete_ne in Hj. }
       (* ---- +0x48/+0x4c a0 := &ftable ; +0x50 jal release ---- *)
       iApply (wp_auipc_s_sconf (mword_of_int (FC + 0x48)) Ra0

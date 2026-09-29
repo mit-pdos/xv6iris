@@ -65,12 +65,12 @@ Definition img0m : gmap Z (bv 8) := <[ax := b0]> (<[az := b0]> {[ay := b0]}).
 Definition img0 : image := λ a, img0m !! a.
 
 Lemma img0_x : img0 ax = Some b0.
-Proof. rewrite /img0 /img0m lookup_insert //. Qed.
+Proof. rewrite /img0 /img0m lookup_insert_eq //. Qed.
 Lemma img0_z : img0 az = Some b0.
-Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_insert //. Qed.
+Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_insert_eq //. Qed.
 Lemma img0_y : img0 ay = Some b0.
 Proof.
-  rewrite /img0 /img0m lookup_insert_ne // lookup_insert_ne // lookup_singleton //.
+  rewrite /img0 /img0m lookup_insert_ne // lookup_insert_ne // lookup_singleton_eq //.
 Qed.
 Lemma img0_x_nb1 : img0 ax ≠ Some b1.
 Proof. rewrite img0_x. intros H. apply b0_ne_b1. congruence. Qed.
@@ -397,8 +397,8 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split.
-  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert //.
-  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert //.
+  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert_eq //.
+  - do 4 eexists. split; [reflexivity|]. rewrite lookup_insert_eq //.
 Qed.
 
 (* ================================================================== *)
@@ -433,7 +433,7 @@ Lemma sbf_content_app log m :
   sbf_content log → (m = SBX ∨ m = SBY) → sbf_content (log ++ [m]).
 Proof.
   intros Hc Hm m' Hin. apply elem_of_app in Hin as [Hin|Hin]; [by apply Hc|].
-  apply elem_of_list_singleton in Hin as ->. done.
+  apply list_elem_of_singleton in Hin as ->. done.
 Qed.
 
 (** Hart 0's phases.  The last one carries the ONE consequence of a load
@@ -544,13 +544,13 @@ Proof.
       rewrite Hlog. split_and!.
       * exact Hcont.
       * right; right; right. split; [reflexivity|]. split; [exact Hex|].
-        rewrite lookup_insert. intros Hv jx jy Hx Hy.
+        rewrite lookup_insert_eq. intros Hv jx jy Hx Hy.
         destruct (decide (jx < jy)%nat) as [?|Hn]; [done|]. exfalso.
         assert (Hvis : visibleb 0%nat tv' (c_log c) (S jy) = true).
         { apply visibleb_below. specialize (Htv _ Hx). lia. }
         destruct (tso_read_from_below img0 (c_log c) 0%nat tv' ay jy SBY b1 v
                     Hy mb_SBY_y Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-        destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+        destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
         { rewrite mb_SBX_y in Hmb. done. }
         rewrite mb_SBY_y in Hmb. apply Hv. congruence.
       * exact HB.
@@ -588,13 +588,13 @@ Proof.
       * exact Hcont.
       * exact HA.
       * right; right; right. split; [reflexivity|]. split; [exact Hex|].
-        rewrite lookup_insert. intros Hv jx jy Hx Hy.
+        rewrite lookup_insert_eq. intros Hv jx jy Hx Hy.
         destruct (decide (jy < jx)%nat) as [?|Hn]; [done|]. exfalso.
         assert (Hvis : visibleb 1%nat tv' (c_log c) (S jx) = true).
         { apply visibleb_below. specialize (Htv _ Hy). lia. }
         destruct (tso_read_from_below img0 (c_log c) 1%nat tv' ax jx SBX b1 v
                     Hx mb_SBX_x Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-        destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+        destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
         { rewrite mb_SBX_x in Hmb. apply Hv. congruence. }
         rewrite mb_SBY_x in Hmb. done.
 Qed.
@@ -663,8 +663,8 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (* ================================================================== *)
@@ -736,7 +736,7 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; left. split; [reflexivity|]. rewrite lookup_insert.
+      * right; left. split; [reflexivity|]. rewrite lookup_insert_eq.
         intros Hv. assert (v = b1) as -> by congruence.
         destruct (tso_read_src _ _ _ _ _ _ Hread) as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_y_nb1 Hi). }
@@ -769,7 +769,7 @@ Proof.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
       * right; right; right. split; [reflexivity|].
-        rewrite lookup_insert_ne // lookup_insert.
+        rewrite lookup_insert_ne // lookup_insert_eq.
         intros Hv. specialize (Hc Hv).
         (* the view is past 2, so the log has both messages *)
         assert (Hl : c_log c = [MPX; MPY]).
@@ -839,8 +839,8 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (* ================================================================== *)
@@ -876,7 +876,7 @@ Lemma corr_content_app log m :
   corr_content log → (m = CX1 ∨ m = CX2) → corr_content (log ++ [m]).
 Proof.
   intros Hc Hm m' Hin. apply elem_of_app in Hin as [Hin|Hin]; [by apply Hc|].
-  apply elem_of_list_singleton in Hin as ->. done.
+  apply list_elem_of_singleton in Hin as ->. done.
 Qed.
 
 (** The reader's middle phase is stated on its COHERENCE FLOOR at [ax], not
@@ -953,12 +953,12 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|].
-      right; left. split; [reflexivity|]. rewrite lookup_insert coh_upd_eq. split.
+      right; left. split; [reflexivity|]. rewrite lookup_insert_eq coh_upd_eq. split.
       * intros Hv. assert (v = b1) as -> by congruence.
         destruct (tso_read_src _ _ _ _ _ _ Hread)
           as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_x_nb1 Hi). }
-        destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->];
+        destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->];
           last first.
         { rewrite mb_CX2 in Hmb. destruct b1_ne_b2. congruence. }
         exists k. split; [exact Hk|].
@@ -967,7 +967,7 @@ Proof.
         destruct (tso_read_src _ _ _ _ _ _ Hread)
           as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_x_nb2 Hi). }
-        destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->].
+        destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->].
         { rewrite mb_CX1 in Hmb. destruct b1_ne_b2. congruence. }
         exists k. split; [exact Hk|].
         eapply (visibleb_foreign 2%nat tv' (c_log c) k CX2); [exact Hk|done|done].
@@ -978,7 +978,7 @@ Proof.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|].
       right; right. split; [reflexivity|].
-      rewrite lookup_insert_ne // lookup_insert. split.
+      rewrite lookup_insert_ne // lookup_insert_eq. split.
       * (* no stale read *)
         intros [Hv|Hv] Hv2; assert (v = b0) as -> by congruence.
         -- destruct (Hc1 Hv) as (j & Hj & Hjtv).
@@ -986,7 +986,7 @@ Proof.
              by (apply visibleb_below; lia).
            destruct (tso_read_from_below img0 (c_log c) 2%nat tv' ax j CX1 b1 b0
                        Hj mb_CX1 Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-           destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+           destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
            ++ rewrite mb_CX1 in Hmb. apply b0_ne_b1. congruence.
            ++ rewrite mb_CX2 in Hmb. apply b0_ne_b2. congruence.
         -- destruct (Hc2 Hv) as (j & Hj & Hjtv).
@@ -994,7 +994,7 @@ Proof.
              by (apply visibleb_below; lia).
            destruct (tso_read_from_below img0 (c_log c) 2%nat tv' ax j CX2 b2 b0
                        Hj mb_CX2 Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-           destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+           destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
            ++ rewrite mb_CX1 in Hmb. apply b0_ne_b1. congruence.
            ++ rewrite mb_CX2 in Hmb. apply b0_ne_b2. congruence.
       * (* coherence *)
@@ -1003,7 +1003,7 @@ Proof.
           by (apply visibleb_below; lia).
         destruct (tso_read_from_below img0 (c_log c) 2%nat tv' ax j CX2 b2 v
                     Hj mb_CX2 Hvis Hread) as (k' & m' & Hge & Hk' & Hmb & _).
-        destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+        destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
         -- right. exists k', j. rewrite mb_CX1 in Hmb.
            split_and!; [exact Hk'|exact Hj|lia].
         -- left. rewrite mb_CX2 in Hmb. congruence.
@@ -1084,7 +1084,7 @@ Lemma lb_content_app log m :
   lb_content log → (m = LBX ∨ m = LBY) → lb_content (log ++ [m]).
 Proof.
   intros Hc Hm m' Hin. apply elem_of_app in Hin as [Hin|Hin]; [by apply Hc|].
-  apply elem_of_list_singleton in Hin as ->. done.
+  apply list_elem_of_singleton in Hin as ->. done.
 Qed.
 
 (** The invariant: each hart's own message is absent from the log until it
@@ -1126,9 +1126,9 @@ Proof.
         destruct (tso_read_src _ _ _ _ _ _ Hread)
           as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_y_nb1 Hi). }
-        destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->].
+        destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->].
         { rewrite mb_LBX_y in Hmb. done. }
-        by eapply elem_of_list_lookup_2. }
+        by eapply list_elem_of_lookup_2. }
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!.
@@ -1139,9 +1139,9 @@ Proof.
       * exact Hp1.
       * exact Hy1.
       * exact Hr1.
-      * rewrite lookup_insert. intros Hv1.
+      * rewrite lookup_insert_eq. intros Hv1.
         assert (v = b1) as -> by congruence. by apply Hv.
-      * rewrite lookup_insert. intros [Hv1 Hv2].
+      * rewrite lookup_insert_eq. intros [Hv1 Hv2].
         assert (v = b1) as Hvb by congruence.
         (* hart 1 already finished, and it did not read 1: else LBX ∈ log *)
         specialize (Hr1 Hv2). done.
@@ -1153,12 +1153,12 @@ Proof.
       * apply lb_content_app; [exact Hcont|by left].
       * intros [Hc|Hc]; discriminate.
       * intros Hc. apply not_elem_of_app. split; [by apply Hn1|].
-        intros Hin%elem_of_list_singleton.
+        intros Hin%list_elem_of_singleton.
         by destruct (LBX_ne_LBY (eq_sym Hin)).
       * by right; right.
       * exact Hp1.
       * intros Hin. apply Hy1. apply elem_of_app in Hin as [Hin|Hin]; [done|].
-        apply elem_of_list_singleton in Hin.
+        apply list_elem_of_singleton in Hin.
         by destruct (LBX_ne_LBY (eq_sym Hin)).
       * intros Hv. apply elem_of_app. left. by apply Hr1.
       * intros Hv. apply elem_of_app. left. by apply Hr0.
@@ -1174,10 +1174,10 @@ Proof.
         destruct (tso_read_src _ _ _ _ _ _ Hread)
           as [Hi|(k & m & Hk & Hmb & Hvis)].
         { by destruct (img0_x_nb1 Hi). }
-        destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->];
+        destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->];
           last first.
         { rewrite mb_LBY_x in Hmb. done. }
-        by eapply elem_of_list_lookup_2. }
+        by eapply list_elem_of_lookup_2. }
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!.
@@ -1187,10 +1187,10 @@ Proof.
       * exact Hp0.
       * by right; left.
       * intros Hin. by destruct (HnY Hin).
-      * rewrite lookup_insert. intros Hv2.
+      * rewrite lookup_insert_eq. intros Hv2.
         assert (v = b1) as -> by congruence. by apply Hv.
       * exact Hr0.
-      * rewrite lookup_insert. intros [Hv1 Hv2].
+      * rewrite lookup_insert_eq. intros [Hv1 Hv2].
         assert (v = b1) as Hvb by congruence.
         specialize (Hr0 Hv1). done.
     + (* store y *)
@@ -1200,7 +1200,7 @@ Proof.
       rewrite Hlog /store_log. split_and!.
       * apply lb_content_app; [exact Hcont|by right].
       * intros Hc. apply not_elem_of_app. split; [by apply Hn0|].
-        intros Hin%elem_of_list_singleton. by destruct (LBX_ne_LBY Hin).
+        intros Hin%list_elem_of_singleton. by destruct (LBX_ne_LBY Hin).
       * intros [Hc|Hc]; discriminate.
       * exact Hp0.
       * by right; right.
@@ -1282,10 +1282,10 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split_and!.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (* ================================================================== *)
@@ -1310,7 +1310,7 @@ Lemma iriw_content_app log m :
   iriw_content log → (m = IX ∨ m = IY) → iriw_content (log ++ [m]).
 Proof.
   intros Hc Hm m' Hin. apply elem_of_app in Hin as [Hin|Hin]; [by apply Hc|].
-  apply elem_of_list_singleton in Hin as ->. done.
+  apply list_elem_of_singleton in Hin as ->. done.
 Qed.
 
 (** Reader C: x, fence, y.  The watermark carries the first observation to
@@ -1421,12 +1421,12 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1| |exact HD].
-      right; left. split; [reflexivity|]. rewrite lookup_insert.
+      right; left. split; [reflexivity|]. rewrite lookup_insert_eq.
       intros Hv. assert (v = b1) as -> by congruence.
       destruct (tso_read_src _ _ _ _ _ _ Hread)
         as [Hi|(k & m & Hk & Hmb & Hvis)].
       { by destruct (img0_x_nb1 Hi). }
-      destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->];
+      destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->];
         last first.
       { rewrite mb_IY_x in Hmb. done. }
       exists k. split; [exact Hk|].
@@ -1448,7 +1448,7 @@ Proof.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1| |exact HD].
       right; right; right. split; [reflexivity|].
-      rewrite lookup_insert_ne // lookup_insert.
+      rewrite lookup_insert_ne // lookup_insert_eq.
       intros Hv1 Hv2. assert (v = b0) as -> by congruence.
       destruct (Hc Hv1) as (jx & Hjx & Hjtv). exists jx. split; [exact Hjx|].
       intros jy Hjy. destruct (decide (jx < jy)%nat) as [?|Hn]; [done|].
@@ -1457,7 +1457,7 @@ Proof.
         by (apply visibleb_below; lia).
       destruct (tso_read_from_below img0 (c_log c) 2%nat tv' ay jy IY b1 b0
                   Hjy mb_IY_y Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-      destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+      destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
       { rewrite mb_IX_y in Hmb. done. }
       rewrite mb_IY_y in Hmb. apply b0_ne_b1. congruence.
   - (* reader D *)
@@ -1467,12 +1467,12 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|exact HC|].
-      right; left. split; [reflexivity|]. rewrite lookup_insert.
+      right; left. split; [reflexivity|]. rewrite lookup_insert_eq.
       intros Hv. assert (v = b1) as -> by congruence.
       destruct (tso_read_src _ _ _ _ _ _ Hread)
         as [Hi|(k & m & Hk & Hmb & Hvis)].
       { by destruct (img0_y_nb1 Hi). }
-      destruct (Hcont m (elem_of_list_lookup_2 _ _ _ Hk)) as [-> | ->].
+      destruct (Hcont m (list_elem_of_lookup_2 _ _ _ Hk)) as [-> | ->].
       { rewrite mb_IX_y in Hmb. done. }
       exists k. split; [exact Hk|].
       pose proof (visibleb_foreign 3%nat tv' (c_log c) k IY Hk ltac:(done) Hvis).
@@ -1491,7 +1491,7 @@ Proof.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl.
       rewrite Hlog. split_and!; [exact Hcont|exact H0|exact H1|exact HC|].
       right; right; right. split; [reflexivity|].
-      rewrite lookup_insert_ne // lookup_insert.
+      rewrite lookup_insert_ne // lookup_insert_eq.
       intros Hv1 Hv2. assert (v = b0) as -> by congruence.
       destruct (Hc Hv1) as (jy & Hjy & Hjtv). exists jy. split; [exact Hjy|].
       intros jx Hjx. destruct (decide (jy < jx)%nat) as [?|Hn]; [done|].
@@ -1500,7 +1500,7 @@ Proof.
         by (apply visibleb_below; lia).
       destruct (tso_read_from_below img0 (c_log c) 3%nat tv' ax jx IX b1 b0
                   Hjx mb_IX_x Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-      destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk')) as [-> | ->].
+      destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk')) as [-> | ->].
       { rewrite mb_IX_x in Hmb. apply b0_ne_b1. congruence. }
       rewrite mb_IY_x in Hmb. done.
 Qed.
@@ -1565,8 +1565,8 @@ Proof.
     apply rtc_refl. }
   split_and!.
   - do 4 eexists. split; [reflexivity|].
-    rewrite lookup_insert. split; [|reflexivity].
-    rewrite lookup_insert_ne // lookup_insert //.
+    rewrite lookup_insert_eq. split; [|reflexivity].
+    rewrite lookup_insert_ne // lookup_insert_eq //.
   - do 4 eexists. reflexivity.
   - vm_compute. reflexivity.
 Qed.
@@ -1613,7 +1613,7 @@ Lemma amo_content_app log m :
   amo_content (log ++ [m]).
 Proof.
   intros Hc Hm m' Hin. apply elem_of_app in Hin as [Hin|Hin]; [by apply Hc|].
-  apply elem_of_list_singleton in Hin as ->. done.
+  apply list_elem_of_singleton in Hin as ->. done.
 Qed.
 
 Definition amo_A (p : list instr) (log : list wmsg) : Prop :=
@@ -1728,14 +1728,14 @@ Proof.
       * exact Hord.
       * exact HA.
       * right; right. split; [reflexivity|].
-        rewrite lookup_insert. intros ja jb Hja Hjb Hlt.
+        rewrite lookup_insert_eq. intros ja jb Hja Hjb Hlt.
         specialize (Htv _ Hjb).
         destruct (Hord _ Hja) as (jx & Hjxlt & Hjx).
         assert (Hvis : visibleb 1%nat tv' (c_log c) (S jx) = true)
           by (apply visibleb_below; lia).
         destruct (tso_read_from_below img0 (c_log c) 1%nat tv' ax jx AMX b1 v
                     Hjx mb_AMX_x Hvis Hread) as (k' & m' & _ & Hk' & Hmb & _).
-        destruct (Hcont m' (elem_of_list_lookup_2 _ _ _ Hk'))
+        destruct (Hcont m' (list_elem_of_lookup_2 _ _ _ Hk'))
           as [-> | [-> | ->]].
         -- rewrite mb_AMX_x in Hmb. congruence.
         -- rewrite mb_AMA_x in Hmb. done.
@@ -1798,7 +1798,7 @@ Proof.
       [eapply (step_load _ 1%nat rg2 ax _ _ _ _ _ 2%nat b1);
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
-  split; [reflexivity|]. split; rewrite lookup_insert //.
+  split; [reflexivity|]. split; rewrite lookup_insert_eq //.
 Qed.
 
 (** [mp_fence_forbidden]: the fenced reader can and does read the flag as
@@ -1821,8 +1821,8 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (** [corr_forbidden]/[corr_no_stale]: the concrete log [CX1; CX2] and the
@@ -1844,8 +1844,8 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; [reflexivity|]. split.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (** [lb_forbidden]: both LB harts complete; the machine produces (0, 1). *)
@@ -1865,7 +1865,7 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     eapply rtc_l; [eapply (step_store _ 1%nat); reflexivity|]. simpl.
     apply rtc_refl. }
-  split; [reflexivity|]. split; rewrite lookup_insert //.
+  split; [reflexivity|]. split; rewrite lookup_insert_eq //.
 Qed.
 
 (** [iriw_fence_forbidden]: all four harts complete, and THREE of the four
@@ -1897,10 +1897,10 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split_and!.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.
 
 (** [amo_strong]: the AMO pair runs, hart 0's AMO write really does land at
@@ -1927,7 +1927,7 @@ Proof.
     apply rtc_refl. }
   split; [reflexivity|]. split; [reflexivity|]. split_and!;
     [reflexivity|reflexivity|].
-  rewrite lookup_insert //.
+  rewrite lookup_insert_eq //.
 Qed.
 
 (* ================================================================== *)
@@ -1964,6 +1964,6 @@ Proof.
         [reflexivity|solve_load]|]. simpl.
     apply rtc_refl. }
   split; [reflexivity|]. split; [reflexivity|]. split.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
+  - rewrite lookup_insert_ne // lookup_insert_eq //.
+  - rewrite lookup_insert_eq //.
 Qed.

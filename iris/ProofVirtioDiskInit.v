@@ -226,8 +226,8 @@ Lemma vdi_trunc32_lo32 (x : mword 64) : trunc32 x = lo32 x.
 Proof.
   apply bv_eq. unfold trunc32. rewrite autocast_id.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   unfold lo32. rewrite !bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 4 8) 1 - 0 + 1)) with 32%N.
@@ -248,7 +248,7 @@ Lemma vdi_srai32 (x : mword 64) : (bv_unsigned x < 2 ^ 32)%Z ->
 Proof.
   intro H. pose proof (bv_unsigned_in_range _ x) as [Hl _].
   apply bv_eq.
-  unfold shift_bits_right_arith, arith_shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shift_bits_right_arith, arith_shiftr,
          MachineWord.MachineWord.arith_shift_right.
   rewrite bv_ashiftr_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)

@@ -219,7 +219,7 @@ Local Lemma extend_value_id8 (b : bool) (v : SailStdpp.Values.mword 64) :
 Proof.
   unfold extend_value. destruct b; [apply zero_extend'_id|].
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       SailStdpp.Values.to_word SailStdpp.Values.get_word
+       
        MachineWord.MachineWord.sign_extend].
   apply bv_eq_signed. rewrite bv_sign_extend_signed; [ reflexivity | lia ].
 Qed.

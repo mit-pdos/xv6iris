@@ -1702,7 +1702,7 @@ Section BoBodies.
           iSplitR.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
-            - rewrite lookup_insert in Hk.
+            - rewrite lookup_insert_eq in Hk.
               assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               apply Nat.le_refl.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k e Hk). }
@@ -1715,7 +1715,7 @@ Section BoBodies.
           iSplitR.
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
-            - rewrite lookup_insert in Hk.
+            - rewrite lookup_insert_eq in Hk.
               assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               reflexivity.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hlive k e Hk). }
@@ -1739,7 +1739,7 @@ Section BoBodies.
              untouched. *)
           { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
-            - rewrite lookup_insert in Hk.
+            - rewrite lookup_insert_eq in Hk.
               assert (e = (MAXOPBLOCKS, (∅ : gset Z), Ep)) as -> by congruence.
               apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }

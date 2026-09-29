@@ -78,7 +78,7 @@ Lemma word_bytes_lookup (a : Arch.pa) (w : bv 64) (j : nat) :
 Proof.
   intros Hj. rewrite /word_bytes. apply elem_of_list_to_map_1.
   - apply word_bytes_keys_nodup.
-  - apply elem_of_list_fmap. exists j. split; [reflexivity |].
+  - apply list_elem_of_fmap. exists j. split; [reflexivity |].
     apply elem_of_seq. lia.
 Qed.
 
@@ -101,7 +101,7 @@ Lemma word_bytes_dom_elim (a : Arch.pa) (w : bv 64) (x : Arch.pa) :
 Proof.
   intros Hx. apply elem_of_dom in Hx as [b Hb].
   rewrite /word_bytes in Hb. apply elem_of_list_to_map_2 in Hb.
-  apply elem_of_list_fmap in Hb as (j & [= -> ->] & Hj).
+  apply list_elem_of_fmap in Hb as (j & [= -> ->] & Hj).
   exists j. split; [| reflexivity]. apply elem_of_seq in Hj. lia.
 Qed.
 
@@ -291,10 +291,10 @@ Proof.
     destruct Hd as [Hhd Htl]. split; [| by apply IH].
     intros m'' Hm''.
     (* locate [m''] in [l2] and its partner in [l] *)
-    apply elem_of_list_lookup in Hm'' as [k Hk].
+    apply list_elem_of_lookup in Hm'' as [k Hk].
     destruct (Forall2_lookup_r _ _ _ _ _ Hrest Hk) as (mk & Hmk & Hdomk).
     apply map_disjoint_dom. rewrite <- Hdm, <- Hdomk.
-    apply map_disjoint_dom, Hhd, elem_of_list_lookup. by exists k.
+    apply map_disjoint_dom, Hhd, list_elem_of_lookup. by exists k.
 Qed.
 
 (* the head of a disjoint list is disjoint from the union of the tail *)
@@ -331,7 +331,7 @@ Section MapsUnion.
     iDestruct (IH with "Hl") as %Hd.
     iAssert (⌜forall m', m' ∈ l -> m ##ₘ m'⌝)%I with "[Hm Hl]" as %Hhd.
     { rewrite bi.pure_forall. iIntros (m'). rewrite bi.pure_impl. iIntros (Hm').
-      apply elem_of_list_lookup in Hm' as [k Hk].
+      apply list_elem_of_lookup in Hm' as [k Hk].
       iDestruct (big_sepL_lookup _ _ _ _ Hk with "Hl") as "Hm'".
       by iDestruct (bytes_own_disj with "Hm Hm'") as %?. }
     iPureIntro. by split.

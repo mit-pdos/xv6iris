@@ -26,7 +26,7 @@ Definition prefixes (L : bytes) : list bytes := (fun k => take k L) <$> seq 0 (S
 
 Lemma prefixes_spec D L : D ∈ prefixes L <-> D `prefix_of` L.
 Proof using.
-  unfold prefixes. rewrite elem_of_list_fmap. split.
+  unfold prefixes. rewrite list_elem_of_fmap. split.
   - intros (k & -> & _). apply prefix_take.
   - intros HD. exists (length D). split; [exact (prefix_take_eq D L HD) |].
     apply elem_of_seq. pose proof (prefix_length _ _ HD). lia.
@@ -75,23 +75,23 @@ Proof using.
     destruct st as [[ws | f] | F | F]; cbn [stage_outs_prog] in H.
     + destruct (decide (L = wl_line (drop 1 ws))) as [HL | HL]; [| by apply elem_of_nil in H].
       apply elem_of_cons in H as [-> | H]; [apply so_echo; exact HL |].
-      apply elem_of_list_fmap in H as (D & -> & HD).
+      apply list_elem_of_fmap in H as (D & -> & HD).
       apply so_echo_halt; [exact HL | apply prefixes_spec; exact HD].
     + apply elem_of_cons in H as [-> | H]; [apply so_catf_open |].
       destruct (decide (fc f = Some L)) as [HL | HL]; [| by apply elem_of_nil in H].
       apply elem_of_cons in H as [-> | H]; [apply so_catf; exact HL |].
-      apply elem_of_list_fmap in H as (D & -> & HD).
+      apply list_elem_of_fmap in H as (D & -> & HD).
       apply so_catf_halt; [exact HL | apply prefixes_spec; exact HD].
     + apply elem_of_app in H as [H | H].
-      * apply elem_of_list_fmap in H as (D & -> & HD).
+      * apply list_elem_of_fmap in H as (D & -> & HD).
         apply so_mid_f. apply prefixes_spec. exact HD.
       * destruct F as [| w]; cbn [mid_halts] in H.
-        -- apply elem_of_list_fmap in H as (D & -> & HD).
+        -- apply list_elem_of_fmap in H as (D & -> & HD).
            apply so_mid_halt. apply prefixes_spec. exact HD.
-        -- apply elem_of_list_bind in H as (D & H & HD).
-           apply elem_of_list_fmap in H as (W & -> & HW).
+        -- apply list_elem_of_bind in H as (D & H & HD).
+           apply list_elem_of_fmap in H as (W & -> & HW).
            apply so_grep_halt; apply prefixes_spec; assumption.
-    + apply elem_of_list_fmap in H as (D & -> & HD). apply so_last_f. apply prefixes_spec. exact HD.
+    + apply list_elem_of_fmap in H as (D & -> & HD). apply so_last_f. apply prefixes_spec. exact HD.
   - unfold stage_outs. intros H.
     destruct H as [st | st | ws HL | ws D HL HD | f Hf | f D Hf HD | f | F D HD | D HD
                   | w D W HD HW | F D HD].
@@ -101,22 +101,22 @@ Proof using.
       rewrite decide_True by exact HL. apply elem_of_cons. left. reflexivity.
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog].
       rewrite decide_True by exact HL. apply elem_of_cons. right.
-      apply elem_of_list_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog]. apply elem_of_cons. right.
       rewrite decide_True by exact Hf. apply elem_of_cons. left. reflexivity.
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog]. apply elem_of_cons. right.
       rewrite decide_True by exact Hf. apply elem_of_cons. right.
-      apply elem_of_list_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog]. apply elem_of_cons. left. reflexivity.
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog]. apply elem_of_app. left.
-      apply elem_of_list_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog mid_halts]. apply elem_of_app. right.
-      apply elem_of_list_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog mid_halts]. apply elem_of_app. right.
-      apply elem_of_list_bind. exists D. split; [| apply prefixes_spec; exact HD].
-      apply elem_of_list_fmap. exists W. split; [reflexivity | apply prefixes_spec; exact HW].
+      apply list_elem_of_bind. exists D. split; [| apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists W. split; [reflexivity | apply prefixes_spec; exact HW].
     + do 2 (apply elem_of_cons; right). cbn [stage_outs_prog].
-      apply elem_of_list_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
+      apply list_elem_of_fmap. exists D. split; [reflexivity | apply prefixes_spec; exact HD].
 Qed.
 
 Fixpoint sfx_runs (fc : bytes -> option bytes) (L : bytes) (fs : list filt) (w : wr_out)
@@ -137,20 +137,20 @@ Proof using.
   - cbn [sfx_runs]. split; [intros H; by apply elem_of_nil in H |].
     intros H. remember [] as z eqn:Hz in H. revert Hz. destruct H; intros Hz; discriminate Hz.
   - destruct fs as [| F' fs'].
-    + cbn [sfx_runs]. rewrite elem_of_list_fmap. split.
-      * intros (so & -> & Hso). apply elem_of_list_filter in Hso as [Hp Hso].
+    + cbn [sfx_runs]. rewrite list_elem_of_fmap. split.
+      * intros (so & -> & Hso). apply list_elem_of_filter in Hso as [Hp Hso].
         apply stage_outs_spec in Hso. apply sr_last; assumption.
       * intros H. remember [F] as z eqn:Hz in H. revert Hz.
         destruct H as [F0 win wc0 so Hso Hp | F0 F1 fs0 win wc0 | F0 F1 fs0 win wc0 so ss0 Hso Hp Hr];
           intros Hz; [| discriminate Hz | discriminate Hz].
         injection Hz as ->.
         exists so. split; [reflexivity |].
-        apply elem_of_list_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
-    + cbn [sfx_runs]. rewrite elem_of_cons, elem_of_list_join. split.
+        apply list_elem_of_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
+    + cbn [sfx_runs]. rewrite elem_of_cons, list_elem_of_join. split.
       * intros [-> | (l & Hss & Hl)]; [apply sr_pipe_fail |].
-        apply elem_of_list_fmap in Hl as (so & -> & Hso).
-        apply elem_of_list_filter in Hso as [Hp Hso].
-        apply elem_of_list_fmap in Hss as (ss' & -> & Hss'). apply IH in Hss'.
+        apply list_elem_of_fmap in Hl as (so & -> & Hso).
+        apply list_elem_of_filter in Hso as [Hp Hso].
+        apply list_elem_of_fmap in Hss as (ss' & -> & Hss'). apply IH in Hss'.
         apply stage_outs_spec in Hso. apply sr_node; assumption.
       * intros H. remember (F :: F' :: fs') as z eqn:Hz in H. revert Hz.
         destruct H as [F0 win wc0 so Hso Hp | F0 F1 fs0 win wc0 | F0 F1 fs0 win wc0 so ss0 Hso Hp Hr];
@@ -158,9 +158,9 @@ Proof using.
         injection Hz as -> -> ->. right.
         exists ((fun ss => so_cons so :: ss) <$> sfx_runs fc L (F' :: fs') (wr_of so) (filt_is_cat F)).
         split.
-        -- apply elem_of_list_fmap. exists ss0. split; [reflexivity | apply IH; exact Hr].
-        -- apply elem_of_list_fmap. exists so. split; [reflexivity |].
-           apply elem_of_list_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
+        -- apply list_elem_of_fmap. exists ss0. split; [reflexivity | apply IH; exact Hr].
+        -- apply list_elem_of_fmap. exists so. split; [reflexivity |].
+           apply list_elem_of_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
 Qed.
 
 Definition line_runs (fc : bytes -> option bytes) (l : pline') : list (list bytes) :=
@@ -179,28 +179,28 @@ Proof using.
   - split.
     + intros H. apply elem_of_cons in H as [-> | H]; [apply lr_echo |].
       apply elem_of_cons in H as [-> | H]; [apply lr_echo_exec |].
-      apply elem_of_list_singleton in H as ->. apply lr_echo_silent.
+      apply list_elem_of_singleton in H as ->. apply lr_echo_silent.
     + intros H. remember (LEcho' ws) as l eqn:Hl. revert Hl.
       destruct H as [ws0 | ws0 | ws0 | p fs Hn | p fs so ss0 Hso Hr]; intros Hl;
         try discriminate Hl; injection Hl as ->.
       * apply elem_of_cons. left. reflexivity.
       * apply elem_of_cons. right. apply elem_of_cons. left. reflexivity.
-      * apply elem_of_cons. right. apply elem_of_cons. right. apply elem_of_list_singleton. reflexivity.
-  - rewrite elem_of_app, elem_of_list_join. split.
+      * apply elem_of_cons. right. apply elem_of_cons. right. apply list_elem_of_singleton. reflexivity.
+  - rewrite elem_of_app, list_elem_of_join. split.
     + intros [H | (l & Hss & Hl)].
       * destruct (decide (fs <> [])) as [Hn | Hn]; [| by apply elem_of_nil in H].
-        apply elem_of_list_singleton in H as ->. apply lr_pipe_fail. exact Hn.
-      * apply elem_of_list_fmap in Hl as (so & -> & Hso).
-        apply elem_of_list_fmap in Hss as (ss' & -> & Hss').
+        apply list_elem_of_singleton in H as ->. apply lr_pipe_fail. exact Hn.
+      * apply list_elem_of_fmap in Hl as (so & -> & Hso).
+        apply list_elem_of_fmap in Hss as (ss' & -> & Hss').
         apply sfx_runs_spec in Hss'. apply stage_outs_spec in Hso. apply lr_node; assumption.
     + intros H. remember (LPipes p fs) as l eqn:Hl. revert Hl.
       destruct H as [ws0 | ws0 | ws0 | p0 fs0 Hn | p0 fs0 so ss0 Hso Hr]; intros Hl;
         try discriminate Hl; injection Hl as -> ->.
-      * left. rewrite decide_True by exact Hn. apply elem_of_list_singleton. reflexivity.
+      * left. rewrite decide_True by exact Hn. apply list_elem_of_singleton. reflexivity.
       * right. exists ((fun ss => so_cons so :: ss)
                          <$> sfx_runs fc (prod_content fc p) fs (wr_of so) (prod_cat p)). split.
-        -- apply elem_of_list_fmap. exists ss0. split; [reflexivity | apply sfx_runs_spec; exact Hr].
-        -- apply elem_of_list_fmap. exists so. split; [reflexivity | apply stage_outs_spec; exact Hso].
+        -- apply list_elem_of_fmap. exists ss0. split; [reflexivity | apply sfx_runs_spec; exact Hr].
+        -- apply list_elem_of_fmap. exists so. split; [reflexivity | apply stage_outs_spec; exact Hso].
 Qed.
 
 (* ===================================================================== *)
@@ -225,13 +225,13 @@ Proof using.
     + intros [H | H].
       * destruct s as [| y s']; [by apply elem_of_nil in H |].
         destruct (decide (y = x)) as [-> | Hne]; [| by apply elem_of_nil in H].
-        apply elem_of_list_singleton in H as ->. exists 0, s'. split; reflexivity.
-      * apply elem_of_list_fmap in H as (r & -> & Hr). apply IH in Hr as (i & s0 & Hi & ->).
+        apply list_elem_of_singleton in H as ->. exists 0, s'. split; reflexivity.
+      * apply list_elem_of_fmap in H as (r & -> & Hr). apply IH in Hr as (i & s0 & Hi & ->).
         exists (S i), s0. split; [exact Hi | reflexivity].
     + intros ([| i] & s0 & Hi & ->).
       * left. injection Hi as ->. cbn. rewrite decide_True by reflexivity.
-        apply elem_of_list_singleton. reflexivity.
-      * right. apply elem_of_list_fmap. exists (<[i := s0]> ss). split; [reflexivity |].
+        apply list_elem_of_singleton. reflexivity.
+      * right. apply list_elem_of_fmap. exists (<[i := s0]> ss). split; [reflexivity |].
         apply IH. exists i, s0. split; [exact Hi | reflexivity].
 Qed.
 
@@ -246,16 +246,16 @@ Proof using.
   revert ss. induction b as [| x b IH]; intros ss; cbn [mergeb].
   - rewrite forallb_forall. split.
     + intros H. apply ma_done. apply Forall_forall. intros s Hs.
-      apply elem_of_list_In in Hs. exact (bool_decide_eq_true_1 _ (H s Hs)).
+      apply list_elem_of_In in Hs. exact (bool_decide_eq_true_1 _ (H s Hs)).
     + intros Hm s Hs. apply bool_decide_eq_true_2.
       inversion Hm as [ss' HF | ]; subst.
-      exact (proj1 (Forall_forall _ _) HF s (proj2 (elem_of_list_In _ _) Hs)).
+      exact (proj1 (Forall_forall _ _) HF s (proj2 (list_elem_of_In _ _) Hs)).
   - rewrite existsb_exists. split.
-    + intros (ss' & Hin & Hm). apply elem_of_list_In, picks_spec in Hin as (i & s & Hi & ->).
+    + intros (ss' & Hin & Hm). apply list_elem_of_In, picks_spec in Hin as (i & s & Hi & ->).
       apply (ma_take ss i x s b Hi). apply IH. exact Hm.
     + intros Hm. inversion Hm as [| ss0 i x0 s b0 Hi Hm']; subst.
       exists (<[i := s]> ss). split; [| apply IH; exact Hm'].
-      apply elem_of_list_In, picks_spec. exists i, s. split; [exact Hi | reflexivity].
+      apply list_elem_of_In, picks_spec. exists i, s. split; [exact Hi | reflexivity].
 Qed.
 
 Definition line_blocksb (fc : bytes -> option bytes) (l : pline') (b : bytes) : bool :=
@@ -265,9 +265,9 @@ Lemma line_blocksb_spec fc l b : line_blocksb fc l b = true <-> line_blocks fc l
 Proof using.
   unfold line_blocksb, line_blocks. rewrite existsb_exists. split.
   - intros (ss & Hin & Hm). exists ss.
-    split; [apply line_runs_spec, elem_of_list_In; exact Hin | apply mergeb_spec; exact Hm].
+    split; [apply line_runs_spec, list_elem_of_In; exact Hin | apply mergeb_spec; exact Hm].
   - intros (ss & Hr & Hm). exists ss.
-    split; [apply elem_of_list_In, line_runs_spec; exact Hr | apply mergeb_spec; exact Hm].
+    split; [apply list_elem_of_In, line_runs_spec; exact Hr | apply mergeb_spec; exact Hm].
 Qed.
 
 (* ===================================================================== *)
@@ -303,27 +303,27 @@ Proof using.
   - destruct fs as [| F' fs'].
     + cbn [sfx_terms]. split; [intros H; by apply elem_of_nil in H |].
       intros H. remember [F] as z eqn:Hz in H. revert Hz. destruct H; intros Hz; discriminate Hz.
-    + cbn [sfx_terms]. rewrite elem_of_app, elem_of_list_join. split.
+    + cbn [sfx_terms]. rewrite elem_of_app, list_elem_of_join. split.
       * intros [H | (l & HWs & Hl)].
-        -- apply elem_of_list_fmap in H as (so & Hq & Hso). injection Hq as -> ->.
+        -- apply list_elem_of_fmap in H as (so & Hq & Hso). injection Hq as -> ->.
            apply stt_here. apply stage_outs_spec. exact Hso.
-        -- apply elem_of_list_fmap in Hl as (so & -> & Hso).
-           apply elem_of_list_filter in Hso as [Hp Hso].
-           apply elem_of_list_fmap in HWs as ([W' s'] & Hq & HWs'). injection Hq as -> ->.
+        -- apply list_elem_of_fmap in Hl as (so & -> & Hso).
+           apply list_elem_of_filter in Hso as [Hp Hso].
+           apply list_elem_of_fmap in HWs as ([W' s'] & Hq & HWs'). injection Hq as -> ->.
            apply IH in HWs'. apply stage_outs_spec in Hso. cbn [fst snd].
            apply stt_next; assumption.
       * intros H. remember (F :: F' :: fs') as z eqn:Hz in H. revert Hz.
         destruct H as [F0 F1 fs0 win wc0 so Hso | F0 F1 fs0 win wc0 so W' s' Hso Hp Hr]; intros Hz;
           injection Hz as -> -> ->.
-        -- left. apply elem_of_list_fmap. exists so.
+        -- left. apply list_elem_of_fmap. exists so.
            split; [reflexivity | apply stage_outs_spec; exact Hso].
         -- right.
            exists ((fun Ws : list bytes * bytes => (so_cons so :: Ws.1, Ws.2))
                      <$> sfx_terms fc L (F' :: fs') (wr_of so) (filt_is_cat F)). split.
-           ++ apply elem_of_list_fmap. exists (W', s'). split; [reflexivity |].
+           ++ apply list_elem_of_fmap. exists (W', s'). split; [reflexivity |].
               apply IH. exact Hr.
-           ++ apply elem_of_list_fmap. exists so. split; [reflexivity |].
-              apply elem_of_list_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
+           ++ apply list_elem_of_fmap. exists so. split; [reflexivity |].
+              apply list_elem_of_filter. split; [exact Hp | apply stage_outs_spec; exact Hso].
 Qed.
 
 Definition line_terms (fc : bytes -> option bytes) (l : pline') : list (list bytes * bytes) :=
@@ -343,25 +343,25 @@ Proof using.
   destruct l as [ws | p fs]; cbn [line_terms].
   - split; [intros H; by apply elem_of_nil in H |].
     intros H. remember (LEcho' ws) as l eqn:Hl. revert Hl. destruct H; intros Hl; discriminate Hl.
-  - rewrite elem_of_app, elem_of_list_join. split.
+  - rewrite elem_of_app, list_elem_of_join. split.
     + intros [H | (l & HWs & Hl)].
       * destruct (decide (fs <> [])) as [Hn | Hn]; [| by apply elem_of_nil in H].
-        apply elem_of_list_fmap in H as (so & Hq & Hso). injection Hq as -> ->.
+        apply list_elem_of_fmap in H as (so & Hq & Hso). injection Hq as -> ->.
         apply lt_here; [exact Hn | apply stage_outs_spec; exact Hso].
-      * apply elem_of_list_fmap in Hl as (so & -> & Hso).
-        apply elem_of_list_fmap in HWs as ([W' s'] & Hq & HWs'). injection Hq as -> ->.
+      * apply list_elem_of_fmap in Hl as (so & -> & Hso).
+        apply list_elem_of_fmap in HWs as ([W' s'] & Hq & HWs'). injection Hq as -> ->.
         apply sfx_terms_spec in HWs'. apply stage_outs_spec in Hso. apply lt_next; assumption.
     + intros H. remember (LPipes p fs) as l eqn:Hl. revert Hl.
       destruct H as [p0 fs0 so Hn Hso | p0 fs0 so W' s' Hso Hr]; intros Hl;
         injection Hl as -> ->.
-      * left. rewrite decide_True by exact Hn. apply elem_of_list_fmap. exists so.
+      * left. rewrite decide_True by exact Hn. apply list_elem_of_fmap. exists so.
         split; [reflexivity | apply stage_outs_spec; exact Hso].
       * right.
         exists ((fun Ws : list bytes * bytes => (so_cons so :: Ws.1, Ws.2))
                   <$> sfx_terms fc (prod_content fc p) fs (wr_of so) (prod_cat p)). split.
-        -- apply elem_of_list_fmap. exists (W', s'). split; [reflexivity |].
+        -- apply list_elem_of_fmap. exists (W', s'). split; [reflexivity |].
            apply sfx_terms_spec. exact Hr.
-        -- apply elem_of_list_fmap. exists so. split; [reflexivity | apply stage_outs_spec; exact Hso].
+        -- apply list_elem_of_fmap. exists so. split; [reflexivity | apply stage_outs_spec; exact Hso].
 Qed.
 
 (* ---- merges, the few facts the prefix test spends ---- *)
@@ -399,8 +399,8 @@ Lemma forallb_nil_iff (W : list bytes) :
   forallb (fun w => bool_decide (w = [])) W = true <-> Forall (fun w => w = []) W.
 Proof using.
   rewrite forallb_forall, Forall_forall. split.
-  - intros H w Hw. apply (bool_decide_eq_true_1 (w = [])). apply H. by apply elem_of_list_In.
-  - intros H w Hw. apply bool_decide_eq_true_2. apply H. by apply elem_of_list_In.
+  - intros H w Hw. apply (bool_decide_eq_true_1 (w = [])). apply H. by apply list_elem_of_In.
+  - intros H w Hw. apply bool_decide_eq_true_2. apply H. by apply list_elem_of_In.
 Qed.
 
 (* THE PREFIX TEST: [b] is a prefix of a shuffle of (a merge of the waited
@@ -430,7 +430,7 @@ Proof using.
   - rewrite !orb_true_iff. split.
     + intros [[H | H] | H].
       * apply existsb_exists in H as (W' & Hin & H).
-        apply elem_of_list_In, picks_spec in Hin as (i & t & Hi & ->).
+        apply list_elem_of_In, picks_spec in Hin as (i & t & Hi & ->).
         apply IH in H as (Wm & sp & c & HWm & Hsp & Hm & Hp).
         exists (x :: Wm), sp, (x :: c). split_and!.
         -- exact (ma_take _ i x t Wm Hi HWm).
@@ -477,7 +477,7 @@ Proof using.
            destruct HWm as [W0 HF0 | W0 j z u Wm1 Hj HWm1]; [discriminate Hww |].
            injection Hww as -> ->.
            left. left. apply existsb_exists. exists (<[j := u]> W0). split.
-           ++ apply elem_of_list_In, picks_spec. exists j, u. split; [exact Hj | reflexivity].
+           ++ apply list_elem_of_In, picks_spec. exists j, u. split; [exact Hj | reflexivity].
            ++ apply IH. exists Wm0, sp, c. split_and!; [exact HWm1 | exact Hsp | | exact Hp].
               exact Hm.
       * (* the stray's byte *)
@@ -498,11 +498,11 @@ Lemma line_termb_spec fc l b :
 Proof using.
   unfold line_termb. rewrite existsb_exists. split.
   - intros ([W s] & Hin & H). cbn [fst snd] in H.
-    apply elem_of_list_In, line_terms_spec in Hin.
+    apply list_elem_of_In, line_terms_spec in Hin.
     apply ptermb_spec in H as (Wm & sp & b' & HWm & Hsp & Hm & Hp).
     exists b'. split; [| exact Hp]. exists W, s, Wm, sp. split_and!; assumption.
   - intros (b' & (W & s & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp).
-    exists (W, s). split; [apply elem_of_list_In, line_terms_spec; exact Hlt |].
+    exists (W, s). split; [apply list_elem_of_In, line_terms_spec; exact Hlt |].
     cbn [fst snd]. apply ptermb_spec. exists Wm, sp, b'. split_and!; assumption.
 Qed.
 

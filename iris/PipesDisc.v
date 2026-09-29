@@ -160,10 +160,10 @@ Qed.
 Lemma split_sep_nosep (s : bytes) : wl_bar ∉ s -> split_sep s = [s].
 Proof using.
   induction s as [| x t IH]; intros Hs; [reflexivity |].
-  assert (Ht : wl_bar ∉ t) by (intros H; apply Hs; apply elem_of_list_further; exact H).
+  assert (Ht : wl_bar ∉ t) by (intros H; apply Hs; apply list_elem_of_further; exact H).
   assert (Hh : head t <> Some wl_bar).
   { destruct t as [| y t']; cbn [head]; [discriminate |].
-    intros Hy. injection Hy as ->. apply Ht. apply elem_of_list_here. }
+    intros Hy. injection Hy as ->. apply Ht. apply list_elem_of_here. }
   rewrite (split_sep_nb x t Hh), (IH Ht). reflexivity.
 Qed.
 
@@ -172,11 +172,11 @@ Proof using.
   induction s as [| x s' IH]; intros Hs.
   - cbn [app]. unfold pl_sep. cbn [app].
     rewrite split_sep_cons3. rewrite decide_True by reflexivity. reflexivity.
-  - assert (Hs' : wl_bar ∉ s') by (intros H; apply Hs; apply elem_of_list_further; exact H).
+  - assert (Hs' : wl_bar ∉ s') by (intros H; apply Hs; apply list_elem_of_further; exact H).
     assert (Hh : head (s' ++ pl_sep ++ t) <> Some wl_bar).
     { destruct s' as [| y s'']; cbn [head app].
       - unfold pl_sep. cbn [app head]. intros Hy. exact (wl_sp_ne_bar (f_equal (default wl_sp) Hy)).
-      - intros Hy. injection Hy as ->. apply Hs'. apply elem_of_list_here. }
+      - intros Hy. injection Hy as ->. apply Hs'. apply list_elem_of_here. }
     cbn [app]. rewrite (split_sep_nb x _ Hh), (IH Hs'). reflexivity.
 Qed.
 
@@ -369,7 +369,7 @@ Lemma split_sep_pl (p : producer) (fs : list filt) :
   split_sep (pl_body (LPipes p fs)) = prod_body p :: map filt_body fs.
 Proof using.
   intros Hp HF. rewrite pl_body_join. apply split_sep_join_nb; [exact (prod_body_nobar p Hp) |].
-  apply Forall_forall. intros t Ht. apply elem_of_list_fmap in Ht as (F & -> & HFin).
+  apply Forall_forall. intros t Ht. apply list_elem_of_fmap in Ht as (F & -> & HFin).
   exact (filt_body_nobar F (proj1 (Forall_forall _ _) HF F HFin)).
 Qed.
 
@@ -939,12 +939,12 @@ Proof using.
     destruct (decide (i = j)) as [-> | Hne].
     + rewrite Hj in Hi. injection Hi as ->.
       destruct (IH (<[j := s]> ss) j s r Hm') as [Hp Hr].
-      * apply list_lookup_insert. exact (lookup_lt_Some _ _ _ Hj).
+      * apply list_lookup_insert_eq. exact (lookup_lt_Some _ _ _ Hj).
       * intros i s' Hne Hi. rewrite list_lookup_insert_ne in Hi; [| done].
         pose proof (Hoth i s' Hne Hi) as H. destruct s' as [| y s'']; [exact I |].
         cbn in H |- *. intros Hy. apply H. by right.
       * split; [by apply prefix_cons |]. cbn [length drop].
-        rewrite list_insert_insert in Hr. exact Hr.
+        rewrite list_insert_insert_eq in Hr. exact Hr.
     + exfalso. pose proof (Hoth i (x :: s) Hne Hi) as H. cbn in H. apply H. by left.
 Qed.
 
@@ -970,8 +970,8 @@ Proof using.
     rewrite list_insert_id in Hm; [exact Hm | exact Hi].
   - change ((z :: x) ++ u) with (z :: (x ++ u)).
     apply (ma_take _ i z (x ++ y)); [exact Hi |].
-    apply IH; [apply list_lookup_insert; exact (lookup_lt_Some _ _ _ Hi) |].
-    rewrite list_insert_insert. exact Hm.
+    apply IH; [apply list_lookup_insert_eq; exact (lookup_lt_Some _ _ _ Hi) |].
+    rewrite list_insert_insert_eq. exact Hm.
 Qed.
 
 (* ---- two streams: the textbook shuffle, and [PipeDisc.pmerge] -------- *)
@@ -1545,7 +1545,7 @@ Proof using.
   - apply (merge_all_head_nohd _ _ _ _ Hm HF).
     pose proof (prefix_lookup_Some _ _ _ _ alt_panic_head Hp) as Hx.
     change (Some x = Some (Z_to_bv 8 102)) in Hx.
-    rewrite (inj Some _ _ Hx). exact (elem_of_list_lookup_2 _ _ _ alt_panic_head).
+    rewrite (inj Some _ _ Hx). exact (list_elem_of_lookup_2 _ _ _ alt_panic_head).
 Qed.
 
 (* ---- THE SHELL'S OWN ALTERNATIVES ARE BLOCKS of a line with runs ---- *)
@@ -1794,7 +1794,7 @@ Proof using.
         destruct Hbp as [[HW Hp'] | [Hd Hp']]; apply prefix_app_inv in Hp';
           [left | right]; split; assumption. }
       destruct Hx as [Hx | Hx]; [exact (Hxd Hx) |].
-      apply Hxi. unfold pan_i. apply elem_of_app. right. apply elem_of_list_singleton.
+      apply Hxi. unfold pan_i. apply elem_of_app. right. apply list_elem_of_singleton.
       apply bv_eq. rewrite Hx. by vm_compute.
 Qed.
 
@@ -2066,7 +2066,7 @@ Proof using.
   - left. rewrite Hf in Hc'. injection Hc' as <-. split; [exact H0 |]. split.
     + rewrite H1. destruct HA as [[Hc0 ->] | (_ & a & Ha & _ & ->)].
       * rewrite Hc0. reflexivity.
-      * apply elem_of_list_singleton in Ha. subst a. rewrite drop_all. reflexivity.
+      * apply list_elem_of_singleton in Ha. subst a. rewrite drop_all. reflexivity.
     + apply so_catf. exact Hf.
   - right; left. split; [exact H1 | split; [exact H0 |]].
     intros D HD. apply so_catf_halt; [exact Hf | exact HD].

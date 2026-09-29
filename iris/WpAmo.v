@@ -16,6 +16,7 @@
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.program_logic Require Import lifting.
+From iris.program_logic Require Import language.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.

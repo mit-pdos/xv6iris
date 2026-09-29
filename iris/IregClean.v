@@ -58,12 +58,12 @@ Section IregClean.
   Lemma ireg_snap_local_acc (E : coPset) (γfs : fs_names) :
     ↑ftopN ⊆ E ->
     (ftop_inv γfs : iProp Σ) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) (1/2) I ∗
+        ghost_map_auth_frac (fs_top γfs) (1/2) I ∗
         ⌜forall S : fs_state_rec, fss_inodes S = I -> snap_local S⌝ ∗
-        ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
-        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
+        ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
+        (ghost_map_auth_frac (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof using .
     iIntros (HE) "#Hi Htxa".
     iMod (ireg_clean_acc E γfs HE with "Hi Htxa")
@@ -86,12 +86,12 @@ Section IregClean.
     size T = size om ->
     om = ∅ ->
     (ftop_inv γfs : iProp Σ) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 T ={E, E ∖ ↑ftopN}=∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 T ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) (1/2) I ∗
+        ghost_map_auth_frac (fs_top γfs) (1/2) I ∗
         ⌜forall S : fs_state_rec, fss_inodes S = I -> snap_local S⌝ ∗
-        ghost_map_auth (ln_tx icfg_log) 1 T ∗
-        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
+        ghost_map_auth_frac (ln_tx icfg_log) 1 T ∗
+        (ghost_map_auth_frac (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof using .
     iIntros (HE Hsz Hom) "#Hi Htxa".
     rewrite (log_tx_empty_of_ops om T Hsz Hom).

@@ -601,7 +601,7 @@ Section ProofFreeproc.
           by (apply lookup_lt_is_Some_1; exists pid3; exact Hsj).
         apply Forall_lookup. intros i q Hi.
         destruct (decide (i = j)) as [-> | Hij].
-        - rewrite list_lookup_insert in Hi; [| exact Hjlt ].
+        - rewrite list_lookup_insert_eq in Hi; [| exact Hjlt ].
           injection Hi as <-. vm_compute. discriminate.
         - rewrite list_lookup_insert_ne in Hi;
             [| exact (fun Hc => Hij (eq_sym Hc)) ].

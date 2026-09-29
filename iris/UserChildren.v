@@ -62,11 +62,11 @@ Section UserChildren.
 
   (* the ENGINE's half: [UkRun.urun] carries it at the key's [uvis_ch] *)
   Definition uch_auth (γs : gname) (S : gset gname) : iProp Σ :=
-    ghost_var γs (1/2) S.
+    ghost_var_frac γs (1/2) S.
 
   (* the PROGRAM's half *)
   Definition uch (γs : gname) (S : gset gname) : iProp Σ :=
-    ghost_var γs (1/2) S.
+    ghost_var_frac γs (1/2) S.
 
   Global Instance uch_auth_timeless γs S : Timeless (uch_auth γs S).
   Proof using . apply _. Qed.
@@ -143,11 +143,11 @@ Section UserPid.
 
   (* the ENGINE's half: [UkRun.urun] carries it at [bv_unsigned (uvis_pid W)] *)
   Definition upid_auth (γp : gname) (p : Z) : iProp Σ :=
-    ghost_var γp (1/2) p.
+    ghost_var_frac γp (1/2) p.
 
   (* the PROGRAM's half *)
   Definition upid (γp : gname) (p : Z) : iProp Σ :=
-    ghost_var γp (1/2) p.
+    ghost_var_frac γp (1/2) p.
 
   Global Instance upid_auth_timeless γp p : Timeless (upid_auth γp p).
   Proof using . apply _. Qed.

@@ -76,13 +76,13 @@ Proof.
   intros Hf.
   unfold mk_pte, zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (44 + 10)) (44 + 10)) as [e | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e)).
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
@@ -104,7 +104,7 @@ Lemma subrange64_unsigned_7_0 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0.
@@ -118,7 +118,7 @@ Lemma subrange64_unsigned_53_10 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 10)) with 10.
   change (MachineWord.MachineWord.Z_idx (53 - 10 + 1)) with 44%N.
@@ -130,7 +130,7 @@ Lemma subrange64_unsigned_63_54 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 54)) with 54.
   change (MachineWord.MachineWord.Z_idx (63 - 54 + 1)) with 10%N.
@@ -218,15 +218,15 @@ Lemma pte_addr_at_unsigned (base : mword 44) (idx : mword 9) :
 Proof.
   unfold pte_addr_at, zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (9 + 3)) (9 + 3)) as [e1 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e1)).
   destruct (Z.eq_dec (Z.of_N (44 + Z.to_N (9 + 3))) (44 + (9 + 3))) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
@@ -298,13 +298,13 @@ Lemma page_base_unsigned (base : mword 44) :
 Proof.
   unfold zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (44 + 12)) (44 + 12)) as [e | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   change (bv_unsigned (MachineWord.MachineWord.zeros _)) with 0.
@@ -321,12 +321,11 @@ Lemma pt_add_vec_int_small (a : mword 64) (j : Z) :
   bv_unsigned (add_vec_int a j) = bv_unsigned a + j.
 Proof.
   intros Hj Hfit.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 64) = j).
-  { unfold mword_of_int, Values.to_word, get_word.
+  { unfold mword_of_int.
     cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn.
@@ -347,7 +346,7 @@ Lemma pt_mword9_of_nat (i : nat) :
   bv_unsigned (mword_of_int (Z.of_nat i) : mword 9) = Z.of_nat i.
 Proof.
   intros Hi.
-  unfold mword_of_int, Values.to_word, get_word. cbn.
+  unfold mword_of_int. cbn.
   rewrite Z_to_bv_unsigned. apply bv_wrap_small.
   unfold bv_modulus.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 9)) with 512. lia.
@@ -482,8 +481,8 @@ Lemma and27_ones (x m : mword 27) :
   bv_unsigned m = 2 ^ 27 - 1 -> and_vec x m = x.
 Proof.
   intro Hm. apply bv_eq.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [and_vec Operators_mwords.word_binop 
+       autocast].
   cbn.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
@@ -500,8 +499,8 @@ Lemma and44_ones (x m : mword 44) :
   bv_unsigned m = 2 ^ 44 - 1 -> and_vec x m = x.
 Proof.
   intro Hm. apply bv_eq.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [and_vec Operators_mwords.word_binop 
+       autocast].
   cbn.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
@@ -518,8 +517,8 @@ Lemma and64_zero_r (x m : mword 64) :
   bv_unsigned m = 0 -> and_vec x m = (zeros' 64 : mword 64).
 Proof.
   intro Hm. apply bv_eq.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [and_vec Operators_mwords.word_binop 
+       autocast].
   cbn.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
@@ -533,9 +532,9 @@ Lemma zero_extend64_id (x : mword 64) : zero_extend' 64 x = x.
 Proof.
   apply bv_eq.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word SailStdpp.Values.with_word autocast].
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.
@@ -544,9 +543,9 @@ Lemma zero_extend44_id (x : mword 44) : zero_extend' 44 x = x.
 Proof.
   apply bv_eq.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word SailStdpp.Values.with_word autocast].
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.
@@ -557,7 +556,7 @@ Proof.
   apply bv_eq.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
   rewrite Z.shiftr_0_r.
@@ -602,8 +601,8 @@ Qed.
 Lemma or64_zeros_r (x : mword 64) : or_vec x (zeros' 64) = x.
 Proof.
   apply bv_eq.
-  cbv [or_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [or_vec Operators_mwords.word_binop 
+       autocast].
   cbn.
   unfold MachineWord.MachineWord.or.
   rewrite bv_or_unsigned.
@@ -616,12 +615,12 @@ Lemma trunc44_zext (x : mword 44) : trunc 44 (zero_extend' 64 x) = x.
 Proof.
   apply bv_eq.
   unfold trunc, vector_truncate, slice.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word SailStdpp.Values.with_word autocast].
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
   rewrite Z.shiftr_0_r.
@@ -640,8 +639,8 @@ Lemma and45_ones (x m : mword 45) :
   bv_unsigned m = 2 ^ 45 - 1 -> and_vec x m = x.
 Proof.
   intro Hm. apply bv_eq.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [and_vec Operators_mwords.word_binop 
+       autocast].
   cbn.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.

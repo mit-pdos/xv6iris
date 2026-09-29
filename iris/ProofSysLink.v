@@ -389,7 +389,7 @@ Lemma sl_zext64_16_unsigned `{XI : CurCtx} (h : mword 16) :
   bv_unsigned (zero_extend' 64 h : mword 64) = bv_unsigned h.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
 Qed.
 
@@ -402,7 +402,7 @@ Proof.
   assert (Hhm32 : bv_half_modulus (MachineWord.MachineWord.Z_idx 32) = 2^31)
     by reflexivity.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   unfold bv_signed.

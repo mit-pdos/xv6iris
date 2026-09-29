@@ -43,7 +43,7 @@
    by the slot index, because the party that has to find its entry -- the
    process itself, at fork and at wait -- names the block and nothing else:
    with a map, holding the row PROVES which entry of the payload is yours
-   ([children_own_lookup]), where two halves of a per-slot [ghost_var]
+   ([children_own_lookup]), where two halves of a per-slot [ghost_var_frac]
    would leave a lock holder unable to say so.  A row's VALUE carries its
    owner's slot address beside its set, so that the tie below can name the
    owner at all.
@@ -269,7 +269,7 @@ Definition op_map (pa ip : mword 64) (O : orph_map) (S : gset gname) : orph_map 
 
 Lemma orph_row_insert (O : orph_map) (pa : mword 64) (S : gset gname) :
   orph_row (<[pa := S]> O) pa = S.
-Proof. rewrite /orph_row lookup_insert. reflexivity. Qed.
+Proof. rewrite /orph_row lookup_insert_eq. reflexivity. Qed.
 
 Lemma orph_row_insert_ne (O : orph_map) (pa pa' : mword 64) (S : gset gname) :
   pa <> pa' -> orph_row (<[pa := S]> O) pa' = orph_row O pa'.
@@ -303,9 +303,9 @@ Proof.
   intros Hm Hru γ1 γ2 pa' S1 S2 H1 H2.
   destruct (decide (γ1 = γ0)) as [-> | Hn1]; destruct (decide (γ2 = γ0)) as [-> | Hn2].
   - reflexivity.
-  - rewrite lookup_insert in H1. rewrite lookup_insert_ne in H2; [| congruence].
+  - rewrite lookup_insert_eq in H1. rewrite lookup_insert_ne in H2; [| congruence].
     apply (Hru γ0 γ2 pa' cs S2); [congruence | exact H2].
-  - rewrite lookup_insert in H2. rewrite lookup_insert_ne in H1; [| congruence].
+  - rewrite lookup_insert_eq in H2. rewrite lookup_insert_ne in H1; [| congruence].
     apply (Hru γ1 γ0 pa' S1 cs); [exact H1 | congruence].
   - rewrite lookup_insert_ne in H1; [| congruence].
     rewrite lookup_insert_ne in H2; [| congruence].
@@ -624,7 +624,7 @@ Section WaitInv.
      statement about ITSELF. *)
   Definition children_own_at
       (m : gmap gname (mword 64 * gset gname)) : iProp Σ :=
-    ghost_map_auth wch_name 1 m.
+    ghost_map_auth_frac wch_name 1 m.
 
   (* ONE PROCESS'S ROW, at the name its private block records
      ([ProcDefs.pv_chg]).  This is the resource behind
@@ -653,7 +653,7 @@ Section WaitInv.
 
   (* A ROW READS THE AUTHORITY -- the lemma the map shape exists for: a
      lock holder that also holds a row learns WHICH entry is its own, and
-     that is what a per-slot pair of [ghost_var] halves could not say. *)
+     that is what a per-slot pair of [ghost_var_frac] halves could not say. *)
   Lemma children_own_lookup m γ pa S :
     children_own_at m -∗ ch_frag γ pa S -∗ ⌜m !! γ = Some (pa, S)⌝.
   Proof using .
@@ -998,12 +998,12 @@ Section WaitInv.
   (* ([inv_slots]), and it is why nothing here has to name <init>: the    *)
   (* address reparent wrote is the key, whatever it is.                   *)
   (*                                                                      *)
-  (* WHOLLY THE KERNEL'S -- no fragment.  A [ghost_var] at the whole map, *)
+  (* WHOLLY THE KERNEL'S -- no fragment.  A [ghost_var_frac] at the whole map, *)
   (* at the canonical name [Xv6Cameras.worph_name]: exclusive ownership   *)
   (* is what makes the move a move, and a lock payload that owns the      *)
   (* whole thing needs no fragment algebra. *)
   Definition orphans_own (O : orph_map) : iProp Σ :=
-    ghost_var worph_name 1 O.
+    ghost_var_frac worph_name 1 O.
 
   Global Instance orphans_own_timeless O : Timeless (orphans_own O).
   Proof using . apply _. Qed.
@@ -1081,7 +1081,7 @@ Section WaitInv.
     iDestruct ("Hback" $! pa with "[Hsg Hpr]") as "Hgh".
     { case_bool_decide; [done |].
       iExists g, pid. iFrame "Hsg Hpr Hgs Hgp". iPureIntro.
-      apply list_lookup_insert. rewrite Hlgs. exact Hjlt. }
+      apply list_lookup_insert_eq. rewrite Hlgs. exact Hjlt. }
     iFrame "Hgh Hoi". iPureIntro.
     (* the slot [j] was free, so nothing already pointed at it *)
     assert (Hne : forall (k : nat) (v : mword 64),
@@ -1107,19 +1107,19 @@ Section WaitInv.
       destruct (decide (k1 = j)) as [-> | Hn1]; destruct (decide (k2 = j)) as [-> | Hn2].
       - reflexivity.
       - exfalso.
-        rewrite (list_lookup_insert gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg1.
+        rewrite (list_lookup_insert_eq gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg1.
         assert (Hgg : g' = g) by congruence. subst g'.
         rewrite list_lookup_insert_ne in Hk2; [| congruence].
         rewrite list_lookup_insert_ne in Hg2; [| congruence].
         pose proof (Hfresh k2 v2 Hk2 Hnz2 Hg2) as Hpk.
-        exact (Hn2 (proc_addr_inj k2 j (Hbnd k2 v2 ltac:(rewrite list_lookup_insert_ne; [exact Hk2 | congruence])) (Hbnd j pa (list_lookup_insert ps j pa Hjlt)) Hpk)).
+        exact (Hn2 (proc_addr_inj k2 j (Hbnd k2 v2 ltac:(rewrite list_lookup_insert_ne; [exact Hk2 | congruence])) (Hbnd j pa (list_lookup_insert_eq ps j pa Hjlt)) Hpk)).
       - exfalso.
-        rewrite (list_lookup_insert gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg2.
+        rewrite (list_lookup_insert_eq gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg2.
         assert (Hgg : g' = g) by congruence. subst g'.
         rewrite list_lookup_insert_ne in Hk1; [| congruence].
         rewrite list_lookup_insert_ne in Hg1; [| congruence].
         pose proof (Hfresh k1 v1 Hk1 Hnz1 Hg1) as Hpk.
-        exact (Hn1 (proc_addr_inj k1 j (Hbnd k1 v1 ltac:(rewrite list_lookup_insert_ne; [exact Hk1 | congruence])) (Hbnd j pa (list_lookup_insert ps j pa Hjlt)) Hpk)).
+        exact (Hn1 (proc_addr_inj k1 j (Hbnd k1 v1 ltac:(rewrite list_lookup_insert_ne; [exact Hk1 | congruence])) (Hbnd j pa (list_lookup_insert_eq ps j pa Hjlt)) Hpk)).
       - rewrite list_lookup_insert_ne in Hk1; [| congruence].
         rewrite list_lookup_insert_ne in Hk2; [| congruence].
         rewrite list_lookup_insert_ne in Hg1; [| congruence].
@@ -1129,7 +1129,7 @@ Section WaitInv.
     { (* inv_rows *)
       intros γ1 pa' S' g' H1 Hnz Hin.
       destruct (decide (γ1 = γ0)) as [-> | Hn].
-      - rewrite lookup_insert in H1.
+      - rewrite lookup_insert_eq in H1.
         assert (Hpa : pa' = pa) by congruence.
         assert (HS : S' = cs ∪ {[g]}) by congruence. subst pa' S'.
         apply elem_of_union in Hin as [Hin | Hin].
@@ -1137,8 +1137,8 @@ Section WaitInv.
           exists k. destruct (Hpsne k pa Hk Hnz) as [Hk' Hg'].
           split; [exact Hk' | rewrite Hg'; exact Hgk].
         + apply elem_of_singleton in Hin. subst g'.
-          exists j. split; [exact (list_lookup_insert ps j pa Hjlt)
-                           | apply list_lookup_insert; rewrite Hlgs; exact Hjlt].
+          exists j. split; [exact (list_lookup_insert_eq ps j pa Hjlt)
+                           | apply list_lookup_insert_eq; rewrite Hlgs; exact Hjlt].
       - rewrite lookup_insert_ne in H1; [| congruence].
         destruct (Hir γ1 pa' S' g' H1 Hnz Hin) as (k & Hk & Hgk).
         exists k. destruct (Hpsne k pa' Hk Hnz) as [Hk' Hg'].
@@ -1152,11 +1152,11 @@ Section WaitInv.
     { (* inv_slots *)
       intros k v g' Hk Hnz Hg.
       destruct (decide (k = j)) as [-> | Hn].
-      - left. rewrite (list_lookup_insert ps j pa Hjlt) in Hk.
-        rewrite (list_lookup_insert gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg.
+      - left. rewrite (list_lookup_insert_eq ps j pa Hjlt) in Hk.
+        rewrite (list_lookup_insert_eq gs j g ltac:(rewrite Hlgs; exact Hjlt)) in Hg.
         assert (Hv : v = pa) by congruence.
         assert (Hgg : g' = g) by congruence. subst v g'.
-        exists γ0, (cs ∪ {[g]}). rewrite lookup_insert.
+        exists γ0, (cs ∪ {[g]}). rewrite lookup_insert_eq.
         split; [reflexivity | set_solver].
       - rewrite list_lookup_insert_ne in Hk; [| congruence].
         rewrite list_lookup_insert_ne in Hg; [| congruence].
@@ -1166,7 +1166,7 @@ Section WaitInv.
         + rewrite Hm in H1.
           assert (Hv : v = pa) by congruence.
           assert (HS : S1 = cs) by congruence. subst v S1.
-          exists γ0, (cs ∪ {[g]}). rewrite lookup_insert.
+          exists γ0, (cs ∪ {[g]}). rewrite lookup_insert_eq.
           split; [reflexivity | set_solver].
         + exists γ1, S1. rewrite lookup_insert_ne; [| congruence].
           split; [exact H1 | exact Hg1]. }
@@ -1245,7 +1245,7 @@ Section WaitInv.
     { (* inv_rows *)
       intros γ1 pa' S' g H1 Hnz Hin.
       destruct (decide (γ1 = γ0)) as [-> | Hn].
-      - rewrite lookup_insert in H1.
+      - rewrite lookup_insert_eq in H1.
         assert (HS : S' = (∅ : gset gname)) by congruence. subst S'.
         exfalso. set_solver.
       - rewrite lookup_insert_ne in H1; [| congruence].
@@ -1370,7 +1370,7 @@ Section WaitInv.
                      v <> (zero_reg : mword 64) -> k' <> k /\ ps !! k' = Some v).
     { intros k' v Hk' Hnz.
       destruct (decide (k' = k)) as [-> | Hn].
-      - rewrite (list_lookup_insert ps k (zero_reg : mword 64) Hklt) in Hk'.
+      - rewrite (list_lookup_insert_eq ps k (zero_reg : mword 64) Hklt) in Hk'.
         exfalso. apply Hnz. congruence.
       - rewrite list_lookup_insert_ne in Hk'; [| congruence]. split; [exact Hn | exact Hk']. }
     (* ...and a slot that is not [k] survives the store *)
@@ -1391,7 +1391,7 @@ Section WaitInv.
     { (* inv_rows *)
       intros γ1 pa' S' g' H1 Hnz Hin.
       destruct (decide (γ1 = γ0)) as [-> | Hn].
-      - rewrite lookup_insert in H1.
+      - rewrite lookup_insert_eq in H1.
         assert (Hpa : pa' = pj) by congruence.
         assert (HS : S' = cs ∖ {[g]}) by congruence. subst pa' S'.
         assert (Hne : g' <> g) by set_solver.
@@ -1434,7 +1434,7 @@ Section WaitInv.
         + rewrite Hm in H1.
           assert (Hv : v = pj) by congruence.
           assert (HS : S1 = cs) by congruence. subst v S1.
-          left. exists γ0, (cs ∖ {[g]}). rewrite lookup_insert.
+          left. exists γ0, (cs ∖ {[g]}). rewrite lookup_insert_eq.
           split; [reflexivity | set_solver].
         + left. exists γ1, S1. rewrite lookup_insert_ne; [| congruence].
           split; [exact H1 | exact Hg1].
@@ -1603,7 +1603,7 @@ Section WaitInv.
      [SlotGen] beside the pid ledger because the counter uses the ambient
      [mono_natG] of [riscvGS], which [SlotGen]'s section does not bind; it
      is born at 0 in [children_res_alloc] below. *)
-  Definition tick_cnt (n : nat) : iProp Σ := mono_nat_auth_own wtk_name 1 n.
+  Definition tick_cnt (n : nat) : iProp Σ := mono_nat_auth_own_frac wtk_name 1 n.
   Definition tick_lb (n : nat) : iProp Σ := mono_nat_lb_own wtk_name n.
 
   Global Instance tick_lb_persistent n : Persistent (tick_lb n).
@@ -1622,7 +1622,7 @@ Section WaitInv.
   Lemma tick_lb_le n m : tick_cnt n -∗ tick_lb m -∗ ⌜(m ≤ n)%nat⌝.
   Proof using .
     rewrite /tick_cnt /tick_lb. iIntros "Ha Hb".
-    by iDestruct (mono_nat_lb_own_valid with "Ha Hb") as %[_ ?].
+    by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hb") as %[_ ?].
   Qed.
 
   Lemma tick_cnt_raise n m : (n ≤ m)%nat -> tick_cnt n ==∗ tick_cnt m.
@@ -1865,9 +1865,9 @@ Section WaitInvBoot.
        S = (∅ : gset gname) /\
        forall i : nat, (k <= i < k + n)%nat -> pa <> proc_addr i) ->
     rows_unique m ->
-    ghost_map_auth γ 1 m ==∗
+    ghost_map_auth_frac γ 1 m ==∗
     ∃ m' : gmap gname (mword 64 * gset gname),
-      ghost_map_auth γ 1 m' ∗
+      ghost_map_auth_frac γ 1 m' ∗
       ⌜rows_unique m' /\
        forall (γ0 : gname) (pa : mword 64) (S : gset gname),
          m' !! γ0 = Some (pa, S) -> S = (∅ : gset gname)⌝ ∗
@@ -1889,7 +1889,7 @@ Section WaitInvBoot.
                  forall i : nat, (S k <= i < S k + n)%nat -> pa <> proc_addr i).
       { intros γ1 pa Sx H1.
         destruct (decide (γ1 = γ0)) as [-> | Hn].
-        - rewrite lookup_insert in H1.
+        - rewrite lookup_insert_eq in H1.
           assert (Hpa : pa = proc_addr k) by congruence.
           assert (HS : Sx = (∅ : gset gname)) by congruence. subst pa Sx.
           split; [reflexivity |]. intros i Hi Hpi.
@@ -1902,11 +1902,11 @@ Section WaitInvBoot.
       { intros γ1 γ2 pa S1 S2 H1 H2.
         destruct (decide (γ1 = γ0)) as [-> | Hn1]; destruct (decide (γ2 = γ0)) as [-> | Hn2].
         - reflexivity.
-        - rewrite lookup_insert in H1.
+        - rewrite lookup_insert_eq in H1.
           assert (Hpa : pa = proc_addr k) by congruence. subst pa.
           rewrite lookup_insert_ne in H2; [| congruence].
           exfalso. exact (proj2 (Hm γ2 (proc_addr k) S2 H2) k ltac:(lia) eq_refl).
-        - rewrite lookup_insert in H2.
+        - rewrite lookup_insert_eq in H2.
           assert (Hpa : pa = proc_addr k) by congruence. subst pa.
           rewrite lookup_insert_ne in H1; [| congruence].
           exfalso. exact (proj2 (Hm γ1 (proc_addr k) S1 H1) k ltac:(lia) eq_refl).

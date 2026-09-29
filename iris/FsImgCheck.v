@@ -445,7 +445,7 @@ Proof. rewrite <- fsimg_Ph_eq. vm_eq. Qed.
 Lemma fsimg_live_set_elem (z : Z) :
   z ∈ fs_live_set fsimg_P fsimg_sb <-> 1 <= z <= 23.
 Proof.
-  rewrite fsimg_live_set, elem_of_list_to_set, elem_of_list_fmap.
+  rewrite fsimg_live_set, elem_of_list_to_set, list_elem_of_fmap.
   split.
   - intros (k & -> & Hk). apply elem_of_seq in Hk. lia.
   - intros Hz. exists (Z.to_nat z).

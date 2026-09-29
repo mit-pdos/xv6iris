@@ -131,8 +131,7 @@ Definition i_addr (ip : mword 64) (j : nat) : mword 64 :=
 Local Lemma iv_addv_assoc (a b c : mword 64) :
   add_vec (add_vec a b) c = add_vec a (add_vec b c).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   apply bv_eq. rewrite !bv_add_unsigned.
   unfold bv_wrap. rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc.
   reflexivity.
@@ -633,11 +632,11 @@ Proof.
   rewrite /bm_blocks elem_of_difference elem_of_singleton elem_of_list_to_set.
   split.
   - intros [Hin Hnz]. split; [exact Hnz|].
-    apply elem_of_list_fmap in Hin as (i & -> & Hi).
+    apply list_elem_of_fmap in Hin as (i & -> & Hi).
     exists i. split; [|reflexivity].
     apply elem_of_seq in Hi. lia.
   - intros (Hnz & i & Hi & <-). split; [|exact Hnz].
-    apply elem_of_list_fmap. exists i. split; [reflexivity|].
+    apply list_elem_of_fmap. exists i. split; [reflexivity|].
     apply elem_of_seq. lia.
 Qed.
 
@@ -674,7 +673,7 @@ Proof.
   { destruct (decide (MAXFILE = j)); [unfold MAXFILE, NDIRECT in *; lia|reflexivity]. }
   destruct (decide ((i < NDIRECT)%nat)) as [Hlt|Hge].
   - destruct (decide (i = j)) as [->|Hij].
-    + rewrite list_lookup_total_insert; [reflexivity | lia].
+    + rewrite list_lookup_total_insert_eq; [reflexivity | lia].
     + rewrite list_lookup_total_insert_ne; [reflexivity | lia].
   - destruct (decide (i = j)) as [->|_]; [lia | reflexivity].
 Qed.
@@ -692,7 +691,7 @@ Proof.
   - destruct (decide (i = (NDIRECT + q)%nat)); [lia | reflexivity].
   - destruct (decide (i = (NDIRECT + q)%nat)) as [->|Hij].
     + rewrite Nat.add_comm Nat.add_sub.
-      rewrite list_lookup_total_insert; [reflexivity | lia].
+      rewrite list_lookup_total_insert_eq; [reflexivity | lia].
     + rewrite list_lookup_total_insert_ne; [reflexivity | lia].
 Qed.
 
@@ -1020,20 +1019,20 @@ Section InodeRes.
     assert (Hndl : base.NoDup l) by exact (NoDup_cons_1_2 i l Hnd).
     rewrite big_sepL_cons.
     assert (Hmem' : forall j : nat, j ∈ l -> f j <> 0 -> f j ∈ U)
-      by (intros j Hj; apply Hmem; by apply elem_of_list_further).
+      by (intros j Hj; apply Hmem; by apply list_elem_of_further).
     assert (Hinj' : forall j k : nat, j ∈ l -> k ∈ l ->
                       f j <> 0 -> f j = f k -> j = k)
-      by (intros j k Hj Hk; apply Hinj; by apply elem_of_list_further).
+      by (intros j k Hj Hk; apply Hinj; by apply list_elem_of_further).
     assert (Hhole' : forall j : nat, j ∈ l -> f j = 0 -> True ⊢ Psi j)
-      by (intros j Hj; apply Hhole; by apply elem_of_list_further).
+      by (intros j Hj; apply Hhole; by apply list_elem_of_further).
     assert (Hstep' : forall j : nat, j ∈ l -> f j <> 0 -> Phi (f j) ⊢ Psi j)
-      by (intros j Hj; apply Hstep; by apply elem_of_list_further).
+      by (intros j Hj; apply Hstep; by apply list_elem_of_further).
     destruct (decide (f i = 0)) as [Hz|Hnz].
     - iIntros "H". iSplitR "H".
-      { iApply (Hhole i (elem_of_list_here _ _) Hz). done. }
+      { iApply (Hhole i (list_elem_of_here _ _) Hz). done. }
       iApply (IH U Hndl Hmem' Hinj' Hhole' Hstep'). iExact "H".
     - assert (Hfi : f i ∈ U)
-        by (apply Hmem; [apply elem_of_list_here | exact Hnz]).
+        by (apply Hmem; [apply list_elem_of_here | exact Hnz]).
       assert (Hmem2 : forall j : nat, j ∈ l -> f j <> 0 ->
                         f j ∈ U ∖ {[f i]}).
       { intros j Hj Hjnz. apply elem_of_difference.
@@ -1041,12 +1040,12 @@ Section InodeRes.
         rewrite elem_of_singleton. intros Heq.
         assert (i = j) as ->.
         { apply Hinj;
-            [apply elem_of_list_here | by apply elem_of_list_further
+            [apply list_elem_of_here | by apply list_elem_of_further
             | exact Hnz | by rewrite Heq]. }
         contradiction. }
       rewrite (big_sepS_delete Phi U (f i) Hfi).
       iIntros "[Hi Hrest]". iSplitL "Hi".
-      { iApply (Hstep i (elem_of_list_here _ _) Hnz). iExact "Hi". }
+      { iApply (Hstep i (list_elem_of_here _ _) Hnz). iExact "Hi". }
       iApply (IH (U ∖ {[f i]}) Hndl Hmem2 Hinj' Hhole' Hstep'). iExact "Hrest".
   Qed.
 

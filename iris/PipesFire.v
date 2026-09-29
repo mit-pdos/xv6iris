@@ -66,7 +66,7 @@ Lemma wids_from_elem (k n : nat) (w : wid) :
   match w with WSh j | WLeft j => k <= j < k + n | WLast => True end.
 Proof using.
   revert k. induction n as [| n IH]; intros k; cbn [wids_from].
-  - rewrite elem_of_list_singleton. destruct w; split; try lia; try done.
+  - rewrite list_elem_of_singleton. destruct w; split; try lia; try done.
   - rewrite !elem_of_cons, IH. destruct w as [j | j |]; split.
     + intros [Hq | [Hq | Hq]]; [injection Hq as ->; lia | discriminate | lia].
     + intros Hj. destruct (decide (j = k)) as [-> | Hne]; [by left | right; right; lia].
@@ -460,12 +460,13 @@ Section build.
 
   Lemma rep_S2 {A : Type} (x : A) (m : nat) :
     replicate (2 * S m) x = x :: replicate (2 * m + 1) x.
-  Proof using. replace (2 * S m) with (S (2 * m + 1)) by lia. reflexivity. Qed.
+  Proof using. clear F. replace (2 * S m) with (S (2 * m + 1)) by lia. reflexivity. Qed.
 
   Lemma wids_from_nil (src : wid -> bytes) (k m : nat) :
     (forall j, k <= j < k + m -> src (WSh j) = [] /\ src (WLeft j) = []) -> src WLast = [] ->
     src <$> wids_from k m = replicate (2 * m + 1) [].
   Proof using.
+    clear F. (* unused; else Rocq counts it as used (asks for Proof using … F) *)
     revert k. induction m as [| m IH]; intros k Hs Hl; cbn [wids_from].
     - rewrite fmap_cons, fmap_nil, Hl. reflexivity.
     - destruct (Hs k ltac:(lia)) as [H1 H2]. rewrite !fmap_cons, H1, H2.
@@ -599,7 +600,7 @@ Section real2.
     (v <$> wids_from k m) = replicate (2 * m + 1) [] -> x ∈ wids_from k m -> v x = [].
   Proof using.
     intros Heq Hx. apply (replicate_nil_elem (v <$> wids_from k m) (2 * m + 1)); [exact Heq |].
-    apply elem_of_list_fmap. by exists x.
+    apply list_elem_of_fmap. by exists x.
   Qed.
 
   (* a middle stage's print, read at its filter *)

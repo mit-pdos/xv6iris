@@ -1350,6 +1350,7 @@ Section UkShMalloc.
   Lemma ushm_hdr_of_ubytes (a : Z) (f : nat -> bv 8) :
     ubytes γd a 16 f -∗ ∃ (nxt : mword 64) (nu : Z), ushm_hdr a nxt nu.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     assert (E : (16 = 8 + (4 + 4))%nat) by lia.
     rewrite E !ubytes_app.
     assert (E8 : (a + Z.of_nat 8) = a + 8) by lia.

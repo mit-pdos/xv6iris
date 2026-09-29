@@ -340,7 +340,7 @@ Lemma arow_at_witness (i : Z) (a : anode) :
 Proof.
   rewrite /arow_at. destruct (decide (an_nlink a = 0%nat)).
   - exact (lookup_empty i).
-  - exact (lookup_singleton i a).
+  - exact (lookup_singleton_eq i a).
 Qed.
 
 (* THE VIEW-PRESERVING RETAG (app-instances.md section 7, round E1).  A
@@ -675,5 +675,5 @@ Proof.
     by (rewrite (abs_view_lookup_of I i n Hi); exact Heq).
   destruct (abs_of n') as [a |] eqn:Hn'.
   - rewrite (abs_view_insert I i n' a Hn'). apply insert_id. by rewrite Hrow.
-  - rewrite (abs_view_insert_None I i n' Hn'). apply delete_notin. by rewrite Hrow.
+  - rewrite (abs_view_insert_None I i n' Hn'). apply delete_id. by rewrite Hrow.
 Qed.

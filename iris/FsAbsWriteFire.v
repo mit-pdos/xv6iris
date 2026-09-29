@@ -22,7 +22,7 @@
 
    and the prover's only source of [astate] is the γtop authority inside
    [InodeRegion.ftop_inv].  Borrowing it is fine; GIVING IT BACK is not.
-   [astate Γ av] is [∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝]
+   [astate Γ av] is [∃ I, ghost_map_auth_frac (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝]
    and [abs_view] IS NOT INJECTIVE, so what a client's fupd returns is an
    authority at SOME map with the right READING -- while [ftop_body]'s row
    ([ftop_clean I A]) is a statement about the RECORDS.  Concretely: a
@@ -545,7 +545,7 @@ Section WriteFire.
   (* =================================================================== *)
 
   (* THE FULL-CHUNK COMMIT: the two-phase fire at the RAW MAP, with the very
-     same [ghost_map_auth] handed back, so the invariant's row obligation
+     same [ghost_map_auth_frac] handed back, so the invariant's row obligation
      survives; phase 2 is quantified over the POST map and constrained by its
      READING alone -- AND WITH THE OFFSET FOLDED IN (OffGv.v).  The kernel
      lends its half of the descriptor's offset shadow at the offset the chunk
@@ -588,16 +588,16 @@ Section WriteFire.
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
        ⌜ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) bs⌝ -∗
        ⌜Z.of_nat (length bs) = wchunk_at n k⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             (* THE HALF COMES BACK AT ONE OF TWO VALUES (lane WRITE-RELAY,
                for lane SKELETON's [Hoff_link]): UNMOVED, which is all a
                node with no user half can do, or ADVANCED BY THE CHUNK,
@@ -662,13 +662,13 @@ Section WriteFire.
        ⌜(r < length bs)%nat -> wr_fail_why P ua (Z.to_nat n)⌝ -∗
        ⌜wi_blocks off (Z.to_nat (wchunk_at n k)) = 1%nat -> r = 0%nat⌝ -∗
        ⌜ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) (take r bs)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             (* ...at one of two values, as the full arm's -- and here the
                advance is by the COUNT the kernel returned, not by the run
                that landed, exactly as [wrf_apart_fire]'s payout is. *)
@@ -799,13 +799,13 @@ Section WriteFire.
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
        ⌜ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) bs⌝ -∗
        ⌜Z.of_nat (length bs) = wchunk_at n k⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             off_link γo (Z.of_nat (off + length bs)) ∗
             REST))%I.
 
@@ -823,13 +823,13 @@ Section WriteFire.
        ⌜(r < length bs)%nat -> wr_fail_why P ua (Z.to_nat n)⌝ -∗
        ⌜wi_blocks off (Z.to_nat (wchunk_at n k)) = 1%nat -> r = 0%nat⌝ -∗
        ⌜ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k)) (take r bs)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             off_link γo (Z.of_nat (off + r)) ∗
             REST))%I.
 
@@ -1040,7 +1040,7 @@ Section WriteFire.
     { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
       case_decide as Hz.
       - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
-        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_id _ _ Hnone).
       - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
                       (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -1057,7 +1057,7 @@ Section WriteFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     (* THE ADVANCE: the user side answers at its own supplier, and both
@@ -1120,7 +1120,7 @@ Section WriteFire.
     { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
       case_decide as Hz.
       - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
-        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_id _ _ Hnone).
       - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
                       (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -1138,7 +1138,7 @@ Section WriteFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hf Hg Hrest".
@@ -1271,7 +1271,7 @@ Section WriteFire.
     { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
       case_decide as Hz.
       - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
-        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_id _ _ Hnone).
       - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
                       (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -1287,7 +1287,7 @@ Section WriteFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     (* THE ADVANCE, at the COUNT writei returned: the user side answers at
@@ -1343,7 +1343,7 @@ Section WriteFire.
     { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
       case_decide as Hz.
       - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
-        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_notin _ _ Hnone).
+        rewrite (delta_write_absent _ _ _ _ Hnone). exact (delete_id _ _ Hnone).
       - by rewrite (delta_write_file (abs_view I) i off bs bs0 nl
                       (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
@@ -1359,7 +1359,7 @@ Section WriteFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hf Hg Hrest".

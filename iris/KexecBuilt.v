@@ -870,7 +870,7 @@ Lemma elf_wf_phdrs_nonneg (f : elf_bytes) :
   elf_wf f = true -> phdrs_nonneg (elf_loads f).
 Proof.
   intros Hwf. apply Forall_lookup. intros i p Hp.
-  destruct (elf_wf_phdr_ok f p Hwf (elem_of_list_lookup_2 _ _ _ Hp)).
+  destruct (elf_wf_phdr_ok f p Hwf (list_elem_of_lookup_2 _ _ _ Hp)).
   lia.
 Qed.
 
@@ -1067,7 +1067,7 @@ Proof.
   rewrite Hid in Hr.
   assert (Hin : p ∈ elf_loads f)
     by (rewrite Hr; apply elem_of_app; left; exact Hp).
-  apply elem_of_list_lookup in Hin as [j Hj].
+  apply list_elem_of_lookup in Hin as [j Hj].
   exact (Forall_lookup_1 _ _ _ _ Hok Hj).
 Qed.
 
@@ -1089,7 +1089,7 @@ Proof.
     by (apply kxb_loads_S_load; exact Hty).
   assert (Hpok : phdr_ok f p)
     by (apply (kxb_walk_phdr_ok f ef (S i) p Hw Hi);
-        rewrite HSi; apply elem_of_app; right; apply elem_of_list_singleton;
+        rewrite HSi; apply elem_of_app; right; apply list_elem_of_singleton;
         reflexivity).
   assert (Htk : take k (elf_loads f) = kxb_loads f ef i).
   { rewrite <- Hid. apply kxb_loads_take. lia. }
@@ -1100,7 +1100,7 @@ Proof.
   assert (Hlk : elf_loads f !! k = Some p).
   { assert (Hpref : take (S k) (elf_loads f) !! k = Some p).
     { rewrite HtSk. apply list_lookup_middle. unfold k. reflexivity. }
-    rewrite lookup_take in Hpref by lia. exact Hpref. }
+    rewrite lookup_take_lt in Hpref by lia. exact Hpref. }
   assert (Hnn : phdrs_nonneg (elf_loads f)).
   { unfold phdrs_nonneg. apply Forall_lookup. intros j q Hq.
     pose proof (Forall_lookup_1 _ _ _ _ Hok Hq) as Hq'.
@@ -1230,7 +1230,7 @@ Proof.
       rewrite (kxb_loads_of_list f ef ps (length ps) ltac:(lia) Hag').
       rewrite take_ge by lia. unfold elf_loads. rewrite Hps. reflexivity.
     + apply Forall_forall. intros p Hp.
-      apply elf_wf_phdr_ok; [exact Hwf | apply elem_of_list_In; exact Hp].
+      apply elf_wf_phdr_ok; [exact Hwf | apply list_elem_of_In; exact Hp].
     + exact Hasc.
   - intros i Hi. rewrite Hphnum in Hi. rewrite (Hoff i Hi).
     pose proof (elf_wf_ph_window f e Hwf He) as Hwin.
@@ -1255,7 +1255,7 @@ Proof.
   intros Hw Hi Hty. pose proof Hw as (Hid & _ & _).
   assert (HSi : kxb_phdr f ef i ∈ kxb_loads f ef (S i)).
   { rewrite (kxb_loads_S_load f ef i Hty).
-    apply elem_of_app; right; apply elem_of_list_singleton; reflexivity. }
+    apply elem_of_app; right; apply list_elem_of_singleton; reflexivity. }
   destruct (kxb_loads_prefix f ef (S i) (Z.to_nat (eh_phnum ef)) Hi) as [r Hr].
   rewrite Hid in Hr. rewrite Hr. apply elem_of_app. by left.
 Qed.
@@ -1272,7 +1272,7 @@ Proof.
   intros Hi Hty Hbad (Hl & Hw & _). apply Hbad.
   pose proof (kxb_load_hdr_in f ef i Hw Hi Hty) as Hin.
   destruct Hw as (_ & Hok & _). destruct Hl as (_ & _ & Hfa & _).
-  apply elem_of_list_lookup in Hin as [j Hj].
+  apply list_elem_of_lookup in Hin as [j Hj].
   split; [exact (Forall_lookup_1 _ _ _ _ Hok Hj) |].
   exact (Forall_lookup_1 _ _ _ _ Hfa Hj).
 Qed.
@@ -1301,7 +1301,7 @@ Proof.
   intros Hp. unfold kexec_sz_after.
   rewrite foldl_kx_grow_map, foldl_Zmax_foldr.
   apply foldr_Zmax_elem.
-  apply elem_of_list_fmap. exists p. split; [reflexivity | exact Hp].
+  apply list_elem_of_fmap. exists p. split; [reflexivity | exact Hp].
 Qed.
 
 (* ...and a segment's own bytes live inside its own [vaddr] window, which
@@ -1445,7 +1445,7 @@ Proof.
       * apply uimg_sub_umem_grow. exact (Hsub q Hq).
     + (* THIS segment: the file half from the window, the bss half from
          the zeros uvmalloc left *)
-      apply elem_of_list_singleton in Hq. rewrite Hq.
+      apply list_elem_of_singleton in Hq. rewrite Hq.
       apply uimg_sub_seg_map.
       * exact (uimg_sub_seg_file_map_win f p Mo Hpok Hwin).
       * exact (uimg_sub_seg_zero_map p Mo Hmf Hzero).
@@ -1495,7 +1495,7 @@ Proof.
   intros Hok Ha. unfold elf_image in Ha.
   apply segs_union_lookup_inv in Ha as (p & Hp & Hg).
   pose proof (kexec_sz_after_elem (elf_loads f) p Hp) as Htop.
-  apply elem_of_list_lookup in Hp as [j Hj].
+  apply list_elem_of_lookup in Hp as [j Hj].
   pose proof (Forall_lookup_1 _ _ _ _ Hok Hj) as Hpok.
   pose proof (seg_map_lookup_range f p a b Hpok Hg). lia.
 Qed.
@@ -1797,7 +1797,7 @@ Lemma kexec_seg_pg_below (f : elf_bytes) (j : nat) (p : elf_phdr) (b : Z) :
 Proof.
   intros Hj [_ [Hlo Hhi]].
   pose proof (kexec_sz_after_elem (elf_loads f) p
-                (elem_of_list_lookup_2 _ _ _ Hj)).
+                (list_elem_of_lookup_2 _ _ _ Hj)).
   pose proof (pgroundup_nonneg (kexec_sz_after (take j (elf_loads f)))
                 (kexec_sz_after_nonneg _)). lia.
 Qed.
@@ -1886,7 +1886,7 @@ Qed.
 (* THE INTRODUCTION IN THE SHAPE [kxc_c_setup] HOLDS IT: the table is
    uvmalloc's, with the guard leaf overwritten by uvmclear at
    [kexec_pg top].  All the map algebra stays here -- the kexec proofs
-   import the Sail instance modules, where [lookup_insert]'s type-class
+   import the Sail instance modules, where [lookup_insert_eq]'s type-class
    inference on [gmap (mword 27)] does not resolve. *)
 Lemma kxb_perm_ok_intro_set (f : elf_bytes) (um : gmap (mword 27) (mword 64))
     (sz top : Z) (xg wstk : mword 64) :
@@ -1902,7 +1902,7 @@ Proof.
   intros Htm Htmod Ht Hsegs Hxg Hstk Hstkp Hne.
   apply kxb_perm_ok_intro.
   - apply kxb_perm_segs_insert; assumption.
-  - exists xg. split; [apply lookup_insert | exact Hxg].
+  - exists xg. split; [apply lookup_insert_eq | exact Hxg].
   - exists wstk. split; [| exact Hstkp].
     rewrite lookup_insert_ne; [exact Hstk | exact Hne].
 Qed.

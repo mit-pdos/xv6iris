@@ -152,7 +152,7 @@ Proof.
   rewrite Hs.
   assert (Hq : shiftr w 4 = (mword_of_int (bv_unsigned w / 16) : mword 32)).
   { apply bv_eq.
-    unfold shiftr, SailStdpp.Values.with_word, get_word,
+    unfold shiftr,
       MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (H4 : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -218,7 +218,7 @@ Lemma iu_sext_mod16 (w : mword 32) :
   bv_unsigned (sign_extend' 64 w : mword 64) `mod` 16 = bv_unsigned w `mod` 16.
 Proof.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       SailStdpp.Values.to_word to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   unfold bv_wrap.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)
@@ -267,7 +267,7 @@ Proof.
                = shiftl (mword_of_int r : mword 64) 6).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftl, SailStdpp.Values.with_word, get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)
@@ -317,7 +317,7 @@ Proof.
               = mword_of_int (Z.of_nat nn)).
   { rewrite Hn. apply bv_eq.
     unfold sign_extend', Operators_mwords.sign_extend,
-      Operators_mwords.exts_vec, SailStdpp.Values.to_word, to_word, get_word,
+      Operators_mwords.exts_vec,
       MachineWord.MachineWord.sign_extend.
     rewrite bv_sign_extend_unsigned.
     assert (Hu : bv_signed (mword_of_int d : mword 12) = d).
@@ -818,7 +818,7 @@ Proof.
                = shiftr (mword_of_int (bv_unsigned w) : mword 64) 4).
   { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)

@@ -110,8 +110,8 @@ Section ProofNameiTrMain.
     assert (E1 : pa_add (pa_stk sp0 4) 8 = pa_stk sp0 3)
       by (rewrite (pa_stk_next sp0 4 ltac:(lia)); reflexivity).
     iIntros "H1 H2".
-    iDestruct (slot_bytes_own with "H1") as "[%Ha1 B1]".
-    iDestruct (slot_bytes_own with "H2") as "[%Ha2 B2]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H1") as "[%Ha1 B1]".
+    iDestruct (slot_bytes_own (KTR := KT1) with "H2") as "[%Ha2 B2]".
     iSplitR; [done |].
     change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iSplitL "B1"; [iExact "B1" | iExact "B2"].
@@ -128,8 +128,8 @@ Section ProofNameiTrMain.
       by (rewrite (pa_stk_next sp0 4 ltac:(lia)); reflexivity).
     iIntros "B". change 16%nat with (8 + 8)%nat.
     rewrite bytes_own_app E1. iDestruct "B" as "[B1 B2]".
-    iDestruct (bytes_own_slot _ Ha1 with "B1") as (w1) "H1".
-    iDestruct (bytes_own_slot _ Ha2 with "B2") as (w2) "H2".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha1 with "B1") as (w1) "H1".
+    iDestruct (bytes_own_slot (KTR := KT1) _ Ha2 with "B2") as (w2) "H2".
     iExists w1, w2. iFrame.
   Qed.
 

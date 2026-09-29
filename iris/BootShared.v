@@ -1328,20 +1328,20 @@ Section BootAlloc.
      strans_pending_at (strans_name c))%I.
 
   Definition hart_sie (c : CPU) : iProp Σ :=
-    (ghost_var (sie_name c) (1/2)%Qp sie_bit_off ∗
-     ghost_var (sie_name c) (1/4)%Qp sie_bit_off ∗
-     ghost_var (sie_name c) (1/4)%Qp sie_bit_off)%I.
+    (ghost_var_frac (sie_name c) (1/2)%Qp sie_bit_off ∗
+     ghost_var_frac (sie_name c) (1/4)%Qp sie_bit_off ∗
+     ghost_var_frac (sie_name c) (1/4)%Qp sie_bit_off)%I.
 
   (* the SPP mirror's two halves, as adequacy mints them.  Its own family
      rather than a conjunct of [hart_sie]: [power_boot_res] hands the two
      out as separate big-ops, and the unpacking below is pure conversion. *)
   Definition hart_spp (c : CPU) : iProp Σ :=
-    (ghost_var (spp_name c) (1/2)%Qp sie_bit_off ∗
-     ghost_var (spp_name c) (1/2)%Qp sie_bit_off)%I.
+    (ghost_var_frac (spp_name c) (1/2)%Qp sie_bit_off ∗
+     ghost_var_frac (spp_name c) (1/2)%Qp sie_bit_off)%I.
 
   Definition hart_spie (c : CPU) : iProp Σ :=
-    (ghost_var (spie_name c) (1/2)%Qp sie_bit_off ∗
-     ghost_var (spie_name c) (1/2)%Qp sie_bit_off)%I.
+    (ghost_var_frac (spie_name c) (1/2)%Qp sie_bit_off ∗
+     ghost_var_frac (spie_name c) (1/2)%Qp sie_bit_off)%I.
 
   (* this hart's HELD-LOCK AUTHORITY at the empty set (LockSet.v), as
      adequacy mints it -- its own family for the same reason [hart_spp] is
@@ -1813,7 +1813,7 @@ Section BootAlloc.
          ⌜virtio_live c0 = false⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c0) ∗
       ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
          i ↪[dn_head γv] st) ∗
-      ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
+      ghost_map_auth_frac (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
       disk_done_lb γv 0%nat ∗
       kpt_unset ∗ kptb_unset ∗ kmap_auth kmap_M0 ∗
       (* THE BOOT MINT IS GONE FROM THIS INTERFACE, and that is stage (d2b):

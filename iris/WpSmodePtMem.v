@@ -160,8 +160,8 @@ Local Lemma data2_id_4 (v : mword 32) :
     update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v = v.
   Proof.
     apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
     erewrite bv_concat_unsigned by (cbn; lia).
     erewrite bv_concat_unsigned by (cbn; lia).
     rewrite !bv_unsigned_N_0.
@@ -1220,7 +1220,7 @@ Section WpSmodePtMemLeaves.
                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                         ppn v dqm Hcan
                         ltac:(apply Forall_forall; intros j Hj;
-                              apply elem_of_list_In, elem_of_seq in Hj;
+                              apply list_elem_of_In, elem_of_seq in Hj;
                               destruct Hj as [_ Hjw];
                               pose proof (Nat2Z.inj_lt j 4) as Hnz;
                               change (Z.of_nat 4) with 4%Z in Hnz; lia)
@@ -1569,7 +1569,7 @@ Section WpSmodePtMemLeaves.
                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                         ppn v dqm Hcan
                         ltac:(apply Forall_forall; intros j Hj;
-                              apply elem_of_list_In, elem_of_seq in Hj;
+                              apply list_elem_of_In, elem_of_seq in Hj;
                               destruct Hj as [_ Hjw];
                               pose proof (Nat2Z.inj_lt j 8) as Hnz;
                               change (Z.of_nat 8) with 8%Z in Hnz; lia)

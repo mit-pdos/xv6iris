@@ -250,8 +250,7 @@ Proof using .
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite HK.
   apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
   rewrite (moi32_small (2 ^ 32 - 1) ltac:(lia)).
@@ -550,7 +549,7 @@ Section IputTail.
         itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' k -∗
         [∗ list] j ∈ seq 0 NINODE, itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' j) ∗
      (∃ tst : nat,
-        mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
         TsoGhost.llb loglen_name tst ∗ TsoCtx.ctx_floor CtxIdDefs.cur_ctx tst) ∗
      (∃ (x0 : ic_x) (td T0 : nat),
         ⌜x0 ≠ IcRaw⌝ ∗
@@ -1308,7 +1307,7 @@ Section IputTail.
                      icnt_half (bv_unsigned inum) 0%nat ∗
                      frz_mir_back FrzOff (frz_close FrzOff)
                        (bv_unsigned inum) ∗
-                     mono_nat_auth_own (icfg_istmp k) 1 tstk ∗
+                     mono_nat_auth_own_frac (icfg_istmp k) 1 tstk ∗
                      P))%I)
                 (((i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)) ∗
                   (∀ P : iProp Σ,
@@ -1319,12 +1318,12 @@ Section IputTail.
                      icnt_half (bv_unsigned inum) 0%nat ∗
                      frz_mir_back FrzOff (frz_close FrzOff)
                        (bv_unsigned inum) ∗
-                     mono_nat_auth_own (icfg_istmp k) 1 tstk ∗
+                     mono_nat_auth_own_frac (icfg_istmp k) 1 tstk ∗
                      P))%I)
                 ((itable_half (delete k Mt) ∗ isl_slot (delete k Mt) k ∗
                   ifreeze_off (bv_unsigned inum) ∗
                   icnt_half (bv_unsigned inum) 0%nat ∗
-                  mono_nat_auth_own (icfg_istmp k) 1 tstk ∗
+                  mono_nat_auth_own_frac (icfg_istmp k) 1 tstk ∗
                   (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)))%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
                 ltac:(solve_ndisj) _
@@ -1406,7 +1405,7 @@ Section IputTail.
           [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. rewrite lookup_delete_ne;
           [reflexivity | by apply not_eq_sym]. }
-      { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_delete.
+      { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_delete_eq.
         iSplitL "Hrd Hc".
         { rewrite /ic_slot_row. iExists td'. iSplitL; [| iExact "Hllbd'"].
           iExists (SlotReg td' false None None). iFrame "Hrd Hc Hllbd'".
@@ -1425,7 +1424,7 @@ Section IputTail.
                    with "[%] [%] [Hdh Hinh Hgidf HgidT Hpinr]") as "Hslots".
       { intros i Hi. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
-      { rewrite /islot2 !lookup_delete. rewrite /islot_empty /islot_free_at /inode_ident.
+      { rewrite /islot2 !lookup_delete_eq. rewrite /islot_empty /islot_free_at /inode_ident.
         iExists icfg_dev, inum. iFrame "Hdh Hinh".
         iSplitL "Hgidf HgidT"; [iApply (ic_id_quarters_join with "Hgidf HgidT") | iExact "Hpinr"]. }
       (* THE DEPOSIT (durable-disk B''-esc): an ORDINARY row goes back into
@@ -1517,7 +1516,7 @@ Section IputTail.
                    isl_slot (<[k := (qrest, npred)]> Mt) k ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat npred) ∗
                    (∃ tstn : nat, ⌜(loip <= tstn)%nat⌝ ∗
-                      mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                      mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                       TsoGhost.llb loglen_name tstn)))%I)
                 ((IcacheInv.pinw_store_post k
                     (mword_of_int (Z.pos npred) : mword 32) loip ∗
@@ -1529,13 +1528,13 @@ Section IputTail.
                    isl_slot (<[k := (qrest, npred)]> Mt) k ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat npred) ∗
                    (∃ tstn : nat, ⌜(loip <= tstn)%nat⌝ ∗
-                      mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                      mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                       TsoGhost.llb loglen_name tstn)))%I)
                 ((itable_half (<[k := (qrest, npred)]> Mt) ∗
                   isl_slot (<[k := (qrest, npred)]> Mt) k ∗
                   icnt_half (bv_unsigned inum) (Pos.to_nat npred) ∗
                   (∃ tstn : nat, ⌜(loip <= tstn)%nat⌝ ∗
-                     mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                     mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                      TsoGhost.llb loglen_name tstn))%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
                 ltac:(solve_ndisj) _
@@ -1605,7 +1604,7 @@ Section IputTail.
       { intros i Hi. rewrite lookup_insert_ne;
           [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. reflexivity. }
-      { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert.
+      { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert_eq.
         iSplitL "Hrd Hc".
         { rewrite /ic_slot_row.
           iExists td'. iSplitL; [| iExact "Hllbd"].
@@ -1636,7 +1635,7 @@ Section IputTail.
                    with "[%] [%] [Hrest Hiu Hgid Hcnt1 Hpark]") as "Hslots".
       { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. reflexivity. }
-      { rewrite /islot2 lookup_insert Hcik. iFrame. }
+      { rewrite /islot2 lookup_insert_eq Hcik. iFrame. }
       iApply (ip_tail_exit CID0 j
  Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Upr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
@@ -1649,7 +1648,7 @@ Section IputTail.
         - intros i Hi. destruct (decide (i = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
         - intros i qi ni Hi. destruct (decide (i = k)) as [->|Hne].
-          + rewrite lookup_insert in Hi. apply Some_inj in Hi.
+          + rewrite lookup_insert_eq in Hi. apply Some_inj in Hi.
             injection Hi as _ Hn. subst ni.
             pose proof (Hcnt' k qt cnt HMk) as Hb. rewrite -Hzs. lia.
           + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
@@ -2408,8 +2407,7 @@ Section IputFreePath.
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite HK.
     apply bv_eq.
-    unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
     rewrite bv_add_unsigned.
     rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
     rewrite (moi32_small (2 ^ 32 - 1) ltac:(lia)).
@@ -2652,7 +2650,7 @@ Section IputFreePath.
        ⌜forall j0, j0 <> k -> ci' !! j0 = ci !! j0⌝ -∗
        itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' k -∗
        [∗ list] j0 ∈ seq 0 NINODE, itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' j0) -∗
-    (∃ tst : nat, mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗ TsoGhost.llb loglen_name tst) -∗
+    (∃ tst : nat, mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗ TsoGhost.llb loglen_name tst) -∗
     ic_regd k (SlotReg td true (Some (icfg_dev, inum)) (Some (IcLoaded g1 dn bm, T0))) -∗
     TsoGhost.llb loglen_name td -∗
     ⌜(T0 <= Kw)%nat⌝ -∗
@@ -3400,9 +3398,9 @@ Section IputFreePath.
                   (IcacheInv.iref_pin_rows k (iref_word Mt2 k) lo tstk2
                      ={⊤ ∖ ↑minstretN ∖ ↑icacheN, ⊤ ∖ ↑minstretN}=∗
                    itable_half Mt2 ∗
-                   mono_nat_auth_own (icfg_istmp k) (1/2) tstk2))%I)
+                   mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk2))%I)
               (itable_half Mt2 ∗
-               mono_nat_auth_own (icfg_istmp k) (1/2) tstk2)%I
+               mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk2)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk2]").
@@ -3527,7 +3525,7 @@ Section IputFreePath.
                    ifreeze_post rg (bv_unsigned inum) ∗
                    icnt_half (bv_unsigned inum) 0%nat ∗
                    frzm_h (bv_unsigned inum) false ∗
-                   mono_nat_auth_own (icfg_istmp k) 1 tstk2 ∗
+                   mono_nat_auth_own_frac (icfg_istmp k) 1 tstk2 ∗
                    P))%I)
               (((i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)) ∗
                 (∀ P : iProp Σ,
@@ -3537,13 +3535,13 @@ Section IputFreePath.
                    ifreeze_post rg (bv_unsigned inum) ∗
                    icnt_half (bv_unsigned inum) 0%nat ∗
                    frzm_h (bv_unsigned inum) false ∗
-                   mono_nat_auth_own (icfg_istmp k) 1 tstk2 ∗
+                   mono_nat_auth_own_frac (icfg_istmp k) 1 tstk2 ∗
                    P))%I)
               ((itable_half (delete k Mt2) ∗ isl_slot (delete k Mt2) k ∗
                 ifreeze_post rg (bv_unsigned inum) ∗
                 icnt_half (bv_unsigned inum) 0%nat ∗
                 frzm_h (bv_unsigned inum) false ∗
-                mono_nat_auth_own (icfg_istmp k) 1 tstk2 ∗
+                mono_nat_auth_own_frac (icfg_istmp k) 1 tstk2 ∗
                 (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
               ltac:(solve_ndisj) _
@@ -3625,7 +3623,7 @@ Section IputFreePath.
         [reflexivity | by apply not_eq_sym]. }
     { intros i0 Hi0. rewrite lookup_delete_ne;
         [reflexivity | by apply not_eq_sym]. }
-    { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_delete.
+    { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_delete_eq.
       iSplitL "Hreg Hc".
       { rewrite /ic_slot_row. iExists td'. iSplitL; [| iExact "Hllbd'"].
         iExists (SlotReg td' false None None). iFrame "Hreg Hc Hllbd'".
@@ -3639,7 +3637,7 @@ Section IputFreePath.
                  with "[%] [%] [Hdh Hinh Hgidf HgidT Hpinr]") as "Hslots".
     { intros i0 Hi0. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
     { intros i0 Hi0. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
-    { rewrite /islot2 !lookup_delete. rewrite /islot_empty /islot_free_at /inode_ident.
+    { rewrite /islot2 !lookup_delete_eq. rewrite /islot_empty /islot_free_at /inode_ident.
       iExists icfg_dev, inum. iFrame "Hdh Hinh".
       iSplitL "Hgidf HgidT"; [iApply (ic_id_quarters_join with "Hgidf HgidT") | iExact "Hpinr"]. }
     iEval (rewrite Hcnt1 Hpos1) in "Hiu".
@@ -3664,6 +3662,10 @@ Section IputFreePath.
        deposit cannot reach the pool (the itable lock goes at +0x94) but it
        DOES open this escrow, so the fragment travels the road the standing
        freeze already travels and the deposit ties it region-side. *)
+    (* the goal's fupd (from [fupd_wp]: [iris_invGS riscv_irisGS]) and the lemma's
+       ([riscvF_invGS]) are the same instance up to unfolding; [iMod] needs them equal *)
+    change (@uPred_bi_fupd HasLc Σ (@iris_invGS HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ riscvGS0))))
+      with (@uPred_bi_fupd HasLc Σ (@riscvF_invGS Σ (@riscv_fixedGS Σ riscvGS0))).
     iMod (escA_alloc ⊤ fsc_fs (bv_unsigned inum) rg with "Hfzpost [Htop2]")
       as (ge gr gd) "(#Hescr & Htkr & Htkd)";
       [iExists (era_node dn bm data2);
@@ -4094,7 +4096,7 @@ Section IputFreePath.
           ⌜forall j0, j0 <> k -> ci' !! j0 = ci !! j0⌝ -∗
           itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' k -∗
           [∗ list] j0 ∈ seq 0 NINODE, itable_slot_res_llb CtxIdDefs.cur_ctx M' ci' j0) -∗
-       (∃ tst : nat, mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗ TsoGhost.llb loglen_name tst) -∗
+       (∃ tst : nat, mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗ TsoGhost.llb loglen_name tst) -∗
        ic_regd k (SlotReg td true (Some (icfg_dev, inum)) (Some (IcLoaded g1 dn bm, T0))) -∗
        TsoGhost.llb loglen_name td -∗
        ⌜(T0 <= Kw)%nat⌝ -∗
@@ -5358,9 +5360,9 @@ Section ProofIput.
                   (IcacheInv.iref_pin_rows k (iref_word Mt k) lo tstk0
                      ={⊤ ∖ ↑minstretN ∖ ↑icacheN, ⊤ ∖ ↑minstretN}=∗
                    itable_half Mt ∗
-                   mono_nat_auth_own (icfg_istmp k) (1/2) tstk0))%I)
+                   mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk0))%I)
               (itable_half Mt ∗
-               mono_nat_auth_own (icfg_istmp k) (1/2) tstk0)%I
+               mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk0)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk0]").

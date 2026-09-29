@@ -22,7 +22,7 @@
 (* fire.  The claim law is therefore stated DUPLICATING ([app_pred]       *)
 (* comes back, because the fire puts the body back), and the TAINT [T] is *)
 (* Persistent AND Timeless (the claim sits under [app_body]'s later, and  *)
-(* the fires strip it).  The invariant's own half of [ghost_map_auth      *)
+(* the fires strip it).  The invariant's own half of [ghost_map_auth_frac      *)
 (* (fs_top γfs)] is what identifies the map the application speaks about  *)
 (* with the map the kernel lends at the fire.                             *)
 (*                                                                       *)
@@ -223,14 +223,14 @@ Section PinnedObs.
   (* ------------------------------------------------------------------ *)
 
   (* [FsAbsEra.elend_aents] with the reading taken straight off the
-     [ghost_map_auth] rather than off an [astate] the caller holds: the
+     [ghost_map_auth_frac] rather than off an [astate] the caller holds: the
      application's invariant owns half the authority, and half is all an
      agreement needs.  This is the step [FsAbsEra.elend_astate_q]'s note
      calls "a consumer that opens ftopN INSIDE the hop's fupd" -- here the
      half comes out of [appN] instead. *)
   Lemma pobs_elend_aents (γfs : fs_names) (q : Qp) (I : gmap Z fs_node)
       (d : Z) (dq : dfrac) (ents : gmap fname Z) :
-    ghost_map_auth (fs_top γfs) q I -∗
+    ghost_map_auth_frac (fs_top γfs) q I -∗
     elend (fs_gamma_L γfs) d dq ents -∗
     ⌜aents (abs_view I) d = Some ents⌝.
   Proof using .
@@ -246,7 +246,7 @@ Section PinnedObs.
      it binds. *)
   Lemma pobs_elend_astep (γfs : fs_names) (q : Qp) (I : gmap Z fs_node)
       (d : Z) (dq : dfrac) (ents : gmap fname Z) (s : fname) :
-    ghost_map_auth (fs_top γfs) q I -∗
+    ghost_map_auth_frac (fs_top γfs) q I -∗
     elend (fs_gamma_L γfs) d dq ents -∗
     ⌜astep (abs_view I) d s = ents !! s⌝.
   Proof using .

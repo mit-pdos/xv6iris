@@ -491,7 +491,7 @@ Section UShPipesDefs.
     rewrite {1}/blkN_body. iDestruct "Hb" as "[Hfam | Hdone]"; last first.
     { iDestruct (blkN_done_not wsN γc w (1/2) c Hw with "Hcw Hdone") as %[]. }
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
-    destruct (elem_of_list_lookup_1 wsN w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 wsN w Hw) as (i & Hi).
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hb") as "[Hw Hcl]".
     rewrite {1}/wstN. iDestruct "Hw" as "(Hc' & Hm' & Hd)".
     rewrite /wcurN /wmodeN.
@@ -519,7 +519,7 @@ Section UShPipesDefs.
     rewrite {1}/blkN_body. iDestruct "Hb" as "[Hfam | Hdone]"; last first.
     { iDestruct (blkN_done_not wsN γc w (1/2) c Hw with "Hcw Hdone") as %[]. }
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
-    destruct (elem_of_list_lookup_1 wsN w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 wsN w Hw) as (i & Hi).
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hb") as "[Hw Hcl]".
     rewrite {1}/wstN. iDestruct "Hw" as "(Hc' & Hm' & Hd)".
     rewrite /wcurN /wmodeN.
@@ -650,7 +650,7 @@ Lemma cmtN_fire_wid (md : wid -> option bytes) (sel : list wid) (w : wid) (s : b
   x <> w -> cmtN (mdupd md w s) (sel ++ [w]) x = cmtN md sel x.
 Proof using.
   intros Hne. rewrite /cmtN /mdupd decide_False; [| exact Hne].
-  apply bool_decide_ext. rewrite elem_of_app elem_of_list_singleton. tauto.
+  apply bool_decide_ext. rewrite elem_of_app list_elem_of_singleton. tauto.
 Qed.
 
 Lemma vsrc_fire (md : wid -> option bytes) (sel : list wid) (w : wid) (s : bytes)

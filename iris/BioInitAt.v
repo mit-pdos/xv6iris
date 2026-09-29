@@ -72,9 +72,9 @@ Section BioInitAt.
         two halves at 0 *)
      ([∗ list] k ∈ seq 0 NBUF,
         own (bn_pres bn k) (● (∅ : gmapUR (bio_id * nat) ufracR)) ∗
-        (ghost_var (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
-         ghost_var (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id)) ∗
-        ghost_var (bn_regd bn k) 1
+        (ghost_var_frac (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+         ghost_var_frac (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id)) ∗
+        ghost_var_frac (bn_regd bn k) 1
           (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None : slot_reg bio_id bio_x) ∗
         (bcnt_var (bn_regc bn k) 0 ∗ bcnt_var (bn_regc bn k) 0)))%I.
 
@@ -111,9 +111,9 @@ Section BioInitAt.
     ⊢ |==> ∃ fs fp fd fc : nat -> gname,
         [∗ list] k ∈ seq j n,
           own (fs k) (● (∅ : gmapUR (bio_id * nat) ufracR)) ∗
-          (ghost_var (fp k) (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
-           ghost_var (fp k) (1/2) (L2Reg 0 None : l2_reg bio_id)) ∗
-          ghost_var (fd k) 1
+          (ghost_var_frac (fp k) (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+           ghost_var_frac (fp k) (1/2) (L2Reg 0 None : l2_reg bio_id)) ∗
+          ghost_var_frac (fd k) 1
             (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None : slot_reg bio_id bio_x) ∗
           (bcnt_var (fc k) 0 ∗ bcnt_var (fc k) 0).
   Proof using .
@@ -227,7 +227,7 @@ Section BioInitAt.
                ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
                  (sl_free_pair (bn_slk bn k) ∗ lock_tok_excl (bn_own bn k) ∗
                   lock_tok_excl (bn_mid bn k))) ∗
-                ghost_var (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id))
+                ghost_var_frac (bn_regp bn k) (1/2) (L2Reg 0 None : l2_reg bio_id))
                ={E}=∗ own_context cur_ctx ∗
                is_sleeplock_genl (fst (bn_slk bn k)) (snd (bn_slk bn k))
                  (buf_lock (bnode k)) "buffer"%string (bslp bn k) sl_untracked)%I

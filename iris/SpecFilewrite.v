@@ -818,6 +818,7 @@ Section SpecFilewrite.
   Lemma write_cons_arms_zero (P : uptd) (ua : mword 64) (Q : nat -> iProp Σ) :
     Q 0%nat -∗ write_cons_arms P ua Q 0 (mword_of_int 0 : mword 64).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     iIntros "H". iLeft. iSplitR; [iPureIntro; split; [done | lia]|].
     iExact "H".
   Qed.
@@ -831,6 +832,7 @@ Section SpecFilewrite.
     ((r < n)%Z -> write_cons_short P ua (Z.to_nat r) n) ->
     Q (Z.to_nat r) -∗ write_cons_arms P ua Q n (mword_of_int r : mword 64).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     iIntros (Hn Hr Hsh) "H".
     destruct (Z.eq_dec r n) as [-> | Hne].
     - iLeft. iSplitR; [by iPureIntro|]. iExact "H".
@@ -1076,6 +1078,7 @@ Section SpecFilewrite.
     Q 0%nat -∗
     write_arms_at Γ i γo P n M ua Q (mword_of_int (-1) : mword 64).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hn. iIntros "Hc".
     rewrite /write_arms_at. iRight.
     iSplitR; [done |]. rewrite /write_post_fail_at.
@@ -1093,6 +1096,7 @@ Section SpecFilewrite.
     awrite_chain Γ appE i γo M ua n Q 0%nat (wchunks n) -∗
     write_arms_at Γ i γo P n M ua Q (mword_of_int (-1) : mword 64).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hn. iIntros "Hc".
     iDestruct (awrite_chain_at_of Γ appE i γo M ua n Q 0%nat (wchunks n) P
                  with "Hc") as "Hc".
@@ -1128,7 +1132,8 @@ Section SpecFilewrite.
         rewrite /filewrite_in_held.
         iIntros "[Hc | [Hc _]]".
         * iDestruct ("Hc" $! P with "[//]") as "Hc".
-          iEval (rewrite (wchunks_nonpos n ltac:(lia))) in "Hc".
+          assert (Hw0 : wchunks n = 0%nat) by (apply wchunks_nonpos; lia).
+          iEval (rewrite Hw0) in "Hc".
           by iApply (write_arms_at_neg_held (fs_gamma_L fsc_fs) i γo P n M ua Q Hn
                        with "Hc").
         * by iApply (write_arms_at_neg with "Hc").

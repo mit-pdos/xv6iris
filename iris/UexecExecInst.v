@@ -1472,7 +1472,7 @@ Section UexecExecInst.
     { destruct st as [| rb wb [i g om | gp | mj]];
         [ exact I | exact I | | exact I ].
       exfalso.
-      exact (Hnp _ (elem_of_list_lookup_2 _ _ _ Hk) rb wb gp eq_refl). }
+      exact (Hnp _ (list_elem_of_lookup_2 _ _ _ Hk) rb wb gp eq_refl). }
     iApply (pipe_row_reg_nopipe st Hst).
   Qed.
 

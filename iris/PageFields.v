@@ -50,12 +50,11 @@ Lemma pa_add_unsigned (a : mword 64) (j : Z) :
   bv_unsigned (add_vec_int a j) = bv_unsigned a + j.
 Proof.
   intros Hj Hfit.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 64) = j).
-  { unfold mword_of_int, Values.to_word, get_word.
+  { unfold mword_of_int.
     cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn.

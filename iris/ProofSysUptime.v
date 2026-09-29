@@ -74,7 +74,7 @@ Proof.
   assert (Hr : forall y : mword 64, shift_bits_right y su_sh32 = shiftr y 32).
   { intro y. unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hl. rewrite Hr. apply bv_eq.
-  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left, MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned. rewrite bv_shiftl_unsigned.
   assert (H32 : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 32)) = 32).
@@ -82,7 +82,7 @@ Proof.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
   rewrite H32.
   assert (Hze : bv_unsigned (zero_extend' 64 (trunc32 x)) = bv_unsigned (trunc32 x)).
-  { cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
+  { cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec 
          MachineWord.MachineWord.zero_extend].
     rewrite bv_zero_extend_unsigned. reflexivity.
     first [ lia | vm_compute; discriminate | done ]. }

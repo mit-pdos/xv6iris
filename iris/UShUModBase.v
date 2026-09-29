@@ -155,7 +155,7 @@ Proof using. reflexivity. Qed.
 (* the round's line is the last of the input's lines (the witness [flw]
    ends at it, sync SY3-A3bc) *)
 Lemma ulines_in_last (I : list (bv 8)) :
-  (0 < nlines I)%nat -> stdpp.list_basics.last (UnionAdm.ulines_in I) = Some (ul I).
+  (0 < nlines I)%nat -> stdpp.list_basics.list.last (UnionAdm.ulines_in I) = Some (ul I).
 Proof using.
   intros Hp. rewrite last_lookup UnionAdm.ulines_in_length.
   rewrite /UnionAdm.ulines_in list_lookup_fmap ul_lastbody /UkSh.ush_lastbody.

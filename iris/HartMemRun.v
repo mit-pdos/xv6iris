@@ -170,7 +170,7 @@ Proof.
     rewrite H0 in H1. apply Some_inj in H1. exact H1.
   - exfalso. revert Hrb. unfold read_bytes.
     case_match eqn:Hm; [congruence|]. intros _.
-    apply stdpp.list_monad.mapM_None_1, List.Exists_exists in Hm.
+    apply stdpp.list_monad.list.mapM_None_1, List.Exists_exists in Hm.
     destruct Hm as (j & Hj & Hnone).
     apply List.in_seq in Hj.
     assert (Hjn : (N.of_nat j < n)%N) by lia.
@@ -731,9 +731,9 @@ Lemma foldr_ins_dom (pa : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
 Proof.
   induction js as [|j js IH]; cbn [foldr]; intros Hd; [reflexivity|].
   rewrite dom_insert_L.
-  rewrite (IH (fun j' Hj' => Hd j' (elem_of_list_further j' j js Hj'))).
+  rewrite (IH (fun j' Hj' => Hd j' (list_elem_of_further j' j js Hj'))).
   assert (Hin : pa_add pa j ∈ dom mm)
-    by (apply elem_of_dom, Hd, elem_of_list_here).
+    by (apply elem_of_dom, Hd, list_elem_of_here).
   set_solver.
 Qed.
 

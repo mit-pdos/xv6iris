@@ -41,11 +41,11 @@ Section UserCwd.
 
   (* the ENGINE's half: [UkRun.urun] carries it at the key's [uvis_cwd] *)
   Definition ucwd_auth (γc : gname) (c : Z) : iProp Σ :=
-    ghost_var γc (1/2) c.
+    ghost_var_frac γc (1/2) c.
 
   (* the PROGRAM's half *)
   Definition ucwd (γc : gname) (c : Z) : iProp Σ :=
-    ghost_var γc (1/2) c.
+    ghost_var_frac γc (1/2) c.
 
   Global Instance ucwd_auth_timeless γc c : Timeless (ucwd_auth γc c).
   Proof using . apply _. Qed.

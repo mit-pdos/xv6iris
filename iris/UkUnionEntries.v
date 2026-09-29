@@ -217,7 +217,7 @@ Section UkUnionLend.
   Proof using .
     intros Hf. iIntros "!>" (c Hc).
     change (gR (PA sb) (S gen_id) v I c) with (upr ug (S gen_id) v I c).
-    iApply (upr_free ug). exact (proj1 (Forall_forall _ _) Hf c (proj1 (elem_of_list_In _ _) Hc)).
+    iApply (upr_free ug). exact (proj1 (Forall_forall _ _) Hf c (proj1 (list_elem_of_In _ _) Hc)).
   Qed.
 
   (* echo's lend at the console: the block at its first byte, code 0 *)
@@ -298,7 +298,7 @@ Section UkUnionLend.
                 [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I ps cs sb pos
                 [ualt_code (UR RCRan)]
                 ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
-                ltac:(intros x Hx; apply elem_of_list_singleton in Hx as ->; constructor)
+                ltac:(intros x Hx; apply list_elem_of_singleton in Hx as ->; constructor)
                 ltac:(constructor;
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I
                       | constructor ])
@@ -413,7 +413,7 @@ Section UkUnionEntries.
       { iApply (fif_exit_k_cons_g gf r N' γreg [0%nat] w0 q s U (PA sb) LK [0%nat] v I0 F
                   eq_refl eq_refl eq_refl with "[] HF").
         iIntros "!>" (a) "%Ha Hpost Hdq HF".
-        apply elem_of_list_singleton in Ha as ->.
+        apply list_elem_of_singleton in Ha as ->.
         rewrite Hpq. iApply ("HQ" with "Hpost Hdq HF"). }
       iApply (fif_env_res_g gf r Heq N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                 (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
@@ -596,9 +596,9 @@ Section UkUnionEntries.
                 (cat_env0 (ucat_alts nm (snd <$> s !! nm)) files [nm])
                 (take NSTD sts) eq_refl Hd0 Hrow Hbnd ltac:(discriminate)
                 ltac:(intros; reflexivity)
-                ltac:(cbn [cat_env0 pe_paths]; intros p; rewrite elem_of_list_singleton;
+                ltac:(cbn [cat_env0 pe_paths]; intros p; rewrite list_elem_of_singleton;
                       intros ->; split; [exact Hu | exact Hrd])
-                ltac:(cbn [cat_env0 pe_paths pe_files]; intros p; rewrite elem_of_list_singleton;
+                ltac:(cbn [cat_env0 pe_paths pe_files]; intros p; rewrite list_elem_of_singleton;
                       intros ->; exact Hfiles)
                 with "Hstd [Hcwd] Hk [] [Hdq] Hpool [Hc]").
       - by rewrite Hcw.

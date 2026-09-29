@@ -345,7 +345,6 @@ Proof.
   split.
   - constructor; rewrite ?uint_unsigned;
       try (rewrite Z.rem_mod_nonneg; [ | lia | lia ]); try lia.
-    + exact (Hmod n1 ltac:(lia) ltac:(lia)).
     + intros Hpos.
       destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.
@@ -359,9 +358,6 @@ Proof.
       apply Hb. lia.
   - constructor; rewrite ?uint_unsigned ?Hu1;
       try (rewrite Z.rem_mod_nonneg; [ | lia | lia ]); try lia.
-    + rewrite Zminus_mod Hal Hn1r. reflexivity.
-    + replace (bv_unsigned sp0 - n1 - n2) with (bv_unsigned sp0 - (n1 + n2)) by lia.
-      pose proof (Hmod (n1 + n2) ltac:(lia) ltac:(lia)). lia.
     + intros Hpos.
       destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.
@@ -899,9 +895,9 @@ Proof.
   split; intros [Hd He]; split; try exact Hd; intros k Hk.
   - apply He. destruct (decide (k < a)); [ by left | right ].
     destruct (decide (a + n <= k)); [ done | ].
-    exfalso. apply Hk. exists (a, n). split; [ apply elem_of_list_here | ]. simpl. lia.
+    exfalso. apply Hk. exists (a, n). split; [ apply list_elem_of_here | ]. simpl. lia.
   - apply He. intros (w & Hw & Hin).
-    apply elem_of_list_singleton in Hw. subst w. simpl in Hin. lia.
+    apply list_elem_of_singleton in Hw. subst w. simpl in Hin. lia.
 Qed.
 
 Lemma uM_only_in_trans (M1 M2 M3 : gmap Z (bv 8)) (ws : list (Z * Z)) :

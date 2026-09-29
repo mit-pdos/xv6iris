@@ -54,13 +54,13 @@ Lemma cfe_nodup0 (x : cfdev) : stdpp.base.NoDup ([(0%nat, x)].*1).
 Proof using . cbn. apply NoDup_singleton. Qed.
 
 Lemma cfe_dp0 (x : cfdev) : dp_in ([(0%nat, x)].*1) {[0%nat]}.
-Proof using . intros d Hd. cbn in Hd. apply elem_of_list_singleton in Hd as ->. set_solver. Qed.
+Proof using . intros d Hd. cbn in Hd. apply list_elem_of_singleton in Hd as ->. set_solver. Qed.
 
 Lemma cfe_kdp0 (pn : pnames) (gp : pipe_names) (w : wid) (A X : list (list (bv 8))) :
   forall dk, dk ∈ [(0%nat, UDProd pn gp w A X)] ->
              exists pn' gp' w' A' X', dk.2 = UDProd pn' gp' w' A' X'.
 Proof using .
-  intros dk Hdk. apply elem_of_list_singleton in Hdk as ->. by exists pn, gp, w, A, X.
+  intros dk Hdk. apply list_elem_of_singleton in Hdk as ->. by exists pn, gp, w, A, X.
 Qed.
 
 Section UkCatFEntries.

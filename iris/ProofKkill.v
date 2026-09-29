@@ -1006,8 +1006,8 @@ Section ProofKkillMain.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
-    iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hb1 & Hb2 & Hb3 & Hb4)".
-    iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hb5 Hb6]".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hf14") as (u1 u2 u3 u4) "(Hb1 & Hb2 & Hb3 & Hb4)".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hf56") as (w5 w6) "[Hb5 Hb6]".
     iEval (rewrite E5) in "Hb5". iEval (rewrite E6) in "Hb6".
     (* the five save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 6)%nat -> (u < 6)%nat ->
@@ -1306,9 +1306,9 @@ Section ProofKkillMain.
                          (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
         by (rewrite Hwv; exact HT5sp).
       iEval (rewrite -E5) in "Hb5". iEval (rewrite -E6) in "Hb6".
-      iDestruct (stack_own_4_intro sp0 (m !!! Regidx Rra) (m !!! Regidx Rs0)
+      iDestruct (stack_own_4_intro (KTR := KT1) sp0 (m !!! Regidx Rra) (m !!! Regidx Rs0)
                    (m !!! Regidx Rs1) (m !!! Regidx Rs2) with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
-      iDestruct (stack_own_2_intro (pa_stk sp0 4) (m !!! Regidx Rs3) w6 with "Hb5 Hb6") as "Hf56".
+      iDestruct (stack_own_2_intro (KTR := KT1) (pa_stk sp0 4) (m !!! Regidx Rs3) w6 with "Hb5 Hb6") as "Hf56".
       iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
       { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
       iEval (rewrite -Hwv) in "Hframe".

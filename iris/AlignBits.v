@@ -23,7 +23,7 @@ Lemma align4_of_low_bits (pc : mword 64) :
 Proof.
   intros H0 H1.
   unfold neq_vec in H0, H1. rewrite negb_false_iff in H0, H1.
-  unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word in H0, H1.
+  unfold eq_vec, access_vec_dec, access_mword_dec, slice in H0, H1.
   rewrite MachineWord.MachineWord.eqb_true_iff in H0, H1.
   apply bv_eq in H0, H1.
   unfold MachineWord.slice in H0, H1.
@@ -119,7 +119,7 @@ Proof.
   change (2 ^ Z.of_N (MachineWord.Z_idx 64))%Z with 18446744073709551616%Z in Hrng.
   apply eq_vec_true_iff in H.
   apply (f_equal bv_unsigned) in H.
-  unfold access_vec_dec, access_mword_dec, MachineWord.slice, get_word in H.
+  unfold access_vec_dec, access_mword_dec, MachineWord.slice in H.
   rewrite bv_extract_unsigned in H.
   assert (Hb0 : bv_unsigned (MachineWord.Z_idx 1 'b "0") = 0%Z)
     by (vm_compute; reflexivity).
@@ -130,7 +130,7 @@ Proof.
   unfold bv_wrap, bv_modulus in H. cbn in H.
   apply bv_eq.
   unfold update_vec_dec, update_mword_dec, MachineWord.update_slice,
-    MachineWord.slice, get_word, to_word.
+    MachineWord.slice.
   rewrite !bv_concat_unsigned; [| reflexivity | reflexivity].
   rewrite !bv_extract_unsigned, Hb0.
   change (MachineWord.Z_idx 1) with 1%N.

@@ -138,11 +138,11 @@ Section FsBlocks.
   (* the logged-view update (log_write's ghost step): auth + both halves.
      The auth is the log lock's (stage 2); nothing else can move L. *)
   Lemma fs_chalf_update γ (L : gmap Z (list (bv 8))) bno bs bs_new bs' :
-    ghost_map_auth (fs_cache γ) 1 L -∗
+    ghost_map_auth_frac (fs_cache γ) 1 L -∗
     fs_chalf γ bno bs -∗
     (bno ↪[fs_cache γ]{#(1/2)} bs') ==∗
     ⌜bs' = bs /\ L !! bno = Some bs⌝ ∗
-    ghost_map_auth (fs_cache γ) 1 (<[bno := bs_new]> L) ∗
+    ghost_map_auth_frac (fs_cache γ) 1 (<[bno := bs_new]> L) ∗
     fs_chalf γ bno bs_new ∗
     (bno ↪[fs_cache γ]{#(1/2)} bs_new).
   Proof using .
@@ -158,11 +158,11 @@ Section FsBlocks.
   (* the dirty-flag flip (log_write: false -> true; install's bunpin step:
      true -> false): auth + both halves, exactly the same shape. *)
   Lemma fs_dirty_flip γ (D : gmap Z bool) bno (b b' bnew : bool) :
-    ghost_map_auth (fs_dirty γ) 1 D -∗
+    ghost_map_auth_frac (fs_dirty γ) 1 D -∗
     (bno ↪[fs_dirty γ]{#(1/2)} b) -∗
     (bno ↪[fs_dirty γ]{#(1/2)} b') ==∗
     ⌜b' = b /\ D !! bno = Some b⌝ ∗
-    ghost_map_auth (fs_dirty γ) 1 (<[bno := bnew]> D) ∗
+    ghost_map_auth_frac (fs_dirty γ) 1 (<[bno := bnew]> D) ∗
     (bno ↪[fs_dirty γ]{#(1/2)} bnew) ∗
     (bno ↪[fs_dirty γ]{#(1/2)} bnew).
   Proof using .
@@ -261,7 +261,7 @@ Lemma blk_splice_lookup_lt (off : nat) (sub bs : list (bv 8)) (j : nat) :
   blk_splice off sub bs !! j = bs !! j.
 Proof.
   intros Hb Hj. rewrite /blk_splice lookup_app_l.
-  - by apply lookup_take.
+  - by apply lookup_take_lt.
   - rewrite length_take. lia.
 Qed.
 
@@ -627,7 +627,7 @@ Section FsBytes.
     destruct (decide (k < length ys)%nat) as [Hk|Hk].
     - destruct (lookup_lt_is_Some_2 ys k Hk) as [y Hy].
       rewrite Hy. symmetry.
-      rewrite lookup_take; [| exact Hk]. rewrite lookup_drop.
+      rewrite lookup_take_lt; [| exact Hk]. rewrite lookup_drop.
       assert (Hxs : is_Some (xs !! (o + k)%nat))
         by (apply lookup_lt_is_Some; lia).
       destruct Hxs as [x Hx]. rewrite Hx. f_equal.
@@ -652,7 +652,7 @@ Section FsBytes.
 
   (* what the auth says about an owned run *)
   Lemma byte_range_lookup gL (L : gmap Z (bv 8)) b off bs :
-    ghost_map_auth gL 1 L -∗ byte_range gL b off bs -∗
+    ghost_map_auth_frac gL 1 L -∗ byte_range gL b off bs -∗
     ⌜(map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)) ⊆ L⌝.
   Proof using .
     iIntros "Ha Hr". rewrite byte_range_map.
@@ -667,7 +667,7 @@ Section FsBytes.
      this is its own three-line proof at a share ([ghost_map_lookup] itself
      takes a [dfrac] -- the big-op version simply was not generalised). *)
   Lemma byte_range_q_lookup gL dq (L : gmap Z (bv 8)) b off bs :
-    ghost_map_auth gL 1 L -∗ byte_range_q gL dq b off bs -∗
+    ghost_map_auth_frac gL 1 L -∗ byte_range_q gL dq b off bs -∗
     ⌜(map_seqZ (b * BSZ + off) bs : gmap Z (bv 8)) ⊆ L⌝.
   Proof using .
     iIntros "Ha Hr". rewrite byte_range_q_map.
@@ -688,9 +688,9 @@ Section FsBytes.
   Lemma byte_range_update_at gL (L : gmap Z (bv 8)) (start : Z)
       (bs bs' : list (bv 8)) :
     length bs' = length bs ->
-    ghost_map_auth gL 1 L -∗
+    ghost_map_auth_frac gL 1 L -∗
     ([∗ list] k ↦ v ∈ bs, (start + Z.of_nat k) ↪[gL] v) ==∗
-    ghost_map_auth gL 1 ((map_seqZ start bs' : gmap Z (bv 8)) ∪ L) ∗
+    ghost_map_auth_frac gL 1 ((map_seqZ start bs' : gmap Z (bv 8)) ∪ L) ∗
     ([∗ list] k ↦ v ∈ bs', (start + Z.of_nat k) ↪[gL] v).
   Proof using .
     revert bs' start L. induction bs as [|x bs IH]; intros bs' start L Hlen.
@@ -724,8 +724,8 @@ Section FsBytes.
 
   Lemma byte_range_update gL (L : gmap Z (bv 8)) b off bs bs' :
     length bs' = length bs ->
-    ghost_map_auth gL 1 L -∗ byte_range gL b off bs ==∗
-    ghost_map_auth gL 1 ((map_seqZ (b * BSZ + off) bs' : gmap Z (bv 8)) ∪ L) ∗
+    ghost_map_auth_frac gL 1 L -∗ byte_range gL b off bs ==∗
+    ghost_map_auth_frac gL 1 ((map_seqZ (b * BSZ + off) bs' : gmap Z (bv 8)) ∪ L) ∗
     byte_range gL b off bs'.
   Proof using .
     intros Hlen. rewrite /byte_range.
@@ -774,7 +774,7 @@ Section FsBytes.
 
   (* the authority, inside [fs_bytes_body] *)
   Definition exc_auth (gX : gname) (X : gset Z) : iProp Σ :=
-    ghost_map_auth gX 1 ({[ tt := X ]} : gmap unit (gset Z)).
+    ghost_map_auth_frac gX 1 ({[ tt := X ]} : gmap unit (gset Z)).
 
   (* the WAL's exclusive handle *)
   Definition exc_own (gX : gname) (X : gset Z) : iProp Σ :=
@@ -806,7 +806,7 @@ Section FsBytes.
   Proof using .
     iIntros "Ha Hf".
     iDestruct (ghost_map_lookup with "Ha Hf") as %Hlk.
-    rewrite lookup_singleton in Hlk. iPureIntro. congruence.
+    rewrite lookup_singleton_eq in Hlk. iPureIntro. congruence.
   Qed.
 
   (* THE SEAL, READ: a discarded element at [∅] against the authority. *)
@@ -815,7 +815,7 @@ Section FsBytes.
   Proof using .
     iIntros "Ha Hs".
     iDestruct (ghost_map_lookup with "Ha Hs") as %Hlk.
-    rewrite lookup_singleton in Hlk. iPureIntro. congruence.
+    rewrite lookup_singleton_eq in Hlk. iPureIntro. congruence.
   Qed.
 
   Lemma exc_update gX X X' :
@@ -823,7 +823,7 @@ Section FsBytes.
   Proof using .
     iIntros "Ha Hf".
     iMod (ghost_map_update X' with "Ha Hf") as "[Ha Hf]".
-    rewrite insert_singleton. by iFrame.
+    rewrite insert_singleton_eq. by iFrame.
   Qed.
 
   (* ...AND THE SEAL, MADE.  Spending the handle at [∅] persists it. *)
@@ -885,7 +885,7 @@ Section FsBytes.
   Definition fs_bytes_body (gL gc gX : gname) (home : gset Z)
       (Xv : Z -> list (bv 8)) : iProp Σ :=
     (∃ (L : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) (X : gset Z),
-       ghost_map_auth gL 1 L ∗
+       ghost_map_auth_frac gL 1 L ∗
        ([∗ map] b ↦ bs ∈ C, b ↪[gc]{#(1/2)} bs) ∗
        exc_auth gX X ∗
        ⌜dom C = home⌝ ∗
@@ -934,7 +934,7 @@ Section FsBytes.
       (b : Z) (off : nat) (bs : list (bv 8)) :
     bytes_dom L home ->
     (off < BSIZE)%nat -> (0 < length bs)%nat ->
-    ghost_map_auth gL 1 L -∗ byte_range gL b (Z.of_nat off) bs -∗ ⌜b ∈ home⌝.
+    ghost_map_auth_frac gL 1 L -∗ byte_range gL b (Z.of_nat off) bs -∗ ⌜b ∈ home⌝.
   Proof using .
     iIntros (Hdm Hoff Hpos) "Ha Hr".
     iDestruct (byte_range_lookup with "Ha Hr") as %Hsub.
@@ -956,7 +956,7 @@ Section FsBytes.
   Lemma fsblock_home (gL : gname) (L : gmap Z (bv 8)) (home : gset Z)
       (b : Z) (bs : list (bv 8)) :
     bytes_dom L home ->
-    ghost_map_auth gL 1 L -∗ fsblock gL b bs -∗ ⌜b ∈ home⌝.
+    ghost_map_auth_frac gL 1 L -∗ fsblock gL b bs -∗ ⌜b ∈ home⌝.
   Proof using .
     iIntros (Hdm) "Ha [%Hlb Hr]".
     iApply (byte_range_home gL L home b 0%nat bs Hdm
@@ -1071,7 +1071,7 @@ Section FsBytes.
       (home : gset Z) (b : Z) (off : nat) (bs : list (bv 8)) :
     bytes_dom L home ->
     (off < BSIZE)%nat -> (0 < length bs)%nat ->
-    ghost_map_auth gL 1 L -∗ byte_range_q gL dq b (Z.of_nat off) bs -∗
+    ghost_map_auth_frac gL 1 L -∗ byte_range_q gL dq b (Z.of_nat off) bs -∗
     ⌜b ∈ home⌝.
   Proof using .
     iIntros (Hdm Hoff Hpos) "Ha Hr".
@@ -1094,7 +1094,7 @@ Section FsBytes.
   Lemma fsblock_q_home (gL : gname) (dq : dfrac) (L : gmap Z (bv 8))
       (home : gset Z) (b : Z) (bs : list (bv 8)) :
     bytes_dom L home ->
-    ghost_map_auth gL 1 L -∗ fsblock_q gL dq b bs -∗ ⌜b ∈ home⌝.
+    ghost_map_auth_frac gL 1 L -∗ fsblock_q gL dq b bs -∗ ⌜b ∈ home⌝.
   Proof using .
     iIntros (Hdm) "Ha [%Hlb Hr]".
     iApply (byte_range_q_home gL dq L home b 0%nat bs Hdm
@@ -1183,12 +1183,12 @@ Section FsBytes.
     (length bs_old = BSIZE -> length sub_new = length sub_old) ->
     fs_bytes_inv gL gc gX home Xv -∗
     exc_sealed gX -∗
-    ghost_map_auth gc 1 C -∗
+    ghost_map_auth_frac gc 1 C -∗
     byte_range gL b (Z.of_nat off) sub_old -∗
     (b ↪[gc]{#(1/2)} bs_old) ={E}=∗
       ⌜C !! b = Some bs_old /\ length bs_old = BSIZE /\
         sub_old = take (length sub_old) (drop off bs_old)⌝ ∗
-      ghost_map_auth gc 1 (<[b := blk_splice off sub_new bs_old]> C) ∗
+      ghost_map_auth_frac gc 1 (<[b := blk_splice off sub_new bs_old]> C) ∗
       byte_range gL b (Z.of_nat off) sub_new ∗
       (b ↪[gc]{#(1/2)} blk_splice off sub_new bs_old).
   Proof using .
@@ -1285,11 +1285,11 @@ Section FsBytes.
         assert (Hbh : b ∈ home) by exact Hb. set_solver.
       - intros b' bs' Hb'.
         destruct (decide (b' = b)) as [->|Hne].
-        + rewrite lookup_insert in Hb'. congruence.
+        + rewrite lookup_insert_eq in Hb'. congruence.
         + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
       - intros b' bs' Hb' _.
         destruct (decide (b' = b)) as [->|Hne].
-        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact Htieb.
+        + rewrite lookup_insert_eq in Hb'. injection Hb' as <-. exact Htieb.
         + rewrite lookup_insert_ne in Hb'; [| done].
           apply map_subseteq_spec. intros a v Hav.
           apply lookup_union_Some_raw. right. split.
@@ -1322,11 +1322,11 @@ Section FsBytes.
     ↑logN ⊆ E -> length bs_new = BSIZE ->
     fs_bytes_inv gL gc gX home Xv -∗
     exc_sealed gX -∗
-    ghost_map_auth gc 1 C -∗
+    ghost_map_auth_frac gc 1 C -∗
     fsblock gL b bs -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
       ⌜bsm = bs /\ C !! b = Some bs⌝ ∗
-      ghost_map_auth gc 1 (<[b := bs_new]> C) ∗
+      ghost_map_auth_frac gc 1 (<[b := bs_new]> C) ∗
       fsblock gL b bs_new ∗
       (b ↪[gc]{#(1/2)} bs_new).
   Proof using .
@@ -1366,11 +1366,11 @@ Section FsBytes.
     ↑logN ⊆ E -> b ∈ X -> length (Xv b) = BSIZE ->
     fs_bytes_inv gL gc gX home Xv -∗
     exc_own gX X -∗
-    ghost_map_auth gc 1 C -∗
+    ghost_map_auth_frac gc 1 C -∗
     (b ↪[gc]{#(1/2)} bsm) ={E}=∗
       ⌜C !! b = Some bsm⌝ ∗
       exc_own gX (X ∖ {[b]}) ∗
-      ghost_map_auth gc 1 (<[b := Xv b]> C) ∗
+      ghost_map_auth_frac gc 1 (<[b := Xv b]> C) ∗
       (b ↪[gc]{#(1/2)} Xv b).
   Proof using .
     iIntros (HE Hb HlXv) "#Hinv Hxo Hca Hm".
@@ -1398,11 +1398,11 @@ Section FsBytes.
       - rewrite dom_insert_L Hdom. set_solver.
       - intros b' bs' Hb'.
         destruct (decide (b' = b)) as [->|Hne].
-        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact HlXv.
+        + rewrite lookup_insert_eq in Hb'. injection Hb' as <-. exact HlXv.
         + rewrite lookup_insert_ne in Hb'; [| done]. exact (Hlens b' bs' Hb').
       - intros b' bs' Hb' Hnin.
         destruct (decide (b' = b)) as [->|Hne].
-        + rewrite lookup_insert in Hb'. injection Hb' as <-. exact (Hxv b Hb).
+        + rewrite lookup_insert_eq in Hb'. injection Hb' as <-. exact (Hxv b Hb).
         + rewrite lookup_insert_ne in Hb'; [| done].
           apply (Htie b' bs' Hb'). set_solver.
       - exact Hdm.
@@ -1426,10 +1426,10 @@ Section FsBytes.
     (forall b bs, C !! b = Some bs -> length bs = BSIZE) ->
     (forall b, b ∈ dom C -> b ∉ h0) ->
     bytes_dom L0 h0 ->
-    ghost_map_auth gL 1 L0 ==∗
+    ghost_map_auth_frac gL 1 L0 ==∗
     ∃ L : gmap Z (bv 8),
       ⌜bytes_dom L (h0 ∪ dom C)⌝ ∗ ⌜bytes_tie L C⌝ ∗
-      ghost_map_auth gL 1 L ∗ ([∗ map] b ↦ bs ∈ C, fsblock gL b bs).
+      ghost_map_auth_frac gL 1 L ∗ ([∗ map] b ↦ bs ∈ C, fsblock gL b bs).
   Proof using .
     revert L0 h0.
     induction C as [|b bs C' Hb IH] using map_ind;
@@ -1450,7 +1450,7 @@ Section FsBytes.
         - apply (Hfresh b); [| exact Hin]. rewrite dom_insert_L. set_solver.
         - apply elem_of_dom in Hin as [x Hx]. congruence. }
       assert (Hlb : length bs = BSIZE).
-      { apply (Hlen b bs). by rewrite lookup_insert. }
+      { apply (Hlen b bs). by rewrite lookup_insert_eq. }
       assert (Hdisj : (map_seqZ (b * BSZ) bs : gmap Z (bv 8)) ##ₘ L').
       { apply map_disjoint_spec. intros a v1 v2 H1 H2.
         assert (Hr1 : b * BSZ <= a < b * BSZ + BSZ).
@@ -1485,7 +1485,7 @@ Section FsBytes.
       iSplitR.
       { iPureIntro. intros b' bs' Hb'.
         destruct (decide (b' = b)) as [->|Hne].
-        - rewrite lookup_insert in Hb'. injection Hb' as <-.
+        - rewrite lookup_insert_eq in Hb'. injection Hb' as <-.
           apply map_union_subseteq_l.
         - rewrite lookup_insert_ne in Hb'; [| done].
           etrans; [exact (Htie' b' bs' Hb') |].
@@ -1746,8 +1746,8 @@ Section FsMint.
     ⊢ |={E}=> ∃ γ : fs_names,
       (* the two ghosts the caller allocated, named back to it *)
       ⌜fs_link γ = γlk⌝ ∗ ⌜fs_top γ = γtp⌝ ∗
-      ghost_map_auth (fs_cache γ) 1 L0 ∗
-      ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
+      ghost_map_auth_frac (fs_cache γ) 1 L0 ∗
+      ghost_map_auth_frac (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
       fs_bytes_inv (fs_bytes γ) (fs_cache γ) (fs_exc γ) home Dv ∗
       exc_own (fs_exc γ) X ∗
       ([∗ map] bno ↦ bs ∈ L0,

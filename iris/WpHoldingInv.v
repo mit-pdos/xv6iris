@@ -43,8 +43,7 @@ Proof.
   replace (sub_vec a a) with (zeros' 64 : mword 64);
     [ apply bv_eq; vm_compute; reflexivity | ].
   apply bv_eq.
-  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
+  unfold sub_vec, Operators_mwords.word_binop, MachineWord.MachineWord.sub.
   rewrite bv_sub_unsigned. rewrite Z.sub_diag. reflexivity.
 Qed.
 

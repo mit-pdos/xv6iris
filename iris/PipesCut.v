@@ -306,7 +306,7 @@ Proof using.
   - cbn in Htk. by apply elem_of_nil in Htk.
   - cbn [replicate ushq_rtoks concat] in Htk. rewrite ushq_cat_len in Htk.
     apply elem_of_app in Htk as [Htk | Htk].
-    + apply elem_of_list_singleton in Htk as ->. exists 0. split; [lia |].
+    + apply list_elem_of_singleton in Htk as ->. exists 0. split; [lia |].
       f_equal; lia.
     + destruct (IH (c + 3 + 3) Htk) as (i & Hi & ->). exists (S i).
       split; [lia |]. f_equal; lia.
@@ -328,7 +328,7 @@ Qed.
 Lemma wl_toks_end_le (ws : list (list (bv 8))) (tk : nat * nat) :
   tk ∈ wl_toks ws -> snd tk <= length (wl_body ws).
 Proof using.
-  intros Htk. apply elem_of_list_lookup_1 in Htk as [i Hi].
+  intros Htk. apply list_elem_of_lookup_1 in Htk as [i Hi].
   assert (Hlt : i < length ws)
     by (rewrite -(wl_toks_length ws); exact (lookup_lt_Some _ _ _ Hi)).
   destruct (lookup_lt_is_Some_2 ws i Hlt) as [w Hw].
@@ -360,7 +360,7 @@ Lemma pcut_low (ws : list (list (bv 8))) (n len : nat) (f : nat -> bv 8) (x : na
 Proof using.
   intros Hx. rewrite pcut_flat.
   apply UkShMain.ushp_nulfold_miss.
-  intros i tk Hi. apply elem_of_list_lookup_2 in Hi.
+  intros i tk Hi. apply list_elem_of_lookup_2 in Hi.
   destruct (rtoks_cats_in n _ tk Hi) as (i' & _ & ->). cbn [snd]. lia.
 Qed.
 
@@ -423,10 +423,10 @@ Proof using.
   - intros j Hj. rewrite UkShCat.cmd_cat_len in Hj.
     rewrite pcut_flat.
     rewrite UkShMain.ushp_nulfold_miss.
-    2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+    2:{ intros i' tk Hi'. apply list_elem_of_lookup_2 in Hi'.
         destruct (rtoks_cats_in (S n) _ tk Hi') as (i'' & _ & ->). cbn [snd]. lia. }
     rewrite UkShMain.ushp_nulfold_miss.
-    2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+    2:{ intros i' tk Hi'. apply list_elem_of_lookup_2 in Hi'.
         pose proof (wl_toks_end_le (FileDisc.prod_words p) tk Hi'). lia. }
     rewrite /UkShParseCmd.ushp_ext bool_decide_eq_true_2; [| lia].
     pose proof (Hc j ltac:(rewrite ushq_cat_len; lia)) as Hcj.
@@ -672,7 +672,7 @@ Proof using.
   - cbn in Hk. injection Hk as ->.
     pose proof (wl_off_le_body r c i w j Hi Hj) as Hle.
     rewrite UkShMain.ushp_nulfold_miss.
-    2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+    2:{ intros i' tk Hi'. apply list_elem_of_lookup_2 in Hi'.
         pose proof (ushq_rtoks_ws_ge rs _ tk Hi'). lia. }
     rewrite wl_rebase_toks. exact (wl_nulfold_at r c g i w j Hi Hj).
   - cbn in Hk.
@@ -681,7 +681,7 @@ Proof using.
     rewrite (IH _ k r _ i w j Hk Hi Hj).
     destruct (Nat.eqb j (length w)); [reflexivity |].
     apply UkShMain.ushp_nulfold_miss.
-    intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+    intros i' tk Hi'. apply list_elem_of_lookup_2 in Hi'.
     rewrite wl_rebase_toks in Hi'. pose proof (wl_toks_at_bounds r0 c tk Hi'). lia.
 Qed.
 
@@ -732,7 +732,7 @@ Proof using.
             = UkShParseCmd.ushp_nulfold (wl_toks (FileDisc.prod_words p)) (UkShParseCmd.ushp_ext len f) x).
   { intros x Hx. rewrite /pcut_fs ushq_nulfolds_flat ushq_nulfold_app.
     apply UkShMain.ushp_nulfold_miss.
-    intros i tk Hi. apply elem_of_list_lookup_2 in Hi.
+    intros i tk Hi. apply list_elem_of_lookup_2 in Hi.
     pose proof (ushq_rtoks_ws_ge _ _ tk Hi). lia. }
   split.
   - intros i j Hi Hj.
@@ -796,7 +796,7 @@ Proof using.
       destruct (Nat.eqb j (length w)) eqn:Hjw; [reflexivity |].
       pose proof (wl_off_ge (FileDisc.filt_words F) (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) i) as Hge.
       rewrite UkShMain.ushp_nulfold_miss.
-      2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
+      2:{ intros i' tk Hi'. apply list_elem_of_lookup_2 in Hi'.
           pose proof (wl_toks_end_le (FileDisc.prod_words p) tk Hi'). lia. }
       rewrite /UkShParseCmd.ushp_ext bool_decide_eq_true_2; [reflexivity |].
       pose proof (wl_off_le_body _ (ushq_soff (length (wl_body (FileDisc.prod_words p)) + 3) rs k) i w j Hi Hj). lia. }

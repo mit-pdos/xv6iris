@@ -322,7 +322,7 @@ Proof.
     by exact (dinode_bytes_length _ Hwfk).
   apply list_eq. intros j.
   destruct (Nat.lt_ge_cases j 64%nat) as [Hj | Hj].
-  - rewrite lookup_take; [| lia]. rewrite lookup_drop.
+  - rewrite lookup_take_lt; [| lia]. rewrite lookup_drop.
     rewrite (diblk_bytes_lookup ds k j Hall ltac:(lia) Hj). reflexivity.
   - rewrite lookup_take_ge; [| lia].
     symmetry. apply lookup_ge_None_2. lia.
@@ -1615,7 +1615,7 @@ Section InodeRegion.
   (* the per-inum observation counter, its epoch bound and its receipt *)
   Definition ireg_ep (z : Z) (d : dinode) : iProp Σ :=
     (∃ v : nat,
-       mono_nat_auth_own (icfg_iep z) 1 v ∗
+       mono_nat_auth_own_frac (icfg_iep z) 1 v ∗
        log_epoch_lb icfg_log v ∗
        izrcpt z d v)%I.
 
@@ -1639,7 +1639,7 @@ Section InodeRegion.
 
   (* BOOT: a counter at zero carries every record, free inodes included *)
   Lemma ireg_ep_intro (z : Z) (d : dinode) :
-    mono_nat_auth_own (icfg_iep z) 1 0 ==∗ ireg_ep z d.
+    mono_nat_auth_own_frac (icfg_iep z) 1 0 ==∗ ireg_ep z d.
   Proof using .
     iIntros "Ha". iMod (log_epoch_lb_0 icfg_log) as "#Hlb".
     iModIntro. iExists 0%nat. iFrame "Ha Hlb".
@@ -1698,7 +1698,7 @@ Section InodeRegion.
     ∃ e : nat, ⌜(e0 <= e)%nat⌝ ∗ logged_at γ e (iblk_of z).
   Proof using .
     iIntros (Hγ Hz He0) "[%v (Ha & #Hlb & #Hrc)] #Hob". subst γ.
-    iDestruct (mono_nat_lb_own_valid with "Ha Hob") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hob") as %[_ Hle].
     iDestruct ("Hrc" $! Hz) as "[%Hv0 | (%e & #Hlg & %Hve)]".
     { exfalso. lia. }
     iSplitR "".
@@ -1873,7 +1873,7 @@ Section InodeRegion.
      exactly as [ireg_claim_ok] does there. *)
   Lemma ireg_fsh_no_ops (f : frzUR) (n : nat) (d : dinode) :
     ireg_frz_ok f n d ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_fsh f -∗ ⌜f = Some (Excl FrzOff)⌝.
   Proof using .
     intros Hfrz. iIntros "Ha Hp".
@@ -2625,7 +2625,7 @@ Section InodeRegion.
      lemma takes it. *)
   Lemma ireg_cpin_no_ops (c : ctyUR) (f : frzUR) (d : dinode) :
     ireg_claim_ok c f d ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_cpin c -∗ ⌜c = None⌝.
   Proof using .
     intros Hclm. iIntros "Ha Hp". rewrite /ireg_cpin.
@@ -2879,7 +2879,7 @@ Section InodeRegion.
     iApply (big_sepL_delete _ (seq 0 16) i i
               ltac:(apply lookup_seq; split; [lia | exact Hi])).
     iSplitL "Hone".
-    { rewrite list_lookup_total_insert; [iExact "Hone" | lia]. }
+    { rewrite list_lookup_total_insert_eq; [iExact "Hone" | lia]. }
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
     destruct (decide (j = i)) as [->|Hne]; [iExact "H" |].
@@ -2913,7 +2913,7 @@ Section InodeRegion.
   Definition ireg_registry (nib : nat) : iProp Σ :=
     (∃ mr : gmap Z (gname * gname),
        ⌜∀ z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (mr !! z)⌝ ∗
-       ghost_map_auth icfg_reg 1 mr)%I.
+       ghost_map_auth_frac icfg_reg 1 mr)%I.
 
   Global Instance ireg_registry_timeless nib : Timeless (ireg_registry nib).
   Proof using . rewrite /ireg_registry. apply _. Qed.
@@ -2925,7 +2925,7 @@ Section InodeRegion.
      stays local to this file. *)
   Lemma ireg_registry_from_map (mr : gmap Z (gname * gname)) (nib : nat) :
     (forall z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (mr !! z)) ->
-    ghost_map_auth icfg_reg 1 mr -∗
+    ghost_map_auth_frac icfg_reg 1 mr -∗
     ireg_registry nib.
   Proof using .
     iIntros (Hcov) "Ha". iExists mr. iSplitR; [done |]. iFrame.
@@ -2937,7 +2937,7 @@ Section InodeRegion.
   Definition ireg_body (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
     (∃ m : gmap Z dinode,
-       ghost_map_auth γi 1 m ∗
+       ghost_map_auth_frac γi 1 m ∗
        ([∗ list] bi ∈ seq 0 nib, ireg_blk γi γfs inodestart m bi) ∗
        ireg_registry nib)%I.
 
@@ -3077,8 +3077,8 @@ Section InodeRegion.
      [AppInv.app_top_update_*]).  Reads work at any fraction. *)
   Definition ftop_body (γfs : fs_names) : iProp Σ :=
     (∃ (I : gmap Z fs_node) (A : gmap nat ireg_arm_ent),
-       ghost_map_auth (fs_top γfs) (1/2) I ∗
-       ghost_map_auth icfg_lk 1 A ∗
+       ghost_map_auth_frac (fs_top γfs) (1/2) I ∗
+       ghost_map_auth_frac icfg_lk 1 A ∗
        (* the arming transactions' tokens, parked at each arm's own share:
           this is what makes "no transaction is open" imply "nothing is
           armed" *)
@@ -3103,8 +3103,8 @@ Section InodeRegion.
 
   Lemma ftop_alloc (E : coPset) (γfs : fs_names) (I : gmap Z fs_node) :
     (forall i n, I !! i = Some n -> inode_local i n) ->
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
-    ghost_map_auth icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ={E}=∗ ftop_inv γfs.
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac icfg_lk 1 (∅ : gmap nat ireg_arm_ent) ={E}=∗ ftop_inv γfs.
   Proof using .
     iIntros (Hloc) "Ha Hlk".
     iMod (inv_alloc ftopN E (ftop_body γfs) with "[Ha Hlk]") as "#Hi".
@@ -3176,11 +3176,11 @@ Section InodeRegion.
       iFrame "Hta Hla".
       iSplitL "Hpark".
       { rewrite (big_sepM_delete _ (<[k := (t, q, S ∖ {[i]})]> A) k
-                   (t, q, S ∖ {[i]})); [| by rewrite lookup_insert].
+                   (t, q, S ∖ {[i]})); [| by rewrite lookup_insert_eq].
         rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
         iDestruct "Hpark" as "[Ht Hrest]".
         rewrite /ireg_parked /tx_pin. cbn [fst snd]. iFrame "Ht".
-        rewrite delete_insert_delete. iExact "Hrest". }
+        rewrite delete_insert_eq. iExact "Hrest". }
       iPureIntro. intros j m Hj Hun.
       destruct (decide (j = i)) as [->|Hne].
       { rewrite HIi in Hj. injection Hj as <-. exact Hloc. }
@@ -3188,7 +3188,7 @@ Section InodeRegion.
       destruct (decide (k' = k)) as [->|Hnt].
       - rewrite HAt in Hk'. injection Hk' as <- <- <-.
         assert (Hlk : <[k := (t, q, S ∖ {[i]})]> A !! k
-                      = Some (t, q, S ∖ {[i]})) by apply lookup_insert.
+                      = Some (t, q, S ∖ {[i]})) by apply lookup_insert_eq.
         specialize (Hun k t q (S ∖ {[i]}) Hlk).
         intros Hin. apply Hun. set_unfold. split; [exact Hin | exact Hne].
       - apply (Hun k' t' q' S').
@@ -3233,12 +3233,12 @@ Section InodeRegion.
   Lemma ireg_clean_acc (E : coPset) (γfs : fs_names) :
     ↑ftopN ⊆ E ->
     ftop_inv γfs -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ftopN}=∗
       ∃ I : gmap Z fs_node,
-        ghost_map_auth (fs_top γfs) (1/2) I ∗
+        ghost_map_auth_frac (fs_top γfs) (1/2) I ∗
         ⌜forall i n, I !! i = Some n -> inode_local i n⌝ ∗
-        ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
-        (ghost_map_auth (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
+        ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
+        (ghost_map_auth_frac (fs_top γfs) (1/2) I ={E ∖ ↑ftopN, E}=∗ True).
   Proof using .
     iIntros (HE) "#Hi Htxa".
     iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
@@ -3388,7 +3388,7 @@ Section InodeRegion.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Ha Hla Hpark". iPureIntro.
       intros j m Hj Hun. destruct (decide (j = i)) as [->|Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl j m Hj Hun). }
     iModIntro. iExact "Hf".
@@ -3575,7 +3575,7 @@ Section InodeRegion.
     iApply (big_sepL_delete _ (seq 0 16) i i
               ltac:(apply lookup_seq; split; [lia | exact Hi])).
     iSplitL "Hone".
-    { rewrite list_lookup_total_insert; [iExact "Hone" | lia]. }
+    { rewrite list_lookup_total_insert_eq; [iExact "Hone" | lia]. }
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
     destruct (decide (j = i)) as [->|Hne]; [iExact "H" |].
@@ -4014,8 +4014,8 @@ Section InodeRegion.
       iSplitR.
       { iPureIntro. intros i Hi.
         destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
+        - rewrite /m' -(ireg_key_split inum) lookup_insert_eq.
+          rewrite list_lookup_total_insert_eq; [done | lia].
         - rewrite /m' lookup_insert_ne; last first.
           { rewrite (ireg_key_split inum). intros Hc.
             destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)
@@ -4308,8 +4308,8 @@ Section InodeRegion.
       iSplitR.
       { iPureIntro. intros i Hi.
         destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
+        - rewrite /m' -(ireg_key_split inum) lookup_insert_eq.
+          rewrite list_lookup_total_insert_eq; [done | lia].
         - rewrite /m' lookup_insert_ne; last first.
           { rewrite (ireg_key_split inum). intros Hc.
             destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)
@@ -5309,8 +5309,8 @@ Section InodeRegion.
       iSplitR.
       { iPureIntro. intros i Hi.
         destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
+        - rewrite /m' -(ireg_key_split inum) lookup_insert_eq.
+          rewrite list_lookup_total_insert_eq; [done | lia].
         - rewrite /m' lookup_insert_ne; last first.
           { rewrite (ireg_key_split inum). intros Hc.
             destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)
@@ -5520,8 +5520,8 @@ Section InodeRegion.
       iSplitR.
       { iPureIntro. intros i Hi.
         destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
+        - rewrite /m' -(ireg_key_split inum) lookup_insert_eq.
+          rewrite list_lookup_total_insert_eq; [done | lia].
         - rewrite /m' lookup_insert_ne; last first.
           { rewrite (ireg_key_split inum). intros Hc.
             destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)

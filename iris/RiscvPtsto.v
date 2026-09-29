@@ -7,6 +7,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat
 From iris.algebra Require Import csum excl agree auth gset.
 From iris.algebra.lib Require Import mono_list.
 From iris.program_logic Require Import weakestpre.
+From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -245,7 +246,7 @@ Record riscvEraGS := RiscvEraGS {
      NOT canonical, and deliberately so: the per-trap ghost [ProofKernelvec.v]
      mints for the handler's own SIE tie.  During a trap the live bit is 0
      while the interrupted thread's half still reads 1, so those two cannot
-     share a name; [wp_kernelvec] takes a raw [ghost_var γ (1/2) _] and stays
+     share a name; [wp_kernelvec] takes a raw [ghost_var_frac γ (1/2) _] and stays
      parameterized.  The functor instance comes from [sieG] at the use sites,
      for the same reason spelled out for [strans_name] above. *)
   era_sie_name : CPU -> gname;
@@ -280,7 +281,7 @@ Record riscvEraGS := RiscvEraGS {
      a pair only because [sieG]'s [ghost_varG (mword 1)] then serves both
      with no new class. *)
   era_spie_name : CPU -> gname;
-  (* THE HART TAG, CANONICALLY per proc slot.  One [ghost_var CPU] per entry
+  (* THE HART TAG, CANONICALLY per proc slot.  One [ghost_var_frac CPU] per entry
      of the proc[] array, naming the hart that a RUNNING proc is running on.
      Two halves: while the proc is RUNNING one sits in its [p->lock]'s
      running arm ([SchedCtx.run_slot]) and the other rides the running
@@ -300,10 +301,10 @@ Record riscvEraGS := RiscvEraGS {
      total; only indices below [NPROC] are ever owned. *)
   era_park_name : nat -> gname;
   (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).
-     Two halves of a [ghost_var] carrying [p->state]'s value: the proc lock
+     Two halves of a [ghost_var_frac] carrying [p->state]'s value: the proc lock
      invariant owns one, tied to the cell, and the other is lock-resident
      except at the two states where a THREAD has claimed the proc (RUNNING,
-     USED).  Since a ghost_var cannot move on half alone and the cell cannot
+     USED).  Since a ghost_var_frac cannot move on half alone and the cell cannot
      move without the ghost, the right to WRITE [p->state] is exactly
      ownership of the second half.
 
@@ -331,7 +332,7 @@ Record riscvEraGS := RiscvEraGS {
      [riscvGS] context, and a second one could not interact with it. *)
   era_disk_name : gname;
   (* THE FS LOG-REGION MIRROR (claude-notes/design/fs-log.md stage 4 phase
-     C2b/D1): this era's [ghost_var] over the physical log region's picture,
+     C2b/D1): this era's [ghost_var_frac] over the physical log region's picture,
      split 1/2 - 1/2 between the log layer ([LogInv]'s batch/lock resource)
      and [P_fs]'s CHECKED-OUT arm.  It is what carries the WAL's physical
      phase ACROSS bwrite calls -- "the on-disk header is clean", "the log
@@ -533,7 +534,7 @@ Proof using . rewrite /wild_none. by iIntros "[]". Qed.
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_invGS :: invGS Σ;
   riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
-  (* the device fabric (DevModel.v): one [ghost_var] per device, in the
+  (* the device fabric (DevModel.v): one [ghost_var_frac] per device, in the
      standard halves pattern -- [state_interp] holds one half (the "auth"),
      the other half (the "frag") floats freely and is typically stored in an
      invariant shared between the driver's hart and the device thread. *)
@@ -555,7 +556,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_lockSetGS :: inG Σ lockSetR;
   riscvF_parkGS :: ghost_varG Σ CPU;
   (* the per-proc state mirror's typing (the NAME is per-era, above).  A
-     [mword 32] instance of its own -- no other ghost_var in the record
+     [mword 32] instance of its own -- no other ghost_var_frac in the record
      carries one, so nothing else can be confused with it. *)
   riscvF_pstateGS :: ghost_varG Σ (SailStdpp.Values.mword 32);
   (* the FS log-region mirror's typing (the NAME is per-era, above) *)
@@ -610,7 +611,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      holds a fragment of the durable disk (they die with the era and take
      what they own with them).  Auth/frag agreement is therefore THE TIE
      between the crash predicate and the real disk -- which retires the
-     [ghost_var] tie halves this field replaces ([disk_tie] / [fs_tie_interp])
+     [ghost_var_frac] tie halves this field replaces ([disk_tie] / [fs_tie_interp])
      and the [dk]-indexing of the crash predicate they required.
 
      The per-era image map ([riscvEraGS.era_disk_name]) STAYS: it is the
@@ -626,7 +627,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
      durability invariant over the durable disk, sealed into [crash_inv]
      below.  A bare [iProp Σ] again (it was [dk]-indexed while the tie was a
-     [ghost_var] half beside it): the client's predicate owns the durable
+     [ghost_var_frac] half beside it): the client's predicate owns the durable
      fragments, and a DMA completion re-establishes it by running the
      client's own view shift with the AUTH lent for the instant
      ([disk_write_permit]).  Still an ARBITRARY predicate, and still nothing
@@ -659,7 +660,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   (* THE OBSERVABLE TRACE (claude-notes/completed/uart-trace.md).  The
      language emits console I/O and power events ([RiscvLang.mobs], §3b')
      and Iris threads them through [state_interp]; these three fields are
-     what lets the logic READ them.  [riscv_obs_name] is a [ghost_var] over
+     what lets the logic READ them.  [riscv_obs_name] is a [ghost_var_frac] over
      the HISTORY SO FAR: [state_interp] holds one half ([obs_auth], below),
      the client's trace predicate the other ([obs_frag]), so every event is
      appended with the client's consent -- the UART thread's proof at its
@@ -676,14 +677,14 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_obs_total : list mobs;
   riscv_obs_pred : iProp Σ;
   (* HISTORIES ONLY GROW, AS A RESOURCE (app-echo.md lane CONS-CURSOR, C1).
-     The history ghost above is a [ghost_var], which says what the history
+     The history ghost above is a [ghost_var_frac], which says what the history
      IS and nothing about what it WAS: a proof that holds a past history
      [h0] -- the UART's receive column holds one per queued byte -- cannot
      compare it with the current [h] at all.  So the machine's half
-     ([obs_auth]) carries, beside the [ghost_var], a MONO_LIST AUTHORITY at
+     ([obs_auth]) carries, beside the [ghost_var_frac], a MONO_LIST AUTHORITY at
      the same history, and its persistent lower bound [obs_hist_lb h0] is
      "[h0] is a prefix of the history the run has reached".  It is stepped
-     in lockstep with the [ghost_var] -- [obs_update] takes the prefix
+     in lockstep with the [ghost_var_frac] -- [obs_update] takes the prefix
      premise every append already satisfies -- so no event can move one
      without the other, and a lower bound taken at any past event stays
      true for ever.
@@ -833,7 +834,7 @@ Definition mirror_name `{!riscvGS Σ} : gname := era_mirror_name riscv_eraGS.
    [minstret_inv]); [gen_dead gen] is the stable death certificate --
    PowerOff bumps [ggen], so a generation once passed is dead forever. *)
 Definition gen_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
-  mono_nat_auth_own riscv_gen_name 1 n.
+  mono_nat_auth_own_frac riscv_gen_name 1 n.
 Definition gen_born `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_gen_name gen.
 Definition gen_dead `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
@@ -847,16 +848,16 @@ Definition gen_dead `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
    SPELLED THROUGH A DEFINITION HERE, NOT RAW AT EACH SITE, FOR THE INSTANCE.
    [Xv6Cameras.diskGhostG] carries a SECOND [mono_natG Σ] ([disk_nc_inG]), and
    [BootShared]'s allocation section binds both it and [riscvGS] -- so a raw
-   [mono_nat_auth_own] written there resolves to whichever instance search
+   [mono_nat_auth_own_frac] written there resolves to whichever instance search
    reaches first and then fails to unify with the one [IntrDefs] used, with
    both propositions printing identically (LogInv.v's duplicate-class trap).
    Fixing the instance at the definition, in a context where [riscvFixedGS]'s
    [riscv_gen_inG] is the only one, makes every site agree by construction --
    exactly why [gen_auth] above is a definition too. *)
 Definition strans_pending_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
-  mono_nat_auth_own γ (1/2)%Qp 0%nat.
+  mono_nat_auth_own_frac γ (1/2)%Qp 0%nat.
 Definition strans_kpt_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
-  mono_nat_auth_own γ 1%Qp 1%nat.
+  mono_nat_auth_own_frac γ 1%Qp 1%nat.
 Definition kpt_on_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
   mono_nat_lb_own γ 1%nat.
 
@@ -866,7 +867,7 @@ Definition kpt_on_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
 Definition start_count (g : gstate) : nat :=
   (g.(ggen) + (if g.(gpow) then 1 else 0))%nat.
 Definition start_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
-  mono_nat_auth_own riscv_start_name 1 n.
+  mono_nat_auth_own_frac riscv_start_name 1 n.
 Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_start_name (S gen).
 
@@ -875,7 +876,7 @@ Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
    persistent SWAP RECEIPT an era keeps after its [initlog] took custody, and
    is what a WAL write's fupd curries to prove the arm is still its own. *)
 Definition swap_auth `{!riscvFixedGS Σ} (g : nat) : iProp Σ :=
-  mono_nat_auth_own riscv_swap_name 1 g.
+  mono_nat_auth_own_frac riscv_swap_name 1 g.
 Definition swap_lb `{!riscvFixedGS Σ} (g : nat) : iProp Σ :=
   mono_nat_lb_own riscv_swap_name g.
 
@@ -957,15 +958,15 @@ Definition obs_hist_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   own riscv_obs_hist (●ML (h : list (leibnizO mobs))).
 (* the machine's half WITHOUT the growth authority.  A CLIENT HOOK MOVES
    THIS ONE: the power hook is written by a client that has no
-   [riscvFixedGS] and spells [ghost_var γobs (1/2) h], so the monotone
+   [riscvFixedGS] and spells [ghost_var_frac γobs (1/2) h], so the monotone
    authority is stepped beside it by the power loop rather than by the
    hook. *)
 Definition obs_half `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
-  ghost_var riscv_obs_name (1/2) h.
+  ghost_var_frac riscv_obs_name (1/2) h.
 Definition obs_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
   (obs_half h ∗ obs_hist_auth h)%I.
 Definition obs_frag `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
-  ghost_var riscv_obs_name (1/2) h.
+  ghost_var_frac riscv_obs_name (1/2) h.
 
 (* THE GROWTH AUTHORITY'S OWN STEP, for the one mover that does not hold
    the client's half: the power loop, whose hook moves [obs_half] alone. *)
@@ -1272,7 +1273,7 @@ Qed.
    ever taken, so all of them may be proved from the SAME resources.  That is
    [∧], and it is the whole reason this shape exists: an earlier design
    handed out one INDEPENDENT permit per sector, and then the client's
-   mirror half (an exclusive [ghost_var] fragment) could be curried into only
+   mirror half (an exclusive [ghost_var_frac] fragment) could be curried into only
    one of them, with no way for the other to obtain it -- a permit is a
    stateless view shift with no input slot and no invariant it may open at
    mask [∅].  Here whatever a later sector needs travels DOWN THE CHAIN
@@ -2302,7 +2303,7 @@ Definition reg_agree (m : gmap register (sigT type_of_register))
 
 (* the register bridge for a GIVEN hart's ghost name [γ]. *)
 Definition reg_interp_at `{!riscvFixedGS Σ} (γ : gname) (rs : regstate) : iProp Σ :=
-  (∃ m, ghost_map_auth γ 1 m ∗ ⌜reg_agree m rs⌝)%I.
+  (∃ m, ghost_map_auth_frac γ 1 m ∗ ⌜reg_agree m rs⌝)%I.
 
 (* the bridge for the AMBIENT hart -- what the WPs manipulate.  Original arity
    ([rs] only): the hart is [cpu_id], carried by [reg_name]. *)
@@ -2310,7 +2311,7 @@ Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
   reg_interp_at reg_name rs.
 
 (* ---------------------------------------------------------------------- *)
-(* device-fabric ownership: the halves pattern over two [ghost_var]s.       *)
+(* device-fabric ownership: the halves pattern over two [ghost_var_frac]s.       *)
 (* [uart_auth]/[plic_auth] live inside [state_interp]; [uart_frag]/         *)
 (* [plic_frag] are the user-facing halves.  Agreement + joint update are    *)
 (* the two bridge lemmas, mirroring [reg_valid]/[reg_update].               *)
@@ -2323,7 +2324,7 @@ Definition reg_interp `{!riscvGS Σ} `{CpuId} (rs : regstate) : iProp Σ :=
    which is where [iFrame] and [iExact] give up. *)
 Definition era_uarts_half `{!riscvFixedGS Σ} (γf : uart_id -> gname)
     (f : uart_id -> uart_state) : iProp Σ :=
-  ([∗ list] i ∈ enum uart_id, ghost_var (γf i) (1/2) (f i))%I.
+  ([∗ list] i ∈ enum uart_id, ghost_var_frac (γf i) (1/2) (f i))%I.
 
 (* ALLOCATE ONE HALVES PAIR PER PORT, and hand back the name FUNCTION the
    era record carries.  Spelled at the two ports rather than folded over
@@ -2346,17 +2347,17 @@ Qed.
 
 
 Definition uart_auth `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
-  ghost_var (uart_name i) (1/2) u.
+  ghost_var_frac (uart_name i) (1/2) u.
 Definition uart_frag `{!riscvGS Σ} (i : uart_id) (u : uart_state) : iProp Σ :=
-  ghost_var (uart_name i) (1/2) u.
+  ghost_var_frac (uart_name i) (1/2) u.
 Definition plic_auth `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
-  ghost_var plic_name (1/2) p.
+  ghost_var_frac plic_name (1/2) p.
 Definition plic_frag `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
-  ghost_var plic_name (1/2) p.
+  ghost_var_frac plic_name (1/2) p.
 Definition virtio_auth `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
-  ghost_var virtio_name (1/2) v.
+  ghost_var_frac virtio_name (1/2) v.
 Definition virtio_frag `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
-  ghost_var virtio_name (1/2) v.
+  ghost_var_frac virtio_name (1/2) v.
 
 (* the state_interp conjunct for the shared device state *)
 (* ONE HALF PER PORT.  A big-op over [enum uart_id] rather than a pair, so
@@ -2440,7 +2441,7 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
 
 (* ---------------------------------------------------------------------- *)
 (* THE RESERVATION MIRROR (design §3a).  [gresv] is a total function and     *)
-(* [ghost_map_auth] wants a map, so this is the one conversion -- via         *)
+(* [ghost_map_auth_frac] wants a map, so this is the one conversion -- via         *)
 (* [map_imap] over [fin_to_set CPU], which makes the lookup lemma three       *)
 (* rewrites with no [NoDup] obligation (the [list_to_map] spelling costs one).*)
 (* ---------------------------------------------------------------------- *)
@@ -2468,7 +2469,7 @@ Lemma resv_map_insert (f : CPU -> option resv) (a : CPU -> hread) (c : CPU)
 Proof.
   apply map_eq. intros c'. rewrite resv_map_lookup.
   destruct (decide (c' = c)) as [->|Hne].
-  - rewrite lookup_insert /insert /gresv_insert /ghr_insert. by rewrite !decide_True.
+  - rewrite lookup_insert_eq /insert /gresv_insert /ghr_insert. by rewrite !decide_True.
   - rewrite lookup_insert_ne // resv_map_lookup /insert /gresv_insert /ghr_insert.
     by rewrite !decide_False.
 Qed.
@@ -2506,7 +2507,7 @@ Qed.
    exclusive read and the conditional write; [resv_frag] is its existential. *)
 Definition resv_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (f : CPU -> option resv) (a : CPU -> hread) : iProp Σ :=
-  ghost_map_auth (era_resv_name E) 1 (resv_map f a).
+  ghost_map_auth_frac (era_resv_name E) 1 (resv_map f a).
 
 Definition resv_fragb `{!riscvGS Σ} (c : CPU) (r : option resv) (b : bool) : iProp Σ :=
   (c ↪[era_resv_name riscv_eraGS] (r, b))%I.
@@ -2530,10 +2531,10 @@ Proof. iIntros "H". by iExists b. Qed.
 Definition iview_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (f : CPU -> nat) : iProp Σ :=
   ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-     mono_nat_auth_own (era_iview_name E c) 1 (f c))%I.
+     mono_nat_auth_own_frac (era_iview_name E c) 1 (f c))%I.
 
 Definition hart_iview_auth `{!riscvGS Σ} (c : CPU) (v : nat) : iProp Σ :=
-  mono_nat_auth_own (era_iview_name riscv_eraGS c) 1 v.
+  mono_nat_auth_own_frac (era_iview_name riscv_eraGS c) 1 v.
 
 Definition hart_iview_lb_at `{!riscvGS Σ} (c : CPU) (K : nat) : iProp Σ :=
   mono_nat_lb_own (era_iview_name riscv_eraGS c) K.
@@ -2549,7 +2550,7 @@ Proof. iIntros "H". by iDestruct (mono_nat_lb_own_get with "H") as "#$". Qed.
 Lemma hart_iview_lb_at_valid `{!riscvGS Σ} (c : CPU) (v K : nat) :
   hart_iview_auth c v -∗ hart_iview_lb_at c K -∗ ⌜(K <= v)%nat⌝.
 Proof.
-  iIntros "Ha Hl". by iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ ?].
+  iIntros "Ha Hl". by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hl") as %[_ ?].
 Qed.
 
 Lemma hart_iview_auth_update `{!riscvGS Σ} (c : CPU) (v v' : nat) :
@@ -2600,10 +2601,10 @@ Qed.
 Definition rview_auth_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (f : CPU -> hread) : iProp Σ :=
   ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-     mono_nat_auth_own (era_rv_name E c) 1 (hr_rv (f c)))%I.
+     mono_nat_auth_own_frac (era_rv_name E c) 1 (hr_rv (f c)))%I.
 
 Definition hart_rview_auth `{!riscvGS Σ} (c : CPU) (v : nat) : iProp Σ :=
-  mono_nat_auth_own (era_rv_name riscv_eraGS c) 1 v.
+  mono_nat_auth_own_frac (era_rv_name riscv_eraGS c) 1 v.
 
 Definition hart_rview_lb_at `{!riscvGS Σ} (c : CPU) (K : nat) : iProp Σ :=
   mono_nat_lb_own (era_rv_name riscv_eraGS c) K.
@@ -2623,7 +2624,7 @@ Proof. iIntros "H". by iDestruct (mono_nat_lb_own_get with "H") as "#$". Qed.
 Lemma hart_rview_lb_at_valid `{!riscvGS Σ} (c : CPU) (v K : nat) :
   hart_rview_auth c v -∗ hart_rview_lb_at c K -∗ ⌜(K <= v)%nat⌝.
 Proof.
-  iIntros "Ha Hl". by iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ ?].
+  iIntros "Ha Hl". by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hl") as %[_ ?].
 Qed.
 
 Lemma hart_rview_lb_at_le `{!riscvGS Σ} (c : CPU) (K K' : nat) :
@@ -2729,8 +2730,8 @@ Definition gregs_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
 Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
     (d : dev_state) : iProp Σ :=
   (era_uarts_half (era_uart_name E) d.(duart) ∗
-   ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
-   ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
+   ghost_var_frac (era_plic_name E) (1/2) d.(dplic) ∗
+   ghost_var_frac (era_virtio_name E) (1/2) d.(dvirtio))%I.
 (* the era's four conjuncts.  The DISK IMAGE rides here, in LAST position,
    rather than beside the fixed conjuncts: it is per-era (see
    [era_disk_name]), so when the power is off there is no disk conjunct at
@@ -2768,7 +2769,7 @@ Qed.
 Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
     : iProp Σ :=
   (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg),
-     ghost_map_auth (era_ts_name E) 1 TM ∗
+     ghost_map_auth_frac (era_ts_name E) 1 TM ∗
      ⌜dom TM = dom g.(gmem)⌝ ∗
      (* THE ELEMENT'S TIE, one conjunct (tso-pin-memo.md §5.1): the LATEST
         half is the old statement verbatim at [e.1]; the PIN half is
@@ -2776,9 +2777,9 @@ Definition tso_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
         CONCLUSION, stored where the step relation can maintain it. *)
      ⌜∀ a e, TM !! a = Some e →
         ts_ok g.(gimg) g.(gmem) g.(glog) a e⌝ ∗
-     ghost_map_auth (era_logm_name E) 1 LM ∗
+     ghost_map_auth_frac (era_logm_name E) 1 LM ∗
      ⌜∀ i, LM !! i = g.(glog) !! i⌝ ∗
-     mono_nat_auth_own (era_loglen_name E) 1 (length g.(glog)) ∗
+     mono_nat_auth_own_frac (era_loglen_name E) 1 (length g.(glog)) ∗
      view_auth (era_view_name E) (avf g) ∗
      ⌜mm_ok g /\ g.(gimg) = era_img E⌝)%I.
 
@@ -2827,7 +2828,7 @@ Definition disk_fixed_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
 Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
   (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗ disk_fixed_interp g ∗
    (∃ R : gmap nat riscvEraGS,
-      ghost_map_auth riscv_registry_name 1 R ∗
+      ghost_map_auth_frac riscv_registry_name 1 R ∗
       ⌜dom R = set_seq 0 (start_count g)⌝ ∗
       (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
        else True%I)))%I.
@@ -2956,7 +2957,7 @@ Section RegAt.
     iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
     iPureIntro. intros k dv Hk.
     destruct (decide (k = r)) as [->|Hne].
-    - rewrite lookup_insert in Hk. injection Hk as <-.
+    - rewrite lookup_insert_eq in Hk. injection Hk as <-.
       by rewrite register_lookup_set.
     - rewrite lookup_insert_ne in Hk; [|done].
       rewrite (Hag k dv Hk).
@@ -3017,7 +3018,7 @@ Section Bridge.
     iModIntro. iExists (<[r := existT r v']> m). iFrame "Hm".
     iPureIntro. intros k dv Hk.
     destruct (decide (k = r)) as [->|Hne].
-    - rewrite lookup_insert in Hk. injection Hk as <-.
+    - rewrite lookup_insert_eq in Hk. injection Hk as <-.
       by rewrite register_lookup_set.
     - rewrite lookup_insert_ne in Hk; [|done].
       rewrite (Hag k dv Hk).
@@ -3269,7 +3270,6 @@ Section Bridge.
     assert (Hpa0 : pa_add a 0 = a).
     { unfold pa_add. change (Z.of_nat 0) with 0%Z.
       unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-             Operators_mwords.with_word', SailStdpp.Values.with_word,
              SailStdpp.Values.mword_of_int,
              MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
       apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.

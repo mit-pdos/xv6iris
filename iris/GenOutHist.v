@@ -159,7 +159,7 @@ Section gen_out_hist.
     destruct (trace_shape_cycles h Hsh) as (cs & Hcs).
     assert (Hin : open_seg h ∈ cycles_of h)
       by (rewrite /cycles_of Hcs; apply epu_elem_of_rev_head).
-    apply elem_of_list_lookup in Hin as [i Hi].
+    apply list_elem_of_lookup in Hin as [i Hi].
     exact (Forall_lookup_1 _ _ _ _ Hd Hi).
   Qed.
 
@@ -177,7 +177,7 @@ Section gen_out_hist.
     assert (Hins0 : ins p0 = [])
       by (apply nil_length_inv; exact (in_pres_lookup_ins sf 0 p0 Hp0)).
     assert (Hp0seg : p0 ∈ in_pres seg).
-    { apply elem_of_list_lookup_2 with 0.
+    { apply list_elem_of_lookup_2 with 0.
       destruct (in_pres_mono sf seg Hpre) as [z Hz].
       rewrite Hz lookup_app_l; [exact Hp0 | lia]. }
     assert (Hw0 : obs_wire Uart0 p0 = []).
@@ -448,11 +448,11 @@ Section gen_out_hist.
       + exact Hlog'.
       + intros e He. apply elem_of_app in He as [He | He].
         * exact (Hdsc e He).
-        * apply elem_of_list_singleton in He as ->.
+        * apply list_elem_of_singleton in He as ->.
           cbn [le_hist fst snd]. exact Hdseg.
       + intros e He. apply elem_of_app in He as [He | He].
         * exact (Hbts e He).
-        * apply elem_of_list_singleton in He as ->.
+        * apply list_elem_of_singleton in He as ->.
           cbn [le_hist fst snd]. exact Hboots.
       + rewrite (echoed_snoc_yes _ _ Hech).
         by apply (prefix_app_r _ _ [(le_hist (h, c, take j cs),
@@ -466,7 +466,7 @@ Section gen_out_hist.
       + apply Forall_app. split; [exact Hall | by rewrite Forall_singleton].
       + intros e He. apply elem_of_app in He as [He | He].
         * exact (Hdh e He).
-        * apply elem_of_list_singleton in He as ->.
+        * apply list_elem_of_singleton in He as ->.
           cbn [le_hist fst snd]. exact (conj Hdish Hshh).
     - exact I.
     - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
@@ -534,7 +534,7 @@ Section gen_out_hist.
       rewrite /seg_of list_lookup_fmap in Hx.
       destruct (echoed L !! j) as [y |] eqn:Hy; [| discriminate].
       cbn in Hx. injection Hx as Hx. rewrite -Hx. cbn [fst].
-      assert (Hyin : y ∈ echoed L) by (by eapply elem_of_list_lookup_2).
+      assert (Hyin : y ∈ echoed L) by (by eapply list_elem_of_lookup_2).
       destruct (echoed_elem_inv L y Hyin) as (e & He & _ & Hye).
       apply open_seg_prefix_boots.
       + rewrite -Hye. cbn [fst]. by destruct (Hord e He) as [Hpre _].
@@ -583,7 +583,7 @@ Section gen_out_hist.
         by lia. }
     assert (Hcin : c ∈ ins (open_seg h)).
     { destruct Hends' as [h0 Hh0]. rewrite Hh0 ins_app ins_in.
-      apply elem_of_app. right. apply elem_of_list_here. }
+      apply elem_of_app. right. apply list_elem_of_here. }
     pose proof (lm_disc_drop_byte _ c Hd Hcin) as (_ & _ & Hner).
     assert (Hcs : cs = [echo_of c]).
     { destruct Hecho as [Hnil | [Hech | [Herase _]]]; [| exact Hech |];

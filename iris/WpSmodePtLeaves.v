@@ -556,7 +556,7 @@ Section WpSmodePtLoad.
                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                         ppn v dqm Hcan
                         ltac:(apply Forall_forall; intros j Hj;
-                              apply elem_of_list_In, elem_of_seq in Hj;
+                              apply list_elem_of_In, elem_of_seq in Hj;
                               destruct Hj as [_ Hj8];
                               pose proof (Nat2Z.inj_lt j 8) as Hnz;
                               change (Z.of_nat 8) with 8%Z in Hnz; lia)

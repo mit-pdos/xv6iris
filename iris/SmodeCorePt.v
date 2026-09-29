@@ -144,7 +144,7 @@ Proof.
   cbn [bits_of_virtaddr].
   unfold neq_vec. rewrite negb_false_iff. unfold eq_vec.
   rewrite MachineWord.MachineWord.eqb_true_iff. apply bv_eq. symmetry.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
        MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned. unfold bv_signed.
   rewrite (lo_subrange_unsigned a Hlt).
@@ -592,6 +592,7 @@ Section SmodeCorePt.
     TsoCtx.own_context CtxIdDefs.cur_ctx ∗
     ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add a j) ↦ₘ (nth_byte vnew j)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hn Hcan Hall. iIntros "#Hk Hm Htso Hrun Hb".
     iDestruct (win_pins a ppn (nth_byte vold) _ Hcan Hall with "Hk Hb") as %Hpins.
     iDestruct (win_to_phys a ppn (nth_byte vold) _ Hcan Hall with "Hk Hb") as "Hb".
@@ -662,6 +663,7 @@ Section SmodeCorePt.
     TsoCtx.own_context CtxIdDefs.cur_ctx ∗
     ([∗ list] j ∈ seq 0 (N.to_nat n), (pa_add a j) ↦ₘ (nth_byte vnew j)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hn Hcan Hall. iIntros "#Hk Hm Htso Hrun Hb".
     iDestruct (win_pins_free a ppn _ Hcan Hall with "Hk Hb") as %Hpins.
     iDestruct (win_to_phys_free a ppn _ Hcan Hall with "Hk Hb") as "Hb".
@@ -724,13 +726,14 @@ Section SmodeCorePt.
          (log ++ [PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)])%list V) ∗
     TsoCtx.own_context CtxIdDefs.cur_ctx ∗ va ↦₈ vnew.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
     iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
     iMod (wordw_win_store_c 8 img σ log V va ppn vold vnew
             ltac:(vm_compute; discriminate) Hcan
             ltac:(apply Forall_forall; intros j Hj;
-                  apply elem_of_list_In, elem_of_seq in Hj;
+                  apply list_elem_of_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
                   change (Z.of_nat 8) with 8%Z in Hnz; lia)
             with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
@@ -757,13 +760,14 @@ Section SmodeCorePt.
          (log ++ [PWMsg (snap_of (pa_of ppn va) 4 vnew) (hart_agent cpu_id)])%list V) ∗
     TsoCtx.own_context CtxIdDefs.cur_ctx ∗ va ↦₄ vnew.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
     iDestruct (ctx_word4_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hb".
     iMod (wordw_win_store_c 4 img σ log V va ppn vold vnew
             ltac:(vm_compute; discriminate) Hcan
             ltac:(apply Forall_forall; intros j Hj;
-                  apply elem_of_list_In, elem_of_seq in Hj;
+                  apply list_elem_of_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj4]; pose proof (Nat2Z.inj_lt j 4) as Hnz;
                   change (Z.of_nat 4) with 4%Z in Hnz; lia)
             with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
@@ -817,13 +821,14 @@ Section SmodeCorePt.
     TsoCtx.ledger_msg_at (length log)
       (PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hcan Hoff. iIntros "#Hk Hm Htso Hw".
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
     assert (Hall : Forall (fun j =>
               (bv_unsigned (subrange_vec_dec va 11 0) + Z.of_nat j < 4096)%Z)
               (seq 0 8)).
     { apply Forall_forall; intros j Hj;
-        apply elem_of_list_In, elem_of_seq in Hj;
+        apply list_elem_of_In, elem_of_seq in Hj;
         destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
         change (Z.of_nat 8) with 8%Z in Hnz; lia. }
     iDestruct (win_to_phys va ppn (nth_byte vold) (seq 0 8) Hcan Hall
@@ -946,7 +951,7 @@ Section SmodeCorePt.
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
     iApply (wordw_win_load_c 8 img σ log V va ppn v dq Hcan
               ltac:(apply Forall_forall; intros j Hj;
-                    apply elem_of_list_In, elem_of_seq in Hj;
+                    apply list_elem_of_In, elem_of_seq in Hj;
                     destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
                     change (Z.of_nat 8) with 8%Z in Hnz; lia)
               with "Hk Hm Htso Hrun Hb").

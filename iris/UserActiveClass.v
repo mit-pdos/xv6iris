@@ -54,7 +54,7 @@ Lemma access0_even (va : mword 64) :
 Proof.
   intro H0.
   unfold neq_vec in H0. rewrite negb_false_iff in H0.
-  unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word in H0.
+  unfold eq_vec, access_vec_dec, access_mword_dec, slice in H0.
   rewrite MachineWord.MachineWord.eqb_true_iff in H0.
   apply bv_eq in H0.
   unfold MachineWord.slice in H0.
@@ -96,8 +96,7 @@ Proof.
   pose proof (bv_unsigned_in_range _ (add_vec_int va 2)) as Hs.
   rewrite Z.rem_mod_nonneg in H; [ | lia | lia ].
   rewrite Z.rem_mod_nonneg; [ | lia | lia ].
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int 2 : mword 64) = 2) by (vm_compute; reflexivity).

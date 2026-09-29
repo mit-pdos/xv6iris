@@ -424,7 +424,7 @@ Section CtxCellsReindex.
      child context needs (A6.127 §6). *)
   Global Instance stack_own_morph (sp : Arch.pa) (n : nat) :
     CtxMorph (λ ξ, stack_own (KTR := KT1) (XI := ξ) sp n).
-  Proof using . iIntros (ξ ξ') "Hd H". iApply (stack_own_reindex ξ ξ' sp n with "Hd H"). Qed.
+  Proof using . iIntros (ξ ξ') "Hd H". iApply (stack_own_reindex (KTR := KT1) ξ ξ' sp n with "Hd H"). Qed.
 
 End CtxCellsReindex.
 
@@ -455,7 +455,7 @@ Section Swconf.
      convention: [cpu_own]'s own [1] level (the [S _] arm of
      [IntrDefs.intr_count]) unconditionally holds the ghost eighth at
      '0' REGARDLESS of [eb'], so a [sie_cap]/[sie_arm b] eighth held
-     alongside it is forced to agree at [b = false] by ghost_var
+     alongside it is forced to agree at [b = false] by ghost_var_frac
      agreement -- [valid_context_pre]'s resume wand below states that
      forced value directly (literal [false]) rather than re-deriving it
      from a case split. *)

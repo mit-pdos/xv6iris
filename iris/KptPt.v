@@ -134,7 +134,7 @@ Lemma subrange64_unsigned_11_0 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0.
@@ -183,13 +183,13 @@ Lemma zext64_concat44_12_unsigned (x : mword 44) (y : mword 12) :
 Proof.
   unfold zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (44 + 12)) (44 + 12)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
@@ -210,9 +210,9 @@ Lemma zext44_27_unsigned (v : mword 27) :
 Proof.
   unfold zero_extend'.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word SailStdpp.Values.with_word autocast].
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.
@@ -618,8 +618,8 @@ Lemma svpn_of_extract (a : mword 64) :
 Proof.
   unfold svpn_of. rewrite autocast_id.
   unfold subrange_vec_dec at 1. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx pagesize_bits) with 12%N.
   rewrite bv_extract_unsigned.
   apply bv_wrap_small.
@@ -665,11 +665,11 @@ Proof.
   { pose proof (Z_div_mod_eq_full (bv_unsigned b) 4096) as Hdm.
     assert (0 <= bv_unsigned b mod 4096 < 4096) by (apply Z_mod_lt; lia). lia. }
   unfold neq_vec in Hcanon. rewrite negb_false_iff in Hcanon. unfold eq_vec in Hcanon.
-  rewrite MachineWord.MachineWord.eqb_true_iff in Hcanon. unfold get_word in Hcanon.
+  rewrite MachineWord.MachineWord.eqb_true_iff in Hcanon. 
   apply (f_equal bv_unsigned) in Hcanon.
   change (bits_of_virtaddr (Virtaddr a)) with a in Hcanon.
   rewrite uint_unsigned. rewrite Hcanon.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
        MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned. unfold bv_signed.
   rewrite bv_swrap_small.
@@ -908,12 +908,12 @@ Proof.
   - apply andb_prop in Hc. destruct Hc as [Hc1 Hc2].
     apply Z.leb_le in Hc1. apply Z.ltb_lt in Hc2.
     apply elem_of_list_to_map; [exact Hnd|].
-    unfold kmap_seq. apply elem_of_list_fmap.
+    unfold kmap_seq. apply list_elem_of_fmap.
     exists (bv_unsigned vpn). split.
     + rewrite mword27_of_unsigned. reflexivity.
     + apply elem_of_seqZ. lia.
   - apply not_elem_of_list_to_map.
-    rewrite kmap_seq_keys. intro Hin. apply elem_of_list_fmap in Hin.
+    rewrite kmap_seq_keys. intro Hin. apply list_elem_of_fmap in Hin.
     destruct Hin as [z [Hz Hzin]]. apply elem_of_seqZ in Hzin.
     assert (bv_unsigned vpn = z) as Hbv.
     { rewrite Hz. apply mword27_unsigned. lia. }

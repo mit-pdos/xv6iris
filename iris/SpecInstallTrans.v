@@ -57,7 +57,7 @@
    above by construction (log_write hands each one back to its caller, and
    [log_state] retains only the log REGION's), so end_op -- the only caller
    with a non-empty write set -- could never discharge such a premise.  What
-   the committer does hold is [ghost_map_auth (fs_cache γfs) 1 L], and one
+   the committer does hold is [ghost_map_auth_frac (fs_cache γfs) 1 L], and one
    [ghost_map_lookup] against the payload the bread returns pins the home
    block's bytes to [L !! uint w], which the pure premise identifies with
    [Lw i].  The log slot's client half stays a resource: it rides in
@@ -73,9 +73,9 @@
    -- bwrite moves the home block's disk cell, which is the whole point of
    the pass.
 
-   [ghost_map_auth (fs_cache γfs) 1 L] rides through UNCHANGED: install writes
+   [ghost_map_auth_frac (fs_cache γfs) 1 L] rides through UNCHANGED: install writes
    the DISK, not the logical view (the memmove writes bytes already equal to
-   the logged content).  [ghost_map_auth (fs_dirty γfs) 1 D] does move: each
+   the logged content).  [ghost_map_auth_frac (fs_dirty γfs) 1 D] does move: each
    entry's flip true -> false at its bunpin needs the authority plus both
    halves (the payload's, out of the handle, and the log side's, peeled out
    of the batch's big-op by the caller), and the post's authority is
@@ -231,7 +231,7 @@ Lemma it_rec_L_upto_hit (W : list (SailStdpp.Values.mword 32))
 Proof.
   intros Hinj. revert j. induction t as [|t IH]; [lia|]. intros j Hj Hw.
   destruct (decide (j = t)) as [->|Hne].
-  - rewrite (it_rec_L_upto_S W Lw L t w Hw) lookup_insert //.
+  - rewrite (it_rec_L_upto_S W Lw L t w Hw) lookup_insert_eq //.
   - destruct (W !! t) as [v|] eqn:Hv.
     + assert (Hneq : uint v <> uint w)
         by (intro Hc; exact (Hne (eq_sym (Hinj t j v w Hv Hw Hc)))).
@@ -380,11 +380,11 @@ Definition wp_install_trans_sconf_body
      handle comes out at the residue.  The commit arm moves nothing there
      (the tie already holds) and supplies [emp]. *)
   (if recovering then exc_own (fs_exc γfs) Xexc else emp) -∗
-  ghost_map_auth (fs_cache γfs) 1 L -∗
+  ghost_map_auth_frac (fs_cache γfs) 1 L -∗
   (* the pinned-set authority: exactly W's entries go back to false at
      commit time; nothing moves at recovery (nothing is pinned in a fresh
      era, and the bunpin is skipped) *)
-  ghost_map_auth (fs_dirty γfs) 1 D -∗
+  ghost_map_auth_frac (fs_dirty γfs) 1 D -∗
   (* per entry: the LOG COPY's client half at the logged content
      (write_log's postcondition, frozen by the authority above), plus
        - commit time: the log side's dirty half of the home block (the
@@ -448,9 +448,9 @@ Definition wp_install_trans_sconf_body
       (* the in-memory header, unchanged (lh.n := 0 is the CALLER's store) *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-      ghost_map_auth (fs_cache γfs) 1
+      ghost_map_auth_frac (fs_cache γfs) 1
         (if recovering then it_rec_L W Lw L else L) -∗
-      ghost_map_auth (fs_dirty γfs) 1
+      ghost_map_auth_frac (fs_dirty γfs) 1
         (if recovering then D else dirty_clear D (map uint W)) -∗
       (* the exception set's RESIDUE: every entry has been landed, so the
          WAL's handle comes back at [Xexc] minus the whole write set --

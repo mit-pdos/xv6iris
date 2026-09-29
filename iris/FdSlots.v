@@ -116,7 +116,7 @@ Definition fdslotUR : ucmra := authUR natUR.
    spec that already threads a process's private state can NAME the
    process's descriptors without a new parameter.
 
-   A GMAP UNDER ONE NAME, not NOFILE separate [ghost_var]s: a list of
+   A GMAP UNDER ONE NAME, not NOFILE separate [ghost_var_frac]s: a list of
    sixteen ghost names would have to be allocated, threaded and kept in
    step with the array, and every lemma about one descriptor would carry
    the list.  With a gmap the per-descriptor resource is a singleton
@@ -150,7 +150,7 @@ Definition fdslotUR : ucmra := authUR natUR.
    [FdInode] ALSO CARRIES THE NAME OF ITS OFFSET GHOST.  [f->off] is the
    one mutable field of a [struct file], and it is per FILE, not per
    descriptor: every fd that names the file (dup, fork) shares it.  The
-   name [γo] is that of a [ghost_var] over [Z] whose value IS the current
+   name [γo] is that of a [ghost_var_frac] over [Z] whose value IS the current
    [f->off] ([FileOffCell.off_resident] owns it whole, beside the cell,
    inside the file's off box), minted fresh at every FD_INODE publish
    ([ProofSysOpenParts.so_deposit]) and never reused: a closed file's

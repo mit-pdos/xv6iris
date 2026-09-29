@@ -83,7 +83,7 @@ Section WpSmodeHalf.
     change (8*(0+1)*2-1) with 15. change (8*0*2) with 0.
     unfold subrange_vec_dec. change (15 - 0 + 1) with 16. rewrite autocast_id.
     apply bv_eq. rewrite autocast_id.
-    unfold to_word_idx, to_word, get_word, MachineWord.slice.
+    unfold to_word_idx, MachineWord.slice.
     rewrite MachineWord.cast_idx_refl.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.

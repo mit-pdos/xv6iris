@@ -528,7 +528,7 @@ Lemma live_pages_lt (sz : Z) (p : mword 27) :
   usz_ok sz -> p ∈ live_pages sz -> (bv_unsigned p < 67108862)%Z.
 Proof.
   unfold usz_ok, live_pages. intros Hsz Hin.
-  apply elem_of_list_to_set, elem_of_list_fmap in Hin as (k & -> & Hk).
+  apply elem_of_list_to_set, list_elem_of_fmap in Hin as (k & -> & Hk).
   apply elem_of_seqZ in Hk.
   assert (Hle : (UserPtTree.pgroundup sz / 4096 <= 67108862)%Z).
   { apply (Z.div_le_mono _ _ 4096 ltac:(lia)) in Hsz.
@@ -756,7 +756,7 @@ Lemma live_pages_mem (sz : Z) (p : mword 27) :
   bv_unsigned p * 4096 < UserPtTree.pgroundup sz -> p ∈ live_pages sz.
 Proof.
   intros Hlt. unfold live_pages.
-  apply elem_of_list_to_set, elem_of_list_fmap.
+  apply elem_of_list_to_set, list_elem_of_fmap.
   exists (bv_unsigned p).
   split; [ symmetry; apply Z_to_bv_bv_unsigned | ].
   apply elem_of_seqZ.
@@ -780,7 +780,7 @@ Proof.
   apply perm_of_ext_rw; [ apply insert_subseteq; exact Hn | ].
   intros p w Hp Hp'.
   destruct (decide (p = vpn)) as [-> | Hne].
-  - rewrite lookup_insert in Hp'. injection Hp' as <-.
+  - rewrite lookup_insert_eq in Hp'. injection Hp' as <-.
     split; [ exact (live_pages_mem sz vpn Hlt) | apply perm_leaf_uvm_pte22 ].
   - rewrite lookup_insert_ne in Hp'; [| congruence ].
     rewrite Hp in Hp'. discriminate Hp'.
@@ -928,7 +928,7 @@ Lemma live_pages_bound (sz : Z) (p : mword 27) :
   (bv_unsigned p * 4096 < UserPtTree.pgroundup sz)%Z.
 Proof.
   unfold usz_ok, live_pages. intros Hsz Hin.
-  apply elem_of_list_to_set, elem_of_list_fmap in Hin as (k & -> & Hk).
+  apply elem_of_list_to_set, list_elem_of_fmap in Hin as (k & -> & Hk).
   apply elem_of_seqZ in Hk. rewrite Z.add_0_l in Hk.
   assert (Hle : (UserPtTree.pgroundup sz / 4096 <= 67108862)%Z).
   { apply (Z.div_le_mono _ _ 4096 ltac:(reflexivity)) in Hsz.
@@ -1266,7 +1266,7 @@ Qed.
 Lemma live_pages_mono (sz sz' : Z) :
   sz <= sz' -> live_pages sz ⊆ live_pages sz'.
 Proof.
-  intros Hle p. unfold live_pages. rewrite !elem_of_list_to_set, !elem_of_list_fmap.
+  intros Hle p. unfold live_pages. rewrite !elem_of_list_to_set, !list_elem_of_fmap.
   intros (k & -> & Hk). exists k. split; [ reflexivity | ].
   apply elem_of_seqZ in Hk. apply elem_of_seqZ.
   pose proof (UserPtTree.pgroundup_mono sz sz' Hle) as Hm.

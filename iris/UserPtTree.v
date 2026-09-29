@@ -239,20 +239,20 @@ Lemma elem_of_uva_dom (P : uptd) (va : Z) :
   va ∈ uva_dom P <-> uva_mapped P va.
 Proof.
   unfold uva_dom, uva_mapped.
-  rewrite elem_of_list_to_set elem_of_list_join.
+  rewrite elem_of_list_to_set list_elem_of_join.
   split.
   - intros (l & Hva & Hl).
-    apply elem_of_list_fmap in Hl as ([vpn w] & -> & Hin).
+    apply list_elem_of_fmap in Hl as ([vpn w] & -> & Hin).
     apply elem_of_map_to_list in Hin.
-    apply elem_of_list_fmap in Hva as (j & -> & Hj).
+    apply list_elem_of_fmap in Hva as (j & -> & Hj).
     apply elem_of_seq in Hj.
     exists vpn, w, j. split_and!; [exact Hin | lia | reflexivity].
   - intros (vpn & w & j & Hl & Hj & ->).
     exists ((fun j0 : nat => bv_unsigned vpn * 4096 + Z.of_nat j0) <$> seq 0 4096).
     split.
-    + apply elem_of_list_fmap. exists j.
+    + apply list_elem_of_fmap. exists j.
       split; [reflexivity |]. apply elem_of_seq. lia.
-    + apply elem_of_list_fmap. exists (vpn, w).
+    + apply list_elem_of_fmap. exists (vpn, w).
       split; [reflexivity |]. apply elem_of_map_to_list. exact Hl.
 Qed.
 
@@ -593,7 +593,7 @@ Proof.
   revert j. induction n as [| k IH]; intros j Hj; [exfalso; lia |].
   cbn [umem_write].
   destruct (decide (j = k)) as [-> | Hne].
-  - apply lookup_insert.
+  - apply lookup_insert_eq.
   - rewrite lookup_insert_ne; [| lia]. apply IH. lia.
 Qed.
 
@@ -611,7 +611,7 @@ Lemma umem_del_lookup_in (M : gmap Z (bv 8)) (a : Z) (n : nat) (j : nat) :
 Proof.
   revert j. induction n as [| k IH]; intros j Hj; [exfalso; lia |].
   cbn [umem_del]. destruct (decide (j = k)) as [-> | Hne].
-  - apply lookup_delete.
+  - apply lookup_delete_eq.
   - rewrite lookup_delete_ne; [| lia]. apply IH. lia.
 Qed.
 
@@ -654,7 +654,7 @@ Proof.
     { intros N. clear -Hj. induction n as [| k IH]; [exfalso; lia |].
       cbn [umem_del].
       destruct (decide (j = k)) as [-> | Hne];
-        [ apply lookup_delete |].
+        [ apply lookup_delete_eq |].
       rewrite lookup_delete_ne; [| lia]. apply IH. lia. }
     rewrite !Hdel. reflexivity.
   - assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
@@ -755,7 +755,7 @@ Lemma umem_wr_lookup_in (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
 Proof.
   induction n as [| k IH]; intros Hj Hlin; [lia |].
   cbn [umem_wr]. destruct (decide (j = k)) as [-> | Hne].
-  - apply lookup_insert.
+  - apply lookup_insert_eq.
   - rewrite lookup_insert_ne.
     + apply IH; [lia |]. intros i Hi. apply Hlin. lia.
     + rewrite (Hlin j ltac:(lia)) (Hlin k ltac:(lia)). lia.
@@ -1009,7 +1009,7 @@ Lemma elem_of_upage_dom (vpn : mword 27) (va : Z) :
   va ∈ upage_dom vpn <->
   exists j, (j < 4096)%nat /\ va = (bv_unsigned vpn * 4096 + Z.of_nat j)%Z.
 Proof.
-  unfold upage_dom. rewrite elem_of_list_to_set elem_of_list_fmap. split.
+  unfold upage_dom. rewrite elem_of_list_to_set list_elem_of_fmap. split.
   - intros (j & -> & Hj). apply elem_of_seq in Hj.
     exists j. split; [lia | reflexivity].
   - intros (j & Hj & ->). exists j.
@@ -1048,7 +1048,7 @@ Lemma upage_map_lookup (vpn : mword 27) (bs : nat -> bv 8) (j : nat) :
 Proof.
   intros Hj. unfold upage_map.
   apply elem_of_list_to_map_1; [ apply upage_kv_nodup |].
-  unfold upage_kv. apply elem_of_list_fmap. exists j.
+  unfold upage_kv. apply list_elem_of_fmap. exists j.
   split; [reflexivity |]. apply elem_of_seq. lia.
 Qed.
 

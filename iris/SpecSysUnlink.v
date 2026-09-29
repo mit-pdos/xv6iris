@@ -536,7 +536,7 @@ Section SysUnlinkArms.
       (Fmiss : pfam Σ (aview -> Z -> fname -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av0 av1 : aview) (d t : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat) (a : anode),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
        ⌜unl_pre av0 d nm ents nl t a⌝ ∗
        ⌜0 < t < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜av1 !! t = Some a⌝ ∗
@@ -569,14 +569,14 @@ Section SysUnlinkArms.
                ∗ ((* (iii-a) the name is a dot: refused BY NAME, before
                      any lookup -- pure, both observations refunded *)
                   (∃ nm : fname,
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                      ⌜nm = DOT \/ nm = DOTDOT⌝ ∗
                      pf_at (dlookup_commit_at Γ appE) Fex ∗
                      pf_at (dmiss_commit_at Γ appE) Fmiss)
                   ∨ (* (iii-b) gone: the miss observation FIRED *)
                   (∃ (av : aview) (nm : fname) (ents : gmap fname Z)
                      (nl : nat),
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                      ⌜arow_at av d (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = None⌝ ∗
                      Fmiss.(pf_recv) av d nm ∗
@@ -585,7 +585,7 @@ Section SysUnlinkArms.
                        FIRED, both rows pinned at the one instant *)
                   (∃ (av : aview) (t : Z) (nm : fname)
                      (ents est : gmap fname Z) (nl nlt : nat),
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = Some t⌝ ∗
                      ⌜av !! t = Some (MkAnode (ADir est) nlt)⌝ ∗

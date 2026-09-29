@@ -528,7 +528,7 @@ Section IgetLic.
     ireg_claim_ok c f d ->
     ireg_frz_ok f n d ->
     mm !! bv_unsigned inum = Some d ->
-    ghost_map_auth γi 1 mm -∗
+    ghost_map_auth_frac γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) c r f n d -∗
     ireg_lnk γfs (bv_unsigned inum) d -∗
     (* the slot's shelter conjunct, whole (durable-disk C-5): the c side is
@@ -658,7 +658,7 @@ Section IgetLic.
     mm !! bv_unsigned inum = Some (ds !!! islot inum) ->
     (* the [BufL] row's block transport, from [iname_buf_list] above *)
     (forall (bno : Z) (ds0 : list dinode), l = BufL bno ds0 -> ds0 = ds) ->
-    ghost_map_auth γi 1 mm -∗
+    ghost_map_auth_frac γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) c r f n (ds !!! islot inum) -∗
     ireg_lnk γfs (bv_unsigned inum) (ds !!! islot inum) -∗
     (⌜c = None⌝ ∨ ireg_open) -∗

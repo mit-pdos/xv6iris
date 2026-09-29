@@ -64,7 +64,7 @@ Local Open Scope list_scope.
 Local Notation fc0 := (files_of {[txt_a := []]}).
 
 Ltac ud_elem :=
-  solve [ repeat first [ apply elem_of_list_here | apply elem_of_list_further ] ].
+  solve [ repeat first [ apply list_elem_of_here | apply list_elem_of_further ] ].
 
 (* ===================================================================== *)
 (*  0.  LIST FACTS                                                        *)
@@ -79,8 +79,8 @@ Fixpoint ud_sublists {A} (l : list A) : list (list A) :=
 Lemma elem_of_ud_sublists {A} (m l : list A) : m `sublist_of` l -> m ∈ ud_sublists l.
 Proof using.
   induction 1 as [| x l1 l2 _ IH | x l1 l2 _ IH]; cbn [ud_sublists].
-  - apply elem_of_list_here.
-  - apply elem_of_app. left. apply elem_of_list_fmap. by exists l1.
+  - apply list_elem_of_here.
+  - apply elem_of_app. left. apply list_elem_of_fmap. by exists l1.
   - apply elem_of_app. right. exact IH.
 Qed.
 
@@ -110,12 +110,12 @@ Lemma merge_all_sublist ss b : merge_all ss b -> forall x, x ∈ ss -> x `sublis
 Proof using.
   induction 1 as [ss HF | ss i x s b Hi Hm IH]; intros y Hy.
   - rewrite Forall_forall in HF. rewrite (HF y Hy). apply sublist_nil_l.
-  - apply elem_of_list_lookup in Hy as [j Hj].
+  - apply list_elem_of_lookup in Hy as [j Hj].
     destruct (decide (j = i)) as [-> | Hne].
     + rewrite Hi in Hj. injection Hj as <-. apply sublist_skip. apply IH.
-      apply elem_of_list_lookup. exists i. apply list_lookup_insert.
+      apply list_elem_of_lookup. exists i. apply list_lookup_insert_eq.
       exact (lookup_lt_Some _ _ _ Hi).
-    + apply sublist_cons. apply IH. apply elem_of_list_lookup. exists j.
+    + apply sublist_cons. apply IH. apply list_elem_of_lookup. exists j.
       rewrite list_lookup_insert_ne; [exact Hj | lia].
 Qed.
 
@@ -171,20 +171,20 @@ Definition gcands (u : bytes) : list bytes :=
     (concat ((fun w => (fun z => w ++ z) <$> txt_sfx) <$> ud_sublists u)).
 
 Lemma gcands_uname g u : g ∈ gcands u -> uname g.
-Proof using. intros H. apply elem_of_list_filter in H as [H _]. exact H. Qed.
+Proof using. intros H. apply list_elem_of_filter in H as [H _]. exact H. Qed.
 
 Lemma gcands_of w z u :
   w `sublist_of` u -> z ∈ txt_sfx -> uname (w ++ z) -> (w ++ z) ∈ gcands u.
 Proof using.
-  intros Hw Hz Hu. apply elem_of_list_filter. split; [exact Hu |].
-  apply elem_of_list_In, in_concat. exists ((fun z => w ++ z) <$> txt_sfx). split.
-  - apply elem_of_list_In, elem_of_list_fmap. exists w.
+  intros Hw Hz Hu. apply list_elem_of_filter. split; [exact Hu |].
+  apply list_elem_of_In, in_concat. exists ((fun z => w ++ z) <$> txt_sfx). split.
+  - apply list_elem_of_In, list_elem_of_fmap. exists w.
     split; [reflexivity | exact (elem_of_ud_sublists w u Hw)].
-  - apply elem_of_list_In, elem_of_list_fmap. exists z. split; [reflexivity | exact Hz].
+  - apply list_elem_of_In, list_elem_of_fmap. exists z. split; [reflexivity | exact Hz].
 Qed.
 
 Lemma txt_sfx_nil : drop 4 txt_ext ∈ txt_sfx.
-Proof using. apply elem_of_list_here. Qed.
+Proof using. apply list_elem_of_here. Qed.
 
 Lemma gcands_self g u : uname g -> g `sublist_of` u -> g ∈ gcands u.
 Proof using.
@@ -217,7 +217,7 @@ Proof using.
   - exists txt_a. split.
     + change txt_a with ([] ++ txt_a).
       apply gcands_of; [apply sublist_nil_l | | exact txt_a_name].
-      do 5 apply elem_of_list_further. apply elem_of_list_here.
+      do 5 apply list_elem_of_further. apply list_elem_of_here.
     + replace (length v - length hdr_open)%nat with 0%nat in Hvt by lia.
       rewrite take_0 app_nil_r in Hvt. rewrite cat_dg_open_eq Hvt.
       apply prefix_app_r. apply ud_take_prefix.
@@ -264,7 +264,7 @@ Proof using.
     + left. apply Forall_lookup. intros j w Hj.
       destruct (decide (j = i)) as [-> | Hne].
       * rewrite Hi in Hj. injection Hj as <-. apply sublist_skip.
-        exact (Forall_lookup_1 _ _ _ _ HF (list_lookup_insert W i t Hlt)).
+        exact (Forall_lookup_1 _ _ _ _ HF (list_lookup_insert_eq W i t Hlt)).
       * apply sublist_cons. refine (Forall_lookup_1 _ _ j _ HF _).
         rewrite list_lookup_insert_ne; [exact Hj | lia].
     + right.
@@ -273,21 +273,21 @@ Proof using.
       apply Forall2_same_length_lookup in HP as [_ HP].
       assert (Hi0 : (i < length W0)%nat) by (rewrite Hl0; exact Hlt).
       destruct (lookup_lt_is_Some_2 W0 i Hi0) as [v Hv].
-      assert (Hvt : v `prefix_of` t) by exact (HP i v t Hv (list_lookup_insert W i t Hlt)).
+      assert (Hvt : v `prefix_of` t) by exact (HP i v t Hv (list_lookup_insert_eq W i t Hlt)).
       exists (<[i := x :: v]> W0). split_and!.
       * apply Forall2_same_length_lookup. split; [by rewrite length_insert |].
         intros j a b Ha Hb. destruct (decide (j = i)) as [-> | Hne].
-        -- rewrite list_lookup_insert in Ha; [| lia]. injection Ha as <-.
+        -- rewrite list_lookup_insert_eq in Ha; [| lia]. injection Ha as <-.
            rewrite Hi in Hb. injection Hb as <-. by apply prefix_cons.
         -- rewrite list_lookup_insert_ne in Ha; [| lia].
            apply (HP j a b Ha). rewrite list_lookup_insert_ne; [exact Hb | lia].
       * apply Forall_lookup. intros j a Ha. destruct (decide (j = i)) as [-> | Hne].
-        -- rewrite list_lookup_insert in Ha; [| lia]. injection Ha as <-.
+        -- rewrite list_lookup_insert_eq in Ha; [| lia]. injection Ha as <-.
            apply sublist_skip. exact (Forall_lookup_1 _ _ _ _ HS Hv).
         -- rewrite list_lookup_insert_ne in Ha; [| lia].
            apply sublist_cons. exact (Forall_lookup_1 _ _ _ _ HS Ha).
-      * apply (pmt_w _ [] s i x v u); [rewrite list_lookup_insert; [reflexivity | lia] |].
-        rewrite list_insert_insert list_insert_id; [exact H0 | exact Hv].
+      * apply (pmt_w _ [] s i x v u); [rewrite list_lookup_insert_eq; [reflexivity | lia] |].
+        rewrite list_insert_insert_eq list_insert_id; [exact H0 | exact Hv].
   - left. eapply Forall_impl; [exact HF |]. intros w ->. apply sublist_nil_l.
   - destruct IH as [HF | (W0 & HP & HS & H0)].
     + left. eapply Forall_impl; [exact HF |]. intros w Hw. by apply sublist_cons.
@@ -342,7 +342,7 @@ Definition umergeb (gp : bool) (u : bytes) : bool :=
 
 Lemma umo_grep (gp : bool) m : m ∈ (if gp then [dg_execG] else []) -> gp = true /\ m = dg_execG.
 Proof using.
-  destruct gp; [intros Hm; split; [reflexivity | exact (proj1 (elem_of_list_singleton _ _) Hm)] |].
+  destruct gp; [intros Hm; split; [reflexivity | exact (proj1 (list_elem_of_singleton _ _) Hm)] |].
   intros Hm. by apply elem_of_nil in Hm.
 Qed.
 
@@ -423,7 +423,7 @@ Section umerge.
     exists x', x' ∈ prodU u /\ pde_pmt W pr x' u.
   Proof using Hadm.
     unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx Hp;
-      apply elem_of_list_In in Hx.
+      apply list_elem_of_In in Hx.
     - exists x. split; [| exact Hp]. apply elem_of_app. left.
       destruct Hx as [<- | [<- | []]]; ud_elem.
     - pose proof (@uda_catf _ _ _ Hadm g fs Ha) as Hg.
@@ -433,7 +433,7 @@ Section umerge.
       destruct (pmt_stray_trunc _ _ _ _ Hp) as (sp & Hsp & Hsu & Hp').
       destruct (open_trunc g sp u Hg Hsp Hsu) as (g' & Hg' & Hsp').
       exists (cat_dg_open g'). split.
-      + apply elem_of_app. right. apply elem_of_list_fmap. by exists g'.
+      + apply elem_of_app. right. apply list_elem_of_fmap. by exists g'.
       + exact (pde_pmt_stray _ _ _ _ _ Hp' Hsp').
   Qed.
 
@@ -443,7 +443,7 @@ Section umerge.
     exists pc', pc' ∈ prodU u /\ pde_pmt (pc' :: R) pr s u.
   Proof using Hadm.
     unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx Hp;
-      apply elem_of_list_In in Hx.
+      apply list_elem_of_In in Hx.
     - exists pc. split; [| exact Hp]. apply elem_of_app. left.
       destruct Hx as [<- | [<- | []]]; ud_elem.
     - pose proof (@uda_catf _ _ _ Hadm g fs Ha) as Hg.
@@ -452,7 +452,7 @@ Section umerge.
         try (split; [apply elem_of_app; left; ud_elem | exact Hp]).
       destruct (pmt_trunc _ _ _ _ Hp) as [HF | (W0 & HP & HS & H0)].
       + exists (cat_dg_open g). split; [| exact Hp].
-        apply elem_of_app. right. apply elem_of_list_fmap. exists g. split; [reflexivity |].
+        apply elem_of_app. right. apply list_elem_of_fmap. exists g. split; [reflexivity |].
         apply gcands_self; [exact Hg |].
         apply Forall_cons_1 in HF as [HF _]. etrans; [| exact HF].
         rewrite cat_dg_open_eq. apply sublist_inserts_l, sublist_inserts_r. reflexivity.
@@ -461,7 +461,7 @@ Section umerge.
         apply Forall_cons_1 in HS as [Hvu _].
         destruct (open_trunc g v u Hg Hv Hvu) as (g' & Hg' & Hv').
         exists (cat_dg_open g'). split.
-        * apply elem_of_app. right. apply elem_of_list_fmap. by exists g'.
+        * apply elem_of_app. right. apply list_elem_of_fmap. by exists g'.
         * apply (pmt_ext (v :: R0) s u H0). by apply Forall2_cons.
   Qed.
 
@@ -475,7 +475,7 @@ Section umerge.
     - exists FCat, (MkSO [] (Some RdGone) (Some WrNone)).
       split_and!; [by left | apply (so_silent fc L (SMid FCat)) | reflexivity | reflexivity].
     - apply elem_of_app in Hm as [Hm | Hm].
-      + apply elem_of_list_In in Hm. destruct Hm as [<- | [<- | []]].
+      + apply list_elem_of_In in Hm. destruct Hm as [<- | [<- | []]].
         * exists FCat, (MkSO PipeDisc.dg_execR (Some RdGone) (Some WrNone)).
           split_and!; [by left | apply (so_exec fc L (SMid FCat)) | reflexivity | reflexivity].
         * exists FCat, (MkSO cat_dg_write (Some RdGone) (Some (WrHalt []))).
@@ -511,7 +511,7 @@ Section umerge.
               /\ exists so, stage_out fc0 (prod_content fc0 p) (SProd p) so /\ so_cons so = pc.
   Proof using Hadm.
     unfold prodU. intros Hpc. apply elem_of_app in Hpc as [Hpc | Hpc].
-    - apply elem_of_list_In in Hpc.
+    - apply list_elem_of_In in Hpc.
       assert (HE : forall fs, Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) fs ->
                               adm (LPipes (PrEcho []) fs) = true)
         by (intros fs Hfs; apply (@uda_real _ _ _ Hadm); [by left | exact Hfs]).
@@ -527,8 +527,8 @@ Section umerge.
         exists (MkSO cat_dg_write None (Some (WrHalt []))).
         split; [| reflexivity].
         apply (so_catf_halt _ _ txt_a []); [| apply prefix_nil].
-        cbn [prod_content]. rewrite /files_of lookup_singleton. reflexivity.
-    - apply elem_of_list_fmap in Hpc as (g & -> & Hg).
+        cbn [prod_content]. rewrite /files_of lookup_singleton_eq. reflexivity.
+    - apply list_elem_of_fmap in Hpc as (g & -> & Hg).
       exists (PrCatF g). split.
       + intros fs Hfs. apply (@uda_real _ _ _ Hadm); [| exact Hfs].
         right. exists g. split; [reflexivity | exact (gcands_uname g u Hg)].
@@ -560,15 +560,15 @@ Section umerge.
     destruct (ud_lterm_shape _ _ _ _ _ Ha Hlt) as [[-> Hs] | (pc & mids & -> & Hpc & HF & Hs)].
     - right. destruct (ud_stray_U p fs s _ _ _ Ha Hs Hp) as (s' & Hs' & Hp').
       apply existsb_exists. exists s'.
-      split; [apply elem_of_list_In; exact Hs' |].
+      split; [apply list_elem_of_In; exact Hs' |].
       apply (pde_chk_complete _ _ _ _ _ Hp' [dg_fork_b] [] false);
         [by rewrite app_nil_r | constructor].
     - left. destruct (ud_head_U p fs pc _ _ _ _ Ha Hpc Hp) as (pc' & Hpc' & Hp').
       apply existsb_exists. exists pc'.
-      split; [apply elem_of_list_In; exact Hpc' |].
+      split; [apply list_elem_of_In; exact Hpc' |].
       apply existsb_exists. exists s. split.
-      { apply elem_of_list_In. destruct Hs as [-> | Hs];
-          [apply elem_of_list_here | apply elem_of_list_further; exact Hs]. }
+      { apply list_elem_of_In. destruct Hs as [-> | Hs];
+          [apply list_elem_of_here | apply list_elem_of_further; exact Hs]. }
       apply (pde_chk_complete _ _ _ _ _ Hp' [pc'; dg_fork_b] mids true); [| exact HF].
       simpl. apply perm_skip. rewrite Permutation_app_comm. reflexivity.
   Qed.
@@ -579,11 +579,11 @@ Section umerge.
     - apply existsb_exists in Hc as (pc & Hpin & Hc).
       apply existsb_exists in Hc as (s & Hsin & Hc).
       assert (Hs : umidok gp s).
-      { apply elem_of_list_In in Hsin. apply elem_of_cons in Hsin as [-> | Hs]; [by left | by right]. }
+      { apply list_elem_of_In in Hsin. apply elem_of_cons in Hsin as [-> | Hs]; [by left | by right]. }
       destruct (pde_chk_sound (umo gp) u [pc; dg_fork_b] true s u_prompt Hc) as (Mu & HF & Hp).
       assert (HFm : Forall (umidok gp) Mu)
         by (eapply Forall_impl; [exact HF |]; intros m [_ Hm]; by right).
-      destruct (ud_real u pc (proj2 (elem_of_list_In _ _) Hpin)) as (p & Ha & so & Hso & Hc').
+      destruct (ud_real u pc (proj2 (list_elem_of_In _ _) Hpin)) as (p & Ha & so & Hso & Hc').
       destruct (ud_sfx_build fc0 (prod_content fc0 p) Mu s HFm Hs) as (F1 & fs & Hfs & Ht).
       apply (ud_merge_of_lt p (F1 :: fs) (pc :: Mu ++ [dg_fork_b]) s u (Ha _ Hfs)).
       + rewrite -Hc'. eapply lt_next; [exact Hso |]. apply Ht.
@@ -592,7 +592,7 @@ Section umerge.
     - apply existsb_exists in Hc as (s & Hsin & Hc).
       destruct (pde_chk_sound (umo gp) u [dg_fork_b] false s u_prompt Hc) as (Mu & HF & Hp).
       destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
-      destruct (ud_real u s (proj2 (elem_of_list_In _ _) Hsin)) as (p & Ha & so & Hso & Hc').
+      destruct (ud_real u s (proj2 (list_elem_of_In _ _) Hsin)) as (p & Ha & so & Hso & Hc').
       apply (ud_merge_of_lt p [FCat] [dg_fork_b] s u
                (Ha [FCat] (proj2 (Forall_singleton _ _) (or_introl eq_refl))));
         [| by rewrite app_nil_r in Hp].
@@ -720,14 +720,14 @@ Proof using.
     | left; intros x t; reflexivity | left; intros x t; reflexivity].
   destruct (decide (M = N)) as [-> | HMN].
   - destruct r; try (left; intros x t; reflexivity).
-    + right. intros x x' t. by rewrite !insert_insert.
-    + right. intros x x' t. by rewrite !insert_insert.
-    + left. intros x t. rewrite lookup_insert.
-      destruct (t !! N); [reflexivity |]. by rewrite insert_insert.
-  - left. intros x t. destruct r; try reflexivity; try (by apply insert_commute).
+    + right. intros x x' t. by rewrite !insert_insert_eq.
+    + right. intros x x' t. by rewrite !insert_insert_eq.
+    + left. intros x t. rewrite lookup_insert_eq.
+      destruct (t !! N); [reflexivity |]. by rewrite insert_insert_eq.
+  - left. intros x t. destruct r; try reflexivity; try (by apply insert_insert_ne).
     destruct (t !! M) as [v |] eqn:E.
     + rewrite lookup_insert_ne; [| congruence]. rewrite E. reflexivity.
-    + rewrite lookup_insert_ne; [| congruence]. rewrite E. by apply insert_commute.
+    + rewrite lookup_insert_ne; [| congruence]. rewrite E. by apply insert_insert_ne.
 Qed.
 
 (* the content function is read only at the producer's file *)
@@ -830,10 +830,10 @@ Proof using.
   pose proof (Hl M eq_refl) as HM.
   destruct r; try exact (Hag N HN);
     try (destruct (decide (M = N)) as [-> | HMN];
-         [by rewrite !lookup_insert | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]]).
+         [by rewrite !lookup_insert_eq | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]]).
   destruct (s' !! M) as [v |] eqn:E'; rewrite (Hag M HM) E'; [exact (Hag N HN) |].
   destruct (decide (M = N)) as [-> | HMN];
-    [by rewrite !lookup_insert | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]].
+    [by rewrite !lookup_insert_eq | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]].
 Qed.
 
 (* ===================================================================== *)
@@ -1076,7 +1076,7 @@ Lemma files_trunc (c : fstate) (N : list (bv 8)) (b0 P : bytes) f :
 Proof using.
   intros Hc HN HP. cbn [prod_content]. rewrite /files_of. cbv beta.
   destruct (decide (f = N)) as [-> | Hf].
-  - rewrite lookup_insert HN. cbn [default].
+  - rewrite lookup_insert_eq HN. cbn [default].
     split_and!; [exact (fcont_ok_nl b0 (proj2 (Hc N b0 HN))) | exact HP | intros _; reflexivity
                 | intros x Hx; exact Hx].
   - destruct (c !! f) as [cf |] eqn:Hcf;
@@ -1161,23 +1161,23 @@ Definition pl_cands (fc : bytes -> option bytes) (l : pline') : list plalt :=
 Lemma pl_cands_complete fc l x : plsafe l x \/ plalt_ok fc l x -> x ∈ pl_cands fc l.
 Proof using.
   rewrite /pl_cands. intros [[-> | [-> | ->]] | Hok].
-  - apply elem_of_app. left. apply elem_of_list_here.
-  - apply elem_of_app. left. apply elem_of_list_further, elem_of_list_here.
-  - apply elem_of_app. left. apply elem_of_list_further, elem_of_list_further, elem_of_list_here.
+  - apply elem_of_app. left. apply list_elem_of_here.
+  - apply elem_of_app. left. apply list_elem_of_further, list_elem_of_here.
+  - apply elem_of_app. left. apply list_elem_of_further, list_elem_of_further, list_elem_of_here.
   - destruct x as [| b | b].
-    + apply elem_of_app. left. apply elem_of_list_here.
+    + apply elem_of_app. left. apply list_elem_of_here.
     + destruct Hok as (ss & Hr & Hm).
       apply elem_of_app. right. apply elem_of_app. left.
-      apply elem_of_list_fmap. exists b. split; [reflexivity |].
-      apply elem_of_list_bind. exists ss.
+      apply list_elem_of_fmap. exists b. split; [reflexivity |].
+      apply list_elem_of_bind. exists ss.
       split; [by apply elem_of_pde_merges | by apply line_runs_spec].
     + destruct Hok as [_ (b' & (W & s & Wm & sp & Hlt & HW & Hsp & Hb) & Hbb)].
       apply elem_of_app. right. apply elem_of_app. right.
-      apply elem_of_list_fmap. exists b. split; [reflexivity |].
-      apply elem_of_list_bind. exists (W, s). split; [| by apply line_terms_spec].
-      apply elem_of_list_bind. exists Wm. split; [| by apply elem_of_pde_merges].
-      apply elem_of_list_bind. exists sp. split; [| by apply prefixes_spec].
-      apply elem_of_list_bind. exists b'. split; [by apply prefixes_spec | by apply elem_of_pde_merges].
+      apply list_elem_of_fmap. exists b. split; [reflexivity |].
+      apply list_elem_of_bind. exists (W, s). split; [| by apply line_terms_spec].
+      apply list_elem_of_bind. exists Wm. split; [| by apply elem_of_pde_merges].
+      apply list_elem_of_bind. exists sp. split; [| by apply prefixes_spec].
+      apply list_elem_of_bind. exists b'. split; [by apply prefixes_spec | by apply elem_of_pde_merges].
 Qed.
 
 Lemma ralt_cands_enc l r : ralt_ok l r -> ralt_enc r ∈ ralt_cands l.
@@ -1216,20 +1216,20 @@ Lemma ucands_complete adm s l a : uok adm s l a -> ualt_code (ucanon a) ∈ ucan
 Proof using.
   intros H. destruct l as [ws | ws N | N | p n | ws |].
   1-3: destruct a as [r | x | x | u]; cbn [uok] in H; try contradiction;
-       cbn [ucands ucanon ualt_code]; apply elem_of_list_fmap; exists (ralt_enc r);
+       cbn [ucands ucanon ualt_code]; apply list_elem_of_fmap; exists (ralt_enc r);
        split; [reflexivity | exact (ralt_cands_enc _ r H)].
   3: destruct a as [r | x | x | u]; cbn [uok] in H; try contradiction;
-       cbn [ucands ucanon ualt_code]; apply elem_of_list_fmap; exists (ralt_enc r);
+       cbn [ucands ucanon ualt_code]; apply list_elem_of_fmap; exists (ralt_enc r);
        split; [reflexivity | exact (ralt_cands_enc _ r H)].
   2: { destruct a as [r | x | x | u]; cbn [uok] in H; try contradiction;
        cbn [ucands ucanon ualt_code]; apply elem_of_app.
-       - left. apply elem_of_list_fmap. exists (ralt_enc r).
+       - left. apply list_elem_of_fmap. exists (ralt_enc r).
          split; [reflexivity | exact (ralt_cands_enc _ r H)].
-       - right. apply elem_of_list_here. }
+       - right. apply list_elem_of_here. }
   destruct (uok_pipe _ _ _ _ _ H) as [-> | (x & -> & Hx)]; cbn [ucands]; apply elem_of_app.
-  { right. apply elem_of_list_here. }
+  { right. apply list_elem_of_here. }
   left. rewrite (_ : ucanon (upl p x) = upl p x); [| by destruct p].
-  apply elem_of_list_fmap. exists x. split; [reflexivity |].
+  apply list_elem_of_fmap. exists x. split; [reflexivity |].
   apply pl_cands_complete. destruct Hx as [Hs | [_ Hok]]; [left | right]; assumption.
 Qed.
 
@@ -1254,10 +1254,10 @@ Lemma ualts_dep_intro (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool
   cs ∈ ualts_dep s bs.
 Proof using.
   revert s cs. induction bs as [| b bs IH]; intros s cs Hl H.
-  - destruct cs; [apply elem_of_list_here | discriminate Hl].
+  - destruct cs; [apply list_elem_of_here | discriminate Hl].
   - destruct cs as [| c cs]; [discriminate Hl |]. cbn [ualts_dep].
-    apply elem_of_list_bind. exists c. split.
-    + apply elem_of_list_fmap. exists cs. split; [reflexivity |].
+    apply list_elem_of_bind. exists c. split.
+    + apply list_elem_of_fmap. exists cs. split; [reflexivity |].
       apply IH; [cbn in Hl; lia |]. intros i Hi.
       pose proof (H (S i) ltac:(cbn; lia)) as Hc.
       rewrite um_upto_cons in Hc. exact Hc.
@@ -1375,11 +1375,11 @@ Proof using.
   change (e :: seg) with ([e] ++ seg). rewrite ins_app length_app.
   destruct e as [[] c | [] c | |]; cbn [in_pres] in Hp.
   1: { rewrite ins_in. apply elem_of_cons in Hp as [-> | Hp]; [cbn; lia |].
-       apply elem_of_list_fmap in Hp as (p' & -> & Hp').
+       apply list_elem_of_fmap in Hp as (p' & -> & Hp').
        change (ObsUartIn Uart0 c :: p') with ([ObsUartIn Uart0 c] ++ p').
        rewrite ins_app ins_in length_app. pose proof (IH p' Hp'). cbn [length]. lia. }
   all: rewrite ins_snoc_other; [| exact I].
-  all: apply elem_of_list_fmap in Hp as (p' & -> & Hp').
+  all: apply list_elem_of_fmap in Hp as (p' & -> & Hp').
   all: match goal with |- length (ins (?e :: ?q)) < _ => change (e :: q) with ([e] ++ q) end.
   all: rewrite ins_app ins_snoc_other; [| exact I].
   all: cbn [length app]; exact (IH p' Hp').
@@ -1418,10 +1418,10 @@ Lemma seg_names_line seg i g :
   i < nlines (ins seg) ->
   line_file (uline_of_u (bodies_of (ins seg) !!! i)) = Some g -> g ∈ seg_names seg.
 Proof using.
-  intros Hi Hg. rewrite /seg_names elem_of_remove_dups. apply elem_of_list_omap.
+  intros Hi Hg. rewrite /seg_names elem_of_remove_dups. apply list_elem_of_omap.
   exists (uline_of_u (bodies_of (ins seg) !!! i)). split; [| exact Hg].
-  apply elem_of_list_fmap. exists (bodies_of (ins seg) !!! i). split; [reflexivity |].
-  apply elem_of_list_lookup_total_2. exact Hi.
+  apply list_elem_of_fmap. exists (bodies_of (ins seg) !!! i). split; [reflexivity |].
+  apply list_elem_of_lookup_total_2. exact Hi.
 Qed.
 
 (* THE PRODUCT BOOT-STATE CHOOSER: every map over the names [Ns] whose
@@ -1440,13 +1440,13 @@ Proof using.
   - assert (Hs0 : s = ∅).
     { apply map_empty. intros M. destruct (s !! M) as [c |] eqn:Hc; [| exact Hc].
       destruct (Hs M c Hc) as [HM _]. by apply elem_of_nil in HM. }
-    rewrite Hs0. apply elem_of_list_here.
+    rewrite Hs0. apply list_elem_of_here.
   - apply NoDup_cons in Hnd as [HN Hnd].
     apply elem_of_app. destruct (s !! N) as [c |] eqn:Hc.
-    + right. apply elem_of_list_bind. exists c. split; [| exact (proj2 (Hs N c Hc))].
-      apply elem_of_list_fmap. exists (delete N s). split; [by rewrite insert_delete |].
+    + right. apply list_elem_of_bind. exists c. split; [| exact (proj2 (Hs N c Hc))].
+      apply list_elem_of_fmap. exists (delete N s). split; [by rewrite insert_delete_id |].
       apply IH; [exact Hnd |]. intros M c' HM.
-      destruct (decide (M = N)) as [-> | HMN]; [by rewrite lookup_delete in HM |].
+      destruct (decide (M = N)) as [-> | HMN]; [by rewrite lookup_delete_eq in HM |].
       rewrite lookup_delete_ne in HM; [| congruence].
       destruct (Hs M c' HM) as [HMin Hc']. split; [| exact Hc'].
       apply elem_of_cons in HMin as [-> | HMin]; [done | exact HMin].
@@ -1568,7 +1568,7 @@ Proof using.
   destruct (ustep_ins_cases (uline_of_u (bs !!! i)) (lm_at U cs i) N) as [Hc | Hi].
   - left. rewrite (Hc P (lm_upto U cs s bs i)). split; [| reflexivity].
     rewrite -(insert_id (lm_upto U cs s bs i : fstate) N b0 H1).
-    rewrite (Hc b0 (lm_upto U cs s bs i)). apply lookup_insert.
+    rewrite (Hc b0 (lm_upto U cs s bs i)). apply lookup_insert_eq.
   - right. rewrite -{1}(insert_id (lm_upto U cs s bs i : fstate) N b0 H1). apply Hi.
 Qed.
 
@@ -1859,7 +1859,7 @@ Proof using Hadm.
       + destruct (u_canon_name seg t N b0 Hot HtN Hdt) as (P & HPb & HPs & HdP).
         apply (IH (<[N := P]> t)).
         * intros M c Hc. destruct (decide (M = N)) as [-> | HMN].
-          { rewrite lookup_insert in Hc. injection Hc as <-.
+          { rewrite lookup_insert_eq in Hc. injection Hc as <-.
             destruct (Hot N b0 HtN) as [Hu Hb0].
             split; [exact Hu | exact (fcont_ok_prefix P b0 HPb Hb0)]. }
           rewrite lookup_insert_ne in Hc; [| congruence]. exact (Hot M c Hc).
@@ -1867,7 +1867,7 @@ Proof using Hadm.
         * intros M c Hc. destruct (decide (M = N)) as [-> | HMN]; [exact (Hnm N b0 HtN) |].
           rewrite lookup_insert_ne in Hc; [| congruence]. exact (Hnm M c Hc).
         * intros M c Hc HM. destruct (decide (M = N)) as [-> | HMN].
-          { rewrite lookup_insert in Hc. injection Hc as <-. exact HPs. }
+          { rewrite lookup_insert_eq in Hc. injection Hc as <-. exact HPs. }
           rewrite lookup_insert_ne in Hc; [| congruence].
           apply (Hsub M c Hc). intros Hin. apply elem_of_cons in Hin as [Hin | Hin];
             [exact (HMN Hin) | exact (HM Hin)].
@@ -1876,7 +1876,7 @@ Proof using Hadm.
         subst M. rewrite HtN in Hc. discriminate Hc. }
   assert (Hsub1 : forall N c, s1 !! N = Some c -> N ∉ (map_to_list s1).*1 ->
                     c ∈ ud_sublists (obs_wire Uart0 seg)).
-  { intros N c Hc HN. exfalso. apply HN. apply elem_of_list_fmap. exists (N, c).
+  { intros N c Hc HN. exfalso. apply HN. apply list_elem_of_fmap. exists (N, c).
     split; [reflexivity | by apply elem_of_map_to_list]. }
   destruct (Hcanon _ s1 Hok1 Hd1 (fun N c Hc => proj2 (H1 N c Hc)) Hsub1)
     as (s' & Hok' & Hd' & Hs').

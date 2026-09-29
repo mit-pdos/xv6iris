@@ -201,7 +201,7 @@ Lemma cl_log_ok_last_ext (pops : list log_entry) (h : list mobs) :
   forall e, e ∈ pops -> hist_ext (le_hist e) h.
 Proof.
   intros Hok Htop e He.
-  apply elem_of_list_lookup_1 in He as [i Hi].
+  apply list_elem_of_lookup_1 in He as [i Hi].
   assert (Hlen : (i < length pops)%nat) by (apply lookup_lt_Some in Hi; lia).
   destruct (lookup_lt_is_Some_2 pops (length pops - 1)%nat ltac:(lia)) as [el Hel].
   destruct (decide (i = length pops - 1)%nat) as [-> | Hne].
@@ -230,7 +230,7 @@ Proof.
   intros [Hin Hch] Hends Hecho Hbelow. split.
   - intros e' He'. apply elem_of_app in He' as [He' | He'].
     + exact (Hin e' He').
-    + apply elem_of_list_singleton in He' as ->. split; assumption.
+    + apply list_elem_of_singleton in He' as ->. split; assumption.
   - intros i e1 e2 H1 H2.
     assert (Hi : (i < length pops)%nat).
     { apply lookup_lt_Some in H1. rewrite length_app in H1. cbn [length] in H1.
@@ -246,7 +246,7 @@ Proof.
       rewrite lookup_app_r in H2; [| lia].
       replace (S i - length pops)%nat with 0%nat in H2 by lia.
       cbn in H2. injection H2 as <-.
-      apply Hbelow. by eapply elem_of_list_lookup_2.
+      apply Hbelow. by eapply list_elem_of_lookup_2.
 Qed.
 
 (* ====================================================================== *)

@@ -338,7 +338,7 @@ Section ctx.
   Proof using .
     apply map_eq. intros k. rewrite wpay_tm_lookup.
     destruct (decide (k = a)) as [->|Hne].
-    - by rewrite !lookup_insert.
+    - by rewrite !lookup_insert_eq.
     - rewrite !lookup_insert_ne // wpay_tm_lookup //.
   Qed.
 
@@ -346,7 +346,7 @@ Section ctx.
       (Pold Pnew mem : gmap Arch.pa (bv 8)) (TM : gmap Arch.pa ts_elem) :
     dom Pold = dom Pnew ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    ghost_map_auth ts_name 1 TM -∗
+    ghost_map_auth_frac ts_name 1 TM -∗
     wpay_map_own Pold (DfracOwn 1) Wold ==∗
     ⌜dom Pnew ⊆ dom mem⌝ ∗
     (* the OLD elements, so the caller can re-establish the pin tie on the
@@ -355,7 +355,7 @@ Section ctx.
     ⌜forall a, a ∈ dom Pnew ->
        exists t, TM !! a = Some ((t, ts_pay_win (Wold a)) : ts_elem)⌝ ∗
     gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-    ghost_map_auth ts_name 1 (wpay_tm i Wf Pnew ∪ TM) ∗
+    ghost_map_auth_frac ts_name 1 (wpay_tm i Wf Pnew ∪ TM) ∗
     ([∗ map] a ↦ v ∈ Pnew, phys_ledger_wpay a (DfracOwn 1) v (S i) (Wf a)).
   Proof using .
     revert Pold. rewrite /wpay_map_own.
@@ -538,7 +538,7 @@ Section ctx.
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
-      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_eq. symmetry. by apply list_lookup_middle.
       - rewrite lookup_insert_ne; last congruence. rewrite HLM.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
@@ -740,7 +740,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v. split; [exact Hgm | exact Hlat].
       + by move => Sv' B' Heq.
@@ -783,7 +783,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + move => Sv' B' Heq. discriminate Heq.

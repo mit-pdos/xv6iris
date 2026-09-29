@@ -218,7 +218,7 @@ Section ProofDevintr.
     { rewrite Hwv. exact HE2sp. }
     iEval (rewrite Hpa1) in "Hb1".
     iEval (rewrite HE1sp Hpa2) in "Hb2".
-    iDestruct (stack_own_4_intro sp0 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.devintr + 0x26)) (mword_of_int 2 : mword 6)
               E2 k 4 false Hpop
@@ -511,7 +511,7 @@ Section ProofDevintr.
       by (rewrite /A0 upd_eq; exact Hpush).
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.devintr + 0x02)) by pcw.
     iEval (rewrite Hpc02) in "Hpc".
-    iDestruct (stack_own_4_elim with "Hframe") as (w1 w2 w3 w4) "(Hb1 & Hb2 & Hb3 & Hb4)".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hframe") as (w1 w2 w3 w4) "(Hb1 & Hb2 & Hb3 & Hb4)".
     assert (Hpa1 : add_vec (A0 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite HA0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.

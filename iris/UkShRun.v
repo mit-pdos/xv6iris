@@ -2933,6 +2933,8 @@ Section UkShRun.
     ∃ w0 w1 : mword 32,
       ubytes g a 4 (nth_byte w0) ∗ ubytes g (a + 4) 4 (nth_byte w1).
   Proof using .
+    clear dependent GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
+    clear dependent Dg. (* unused; else Rocq counts it as used (asks for Proof using … Dg) *)
     iIntros "Hbs".
     rewrite (ubytes_split g a 4 8 f ltac:(lia)).
     iDestruct "Hbs" as "[Hlo Hhi]".

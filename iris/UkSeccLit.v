@@ -150,7 +150,7 @@ Proof using . vm_compute. reflexivity. Qed.
 Lemma secc_mask_masked : secc_masked (and_vec secc_all secc_mask_lit).
 Proof using .
   intros n Hn. rewrite and_vec64_unsigned secc_mask_lit_val.
-  rewrite elem_of_list_In in Hn. cbn in Hn.
+  rewrite list_elem_of_In in Hn. cbn in Hn.
   destruct Hn as [<- | [<- | [<- | [<- | [<- | [<- | []]]]]]];
     vm_compute; reflexivity.
 Qed.

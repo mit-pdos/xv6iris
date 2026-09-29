@@ -239,7 +239,7 @@ Proof.
   rewrite (dirblk_bytes_lookup (<[k := d]> ds) k j
              (dirent_wf_insert ds k d Hall Hd)
              ltac:(rewrite length_insert; exact Hk) Hj).
-  rewrite list_lookup_total_insert by exact Hk. reflexivity.
+  rewrite list_lookup_total_insert_eq by exact Hk. reflexivity.
 Qed.
 
 Lemma dirblk_bytes_insert_other (ds : list dirent) (k : nat) (d : dirent) (i : nat) :
@@ -572,7 +572,7 @@ Lemma cut_nul_take (l : list (bv 8)) : cut_nul l = take (length (cut_nul l)) l.
 Proof.
   apply list_eq. intros j.
   destruct (Nat.lt_ge_cases j (length (cut_nul l))) as [Hj|Hj].
-  - rewrite lookup_take by exact Hj. apply cut_nul_lookup, Hj.
+  - rewrite lookup_take_lt by exact Hj. apply cut_nul_lookup, Hj.
   - rewrite lookup_take_ge by exact Hj.
     apply lookup_ge_None_2. exact Hj.
 Qed.

@@ -227,10 +227,10 @@ Proof using.
     + rewrite Hc lookup_empty in H0. discriminate H0.
     + rewrite Hc in Hs. injection Hs as ->. exists ws, sel.
       split_and!; [| exact Hsel | reflexivity].
-      apply elem_of_list_omap. exists (LEchoF ws N). split; [exact Hin | reflexivity].
+      apply list_elem_of_omap. exists (LEchoF ws N). split; [exact Hin | reflexivity].
   - intros H N. destruct (s !! N) as [c |] eqn:Hc; [right | left; by rewrite lookup_empty].
     destruct (H N c Hc) as (ws & sel & Hin & Hsel & ->).
-    apply elem_of_list_omap in Hin as (l & Hl & Hw).
+    apply list_elem_of_omap in Hin as (l & Hl & Hw).
     destruct l; try discriminate Hw. injection Hw as <- <-.
     exists ws0, sel. rewrite drop_0. by split_and!.
 Qed.
@@ -258,8 +258,8 @@ Proof using.
   - right. exists ws, sel. split_and!; [| exact Hsel | exact Hs].
     rewrite (_ : r'.1 = r.1 + (r'.1 - r.1)) in Hin; [| lia].
     rewrite -drop_drop in Hin.
-    apply elem_of_list_lookup in Hin as [j Hj]. rewrite lookup_drop in Hj.
-    apply elem_of_list_lookup. by eexists.
+    apply list_elem_of_lookup in Hin as [j Hj]. rewrite lookup_drop in Hj.
+    apply list_elem_of_lookup. by eexists.
 Qed.
 
 Lemma srec_le_refl ls r : srec_le ls r r.
@@ -299,7 +299,7 @@ Lemma uadm_redir ls r s ws N sel :
   uadm ls r s -> uadm ls r (<[N := subseq (echo_chunks ws) sel]> s).
 Proof using.
   intros Hin Hsel H M. destruct (decide (M = N)) as [-> | Hne].
-  - right. exists ws, sel. rewrite lookup_insert. by split_and!.
+  - right. exists ws, sel. rewrite lookup_insert_eq. by split_and!.
   - rewrite lookup_insert_ne; [| done]. exact (H M).
 Qed.
 
@@ -311,7 +311,7 @@ Proof using.
   destruct a as [a | x | x | u]; cbn [ustep]; [| exact H | exact H | exact H].
   destruct l as [ws | ws N | N | p n | ws |]; cbn [fsm]; try exact H.
   assert (Hin : LEchoF ws N ∈ drop r.1 ls).
-  { apply elem_of_list_lookup. exists (j - r.1). rewrite lookup_drop.
+  { apply list_elem_of_lookup. exists (j - r.1). rewrite lookup_drop.
     by rewrite (_ : r.1 + (j - r.1) = j); [| lia]. }
   cbn [uok ralt_ok] in Hok.
   destruct a; try exact H; try contradiction.
@@ -545,7 +545,7 @@ Lemma usync_last_pad (ps cs : list nat) (s : fstate) (I w : list (bv 8)) (r : sr
 Proof using.
   rewrite /usync_last /usyncs. intros Hl.
   apply last_Some_elem_of in Hl.
-  apply elem_of_list_omap in Hl as (i & Hi & Hu). apply elem_of_seq in Hi.
+  apply list_elem_of_omap in Hl as (i & Hi & Hu). apply elem_of_seq in Hi.
   exists i. destruct (decide (i < length cs)) as [Hic | Hic]; [split_and!; [exact Hic | lia | exact Hu] |].
   exfalso. revert Hu. rewrite /usync_at. case_decide as Hd; [| discriminate].
   intros _. destruct Hd as (Hls & Ha & _).

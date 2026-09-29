@@ -1098,7 +1098,7 @@ Section ProofBrelse.
       (* ---- locate k in the LRU order and unlink it ---- *)
       assert (Hkord : k ∈ ord).
       { rewrite Hord. apply elem_of_seq. lia. }
-      apply elem_of_list_split in Hkord as (o1 & o2 & Hordeq).
+      apply list_elem_of_split in Hkord as (o1 & o2 & Hordeq).
       iEval (rewrite Hordeq map_app) in "Hlru".
       iEval (cbn [List.map]) in "Hlru".
       iDestruct (bcache_lru_unlink bhead (bnode k) (map bnode o1) (map bnode o2)

@@ -47,8 +47,8 @@ Section Custody.
     iIntros "#(Hborn & Hstarted & _) Hhook Hk".
     iEval (rewrite /wp_triv wp_unfold /wp_pre /=).
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { (* DEAD -- the birth bound rules out the unborn side *)
       iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".

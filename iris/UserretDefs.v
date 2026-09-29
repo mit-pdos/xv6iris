@@ -128,7 +128,7 @@ Proof.
         * intros i Hi.
           rewrite (Hprop i Hi).
           rewrite ?sregs_set_reg. rewrite register_lookup_set.
-          rewrite (vec64_access_update _ from i None ltac:(lia)).
+          erewrite (vec64_access_update _ from i None) by lia.
           destruct (Z.leb_spec from i) as [Hfi | Hfi];
             destruct (Z.leb_spec (from + 1) i) as [Hf1i | Hf1i];
             destruct (Z.eqb_spec i from) as [-> | Hne];

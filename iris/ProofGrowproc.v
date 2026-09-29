@@ -273,7 +273,7 @@ Section ProofGrowproc.
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HT4sp).
-    iDestruct (stack_own_4_intro sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.growproc + 0x44))
               (mword_of_int 2 : mword 6) T4 (av - 4)%nat 4 b Hpop
@@ -448,7 +448,7 @@ Section ProofGrowproc.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iDestruct (stack_own_4_elim with "Hframe") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hframe") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     (* ---- +0x02 .. +0x08: save ra / s0 / s1 / s2 ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).

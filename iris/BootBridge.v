@@ -299,7 +299,7 @@ Section BootBridge.
     hw_config -∗ minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms -∗
-    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
     (* the SPP mirror's TIED half, at this mstatus.  Its twin travels with
        [trap_csrs] -- boot holds it, because interrupts are off. *)
     sret_tie ms -∗
@@ -398,9 +398,9 @@ Section BootBridge.
        into (IntrDefs.v §2), all at '0' -- interrupts are off at boot.  The
        NAME is canonical ([sie_gname]), so there is nothing to allocate and
        nothing to existentially quantify. *)
-    ghost_var sie_gname (1/2) ('b"0" : mword 1) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/2) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     tlb ↦ᵣ tlbvec0 -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
@@ -437,7 +437,7 @@ Section BootBridge.
       sie_cap_gpr KT0 mf (kv_frame_slots + K) false p0 ∗
       cpu_ctx_free ∗
       cpu_own 0 false p0 false ∅ ∗
-      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+      ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof using .
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
@@ -487,7 +487,7 @@ Section BootBridge.
                  with "Hstk Hbit Hbare Hstv Hthr He1 Htimc") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".
-    iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE msf))
+    iAssert (ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE msf))
       with "[Hg2]" as "Hg2".
     { rewrite Hsie. iExact "Hg2". }
     (* SET THE TIE.  Both halves are in hand exactly here, which is the only

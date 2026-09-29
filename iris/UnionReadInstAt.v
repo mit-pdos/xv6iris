@@ -77,11 +77,11 @@ Proof using.
     - rewrite cons_xlate_cr in Hx. vm_compute in Hx. discriminate Hx.
     - rewrite (cons_xlate_other b Hne) in Hx. exact Hx. }
   destruct (UkSh.ush_cycles_snoc_in h0 b) as (s0 & Hin).
-  apply elem_of_list_In in Hin.
+  apply list_elem_of_In in Hin.
   pose proof (proj1 (Forall_forall _ _) Hd _ Hin) as (s & _ & Hseg & _).
   rewrite ins_app ins_in in Hseg.
   assert (Hin' : b ∈ ins s0 ++ [b]).
-  { apply elem_of_app. right. by apply elem_of_list_singleton. }
+  { apply elem_of_app. right. by apply list_elem_of_singleton. }
   pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_on) (ins s0 ++ [b]) b
                 Hseg Hin') as Hv.
   lia.

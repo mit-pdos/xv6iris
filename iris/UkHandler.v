@@ -597,7 +597,7 @@ Section UkHandler.
             iSplit.
             { iPureIntro. intros fd' d'. cbv [env_set_dev env_bind pe_fd].
               destruct (decide (fd' = fd)) as [-> | Hne].
-              - rewrite lookup_insert. intros [= ->]. set_solver.
+              - rewrite lookup_insert_eq. intros [= ->]. set_solver.
               - rewrite lookup_insert_ne; [| done]. intros Hin. apply Hdom in Hin. set_solver. }
             iFrame "Hfds Hfiles".
             assert (Hnot : d ∉ ds) by apply is_fresh.
@@ -620,7 +620,7 @@ Section UkHandler.
         assert (Hin : d ∈ ds) by (apply (Hdom fd); exact Hfd).
         assert (Hdom' : forall fd' d', pe_fd (env_unbind E fd) !! fd' = Some d' -> d' ∈ ds).
         { intros fd' d'. cbv [env_unbind pe_fd].
-          destruct (decide (fd' = fd)) as [-> | Hne]; [by rewrite lookup_delete |].
+          destruct (decide (fd' = fd)) as [-> | Hne]; [by rewrite lookup_delete_eq |].
           rewrite lookup_delete_ne; [| done]. apply Hdom. }
         assert (Hsafe' : safe_fds (dom (pe_fd (env_unbind E fd))) (k 0)).
         { cbv [env_unbind pe_fd]. rewrite dom_delete_L. apply Hs. }
@@ -649,7 +649,7 @@ Section UkHandler.
             iSplit.
             { iPureIntro. intros fd' d' Hfd'. pose proof (Hdom' fd' d' Hfd') as Hin'.
               cbv [env_unbind pe_fd] in Hfd'.
-              destruct (decide (fd' = fd)) as [-> | Hne]; [by rewrite lookup_delete in Hfd' |].
+              destruct (decide (fd' = fd)) as [-> | Hne]; [by rewrite lookup_delete_eq in Hfd' |].
               assert (d' <> d) as Hne'.
               { intros ->. apply Hsh'. exists fd'. split.
                 - rewrite dom_delete_L. rewrite lookup_delete_ne in Hfd'; [| done].

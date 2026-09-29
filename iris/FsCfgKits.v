@@ -125,7 +125,7 @@ Section FsCfgKits.
     ((* --- [icache_boot_at]'s ghost premises, in its own order --- *)
      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
-     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      (* THE STOCKED POOL (R5): image-accurate before [userinit] runs, so
@@ -135,15 +135,15 @@ Section FsCfgKits.
      (* ...and the pool's RESIDENCY KEY, whole (durable-disk B''-esc):
         [icache_boot_at] is what turns the pair into the pool's invariant
         plus the itable lock's [ipool] conjunct. *)
-     ghost_var icfg_pool 1 (∅ : gset Z) ∗
+     ghost_var_frac icfg_pool 1 (∅ : gset Z) ∗
      (* ...and its IN-TRANSITION twin (durable-disk C-3b), whole: the pool
         invariant's partition needs both keys. *)
-     ghost_var icfg_pext 1 (∅ : gset Z) ∗
+     ghost_var_frac icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
      (* the identification family at DUMMY recorded values: [ic_id] is a
-        plain [ghost_var] and [icache_boot_at] re-tags every slot to the
+        plain [ghost_var_frac] and [icache_boot_at] re-tags every slot to the
         dev/inum words the entry cells actually hold ([ic_id_set]), so the
         era owes no image premise for it (scout verdict 3). *)
      ([∗ list] k ∈ seq 0 NINODE,
@@ -165,28 +165,28 @@ Section FsCfgKits.
      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
      (* ...AND THE POOL'S TRANSIT LEDGER (durable-disk C-4), whole and empty.
         LAST, for the pin's reason verbatim. *)
-     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+     ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
      (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
         the image has no corpses.  LAST, for the transit ledger's reason. *)
-     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+     ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
      (* the fifty boxes' fresh ghosts (tso-flip F19/F23), for
         [IcacheBoot.icache_boot_at]'s [CtxBox.box_alloc_at] *)
      ([∗ list] k ∈ seq 0 NINODE,
         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+        ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
 
   Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
-     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
-      ghost_var icfg_pool 1 (∅ : gset Z) ∗
-      ghost_var icfg_pext 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pool 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
@@ -201,13 +201,13 @@ Section FsCfgKits.
       kalloc_avail fsc_kpages (Some 0%nat) ∗
       kmem_avail_auth fsc_kpages 0%nat ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
       ([∗ list] k ∈ seq 0 NINODE,
         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+        ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
   Proof using . iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
@@ -282,8 +282,8 @@ Section FsCfgKits.
         what turns the boot [log_state] pack's row (b) into computation. *)
      (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
         ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
-        ghost_map_auth (fs_cache fsc_fs) 1 L ∗
-        ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
+        ghost_map_auth_frac (fs_cache fsc_fs) 1 L ∗
+        ghost_map_auth_frac (fs_dirty fsc_fs) 1 D) ∗
      ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
      (* the log region, split as [initlog] wants it *)
      fs_chalf fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
@@ -347,8 +347,8 @@ Section FsCfgKits.
       fsblock (fs_bytes fsc_fs) 1 (P 1) ∗
       (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
          ⌜forall b : Z, b ∈ fsc_cov -> L !! b = Some (P b)⌝ ∗
-         ghost_map_auth (fs_cache fsc_fs) 1 L ∗
-         ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
+         ghost_map_auth_frac (fs_cache fsc_fs) 1 L ∗
+         ghost_map_auth_frac (fs_dirty fsc_fs) 1 D) ∗
       ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
       fs_chalf fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
@@ -388,14 +388,14 @@ Section FsCfgKits.
   Definition fs_kit_icache_rest (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
     (own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
-     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) ∗
      ([∗ list] k ∈ seq 0 NINODE,
         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
      ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
-     ghost_var icfg_pool 1 (∅ : gset Z) ∗
+     ghost_var_frac icfg_pool 1 (∅ : gset Z) ∗
      (* ...and its IN-TRANSITION twin (durable-disk C-3b), whole: the pool
         invariant's partition needs both keys. *)
-     ghost_var icfg_pext 1 (∅ : gset Z) ∗
+     ghost_var_frac icfg_pext 1 (∅ : gset Z) ∗
      lock_free_tok fsc_itlock ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
      ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
@@ -411,17 +411,17 @@ Section FsCfgKits.
      ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
      (* ...AND THE POOL'S TRANSIT LEDGER (durable-disk C-4), whole and empty.
         LAST, for the pin's reason verbatim. *)
-     ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+     ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
      (* ...AND THE POOL'S CORPSE LEDGER (durable-disk C-7), whole and empty:
         the image has no corpses.  LAST, for the transit ledger's reason. *)
-     ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+     ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
      (* the fifty boxes' fresh ghosts (tso-flip F19/F23), for
         [IcacheBoot.icache_boot_at]'s [CtxBox.box_alloc_at] *)
      ([∗ list] k ∈ seq 0 NINODE,
         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+        ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)))%I.
 
   Lemma fs_kit_icache_split (ICFG : icfg) (FSC : fscfg) :
     fs_kit_icache ICFG FSC -∗
@@ -448,12 +448,12 @@ Section FsCfgKits.
     fs_kit_icache_rest ICFG FSC -∗
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac0 k 1%Qp) ∗
-     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
+     ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
       ipool_rows fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
-      ghost_var icfg_pool 1 (∅ : gset Z) ∗
-      ghost_var icfg_pext 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pool 1 (∅ : gset Z) ∗
+      ghost_var_frac icfg_pext 1 (∅ : gset Z) ∗
       lock_free_tok fsc_itlock ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_dep_neutral fsc_ic k) ∗
@@ -464,13 +464,13 @@ Section FsCfgKits.
          pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
       lock_free_tok fsc_dlock ∗
       ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) ∗
-      ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
-      ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
+      ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) ∗
+      ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) ∗
       ([∗ list] k ∈ seq 0 NINODE,
         own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-        ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-        ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
+        ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+        ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+        ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)).
   Proof using . iIntros "H". iExact "H". Qed.
 
   (*  THE ONE ROW OF KIT 2 THAT main ITSELF NEEDS, peeled without spending

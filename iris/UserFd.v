@@ -292,7 +292,7 @@ Lemma tab_le_take (fdv v : list fdstate) :
 Proof.
   intros [Hl H]. apply list_eq. intros i.
   destruct (decide (i < NSTD)%nat) as [Hlt | Hge].
-  - rewrite !lookup_take; [| exact Hlt | exact Hlt].
+  - rewrite !lookup_take_lt; [| exact Hlt | exact Hlt].
     destruct (fdv !! i) as [st |] eqn:Hi.
     + destruct (H i st Hi) as [-> | [_ Hc]]; [reflexivity | lia].
     + symmetry. apply lookup_ge_None. apply lookup_ge_None in Hi. lia.
@@ -313,13 +313,13 @@ Qed.
 
 Lemma ufd_gm_none (S : gmap nat fdstate) (v : list fdstate) :
   ufd_gm S v !! None = Some (UCTab v).
-Proof. unfold ufd_gm. by rewrite lookup_insert. Qed.
+Proof. unfold ufd_gm. by rewrite lookup_insert_eq. Qed.
 
 Lemma ufd_gm_insert (S : gmap nat fdstate) (v : list fdstate) (k : nat)
     (st : fdstate) :
   <[Some k := UCSlot st]> (ufd_gm S v) = ufd_gm (<[k := st]> S) v.
 Proof.
-  unfold ufd_gm. rewrite insert_commute; [| discriminate].
+  unfold ufd_gm. rewrite insert_insert_ne; [| discriminate].
   f_equal. rewrite fmap_insert. by rewrite (kmap_insert Some).
 Qed.
 
@@ -332,7 +332,7 @@ Qed.
 
 Lemma ufd_gm_retab (S : gmap nat fdstate) (v w : list fdstate) :
   <[None := UCTab w]> (ufd_gm S v) = ufd_gm S w.
-Proof. unfold ufd_gm. by rewrite insert_insert. Qed.
+Proof. unfold ufd_gm. by rewrite insert_insert_eq. Qed.
 
 Class ufdG (Σ : gFunctors) := UfdG { ufd_ghost_mapG :: ghost_mapG Σ (option nat) ufdcell }.
 Definition ufdΣ : gFunctors := #[ ghost_mapΣ (option nat) ufdcell ].
@@ -355,7 +355,7 @@ Section UserFd.
      other half is in the program's ledger. *)
   Definition ufd_auth (γf : gname) (fdv : list fdstate) : iProp Σ :=
     (∃ v : list fdstate,
-       ghost_map_auth γf 1 (ufd_gm (ufd_map fdv) v) ∗ ⌜length fdv = NOFILE⌝ ∗
+       ghost_map_auth_frac γf 1 (ufd_gm (ufd_map fdv) v) ∗ ⌜length fdv = NOFILE⌝ ∗
        ⌜tab_le fdv v⌝ ∗ @None nat ↪[γf]{#1/2} UCTab v)%I.
 
   Lemma ufd_auth_len (γf : gname) (fdv : list fdstate) :
@@ -379,9 +379,9 @@ Section UserFd.
 
   (* THE ONE WAY THE VIEW MOVES: both halves in hand, re-set to the table *)
   Local Lemma ufd_retab (γf : gname) (S : gmap nat fdstate) (v v' w : list fdstate) :
-    ghost_map_auth γf 1 (ufd_gm S v) -∗ @None nat ↪[γf]{#1/2} UCTab v -∗
+    ghost_map_auth_frac γf 1 (ufd_gm S v) -∗ @None nat ↪[γf]{#1/2} UCTab v -∗
     @None nat ↪[γf]{#1/2} UCTab v' ==∗
-    ghost_map_auth γf 1 (ufd_gm S w) ∗ @None nat ↪[γf]{#1/2} UCTab w ∗
+    ghost_map_auth_frac γf 1 (ufd_gm S w) ∗ @None nat ↪[γf]{#1/2} UCTab w ∗
     @None nat ↪[γf]{#1/2} UCTab w.
   Proof using .
     iIntros "Ha H1 H2".
@@ -585,7 +585,7 @@ Section UserFd.
     iPureIntro.
     apply list_eq. intros i.
     destruct (decide (i < NSTD)%nat) as [Hlt | Hge].
-    - rewrite lookup_take; [| exact Hlt].
+    - rewrite lookup_take_lt; [| exact Hlt].
       destruct (l !! i) as [st |] eqn:Hi.
       + assert (Hm : (map_seq 0 l : gmap nat fdstate) !! i = Some st)
           by (by rewrite lookup_map_seq_0).
@@ -672,7 +672,7 @@ Section UserFd.
     iDestruct "Ho" as "[[%Hlt %Hl] | Hh]".
     - iPureIntro.
       assert (Hi : take NSTD fdv !! fd = Some st) by (by rewrite Hst).
-      rewrite lookup_take in Hi; [| exact Hlt].
+      rewrite lookup_take_lt in Hi; [| exact Hlt].
       split; [exact Hi |]. rewrite <- Hlen. exact (lookup_lt_Some _ _ _ Hi).
     - iDestruct (ufd_agree with "Ha Hh") as %Hi.
       iDestruct (ufd_bound with "Ha Hh") as %Hb.
@@ -955,7 +955,7 @@ Section UserFd.
     iDestruct (ustd_len with "Hl") as %Hll.
     iDestruct (ustd_agree with "Ha Hl") as %Hst.
     assert (Hi : fdv !! fd = Some st).
-    { rewrite <- (lookup_take fdv NSTD fd Hs). by rewrite Hst. }
+    { rewrite <- (lookup_take_lt fdv NSTD fd Hs). by rewrite Hst. }
     assert (Hlt : (fd < length fdv)%nat) by exact (lookup_lt_Some _ _ _ Hi).
     iDestruct "Ha" as (v) "(Ha & _ & _ & Hta)".
     iDestruct "Hl" as "[Hl [%v' Htl]]".

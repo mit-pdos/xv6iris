@@ -1617,7 +1617,7 @@ Section UkRunSys.
     iDestruct (ustd_agree (ukn_fd N) fdv l with "Hufd Hstd") as %Htake.
     assert (Htk : take NSTD fdv !! fd0 = Some FdClosed)
       by (rewrite Htake; exact Hrow).
-    rewrite lookup_take in Htk; [| exact Hlt].
+    rewrite lookup_take_lt in Htk; [| exact Hlt].
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
                 with "Hdep Hmy Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -1732,7 +1732,7 @@ Section UkRunSys.
     iDestruct (ustd_at_agree (ukn_fd N) fdv l v with "Hufd Hstd") as %Htake.
     assert (Htk : take NSTD fdv !! fd0 = Some FdClosed)
       by (rewrite Htake; exact Hrow).
-    rewrite lookup_take in Htk; [| exact Hlt].
+    rewrite lookup_take_lt in Htk; [| exact Hlt].
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
                 with "Hdep Hmy Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -2034,7 +2034,7 @@ Section UkRunSys.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (ustd_agree with "Hufd Hstd") as %Hst.
     assert (Hi : fdv !! fd = Some st).
-    { rewrite <- (lookup_take fdv NSTD fd Hs). by rewrite Hst. }
+    { rewrite <- (lookup_take_lt fdv NSTD fd Hs). by rewrite Hst. }
     assert (Hfdlt : (fd < NOFILE)%nat) by (unfold NSTD, NOFILE in *; lia).
     iMod (udepw_cl_mint N m pc st M pm sz fdv cw gn cs pidv
                 (uk_fd_st_of_key _ fdv fd st Harg Hfdlt Hi)
@@ -3290,19 +3290,19 @@ Section UkRunSys.
        the read end's install left it open *)
     assert (Hba : b <> a).
     { intros ->. pose proof (fd_least_closed_free _ _ Hcb) as Hf.
-      rewrite list_lookup_insert in Hf; [ discriminate Hf | exact Halt ]. }
+      rewrite list_lookup_insert_eq in Hf; [ discriminate Hf | exact Halt ]. }
     assert (Hb2a : b2 <> a).
     { intros ->. pose proof (fd_least_closed_free _ _ Hcb2) as Hf.
-      rewrite list_lookup_insert in Hf; [ discriminate Hf | exact Halt ]. }
+      rewrite list_lookup_insert_eq in Hf; [ discriminate Hf | exact Halt ]. }
     (* ...so slot [a] of the OUTGOING table is the read end, read twice *)
     assert (Hr1 : (<[b := FdOpen false true (FdPipe gp)]>
                     (<[a := FdOpen true false (FdPipe gp)]> fdv)) !! a
                   = Some (FdOpen true false (FdPipe gp))).
     { rewrite list_lookup_insert_ne; [ | exact Hba ].
-      rewrite list_lookup_insert; [ reflexivity | exact Halt ]. }
+      rewrite list_lookup_insert_eq; [ reflexivity | exact Halt ]. }
     rewrite Heq in Hr1.
     rewrite list_lookup_insert_ne in Hr1; [ | exact Hb2a ].
-    rewrite list_lookup_insert in Hr1; [ | exact Halt ].
+    rewrite list_lookup_insert_eq in Hr1; [ | exact Halt ].
     injection Hr1 as Hr1. exact Hr1.
   Qed.
 

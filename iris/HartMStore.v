@@ -561,6 +561,7 @@ Section store.
        TsoCtx.phys_ledger_pin (pa_add (Interface.WriteReq.pa req) j)
          (DfracOwn 1) (nth_byte (Interface.WriteReq.value req) j) t (Bf j) (Sf j)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hex Hn HS HBg Hin. iIntros "Hgh Htso Hb".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     set (pa := Interface.WriteReq.pa req).
@@ -636,6 +637,7 @@ Section store.
        TsoCtx.ctx_phys_pointsto xi (pa_add (Interface.WriteReq.pa req) j)
          (DfracOwn 1) (nth_byte (Interface.WriteReq.value req) j)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hex Hn. iIntros "Hgh Htso Hrun Hb".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     (* the view function after the store: the author's own entry does NOT

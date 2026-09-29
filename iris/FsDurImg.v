@@ -343,7 +343,7 @@ Proof.
     rewrite fs_tick_count_cons in Hp |- *.
     destruct (decide (t = z)) as [-> | Hne].
     + rewrite (bool_decide_eq_true_2 (z = z) eq_refl) in Hp |- *.
-      rewrite /link_tok_elem /link_toks_elem lookup_singleton.
+      rewrite /link_tok_elem /link_toks_elem lookup_singleton_eq.
       destruct (decide (fs_tick_count L z = 0%nat)) as [H0 | H0].
       * rewrite (toks_of_list_lookup_zero fv L z H0) H0 right_id
           link_reps_1. reflexivity.
@@ -370,7 +370,7 @@ Proof.
     rewrite (Heq z) lookup_op.
     destruct (decide (z = i)) as [-> | Hne].
     + pose proof (IH i) as IHz. rewrite Hi in IHz. simpl in IHz.
-      rewrite /link_toks_elem lookup_singleton lookup_insert IHz right_id.
+      rewrite /link_toks_elem lookup_singleton_eq lookup_insert_eq IHz right_id.
       reflexivity.
     + rewrite /link_toks_elem lookup_singleton_ne; [| by apply not_eq_sym].
       rewrite lookup_insert_ne; [| by apply not_eq_sym].
@@ -425,7 +425,7 @@ Proof.
     by (rewrite E; left; reflexivity).
   apply List.filter_In in Hin as [Hin Ha].
   apply bool_decide_eq_true in Ha. subst a.
-  by apply elem_of_list_In.
+  by apply list_elem_of_In.
 Qed.
 
 (* ---- 9d.   A DIRECTORY'S VIEW READ AT AGREEING BYTES ----------------- *)
@@ -599,7 +599,7 @@ Proof.
     rewrite insert_empty -insert_union_singleton_r; [| exact Hfresh].
     destruct (decide (dir_bname data n = ex)) as [Hex | Hex].
     { (* THE EXEMPT NAME: the caller carries it, so nothing is added *)
-      rewrite Hex delete_insert_delete.
+      rewrite Hex delete_insert_eq.
       apply (cmra_included_trans _
                (toks_of_list fv (omap tick (seq 0 n))));
         [exact IHn |].
@@ -673,7 +673,7 @@ Lemma img_nodes_lookup_inv (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
 Proof.
   intros Hz. rewrite /img_nodes in Hz.
   apply elem_of_list_to_map_2 in Hz.
-  apply elem_of_list_fmap in Hz as (y & Heq & Hy).
+  apply list_elem_of_fmap in Hz as (y & Heq & Hy).
   injection Heq as -> ->. split; [| reflexivity].
   by apply elem_of_elements.
 Qed.
@@ -797,7 +797,7 @@ Proof.
                       (fs_dinode P sb FsImg.ROOTINO)) t
      <= fs_link_count P sb t)%nat).
   { intros t. rewrite /fs_link_count /fs_all_tickets.
-    apply fs_tick_count_join. apply elem_of_list_fmap.
+    apply fs_tick_count_join. apply list_elem_of_fmap.
     exists (Z.to_nat FsImg.ROOTINO). split.
     - rewrite Z2Nat.id; [| unfold FsImg.ROOTINO; lia].
       rewrite /fs_dir_tickets_at. cbv zeta.
@@ -868,7 +868,7 @@ Proof.
   rewrite (bool_decide_eq_false_2 (FsImg.ROOTINO = z) Hzne) in Hz |- *.
   pose proof (fs_tick_count_elem _ z Hz) as Hin.
   rewrite /fs_dir_tickets in Hin.
-  apply elem_of_list_omap in Hin as (k & Hk & Hkt).
+  apply list_elem_of_omap in Hin as (k & Hk & Hkt).
   apply elem_of_seq in Hk as [_ Hk].
   rewrite /fs_rec_ticket in Hkt. cbv zeta in Hkt.
   destruct (dir_liveb (fs_data_of P (fs_dinode P sb FsImg.ROOTINO)) k
@@ -1304,7 +1304,7 @@ Proof.
   pose proof (fs_inode_blocks_lookup P sb (fs_dinode P sb z) k Hok Hk Hsnz)
     as Hlk.
   rewrite Hsl in Hlk.
-  pose proof (elem_of_list_lookup_2 _ _ _ Hlk) as Hin.
+  pose proof (list_elem_of_lookup_2 _ _ _ Hlk) as Hin.
   split; [exact Hin | exact (fs_inode_blocks_range P sb _ b Hok Hin)].
 Qed.
 

@@ -117,7 +117,7 @@ Section pipes_wild_v.
   (*  1.  THE FLAG AND THE TOKEN                                         *)
   (* ================================================================== *)
   Definition secc_flag (v : era_pins) (n : nat) : iProp Σ :=
-    mono_nat_auth_own (ep_secc v) 1 n.
+    mono_nat_auth_own_frac (ep_secc v) 1 n.
 
   (* THE TOKEN CARRIES THE FREEZE: the era's input up to and including the
      wild line, and the choice list frozen one short of it *)
@@ -139,7 +139,7 @@ Section pipes_wild_v.
        ∗ cs_frozen_at v (nlines I0 - 1)%nat
        ∗ ∃ (D : list (list mobs * bv 8)) (h0 : list mobs),
            dl_list_lb v D
-           ∗ ⌜(snd <$> D) = I0 /\ list_basics.last D = Some (h0, wl_nl)
+           ∗ ⌜(snd <$> D) = I0 /\ list_basics.list.last D = Some (h0, wl_nl)
               /\ ins (open_seg h0) = I0 /\ obs_boots h0 = k
               /\ trace_shape h0 true⌝)%I.
 
@@ -166,7 +166,7 @@ Section pipes_wild_v.
   Proof using .
     iIntros "(%v0 & %I0 & #Hp0 & #Hlb & _) #Hp Hf".
     iDestruct (gcPIN_agree G with "Hp Hp0") as %<-.
-    iDestruct (mono_nat_lb_own_valid with "Hf Hlb") as %[_ Hle]. lia.
+    iDestruct (mono_nat_auth_lb_own_valid with "Hf Hlb") as %[_ Hle]. lia.
   Qed.
 
   (* ================================================================== *)
@@ -695,7 +695,7 @@ Section pipes_wild_v.
      ∗ (⌜rd_wild CH ws⌝ -∗
           (secc_tok_at k (snd <$> (LogEntryDefs.ch_dl CH ++ ws))
            (* ...and the newline is the window's own last entry (S5b) *)
-           ∗ ⌜exists h0 : list mobs, list_basics.last ws = Some (h0, wl_nl)
+           ∗ ⌜exists h0 : list mobs, list_basics.list.last ws = Some (h0, wl_nl)
                /\ ins (open_seg h0) = snd <$> (LogEntryDefs.ch_dl CH ++ ws)
                /\ obs_boots h0 = k⌝)
           ∨ T))%I.
@@ -821,7 +821,7 @@ Section pipes_wild_v.
         iApply (turn_lb_weaken with "Htlb").
         rewrite /lm_pcount Hw0 HEI. cbn [length]. unfold I' in *. lia.
       + iIntros "_". iLeft.
-        assert (Hlw : list_basics.last ws = Some (h0, wl_nl)).
+        assert (Hlw : list_basics.list.last ws = Some (h0, wl_nl)).
         { destruct (exists_last Hws) as (ws0 & x & ->).
           rewrite app_assoc last_snoc in Hl0. rewrite last_snoc. exact Hl0. }
         iSplitR; last first.

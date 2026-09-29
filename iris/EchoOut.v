@@ -38,7 +38,7 @@
    was persistent, and the application's spec had to be total over
    interleavings cons.lock forbids but never states.  The kernel therefore
    LENT the application a per-era exclusive on the PLIC payload, and a
-   [ghost_var nat] in QUARTERS made a second firing of one run meet five
+   [ghost_var_frac nat] in QUARTERS made a second firing of one run meet five
    quarters.  Since the redesign the arm is a FIELD of the console history
    ([ConsLog.cons_hist]'s [ch_arm]) and every event steps it with the port
    invariant open, so a second open, a byte after the close and a second
@@ -1294,7 +1294,7 @@ Record echo_gn := MkEchoGn {
    is the persistent name by which a claim, a writer and a reader mean the
    same era. *)
 Record era_pins := MkPins {
-  ep_go  : gname;   (* ghost_var nat: the era's PROCESS-BYTE CURSOR; the
+  ep_go  : gname;   (* ghost_var_frac nat: the era's PROCESS-BYTE CURSOR; the
                        output claim holds one half as [turn_auth], a writer
                        (init, through [app_turn]) the other *)
   ep_gcs : gname;   (* mono_list nat: the era's line choices; the output
@@ -1309,7 +1309,7 @@ Record era_pins := MkPins {
   ep_gE  : gname;   (* mono_list (list mobs * bv 8): the era's ECHOED LIST;
                        the output claim holds the authority, the input claim
                        a lower bound at the log's own slice *)
-  ep_gdl : gname;   (* ghost_var nat: the DELIVERED COUNT, in two halves --
+  ep_gdl : gname;   (* ghost_var_frac nat: the DELIVERED COUNT, in two halves --
                        one in the input claim at [length dl], one in the
                        READER's hand.  A read hands its half over and gets
                        it back advanced, and the agreement inside the link
@@ -1826,11 +1826,11 @@ Proof.
     + exact Hlog'.
     + intros e He. apply elem_of_app in He as [He | He].
       * exact (Hdsc e He).
-      * apply elem_of_list_singleton in He as ->.
+      * apply list_elem_of_singleton in He as ->.
         cbn [le_hist fst snd]. exact Hdseg.
     + intros e He. apply elem_of_app in He as [He | He].
       * exact (Hbts e He).
-      * apply elem_of_list_singleton in He as ->.
+      * apply list_elem_of_singleton in He as ->.
         cbn [le_hist fst snd]. exact Hboots.
     + (* the delivered prefix survives: the log's echoed slice only grows *)
       rewrite (echoed_snoc_yes _ _ Hech).
@@ -1928,7 +1928,7 @@ Proof.
     rewrite /seg_of list_lookup_fmap in Hx.
     destruct (echoed L !! j) as [y |] eqn:Hy; [| discriminate].
     cbn in Hx. injection Hx as Hx. rewrite -Hx. cbn [fst].
-    assert (Hyin : y ∈ echoed L) by (by eapply elem_of_list_lookup_2).
+    assert (Hyin : y ∈ echoed L) by (by eapply list_elem_of_lookup_2).
     destruct (echoed_elem_inv L y Hyin) as (e & He & _ & Hye).
     apply open_seg_prefix_boots.
     + rewrite -Hye. cbn [fst]. by destruct (Hord e He) as [Hpre _].
@@ -1999,7 +1999,7 @@ Proof.
   (* the byte typed is a byte the discipline allows *)
   assert (Hcin : c ∈ ins (open_seg h)).
   { destruct Hends' as [h0 Hh0]. rewrite Hh0 ins_app ins_in.
-    apply elem_of_app. right. apply elem_of_list_here. }
+    apply elem_of_app. right. apply list_elem_of_here. }
   pose proof (disc_drop_byte _ c Hd Hcin) as (_ & _ & Hner).
   (* THE ARM ECHOES ITS BYTE: the drop and the erase arms are refuted *)
   assert (Hcs : cs = [echo_of c]).
@@ -2096,9 +2096,9 @@ Section echo_out.
      refutes an untainted read at a prompt the writer has not written
      ([EchoLinks.ewc_owed_read_refute]). *)
   Definition turn (v : era_pins) (P : nat) : iProp Σ :=
-    mono_nat_auth_own (ep_go v) (1/2) P.
+    mono_nat_auth_own_frac (ep_go v) (1/2) P.
   Definition turn_auth (v : era_pins) (P : nat) : iProp Σ :=
-    mono_nat_auth_own (ep_go v) (1/2) P.
+    mono_nat_auth_own_frac (ep_go v) (1/2) P.
   Definition turn_lb (v : era_pins) (m : nat) : iProp Σ :=
     mono_nat_lb_own (ep_go v) m.
 
@@ -2125,7 +2125,7 @@ Section echo_out.
   Proof using .
     intros Hle. rewrite /turn /turn_auth. iIntros "H1 H2".
     iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[_ <-].
-    iAssert (mono_nat_auth_own (ep_go v) 1 P) with "[H1 H2]" as "H".
+    iAssert (mono_nat_auth_own_frac (ep_go v) 1 P) with "[H1 H2]" as "H".
     { iEval (rewrite -Qp.half_half). iSplitL "H1"; [iExact "H1" | iExact "H2"]. }
     iMod (mono_nat_own_update P'' with "H") as "[H _]"; [exact Hle |].
     iModIntro. iEval (rewrite -Qp.half_half) in "H". iDestruct "H" as "[H1 H2]".
@@ -2138,7 +2138,7 @@ Section echo_out.
   Lemma turn_lb_le v P m : turn v P -∗ turn_lb v m -∗ ⌜(m <= P)%nat⌝.
   Proof using .
     rewrite /turn /turn_lb. iIntros "H1 H2".
-    iDestruct (mono_nat_lb_own_valid with "H1 H2") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "H1 H2") as %[_ Hle].
     iPureIntro. exact Hle.
   Qed.
 
@@ -2456,7 +2456,7 @@ Section echo_out.
   (* THE DELIVERED COUNT, in two halves: the input claim's and the
      reader's. *)
   Definition dl_cnt (v : era_pins) (q : Qp) (n : nat) : iProp Σ :=
-    ghost_var (ep_gdl v) q n.
+    ghost_var_frac (ep_gdl v) q n.
 
   Global Instance dl_cnt_timeless v q n : Timeless (dl_cnt v q n).
   Proof using . rewrite /dl_cnt. apply _. Qed.
@@ -2478,7 +2478,7 @@ Section echo_out.
 
   (* THE READER'S POSITION, whole, and its persistent lower bound *)
   Definition rpos_auth (v : era_pins) (n : nat) : iProp Σ :=
-    mono_nat_auth_own (ep_rpos v) 1 n.
+    mono_nat_auth_own_frac (ep_rpos v) 1 n.
   Definition rpos_lb (v : era_pins) (n : nat) : iProp Σ :=
     mono_nat_lb_own (ep_rpos v) n.
 
@@ -2494,7 +2494,7 @@ Section echo_out.
 
   Lemma rpos_lb_le v n m : rpos_auth v n -∗ rpos_lb v m -∗ ⌜(m <= n)%nat⌝.
   Proof using .
-    iIntros "H Hl". by iDestruct (mono_nat_lb_own_valid with "H Hl") as %[_ ?].
+    iIntros "H Hl". by iDestruct (mono_nat_auth_lb_own_valid with "H Hl") as %[_ ?].
   Qed.
 
   Lemma rpos_update v n n' : (n <= n')%nat -> rpos_auth v n ==∗ rpos_auth v n'.
@@ -2607,7 +2607,7 @@ Section echo_out.
 
   Definition pin_map (h : list mobs) : iProp Σ :=
     (∃ Mp : gmap nat era_pins,
-       ghost_map_auth (eg_pin γ) 1 Mp ∗ ⌜pin_dom Mp (obs_boots h)⌝)%I.
+       ghost_map_auth_frac (eg_pin γ) 1 Mp ∗ ⌜pin_dom Mp (obs_boots h)⌝)%I.
 
   Global Instance pin_map_timeless h : Timeless (pin_map h).
   Proof using . rewrite /pin_map. apply _. Qed.
@@ -2638,10 +2638,10 @@ Section echo_out.
   (* ---- THE ERA'S GHOSTS AT FULL OWNERSHIP, and their split into the
          port's claim and init's credential ---- *)
   Definition era_full (v : era_pins) : iProp Σ :=
-    (mono_nat_auth_own (ep_go v) 1 0%nat ∗ cs_auth v [] ∗ ps_auth v []
-     ∗ Elist_auth v [] ∗ ghost_var (ep_gdl v) 1 0%nat
-     ∗ dl_list_auth v [] ∗ mono_nat_auth_own (ep_secc v) 1 0%nat
-     ∗ mono_nat_auth_own (ep_rpos v) 1 0%nat)%I.
+    (mono_nat_auth_own_frac (ep_go v) 1 0%nat ∗ cs_auth v [] ∗ ps_auth v []
+     ∗ Elist_auth v [] ∗ ghost_var_frac (ep_gdl v) 1 0%nat
+     ∗ dl_list_auth v [] ∗ mono_nat_auth_own_frac (ep_secc v) 1 0%nat
+     ∗ mono_nat_auth_own_frac (ep_rpos v) 1 0%nat)%I.
 
   Global Instance era_full_timeless v : Timeless (era_full v).
   Proof using . rewrite /era_full. apply _. Qed.
@@ -2710,7 +2710,7 @@ Section echo_out.
 
   (* ...and THE WHOLE LEDGER, which is what [AppEcho.echo_R] becomes. *)
   Definition echo_led (h : list mobs) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint γ) 1 (if decide (disc h) then 0%nat else 1%nat)
+    (mono_nat_auth_own_frac (eg_taint γ) 1 (if decide (disc h) then 0%nat else 1%nat)
      ∗ pin_map h
      ∗ (⌜Forall good_out (cycles_of h)⌝ ∨ T))%I.
 
@@ -2720,8 +2720,8 @@ Section echo_out.
   (* WHAT THE BIRTH STEP YIELDS, i.e. what [AppEcho.echo_cl] becomes:
      [AppEcho.echo_birth] is two [own_alloc]s and this. *)
   Lemma echo_led_init :
-    mono_nat_auth_own (eg_taint γ) 1 0%nat -∗
-    ghost_map_auth (eg_pin γ) 1 (∅ : gmap nat era_pins) -∗
+    mono_nat_auth_own_frac (eg_taint γ) 1 0%nat -∗
+    ghost_map_auth_frac (eg_pin γ) 1 (∅ : gmap nat era_pins) -∗
     echo_led [].
   Proof using .
     iIntros "Ht Hm". rewrite /echo_led /pin_map.
@@ -2893,7 +2893,7 @@ Section echo_out.
     iIntros "HTT (Hcnt & _ & [%Hg | HT'])".
     { iPureIntro. by intros _. }
     iDestruct ("HTT" with "HT'") as "Hlb".
-    iDestruct (mono_nat_lb_own_valid with "Hcnt Hlb") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hcnt Hlb") as %[_ Hle].
     iPureIntro. intros Hd. exfalso.
     rewrite decide_True in Hle; [| exact Hd]. lia.
   Qed.
@@ -2973,7 +2973,7 @@ Section echo_out.
         [| discriminate].
       cbn in Hx. injection Hx as Hx. rewrite -Hx. cbn [fst].
       assert (Hyin : y ∈ echoed (LogEntryDefs.ch_log CH))
-        by (by eapply elem_of_list_lookup_2).
+        by (by eapply list_elem_of_lookup_2).
       destruct (echoed_elem_inv (LogEntryDefs.ch_log CH) y Hyin)
         as (e & He & _ & Hye).
       apply open_seg_prefix_boots.
@@ -2994,7 +2994,7 @@ Section echo_out.
                      = take (length (o_E so)) (ins (open_seg h)))
       by (apply (E_bytes_of_hist (o_E so) (open_seg h) Hidx Hpl); lia).
     assert (Hnew' : forall x, x ∈ o_E so -> hist_ext x.1 (open_seg h)).
-    { intros x Hx. apply elem_of_list_lookup in Hx as [jj Hj].
+    { intros x Hx. apply list_elem_of_lookup in Hx as [jj Hj].
       destruct (Hidx jj x Hj) as [Hxe Hxlen].
       pose proof (Forall_lookup_1 _ _ _ _ Hprefixes Hj) as Hpx.
       apply lookup_lt_Some in Hj.

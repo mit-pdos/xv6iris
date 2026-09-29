@@ -490,7 +490,7 @@ Section PipeQueue.
   Proof using . iIntros "H". rewrite /pipe_cpost. by iLeft. Qed.
   Lemma pipe_cpost_taint γ w Φ last :
     app_taint -∗ pipe_cpay γ w Φ -∗ pipe_cpost γ w Φ last.
-  Proof using . iIntros "#Ht Hp". rewrite /pipe_cpost. iRight. iLeft. iFrame "Ht Hp". Qed.
+  Proof using . iIntros "#Ht Hp". rewrite /pipe_cpost. iRight. iLeft. iFrame "Hp Ht". Qed.
   Lemma pipe_cpost_unfired γ w Φ :
     pipe_cpay γ w Φ -∗ pipe_cpost γ w Φ false.
   Proof using . iIntros "Hp". rewrite /pipe_cpost. iRight. iRight. by iFrame "Hp". Qed.

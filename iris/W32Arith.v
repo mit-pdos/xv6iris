@@ -428,7 +428,7 @@ Proof.
                                    (Z.sub log2_xlen 1) 0) = shiftr y 32).
   { intro y. unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hl Hr. apply bv_eq.
-  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned bv_shiftl_unsigned moi64_unsigned.

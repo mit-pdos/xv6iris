@@ -79,8 +79,8 @@ Local Lemma data2_id_4 (v : mword 32) :
     update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v = v.
   Proof.
     apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
     erewrite bv_concat_unsigned by (cbn; lia).
     erewrite bv_concat_unsigned by (cbn; lia).
     rewrite !bv_unsigned_N_0.
@@ -176,6 +176,7 @@ Section WpSconfMem.
     TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
     rewrite /wordw_pointsto.
     iDestruct "Hw" as "(%Hal & Hb)".
@@ -187,7 +188,7 @@ Section WpSconfMem.
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
                   rewrite Hwn; lia) Hcan
             ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
-                  apply elem_of_list_In, elem_of_seq in Hj;
+                  apply list_elem_of_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hjw];
                   assert (Hjz : Z.of_nat j < width) by
                     (rewrite <- (Z2Nat.id width) by lia;
@@ -228,6 +229,7 @@ Section WpSconfMem.
     TsoCtx.own_context (CID := CIDw) CtxIdDefs.cur_ctx ∗
     wordw_pointsto width a (DfracOwn 1) vnew.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
     rewrite /wordw_free /wordw_pointsto.
     iDestruct "Hw" as "(%Hal & Hb)".
@@ -240,7 +242,7 @@ Section WpSconfMem.
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
                   rewrite Hwn; lia) Hcan
             ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
-                  apply elem_of_list_In, elem_of_seq in Hj;
+                  apply list_elem_of_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hjw];
                   assert (Hjz : Z.of_nat j < width) by
                     (rewrite <- (Z2Nat.id width) by lia;
@@ -284,7 +286,7 @@ Section WpSconfMem.
     iApply (wordw_win_load_c (KTR := KTR) (CID := CIDw) (Z.to_N width) img σ log V a ppn v dq
               Hcan
               ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
-                    apply elem_of_list_In, elem_of_seq in Hj;
+                    apply list_elem_of_In, elem_of_seq in Hj;
                     destruct Hj as [_ Hjw];
                     assert (Hjz : Z.of_nat j < width) by
                       (rewrite <- (Z2Nat.id width) by lia;
@@ -736,9 +738,9 @@ Section WpSconfMem.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -772,7 +774,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HPsi)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
   Qed.
 
@@ -1150,9 +1152,9 @@ Section WpSconfMem.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -1187,7 +1189,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv & HT)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
   Qed.
 
@@ -1509,9 +1511,9 @@ Section WpSconfMem.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -1549,7 +1551,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
 
@@ -1865,9 +1867,9 @@ Section WpSconfMem.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -1904,7 +1906,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
 
@@ -2223,9 +2225,9 @@ Section WpSconfMem.
                  (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
       - iExists tvx.
-        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+        iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                      pcfg paddr tlbv tvx) with "Hro") as "Hro".
         iFrame "Hrw Hro".
         iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -2263,7 +2265,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
   (* The non-atomic instance: the caller owns the cell throughout.  Generic
@@ -2937,9 +2939,9 @@ Section WpSconfMem.
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-          iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hro") as "Hro".
           iFrame "Hrw Hro".
           iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -2963,7 +2965,7 @@ Section WpSconfMem.
       iFrame "Hfile HPsi". iPureIntro. split_and!; reflexivity.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HPsi)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
   Qed.
   (* THE CTX-WORD INSTANCE, character-identical to what this leaf always was:
@@ -3131,7 +3133,7 @@ Section WpSconfMem.
     change (8*(0+1)*4-1) with 31. change (8*0*4) with 0.
     unfold subrange_vec_dec. change (31 - 0 + 1) with 32. rewrite autocast_id.
     apply bv_eq. rewrite autocast_id.
-    unfold to_word_idx, to_word, get_word, MachineWord.slice.
+    unfold to_word_idx, MachineWord.slice.
     rewrite MachineWord.cast_idx_refl.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
@@ -3331,11 +3333,11 @@ Section WpSconfMem.
   Proof using .
     apply bv_eq. unfold trunc8. rewrite autocast_id.
     unfold subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.slice.
     change (MachineWord.MachineWord.Z_idx 0) with 0%N.
     rewrite bv_extract_0_unsigned.
-    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
+    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec 
          MachineWord.MachineWord.zero_extend].
     rewrite bv_zero_extend_unsigned; [| vm_compute; discriminate].
     change (MachineWord.Z_idx 8) with 8%N.

@@ -258,8 +258,7 @@ Proof.
   assert (Hsum : add_vec (mword_of_int z : mword 32) (mword_of_int 1 : mword 32)
                  = (mword_of_int (z + 1) : mword 32)).
   { apply bv_eq.
-    unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
     rewrite bv_add_unsigned.
     rewrite (moi32_small z ltac:(change (2^32)%Z with 4294967296%Z; lia)).
     rewrite (moi32_small 1 ltac:(change (2^32)%Z with 4294967296%Z; lia)).

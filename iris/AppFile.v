@@ -15,7 +15,7 @@
    subset of an [echo … > N] line at its own name the console has seen (a
    lower bound of the ledger's line list says which lines those are).
 
-   THE DEED is a [ghost_var] over [FileState.fstate] in two halves: the claim
+   THE DEED is a [ghost_var_frac] over [FileState.fstate] in two halves: the claim
    keeps one, the process chain (sh, its forked child, the exec'd echo or
    cat) the other, beside a TICKET of the same shape.  Agreement makes the
    claim's state KNOWN to the holder -- that is how a write step knows the
@@ -120,7 +120,7 @@ Lemma fl_redirs_last (ls : list fl_line) (ws : list (list (bv 8))) (N : list (bv
 Proof using .
   intros Hl. destruct ls as [| x ls0] using rev_ind; [discriminate Hl |].
   rewrite last_snoc in Hl. injection Hl as ->.
-  rewrite omap_app. apply elem_of_app. right. cbn. by apply elem_of_list_singleton.
+  rewrite omap_app. apply elem_of_app. right. cbn. by apply list_elem_of_singleton.
 Qed.
 
 Lemma fl_redirs_prefix (ls ls' : list fl_line) :
@@ -174,7 +174,7 @@ Record file_names := MkFileNames {
   fn_era  : nat;
   fn_role : bool;
   (* THE ROUND POSITION (sync design section 4.5 "The round position", lane
-     SY3-A3b): a [ghost_var nat], "lines consumed" -- one half in the
+     SY3-A3b): a [ghost_var_frac nat], "lines consumed" -- one half in the
      running claim's sync part, one with the deed's holder (sh's deed
      lend), both advanced at each round's start ([fpos_update]).  A
      durable copy carries none. *)
@@ -222,8 +222,8 @@ Definition esc_rec : Type := dst * gname.
    equation [riscvF_genGS = riscv_pre_genGS]) -- the union's top theorem
    BUILDS its instance with [fa_st := riscv_pre_genGS]
    ([UUnionBootAdequacy]).  [fa_pos] is the round position's camera
-   ([fpos]).  Every use is spelled [@mono_nat_auth_own Σ fa_st …] /
-   [@ghost_var Σ nat fa_pos …]: a scope has several [mono_natG] and
+   ([fpos]).  Every use is spelled [@mono_nat_auth_own Σ fa_st … (DfracOwn q) …] /
+   [@ghost_var Σ nat fa_pos … (DfracOwn q) …]: a scope has several [mono_natG] and
    [ghost_varG nat] instances ([echoOutG]'s among them), and a second one
    picked by resolution is the duplicate-class trap. *)
 Class fileAppG (Σ : gFunctors) := FileAppG {
@@ -329,10 +329,10 @@ Section FileClaim.
      until then nothing is kept at them *)
   Lemma file_birth (γst : gname) :
     ⊢ |==> ∃ c : file_fixed, ⌜ff_st c = γst⌝ ∗ file_cl c
-        ∗ ghost_map_auth (ff_reg c) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm c) 1 0%nat
+        ∗ ghost_map_auth_frac (ff_reg c) 1 (∅ : gmap nat gname)
+        ∗ @mono_nat_auth_own Σ fa_st (ff_cm c) (DfracOwn 1) 0%nat
         ∗ own (ff_hist c) (●ML ([] : list (leibnizO UnionAdm.srec)))
-        ∗ ghost_map_auth (ff_run c) 1 (∅ : gmap nat (gname * gname)).
+        ∗ ghost_map_auth_frac (ff_run c) 1 (∅ : gmap nat (gname * gname)).
   Proof using .
     iMod echo_birth as (γ) "He".
     iMod (own_alloc (●ML ([] : list (leibnizO fl_line)))) as (g) "Hl";
@@ -351,11 +351,11 @@ Section FileClaim.
   (* ---------------------------------------------------------------- *)
 
   Definition fdeed (r : file_names) (s : dst) : iProp Σ :=
-    ghost_var (fn_deed r) (1/2) s.
+    ghost_var_frac (fn_deed r) (1/2) s.
   Definition fdeed_whole (r : file_names) (s : dst) : iProp Σ :=
-    ghost_var (fn_deed r) 1 s.
+    ghost_var_frac (fn_deed r) 1 s.
   Definition ftkt (r : file_names) (s : dst) : iProp Σ :=
-    ghost_var (fn_tkt r) (1/2) s.
+    ghost_var_frac (fn_tkt r) (1/2) s.
 
   (* what a holder normally has: both halves, at one value *)
   Definition fown (r : file_names) (s : dst) : iProp Σ :=
@@ -390,7 +390,7 @@ Section FileClaim.
     fdeed r s -∗ fdeed_whole r s' -∗ False.
   Proof using .
     rewrite /fdeed /fdeed_whole. iIntros "H1 H2".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
+    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _]. rewrite dfrac_op_own dfrac_valid_own in Hq.
     iPureIntro. rewrite Qp.add_comm in Hq. exact (Qp.not_add_le_l _ _ Hq).
   Qed.
 
@@ -440,7 +440,7 @@ Section FileClaim.
      value the half is at.  Only all three together move the position
      ([fposf_update]). *)
   Definition fposf (r : file_names) (q : Qp) (n : nat) : iProp Σ :=
-    @ghost_var Σ nat fa_pos (fn_pos r) q n.
+    @ghost_var Σ nat fa_pos (fn_pos r) (DfracOwn q) n.
   Definition fpos (r : file_names) (n : nat) : iProp Σ :=
     (⌜fn_role r = false⌝ ∗ fposf r (1/2) n)%I.
   Definition fposq (r : file_names) (n : nat) : iProp Σ :=
@@ -530,8 +530,8 @@ Section FileClaim.
   (* a fresh position: the claim's quarter, the holder's half and quarter *)
   Lemma fpos_alloc (n : nat) :
     ⊢ |==> ∃ γp : gname,
-        @ghost_var Σ nat fa_pos γp (1/4) n ∗ @ghost_var Σ nat fa_pos γp (1/2) n
-        ∗ @ghost_var Σ nat fa_pos γp (1/4) n.
+        @ghost_var Σ nat fa_pos γp (DfracOwn (1/4)) n ∗ @ghost_var Σ nat fa_pos γp (DfracOwn (1/2)) n
+        ∗ @ghost_var Σ nat fa_pos γp (DfracOwn (1/4)) n.
   Proof using .
     iMod (ghost_var_alloc (ghost_varG0 := fa_pos) n) as (γp) "H".
     set (r := MkFileNames inhabitant inhabitant inhabitant inhabitant
@@ -579,7 +579,7 @@ Section FileClaim.
   (* THE ONE-SHOT, at [mono_nat] (the taint counter's algebra, already in
      [echoOutG]): the whole authority at 0 is the token, a lower bound of
      1 is the persistent record that it was spent. *)
-  Definition esc_tok (g : gname) : iProp Σ := mono_nat_auth_own g 1 0%nat.
+  Definition esc_tok (g : gname) : iProp Σ := mono_nat_auth_own_frac g 1 0%nat.
   Definition esc_spent (g : gname) : iProp Σ := mono_nat_lb_own g 1%nat.
 
   Global Instance esc_spent_persistent g : Persistent (esc_spent g).
@@ -606,7 +606,7 @@ Section FileClaim.
   Lemma esc_tok_spent (g : gname) : esc_tok g -∗ esc_spent g -∗ False.
   Proof using .
     rewrite /esc_tok /esc_spent. iIntros "Ht Hlb".
-    iDestruct (mono_nat_lb_own_valid with "Ht Hlb") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Ht Hlb") as %[_ Hle].
     iPureIntro. lia.
   Qed.
 
@@ -1084,7 +1084,7 @@ Proof using.
       pose proof (Hc _ _ _ H1 H2) as Hs. destruct Hs as [Hs _]. exact Hs. }
     apply elem_of_app in Hin as [Hin | Hin].
     + pose proof (IH HcL rec Hin). lia.
-    + apply elem_of_list_singleton in Hin as ->. lia.
+    + apply list_elem_of_singleton in Hin as ->. lia.
 Qed.
 
 (* a bound on every record bounds the last *)
@@ -1297,7 +1297,7 @@ Section sync.
   (* the registry's authority, as the durable copy holds it: eras at most
      the copy's *)
   Definition run_auth (c : file_fixed) (k : nat) : iProp Σ :=
-    (∃ M : gmap nat (gname * gname), ghost_map_auth (ff_run c) 1 M
+    (∃ M : gmap nat (gname * gname), ghost_map_auth_frac (ff_run c) 1 M
        ∗ ⌜forall j, j ∈ dom M -> j <= k⌝)%I.
 
   Global Instance run_auth_timeless c k : Timeless (run_auth c k).
@@ -1321,14 +1321,14 @@ Section sync.
     destruct Hj as [-> | Hj]; [lia |]. pose proof (HM j Hj). lia.
   Qed.
 
-  Lemma run_auth_0 c : ghost_map_auth (ff_run c) 1 (∅ : gmap nat (gname * gname)) -∗ run_auth c 0.
+  Lemma run_auth_0 c : ghost_map_auth_frac (ff_run c) 1 (∅ : gmap nat (gname * gname)) -∗ run_auth c 0.
   Proof using .
     iIntros "H". iExists ∅. iFrame "H". iPureIntro. intros j Hj. set_solver.
   Qed.
 
   (* ---- the counters, at the machine's instance ---- *)
   Definition sync_cm_auth (c : file_fixed) (k : nat) : iProp Σ :=
-    @mono_nat_auth_own Σ fa_st (ff_cm c) 1 k.
+    @mono_nat_auth_own Σ fa_st (ff_cm c) (DfracOwn 1) k.
   Definition sync_cm_lb (c : file_fixed) (k : nat) : iProp Σ :=
     @mono_nat_lb_own Σ fa_st (ff_cm c) k.
   Definition sync_st_lb (c : file_fixed) (k : nat) : iProp Σ :=
@@ -1336,7 +1336,7 @@ Section sync.
   (* the LOAN's shape: the machine's [start_auth n], at the union's copy of
      its gname ([App.app_born] identifies the two; sync SY3-A3b) *)
   Definition sync_st_auth (c : file_fixed) (n : nat) : iProp Σ :=
-    @mono_nat_auth_own Σ fa_st (ff_st c) 1 n.
+    @mono_nat_auth_own Σ fa_st (ff_st c) (DfracOwn 1) n.
 
   Global Instance sync_cm_lb_persistent c k : Persistent (sync_cm_lb c k).
   Proof using . rewrite /sync_cm_lb. apply _. Qed.
@@ -1437,8 +1437,8 @@ Section sync.
     unfold sync_role; cbn [fn_role fn_era fn_sync].
     iDestruct "Hro" as "(Ho & Hcmo & #Hsto & Hho & Hra)".
     iDestruct "Hr" as "(Hq & #Hcml & Hpos & #Hrr)".
-    iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcml") as %[_ Hle1].
-    iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hle2].
+    iDestruct (mono_nat_auth_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcml") as %[_ Hle1].
+    iDestruct (mono_nat_auth_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hle2].
     assert (ok = S gen) as -> by lia.
     iDestruct (sync_reg_agree with "Hrego Hreg") as %->.
     iDestruct (sync_reg_agree with "Hreg Hregt") as %->.
@@ -1519,7 +1519,7 @@ Section sync.
     assert (Hbm' : forall rec : srec, rec ∈ Ls ++ [(length ls', fcont_of av)] ->
                      rec.1 <= length ls').
     { intros rec Hin. apply elem_of_app in Hin as [Hin | Hin]; [exact (Hbm rec Hin) |].
-      apply elem_of_list_singleton in Hin as ->. cbn. lia. }
+      apply list_elem_of_singleton in Hin as ->. cbn. lia. }
     iModIntro.
     iSplitL "Hg Hcmg Hhg Hrag".
     { iExists L, (Ls ++ [(length ls', fcont_of av)]).
@@ -1574,7 +1574,7 @@ Section sync.
     assert (Hpj : (slast Ls).1 <= j).
     { apply (sync_chain_redir_pos ls ls_w Ls j ws N Hch Hcmp Hj). lia. }
     assert (Hin : FileDisc.LEchoF ws N ∈ drop (slast Ls).1 L).
-    { apply elem_of_list_lookup. exists (j - (slast Ls).1). rewrite lookup_drop.
+    { apply list_elem_of_lookup. exists (j - (slast Ls).1). rewrite lookup_drop.
       rewrite (_ : (slast Ls).1 + (j - (slast Ls).1) = j); [| lia].
       exact (prefix_lookup_Some _ _ _ _ Hj HlswL). }
     pose proof (sync_chain_mono ls L Ls HlsL Hch) as Hch'.
@@ -1713,7 +1713,7 @@ Section sync.
     iDestruct "Hr" as "(Ho & Hcm & #Hsto & Hho & Hra)".
     iDestruct (sl_auth_lb_prefix with "Hho HF") as %HFc.
     iDestruct (sl_lb_get with "Hho") as "#Hhlb".
-    iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hk].
+    iDestruct (mono_nat_auth_lb_own_valid (mono_natG0 := fa_st) with "Hst Hsto") as %[_ Hk].
     (* the copy is of an EARLIER era: at [S gen] its list would be the fresh
        one, whose full authority is in hand *)
     iAssert ⌜rk <> S gen⌝%I as %Hne.
@@ -2847,9 +2847,9 @@ Section FileMerge.
       iNext. iDestruct "Hro_o" as %Hro_o. rewrite /sync_role Hro_o.
       iDestruct "Hroo" as "(Ho & Hcmo & #Hsto & _)".
       rewrite /sync_cm_auth /sync_cm_lb /sync_st_lb /sync_st_auth.
-      iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcmt")
+      iDestruct (mono_nat_auth_lb_own_valid (mono_natG0 := fa_st) with "Hcmo Hcmt")
         as %[_ Hle1].
-      iDestruct (mono_nat_lb_own_valid (mono_natG0 := fa_st) with "Hsa Hsto")
+      iDestruct (mono_nat_auth_lb_own_valid (mono_natG0 := fa_st) with "Hsa Hsto")
         as %[_ Hle2].
       assert (He : fn_era r_o = S gen) by lia.
       rewrite He. iDestruct (sync_reg_agree with "Hrego Hregt") as %Hγ.
@@ -2923,8 +2923,8 @@ Section FileClaimEra.
     file_app = MkAppcfg file_names (file_pred c) r ->
     fcontent_of (abs_view I') = s' -> s <> s' ->
     app_inv γfs -∗ ftkt r s -∗ fposq r n -∗
-    ghost_map_auth (fs_top γfs) (1/2) I' ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) I' ∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I' ={E}=∗
+      ghost_map_auth_frac (fs_top γfs) (1/2) I' ∗
       ((fown r s' ∗ fpos r n) ∨ (ftkt r s ∗ file_taint c)).
   Proof using .
     intros HE Heq Hcont Hne. iIntros "#Hinv Htk Hkq Hka".

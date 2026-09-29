@@ -63,8 +63,7 @@ Lemma sf_frame_cancel (X : mword 64) :
 Proof.
   assert (add_vec_unsigned : forall x y : mword 64,
             bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
     rewrite bv_add_unsigned. reflexivity. }
   apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
   assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
@@ -141,7 +140,7 @@ Section ProofSysFork.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite Hcsp1. unfold sp', sp0, pa_stk, add_vec_int, imm_entry. rewrite add_vec_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -269,7 +268,7 @@ Section ProofSysFork.
     { rewrite Hwv HE0esp. exact Hpush. }
     iEval (rewrite Hpa1') in "Hbra".
     iEval (rewrite HE0csp Hpa2') in "Hbs0".
-    iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x10)) imm_dealloc E0e
               (av - 2)%nat 2 b Hpop

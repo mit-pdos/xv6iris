@@ -137,7 +137,7 @@ Proof.
   intros Hmn. rewrite !map_eq_fmap. apply list_eq. intros k.
   destruct (Nat.lt_ge_cases k m) as [Hk|Hk].
   - rewrite list_lookup_fmap, lookup_seq_lt by exact Hk.
-    rewrite lookup_take by exact Hk.
+    rewrite lookup_take_lt by exact Hk.
     rewrite list_lookup_fmap, lookup_seq_lt by lia. reflexivity.
   - rewrite list_lookup_fmap.
     rewrite lookup_ge_None_2 by (rewrite length_seq; lia).
@@ -472,8 +472,8 @@ Lemma elf_loads_elem (l : elf_bytes) (ps : list elf_phdr) (i : nat)
   p ∈ elf_loads l.
 Proof.
   intros Hps Hi Hty. unfold elf_loads. rewrite Hps.
-  apply elem_of_list_In, List.filter_In. split.
-  - apply elem_of_list_In, (elem_of_list_lookup_2 ps i p Hi).
+  apply list_elem_of_In, List.filter_In. split.
+  - apply list_elem_of_In, (list_elem_of_lookup_2 ps i p Hi).
   - apply Z.eqb_eq, Hty.
 Qed.
 
@@ -483,8 +483,8 @@ Lemma elf_loads_sub (l : elf_bytes) (ps : list elf_phdr) (p : elf_phdr) :
   elf_phdrs l = Some ps -> p ∈ elf_loads l -> p ∈ ps /\ ep_type p = 1.
 Proof.
   intros Hps Hp. unfold elf_loads in Hp. rewrite Hps in Hp.
-  apply elem_of_list_In, List.filter_In in Hp as [Hin Hty].
-  split; [apply elem_of_list_In, Hin | apply Z.eqb_eq, Hty].
+  apply list_elem_of_In, List.filter_In in Hp as [Hin Hty].
+  split; [apply list_elem_of_In, Hin | apply Z.eqb_eq, Hty].
 Qed.
 
 (* ====================================================================== *)

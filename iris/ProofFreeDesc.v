@@ -549,7 +549,7 @@ Section ProofFreeDesc.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.free_desc + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (vra vs0) "[Hbra Hbs0]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (vra vs0) "[Hbra Hbs0]".
     assert (Hpa1 : add_vec (A0 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite HA0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
@@ -873,7 +873,7 @@ Section ProofFreeDesc.
     { rewrite Hwv. exact HF1sp. }
     iEval (rewrite Hqa1) in "Hbra".
     iEval (rewrite HF0sp Hqa2) in "Hbs0".
-    iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.free_desc + 0x5a)) (mword_of_int 16 : mword 6)
               F1 (K - 2)%nat 2 b Hpop with "Hcg Hpc [] Hframe").

@@ -62,13 +62,13 @@ Section WritePart.
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
        (* WHAT THE MAPPED SOURCE BUYS: the chunk STRADDLES a block boundary *)
        ⌜wi_blocks off (Z.to_nat (wchunk_at n k)) <> 1%nat⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             off_ret γo off (length bs) ∗
             REST)) -∗
     awrite_part_at Γ E i γo M ua P n k REST.
@@ -100,13 +100,13 @@ Section WritePart.
     (∀ (I : gmap Z fs_node) (off : nat) (bs bs0 : list (bv 8)) (nl : nat),
        ⌜wri_pre (abs_view I) i off bs bs0 nl⌝ -∗
        ⌜wi_blocks off (Z.to_nat (wchunk_at n k)) <> 1%nat⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_write i off bs (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗
             off_link γo (Z.of_nat (off + length bs)) ∗
             REST)) -∗
     awrite_part_adv Γ E i γo M ua P n k REST.

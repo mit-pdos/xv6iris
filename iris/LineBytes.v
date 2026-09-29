@@ -36,7 +36,7 @@ Lemma lb_Forall_drop {A} (P : A -> Prop) (n : nat) (l : list A) :
   Forall P l -> Forall P (drop n l).
 Proof.
   intro HF. apply Forall_forall. intros x Hx.
-  apply elem_of_list_lookup in Hx as [i Hi]. rewrite lookup_drop in Hi.
+  apply list_elem_of_lookup in Hx as [i Hi]. rewrite lookup_drop in Hi.
   exact (Forall_lookup_1 _ _ _ _ HF Hi).
 Qed.
 
@@ -56,9 +56,9 @@ Lemma lb_lta_take_eq {A} `{!Inhabited A} (l l' : list A) (q j : nat) :
 Proof.
   intros Heq Hj.
   assert (H1 : l' !! j = take q l' !! j)
-    by (symmetry; rewrite lookup_take; [done | lia]).
+    by (symmetry; rewrite lookup_take_lt; [done | lia]).
   assert (H2 : l !! j = take q l !! j)
-    by (symmetry; rewrite lookup_take; [done | lia]).
+    by (symmetry; rewrite lookup_take_lt; [done | lia]).
   by rewrite !list_lookup_total_alt H1 H2 Heq.
 Qed.
 
@@ -211,7 +211,7 @@ Proof.
       by (rewrite lookup_app_l;
           [exact lb_panic_nl4 | rewrite lb_panic_len; lia]).
     pose proof (lb_cmp_at _ _ _ _ _ Hcmp H1 H2) as Hb2.
-    rewrite Hb2 in Hb. exact (elem_of_list_lookup_2 _ _ _ Hb). }
+    rewrite Hb2 in Hb. exact (list_elem_of_lookup_2 _ _ _ Hb). }
   destruct Hnl as [Hno | (v & Hv & Hu)]; [by destruct (Hno Hnlin) |].
   rewrite Hu lb_panic_split. f_equal.
   rewrite Hu lb_panic_split in Hcmp.

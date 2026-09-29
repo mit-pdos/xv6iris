@@ -74,7 +74,7 @@ Local Open Scope Z_scope.
 Lemma bupd_absurd (Σ : gFunctors) : (⊢@{iProp Σ} |==> False) → False.
 Proof.
   intros H.
-  apply (uPred.pure_soundness (M:=iResUR Σ)).
+  apply (pure_soundness (PROP:=iPropI Σ)).
   iApply (bupd_elim (PROP:=iProp Σ) (⌜False⌝)%I).
   iMod H as "[]".
 Qed.
@@ -174,15 +174,15 @@ Section rehearsal.
       destruct (decide (h1 = h)) as [->|Hne1];
         destruct (decide (h2 = h)) as [->|Hne2].
       + done.
-      + rewrite lookup_insert lookup_insert_ne; last congruence.
+      + rewrite lookup_insert_eq lookup_insert_ne; last congruence.
         move => [= Heq] HR2. exfalso. apply (Hnr h2). congruence.
-      + rewrite lookup_insert_ne; last congruence. rewrite lookup_insert.
+      + rewrite lookup_insert_ne; last congruence. rewrite lookup_insert_eq.
         move => HR1 [= Heq]. exfalso. apply (Hnr h1). congruence.
       + rewrite !lookup_insert_ne; [|congruence..]. exact (Hinj h1 h2 ξ0).
     - (* parked_not_run *)
       move => ξ0 T h0 HT.
       destruct (decide (h0 = h)) as [->|Hne].
-      + rewrite lookup_insert. move => [= Heq]. congruence.
+      + rewrite lookup_insert_eq. move => [= Heq]. congruence.
       + rewrite lookup_insert_ne; last congruence. exact (Hpnr _ _ _ HT).
     - exact Huniq.
   Qed.
@@ -197,7 +197,7 @@ Section rehearsal.
     run !! h = Some ξ → ξ ∈ ctx_used run parked.
   Proof using .
     move => Hh. rewrite /ctx_used elem_of_union. left.
-    rewrite elem_of_list_to_set elem_of_list_fmap.
+    rewrite elem_of_list_to_set list_elem_of_fmap.
     exists (h, ξ). split; first done. by apply elem_of_map_to_list.
   Qed.
 
@@ -272,7 +272,7 @@ Section rehearsal.
     - (* sees *)
       move => ξ0 a0 t0 HL0.
       destruct (decide (ξ0 = ξc)) as [->|Hne].
-      + right. exists (length log). rewrite lookup_insert. split; first done.
+      + right. exists (length log). rewrite lookup_insert_eq. split; first done.
         exact (Hbnd _ _ _ HL0).
       + destruct (Hsees _ _ _ HL0) as [Hleft | (T & HT & Hle)].
         * by left.
@@ -281,7 +281,7 @@ Section rehearsal.
     - (* parked_le *)
       move => ξ0 T.
       destruct (decide (ξ0 = ξc)) as [->|Hne].
-      + rewrite lookup_insert. move => [= <-]. lia.
+      + rewrite lookup_insert_eq. move => [= <-]. lia.
       + rewrite lookup_insert_ne; last congruence. exact (Hple ξ0 T).
     - exact Hinj.
     - (* parked_not_run *)
@@ -353,13 +353,13 @@ Section rehearsal.
     - (* bound *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξc, a))) as [[= -> ->]|Hne0].
-      + rewrite lookup_insert. intros [= <-]. exact Hbt.
+      + rewrite lookup_insert_eq. intros [= <-]. exact Hbt.
       + rewrite lookup_insert_ne; last congruence.
         rewrite lookup_delete_Some. move => [_ HL0]. exact (Hbnd _ _ _ HL0).
     - (* sees: THE PARKED ARM, discharged by the stamp *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξc, a))) as [[= -> ->]|Hne0].
-      + rewrite lookup_insert. intros [= <-].
+      + rewrite lookup_insert_eq. intros [= <-].
         right. exists (length log). by split.
       + rewrite lookup_insert_ne; last congruence.
         rewrite lookup_delete_Some. move => [_ HL0]. exact (Hsees _ _ _ HL0).
@@ -371,13 +371,13 @@ Section rehearsal.
       destruct (decide ((ξ1, a0) = (ξc, a))) as [[= -> ->]|Hne1].
       + destruct (decide ((ξ2, a) = (ξc, a))) as [[= ->]|Hne2].
         * move => _ _. done.
-        * rewrite lookup_insert. rewrite lookup_insert_ne; last congruence.
+        * rewrite lookup_insert_eq. rewrite lookup_insert_ne; last congruence.
           rewrite lookup_delete_Some.
           move => _ [Hne2' HL2]. exfalso.
           have : ξ2 = ξp by exact (Huniq _ _ _ _ _ HL2 HLa).
           congruence.
       + destruct (decide ((ξ2, a0) = (ξc, a))) as [[= -> ->]|Hne2].
-        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert.
+        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert_eq.
           rewrite lookup_delete_Some.
           move => [Hne1' HL1] _. exfalso.
           have : ξ1 = ξp by exact (Huniq _ _ _ _ _ HL1 HLa).
@@ -484,7 +484,7 @@ Section rehearsal.
     iMod (ghost_map_delete with "Hr Hrun") as "Hr".
     have Hfresh' : delete h run !! h' = None.
     { destruct (decide (h' = h)) as [->|Hne].
-      - by rewrite lookup_delete.
+      - by rewrite lookup_delete_eq.
       - rewrite lookup_delete_ne; [exact Hfresh | congruence]. }
     iMod (ghost_map_insert h' ξ Hfresh' with "Hr") as "[Hr Hrun]".
     iModIntro. iFrame "Hrun".
@@ -495,7 +495,7 @@ Section rehearsal.
     - (* sees *)
       move => ξ0 a0 t0 HL0.
       destruct (decide (ξ0 = ξ)) as [->|Hne].
-      + left. exists h'. rewrite lookup_insert. split; first done.
+      + left. exists h'. rewrite lookup_insert_eq. split; first done.
         apply visibleb_below. have := Hbnd _ _ _ HL0. lia.
       + destruct (Hsees _ _ _ HL0) as [(h0 & Hh0 & Hv0) | (T & HT & Hle)].
         * left. exists h0. split; last done.
@@ -512,10 +512,10 @@ Section rehearsal.
       destruct (decide (h1 = h')) as [->|Hne1];
         destruct (decide (h2 = h')) as [->|Hne2].
       + done.
-      + rewrite lookup_insert lookup_insert_ne; last congruence.
+      + rewrite lookup_insert_eq lookup_insert_ne; last congruence.
         rewrite lookup_delete_Some. move => [= Heq] [Hnh HR2].
         exfalso. apply Hnh. apply (Hinj h h2 ξ0); [congruence | exact HR2].
-      + rewrite lookup_insert_ne; last congruence. rewrite lookup_insert.
+      + rewrite lookup_insert_ne; last congruence. rewrite lookup_insert_eq.
         rewrite lookup_delete_Some. move => [Hnh HR1] [= Heq].
         exfalso. apply Hnh. apply (Hinj h h1 ξ0); [congruence | exact HR1].
       + rewrite !lookup_insert_ne; [|congruence..].
@@ -524,7 +524,7 @@ Section rehearsal.
     - (* parked_not_run *)
       move => ξ0 T h0 HT.
       destruct (decide (h0 = h')) as [->|Hne].
-      + rewrite lookup_insert. move => [= Heq].
+      + rewrite lookup_insert_eq. move => [= Heq].
         apply (Hpnr ξ0 T h HT). congruence.
       + rewrite lookup_insert_ne; last congruence.
         rewrite lookup_delete_Some. move => [_ HR0].
@@ -539,7 +539,7 @@ Section rehearsal.
   (* PARK-THEN-RESUME COMPOSES ON ONE HART.  The question was whether the
      intermediate state (h running nothing) is forbidden: it is NOT.
      [twin_park] deletes h from [run]; [twin_resume] asks only for
-     [run !! h' = None], which [lookup_delete] supplies at h' = h.  So the
+     [run !! h' = None], which [lookup_delete_eq] supplies at h' = h.  So the
      exchange is a DERIVED lemma, not a new primitive.
 
      The premise [T ≤ tvs h] is the whole content of the crossing: THE
@@ -557,7 +557,7 @@ Section rehearsal.
     iMod (twin_park with "Hint Hrun") as "[Hint Hparkr]".
     iMod (twin_resume _ _ _ _ _ _ _ _ _ ξp T h with "Hint Hpark")
       as "[Hint Hrun]".
-    { by rewrite lookup_delete. }
+    { by rewrite lookup_delete_eq. }
     { exact Hcov. }
     iModIntro. iFrame.
   Qed.
@@ -600,10 +600,10 @@ Section rehearsal.
      visible to the refutation. *)
   Lemma twin_populated (a : Z) (v : bv 8) (tvs : agent → nat) (h : agent) :
     ⊢ |==> ∃ γh γl γr γp : gname,
-        ghost_map_auth γh 1 {[a := (0%nat, v)]} ∗
-        ghost_map_auth γl 1 {[(0%nat, a) := 0%nat]} ∗
-        ghost_map_auth γr 1 {[h := 1%nat]} ∗
-        ghost_map_auth γp 1 {[0%nat := 0%nat]} ∗
+        ghost_map_auth_frac γh 1 {[a := (0%nat, v)]} ∗
+        ghost_map_auth_frac γl 1 {[(0%nat, a) := 0%nat]} ∗
+        ghost_map_auth_frac γr 1 {[h := 1%nat]} ∗
+        ghost_map_auth_frac γp 1 {[0%nat := 0%nat]} ∗
         ⌜twin_wf (img_fun {[a := v]}) [] tvs {[h := 1%nat]}
                  {[0%nat := 0%nat]} {[a := (0%nat, v)]}
                  {[(0%nat, a) := 0%nat]}⌝ ∗
@@ -625,7 +625,7 @@ Section rehearsal.
     - (* latest *)
       move => a0 t0 v0. rewrite lookup_singleton_Some.
       move => [<- [= <- <-]]. split.
-      + rewrite /log_byte /img_fun lookup_singleton //.
+      + rewrite /log_byte /img_fun lookup_singleton_eq //.
       + move => t' Ht'. destruct t' as [|i]; first lia.
         rewrite /log_byte /=. done.
     - (* bound *)
@@ -634,7 +634,7 @@ Section rehearsal.
     - (* sees *)
       move => ξ0 a0 t0. rewrite lookup_singleton_Some.
       move => [Hk <-]. injection Hk as <- <-.
-      right. exists 0%nat. split; [by rewrite lookup_singleton | lia].
+      right. exists 0%nat. split; [by rewrite lookup_singleton_eq | lia].
     - (* parked_le *)
       move => ξ0 T. rewrite lookup_singleton_Some. move => [_ <-]. simpl. lia.
     - (* run_inj *)
@@ -883,9 +883,9 @@ Section roster.
   Notation CtxG := gname (only parsing).
 
   (* "ξ exists and has never been enrolled anywhere." *)
-  Definition ctx_unstarted (ξ : CtxG) : iProp Σ := ghost_var ξ 1 ().
+  Definition ctx_unstarted (ξ : CtxG) : iProp Σ := ghost_var_frac ξ 1 ().
   (* the interp's half, one per live (running or parked) context *)
-  Definition ctx_live (ξ : CtxG) : iProp Σ := ghost_var ξ (1/2) ().
+  Definition ctx_live (ξ : CtxG) : iProp Σ := ghost_var_frac ξ (1/2) ().
   Definition roster (S : gset CtxG) : iProp Σ :=
     ([∗ set] ξ ∈ S, ctx_live ξ)%I.
 

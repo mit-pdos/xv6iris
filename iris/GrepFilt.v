@@ -77,7 +77,7 @@ Proof using.
   revert cur. induction S as [| b r IH]; intros cur Hc; [exact Hc |].
   simpl. destruct (bdec b wl_nl) eqn:Hb.
   - apply IH. apply not_elem_of_nil.
-  - apply IH. rewrite elem_of_app, elem_of_list_singleton. intros [H | H]; [exact (Hc H) |].
+  - apply IH. rewrite elem_of_app, list_elem_of_singleton. intros [H | H]; [exact (Hc H) |].
     subst b. rewrite (bdec_true _ _ eq_refl) in Hb. discriminate.
 Qed.
 

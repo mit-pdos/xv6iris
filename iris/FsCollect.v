@@ -402,7 +402,7 @@ Section Collect.
      the log is needed -- this is the whole of the interface. *)
   Definition col_auth γfs (Lb : gmap Z (bv 8))
       (C : gmap Z (list (bv 8))) (home : gset Z) : iProp Σ :=
-    (ghost_map_auth (fs_bytes γfs) 1 Lb ∗
+    (ghost_map_auth_frac (fs_bytes γfs) 1 Lb ∗
      ⌜dom C = home⌝ ∗
      ⌜forall b bs, C !! b = Some bs -> length bs = BSIZE⌝ ∗
      ⌜bytes_tie Lb C⌝ ∗ ⌜bytes_dom Lb home⌝)%I.
@@ -525,7 +525,7 @@ Section Collect.
      commit reads every one of them off ONE opening of [iregN]. *)
   Definition col_recs γfs (γi : gname) (ist : Z) (nib : nat)
       (m : gmap Z dinode) : iProp Σ :=
-    (ghost_map_auth γi 1 m ∗
+    (ghost_map_auth_frac γi 1 m ∗
      [∗ list] bi ∈ seq 0 nib,
         ∃ ds : list dinode,
           ⌜diblk_wf ds⌝ ∗ ⌜ireg_couple m bi ds⌝ ∗ ireg_recs γfs ist bi ds)%I.
@@ -636,7 +636,7 @@ Section Collect.
   Qed.
 
   Lemma col_bundle_rec γfs γi (i : Z) (n : fs_node) (m : gmap Z dinode) :
-    ghost_map_auth γi 1 m -∗ col_bundle γfs γi i n -∗
+    ghost_map_auth_frac γi 1 m -∗ col_bundle γfs γi i n -∗
     ⌜m !! i = Some (fn_rec n)⌝.
   Proof using .
     iIntros "Ha H". iDestruct "H" as (inum Hbv) "H".
@@ -652,7 +652,7 @@ Section Collect.
      authority [InodeRegion.ftop_inv] holds.  This is where the collection's
      state comes from (durable-disk C-8). *)
   Lemma col_bundle_top γfs γi (i : Z) (n : fs_node) (I : gmap Z fs_node) :
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ col_bundle γfs γi i n -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ col_bundle γfs γi i n -∗
     ⌜I !! i = Some n⌝.
   Proof using .
     iIntros "Ha H". iDestruct "H" as (inum Hbv) "H".
@@ -1020,9 +1020,9 @@ Section Collect.
   (*  reading in this file, and so does the slot: both branches carry      *)
   (*  their own closing wand.                                              *)
   Lemma col_region_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ((imark γi (bv_unsigned inum)
           ∗ (imark γi (bv_unsigned inum)
              -∗ ireg_slot γfs γi (bv_unsigned inum) d))
@@ -1095,10 +1095,10 @@ Section Collect.
      ledger the type is a conclusion, so the caller does not have to know
      in advance that the record it is about to read is free. *)
   Lemma col_free_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     imark γi (bv_unsigned inum) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ⌜bv_unsigned (di_type d) = 0⌝
       ∗ imark γi (bv_unsigned inum)
       ∗ inode_owned_era γfs γi inum (free_node d)
@@ -1127,9 +1127,9 @@ Section Collect.
   (*  [col_region_slot_acc] verbatim.                                      *)
   (* ==================================================================== *)
   Lemma col_region_slot_lnk_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ireg_lnk γfs (bv_unsigned inum) d
       ∗ ((imark γi (bv_unsigned inum)
           ∗ (imark γi (bv_unsigned inum)
@@ -1197,10 +1197,10 @@ Section Collect.
 
   (* ...and the marker-arm reading of it, [col_free_slot_acc]'s twin. *)
   Lemma col_free_slot_lnk_acc γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     imark γi (bv_unsigned inum) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ireg_lnk γfs (bv_unsigned inum) d
       ∗ ⌜bv_unsigned (di_type d) = 0⌝
       ∗ imark γi (bv_unsigned inum)
@@ -1303,7 +1303,7 @@ Section Collect.
   (*  accessor's own closing wands are dropped.                            *)
   (* ==================================================================== *)
   Lemma col_side_slot_excl γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
     col_side γfs γi inum -∗ col_side γfs γi inum -∗ False.
   Proof using .
@@ -1525,10 +1525,10 @@ Section Collect.
   (* ==================================================================== *)
   Lemma col_row_slot_acc γfs (γi : gname) (inum : bv 32) (d : dinode)
       (Q : iProp Σ) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     col_row γfs γi inum Q -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ireg_lnk γfs (bv_unsigned inum) d
       ∗ ∃ n : fs_node,
           ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
@@ -1575,12 +1575,12 @@ Section Collect.
   Lemma col_leg_bundle_acc γfs (γi : gname) (inum : bv 32) (n : fs_node)
       (d : dinode) (m : gmap Z dinode) (I : gmap Z fs_node) :
     m !! bv_unsigned inum = Some d ->
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac γi 1 m -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
     ireg_lnk γfs (bv_unsigned inum) d -∗
     ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
-      ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) (1/2) I
+      ghost_map_auth_frac γi 1 m
+      ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
       ∗ ⌜I !! bv_unsigned inum = Some n⌝
       ∗ col_bundle γfs γi (bv_unsigned inum) n
       ∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n
@@ -1669,7 +1669,7 @@ Section Collect.
      in advance which of the region's inums are free. *)
   Lemma col_claim_box_no_ops γfs (γi : gname) (inum : bv 32) (d : dinode) :
     bv_unsigned (di_type d) <> 0 ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     imark γi (bv_unsigned inum) -∗
     ireg_slot γfs γi (bv_unsigned inum) d -∗ False.
   Proof using .
@@ -1734,7 +1734,7 @@ Section Collect.
   Lemma col_corpse_no_ops gfs (gi : gname) (inum : bv 32) (d : dinode)
       (ph : frz) :
     frz_reg ph <> None ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ifreeze ph (bv_unsigned inum) -∗
     ireg_slot gfs gi (bv_unsigned inum) d -∗ False.
   Proof using .
@@ -1755,11 +1755,11 @@ Section Collect.
      column, and it is PURE, so the slot comes straight back. *)
   Lemma col_slot_unfrozen gfs (gi : gname) (inum : bv 32) (d : dinode)
       (ph : frz) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot gfs gi (bv_unsigned inum) d -∗
     ifreeze ph (bv_unsigned inum) -∗
       ⌜ph = FrzOff⌝
-      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ ireg_slot gfs gi (bv_unsigned inum) d
       ∗ ifreeze ph (bv_unsigned inum).
   Proof using .

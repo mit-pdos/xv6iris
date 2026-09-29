@@ -17,7 +17,7 @@
                  inside; NO box, NO birth                                 [proto_open_slot]
      publish     [f->off = 0] over the free word re-mints the cell at   [proto_store]
                  the storer's context and mints its offset SHADOW (the
-                 ghost_var [FdSlots.FdInode] names); THEN the box is
+                 ghost_var_frac [FdSlots.FdInode] names); THEN the box is
                  born on both, the share minted at mass 1, the L2 row
                  inserted                                                 [proto_publish]
      dup         a pure split of the share by fraction                  [proto_dup]
@@ -184,8 +184,8 @@ Section FileOffProtocol.
     off_box k γb γo ∗ off_member off_cfg i γb ∗
     ∃ T0 : nat,
       CtxBox.l2_hold (X := unit) γb k m ∗
-      ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
-      ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
+      ghost_var_frac (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+      ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (DfracOwn (q / 2)) 1%nat ∗
       (∃ T : nat, off_rows_dep_but off_cfg i γb T).
   Proof using .
     iIntros (HE Hip Hi HKt) "Hctx #Hflt Hat Hrows".
@@ -212,8 +212,8 @@ Section FileOffProtocol.
     qsum m = Qp_to_Qc q ->
     own_context ξ -∗ off_resident (XI := ξ) γo k -∗
     CtxBox.l2_hold (X := unit) γb k m -∗
-    ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) -∗
-    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat -∗
+    ghost_var_frac (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) -∗
+    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (DfracOwn (q / 2)) 1%nat -∗
     off_box k γb γo -∗ off_member off_cfg i γb -∗
     off_rows_dep_but off_cfg i γb Tr ={E}=∗
     own_context ξ ∗ off_fd k q γb γo C ∗
@@ -282,8 +282,8 @@ Section FileOffProtocol.
          off_box k γb γo ∗ off_member off_cfg i γb ∗
          ∃ T0 : nat,
            CtxBox.l2_hold (X := unit) γb k m ∗
-           ghost_var (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
-           ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2 / 2) 1%nat ∗
+           ghost_var_frac (bx_slotd γb) (q / 2 / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+           ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (DfracOwn (q / 2 / 2)) 1%nat ∗
            (∃ T : nat, off_rows_dep_but off_cfg i γb T)).
   Proof using .
     iIntros (HE Hip Hi) "Hfd".

@@ -144,7 +144,7 @@ Definition dv_of_D (D : gmap Z (list (bv 8))) : Z -> list (bv 8) :=
 (* a total block view, restricted to a finite set of block numbers *)
 Definition fs_restrict (P : Z -> list (bv 8)) (s : gset Z)
     : gmap Z (list (bv 8)) :=
-  set_to_map (fun b => (b, P b)) s.
+  set_to_map (fun b => P b) s.
 
 (* INSTALLING the on-disk log over the home map: entry [i] of the write set
    takes its content from log slot [i].  A [foldr] over the INDEX list
@@ -167,10 +167,7 @@ Lemma fs_restrict_lookup_Some (P : Z -> list (bv 8)) (s : gset Z)
     (b : Z) (v : list (bv 8)) :
   fs_restrict P s !! b = Some v <-> b ∈ s /\ v = P b.
 Proof.
-  rewrite /fs_restrict lookup_set_to_map; last by intros y y' _ _ ?.
-  split.
-  - intros (x & Hx & Hf). injection Hf as Hb Hv. subst. done.
-  - intros [Hb ->]. exists b. done.
+  rewrite /fs_restrict lookup_set_to_map_Some. naive_solver.
 Qed.
 
 Lemma fs_restrict_dom (P : Z -> list (bv 8)) (s : gset Z) :
@@ -321,8 +318,8 @@ Lemma lm_logged_insert_home (L : gmap Z (list (bv 8))) (cov : gset Z)
 Proof.
   intros Hb. apply map_eq. intros c. rewrite /lm_logged /dv_of_D.
   destruct (decide (c = b)) as [-> | Hne].
-  - rewrite lookup_insert fs_restrict_lookup (decide_True _ _ Hb)
-            lookup_insert //.
+  - rewrite lookup_insert_eq fs_restrict_lookup (decide_True _ _ Hb)
+            lookup_insert_eq //.
   - rewrite lookup_insert_ne; [| exact (not_eq_sym Hne)].
     rewrite !fs_restrict_lookup.
     destruct (decide (c ∈ fs_home_set cov ls)) as [_ | _]; [| reflexivity].
@@ -403,7 +400,7 @@ Section LogMirrorDefs.
   (* The era's half, at a NAMED picture -- what a WAL caller chains its
      knowledge of the durable disk through. *)
   Definition log_mirror_half (M : log_mirror) : iProp Σ :=
-    ghost_var mirror_name (1/2) M.
+    ghost_var_frac mirror_name (1/2) M.
 
   (* The era's half, indexed by the on-disk header's reading only. *)
   Definition log_mirror_at (ls : Z) (h : nat * list Z) : iProp Σ :=
@@ -460,7 +457,7 @@ Record log_names := MkLogNames {
 (*  "epoch at least [v]".                                               *)
 (*                                                                      *)
 (*  The auth-facing lemmas come along: they say what a fragment IS       *)
-(*  against the authority ([mono_nat_auth_own (ln_ep γ)], [own (ln_lg    *)
+(*  against the authority ([mono_nat_auth_own_frac (ln_ep γ)], [own (ln_lg    *)
 (*  γ) (● X)]) and mention no invariant either.  What stays in [LogInv]  *)
 (*  is the TRANSITION -- [log_epoch_bump], the commit's re-deposit --    *)
 (*  which is a step of the WAL's own ghost machine.  [LogInv]            *)
@@ -487,8 +484,8 @@ Section LogFrags.
   (* MINTING, where the auth is open (every log ghost step, and begin_op's
      in particular).  Free: the auth is handed straight back. *)
   Lemma log_epoch_lb_get (γ : log_names) (E : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗
-    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
+    mono_nat_auth_own_frac (ln_ep γ) 1 E -∗
+    mono_nat_auth_own_frac (ln_ep γ) 1 E ∗ log_epoch_lb γ E.
   Proof using .
     iIntros "Ha".
     iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
@@ -497,10 +494,10 @@ Section LogFrags.
 
   (* ...and USING one, back under the auth: the bound is real. *)
   Lemma log_epoch_lb_le (γ : log_names) (E e : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
+    mono_nat_auth_own_frac (ln_ep γ) 1 E -∗ log_epoch_lb γ e -∗ ⌜(e <= E)%nat⌝.
   Proof using .
     iIntros "Ha Hl".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
   Qed.
 
   (* ...and the trivial anchor, for every caller that wants none of it *)
@@ -588,15 +585,15 @@ Section LogGhostAlloc.
 
   Definition log_free_tok (γ : log_names) : iProp Σ :=
     (lock_free_tok (ln_lk γ) ∗
-     ghost_map_auth (ln_ops γ) 1 (∅ : gmap nat op_entry) ∗
-     mono_nat_auth_own (ln_ep γ) 1 1%nat ∗
+     ghost_map_auth_frac (ln_ops γ) 1 (∅ : gmap nat op_entry) ∗
+     mono_nat_auth_own_frac (ln_ep γ) 1 1%nat ∗
      own (ln_lg γ) (● (∅ : gset (nat * Z))) ∗
      (* the open-transaction authority, born empty: no transaction has run
         yet, which is [LogInv.log_res]'s [size T = size om] at both zeroes *)
-     ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ∗
+     ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) ∗
      (* the helping slot's authority, born empty: no [sync] waiter yet
         (claude-notes/design/sync.md §4.2) *)
-     ghost_map_auth (ln_help γ) 1
+     ghost_map_auth_frac (ln_help γ) 1
        (∅ : gmap nat (gname * SailStdpp.Values.mword 32)) ∗
      (* ...and THE ERA'S SYNC TOKEN, the application's opaque slot of the
         fixed record ([RiscvPtsto.riscv_sync_tok]).  Its birth is the

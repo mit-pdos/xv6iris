@@ -1435,7 +1435,7 @@ Section ProofMain.
        cell's value here, the payload's tie founded (ni-ticks-ledger.md D2) *)
     tick_cnt 0 -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     (* IT HANDS OUT THE WRITTEN CELL AND THE GHOST QUARTER, NOT [intr_res],
        and that is an ORDERING fact about main rather than a preference: the
        handler contract closes over [devintr_caps] (SpecKernelvec.v), whose
@@ -1448,7 +1448,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
         is_tickslock γtl -∗
         stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+        ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -1767,7 +1767,7 @@ Section ProofMain.
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
     (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ghost_map_auth_frac (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) -∗

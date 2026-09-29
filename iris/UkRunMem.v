@@ -90,7 +90,7 @@ Proof.
   assert (Hs : bv_unsigned (sign_extend' 64 imm : mword 64)
                = bv_wrap 64 (bv_signed imm)).
   { cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-         to_word get_word MachineWord.MachineWord.sign_extend].
+         MachineWord.MachineWord.sign_extend].
     apply bv_sign_extend_unsigned. }
   rewrite Hs moi64_unsigned.
   unfold bv_wrap. rewrite !Zmod64.

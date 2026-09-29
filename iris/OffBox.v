@@ -432,9 +432,9 @@ Section OffBox.
   Lemma off_publish_park `{CID : RiscvLang.CpuId} on i k γ (γo : gname) (ξ : CtxId) (E : coPset) :
     ↑(offBoxN .@ k) ⊆ E ->
     CtxBox.stamps_auth (X := unit) γ ∅ -∗
-    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) 1 0%nat -∗
-    ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
-    ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
+    ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γ) (DfracOwn 1) 0%nat -∗
+    ghost_var_frac (bx_slotd γ) 1 (inhabitant : slot_reg nat unit) -∗
+    ghost_var_frac (bx_slotp γ) 1 (inhabitant : l2_reg nat) -∗
     own_context ξ -∗
     off_resident (XI := ξ) γo k -∗
     off_rows on i ξ ={E}=∗

@@ -101,9 +101,9 @@ Lemma zbound_dec (P : Z -> Prop) `{HP : forall j : Z, Decision (P j)} (n : Z) :
 Proof.
   destruct (decide (Forall P (seqZ 0 n))) as [Hf | Hf].
   - left. intros j Hj. rewrite Forall_forall in Hf. apply Hf.
-    rewrite <- elem_of_list_In. apply elem_of_seqZ. lia.
+    rewrite <- list_elem_of_In. apply elem_of_seqZ. lia.
   - right. intros H. apply Hf. rewrite Forall_forall. intros j Hj.
-    rewrite <- elem_of_list_In in Hj. apply elem_of_seqZ in Hj. apply H. lia.
+    rewrite <- list_elem_of_In in Hj. apply elem_of_seqZ in Hj. apply H. lia.
 Defined.
 
 Lemma nbound_dec (P : nat -> Prop) `{HP : forall j : nat, Decision (P j)} (k : nat) :
@@ -111,9 +111,9 @@ Lemma nbound_dec (P : nat -> Prop) `{HP : forall j : nat, Decision (P j)} (k : n
 Proof.
   destruct (decide (Forall P (seq 0 k))) as [Hf | Hf].
   - left. intros j Hj. rewrite Forall_forall in Hf. apply Hf.
-    rewrite <- elem_of_list_In. apply elem_of_seq. lia.
+    rewrite <- list_elem_of_In. apply elem_of_seq. lia.
   - right. intros H. apply Hf. rewrite Forall_forall. intros j Hj.
-    rewrite <- elem_of_list_In in Hj. apply elem_of_seq in Hj. apply H. lia.
+    rewrite <- list_elem_of_In in Hj. apply elem_of_seq in Hj. apply H. lia.
 Defined.
 
 (* "the image has a byte here" and "the image has a NON-NUL byte here" --
@@ -793,10 +793,10 @@ Proof.
   - left. intros j Hj.
     rewrite Forall_forall in Hf.
     destruct (Hf j) as [b Hb];
-      [ rewrite <- elem_of_list_In; apply elem_of_seqZ; lia | ].
+      [ rewrite <- list_elem_of_In; apply elem_of_seqZ; lia | ].
     exists b. exact Hb.
   - right. intros H. apply Hf. rewrite Forall_forall. intros j Hj.
-    rewrite <- elem_of_list_In in Hj. apply elem_of_seqZ in Hj.
+    rewrite <- list_elem_of_In in Hj. apply elem_of_seqZ in Hj.
     destruct (H j ltac:(lia)) as [b Hb]. exists b. exact Hb.
 Defined.
 
@@ -879,7 +879,6 @@ Proof.
   split.
   - constructor; try (rewrite !uint_unsigned; assumption); try lia.
     + rewrite uint_unsigned. rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hal.
-    + rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hn1r.
     + rewrite uint_unsigned. rewrite Z.rem_mod_nonneg; [ | lia | lia ]. lia.
     + rewrite uint_unsigned. lia.
     + intros Hp. destruct (Hleaf ltac:(lia)) as (q & Hq & Hw). exists q. split; [ | exact Hw ].
@@ -902,7 +901,6 @@ Proof.
   - constructor; try lia.
     + rewrite uint_unsigned, Hlow. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
       rewrite Zminus_mod, Hal, Hn1r. reflexivity.
-    + rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hn2r.
     + rewrite uint_unsigned, Hlow. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
       replace (bv_unsigned sp0 - n1 - n2) with (bv_unsigned sp0 - (n1 + n2)) by lia. lia.
     + rewrite uint_unsigned, Hlow. lia.

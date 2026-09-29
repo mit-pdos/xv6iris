@@ -284,10 +284,10 @@ Lemma file_write_premises_sat (i : Z) (bs0 bsk : list (bv 8)) :
   /\ Z.of_nat (length bsk) = wchunk_at (Z.of_nat (length bsk)) 0.
 Proof.
   intros Hne Hcap av. split_and!.
-  - rewrite /astep /aents /av lookup_insert /= /anode_ents /=.
-    by rewrite lookup_singleton.
+  - rewrite /astep /aents /av lookup_insert_eq /= /anode_ents /=.
+    by rewrite lookup_singleton_eq.
   - apply arow_at_of_Some; [ done |].
-    rewrite /av lookup_insert_ne; [| exact (not_eq_sym Hne)]. by rewrite lookup_singleton.
+    rewrite /av lookup_insert_ne; [| exact (not_eq_sym Hne)]. by rewrite lookup_singleton_eq.
   - reflexivity.
   - rewrite /wchunk_at /=. lia.
 Qed.
@@ -322,7 +322,7 @@ Section FileWrite.
            writer's own line, and the writer holds the round position's
            half at its length -- what a move of the line's file hands the
            claim's sync part ([AppFile.sync_redir]) *)
-        ∗ ⌜stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws N)⌝ ∗ fpos r (length ls))
+        ∗ ⌜stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws N)⌝ ∗ fpos r (length ls))
      ∨ file_taint c)%I.
 
   (* the tainted fire's step, [TreeMove.tree_app_step_taint]'s twin *)
@@ -344,8 +344,8 @@ Section FileWrite.
       (s : dst) (I : gmap Z fs_node) :
     file_app = MkAppcfg file_names (file_pred c) r ->
     app_inv γfs -∗ fdeed r s -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗ fdeed r s ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗ fdeed r s ∗
       ((⌜f_ok (abs_view I) s⌝ ∗ f_typed c s) ∨ file_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv Hd Hka".
@@ -395,13 +395,13 @@ Section FileWrite.
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
     i <> SECC_INO -> i <> SYNC_INO ->
     app_inv γfs -∗ file_wq c r N s i ws sel off -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step i I (delta_write i offk bs (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_write i offk bs (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          file_wq c r N s i ws (sel ++ [jx]) (off + length bs)).
   Proof using .
     intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7. subst offk.
@@ -425,7 +425,7 @@ Section FileWrite.
       rewrite /file_wq. by iRight. }
     (* THE EXACT ARM: the deed's content at [N] IS the row the fire is at *)
     assert (Hs0N : s0 !! N = Some (i, subseq (echo_chunks ws) sel))
-      by (rewrite /s0; apply lookup_insert).
+      by (rewrite /s0; apply lookup_insert_eq).
     destruct Hpre as (Hrow & Hpos & Hle & Hcap).
     destruct (f_ok_pin _ s0 N i _ Hok Hs0N) as (Hst0 & Hrow0).
     pose proof (arow_at_pinned (abs_view I) i _ _ Hrow Hrow0) as Hab.
@@ -441,7 +441,7 @@ Section FileWrite.
       by exact (sel_ok_snoc _ sel jx Hsel Hjx Hlt).
     set (s1 := <[N := (i, subseq (echo_chunks ws) (sel ++ [jx]))]> s).
     assert (Hs01 : <[N := (i, subseq (echo_chunks ws) (sel ++ [jx]))]> s0 = s1)
-      by (rewrite /s0 /s1; apply insert_insert).
+      by (rewrite /s0 /s1; apply insert_insert_eq).
     (* the step's own obligations: the write at [N]'s own inum, every
        other file carried by the map's inum distinctness *)
     assert (Hstep : f_ok (abs_view I) s0 -> f_ok (delta_write i off bs (abs_view I)) s1).
@@ -461,13 +461,13 @@ Section FileWrite.
                 Hstep with "Hd Hty' [Hq1]").
       rewrite /sync_redir. iExists ls, ws, N, (sel ++ [jx]), (length ls).
       iFrame "Hlb Hq1". iPureIntro. split_and!; [exact Hlast | exact Hselok | reflexivity |].
-      rewrite /s0 /s1 !dst_content_insert insert_insert. reflexivity. }
+      rewrite /s0 /s1 !dst_content_insert insert_insert_eq. reflexivity. }
     (* PHASE 2 *)
     iIntros (I') "%Hav Hka'".
     assert (Hokpost : f_ok (abs_view I') s1) by (rewrite Hav; exact (Hstep Hok)).
     assert (Hne : s0 <> s1).
     { intros Hc. apply (f_equal (fun m : dst => m !! N)) in Hc.
-      rewrite /s0 /s1 !lookup_insert in Hc. injection Hc as Hc. rewrite Hsnoc in Hc.
+      rewrite /s0 /s1 !lookup_insert_eq in Hc. injection Hc as Hc. rewrite Hsnoc in Hc.
       assert (Hl : length (subseq (echo_chunks ws) sel)
                    = length (subseq (echo_chunks ws) sel ++ bs))
         by (by rewrite -Hc).
@@ -521,14 +521,14 @@ Section FileWrite.
           [SpecFilewrite.filewrite_in] can relay off
           [FdPark.off_supply_of_st_at_eq]'s tie. *)
        ⌜off = off0⌝ -∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I -∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I -∗
        off_link γo (Z.of_nat off) ={appE}=∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
        app_step i I (delta_write i off bs (abs_view I)) ∗
        (∀ I' : gmap Z fs_node,
           ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+          ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+          ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
           (* the node's own answer, verbatim from [awrite_full_at]: the
              half comes back UNMOVED or ADVANCED BY THE CHUNK, and this
              cursor proves the first ([OffGv.off_ret_keep]) until it holds
@@ -712,7 +712,7 @@ Section FileWrite.
       iIntros (I') "%Hav Hka'". iModIntro. iFrame "Hka'".
       iSplitL "Hk"; [ by iApply off_link_of | ].
       iApply (file_cur_taint with "HTf Hu"). }
-    destruct (f_ok_pin _ _ N i _ Hok (lookup_insert _ _ _)) as [Hnode _].
+    destruct (f_ok_pin _ _ N i _ Hok (lookup_insert_eq _ _ _)) as [Hnode _].
     (* the cursor goes back together for the phase lemma *)
     iAssert (file_wq c r N s i ws sel off) with "[Hd Htk Hpos]" as "Hq".
     { rewrite /file_wq. iLeft. iExists ls. iFrame "Hd Htk Hlb Hpos".

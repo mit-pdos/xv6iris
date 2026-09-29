@@ -692,7 +692,7 @@ Section union_out.
       rewrite (lm_upto_bs_ext U csr s0 (bodies_of (ins seg)) (bodies_of J) i
                  ltac:(intros j Hj; apply Hbod; lia)).
       apply lm_upto_cs_ext. intros j Hj. rewrite Hcsi; [| lia].
-      rewrite Hcs'e !list_lookup_total_alt lookup_take; [reflexivity | exact Hj]. }
+      rewrite Hcs'e !list_lookup_total_alt lookup_take_lt; [reflexivity | exact Hj]. }
     iRight. iExists s0, vf, (Some (S i, lm_upto U csr s0 (bodies_of (ins seg)) i)).
     iFrame "Hty Hfp Hlb". iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iRight. iExists J, (lm_upto U csr s0 (bodies_of (ins seg)) i), L.
@@ -954,7 +954,7 @@ Section union_out.
   (* THE SYNC REGISTRY'S AUTHORITY (sync SY3-A3bc): eras [0 .. obs_boots h]
      registered *)
   Definition union_reg (h : list mobs) : iProp Σ :=
-    (∃ R : gmap nat gname, ghost_map_auth (ff_reg (fgn_cl gf)) 1 R
+    (∃ R : gmap nat gname, ghost_map_auth_frac (ff_reg (fgn_cl gf)) 1 R
        ∗ ⌜forall k : nat, k ∈ dom R <-> (k <= obs_boots h)%nat⌝)%I.
 
   (* THE FLOOR (sync SY3-A4, the owner's ruling): a lower bound of the
@@ -981,7 +981,7 @@ Section union_out.
   Proof using . rewrite /union_base. apply _. Qed.
 
   Definition union_led (h : list mobs) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint (fgn_echo gf)) 1
+    (mono_nat_auth_own_frac (eg_taint (fgn_echo gf)) 1
        (if decide (lm_disc U h) then 0%nat else 1%nat)
      ∗ pin_map (fgn_echo gf) h
      ∗ f0_map gf h
@@ -996,8 +996,8 @@ Section union_out.
   (* the birth's yield: the TRACE slot's part -- the registry at era 0 and
      the era-0 floor beside the file's and the byte ledger's *)
   Definition union_cl_all : iProp Σ :=
-    (file_cl_all gf ∗ ghost_map_auth (ugn_pera ug) 1 (∅ : gmap nat pipe_era)
-     ∗ (∃ γ0 : gname, ghost_map_auth (ff_reg (fgn_cl gf)) 1 {[0%nat := γ0]})
+    (file_cl_all gf ∗ ghost_map_auth_frac (ugn_pera ug) 1 (∅ : gmap nat pipe_era)
+     ∗ (∃ γ0 : gname, ghost_map_auth_frac (ff_reg (fgn_cl gf)) 1 {[0%nat := γ0]})
      ∗ sl_lb (ff_hist (fgn_cl gf)) [])%I.
 
   (* ...and the CRASH slot's part: what era 0's durable copy is founded
@@ -1397,7 +1397,7 @@ Section union_out.
     { iDestruct "Hphi" as (W) "[%Hb _]". iPureIntro.
       exact (union_phi_sync_of_body h W Hb). }
     rewrite /file_taint /echo_taint.
-    iDestruct (mono_nat_lb_own_valid with "Hcnt HT'") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hcnt HT'") as %[_ Hle].
     iPureIntro. rewrite /union_phi_sync. intros Hd. exfalso.
     rewrite decide_True in Hle; [| exact Hd]. lia.
   Qed.

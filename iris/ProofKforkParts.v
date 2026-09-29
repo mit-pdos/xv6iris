@@ -165,7 +165,7 @@ Lemma kfk_vpn_run_elem (vpn0 vpn : mword 27) (k : nat) :
 Proof.
   rewrite /vpn_run. intro Hin.
   apply elem_of_list_to_set in Hin.
-  apply elem_of_list_fmap in Hin as (i & -> & Hi).
+  apply list_elem_of_fmap in Hin as (i & -> & Hi).
   apply elem_of_seq in Hi. exists i. split; [lia | reflexivity].
 Qed.
 

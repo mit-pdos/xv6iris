@@ -262,10 +262,10 @@ Lemma zext32_unsigned (w : mword 32) :
 Proof.
   unfold zero_extend'.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       
+       autocast].
   cbn.
-  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend.
   erewrite bv_zero_extend_unsigned by (cbn; lia).
   reflexivity.
 Qed.

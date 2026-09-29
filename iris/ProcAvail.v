@@ -62,7 +62,7 @@
         [procs_avail_seal] converts [Some n ==∗ None] and there is no way
         back.
 
-   Unlike [KallocInv] this needs no one-shot and no count ghost_var: the
+   Unlike [KallocInv] this needs no one-shot and no count ghost_var_frac: the
    count lives in the caller's own authority, and sealing IS the move of
    that authority into the invariant.  Nothing ever re-enters the counted
    regime, which is what makes the simpler shape sound. *)

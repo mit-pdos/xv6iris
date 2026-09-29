@@ -308,7 +308,7 @@ Section DiskAvail.
       apply (read_bytes_spec pin A 2 w Hr j). lia. }
     assert (Hd : rm ∪ (pin ∖ rm) = pin) by (apply map_difference_union; exact Hsub).
     assert (Hdj : rm ##ₘ pin ∖ rm)
-      by (apply (map_disjoint_difference_r pin rm rm); reflexivity).
+      by (apply (map_disjoint_difference_r1 pin rm rm); reflexivity).
     assert (Heq : hcell_map ξ pin ⊣⊢ hcell_map ξ rm ∗ hcell_map ξ (pin ∖ rm)).
     { rewrite -(hcell_map_union ξ rm (pin ∖ rm) Hdj) Hd. reflexivity. }
     iIntros "Hpin". iEval (rewrite Heq) in "Hpin". iExact "Hpin".
@@ -327,7 +327,7 @@ Section DiskAvail.
       apply (read_bytes_spec pin A 2 w Hr j). lia. }
     assert (Hd : rm ∪ (pin ∖ rm) = pin) by (apply map_difference_union; exact Hsub).
     assert (Hdj : rm ##ₘ pin ∖ rm)
-      by (apply (map_disjoint_difference_r pin rm rm); reflexivity).
+      by (apply (map_disjoint_difference_r1 pin rm rm); reflexivity).
     assert (Heq : half_map pin ⊣⊢ half_map rm ∗ half_map (pin ∖ rm)).
     { rewrite -(half_map_union rm (pin ∖ rm) Hdj) Hd. reflexivity. }
     iIntros "Hpin". iEval (rewrite Heq) in "Hpin". iExact "Hpin".

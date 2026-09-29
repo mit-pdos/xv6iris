@@ -317,7 +317,7 @@ Lemma sp_ofile_restore (V : pprivate) (fd : nat) (x : mword 64) :
 Proof.
   intro Hlk. unfold upd_ofile.
   cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
-  rewrite list_insert_insert. rewrite (list_insert_id _ _ _ Hlk). by destruct V.
+  rewrite list_insert_insert_eq. rewrite (list_insert_id _ _ _ Hlk). by destruct V.
 Qed.
 
 (* copyout's length argument, and the page-table descriptor riding along the
@@ -361,8 +361,8 @@ Lemma sp_restore_upt (V : pprivate) (P' : uptd) (fd0 fd1 : nat) (x0 x1 : mword 6
 Proof.
   intros Hne H0 H1. unfold upd_ofile, upd_upt.
   cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
-  rewrite (list_insert_commute _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
-  rewrite !list_insert_insert.
+  rewrite (list_insert_insert_ne _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
+  rewrite !list_insert_insert_eq.
   rewrite (list_insert_id _ _ _ H0) (list_insert_id _ _ _ H1).
   by destruct V.
 Qed.
@@ -401,8 +401,8 @@ Lemma sp_ofile_restore2 (V : pprivate) (fd0 fd1 : nat) (x0 x1 : mword 64) :
 Proof.
   intros Hne H0 H1. unfold upd_ofile.
   cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
-  rewrite (list_insert_commute _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
-  rewrite !list_insert_insert.
+  rewrite (list_insert_insert_ne _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
+  rewrite !list_insert_insert_eq.
   rewrite (list_insert_id _ _ _ H0) (list_insert_id _ _ _ H1).
   by destruct V.
 Qed.
@@ -1276,8 +1276,8 @@ Section ProofSysPipe.
     (* ================================================================= *)
     (*  THE EPILOGUE, taken before any branch: every exit reaches +0xda.  *)
     (* ================================================================= *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hb8") as %Hal8.
-    iDestruct (ctx_word_pointsto_split4 with "Hb8") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hb8") as %Hal8.
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hb8") as "[Hlo Hhi]".
     (* BOTH BLOCK CONTINUATIONS MOVE WITH sys_pipe's OWN CROSSING, to the
        literal [true]: every path that reaches them has crossed pipealloc or
        [sp_close2], whose crossings are [true] and carry no chain fact at
@@ -1326,7 +1326,7 @@ Section ProofSysPipe.
       iIntros (CIDE HsE mj P' d bs res) "(%Hjsp & %Hja5 & %Hjthr) %Hext %Hd8 Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
       iDestruct "Hrest" as (w5 w6 w7) "(Hb5 & Hb6 & Hb7)".
       iDestruct "Hslot8" as (lo hi) "[Hlo Hhi]".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
       iApply (sp_epi (CID0 := CIDE) m mj av res sp0 ra0 s00 s10 u4 w5 w6 w7
                 (word_of_words lo hi) p b
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr
@@ -2036,7 +2036,7 @@ Section ProofSysPipe.
     assert (Hfree0 : pv_ofile (us_V U) !! fd0 = Some (zero_reg : mword 64))
       by exact (fd_frees_head (pv_ofile (us_V U)) fd0 l0 Hfr0).
     assert (Hlk0 : pv_ofile (upd_ofile (us_V U) fd0 (fnode k0)) !! fd0 = Some (fnode k0)).
-    { cbn [upd_ofile pv_ofile pv_fdg]. by apply list_lookup_insert. }
+    { cbn [upd_ofile pv_ofile pv_fdg]. by apply list_lookup_insert_eq. }
     rewrite /fdalloc_post. iDestruct "Hpost2" as "[Hf2 | Hs2]".
     { (* ===== no second descriptor: undo the first, close both ===== *)
       iDestruct "Hf2" as "([%Hr2 %Hnone2] & Hof)".
@@ -2189,10 +2189,10 @@ Section ProofSysPipe.
         [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
       (* THE TAIL'S RE-NULL IS THE IDENTITY ON THE TABLE.  It retyped fd0
          back to [FdClosed] over its own open, so the two inserts collapse
-         ([list_insert_insert]) and the survivor writes [FdClosed] over a
+         ([list_insert_insert_eq]) and the survivor writes [FdClosed] over a
          row that was already closed -- which is what [Hlkstq0] says, off
          the free slot's own authority. *)
-      rewrite list_insert_insert (list_insert_id sts fd0 FdClosed Hlkstq0).
+      rewrite list_insert_insert_eq (list_insert_id sts fd0 FdClosed Hlkstq0).
       iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* ===== both descriptors are taken: copy them out ===== *)
     iDestruct "Hs2" as (fd1 l1) "([%Hr2 %Hfr1] & Hof & Hu1 & Hauth1)".
@@ -2292,12 +2292,12 @@ Section ProofSysPipe.
                     = Some (fnode k0)).
     { cbn [upd_ofile pv_ofile pv_fdg].
       rewrite list_lookup_insert_ne; [| congruence].
-      by apply list_lookup_insert. }
+      by apply list_lookup_insert_eq. }
     assert (Hlk1' : pv_ofile (upd_ofile (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1))
                                 fd0 (zero_reg : mword 64)) !! fd1 = Some (fnode k1)).
     { cbn [upd_ofile pv_ofile pv_fdg].
       rewrite list_lookup_insert_ne; [| congruence].
-      apply list_lookup_insert. by rewrite length_insert. }
+      apply list_lookup_insert_eq. by rewrite length_insert. }
     (* the copy accessor, taken ONCE and closed once *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
     (* [Hpt] STAYS memory-indexed -- [Hpback] already accepts [proc_ptm] on
@@ -2496,7 +2496,7 @@ Section ProofSysPipe.
     (* the window's base is [A6]'s a2, i.e. [v] (HA6a2) *)
     rewrite HA6a2 in Hret1.
     iEval (rewrite HA6a3) in "Hbufhi".
-    iDestruct (ctx_word4_pointsto_intro _ _ _ _ Halhi with "Hbufhi") as "Hhi".
+    iDestruct (ctx_word4_pointsto_intro (KTR := KT1) _ _ _ _ Halhi with "Hbufhi") as "Hhi".
     assert (Hpc62 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x62))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc62) in "Hpc".
@@ -2579,7 +2579,7 @@ Section ProofSysPipe.
                        = Some (fnode k1)).
       { cbn [upd_ofile upd_upt pv_ofile pv_fdg].
         rewrite list_lookup_insert_ne; [| congruence].
-        apply list_lookup_insert. by rewrite length_insert. }
+        apply list_lookup_insert_eq. by rewrite length_insert. }
       (* +0x80 lw a5,-60(s0) -- reload fd0 *)
       assert (Ha0h : add_vec (rget Mt Rs0) (sign_extend' 64 (mword_of_int 0xfc4 : mword 12))
                      = pa_add (pa_stk sp0 8) 4) by (rgne; rewrite Hts0; apply sp_addr_fd0).
@@ -2788,11 +2788,11 @@ Section ProofSysPipe.
       (* BOTH re-nulls are the identity on the table.  The two [FdClosed]
          writes sit outside BOTH opens, so each has to be commuted past the
          other descriptor's open before it meets its own ([fd0 <> fd1]);
-         then each pair collapses ([list_insert_insert]) and the survivors
+         then each pair collapses ([list_insert_insert_eq]) and the survivors
          write [FdClosed] over rows that were free, hence already closed. *)
-      rewrite (list_insert_commute _ fd0 fd1 FdClosed
+      rewrite (list_insert_insert_ne _ fd0 fd1 FdClosed
                  (FdOpen false true (FdPipe γp)) Hne01)
-              !list_insert_insert
+              !list_insert_insert_eq
               (list_insert_id sts fd0 FdClosed Hlkstq0)
               (list_insert_id sts fd1 FdClosed Hst1c).
       iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
@@ -3079,7 +3079,7 @@ Section ProofSysPipe.
     (* the window's base is [C7]'s a2, i.e. [v+4] (HC7a2) *)
     rewrite HC7a2 in Hret2.
     iEval (rewrite HC7a3) in "Hbuflo".
-    iDestruct (ctx_word4_pointsto_intro _ _ _ _ Hallo with "Hbuflo") as "Hlo".
+    iDestruct (ctx_word4_pointsto_intro (KTR := KT1) _ _ _ _ Hallo with "Hbuflo") as "Hlo".
     assert (Hpc7a : ret_pc (C7 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x7a))
       by (rewrite HC7ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc7a) in "Hpc".

@@ -1022,7 +1022,7 @@ Section line_model.
     { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
         [reflexivity | rewrite /nlines in Hj; lia]. }
     assert (Htk : forall j, j < nlines I -> take (nlines I) cs !!! j = cs !!! j).
-    { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
+    { intros j Hj. rewrite !list_lookup_total_alt lookup_take_lt; [done | lia]. }
     split; [rewrite length_take; lia |].
     intros i Hi.
     rewrite /lm_at (Htk i Hi) -(Hbod i Hi).
@@ -1171,7 +1171,7 @@ Section line_model.
       apply elem_of_app in Hin as [Hin | Hin].
       - destruct (join_elem_of (bodies_of I) b Hin) as [-> | (l & Hl & Hbl)];
           [by right | left].
-        apply elem_of_list_lookup in Hl as [k Hk].
+        apply list_elem_of_lookup in Hl as [k Hk].
         pose proof (lmb_body_bytes B l (lm_disc_input_body I k l Hd Hk)) as Hfb.
         exact (proj1 (Forall_forall _ _) Hfb b Hbl).
       - left. exact (proj1 (Forall_forall _ _) Hr b Hin).

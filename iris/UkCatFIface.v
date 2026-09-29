@@ -209,13 +209,13 @@ Section cif_ok_lemmas.
   Proof using .
     intros H3 H4 Hnone. split.
     - intros d'. rewrite dom_insert_L elem_of_union elem_of_singleton. intros [-> | Hd'].
-      + left. exists (Z.of_nat k). apply lookup_insert.
+      + left. exists (Z.of_nat k). apply lookup_insert_eq.
       + destruct (H3 d' Hd') as [(fd & Hfd) | HD]; [left | by right].
         exists fd. rewrite lookup_insert_ne; [exact Hfd |]. intros Heq.
         rewrite <- Heq in Hfd. congruence.
     - intros fd d'. rewrite dom_insert_L elem_of_union elem_of_singleton.
       destruct (decide (fd = Z.of_nat k)) as [-> |].
-      + rewrite lookup_insert. intros [= <-]. by left.
+      + rewrite lookup_insert_eq. intros [= <-]. by left.
       + rewrite lookup_insert_ne; [| congruence]. intros Hfd. right. exact (H4 fd d' Hfd).
   Qed.
 
@@ -233,7 +233,7 @@ Section cif_ok_lemmas.
       + intros _. lia.
       + rewrite lookup_insert_ne; [| congruence]. apply H1.
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> |].
-      + rewrite lookup_insert. intros [= <-]. rewrite lookup_insert. simpl. lia.
+      + rewrite lookup_insert_eq. intros [= <-]. rewrite lookup_insert_eq. simpl. lia.
       + rewrite (lookup_insert_ne fdm); [| congruence]. intros Hfd.
         rewrite (lookup_insert_ne vs); [| intros ->; exact (Hfr fd Hfd)]. exact (H2 fd d' Hfd).
     - intros fd fd' d' s' nm' i' γo'.
@@ -246,14 +246,14 @@ Section cif_ok_lemmas.
       + rewrite (lookup_insert_ne vs); [| congruence].
         intros Ha Hb.
         destruct (decide (fd = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
+          [rewrite lookup_insert_eq in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
         destruct (decide (fd' = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
+          [rewrite lookup_insert_eq in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
         apply (H5 fd fd' d' s' nm' i' γo' Ha Hb).
     - intros dk Hdk. rewrite lookup_insert_ne; [exact (H6 dk Hdk) |].
-      intros Hq. apply HD. rewrite Hq. by apply elem_of_list_fmap_1.
+      intros Hq. apply HD. rewrite Hq. by apply list_elem_of_fmap_2.
     - intros d' s' nm' i' γo'. destruct (decide (d' = d)) as [-> |].
-      + rewrite lookup_insert. intros [= _ <- _ _]. exact Hu.
+      + rewrite lookup_insert_eq. intros [= _ <- _ _]. exact Hu.
       + rewrite lookup_insert_ne; [| congruence]. apply H7.
   Qed.
 
@@ -315,8 +315,8 @@ Section cif_ok_lemmas.
       + intros _. unfold NSTD, NOFILE in *. lia.
       + rewrite lookup_insert_ne; [| congruence]. apply H1.
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> | Hne].
-      + rewrite lookup_insert. intros [= <-]. rewrite lookup_insert. simpl.
-        split; [unfold NSTD in *; lia |]. rewrite Nat2Z.id. apply list_lookup_insert. exact Hkl.
+      + rewrite lookup_insert_eq. intros [= <-]. rewrite lookup_insert_eq. simpl.
+        split; [unfold NSTD in *; lia |]. rewrite Nat2Z.id. apply list_lookup_insert_eq. exact Hkl.
       + rewrite (lookup_insert_ne fdm); [| congruence]. intros Hfd.
         rewrite (lookup_insert_ne vs); [| intros ->; exact (Hfr fd Hfd)]. exact (H2 fd d' Hfd).
     - intros fd fd' d' s' nm' i' γo'.
@@ -329,14 +329,14 @@ Section cif_ok_lemmas.
       + rewrite (lookup_insert_ne vs); [| congruence].
         intros Ha Hb.
         destruct (decide (fd = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
+          [rewrite lookup_insert_eq in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
         destruct (decide (fd' = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
+          [rewrite lookup_insert_eq in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
         apply (H5 fd fd' d' s' nm' i' γo' Ha Hb).
     - intros dk Hdk. rewrite lookup_insert_ne; [exact (H6 dk Hdk) |].
-      intros Hq. apply HD. rewrite Hq. by apply elem_of_list_fmap_1.
+      intros Hq. apply HD. rewrite Hq. by apply list_elem_of_fmap_2.
     - intros d' s' nm' i' γo'. destruct (decide (d' = d)) as [-> |].
-      + rewrite lookup_insert. intros [= _ <- _ _]. exact Hu.
+      + rewrite lookup_insert_eq. intros [= _ <- _ _]. exact Hu.
       + rewrite lookup_insert_ne; [| congruence]. apply H7.
   Qed.
 
@@ -370,7 +370,7 @@ Section cif_ok_lemmas.
       apply lookup_delete_Some in Hv as [_ Hv].
       exact (H5 fa fb d' s' nm' i' γo' Ha Hb Hv).
     - intros dk Hdk. rewrite lookup_delete_ne; [exact (H6 dk Hdk) |].
-      intros Hq. apply HD. rewrite Hq. by apply elem_of_list_fmap_1.
+      intros Hq. apply HD. rewrite Hq. by apply list_elem_of_fmap_2.
     - intros d' s' nm' i' γo' Hv. apply lookup_delete_Some in Hv as [_ Hv]. exact (H7 _ _ _ _ _ Hv).
   Qed.
 
@@ -499,9 +499,9 @@ Section UkCatFIface.
   Proof using .
     intros Ha.
     iIntros "[(%Hp & #Hinv & Hc & Hm & #Hkit & Hdep) | (%c & %Hw & #Hinv & %Hp & %Hst & Hc & Hm)]".
-    - destruct Hp as (-> & Hs & Hw). apply elem_of_list_singleton in Ha as ->.
+    - destruct Hp as (-> & Hs & Hw). apply list_elem_of_singleton in Ha as ->.
       iLeft. iFrame "Hinv Hc Hm Hkit Hdep". iPureIntro. split_and!; done.
-    - destruct Hp as ([Hc0 Hc1] & -> & Hs). apply elem_of_list_singleton in Ha as ->.
+    - destruct Hp as ([Hc0 Hc1] & -> & Hs). apply list_elem_of_singleton in Ha as ->.
       iRight. iExists c. rewrite /cif_conF. iFrame "Hinv Hc Hm". iPureIntro. split_and!; done.
   Qed.
 
@@ -544,7 +544,7 @@ Section UkCatFIface.
     [] ∈ alts -> cif_conF w x c alts -∗ pns_wfin γc γm w (Some x).
   Proof using .
     intros Hn. iIntros "(_ & _ & %Hp & _ & Hc & Hm)".
-    destruct Hp as ([_ HcS] & -> & _). apply elem_of_list_singleton in Hn.
+    destruct Hp as ([_ HcS] & -> & _). apply list_elem_of_singleton in Hn.
     assert (c = length x) as ->.
     { symmetry in Hn. pose proof (pns_drop_nil_le x c Hn). lia. }
     cbn [pns_wfin]. iFrame "Hc Hm".
@@ -704,7 +704,7 @@ Section UkCatFIface.
     iIntros "(#H1 & #H2 & #H3 & #H4 & #Hm)". iFrame "H1 H2 H3 H4".
     destruct (vs !! d) as [kd |] eqn:Hv.
     - iDestruct (big_sepM_delete with "Hm") as "[_ $]". exact Hv.
-    - rewrite delete_notin; [iExact "Hm" | exact Hv].
+    - rewrite delete_id; [iExact "Hm" | exact Hv].
   Qed.
 
   Lemma cif_env_insert (vs : gmap nat cfdev) (d : nat) (kd : cfdev) :
@@ -898,17 +898,17 @@ Section UkCatFIface.
                         | [(%Hp & (%S & -> & Hpo) & Hcon) | (%Hp & _)]]]".
       - iExists L. iSplitR.
         { iPureIntro. apply elem_of_cons in Ha as [-> | Ha]; [by left |].
-          apply elem_of_list_singleton in Ha as ->. exfalso. apply Hne. by apply prefix_nil_inv. }
+          apply list_elem_of_singleton in Ha as ->. exfalso. apply Hne. by apply prefix_nil_inv. }
         iSplitL "Hw"; [| iApply (cif_unf_con with "Hu")].
         rewrite /pipe_out. iExists 0%nat. rewrite drop_0 take_0. iFrame "Hw Hlb".
         iPureIntro. split; [reflexivity | exact HL31].
       - destruct Hp as [_ ->]. iExists L. iSplitR.
         { iPureIntro. apply elem_of_cons in Ha as [-> | Ha]; [by left |].
-          apply elem_of_list_singleton in Ha as ->. exfalso. apply Hne. by apply prefix_nil_inv. }
+          apply list_elem_of_singleton in Ha as ->. exfalso. apply Hne. by apply prefix_nil_inv. }
         iFrame "Hcon". rewrite /pipe_out. iExists 0%nat. rewrite drop_0 take_0. iFrame "Hw Hlb".
         iPureIntro. split; [reflexivity | exact HL31].
       - iExists S. iFrame "Hpo Hcon". by iPureIntro.
-      - destruct Hp as [_ ->]. apply elem_of_list_singleton in Ha as ->.
+      - destruct Hp as [_ ->]. apply list_elem_of_singleton in Ha as ->.
         exfalso. apply Hne. by apply prefix_nil_inv. }
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hdq & #He & Hxk)".
     destruct (cif_ok_lookup kds _ _ _ _ _ Hok Hfd) as [kd Hv].
@@ -1005,7 +1005,7 @@ Section UkCatFIface.
       iExists pn, gp, w, A, X. iFrame "Htk". iRight. iRight. iLeft. iFrame "Hpo Hcon". by iPureIntro.
     - destruct Hp as [-> ->].
       iDestruct (cif_conF_shape with "Hcf") as %[Hds Hc0]. subst ds.
-      apply elem_of_list_singleton in Ha as ->.
+      apply list_elem_of_singleton in Ha as ->.
       iDestruct (cif_conF_X with "Hcf") as "Hcx".
       iApply (cons_write N P (HPc := HPc) Hsw (cif_conX w x) (cif_conX_short w x)
                 (cif_conX_sub w x) (cif_conX_step w x)
@@ -1038,7 +1038,7 @@ Section UkCatFIface.
        | subst xs; by apply elem_of_nil in Ha
        | destruct Hp as [-> _]; by apply elem_of_nil in Ha].
     iDestruct "Hu" as "(%Hw0 & #Hinv & [%Hsd %Hsx] & [%HA %HX] & Hc & Hm & _ & Hxs)".
-    destruct (elem_of_list_lookup_1 xs a Ha) as [j Hj].
+    destruct (list_elem_of_lookup_1 xs a Ha) as [j Hj].
     iDestruct (big_sepL_lookup_acc _ _ j a Hj with "Hxs") as "[Hx _]".
     iDestruct "Hx" as "[%Hnil | [#Hkit #Hdw]]".
     { subst a. exfalso. apply Hne. by apply prefix_nil_inv. }
@@ -1361,12 +1361,12 @@ Section UkCatFIface.
         iPureIntro. intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
         * apply elem_of_singleton in Hx as ->. split; [unfold NSTD, NOFILE in *; lia |].
           left. split; [unfold NSTD in *; lia |]. exists (FdOpen rd wr t).
-          rewrite Nat2Z.id list_lookup_insert; [split; [done | discriminate] | exact Hk0l].
+          rewrite Nat2Z.id list_lookup_insert_eq; [split; [done | discriminate] | exact Hk0l].
         * destruct (Hho x Hx) as [Hb Hc]. split; [exact Hb |].
           destruct Hc as [(Hs' & st' & Hl' & Hne') | Hc]; [left | by right].
           split; [exact Hs' |].
           destruct (decide (Z.to_nat x = k0)) as [-> | Hne].
-          -- exists (FdOpen rd wr t). rewrite list_lookup_insert; [split; [done | discriminate] |].
+          -- exists (FdOpen rd wr t). rewrite list_lookup_insert_eq; [split; [done | discriminate] |].
              exact Hk0l.
           -- exists st'. rewrite list_lookup_insert_ne; [split; [exact Hl' | exact Hne'] |].
              congruence.
@@ -1377,11 +1377,11 @@ Section UkCatFIface.
         iSplit.
         * iPureIntro. intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
           -- apply elem_of_singleton in Hx as ->. split; [lia |]. right.
-             split; [lia |]. rewrite lookup_insert. by eexists.
+             split; [lia |]. rewrite lookup_insert_eq. by eexists.
           -- destruct (Hho x Hx) as [Hb Hc]. split; [exact Hb |].
              destruct Hc as [Hc | (Hs & Hsm)]; [by left | right]. split; [exact Hs |].
              destruct (decide (x = Z.of_nat fd)) as [-> | Hne];
-               [rewrite lookup_insert; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
+               [rewrite lookup_insert_eq; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
         * rewrite big_sepM_insert; [| exact Hfr]. rewrite Nat2Z.id. iFrame "Hh Hhs".
     - rewrite Hr fdev_m1 /open_held. case_decide; [lia |].
       rewrite cif_hdls_hm. rewrite /cif_taint /fh_taint. iFrame "Htn Hpay".
@@ -1456,7 +1456,7 @@ Section UkCatFIface.
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
           iSplitL "Hhs".
           { rewrite big_sepM_insert; [| exact Hnb]. iSplitR.
-            { rewrite /cif_hdl lookup_insert. done. }
+            { rewrite /cif_hdl lookup_insert_eq. done. }
             iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
             rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd'). }
           iApply (cif_env_insert vs d _ Hvd with "He"). cbn [cif_pk_inv]. by iPureIntro.
@@ -1486,7 +1486,7 @@ Section UkCatFIface.
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
           iSplitL "Hhs Hh".
           { rewrite big_sepM_insert; [| exact Hnb]. iSplitL "Hh".
-            { rewrite /cif_hdl lookup_insert Nat2Z.id. iExact "Hh". }
+            { rewrite /cif_hdl lookup_insert_eq Nat2Z.id. iExact "Hh". }
             iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
             rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd'). }
           iApply (cif_env_insert vs d _ Hvd with "He"). cbn [cif_pk_inv]. by iPureIntro.
@@ -1668,7 +1668,7 @@ Section UkCatFIface.
     { destruct kd as [[|] nm i γo | pn gp w A X]; cbn [cif_row] in Hrow.
       - by destruct Hrow.
       - exfalso. destruct Hsh as [HD | (fd' & Hin' & Hfd')].
-        + apply elem_of_list_fmap in HD as (dk & -> & Hdk).
+        + apply list_elem_of_fmap in HD as (dk & -> & Hdk).
           destruct (Hkdp dk Hdk) as (pn & gp & w & A & X & Hq).
           pose proof (H6 dk Hdk) as Hw. rewrite Hv Hq in Hw. discriminate Hw.
         + apply elem_of_dom in Hin' as [d'' Hd'']. apply lookup_delete_Some in Hd'' as [Hne _].
@@ -1713,7 +1713,7 @@ Section UkCatFIface.
         iApply (cif_unf_con with "Hu").
       + iModIntro. iLeft. iSplitL "Hw"; [by iRight |].
         iApply (pns_con_drained g M V G v I sR lR TERM TOK dep γc γm w A ds Hdn with "Hcon").
-      + apply elem_of_list_singleton in Hon as <-.
+      + apply list_elem_of_singleton in Hon as <-.
         iMod (pns_lexit_of_lend L TERM dep pn gp with "Hi [Hpo]") as "Hle"; [by iLeft |].
         iModIntro. iLeft. iSplitL "Hle"; [by iLeft |].
         iApply (pns_con_drained g M V G v I sR lR TERM TOK dep γc γm w A ds Hdn with "Hcon").
@@ -1735,10 +1735,10 @@ Section UkCatFIface.
     induction kl as [| dk kl IH]; intros Hall; iIntros "#He Htoks Hdev".
     - by iModIntro.
     - iDestruct "Hdev" as "[Hd Hdev]".
-      destruct (Hall dk (elem_of_list_here _ _)) as [Hv Hdr].
+      destruct (Hall dk (list_elem_of_here _ _)) as [Hv Hdr].
       iMod (cif_dev_final vs dk.1 dk.2 (dv dk.1) Hv Hdr with "He Htoks Hd") as "[Htoks Hf]".
       iMod (IH with "He Htoks Hdev") as "Hfs".
-      { intros dk' Hdk'. apply Hall. by apply elem_of_list_further. }
+      { intros dk' Hdk'. apply Hall. by apply list_elem_of_further. }
       iModIntro. iSplitL "Hf"; [iExact "Hf" | iExact "Hfs"].
   Qed.
 
@@ -1764,7 +1764,7 @@ Section UkCatFIface.
     iApply fupd_wp.
     iMod (cif_finals vs dv kds with "He Htoks Hdev") as "Hfin".
     { intros dk Hdk. split; [exact (Hkd dk Hdk) |]. apply Hdr, Hdp.
-      apply elem_of_list_fmap_1. exact Hdk. }
+      apply list_elem_of_fmap_2. exact Hdk. }
     iDestruct ("Hxk" with "[Hfin Hdq]") as "Hpay"; [iRight; iFrame "Hfin Hdq" |].
     iModIntro.
     iPoseProof (fh_exit_pay N P Hse s with "Hpay") as "Hex".
@@ -1831,10 +1831,10 @@ Section UkCatFIface.
     intros Hk Hw0 Hl1 Hl2 Hu Hfs.
     set (fdm := (<[1 := 0%nat]> {[2 := 0%nat]} : fdmap)).
     set (vs := ({[0%nat := UDProd pn gp w A X]} : gmap nat cfdev)).
-    assert (Hv0 : vs !! 0%nat = Some (UDProd pn gp w A X)) by (rewrite /vs; apply lookup_singleton).
+    assert (Hv0 : vs !! 0%nat = Some (UDProd pn gp w A X)) by (rewrite /vs; apply lookup_singleton_eq).
     assert (Hfdm : forall fd d, fdm !! fd = Some d -> d = 0%nat /\ (fd = 1 \/ fd = 2)).
     { intros fd d. rewrite /fdm. destruct (decide (fd = 1)) as [-> |].
-      - rewrite lookup_insert. intros [= <-]. split; [done | by left].
+      - rewrite lookup_insert_eq. intros [= <-]. split; [done | by left].
       - rewrite lookup_insert_ne; [| done]. rewrite lookup_singleton_Some. intros [<- <-].
         split; [done | by right]. }
     assert (Hok : cif_ok kds fdm l vs).
@@ -1844,12 +1844,12 @@ Section UkCatFIface.
         + left. split; [reflexivity | by exists rb1].
         + right. split; [reflexivity | by exists rb2].
       - intros d. rewrite /vs dom_singleton_L elem_of_singleton.
-        intros ->. left. exists 1. rewrite /fdm. apply lookup_insert.
+        intros ->. left. exists 1. rewrite /fdm. apply lookup_insert_eq.
       - intros fd d Hfd. destruct (Hfdm fd d Hfd) as [-> _].
         rewrite /vs dom_singleton_L. set_solver.
       - intros fd fd' d s nm' i γo _ _ Hv. rewrite /vs lookup_singleton_Some in Hv.
         by destruct Hv as [_ Hq].
-      - intros dk. rewrite Hk elem_of_list_singleton. intros ->. exact Hv0.
+      - intros dk. rewrite Hk list_elem_of_singleton. intros ->. exact Hv0.
       - intros d s nm' i γo Hv. rewrite /vs lookup_singleton_Some in Hv.
         by destruct Hv as [_ Hq]. }
     iIntros "Hstd Hcwd Hpool (#Hinv & Hw & #Hlb & Hu & Hdq & #Hbr & #Hrb & #Hai & #Hcr & Hxk)".
@@ -1872,8 +1872,8 @@ Section UkCatFIface.
       - rewrite /cif_xk Hk. iExact "Hxk". }
     iSplitR.
     { rewrite cif_ei_files /cif_filesr. cbn [catp_env pe_paths pe_files]. iPureIntro. split.
-      - intros p Hp. apply elem_of_list_singleton in Hp as ->. exact Hu.
-      - intros p Hp. apply elem_of_list_singleton in Hp as ->. exact Hfs. }
+      - intros p Hp. apply list_elem_of_singleton in Hp as ->. exact Hu.
+      - intros p Hp. apply list_elem_of_singleton in Hp as ->. exact Hfs. }
     rewrite /dev_res big_sepS_singleton cif_dev_of.
     assert (E0 : pe_dev (catp_env (DProd [L; []] xs ds) files [nm]) 0%nat
                  = DProd [L; []] xs ds) by reflexivity.

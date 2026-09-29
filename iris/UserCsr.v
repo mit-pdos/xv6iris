@@ -659,8 +659,8 @@ Lemma sub114_unsigned (x : mword 12) :
   bv_unsigned (subrange_vec_dec x 11 4) = (bv_unsigned x / 16) mod 256.
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   unfold bv_wrap, bv_modulus.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 4 + 1))) with 256.
@@ -674,8 +674,8 @@ Lemma csrPriv_unsigned (x : mword 12) :
   bv_unsigned (csrPriv x) = (bv_unsigned x / 256) mod 4.
 Proof.
   unfold csrPriv, subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   unfold bv_wrap, bv_modulus.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (9 - 8 + 1))) with 4.
@@ -779,8 +779,8 @@ Lemma sub115_unsigned (x : mword 12) :
   bv_unsigned (subrange_vec_dec x 11 5) = (bv_unsigned x / 32) mod 128.
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   unfold bv_wrap, bv_modulus.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 5 + 1))) with 128.
@@ -1327,8 +1327,8 @@ Lemma csrAccess_unsigned (x : mword 12) :
   bv_unsigned (csrAccess x) = (bv_unsigned x / 1024) mod 4.
 Proof.
   unfold csrAccess, subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   unfold bv_wrap, bv_modulus.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 10 + 1))) with 4.
@@ -1632,8 +1632,8 @@ Lemma sub40_unsigned (x : mword 12) :
   bv_unsigned (subrange_vec_dec x 4 0) = bv_unsigned x mod 32.
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   rewrite Z.shiftr_0_r.
   unfold bv_wrap, bv_modulus.

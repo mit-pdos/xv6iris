@@ -184,7 +184,7 @@ Section ProofSysOpenCreArm.
       (Phio : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
        ⌜cre_pre av d nm ents nl i0 (AFile [])⌝ ∗
        ⌜0 < i0 < 16 * Z.of_nat icfg_nib⌝ ∗
        cur_kept vom P (length (npar_elems pl)) d ∗
@@ -209,7 +209,7 @@ Section ProofSysOpenCreArm.
       (Phiok Phiex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ))
       (pl : list (bv 8)) (i0 : Z) : iProp Σ :=
     (∃ (d : Z) (nm : fname) (av : aview) (ents : gmap fname Z) (nl : nat),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
        ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
        ⌜ents !! nm = Some i0⌝ ∗
        cur_kept vom P (length (npar_elems pl)) d ∗
@@ -304,7 +304,7 @@ Section ProofSysOpenCreArm.
       (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (pl : list (bv 8)) (i0 d : Z) (nm : fname) (av : aview)
       (ents : gmap fname Z) (nl : nat) :
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     cre_pre av d nm ents nl i0 (AFile []) ->
     0 < i0 < 16 * Z.of_nat icfg_nib ->
     P (length (npar_elems pl)) d -∗
@@ -352,7 +352,7 @@ Section ProofSysOpenCreArm.
       (Phit : pfam Σ (aview -> Z -> list (bv 8) -> iProp Σ))
       (pl : list (bv 8)) (i0 d : Z) (nm : fname) (av : aview)
       (ents : gmap fname Z) (nl : nat) :
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     av !! d = Some (MkAnode (ADir ents) nl) ->
     ents !! nm = Some i0 ->
     P (length (npar_elems pl)) d -∗

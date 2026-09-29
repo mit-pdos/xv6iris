@@ -57,15 +57,17 @@ jobs:
       - name: Set up OCaml / opam
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "5.3"
+          ocaml-compiler: "5.3.0"
           opam-repositories: |
-            coq-released: https://coq.inria.fr/opam/released
+            rocq-released: https://rocq-prover.org/opam/released
             default: https://opam.ocaml.org
 
       # Cache the whole built switch (Rocq + Iris + Sail support take many
       # minutes to compile).  Keyed on the OS, compiler, and the pinned package
-      # list — editing .github/coq-deps.txt busts the cache; the restore-keys
-      # let an older switch be reused and reconciled by `opam install` on a miss.
+      # list — editing opam/xv6rocq.export busts the cache.  No restore-keys on
+      # purpose: a miss builds the switch from scratch (~15 min, rare) instead
+      # of asking `opam switch import` to reconcile an older switch in place,
+      # which is the one path we have never exercised.
       #
       # The key is also scoped to runner.name: a project-local opam switch bakes
       # its absolute workspace path into the switch, so it is NOT relocatable.
@@ -78,15 +80,15 @@ jobs:
         uses: actions/cache@v5
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.name }}-opam-5.3-
+          key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('opam/xv6rocq.export') }}
 
-      # Pinned to match the development switch (Rocq 9.0.1, Iris 4.4.0, Sail
-      # support 0.20.1).  The leaf packages pull in coq-stdpp transitively, but
-      # we pin them too for a reproducible solve.  No-op on a cache hit.
+      # The development switch, exactly: opam/xv6rocq.export is a full, frozen
+      # `opam switch export` (Rocq 9.0.1, stdpp and Iris master dev versions,
+      # rocq-sail-stdpp 0.20.3 frozen to its git commit, coq-lsp) with every
+      # package definition embedded, so no dev repository is needed.  The same
+      # file builds the container image's default switch.  No-op on a cache hit.
       - name: Install Rocq / Iris / Sail toolchain
-        run: opam install -y $(cat .github/coq-deps.txt)
+        run: opam switch import --yes opam/xv6rocq.export
 
       # ---- 1 + 2. Sail model (model-xv6iris/) and kernel dump (kernel-rocq/) ----
       # These two trees don't depend on one another, so build them concurrently.

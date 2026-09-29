@@ -82,7 +82,7 @@ Section ProofStrncmp.
     assert (Hze1 : (8 <= 64)%N) by (vm_compute; intro Hc; discriminate Hc).
     assert (Hze2 : (8 <= 64)%N) by (vm_compute; intro Hc; discriminate Hc).
     unfold sign_extend', zero_extend', Operators_mwords.sign_extend, Operators_mwords.zero_extend,
-      Operators_mwords.exts_vec, Operators_mwords.extz_vec, to_word, get_word.
+      Operators_mwords.exts_vec, Operators_mwords.extz_vec.
     rewrite bv_sign_extend_unsigned.
     unfold bv_signed.
     rewrite sub_vec32_unsigned.
@@ -136,7 +136,7 @@ Section ProofStrncmp.
     rewrite add_vec64_unsigned !moi64_unsigned.
     unfold bv_wrap.
     change (bv_modulus 64) with 18446744073709551616%Z.
-    change (bv_signed (get_word (sign_extend' 12 (mword_of_int 63)))) with (-1)%Z.
+    change (bv_signed (sign_extend' 12 (mword_of_int 63))) with (-1)%Z.
     rewrite <- Z.add_mod; [| intro Hc; discriminate Hc].
     replace (Z.of_nat (n - t) + -1)%Z with (Z.of_nat (n - S t))%Z by lia.
     reflexivity.
@@ -220,7 +220,7 @@ Section ProofStrncmp.
                    = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv; exact HT2sp).
-    iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.strncmp + 0x36))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
@@ -319,7 +319,7 @@ Section ProofStrncmp.
     - (* rem = 0: t = n - 1 *)
       assert (Htn1 : t = (n - 1)%nat) by lia.
       assert (Htn : (t < n)%nat) by lia.
-      iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+      iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
       assert (HMa0 : rget M Ra0 = pa_add s1 t) by (rgne; exact Ha0).
       (* +0x0a: lbu a5, 0(a0) *)
       iApply (wp_lbu_s_sconf (kt := KT1) (ktd := ktf) (mword_of_int (KernelSyms.strncmp + 0x0a)) Ra5 Ra0
@@ -356,8 +356,8 @@ Section ProofStrncmp.
                 = mword_of_int (KernelSyms.strncmp + 0x28))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Ht28) in "Hpc".
-        iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
-        iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+        iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+        iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
         assert (HM1a0 : M1 !!! Regidx Ra0 = pa_add s1 t)
           by (rewrite /M1 upd_ne; [exact Ha0 | reg_neq]).
         assert (HM1a0' : rget M1 Ra0 = pa_add s1 t) by (rgne; exact HM1a0).
@@ -459,7 +459,7 @@ Section ProofStrncmp.
                        = mword_of_int (KernelSyms.strncmp + 0x10))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp10) in "Hpc".
-        iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+        iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
         assert (HM1a1 : M1 !!! Regidx Ra1 = pa_add s2 t)
           by (rewrite /M1 upd_ne; [exact Ha1 | reg_neq]).
         assert (HM1a1' : rget M1 Ra1 = pa_add s2 t) by (rgne; exact HM1a1).
@@ -490,8 +490,7 @@ Section ProofStrncmp.
         * (* g t = f t: bne falls through to +0x18 *)
           assert (Hgtft : g t = f t).
           { apply eq_vec_true_iff in Eeq. apply (f_equal bv_unsigned) in Eeq.
-            unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
-              to_word, get_word, MachineWord.MachineWord.zero_extend in Eeq.
+            unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec, MachineWord.MachineWord.zero_extend in Eeq.
             rewrite !bv_zero_extend_unsigned in Eeq; try (vm_compute; intro Hc; discriminate Hc).
             apply bv_eq. exact Eeq. }
           assert (Hneq : neq_vec (rget M2 Ra4) (rget M2 Ra5) = false).
@@ -528,7 +527,7 @@ Section ProofStrncmp.
           { rewrite /M3 upd_eq /regval_into_reg HM2a2.
             rewrite (snc_dec_a2 n t Htn Hn31).
             apply bv_eq.
-            unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec, to_word, get_word.
+            unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec.
             rewrite bv_sign_extend_unsigned. unfold bv_signed. rewrite !subrange_31_0_unsigned !moi64_unsigned.
             unfold MachineWord.Z_idx, bv_half_modulus, bv_modulus, bv_swrap, bv_wrap.
             change (Z.to_N (31 - 0 + 1)) with 32%N.
@@ -682,8 +681,8 @@ Section ProofStrncmp.
                   = mword_of_int (KernelSyms.strncmp + 0x28))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Ht28) in "Hpc".
-          iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
-          iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+          iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+          iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
           assert (HM2a0 : M2 !!! Regidx Ra0 = pa_add s1 t).
           { rewrite /M2 upd_ne; [| reg_neq]. rewrite /M1 upd_ne; [exact Ha0 | reg_neq]. }
           assert (HM2a0' : rget M2 Ra0 = pa_add s1 t) by (rgne; exact HM2a0).
@@ -778,7 +777,7 @@ Section ProofStrncmp.
       assert (Htn : (t < n)%nat) by lia.
       assert (Hstn : (S t < n)%nat) by lia.
       assert (Hnstpos : (0 < n - S t)%nat) by lia.
-      iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+      iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
       assert (HMa0 : rget M Ra0 = pa_add s1 t) by (rgne; exact Ha0).
       (* +0x0a: lbu a5, 0(a0) *)
       iApply (wp_lbu_s_sconf (kt := KT1) (ktd := ktf) (mword_of_int (KernelSyms.strncmp + 0x0a)) Ra5 Ra0
@@ -815,8 +814,8 @@ Section ProofStrncmp.
                 = mword_of_int (KernelSyms.strncmp + 0x28))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Ht28) in "Hpc".
-        iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
-        iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+        iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+        iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
         assert (HM1a0 : M1 !!! Regidx Ra0 = pa_add s1 t) by (rewrite /M1 upd_ne; [exact Ha0 | reg_neq]).
         assert (HM1a0' : rget M1 Ra0 = pa_add s1 t) by (rgne; exact HM1a0).
         assert (HM1a1 : M1 !!! Regidx Ra1 = pa_add s2 t) by (rewrite /M1 upd_ne; [exact Ha1 | reg_neq]).
@@ -907,7 +906,7 @@ Section ProofStrncmp.
                        = mword_of_int (KernelSyms.strncmp + 0x10))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp10) in "Hpc".
-        iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+        iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
         assert (HM1a1 : M1 !!! Regidx Ra1 = pa_add s2 t) by (rewrite /M1 upd_ne; [exact Ha1 | reg_neq]).
         assert (HM1a1' : rget M1 Ra1 = pa_add s2 t) by (rgne; exact HM1a1).
         (* +0x10: lbu a4, 0(a1) *)
@@ -937,8 +936,7 @@ Section ProofStrncmp.
         * (* g t = f t: bne falls through to +0x18 *)
           assert (Hgtft : g t = f t).
           { apply eq_vec_true_iff in Eeq. apply (f_equal bv_unsigned) in Eeq.
-            unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
-              to_word, get_word, MachineWord.MachineWord.zero_extend in Eeq.
+            unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec, MachineWord.MachineWord.zero_extend in Eeq.
             rewrite !bv_zero_extend_unsigned in Eeq; try (vm_compute; intro Hc; discriminate Hc).
             apply bv_eq. exact Eeq. }
           assert (Hneq : neq_vec (rget M2 Ra4) (rget M2 Ra5) = false).
@@ -975,7 +973,7 @@ Section ProofStrncmp.
           { rewrite /M3 upd_eq /regval_into_reg HM2a2.
             rewrite (snc_dec_a2 n t Htn Hn31).
             apply bv_eq.
-            unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec, to_word, get_word.
+            unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec.
             rewrite bv_sign_extend_unsigned. unfold bv_signed. rewrite !subrange_31_0_unsigned !moi64_unsigned.
             unfold MachineWord.Z_idx, bv_half_modulus, bv_modulus, bv_swrap, bv_wrap.
             change (Z.to_N (31 - 0 + 1)) with 32%N.
@@ -1106,8 +1104,8 @@ Section ProofStrncmp.
                   = mword_of_int (KernelSyms.strncmp + 0x28))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Ht28) in "Hpc".
-          iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
-          iDestruct (bb_byte_acc s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
+          iDestruct (bb_byte_acc (KTR := ktf) s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
+          iDestruct (bb_byte_acc (KTR := ktg) s2 n t g dq2 Htn with "Hbuf2") as "[Hb2 Hback2]".
           assert (HM2a0 : M2 !!! Regidx Ra0 = pa_add s1 t).
           { rewrite /M2 upd_ne; [| reg_neq]. rewrite /M1 upd_ne; [exact Ha0 | reg_neq]. }
           assert (HM2a0' : rget M2 Ra0 = pa_add s1 t) by (rgne; exact HM2a0).
@@ -1221,7 +1219,7 @@ Section ProofStrncmp.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.strncmp + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (u1 u2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (u1 u2) "[Hb1 Hb2]".
     assert (Hpa1 : add_vec (R1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 1).

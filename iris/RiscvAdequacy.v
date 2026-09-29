@@ -44,6 +44,7 @@ From iris.algebra Require Import csum excl auth gset.
 From iris.algebra.lib Require Import mono_list.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
 From iris.program_logic Require Import weakestpre lifting adequacy.
+From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang ObsTrace RiscvPtsto.
@@ -109,7 +110,7 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_kptbGS :: inG Σ kptbR;
   riscv_pre_tsomemGS :: tsoMemG Σ;
   (* the PER-PROC HART TAG (ProcGeom.hart_own): capacity only -- the theorem
-     below mints one [ghost_var CPU] per proc slot, at hart 0, and hands all
+     below mints one [ghost_var_frac CPU] per proc slot, at hart 0, and hands all
      of them to the boot client, which spends them in
      [SpecProcinit.procs_inv_alloc] as the fourth guarded slot of every
      proc's lock resource. *)
@@ -177,17 +178,14 @@ Proof. solve_inG. Qed.
 
 Definition reg_init_map (rs : regstate) (D : gset register)
     : gmap register (sigT type_of_register) :=
-  set_to_map (fun r => (r, existT r (register_lookup r rs))) D.
+  set_to_map (fun r => existT r (register_lookup r rs)) D.
 
 Lemma reg_init_map_lookup rs D r dv :
   reg_init_map rs D !! r = Some dv <->
   r ∈ D /\ dv = existT r (register_lookup r rs).
 Proof.
   unfold reg_init_map.
-  rewrite lookup_set_to_map; last by intros y y' _ _ ?.
-  split.
-  - intros (y & Hy & Hf). injection Hf as -> Hdv. subst dv. done.
-  - intros [Hr ->]. exists r. done.
+  rewrite lookup_set_to_map_Some. naive_solver.
 Qed.
 
 Lemma reg_init_map_agree rs D : reg_agree (reg_init_map rs D) rs.
@@ -225,7 +223,7 @@ Section reg_alloc.
 
   Lemma reg_alloc_one (rs : regstate) (D : gset register) :
     ⊢ |==> ∃ γ : gname,
-        (∃ m, ghost_map_auth γ 1 m ∗ ⌜reg_agree m rs⌝) ∗
+        (∃ m, ghost_map_auth_frac γ 1 m ∗ ⌜reg_agree m rs⌝) ∗
         [∗ set] r ∈ D,
           ghost_map_elem γ r (DfracOwn 1) (existT r (register_lookup r rs)).
   Proof using .
@@ -240,7 +238,7 @@ Section reg_alloc.
     NoDup cs ->
     ⊢ |==> ∃ f : CPU -> gname,
       [∗ list] c ∈ cs,
-        (∃ m, ghost_map_auth (f c) 1 m ∗ ⌜reg_agree m (gr c)⌝) ∗
+        (∃ m, ghost_map_auth_frac (f c) 1 m ∗ ⌜reg_agree m (gr c)⌝) ∗
         ([∗ set] r ∈ D c,
            ghost_map_elem (f c) r (DfracOwn 1)
              (existT r (register_lookup r (gr c)))).
@@ -256,7 +254,7 @@ Section reg_alloc.
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
-      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+      intros ->. apply Hc. by eapply list_elem_of_lookup_2.
   Qed.
   (* THE PER-HART ONE-SHOT allocation, [ghost_var_alloc_halves_cpus]' mono_nat
      twin: one fresh name per hart, the auth minted at 0 and split into the two
@@ -269,7 +267,7 @@ Section reg_alloc.
     NoDup cs ->
     ⊢ |==> ∃ f : CPU -> gname,
       [∗ list] c ∈ cs,
-        (mono_nat_auth_own (f c) (1/2)%Qp n ∗ mono_nat_auth_own (f c) (1/2)%Qp n).
+        (mono_nat_auth_own_frac (f c) (1/2)%Qp n ∗ mono_nat_auth_own_frac (f c) (1/2)%Qp n).
   Proof using .
     induction cs as [|c cs' IH]; intros Hnd.
     - iModIntro. iExists (fun _ => 1%positive). done.
@@ -283,17 +281,17 @@ Section reg_alloc.
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
-      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+      intros ->. apply Hc. by eapply list_elem_of_lookup_2.
   Qed.
 
-  (* the per-hart HALVES allocation, the [ghost_var] analogue of
+  (* the per-hart HALVES allocation, the [ghost_var_frac] analogue of
      [reg_alloc_cpus]: one fresh name per hart, both halves handed out. *)
   Lemma ghost_var_alloc_halves_cpus {A : Type} `{!ghost_varG Σ A} (a : A)
       (cs : list CPU) :
     NoDup cs ->
     ⊢ |==> ∃ f : CPU -> gname,
       [∗ list] c ∈ cs,
-        (ghost_var (f c) (1/2)%Qp a ∗ ghost_var (f c) (1/2)%Qp a).
+        (ghost_var_frac (f c) (1/2)%Qp a ∗ ghost_var_frac (f c) (1/2)%Qp a).
   Proof using .
     induction cs as [|c cs' IH]; intros Hnd.
     - iModIntro. iExists (fun _ => 1%positive). done.
@@ -308,7 +306,7 @@ Section reg_alloc.
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
-      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+      intros ->. apply Hc. by eapply list_elem_of_lookup_2.
   Qed.
 
   (* The per-hart THREE-PIECE allocation the CANONICAL SIE ghost needs: the
@@ -321,8 +319,8 @@ Section reg_alloc.
     NoDup cs ->
     ⊢ |==> ∃ f : CPU -> gname,
       [∗ list] c ∈ cs,
-        (ghost_var (f c) (1/2)%Qp a ∗ ghost_var (f c) (1/4)%Qp a ∗
-         ghost_var (f c) (1/4)%Qp a).
+        (ghost_var_frac (f c) (1/2)%Qp a ∗ ghost_var_frac (f c) (1/4)%Qp a ∗
+         ghost_var_frac (f c) (1/4)%Qp a).
   Proof using .
     induction cs as [|c cs' IH]; intros Hnd.
     - iModIntro. iExists (fun _ => 1%positive). done.
@@ -339,7 +337,7 @@ Section reg_alloc.
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
-      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+      intros ->. apply Hc. by eapply list_elem_of_lookup_2.
   Qed.
 
   (* the PER-HART allocation the CANONICAL HELD-LOCK SET needs (LockSet.v):
@@ -364,7 +362,7 @@ Section reg_alloc.
       iApply (big_sepL_mono with "Hrest").
       intros k c' Hk. simpl.
       rewrite decide_False; [done|].
-      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+      intros ->. apply Hc. by eapply list_elem_of_lookup_2.
   Qed.
 
   (* the PER-PROC-SLOT allocation the CANONICAL park receipt needs: one
@@ -372,7 +370,7 @@ Section reg_alloc.
      as [ghost_var_alloc_halves_cpus], over [seq 0 n] rather than the (finite)
      hart enumeration -- what [park_name : nat -> gname] needs. *)
   Lemma ghost_var_alloc_nats {A : Type} `{!ghost_varG Σ A} (a : A) (n : nat) :
-    ⊢ |==> ∃ f : nat -> gname, [∗ list] j ∈ seq 0 n, ghost_var (f j) 1 a.
+    ⊢ |==> ∃ f : nat -> gname, [∗ list] j ∈ seq 0 n, ghost_var_frac (f j) 1 a.
   Proof using .
     induction n as [|n IH].
     - iModIntro. iExists (fun _ => 1%positive). done.
@@ -394,7 +392,7 @@ End reg_alloc.
 Lemma iview_alloc_cpus `{!riscvFixedGS Σ} (cs : list CPU) :
   NoDup cs ->
   ⊢ |==> ∃ f : CPU -> gname,
-    [∗ list] c ∈ cs, mono_nat_auth_own (f c) 1 0%nat.
+    [∗ list] c ∈ cs, mono_nat_auth_own_frac (f c) 1 0%nat.
 Proof.
   induction cs as [|c cs' IH]; intros Hnd.
   - iModIntro. iExists (fun _ => 1%positive). done.
@@ -407,7 +405,7 @@ Proof.
     iApply (big_sepL_mono with "Hrest").
     intros k c' Hk. simpl.
     rewrite decide_False; [done|].
-    intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+    intros ->. apply Hc. by eapply list_elem_of_lookup_2.
 Qed.
 
 (* Bridge a big-sep over the LIST [enum CPU] to one over the SET
@@ -507,7 +505,7 @@ Section power.
      (@ghost_map_auth Σ (SailStdpp.Values.mword 27) _
         (@SailStdpp.Instances.Decidable_eq_mword 27)
         (@SailStdpp.Instances.Countable_mword 27) _
-        (era_kmap_name HE) 1 kmap_M0) ∗
+        (era_kmap_name HE) (DfracOwn 1) kmap_M0) ∗
      ([∗ map] vpn ↦ pc ∈ kmap_M0,
         @ghost_map_elem Σ (SailStdpp.Values.mword 27) _
           (@SailStdpp.Instances.Decidable_eq_mword 27)
@@ -521,34 +519,34 @@ Section power.
         strans_pending_at (era_strans_name HE c) ∗
         strans_pending_at (era_strans_name HE c)) ∗
      ([∗ list] c ∈ enum CPU,
-        ghost_var (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
-        ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
-        ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off) ∗
+        ghost_var_frac (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var_frac (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
+        ghost_var_frac (era_sie_name HE c) (1/4)%Qp sie_bit_off) ∗
      (* BOTH halves of the SPP mirror.  The value is arbitrary here -- the
         M->S bridge holds both and sets them to the mstatus it installs --
         which is why this is not stated at any particular bit. *)
      ([∗ list] c ∈ enum CPU,
-        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off ∗
-        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off) ∗
+        ghost_var_frac (era_spp_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var_frac (era_spp_name HE c) (1/2)%Qp sie_bit_off) ∗
      ([∗ list] c ∈ enum CPU,
-        ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off ∗
-        ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off) ∗
+        ghost_var_frac (era_spie_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var_frac (era_spie_name HE c) (1/2)%Qp sie_bit_off) ∗
      (* THE HELD-LOCK AUTHORITIES, one per hart, at the empty set.  The boot
         client folds each into its hart's [CpuOwn.cpu_own] and never sees the
         set again: it rides inside [IntrDefs.cpu_hart] from there on. *)
      ([∗ list] c ∈ enum CPU,
         own (era_lockset_name HE c) ((● (GSet ∅)) : lockSetR)) ∗
-     ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 (0%fin : CPU)) ∗
+     ([∗ list] j ∈ seq 0 nproc, ghost_var_frac (era_park_name HE j) 1 (0%fin : CPU)) ∗
      ([∗ list] j ∈ seq 0 nproc,
-        ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
+        ghost_var_frac (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
      (* every hart's reservation mirror, at [None] (design §3a) *)
      (* the reservation mirror at [None], whatever acquire bit rides with
         it (relaxed-rr.md, the .aq knob: the machine's is [false]) *)
      ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
         ∃ b : bool, c ↪[era_resv_name HE] (None, b)) ∗
      era_uarts_half (era_uart_name HE) g'.(gdev).(duart) ∗
-     ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
-     ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
+     ghost_var_frac (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
+     ghost_var_frac (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
      (* THE BOOT MINT (claude-notes/design/fs-log.md, stage 4): this era's
         disk image map, allocated by the PowerOn arm at the disk's PRESERVED
         content, handed out WHOLE -- the full byte fragments over
@@ -568,7 +566,7 @@ Section power.
         which is what makes every boot-path write a value-chained one and
         [initlog]'s recovering arms ghost no-ops.  The swap receipt beside
         it is what a WAL fupd curries to prove the arm is still its own. *)
-     ghost_var (era_mirror_name HE) (1/2) (Mof (v_disk (g'.(gdev).(dvirtio)))) ∗
+     ghost_var_frac (era_mirror_name HE) (1/2) (Mof (v_disk (g'.(gdev).(dvirtio)))) ∗
      swap_lb (S gen) ∗
      (* THE CLIENT'S LENT RESOURCE (durable-disk BT-1).  It sits HERE, at
         the end of the era's own mint and before the fixed-layer rows,
@@ -802,13 +800,13 @@ Section power.
       (Hswap : forall (HE : riscvEraGS) (gen : nat) (dk : Z -> bv 8),
          ⊢ era_registered gen HE -∗ gen_started gen -∗
            start_auth (gen + 1)%nat -∗ disk_fixed_auth dk -∗
-           ghost_var (era_mirror_name HE) 1 (Mof dk) -∗
+           ghost_var_frac (era_mirror_name HE) 1 (Mof dk) -∗
            ▷ riscv_crash_pred -∗
            (* the era's turn, lent by [Hobs]'s on-arm (sync SY3-A1) *)
            Tn (S gen) ==∗
              ◇ (start_auth (gen + 1)%nat ∗ disk_fixed_auth dk ∗
                 ▷ riscv_crash_pred ∗
-                ghost_var (era_mirror_name HE) (1/2) (Mof dk) ∗
+                ghost_var_frac (era_mirror_name HE) (1/2) (Mof dk) ∗
                 swap_lb (S gen) ∗
                 (* ...AND THE CLIENT'S LENT RESOURCE (durable-disk BT-1),
                    already at the application's fixed part (see
@@ -832,7 +830,7 @@ Section power.
          facts through the durable disk reads the disk at every power event
          here.  A basic update under a [◇] for [Hswap]'s reasons. *)
       (* ...AT [obs_half], NOT [obs_auth]: the client writes this hook in a
-         context with no [riscvFixedGS] and spells the raw [ghost_var
+         context with no [riscvFixedGS] and spells the raw [ghost_var_frac
          γobs (1/2) h], so the GROWTH authority that rides in [obs_auth]
          beside it ([RiscvPtsto.obs_hist_auth]) is stepped by the two arms
          below rather than by the hook. *)
@@ -1206,7 +1204,7 @@ Section power.
           rewrite dom_insert_L Hdom set_seq_snoc_nat. set_solver. }
         iExists HE.
         iSplitR.
-        { iPureIntro. by rewrite lookup_insert. }
+        { iPureIntro. by rewrite lookup_insert_eq. }
         rewrite /era_interp /disk_dur_interp.
         replace (era_uart_name HE) with γu by reflexivity.
         iSplitL "Hauths".
@@ -1274,7 +1272,7 @@ Section power.
         iSplitL "Hivauths2".
         { rewrite /iview_auth_at. iApply big_sepL_enum_to_set.
           iApply (big_sepL_mono
-                    (fun _ c => mono_nat_auth_own (fiv c) 1 0%nat)).
+                    (fun _ c => mono_nat_auth_own_frac (fiv c) 1 0%nat)).
           { intros k c Hk. rewrite Hitv0. iIntros "H". iExact "H". }
           iExact "Hivauths2". }
         iSplitR; [iPureIntro; intros c; rewrite Hitv0; lia|].
@@ -1283,7 +1281,7 @@ Section power.
         iSplitL "Hrvauths2".
         { rewrite /rview_auth_at. iApply big_sepL_enum_to_set.
           iApply (big_sepL_mono
-                    (fun _ c => mono_nat_auth_own (frv c) 1 0%nat)).
+                    (fun _ c => mono_nat_auth_own_frac (frv c) 1 0%nat)).
           { intros k c Hk. rewrite Hghr0. iIntros "H". iExact "H". }
           iExact "Hrvauths2". }
         iPureIntro. intros c. rewrite Hghr0.
@@ -1369,7 +1367,7 @@ Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
 (*     [gregs_interp_at E g.(gregs)]      -- every hart's registers        *)
 (*     [gen_heap_interp .. g.(gmem)]      -- the whole memory image        *)
 (*     [dev_interp_at E g.(gdev)]         -- the DEVICE FABRIC: a half     *)
-(*        [ghost_var] each at [duart], [dplic] and [dvirtio], so a client  *)
+(*        [ghost_var_frac] each at [duart], [dplic] and [dvirtio], so a client  *)
 (*        holding the other half in its invariant reads the UART's or the  *)
 (*        PLIC's or the virtio device's exact state off the machine        *)
 (*     [disk_dur_interp] / [resv_auth_at] -- the era's image map and the   *)
@@ -1438,7 +1436,7 @@ Qed.
    keep hold of across the era's life (this is how [FsCrash.P_fs]'s custody
    arm identifies its own era) -- gets [era_interp E g], whose conjuncts are
    the register interpretation, the memory heap, and the device fabric's
-   three half-[ghost_var]s.  From there a UART fact, a memory fact or a
+   three half-[ghost_var_frac]s.  From there a UART fact, a memory fact or a
    register fact is the SAME two-line agreement the disk case is; nothing
    about the channel privileges the disk.
 
@@ -1486,10 +1484,10 @@ Qed.
    and the two are convertible at the [boot_fixedGS] literal.  Its two
    hooks are the two lemmas below. *)
 Definition obs_pred_at {Σ : gFunctors} `{!riscvGpreS Σ} (γ : gname) : iProp Σ :=
-  (∃ h : list mobs, ghost_var γ (1/2) h)%I.
+  (∃ h : list mobs, ghost_var_frac γ (1/2) h)%I.
 
 Lemma obs_pred_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ} (γ : gname) :
-  ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
+  ghost_var_frac γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
 Proof. iIntros "H". iModIntro. iExists []. iExact "H". Qed.
 
 (* ...and the same birth at the shape [riscv_power_adequacy] asks for: the
@@ -1498,7 +1496,7 @@ Proof. iIntros "H". iModIntro. iExists []. iExact "H". Qed.
    property drops it. *)
 Lemma obs_pred_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ} {CT : Type}
     (Cl : CT -> iProp Σ) (γ : gname) (c : CT) :
-  Cl c ∗ ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
+  Cl c ∗ ghost_var_frac γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
 Proof. iIntros "[_ H]". iApply (obs_pred_at_alloc with "H"). Qed.
 
 (* ...AND THE FOUNDING OF THE ERA'S PORT CLAIMS (lane CONS-IO milestone E),
@@ -1517,9 +1515,9 @@ Lemma obs_pred_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat
     (γdisk γobs : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8) :
   trace_shape h on ->
   ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ obs_pred_at γobs -∗
-    ghost_var γobs (1/2) h ==∗
+    ghost_var_frac γobs (1/2) h ==∗
       ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ obs_pred_at γobs ∗
-         ghost_var γobs (1/2)
+         ghost_var_frac γobs (1/2)
            (h ++ [if on then ObsPowerOff else ObsPowerOn])%list ∗
          (if on then emp
           else C (S (obs_boots h)) [] (LogEntryDefs.MkCH [] [] [] None) ∗
@@ -1548,12 +1546,12 @@ Qed.
    invariant's later off it. *)
 Definition obs_ledger_at {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (γ : gname) : iProp Σ :=
-  (∃ h : list mobs, ghost_var γ (1/2) h ∗ R h)%I.
+  (∃ h : list mobs, ghost_var_frac γ (1/2) h ∗ R h)%I.
 
 Lemma obs_ledger_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (γ : gname) :
   (⊢ |==> R []) ->
-  ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
+  ghost_var_frac γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
 Proof.
   intros HR0. iIntros "H". iMod HR0 as "HR". iModIntro. iExists []. iFrame.
 Qed.
@@ -1567,7 +1565,7 @@ Qed.
 Lemma obs_ledger_at_alloc_cl {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (γ : gname) (P : iProp Σ) :
   (P ⊢ |==> R []) ->
-  P ∗ ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
+  P ∗ ghost_var_frac γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
 Proof.
   intros HR0. iIntros "[Hc H]". iMod (HR0 with "Hc") as "HR".
   iModIntro. iExists []. iFrame.
@@ -1595,9 +1593,9 @@ Lemma obs_ledger_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : n
     (γdisk γobs : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8) :
   trace_shape h on ->
   ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ obs_ledger_at R γobs -∗
-    ghost_var γobs (1/2) h ==∗
+    ghost_var_frac γobs (1/2) h ==∗
       ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ obs_ledger_at R γobs ∗
-         ghost_var γobs (1/2)
+         ghost_var_frac γobs (1/2)
            (h ++ [if on then ObsPowerOff else ObsPowerOn])%list ∗
          (if on then emp
           else C (S (obs_boots h)) [] (LogEntryDefs.MkCH [] [] [] None) ∗
@@ -1624,8 +1622,8 @@ Lemma obs_ledger_at_back {Σ : gFunctors} `{!riscvGpreS Σ}
     (T T' : iProp Σ) (h : list mobs)
     (Hb : ⊢ R h -∗ T ==∗ R h ∗ T')
     (γobs : gname) :
-  ⊢ ▷ obs_ledger_at R γobs -∗ ghost_var γobs (1/2) h -∗ T ==∗
-    ◇ (▷ obs_ledger_at R γobs ∗ ghost_var γobs (1/2) h ∗ T').
+  ⊢ ▷ obs_ledger_at R γobs -∗ ghost_var_frac γobs (1/2) h -∗ T ==∗
+    ◇ (▷ obs_ledger_at R γobs ∗ ghost_var_frac γobs (1/2) h ∗ T').
 Proof.
   iIntros "HP Hauth HT". iDestruct "HP" as (h') "[>Hfrag >HR]".
   iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
@@ -1649,7 +1647,7 @@ Lemma obs_ledger_at_phi {Σ : gFunctors} `{!riscvGpreS Σ}
     (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
     (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
     (γobs : gname) (h : list mobs) :
-  ⊢ ghost_var γobs (1/2) h -∗ ▷ obs_ledger_at R γobs -∗ ◇ ⌜P h⌝.
+  ⊢ ghost_var_frac γobs (1/2) h -∗ ▷ obs_ledger_at R γobs -∗ ◇ ⌜P h⌝.
 Proof.
   iIntros "Hauth HP". iDestruct "HP" as (h') "[>Hfrag >HR]".
   iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
@@ -1702,7 +1700,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (HPc : forall (γdisk γsw γreg γst : gname) (c : CT),
        Cls c ∗
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
-       mono_nat_auth_own γsw 1 0%nat ⊢
+       mono_nat_auth_own_frac γsw 1 0%nat ⊢
          |==> Pc γdisk γsw γreg γst c)
     (* THE TWO SYNC SLOTS (claude-notes/design/sync.md §4.2): the era's
        opaque token and the family of a waiter's hooks, which the WAL
@@ -1767,15 +1765,15 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
          mono_nat_lb_own γst (S gen) -∗
-         mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+         mono_nat_auth_own_frac γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
-         ghost_var (era_mirror_name E) 1 (Mof dk) -∗
+         ghost_var_frac (era_mirror_name E) 1 (Mof dk) -∗
          ▷ Pc γdisk γsw γreg γst c -∗
          Tn c (S gen) ==∗
-           ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+           ◇ (mono_nat_auth_own_frac γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
               ▷ Pc γdisk γsw γreg γst c ∗
-              ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
+              ghost_var_frac (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen) ∗
               (* ...and the client's lent resource (durable-disk BT-1), at
                  the application's fixed part (app-instances.md §6) *)
@@ -1812,7 +1810,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        and the trace slot is the owner of its yield from the slot's own
        birth. *)
     (HPt : forall (γobs : gname) (c : CT),
-       Clt c ∗ ghost_var γobs (1/2) ([] : list mobs)
+       Clt c ∗ ghost_var_frac γobs (1/2) ([] : list mobs)
          ⊢ |==> Pt γobs c)
     (* THE POWER HOOK: a power event is observed, and the client moves its
        half of the history by it, knowing the shape of the history so far
@@ -1833,9 +1831,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                    (dk : Z -> bv 8),
        trace_shape h on ->
        ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ Pt γobs c -∗
-         ghost_var γobs (1/2) h ==∗
+         ghost_var_frac γobs (1/2) h ==∗
            ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ Pt γobs c ∗
-              ghost_var γobs (1/2)
+              ghost_var_frac γobs (1/2)
                 (h ++ [if on then ObsPowerOff else ObsPowerOn])%list ∗
               (if on then emp
                else ai_cons (Ai c) (S (obs_boots h)) []
@@ -1848,9 +1846,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        swap's yield [Tn'] into the boot's [Tn''] (see [wp_power_loop]).  A
        client with nothing to file hands the turn straight back. *)
     (Hback : forall (γobs : gname) (c : CT) (h : list mobs),
-       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list -∗
+       ⊢ ▷ Pt γobs c -∗ ghost_var_frac γobs (1/2) (h ++ [ObsPowerOn])%list -∗
          Tn' c (S (obs_boots h)) ==∗
-         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list
+         ◇ (▷ Pt γobs c ∗ ghost_var_frac γobs (1/2) (h ++ [ObsPowerOn])%list
             ∗ Tn'' c (S (obs_boots h))))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
        [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
@@ -1903,7 +1901,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                (Pc γdisk γswap γreg γstart c)
                (Tk c) (Hk c)
                γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
-         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
+         ghost_var_frac γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ Pc γdisk γswap γreg γstart c -∗ ▷ Pt γobs c -∗
          ◇ ⌜phi g' h⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
@@ -2084,7 +2082,7 @@ Proof.
      invariant in the world may be OPENED AND NEVER CLOSED.  That is the
      whole content of Iris's adequacy at the [wsat] level: world satisfaction
      is spent, in exchange for a PURE fact (the soundness lemma underneath,
-     [step_fupdN_soundness_gen], demands a [Plain] conclusion, which is
+     [step_fupdN_soundness], demands a [Plain] conclusion, which is
      precisely why [phi] has to be a [Prop] about [g2] and not an [iProp]).
 
      So: open [crashN] and drop its closing update on the floor, hand the
@@ -2098,7 +2096,7 @@ Proof.
   subst h.
   iInv "Hcinv" as "HP" "Hclose".
   iInv "Hoinv" as "HPt" "Hoclose".
-  (* the client's hook moves only the [ghost_var] half of [obs_auth]; the
+  (* the client's hook moves only the [ghost_var_frac] half of [obs_auth]; the
      growth authority beside it is the machine's and is simply dropped here,
      at the end of the run, where nothing is owed *)
   iDestruct "Hoauth" as "[Hovar _]".
@@ -2123,7 +2121,7 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (Pc : gname -> gname -> gname -> gname -> iProp Σ)
     (HPc : forall γdisk γsw γreg γst : gname,
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
-       mono_nat_auth_own γsw 1 0%nat ⊢
+       mono_nat_auth_own_frac γsw 1 0%nat ⊢
          |==> Pc γdisk γsw γreg γst)
     (Ppure : (Z -> bv 8) -> Prop)
     (Hproj : forall (γdisk γsw γreg γst : gname)
@@ -2139,14 +2137,14 @@ Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
                     (gen : nat) (dk : Z -> bv 8),
        ⊢ gen ↪[γreg]□ E -∗
          mono_nat_lb_own γst (S gen) -∗
-         mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+         mono_nat_auth_own_frac γst 1 (gen + 1)%nat -∗
          disk_img_auth_sized γdisk ndisk dk -∗
-         ghost_var (era_mirror_name E) 1 (Mof dk) -∗
+         ghost_var_frac (era_mirror_name E) 1 (Mof dk) -∗
          ▷ Pc γdisk γsw γreg γst ==∗
-           ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+           ◇ (mono_nat_auth_own_frac γst 1 (gen + 1)%nat ∗
               disk_img_auth_sized γdisk ndisk dk ∗
               ▷ Pc γdisk γsw γreg γst ∗
-              ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
+              ghost_var_frac (era_mirror_name E) (1/2) (Mof dk) ∗
               mono_nat_lb_own γsw (S gen) ∗
               Rb dk))
     (* THE CLIENT'S TRACE RESOURCE, its birth, its power step, and its pure

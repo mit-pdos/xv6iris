@@ -297,16 +297,16 @@ Section SysLinkAbs.
        ⌜arow_at (abs_view I) t a⌝ -∗
        ⌜link_tgt_ok (an_node a)⌝ -∗
        ⌜is_Some (I !! t)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
          app_step t I (delta_link_tgt t a (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_link_tgt t a (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t a))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t a))%I.
 
   (* INSTANT 2 -- the parent row, [uent_commit_at]'s shape at
      [delta_link_ent].  The parent is a LIVE directory (the orphan guard at
@@ -318,13 +318,13 @@ Section SysLinkAbs.
        (ents : gmap fname Z) (nl : nat),
        ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = None⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step d I (delta_link_ent d nm t (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_link_ent d nm t (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  Satisfiability: the [_unit] dischargers                            *)

@@ -255,7 +255,7 @@ Section pipes_led.
   (*  THE LEDGER                                                        *)
   (* ================================================================= *)
   Definition pipesE_led (h : list mobs) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint γ) 1
+    (mono_nat_auth_own_frac (eg_taint γ) 1
        (if decide (lm_disc PME h) then 0%nat else 1%nat)
      ∗ pin_map γ h
      ∗ pera_map g h

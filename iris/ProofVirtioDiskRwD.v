@@ -149,7 +149,7 @@ Lemma vdrwd_cm_ins (np : nat) (cm : gmap nat dclaim) (dc : dclaim) :
 Proof.
   intros Hcm Hpos Hlink p dc' Hp.
   destruct (decide (p = np)) as [->|Hne].
-  - rewrite lookup_insert in Hp. injection Hp as <-.
+  - rewrite lookup_insert_eq in Hp. injection Hp as <-.
     split_and!; [lia | exact Hpos | exact Hlink].
   - rewrite (lookup_insert_ne cm np p dc (not_eq_sym Hne)) in Hp.
     destruct (Hcm p dc' Hp) as (Hlt & Hpp & Hl).
@@ -167,7 +167,7 @@ Lemma vdrwd_zext16_unsigned (x : SailStdpp.Values.mword 16) :
   bv_unsigned (zero_extend' 64 x : SailStdpp.Values.mword 64) = bv_unsigned x.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Values.to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned. reflexivity.
   first [ lia | vm_compute; discriminate | done ].
 Qed.
@@ -175,8 +175,8 @@ Qed.
 Lemma vdrwd_and_vec_unsigned (a b : mword 64) :
   bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
 Proof.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word SailStdpp.Values.to_word SailStdpp.Values.get_word].
+  cbv [and_vec Operators_mwords.word_binop 
+       ].
   unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
 Qed.
 
@@ -191,9 +191,9 @@ Lemma vdrwd_trunc16_unsigned (w : mword 64) :
 Proof.
   rewrite vdrwd_trunc16_subrange.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, SailStdpp.Values.to_word.
+  unfold to_word_idx.
   rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold SailStdpp.Values.get_word, MachineWord.MachineWord.slice.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
@@ -328,7 +328,7 @@ Proof.
              = shiftl x 32).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hn.
-  unfold shiftl, SailStdpp.Values.with_word, SailStdpp.Values.get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -348,7 +348,7 @@ Proof.
              = shiftr x 32).
   { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hn.
-  unfold shiftr, SailStdpp.Values.with_word, SailStdpp.Values.get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -374,7 +374,7 @@ Proof.
   assert (Hn : shift_bits_left x (mword_of_int 1 : mword 5) = shiftl x 1).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hn.
-  unfold shiftl, SailStdpp.Values.with_word, SailStdpp.Values.get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -391,7 +391,7 @@ Proof. intros H0 H1. rewrite Z.mod_small; lia. Qed.
 Lemma vdrwd_uint32 (a : SailStdpp.Values.mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -1243,38 +1243,38 @@ Proof.
   - exact Ht.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (d_ops h : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 0). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 0). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 16) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 1). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 1). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 1) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 2). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 2). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 (Z.of_nat m2)) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 3). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 3). reflexivity.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (b_data b : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 4). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 4). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 1024) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 5). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 5). reflexivity.
     + assert (Hr : read_bytes pin (pa_add pd (16 * m2 + 12)) 2 = Some (vdrw_flags wr)).
       { apply (vdrwd_read_reg _ 2 (vdrw_flags wr) pin ltac:(lia)).
-        apply Hsub. apply (elem_of_list_lookup_2 _ 6). reflexivity. }
+        apply Hsub. apply (list_elem_of_lookup_2 _ 6). reflexivity. }
       rewrite Hr Hflags. reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 (Z.of_nat t)) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 7). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 7). reflexivity.
   - split_and!.
     + apply (vdrwd_read_reg _ 8 (d_info_status h : SailStdpp.Values.mword 64) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 8). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 8). reflexivity.
     + apply (vdrwd_read_reg _ 4 (Z_to_bv 32 1) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 9). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 9). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 2) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 10). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 10). reflexivity.
     + apply (vdrwd_read_reg _ 2 (Z_to_bv 16 0) pin ltac:(lia)).
-      apply Hsub. apply (elem_of_list_lookup_2 _ 11). reflexivity.
+      apply Hsub. apply (list_elem_of_lookup_2 _ 11). reflexivity.
   - apply (vdrwd_read_reg _ 4 (vdrw_ty wr) pin ltac:(lia)).
-    apply Hsub. apply (elem_of_list_lookup_2 _ 12). reflexivity.
+    apply Hsub. apply (list_elem_of_lookup_2 _ 12). reflexivity.
   - rewrite vdrwd_ops_sec_pa.
     apply (vdrwd_read_reg _ 8 sector pin ltac:(lia)).
-    apply Hsub. apply (elem_of_list_lookup_2 _ 14). reflexivity.
+    apply Hsub. apply (list_elem_of_lookup_2 _ 14). reflexivity.
   - exact Htyv.
   - intro Hout.
     replace 1024%nat with (length bs) by exact Hlen.
@@ -1601,7 +1601,7 @@ Section VdrwdPinBuild.
                  Hh Hm Ht Hlensl).
         * exact Hsub.
         * intros _. rewrite Hbe.
-          apply Hsub. apply (elem_of_list_lookup_2 _ 15). reflexivity.
+          apply Hsub. apply (list_elem_of_lookup_2 _ 15). reflexivity.
         * exact Hstat.
       + rewrite dom_singleton_L.
         unfold slot_wr, vdrwd_slot, vs_is_out.

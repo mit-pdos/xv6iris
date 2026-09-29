@@ -110,7 +110,7 @@ Section UkWriteClosed.
     destruct (decide (0 <= Z.of_nat i < Z.of_nat NOFILE)) as [_ | Hc];
       [ | exfalso; apply Hc; unfold NOFILE, NSTD in *; lia ].
     rewrite <- Htake in Hli.
-    rewrite lookup_take in Hli; [ | exact Hi ].
+    rewrite lookup_take_lt in Hli; [ | exact Hi ].
     rewrite Nat2Z.id Hli. reflexivity.
   Qed.
 

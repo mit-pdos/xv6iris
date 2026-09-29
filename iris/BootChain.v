@@ -148,7 +148,7 @@ Section BootRun.
        sie_cap_gpr KT0 mf (kv_frame_slots + K_main)%nat false zero_reg -∗
        cpu_ctx_free -∗
        cpu_own 0 false zero_reg false ∅ -∗
-       ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+       ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
        (* THE TIMER CAPABILITY, allocated HERE rather than in main: it is
           PERSISTENT and PER-HART, and this is the one place that holds the
@@ -483,7 +483,7 @@ Section BootPrimary.
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
     (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ghost_map_auth_frac (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     kpt_unset -∗
     (* A6.71: ...and the pin bound's one-shot beside it -- [kpt_inv_alloc]

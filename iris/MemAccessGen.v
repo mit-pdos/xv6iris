@@ -740,6 +740,7 @@ Section CheckedMemWriteSplit.
 
   Lemma wsplit_var0 : wsplit_var 0%nat = (false, 0%Z, true).
   Proof using HN.
+    clear sw. (* unused; else Rocq counts it as used (asks for Proof using … sw) *)
     unfold wsplit_var. cbn [ws_seq].
     replace (Nat.eqb 0 N) with false by (symmetry; apply Nat.eqb_neq; lia).
     replace (Nat.min 0 (N - 1)) with 0%nat by lia. reflexivity.

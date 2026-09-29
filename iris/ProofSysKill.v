@@ -97,12 +97,12 @@ Section ProofSysKill.
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
     (* the local [pid] is the upper half of slot 3 *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hb3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hb3") as %Hal3.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hb3") as "[Hb3lo Hb3hi]".
     iAssert (∀ nv : bv 32, pa_add (pa_stk sp0 3) 4 ↦₄[KT1] nv -∗ ∃ w, pa_stk sp0 3 ↦₈[KT1] w)%I
       with "[Hb3lo]" as "Hjoin3".
-    { iIntros (nv) "Hhi". iExists _. iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal3 with "Hb3lo Hhi"). }
+    { iIntros (nv) "Hhi". iExists _. iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal3 with "Hb3lo Hhi"). }
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->
               add_vec (M1 !!! Regidx csp_rs1)

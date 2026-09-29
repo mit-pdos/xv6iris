@@ -145,7 +145,7 @@ Proof.
   intros Hoff. unfold uart_size in Hoff.
   pose proof (uart_base_lo i). pose proof (uart_base_hi i).
   unfold uart_size in *.
-  unfold uart_pa, uint, MachineWord.word_to_N. unfold get_word.
+  unfold uart_pa, uint, MachineWord.word_to_N. idtac.
   rewrite Z_to_bv_unsigned.
   rewrite bv_wrap_small.
   2:{ assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
@@ -361,7 +361,7 @@ Section DevLoops.
   (* ---- EXCLUSIVE ownership of the transmitter ----
 
      [uart_tx_own γ l] is the right to push bytes, and says the accepted trace
-     is EXACTLY [l].  It is one half of a [ghost_var]; the invariant holds the
+     is EXACTLY [l].  It is one half of a [ghost_var_frac]; the invariant holds the
      other.  Two consequences make it do its job:
 
        - it is stable across DEVICE steps, because draining does not change
@@ -371,9 +371,9 @@ Section DevLoops.
          cannot push at all, which is what pins the FIFO between a THRE poll
          and the write that follows it. *)
   Definition uart_tx_own (γ : uart_names) (l : list (bv 8)) : iProp Σ :=
-    ghost_var γ.(un_tx) (1/2) l.
+    ghost_var_frac γ.(un_tx) (1/2) l.
   Definition uart_tx_auth (γ : uart_names) (u : uart_state) : iProp Σ :=
-    ghost_var γ.(un_tx) (1/2) (uart_acc u).
+    ghost_var_frac γ.(un_tx) (1/2) (uart_acc u).
 
   (* ---- DLAB, freezable to a persistent fact ---- *)
   Definition uart_dlab_is (γ : uart_names) (dq : dfrac) (b : bool) : iProp Σ :=
@@ -549,7 +549,7 @@ Section DevLoops.
 
        - the token pins [uart_acc u2 = l], because the only transition that
          grows the accepted trace is a THR push and a push needs the token's
-         half of the ghost_var, which we are holding;
+         half of the ghost_var_frac, which we are holding;
        - [uart_out_lb] says the transmitted prefix has already reached [l],
          and the device can only ever extend it;
        - so by [uart_tx_still_empty] there is nothing left in the FIFO;
@@ -641,7 +641,7 @@ Section DevLoops.
   (*  FIFO-is-non-empty fact a poll observes survives to the pop.           *)
   (*                                                                      *)
   (*  EXACTLY ONE HART MAY SHORTEN THE FIFO, and that is a theorem, not a   *)
-  (*  hope: the pop counter is a [ghost_var] whose other half is the        *)
+  (*  hope: the pop counter is a [ghost_var_frac] whose other half is the        *)
   (*  RECEIVE TOKEN, and both the RHR pop and the FCR receive-flush need    *)
   (*  it.  The token lives in the PLIC invariant while the UART is          *)
   (*  unclaimed and leaves it at the claim.                                *)
@@ -656,11 +656,11 @@ Section DevLoops.
      it (app-echo.md, lane CONS-CURSOR, C1). *)
   Definition uart_rx_tok (γ : uart_names) (k : nat)
       (hl : option (list mobs)) : iProp Σ :=
-    ghost_var γ.(un_rxpop) (1/2) (k, hl).
+    ghost_var_frac γ.(un_rxpop) (1/2) (k, hl).
   (* the invariant's half *)
   Definition uart_rx_popped (γ : uart_names) (k : nat)
       (hl : option (list mobs)) : iProp Σ :=
-    ghost_var γ.(un_rxpop) (1/2) (k, hl).
+    ghost_var_frac γ.(un_rxpop) (1/2) (k, hl).
   (* persistent: at least [n] bytes have ever been pushed *)
   Definition uart_rx_pushed_lb (γ : uart_names) (n : nat) : iProp Σ :=
     mono_nat_lb_own γ.(un_rxpush) n.
@@ -677,7 +677,7 @@ Section DevLoops.
      of the two came first. *)
   Definition uart_rx_hi (γ : uart_names) (q : Qp)
       (hh : option (list mobs)) : iProp Σ :=
-    ghost_var γ.(un_rxhi) q hh.
+    ghost_var_frac γ.(un_rxhi) q hh.
 
   Global Instance uart_rx_pushed_lb_persistent γ n :
     Persistent (uart_rx_pushed_lb γ n).
@@ -713,7 +713,7 @@ Section DevLoops.
     iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2").
   Qed.
   Lemma uart_rx_hi_alloc (hh : option (list mobs)) :
-    ⊢ |==> ∃ γn : gname, ghost_var γn (1/2) hh ∗ ghost_var γn (1/2) hh.
+    ⊢ |==> ∃ γn : gname, ghost_var_frac γn (1/2) hh ∗ ghost_var_frac γn (1/2) hh.
   Proof using .
     iMod (ghost_var_alloc hh) as (γn) "H".
     iEval (rewrite -Qp.half_half) in "H".
@@ -726,7 +726,7 @@ Section DevLoops.
      token; the persistent lower bound is what plicinithart needs before it
      may enable the UART's interrupt source. *)
   Definition uart_preinit (γ : uart_names) : iProp Σ :=
-    mono_nat_auth_own γ.(un_init) 1 0.
+    mono_nat_auth_own_frac γ.(un_init) 1 0.
   Definition uart_inited (γ : uart_names) : iProp Σ :=
     mono_nat_lb_own γ.(un_init) 1.
 
@@ -738,7 +738,7 @@ Section DevLoops.
   Lemma uart_preinit_inited_False γ : uart_preinit γ -∗ uart_inited γ -∗ False.
   Proof using .
     iIntros "Ha Hlb".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ Hle].
     iPureIntro. lia.
   Qed.
   Lemma uart_preinit_fire γ : uart_preinit γ ==∗ uart_inited γ.
@@ -944,22 +944,22 @@ Section DevLoops.
      ACCEPTED byte, drops and erase characters included. *)
   Definition uart_log_hi (γ : uart_names) (q : Qp)
       (hg : option (list mobs)) : iProp Σ :=
-    ghost_var γ.(un_loghi) q hg.
+    ghost_var_frac γ.(un_loghi) q hg.
 
   (* THE CONSUMED SEQUENCE, in two halves: the port invariant's and the
      console ring's ([ConsoleInv.cons_deliv], spelled there as the same
-     [ghost_var] at the same name because the two files are SIBLINGS --
+     [ghost_var_frac] at the same name because the two files are SIBLINGS --
      neither requires the other -- exactly as [ConsoleInv.cons_hi] is
      spelled beside [uart_rx_hi]).  It is what ties the boundary's [dl] to
      the ring's consumed count, without which a read cannot say where its
      window begins in the log. *)
   Definition uart_deliv (γ : uart_names) (q : Qp)
       (dv : list (list mobs * bv 8)) : iProp Σ :=
-    ghost_var γ.(un_deliv) q dv.
+    ghost_var_frac γ.(un_deliv) q dv.
 
   (* THE LOG'S EXACT MIRROR, in two halves: the port invariant's and the
      console ring's ([ConsoleInv.cons_logm], spelled there as the same
-     [ghost_var] at the same name because the two files are SIBLINGS).
+     [ghost_var_frac] at the same name because the two files are SIBLINGS).
      A PAIR AND NOT A BOUND (lane CONS-IO milestone B, ruling F4): the
      ring's gap accumulator quantifies over the log entries ABOVE the
      ring's top, and a [mono_list] lower bound cannot exclude an entry that
@@ -969,11 +969,11 @@ Section DevLoops.
      holds cons.lock and the port invariant together when it does. *)
   Definition uart_logm (γ : uart_names) (q : Qp)
       (L : list LogEntryDefs.log_entry) : iProp Σ :=
-    ghost_var γ.(un_logm) q L.
+    ghost_var_frac γ.(un_logm) q L.
 
   (* THE DELIVERED COUNT, in two halves (relax-d2, lane K2): the port
      invariant's, pinned to [length (ch_dl H)], and the console ring's
-     ([ConsoleInv.cons_dlcnt], the same [ghost_var] at the same name -- the
+     ([ConsoleInv.cons_dlcnt], the same [ghost_var_frac] at the same name -- the
      two files are SIBLINGS, exactly as [uart_deliv]/[cons_deliv] are).
 
      WHY THE NUMBER AND NOT THE LIST.  The LIST's kernel half travels with
@@ -985,9 +985,9 @@ Section DevLoops.
      entries and [length dl <= cur].  The number is what makes the second
      half of that sentence sayable inside the ring. *)
   Definition uart_dlcnt (γ : uart_names) (q : Qp) (n : nat) : iProp Σ :=
-    ghost_var γ.(un_dlcnt) q n.
+    ghost_var_frac γ.(un_dlcnt) q n.
 
-  (* THE CONSOLEINTR ARM IN PROGRESS (redesign R2, option A).  A ghost_var
+  (* THE CONSOLEINTR ARM IN PROGRESS (redesign R2, option A).  A ghost_var_frac
      PAIR: one half in the port invariant, one riding the PLIC payload
      beside the receive token.  consoleintr agrees the two at the arm's
      entry (so [None] is a PURE side condition it can prove), advances both,
@@ -1003,7 +1003,7 @@ Section DevLoops.
      code. *)
   Definition uart_arm (γ : uart_names) (q : Qp)
       (a : option LogEntryDefs.cons_arm) : iProp Σ :=
-    ghost_var γ.(un_arm) q a.
+    ghost_var_frac γ.(un_arm) q a.
 
   Global Instance uart_arm_timeless γ q a : Timeless (uart_arm γ q a).
   Proof using . rewrite /uart_arm. apply _. Qed.
@@ -1249,7 +1249,7 @@ Section DevLoops.
             [| discriminate]. exists e. split; [reflexivity |].
           by injection Htop as <-. }
         destruct Hin as (e & He & <-).
-        pose proof (Hbelow e (elem_of_list_lookup_2 _ _ _ He)) as [Hp _].
+        pose proof (Hbelow e (list_elem_of_lookup_2 _ _ _ He)) as [Hp _].
         exists f. split.
         * apply (flush_lost_mono _ h f Hp); [| exact Hsh | exact Hfl].
           rewrite Hbg Hbh. reflexivity.
@@ -1317,7 +1317,7 @@ Section DevLoops.
   Definition uart_col (iu : uart_id) (γ : uart_names) (u : uart_state)
       (hs : list (list mobs)) (np nk : nat)
       (hl ht : option (list mobs)) : iProp Σ :=
-    (mono_nat_auth_own γ.(un_rxpush) 1 np ∗ uart_rx_popped γ nk hl ∗
+    (mono_nat_auth_own_frac γ.(un_rxpush) 1 np ∗ uart_rx_popped γ nk hl ∗
      (* ...AND THE WIRE AS IT STOOD WHEN THE BYTE ARRIVED (lane CONS-IO,
         the coordinator's second C2 amendment).  A persistent lower bound on
         the transmitted prefix, minted at the rx arm where the trace
@@ -1667,7 +1667,7 @@ Section DevLoops.
     iDestruct (uart_rx_tok_agree with "Hk Htok") as %[<- <-].
     destruct Hok as (H1 & H2 & H3 & Hwo & H4 & H5 & H6 & H7 & H8
                      & R1 & R2 & R3 & R4 & R5 & R6).
-    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ Hge].
     destruct (u_rx u) as [| b rx'] eqn:Hrx.
     { cbn [length] in H1. lia. }
     destruct (Hpop b rx' eq_refl) as (-> & Hrx' & Hlb').
@@ -3622,7 +3622,7 @@ Section DevLoops.
     (* peel the caller's permanent accepted-trace bound off the authority *)
     iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
     iDestruct "Ha" as "[Ha Hsent]".
-    (* split the ghost_var into the invariant's half and the caller's token *)
+    (* split the ghost_var_frac into the invariant's half and the caller's token *)
     iEval (rewrite -Qp.half_half) in "Hc".
     iDestruct (ghost_var_split with "Hc") as "[Hc1 Hc2]".
     (* split the DLAB agree into the invariant's half and the caller's *)
@@ -4483,7 +4483,7 @@ Section DevLoops.
             iDestruct (TsoCtxStore.ledger_rpay_ok with "Htso Hc0") as %Hok0.
             iPureIntro. intros k q' g Hk.
             destruct Hok0 as (_ & _ & _ & _ & H1b & _). cbn in H1b.
-            destruct (H1b q' g (elem_of_list_lookup_2 _ _ _ Hk)) as (_ & i0 & mg & -> & Hlk & _).
+            destruct (H1b q' g (list_elem_of_lookup_2 _ _ _ Hk)) as (_ & i0 & mg & -> & Hlk & _).
             apply lookup_lt_Some in Hlk. lia. }
           (* THE RECORD'S CELLS: stamped by earlier appends, so under the log *)
           iDestruct (phys_map_ledger_le (gs_of img m log V (gr 0%fin) d) old

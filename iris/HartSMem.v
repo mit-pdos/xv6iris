@@ -1328,6 +1328,7 @@ Section smem.
                 ⌜r = Values.Ok (bytes, tt)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ Rr bytes).
   Proof using Hmmio_r Hpma_load Hpmprange Hvw.
+    clear Hread_node Mobl. (* unused; else Rocq counts it as used (asks for Proof using … Mobl) *)
     intros Hdisj HDpma HDcfg HDaddr HDhtif Hhtif Hpma Hpcfg Hpaddr
       HA Hord HR Hcov Hpallow Hram Hpa Hnode_ex.
     pose proof w_pos as Hw0. pose proof w_le8 as Hw8.
@@ -1512,6 +1513,7 @@ Section smem.
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
   Proof using Hmmio_r Hpma_load Hpmprange Hvw.
+    clear Hread_node Mobl. (* unused; else Rocq counts it as used (asks for Proof using … Mobl) *)
     intros Hdisj HDmst HDpriv HDpma HDcfg HDaddr HDhtif Hpriv Hhtif Hpma
       Hpcfg Hpaddr Hep HA Hord HR Hcov Hpallow Hram Hpa Hnode_ex.
     iIntros "#Hcert Hfrag Hres Hrw Hro Htr Hmem".
@@ -1612,6 +1614,7 @@ Section smem.
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
   Proof using Hmmio_r Hpma_load Hpmprange Hvw.
+    clear Hread_node Mobl. (* unused; else Rocq counts it as used (asks for Proof using … Mobl) *)
     intros Hdisj HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif Hpriv Hhtif
       Hpma Hpcfg Hpaddr HSXL Hmode Hep HA Hord HR Hcov Hpallow Hram Hva Hpa
       Hnode_ex.
@@ -1740,6 +1743,7 @@ Section smem.
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
   Proof using Hmmio_r Hpma_load Hpmprange Hvw.
+    clear Hread_node Mobl. (* unused; else Rocq counts it as used (asks for Proof using … Mobl) *)
     intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
       Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
       Hcov Hpallow Hram Hva Hpa Hnode_ex.
@@ -1842,6 +1846,7 @@ Section smem.
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   Rt rsf ∗ resv_any cpu_id ∗ Rr bytes).
   Proof using Hmmio_r Hpma_load Hpmprange Hvw.
+    clear Hread_node Mobl. (* unused; else Rocq counts it as used (asks for Proof using … Mobl) *)
     intros ea Hdisj HDmst HDpriv HDmenv HDsatp HDpma HDcfg HDaddr HDhtif
       Hpriv Hhtif Hpma Hpcfg Hpaddr Hmxr Hpmm HSXL Htf Hmode Hep HA Hord HR
       Hcov Hpallow Hram Hva Hpa Hrd Hnode_ex.
@@ -2874,6 +2879,7 @@ Section smem_w.
       (fun r => ⌜r = Values.Ok tt⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof using Hpma_store Hpmprange Hvw.
+    clear Hwrite_node Wobl. (* unused; else Rocq counts it as used (asks for Proof using … Wobl) *)
     intros Hdisj HDmst HDpriv HDpma HDcfg HDaddr Hpriv Hpma Hpcfg Hpaddr
       Hep HA Hord HW Hcov Hpallow Hram Hpa.
     pose proof ww_pos as Hw0. pose proof ww_le8 as Hw8.

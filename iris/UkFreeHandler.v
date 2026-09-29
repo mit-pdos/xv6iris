@@ -303,13 +303,13 @@ Section UkFreeHandler.
         intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
         * apply elem_of_singleton in Hx as ->. split; [unfold NSTD, NOFILE in *; lia |].
           left. split; [unfold NSTD in *; lia |]. exists (FdOpen rd wr t).
-          rewrite Nat2Z.id list_lookup_insert; [split; [done | discriminate] |].
+          rewrite Nat2Z.id list_lookup_insert_eq; [split; [done | discriminate] |].
           rewrite <- Hlen in Hk0l. rewrite Hlen. unfold NSTD in *; lia.
         * destruct (Hok x Hx) as [Hb Hc]. split; [exact Hb |].
           destruct Hc as [(Hs' & st' & Hl' & Hne') | Hc]; [left | by right].
           split; [exact Hs' |].
           destruct (decide (Z.to_nat x = k0)) as [-> | Hne].
-          -- exists (FdOpen rd wr t). rewrite list_lookup_insert; [split; [done | discriminate] |].
+          -- exists (FdOpen rd wr t). rewrite list_lookup_insert_eq; [split; [done | discriminate] |].
              exact (lookup_lt_Some _ _ _ Hk0).
           -- exists st'. rewrite list_lookup_insert_ne; [split; [exact Hl' | exact Hne'] |].
              congruence.
@@ -318,11 +318,11 @@ Section UkFreeHandler.
         iExists l, (<[Z.of_nat fd := FdOpen rd wr t]> hm). iFrame "Hstd". iSplit.
         * iPureIntro. intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
           -- apply elem_of_singleton in Hx as ->. split; [unfold NOFILE in *; lia |].
-             right. split; [lia |]. rewrite lookup_insert. by eexists.
+             right. split; [lia |]. rewrite lookup_insert_eq. by eexists.
           -- destruct (Hok x Hx) as [Hb Hc]. split; [exact Hb |].
              destruct Hc as [Hc | (Hs' & Hsm)]; [by left | right]. split; [exact Hs' |].
              destruct (decide (x = Z.of_nat fd)) as [-> |];
-               [rewrite lookup_insert; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
+               [rewrite lookup_insert_eq; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
         * rewrite big_sepM_insert; [| exact Hfr]. rewrite Nat2Z.id. iFrame "Hh Hhm".
     - iApply ("Hcont" $! h3 ret with "[%] [-Hp Hrun] Hp Hrun").
       { left. rewrite Hr. exact fh_m1. }

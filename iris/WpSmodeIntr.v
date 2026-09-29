@@ -271,7 +271,7 @@ Section WpSmodeIntr.
     iIntros "Hcg Hpc #Hinstr Hbody".
     (* ---- the bundle, into the 25 cells ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
+    iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (mst0 mdv0)
       "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
         Hmdl & Hmenv)".
     (* THE SLOT, THROUGH THE ARM-AWARE ACCESSOR.  [sie_cap_to_cells] hands
@@ -302,7 +302,7 @@ Section WpSmodeIntr.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
         %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
         %Hmisaval & %Hsecval & #Hkmapb)".
-    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     pose proof Hmsf as Hmsf'. destruct Hmsf' as (HMPRV & HSXL & _).
     (* ---- THE ARM, SPLIT HERE AND NOWHERE ELSE.  Both branches are
        CONCRETE in the write set, and they have to be: an [iApply] of a cycle
@@ -395,7 +395,7 @@ Section WpSmodeIntr.
                            arm it is holding the tlb cell. *)
                         (wp_next false p
                            (sconf_step_obl_clock m n false b' pc is_rvc i R)
-                         ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                         ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                          ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
                          ∗ gpr_file (tp_pin m)
                          ∗ (∀ (m1 : regfile) (av1 : nat) (b1 : bool)
@@ -651,7 +651,7 @@ Section WpSmodeIntr.
                            arm it is holding the tlb cell. *)
                         (wp_next false p
                            (sconf_step_obl_clock m n false b' pc is_rvc i R)
-                         ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                         ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                          ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
                          ∗ gpr_file (tp_pin m)
                          ∗ (∀ (m1 : regfile) (av1 : nat) (b1 : bool)
@@ -971,7 +971,7 @@ Section WpSmodeIntr.
     - (* the instruction: hand the walk the file, take the written one back *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iDestruct ("Hex" $! CID with "Hcert Hfile") as "Hexx".
       iApply (swp_mono (CID := CID) with "[Hsc Hcap HPC HnPC Hresv] [Hexx]");
         [| iExact "Hexx" ].
@@ -984,7 +984,7 @@ Section WpSmodeIntr.
               (<[Regidx rd := regval_into_reg wval]> m), n.
       iFrame "HPC HnPC Hresv Hscp".
       iSplitL "Hcap".
-      { iApply (sie_cap_retarget m
+      { iApply (sie_cap_retarget (CID := CID) m
                   (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap"). }
       iSplitL "Hfile".
       { iEval (rewrite (tp_pin_upd m rd (regval_into_reg wval) Hrdtp))
@@ -992,7 +992,7 @@ Section WpSmodeIntr.
       done.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
   Qed.
 

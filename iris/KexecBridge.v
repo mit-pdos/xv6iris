@@ -169,21 +169,21 @@ Proof.
   assert (Hwpc : tf_w ws tf_epc_idx = entry).
   { unfold ws, tf_w. rewrite Htf.
     rewrite list_lookup_total_insert_ne by (unfold tf_arg_idx, tf_epc_idx; lia).
-    apply list_lookup_total_insert.
+    apply list_lookup_total_insert_eq.
     rewrite !length_insert. exact Hlt3. }
   assert (Hwsp : tf_w ws kxc_tf_sp_idx = spv).
   { unfold ws, tf_w. rewrite Htf.
     rewrite list_lookup_total_insert_ne by (unfold tf_arg_idx, kxc_tf_sp_idx; lia).
     rewrite list_lookup_total_insert_ne by (unfold tf_epc_idx, kxc_tf_sp_idx; lia).
-    apply list_lookup_total_insert. rewrite length_insert. exact Hlt6. }
+    apply list_lookup_total_insert_eq. rewrite length_insert. exact Hlt6. }
   assert (Hwa1 : tf_w ws (tf_arg_idx 1) = spv).
   { unfold ws, tf_w. rewrite Htf.
     rewrite list_lookup_total_insert_ne by (unfold tf_arg_idx; lia).
     rewrite list_lookup_total_insert_ne by (unfold tf_epc_idx, tf_arg_idx; lia).
     rewrite list_lookup_total_insert_ne by (unfold kxc_tf_sp_idx, tf_arg_idx; lia).
-    apply list_lookup_total_insert. exact Hlt15. }
+    apply list_lookup_total_insert_eq. exact Hlt15. }
   assert (Hwa0 : tf_w ws (tf_arg_idx 0) = (mword_of_int (Z.of_nat na) : mword 64)).
-  { unfold ws, tf_w. apply list_lookup_total_insert.
+  { unfold ws, tf_w. apply list_lookup_total_insert_eq.
     rewrite Htf, !length_insert. exact Hlt14. }
   assert (Hwlen : length ws = TFWORDS).
   { unfold ws. rewrite length_insert, Htf, !length_insert. exact Hlen. }

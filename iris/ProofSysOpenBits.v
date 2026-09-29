@@ -56,7 +56,7 @@ Proof.
   { apply (Z.divide_trans M (2 ^ 32) (2 ^ 64) Hdvd).
     exists (2 ^ 32). vm_compute. reflexivity. }
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       SailStdpp.Values.to_word to_word get_word
+       
        MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   unfold bv_wrap.

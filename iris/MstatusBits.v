@@ -29,9 +29,9 @@ Local Open Scope Z_scope.
 Ltac mw_prep :=
   unfold subrange_vec_dec, update_subrange_vec_dec;
   unfold MachineWord.update_slice, MachineWord.slice;
-  cbn [get_word];
+  idtac;
   rewrite ?autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite ?MachineWord.MachineWord.cast_idx_refl.
 
 (* Normalize the closed N-index arithmetic (Z_idx / N.add / Z.of_N) that

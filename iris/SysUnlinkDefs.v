@@ -279,8 +279,8 @@ Section UnlinkDefs.
        (ents : gmap fname Z) (nl : nat) (a : anode),
        ⌜unl_pre (abs_view I) d nm ents nl t a⌝ -∗
        Pd d -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Pd d ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Pd d ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
@@ -288,8 +288,8 @@ Section UnlinkDefs.
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I'
              = delta_unl_ent d nm (unl_dec (an_node a)) (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm t))%I.
 
   (* ...and the cursor's ISO, [FsAbsCreateFire.acre_commit_at_gen_mono]'s
      twin *)
@@ -330,16 +330,16 @@ Section UnlinkDefs.
     (∀ (I : gmap Z fs_node) (t : Z) (a : anode),
        ⌜abs_view I !! t = Some a⌝ -∗
        ⌜(1 <= an_nlink a)%nat⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
          app_step t I (delta_unl_tgt t (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_unl_tgt t (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) t))%I.
 
   (* THE MISS OBSERVATION, single-phase and read-only --
      [dlookup_commit_at]'s twin at the ABSENT entry (header, deviation
@@ -353,8 +353,8 @@ Section UnlinkDefs.
           and this lock, and then the view has no row for it *)
        ⌜arow_at (abs_view I) d (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = None⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm)%I.
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm)%I.
 
   (* The FOUND observation is [FsAbsMknodFire.dlookup_commit_at],
      reused verbatim -- fired here at the isdirempty refusal (arm

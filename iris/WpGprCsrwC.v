@@ -136,7 +136,7 @@ Ltac quu :=
          _update_Mstatus_UXL;
   unfold subrange_vec_dec, update_subrange_vec_dec;
   rewrite !autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite !MachineWord.MachineWord.cast_idx_refl.
 
 Ltac qu_disj :=
@@ -1105,7 +1105,7 @@ Proof.
     + apply Z.eqb_eq in Hjm. subst j.
       rewrite nth_lookup.
       replace (Z.to_nat (63 - m)) with k by reflexivity.
-      rewrite (list_lookup_insert xs k t Hk). reflexivity.
+      rewrite (list_lookup_insert_eq xs k t Hk). reflexivity.
     + apply Z.eqb_neq in Hjm.
       rewrite nth_lookup.
       rewrite list_lookup_insert_ne.
@@ -1270,7 +1270,7 @@ Qed.
 Ltac us_id_tac :=
   unfold subrange_vec_dec, update_subrange_vec_dec;
   rewrite !autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite !MachineWord.MachineWord.cast_idx_refl;
   unfold MachineWord.MachineWord.slice;
   match goal with
@@ -1343,7 +1343,7 @@ Ltac to_bv :=
     _update_Sstatus_UXL, _update_Sstatus_SD;
   unfold subrange_vec_dec, update_subrange_vec_dec;
   rewrite ?autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite ?MachineWord.MachineWord.cast_idx_refl;
   unfold MachineWord.MachineWord.slice.
 
@@ -1433,7 +1433,7 @@ Qed.
 Lemma zext64_id (w : mword 64) : zero_extend' 64 w = w.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   apply bv_zero_extend_idemp.
 Qed.
 
@@ -1441,7 +1441,7 @@ Qed.
 Lemma subrange_full (w : mword 64) : subrange_vec_dec w (Z.sub xlen 1) 0 = w.
 Proof.
   unfold subrange_vec_dec.
-  rewrite autocast_refl. unfold to_word_idx, to_word, get_word.
+  rewrite autocast_refl. unfold to_word_idx.
   rewrite MachineWord.MachineWord.cast_idx_refl.
   unfold MachineWord.MachineWord.slice.
   apply bv_eq. rewrite bv_extract_unsigned. rewrite Z.shiftr_0_r.
@@ -1451,8 +1451,8 @@ Qed.
 Lemma and_vec_unsigned (a b : mword 64) :
   bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
 Proof.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word].
+  cbv [and_vec Operators_mwords.word_binop 
+       ].
   unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
 Qed.
 
@@ -1546,7 +1546,7 @@ Proof.
   apply (f_equal bv_unsigned) in HS.
   unfold _get_Mstatus_SIE, subrange_vec_dec in HS.
   rewrite autocast_refl in HS.
-  unfold to_word_idx, to_word, get_word in HS.
+  unfold to_word_idx in HS.
   rewrite MachineWord.MachineWord.cast_idx_refl in HS.
   unfold MachineWord.MachineWord.slice in HS.
   rewrite bv_extract_unsigned in HS.
@@ -1585,7 +1585,7 @@ Lemma sstatus_spp_bit (w : mword 64) :
 Proof.
   unfold _get_Sstatus_SPP, subrange_vec_dec.
   rewrite autocast_refl.
-  unfold to_word_idx, to_word, get_word.
+  unfold to_word_idx.
   rewrite MachineWord.MachineWord.cast_idx_refl.
   unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
@@ -1648,8 +1648,8 @@ Proof.
   intro Hb1.
   assert (HC : bv_unsigned (not_vec (zero_extend' 64 (mword_of_int 2 : mword 5)) : mword 64)
                = bv_wrap 64 (Z.lnot 2)).
-  { cbv [not_vec Operators_mwords.word_unop Operators_mwords.with_word'
-         SailStdpp.Values.with_word to_word get_word MachineWord.MachineWord.not].
+  { cbv [not_vec Operators_mwords.word_unop 
+         MachineWord.MachineWord.not].
     rewrite bv_not_unsigned. f_equal. }
   apply bv_eq. rewrite and_vec_unsigned. rewrite HC.
   apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec.

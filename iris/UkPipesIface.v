@@ -729,17 +729,17 @@ Section UkPipesIface.
   Proof using .
     intros Ha'. iIntros "(%Hs & %Hw & #Hinv & H)".
     iSplitR.
-    { iPureIntro. destruct (elem_of_list_lookup_1 alts a Ha') as [i Hi].
+    { iPureIntro. destruct (list_elem_of_lookup_1 alts a Ha') as [i Hi].
       rewrite /cons_short Forall_singleton. exact (Forall_lookup_1 _ _ _ _ Hs Hi). }
     iSplitR; [by iPureIntro |]. iSplitR; [iExact "Hinv" |].
     iDestruct "H" as "[(Hc & Hm & %HA & Hks) | (%s & %c & %Hpure & %Hst & Hcw & Hmw)]".
     - iLeft. iFrame "Hc Hm". iSplitR.
-      { iPureIntro. intros a' Ha''. apply elem_of_list_singleton in Ha'' as ->. by apply HA. }
-      destruct (elem_of_list_lookup_1 alts a Ha') as (i & Hi).
+      { iPureIntro. intros a' Ha''. apply list_elem_of_singleton in Ha'' as ->. by apply HA. }
+      destruct (list_elem_of_lookup_1 alts a Ha') as (i & Hi).
       iDestruct (big_sepL_lookup _ _ i a Hi with "Hks") as "Hk".
       rewrite big_sepL_singleton. iExact "Hk".
     - destruct Hpure as (Hc & Halts & HsA). subst alts.
-      apply elem_of_list_singleton in Ha' as ->.
+      apply list_elem_of_singleton in Ha' as ->.
       iRight. iExists s, c. iSplitR; [iPureIntro; done |].
       iSplitR; [iPureIntro; exact Hst |]. iFrame "Hcw Hmw".
   Qed.
@@ -760,7 +760,7 @@ Section UkPipesIface.
       iSplitR; [by iPureIntro |]. iSplitR; [iExact "Hinv" |].
       iRight. iExists x, 1%nat.
       iSplitR.
-      { iPureIntro. split; [| split; [reflexivity | apply HA; by apply elem_of_list_singleton]].
+      { iPureIntro. split; [| split; [reflexivity | apply HA; by apply list_elem_of_singleton]].
         apply lookup_lt_Some in Hb. lia. }
       iSplitR; [iPureIntro; exact Hst |]. iFrame "Hc Hm".
     - destruct Hpure as ([Hc0 HcS] & Halts & HsA).
@@ -796,7 +796,7 @@ Section UkPipesIface.
     iIntros "(_ & _ & _ & [(Hc & Hm & _) | (%s & %c & %Hpure & _ & Hcw & Hmw)])".
     - iExists None. iSplitR; [iPureIntro; by left |]. cbn [pns_wfin]. iFrame "Hc Hm".
     - destruct Hpure as ([Hc0 HcS] & -> & HsA).
-      apply elem_of_list_singleton in Hnil.
+      apply list_elem_of_singleton in Hnil.
       assert (c = length s) as ->.
       { symmetry in Hnil. pose proof (pns_drop_nil_le s c Hnil). lia. }
       iExists (Some s). iSplitR; [iPureIntro; right; by exists s |].
@@ -846,7 +846,7 @@ Section UkPipesIface.
     a ∈ alts -> pns_wD pin F w c alts -∗ pns_wD pin F w c [a].
   Proof using .
     intros Ha'. iIntros "(%HcL & #H0 & %Hw & #Hinv & #Hck & %wc & [%Halts %Hwc] & Hcw & Hmw)".
-    subst alts. apply elem_of_list_singleton in Ha'. subst a.
+    subst alts. apply list_elem_of_singleton in Ha'. subst a.
     iSplitR; [by iPureIntro |]. iSplitR; [iExact "H0" |]. iSplitR; [by iPureIntro |].
     iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hck" |].
     iExists wc. iFrame "Hcw Hmw". by iPureIntro.
@@ -1082,7 +1082,7 @@ Section UkPipesIface.
     d ∉ Dp -> pns_kds_ok vs -> pns_kds_ok (delete d vs).
   Proof using .
     intros HD Hk dk Hdk. rewrite lookup_delete_ne; [exact (Hk dk Hdk) |].
-    intros Hq. apply HD. rewrite Hq. apply elem_of_list_fmap_1. exact Hdk.
+    intros Hq. apply HD. rewrite Hq. apply list_elem_of_fmap_2. exact Hdk.
   Qed.
 
   Lemma pns_fds_row (fdm : fdmap) (l : list fdstate) (vs : gmap nat pdev) (fd : Z) (d : nat)
@@ -1162,7 +1162,7 @@ Section UkPipesIface.
     iIntros "(#Hk & #Hs & #Hm)". iFrame "Hk Hs".
     destruct (vs !! d) as [kd |] eqn:Hv.
     - iDestruct (big_sepM_delete with "Hm") as "[_ $]". exact Hv.
-    - rewrite delete_notin; [iExact "Hm" | exact Hv].
+    - rewrite delete_id; [iExact "Hm" | exact Hv].
   Qed.
 
   (* ---- THE FINAL STATES, per kind (the file header's table) ---- *)
@@ -1399,7 +1399,7 @@ Section UkPipesIface.
       iIntros "Hstd Hd". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-Hd Htk] [Htk Hd]"); [pns_repack |].
       iLeft. iExists w, A. iFrame "Htk Hd".
-    - exfalso. subst alts. apply elem_of_list_singleton in Ha'. subst a.
+    - exfalso. subst alts. apply list_elem_of_singleton in Ha'. subst a.
       destruct Hpre as [k Hk]. symmetry in Hk. apply app_eq_nil in Hk as [Hbs _].
       exact (Hne Hbs).
   Qed.
@@ -1422,7 +1422,7 @@ Section UkPipesIface.
       - iExists S. iFrame "Hd". by iPureIntro.
       - iExists L. iSplitR.
         + iPureIntro. apply elem_of_cons in Ha' as [-> | Ha']; [by left |].
-          apply elem_of_list_singleton in Ha'. subst a. exfalso. apply Hne.
+          apply list_elem_of_singleton in Ha'. subst a. exfalso. apply Hne.
           by apply prefix_nil_inv.
         + rewrite /pipe_out. iExists 0%nat. rewrite drop_0 take_0. iFrame "Hw Hlb".
           iPureIntro. split; [reflexivity | exact HL31]. }
@@ -1865,7 +1865,7 @@ Section UkPipesIface.
     change copy_out with (Z.of_nat 1%nat).
     iApply (cons_write N P (HPc := HPc) Hsw (pns_wD pin F w c) (pns_wD_short pin F w c)
               (pns_wD_sub pin F w c) (pns_wD_step pin F w c) l 1 rb [p] p bs K
-              ltac:(unfold NSTD; lia) Hl1 ltac:(apply elem_of_list_singleton; reflexivity) Hpre
+              ltac:(unfold NSTD; lia) Hl1 ltac:(apply list_elem_of_singleton; reflexivity) Hpre
               with "Hstd [Hcw Hmw]").
     { iSplitR; [iPureIntro; split; [exact HcL | exact Hfok] |]. iSplitR; [iExact "H0" |].
       iSplitR; [iPureIntro; exact Hw |]. iSplitR; [iExact "Hinv" |].
@@ -2250,7 +2250,7 @@ Section UkPipesIface.
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. cbn [pns_pk_inv pns_final].
       iDestruct "Hd" as "[(%S & -> & Hd) | (-> & Hw & _)]".
-      + apply elem_of_list_singleton in Hdr. subst S.
+      + apply list_elem_of_singleton in Hdr. subst S.
         iMod (pns_lexit_of_lend pn gp with "Hi [Hd]") as "Hle"; [by iLeft |].
         iModIntro. iFrame "Htoks". by iLeft.
       + (* the unfired write end: nothing written *)
@@ -2298,10 +2298,10 @@ Section UkPipesIface.
     induction kl as [| dk kl IH]; intros Hall; iIntros "#He Htoks Hdev".
     - by iModIntro.
     - iDestruct "Hdev" as "[Hd Hdev]".
-      destruct (Hall dk (elem_of_list_here _ _)) as [Hv Hdr].
+      destruct (Hall dk (list_elem_of_here _ _)) as [Hv Hdr].
       iMod (pns_dev_final vs dk.1 dk.2 (dv dk.1) Hv Hdr with "He Htoks Hd") as "[Htoks Hf]".
       iMod (IH with "He Htoks Hdev") as "Hfs".
-      { intros dk' Hdk'. apply Hall. by apply elem_of_list_further. }
+      { intros dk' Hdk'. apply Hall. by apply list_elem_of_further. }
       iModIntro. iSplitL "Hf"; [iExact "Hf" | iExact "Hfs"].
   Qed.
 
@@ -2327,7 +2327,7 @@ Section UkPipesIface.
     iApply fupd_wp.
     iMod (pns_finals vs dv kds with "He Htoks Hdev") as "Hfin".
     { intros dk Hdk. split; [exact (Hkd dk Hdk) |]. apply Hdr, Hdp.
-      apply elem_of_list_fmap_1. exact Hdk. }
+      apply list_elem_of_fmap_2. exact Hdk. }
     iDestruct ("Hxk" with "[Hfin]") as "Hpay"; [by iRight |].
     iModIntro.
     iPoseProof (fh_exit_pay N P Hse s with "Hpay") as "Hex".
@@ -2413,9 +2413,9 @@ Section UkPipesIface.
     intros Hk Hw0 Hw1 Hl0 Hl1 Hl2.
     set (fdm := (<[0 := 1%nat]> (<[1 := 1%nat]> {[2 := 0%nat]}) : fdmap)).
     set (vs := (<[0%nat := PDCon w2 A2]> {[1%nat := PDCopy (pin, gin) F sk]} : gmap nat pdev)).
-    assert (Hv0 : vs !! 0%nat = Some (PDCon w2 A2)) by (rewrite /vs; apply lookup_insert).
+    assert (Hv0 : vs !! 0%nat = Some (PDCon w2 A2)) by (rewrite /vs; apply lookup_insert_eq).
     assert (Hv1 : vs !! 1%nat = Some (PDCopy (pin, gin) F sk)).
-    { rewrite /vs lookup_insert_ne; [| done]. apply lookup_singleton. }
+    { rewrite /vs lookup_insert_ne; [| done]. apply lookup_singleton_eq. }
     assert (Hok : pns_ok fdm l vs).
     { split; [| split; [| split]].
       - intros fd d. rewrite /fdm lookup_insert_Some lookup_insert_Some lookup_singleton_Some.
@@ -2428,13 +2428,13 @@ Section UkPipesIface.
       - intros d. rewrite /vs dom_insert_L dom_singleton_L elem_of_union !elem_of_singleton.
         intros [-> | ->]; left; [exists 2 | exists 0].
         + rewrite /fdm lookup_insert_ne; [| lia]. rewrite lookup_insert_ne; [| lia].
-          apply lookup_singleton.
-        + apply lookup_insert.
+          apply lookup_singleton_eq.
+        + apply lookup_insert_eq.
       - intros fd d. rewrite /fdm lookup_insert_Some lookup_insert_Some lookup_singleton_Some.
         rewrite /vs dom_insert_L dom_singleton_L.
         intros [[_ <-] | (_ & [[_ <-] | (_ & _ & <-)])]; set_solver. }
     assert (Hkd : pns_kds_ok vs).
-    { intros dk. rewrite Hk elem_of_cons elem_of_list_singleton.
+    { intros dk. rewrite Hk elem_of_cons list_elem_of_singleton.
       intros [-> | ->]; cbn [fst snd]; [exact Hv0 | exact Hv1]. }
     iIntros "Hstd Hpool (#Hinv & Hr & Hsk & %Hc2 & #Hfam & Hc & Hm & Hks & Hxk)".
     destruct Hc2 as (Hs2 & Hw2 & HA2).
@@ -2507,9 +2507,9 @@ Section UkPipesIface.
     intros Hk Hw0 Hw1 Hl0 Hl1 Hl2.
     set (fdm := (<[0 := 1%nat]> (<[1 := 1%nat]> {[2 := 0%nat]}) : fdmap)).
     set (vs := (<[0%nat := PDMute]> {[1%nat := PDCopy (pin, gin) F sk]} : gmap nat pdev)).
-    assert (Hv0 : vs !! 0%nat = Some PDMute) by (rewrite /vs; apply lookup_insert).
+    assert (Hv0 : vs !! 0%nat = Some PDMute) by (rewrite /vs; apply lookup_insert_eq).
     assert (Hv1 : vs !! 1%nat = Some (PDCopy (pin, gin) F sk)).
-    { rewrite /vs lookup_insert_ne; [| done]. apply lookup_singleton. }
+    { rewrite /vs lookup_insert_ne; [| done]. apply lookup_singleton_eq. }
     assert (Hok : pns_ok fdm l vs).
     { split; [| split; [| split]].
       - intros fd d. rewrite /fdm lookup_insert_Some lookup_insert_Some lookup_singleton_Some.
@@ -2522,13 +2522,13 @@ Section UkPipesIface.
       - intros d. rewrite /vs dom_insert_L dom_singleton_L elem_of_union !elem_of_singleton.
         intros [-> | ->]; left; [exists 2 | exists 0].
         + rewrite /fdm lookup_insert_ne; [| lia]. rewrite lookup_insert_ne; [| lia].
-          apply lookup_singleton.
-        + apply lookup_insert.
+          apply lookup_singleton_eq.
+        + apply lookup_insert_eq.
       - intros fd d. rewrite /fdm lookup_insert_Some lookup_insert_Some lookup_singleton_Some.
         rewrite /vs dom_insert_L dom_singleton_L.
         intros [[_ <-] | (_ & [[_ <-] | (_ & _ & <-)])]; set_solver. }
     assert (Hkd : pns_kds_ok vs).
-    { intros dk. rewrite Hk elem_of_cons elem_of_list_singleton.
+    { intros dk. rewrite Hk elem_of_cons list_elem_of_singleton.
       intros [-> | ->]; cbn [fst snd]; [exact Hv0 | exact Hv1]. }
     iIntros "Hstd Hpool (#Hinv & Hr & Hsk & Hxk)".
     rewrite /env_res.
@@ -2586,18 +2586,18 @@ Section UkPipesIface.
     intros Hk Hw0 Hl1.
     set (fdm := ({[1 := 0%nat]} : fdmap)).
     set (vs := ({[0%nat := PDWr pn gp]} : gmap nat pdev)).
-    assert (Hv0 : vs !! 0%nat = Some (PDWr pn gp)) by (rewrite /vs; apply lookup_singleton).
+    assert (Hv0 : vs !! 0%nat = Some (PDWr pn gp)) by (rewrite /vs; apply lookup_singleton_eq).
     assert (Hok : pns_ok fdm l vs).
     { split; [| split; [| split]].
       - intros fd d. rewrite /fdm lookup_singleton_Some. intros [<- _]. lia.
       - intros fd d. rewrite /fdm lookup_singleton_Some. intros [<- <-].
         rewrite Hv0. cbn [pns_row]. split; [unfold NSTD; lia | by exists rb].
       - intros d. rewrite /vs dom_singleton_L elem_of_singleton.
-        intros ->. left. exists 1. apply lookup_singleton.
+        intros ->. left. exists 1. apply lookup_singleton_eq.
       - intros fd d. rewrite /fdm lookup_singleton_Some. intros [_ <-].
         rewrite /vs dom_singleton_L. set_solver. }
     assert (Hkd : pns_kds_ok vs).
-    { intros dk. rewrite Hk elem_of_list_singleton. intros ->. exact Hv0. }
+    { intros dk. rewrite Hk list_elem_of_singleton. intros ->. exact Hv0. }
     iIntros "Hstd Hpool (#Hinv & Hw & #Hlb & Hxk)". rewrite /env_res.
     iDestruct (pns_pool_own_take ∅ wv 0%nat with "Hpool") as "[Hpool Htk]"; [set_solver |].
     rewrite Hw0. iDestruct (pns_tok_halves with "Htk") as "[Htk1 Htk2]".

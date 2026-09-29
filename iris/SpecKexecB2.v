@@ -580,7 +580,7 @@ Section KexecB2Res.
   Proof using .
     intro Hal. iIntros "Hh".
     iApply (kxc_bytes_ph sp0 Hal). rewrite /bytes_own.
-    iApply (bb_named_any with "Hh").
+    iApply (bb_named_any (KTR := KT1) with "Hh").
   Qed.
 
   (* An 8-byte READ window into a named run -- [ProofKexecSeam.kxc_win2] and
@@ -603,7 +603,7 @@ Section KexecB2Res.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word_pointsto_bytes (KTR := KT1) with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

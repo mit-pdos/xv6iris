@@ -158,9 +158,9 @@ Section ProofSysExit.
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
     (* the local [n] is the upper half of slot 3 *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hb3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hb3") as %Hal3.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hb3") as "[Hb3lo Hb3hi]".
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->
               add_vec (M1 !!! Regidx csp_rs1)
@@ -318,7 +318,7 @@ Section ProofSysExit.
       rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite (proj1 HcsAi). exact HA4sp. }
     iEval (rewrite Haddrn) in "Hb3hi".
-    iDestruct (ctx_word_pointsto_join4 _ (pa_stk sp0 3) (DfracOwn 1) _ _ Hal3
+    iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ (pa_stk sp0 3) (DfracOwn 1) _ _ Hal3
                  with "Hb3lo Hb3hi") as "Hb3".
     iDestruct (sex_frame_stack sp0 _ _ _ _ with "Hb1 Hb2 Hb3 Hb4") as "Hfr".
     iDestruct (kstack_closer_frame pj sp0 (trap_res b + av)%nat 4 ltac:(lia)

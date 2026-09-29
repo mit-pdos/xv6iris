@@ -169,12 +169,12 @@ Section UShPipesNode.
     assert (Hlt : (j - 1 < length fs)%nat) by lia.
     destruct (lookup_lt_is_Some_2 fs (j - 1) Hlt) as [x Hx].
     rewrite /lfilt lfilts_round (nth_lookup_Some _ _ _ _ Hx).
-    exact (elem_of_list_lookup_2 _ _ _ Hx).
+    exact (list_elem_of_lookup_2 _ _ _ Hx).
   Qed.
 
   Lemma fok_round (j : nat) : (1 <= j <= nc)%nat -> fok (lfilt lR j) L.
   Proof using Hgate Hline P gF gG.
-    intros Hj. exact (proj1 (Forall_forall _ _) Hgate _ (proj1 (elem_of_list_In _ _) (lfilt_in j Hj))).
+    intros Hj. exact (proj1 (Forall_forall _ _) Hgate _ (proj1 (list_elem_of_In _ _) (lfilt_in j Hj))).
   Qed.
 
   Lemma Hfire : forall w s, w ∈ wsN -> fire_src fcR pr (lfilts lR) L w s ->
@@ -945,7 +945,7 @@ Section UShPipesNode.
     pose proof ld0_len as Hl.
     set (ld := <[1%nat := wr γp]> (<[0%nat := st0]> ld0)).
     assert (H1 : ld !! 1%nat = Some (wr γp)).
-    { rewrite /ld. apply list_lookup_insert. rewrite length_insert. lia. }
+    { rewrite /ld. apply list_lookup_insert_eq. rewrite length_insert. lia. }
     assert (H2 : ld !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))).
     { rewrite /ld list_lookup_insert_ne; [| lia]. rewrite list_lookup_insert_ne; [| lia].
       exact Hld2. }
@@ -964,7 +964,7 @@ Section UShPipesNode.
       rewrite /RcLf. destruct (gin_of st0) as [gin |] eqn:Hg; [| iDestruct "HRc" as %[]].
       destruct (gin_of_some st0 gin Hg) as [wb ->].
       assert (H0 : ld !! 0%nat = Some (FdOpen true wb (FdPipe gin))).
-      { rewrite /ld list_lookup_insert_ne; [| lia]. apply list_lookup_insert. lia. }
+      { rewrite /ld list_lookup_insert_ne; [| lia]. apply list_lookup_insert_eq. lia. }
       iApply (stage_mid g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
                 Rd γc γm P gF gG Hfire k' (lfilt lR (S k')) co s0 gs N' h' m' gin γp q szv ld av
                 eq_refl (fok_round (S k') ltac:(lia)) Hok Hab ltac:(lia) Hpeq Ha0
@@ -991,7 +991,7 @@ Section UShPipesNode.
     rewrite Hka in Hk. injection Hk as <-.
     rewrite /RcRf. case_decide as Hq; [| lia].
     set (ld := <[0%nat := rd γp]> ld0).
-    assert (H0 : ld !! 0%nat = Some (rd γp)) by (apply list_lookup_insert; lia).
+    assert (H0 : ld !! 0%nat = Some (rd γp)) by (apply list_lookup_insert_eq; lia).
     assert (H1 : ld !! 1%nat = Some (FdOpen rb1 true (FdDevice ConsoleInv.CONSOLE))).
     { rewrite /ld list_lookup_insert_ne; [exact Hld1 | lia]. }
     assert (H2 : ld !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))).

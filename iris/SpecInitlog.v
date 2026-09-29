@@ -154,10 +154,10 @@ Definition log_name_str : Z := 0x80007520.
    contract consumes (durable-disk stage D1) *)
 Lemma initlog_dirty_all_false `{!riscvGS Σ, !xv6G Σ} (γfs : fs_names)
     (D : gmap Z bool) (cov : gset Z) :
-  ghost_map_auth (fs_dirty γfs) 1 D -∗
+  ghost_map_auth_frac (fs_dirty γfs) 1 D -∗
   ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false) -∗
   ⌜forall b : Z, b ∈ cov -> D !! b = Some false⌝ ∗
-  ghost_map_auth (fs_dirty γfs) 1 D ∗
+  ghost_map_auth_frac (fs_dirty γfs) 1 D ∗
   ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false).
 Proof.
   iIntros "Ha Hs".
@@ -350,8 +350,8 @@ Definition wp_initlog_sconf_body
      still reads the RAW home blocks; opening that window is what deletes
      [SpecFsinit]'s clean-header premise. *)
   exc_own (fs_exc γfs) (list_to_set (hdr_dec bs_hdr).2) -∗
-  ghost_map_auth (fs_cache γfs) 1 L -∗
-  ghost_map_auth (fs_dirty γfs) 1 D -∗
+  ghost_map_auth_frac (fs_cache γfs) 1 L -∗
+  ghost_map_auth_frac (fs_dirty γfs) 1 D -∗
   (* the LOG SIDE's dirty halves, over the whole covered range, all false:
      nothing is logged yet *)
   ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false) -∗

@@ -138,7 +138,7 @@ Lemma fx_wf_delete (fx : gmap (mword 27) (mword 64)) (v : mword 27) :
   fx_wf fx -> fx_wf (delete v fx).
 Proof.
   intros Hwf u w Hl.
-  destruct (decide (u = v)) as [-> | Hne]; [rewrite lookup_delete in Hl; discriminate |].
+  destruct (decide (u = v)) as [-> | Hne]; [rewrite lookup_delete_eq in Hl; discriminate |].
   rewrite (lookup_delete_ne fx v u (not_eq_sym Hne)) in Hl.
   exact (Hwf u w Hl).
 Qed.
@@ -150,18 +150,18 @@ Qed.
 Lemma upt_fixed_both_del_tramp (tfp : mword 44) :
   delete tramp_vpn (upt_fixed_both tfp) = {[tf_vpn := pte_tf tfp]}.
 Proof.
-  rewrite /upt_fixed_both delete_insert_delete.
-  apply delete_notin.
+  rewrite /upt_fixed_both delete_insert_eq.
+  apply delete_id.
   apply lookup_singleton_ne. exact tf_vpn_ne_tramp.
 Qed.
 
 Lemma upt_fixed_tf_del_tf (tfp : mword 44) :
   delete tf_vpn ({[tf_vpn := pte_tf tfp]} : gmap (mword 27) (mword 64)) = ∅.
-Proof. apply delete_singleton. Qed.
+Proof. apply delete_singleton_eq. Qed.
 
 Lemma upt_fixed_tramp_del_tramp :
   delete tramp_vpn upt_fixed_tramp = ∅.
-Proof. rewrite /upt_fixed_tramp. apply delete_singleton. Qed.
+Proof. rewrite /upt_fixed_tramp. apply delete_singleton_eq. Qed.
 
 (* ===================================================================== *)
 (* §2  The whole leaf map, and the two disjointness facts.                *)
@@ -182,13 +182,13 @@ Lemma uptg_full_both (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
 Proof.
   apply map_eq. intros v. rewrite /uptg_map /upt_fixed_both /upt_full_map.
   destruct (decide (v = tramp_vpn)) as [-> | Hne1].
-  - rewrite lookup_insert. apply lookup_union_Some_l. apply lookup_insert.
+  - rewrite lookup_insert_eq. apply lookup_union_Some_l. apply lookup_insert_eq.
   - rewrite (lookup_insert_ne _ tramp_vpn v pte_tramp (not_eq_sym Hne1)).
     destruct (decide (v = tf_vpn)) as [-> | Hne2].
-    + rewrite lookup_insert. apply lookup_union_Some_l.
+    + rewrite lookup_insert_eq. apply lookup_union_Some_l.
       rewrite (lookup_insert_ne _ tramp_vpn tf_vpn pte_tramp
                  (not_eq_sym tf_vpn_ne_tramp)).
-      apply lookup_singleton.
+      apply lookup_singleton_eq.
     + rewrite (lookup_insert_ne _ tf_vpn v (pte_tf tfp) (not_eq_sym Hne2)).
       apply lookup_union_r.
       rewrite (lookup_insert_ne _ tramp_vpn v pte_tramp (not_eq_sym Hne1)).
@@ -258,7 +258,7 @@ Lemma uptg_map_delete (fx um : gmap (mword 27) (mword 64)) (vpn : mword 27) :
 Proof.
   intros Hwf Hlt. rewrite /uptg_map delete_union.
   assert (Hd : delete vpn fx = fx)
-    by (apply delete_notin; exact (uptg_fixed_user_none fx vpn Hwf Hlt)).
+    by (apply delete_id; exact (uptg_fixed_user_none fx vpn Hwf Hlt)).
   rewrite Hd. reflexivity.
 Qed.
 
@@ -269,7 +269,7 @@ Lemma uptg_map_delete_fixed (fx um : gmap (mword 27) (mword 64)) (v : mword 27) 
   uptg_map (delete v fx) um = delete v (uptg_map fx um).
 Proof.
   intros Hwf Hv. rewrite /uptg_map delete_union.
-  rewrite (delete_notin um v (uptg_um_fixed_none um v Hwf Hv)). reflexivity.
+  rewrite (delete_id um v (uptg_um_fixed_none um v Hwf Hv)). reflexivity.
 Qed.
 
 (* ===================================================================== *)
@@ -668,12 +668,12 @@ Section BarePt.
     rewrite /uptg_view (uptg_map_delete fx um vpn Hfx Hlt).
     split.
     - intros v. destruct (decide (v = vpn)) as [-> | Hne].
-      + rewrite !lookup_delete. split; intros _; reflexivity.
+      + rewrite !lookup_delete_eq. split; intros _; reflexivity.
       + rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)).
         rewrite (lookup_delete_ne (uptg_map fx um) vpn v (not_eq_sym Hne)).
         exact (Hnone v).
     - intros v w' Hl. destruct (decide (v = vpn)) as [-> | Hne].
-      { rewrite lookup_delete in Hl. discriminate. }
+      { rewrite lookup_delete_eq in Hl. discriminate. }
       rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)) in Hl.
       rewrite (lookup_delete_ne (uptg_map fx um) vpn v (not_eq_sym Hne)).
       exact (Hsome v w' Hl).
@@ -716,12 +716,12 @@ Section BarePt.
     rewrite /uptg_view (uptg_map_delete_fixed fx um v Hwf Hv).
     split.
     - intros u. destruct (decide (u = v)) as [-> | Hne].
-      + rewrite !lookup_delete. split; intros _; reflexivity.
+      + rewrite !lookup_delete_eq. split; intros _; reflexivity.
       + rewrite (lookup_delete_ne m_ad v u (not_eq_sym Hne)).
         rewrite (lookup_delete_ne (uptg_map fx um) v u (not_eq_sym Hne)).
         exact (Hnone u).
     - intros u w' Hl. destruct (decide (u = v)) as [-> | Hne].
-      { rewrite lookup_delete in Hl. discriminate. }
+      { rewrite lookup_delete_eq in Hl. discriminate. }
       rewrite (lookup_delete_ne m_ad v u (not_eq_sym Hne)) in Hl.
       rewrite (lookup_delete_ne (uptg_map fx um) v u (not_eq_sym Hne)).
       exact (Hsome u w' Hl).
@@ -833,10 +833,10 @@ Section BarePt.
   Proof using .
     intros Hwf Hfx Hok Hview Hnone. rewrite /uu_fx /uu_um in Hview |- *.
     destruct df.
-    - split; [reflexivity |]. cbn [um_del_run]. apply delete_notin.
+    - split; [reflexivity |]. cbn [um_del_run]. apply delete_id.
       exact (uptg_view_none fx (um_del_run um vpn0 k) m_ad (vpn_at vpn0 k)
                Hfx Hok Hview Hnone).
-    - split; [| reflexivity]. cbn [um_del_run]. apply delete_notin.
+    - split; [| reflexivity]. cbn [um_del_run]. apply delete_id.
       exact (uptg_view_fx_none (um_del_run fx vpn0 k) um m_ad (vpn_at vpn0 k)
                (proj1 Hwf) Hok Hview Hnone).
   Qed.
@@ -929,15 +929,15 @@ Section BarePt.
                       (<[tramp_vpn := mappages_pte tramp_ppn 10 0]> ∅)).
     { rewrite /uptg_view /uptg_map /upt_fixed_tramp right_id_L. split.
       - intros v. destruct (decide (v = tramp_vpn)) as [-> | Hne].
-        + rewrite lookup_insert lookup_singleton.
+        + rewrite lookup_insert_eq lookup_singleton_eq.
           split; intros H; discriminate.
         + rewrite (lookup_insert_ne _ tramp_vpn v _ (not_eq_sym Hne)).
           rewrite (lookup_singleton_ne tramp_vpn v pte_tramp (not_eq_sym Hne)).
           split; intros _; [reflexivity | apply lookup_empty].
       - intros v w' Hl. destruct (decide (v = tramp_vpn)) as [-> | Hne].
-        + rewrite lookup_insert in Hl.
+        + rewrite lookup_insert_eq in Hl.
           exists pte_tramp, (mword_of_int 0 : mword 1), (mword_of_int 0 : mword 1).
-          split; [apply lookup_singleton |].
+          split; [apply lookup_singleton_eq |].
           injection Hl as <-. exact tramp_pte_ad.
         + rewrite (lookup_insert_ne _ tramp_vpn v _ (not_eq_sym Hne)) in Hl.
           rewrite lookup_empty in Hl. discriminate. }

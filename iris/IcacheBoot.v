@@ -357,7 +357,7 @@ Definition mark_inums (nib : nat) : gset Z :=
 
 Lemma mark_inums_neg (nib : nat) (y : Z) : y ∈ mark_inums nib -> y < 0.
 Proof.
-  rewrite /mark_inums elem_of_list_to_set elem_of_list_fmap.
+  rewrite /mark_inums elem_of_list_to_set list_elem_of_fmap.
   intros (j & -> & _). rewrite /imark_key. lia.
 Qed.
 
@@ -700,7 +700,7 @@ Section IcacheBootRegion.
        free inodes.  A PREMISE for [icfg_iref]'s reason -- the gnames are
        the ambient class's, so only the [own_alloc] that minted them can
        hand them over ([IcacheRefDefs.icfg_alloc]). *)
-    ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
+    ([∗ set] z ∈ region_inums nib, mono_nat_auth_own_frac (icfg_iep z) 1 0) -∗
     (* THE FREE INUMS' ABSTRACT VALUE (durable-disk C-3c): one [top_frag] per
        FREE inum, at the node its record determines, parked region-side in
        [InodeRegion.ireg_top_park].  It used to go to the pool's marker arm
@@ -725,7 +725,7 @@ Section IcacheBootRegion.
     ireg_boot -∗
     (* OPTION A: the escrow registry's EMPTY auth ([icfg_alloc]'s new hand-out);
        populated here over every inum and parked inside [ireg_body]. *)
-    ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname))
+    ghost_map_auth_frac icfg_reg 1 (∅ : gmap Z (gname * gname))
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
       ⌜length dss = nib⌝ ∗ ⌜Forall diblk_wf dss⌝ ∗
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
@@ -1193,7 +1193,7 @@ Section IcacheBootTable.
      HAPPEN FIRST.  The collection has to precede the [ghost_var_alloc], and
      the cells are only readable at iinit's post -- so an era fupd that must
      mint [fsc_ic] long before that cannot run [ic_names_alloc] at the right
-     values.  It does not have to: [ic_id] is a plain [ghost_var], a WHOLE
+     values.  It does not have to: [ic_id] is a plain [ghost_var_frac], a WHOLE
      one updates to anything ([ic_id_set] below), so the era mints the family
      blind and [icache_boot_at] runs THIS lemma on the cells it is handed and
      then WRITES what it read.  [fun_of_big] therefore stays here, inside the
@@ -1272,7 +1272,7 @@ Section IcacheBootTable.
 
   (* ---- the two facts that let the NAMES be minted before the VALUES ---- *)
 
-  (* [ic_id] is a plain [ghost_var] ([IcacheEscrow.v] §13.8), so a WHOLE one
+  (* [ic_id] is a plain [ghost_var_frac] ([IcacheEscrow.v] §13.8), so a WHOLE one
      is not merely flippable ([ic_id_flip], which needs both halves) but
      writable outright.  [icache_boot_at] spends exactly this: it is handed
      the era fupd's blind family and re-tags each slot at the dev/inum words
@@ -1325,7 +1325,7 @@ Section IcacheBootTable.
        - [ic_names_alloc] becomes the three families as PREMISES, with the
          identification one at ARBITRARY recorded values, re-tagged per slot
          by [ic_id_set].  [ic_tok] and [ic_mid] are value-free exclusive
-         tokens ([ghost_var … DepNone], [lock_tok_excl]), so they pass
+         tokens ([ghost_var_frac … DepNone], [lock_tok_excl]), so they pass
          straight through.
      [icache_boot] below is this lemma plus the two mints, so there is one
      body and the old signature is a corollary. *)
@@ -1376,14 +1376,14 @@ Section IcacheBootTable.
     iref_slots_auth -∗
     (* A6.145: the fifty per-slot STAMP authorities, at 0 -- straight out
        of [IcacheRefDefs.icfg_alloc]'s post *)
-    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) -∗
+    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) -∗
     (* THE STOCKED POOL, as ORDINARY ROWS (durable-disk B''-esc), beside the
        residency key WHOLE; this lemma allocates the pool's own invariant out
        of the two, and [is_itable2] carries it on. *)
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
-    ghost_var icfg_pool 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_pool 1 (∅ : gset Z) -∗
     (* ...AND THE IN-TRANSITION KEY (durable-disk C-3b), whole and empty *)
-    ghost_var icfg_pext 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_pext 1 (∅ : gset Z) -∗
     (* THE ITABLE LOCK'S GHOST, unbuilt ([WpLockAt.lock_ghost_alloc]) *)
     lock_free_tok γl -∗
     (* THE ESCROW LAYER'S THREE FAMILIES, as [IcacheEscrow.ic_names_alloc]
@@ -1398,17 +1398,17 @@ Section IcacheBootTable.
        at [None]: "no slot is inside one of iput's two windows at boot". *)
     ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) -∗
     (* THE POOL'S TRANSIT LEDGER (durable-disk C-4), WHOLE and empty *)
-    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
+    ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
     (* THE POOL'S CORPSE LEDGER (durable-disk C-7), WHOLE and empty *)
-    ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
+    ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
     (* THE FIFTY BOXES' FRESH GHOSTS (tso-flip F19/F23): minted by
        [IcacheRefDefs.icfg_alloc] into [icfg_box k]; [CtxBox.box_alloc_at]
        builds the boxes into them here. *)
     ([∗ list] k ∈ seq 0 NINODE,
        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-       ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-       ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) -∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+       ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+       ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) -∗
     (* STATEMENT CHANGE (r25 pass 1): the fifty OFF-BOX SET AUTHORITIES,
        empty.  [ic_slp cn k] gained the conjunct [OffBox.off_rows off_cfg k ξ]
        (the third final shape), and at boot no file points at any inode, so
@@ -1484,9 +1484,9 @@ Section IcacheBootTable.
     iDestruct (big_sepL_sep_2 with "Hbox H3") as "Hall".
     iAssert ([∗ list] k ∈ seq 0 NINODE,
                |==> (CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
-                     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-                     ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-                     ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
+                     ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+                     ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+                     ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
                      ic_hdr cn γfs γi cov logstart k None IcRaw cur_ctx ∗
                      ic_rest k IcRaw cur_ctx) ∗
                     (islot_empty cur_ctx cn k ∗
@@ -1631,18 +1631,18 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
-    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) -∗
+    ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own_frac (icfg_istmp k) 1 0) -∗
     ipool_rows γfs γi cov logstart (region_inums nib) -∗
-    ghost_var icfg_pool 1 (∅ : gset Z) -∗
-    ghost_var icfg_pext 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_pool 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_pext 1 (∅ : gset Z) -∗
     ([∗ list] k ∈ seq 0 NINODE, hpn_full k None) -∗
-    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
-    ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
+    ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
+    ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
     ([∗ list] k ∈ seq 0 NINODE,
        own (bx_stamps (icfg_box k)) (● (∅ : gmapUR (ic_bid * nat) ufracR)) ∗
-       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-       ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-       ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) -∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+       ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+       ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid)) -∗
     (* STATEMENT CHANGE (r25 pass 1): the same off-box set authorities
        [icache_boot_at] now takes -- see its premise. *)
     ([∗ list] k ∈ seq 0 NINODE, OffBox.off_set_auth off_cfg k ∅) -∗
@@ -1685,8 +1685,7 @@ Lemma addv_moi_moi (A B : Z) :
   add_vec (mword_of_int A : mword 64) (mword_of_int B : mword 64)
   = mword_of_int (A + B).
 Proof.
-  unfold add_vec, mword_of_int, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec, mword_of_int, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   apply bv_eq. rewrite bv_add_unsigned !Z_to_bv_unsigned.

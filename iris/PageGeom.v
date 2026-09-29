@@ -116,8 +116,7 @@ Local Lemma kalloc_uint_pa_add (a : mword 64) (j : nat) :
   uint (pa_add a j) = uint a + Z.of_nat j.
 Proof.
   intro Hlt. rewrite !uint_unsigned in Hlt |- *.
-  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hj : bv_unsigned (mword_of_int (Z.of_nat j) : mword 64) = Z.of_nat j).

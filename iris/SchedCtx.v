@@ -1191,7 +1191,7 @@ Section SchedCtxPay.
        ctx_word4_pointsto ξl (p_state pa) (DfracOwn 1) st ∗
        (* THE STATE MIRROR'S LOCK-SIDE SHARE, at the same [st] the cell holds.
           Half #1 is the tie: nothing moves the cell without moving the ghost,
-          and a ghost_var does not move on half alone.  Half #2 is here too
+          and a ghost_var_frac does not move on half alone.  Half #2 is here too
           exactly on [unclaimed] -- so on an unclaimed state the lock can move
           the state by itself, and on a claimed one the claimant must bring
           the other half.  THE RIGHT TO WRITE [p->state] IS OWNERSHIP OF
@@ -1396,7 +1396,7 @@ Section SchedCtxPay.
   Proof using .
     rewrite /sched_vc_at bi.later_exist. iIntros "(%XIs & H)".
     rewrite bi.later_sep. iDestruct "H" as "[Hown Hrec]".
-    iPoseProof (@timeless _ (own_context (CID := h) XIs) (own_context_timeless XIs)
+    iPoseProof (@timeless _ _ (own_context (CID := h) XIs) (own_context_timeless (CID := h) XIs)
                   with "Hown") as "Hown".
     iMod "Hown". iModIntro. iExists XIs. iFrame.
   Qed.

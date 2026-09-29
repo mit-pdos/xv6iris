@@ -614,7 +614,7 @@ Lemma pt_sub27_26_18 (x : mword 27) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 18)) with 18.
   change (MachineWord.MachineWord.Z_idx (26 - 18 + 1)) with 9%N.
@@ -626,7 +626,7 @@ Lemma pt_sub27_17_9 (x : mword 27) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 9)) with 9.
   change (MachineWord.MachineWord.Z_idx (17 - 9 + 1)) with 9%N.
@@ -638,7 +638,7 @@ Lemma pt_sub27_8_0 (x : mword 27) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0.

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# main only (the script checks the branch): refuse a commit whose BLOCKING findings the human has
+# not approved with INTEGRITY_ALLOW=<fingerprint printed by the report>. Also installed as
+# pre-merge-commit, so `git merge --no-ff agent/<name>` on main goes through the same gate.
+s="$(git rev-parse --show-toplevel)/tools/integrity/integrity.py"
+# a worktree of a commit that predates the tool (an upstream checkout, an old tag): nothing to gate
+[ -f "$s" ] || exit 0
+exec python3 "$s" hook pre-commit

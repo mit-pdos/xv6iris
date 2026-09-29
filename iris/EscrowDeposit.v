@@ -340,7 +340,7 @@ Section EscrowDeposit.
     iAssert (ireg_registry nib) with "[Hauthr]" as "Hreg".
     { iExists (<[bv_unsigned inum := (ge, gr)]> mr). iSplitR; [| iFrame].
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
-      - rewrite lookup_insert. done.
+      - rewrite lookup_insert_eq. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }
     iMod ("Hclose" with "[Ha Hreg Hrecb Hdn Hla Hep Hlnk Hslback Hback Hrh1 Hrh2 Hcnt Hmr Hpark Hcpin]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
@@ -355,8 +355,8 @@ Section EscrowDeposit.
       iSplitR.
       { iPureIntro. intros i Hi.
         destruct (decide (i = islot inum)) as [->|Hne].
-        - rewrite /m' -(ireg_key_split inum) lookup_insert.
-          rewrite list_lookup_total_insert; [done | lia].
+        - rewrite /m' -(ireg_key_split inum) lookup_insert_eq.
+          rewrite list_lookup_total_insert_eq; [done | lia].
         - rewrite /m' lookup_insert_ne; last first.
           { rewrite (ireg_key_split inum). intros Hc.
             destruct (ireg_key_inj (ireg_bi inum) (ireg_bi inum)

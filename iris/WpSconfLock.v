@@ -70,8 +70,8 @@ Local Lemma data2_id_4 (v : mword 32) :
     update_subrange_vec_dec (zeros' (4*1*8)) (4*(0+1)*8-1) (4*0*8) v = v.
   Proof.
     apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
     erewrite bv_concat_unsigned by (cbn; lia).
     erewrite bv_concat_unsigned by (cbn; lia).
     rewrite !bv_unsigned_N_0.
@@ -589,6 +589,7 @@ Section WpSconfLock.
          floor the holder token carries away (§0.38′'s agreed one form). *)
       TsoCtx.ctx_floor CtxIdDefs.cur_ctx (S (length log)).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hset. iIntros "Hm Htso Hctx (%vold & %Hal & Hb)".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
     iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
@@ -2452,9 +2453,9 @@ Section WpSconfLock.
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-          iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hro") as "Hro".
           iFrame "Hrw Hro".
           iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -2489,7 +2490,7 @@ Section WpSconfLock.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (w) "(-> & -> & -> & HTc & #Hpaira & Hpay)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! w CID with "[%] HTc Hcg' Hpc' Hpaira Hpay"). exact Hs.
   Qed.
 

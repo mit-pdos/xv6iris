@@ -194,7 +194,7 @@ Qed.
 Lemma it_uint32 (a : mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -303,7 +303,7 @@ Lemma it_slot_in_region (logstart : Z) (i : nat) :
   (i < LOGBLOCKS)%nat -> log_slot_bno logstart i ∈ log_region_set logstart.
 Proof.
   intro Hi. rewrite /log_region_set. apply elem_of_union. left.
-  apply elem_of_list_to_set. apply elem_of_list_fmap.
+  apply elem_of_list_to_set. apply list_elem_of_fmap.
   exists i. split; [reflexivity|]. apply elem_of_seq. lia.
 Qed.
 
@@ -326,8 +326,8 @@ Proof.
   induction ws as [|w ws IH]; intro Hz.
   - reflexivity.
   - rewrite -app_comm_cons !it_dc_cons.
-    rewrite (IH ltac:(intro Hin; apply Hz; exact (elem_of_list_further _ _ _ Hin))).
-    apply insert_commute. intro Heq. apply Hz.
+    rewrite (IH ltac:(intro Hin; apply Hz; exact (list_elem_of_further _ _ _ Hin))).
+    apply insert_insert_ne. intro Heq. apply Hz.
     apply elem_of_cons. left. by rewrite Heq.
 Qed.
 
@@ -342,7 +342,7 @@ Proof.
   { rewrite -{1}(take_drop_middle W t w Hw). apply map_app. }
   rewrite Hsplit in Hnd.
   apply NoDup_remove_2 in Hnd. apply Hnd.
-  apply in_or_app. left. by apply elem_of_list_In.
+  apply in_or_app. left. by apply list_elem_of_In.
 Qed.
 
 Lemma it_map_take_S (W : list (mword 32)) (t : nat) (w : mword 32) :
@@ -352,7 +352,7 @@ Proof. intro Hw. rewrite (take_S_r W t w Hw) map_app. reflexivity. Qed.
 
 Lemma it_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
-Proof. intro Hw. apply elem_of_list_lookup. by exists t. Qed.
+Proof. intro Hw. apply list_elem_of_lookup. by exists t. Qed.
 
 
 Lemma it_n_small (n : nat) : (n <= LOGBLOCKS)%nat -> (0 <= Z.of_nat n < 2^31)%Z.
@@ -661,9 +661,9 @@ Section InstallTransDefs.
         proc_priv_bare (proc_addr j) pidv Upr -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-        ghost_map_auth (fs_cache γfs) 1
+        ghost_map_auth_frac (fs_cache γfs) 1
           (if recovering then it_rec_L W Lw L else L) -∗
-        ghost_map_auth (fs_dirty γfs) 1
+        ghost_map_auth_frac (fs_dirty γfs) 1
           (if recovering then D else dirty_clear D (map uint W)) -∗
         (if recovering
          then exc_own (fs_exc γfs) (Xexc ∖ list_to_set (map uint W))
@@ -717,9 +717,9 @@ Section InstallTransDefs.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool) : iProp Σ :=
     (lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
      ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
-     ghost_map_auth (fs_cache γfs) 1
+     ghost_map_auth_frac (fs_cache γfs) 1
        (if recovering then it_rec_L W Lw L else L) ∗
-     ghost_map_auth (fs_dirty γfs) 1
+     ghost_map_auth_frac (fs_dirty γfs) 1
        (if recovering then D else dirty_clear D (map uint W)) ∗
      (if recovering
       then exc_own (fs_exc γfs) (Xexc ∖ list_to_set (map uint W))
@@ -752,7 +752,7 @@ Section InstallTransDefs.
   Lemma it_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
     ⌜L !! uint bno = Some bsl⌝.
   Proof using .
@@ -804,7 +804,7 @@ Section InstallTransDefs.
   Lemma it_pay_d_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (D : gmap Z bool) :
-    ghost_map_auth (fs_dirty γfs) 1 D -∗
+    ghost_map_auth_frac (fs_dirty γfs) 1 D -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
     ⌜D !! uint bno = Some d⌝.
   Proof using .
@@ -853,9 +853,9 @@ Section InstallTransDefs.
     (recovering = true -> length (Lw t) = BSIZE) ->
     (recovering = true -> uint w ∈ Xexc /\ Xv (uint w) = Lw t) ->
     fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Xv -∗
-    ghost_map_auth (fs_cache γfs) 1
+    ghost_map_auth_frac (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
-    ghost_map_auth (fs_dirty γfs) 1
+    ghost_map_auth_frac (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
     (if recovering
      then exc_own (fs_exc γfs) (it_exc_rest Xexc W t)
@@ -863,9 +863,9 @@ Section InstallTransDefs.
     (if recovering then emp
      else (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w bs2 bsd2 d2 ={⊤}=∗
-    ghost_map_auth (fs_cache γfs) 1
+    ghost_map_auth_frac (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L (S t) else L) ∗
-    ghost_map_auth (fs_dirty γfs) 1
+    ghost_map_auth_frac (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take (S t) W))) ∗
     bio_pay bn (fs_view γfs γd dev cov) k2 dev w (Lw t) (Lw t) false ∗
     (if recovering
@@ -1827,9 +1827,9 @@ Section InstallTransBlocks.
     (if recovering
      then exc_own (fs_exc γfs) (it_exc_rest Xexc W t)
      else emp) -∗
-    ghost_map_auth (fs_cache γfs) 1
+    ghost_map_auth_frac (fs_cache γfs) 1
       (if recovering then it_rec_L_upto W Lw L t else L) -∗
-    ghost_map_auth (fs_dirty γfs) 1
+    ghost_map_auth_frac (fs_dirty γfs) 1
       (if recovering then D else dirty_clear D (map uint (take t W))) -∗
     ([∗ list] i ↦ w ∈ take t W,
        fs_chalf γfs (log_slot_bno logstart i) (Lw i) ∗

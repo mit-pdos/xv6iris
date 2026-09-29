@@ -9,7 +9,7 @@
     THE TIE (section 2).  Owner's rule: nothing application-specific inside
     a kernel file-system invariant.  So the application's claim lives in an
     invariant of ITS OWN, and what ties it to the kernel's map is a SHARED
-    PIECE that already exists: the map authority itself.  [ghost_map_auth]
+    PIECE that already exists: the map authority itself.  [ghost_map_auth_frac]
     is fractional, any two fractions AGREE on the map
     ([ghost_map_auth_agree]), and an UPDATE needs the whole.
     [InodeRegion.ftop_body] keeps the kernel's half; [app_body] below keeps
@@ -325,11 +325,11 @@ Section AppSyncRaw.
     (□ (∀ (Q : iProp Σ) (gt : gname) (I : gmap Z fs_node) (r r' : N),
           ⌜Ok r⌝ -∗ ⌜Ok r'⌝ -∗ ⌜Okc r'⌝ -∗
           Hk Q -∗
-          ghost_map_auth gt (1/2) I -∗
+          ghost_map_auth_frac gt (1/2) I -∗
           ▷ A r' (abs_view I) -∗
           ▷ A r (abs_view I) -∗
           T ={∅}=∗
-            ghost_map_auth gt (1/2) I ∗
+            ghost_map_auth_frac gt (1/2) I ∗
             ▷ A r' (abs_view I) ∗
             ▷ A r (abs_view I) ∗
             T ∗ Q))%I.
@@ -361,11 +361,11 @@ Section AppSyncRaw.
     Ok r -> Ok r' -> Okc r' ->
     app_sync_run_raw A Ok Okc T Hk -∗
     ([∗ list] Q ∈ Qs, Hk Q) -∗
-    ghost_map_auth gt (1/2) I -∗
+    ghost_map_auth_frac gt (1/2) I -∗
     ▷ A r' (abs_view I) -∗
     ▷ A r (abs_view I) -∗
     T ={E}=∗
-      ghost_map_auth gt (1/2) I ∗
+      ghost_map_auth_frac gt (1/2) I ∗
       ▷ A r' (abs_view I) ∗
       ▷ A r (abs_view I) ∗
       T ∗ ([∗ list] Q ∈ Qs, Q).
@@ -506,7 +506,7 @@ Section AppInv.
      without a step).  The commit takes [app_merge] off fsinit's kit. *)
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
-       ghost_map_auth (fs_top γfs) (1/2) I ∗
+       ghost_map_auth_frac (fs_top γfs) (1/2) I ∗
        app_pred app_run (abs_view I) ∗
        ⌜app_dom I⌝)%I.
 
@@ -521,7 +521,7 @@ Section AppInv.
      [inv_alloc] takes the later -- and the domain row. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
     app_dom I ->
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
     ▷ app_pred app_run (abs_view I) -∗ |={E}=> app_inv γfs.
   Proof using .
     iIntros (Hd) "Hh Hp". rewrite /app_inv.
@@ -549,8 +549,8 @@ Section AppInv.
     (⌜I !! i = Some n⌝ -∗
        ▷ app_pred app_run (abs_view I) ==∗
        ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+      ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
@@ -558,7 +558,7 @@ Section AppInv.
     iDestruct "Hbody" as (I') "(>Hh & Hp & >%Hd)".
     iDestruct (ghost_map_auth_agree with "Hk Hh") as %<-.
     iDestruct (ghost_map_lookup with "Hk Hf") as %Hi.
-    iAssert (ghost_map_auth (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
+    iAssert (ghost_map_auth_frac (fs_top γfs) 1 I) with "[Hk Hh]" as "Hk".
     { iEval (rewrite -Qp.half_half). iSplitL "Hk"; [iExact "Hk" | iExact "Hh"]. }
     iMod (ghost_map_update n' with "Hk Hf") as "[Hk Hf]".
     iDestruct "Hk" as "[Hk Hh]".
@@ -575,8 +575,8 @@ Section AppInv.
     ↑appN ⊆ E ->
     abs_of n = abs_of n' ->
     app_inv γfs -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+      ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
     iIntros (HE Habs) "#Hinv Hk Hf".
     iApply (app_top_update E γfs I i n n' HE with "Hinv [] Hk Hf").
@@ -591,8 +591,8 @@ Section AppInv.
     app_inv γfs -∗
     (app_pred app_run (abs_view I) -∗
        app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+      ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf").
@@ -612,8 +612,8 @@ Section AppInv.
     app_inv γfs -∗
     (▷ app_pred app_run (abs_view I) ==∗
        ▷ app_pred app_run (abs_view (<[i := n']> I))) -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
-      ghost_map_auth (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ i ↪[fs_top γfs] n ={E}=∗
+      ghost_map_auth_frac (fs_top γfs) (1/2) (<[i := n']> I) ∗ i ↪[fs_top γfs] n'.
   Proof using .
     iIntros (HE) "#Hinv Hstep Hk Hf".
     iApply (app_top_update E γfs I i n n' HE with "Hinv [Hstep] Hk Hf").

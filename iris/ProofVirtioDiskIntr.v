@@ -994,7 +994,7 @@ Section VtLoopSeam.
         openings of the device invariant.  It holds the lock for the whole
         loop, so the map is stable in its hands; each accessor agrees the
         receipt's fragment with it and speaks about the claim it read here. *)
-     ghost_map_auth (dn_claim γ) 1 cm ∗
+     ghost_map_auth_frac (dn_claim γ) 1 cm ∗
      (* the claim ROWS (DiskInv.v, the row design): the handler reads
         [info[id].b] off the row at the record's position and clears
         [b->disk] through its cell, then flips the row to its Right arm *)
@@ -1586,7 +1586,7 @@ Section VtDevRam.
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd (S u) -∗ disk_read_at γd u -∗
-    ghost_map_auth (dn_claim γd) 1 cm -∗
+    ghost_map_auth_frac (dn_claim γd) 1 cm -∗
     TsoCtx.hart_view_lb V0 -∗
     (∃ q0 : nat, disk_done_pos γd u q0 ∗ ⌜(q0 <= V0)%nat⌝) -∗
     ( ∀ (p : nat) (dc : dclaim),
@@ -1597,7 +1597,7 @@ Section VtDevRam.
           (sign_extend' 64 (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))
                             : SailStdpp.Values.mword 32))]> m) n false pp -∗
       pc_is (add_vec_int pc 2) -∗
-      disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
+      disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth_frac (dn_claim γd) 1 cm -∗
       mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -1668,8 +1668,8 @@ Section VtDevRam.
                (([∗ list] j ∈ seq 0 4,
                    ledger_le (pa_add (pa_add pu (vt_uoff u)) j) (nth_byte head j) q0) -∗
                 |={⊤ ∖ ↑minstretN ∖ ↑diskN, ⊤ ∖ ↑minstretN}=>
-                  disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm))%I
-              (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm)%I
+                  disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth_frac (dn_claim γd) 1 cm))%I
+              (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth_frac (dn_claim γd) 1 cm)%I
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj)
@@ -1715,7 +1715,7 @@ Section VtDevRam.
     bv_unsigned (zero_extend' 64 x : SailStdpp.Values.mword 64) = bv_unsigned x.
   Proof using .
     cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-         Values.to_word get_word MachineWord.MachineWord.zero_extend].
+         MachineWord.MachineWord.zero_extend].
     rewrite bv_zero_extend_unsigned. reflexivity.
     first [ lia | vm_compute; discriminate | done ].
   Qed.
@@ -1969,8 +1969,8 @@ Qed.
 Lemma vt_and_vec_unsigned (a b : mword 64) :
   bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
 Proof.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word SailStdpp.Values.to_word SailStdpp.Values.get_word].
+  cbv [and_vec Operators_mwords.word_binop 
+       ].
   unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
 Qed.
 
@@ -2067,9 +2067,9 @@ Lemma vt_trunc16_unsigned (w : mword 64) :
 Proof.
   rewrite vt_trunc16_subrange.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, SailStdpp.Values.to_word.
+  unfold to_word_idx.
   rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold SailStdpp.Values.get_word, MachineWord.MachineWord.slice.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
@@ -2109,7 +2109,7 @@ Proof.
              = shiftl x 48).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hn.
-  unfold shiftl, SailStdpp.Values.with_word, SailStdpp.Values.get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -2127,7 +2127,7 @@ Proof.
              = shiftr x 48).
   { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hn.
-  unfold shiftr, SailStdpp.Values.with_word, SailStdpp.Values.get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -2225,7 +2225,7 @@ Section VtBody.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     disk_pub γd np -∗ disk_done_lb γd c -∗ disk_read_at γd nr -∗
-    ghost_map_auth (dn_claim γd) 1 cm -∗
+    ghost_map_auth_frac (dn_claim γd) 1 cm -∗
     d_used_idx ↦₂ wrap16 nr -∗
     (* A6.126 §6 / relaxed-rr.md §4.3: the view the index read settled at --
        as the load's READ receipt, which the fence below turns into the view
@@ -2243,7 +2243,7 @@ Section VtBody.
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
         d_used_idx ↦₂ wrap16 nr -∗
-        disk_pub γd np -∗ disk_read_at γd nr -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
+        disk_pub γd np -∗ disk_read_at γd nr -∗ ghost_map_auth_frac (dn_claim γd) 1 cm -∗
         (* the read's view, ACQUIRED by the fence, and the handler's context
            bound raised to it *)
         TsoCtx.hart_view_lb V0 -∗
@@ -2459,7 +2459,7 @@ Section VtBody.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x50) : mword 64) -∗
     dev_inv γu γd -∗
     disk_pub γd np -∗ disk_ord γd p u -∗ disk_read_at γd u -∗
-    ghost_map_auth (dn_claim γd) 1 cm -∗
+    ghost_map_auth_frac (dn_claim γd) 1 cm -∗
     (* the status byte is the lease's STAMPED cell until the deposit; the
        handler reads it exactly at the index read's view [V0] *)
     TsoCtx.hart_view_lb V0 -∗
@@ -2470,7 +2470,7 @@ Section VtBody.
                 M' !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
-        disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth (dn_claim γd) 1 cm -∗
+        disk_pub γd np -∗ disk_read_at γd u -∗ ghost_map_auth_frac (dn_claim γd) 1 cm -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -2592,8 +2592,8 @@ Section VtBody.
                ledger_le (d_info_status h) byte_zero q0 ∗
                (ledger_le (d_info_status h) byte_zero q0 -∗
                 |={⊤ ∖ ↑minstretN ∖ ↑diskN, ⊤ ∖ ↑minstretN}=>
-                  disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm))%I
-              (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth (dn_claim γd) 1 cm)%I
+                  disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth_frac (dn_claim γd) 1 cm))%I
+              (disk_pub γd np ∗ disk_read_at γd u ∗ ghost_map_auth_frac (dn_claim γd) 1 cm)%I
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               WpSconfMem.exec_read_ram_plain_1 vt_ext1
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2676,7 +2676,7 @@ Section VtBody.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x60) : mword 64) -∗
     dev_inv γu γd -∗
     disk_pub γd np -∗ disk_ord γd p u -∗ disk_read_at γd u -∗
-    ghost_map_auth (dn_claim γd) 1 cm -∗
+    ghost_map_auth_frac (dn_claim γd) 1 cm -∗
     (* the reader floor, and the record's completion position under the view
        the index read settled at: what the deposit moves the floor to *)
     disk_flr γd F -∗
@@ -2693,7 +2693,7 @@ Section VtBody.
         sie_cap_gpr KT1 M' n false pp -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x6e) : mword 64) -∗
         disk_pub γd np -∗ disk_done_lb γd (S u) -∗ disk_read_at γd (S u) -∗
-        ghost_map_auth (dn_claim γd) 1 cm -∗
+        ghost_map_auth_frac (dn_claim γd) 1 cm -∗
         disk_flr γd (Nat.max F V0) -∗
         d_info_b h ↦₈ (dc_buf dc : SailStdpp.Values.mword 64) -∗
         b_disk (dc_buf dc) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) -∗

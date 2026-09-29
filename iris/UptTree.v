@@ -240,14 +240,14 @@ Definition upt_full_map (tfp : mword 44) (um : gmap (mword 27) (mword 64))
    vocabulary. *)
 Lemma upt_full_map_tramp (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   upt_full_map tfp um !! tramp_vpn = Some pte_tramp.
-Proof. apply lookup_insert. Qed.
+Proof. apply lookup_insert_eq. Qed.
 
 Lemma upt_full_map_tf (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   upt_full_map tfp um !! tf_vpn = Some (pte_tf tfp).
 Proof.
   rewrite /upt_full_map.
   rewrite (lookup_insert_ne _ tramp_vpn tf_vpn pte_tramp (not_eq_sym tf_vpn_ne_tramp)).
-  apply lookup_insert.
+  apply lookup_insert_eq.
 Qed.
 
 (* a USER entry: [upt_map_wf] is what says the vpn is neither fixed vpn, so
@@ -442,17 +442,17 @@ Proof.
   intros (Hnone & Hsome) Hl.
   split.
   - intros v. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite !lookup_insert. split; [discriminate |].
+    + rewrite !lookup_insert_eq. split; [discriminate |].
       intros (_ & _ & Hc). discriminate.
     + rewrite (lookup_insert_ne m_ad vpn v w (not_eq_sym Hne)).
       rewrite (lookup_insert_ne um vpn v w (not_eq_sym Hne)).
       exact (Hnone v).
   - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite lookup_insert in Hl'.
+    + rewrite lookup_insert_eq in Hl'.
       assert (Hw : w' = w) by congruence.
       destruct (pte_set_ad_refl w) as (a & d & Hr).
       exists w, a, d. split; [| rewrite Hw; exact Hr].
-      right. right. apply lookup_insert.
+      right. right. apply lookup_insert_eq.
     + rewrite (lookup_insert_ne m_ad vpn v w (not_eq_sym Hne)) in Hl'.
       destruct (Hsome v w' Hl') as (w0 & a & d & Hleaf & Hr).
       exists w0, a, d. split; [| exact Hr].
@@ -476,16 +476,16 @@ Proof.
   pose proof (upt_map_wf_not_tf um vpn w Hwf Hl) as Hntf.
   split.
   - intros v. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite !lookup_insert. split; [discriminate |].
+    + rewrite !lookup_insert_eq. split; [discriminate |].
       intros (_ & _ & Hc). discriminate.
     + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)).
       rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)).
       exact (Hnone v).
   - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite lookup_insert in Hl'.
+    + rewrite lookup_insert_eq in Hl'.
       assert (Hw : w' = pte_set_ad x a d) by congruence.
       exists x, a, d. split; [| exact Hw].
-      right. right. apply lookup_insert.
+      right. right. apply lookup_insert_eq.
     + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)) in Hl'.
       destruct (Hsome v w' Hl') as (w0 & a0 & d0 & Hleaf & Hr).
       exists w0, a0, d0. split; [| exact Hr].
@@ -529,14 +529,14 @@ Proof.
   intros Hntr Hntf (Hnone & Hsome).
   split.
   - intros v. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite !lookup_delete. split.
+    + rewrite !lookup_delete_eq. split.
       * intros _. split; [exact Hntr | split; [exact Hntf | reflexivity]].
       * intros _. reflexivity.
     + rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)).
       rewrite (lookup_delete_ne um vpn v (not_eq_sym Hne)).
       exact (Hnone v).
   - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
-    { rewrite lookup_delete in Hl'. discriminate. }
+    { rewrite lookup_delete_eq in Hl'. discriminate. }
     rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)) in Hl'.
     destruct (Hsome v w' Hl') as (w0 & a & d & Hleaf & Hr).
     exists w0, a, d. split; [| exact Hr].

@@ -267,13 +267,13 @@ Section fif_ok_lemmas.
   Proof using .
     intros H3 H4 Hnone. split.
     - intros d'. rewrite dom_insert_L elem_of_union elem_of_singleton. intros [-> | Hd'].
-      + left. exists (Z.of_nat k). apply lookup_insert.
+      + left. exists (Z.of_nat k). apply lookup_insert_eq.
       + destruct (H3 d' Hd') as [(fd & Hfd) | HD]; [left | by right].
         exists fd. rewrite lookup_insert_ne; [exact Hfd |]. intros Heq.
         rewrite <- Heq in Hfd. congruence.
     - intros fd d'. rewrite dom_insert_L elem_of_union elem_of_singleton.
       destruct (decide (fd = Z.of_nat k)) as [-> |].
-      + rewrite lookup_insert. intros [= <-]. by left.
+      + rewrite lookup_insert_eq. intros [= <-]. by left.
       + rewrite lookup_insert_ne; [| congruence]. intros Hfd. right. exact (H4 fd d' Hfd).
   Qed.
 
@@ -289,7 +289,7 @@ Section fif_ok_lemmas.
       + intros _. lia.
       + rewrite lookup_insert_ne; [| congruence]. apply H1.
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> |].
-      + rewrite lookup_insert. intros [= <-]. rewrite lookup_insert. simpl. lia.
+      + rewrite lookup_insert_eq. intros [= <-]. rewrite lookup_insert_eq. simpl. lia.
       + rewrite (lookup_insert_ne fdm); [| congruence]. intros Hfd.
         rewrite (lookup_insert_ne vs); [| intros ->; exact (Hfr fd Hfd)]. exact (H2 fd d' Hfd).
     - intros fd fd' d' s' nm' i' γo'.
@@ -302,9 +302,9 @@ Section fif_ok_lemmas.
       + rewrite (lookup_insert_ne vs); [| congruence].
         intros Ha Hb.
         destruct (decide (fd = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
+          [rewrite lookup_insert_eq in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
         destruct (decide (fd' = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
+          [rewrite lookup_insert_eq in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
         apply (H5 fd fd' d' s' nm' i' γo' Ha Hb).
     - intros d' Hd'. rewrite lookup_insert_ne; [exact (H6 d' Hd') |]. intros ->. done.
   Qed.
@@ -357,8 +357,8 @@ Section fif_ok_lemmas.
       + intros _. unfold NSTD, NOFILE in *. lia.
       + rewrite lookup_insert_ne; [| congruence]. apply H1.
     - intros fd d'. destruct (decide (fd = Z.of_nat k)) as [-> | Hne].
-      + rewrite lookup_insert. intros [= <-]. rewrite lookup_insert. simpl.
-        split; [unfold NSTD in *; lia |]. rewrite Nat2Z.id. apply list_lookup_insert. exact Hkl.
+      + rewrite lookup_insert_eq. intros [= <-]. rewrite lookup_insert_eq. simpl.
+        split; [unfold NSTD in *; lia |]. rewrite Nat2Z.id. apply list_lookup_insert_eq. exact Hkl.
       + rewrite (lookup_insert_ne fdm); [| congruence]. intros Hfd.
         rewrite (lookup_insert_ne vs); [| intros ->; exact (Hfr fd Hfd)].
         specialize (H2 fd d' Hfd). destruct (H1 fd d' Hfd) as [H0 _].
@@ -377,9 +377,9 @@ Section fif_ok_lemmas.
       + rewrite (lookup_insert_ne vs); [| congruence].
         intros Ha Hb.
         destruct (decide (fd = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
+          [rewrite lookup_insert_eq in Ha; congruence | rewrite lookup_insert_ne in Ha; [| congruence]].
         destruct (decide (fd' = Z.of_nat k)) as [-> |];
-          [rewrite lookup_insert in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
+          [rewrite lookup_insert_eq in Hb; congruence | rewrite lookup_insert_ne in Hb; [| congruence]].
         apply (H5 fd fd' d' s' nm' i' γo' Ha Hb).
     - intros d' Hd'. rewrite lookup_insert_ne; [exact (H6 d' Hd') |]. intros ->. done.
   Qed.
@@ -635,12 +635,12 @@ Section UkFileIface.
   Proof using .
     intros HD0 Hd0 Hrow Hbnd Hnin. rewrite HD0.
     split; [exact Hbnd | split; [| split; [| split; [| split]]]].
-    - intros fd d Hfd. rewrite (Hd0 fd d Hfd) lookup_singleton. exact (Hrow fd d Hfd).
+    - intros fd d Hfd. rewrite (Hd0 fd d Hfd) lookup_singleton_eq. exact (Hrow fd d Hfd).
     - intros d. rewrite dom_singleton_L elem_of_singleton. intros ->. right. constructor.
     - intros fd d Hfd. rewrite (Hd0 fd d Hfd) dom_singleton_L. by apply elem_of_singleton.
     - intros fd fd' d s nm i γo Hfd _ Hv. apply lookup_singleton_Some in Hv as [<- Hv].
       by destruct (Hnin s nm i γo).
-    - intros d Hd. apply elem_of_list_singleton in Hd as ->. apply lookup_singleton.
+    - intros d Hd. apply list_elem_of_singleton in Hd as ->. apply lookup_singleton_eq.
   Qed.
 
   Section UkFileIfaceGen.
@@ -857,12 +857,12 @@ Section UkFileIface.
         iPureIntro. intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
         * apply elem_of_singleton in Hx as ->. split; [unfold NSTD, NOFILE in *; lia |].
           left. split; [unfold NSTD in *; lia |]. exists (FdOpen rd wr t).
-          rewrite Nat2Z.id list_lookup_insert; [split; [done | discriminate] | exact Hk0l].
+          rewrite Nat2Z.id list_lookup_insert_eq; [split; [done | discriminate] | exact Hk0l].
         * destruct (Hho x Hx) as [Hb Hc]. split; [exact Hb |].
           destruct Hc as [(Hs' & st' & Hl' & Hne') | Hc]; [left | by right].
           split; [exact Hs' |].
           destruct (decide (Z.to_nat x = k0)) as [-> | Hne].
-          -- exists (FdOpen rd wr t). rewrite list_lookup_insert; [split; [done | discriminate] |].
+          -- exists (FdOpen rd wr t). rewrite list_lookup_insert_eq; [split; [done | discriminate] |].
              exact Hk0l.
           -- exists st'. rewrite list_lookup_insert_ne; [split; [exact Hl' | exact Hne'] |].
              congruence.
@@ -874,11 +874,11 @@ Section UkFileIface.
         iSplit.
         * iPureIntro. intros x Hx. apply elem_of_union in Hx as [Hx | Hx].
           -- apply elem_of_singleton in Hx as ->. split; [lia |]. right.
-             split; [lia |]. rewrite lookup_insert. by eexists.
+             split; [lia |]. rewrite lookup_insert_eq. by eexists.
           -- destruct (Hho x Hx) as [Hb Hc]. split; [exact Hb |].
              destruct Hc as [Hc | (Hs & Hsm)]; [by left | right]. split; [exact Hs |].
              destruct (decide (x = Z.of_nat fd)) as [-> | Hne];
-               [rewrite lookup_insert; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
+               [rewrite lookup_insert_eq; by eexists | rewrite lookup_insert_ne; [exact Hsm | congruence]].
         * rewrite big_sepM_insert; [| exact Hfr]. rewrite Nat2Z.id. iFrame "Hh Hhs".
     - rewrite Hr fdev_m1 /open_held. case_decide; [lia |].
       iApply (fif_taint_of_fds fdm l vs Hok with "Htn [] Hstd Hhs").
@@ -1234,7 +1234,7 @@ Section UkFileIface.
           iSplitL "Htoks Htk1".
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
           rewrite big_sepM_insert; [| exact Hnb]. iSplitR.
-          { rewrite /fif_hdl lookup_insert. done. }
+          { rewrite /fif_hdl lookup_insert_eq. done. }
           iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
           rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd').
         * iExists true, path, i, γo, p. iFrame "Htk2 Hu". iPureIntro.
@@ -1264,7 +1264,7 @@ Section UkFileIface.
           iSplitL "Htoks Htk1".
           { rewrite big_sepM_insert; [| exact Hvd]. iFrame "Htk1 Htoks". }
           rewrite big_sepM_insert; [| exact Hnb]. iSplitL "Hh".
-          { rewrite /fif_hdl lookup_insert Nat2Z.id. iExact "Hh". }
+          { rewrite /fif_hdl lookup_insert_eq Nat2Z.id. iExact "Hh". }
           iApply (big_sepM_impl with "Hhs"). iIntros "!>" (fd' d' Hfd') "Hx".
           rewrite lookup_insert_ne; [iExact "Hx" |]. intros ->. exact (Hfr fd' Hfd').
         * iExists false, path, i, γo, p. iFrame "Htk2 Hu". iPureIntro.
@@ -1786,7 +1786,7 @@ Section UkFileIface.
       iSplitL "Hpool"; [by rewrite dom_singleton_L right_id_L |].
       iSplitL "Htk1"; [by rewrite big_sepM_singleton |].
       iApply big_sepM_intro. iIntros "!>" (fd d) "%Hfd".
-      rewrite (Hd0 fd d Hfd) lookup_singleton (Hhdl fd d Hfd). done. }
+      rewrite (Hd0 fd d Hfd) lookup_singleton_eq (Hhdl fd d Hfd). done. }
     iSplitR.
     { rewrite fif_ei_files. iPureIntro. split; [exact Hpaths | exact Hfiles]. }
     rewrite /dev_res big_sepS_singleton fif_dev_of. iApply ("Hdev" with "Htk2").
@@ -1803,7 +1803,7 @@ Section UkFileIface.
 
   Lemma fif_dp0 : D0 = [0%nat] -> dp_in D0 {[0%nat]}.
   Proof using .
-    intros HD0 d Hd. rewrite HD0 in Hd. apply elem_of_list_singleton in Hd as ->. set_solver.
+    intros HD0 d Hd. rewrite HD0 in Hd. apply list_elem_of_singleton in Hd as ->. set_solver.
   Qed.
 
   (* the two-descriptor console environment's pure side, once *)

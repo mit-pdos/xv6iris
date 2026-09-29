@@ -14,6 +14,8 @@ Open Scope bool.
 Open Scope Z.
 
 
+Definition __id (x : Z) : Z := x.
+
 Definition is_none {a : Type} (opt : option a) : bool :=
    match opt with | Some _ => false | None => true end.
 
@@ -63,8 +65,6 @@ Definition privileged_isa_version_gt (x : Privileged_ISA_Version) (y : Privilege
 
 Definition vector_support_gt (x : vector_support) (y : vector_support) : bool :=
    Z.gtb ((num_of_vector_support (x))) ((num_of_vector_support (y))).
-
-Definition __id (x : Z) : Z := x.
 
 Definition regidx_offset '((Regidx r) : regidx) (o : mword ((if false then 4 else 5))) : regidx :=
    Regidx ((add_vec (r) (o))).
@@ -5884,60 +5884,60 @@ Definition is_highest_zero {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool 
 Definition is_all_zeros {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool :=
    eq_vec (op) ((zeros n)).
 
-Definition float_is_nan {ex570907_ : Z} (op : mword ex570907_)
-(*member_Z_list ex570907_ [16; 32; 64; 128]*)
+Definition float_is_nan {ex570039_ : Z} (op : mword ex570039_)
+(*member_Z_list ex570039_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((negb ((is_all_zeros (mantissa))))).
 
-Definition float_is_snan {ex570924_ : Z} (op : mword ex570924_)
-(*member_Z_list ex570924_ [16; 32; 64; 128]*)
+Definition float_is_snan {ex570041_ : Z} (op : mword ex570041_)
+(*member_Z_list ex570041_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_zero (mantissa))).
 
-Definition float_is_qnan {ex570931_ : Z} (op : mword ex570931_)
-(*member_Z_list ex570931_ [16; 32; 64; 128]*)
+Definition float_is_qnan {ex570043_ : Z} (op : mword ex570043_)
+(*member_Z_list ex570043_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_one (mantissa))).
 
-Definition float_is_inf {ex570938_ : Z} (op : mword ex570938_)
-(*member_Z_list ex570938_ [16; 32; 64; 128]*)
+Definition float_is_inf {ex570045_ : Z} (op : mword ex570045_)
+(*member_Z_list ex570045_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_positive {ex570945_ : Z} (op : mword ex570945_)
-(*member_Z_list ex570945_ [16; 32; 64; 128]*)
+Definition float_is_positive {ex570047_ : Z} (op : mword ex570047_)
+(*member_Z_list ex570047_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_zero (op).
 
-Definition float_is_negative {ex570947_ : Z} (op : mword ex570947_)
-(*member_Z_list ex570947_ [16; 32; 64; 128]*)
+Definition float_is_negative {ex570049_ : Z} (op : mword ex570049_)
+(*member_Z_list ex570049_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_one (op).
 
-Definition float_is_zero {ex570949_ : Z} (op : mword ex570949_)
-(*member_Z_list ex570949_ [16; 32; 64; 128]*)
+Definition float_is_zero {ex570051_ : Z} (op : mword ex570051_)
+(*member_Z_list ex570051_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_zeros (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_normal {ex570956_ : Z} (op : mword ex570956_)
-(*member_Z_list ex570956_ [16; 32; 64; 128]*)
+Definition float_is_normal {ex570053_ : Z} (op : mword ex570053_)
+(*member_Z_list ex570053_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_sign := _; float_bits_mantissa := _ |}) :=
      float_decompose (op) in
    andb ((negb ((is_all_ones (exp))))) ((negb ((is_all_zeros (exp))))).
 
-Definition float_is_subnormal {ex570974_ : Z} (op : mword ex570974_)
-(*member_Z_list ex570974_ [16; 32; 64; 128]*)
+Definition float_is_subnormal {ex570055_ : Z} (op : mword ex570055_)
+(*member_Z_list ex570055_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
@@ -6280,8 +6280,8 @@ Definition undefined_float_class '(tt : unit) : M (float_class) :=
       float_class_qnan]))
     : M (float_class).
 
-Definition float_classify {ex571350_ : Z} (f : mword ex571350_)
-(*member_Z_list ex571350_ [16; 32; 64; 128]*)
+Definition float_classify {ex570137_ : Z} (f : mword ex570137_)
+(*member_Z_list ex570137_ [16; 32; 64; 128]*)
 : M (float_class) :=
    (if float_is_snan (f) then returnM (float_class_snan)
     else if float_is_qnan (f) then returnM (float_class_qnan)
@@ -6758,42 +6758,42 @@ Definition unwrap_or {a : Type} {b : Type} (r : result a b) (y : a) : a :=
 
 Axiom read_mem_ :
   forall
-  {fv38637_a : Type}
-  (_ : fv38637_a) (fv38638_addrsize : Z) (_ : mword fv38638_addrsize) (fv38639_n : Z)
-  (*fv38639_n >=? 0*) (*fv38638_addrsize >=? 0*) (*(fv38639_n >=? 0) &&
-    member_Z_list fv38638_addrsize [32; 64]*),
-  mword (8 * fv38639_n).
+  {fv38253_a : Type}
+  (_ : fv38253_a) (fv38254_addrsize : Z) (_ : mword fv38254_addrsize) (fv38255_n : Z)
+  (*fv38255_n >=? 0*) (*fv38254_addrsize >=? 0*) (*(fv38255_n >=? 0) &&
+    member_Z_list fv38254_addrsize [32; 64]*),
+  mword (8 * fv38255_n).
 
 Axiom read_mem_ifetch_ :
   forall
-  {fv38640_a : Type}
-  (_ : fv38640_a) (fv38641_addrsize : Z) (_ : mword fv38641_addrsize) (fv38642_n : Z)
-  (*fv38642_n >=? 0*) (*fv38641_addrsize >=? 0*) (*(fv38642_n >=? 0) &&
-    member_Z_list fv38641_addrsize [32; 64]*),
-  mword (8 * fv38642_n).
+  {fv38256_a : Type}
+  (_ : fv38256_a) (fv38257_addrsize : Z) (_ : mword fv38257_addrsize) (fv38258_n : Z)
+  (*fv38258_n >=? 0*) (*fv38257_addrsize >=? 0*) (*(fv38258_n >=? 0) &&
+    member_Z_list fv38257_addrsize [32; 64]*),
+  mword (8 * fv38258_n).
 
 Axiom read_mem_exclusive_ :
   forall
-  {fv38643_a : Type}
-  (_ : fv38643_a) (fv38644_addrsize : Z) (_ : mword fv38644_addrsize) (fv38645_n : Z)
-  (*fv38645_n >=? 0*) (*fv38644_addrsize >=? 0*) (*(fv38645_n >=? 0) &&
-    member_Z_list fv38644_addrsize [32; 64]*),
-  mword (8 * fv38645_n).
+  {fv38259_a : Type}
+  (_ : fv38259_a) (fv38260_addrsize : Z) (_ : mword fv38260_addrsize) (fv38261_n : Z)
+  (*fv38261_n >=? 0*) (*fv38260_addrsize >=? 0*) (*(fv38261_n >=? 0) &&
+    member_Z_list fv38260_addrsize [32; 64]*),
+  mword (8 * fv38261_n).
 
 Axiom write_mem_ :
   forall
-  {fv38646_a : Type}
-  (_ : fv38646_a) (fv38647_addrsize : Z) (_ : mword fv38647_addrsize) (fv38648_n : Z) (_ : mword (8 * fv38648_n))
-  (*fv38648_n >=? 0*) (*fv38647_addrsize >=? 0*) (*(fv38648_n >? 0) &&
-    member_Z_list fv38647_addrsize [32; 64]*),
+  {fv38262_a : Type}
+  (_ : fv38262_a) (fv38263_addrsize : Z) (_ : mword fv38263_addrsize) (fv38264_n : Z) (_ : mword (8 * fv38264_n))
+  (*fv38264_n >=? 0*) (*fv38263_addrsize >=? 0*) (*(fv38264_n >? 0) &&
+    member_Z_list fv38263_addrsize [32; 64]*),
   bool.
 
 Axiom write_mem_exclusive_ :
   forall
-  {fv38649_a : Type}
-  (_ : fv38649_a) (fv38650_addrsize : Z) (_ : mword fv38650_addrsize) (fv38651_n : Z) (_ : mword (8 * fv38651_n))
-  (*fv38651_n >=? 0*) (*fv38650_addrsize >=? 0*) (*(fv38651_n >? 0) &&
-    member_Z_list fv38650_addrsize [32; 64]*),
+  {fv38265_a : Type}
+  (_ : fv38265_a) (fv38266_addrsize : Z) (_ : mword fv38266_addrsize) (fv38267_n : Z) (_ : mword (8 * fv38267_n))
+  (*fv38267_n >=? 0*) (*fv38266_addrsize >=? 0*) (*(fv38267_n >? 0) &&
+    member_Z_list fv38266_addrsize [32; 64]*),
   bool.
 
 Definition sail_instr_announce {n : Z} (_ : mword n) (*n >=? 0*) (*n >? 0*) : unit := tt.
@@ -7006,19 +7006,19 @@ Definition read_ram (rk : read_kind) '((Physaddr addr) : physaddr) (width : Z) (
 
 Axiom __TraceMemoryWrite :
   forall
-  {fv38666_m : Z}
-  (fv38667_n : Z) (_ : mword fv38666_m) (_ : mword (8 * fv38667_n))
-  (*fv38667_n >=? 0*) (*fv38666_m >=? 0*),
+  {fv38282_m : Z}
+  (fv38283_n : Z) (_ : mword fv38282_m) (_ : mword (8 * fv38283_n))
+  (*fv38283_n >=? 0*) (*fv38282_m >=? 0*),
   unit.
 
 Axiom __TraceMemoryRead :
   forall
-  {fv38668_m : Z}
-  (fv38669_n : Z) (_ : mword fv38668_m) (_ : mword (8 * fv38669_n))
-  (*fv38669_n >=? 0*) (*fv38668_m >=? 0*),
+  {fv38284_m : Z}
+  (fv38285_n : Z) (_ : mword fv38284_m) (_ : mword (8 * fv38285_n))
+  (*fv38285_n >=? 0*) (*fv38284_m >=? 0*),
   unit.
 
-Definition brev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((ZEuclid.modulo m 8) =? 0)*)
+Definition brev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((e_modulo m 8) =? 0)*)
 : mword m :=
    let output : bits m := zeros' m in
    let '(loop_i_lower) := 0 in
@@ -7069,7 +7069,7 @@ Definition mult_to_bits_half
 Definition cmulr_equivalence (a : mword 16) (b : mword 16) : bool :=
    eq_vec ((carryless_mul_reversed (a) (b))) ((carryless_mulr (a) (b))).
 
-Definition rev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((ZEuclid.modulo m 8) =? 0)*)
+Definition rev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((e_modulo m 8) =? 0)*)
 : mword m :=
    let output : bits m := zeros' m in
    let '(loop_i_lower) := 0 in
@@ -15100,9 +15100,9 @@ Definition csr_full_read_callback (_ : string) (_ : mword 12) (_ : mword 64) : u
 
 Definition redirect_callback (_ : mword 64) : unit := tt.
 
-Definition trap_callback (ex576568_ : bool) (_ : mword 6) : unit := tt.
+Definition trap_callback (ex571738_ : bool) (_ : mword 6) : unit := tt.
 
-Definition xret_callback (ex576569_ : bool) : unit := tt.
+Definition xret_callback (ex571739_ : bool) : unit := tt.
 
 Definition csr_name_map_backwards (arg_ : string) : M (mword 12) :=
    let head_exp_ := arg_ in
@@ -24575,19 +24575,19 @@ Definition ptw_start_callback
    tt.
 
 Definition ptw_step_callback
-(ex612438_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
-(*(0 <=? ex612438_) && (ex612438_ <=? 4)*)
+(ex571970_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
+(*(0 <=? ex571970_) && (ex571970_ <=? 4)*)
 : unit :=
    tt.
 
-Definition ptw_success_callback (_ : mword 64) (ex612439_ : Z)
-(*(0 <=? ex612439_) && (ex612439_ <=? 4)*)
+Definition ptw_success_callback (_ : mword 64) (ex571971_ : Z)
+(*(0 <=? ex571971_) && (ex571971_ <=? 4)*)
 : unit :=
    tt.
 
 Definition ptw_fail_callback
-(_ : PTW_Error) (ex612440_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
-(*(0 <=? ex612440_) && (ex612440_ <=? 4)*)
+(_ : PTW_Error) (ex571972_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
+(*(0 <=? ex571972_) && (ex571972_ <=? 4)*)
 : unit :=
    tt.
 
@@ -24644,14 +24644,14 @@ Definition tlb_get_pbmt (ent : TLB_Entry) : M (page_based_mem_type) :=
 
 Definition num_tlb_entries_exp := 6.
 #[export] Hint Unfold num_tlb_entries_exp : sail.
-Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex612510_ : Z)
-(*(0 <=? ex612510_) && (ex612510_ <=? (2 ^ 6))*)
+Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex571987_ : Z)
+(*(0 <=? ex571987_) && (ex571987_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 
 Definition tlb_flush_begin_callback (_ : unit) : unit := tt.
 
-Definition tlb_flush_callback (ex612511_ : Z) (*(0 <=? ex612511_) && (ex612511_ <=? (2 ^ 6))*)
+Definition tlb_flush_callback (ex571988_ : Z) (*(0 <=? ex571988_) && (ex571988_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 

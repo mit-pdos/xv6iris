@@ -99,7 +99,7 @@ Proof.
   rewrite elf_map_is_fmap, list_lookup_fmap.
   destruct (Nat.lt_ge_cases j n) as [Hj|Hj].
   - rewrite lookup_seq_lt by exact Hj. simpl.
-    rewrite lookup_take by exact Hj. rewrite lookup_drop.
+    rewrite lookup_take_lt by exact Hj. rewrite lookup_drop.
     rewrite (list_lookup_lookup_total_lt l (o + j)%nat) by lia.
     reflexivity.
   - rewrite lookup_ge_None_2 by (rewrite length_seq; lia). simpl.
@@ -429,7 +429,7 @@ Proof.
   simpl in Hd. apply andb_true_iff in Hd as [Hall Hd].
   rewrite elem_of_cons in Hp, Hq.
   rewrite List.forallb_forall in Hall.
-  setoid_rewrite <- elem_of_list_In in Hall.
+  setoid_rewrite <- list_elem_of_In in Hall.
   destruct Hp as [->|Hp]; destruct Hq as [->|Hq].
   - contradiction.
   - apply Hall, Hq.
@@ -447,7 +447,7 @@ Proof.
   apply andb_true_iff in H as [H _].
   apply andb_true_iff in H as [_ Hall].
   rewrite List.forallb_forall in Hall.
-  apply phdr_wf_ok, Hall, elem_of_list_In, Hp.
+  apply phdr_wf_ok, Hall, list_elem_of_In, Hp.
 Qed.
 
 Lemma elf_wf_loads_disj (f : elf_bytes) (p q : elf_phdr) (a : Z) :
@@ -478,7 +478,7 @@ Lemma seg_file_bytes_lookup (f : elf_bytes) (p : elf_phdr) (k : nat) :
   seg_file_bytes f p !! k = f !! (Z.to_nat (ep_offset p) + k)%nat.
 Proof.
   intros [Ho Hf Hw Hm Hv Ht] Hk. unfold seg_file_bytes.
-  rewrite lookup_take by lia. rewrite lookup_drop. reflexivity.
+  rewrite lookup_take_lt by lia. rewrite lookup_drop. reflexivity.
 Qed.
 
 Lemma lookup_seg_file_map (f : elf_bytes) (p : elf_phdr) (a : Z) (b : bv 8) :
@@ -597,9 +597,9 @@ Section segs.
     induction ps as [|c ps IH]; simpl.
     { rewrite lookup_empty. discriminate. }
     intros H. apply lookup_union_Some_raw in H as [H|[_ H]].
-    - exists c. split; [apply elem_of_list_here|exact H].
+    - exists c. split; [apply list_elem_of_here|exact H].
     - apply IH in H as [p [Hp Hg]]. exists p.
-      split; [apply elem_of_list_further, Hp|exact Hg].
+      split; [apply list_elem_of_further, Hp|exact Hg].
   Qed.
 
   Lemma segs_union_disjoint_l g1 g2 (p : A) (qs : list A) :
@@ -608,8 +608,8 @@ Section segs.
     induction qs as [|c qs IH]; simpl; intros H.
     { apply map_disjoint_empty_r. }
     apply map_disjoint_union_r_2.
-    - apply H, elem_of_list_here.
-    - apply IH. intros q Hq. apply H, elem_of_list_further, Hq.
+    - apply H, list_elem_of_here.
+    - apply IH. intros q Hq. apply H, list_elem_of_further, Hq.
   Qed.
 
   Lemma segs_union_disjoint g1 g2 (ps qs : list A) :
@@ -620,9 +620,9 @@ Section segs.
     { apply map_disjoint_empty_l. }
     apply map_disjoint_union_l_2.
     - apply segs_union_disjoint_l. intros q Hq.
-      apply H; [apply elem_of_list_here|exact Hq].
+      apply H; [apply list_elem_of_here|exact Hq].
     - apply IH. intros p q Hp Hq.
-      apply H; [apply elem_of_list_further, Hp|exact Hq].
+      apply H; [apply list_elem_of_further, Hp|exact Hq].
   Qed.
 
   Lemma segs_union_lookup g (ps : list A) (a : Z) (b : bv 8) :
@@ -637,14 +637,14 @@ Section segs.
     - assert (Hrest : segs_union g ps !! a = Some b).
       { apply IH; [|exists p; split; assumption].
         intros x y Hx Hy Hne.
-        apply Hdisj; [apply elem_of_list_further, Hx
-                     |apply elem_of_list_further, Hy|exact Hne]. }
+        apply Hdisj; [apply list_elem_of_further, Hx
+                     |apply list_elem_of_further, Hy|exact Hne]. }
       destruct (decide (c = p)) as [->|Hne].
       + apply lookup_union_Some_l, Hg.
       + apply lookup_union_Some_raw. right. split; [|exact Hrest].
         apply (map_disjoint_Some_l (g p) (g c) a b); [|exact Hg].
-        apply Hdisj; [apply elem_of_list_further, Hp
-                     |apply elem_of_list_here|congruence].
+        apply Hdisj; [apply list_elem_of_further, Hp
+                     |apply list_elem_of_here|congruence].
   Qed.
 
   Lemma segs_union_elem_of_dom g (ps : list A) (a : Z) :
@@ -655,8 +655,8 @@ Section segs.
       intros [p [Hp _]]. inversion Hp. }
     rewrite dom_union_L, elem_of_union, IH. split.
     - intros [H|[p [Hp Hg]]].
-      + exists c. split; [apply elem_of_list_here|exact H].
-      + exists p. split; [apply elem_of_list_further, Hp|exact Hg].
+      + exists c. split; [apply list_elem_of_here|exact H].
+      + exists p. split; [apply list_elem_of_further, Hp|exact Hg].
     - intros [p [Hp Hg]]. rewrite elem_of_cons in Hp.
       destruct Hp as [->|Hp]; [left; exact Hg|right; exists p; split; assumption].
   Qed.
@@ -668,10 +668,10 @@ Section segs.
     induction ps as [|c ps IH]; simpl; intros H.
     { rewrite (left_id_L ∅ (∪)). reflexivity. }
     rewrite IH by (intros p q Hp Hq;
-                   apply H; apply elem_of_list_further; assumption).
+                   apply H; apply list_elem_of_further; assumption).
     assert (Hbx : g2 c ##ₘ segs_union g1 ps).
     { apply segs_union_disjoint_l. intros q Hq. apply symmetry.
-      apply H; [apply elem_of_list_further, Hq|apply elem_of_list_here]. }
+      apply H; [apply list_elem_of_further, Hq|apply list_elem_of_here]. }
     rewrite <- !(assoc_L (∪)). f_equal.
     rewrite !(assoc_L (∪)). rewrite (map_union_comm _ _ Hbx). reflexivity.
   Qed.

@@ -164,7 +164,7 @@ Section ProofMemcpy.
                    = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv; exact HT2sp).
-    iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := kt) sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.memcpy + 0x10))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
@@ -252,7 +252,7 @@ Section ProofMemcpy.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.memcpy + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (u1 u2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := kt) with "Hframe") as (u1 u2) "[Hb1 Hb2]".
     assert (Hpa1 : add_vec (R1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 1).

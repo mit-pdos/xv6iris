@@ -321,7 +321,7 @@ Section IcacheEscrow.
 
      Holding [ic_tok] is what lets a winner refute the checked-out arm; the
      checkout then splits it so that the arm records "somebody is inside the
-     critical section" AND WHAT THEY LEFT.  It is a [ghost_var] over
+     critical section" AND WHAT THEY LEFT.  It is a [ghost_var_frac] over
      [Xv6Cameras.ic_dep] rather than a [WpLock.lock_tok_excl] for exactly one
      reason (§14.8, "the two-parkers problem"): with the OUT arm able to hold
      EITHER a reference (iput's window exit) or a share (ilock's checkout), the
@@ -335,7 +335,7 @@ Section IcacheEscrow.
      (ic_tok cn k)] is unchanged, and IcacheBoot's allocation is unchanged in
      character. *)
   Definition ic_tok (cn : ic_names) (k : nat) : iProp Σ :=
-    ghost_var (icn_esc cn k) 1 DepNone.
+    ghost_var_frac (icn_esc cn k) 1 DepNone.
   Lemma ic_tok_exclusive cn k : ic_tok cn k -∗ ic_tok cn k -∗ False.
   Proof using .
     rewrite /ic_tok. iIntros "H1 H2".
@@ -347,13 +347,13 @@ Section IcacheEscrow.
      arm and the other travels with the checked-out thread, from the checkout
      to the park. *)
   Definition ic_deposit (cn : ic_names) (k : nat) (d : ic_dep) : iProp Σ :=
-    ghost_var (icn_dep cn k) (1/2) d.
+    ghost_var_frac (icn_dep cn k) (1/2) d.
   (* ...and the variable WHOLE at the neutral descriptor: what the L2 payload
      row carries between a park and the next checkout (the stitch: the box's
      token [ic_tok] stays whole inside the box during OUT_L2, so main's
      descriptor halves live on their own gname, [icn_dep]). *)
   Definition ic_dep_neutral (cn : ic_names) (k : nat) : iProp Σ :=
-    ghost_var (icn_dep cn k) 1 DepNone.
+    ghost_var_frac (icn_dep cn k) 1 DepNone.
 
   (* THE CHECKOUT'S GHOST STEP: the winner turns the sleeplock's variable into
      the descriptor of what it is about to deposit, and splits.  One half goes
@@ -417,7 +417,7 @@ Section IcacheEscrow.
      only one of them. *)
   Definition ic_id (cn : ic_names) (k : nat) (q : Qp)
       (v : bool) (dev inum : mword 32) : iProp Σ :=
-    ghost_var (icn_id cn k) q (v, dev, inum).
+    ghost_var_frac (icn_id cn k) q (v, dev, inum).
 
   Global Instance ic_id_timeless cn k q v dev inum :
     Timeless (ic_id cn k q v dev inum).
@@ -2116,7 +2116,7 @@ Section IcacheEscrow.
     z ∈ ci_inums ci <->
     ∃ (k : nat) (p : mword 32 * mword 32), ci !! k = Some p /\ z = bv_unsigned (snd p).
   Proof using .
-    rewrite /ci_inums elem_of_list_to_set elem_of_list_fmap.
+    rewrite /ci_inums elem_of_list_to_set list_elem_of_fmap.
     split.
     - intros ([k p] & -> & Hin). exists k, p.
       split; [| reflexivity]. by apply elem_of_map_to_list in Hin.
@@ -2131,7 +2131,7 @@ Section IcacheEscrow.
   Lemma region_inums_spec (nib : nat) (z : Z) :
     z ∈ region_inums nib <-> 0 <= z < 16 * Z.of_nat nib.
   Proof using .
-    rewrite /region_inums elem_of_list_to_set elem_of_list_fmap.
+    rewrite /region_inums elem_of_list_to_set list_elem_of_fmap.
     split.
     - intros (j & -> & Hj). apply elem_of_seq in Hj. lia.
     - intros [Hlo Hhi]. exists (Z.to_nat z).
@@ -2248,7 +2248,7 @@ Section IcacheEscrow.
      that only a lock holder moves the index and the commit -- which never
      takes the lock -- can still read every row. *)
   Definition ipool_key (P : gset Z) : iProp Σ :=
-    ghost_var icfg_pool (1/2) P.
+    ghost_var_frac icfg_pool (1/2) P.
 
   (* ==================================================================== *)
   (*  5c.  THE PARTITION (durable-disk lane C-3b; durable-fs-plan.md       *)
@@ -2310,7 +2310,7 @@ Section IcacheEscrow.
   (* THE IN-TRANSITION KEY, the twin of [ipool_key] and in the same two
      places: one half inside the invariant, one inside [ipool]. *)
   Definition ipool_xkey (X : gset Z) : iProp Σ :=
-    ghost_var icfg_pext (1/2) X.
+    ghost_var_frac icfg_pext (1/2) X.
 
   (* ==================================================================== *)
   (*  5c'.  THE TRANSIT LEDGER (durable-disk lane C-4, plan section 4)     *)
@@ -2335,12 +2335,12 @@ Section IcacheEscrow.
   (*  parked share, for [Xv6Cameras.ic_dep]'s reason verbatim              *)
   (*  -- two halves are not the whole: [ipool_put] has to hand             *)
   (*  the walk back EXACTLY the element it parked, and an existentially    *)
-  (*  keyed share cannot be re-identified.  The ledger is a [ghost_var]    *)
+  (*  keyed share cannot be re-identified.  The ledger is a [ghost_var_frac]    *)
   (*  whose other half the walk carries inside [ipool], so the two agree.  *)
   (* ==================================================================== *)
 
   Definition ipool_tkey (T : gmap Z (nat * Qp)) : iProp Σ :=
-    ghost_var icfg_ptrn (1/2) T.
+    ghost_var_frac icfg_ptrn (1/2) T.
 
   (* one parked share per inum in transit, at the ledger's own [(t, q)] --
      [TxPin.tx_pins] at the pool's key, which is exactly the shape *)
@@ -2383,7 +2383,7 @@ Section IcacheEscrow.
   (*      [InodeRegion.imark], which is what [FsCollect.col_free_slot_acc] *)
   (*      reads as the free bundle.                                       *)
   (*                                                                      *)
-  (*  THE KEY IS A [ghost_map] AND NOT [ipool_tkey]'s PAIRED [ghost_var],  *)
+  (*  THE KEY IS A [ghost_map] AND NOT [ipool_tkey]'s PAIRED [ghost_var_frac],  *)
   (*  and that is forced: the deposit runs twenty instructions after iput  *)
   (*  released the itable lock, so it holds neither half of [icfg_pext]    *)
   (*  and cannot tell that its own inum is in [X].  Its ELEMENT locates    *)
@@ -2400,7 +2400,7 @@ Section IcacheEscrow.
 
   (* the ledger's AUTHORITY, whole and in this body alone *)
   Definition ipool_ckey (K : gmap Z icorpse) : iProp Σ :=
-    ghost_map_auth icfg_pcrp 1 K.
+    ghost_map_auth_frac icfg_pcrp 1 K.
 
   (* what one row parks, by its value *)
   Definition crp_row (γi : gname) (z : Z) (v : icorpse) : iProp Σ :=
@@ -2430,7 +2430,7 @@ Section IcacheEscrow.
      [TxPin.tx_pin_no_ops] and gets no name of its own; the induction stays
      because the conclusion is a [map_Forall], not [K = ∅]. *)
   Lemma ipool_corpse_no_ops γi (K : gmap Z icorpse) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ipool_corpse γi K -∗ ⌜map_Forall (fun _ v => v = CrpDep) K⌝.
   Proof using .
     rewrite /ipool_corpse.
@@ -2515,13 +2515,13 @@ Section IcacheEscrow.
     ∃ (k : nat) (p : bool * mword 32 * mword 32),
       ids !! k = Some p /\ p.1.1 = true /\ z = bv_unsigned p.2.
   Proof using .
-    rewrite /ic_live_inums elem_of_list_to_set elem_of_list_omap.
+    rewrite /ic_live_inums elem_of_list_to_set list_elem_of_omap.
     split.
-    - intros (p & Hp & Hf). apply elem_of_list_lookup in Hp as [k Hk].
+    - intros (p & Hp & Hf). apply list_elem_of_lookup in Hp as [k Hk].
       exists k, p. destruct (p.1.1) eqn:Hv; [| discriminate].
       split; [exact Hk |]. split; [reflexivity |]. by injection Hf.
     - intros (k & p & Hk & Hv & ->). exists p.
-      split; [apply elem_of_list_lookup; by exists k |]. by rewrite Hv.
+      split; [apply list_elem_of_lookup; by exists k |]. by rewrite Hv.
   Qed.
 
   (* THE ONE MOVE, as a set equation: replacing slot [k]'s identity trades
@@ -2540,7 +2540,7 @@ Section IcacheEscrow.
     split.
     - intros [(j & r & Hj & Hv & ->) | Hq].
       + destruct (decide (j = k)) as [->|Hne].
-        * rewrite list_lookup_insert in Hj; [| exact Hlen].
+        * rewrite list_lookup_insert_eq in Hj; [| exact Hlen].
           injection Hj as <-. by right.
         * rewrite list_lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
           left. by exists j, r.
@@ -2550,7 +2550,7 @@ Section IcacheEscrow.
         * rewrite Hk in Hj. injection Hj as <-. by right.
         * left. exists j, r. rewrite list_lookup_insert_ne; [| exact (not_eq_sym Hne)].
           done.
-      + left. exists k, p. rewrite list_lookup_insert; [| exact Hlen].
+      + left. exists k, p. rewrite list_lookup_insert_eq; [| exact Hlen].
         destruct Hp as [Hv ->]. done.
   Qed.
 
@@ -2664,14 +2664,14 @@ Section IcacheEscrow.
       (ids : list (bool * mword 32 * mword 32)) :
     length ids = NINODE ->
     ic_live_inums ids = ∅ ->
-    ghost_var icfg_pool 1 (∅ : gset Z) -∗
-    ghost_var icfg_pext 1 (∅ : gset Z) -∗
-    ghost_var icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
+    ghost_var_frac icfg_pool 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_pext 1 (∅ : gset Z) -∗
+    ghost_var_frac icfg_ptrn 1 (∅ : gmap Z (nat * Qp)) -∗
     (* ...AND THE CORPSE LEDGER (durable-disk C-7), EMPTY: the image has no
        corpses -- every free inum's record is bare and its marker is on the
        pool's own ordinary row, not in transit -- so [X] and the ledger are
        empty together and the partition is the two-way one. *)
-    ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
+    ghost_map_auth_frac icfg_pcrp 1 (∅ : gmap Z icorpse) -∗
     ic_ids cn ids -∗
     ipool_rows γfs γi cov logstart (region_inums nib) ={E}=∗
       ipool_inv cn γfs γi cov logstart nib ∗
@@ -3279,11 +3279,11 @@ Section IcacheEscrow.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) :
     ↑ipoolN ⊆ E ->
     ipool_inv cn γfs γi cov logstart nib -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ipoolN}=∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ={E, E ∖ ↑ipoolN}=∗
       ∃ (O X : gset Z) (ids : list (bool * mword 32 * mword 32)),
         ⌜length ids = NINODE⌝ ∗
         ⌜region_inums nib = O ∪ X ∪ ic_live_inums ids⌝ ∗
-        ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
+        ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) ∗
         ipool_rows γfs γi cov logstart O ∗ ic_ids cn ids ∗
         (* THE [X] PART'S MARKERS (durable-disk C-7): every corpse has been
            deposited (a pre-deposit row parks a share of the freeing
@@ -5477,9 +5477,9 @@ Section IcacheBox.
     own_context ξ -∗
     ([∗ list] k ∈ seq 0 NINODE,
        CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
-       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-       ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-       ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+       ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+       ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
        ic_hdr cn γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
     own_context ξ ∗
     ic_boxes_all cn γfs γi cov logstart ∗
@@ -5491,9 +5491,9 @@ Section IcacheBox.
     iAssert ([∗ list] i↦k ∈ seq 0 NINODE,
                own_context ξ -∗
                (CtxBox.stamps_auth (X := ic_x) (icfg_box k) ∅ ∗
-                ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) 1 0%nat ∗
-                ghost_var (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
-                ghost_var (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
+                ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt (icfg_box k)) (DfracOwn 1) 0%nat ∗
+                ghost_var_frac (bx_slotd (icfg_box k)) 1 (inhabitant : slot_reg ic_bid ic_x) ∗
+                ghost_var_frac (bx_slotp (icfg_box k)) 1 (inhabitant : l2_reg ic_bid) ∗
                 ic_hdr cn γfs γi cov logstart k None IcRaw ξ ∗ ic_rest k IcRaw ξ) ={E}=∗
                own_context ξ ∗
                (ic_box cn γfs γi cov logstart k ∗
@@ -5624,7 +5624,7 @@ Section IcacheTable.
      -- optimization.md's rule against [apply _] on a large unfolded body).
      So the row gets its own instance, and its two cell arms get theirs.
      Everything else in either arm is ghost: [iref_slots], [ic_id],
-     [icnt_half], [frz_park] and [ic_pin_rest] are [own]s / [ghost_var]s and
+     [icnt_half], [frz_park] and [ic_pin_rest] are [own]s / [ghost_var_frac]s and
      take no context. *)
   Global Instance islot_rest_at_morph (k : nat) (q : Qp) (dev inum : mword 32) :
     CtxMorph (fun ξ => islot_rest_at (XI := ξ) k q dev inum).
@@ -5693,10 +5693,10 @@ Section IcacheTable.
     | None => (∃ tst : nat,
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
-        mono_nat_auth_own (icfg_istmp k) 1 tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) 1 tst ∗
         TsoGhost.llb loglen_name tst)%I
     | Some _ => (∃ tst : nat,
-        mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
         TsoGhost.llb loglen_name tst ∗
         TsoCtx.ctx_floor ξ tst)%I
     end.
@@ -5712,11 +5712,11 @@ Section IcacheTable.
     | None => (∃ tst : nat,
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
-        mono_nat_auth_own (icfg_istmp k) 1 tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) 1 tst ∗
         TsoGhost.llb loglen_name tst)%I
     | Some _ => (∃ tst : nat,
         ⌜(tst <= tl)%nat⌝ ∗
-        mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
         TsoGhost.llb loglen_name tst)%I
     end.
 
@@ -5749,10 +5749,10 @@ Section IcacheTable.
     | None => (∃ tst : nat,
         TsoCtx.ctx_word4_pointsto ξ (i_ref (ientry k))
           (DfracOwn 1) (mword_of_int 0 : mword 32) ∗
-        mono_nat_auth_own (icfg_istmp k) 1 tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) 1 tst ∗
         TsoGhost.llb loglen_name tst)%I
     | Some _ => (∃ tst : nat,
-        mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+        mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
         TsoGhost.llb loglen_name tst)%I
     end.
 
@@ -6322,7 +6322,7 @@ Section IcacheEscrowAlloc.
      the esc names used to be, and reuses [ic_id_fun_alloc]'s shape verbatim. *)
   Lemma ic_dep_fun_alloc (n j : nat) :
     ⊢ |==> ∃ f : nat -> gname,
-      [∗ list] k ∈ seq j n, ghost_var (f k) 1 DepNone.
+      [∗ list] k ∈ seq j n, ghost_var_frac (f k) 1 DepNone.
   Proof using .
     iInduction n as [|n IH] forall (j).
     { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
@@ -6341,7 +6341,7 @@ Section IcacheEscrowAlloc.
      WHOLE, so the caller splits it into the escrow's half and the table's. *)
   Lemma ic_id_fun_alloc (dvs : nat -> mword 32 * mword 32) (n j : nat) :
     ⊢ |==> ∃ f : nat -> gname,
-      [∗ list] k ∈ seq j n, ghost_var (f k) 1 (false, (dvs k).1, (dvs k).2).
+      [∗ list] k ∈ seq j n, ghost_var_frac (f k) 1 (false, (dvs k).1, (dvs k).2).
   Proof using .
     iInduction n as [|n IH] forall (j).
     { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }

@@ -50,7 +50,7 @@ Section EscrowDefs.
      ([IcacheEscrow.ipool_put_corpse]) to the off-lock deposit
      ([EscrowDeposit.ireg_free_deposit_au]) -- across the release of the
      itable lock, which is why the ledger is a [ghost_map] and not a paired
-     [ghost_var] like [IcacheEscrow.ipool_tkey]: the element ALONE locates
+     [ghost_var_frac] like [IcacheEscrow.ipool_tkey]: the element ALONE locates
      the row.  [Xv6Cameras.icorpse] says what each value parks. *)
   Definition crp_elem (z : Z) (v : icorpse) : iProp Σ :=
     (z ↪[icfg_pcrp] v)%I.

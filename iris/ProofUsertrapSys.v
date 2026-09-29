@@ -963,7 +963,7 @@ Section UtSysBlock.
           { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
           (* THE STORED a0 WORD, hoisted: the cwd row and sbrk's both read it *)
           assert (Ha0w : pv_tf V2 !!! tf_arg_idx 0 = w).
-          { rewrite Hw. apply list_lookup_total_insert.
+          { rewrite Hw. apply list_lookup_total_insert_eq.
             rewrite HV1tf length_insert Htflen0. unfold tf_arg_idx, TFWORDS. lia. }
           (* the dispatcher's record differs from the entry's in the EPC word
              alone, so the two agree at a7 (the number) and at a0 (sbrk's

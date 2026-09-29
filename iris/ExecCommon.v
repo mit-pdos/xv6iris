@@ -227,7 +227,7 @@ Qed.
    ~1.7s -> ~0.02s per call. *)
 Ltac csr_dispatch_eq :=
   unfold is_CSR_accessible;
-  cbv delta [eq_vec get_word MachineWord.MachineWord.eqb bool_decide] iota zeta beta;
+  cbv delta [eq_vec MachineWord.MachineWord.eqb bool_decide] iota zeta beta;
   reflexivity.
 
 Lemma exec_check_CSR_result_csrr s :

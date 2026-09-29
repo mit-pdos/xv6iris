@@ -422,8 +422,8 @@ Lemma foldr_ins_union_r (A B : pamap) (a : Arch.pa) {wd : N} (v : bv wd)
   = A ∪ foldr (fun j acc => <[pa_add a j := nth_byte v j]> acc) B js.
 Proof.
   induction js as [| j js IH]; cbn [foldr]; intros HA; [reflexivity |].
-  rewrite (IH (fun j' Hj' => HA j' (elem_of_list_further j' j js Hj'))).
-  apply insert_union_r. exact (HA j (elem_of_list_here j js)).
+  rewrite (IH (fun j' Hj' => HA j' (list_elem_of_further j' j js Hj'))).
+  apply insert_union_r. exact (HA j (list_elem_of_here j js)).
 Qed.
 
 Lemma write_bytes_union_r (A B : pamap) (a : Arch.pa) (n : N) {wd : N} (v : bv wd) :
@@ -441,7 +441,7 @@ Qed.
    equations are applied as CONCRETE instances rather than rewritten with:
    [write_bytes]'s inserts carry [RiscvModelBytes]' [bv_countable Arch.pa],
    which is not the one this file's typeclass search finds, so a bare
-   [rewrite lookup_insert] reports "found no subterm" on a goal that prints
+   [rewrite lookup_insert_eq] reports "found no subterm" on a goal that prints
    as its own left-hand side. *)
 Lemma foldr_ins_is_Some_rev (a : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
     (m : pamap) (x : Arch.pa) :
@@ -451,8 +451,8 @@ Lemma foldr_ins_is_Some_rev (a : Arch.pa) {wd : N} (v : bv wd) (js : list nat)
 Proof.
   induction js as [| j js IH]; cbn [foldr]; intros Hj Hx; [ exact Hx |].
   destruct (decide (x = pa_add a j)) as [Heq | Hne].
-  - subst x. exact (Hj j (elem_of_list_here j js)).
-  - apply (IH (fun j' Hj' => Hj j' (elem_of_list_further j' j js Hj'))).
+  - subst x. exact (Hj j (list_elem_of_here j js)).
+  - apply (IH (fun j' Hj' => Hj j' (list_elem_of_further j' j js Hj'))).
     assert (Hne' : pa_add a j <> x) by (intros H; apply Hne; by rewrite H).
     assert (Heq : <[pa_add a j := nth_byte v j]>
                     (foldr (fun j0 acc => <[pa_add a j0 := nth_byte v j0]> acc) m js)

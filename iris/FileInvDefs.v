@@ -272,7 +272,7 @@ Record fpnames := MkFPNames
     (* the off box's names (plan §9 item 24): set at sys_open's publish,
        read by every fd of the file through [fpay_tok]'s agreement *)
     fp_obox : box_names;
-    (* THE OFFSET SHADOW'S NAME ([FileOffCell.off_gv]): the ghost_var over
+    (* THE OFFSET SHADOW'S NAME ([FileOffCell.off_gv]): the ghost_var_frac over
        [Z] that tracks [f->off], owned whole inside the box's header
        ([off_resident]).  Set at the same publish as [fp_obox], minted
        fresh there, and what [FdSlots.FdInode]'s [γo] reports -- the tie
@@ -836,7 +836,7 @@ Proof.
   assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
   rewrite Hz in Hc. revert Hc.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned. rewrite Hs.
   unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
   rewrite E64. rewrite Z.mod_small; [lia|]. lia.
@@ -1573,8 +1573,8 @@ Section FileInv.
     (∃ (i : nat) (T0 : nat),
        ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
        off_box k γb γo ∗ off_member off_cfg i γb ∗
-       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
-       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
+       ghost_var_frac (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (DfracOwn (q / 2)) 1%nat ∗
        off_ref_stamps γb k q)%I.
   (* THE SHARE WITH ITS STAMPS FRAGMENT NAMED (reviewer 2, plan §9 item 31;
      the [inode_ref_at] precedent): what a reader presents at its ilock
@@ -1585,8 +1585,8 @@ Section FileInv.
     (∃ (i : nat) (T0 : nat),
        ⌜fc_ip C = ientry i⌝ ∗ ⌜(i < NINODE)%nat⌝ ∗
        off_box k γb γo ∗ off_member off_cfg i γb ∗
-       ghost_var (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
-       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (q / 2) 1%nat ∗
+       ghost_var_frac (bx_slotd γb) (q / 2) (SlotReg T0 false k None : slot_reg nat unit) ∗
+       ghost_var (ghost_varG0 := kalloc_count_inG) (bx_cnt γb) (DfracOwn (q / 2)) 1%nat ∗
        ⌜qsum m = Qp_to_Qc q⌝ ∗ CtxBox.reference (X := unit) γb k m)%I.
 
   (* the named fragment's mass, read off without disturbing the share *)

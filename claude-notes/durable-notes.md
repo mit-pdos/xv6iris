@@ -75,8 +75,16 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
   edit loop; see [`remote-build-gcp.md`](remote-build-gcp.md). This host (an
   EC2 r7a.8xlarge) runs at most a single-file `coqc` against `.vo` pulled back
   with `--pull-vo`; never a tree build here.
-- **opam switch `/shared/xv6rocq`** (Rocq 9.0.1, coq-iris 4.4.0, coq-stdpp 1.12.0,
-  coq-sail-stdpp 0.20.1). Its `bin/` is symlinked into `/usr/local/bin`, so
+- **The toolchain changed on 2026-09-26** (Iris 4.4 → Iris master, stdpp 1.12 → master, coq-sail
+  0.20.1 → 0.20.3, Rocq 9.0.1 kept): `opam/README.md` says how to replace a switch and
+  `tools/migrate/README.md` how to bring a branch written before the change across (a script;
+  do not redo the renames by hand). `make toolchain-check` says whether your switch is the one
+  the tree expects; a `.vo` built against another is rejected ("inconsistent assumptions").
+- **opam switch `/shared/xv6rocq`**, built from `opam/xv6rocq.export` (the full, frozen
+  export CI imports too; since 2026-09-26: Rocq 9.0.1, rocq-iris dev.2026-09-24.0.8e490959,
+  rocq-stdpp(+bitvector) dev.2026-09-17.0.d510b616, rocq-sail-stdpp 0.20.3, rocq-elpi 3.5.1,
+  coq-lsp 0.2.5+9.0; changing the toolchain = changing that file). On the collaborators'
+  machine its `bin/` is symlinked into `/usr/local/bin`, so
   `coqc`, `rocq` and `coq_makefile` resolve in every shell, background ones
   included; where those symlinks are absent, `eval $(opam env
   --switch=/shared/xv6rocq)` is mandatory in any raw `coqc`. Rocq ≥ 9.1 is not

@@ -165,7 +165,7 @@ Section UkShParseTok.
     = (((bv_unsigned w + Z31) mod Z32) - Z31) mod Z64.
   Proof using .
     cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-         to_word get_word MachineWord.MachineWord.sign_extend].
+         MachineWord.MachineWord.sign_extend].
     rewrite bv_sign_extend_unsigned.
     unfold bv_signed, bv_swrap, bv_wrap.
     assert (Eh32 : bv_half_modulus 32 = Z31) by (vm_compute; reflexivity).

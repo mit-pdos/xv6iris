@@ -242,7 +242,7 @@ Section union_links.
                   ∗ ⌜lm_rd_stage U ps0 cs0 s0 (snd <$> (dl ++ ws))⌝)
            ∗ (⌜uread_wild (snd <$> (dl ++ ws)) ws⌝
               -∗ (usecc_tok_at ug k (snd <$> (dl ++ ws))
-                  ∗ ⌜exists h0 : list mobs, list_basics.last ws = Some (h0, wl_nl)
+                  ∗ ⌜exists h0 : list mobs, list_basics.list.last ws = Some (h0, wl_nl)
                       /\ ins (open_seg h0) = snd <$> (dl ++ ws)
                       /\ obs_boots h0 = k⌝)
                  ∨ UT))%I.

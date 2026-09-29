@@ -400,6 +400,7 @@ Section UkLoadPostFetch.
       (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
                         uv_step_post C R rsE (Step_Execute (r, ib'))) ib).
   Proof using .
+    clear Qp. (* unused; else Rocq counts it as used (asks for Proof using … Qp) *)
     intros Hkw Hred Hg1 Hexp Hrd Hva Hwval Hl Hchk Hcanon Hal Hbw Hntx Hinj
       Hpins2 Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2 Lmie2 Lmdl2 Lmedl2 Lmenv2
       Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2 Lmi2 Hagd2 Htok' Hpure.

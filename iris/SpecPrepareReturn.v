@@ -193,13 +193,13 @@ Proof.
     rewrite list_lookup_insert_ne; [| lia].
     rewrite list_lookup_insert_ne; [| lia].
     rewrite list_lookup_insert_ne; [| lia].
-    apply list_lookup_insert. lia.
+    apply list_lookup_insert_eq. lia.
   - rewrite list_lookup_insert_ne; [| lia].
     rewrite list_lookup_insert_ne; [| lia].
-    apply list_lookup_insert. rewrite length_insert. lia.
+    apply list_lookup_insert_eq. rewrite length_insert. lia.
   - rewrite list_lookup_insert_ne; [| lia].
-    apply list_lookup_insert. rewrite !length_insert. lia.
-  - apply list_lookup_insert. rewrite !length_insert. lia.
+    apply list_lookup_insert_eq. rewrite !length_insert. lia.
+  - apply list_lookup_insert_eq. rewrite !length_insert. lia.
 Qed.
 
 Definition wp_prepare_return_sconf_body
@@ -279,7 +279,7 @@ Definition wp_prepare_return_sconf_body
       (* the SIE quarter that lived in [intr_res].  DANGLING ON PURPOSE --
          see the header: it is what forbids re-enabling interrupts before
          the sret. *)
-      ghost_var sie_gname (1/4) vb -∗
+      ghost_var_frac sie_gname (1/4) vb -∗
       (* the KPT receipt, likewise out of [trap_csrs] and not folded back *)
       kpt_on cpu_id -∗
       (* the process block, with the four kernel words re-armed *)

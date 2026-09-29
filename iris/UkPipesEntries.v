@@ -134,12 +134,12 @@ Lemma pse_nodup01 (x y : pdev) : stdpp.base.NoDup ([(0%nat, x); (1%nat, y)].*1).
 Proof using . cbn. apply NoDup_cons_2; [set_solver | apply NoDup_singleton]. Qed.
 
 Lemma pse_dp0 (x : pdev) : dp_in ([(0%nat, x)].*1) {[0%nat]}.
-Proof using . intros d Hd. cbn in Hd. apply elem_of_list_singleton in Hd as ->. set_solver. Qed.
+Proof using . intros d Hd. cbn in Hd. apply list_elem_of_singleton in Hd as ->. set_solver. Qed.
 
 Lemma pse_dp01 (x y : pdev) : dp_in ([(0%nat, x); (1%nat, y)].*1) {[0%nat; 1%nat]}.
 Proof using .
   intros d Hd. cbn in Hd. apply elem_of_cons in Hd as [-> | Hd]; [set_solver |].
-  apply elem_of_list_singleton in Hd as ->. set_solver.
+  apply list_elem_of_singleton in Hd as ->. set_solver.
 Qed.
 
 (* ===================================================================== *)
@@ -378,7 +378,7 @@ Section UkPipesEntries.
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
                   (cat_copy_conforms false L [[]] (fun _ => None) []
-                     (elem_of_list_here _ _) (fun Hf => match Bool.diff_false_true Hf with end))
+                     (list_elem_of_here _ _) (fun Hf => match Bool.diff_false_true Hf with end))
                   (cat_tree_safe _ _) (pse_dp01 _ _)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd _ [Hpool Hlend]".
@@ -523,7 +523,7 @@ Section UkPipesEntries.
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
                   (GrepFilt.grep_filter_conforms wp false L [[]] (fun _ => None) [] HLg
-                     (elem_of_list_here _ _))
+                     (list_elem_of_here _ _))
                   (pse_dp01 _ _)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd _ [Hpool Hlend]".

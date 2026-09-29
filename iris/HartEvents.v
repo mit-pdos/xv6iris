@@ -71,7 +71,7 @@ Proof.
     rewrite H0 in H1. apply Some_inj in H1. exact H1.
   - exfalso. revert Hrb. unfold read_bytes.
     case_match eqn:Hm; [congruence|]. intros _.
-    apply stdpp.list_monad.mapM_None_1, List.Exists_exists in Hm.
+    apply stdpp.list_monad.list.mapM_None_1, List.Exists_exists in Hm.
     destruct Hm as (j & Hj & Hnone).
     apply List.in_seq in Hj.
     assert (Hjn : (N.of_nat j < n)%N) by lia.

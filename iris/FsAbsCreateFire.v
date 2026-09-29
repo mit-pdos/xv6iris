@@ -280,8 +280,8 @@ Section CreateFire.
        (nl : nat),
        ⌜abs_view I !! d = Some (MkAnode (ADir ents) nl)⌝ -∗
        ⌜ents !! nm = Some i⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm i)%I.
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Φ (abs_view I) d nm i)%I.
 
   (* THE PARENT LEG (create's success commit), two-phase, at the raw map,
      with the child's content a FUNCTION of the two inums (a directory's
@@ -352,16 +352,16 @@ Section CreateFire.
        ⌜nm <> DOT /\ nm <> DOTDOT⌝ -∗
        cre_arm_fired Farm i -∗
        Pd d -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Pd d ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Pd d ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
          app_step d I (delta_create d nm i (cf d i) (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_create d nm i (cf d i) (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm i))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm i))%I.
 
   (* ...and the CONSTANT-content instance the two pinned AU twins carry
      (a device at mknod, an empty file at open(O_CREATE)) *)
@@ -437,13 +437,13 @@ Section CreateFire.
       (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z),
        ⌜abs_view I !! i = None⌝ -∗ ⌜is_Some (I !! i)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_arm i c (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_arm i c (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
 
   (* THE DOTS: an empty directory at count 1 gains its dot names -- both
      ([full = true], [delta_dots i d]) or the first alone ([full = false],
@@ -452,13 +452,13 @@ Section CreateFire.
       (Φ : aview -> Z -> Z -> bool -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i d : Z) (full : bool),
        ⌜abs_view I !! i = Some (MkAnode (ADir ∅) 1%nat)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (dots_delta full i d (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = dots_delta full i d (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i d full))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i d full))%I.
 
   (* THE UNARM (ruling Q-h): the row AT [i] at count 1 -- whatever its
      content -- DISAPPEARS.  The content is quantified inside: the failure
@@ -476,13 +476,13 @@ Section CreateFire.
       (Φ : aview -> Z -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (c : absnode),
        ⌜abs_view I !! i = Some (MkAnode c 1%nat)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_unarm i (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_unarm i (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
 
   (* ------------------------------------------------------------------ *)
   (*  1a.  The receipts, as the contracts hand them out                   *)
@@ -656,7 +656,7 @@ Section CreateFire.
   (* at ANY fraction of the authority: agreement is all a reading needs *)
   Lemma mkf_auth_frag Γ (q : Qp) (I : gmap Z fs_node) (dq : dfrac) (i : Z)
       (n : fs_node) :
-    ghost_map_auth (γtop Γ) q I -∗ top_frag_q Γ dq i n -∗ ⌜I !! i = Some n⌝.
+    ghost_map_auth_frac (γtop Γ) q I -∗ top_frag_q Γ dq i n -∗ ⌜I !! i = Some n⌝.
   Proof using .
     rewrite /top_frag_q. iIntros "Ha Hf".
     by iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
@@ -664,7 +664,7 @@ Section CreateFire.
 
   Lemma mkf_auth_nview Γ (q : Qp) (I : gmap Z fs_node) (dq : dfrac) (i : Z)
       (a : anode) :
-    ghost_map_auth (γtop Γ) q I -∗ nview_dq Γ dq i a -∗
+    ghost_map_auth_frac (γtop Γ) q I -∗ nview_dq Γ dq i a -∗
       ⌜abs_view I !! i = Some a⌝.
   Proof using .
     rewrite /nview_dq. iIntros "Ha Hn". iDestruct "Hn" as (n) "[Hf %Han]".
@@ -788,11 +788,11 @@ Section CreateFire.
     i ∈ S ->
     ftop_inv γfs -∗ app_inv γfs -∗ ireg_armed k t q S -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
        app_step i I (abs_view (<[i := n']> I)) ∗
-       (ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
-        ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
+       (ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
+        ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗
       ireg_armed k t q S ∗ top_frag (fs_gamma_L γfs) i n' ∗ R.
   Proof using .
@@ -833,11 +833,11 @@ Section CreateFire.
     inode_local i n' ->
     ftop_inv γfs -∗ app_inv γfs -∗
     (∀ I : gmap Z fs_node, ⌜I !! i = Some n⌝ -∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+       ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
        app_step i I (abs_view (<[i := n']> I)) ∗
-       (ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
-        ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
+       (ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ={appE}=∗
+        ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) (<[i := n']> I) ∗ R)) -∗
     top_frag (fs_gamma_L γfs) i n ={E}=∗ top_frag (fs_gamma_L γfs) i n' ∗ R.
   Proof using .
     iIntros (HE Hloc) "#Hi #Hai Hcm Hf".
@@ -857,7 +857,7 @@ Section CreateFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros j m Hj Hun. destruct (decide (j = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl j m Hj Hun). }
     iModIntro. iFrame "Hf HR".

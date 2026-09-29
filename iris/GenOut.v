@@ -1231,7 +1231,7 @@ Section gen_out.
       { apply open_seg_ends_in. by apply (proj1 (proj1 Hlog e He)). }
       assert (Hcin : le_byte e ∈ ins (open_seg (le_hist e))).
       { destruct Hends as [h0 Hh0]. rewrite Hh0 ins_app ins_in.
-        apply elem_of_app. right. apply elem_of_list_here. }
+        apply elem_of_app. right. apply list_elem_of_here. }
       by destruct (lm_disc_drop_byte M B _ _ (Hdisc e He) Hcin) as (_ & _ & ?). }
     assert (Hpref : (dl ++ ws) `prefix_of` echoed pops)
       by (eapply read_window_prefix;
@@ -1318,7 +1318,7 @@ Section gen_out.
     assert (Hagree : forall j, j < q -> csq !!! j = gs_cs M so !!! j).
     { intros j Hj. rewrite /csq !list_lookup_total_alt.
       destruct (decide (j < length (gs_cs M so))) as [Hl | Hl].
-      - rewrite lookup_take; [done | lia].
+      - rewrite lookup_take_lt; [done | lia].
       - rewrite (lookup_ge_None_2 (gs_cs M so) j ltac:(lia)).
         rewrite (lookup_ge_None_2 (take q (gs_cs M so)) j);
           [done | rewrite length_take; lia]. }
@@ -1491,7 +1491,7 @@ Section gen_out.
   Proof using.
     intros [Hd (ps & cs & Hao & Hd4 & Hall)] [seg0 ->].
     assert (Hip : seg0 ∈ in_pres (seg0 ++ [ObsUartIn Uart0 c])).
-    { rewrite in_pres_in. apply elem_of_app. right. apply elem_of_list_here. }
+    { rewrite in_pres_in. apply elem_of_app. right. apply list_elem_of_here. }
     destruct (Hall _ Hip) as [Hok Hpt]. rewrite /lm_disc_pt in Hpt.
     rewrite ins_app ins_in epu_removelast_snoc.
     rewrite ins_app ins_in in Hao Hd4.
@@ -1502,7 +1502,7 @@ Section gen_out.
     assert (Hlen : length cs = nlines (ins seg0 ++ [c]))
       by exact (lm_alts_ok_len M s _ _ Hao).
     assert (Htk : forall j, j < n -> take n cs !!! j = cs !!! j).
-    { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
+    { intros j Hj. rewrite !list_lookup_total_alt lookup_take_lt; [done | lia]. }
     exists ps, (take n cs). split_and!.
     - destruct Hok as [HF Hlt]. split; [exact HF |].
       rewrite (lm_pro_idx_ext M (take n cs) cs n Htk n ltac:(lia)). exact Hlt.
@@ -1538,12 +1538,12 @@ Section gen_out.
   Proof using B.
     intros HEb HEi Hnew Hends Hm HlenE Hw Hlow Hup.
     assert (Hprefix : forall j x, E !! j = Some x -> x.1 `prefix_of` h).
-    { intros j x Hx. apply (Hnew x). by eapply elem_of_list_lookup_2. }
+    { intros j x Hx. apply (Hnew x). by eapply list_elem_of_lookup_2. }
     pose proof (E_length_le_hist E h HEi Hprefix) as Hle.
     pose proof (E_bytes_of_hist E h HEi Hprefix Hle) as HEq.
     rewrite HlenE in HEq.
     destruct (decide (rest_of (snd <$> E) = [])) as [Hr | Hr].
-    - apply (anti_symm list_relations.prefix); [exact Hw |].
+    - apply (anti_symm list_relations.list.prefix); [exact Hw |].
       eapply (prefix_app_cancel (lm_D M ps cs s E)).
       rewrite (lm_D_pending_sess M B ps cs s E HEb).
       etrans; [| etrans; [exact Hlow | exact Hup] ].
@@ -1620,7 +1620,7 @@ Section gen_out.
         [| discriminate].
       cbn in Hx. injection Hx as Hx. rewrite -Hx. cbn [fst].
       assert (Hyin : y ∈ echoed (LogEntryDefs.ch_log CH))
-        by (by eapply elem_of_list_lookup_2).
+        by (by eapply list_elem_of_lookup_2).
       destruct (echoed_elem_inv (LogEntryDefs.ch_log CH) y Hyin)
         as (e & He & _ & Hye).
       apply open_seg_prefix_boots.
@@ -1643,7 +1643,7 @@ Section gen_out.
       replace (length (ins (open_seg h)) - 1) with (length (gs_E M so)) by lia.
       reflexivity. }
     assert (Hnew' : forall x, x ∈ gs_E M so -> hist_ext x.1 (open_seg h)).
-    { intros x Hx. apply elem_of_list_lookup in Hx as [jj Hj].
+    { intros x Hx. apply list_elem_of_lookup in Hx as [jj Hj].
       destruct (Hidx jj x Hj) as [Hxe Hxlen].
       pose proof (Forall_lookup_1 _ _ _ _ Hprefixes Hj) as Hpx.
       apply lookup_lt_Some in Hj.
@@ -1857,7 +1857,7 @@ Section gen_out.
         assert (Hcin : ca ∈ ins (open_seg ho)).
         { destruct (open_seg_ends_in ho ca Hends) as [h0 Hh0].
           rewrite Hh0 ins_app ins_in.
-          apply elem_of_app. right. apply elem_of_list_here. }
+          apply elem_of_app. right. apply list_elem_of_here. }
         destruct (lm_disc_drop_byte M B _ ca Hdseg Hcin) as (_ & _ & Hno).
         rewrite Hno in Herase. discriminate. }
     destruct Hshape as (Hcsa & Hja & Hb).

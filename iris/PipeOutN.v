@@ -1464,9 +1464,9 @@ Section pipes_family_v.
     tmN termw md sel = false -> prompt_okN md sel.
   Proof using.
     intros Htm s1 s2 k Hsel HmT. exfalso.
-    assert (Hin : WSh k ∈ sel) by (rewrite Hsel; apply elem_of_app; right; apply elem_of_list_here).
+    assert (Hin : WSh k ∈ sel) by (rewrite Hsel; apply elem_of_app; right; apply list_elem_of_here).
     revert Htm. apply not_false_iff_true. rewrite /tmN existsb_exists. exists (WSh k).
-    split; [by apply elem_of_list_In |]. rewrite /srcN HmT.
+    split; [by apply list_elem_of_In |]. rewrite /srcN HmT.
     exact (bool_decide_eq_true_2 _ eq_refl).
   Qed.
 
@@ -1514,7 +1514,7 @@ Section pipes_family_v.
         intros x. rewrite /rmd (cmtN_step md sel _ x Hws). reflexivity.
       - apply prompt_okN_prompt; [exact Hpo |]. intros j Hj.
         destruct (Hheld (WLeft j, sw j, length (sw j))) as [Hm Hcn].
-        { rewrite /heldN elem_of_list_fmap. exists j. split; [reflexivity |].
+        { rewrite /heldN list_elem_of_fmap. exists j. split; [reflexivity |].
           apply elem_of_seq. lia. }
         exists (sw j). split; [exact Hm | exact Hcn]. }
     split; [exact Htok |].

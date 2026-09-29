@@ -2294,7 +2294,7 @@ Section BreadBlocks.
                          ¬ (devs i = dev /\ bnos i = bno)).
       { intros i Hi. apply elem_of_app in Hi as [Hi | Hi].
         - exact (Hdone i Hi).
-        - apply elem_of_list_singleton in Hi. subst i. exact Hxne. }
+        - apply list_elem_of_singleton in Hi. subst i. exact Hxne. }
       rewrite /bcache_scan2.
       iDestruct "Hscan" as
       "(Hauth & Hsauth & %Hdom & %Hordp2 & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".

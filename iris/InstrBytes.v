@@ -101,7 +101,7 @@ Section InstrBytes.
       unfold is_aligned_vaddr in H2. exact H2.
     - (* bit0 = 0 *)
       unfold neq_vec; rewrite negb_false_iff;
-      unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word;
+      unfold eq_vec, access_vec_dec, access_mword_dec, slice;
       rewrite MachineWord.MachineWord.eqb_true_iff; apply bv_eq;
       rewrite bv_extract_unsigned;
       replace (bv_unsigned ('b"0")) with 0%Z by (vm_compute; reflexivity);
@@ -112,7 +112,7 @@ Section InstrBytes.
       replace (2 * k)%Z with (k * 2)%Z by lia. apply Z_mod_mult.
     - (* bit1 = 1 *)
       unfold neq_vec; rewrite negb_true_iff;
-      unfold eq_vec, access_vec_dec, access_mword_dec, slice, get_word.
+      unfold eq_vec, access_vec_dec, access_mword_dec, slice.
       apply not_true_is_false. rewrite MachineWord.MachineWord.eqb_true_iff.
       intro Heq. apply (f_equal bv_unsigned) in Heq.
       rewrite bv_extract_unsigned in Heq.
@@ -132,8 +132,7 @@ Section InstrBytes.
   Lemma avi_assoc (a : mword 64) (x y : Z) :
     add_vec_int (add_vec_int a x) y = add_vec_int a (x + y).
   Proof using .
-    unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-           SailStdpp.Values.with_word, mword_of_int,
+    unfold add_vec_int, add_vec, Operators_mwords.word_binop, mword_of_int,
            MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
     apply bv_eq. rewrite !bv_add_unsigned !Z_to_bv_unsigned.
     change (MachineWord.MachineWord.Z_idx 64) with 64%N.
@@ -157,8 +156,7 @@ Section InstrBytes.
     rewrite Z.rem_mod_nonneg in H2; [| lia | lia].
     unfold is_aligned_paddr. rewrite fetch_pa_id. apply Z.eqb_eq.
     rewrite uint_unsigned.
-    unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-           SailStdpp.Values.with_word, mword_of_int,
+    unfold add_vec_int, add_vec, Operators_mwords.word_binop, mword_of_int,
            MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
     rewrite bv_add_unsigned Z_to_bv_unsigned.
     change (MachineWord.MachineWord.Z_idx 64) with 64%N.
@@ -200,8 +198,8 @@ Section InstrBytes.
   Proof using .
     intro Hj. apply bv_eq. unfold nth_byte, subrange_vec_dec.
     rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.slice.
     rewrite !bv_extract_unsigned.
     change (MachineWord.MachineWord.Z_idx 0) with 0%N.
     change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
@@ -217,8 +215,8 @@ Section InstrBytes.
   Proof using .
     intro Hj. apply bv_eq. unfold nth_byte, subrange_vec_dec.
     rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice.
+    unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.slice.
     rewrite !bv_extract_unsigned.
     change (MachineWord.MachineWord.Z_idx 16) with 16%N.
     change (MachineWord.MachineWord.Z_idx (31 - 16 + 1)) with 16%N.
@@ -234,8 +232,8 @@ Section InstrBytes.
   Proof using .
     apply bv_eq. unfold concat_vec, subrange_vec_dec.
     rewrite !autocast_id.
-    unfold to_word_idx, to_word. rewrite !MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
+    unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+    unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
     rewrite bv_concat_unsigned'.
     rewrite !bv_extract_unsigned.
     change (MachineWord.MachineWord.Z_idx 0) with 0%N.
@@ -1214,7 +1212,6 @@ Proof.
   unfold bv_modulus in Hhi. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hhi.
   pose proof (z_rem8_no_wrap _ (conj Hlo Hhi) H8) as Hnw.
   unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (H4 : bv_unsigned (mword_of_int (Z.of_nat 4) : mword 64) = 4%Z)

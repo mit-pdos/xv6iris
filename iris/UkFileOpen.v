@@ -850,8 +850,8 @@ Section UkFileOpen.
     assert (Hins : <[fd := FdOpen rd wr ty]> sts
                    = <[fd := FdOpen rb wb t]> sts)
       by exact (eq_trans (eq_sym Hfdv) Hfdv0).
-    pose proof (list_lookup_insert sts fd (FdOpen rd wr ty) Hfdlt) as Hl1.
-    pose proof (list_lookup_insert sts fd (FdOpen rb wb t) Hfdlt) as Hl2.
+    pose proof (list_lookup_insert_eq sts fd (FdOpen rd wr ty) Hfdlt) as Hl1.
+    pose proof (list_lookup_insert_eq sts fd (FdOpen rb wb t) Hfdlt) as Hl2.
     rewrite Hins in Hl1. rewrite Hl2 in Hl1. congruence.
   Qed.
 
@@ -881,8 +881,8 @@ Section UkFileOpen.
     om_create (m !!! Regidx a1_idx) = true ->
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
-    list_basics.last (path_elems pl) = Some Nf ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some Nf ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ utext_img (ukn_t N) Img -∗
     file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g np -∗
@@ -942,8 +942,8 @@ Section UkFileOpen.
     om_trunc (m !!! Regidx a1_idx) = true ->
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
-    list_basics.last (path_elems pl) = Some Nf ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some Nf ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     utext_img (ukn_t N) Img -∗
     urun N h m pc avail -∗
@@ -1139,8 +1139,8 @@ Section UkFileOpen.
     om_create (m !!! Regidx a1_idx) = true ->
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
-    list_basics.last (path_elems pl) = Some Nf ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some Nf ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
     app_inv fsc_fs -∗ uimg_view N Img -∗
     file_cons_cred c r jo -∗ fl_lb c ls -∗
     esc_key c r n s g -∗ fesc_res r s g np -∗
@@ -1353,8 +1353,8 @@ Section UkFileOpen.
     om_trunc (m !!! Regidx a1_idx) = true ->
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
-    list_basics.last (path_elems pl) = Some Nf ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some Nf ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     uimg_view N Img -∗
     urun N h m pc avail -∗
@@ -1559,8 +1559,8 @@ Section UkFileOpen.
     om_trunc (m !!! Regidx a1_idx) = true ->
     np_elems pl = [] ->
     um_start_of cw pl = FsImg.ROOTINO ->
-    list_basics.last (path_elems pl) = Some Nf ->
-    stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
+    list_basics.list.last (path_elems pl) = Some Nf ->
+    stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws Nf) -> np = length ls -> EchoDisc.line_ok ws ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     ([∗ map] a ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded a b) -∗
     urun N h m pc avail -∗

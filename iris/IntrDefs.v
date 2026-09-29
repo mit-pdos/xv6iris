@@ -325,7 +325,7 @@ Section IntrDefsBase.
      wants one without the other -- so they are held together and the whole
      tier sees ONE conjunct rather than two. *)
   Definition sret_bits (spp spie : mword 1) : iProp Σ :=
-    (ghost_var spp_gname (1/2) spp ∗ ghost_var spie_gname (1/2) spie)%I.
+    (ghost_var_frac spp_gname (1/2) spp ∗ ghost_var_frac spie_gname (1/2) spie)%I.
 
   Lemma sret_bits_agree (a b a' b' : mword 1) :
     sret_bits a b -∗ sret_bits a' b' -∗ ⌜ a = a' /\ b = b' ⌝.
@@ -378,13 +378,13 @@ Section IntrDefsBase.
   Proof using . intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
 
   (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
-     statements about a raw [ghost_var], with no sconf-tier resource in
+     statements about a raw [ghost_var_frac], with no sconf-tier resource in
      sight, and one of their consumers (the per-trap tie ProofKernelvec.v
      mints) is deliberately NOT the canonical name.  Callers in the sconf
      tier instantiate them at [sie_gname]. *)
   Lemma sie_ghost_alloc (v : mword 1) :
     ⊢ |==> ∃ γ : gname,
-        ghost_var γ (1/2) v ∗ ghost_var γ (1/4) v ∗ ghost_var γ (1/4) v.
+        ghost_var_frac γ (1/2) v ∗ ghost_var_frac γ (1/4) v ∗ ghost_var_frac γ (1/4) v.
   Proof using .
     iMod (ghost_var_alloc v) as (γ) "Hg".
     iEval (rewrite -Qp.half_half) in "Hg".
@@ -402,8 +402,8 @@ Section IntrDefsBase.
      now take [intr_res] as an ordinary resource and read it out with
      [intr_res_acc]. *)
   Lemma sie_ghost_flip (γ : gname) (v1 v2 v3 w : mword 1) :
-    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4) v2 -∗ ghost_var γ (1/4) v3 ==∗
-    ghost_var γ (1/2) w ∗ ghost_var γ (1/4) w ∗ ghost_var γ (1/4) w.
+    ghost_var_frac γ (1/2) v1 -∗ ghost_var_frac γ (1/4) v2 -∗ ghost_var_frac γ (1/4) v3 ==∗
+    ghost_var_frac γ (1/2) w ∗ ghost_var_frac γ (1/4) w ∗ ghost_var_frac γ (1/4) w.
   Proof using .
     iIntros "H1 H2 H3".
     iCombine "H2 H3" as "H23".
@@ -418,10 +418,10 @@ Section IntrDefsBase.
   (* '1'->'0' (csrci): gather 1/2 + 1/8(cap) + 1/8(count) + 1/4(inv),
      come back the same shape at '0'. *)
   Lemma sie_ghost_flip_off (γ : gname) (v1 v2a v2b v3 : mword 1) :
-    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4/2)%Qp v2a -∗ ghost_var γ (1/4/2)%Qp v2b -∗
-    ghost_var γ (1/4) v3 ==∗
-    ghost_var γ (1/2) ('b"0" : mword 1) ∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ ghost_var γ (1/4) ('b"0" : mword 1).
+    ghost_var_frac γ (1/2) v1 -∗ ghost_var_frac γ (1/4/2)%Qp v2a -∗ ghost_var_frac γ (1/4/2)%Qp v2b -∗
+    ghost_var_frac γ (1/4) v3 ==∗
+    ghost_var_frac γ (1/2) ('b"0" : mword 1) ∗ ghost_var_frac γ (1/4/2)%Qp ('b"0" : mword 1) ∗
+    ghost_var_frac γ (1/4/2)%Qp ('b"0" : mword 1) ∗ ghost_var_frac γ (1/4) ('b"0" : mword 1).
   Proof using .
     iIntros "H1 H2a H2b H3".
     iCombine "H2a H2b" as "H2".
@@ -436,10 +436,10 @@ Section IntrDefsBase.
   (* '0'->'1' (csrsi): gather the same four pieces, come back at '1'
      (cap eighth + count eighth + invariant quarter). *)
   Lemma sie_ghost_flip_on (γ : gname) (v1 v2a v2b v3 : mword 1) :
-    ghost_var γ (1/2) v1 -∗ ghost_var γ (1/4/2)%Qp v2a -∗ ghost_var γ (1/4/2)%Qp v2b -∗
-    ghost_var γ (1/4) v3 ==∗
-    ghost_var γ (1/2) ('b"1" : mword 1) ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗ ghost_var γ (1/4) ('b"1" : mword 1).
+    ghost_var_frac γ (1/2) v1 -∗ ghost_var_frac γ (1/4/2)%Qp v2a -∗ ghost_var_frac γ (1/4/2)%Qp v2b -∗
+    ghost_var_frac γ (1/4) v3 ==∗
+    ghost_var_frac γ (1/2) ('b"1" : mword 1) ∗ ghost_var_frac γ (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var_frac γ (1/4/2)%Qp ('b"1" : mword 1) ∗ ghost_var_frac γ (1/4) ('b"1" : mword 1).
   Proof using .
     iIntros "H1 H2a H2b H3".
     iCombine "H2a H2b" as "H2".
@@ -597,7 +597,7 @@ Section IntrDefsBase.
      cur_privilege ↦ᵣ Supervisor ∗
      (∃ ms : mword 64,
         mstatus ↦ᵣ ms ∗
-        ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+        ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         sret_tie ms ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
      (* [mie] IS PINNED, exactly as [menvcfg] is below and for the same
@@ -648,7 +648,7 @@ Section IntrDefsBase.
   (* ------------------------------------------------------------------- *)
   Definition sconf_msown (ms : mword 64) : iProp Σ :=
     (mstatus ↦ᵣ ms ∗
-     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+     ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
      sret_tie ms ∗
      ⌜ sconf_ms_facts ms ⌝)%I.
 
@@ -748,7 +748,7 @@ Section IntrDefsBase.
      exactly this to refute its own panic checks.  At the [b = true] arm
      the capability holds the FULL quarter (no token outstanding). *)
   Definition intr_off_tok : iProp Σ :=
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1).
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1).
 
   (* =================================================================== *)
   (* §6a THE PUSH/POP COUNTING TOKEN and THE PER-CPU CELLS.               *)
@@ -829,7 +829,7 @@ Section IntrDefsBase.
      per-hart translation regime is MONOTONE -- Bare -> KPT, once per era
      (kexec starts a new era with a fresh [era_strans_name], so within-era
      persistence is safe) -- so it is tracked by a ONE-SHOT [mono_nat] rather
-     than a two-valued [ghost_var]:
+     than a two-valued [ghost_var_frac]:
 
        [strans_pending]  auth at 0, HALF.  Two halves exist: the Bare arm of
                          [strans_inv] holds one, the boot receipt is the
@@ -875,7 +875,7 @@ Section IntrDefsBase.
   Proof using .
     rewrite /kpt_on /kpt_on_at /strans_pending /strans_pending_at.
     iIntros "Hlb Hauth".
-    iDestruct (mono_nat_lb_own_valid with "Hauth Hlb") as %[_ Hle].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hauth Hlb") as %[_ Hle].
     iPureIntro. lia.
   Qed.
 
@@ -893,7 +893,7 @@ Section IntrDefsBase.
   Proof using .
     rewrite /strans_pending /strans_pending_at /strans_kpt /strans_kpt_at.
     iIntros "H1 H2".
-    iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[Hq _].
+    iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[Hq _]. rewrite dfrac_op_own dfrac_valid_own in Hq.
     iPureIntro. by eapply Qp.not_add_le_r.
   Qed.
 
@@ -905,10 +905,10 @@ Section IntrDefsBase.
      nothing.  Build the sum first, then rewrite FORWARDS. *)
   Lemma strans_pending_combine :
     strans_pending -∗ strans_pending -∗
-    mono_nat_auth_own (strans_name cpu_id) 1%Qp 0%nat.
+    mono_nat_auth_own_frac (strans_name cpu_id) 1%Qp 0%nat.
   Proof using .
     rewrite /strans_pending /strans_pending_at. iIntros "H1 H2".
-    iAssert (mono_nat_auth_own (strans_name cpu_id) (1/2 + 1/2)%Qp 0%nat)
+    iAssert (mono_nat_auth_own_frac (strans_name cpu_id) (1/2 + 1/2)%Qp 0%nat)
       with "[H1 H2]" as "H".
     { iApply (bi.equiv_entails_1_2 _ _
                 (mono_nat_auth_own_fractional (strans_name cpu_id) 0%nat
@@ -931,8 +931,8 @@ Section IntrDefsBase.
      [intena_val eb] -- the level was never the thing that tracked it. *)
   Definition intr_count (n : nat) (eb : bool) : iProp Σ :=
     match n with
-    | O => ghost_var sie_gname (1/4/2)%Qp (sie_bit eb)
-    | S _ => ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1)
+    | O => ghost_var_frac sie_gname (1/4/2)%Qp (sie_bit eb)
+    | S _ => ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1)
     end.
 
   (* ------------------------------------------------------------------- *)
@@ -1980,7 +1980,7 @@ Section IntrDefsBase.
   Definition sie_arm_of (R : CPU -d> iPropO Σ) (b : bool) (p : mword 64)
       : iProp Σ :=
     (if b
-     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+     then (ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
            R cpu_id ∗
            (* the KPT receipt: interrupts on implies the kernel table is
               installed, so it has exactly this arm's lifetime (§6b). *)
@@ -1991,7 +1991,7 @@ Section IntrDefsBase.
            (∃ a b : mword 1, sret_bits a b) ∗
            cpu_claim p ∗
            cpu_hart 0 true p ∅)
-     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+     else ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
   (* THE TIER IS AN EXPLICIT LEADING ARGUMENT, AND IT MEANS THE HART'S
      TRANSLATION REGIME (sp-migration.md, K2b SETTLED): [sie_cap_of kt R m
@@ -2183,7 +2183,7 @@ Section IntrDefs.
     (∃ (h : mword 64) (b : mword 1),
        ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
        ⌜ stvec_base h = h ⌝ ∗
-       ghost_var (sie_name c) (1/4) b ∗
+       ghost_var_frac (sie_name c) (1/4) b ∗
        reg_pointsto_at c stvec (DfracOwn 1) h ∗
        ▷ S c h)%I.
 
@@ -2453,7 +2453,7 @@ Section IntrDefs.
     (∃ (h : mword 64) (b : mword 1),
        ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
        ⌜ stvec_base h = h ⌝ ∗
-       ghost_var sie_gname (1/4) b ∗
+       ghost_var_frac sie_gname (1/4) b ∗
        stvec ↦ᵣ h ∗
        ▷ intr_handler_spec kt E h)%I.
 
@@ -2492,7 +2492,7 @@ Section IntrDefs.
       (h : mword 64) (b : mword 1) :
     trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ->
     stvec_base h = h ->
-    ghost_var sie_gname (1/4) b -∗
+    ghost_var_frac sie_gname (1/4) b -∗
     stvec ↦ᵣ h -∗
     ▷ intr_handler_spec kt E h -∗
     □ E XI -∗
@@ -2672,7 +2672,7 @@ Section IntrDefs.
      interrupts off. *)
   Definition sie_arm (kt : ktier) (b : bool) (p : mword 64) : iProp Σ :=
     (if b
-     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+     then (ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
            intr_res kt ∗
            kpt_on cpu_id ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
@@ -2681,7 +2681,7 @@ Section IntrDefs.
            (∃ a b : mword 1, sret_bits a b) ∗
            cpu_claim p ∗
            cpu_hart 0 true p ∅)
-     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+     else ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
   (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
      at the call site.  [sconf]'s tied half and the arm's eighth are
@@ -2689,7 +2689,7 @@ Section IntrDefs.
      index -- which is what every leaf that has to know whether interrupts
      are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
   Lemma sie_arm_half_agree {kt : ktier} (b : bool) (px : mword 64) (ms : mword 64) :
-    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
     sie_arm kt b px -∗
     ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
   Proof using .
@@ -2701,8 +2701,8 @@ Section IntrDefs.
 
   Lemma sie_arm_of_ex {kt : ktier} (p : mword 64) :
     (∃ b : bool, sie_arm kt b p) ⊣⊢
-    (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
-     (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    (ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
+     (ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
       intr_res kt ∗
       kpt_on cpu_id ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
@@ -2726,14 +2726,14 @@ Section IntrDefs.
      OF it, so these two are pure re-associations of the same five cells. *)
   Lemma sie_arm_on_out {kt : ktier} (p : mword 64) :
     sie_arm kt true p -∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
     trap_csrs kt ∗
     cpu_claim p ∗
     cpu_hart 0 true p ∅.
   Proof using . iIntros "(Hbit & Hres & Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in {kt : ktier} (p : mword 64) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     trap_csrs kt -∗
     cpu_claim p -∗
     cpu_hart 0 true p ∅ -∗
@@ -3201,7 +3201,7 @@ Section IntrDefs.
     bare_inv -∗
     stvec ↦ᵣ v -∗
     own_context cur_ctx -∗   (* boot mints it: [own_context_boot] *)
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     (* THIS HART'S TIMER CAPABILITY, minted in M-mode by timerinit and handed
        across the bridge -- see the note at [sie_cap].  Persistent, so the
        boot chain keeps its copy. *)
@@ -3597,17 +3597,17 @@ Section IntrDefs.
   (* n > 0 implies interrupts disabled: any fraction of '0' pins the arm *)
   Lemma intr_count_pos_off (n : nat) (eb : bool) :
     intr_count (S n) eb -∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1).
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1).
   Proof using . iIntros "Htok". iFrame. Qed.
 
   (* the '0'-arm PUSH (csrci with interrupts already off): the level just
      increments -- at n = 0 ghost agreement with the capability's '0'
      eighth pins eb = false, so the payload owed at level 1 is [emp]. *)
   Lemma intr_count_push_off (n : nat) (eb : bool) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     intr_count n eb -∗
     ⌜ n = 0%nat -> eb = false ⌝ ∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_count (S n) eb.
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_count (S n) eb.
   Proof using .
     iIntros "Hcap Hcnt". destruct n.
     - iDestruct (ghost_var_agree with "Hcap Hcnt") as %Hb.
@@ -3634,11 +3634,11 @@ Section IntrDefs.
      eb = true, and yields the two '1' eighths -- the S-case and the
      n = 0 eb = false case both carry a '0' eighth, refuted by agreement. *)
   Lemma intr_count_get_on (n : nat) (eb : bool) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     intr_count n eb -∗
     ⌜ n = 0%nat /\ eb = true ⌝ ∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
-    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1).
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1).
   Proof using .
     iIntros "Hcap Hcnt". destruct n.
     - destruct eb.
@@ -3660,13 +3660,13 @@ Section IntrDefs.
      for source compatibility, but the two are now the SAME statement: the
      level-S token no longer depends on [eb]. *)
   Lemma intr_count_pack_S_on (n : nat) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     intr_count (S n) true.
   Proof using . iIntros "Hc0". iFrame. Qed.
 
   (* ... and the disabled-base level S n needs only the eighth *)
   Lemma intr_count_pack_S_off (n : nat) :
-    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
     intr_count (S n) false.
   Proof using . iIntros "Hc0". iFrame. Qed.
 

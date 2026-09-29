@@ -71,7 +71,7 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
      [None].  What [WpLockAt.newlock_at] fills. *)
   lock_free_tok γl -∗
   (* the free-list count at GENESIS -- zero pages -- in both halves.  The
-     [ghost_var] pair [KallocInv.kalloc_avail_alloc] used to mint here. *)
+     [ghost_var_frac] pair [KallocInv.kalloc_avail_alloc] used to mint here. *)
   kalloc_avail γk (Some 0%nat) -∗
   kmem_avail_auth γk 0%nat -∗
   wp_next b pcur (fun (CID : CpuId) =>

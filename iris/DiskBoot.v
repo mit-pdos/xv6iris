@@ -327,7 +327,7 @@ Section DiskBoot.
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γ] st) -∗
     (* ...and the CLAIM MAP's authority, empty: nothing is published *)
-    ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
+    ghost_map_auth_frac (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
     (* A6.124: the payload's half of the avail-index word, out of the init *)
     avail_half pav 0%nat -∗
     (* A6.126 §6: the reader's floors, from virtio_disk_init's carve-out of

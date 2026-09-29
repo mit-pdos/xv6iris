@@ -470,7 +470,7 @@ Section DiskInv.
           the staged head at its ring store and spends it at the index bump,
           both under [vdisk_lock]. *)
        disk_stage γ None ∗
-       ghost_map_auth (dn_claim γ) 1 cm ∗
+       ghost_map_auth_frac (dn_claim γ) 1 cm ∗
        (* the claim ROWS (the row design, above) *)
        ([∗ map] p ↦ dc ∈ cm, claim_cells γ nr p dc) ∗
        d_used_idx ↦₂ wrap16 nr ∗

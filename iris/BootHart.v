@@ -415,9 +415,9 @@ Section BootHartRes.
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
      strans_pending ∗
      strans_pending ∗
-     ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
-     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
-     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     ghost_var_frac sie_gname (1/2) ('b"0" : mword 1) ∗
+     ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
+     ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
      (* BOTH halves of the SPP mirror.  Adequacy mints them at an arbitrary
         value; the M->S bridge is what ties them to the mstatus it installs,
         so nothing here depends on which value that is. *)

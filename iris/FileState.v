@@ -53,7 +53,7 @@ Definition fst_of (o : option (list (bv 8))) : fstate :=
   match o with None => ∅ | Some bs => {[fname_m := bs]} end.
 
 Lemma fst_of_lookup (o : option (list (bv 8))) : fst_of o !! fname_m = o.
-Proof using. destruct o as [bs |]; cbn [fst_of]; [apply lookup_singleton | apply lookup_empty]. Qed.
+Proof using. destruct o as [bs |]; cbn [fst_of]; [apply lookup_singleton_eq | apply lookup_empty]. Qed.
 
 Lemma fst_of_lookup_ne (o : option (list (bv 8))) (N : list (bv 8)) :
   N <> fname_m -> fst_of o !! N = None.

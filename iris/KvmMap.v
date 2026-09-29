@@ -179,7 +179,6 @@ Local Lemma kvm_avi27 (a : mword 27) (j : Z) :
 Proof.
   intros Hj Hfit. pose proof (vpn27_bound a) as Ha.
   unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite (mword27_unsigned j ltac:(lia)).
@@ -197,7 +196,6 @@ Proof.
   assert (bv_modulus (MachineWord.MachineWord.Z_idx 44) = 17592186044416) as HM by (vm_compute; reflexivity).
   rewrite HM in Ha.
   unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 44) = j).
@@ -250,7 +248,7 @@ Proof.
   induction k as [|k' IH]; intros j Hjk Hk; [lia|].
   cbn [pt_insert_run].
   destruct (decide (j = k')) as [->|Hne].
-  - rewrite lookup_insert. reflexivity.
+  - rewrite lookup_insert_eq. reflexivity.
   - rewrite lookup_insert_ne.
     + apply IH; lia.
     + apply not_eq_sym. apply (vpn_at_ne vpn0 j k'); [lia|].
@@ -306,7 +304,7 @@ Proof.
   cbn [pt_insert_run]. unfold vpn_at, mappages_pte.
   change (Z.of_nat 0) with 0. rewrite (avi27_0 vpn0). rewrite (avi44_0 ppn0).
   destruct (decide (vpn = vpn0)) as [->|Hne].
-  - apply lookup_insert.
+  - apply lookup_insert_eq.
   - apply lookup_insert_ne. congruence.
 Qed.
 
@@ -799,7 +797,7 @@ Proof.
   induction k as [|k' IH]; intros i Hik Hk; [lia|].
   cbn [kvm_M_stacks].
   destruct (decide (i = k')) as [->|Hne].
-  - rewrite lookup_insert. reflexivity.
+  - rewrite lookup_insert_eq. reflexivity.
   - rewrite lookup_insert_ne; [apply IH; lia | apply kstack_vpn_inj; lia].
 Qed.
 
@@ -837,7 +835,7 @@ Proof.
     2:{ intros i Hi Heq. rewrite Heq in Hks.
         rewrite (proj2 (kstack_index_spec _ i) (conj Hi eq_refl)) in Hks. discriminate. }
     destruct (decide (vpn = tramp_vpn)) as [->|Hnt].
-    + rewrite lookup_insert, kmap_class_tramp_None.
+    + rewrite lookup_insert_eq, kmap_class_tramp_None.
       destruct (decide (tramp_vpn = tramp_vpn)) as [_|Hne]; [reflexivity | congruence].
     + rewrite lookup_insert_ne; [| exact (not_eq_sym Hnt)].
       rewrite kmap_M0_lookup.

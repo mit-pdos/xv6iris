@@ -118,7 +118,7 @@ Section UName.
   Lemma uname_np_elems : np_elems nm = [].
   Proof using Hu. unfold np_elems. rewrite uname_path_elems. reflexivity. Qed.
 
-  Lemma uname_last : list_basics.last (path_elems nm) = Some nm.
+  Lemma uname_last : list_basics.list.last (path_elems nm) = Some nm.
   Proof using Hu. rewrite uname_path_elems. reflexivity. Qed.
 
   Lemma uname_start (cw : Z) : um_start_of cw nm = cw.

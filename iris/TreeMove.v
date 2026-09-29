@@ -123,7 +123,7 @@ Proof.
   - intros j Hj. rewrite /top_write /= H.
     apply lookup_insert_ne. congruence.
   - exists bs, (blk_splice off new bs). split; [exact H |].
-    rewrite /top_write /= H lookup_insert //.
+    rewrite /top_write /= H lookup_insert_eq //.
 Qed.
 
 (* ---- 1a.  ...AND WHAT IT DOES NOT DO: MOVE A PATH ------------------- *)
@@ -245,8 +245,8 @@ Section TreeMove.
       (g : gname) (root : Z) (t : ttree) (I : gmap Z fs_node) :
     file_app = MkAppcfg tree_names (tree_pred c) r ->
     app_inv γfs -∗ tree_own r g root t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗ tree_own r g root t
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗ tree_own r g root t
       ∗ (⌜subtree (abs_view I) root = Some t⌝ ∨ tree_taint c).
   Proof using .
     intros Heq. iIntros "#Hinv Hown Hka".
@@ -276,8 +276,8 @@ Section TreeMove.
     file_app = MkAppcfg tree_names (tree_pred c) r ->
     subtree (abs_view I') root = Some t' -> t' <> t ->
     app_inv γfs -∗ tree_tkt r g root t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I'
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I'
       ∗ (tree_own r g root t' ∨ tree_taint c).
   Proof using .
     intros Heq Hsub Hne. iIntros "#Hinv Htk Hka".
@@ -315,13 +315,13 @@ Section TreeMove.
     file_app = MkAppcfg tree_names (tree_pred c) r ->
     arow_at (abs_view I) i (MkAnode (AFile bs0) nl) ->
     app_inv γfs -∗ tree_wq c r g root i t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step i I (delta_write i off bs (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_write i off bs (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          tree_wq c r g root i t).
   Proof using .
     intros Heq Hrow. iIntros "#Hinv Hq Hka".
@@ -476,13 +476,13 @@ Section TreeMove.
     aview_no_edge_to (abs_view I) i ->
     d ∈ dom (tv_nodes t) ->
     app_inv γfs -∗ tree_own r g root t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step d I (delta_create d nm i ch (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_create d nm i ch (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          (tree_own r g root (top_ins d nm i (tabs_of ch) t) ∨ tree_taint c)).
   Proof using .
     intros Heq Hnm Hpre Hleaf Hnd Hno Hdd. iIntros "#Hinv Hown Hka".
@@ -542,13 +542,13 @@ Section TreeMove.
     i ∉ dom (tv_nodes t) ->
     d ∈ dom (tv_nodes t) ->
     app_inv γfs -∗ tree_own r g FsImg.ROOTINO t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step d I (delta_create d nm i ch (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_create d nm i ch (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          (tree_own r g FsImg.ROOTINO (top_ins d nm i (tabs_of ch) t)
           ∨ tree_taint c)).
   Proof using .
@@ -602,13 +602,13 @@ Section TreeMove.
     (forall s : fname, fs_pname s -> astep (abs_view I) tg s = None) ->
     d ∈ dom (tv_nodes t) ->
     app_inv γfs -∗ tree_own r g root t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step d I (delta_unl_ent d nm dec (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_unl_ent d nm dec (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          (tree_own r g root (top_unlink d nm t) ∨ tree_taint c)).
   Proof using .
     intros Heq Hnm Hd Hnm0 Hlf Hdd. iIntros "#Hinv Hown Hka".
@@ -767,7 +767,7 @@ Section TreeMove.
     rewrite /dots_ents /hide_dots.
     rewrite (delete_insert_ne _ DOTDOT DOT);
       [| intros Hc; exact (dot_ne_dotdot (eq_sym Hc))].
-    rewrite !delete_insert_delete !delete_empty //.
+    rewrite !delete_insert_eq !delete_empty //.
   Qed.
 
   (* THE CLAIM'S PURE CONJUNCTS, read at the fire without a deed: this is
@@ -778,8 +778,8 @@ Section TreeMove.
       (I : gmap Z fs_node) :
     file_app = MkAppcfg tree_names (tree_pred c) r ->
     app_inv γfs -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       (⌜aview_tree_wf (abs_view I) /\ adir_at (abs_view I) FsImg.ROOTINO
         /\ aview_rooted (abs_view I)⌝ ∨ tree_taint c).
   Proof using .
@@ -1232,13 +1232,13 @@ Section TreeMove.
     abs_view I !! tg = Some a -> an_nlink a = 1%nat ->
     tg ∉ dom (tv_nodes t) ->
     app_inv γfs -∗ tree_own r g FsImg.ROOTINO t -∗
-    ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
-      ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
+    ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
+      ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I ∗
       app_step tg I (delta_unl_tgt tg (abs_view I)) ∗
       (∀ I' : gmap Z fs_node,
          ⌜abs_view I' = delta_unl_tgt tg (abs_view I)⌝ -∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
-         ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ={appE}=∗
+         ghost_map_auth_frac (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          (tree_own r g FsImg.ROOTINO t ∨ tree_taint c)).
   Proof using .
     intros Heq Ha Hnl Hni. iIntros "#Hinv Hown Hka".

@@ -52,14 +52,14 @@ Proof.
              = shiftl p 52).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hn. apply bv_eq.
-  unfold shiftl, with_word, get_word, MachineWord.logical_shift_left.
+  unfold shiftl, MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hsh : bv_unsigned (MachineWord.N_to_word (MachineWord.Z_idx 64) (MachineWord.Z_idx 52)) = 52).
   { unfold MachineWord.N_to_word, MachineWord.Z_idx. rewrite Z_to_bv_unsigned.
     apply bv_wrap_small. unfold bv_modulus. simpl. lia. }
   rewrite Hsh.
   assert (Hup : uint p = bv_unsigned p).
-  { unfold uint, MachineWord.word_to_N, get_word. rewrite Z2N.id; [reflexivity|].
+  { unfold uint, MachineWord.word_to_N. rewrite Z2N.id; [reflexivity|].
     pose proof (bv_unsigned_in_range _ p). lia. }
   rewrite Hup in Hal.
   apply Z.mod_divide in Hal; [| lia]. destruct Hal as [q Hq].

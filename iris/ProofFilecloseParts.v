@@ -140,8 +140,7 @@ Proof.
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite HK.
   apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
   rewrite (moi32_small (2 ^ 32 - 1) ltac:(lia)).
@@ -239,8 +238,7 @@ Proof.
   assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
   apply (f_equal bv_unsigned) in Heq.
   revert Heq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite (moi32_small (2 ^ 32 - 2) ltac:(lia)).
   rewrite (moi32_small z ltac:(lia)).
@@ -310,7 +308,7 @@ Proof.
   { intro Hc. apply eq_vec_true_iff in Hc.
     apply (f_equal bv_unsigned) in Hc.
     cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-         to_word get_word MachineWord.MachineWord.zero_extend] in Hc.
+         MachineWord.MachineWord.zero_extend] in Hc.
     rewrite bv_zero_extend_unsigned in Hc.
     assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z) by (by vm_compute).
     rewrite Hz in Hc. apply bv_eq. rewrite Hc.

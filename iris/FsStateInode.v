@@ -1340,7 +1340,7 @@ Section InodeOwned.
       + iExists tyf. iSplitR.
         { iPureIntro. intros s' t' Hlk Hnt.
           destruct (decide (s' = s)) as [-> | Hne].
-          - rewrite lookup_insert in Hlk. inversion Hlk; subst t'.
+          - rewrite lookup_insert_eq in Hlk. inversion Hlk; subst t'.
             rewrite Etl in Hnt. done.
           - rewrite lookup_insert_ne // in Hlk. exact (Hok s' t' Hlk Hnt). }
         rewrite big_sepM_insert //. rewrite /ent_tok_at Etl. iFrame.
@@ -1707,7 +1707,7 @@ Section InodeOwned.
     iIntros "[$ H]". rewrite Hdel Horph Hdd.
     iApply (big_sepM_mono with "H"). intros s' t' Hs'; simpl.
     assert (Hne : s' <> s)
-      by (intros ->; rewrite lookup_delete in Hs'; discriminate).
+      by (intros ->; rewrite lookup_delete_eq in Hs'; discriminate).
     rewrite (bool_decide_ext (s' ∈ D ∖ {[s]}) (s' ∈ D)); [done | set_solver].
   Qed.
 
@@ -2059,7 +2059,7 @@ Section InodeOwned.
   Proof using .
     rewrite /fn_data /fn_set_blk /=.
     destruct (decide (j = k)) as [-> |].
-    - by rewrite lookup_insert.
+    - by rewrite lookup_insert_eq.
     - by rewrite lookup_insert_ne.
   Qed.
 

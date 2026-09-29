@@ -528,7 +528,7 @@ Proof.
     [| by rewrite (zidx_of_range i Hi) in E ].
   rewrite Hlen, list_update_insert by (rewrite Hlen; exact (zidx_lt i Hi)).
   rewrite length_insert, Hlen, (zidx_pos i Hi).
-  apply nth_lookup_Some, list_lookup_insert.
+  apply nth_lookup_Some, list_lookup_insert_eq.
   rewrite Hlen. exact (zidx_lt i Hi).
 Qed.
 

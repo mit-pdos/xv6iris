@@ -20,7 +20,7 @@
 (* ([app_pred] comes back, because the fire puts the body back), and the  *)
 (* TAINT [T] is Persistent AND Timeless (the claim sits under             *)
 (* [app_body]'s later, and the fires strip it).  The invariant's own half *)
-(* of [ghost_map_auth (fs_top γfs)] is what identifies the map the        *)
+(* of [ghost_map_auth_frac (fs_top γfs)] is what identifies the map the        *)
 (* application speaks about with the map the kernel lends at the fire.    *)
 (*                                                                       *)
 (* THE THREE PIECES, one per conjunct of                                  *)

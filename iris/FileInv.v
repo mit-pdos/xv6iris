@@ -249,8 +249,8 @@ Section FileInv.
       pose proof (lookup_insert_ne m k i n Hki) as Hmi.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hmi. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k 1%positive) as Hs.
-    pose proof (lookup_insert m k n) as Hmi.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k 1%positive) as Hs.
+    pose proof (lookup_insert_eq m k n) as Hmi.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite Hm in Hz, Hv. rewrite Hs in Hz. rewrite Hmi.
     destruct mz as [[nf|]|]; simpl in Hz.
@@ -278,8 +278,8 @@ Section FileInv.
       pose proof (lookup_delete_ne m k i Hki) as Hmi.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hmi. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k 1%positive) as Hs.
-    pose proof (lookup_delete m k) as Hmi.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k 1%positive) as Hs.
+    pose proof (lookup_delete_eq m k) as Hmi.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite Hm in Hz. rewrite Hs in Hz. rewrite Hmi.
     destruct mz as [[nf|]|]; simpl in Hz.
@@ -446,8 +446,8 @@ Section FileInv.
       pose proof (lookup_insert_ne M k i (qr, n) Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (q, 1%positive)) as Hs.
-    pose proof (lookup_insert M k (qr, n)) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (q, 1%positive)) as Hs.
+    pose proof (lookup_insert_eq M k (qr, n)) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz, Hv. rewrite Hs in Hz. rewrite Hm.
     (* the frame is an [option] of the ENTRY, so three shapes *)
@@ -508,8 +508,8 @@ Section FileInv.
       pose proof (lookup_delete_ne M k i Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (qt, 1%positive)) as Hs.
-    pose proof (lookup_delete M k) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (qt, 1%positive)) as Hs.
+    pose proof (lookup_delete_eq M k) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.

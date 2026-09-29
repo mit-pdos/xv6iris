@@ -109,7 +109,7 @@ Section ProofMycpu.
     iIntros "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.mycpu + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
+    iDestruct (stack_own_2_elim (KTR := kt) with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
     (* the two frame cells at csdsp's own address spelling *)
     assert (Hpa1 : add_vec (m1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite Hcsp1. unfold sp', sp0, pa_stk, add_vec_int, imm_entry. rewrite add_vec_off2.
@@ -259,7 +259,7 @@ Section ProofMycpu.
     { rewrite Hwv Hm10sp. exact Hpush. }
     iEval (rewrite Hpa1') in "Hbra".
     iEval (rewrite Hm9sp Hpa2') in "Hbs0".
-    iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := kt) sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.mycpu + 0x1c)) imm_dealloc m10
               (n - 2)%nat 2 false Hpop

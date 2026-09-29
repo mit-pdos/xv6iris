@@ -1,5 +1,6 @@
 From Stdlib Require Import ZArith.
 From iris.program_logic Require Import lifting.
+From iris.program_logic Require Import language.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.

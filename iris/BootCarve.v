@@ -270,7 +270,7 @@ Section BootCarve.
     assert (Hram : (ram_lo <= a < ram_hi)%Z) by (unfold ram_lo, ram_hi; lia).
     assert (Huint : uint (SailStdpp.Values.mword_of_int a : Arch.pa) = a)
       by exact (boot_uint_pa a Hram).
-    iApply (big_sepM_lookup _ _ (SailStdpp.Values.mword_of_int a : Arch.pa) b with "Ht").
+    iApply (big_sepM_lookup (fun (k : Arch.pa) v => k ↦ₓ□ v)%I (sub_text g) (SailStdpp.Values.mword_of_int a : Arch.pa) b with "Ht").
     rewrite /sub_text. apply map_lookup_filter_Some_2.
     - rewrite <- (boot_byte_text a b Hlk). exact (Hmem a Hram).
     - cbn. rewrite Huint. unfold text_end. lia.
@@ -366,7 +366,7 @@ Section BootCarve.
   Proof using .
     intros Hmem Ha. apply map_eq. intros k. rewrite /ran_bytes.
     destruct (decide (k = pa_of_z a)) as [-> | Hne].
-    - rewrite lookup_singleton.
+    - rewrite lookup_singleton_eq.
       apply map_lookup_filter_Some_2;
         [ exact (Hmem a Ha) | cbn; rewrite (boot_uint_pa a Ha); lia ].
     - assert (Hne' : pa_of_z a <> k) by (intro Hq; apply Hne; symmetry; exact Hq).

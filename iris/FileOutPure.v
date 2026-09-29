@@ -52,7 +52,7 @@ Proof using.
   apply elem_of_app in Hin as [Hin | Hin].
   - destruct (join_elem_of (bodies_of I) b Hin) as [-> | (l & Hl & Hbl)];
       [by right | left].
-    apply elem_of_list_lookup in Hl as [k Hk].
+    apply list_elem_of_lookup in Hl as [k Hk].
     pose proof (fbody_ok_bytes l (disc_input_f_body I k l Hd Hk)) as Hfb.
     exact (proj1 (Forall_forall _ _) Hfb b Hbl).
   - left. exact (proj1 (Forall_forall _ _) Hr b Hin).
@@ -117,7 +117,7 @@ Lemma disc_seg_f_last_in (h : list mobs) (c : bv 8) :
   disc_seg_f h -> obs_ends_in Uart0 h c -> c ∈ ins h.
 Proof using.
   intros _ [h0 ->]. rewrite ins_app ins_in.
-  apply elem_of_app. right. apply elem_of_list_here.
+  apply elem_of_app. right. apply list_elem_of_here.
 Qed.
 
 Lemma disc_seg_f_no_ctrl_d (h : list mobs) (c : bv 8) :
@@ -228,7 +228,7 @@ Proof using.
   - rewrite /pro_ok_f. split; [exact HF |].
     rewrite (pro_idx_f_ext (take (nlines (ins seg)) cs) cs (nlines (ins p)));
       [exact Hlt | | lia].
-    intros j Hj. rewrite list_lookup_total_alt lookup_take; [| lia].
+    intros j Hj. rewrite list_lookup_total_alt lookup_take_lt; [| lia].
     by rewrite -list_lookup_total_alt.
   - rewrite /disc_pt_f (sessf_take ps cs s (done_of (ins p)) _
                           ltac:(rewrite nlines_done; exact Hplt)).
@@ -257,7 +257,7 @@ Proof using.
   destruct (trace_shape_cycles h Hsh) as (cs & Hcs).
   assert (Hin : open_seg h ∈ cycles_of h)
     by (rewrite /cycles_of Hcs; apply epu_elem_of_rev_head).
-  apply elem_of_list_lookup in Hin as [i Hi].
+  apply list_elem_of_lookup in Hin as [i Hi].
   exact (Forall_lookup_1 _ _ _ _ Hd Hi).
 Qed.
 
@@ -620,16 +620,16 @@ Proof using.
     + intros _. exists []. split; [apply elem_of_cons; by left | done].
     + intros Hne. destruct (IH Hne) as (p & Hp & Hi).
       exists (ObsUartIn Uart1 b :: p). split; [| exact Hi].
-      apply elem_of_list_fmap. by exists p.
+      apply list_elem_of_fmap. by exists p.
   - intros Hne. destruct (IH Hne) as (p & Hp & Hi).
     exists (ObsUartOut i b :: p). split; [| exact Hi].
-    apply elem_of_list_fmap. by exists p.
+    apply list_elem_of_fmap. by exists p.
   - intros Hne. destruct (IH Hne) as (p & Hp & Hi).
     exists (ObsPowerOn :: p). split; [| exact Hi].
-    apply elem_of_list_fmap. by exists p.
+    apply list_elem_of_fmap. by exists p.
   - intros Hne. destruct (IH Hne) as (p & Hp & Hi).
     exists (ObsPowerOff :: p). split; [| exact Hi].
-    apply elem_of_list_fmap. by exists p.
+    apply list_elem_of_fmap. by exists p.
 Qed.
 
 (* THE PURE FACT.  Under the discipline, a cycle whose console wire is

@@ -85,8 +85,31 @@ boot.
 Build graph: each ELF is disassembled by `tools/dump_elf.py` — the kernel into
 `kernel-rocq/*.v`, each user program into `user-rocq/*.v`; `iris/` depends on
 `kernel-rocq/` and the Sail model in `model-xv6iris/`. Toolchain (in the opam
-switch): Rocq 9.0.1, coq-iris 4.4.0, coq-sail-stdpp 0.20.1, plus
+switch, pinned by `opam/xv6rocq.export`): Rocq 9.0.1, Iris master (`rocq-iris`
+dev.2026-09-24.0.8e490959), stdpp master (`rocq-stdpp` dev.2026-09-17.0.d510b616),
+`rocq-sail-stdpp` 0.20.3, plus
 `riscv64-linux-gnu-gcc`/`objdump` and `python3` for the images and dumper.
+
+### Toolchain
+
+`opam/xv6rocq.export` is the whole toolchain, exactly (a full, frozen opam switch export;
+[`opam/README.md`](opam/README.md) has the package table and the reasons). To set a machine up,
+or to move a shared switch to a new toolchain, make a **fresh** switch from it and rebuild every
+tree from clean -- never `opam install` into the shared switch, and never upgrade it in place:
+
+```sh
+opam switch create /shared/xv6rocq ocaml-base-compiler.5.3.0 \
+     --repos default,rocq-released=https://rocq-prover.org/opam/released
+opam switch import --switch /shared/xv6rocq opam/xv6rocq.export
+make toolchain-check          # the switch re-exports byte-identical to the file
+for d in model-xv6iris kernel-rocq user-rocq iris; do (cd $d && make -f CoqMakefile cleanall); done
+make
+```
+
+`make toolchain-check` (`tools/toolchain_check.sh [SWITCH]`) answers "is my switch the one this
+tree expects?"; a `.vo` built against a different switch is rejected with *inconsistent
+assumptions*, which `make` cannot see by timestamps. CI imports the same file and keys its switch
+cache on its hash; the toolchain changes only by changing the file (see `opam/README.md`).
 
 The generated `.v` are checked in but the ELFs are **not** (`xv6-riscv/` is
 `.gitignored`), so the Makefile pins the upstream revision they were built
@@ -144,6 +167,16 @@ assumed, why.
 The regen needs no `cmake`: nothing in the model's `.sail` sources is generated
 by sail-riscv's build, so the source tree plus those files is everything `sail`
 needs.
+
+The regen needs `sail` **0.20.3** (the version of `rocq-sail-stdpp` the model
+compiles against) and `z3` on `PATH` (sail's type checker calls it). One step is
+not sail's own output: stdpp ≥ 1.13 puts `{[ x ]}` at level 0, while sail's coq
+backend emits the record-update notations at level 1, and the two cannot both
+parse in a file importing the model and stdpp; the script rewrites the generated
+`(at level 1)` annotations of `rv64d_types.v` to level 0 (and fails if one is
+left). In the agent container `z3` is installed (apt) and `sail` is in the opam switch
+`/work/opam/sail-0.20.3`: `PATH=$PATH:/work/opam/sail-0.20.3/bin make model-gen` (appended,
+so the proofs' `coqc` stays the default switch's).
 
 On this machine the toolchain is already installed, but **not in the switch the
 proofs build in**: `sail` + `sail_coq_backend` live in the DEFAULT opam switch

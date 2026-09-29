@@ -140,7 +140,7 @@ Definition blk_inums (bi : nat) : gset Z :=
 Lemma blk_inums_spec (bi : nat) (z : Z) :
   z ∈ blk_inums bi <-> 16 * Z.of_nat bi <= z < 16 * Z.of_nat bi + 16.
 Proof.
-  rewrite /blk_inums elem_of_list_to_set elem_of_list_fmap.
+  rewrite /blk_inums elem_of_list_to_set list_elem_of_fmap.
   split.
   - intros (i & -> & Hi). apply elem_of_seq in Hi. lia.
   - intros [Hlo Hhi]. exists (Z.to_nat (z - 16 * Z.of_nat bi)).
@@ -234,7 +234,7 @@ End BigOpsRegion.
 
 (* THE SIDE CONDITION A SECOND OPENING WOULD OWE, REFUTED.  [inv_acc] at
    [E] concludes at [E ∖ ↑N]; a second [inv N _] there needs
-   [↑N ⊆ E ∖ ↑N].  A namespace's closure is infinite ([nclose_infinite]),
+   [↑N ⊆ E ∖ ↑N].  A namespace's closure is infinite ([nclose_not_finite]),
    hence inhabited, and no inhabited set is contained in a set it has been
    removed from.  Stated at an arbitrary [E] so that it covers the nested
    openings the collection would need, not just the outermost one. *)
@@ -242,7 +242,7 @@ Lemma ns_not_reopenable (N : namespace) (E : coPset) :
   ↑N ⊆ E -> ~ (↑N ⊆ E ∖ ↑N).
 Proof.
   intros HE Hsub.
-  pose proof (coPpick_elem_of (↑N) (nclose_infinite N)) as Hx.
+  pose proof (coPpick_elem_of (↑N) (nclose_non_empty N)) as Hx.
   apply (Hsub _) in Hx as Hx'.
   apply elem_of_difference in Hx' as [_ Hnot].
   exact (Hnot Hx).
@@ -328,7 +328,7 @@ Section CollectAll.
   Lemma col_side_slot_excl_z (γfs : fs_names) (γi : gname) (z : Z)
       (w : mword 32) (d : dinode) :
     bv_unsigned w = z ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_slot γfs γi z d -∗
     col_side γfs γi w -∗ col_side γfs γi w -∗ False.
   Proof using .
@@ -340,7 +340,7 @@ Section CollectAll.
       (Rs A B : gset Z) :
     A ⊆ Rs -> B ⊆ Rs ->
     (forall z : Z, z ∈ Rs -> 0 <= z < 2 ^ 32) ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ([∗ set] z ∈ Rs, ∃ d : dinode, ⌜m !! z = Some d⌝
                                    ∗ ireg_slot γfs γi z d) -∗
     ([∗ set] z ∈ A, col_sidez γfs γi z) -∗
@@ -743,14 +743,14 @@ Section CollectAll.
       (I : gmap Z fs_node) (z : Z) (w : mword 32) (d : dinode) (Q : iProp Σ) :
     bv_unsigned w = z ->
     m !! z = Some d ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac γi 1 m -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
     col_row γfs γi w Q -∗
     ireg_slot γfs γi z d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) (1/2) I
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ghost_map_auth_frac γi 1 m
+      ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
       ∗ col_got γfs γi I z
       ∗ (col_got γfs γi I z -∗ Q ∗ ireg_slot γfs γi z d).
   Proof using .
@@ -780,14 +780,14 @@ Section CollectAll.
   Lemma col_rows_got_acc (γfs : fs_names) (γi : gname) (m : gmap Z dinode)
       (I : gmap Z fs_node) (Rs : gset Z) (Ψ : Z -> iProp Σ) :
     (forall z : Z, z ∈ Rs -> 0 <= z < 2 ^ 32) ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac γi 1 m -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
     ([∗ set] z ∈ Rs, col_rowz γfs γi z (Ψ z)) -∗
     ([∗ set] z ∈ Rs, ∃ d : dinode, ⌜m !! z = Some d⌝ ∗ ireg_slot γfs γi z d) -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) (1/2) I
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ghost_map_auth_frac γi 1 m
+      ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
       ∗ ([∗ set] z ∈ Rs, col_got γfs γi I z)
       ∗ (([∗ set] z ∈ Rs, col_got γfs γi I z)
          -∗ ([∗ set] z ∈ Rs, Ψ z)
@@ -839,17 +839,17 @@ Section CollectAll.
       (cov : gset Z) (ls : Z) (m : gmap Z dinode) (I : gmap Z fs_node)
       (o : nat) (ids : list (bool * mword 32 * mword 32)) :
     (forall z : Z, z ∈ ic_live_inums ids -> 0 <= z < 2 ^ 32) ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) (1/2) I -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac γi 1 m -∗
+    ghost_map_auth_frac (fs_top γfs) (1/2) I -∗
     ([∗ list] k ↦ p ∈ ids,
        (ic_id cn (o + k) (1/4) p.1.1 p.1.2 p.2
         ∗ ic_slot_cover cn γfs γi cov ls (o + k))) -∗
     ([∗ set] z ∈ ic_live_inums ids,
        ∃ d : dinode, ⌜m !! z = Some d⌝ ∗ ireg_slot γfs γi z d) -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) (1/2) I
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ∗ ghost_map_auth_frac γi 1 m
+      ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
       ∗ ([∗ set] z ∈ ic_live_inums ids, col_got γfs γi I z)
       ∗ (([∗ set] z ∈ ic_live_inums ids, col_got γfs γi I z)
          -∗ ([∗ list] k ↦ p ∈ ids,
@@ -936,9 +936,9 @@ Section CollectAll.
      so the threading is an induction either way *)
   Lemma ic_escrow_body_cover_list (l : list nat) (cn : ic_names)
       (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ([∗ list] k ∈ l, ic_escrow_body cn γfs γi cov ls k) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
     ∗ ([∗ list] k ∈ l, ic_slot_cover cn γfs γi cov ls k).
   Proof using .
     induction l as [| k l IH].
@@ -1267,7 +1267,7 @@ Section CollectAll.
     (* ---- the records' values, against the region's own authority ---- *)
     rewrite /col_recs. iDestruct "Hrec" as "[Hma Hrows]".
     iAssert (⌜forall i n, I !! i = Some n -> m !! i = Some (fn_rec n)⌝
-             ∧ (ghost_map_auth γi 1 m
+             ∧ (ghost_map_auth_frac γi 1 m
                 ∗ [∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
       with "[Hma Hb]" as "[%Hmrec [Hma Hb]]".
     { iSplit; [| iFrame "Hma Hb"].
@@ -1426,10 +1426,10 @@ Section CollectAll.
     region_inums nib = O ∪ X ∪ ic_live_inums ids ->
     length ids = NINODE ->
     fs_parse_sb (fun _ => sbb) = Some sb ->
-    (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+    (ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
      ∗ col_auth γfs Lb C (fs_home_set cov ls)
-     ∗ ghost_map_auth (fs_top γfs) (1/2) I
-     ∗ ghost_map_auth γi 1 m
+     ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
+     ∗ ghost_map_auth_frac γi 1 m
      ∗ ([∗ list] bi ∈ seq 0%nat nib,
           ireg_blk γi γfs (FsImg.sb_inodestart sb) m bi)
      ∗ bitmap_res γfs (FsImg.sb_bmapstart sb) (FsImg.sb_size sb) used
@@ -1449,10 +1449,10 @@ Section CollectAll.
         ∗ (col_auth γfs Lb C (fs_home_set cov ls)
            -∗ (∃ kv : ity, ireg_keep γfs ireg_root kv)
            -∗ fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S
-           -∗ (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+           -∗ (ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
                ∗ col_auth γfs Lb C (fs_home_set cov ls)
-               ∗ ghost_map_auth (fs_top γfs) (1/2) I
-               ∗ ghost_map_auth γi 1 m
+               ∗ ghost_map_auth_frac (fs_top γfs) (1/2) I
+               ∗ ghost_map_auth_frac γi 1 m
                ∗ ([∗ list] bi ∈ seq 0%nat nib,
                     ireg_blk γi γfs (FsImg.sb_inodestart sb) m bi)
                ∗ bitmap_res γfs (FsImg.sb_bmapstart sb) (FsImg.sb_size sb) used
@@ -1507,7 +1507,7 @@ Section CollectAll.
     (* ---- THE PARTITION IS DISJOINT, read off the sides ---- *)
     iAssert (⌜O ## X⌝ ∧ ⌜O ## ic_live_inums ids⌝
              ∧ ⌜X ## ic_live_inums ids⌝
-             ∧ (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+             ∧ (ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
                 ∗ ([∗ set] z ∈ region_inums nib, (∃ d : dinode, ⌜m !! z = Some d⌝ ∗ ireg_slot γfs γi z d))
                 ∗ ([∗ set] z ∈ O,
                      col_rowz γfs γi z
@@ -1837,11 +1837,11 @@ Section CollectAll.
     ipool_inv cn γfs γi cov ls icfg_nib -∗
     sb_park γfs sb -∗
     col_auth γfs Lb C (fs_home_set cov ls) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     T ={E}=∗
       dur_pair (app_guest Okc) T gd (col_view C (fs_home_set cov ls))
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
-      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
+      ∗ ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien HOk.
     iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx HT".
@@ -1987,7 +1987,7 @@ Section CollectAll.
     ipool_inv cn γfs γi cov ls icfg_nib -∗
     sb_park γfs sb -∗
     col_auth γfs Lb C (fs_home_set cov ls) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     (* the OLD durable guest, the token, the loan, and the hooks *)
     ▷ app_guest Okc gt_o -∗
     T -∗
@@ -1999,7 +1999,7 @@ Section CollectAll.
       ∗ start_auth n
       ∗ ([∗ list] Q ∈ Qs, Q)
       ∗ col_auth γfs Lb C (fs_home_set cov ls)
-      ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
+      ∗ ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien Hn HOk.
     iIntros "#Hmerge #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT Hsa HQs".

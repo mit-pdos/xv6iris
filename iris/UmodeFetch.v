@@ -194,7 +194,7 @@ Lemma se39_unsigned (a : mword 64) :
   = bv_wrap 64 (bv_swrap 39 (bv_unsigned a mod 549755813888)).
 Proof.
   cbn [bits_of_virtaddr].
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
        MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned. unfold bv_signed.
   rewrite (subrange_dec_unsigned_lo0 a (Z.sub 39 1) 549755813888

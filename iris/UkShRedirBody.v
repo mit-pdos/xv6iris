@@ -214,6 +214,7 @@ Section UkShRedirBody.
       (UkShRedirCut.ushs_nulcut (wl_toks ws) len
          (fun j : nat => f (k + j)%nat) fe).
   Proof using .
+    clear - ws file f k len fe. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc Σ) *)
     intros Hl Hfe. pose proof Hl as HL.
     destruct HL as (Hok & Hfile & Hlen & Hbody & _ & _ & _ & _ & _).
     assert (Hfpos : (0 < length file)%nat)
@@ -416,6 +417,7 @@ Section UkShRedirBody.
       ubyteq γd dq (a + Z.of_nat j) (f j) ∗
       (ubyteq γd dq (a + Z.of_nat j) (f j) -∗ ubytesq γd dq a kk f).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     intros Hj. rewrite /ubytesq. iIntros "H".
     iDestruct (big_sepL_lookup_acc _ _ j j with "H") as "[Hb Hcl]";
       [ apply lookup_seq; split; [ lia | exact Hj ] | ].
@@ -429,6 +431,7 @@ Section UkShRedirBody.
     (j < 4)%nat ->
     f (k + j)%nat = cat_pre !!! j.
   Proof using .
+    clear - nm f k len j. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc Σ) *)
     intros (Hok & Hlen & Hby) Hj.
     rewrite (Hby j ltac:(rewrite Hlen cat_line_len; lia)).
     exact (cat_line_head nm j Hj).

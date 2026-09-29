@@ -117,7 +117,7 @@ Proof.
   - apply Hcovm. rewrite /SB_BNO. lia.
   - rewrite /log_region_set. intros Hin.
     apply elem_of_union in Hin as [Hin | Hin].
-    + apply elem_of_list_to_set, elem_of_list_fmap in Hin as (i & Heq & _).
+    + apply elem_of_list_to_set, list_elem_of_fmap in Hin as (i & Heq & _).
       rewrite /log_slot_bno /SB_BNO in Heq. lia.
     + apply elem_of_singleton in Hin. rewrite /log_hdr_bno /SB_BNO in Hin. lia.
 Qed.
@@ -308,11 +308,11 @@ Section CollectImgFree.
       (inum : bv 32) :
     fs_boot_image_wf dk ndisk sb nib cov ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     imark γi (bv_unsigned inum) -∗
     ireg_slot γfs γi (bv_unsigned inum)
       (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ col_bundle γfs γi (bv_unsigned inum)
           (img_node (fs_blocks dk) sb (bv_unsigned inum)).
   Proof using .
@@ -346,11 +346,11 @@ Section CollectImgFree.
       (inum : bv 32) :
     fs_boot_image_wf dk ndisk sb nib cov ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     imark γi (bv_unsigned inum) -∗
     ireg_slot γfs γi (bv_unsigned inum)
       (fs_dinode (fs_blocks dk) sb (bv_unsigned inum)) -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+      ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
       ∗ inode_owned_era_q γfs (DfracOwn 1) γi inum
           (img_node (fs_blocks dk) sb (bv_unsigned inum))
       ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum

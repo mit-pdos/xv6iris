@@ -372,6 +372,7 @@ Section CrBodies.
     (l1 `prefix_of` l2 \/ l2 `prefix_of` l1) ->
     (length l1 <= length l2)%nat -> l1 `prefix_of` l2.
   Proof using .
+    clear - l1 l2. (* unused; else Rocq counts Σ Rin as used (asks for Proof using … Σ Rin) *)
     intros [H | H] Hle; [exact H |].
     assert (Heq : l2 = l1) by (apply prefix_length_eq; [exact H | lia]).
     rewrite Heq. reflexivity.
@@ -4153,9 +4154,9 @@ Section ProofConsoleread.
     { rewrite /cr_exits. iSplit.
       - iApply (cr_mk_retx cn Wd ord γc j sp0 m av pid U n lks Hn31 Hav Hbelow
                   with "Ht Hlk Huinv Hprice").
-        iApply (cr_mk_epi Rin cn Wd ord j sp0 m av pid U n lks eq_refl Hav
+        iApply (cr_mk_epi (CID := CID) Rin cn Wd ord j sp0 m av pid U n lks eq_refl Hav
                   with "Ht Hsaved Hcont").
-      - iApply (cr_mk_epi Rin cn Wd ord j sp0 m av pid U n lks eq_refl Hav
+      - iApply (cr_mk_epi (CID := CID) Rin cn Wd ord j sp0 m av pid U n lks eq_refl Hav
                   with "Ht Hsaved Hcont"). }
     (* ---- +0x12 c.addi4spn s0,sp,96 ---- *)
     assert (Hs0v : add_vec (pa_stk sp0 12%nat)

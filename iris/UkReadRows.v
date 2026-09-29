@@ -269,7 +269,7 @@ Section UkReadRows.
     destruct (decide (0 <= Z.of_nat fd < Z.of_nat NOFILE)) as [_ | Hc];
       [ | exfalso; apply Hc; unfold NSTD, NOFILE in *; lia ].
     rewrite <- Htake in Hl0.
-    rewrite lookup_take in Hl0; [ | lia ].
+    rewrite lookup_take_lt in Hl0; [ | lia ].
     rewrite Nat2Z.id Hl0. reflexivity.
   Qed.
 

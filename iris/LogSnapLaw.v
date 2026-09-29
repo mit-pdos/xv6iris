@@ -127,12 +127,12 @@ Section SnapLaw.
              C !! b = Some bs -> length bs = BSIZE⌝ -∗
           ⌜bytes_tie Lb C⌝ -∗
           ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
-          ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-          ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+          ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
+          ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
           T ={E}=∗
             snap_law_out G T gd C (fs_home_set cov logstart)
-            ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
-            ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
+            ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
+            ∗ ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
 
   (* ...and the arity-free form [LogInv.log_ctx] carries: the mask and the
      guest are closed over, with the one fact a holder still needs about
@@ -182,15 +182,15 @@ Section SnapLaw.
     bytes_tie Lb C ->
     bytes_dom Lb (fs_home_set cov logstart) ->
     snap_law γ γfs cov logstart T gd -∗
-    ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
+    ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
     T ={⊤ ∖ ↑fsbN}=∗
       (* the epoch AND the seam, at the law's own guest (round C) *)
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
          snap_law_out G T gd C (fs_home_set cov logstart))
-      ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
-      ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit).
+      ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
+      ∗ ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hdom Hlens Htie Hdm. iIntros "#Hlaw Hb Ht HT".
     iDestruct "Hlaw" as (N G Hdj) "[#Hseam #Hbody]".
@@ -240,8 +240,8 @@ Section SnapLaw.
              C !! b = Some bs -> length bs = BSIZE⌝ -∗
           ⌜bytes_tie Lb C⌝ -∗
           ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
-          ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-          ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+          ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
+          ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
           ▷ G gt_o -∗
           T -∗
           ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
@@ -252,8 +252,8 @@ Section SnapLaw.
             ∗ T
             ∗ start_auth n
             ∗ ([∗ list] Q ∈ Qs, Q)
-            ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
-            ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
+            ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
+            ∗ ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit)))%I.
 
   (* ...and its arity-free form, with the crash seam at the same guest --
      the ghost commit turns the crash slot into the record and the old
@@ -306,8 +306,8 @@ Section SnapLaw.
               C !! b = Some bs -> length bs = BSIZE⌝ -∗
            ⌜bytes_tie Lb C⌝ -∗
            ⌜bytes_dom Lb (fs_home_set cov logstart)⌝ -∗
-           ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-           ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+           ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
+           ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
            ▷ G gt_o -∗
            T -∗
            ⌜n = (gd + 1)%nat⌝ -∗ start_auth n -∗
@@ -318,8 +318,8 @@ Section SnapLaw.
              ∗ T
              ∗ start_auth n
              ∗ ([∗ list] Q ∈ Qs, Q)
-             ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
-             ∗ ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit)).
+             ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
+             ∗ ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit)).
   Proof using .
     iIntros "#Hlaw".
     iDestruct "Hlaw" as (N G Hdj Hdc) "[#Hseam #Hbody]".

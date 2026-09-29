@@ -350,7 +350,7 @@ Section ProofUvmclear.
     assert (HPntfp : (uptd_set P vpn (pte_clear_u w)).(ud_tfp) = P.(ud_tfp)) by reflexivity.
     assert (HPnroot : (uptd_set P vpn (pte_clear_u w)).(ud_root) = P.(ud_root)) by reflexivity.
     assert (HPnl : (uptd_set P vpn (pte_clear_u w)).(ud_um) !! vpn = Some (pte_clear_u w))
-      by (rewrite HPnum; apply lookup_insert).
+      by (rewrite HPnum; apply lookup_insert_eq).
     destruct (proj1 Hwf' vpn (pte_clear_u w) HPnl) as (_ & Hleafs).
     destruct (Hleafs a d) as (Hlv & Hll & Hln & Hlp).
     assert (Hrep' : pt_rep0 (ptree_set_leaf t vpn (pte_set_ad (pte_clear_u w) a d))

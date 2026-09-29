@@ -1093,7 +1093,7 @@ Section ProofSysUnlinkW2.
                         = mword_of_int (SU + 0x5e)) by pcw.
         iEval (rewrite Hpp5e) in "Hpc".
         (* the [off] cell, carved out of slot 27's UPPER word *)
-        iDestruct (ctx_word_pointsto_aligned_p with "H27") as %Hal27.
+        iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "H27") as %Hal27.
         iDestruct (su_off_split sp0 w27 with "H27") as "[H27lo H27hi]".
         (* ===== +0x5e addi a2,s0,-212 -- &off ===== *)
         iApply (wp_addi4_s_sconf (CID := CID15) (mword_of_int (SU + 0x5e)) Ra2

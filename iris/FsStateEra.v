@@ -148,7 +148,7 @@ Proof.
   - rewrite lookup_empty. destruct (decide _) as [Hc | _]; [lia | done].
   - destruct (f b) as [v |] eqn:Hb.
     + destruct (decide (k = b)) as [-> | Hne].
-      * rewrite lookup_insert.
+      * rewrite lookup_insert_eq.
         destruct (decide (b <= b < b + S n)%nat) as [_ | Hc]; [| lia].
         by rewrite Hb.
       * rewrite lookup_insert_ne; [| done]. rewrite IH.
@@ -269,7 +269,7 @@ Proof.
   destruct (lookup_lt_is_Some_2 _ _ Hl) as [x Hx].
   rewrite (list_lookup_total_correct _ _ _ Hx).
   apply list_lookup_total_correct.
-  rewrite lookup_take; [exact Hx | lia].
+  rewrite lookup_take_lt; [exact Hx | lia].
 Qed.
 
 Lemma bm_of_slot (n : fs_node) (k : nat) :
@@ -1701,15 +1701,15 @@ Section EraRes.
   Lemma inode_owned_era_retag (γfs : fs_names) (γi : gname) (inum : bv 32)
       (R : gmap Z dinode) (I : gmap Z fs_node) (n n' : fs_node) :
     inode_local (bv_unsigned inum) n' ->
-    ghost_map_auth γi 1 R -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth_frac γi 1 R -∗
+    ghost_map_auth_frac (fs_top γfs) 1 I -∗
     dinode_at γi inum (fn_rec n) -∗
     top_frag (fs_gamma_L γfs) (bv_unsigned inum) n -∗
     ([∗ map] k ↦ bs ∈ fn_blk n',
        FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n' k) bs) -∗
     ind_owned (fs_gamma_L γfs) n' ==∗
-      ghost_map_auth γi 1 (<[bv_unsigned inum := fn_rec n']> R)
-      ∗ ghost_map_auth (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
+      ghost_map_auth_frac γi 1 (<[bv_unsigned inum := fn_rec n']> R)
+      ∗ ghost_map_auth_frac (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
       ∗ inode_owned_era γfs γi inum n'.
   Proof using .
     intros Hl'. iIntros "HaR HaI Hd Ht Hb Hi".
@@ -1733,11 +1733,11 @@ Section EraRes.
     fn_indb n' = fn_indb n ->
     fn_addrs_kept n n' ->
     inode_local (bv_unsigned inum) n' ->
-    ghost_map_auth γi 1 R -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth_frac γi 1 R -∗
+    ghost_map_auth_frac (fs_top γfs) 1 I -∗
     inode_owned_era γfs γi inum n ==∗
-      ghost_map_auth γi 1 (<[bv_unsigned inum := fn_rec n']> R)
-      ∗ ghost_map_auth (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
+      ghost_map_auth_frac γi 1 (<[bv_unsigned inum := fn_rec n']> R)
+      ∗ ghost_map_auth_frac (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
       ∗ inode_owned_era γfs γi inum n'.
   Proof using .
     intros Hblk Hent Hind Hkept Hl'.
@@ -1795,11 +1795,11 @@ Section EraRes.
     fn_blk n' = ∅ ->
     fn_indb n' = 0 ->
     inode_local (bv_unsigned inum) n' ->
-    ghost_map_auth γi 1 R -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
+    ghost_map_auth_frac γi 1 R -∗
+    ghost_map_auth_frac (fs_top γfs) 1 I -∗
     inode_owned_era γfs γi inum n ==∗
-      ghost_map_auth γi 1 (<[bv_unsigned inum := fn_rec n']> R)
-      ∗ ghost_map_auth (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
+      ghost_map_auth_frac γi 1 (<[bv_unsigned inum := fn_rec n']> R)
+      ∗ ghost_map_auth_frac (fs_top γfs) 1 (<[bv_unsigned inum := n']> I)
       ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
            FsStateDefs.blk_owned (fs_gamma_L γfs) (fn_naddr n k) bs)
       ∗ ind_owned (fs_gamma_L γfs) n
@@ -2402,7 +2402,7 @@ Section EraRes.
       by (rewrite /fn_orphan /fn_nlink !era_node_rec Hnl //).
     assert (Hdd' : FsStateInode.fn_dd (era_node dn' bm' data')
                    = Some (bv_unsigned inum))
-      by (rewrite /FsStateInode.fn_dd Hents' lookup_insert //).
+      by (rewrite /FsStateInode.fn_dd Hents' lookup_insert_eq //).
     assert (Hdotv : dir_view data nrec !! DOT = Some i)
       by (rewrite -Hents; exact Hdot).
     iIntros "Hrest Hdt Hpt".
@@ -2424,7 +2424,7 @@ Section EraRes.
     rewrite /FsStateInode.ent_toks_nodot Hents Ho.
     iApply (big_sepM_mono with "Hrest"). intros s t Hs.
     assert (Hne : s <> DOT)
-      by (intros ->; rewrite lookup_delete in Hs; discriminate).
+      by (intros ->; rewrite lookup_delete_eq in Hs; discriminate).
     iApply (FsStateInode.ent_tok_dd_ne Γ i
               (FsStateInode.fn_dd (era_node dn bm data))
               (Some (bv_unsigned inum)) false (bool_decide (s ∈ D)) s t Hne).
@@ -2892,7 +2892,7 @@ Section EraRes.
                    Hnrec Hk0 Hlen Hs Hnz Hsz Hrng Hnone). }
         intros s' Hs'. rewrite Heq. rewrite Hents in Hs'.
         destruct (decide (s' = s)) as [-> | Hne].
-        * rewrite lookup_insert. by eexists.
+        * rewrite lookup_insert_eq. by eexists.
         * rewrite lookup_insert_ne //.
   Qed.
 

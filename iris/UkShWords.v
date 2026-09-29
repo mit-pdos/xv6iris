@@ -69,7 +69,7 @@ Lemma ushp_is_ws_val (b : bv 8) :
 Proof.
   rewrite /ushp_is_ws /ushp_ws_bytes. intro H.
   apply bool_decide_eq_true_1 in H.
-  apply elem_of_list_fmap in H as (z & -> & Hz).
+  apply list_elem_of_fmap in H as (z & -> & Hz).
   apply elem_of_cons in Hz as [-> | Hz]; [left; by vm_compute |].
   apply elem_of_cons in Hz as [-> | Hz]; [right; left; by vm_compute |].
   apply elem_of_cons in Hz as [-> | Hz]; [right; right; left; by vm_compute |].
@@ -88,7 +88,7 @@ Lemma ushp_is_sym_val (b : bv 8) :
 Proof.
   rewrite /ushp_is_sym /ushp_sym_bytes. intro H.
   apply bool_decide_eq_true_1 in H.
-  apply elem_of_list_fmap in H as (z & -> & Hz).
+  apply list_elem_of_fmap in H as (z & -> & Hz).
   apply elem_of_cons in Hz as [-> | Hz]; [left; by vm_compute |].
   apply elem_of_cons in Hz as [-> | Hz]; [right; left; by vm_compute |].
   apply elem_of_cons in Hz as [-> | Hz]; [right; right; left; by vm_compute |].
@@ -485,7 +485,7 @@ Proof.
   apply not_true_is_false. intro He.
   apply existsb_exists in He as [tk [Htk Heq]].
   apply Nat.eqb_eq in Heq.
-  apply elem_of_list_In in Htk.
+  apply list_elem_of_In in Htk.
   destruct (wl_toks_at_ge ws p tk Htk) as [_ Hge]. lia.
 Qed.
 

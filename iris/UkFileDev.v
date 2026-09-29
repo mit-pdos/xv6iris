@@ -144,7 +144,7 @@ Proof.
   intros Hk Hg. apply list_eq. intros j.
   destruct (decide (j < k)%nat) as [Hj | Hj].
   - rewrite (map_seq_lookup g k j Hj).
-    rewrite lookup_take; [ | lia ]. rewrite lookup_drop.
+    rewrite lookup_take_lt; [ | lia ]. rewrite lookup_drop.
     rewrite (Hg j Hj). symmetry. apply list_lookup_lookup_total_lt. lia.
   - rewrite !lookup_ge_None_2; [ reflexivity | | ].
     + rewrite length_take length_drop. lia.
@@ -370,7 +370,7 @@ Section UkFileDev.
     intros H0 Hs Hl. iIntros "Ha Hstd".
     iDestruct (UserFd.ustd_agree with "Ha Hstd") as %Hst. iPureIntro.
     apply (uk_fd_st_of_key v0 fdv fd st H0 ltac:(unfold NSTD, NOFILE in *; lia)).
-    rewrite <- (lookup_take fdv NSTD fd Hs). by rewrite Hst.
+    rewrite <- (lookup_take_lt fdv NSTD fd Hs). by rewrite Hst.
   Qed.
 
   (* [ei_read] at a HELD descriptor on the deed's inum, at ANY handle [D]

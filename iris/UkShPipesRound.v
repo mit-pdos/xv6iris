@@ -315,7 +315,7 @@ Section UkShPipesRound.
       all: pose proof (f_equal length Hdrop) as Hlen;
            rewrite length_drop in Hlen; cbn [length] in Hlen.
       all: assert (Hl0 : (<[0%nat := st0]> ld0) !! 0%nat = Some st0)
-             by exact (list_lookup_insert ld0 0%nat st0 Hl0len).
+             by exact (list_lookup_insert_eq ld0 0%nat st0 Hl0len).
       all: assert (Hl1' : (<[0%nat := st0]> ld0) !! 1%nat = Some st1)
              by (rewrite list_lookup_insert_ne; [ exact Hl1 | lia ]).
       all: iDestruct "Hobl" as (Cr Wr Pw R Rk Cx)
@@ -337,7 +337,7 @@ Section UkShPipesRound.
       - (* ---- rest = []: the LAST stage ---- *)
         iIntros (N' h' m' γ' γp q) "%Hpeq %Ha0' Hmy #Hck #Hjt2 #Hqc Hsz Hstd
                                     Hcwd Hch Hpid #Hcd1 #Hcd2 HRc Hrun".
-        rewrite list_insert_insert.
+        rewrite list_insert_insert_eq.
         iApply ("Hlast" $! k st0 b N' h' m' γ' γp q (6 * 0 + n)%nat
                   with "[] [] [] [] [] Hmy Hck Hjt2 Hqc Hsz Hstd Hcwd Hch
                         Hcd1 Hcd2 HRc Hrun");
@@ -354,7 +354,7 @@ Section UkShPipesRound.
         iIntros (N' h' m' γ' γp q) "%Hpeq %Ha0' Hmy #Hck #Hjt2 #Hqc Hsz Hstd
                                     Hcwd Hch Hpid #Hcd1 #Hcd2 HRc Hrun".
         pose proof (ukn_const_of_eq N' (Qc k st0) Hpeq (HQc k st0)) as Hcst'.
-        rewrite list_insert_insert.
+        rewrite list_insert_insert_eq.
         iApply fupd_mwp_ps.
         iMod ("Hent" $! k st0 N' γ' γp (6 * length rest + n)%nat
                 with "[] [] [] Hmy HRc Hpid Hck Hjt2") as "Hobl'".

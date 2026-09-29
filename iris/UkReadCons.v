@@ -298,7 +298,7 @@ Section UkReadCons.
     assert (Hfdw : uvis_fd W !! fd
                    = Some (FdOpen true wr (FdDevice CONSOLE))).
     { pose proof Hl0 as Hl0'. rewrite <- Htake in Hl0'.
-      rewrite lookup_take in Hl0'; [ exact Hl0' | lia ]. }
+      rewrite lookup_take_lt in Hl0'; [ exact Hl0' | lia ]. }
     assert (Hcgz : (0 <= bv_signed
                       (trunc32 (tf_w (uvis_tf W) (tf_arg_idx 2))))%Z).
     { rewrite Harg2. rewrite /sys_rw_count in Hcnt. lia. }

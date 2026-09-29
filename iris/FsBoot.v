@@ -154,7 +154,7 @@ Lemma log_hdr_not_slot (logstart : Z) :
   log_hdr_bno logstart ∉
     ((fun i => log_slot_bno logstart i) <$> seq 0 LOGBLOCKS).
 Proof.
-  intros Hin. apply elem_of_list_fmap in Hin as (i & Hi & _).
+  intros Hin. apply list_elem_of_fmap in Hin as (i & Hi & _).
   rewrite /log_hdr_bno /log_slot_bno in Hi. lia.
 Qed.
 
@@ -350,7 +350,7 @@ Section FsBoot.
     iExact "Hl".
     (* [big_sepS_subseteq]'s [Affine] side condition is SHELVED, not solved:
        leaving it makes Qed report only "incomplete proof". *)
-    Unshelve. intros ?. apply _.
+    Unshelve. all: intros ?; apply _.
   Qed.
 
 (* ====================================================================== *)
@@ -405,8 +405,8 @@ Section FsBoot.
     ∃ γfs : fs_names,
       ⌜fs_link γfs = γlk⌝ ∗ ⌜fs_top γfs = γtp⌝ ∗
       ([∗ set] b ∈ cov, pool_blk (fs_view γfs γv dev cov) b) ∗
-      ghost_map_auth (fs_cache γfs) 1 (fs_C0 dk cov) ∗
-      ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
+      ghost_map_auth_frac (fs_cache γfs) 1 (fs_C0 dk cov) ∗
+      ghost_map_auth_frac (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       fs_bytes_inv (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs) home Dv ∗
       exc_own (fs_exc γfs) X ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
@@ -481,19 +481,19 @@ Section FsBoot.
       iIntros "H". iSplitR "H"; [done | iExact "H"]. }
     assert (Hni : i ∉ l) by exact (NoDup_cons_1_1 i l Hnd).
     assert (Hndl : base.NoDup l) by exact (NoDup_cons_1_2 i l Hnd).
-    assert (Hle : f i ⊆ X) by (apply Hsub, elem_of_list_here).
+    assert (Hle : f i ⊆ X) by (apply Hsub, list_elem_of_here).
     assert (Hsub' : forall j : B, j ∈ l -> f j ⊆ X ∖ f i).
     { intros j Hj. apply elem_of_subseteq. intros b Hb.
       apply elem_of_difference. split.
-      - apply (Hsub j (elem_of_list_further _ _ _ Hj)), Hb.
+      - apply (Hsub j (list_elem_of_further _ _ _ Hj)), Hb.
       - intros Hbi.
         assert (Hd : f j ## f i).
         { apply Hdisj;
-            [by apply elem_of_list_further | apply elem_of_list_here |].
+            [by apply list_elem_of_further | apply list_elem_of_here |].
           intros ->. contradiction. }
         exact (Hd b Hb Hbi). }
     assert (Hdisj' : forall j k : B, j ∈ l -> k ∈ l -> j <> k -> f j ## f k)
-      by (intros j k Hj Hk; apply Hdisj; by apply elem_of_list_further).
+      by (intros j k Hj Hk; apply Hdisj; by apply list_elem_of_further).
     iIntros "H".
     iDestruct (big_sepS_split_sub Φ X (f i) Hle with "H") as "[Hi Hrest]".
     iDestruct (IH (X ∖ f i) Hndl Hsub' Hdisj' with "Hrest") as "[Hl Hrem]".

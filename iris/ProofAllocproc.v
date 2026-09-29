@@ -1259,7 +1259,7 @@ Section ProofAllocprocPid.
                  what the registration is keyed to. *)
               assert (Hnotin : (pidn : mword 32) ∉ pids).
               { rewrite /pidn HRga3. intro Hin.
-                apply elem_of_list_lookup in Hin as [i Hi].
+                apply list_elem_of_lookup in Hin as [i Hi].
                 assert (Hilt : (i < NPROC)%nat)
                   by (apply lookup_lt_Some in Hi; rewrite Hplen in Hi; exact Hi).
                 exact (Hfresh' i ltac:(lia) Hi). }

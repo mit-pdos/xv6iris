@@ -46,7 +46,7 @@ Lemma str_cells_key_ne (pv : Z) (n : nat) (f : nat -> bv 8) :
   pv + Z.of_nat n ∉ (str_cells pv n f).*1.
 Proof using.
   rewrite /str_cells -list_fmap_compose. intros Hin.
-  apply elem_of_list_fmap in Hin as (j & Hj & Hs).
+  apply list_elem_of_fmap in Hin as (j & Hj & Hs).
   apply elem_of_seq in Hs. cbn in Hj. lia.
 Qed.
 
@@ -58,7 +58,7 @@ Lemma str_img_lookup (pv : Z) (n : nat) (f : nat -> bv 8) (a : Z) (b : bv 8) :
 Proof using.
   rewrite /str_img lookup_insert_Some. intros [[<- <-] | [_ Hl]]; [by left |].
   right. apply elem_of_list_to_map_2 in Hl.
-  apply elem_of_list_fmap in Hl as (j & Hj & Hs).
+  apply list_elem_of_fmap in Hl as (j & Hj & Hs).
   apply elem_of_seq in Hs. injection Hj as -> ->. exists j.
   split; [lia | split; reflexivity].
 Qed.
@@ -68,13 +68,13 @@ Lemma str_img_byte (pv : Z) (n : nat) (f : nat -> bv 8) (j : nat) :
 Proof using.
   intros Hj. rewrite /str_img lookup_insert_ne; [| lia].
   apply elem_of_list_to_map_1; [apply str_cells_keys |].
-  rewrite /str_cells. apply elem_of_list_fmap. exists j. split; [reflexivity |].
+  rewrite /str_cells. apply list_elem_of_fmap. exists j. split; [reflexivity |].
   apply elem_of_seq. lia.
 Qed.
 
 Lemma str_img_nul (pv : Z) (n : nat) (f : nat -> bv 8) :
   str_img pv n f !! (pv + Z.of_nat n) = Some ubyte0.
-Proof using. rewrite /str_img. apply lookup_insert. Qed.
+Proof using. rewrite /str_img. apply lookup_insert_eq. Qed.
 
 (* THE OWNERSHIP: the string's bytes and its terminator ARE the image's
    cells, at any per-cell predicate *)

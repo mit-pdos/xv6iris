@@ -604,7 +604,7 @@ Section ProofCreateFound.
     (* ---- the sixteen-byte [name] local, and the fourteen it lends ---- *)
     iDestruct (cr_slots_bytes sp0 u10 u9 with "Hb10 Hb9") as "[%Hal Hnb]".
     destruct Hal as [Hal10 Hal9].
-    iDestruct (dlk_bytes_name with "Hnb") as (nf0) "Hnb".
+    iDestruct (dlk_bytes_name (KTR := KT1) with "Hnb") as (nf0) "Hnb".
     iEval (rewrite cr_split14) in "Hnb".
     iDestruct "Hnb" as "[Hnb14 Hnb2]".
     (* ---- the ledger: two slots out for nameiparent ---- *)

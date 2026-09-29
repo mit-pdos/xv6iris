@@ -137,10 +137,10 @@ Section mergeN.
     (forall w, w ∈ sel -> f w = g w) -> mergeN f sel = mergeN g sel.
   Proof using.
     revert f g. induction sel as [| w s IH]; intros f g Hfg; [reflexivity |].
-    cbn [mergeN]. rewrite (Hfg w (elem_of_list_here w s)).
+    cbn [mergeN]. rewrite (Hfg w (list_elem_of_here w s)).
     destruct (g w) as [| b r]; [reflexivity |].
     f_equal. apply IH. intros w' Hw'. unfold supd. case_decide; [reflexivity |].
-    apply Hfg. by apply elem_of_list_further.
+    apply Hfg. by apply list_elem_of_further.
   Qed.
 
   Lemma sel_wfN_cons_inv src w s :
@@ -219,11 +219,11 @@ Section mergeN.
     (forall w, w ∈ sel -> Forall P (src w)) -> Forall P (mergeN src sel).
   Proof using.
     revert src. induction sel as [| w s IH]; intros src HP; [constructor |].
-    cbn [mergeN]. pose proof (HP w (elem_of_list_here w s)) as Hw.
+    cbn [mergeN]. pose proof (HP w (list_elem_of_here w s)) as Hw.
     destruct (src w) as [| b r] eqn:Hs; [constructor |].
     apply Forall_cons_1 in Hw as [Hb Hr]. constructor; [exact Hb |].
     apply IH. intros w' Hw'. unfold supd. case_decide; [exact Hr |].
-    apply HP. by apply elem_of_list_further.
+    apply HP. by apply list_elem_of_further.
   Qed.
 
   (* ===================================================================== *)
@@ -236,7 +236,7 @@ Section mergeN.
   Proof using.
     intros Hnd Hi. apply list_eq. intros j.
     rewrite list_lookup_fmap. destruct (decide (j = i)) as [-> | Hne].
-    - rewrite list_lookup_insert by (rewrite length_fmap; exact (lookup_lt_Some _ _ _ Hi)).
+    - rewrite list_lookup_insert_eq by (rewrite length_fmap; exact (lookup_lt_Some _ _ _ Hi)).
       rewrite Hi. cbn. unfold supd. rewrite decide_True by reflexivity. reflexivity.
     - rewrite list_lookup_insert_ne by congruence. rewrite list_lookup_fmap.
       destruct (ws !! j) as [w' |] eqn:Hj; [| reflexivity]. cbn. unfold supd.
@@ -254,14 +254,14 @@ Section mergeN.
     - cbn [mergeN]. apply ma_done. apply Forall_fmap. apply Forall_forall.
       intros w Hw. specialize (Hcnt w Hw). cbn [cntN] in Hcnt. cbn.
       by apply nil_length_inv.
-    - assert (Hw : w ∈ ws) by (apply Hin; apply elem_of_list_here).
+    - assert (Hw : w ∈ ws) by (apply Hin; apply list_elem_of_here).
       pose proof (Hcnt w Hw) as Hcw. cbn [cntN] in Hcw.
       rewrite decide_True in Hcw by reflexivity.
       destruct (src w) as [| b r] eqn:Hs; [cbn [length] in Hcw; lia |].
-      destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+      destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
       assert (Hm : merge_all (supd src w r <$> ws) (mergeN (supd src w r) s)).
       { apply IH.
-        - intros w' Hw'. apply Hin. by apply elem_of_list_further.
+        - intros w' Hw'. apply Hin. by apply list_elem_of_further.
         - intros w' Hw'. specialize (Hcnt w' Hw'). cbn [cntN] in Hcnt. unfold supd.
           destruct (decide (w' = w)) as [-> | Hne].
           + rewrite decide_True in Hcnt by reflexivity. rewrite Hs in Hcnt.
@@ -289,9 +289,9 @@ Section mergeN.
     - apply NoDup_cons in Hnd as [Hx Hnd].
       rewrite fmap_cons. cbn [concat]. rewrite cntN_app, cntN_replicate, (IH Hnd).
       destruct (decide (x = w)) as [-> | Hne].
-      + rewrite decide_False by exact Hx. rewrite decide_True by apply elem_of_list_here. lia.
+      + rewrite decide_False by exact Hx. rewrite decide_True by apply list_elem_of_here. lia.
       + destruct (decide (w ∈ ws)) as [Hw | Hw].
-        * rewrite decide_True by (by apply elem_of_list_further). lia.
+        * rewrite decide_True by (by apply list_elem_of_further). lia.
         * rewrite decide_False; [lia |]. rewrite elem_of_cons. intros [-> | H]; [congruence | done].
   Qed.
 
@@ -306,9 +306,9 @@ Section mergeN.
     (forall x, x ∈ sel -> x ∈ ws) -> w ∈ padN ws src sel -> w ∈ ws.
   Proof using.
     intros Hin Hw. unfold padN in Hw. apply elem_of_app in Hw as [Hw | Hw]; [by apply Hin |].
-    apply elem_of_list_In in Hw. apply in_concat in Hw as (l & Hl & Hwl).
-    apply elem_of_list_In in Hl. apply elem_of_list_In in Hwl.
-    apply elem_of_list_fmap in Hl as (x & -> & Hx).
+    apply list_elem_of_In in Hw. apply in_concat in Hw as (l & Hl & Hwl).
+    apply list_elem_of_In in Hl. apply list_elem_of_In in Hwl.
+    apply list_elem_of_fmap in Hl as (x & -> & Hx).
     apply elem_of_replicate in Hwl as [-> _]. exact Hx.
   Qed.
 
@@ -428,7 +428,7 @@ Section mergeN.
     intros Hnd Hin Hall (src & Hr & Hag). exists src. split; [exact Hr |].
     assert (Hmap : src <$> ws = srcN md <$> ws).
     { apply list_fmap_ext. intros i w Hi.
-      destruct (Hall w (elem_of_list_lookup_2 _ _ _ Hi)) as (s & Hs & _).
+      destruct (Hall w (list_elem_of_lookup_2 _ _ _ Hi)) as (s & Hs & _).
       unfold srcN. rewrite Hs. cbn. exact (Hag w s Hs). }
     rewrite Hmap. unfold pendN. apply mergeN_merge_all; [exact Hnd | exact Hin |].
     intros w Hw. destruct (Hall w Hw) as (s & Hs & Hc). unfold srcN. rewrite Hs. exact Hc.
@@ -470,7 +470,7 @@ Section mergeN.
     sel_firedN md sel -> is_Some (md w) -> sel_firedN md (sel ++ [w]).
   Proof using.
     intros Hf Hw w' Hw'. apply elem_of_app in Hw' as [Hw' | Hw']; [exact (Hf w' Hw') |].
-    apply elem_of_list_singleton in Hw' as ->. exact Hw.
+    apply list_elem_of_singleton in Hw' as ->. exact Hw.
   Qed.
 
   (* THE BYTE STEP, at the fired sources *)
@@ -517,7 +517,7 @@ Lemma wids_from_in k n w :
   match w with WSh j | WLeft j => k <= j | WLast => True end.
 Proof using.
   revert k. induction n as [| n IH]; intros k Hw; cbn [wids_from] in Hw.
-  - apply elem_of_list_singleton in Hw as ->. exact I.
+  - apply list_elem_of_singleton in Hw as ->. exact I.
   - apply elem_of_cons in Hw as [-> | Hw]; [lia |].
     apply elem_of_cons in Hw as [-> | Hw]; [lia |].
     specialize (IH (S k) Hw). destruct w; lia || exact I.
@@ -783,7 +783,7 @@ Section mergeN_term.
   Proof using.
     intros Hw. apply list_fmap_ext. intros i x Hx. unfold supd.
     rewrite decide_False; [reflexivity |]. intros ->. apply Hw.
-    exact (elem_of_list_lookup_2 _ _ _ Hx).
+    exact (list_elem_of_lookup_2 _ _ _ Hx).
   Qed.
 
   Lemma insert_last {A} (l : list A) (y x : A) : <[length l := x]> (l ++ [y]) = l ++ [x].
@@ -805,13 +805,13 @@ Section mergeN_term.
     - destruct (sel_wfN_cons_inv src w s Hwf) as (y & r & Hs & Hwf').
       cbn [mergeN]. rewrite Hs. cbn [ptermb]. rewrite !orb_true_iff.
       assert (HIN : forall x, x ∈ s -> x = T \/ x = S \/ x ∈ Wd)
-        by (intros x Hx; apply Hin; by apply elem_of_list_further).
+        by (intros x Hx; apply Hin; by apply list_elem_of_further).
       (* the step's reading of the split before the rest *)
       assert (Hpo1 : forall s1 s2, s = s1 ++ T :: s2 ->
                        length fr <= cntN (w :: s1) T ->
                        forall x, x ∈ Wd -> cntN (w :: s1) x = length (src x)).
       { intros s1 s2 Heq. apply (Hpo (w :: s1) s2). rewrite Heq. reflexivity. }
-      destruct (Hin w (elem_of_list_here w s)) as [-> | [-> | Hw]].
+      destruct (Hin w (list_elem_of_here w s)) as [-> | [-> | Hw]].
       + (* THE TERMINAL WRITER: its fork line, or the prompt *)
         rewrite HsT in Hs.
         assert (HmS : supd src T r S = src S)
@@ -825,7 +825,7 @@ Section mergeN_term.
         * (* the prompt: every waited writer is done *)
           cbn [app] in Hs. subst pr. left. right. apply andb_true_iff. split.
           -- apply forallb_nil_iff. apply Forall_app. split; [| by apply Forall_singleton].
-             apply Forall_forall. intros z Hz. apply elem_of_list_fmap in Hz as (x & -> & Hx).
+             apply Forall_forall. intros z Hz. apply list_elem_of_fmap in Hz as (x & -> & Hx).
              pose proof (Hpo [] s eq_refl ltac:(cbn [length]; lia) x Hx) as Hc.
              cbn [cntN] in Hc. symmetry in Hc. by apply nil_length_inv.
           -- change (bool_decide (y = y) && ptermb ((src <$> Wd) ++ [[]]) r
@@ -853,7 +853,7 @@ Section mergeN_term.
           rewrite HmS, HmW in Hrec.
           left. left. apply existsb_exists.
           exists ((src <$> Wd) ++ [fr']). split; [| exact Hrec].
-          apply elem_of_list_In, picks_spec. exists (length (src <$> Wd)), fr'.
+          apply list_elem_of_In, picks_spec. exists (length (src <$> Wd)), fr'.
           split; [apply list_lookup_middle; reflexivity |].
           symmetry. apply insert_last.
       + (* THE STRAY *)
@@ -878,7 +878,7 @@ Section mergeN_term.
       + (* A WAITED WRITER *)
         assert (HwT : w <> T) by (intros ->; exact (HT Hw)).
         assert (HwS : w <> S) by (intros ->; exact (HS Hw)).
-        destruct (elem_of_list_lookup_1 Wd w Hw) as (i & Hi).
+        destruct (list_elem_of_lookup_1 Wd w Hw) as (i & Hi).
         assert (Hlen : i < length (src <$> Wd))
           by (rewrite length_fmap; exact (lookup_lt_Some _ _ _ Hi)).
         assert (HmS : supd src w r S = src S)
@@ -898,7 +898,7 @@ Section mergeN_term.
         rewrite HmS in Hrec.
         left. left. apply existsb_exists.
         exists ((supd src w r <$> Wd) ++ [fr]). split; [| exact Hrec].
-        apply elem_of_list_In, picks_spec. exists i, r. split.
+        apply list_elem_of_In, picks_spec. exists i, r. split.
         * rewrite lookup_app_l; [| exact Hlen]. rewrite list_lookup_fmap, Hi. cbn.
           rewrite Hs. reflexivity.
         * rewrite insert_app_l; [| exact Hlen]. f_equal. symmetry.
@@ -931,7 +931,7 @@ Definition waitedN (k : nat) : list wid := WLeft <$> seq 0 k.
 
 Lemma waitedN_elem k w : w ∈ waitedN k <-> exists j, w = WLeft j /\ j < k.
 Proof using.
-  unfold waitedN. rewrite elem_of_list_fmap. split.
+  unfold waitedN. rewrite list_elem_of_fmap. split.
   - intros (j & -> & Hj). apply elem_of_seq in Hj. exists j. split; [reflexivity | lia].
   - intros (j & -> & Hj). exists j. split; [reflexivity |]. apply elem_of_seq. lia.
 Qed.
@@ -1046,7 +1046,7 @@ Proof using.
     - rewrite (cntN_nil_notin sel w Hw). lia. }
   assert (Hpo' : prompt_ok_src (waitedN k) (WSh k) dg_fork_b src sel).
   { intros s1 s2 Hsel Hle w Hw. apply waitedN_elem in Hw as (j & -> & Hj).
-    assert (HTin : WSh k ∈ sel) by (rewrite Hsel; apply elem_of_app; right; apply elem_of_list_here).
+    assert (HTin : WSh k ∈ sel) by (rewrite Hsel; apply elem_of_app; right; apply list_elem_of_here).
     assert (HmT : md (WSh k) = Some alt_forkc).
     { destruct (Hfd _ HTin) as [s Hs]. rewrite Hs. f_equal.
       rewrite <- (Hag _ s (or_introl HTin) Hs). exact (proj1 (proj2 Htm)). }
@@ -1104,7 +1104,7 @@ Proof using.
   intros Hw Hws Hpo s1 s2 k Hsel HmT Hle j Hj.
   (* the terminal writer at a split has written: it is not the one firing *)
   assert (HkW : WSh k <> w).
-  { intros <-. apply Hws. rewrite Hsel. apply elem_of_app. right. apply elem_of_list_here. }
+  { intros <-. apply Hws. rewrite Hsel. apply elem_of_app. right. apply list_elem_of_here. }
   assert (HmT' : md (WSh k) = Some alt_forkc).
   { unfold mdupd in HmT. rewrite decide_False in HmT; [exact HmT | exact HkW]. }
   destruct (Hpo s1 s2 k Hsel HmT' Hle j Hj) as (s' & Hs' & Hc).

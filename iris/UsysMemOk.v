@@ -1351,7 +1351,7 @@ Lemma bump_tf_epc (tf : list (mword 64)) (r : mword 64) :
 Proof.
   intros Hl. unfold bump_tf.
   rewrite list_lookup_total_insert_ne; [ | unfold tf_arg_idx, tf_epc_idx; lia ].
-  apply list_lookup_total_insert. exact Hl.
+  apply list_lookup_total_insert_eq. exact Hl.
 Qed.
 
 Lemma bump_tf_a0 (tf : list (mword 64)) (r : mword 64) :
@@ -1359,7 +1359,7 @@ Lemma bump_tf_a0 (tf : list (mword 64)) (r : mword 64) :
   bump_tf tf r !!! tf_arg_idx 0 = r.
 Proof.
   intros Hl. unfold bump_tf.
-  apply list_lookup_total_insert. rewrite length_insert. exact Hl.
+  apply list_lookup_total_insert_eq. rewrite length_insert. exact Hl.
 Qed.
 
 Lemma bump_tf_other (tf : list (mword 64)) (r : mword 64) (i : nat) :

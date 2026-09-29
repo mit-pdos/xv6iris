@@ -531,7 +531,7 @@ Section VdrwbDefs.
      disk_stage γ None ∗
      (* the CLAIM MAP's authority: the publisher inserts its row under the
         lock, the woken publisher deletes it under the lock *)
-     ghost_map_auth (dn_claim γ) 1 cm ∗
+     ghost_map_auth_frac (dn_claim γ) 1 cm ∗
      (* the claim ROWS (DiskInv.claim_cells, the row design) *)
      ([∗ map] p ↦ dc ∈ cm, claim_cells γ nr p dc) ∗
      d_used_idx ↦₂ wrap16 nr ∗
@@ -562,7 +562,7 @@ Section VdrwbDefs.
      disk_stage γ None ∗
      (* the CLAIM MAP's authority: the publisher inserts its row under the
         lock, the woken publisher deletes it under the lock *)
-     ghost_map_auth (dn_claim γ) 1 cm ∗
+     ghost_map_auth_frac (dn_claim γ) 1 cm ∗
      (* the claim ROWS (DiskInv.claim_cells, the row design) *)
      ([∗ map] p ↦ dc ∈ delete q cm, claim_cells γ nr p dc) ∗
      d_used_idx ↦₂ wrap16 nr ∗

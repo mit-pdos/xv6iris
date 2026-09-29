@@ -55,7 +55,7 @@ Lemma ushs_sym_val (b : bv 8) :
 Proof.
   intro E. unfold ushp_is_sym in E. apply bool_decide_eq_true in E.
   unfold ushp_sym_bytes in E. cbn [fmap list_fmap] in E.
-  apply elem_of_list_lookup_1 in E as [ i Hi ].
+  apply list_elem_of_lookup_1 in E as [ i Hi ].
   destruct i as [| [| [| [| [| [| [| i ]]]]]]]; cbn in Hi;
     try discriminate Hi;
     (injection Hi as Hb; rewrite <- Hb; vm_compute; tauto).
@@ -68,7 +68,7 @@ Lemma ushs_ws_val (b : bv 8) :
 Proof.
   intro E. unfold ushp_is_ws in E. apply bool_decide_eq_true in E.
   unfold ushp_ws_bytes in E. cbn [fmap list_fmap] in E.
-  apply elem_of_list_lookup_1 in E as [ i Hi ].
+  apply list_elem_of_lookup_1 in E as [ i Hi ].
   destruct i as [| [| [| [| [| i ]]]]]; cbn in Hi;
     try discriminate Hi;
     (injection Hi as Hb; rewrite <- Hb; vm_compute; tauto).
@@ -149,7 +149,7 @@ Proof.
   intros (Hok & Hlen & Hbytes) j Hj.
   assert (Hjl : (j < length (wl_line ws))%nat) by lia.
   assert (Hin : wl_line ws !!! j ∈ wl_line ws)
-    by (apply elem_of_list_lookup_2 with j;
+    by (apply list_elem_of_lookup_2 with j;
         exact (list_lookup_lookup_total_lt (wl_line ws) j Hjl)).
   pose proof (wl_line_byte_val ws (wl_line ws !!! j)
                 (line_ok_wf ws Hok) Hin) as Hv.

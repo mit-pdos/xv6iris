@@ -136,7 +136,7 @@ Section UkShRedirAns.
            arg_path_of M (mword_of_int file : mword 64) pl ⌝ -∗
        ⌜ np_elems pl = [] ⌝ -∗
        ⌜ um_start_of cwdv pl = FsImg.ROOTINO ⌝ -∗
-       ⌜ list_basics.last (path_elems pl) = Some nm ⌝ -∗
+       ⌜ list_basics.list.last (path_elems pl) = Some nm ⌝ -∗
        ⌜ fd_lowest_closed l = Some 1%nat ⌝ -∗
        ([∗ map] ad ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded ad b) -∗
        Dd a -∗

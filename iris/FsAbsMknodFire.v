@@ -14,7 +14,7 @@
    than a proof gap.  The prover's only source of [astate] is the γtop
    authority inside [InodeRegion.ftop_inv].  Borrowing it
    ([FsAbs.ftop_astate_ro] / [ftop_astate_acc]) is fine; GIVING IT BACK is
-   not.  [astate Γ av] is [∃ I, ghost_map_auth (γtop Γ) 1 I ∗
+   not.  [astate Γ av] is [∃ I, ghost_map_auth_frac (γtop Γ) 1 I ∗
    ⌜av = abs_view I⌝], and [abs_view] IS NOT INJECTIVE ([abs_of] forgets
    the record: the block map, the size's slack, every field [inode_local]
    constrains).  So what comes back out of a caller's fupd is an authority
@@ -28,7 +28,7 @@
        map comes back, which is exactly the fact [abs_view] threw away.
 
    So the commits ([FsAbsCreateFire], re-exported below) take the RAW MAP
-   and hand the very same [ghost_map_auth] back.  Everything a client
+   and hand the very same [ghost_map_auth_frac] back.  Everything a client
    wants of them is offered at that shape: the trivial-receipt units, and
    the agreement seeds ([_pinned]) the stable corollaries are derived from.
 
@@ -619,7 +619,7 @@ Proof.
   assert (Hne : d <> i) by exact (cre_pre_ne av d nm ents nl i c Hp Hc).
   destruct Hp as (Hd & Hnm & Hi).
   rewrite /delta_create Hd /= (caf_acre_bump_nondir c Hc) Nat.add_0_r.
-  rewrite (insert_commute _ i d); [| congruence].
+  rewrite (insert_insert_ne _ i d); [| congruence].
   by rewrite (insert_id av i (MkAnode c 1%nat) Hi).
 Qed.
 
@@ -767,7 +767,7 @@ Section CreateFire.
     { iNext. rewrite /ftop_body. iExists (<[d := np']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = d)) as [-> | Hne'].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne')].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hfp Hfc HPd". iExists (abs_view I).

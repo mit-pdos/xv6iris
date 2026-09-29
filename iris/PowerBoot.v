@@ -128,7 +128,7 @@ Local Lemma boot_mem_raw_lookup (a : Z) :
 Proof.
   intro Ha. unfold boot_mem_raw.
   apply elem_of_list_to_map; [ exact boot_mem_keys_nodup |].
-  apply elem_of_list_fmap. exists a.
+  apply list_elem_of_fmap. exists a.
   split; [ reflexivity | apply (proj2 (seqZ_ram_range a) Ha) ].
 Qed.
 

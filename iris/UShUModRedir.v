@@ -284,7 +284,7 @@ Section UShUModRedir.
       (cs : list nat) (ls : list fl_line) (sp : dst) (vf : file_era) :
     FileDisc.uname nm ->
     ul I = LEchoF ws nm -> upre_tie cs s0 I (dst_content sp) ->
-    EchoDisc.line_ok ws -> stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws nm) ->
+    EchoDisc.line_ok ws -> stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws nm) ->
     (length ls <= length (fe_base vf) + nlines I)%nat ->
     length cs = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
@@ -479,7 +479,7 @@ Section UShUModRedir.
        input's lines, ending at this round's line ---- *)
     rewrite /FileLinksLine.flw. iDestruct "Hwit" as (vf) "[#Hvf #Hfl]".
     set (ls := (fe_base vf ++ UnionAdm.ulines_in I)%list).
-    assert (Hlst : stdpp.list_basics.last ls = Some (FileDisc.LEchoF ws file)).
+    assert (Hlst : stdpp.list_basics.list.last ls = Some (FileDisc.LEchoF ws file)).
     { rewrite /ls last_app (ulines_in_last I Hpos) Hul. reflexivity. }
     pose proof (fl_redirs_last ls ws file Hlst) as Hin.
     assert (Hnp : (length ls <= length (fe_base vf) + nlines I)%nat).

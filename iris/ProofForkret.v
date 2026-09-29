@@ -1927,7 +1927,7 @@ Proof.
   iEval (rewrite Hp02) in "Hpc".
   (* the frame: three saved words, three scratch slots *)
   iDestruct (stack_own_split_1 (KTR := KT1) ksp 4 6 ltac:(lia) with "Hframe") as "[Hf14 Hf56]".
-  iDestruct (stack_own_4_elim with "Hf14") as (vra vs0 vs1 vsc) "(Hbra & Hbs0 & Hbs1 & Hbsc)".
+  iDestruct (stack_own_4_elim (KTR := KT1) with "Hf14") as (vra vs0 vs1 vsc) "(Hbra & Hbs0 & Hbs1 & Hbsc)".
   assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                    (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
                  = pa_stk ksp 1)

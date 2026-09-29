@@ -81,7 +81,7 @@ Lemma secc_notin_cases (n : Z) :
   n <> 6 /\ n <> 15 /\ n <> 17 /\ n <> 18 /\ n <> 19 /\ n <> 20.
 Proof.
   intros H.
-  split_and!; intros ->; apply H; rewrite elem_of_list_In; cbn; tauto.
+  split_and!; intros ->; apply H; rewrite list_elem_of_In; cbn; tauto.
 Qed.
 
 (* a blocked number IS the unknown-number call *)
@@ -98,7 +98,7 @@ Proof.
   intros Hm. unfold usys_eff.
   destruct (Z.testbit (bv_unsigned m) (usys_num tf)) eqn:Hb.
   - intros Hin. rewrite (Hm _ Hin) in Hb. discriminate Hb.
-  - rewrite elem_of_list_In. cbn. lia.
+  - rewrite list_elem_of_In. cbn. lia.
 Qed.
 
 Lemma uvis_num_masked (W : uvis) :
@@ -704,7 +704,7 @@ Section UexecSecc.
     iPoseProof "Hk" as "[%Hm _]".
     pose proof (uvis_num_masked W Hm) as Hnb.
     assert (Hxb : USYS_exit ∉ secc_B)
-      by (rewrite elem_of_list_In; cbn; unfold USYS_exit; lia).
+      by (rewrite list_elem_of_In; cbn; unfold USYS_exit; lia).
     rewrite /uexec_ret /uexec_ret_F.
     iAssert (uexec_pay_dep (SG := uexecSG_xv6) sc W secc_fam) as "Hpd".
     { iApply (uexec_pay_dep_triv (SG := uexecSG_xv6) sc W secc_fam secc_fam_xpay with "Hpay"). }

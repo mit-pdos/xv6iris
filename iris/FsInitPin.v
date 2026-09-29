@@ -39,7 +39,7 @@
     mint ([FsCfgSnap.fs_cfg_alloc_snap], which
     [BootShared.boot_shared_alloc] runs at EVERY era) reaches
     [FsState.fs_boot_alloc_root_slack] AT [fss_inodes S], so the authority
-    [FsAbs.astate] reads is [ghost_map_auth (γtop Γ) 1 (fss_inodes S)] and
+    [FsAbs.astate] reads is [ghost_map_auth_frac (γtop Γ) 1 (fss_inodes S)] and
     the founded abstract view is [abs_view (fss_inodes S)] on the nose.  A
     fact about [abs_view (fss_inodes S)] for EVERY [S] over [era0_D] is
     therefore a fact about the view the era boots with, with no ghost in it.

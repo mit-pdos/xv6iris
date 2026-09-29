@@ -281,8 +281,8 @@ Section OpenDefs.
       (Φ : aview -> Z -> anode -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (a : anode),
        ⌜arow_at (abs_view I) i a⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Φ (abs_view I) i a)%I.
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Φ (abs_view I) i a)%I.
 
   (* satisfiability: the seal cannot be vacuously blocked on the caller *)
   Lemma aopen_commit_at_unit `{XI : CurCtx} Γ E :
@@ -322,16 +322,16 @@ Section OpenDefs.
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (i : Z) (bs0 : list (bv 8)) (nl : nat),
        ⌜arow_at (abs_view I) i (MkAnode (AFile bs0) nl)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          (* THE CALLER'S STEP (app-instances.md section 7): its claim about
             the pre-view survives the delta, at the RAW insert the mover
             performs ([AppInv.app_step]; the delta is its reading) *)
          app_step i I (delta_trunc i (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_trunc i (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
 
   (* satisfiability, at the live Γ: a write-kind shape owes the caller's
      step, which a client that answers for no abstract state pays out of
@@ -419,13 +419,13 @@ Section OpenDefs.
       (Φ : aview -> Z -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (bs0 : list (bv 8)) (nl : nat),
        ⌜arow_at (abs_view I) i (MkAnode (AFile bs0) nl)⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_trunc i (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_trunc i (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i bs0))%I.
 
   (* the two readings, in both directions: the indexed family at every
      index IS the landed one *)
@@ -563,14 +563,14 @@ Section OpenDefs.
   (* the tie at the ONE-PATH tier: the two pure-and-cursor facts bare *)
   Definition trunc_tie_at (pl : list (bv 8)) (P : nat -> Z -> iProp Σ)
       (d : Z) (nm : fname) : iProp Σ :=
-    (⌜list_basics.last (path_elems pl) = Some nm⌝
+    (⌜list_basics.list.last (path_elems pl) = Some nm⌝
      ∗ P (length (npar_elems pl)) d)%I.
 
   (* ...and at the SYSCALL tier, under the reading of argument 0 *)
   Definition trunc_tie_arg (M : gmap Z (bv 8)) (pv : mword 64)
       (P : nat -> Z -> iProp Σ) (d : Z) (nm : fname) : iProp Σ :=
     ((∀ pl : list (bv 8), ⌜arg_path_of M pv pl⌝ -∗
-        ⌜list_basics.last (path_elems pl) = Some nm⌝)
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝)
      ∗ npar_cur M pv P d)%I.
 
   (* the reading is a function of [(M, pv)], so the two ties are one at

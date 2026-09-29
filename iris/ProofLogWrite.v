@@ -227,8 +227,8 @@ Qed.
 Local Lemma lw_mem_snoc (W : list (mword 32)) (w : mword 32) :
   uint w ∈ map uint (W ++ [w]).
 Proof.
-  apply elem_of_list_fmap. exists w. split; [reflexivity|].
-  apply elem_of_app. right. apply elem_of_list_singleton. reflexivity.
+  apply list_elem_of_fmap. exists w. split; [reflexivity|].
+  apply elem_of_app. right. apply list_elem_of_singleton. reflexivity.
 Qed.
 
 Local Lemma lw_bd_snoc (W : list (mword 32)) (w : mword 32) (x : Z) :
@@ -236,12 +236,12 @@ Local Lemma lw_bd_snoc (W : list (mword 32)) (w : mword 32) (x : Z) :
   bool_decide (x ∈ map uint (W ++ [w])) = bool_decide (x ∈ map uint W).
 Proof.
   intro Hne. apply bool_decide_ext. split.
-  - intro Hin. apply elem_of_list_fmap in Hin as (w2 & -> & Hw).
+  - intro Hin. apply list_elem_of_fmap in Hin as (w2 & -> & Hw).
     apply elem_of_app in Hw as [Hw | Hw].
-    + apply elem_of_list_fmap. exists w2. split; [reflexivity | exact Hw].
-    + apply elem_of_list_singleton in Hw. subst w2. congruence.
-  - intro Hin. apply elem_of_list_fmap in Hin as (w2 & -> & Hw).
-    apply elem_of_list_fmap. exists w2. split; [reflexivity|].
+    + apply list_elem_of_fmap. exists w2. split; [reflexivity | exact Hw].
+    + apply list_elem_of_singleton in Hw. subst w2. congruence.
+  - intro Hin. apply list_elem_of_fmap in Hin as (w2 & -> & Hw).
+    apply list_elem_of_fmap. exists w2. split; [reflexivity|].
     apply elem_of_app. left. exact Hw.
 Qed.
 
@@ -255,7 +255,7 @@ Proof.
   - exact Hnd.
   - constructor; [ intros [] | constructor ].
   - intros x Hx Hy. destruct Hy as [Heqx | []]. subst x.
-    apply Hni. apply elem_of_list_In. exact Hx.
+    apply Hni. apply list_elem_of_In. exact Hx.
 Qed.
 
 (* THE APPEND ARM'S ROW, WITH BLOCK 1 IN IT (durable-disk lane E-blk1).
@@ -275,7 +275,7 @@ Local Lemma lw_wok_snoc (W : list (mword 32)) (w : mword 32)
 Proof.
   intros Hall Hc Hl Hs v Hv. apply elem_of_app in Hv as [Hv | Hv].
   - exact (Hall v Hv).
-  - apply elem_of_list_singleton in Hv. subst v. split_and!; assumption.
+  - apply list_elem_of_singleton in Hv. subst v. split_and!; assumption.
 Qed.
 
 (* uint is injective on [mword 32] -- the scan compares words, the batch's
@@ -283,7 +283,7 @@ Qed.
 Local Lemma lw_uint32 (a : mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -1598,8 +1598,8 @@ Section LogWriteBlocks.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt94) in "Hpc".
       assert (Hmem : uint bno ∈ map uint W).
-      { apply elem_of_list_fmap. exists bno. split; [reflexivity|].
-        apply elem_of_list_lookup. exists i. rewrite Hw Hhit. reflexivity. }
+      { apply list_elem_of_fmap. exists bno. split; [reflexivity|].
+        apply list_elem_of_lookup. exists i. rewrite Hw Hhit. reflexivity. }
       subst w.
       iDestruct "Hcl" as "[HA _]".
       iAssert ((⌜i = nl⌝ -∗ lh_block i ↦₄ bno -∗
@@ -1719,8 +1719,8 @@ Section LogWriteBlocks.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp52) in "Hpc".
         assert (Hnotmem : ~ (uint bno ∈ map uint W)).
-        { intro Hc. apply elem_of_list_fmap in Hc as (w2 & Heq & Hin).
-          apply elem_of_list_lookup in Hin as [j Hj].
+        { intro Hc. apply list_elem_of_fmap in Hc as (w2 & Heq & Hin).
+          apply list_elem_of_lookup in Hin as [j Hj].
           apply (Hprev' j); [| rewrite Hj; f_equal; symmetry; apply lw_uint_inj; exact Heq].
           assert (Hjl : (j < length W)%nat) by (apply lookup_lt_is_Some_1; eauto).
           lia. }
@@ -2073,7 +2073,7 @@ Section ProofLogWrite.
     iDestruct (log_credit_use γ om Ep Xr LB (S u) Sb Ep (uint bno) cr
                  Hlive Hcap Hreg Hsub with "Hoauth Hxa Hop Hcredit") as %HcrLB.
     iAssert (|==> ∃ (om' : gmap nat op_entry),
-               ghost_map_auth (ln_ops γ) 1 om' ∗
+               ghost_map_auth_frac (ln_ops γ) 1 om' ∗
                log_opSe γ (if cr then S u else u) (Sb ∪ {[uint bno]}) Ep ∗
                ⌜size om' = out⌝ ∗
                ⌜forall j e, om' !! j = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
@@ -2116,14 +2116,14 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hbnd i0 (S u, Sb, Ep) Hi0) as Hb. cbn in Hb. lia.
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hbnd j e Hj). }
         iSplitR.
         { iPureIntro. intros _ j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             apply union_least; [exact Hs | apply elem_of_subseteq_singleton, HcrLB].
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
@@ -2131,7 +2131,7 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             exact (union_mono_r _ _ _ Hs).
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
@@ -2139,7 +2139,7 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. reflexivity.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. reflexivity.
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hlive j e Hj). }
         iSplitR; [iPureIntro; rewrite Habs; exact Hsum|].
@@ -2168,14 +2168,14 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hbnd i0 (S u, Sb, Ep) Hi0) as Hb. cbn in Hb. lia.
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hbnd j e Hj). }
         iSplitR.
         { iPureIntro. intros HinLB j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             apply union_least; [exact Hs | apply elem_of_subseteq_singleton, HinLB].
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
@@ -2183,7 +2183,7 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. cbn.
             pose proof (Hsub i0 (S u, Sb, Ep) Hi0) as Hs. cbn in Hs.
             exact (union_mono_r _ _ _ Hs).
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
@@ -2193,7 +2193,7 @@ Section ProofLogWrite.
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
-          - rewrite lookup_insert in Hj. injection Hj as <-. reflexivity.
+          - rewrite lookup_insert_eq in Hj. injection Hj as <-. reflexivity.
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hlive j e Hj). }
         iSplitR; [iPureIntro; rewrite Hspend; unfold LOGBLOCKS in *; lia|].

@@ -102,7 +102,7 @@ Proof.
   intros Hin. apply negb_true_iff in Hx.
   assert (Hex : List.existsb (Z.eqb x) l = true).
   { apply List.existsb_exists. exists x.
-    split; [by apply elem_of_list_In | apply Z.eqb_refl]. }
+    split; [by apply list_elem_of_In | apply Z.eqb_refl]. }
   rewrite Hex in Hx. discriminate.
 Qed.
 
@@ -214,7 +214,7 @@ Lemma img_root_range (s : fname) (j : Z) :
 Proof.
   intros Hs.
   assert (Hin : In (s, j) (map_to_list img_root_ents)).
-  { rewrite <- elem_of_list_In. by apply elem_of_map_to_list. }
+  { rewrite <- list_elem_of_In. by apply elem_of_map_to_list. }
   pose proof img_root_range_ok as H. rewrite /img_root_range_b in H.
   rewrite List.forallb_forall in H.
   specialize (H (s, j) Hin). cbn in H.
@@ -241,8 +241,8 @@ Proof.
   assert (Hnd : base.NoDup ((map_to_list (hide_dots img_root_ents)).*2))
     by (apply zs_nodup_spec; exact img_root_inj_ok).
   apply elem_of_map_to_list in H1. apply elem_of_map_to_list in H2.
-  apply elem_of_list_lookup_1 in H1 as [i1 Hi1].
-  apply elem_of_list_lookup_1 in H2 as [i2 Hi2].
+  apply list_elem_of_lookup_1 in H1 as [i1 Hi1].
+  apply list_elem_of_lookup_1 in H2 as [i2 Hi2].
   (* [reflexivity], not [//]: [done]'s assumption pass unified the goal
      with [Hf1] by normalising [img_root_ents] (3.8 s) *)
   assert (Hf1 : (map_to_list (hide_dots img_root_ents)).*2 !! i1 = Some j)

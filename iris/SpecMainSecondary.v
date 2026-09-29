@@ -219,7 +219,7 @@ Section SpecMainSecondaryBody.
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
        own [intr_res] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
        acquire wants them hart-generically. *)

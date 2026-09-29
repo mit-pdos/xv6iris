@@ -122,7 +122,7 @@ Section IcacheCover.
 
   (* a window pin is a share of an open transaction: none at quiescence *)
   Lemma ic_pin_tx_quiet k :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗ ic_pin_tx k -∗ False.
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗ ic_pin_tx k -∗ False.
   Proof using .
     iIntros "Hauth Hpin". rewrite /ic_pin_tx. iDestruct "Hpin" as (t q) "[_ Htx]".
     iApply (TxPin.tx_pin_no_ops with "Hauth Htx").
@@ -130,7 +130,7 @@ Section IcacheCover.
 
   (* THE VIEWER CLAUSE (law 9), over every state the rows admit *)
   Lemma ic_arm_cover_side (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (logstart : Z) (E : coPset) (k : nat) (dev inum : mword 32) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ic_id cn k (1/4) true dev inum -∗
     ic_arm_cover cn γfs γi cov logstart E k -∗
     ic_cover_read γfs γi inum.
@@ -235,9 +235,9 @@ Section IcacheCover.
 
   (* THE COVERAGE LEMMA (main's statement): it moves no resource *)
   Lemma ic_escrow_body_cover cn γfs γi cov logstart k :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ic_escrow_body cn γfs γi cov logstart k -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
+    ghost_map_auth_frac (ln_tx icfg_log) 1 (∅ : gmap nat unit)
     ∗ ic_slot_cover cn γfs γi cov logstart k.
   Proof using .
     iIntros "Hauth Hbody".

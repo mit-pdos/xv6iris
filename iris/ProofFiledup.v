@@ -381,7 +381,7 @@ Section ProofFiledup.
     { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields". }
     iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> Mg) with "[%] [Hcell Hrest Hfd]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | congruence]. }
-    { rewrite /fslot lookup_insert. iFrame "Hcell Hrest Hfd". iPureIntro. exact Hno. }
+    { rewrite /fslot lookup_insert_eq. iFrame "Hcell Hrest Hfd". iPureIntro. exact Hno. }
     iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
     { iExists (<[k := (qt, Pos.succ cnt)]> Mg). iFrame "Hauth Hfdauth Hslots".
       iPureIntro. intros j Hj.

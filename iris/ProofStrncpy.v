@@ -129,7 +129,7 @@ Section MachineProof.
     assert (Hsub : Z.of_nat (r - 1) = (Z.of_nat r - 1)%Z) by lia.
     apply bv_eq.
     cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-         to_word get_word MachineWord.MachineWord.sign_extend].
+         MachineWord.MachineWord.sign_extend].
     rewrite bv_sign_extend_unsigned. change (MachineWord.MachineWord.Z_idx 64) with 64%N.
     unfold bv_signed. rewrite subrange_31_0_unsigned add_vec64_unsigned moi64_unsigned.
     assert (Hm1 : bv_unsigned (sign_extend' 64 (mword_of_int 4095 : mword 12) : mword 64)
@@ -263,7 +263,7 @@ Section MachineProof.
     assert (Hpop : T2 !!! Regidx csp_rs1 = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv; exact HT2sp).
-    iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.strncpy + 0x42))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
@@ -443,7 +443,7 @@ Qed.
     assert (Hp32 : add_vec_int (mword_of_int (KernelSyms.strncpy + 0x30) : mword 64) 2
                    = mword_of_int (KernelSyms.strncpy + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp32) in "Hpc".
-    iDestruct (bb_byte_acc s n k h (DfracOwn 1) Hklt with "Hdst") as "[Hdb Hdback]".
+    iDestruct (bb_byte_acc (KTR := KT1) s n k h (DfracOwn 1) Hklt with "Hdst") as "[Hdb Hdback]".
     iDestruct (sie_cap_gpr_x0 P1 (K - 2)%nat b p Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
     iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x32)) Rz Ra4
@@ -682,7 +682,7 @@ Qed.
       assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.strncpy + 0x18) : mword 64) 2
                      = mword_of_int (KernelSyms.strncpy + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1a) in "Hpc".
-      iDestruct (bb_byte_acc t n d f dq Hdlt with "Hsrc") as "[Hsb Hsback]".
+      iDestruct (bb_byte_acc (KTR := KT1) t n d f dq Hdlt with "Hsrc") as "[Hsb Hsback]".
       iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.strncpy + 0x1a)) Ra4 Ra1
                 (mword_of_int 0 : mword 12) C3 (K - 2)%nat (f d : mword 8) b (dqm:=dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -705,7 +705,7 @@ Qed.
       assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.strncpy + 0x1a) : mword 64) 4
                      = mword_of_int (KernelSyms.strncpy + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1e) in "Hpc".
-      iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
+      iDestruct (bb_byte_acc (KTR := KT1) s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
       iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x1e)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) C4 (K - 2)%nat (h d) b
                 with "Hcg Hpc [] [Hdb]").
@@ -1010,7 +1010,7 @@ Qed.
                      mword_of_int (KernelSyms.strncpy + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (u1 u2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (u1 u2) "[Hb1 Hb2]".
     assert (Hpa1 : add_vec (R1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 1).

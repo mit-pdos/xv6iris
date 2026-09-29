@@ -104,7 +104,7 @@ Lemma not_in_of_forallb (P : fname -> Prop) (p : fname -> bool) (l : list fname)
   forallb (fun N => negb (p N)) l = true ->
   forall N, P N -> N ∉ l.
 Proof using.
-  intros Hp Hl N HN Hin. apply elem_of_list_In in Hin.
+  intros Hp Hl N HN Hin. apply list_elem_of_In in Hin.
   rewrite List.forallb_forall in Hl. specialize (Hl N Hin).
   rewrite (Hp N HN) in Hl. discriminate.
 Qed.
@@ -118,7 +118,7 @@ Lemma map_Forall_of_forallb (P : fname -> Prop) (p : fname -> bool)
 Proof using.
   intros Hp Hl nm z Hnm HP.
   assert (Hin : In (nm, z) (map_to_list m))
-    by (apply elem_of_list_In; by apply elem_of_map_to_list).
+    by (apply list_elem_of_In; by apply elem_of_map_to_list).
   rewrite List.forallb_forall in Hl. specialize (Hl _ Hin). cbn in Hl.
   rewrite (Hp nm HP) in Hl. discriminate.
 Qed.

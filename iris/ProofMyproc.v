@@ -109,8 +109,7 @@ Proof.
   fold a5. fold store. rewrite Hstore.
   apply bv_eq.
   assert (avu : forall x y : mword 32, bv_unsigned (add_vec x y) = bv_wrap 32 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
     rewrite bv_add_unsigned. reflexivity. }
   rewrite !avu.
   change (bv_unsigned (mword_of_int 1 : mword 32)) with 1.

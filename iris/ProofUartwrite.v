@@ -214,11 +214,11 @@ Lemma uw_sub8_zext (b : mword 8) :
      (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = b.
 Proof.
   apply bv_eq. rewrite autocast_id.
-  unfold subrange_vec_dec, to_word_idx, to_word, get_word,
+  unfold subrange_vec_dec, to_word_idx,
          MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned; [| first [ done | vm_compute; discriminate | lia ] ].
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.

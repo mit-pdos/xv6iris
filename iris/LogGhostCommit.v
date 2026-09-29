@@ -70,11 +70,11 @@ Section LogGhostCommit.
   Lemma log_state_quiet_acc (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (ls : Z) :
     log_state bn γfs cov ls 0 ∅ ∅ -∗
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
     ∃ (L : gmap Z (list (bv 8))) (M : log_mirror),
       log_quiet γ γfs cov ls L M ∗
       (log_quiet γ γfs cov ls L M -∗
-       ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ∗
+       ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) ∗
        log_state bn γfs cov ls 0 ∅ ∅).
   Proof using .
     iIntros "Hbatch Htx". rewrite /log_state.

@@ -166,7 +166,7 @@ Local Lemma fsi_take_total (l : list (bv 8)) (n k : nat) :
   (k < n)%nat -> take n l !!! k = l !!! k.
 Proof.
   intros Hk. rewrite !list_lookup_total_alt.
-  rewrite lookup_take; [reflexivity | exact Hk].
+  rewrite lookup_take_lt; [reflexivity | exact Hk].
 Qed.
 
 (* [neq_vec] on a value against itself -- the +0x40 refutation's last step *)
@@ -433,7 +433,7 @@ Section FsinitEpilogue.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HP4sp).
-    iDestruct (stack_own_4_intro (m !!! Regidx csp_rs1 : mword 64)
+    iDestruct (stack_own_4_intro (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64)
                  (m !!! Regidx Rra : mword 64) (m !!! Regidx Rs0 : mword 64)
                  (m !!! Regidx Rs1 : mword 64) (m !!! Regidx Rs2 : mword 64)
                  with "Hf1 Hf2 Hf3 Hf4") as "Hstk".

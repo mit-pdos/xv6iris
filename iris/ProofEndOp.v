@@ -68,7 +68,7 @@
    (LOGBLOCKS - 0) + 2 = 32, and (32 - n) - 2 + (2 + n) = 32.
 
    THE RE-ACQUIRE KNOWS committing IS STILL SET without any extra ghost: the
-   committer holds [ghost_map_auth (fs_cache γfs) 1 L] out of the batch, and
+   committer holds [ghost_map_auth_frac (fs_cache γfs) 1 L] out of the batch, and
    log_res's cmt = false arm holds one too -- two authorities at fraction 1
    are contradictory ([ghost_map_auth_valid_2]).
 
@@ -159,7 +159,7 @@ Qed.
 Lemma eo_uint32 (a : mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -372,7 +372,7 @@ Lemma eo_slot_in_region (logstart : Z) (i : nat) :
   (i < LOGBLOCKS)%nat -> log_slot_bno logstart i ∈ log_region_set logstart.
 Proof.
   intro Hi. rewrite /log_region_set. apply elem_of_union_l.
-  apply elem_of_list_to_set. apply elem_of_list_fmap.
+  apply elem_of_list_to_set. apply list_elem_of_fmap.
   exists i. split; [reflexivity|]. apply elem_of_seq. lia.
 Qed.
 
@@ -445,7 +445,7 @@ Proof. intros Hne Hc. apply Hne. rewrite /log_slot_bno in Hc. lia. Qed.
 
 Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
-Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
+Proof. intro H. eapply list_elem_of_lookup_2. exact H. Qed.
 (* the batch's home-blocks row, restated at the DECODED header's spelling --
    what [FsCrash.fs_commit_L_seq_permit]'s home-blocks premise wants *)
 Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
@@ -455,7 +455,7 @@ Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
 Proof.
   intros Hwok b Hb.
   change (map uint W) with (uint <$> W) in Hb.
-  apply elem_of_list_fmap in Hb.
+  apply list_elem_of_fmap in Hb.
   destruct Hb as (w & -> & Hw). destruct (Hwok w Hw) as (Hc & Hl & _).
   split; assumption.
 Qed.
@@ -470,7 +470,7 @@ Lemma eo_hdr_ne_sb (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
 Proof.
   intros Hwok b Hb.
   change (map uint W) with (uint <$> W) in Hb.
-  apply elem_of_list_fmap in Hb.
+  apply list_elem_of_fmap in Hb.
   destruct Hb as (w & -> & Hw). exact (proj2 (proj2 (Hwok w Hw))).
 Qed.
 Lemma eo_t_lt_lb (t n : nat) : (t < n)%nat -> (n <= LOGBLOCKS)%nat -> (t < LOGBLOCKS)%nat.
@@ -817,8 +817,8 @@ Section EndOpDefs.
       (L : gmap Z (list (bv 8))) :
     size T = size om -> om = ∅ ->
     log_ctx γ bn γfs cov logstart dev -∗
-    ghost_map_auth (fs_cache γfs) 1 L -∗
-    ghost_map_auth (ln_tx γ) 1 T -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (ln_tx γ) 1 T -∗
     (* the era's token, checked out of [log_res] with the batch (sync
        K3-3): the law puts it into the pair *)
     riscv_sync_tok gen_id ={⊤}=∗
@@ -828,8 +828,8 @@ Section EndOpDefs.
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
          snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart)) ∗
-      ghost_map_auth (fs_cache γfs) 1 L ∗
-      ghost_map_auth (ln_tx γ) 1 T.
+      ghost_map_auth_frac (fs_cache γfs) 1 L ∗
+      ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
     intros Hsz Hom. iIntros "#Hctx HcL Ht HT".
     iPoseProof (log_ctx_bytes with "Hctx") as "#Hbrow".
@@ -874,8 +874,8 @@ Section EndOpDefs.
      ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) ∗
      ([∗ list] i ∈ seq n (LOGBLOCKS - n),
         ∃ junk : mword 32, lh_block i ↦₄ junk) ∗
-     ghost_map_auth (fs_cache γfs) 1 L ∗
-     ghost_map_auth (fs_dirty γfs) 1 D ∗
+     ghost_map_auth_frac (fs_cache γfs) 1 L ∗
+     ghost_map_auth_frac (fs_dirty γfs) 1 D ∗
      ([∗ set] b ∈ cov,
         b ↪[fs_dirty γfs]{#(1/2)} (bool_decide (b ∈ map uint W))) ∗
      (∃ bsh, fs_chalf γfs (log_hdr_bno logstart) bsh) ∗
@@ -987,13 +987,13 @@ Section EndOpDefs.
     size T = size om -> om = ∅ ->
     log_ctx γ bn γfs cov logstart dev -∗
     eo_open bn γfs cov logstart n W L Db Lw t -∗
-    ghost_map_auth (ln_tx γ) 1 T -∗
+    ghost_map_auth_frac (ln_tx γ) 1 T -∗
     riscv_sync_tok gen_id ={⊤}=∗
       (∃ G : gname -> iProp Σ,
          fs_crash_seam_at G cov logstart ∗
          snap_law_out G (riscv_sync_tok gen_id) gen_id L (fs_home_set cov logstart)) ∗
       eo_open bn γfs cov logstart n W L Db Lw t ∗
-      ghost_map_auth (ln_tx γ) 1 T.
+      ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
     intros Hsz Hom. iIntros "#Hctx Hopen Ht HT".
     rewrite /eo_open.
@@ -1040,7 +1040,7 @@ Section EndOpDefs.
   Lemma eo_pay_bs_auth (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) (L : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
     ⌜L !! uint bno = Some bsl⌝.
   Proof using .
@@ -1065,7 +1065,7 @@ Section EndOpDefs.
     assert (Hnd : base.NoDup (map uint W)) by (apply NoDup_ListNoDup; exact Hnd0).
     assert (Hss : (list_to_set (map uint W) : gset Z) ⊆ cov).
     { intros x Hx. apply elem_of_list_to_set in Hx.
-      apply elem_of_list_fmap in Hx as [w [-> Hw]]. exact (Hsub w Hw). }
+      apply list_elem_of_fmap in Hx as [w [-> Hw]]. exact (Hsub w Hw). }
     assert (Hdisj : (list_to_set (map uint W) : gset Z)
                     ## cov ∖ list_to_set (map uint W)) by set_solver.
     rewrite {1}(union_difference_L (list_to_set (map uint W)) cov Hss).
@@ -1075,8 +1075,8 @@ Section EndOpDefs.
     - rewrite (big_sepS_list_to_set _ (map uint W) Hnd) big_sepL_fmap.
       iApply (big_sepL_mono with "Hin"). intros i w Hw.
       rewrite bool_decide_eq_true_2; [done|].
-      apply elem_of_list_fmap. exists w. split; [reflexivity|].
-      eapply elem_of_list_lookup_2. exact Hw.
+      apply list_elem_of_fmap. exists w. split; [reflexivity|].
+      eapply list_elem_of_lookup_2. exact Hw.
     - iApply (big_sepS_mono with "Hout"). intros x Hx.
       apply elem_of_difference in Hx as [_ Hx].
       rewrite bool_decide_eq_false_2; [done|].
@@ -1096,7 +1096,7 @@ Section EndOpDefs.
     assert (Hnd : base.NoDup (map uint W)) by (apply NoDup_ListNoDup; exact Hnd0).
     assert (Hss : (list_to_set (map uint W) : gset Z) ⊆ cov).
     { intros x Hx. apply elem_of_list_to_set in Hx.
-      apply elem_of_list_fmap in Hx as [w [-> Hw]]. exact (Hsub w Hw). }
+      apply list_elem_of_fmap in Hx as [w [-> Hw]]. exact (Hsub w Hw). }
     assert (Hdisj : (list_to_set (map uint W) : gset Z)
                     ## cov ∖ list_to_set (map uint W)) by set_solver.
     rewrite {2}(union_difference_L (list_to_set (map uint W)) cov Hss).
@@ -2658,7 +2658,7 @@ Section EndOpBlocks.
                    (lm_upd Mc (log_hdr_bno logstart) bs1) n b ltac:(lia)
                    ltac:(intros k u Hk Hu Heq; apply HbW; rewrite -Heq;
                          apply elem_of_list_to_set;
-                         exact (elem_of_list_lookup_2 _ k _
+                         exact (list_elem_of_lookup_2 _ k _
                                   (eo_map_lookup W k u Hu)))).
         exact (lm_upd_view_ne Mc (log_hdr_bno logstart) b bs1 Hbh).
       - (* the logged view, at the entries the batch wrote *)

@@ -115,8 +115,7 @@ Lemma uint_pa_stk (a : mword 64) (k : nat) :
   uint (pa_stk a k) = (uint a - 8 * Z.of_nat k)%Z.
 Proof.
   intro Hle. rewrite !uint_unsigned in Hle |- *.
-  unfold pa_stk, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold pa_stk, add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hj : bv_unsigned (mword_of_int (- (8 * Z.of_nat k)) : mword 64)
@@ -394,7 +393,6 @@ Section stack_own.
     apply (z_stk_bounds (bv_unsigned sp) (bv_unsigned (pa_stk sp 1)));
       [ split; [exact Hlo | exact Hhi] | | exact Hc ].
     unfold pa_stk, add_vec_int, add_vec, Operators_mwords.word_binop,
-      Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
       MachineWord.MachineWord.add.
     rewrite bv_add_unsigned.
     assert (H8 : bv_unsigned (mword_of_int (- (8 * Z.of_nat 1)) : mword 64)
@@ -501,7 +499,6 @@ Proof.
   assert (Hu : uint (add_vec_int sp c) = 0%Z) by (rewrite Heq; apply uint_zero_reg).
   rewrite uint_unsigned in Hu. rewrite uint_unsigned in Hsp.
   unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.add in Hu.
   rewrite bv_add_unsigned in Hu.
   rewrite (moi64_unsigned c) in Hu.

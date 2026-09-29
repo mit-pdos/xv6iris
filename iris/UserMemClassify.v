@@ -226,13 +226,13 @@ Lemma zext5_concat1_3_unsigned (x : mword 1) (y : mword 3) :
 Proof.
   unfold zero_extend', concat_vec.
   cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+       Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (1 + 3)) (1 + 3)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat.
   erewrite bv_zero_extend_unsigned; [| cbn; lia].
   erewrite bv_concat_unsigned; [| cbn; lia].
   change (Z.of_N (MachineWord.MachineWord.Z_idx 3)) with 3.

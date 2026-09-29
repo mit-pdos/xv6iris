@@ -1273,7 +1273,7 @@ Section ProofPushOff.
     iEval (rewrite Hreidx) in "Hcg".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (vr8 vr0) "[Hr8 Hr0]".
+    iDestruct (stack_own_2_elim (KTR := kt) with "Hframe") as (vr8 vr0) "[Hr8 Hr0]".
     assert (Hb1 : pa_stk sp0 1
                    = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))).
     { rewrite /spd. unfold sp0, pa_stk, add_vec_int. rewrite add_vec_off2.

@@ -179,8 +179,7 @@ End gset_tools.
 Lemma vq_add_vec_unsigned (x y : SailStdpp.Values.mword 64) :
   bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, SailStdpp.Values.to_word, SailStdpp.Values.get_word,
+  unfold add_vec, Operators_mwords.word_binop,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
@@ -287,7 +286,7 @@ Lemma foldr_ins_dom_sub {A : Type} (f : A -> Arch.pa) (g : A -> bv 8) (l : list 
   dom (foldr (fun x acc => <[ f x := g x ]> acc) mm l) ⊆ X.
 Proof.
   intros Hm Hl. rewrite (foldr_ins_dom f g l mm). apply union_least; [|exact Hm].
-  intros y Hy. apply elem_of_list_to_set, elem_of_list_fmap in Hy as (x & -> & Hx).
+  intros y Hy. apply elem_of_list_to_set, list_elem_of_fmap in Hy as (x & -> & Hx).
   exact (Hl x Hx).
 Qed.
 
@@ -298,7 +297,7 @@ Lemma write_byte_list_dom_sub (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa)
 Proof.
   intros Hm Hj. unfold write_byte_list.
   apply (foldr_ins_dom_sub (fun jb => pa_add pa (fst jb)) snd); [exact Hm|].
-  intros x Hx. apply elem_of_list_lookup in Hx as (i & Hi).
+  intros x Hx. apply list_elem_of_lookup in Hx as (i & Hi).
   rewrite list_lookup_imap in Hi.
   destruct (bs !! i) as [b|] eqn:Hb; [| discriminate ].
   cbn in Hi. injection Hi as <-. cbn [fst].
@@ -362,7 +361,7 @@ Proof.
   assert (Hm : mapM (fun j : nat => mm !! pa_add pa j) (seq 0 (N.to_nat n)) = Some bs).
   { apply mapM_Some. subst bs. apply Forall2_fmap_r.
     apply Forall_Forall2_diag, Forall_forall. intros j Hj.
-    apply elem_of_list_In, elem_of_seq in Hj. apply Hb. lia. }
+    apply list_elem_of_In, elem_of_seq in Hj. apply Hb. lia. }
   unfold read_bytes. rewrite Hm. f_equal.
   apply bv_eq_of_bytes. intros j Hj.
   assert (Hjl : (j < length bs)%nat) by lia.
@@ -386,14 +385,14 @@ Proof.
   induction l as [|i l IH]; intros Hb Hj Hin.
   { exfalso. exact (not_elem_of_nil j Hin). }
   simpl. destruct (decide (i = j)) as [->|Hne].
-  - apply lookup_insert.
+  - apply lookup_insert_eq.
   - rewrite lookup_insert_ne.
     + apply IH.
-      * intros k Hk. apply Hb, elem_of_list_further, Hk.
+      * intros k Hk. apply Hb, list_elem_of_further, Hk.
       * exact Hj.
       * apply elem_of_cons in Hin as [->|Hin]; [ done | exact Hin ].
     + intro Heq. apply Hne.
-      apply (pa_add_inj pa i j); [ apply Hb, elem_of_list_here | exact Hj | exact Heq ].
+      apply (pa_add_inj pa i j); [ apply Hb, list_elem_of_here | exact Hj | exact Heq ].
 Qed.
 
 Lemma write_bytes_lookup {w : N} (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : N)
@@ -520,7 +519,7 @@ Definition used_page_pas (c : virtio_cfg) : gset Arch.pa :=
 Lemma pa_range_intro (a : Arch.pa) (n j : nat) :
   (j < n)%nat -> pa_add a j ∈ pa_range a n.
 Proof.
-  intro Hj. unfold pa_range. apply elem_of_list_to_set, elem_of_list_fmap.
+  intro Hj. unfold pa_range. apply elem_of_list_to_set, list_elem_of_fmap.
   exists j. split; [reflexivity|]. apply elem_of_seq. lia.
 Qed.
 
@@ -528,7 +527,7 @@ Lemma pa_range_elim (a : Arch.pa) (n : nat) (x : Arch.pa) :
   x ∈ pa_range a n -> exists j, (j < n)%nat /\ x = pa_add a j.
 Proof.
   unfold pa_range. intro Hx.
-  apply elem_of_list_to_set, elem_of_list_fmap in Hx as (j & -> & Hj).
+  apply elem_of_list_to_set, list_elem_of_fmap in Hx as (j & -> & Hj).
   apply elem_of_seq in Hj. exists j. split; [lia|reflexivity].
 Qed.
 
@@ -634,7 +633,7 @@ Lemma write_bytes_lookup_off {w : N} (mm : gmap Arch.pa (bv 8))
 Proof.
   intro Ha. unfold write_bytes. apply write_foldr_lookup_off.
   intros j Hj Heq. apply Ha. subst a.
-  unfold pa_range. apply elem_of_list_to_set, elem_of_list_fmap.
+  unfold pa_range. apply elem_of_list_to_set, list_elem_of_fmap.
   exists j. split; [reflexivity|]. apply elem_of_seq. lia.
 Qed.
 
@@ -1236,7 +1235,7 @@ Proof.
   - rewrite <- list_fmap_compose.
     apply (NoDup_fmap_2_strong (vs_key sl)); [| apply NoDup_seq ].
     intros x y _ _ Hxy. exact (vs_key_inj sl x y Hxy).
-  - apply elem_of_list_fmap. exists i. split; [reflexivity|].
+  - apply list_elem_of_fmap. exists i. split; [reflexivity|].
     apply elem_of_seq. lia.
 Qed.
 
@@ -1346,7 +1345,7 @@ Lemma vs_todo_full (sl : vslot) :
   vs_todo sl (dom (vslot_cache sl)) = set_seq 0 (wr_nsectors (vs_wr sl)).
 Proof.
   apply set_eq. intro x. rewrite vs_todo_elem, elem_of_set_seq.
-  rewrite vslot_cache_dom, elem_of_list_to_set, elem_of_list_fmap.
+  rewrite vslot_cache_dom, elem_of_list_to_set, list_elem_of_fmap.
   split.
   - intros [Hx _]. lia.
   - intros Hx. assert (Hlt : (x < wr_nsectors (vs_wr sl))%nat) by lia.
@@ -1801,7 +1800,7 @@ Proof.
   - intros p pin _ Hp. rewrite lookup_empty in Hp. discriminate.
   - intros i x m r Hi IH p pin Hdisj Hp.
     destruct (decide (p = i)) as [->|Hne].
-    + rewrite lookup_insert in Hp. injection Hp as <-. apply map_union_subseteq_l.
+    + rewrite lookup_insert_eq in Hp. injection Hp as <-. apply map_union_subseteq_l.
     + rewrite lookup_insert_ne in Hp by congruence.
       assert (Hsub : pin ⊆ r).
       { apply (IH p pin); [| exact Hp ].
@@ -1814,7 +1813,7 @@ Proof.
       apply virtio_ctl_union; [| exact Hsub ].
       apply (Hdisj i p x pin).
       * congruence.
-      * apply lookup_insert.
+      * apply lookup_insert_eq.
       * rewrite lookup_insert_ne; [exact Hp|]. congruence.
 Qed.
 
@@ -1832,7 +1831,7 @@ Proof.
     exact (proj1 (elem_of_empty a) Ha).
   - intros i x m r Hi IH a Ha. rewrite dom_union_L in Ha.
     apply elem_of_union in Ha as [Ha|Ha].
-    + exists i, x. split; [apply lookup_insert | exact Ha].
+    + exists i, x. split; [apply lookup_insert_eq | exact Ha].
     + destruct (IH a Ha) as (q & mq & Hq & Hmq). exists q, mq. split; [|exact Hmq].
       rewrite lookup_insert_ne; [exact Hq|].
       intros Hc. rewrite <- Hc, Hi in Hq. discriminate.
@@ -1870,10 +1869,10 @@ Lemma pins_union_delete (pins : gmap nat (gmap Arch.pa (bv 8))) (p : nat)
 Proof.
   intros Hp Hdisj.
   assert (Hpins : <[ p := pin ]> (delete p pins) = pins)
-    by (apply insert_delete; exact Hp).
+    by (apply insert_delete_id; exact Hp).
   transitivity (pins_union (<[ p := pin ]> (delete p pins)));
     [ rewrite Hpins; reflexivity | ].
-  apply pins_union_insert; [ apply lookup_delete | ].
+  apply pins_union_insert; [ apply lookup_delete_eq | ].
   rewrite Hpins. exact Hdisj.
 Qed.
 
@@ -2003,8 +2002,8 @@ Proof.
   intros Hinj Hk. unfold uix_inv.
   assert (Hin : k ∈ List.filter (fun q => bool_decide (m !! q = Some u))
                                 (elements (dom m))).
-  { apply elem_of_list_In, filter_In. split.
-    - apply elem_of_list_In, elem_of_elements, elem_of_dom. by exists u.
+  { apply list_elem_of_In, filter_In. split.
+    - apply list_elem_of_In, elem_of_elements, elem_of_dom. by exists u.
     - by apply bool_decide_eq_true. }
   destruct (head (List.filter (fun q => bool_decide (m !! q = Some u))
                               (elements (dom m)))) as [x|] eqn:Hh; cbn.
@@ -2012,8 +2011,8 @@ Proof.
                                  (elements (dom m))).
     { destruct (List.filter (fun q => bool_decide (m !! q = Some u))
                             (elements (dom m))) as [|y l]; [discriminate|].
-      cbn in Hh. injection Hh as <-. apply elem_of_list_here. }
-    apply elem_of_list_In, filter_In in Hx as [_ Hxb].
+      cbn in Hh. injection Hh as <-. apply list_elem_of_here. }
+    apply list_elem_of_In, filter_In in Hx as [_ Hxb].
     apply bool_decide_eq_true in Hxb. exact (Hinj x k Hxb Hk).
   - exfalso. destruct (List.filter (fun q => bool_decide (m !! q = Some u))
                                    (elements (dom m))) as [|y l];
@@ -2119,7 +2118,7 @@ Proof.
     exact (Hresinj x y ltac:(lia) ltac:(lia) Hxy). }
   assert (Hsub : forall x, x ∈ ((fun j => res (g j)) <$> seq 0 9) ->
                    x ∈ seq 0 8).
-  { intros x Hx. apply elem_of_list_fmap in Hx as (j & -> & Hj).
+  { intros x Hx. apply list_elem_of_fmap in Hx as (j & -> & Hj).
     apply elem_of_seq. apply elem_of_seq in Hj.
     destruct (Hgpin j ltac:(lia)) as (slj & pinj & Hsj & _).
     unfold res. rewrite Hsj.
@@ -2159,7 +2158,7 @@ Proof.
   set (l := h :: (f <$> seq a (b - a))).
   assert (HND : NoDup l).
   { constructor.
-    - rewrite elem_of_list_fmap. intros (q & Heq & Hq).
+    - rewrite list_elem_of_fmap. intros (q & Heq & Hq).
       apply elem_of_seq in Hq. apply (Hne q); [lia | done].
     - apply NoDup_fmap_2_strong; [| apply NoDup_seq].
       intros q1 q2 Hq1 Hq2 Heq. apply elem_of_seq in Hq1, Hq2.
@@ -2168,7 +2167,7 @@ Proof.
   { apply NoDup_submseteq; [exact HND|].
     intros x Hx. apply elem_of_seq.
     apply elem_of_cons in Hx as [-> | Hx']; [lia|].
-    apply elem_of_list_fmap in Hx' as (q & -> & Hq).
+    apply list_elem_of_fmap in Hx' as (q & -> & Hq).
     apply elem_of_seq in Hq. pose proof (Hlt q ltac:(lia)). lia. }
   apply submseteq_length in Hsub.
   unfold l in Hsub. simpl in Hsub. rewrite length_fmap, length_seq in Hsub. lia.
@@ -2619,8 +2618,8 @@ Proof.
   assert (Hslots : vp_slots (vproto_step_state pr p sl) = vp_slots pr).
   { unfold vp_slots, vproto_step_state. cbn [vp_pend vp_done].
     apply map_eq. intro q. destruct (decide (q = p)) as [->|Hne].
-    - rewrite lookup_union_r by apply lookup_delete.
-      rewrite lookup_insert. symmetry. apply lookup_union_Some_l. exact Hsl.
+    - rewrite lookup_union_r by apply lookup_delete_eq.
+      rewrite lookup_insert_eq. symmetry. apply lookup_union_Some_l. exact Hsl.
     - rewrite !lookup_union, lookup_delete_ne by congruence.
       rewrite lookup_insert_ne by congruence. reflexivity. }
   assert (Hpd : p ∈ dom (vp_pend pr))
@@ -2694,7 +2693,7 @@ Proof.
     rewrite dom_insert_L, elem_of_union, elem_of_singleton.
     destruct (decide (k = p)) as [->|Hne].
     + split.
-      * intros _. exists (vp_nc pr). rewrite lookup_insert.
+      * intros _. exists (vp_nc pr). rewrite lookup_insert_eq.
         split; [reflexivity|]. pose proof (vpo_nr_nc _ _ _ Hok). lia.
       * intros _. by left.
     + rewrite lookup_insert_ne by congruence.
@@ -2703,7 +2702,7 @@ Proof.
              | intro Hc; by right ].
   - unfold vproto_step_state. cbn [vp_uix vp_nc]. intros q u Hq.
     destruct (decide (q = p)) as [->|Hne].
-    + rewrite lookup_insert in Hq. injection Hq as <-. lia.
+    + rewrite lookup_insert_eq in Hq. injection Hq as <-. lia.
     + rewrite lookup_insert_ne in Hq by congruence.
       pose proof (vpo_uix_lt _ _ _ Hok q u Hq). lia.
   - unfold vproto_step_state. cbn [vp_uix]. intros q1 q2 u H1 H2.
@@ -2711,10 +2710,10 @@ Proof.
     { intros q u' Hu. pose proof (vpo_uix_lt _ _ _ Hok q u' Hu). lia. }
     destruct (decide (q1 = p)) as [->|H1n]; destruct (decide (q2 = p)) as [->|H2n].
     + reflexivity.
-    + rewrite lookup_insert in H1. injection H1 as <-.
+    + rewrite lookup_insert_eq in H1. injection H1 as <-.
       rewrite lookup_insert_ne in H2 by congruence.
       exfalso. exact (Hfresh q2 _ H2 eq_refl).
-    + rewrite lookup_insert in H2. injection H2 as <-.
+    + rewrite lookup_insert_eq in H2. injection H2 as <-.
       rewrite lookup_insert_ne in H1 by congruence.
       exfalso. exact (Hfresh q1 _ H1 eq_refl).
     + rewrite lookup_insert_ne in H1 by congruence.
@@ -2722,7 +2721,7 @@ Proof.
       exact (vpo_uix_inj _ _ _ Hok q1 q2 u H1 H2).
   - unfold vproto_step_state. cbn [vp_uix vp_nc]. intros u Hu.
     destruct (decide (u = vp_nc pr)) as [->|Hne].
-    + exists p. apply lookup_insert.
+    + exists p. apply lookup_insert_eq.
     + destruct (vpo_uix_surj _ _ _ Hok u ltac:(lia)) as [q Hq].
       exists q. rewrite lookup_insert_ne; [exact Hq|].
       (* [p] had no used index before the step: it was pending *)
@@ -3461,7 +3460,7 @@ Proof.
     rewrite vppq_ring, vppq_lo, vppq_np, vppq_pend.
     intros q slq Hq Hsq.
     destruct (decide (q = vp_np pr)) as [->|Hne].
-    + rewrite lookup_insert in Hsq. injection Hsq as <-. exact Hcell.
+    + rewrite lookup_insert_eq in Hsq. injection Hsq as <-. exact Hcell.
     + rewrite lookup_insert_ne in Hsq by (exact (fun e => Hne (eq_sym e))).
       exact (vpo_ring _ _ _ Hok q slq ltac:(lia) Hsq).
   - rewrite vppq_nc, vppq_srv. exact (vpo_nc _ _ _ Hok).
@@ -3586,7 +3585,7 @@ Proof.
   assert (Hs : vp_slots pr !! p = Some sl).
   { unfold vp_slots. rewrite lookup_union_r by exact Hnpend. exact Hdone. }
   assert (Hdn : delete p (vp_pend pr) = vp_pend pr)
-    by (apply delete_notin; exact Hnpend).
+    by (apply delete_id; exact Hnpend).
   assert (Hslots : vp_slots (vproto_reclaim_state pr p) = delete p (vp_slots pr)).
   { unfold vp_slots, vproto_reclaim_state. cbn [vp_pend vp_done].
     rewrite delete_union, Hdn. reflexivity. }

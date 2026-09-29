@@ -430,13 +430,13 @@ Lemma ushp_ws_mem (j : nat) : (j < 5)%nat -> ushp_ws_f j ∈ ushp_ws_bytes.
 Proof.
   intro Hj. unfold ushp_ws_bytes.
   destruct j as [| [| [| [| [| j ]]]]]; cbn [fmap list_fmap ushp_ws_f];
-    [ apply elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_further, elem_of_list_here
+    [ apply list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_further, list_elem_of_here
     | lia ].
 Qed.
 
@@ -529,19 +529,19 @@ Proof.
   intro Hj. unfold ushp_sym_bytes.
   destruct j as [| [| [| [| [| [| [| j ]]]]]]];
     cbn [fmap list_fmap ushp_sym_f];
-    [ apply elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_here
-    | apply elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_further,
-            elem_of_list_further, elem_of_list_further, elem_of_list_here
+    [ apply list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_here
+    | apply list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_further,
+            list_elem_of_further, list_elem_of_further, list_elem_of_here
     | lia ].
 Qed.
 

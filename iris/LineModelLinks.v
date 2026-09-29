@@ -757,7 +757,7 @@ Section line_model_links.
     lm_body s0 cs I a !! j = lm_abs s0 cs I a !! j.
   Proof using.
     intros Hj. rewrite lm_body_length in Hj. rewrite /lm_body.
-    apply lookup_take. lia.
+    apply lookup_take_lt. lia.
   Qed.
 
   Lemma lm_body_lookup_Some (s0 : lm_st M) (cs : list nat) (I : list (bv 8))

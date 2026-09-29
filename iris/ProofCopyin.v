@@ -1008,7 +1008,7 @@ Section ProofCopyin.
               with (uint va0 + Z.of_nat (off + (j - done)))%Z
               by (rewrite uint_unsigned Nat2Z.inj_add; lia).
             exact (Hpgm (off + (j - done))%nat ltac:(lia)). }
-        iDestruct (bb_join3_fn dst done n (rem - n) len fd
+        iDestruct (bb_join3_fn (KTR := ktb) dst done n (rem - n) len fd
                      (fun j => fpg (off + j)%nat) (fun j => fd (done + (n + j))%nat)
                      fd' Hsplitd
                      ltac:(intros j Hj; exact (Hfdlo j Hj))
@@ -1530,7 +1530,7 @@ Section ProofCopyin.
                    with "Hpt") as %Hwfins.
       assert (Hlins : (uptd_insert Pc (svpn_of va0) r).(ud_um) !! (svpn_of va0)
                       = Some (vmfault_pte r))
-        by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+        by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert_eq).
       iDestruct (proc_ptm_page_bytes (uptd_insert Pc (svpn_of va0) r) (uint szv) M
                    (svpn_of va0) (vmfault_pte r) Hlins with "Hpt") as %Hbytes.
       assert (Hpgm : forall j, (j < 4096)%nat ->

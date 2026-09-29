@@ -73,7 +73,7 @@ Section AppDurRaw.
   Definition app_dur_raw {N : Type} (A : N -> aview -> iProp Σ)
       (Okc : N -> Prop) (gt : gname) : iProp Σ :=
     (∃ (r : N) (I : gmap Z fs_node),
-       ⌜Okc r⌝ ∗ ghost_map_auth gt (1/2) I ∗ A r (abs_view I))%I.
+       ⌜Okc r⌝ ∗ ghost_map_auth_frac gt (1/2) I ∗ A r (abs_view I))%I.
 
   (* OPENING A LATER-SHAPED GUEST: the half and the record's predicate are
      timeless and come out; the claim stays under its later.  [N] need not
@@ -83,7 +83,7 @@ Section AppDurRaw.
       (gt : gname) :
     ▷ app_dur_raw A Okc gt -∗
       ◇ ∃ (r : N) (I : gmap Z fs_node),
-          ⌜Okc r⌝ ∗ ghost_map_auth gt (1/2) I ∗ ▷ A r (abs_view I).
+          ⌜Okc r⌝ ∗ ghost_map_auth_frac gt (1/2) I ∗ ▷ A r (abs_view I).
   Proof using .
     iIntros "H". rewrite /app_dur_raw.
     iPoseProof (bi.later_exist_except_0 with "H") as "H".
@@ -96,7 +96,7 @@ Section AppDurRaw.
      later the transport left on the claim, at a record satisfying [Okc] *)
   Lemma app_dur_raw_pack {N} (A : N -> aview -> iProp Σ) (Okc : N -> Prop)
       (gt : gname) (I : gmap Z fs_node) :
-    ghost_map_auth gt (1/2) I -∗
+    ghost_map_auth_frac gt (1/2) I -∗
     (∃ r : N, ⌜Okc r⌝ ∗ ▷ A r (abs_view I)) -∗
     ▷ app_dur_raw A Okc gt.
   Proof using .
@@ -109,9 +109,9 @@ Section AppDurRaw.
      later, with its record's predicate; both fractions come back *)
   Lemma app_dur_raw_agree {N} (A : N -> aview -> iProp Σ) (Okc : N -> Prop)
       (gt : gname) (q : Qp) (I : gmap Z fs_node) :
-    ghost_map_auth gt q I -∗
+    ghost_map_auth_frac gt q I -∗
     ▷ app_dur_raw A Okc gt -∗
-      ◇ (ghost_map_auth gt q I ∗ ghost_map_auth gt (1/2) I ∗
+      ◇ (ghost_map_auth_frac gt q I ∗ ghost_map_auth_frac gt (1/2) I ∗
          ∃ r : N, ⌜Okc r⌝ ∗ ▷ A r (abs_view I)).
   Proof using .
     iIntros "Hk Hg".
@@ -140,7 +140,7 @@ Section AppDurMerge.
     (* the running record satisfies the era's record predicate *)
     Ok r ->
     app_merge_raw A Ok Okc T gd -∗
-    ghost_map_auth gt (1/2) I -∗
+    ghost_map_auth_frac gt (1/2) I -∗
     ▷ A r (abs_view I) -∗
     T ==∗
       ▷ A r (abs_view I) ∗

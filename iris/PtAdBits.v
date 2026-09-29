@@ -56,9 +56,9 @@ Qed.
 Ltac mw_prep :=
   unfold subrange_vec_dec, update_subrange_vec_dec;
   unfold MachineWord.update_slice, MachineWord.slice;
-  cbn [get_word];
+  idtac;
   rewrite ?autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite ?MachineWord.MachineWord.cast_idx_refl.
 
 Ltac zn_norm :=
@@ -422,7 +422,7 @@ Proof.
   intros Hk.
   unfold zero_extend', Operators_mwords.zero_extend, extz_vec, concat_vec,
     mword_of_int, Values.mword_of_int.
-  cbn [get_word].
+  idtac.
   mw_prep.
   unfold MachineWord.MachineWord.zero_extend, MachineWord.MachineWord.concat,
     MachineWord.MachineWord.Z_to_word.

@@ -1296,7 +1296,7 @@ Section ProofUvmalloc.
                   Pj.(ud_um) !! v = Some (uvm_pte (Z.lor xperm 18) r0)).
       { intros v Hv. rewrite /Pj /uptd_insert_perm. cbn [ud_um].
         destruct (decide (v = svpn_of av)) as [-> | Hvne].
-        - exists r. apply lookup_insert.
+        - exists r. apply lookup_insert_eq.
         - rewrite lookup_insert_ne; [| exact (not_eq_sym Hvne)].
           apply Hleaf. rewrite vpn_run_S in Hv.
           apply elem_of_union in Hv as [Hv | Hv]; [exact Hv |].

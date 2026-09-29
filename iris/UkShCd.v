@@ -232,6 +232,7 @@ Section UkShCd.
       (ubytes γd (a + Z.of_nat k) L (fun j => f (k + j)%nat) -∗
          ubytes γd a Nb f).
   Proof using .
+    clear Pm Wb Wc. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc) *)
     intros Hkl.
     remember (Nb - k - L)%nat as q eqn:Hq.
     assert (HN : Nb = (k + (L + q))%nat) by lia.
@@ -256,6 +257,7 @@ Section UkShCd.
       (∀ b : bv 8, ubyte γd (a + Z.of_nat j) b -∗
          ubytes γd a Nb (ush_set f j b)).
   Proof using .
+    clear Pm Wb Wc. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc) *)
     intros Hj.
     remember (Nb - j - 1)%nat as q eqn:Hq.
     assert (HN : Nb = (j + (1 + q))%nat) by lia.
@@ -288,6 +290,7 @@ Section UkShCd.
     g L = ubyte0 ->
     ubytes γd a (S L) g -∗ ustr γd (DfracOwn 1) a L g.
   Proof using .
+    clear Pm Wb Wc. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc) *)
     intros Hnn Hlen Hz.
     assert (E : S L = (L + 1)%nat) by lia. rewrite E.
     iIntros "H". rewrite ubytes_app.
@@ -302,6 +305,7 @@ Section UkShCd.
     g L = ubyte0 ->
     ustr γd (DfracOwn 1) a L g -∗ ubytes γd a (S L) g.
   Proof using .
+    clear Pm Wb Wc. (* unused; else Rocq counts it as used (asks for Proof using … Pm Wb Wc) *)
     intros Hz.
     assert (E : S L = (L + 1)%nat) by lia. rewrite E.
     iIntros "(_ & _ & Hlo & Hhi)". rewrite ubytes_app. iFrame "Hlo".

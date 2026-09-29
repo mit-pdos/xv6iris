@@ -345,7 +345,7 @@ Section FsAbsEra.
 
   (* THE READING AGAINST THE AUTHORITY -- the law the era walk exists for.
      No client-held share is needed: the lent fragment agrees with the
-     [ghost_map_auth] [FsAbs.ftop_astate_ro] hands out, so a consumer that
+     [ghost_map_auth_frac] [FsAbs.ftop_astate_ro] hands out, so a consumer that
      opens ftopN INSIDE the hop's [={T}=*] reads the parent's row as an
      [ADir] at the lent entry map.  That is [FsAbsCreateFire]'s
      [dlookup_commit_at] shape on the nose. *)

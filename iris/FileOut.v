@@ -561,7 +561,7 @@ Section file_out.
   (* the SECOND per-era map, beside [EchoOut.pin_map] *)
   Definition f0_map (h : list mobs) : iProp Σ :=
     (∃ Mf : gmap nat file_era,
-       ghost_map_auth (fgn_era g) 1 Mf ∗ ⌜pin_dom Mf (obs_boots h)⌝)%I.
+       ghost_map_auth_frac (fgn_era g) 1 Mf ∗ ⌜pin_dom Mf (obs_boots h)⌝)%I.
 
   Global Instance f0_map_timeless h : Timeless (f0_map h).
   Proof using . rewrite /f0_map. apply _. Qed.
@@ -754,7 +754,7 @@ Section file_out.
   (* the birth's yield *)
   Definition file_cl_all : iProp Σ :=
     (file_cl (fgn_cl g)
-     ∗ ghost_map_auth (fgn_era g) 1 (∅ : gmap nat file_era))%I.
+     ∗ ghost_map_auth_frac (fgn_era g) 1 (∅ : gmap nat file_era))%I.
 
 
   (* the deed's typed witness, read against the ledger's own line list *)
@@ -801,8 +801,8 @@ Section file_birth.
      keeps ([AppFile.file_birth]) *)
   Lemma file_birth_all (γst : gname) :
     ⊢ |==> ∃ g : file_gn, ⌜ff_st (fgn_cl g) = γst⌝ ∗ file_cl_all g
-        ∗ ghost_map_auth (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
-        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) 1 0%nat
+        ∗ ghost_map_auth_frac (ff_reg (fgn_cl g)) 1 (∅ : gmap nat gname)
+        ∗ @mono_nat_auth_own Σ fa_st (ff_cm (fgn_cl g)) (DfracOwn 1) 0%nat
         ∗ sl_auth (ff_hist (fgn_cl g)) 1 []
         ∗ run_auth (fgn_cl g) 0.
   Proof using .

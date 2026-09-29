@@ -116,7 +116,7 @@ Section KvmSatp.
                 = shiftr rb 12).
     { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
     rewrite Hsh.
-    unfold shiftr, with_word, get_word, MachineWord.MachineWord.logical_shift_right.
+    unfold shiftr, MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (Hs12 : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12)) = 12)
       by (vm_compute; reflexivity).
@@ -158,7 +158,7 @@ Section KvmSatp.
   Proof.
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.MachineWord.Z_idx 60)) with 60.
     change (MachineWord.MachineWord.Z_idx (63 - 60 + 1)) with 4%N.
@@ -170,7 +170,7 @@ Section KvmSatp.
   Proof.
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.MachineWord.Z_idx 44)) with 44.
     change (MachineWord.MachineWord.Z_idx (59 - 44 + 1)) with 16%N.
@@ -182,7 +182,7 @@ Section KvmSatp.
   Proof.
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (MachineWord.MachineWord.Z_idx 0) with 0%N.
     change (Z.of_N 0) with 0.

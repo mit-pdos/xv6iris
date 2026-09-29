@@ -16,6 +16,7 @@
 #   make vtest-table   THE TABLE: every case, its runs on QEMU and the
 #                   board, and whether each run has a passing proof
 #   make vtest-passes  build every run's proof, then print the table
+#   make toolchain-check  is $(SWITCH) exactly opam/xv6rocq.export? (tools/toolchain_check.sh)
 #   make audit      build, then Print Assumptions on the system theorem
 #   make audit-only the same audit, against an already-built tree
 #   make audit-tree / audit-tree-only  the same, for the TREE APPLICATION's
@@ -154,7 +155,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep seccomp:Secc
         audit audit-only audit-tree audit-tree-only audit-union audit-union-only audit-all audit-all-only intr-cone-check vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         hwtest hwtest-gen hwtest-gen-all hwtest-probe cva6test-sim cva6test-gen \
         vtest-runs vtest-passes vtest-table \
-        clean clean-proofs distclean model-gen
+        clean clean-proofs distclean model-gen toolchain-check
 
 all: proofs
 
@@ -336,6 +337,12 @@ $(IRIS)/CoqMakefile: $(IRIS)/_CoqProject
 	cd $(IRIS) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile
 	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS)
+
+# ---- 4a. The toolchain check ----
+# Is $(SWITCH) exactly the switch opam/xv6rocq.export describes?  Re-exports it (full, frozen)
+# and diffs; identical means .vo built here are interchangeable with CI's and the container's.
+toolchain-check:
+	tools/toolchain_check.sh "$(SWITCH)"
 
 # ---- 4b. The assumption audit (iris/SystemAssumptions.v) ----
 # `Print Assumptions` on the system theorem -- the one check that sees through
@@ -653,8 +660,8 @@ model-gen: | $(SAIL_RISCV_DIR)
 		SAIL_RISCV_URL="$(SAIL_RISCV_URL)" SAIL_RISCV_REV="$(SAIL_RISCV_REV)" \
 		  tools/regen_sail_model.sh "$(SAIL_RISCV_DIR)"; \
 	else \
-		echo "Regenerating $(MODEL)/*.v requires the 'sail' compiler (0.20.1,"; \
-		echo "sail_coq_backend) on PATH -- eval \$$(opam env) into whichever switch"; \
+		echo "Regenerating $(MODEL)/*.v requires the 'sail' compiler (0.20.3,"; \
+		echo "sail_coq_backend) and z3 on PATH -- eval \$$(opam env) into whichever switch"; \
 		echo "has it installed, then run tools/regen_sail_model.sh directly, or"; \
 		echo "'make model-gen SAIL_RISCV_DIR=path/to/sail-riscv'."; \
 		echo "See README.md > Build > 'Regenerating the Sail model'."; \

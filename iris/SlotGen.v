@@ -262,7 +262,7 @@ Section SlotGen.
 
   (* the authority, in <pid_lock>'s payload ([PidLock.nextpid_res_at]) *)
   Definition pid_reg_auth (R : gmap Z gname) : iProp Σ :=
-    ghost_map_auth wpr_name 1 R.
+    ghost_map_auth_frac wpr_name 1 R.
 
   Global Instance pid_reg_timeless pid dq g : Timeless (pid_reg pid dq g).
   Proof using . apply _. Qed.
@@ -864,14 +864,14 @@ Proof.
   destruct (decide (q = bv_unsigned p)) as [-> | Hne].
   - split; [exact Hp |].
     exists p. split; [| reflexivity].
-    apply elem_of_list_lookup. exists k. apply list_lookup_insert.
+    apply list_elem_of_lookup. exists k. apply list_lookup_insert_eq.
     apply lookup_lt_Some in Hk. exact Hk.
   - rewrite lookup_insert_ne in Hq; [| exact (fun H => Hne (eq_sym H))].
     destruct (Hdom q Hq) as [Hnz (r & Hr & Hrv)].
     split; [exact Hnz |].
     exists r. split; [| exact Hrv].
-    apply elem_of_list_lookup in Hr as [i Hi].
-    apply elem_of_list_lookup. exists i.
+    apply list_elem_of_lookup in Hr as [i Hi].
+    apply list_elem_of_lookup. exists i.
     destruct (decide (i = k)) as [-> | Hik].
     + rewrite Hk in Hi. injection Hi as <-. rewrite Hz in Hrv.
       exfalso. exact (Hnz (eq_sym Hrv)).
@@ -886,13 +886,13 @@ Lemma pid_reg_dom_delete (R : gmap Z gname) (pids : list (mword 32))
 Proof.
   intros Hdom Hk q Hq.
   assert (Hne : q <> bv_unsigned p).
-  { intro Heq. rewrite Heq lookup_delete in Hq. exact (is_Some_None Hq). }
+  { intro Heq. rewrite Heq lookup_delete_eq in Hq. exact (is_Some_None Hq). }
   rewrite lookup_delete_ne in Hq; [| exact (fun H => Hne (eq_sym H))].
   destruct (Hdom q Hq) as [Hnz (r & Hr & Hrv)].
   split; [exact Hnz |].
   exists r. split; [| exact Hrv].
-  apply elem_of_list_lookup in Hr as [i Hi].
-  apply elem_of_list_lookup. exists i.
+  apply list_elem_of_lookup in Hr as [i Hi].
+  apply list_elem_of_lookup. exists i.
   destruct (decide (i = k)) as [-> | Hik].
   + rewrite Hk in Hi. injection Hi as <-. exfalso. exact (Hne (eq_sym Hrv)).
   + rewrite list_lookup_insert_ne; [exact Hi | exact (fun H => Hik (eq_sym H))].

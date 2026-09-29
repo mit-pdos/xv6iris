@@ -286,8 +286,8 @@ Section UkTreeRead.
     assert (Hins : <[fd := FdOpen rd wr ty]> sts
                    = <[fd := FdOpen rb wb (FdInode i γo omo)]> sts)
       by exact (eq_trans (eq_sym Hfdv) Hfdv0).
-    pose proof (list_lookup_insert sts fd (FdOpen rd wr ty) Hfdlt) as Hl1.
-    pose proof (list_lookup_insert sts fd
+    pose proof (list_lookup_insert_eq sts fd (FdOpen rd wr ty) Hfdlt) as Hl1.
+    pose proof (list_lookup_insert_eq sts fd
                   (FdOpen rb wb (FdInode i γo omo)) Hfdlt) as Hl2.
     rewrite Hins in Hl1. rewrite Hl2 in Hl1. congruence.
   Qed.

@@ -51,14 +51,13 @@ Lemma aq_subrange_sext (x : mword 32) :
 Proof.
   apply bv_eq.
   unfold subrange_vec_dec.
-  unfold to_word_idx, to_word, get_word.
+  unfold to_word_idx.
   rewrite MachineWord.cast_idx_refl.
   unfold MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.Z_idx 0)) with 0.
   rewrite Z.shiftr_0_r.
-  unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec,
-    SailStdpp.Values.to_word, to_word, get_word, MachineWord.sign_extend.
+  unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec, MachineWord.sign_extend.
   rewrite bv_sign_extend_unsigned.
   rewrite bv_wrap_bv_wrap; [| vm_compute; intro Hc; discriminate Hc].
   apply aq_wrap_signed.

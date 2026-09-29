@@ -177,8 +177,7 @@ Local Notation Rs11 := (mword_of_int 27 : mword 5).
 Lemma pw_add32_unsigned (x y : mword 32) :
   bv_unsigned (add_vec x y) = bv_wrap 32 (bv_unsigned x + bv_unsigned y).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
@@ -1708,7 +1707,7 @@ Section ProofPipewrite.
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res_at γp pi) (pipe_dead γl γp) emp%I
                   T4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaT4 HavR
-                  ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
+                  ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
         iIntros (CIDrr Hsrr mr) "_ Hcg Hpc %Hcsr Hown". rgall.
@@ -1782,7 +1781,7 @@ Section ProofPipewrite.
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res_at γp pi) (pipe_dead γl γp) emp%I
                   Q2 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaQ2 HavR
-                  ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
+                  ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
         iIntros (CIDrr Hsrr mr) "_ Hcg Hpc %Hcsr Hown". rgall.
@@ -2110,7 +2109,7 @@ Section ProofPipewrite.
                  with "Hown") as "Hown".
     iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res_at γp pi) (pipe_ref γp w q)
               (pipe_dead γl γp) B3 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
-              ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
+              ltac:(exact (pipe_ref_dead _ _ _ _)) ltac:(intros ?i; exact (locked_pre_dead _ _ _))
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
@@ -2866,7 +2865,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
               iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res_at γp pi) (pipe_dead γl γp) emp%I
                         G4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaG4 Hav10
-                        ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
+                        ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
               { iApply lock_finisher_close. }
               iIntros (CIDrs Hsrs Mrl) "_ Hcg Hpc %Hcsrl Hown". rgall.
@@ -2949,7 +2948,7 @@ Section ProofPipewrite.
                            with "Hown") as "Hown".
               iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res_at γp pi) (pipe_ref γp w q)
                         (pipe_dead γl γp) G7 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
-                        ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
+                        ltac:(exact (pipe_ref_dead _ _ _ _)) ltac:(intros ?i; exact (locked_pre_dead _ _ _))
                         with "Hcg Hown Htext Hpc [] Href").
               all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }

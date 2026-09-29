@@ -88,7 +88,7 @@ Definition fsimg_cov : gset Z := list_to_set (Z.of_nat <$> seq 1 1999).
 
 Lemma fsimg_cov_elem_of (b : Z) : b ∈ fsimg_cov <-> 1 <= b < 2000.
 Proof.
-  rewrite /fsimg_cov elem_of_list_to_set elem_of_list_fmap. split.
+  rewrite /fsimg_cov elem_of_list_to_set list_elem_of_fmap. split.
   - intros (k & -> & Hk). apply elem_of_seq in Hk. lia.
   - intros Hb. exists (Z.to_nat b).
     split; [lia | apply elem_of_seq; lia].

@@ -988,7 +988,7 @@ Proof.
   unfold disk_write.
   rewrite (proj2 (Z.leb_le (off + 512 * Z.of_nat i) a)) by lia.
   rewrite (proj2 (Z.leb_le off a)) by lia.
-  rewrite Hidx, lookup_take by lia. rewrite lookup_drop. reflexivity.
+  rewrite Hidx, lookup_take_lt by lia. rewrite lookup_drop. reflexivity.
 Qed.
 
 (* Distinct sectors of ONE write commute -- the model's licence to land them
@@ -1430,7 +1430,7 @@ Definition vreq_sectors (r : vio_req) : gset Z :=
 Lemma vreq_sectors_spec (r : vio_req) (s : Z) :
   s ∈ vreq_sectors r <-> exists i, (i < vreq_nsectors r)%nat /\ s = vreq_key r i.
 Proof.
-  unfold vreq_sectors. rewrite elem_of_list_to_set, elem_of_list_fmap.
+  unfold vreq_sectors. rewrite elem_of_list_to_set, list_elem_of_fmap.
   split.
   - intros (i & -> & Hi). apply elem_of_seq in Hi. exists i. split; [lia|done].
   - intros (i & Hi & ->). exists i. split; [done|]. apply elem_of_seq. lia.
@@ -1448,7 +1448,7 @@ Definition vreq_touch (r : vio_req) : gset Z :=
 Lemma vreq_touch_spec (r : vio_req) (s : Z) :
   s ∈ vreq_touch r <-> exists i, (i < vreq_span r)%nat /\ s = vreq_key r i.
 Proof.
-  unfold vreq_touch. rewrite elem_of_list_to_set, elem_of_list_fmap.
+  unfold vreq_touch. rewrite elem_of_list_to_set, list_elem_of_fmap.
   split.
   - intros (i & -> & Hi). apply elem_of_seq in Hi. exists i. split; [lia|done].
   - intros (i & Hi & ->). exists i. split; [done|]. apply elem_of_seq. lia.
@@ -2310,7 +2310,7 @@ Proof.
   apply andb_prop in H as [Hl Hex]. rewrite Hl. cbn [andb].
   apply orb_prop in Hex as [Hex|Hdup].
   - apply existsb_exists in Hex as ([h ph] & Hin & _).
-    apply elem_of_list_In, elem_of_map_to_list in Hin.
+    apply list_elem_of_In, elem_of_map_to_list in Hin.
     rewrite (bool_decide_eq_false_2 (v_inflight v = ∅));
       [by rewrite orb_true_r|].
     intro Hc. rewrite Hc, lookup_empty in Hin. discriminate.
@@ -2329,7 +2329,7 @@ Proof.
   apply andb_prop in H as [Hl Hex].
   apply orb_prop in Hex as [Hex|Hdup]; [left | by right].
   apply existsb_exists in Hex as ([h ph] & Hin & Hbad).
-  apply elem_of_list_In, elem_of_map_to_list in Hin.
+  apply list_elem_of_In, elem_of_map_to_list in Hin.
   apply andb_prop in Hbad as [Hun Hbad]. cbn [fst snd] in *.
   destruct ph; try discriminate Hun.
   exists h. split; [by apply virtio_phase_intro | by apply negb_true_iff].
@@ -2496,7 +2496,7 @@ Proof.
   - (* a popped head with a bad chain: the obligation covers every head the
        device holds *)
     apply existsb_exists in Hex as ([h ph] & Hin & Hbad).
-    apply elem_of_list_In, elem_of_map_to_list in Hin.
+    apply list_elem_of_In, elem_of_map_to_list in Hin.
     apply andb_prop in Hbad as [_ Hbad]. cbn [fst snd] in Hbad.
     assert (Hhd : h ∈ dom (v_inflight v)) by (apply elem_of_dom; by exists ph).
     rewrite (HS h (Hcovf h Hhd) mv Hv) in Hbad. discriminate.

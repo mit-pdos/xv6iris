@@ -8,6 +8,7 @@
 
    Regenerate with:  make gen-code                                        *)
 From iris.program_logic Require Import lifting.
+From iris.program_logic Require Import language.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.

@@ -104,14 +104,14 @@ Local Lemma f2p_shift_bit (fl : mword 64) :
   = Z.testbit (bv_unsigned fl) 0.
 Proof.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   rewrite (bv_wrap_spec_low 64 _ 3 ltac:(lia)).
   unfold bv_signed.
   change (MachineWord.MachineWord.Z_idx 32) with 32%N.
   rewrite (zbit_swrap_low 32 _ 3 ltac:(lia)).
-  cbv [shift_bits_left Operators_mwords.shiftl SailStdpp.Values.with_word to_word get_word].
+  cbv [shift_bits_left Operators_mwords.shiftl ].
   unfold MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   match goal with

@@ -246,7 +246,7 @@ Section ghosts.
      [ctx_bound_raise]) that is exactly ruling §0.35'(iii)'s ABSORB, so the
      floor is bought by the READER instead of the writer. <<< *)
   Lemma llb_get γll n :
-    mono_nat_auth_own γll 1 n -∗ mono_nat_auth_own γll 1 n ∗ llb γll n.
+    mono_nat_auth_own_frac γll 1 n -∗ mono_nat_auth_own_frac γll 1 n ∗ llb γll n.
   Proof using .
     iIntros "Ha".
     iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb".
@@ -254,10 +254,10 @@ Section ghosts.
   Qed.
 
   Lemma llb_valid γll n K :
-    mono_nat_auth_own γll 1 n -∗ llb γll K -∗ ⌜(K ≤ n)%nat⌝.
+    mono_nat_auth_own_frac γll 1 n -∗ llb γll K -∗ ⌜(K ≤ n)%nat⌝.
   Proof using .
     iIntros "Ha [Hlb|%Hz]".
-    - by iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ ?].
+    - by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ ?].
     - iPureIntro. lia.
   Qed.
 
@@ -359,8 +359,8 @@ Section ghosts.
       receipt that keeps it a legal position. *)
   Lemma view_lb_get γv γll tvs (n : nat) h :
     (tvs h ≤ n)%nat →
-    view_auth γv tvs -∗ mono_nat_auth_own γll 1 n -∗
-    view_auth γv tvs ∗ mono_nat_auth_own γll 1 n ∗
+    view_auth γv tvs -∗ mono_nat_auth_own_frac γll 1 n -∗
+    view_auth γv tvs ∗ mono_nat_auth_own_frac γll 1 n ∗
     view_lb γv γll h (tvs h).
   Proof using .
     iIntros (Htop) "Hv Hll".

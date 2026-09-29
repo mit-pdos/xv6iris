@@ -446,7 +446,7 @@ Lemma su_sext16_sint (h : mword 16) :
 Proof.
   change (sint ?x) with (bv_signed x).
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_signed; [reflexivity |].
   apply N.leb_le; vm_compute; reflexivity.
 Qed.
@@ -503,7 +503,7 @@ Lemma su_sext16_inj (x y : mword 16) :
 Proof.
   intros H. apply (f_equal bv_signed) in H.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+       MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H;
     [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.
@@ -1050,7 +1050,7 @@ Section ProofSysUnlinkFrame.
   Proof using .
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
        4-byte tower through the shim *)
-    iIntros "H". iDestruct (ctx_word_pointsto_split4 with "H") as "[Hlo Hhi]".
+    iIntros "H". iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "H") as "[Hlo Hhi]".
     iFrame "Hlo Hhi".
   Qed.
 
@@ -1060,7 +1060,7 @@ Section ProofSysUnlinkFrame.
     (pa_stk sp0 27) ↦₈[KT1] word_of_words lo hi.
   Proof using .
     intro Hal. iIntros "Hlo Hhi".
-    iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal with "Hlo Hhi").
+    iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal with "Hlo Hhi").
   Qed.
 
 End ProofSysUnlinkFrame.

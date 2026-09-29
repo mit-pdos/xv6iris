@@ -118,7 +118,7 @@ Proof.
                    <[i := c]> (tv_nodes t) !! d = Some (ADir e1)).
   { destruct (decide (i = d)) as [-> | Hne].
     - destruct Hc as [Hc | [e0 ->]]; [ exfalso; exact (Hc eq_refl) | ].
-      rewrite lookup_insert. by exists e0.
+      rewrite lookup_insert_eq. by exists e0.
     - rewrite lookup_insert_ne; [| exact Hne]. rewrite Hd. by exists e. }
   destruct Hrow as [e1 He1].
   rewrite (tedge_ins_lookup_at _ d nm i e1 He1). by exists (<[nm := i]> e1).
@@ -143,7 +143,7 @@ Proof.
   rewrite /resolves_from Hpl Hnodes npath_cons.
   rewrite (nstep_tedge_ins_at _ d nm i e nm Hrow) decide_True; [| reflexivity].
   rewrite npath_nil.
-  rewrite (tedge_ins_lookup_ne _ d nm i i Hne) lookup_insert //.
+  rewrite (tedge_ins_lookup_ne _ d nm i i Hne) lookup_insert_eq //.
 Qed.
 
 
@@ -404,7 +404,7 @@ Section UkTreeCreate.
       (t : ttree) (ma mi : Z) (M : gmap Z (bv 8)) (pv : mword 64)
       (pl : list (bv 8)) (nm : fname) :
     arg_path_of M pv pl ->
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     mknod_post_ok (fs_gamma_L fsc_fs) M pv ma mi tree_root_cur
       (tree_arm_fam c r g t) (tree_unarm_fam c r g t)
       (tree_acre_fam c r g t (fun _ _ => ADev ma mi))
@@ -485,7 +485,7 @@ Section UkTreeCreate.
     dev_arg (m !!! Regidx a2_idx) = mi ->
     (* THE PATH'S PARENT PREFIX IS EMPTY -- "/x", not "/a/x" *)
     np_elems pl = [] ->
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     um_start_of cw pl = FsImg.ROOTINO ->
     FsImg.ROOTINO ∈ dom (tv_nodes t) ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
@@ -562,7 +562,7 @@ Section UkTreeCreate.
     rewrite cre_child_dir /tabs_of /dots_ents /hide_dots.
     rewrite (delete_insert_ne _ DOTDOT DOT);
       [| intros Hc; exact (dot_ne_dotdot (eq_sym Hc))].
-    rewrite !delete_insert_delete !delete_empty //.
+    rewrite !delete_insert_eq !delete_empty //.
   Qed.
 
   Definition tree_mkdir_fam (c : tree_fixed) (r : tree_names) (g : gname)
@@ -630,7 +630,7 @@ Section UkTreeCreate.
             (bv_unsigned (mword_of_int 0 : mword 16))))
       (pfam_triv (fun _ _ _ _ => True%I)) pl true i -∗
     ((∃ nm : fname,
-        ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+        ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
         tree_own r g FsImg.ROOTINO
           (top_ins FsImg.ROOTINO nm i (ADir ∅) t))
      ∨ tree_taint c).
@@ -817,7 +817,7 @@ Section UkTreeCreate.
        is [0x201]. *)
     om_trunc vom = false ->
     arg_path_of M pv pl ->
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     open_post_fail_create (fs_gamma_L fsc_fs) fsc_fs cw M pv vom
       tree_root_cur (fun _ _ => True%I)
       (tree_arm_fam c r g t) (tree_unarm_fam c r g t)
@@ -891,7 +891,7 @@ Section UkTreeCreate.
     om_create (m !!! Regidx a1_idx) = true ->
     om_trunc (m !!! Regidx a1_idx) = false ->
     np_elems pl = [] ->
-    list_basics.last (path_elems pl) = Some nm ->
+    list_basics.list.last (path_elems pl) = Some nm ->
     um_start_of cw pl = FsImg.ROOTINO ->
     FsImg.ROOTINO ∈ dom (tv_nodes t) ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
@@ -1179,7 +1179,7 @@ Section UkTreeCreate.
                     = Some (AFile [])).
     { rewrite /top_ins /=.
       rewrite (tedge_ins_lookup_ne _ FsImg.ROOTINO nmf i i ltac:(exact Hne)).
-      rewrite lookup_insert //. }
+      rewrite lookup_insert_eq //. }
     assert (Hres : resolves_from (top_ins FsImg.ROOTINO nmf i (AFile []) t1)
                      FsImg.ROOTINO plf = Some (i, AFile [])).
     { exact (resolves_from_top_ins FsImg.ROOTINO nmf i (AFile []) t1 e1 plf

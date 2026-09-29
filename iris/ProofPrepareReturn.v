@@ -171,7 +171,7 @@ Section ProofPrepareReturn.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 2)
       by (rewrite /M1 upd_eq; exact Hpush).
-    iDestruct (stack_own_2_elim with "Hframe") as (vra vs0) "[Hbra Hbs0]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (vra vs0) "[Hbra Hbs0]".
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 1).

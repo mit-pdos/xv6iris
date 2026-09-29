@@ -116,7 +116,7 @@ Section BreadScan.
   Lemma bd_uint32 (a : mword 32) : uint a = bv_unsigned a.
   Proof using .
     pose proof (bv_unsigned_in_range _ a) as Hr.
-    unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+    unfold uint, MachineWord.MachineWord.word_to_N.
     rewrite Z2N.id; [ reflexivity | lia ].
   Qed.
 
@@ -434,7 +434,7 @@ Section BreadScan2.
       iAssert (bio_slot_res2 bn V (<[k := (ot ⋅ Some (qr/2)%Qp, Pos.succ cnt)]> M) k
                  (devs k) (bnos k) tl cur_ctx)
         with "[Hrd Hcell Hfd Hbslot Hc Hdev1 Hbno1]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert.
+      { rewrite /bio_slot_res2 lookup_insert_eq.
         iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ. rewrite Pos2Z.inj_succ in Hn2. lia. }
         iFrame "Hcell".
@@ -477,7 +477,7 @@ Section BreadScan2.
       iEval (rewrite /bslot) in "Hbslot".
       iAssert (bio_slot_res2 bn V (<[k := (Some (1/4)%Qp, 1%positive)]> M) k (devs k) (bnos k) tl cur_ctx)
         with "[Hrd Hcell Hbslot Hc Hdev1 Hbno1]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert.
+      { rewrite /bio_slot_res2 lookup_insert_eq.
         iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. exact bd_pos1_lt. }
         iFrame "Hcell".
@@ -537,7 +537,7 @@ Section BreadScan2.
       iAssert (bio_slot_res2 bn V (<[k := (ot ⋅ None, Pos.succ cnt)]> M) k
                  (devs k) (bnos k) tl cur_ctx)
         with "[Hrd Hcell Hfd Hbslot Hc Hdev Hbno]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert.
+      { rewrite /bio_slot_res2 lookup_insert_eq.
         iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ. rewrite Pos2Z.inj_succ in Hn2. lia. }
         iFrame "Hcell".
@@ -570,7 +570,7 @@ Section BreadScan2.
       iEval (rewrite /bslot) in "Hbslot".
       iAssert (bio_slot_res2 bn V (<[k := (None, 1%positive)]> M) k (devs k) (bnos k) tl cur_ctx)
         with "[Hrd Hcell Hbslot Hc Hdev Hbno]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert.
+      { rewrite /bio_slot_res2 lookup_insert_eq.
         iSplitL "Hrd". { iApply (bd_regs_same _ _ _ _ _ _ Hw Hxn Hid Hb with "Hrd Hllbd"). }
         iSplitR. { iPureIntro. exact bd_pos1_lt. }
         iFrame "Hcell".
@@ -670,7 +670,7 @@ Section BreadScan2.
     iEval (rewrite /bslot) in "Hbslot".
     iAssert (bio_slot_res2 bn V (<[k := (None, 1%positive)]> M) k D B (Nat.max tl T') cur_ctx)
       with "[Hrd Hcell Hbslot Hc Hdevs Hbnos]" as "Hslot".
-    { rewrite /bio_slot_res2 lookup_insert.
+    { rewrite /bio_slot_res2 lookup_insert_eq.
       iSplitL "Hrd".
       { iExists (SlotReg T' false (D, B) None). iFrame "Hrd Hllb'". iPureIntro. cbn.
         split_and!; [done | done | done | lia]. }
@@ -760,7 +760,7 @@ Section BreadScan2.
       iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k))%I with "[Hrbno Hbno]" as "Hbno".
       { cbn in Htie. rewrite -(Qp.add_comm qr q) in Htie. rewrite -Htie ctx_word4_pointsto_frac_split.
         iFrame "Hbno Hrbno". }
-      assert (Hdel : delete k M !! k = None) by apply lookup_delete.
+      assert (Hdel : delete k M !! k = None) by apply lookup_delete_eq.
       iAssert (bio_slot_res2 bn V (delete k M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
         with "[Hregs Hcell Hc Hdev Hbno]" as "Hslot".
       { rewrite /bio_slot_res2 Hdel. iFrame "Hregs Hcell Hc Hdev Hbno". }
@@ -805,7 +805,7 @@ Section BreadScan2.
       iDestruct "Hfd" as "[Hfd Hout]".
       iAssert (bio_slot_res2 bn V (<[k := (orem, cp)]> M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
         with "[Hregs Hcell Hfd Hc Hdev Hbno]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+      { rewrite /bio_slot_res2 lookup_insert_eq. iFrame "Hregs".
         iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ in Hcnt. lia. }
         iFrame "Hcell Hfd Hc".
         iExists (qr + q)%Qp. iSplitR.
@@ -876,7 +876,7 @@ Section BreadScan2.
       assert (Hz0 : (Z.pos 1 - 1)%Z = 0%Z) by reflexivity.
       iEval (rewrite Hz0) in "Hcell".
       assert (Hc'0 : c' = 0%nat) by (change (Pos.to_nat 1) with 1%nat in Hc'; lia). subst c'.
-      assert (Hdel : delete k M !! k = None) by apply lookup_delete.
+      assert (Hdel : delete k M !! k = None) by apply lookup_delete_eq.
       iAssert (bio_slot_res2 bn V (delete k M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
         with "[Hregs Hcell Hc Hdev Hbno]" as "Hslot".
       { rewrite /bio_slot_res2 Hdel. iFrame "Hregs Hcell Hc Hdev Hbno". }
@@ -914,7 +914,7 @@ Section BreadScan2.
       iDestruct "Hfd" as "[Hfd Hout]".
       iAssert (bio_slot_res2 bn V (<[k := (ot, cp)]> M) k (devs k) (bnos k) (Nat.max tl td') cur_ctx)
         with "[Hregs Hcell Hfd Hc Hdev Hbno]" as "Hslot".
-      { rewrite /bio_slot_res2 lookup_insert. iFrame "Hregs".
+      { rewrite /bio_slot_res2 lookup_insert_eq. iFrame "Hregs".
         iSplitR. { iPureIntro. rewrite Pos2Z.inj_succ in Hcnt. lia. }
         iFrame "Hcell Hfd Hc".
         iExists qr. iSplitR; [iPureIntro; exact Htie|].

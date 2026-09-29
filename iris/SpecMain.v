@@ -102,7 +102,7 @@
    [IntrDefs.intr_inv], and main is the only code that ever allocates it
    ([intr_inv_alloc_off], from trapinithart's [stvec ↦ᵣ kernelvec]) -- so the
    spare quarter has to sit raw in main's precondition until then.  That is the
-   [ghost_var γ (1/4) ('b"0")] conjunct below; before the allocation nothing
+   [ghost_var_frac γ (1/4) ('b"0")] conjunct below; before the allocation nothing
    holds an interrupt handler, hence the '0'.
 
    THE CONTEXT SLOT is [SchedCtx.cpu_ctx_free], not an opaque [C]: nothing on
@@ -572,7 +572,7 @@ Section SpecMain.
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
        code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     (* HART-GENERIC, and it has to be: main's boot arm calls kinit (-> freerange
        -> kfree -> acquire) and userinit, and builds [kalloc_env], all three of
@@ -810,7 +810,7 @@ Section SpecMain.
     ([∗ map] i ↦ st ∈ gset_to_gmap HInactive (set_seq 0 8 : gset nat),
        i ↪[dn_head γv] st) -∗
     (* ...the CLAIM MAP's authority, empty (nothing has been published)... *)
-    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    ghost_map_auth_frac (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     (* THE TIMER CAPABILITY, this hart's.  [timer_cap] is the sstc pin plus the
        stimecmp invariant (TimerCap.v), allocated in the boot chain out of the

@@ -1138,6 +1138,7 @@ Section UkShFork.
         (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) /\
         f (k + len)%nat = ubyte0.
   Proof using .
+    clear - f d. (* unused; else Rocq counts it as used (asks for Proof using … Wc Σ) *)
     induction d as [| d IH]; intros k Hd.
     - exists 0%nat. split; [ lia | ].
       split; [ intros j Hj; lia | exact Hd ].
@@ -1161,6 +1162,7 @@ Section UkShFork.
       (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) /\
       f (k + len)%nat = ubyte0.
   Proof using .
+    clear - f k i2. (* unused; else Rocq counts it as used (asks for Proof using … Wc Σ) *)
     intros Hk Hi2.
     destruct (ushf_first_nul_aux f (i2 - k)%nat k
                 ltac:(replace (k + (i2 - k))%nat with i2 by lia; exact Hi2))
@@ -1232,6 +1234,7 @@ Section UkShFork.
       (k len : nat) :
     UkSh.ush_line_is ws g k len -> bv_unsigned (g k) = 101%Z.
   Proof using .
+    clear - ws g k len. (* unused; else Rocq counts it as used (asks for Proof using … Wc Σ) *)
     intros (Hok & Hlen & Hby).
     pose proof (wl_line_pos ws) as HL.
     pose proof (Hby 0%nat ltac:(lia)) as H0.

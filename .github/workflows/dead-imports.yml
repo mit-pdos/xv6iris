@@ -78,21 +78,19 @@ jobs:
       - name: Set up OCaml / opam
         uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "5.3"
+          ocaml-compiler: "5.3.0"
           opam-repositories: |
-            coq-released: https://coq.inria.fr/opam/released
+            rocq-released: https://rocq-prover.org/opam/released
             default: https://opam.ocaml.org
 
       - name: Cache opam switch
         uses: actions/cache@v5
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.name }}-opam-5.3-
+          key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('opam/xv6rocq.export') }}
 
       - name: Install Rocq / Iris / Sail toolchain
-        run: opam install -y $(cat .github/coq-deps.txt)
+        run: opam switch import --yes opam/xv6rocq.export
 
       # ---- Build, so that .vo/.glob exist for every file. ----
       # Same ELF-free / regen-free path as ci.yml.

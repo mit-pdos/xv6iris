@@ -469,7 +469,7 @@ Proof.
       assert (Hlb : lb 255 = 2%nat) by (unfold lb; reflexivity). rewrite Hlb.
       apply (Nat.le_trans _ (1 + length [511%Z])%nat); [reflexivity |].
       apply (pt_nodes_lvl1_ge c [511%Z]); [apply NoDup_singleton |].
-      intros j Hj. apply elem_of_list_singleton in Hj. subst j. split; [lia | exact Hk1]. }
+      intros j Hj. apply list_elem_of_singleton in Hj. subst j. split; [lia | exact Hk1]. }
 Qed.
 
 (* every kstack vpn (i<64) lives in the trampoline's l0/l1 groups *)

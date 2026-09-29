@@ -84,7 +84,7 @@ Local Lemma map_insert_sub (m1 m2 : gmap Z (bv 8)) (i : Z) (x : bv 8) :
 Proof.
   intros Hi H. apply map_subseteq_spec. intros k v Hk.
   destruct (decide (i = k)) as [-> | Hne].
-  - rewrite lookup_insert in Hk. injection Hk as <-. exact Hi.
+  - rewrite lookup_insert_eq in Hk. injection Hk as <-. exact Hi.
   - rewrite lookup_insert_ne in Hk; [ | exact Hne ].
     exact (proj1 (map_subseteq_spec _ _) H k v Hk).
 Qed.
@@ -188,7 +188,7 @@ Section UkFork.
   (* a uniform-dq fragment map is a submap of its authority *)
   Local Lemma ghost_frags_sub (γ : gname) (q : Qp) (Md T : gmap Z (bv 8))
       (dq : dfrac) :
-    ghost_map_auth γ q Md -∗ ([∗ map] a ↦ b ∈ T, a ↪[γ]{dq} b) -∗ ⌜ T ⊆ Md ⌝.
+    ghost_map_auth_frac γ q Md -∗ ([∗ map] a ↦ b ∈ T, a ↪[γ]{dq} b) -∗ ⌜ T ⊆ Md ⌝.
   Proof using .
     induction T as [| a b T Ha IH] using map_ind.
     - iIntros "_ _". iPureIntro. apply map_empty_subseteq.
@@ -240,7 +240,7 @@ Section UkFork.
         iDestruct (ghost_map_elem_agree with "Hb1 Hb") as %Heq.
         iPureIntro. intros a' b1' b2' Hl1 Hl2.
         destruct (decide (a = a')) as [<- | Hne].
-        * rewrite lookup_insert in Hl2. injection Hl2 as <-.
+        * rewrite lookup_insert_eq in Hl2. injection Hl2 as <-.
           rewrite H1a in Hl1. injection Hl1 as <-. exact Heq.
         * rewrite lookup_insert_ne in Hl2; [ | exact Hne ].
           exact (HIH a' b1' b2' Hl1 Hl2).

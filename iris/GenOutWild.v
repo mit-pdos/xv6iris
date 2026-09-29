@@ -419,11 +419,11 @@ Section gen_out_wild.
     (forall e, e ∈ pops -> trace_shape (le_hist e) true) ->
     hist_chain D -> D <> [] ->
     exists (h0 : list mobs) (c0 : bv 8),
-      list_basics.last D = Some (h0, c0) /\ ins (open_seg h0) = snd <$> D
+      list_basics.list.last D = Some (h0, c0) /\ ins (open_seg h0) = snd <$> D
       /\ obs_boots h0 = k /\ trace_shape h0 true.
   Proof using.
     intros HD Hidx Hbt Hsh Hch Hne.
-    destruct (list_basics.last D) as [[h0 c0] |] eqn:Hl; last first.
+    destruct (list_basics.list.last D) as [[h0 c0] |] eqn:Hl; last first.
     { exfalso. apply Hne. by apply last_None. }
     assert (Hlk : D !! (length D - 1)%nat = Some (h0, c0)).
     { rewrite -Hl last_lookup. f_equal. destruct D; cbn; [done | lia]. }
@@ -431,7 +431,7 @@ Section gen_out_wild.
     { intros x Hx.
       destruct (echoed_elem_inv pops x (elem_of_prefix _ _ _ Hx HD)) as (e & He & _ & <-).
       split; [exact (Hbt e He) | exact (Hsh e He)]. }
-    destruct (Hof (h0, c0) (elem_of_list_lookup_2 _ _ _ Hlk)) as [Hb0 Hs0].
+    destruct (Hof (h0, c0) (list_elem_of_lookup_2 _ _ _ Hlk)) as [Hb0 Hs0].
     assert (HidxD : E_index (seg_of D)).
     { intros j x Hx. apply Hidx.
       apply (prefix_lookup_Some _ _ _ _ Hx).
@@ -445,7 +445,7 @@ Section gen_out_wild.
       { rewrite Hlk in Hj. injection Hj as -> ->. done. }
       destruct (hist_chain_lt D j (length D - 1) hj cj h0 c0 Hch ltac:(lia) Hj Hlk)
         as [Hp _].
-      destruct (Hof (hj, cj) (elem_of_list_lookup_2 _ _ _ Hj)) as [Hbj _].
+      destruct (Hof (hj, cj) (list_elem_of_lookup_2 _ _ _ Hj)) as [Hbj _].
       apply (open_seg_prefix_of_boots hj h0 Hp); [cbn [fst] in Hbj; rewrite Hbj Hb0; reflexivity | exact Hs0]. }
     assert (Hlen : length (ins (open_seg h0)) = length D).
     { assert (Hx : seg_of D !! (length D - 1)%nat = Some (open_seg h0, c0))

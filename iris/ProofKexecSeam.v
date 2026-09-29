@@ -430,7 +430,7 @@ Section KexecBFrame.
   Proof using .
     intro Hal. iIntros "Hg".
     iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-    rewrite /bytes_own. iApply (bb_named_any with "Hg").
+    rewrite /bytes_own. iApply (bb_named_any (KTR := KT1) with "Hg").
   Qed.
 
   (* A READ-ONLY 2-byte window into a named run: the halfword the [lhu]
@@ -455,7 +455,7 @@ Section KexecBFrame.
     (* the FIRST [rewrite] already split the run inside the giveback wand's
        conclusion too, so there is nothing left to split here. *)
     iIntros "Hw".
-    iDestruct (ctx_word2_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word2_pointsto_bytes (KTR := KT1) with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
@@ -480,7 +480,7 @@ Section KexecBFrame.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 32 f o 4 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word4_pointsto_bytes (KTR := KT1) with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

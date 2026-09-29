@@ -295,8 +295,8 @@ Lemma Forall2_refl_list {A} (Q : A -> A -> Prop) (l : list A) :
   (forall x, x ∈ l -> Q x x) -> Forall2 Q l l.
 Proof.
   induction l as [| x l IH]; intros H; constructor.
-  - apply H, elem_of_list_here.
-  - apply IH. intros y Hy. apply H, elem_of_list_further, Hy.
+  - apply H, list_elem_of_here.
+  - apply IH. intros y Hy. apply H, list_elem_of_further, Hy.
 Qed.
 
 Lemma Forall2_concat {A B} (Q : A -> B -> Prop)
@@ -483,7 +483,7 @@ Lemma pt_page_map_mem (t : ptree) (i : Z) :
   word_bytes (u_pte_addr (pt_base t) (mword_of_int i))
              (pt_ents t (mword_of_int i)) ∈ pt_page_maps t.
 Proof.
-  intros Hi. rewrite /pt_page_maps. apply elem_of_list_fmap.
+  intros Hi. rewrite /pt_page_maps. apply list_elem_of_fmap.
   exists i. split; [reflexivity |]. apply elem_of_seqZ. lia.
 Qed.
 
@@ -499,11 +499,11 @@ Lemma pt_maps_kid (lvl : nat) (t c : ptree) (i : Z) (m : pamap) :
   m ∈ pt_maps lvl c -> m ∈ pt_maps (S lvl) t.
 Proof.
   intros Hi Hk Hm. rewrite pt_maps_S elem_of_app. right.
-  apply elem_of_list_In, in_concat.
+  apply list_elem_of_In, in_concat.
   exists (pt_maps lvl c). split.
-  - apply elem_of_list_In, elem_of_list_fmap.
+  - apply list_elem_of_In, list_elem_of_fmap.
     exists i. rewrite Hk. split; [reflexivity |]. apply elem_of_seqZ. lia.
-  - by apply elem_of_list_In.
+  - by apply list_elem_of_In.
 Qed.
 
 

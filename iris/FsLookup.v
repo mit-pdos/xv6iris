@@ -261,7 +261,7 @@ Proof.
   pose proof (dir_written_live0 data data' k0 s z Hw Hz) as Hl0.
   apply map_eq. intros x.
   destruct (decide (x = s)) as [-> | Hne].
-  - rewrite lookup_insert.
+  - rewrite lookup_insert_eq.
     pose proof (dir_view_live data' nrec' k0 Hu' Hk0 Hl0) as H.
     rewrite (proj1 (proj2 Hw)) in H. rewrite H.
     rewrite (proj1 Hw). reflexivity.
@@ -394,7 +394,7 @@ Proof.
   intros Hu Hk0 Hl0 Hzer.
   apply dir_view_lookup_None.
   rewrite (dir_view_zero data data' nrec k0 Hu Hk0 Hl0 Hzer).
-  apply lookup_delete.
+  apply lookup_delete_eq.
 Qed.
 
 (* ====================================================================== *)
@@ -762,7 +762,7 @@ Section FsLookupAu.
   Lemma tree_ins_ent (t : fstree) (i : Z) (ents : gmap fname Z) (f : fname) :
     tree_ent (tree_ins t i (NDir ents)) i f = ents !! f.
   Proof using .
-    rewrite /tree_ent /tree_ins /=. rewrite lookup_insert. reflexivity.
+    rewrite /tree_ent /tree_ins /=. rewrite lookup_insert_eq. reflexivity.
   Qed.
 
   (* **THE LOGICALLY-ATOMIC FORM (R8), AND THE ONLY ONE THAT IS SOUND

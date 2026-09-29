@@ -637,7 +637,7 @@ Section UkPipeDev.
      ∧ (UserFd.ustd γfd l -∗ app_taint -∗ ∀ z : Z, K z)) -∗
     wr_obl N P (Z.of_nat fd) bs K.
   Proof using Hsw.
-    intros Hlt Hl Ha Hpre Hne. apply elem_of_list_singleton in Ha. subst a.
+    intros Hlt Hl Ha Hpre Hne. apply list_elem_of_singleton in Ha. subst a.
     iIntros "#Hinv Hstd Hout HK".
     iDestruct "Hout" as (c) "([%HS %HL] & Hw & #Hlb)".
     assert (Hlen : (length bs <= length L - c)%nat).

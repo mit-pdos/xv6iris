@@ -165,7 +165,7 @@ Lemma pname_wf_insert0 (bs : list (bv 8)) :
   pname_wf (<[0%nat := (mword_of_int 0 : mword 8)]> bs).
 Proof.
   intro H. exists 0%nat. rewrite length_insert. split; [exact H |].
-  apply list_lookup_insert. exact H.
+  apply list_lookup_insert_eq. exact H.
 Qed.
 Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
   add_vec pa (mword_of_int (344 + Z.of_nat i)).
@@ -284,7 +284,7 @@ Lemma ofile_slli3 (z : Z) : 0 <= z -> z * 8 < 18446744073709551616 ->
   = mword_of_int (z * 8).
 Proof.
   intros Hz0 Hz. apply bv_eq.
-  unfold shift_bits_left, shiftl, with_word, get_word,
+  unfold shift_bits_left, shiftl,
          MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
@@ -1038,7 +1038,7 @@ Section ParkGhost.
   Context `{!riscvGS Σ}.
 
   Definition hart_own (j : nat) (q : Qp) (h : CPU) : iProp Σ :=
-    ghost_var (park_name j) q h.
+    ghost_var_frac (park_name j) q h.
 
   Definition hart_hlf (j : nat) (h : CPU) : iProp Σ := hart_own j (1/2) h.
   Definition hart_full (j : nat) (h : CPU) : iProp Σ := hart_own j 1 h.
@@ -1047,7 +1047,7 @@ Section ParkGhost.
   Proof using . rewrite /hart_own. apply _. Qed.
 
   (* THE COLLAPSE.  This is the whole point of the tag: it turns the lock's
-     existential hart into the ambient one, and it is a [ghost_var]
+     existential hart into the ambient one, and it is a [ghost_var_frac]
      agreement, hence timeless. *)
   Lemma hart_own_agree (j : nat) (q1 q2 : Qp) (h1 h2 : CPU) :
     hart_own j q1 h1 -∗ hart_own j q2 h2 -∗ ⌜h1 = h2⌝.
@@ -1057,7 +1057,7 @@ Section ParkGhost.
   Qed.
 
   Local Lemma ghost_var_halve {A : Type} `{!ghost_varG Σ A} (γ : gname) (r : A) :
-    ghost_var γ 1 r ⊣⊢ ghost_var γ (1/2) r ∗ ghost_var γ (1/2) r.
+    ghost_var_frac γ 1 r ⊣⊢ ghost_var_frac γ (1/2) r ∗ ghost_var_frac γ (1/2) r.
   Proof using .
     iSplit.
     - iIntros "H". iApply (ghost_var_split γ r (1/2) (1/2)).
@@ -1118,10 +1118,10 @@ Section ParkGhost.
   (* ==================================================================== *)
   (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).    *)
   (*                                                                       *)
-  (* A [ghost_var] carrying [p->state]'s value, in two halves.  The proc    *)
+  (* A [ghost_var_frac] carrying [p->state]'s value, in two halves.  The proc    *)
   (* lock invariant owns half #1, tied to the cell; half #2 is lock-        *)
   (* resident on [unclaimed] and held by the claiming thread otherwise.     *)
-  (* Since a ghost_var cannot move on half alone and the tie forbids moving *)
+  (* Since a ghost_var_frac cannot move on half alone and the tie forbids moving *)
   (* the cell without the ghost, THE RIGHT TO WRITE [p->state] IS EXACTLY   *)
   (* OWNERSHIP OF HALF #2.                                                  *)
   (*                                                                       *)
@@ -1131,7 +1131,7 @@ Section ParkGhost.
   (* the cell and get the ghost value for free.                            *)
   (* ==================================================================== *)
   Definition pstate_own (j : nat) (q : Qp) (st : mword 32) : iProp Σ :=
-    ghost_var (pstate_name j) q st.
+    ghost_var_frac (pstate_name j) q st.
 
   Definition pstate_hlf (j : nat) (st : mword 32) : iProp Σ := pstate_own j (1/2) st.
   Definition pstate_full (j : nat) (st : mword 32) : iProp Σ := pstate_own j 1 st.

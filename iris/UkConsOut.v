@@ -660,7 +660,7 @@ Section UkConsOutGen.
         iSplit; [done |]. iExact "Hc".
       + iExists [c]. iSplitL "Hlk"; [iExact "Hlk" |]. iSplit; [done |]. iLeft.
         iExists ps, cs, s0, pos. iSplit; [done |]. iSplitL "Hpin"; [iExact "Hpin" |].
-        iRight. iExists c, i. iSplit; [iPureIntro; by apply elem_of_list_singleton |].
+        iRight. iExists c, i. iSplit; [iPureIntro; by apply list_elem_of_singleton |].
         iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
         iExact "Hc".
     - iExists []. iSplitL "Hlk"; [iExact "Hlk" |]. iSplit; [done |]. by iRight.
@@ -686,23 +686,23 @@ Section UkConsOutGen.
     intros Ha. iIntros "(Hlk & %Hs & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].
     iSplit.
     { iPureIntro. unfold cons_short in *. apply Forall_singleton.
-      exact (proj1 (Forall_forall _ _) Hs a (proj1 (elem_of_list_In _ _) Ha)). }
+      exact (proj1 (Forall_forall _ _) Hs a (proj1 (list_elem_of_In _ _) Ha)). }
     iDestruct "Hd" as "[Hd | HT]"; [| by iRight]. iLeft.
     iDestruct "Hd" as (ps cs s0 pos) "(%Hw & Hpin & Hd)".
     iExists ps, cs, s0, pos.
     iSplit; [iPureIntro; exact Hw |]. iSplitL "Hpin"; [iExact "Hpin" |].
     iDestruct "Hd" as "[(%codes & %Hnw & %Hsub & %Hal & %Hadm & Hc)
                       | (%c & %i & %Hc & %Hi & %Hil & %Hadm & %Hal & Hc)]".
-    - iLeft. subst alts. apply elem_of_list_fmap in Ha as (c & -> & Hc).
+    - iLeft. subst alts. apply list_elem_of_fmap in Ha as (c & -> & Hc).
       iExists [c]. iSplit; [iPureIntro; exact Hnw |].
-      iSplit; [iPureIntro; intros x Hx; apply elem_of_list_singleton in Hx as ->; by apply Hsub |].
+      iSplit; [iPureIntro; intros x Hx; apply list_elem_of_singleton in Hx as ->; by apply Hsub |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; apply Forall_singleton;
-               exact (proj1 (Forall_forall _ _) Hadm c (proj1 (elem_of_list_In _ _) Hc)) |].
+               exact (proj1 (Forall_forall _ _) Hadm c (proj1 (list_elem_of_In _ _) Hc)) |].
       iDestruct "Hc" as "[Hc #Hrn]". iFrame "Hc".
       iApply (cons_rnd_sub with "Hrn").
-      intros x Hx. apply elem_of_list_singleton in Hx as ->. exact Hc.
-    - iRight. subst alts. apply elem_of_list_singleton in Ha as ->.
+      intros x Hx. apply list_elem_of_singleton in Hx as ->. exact Hc.
+    - iRight. subst alts. apply list_elem_of_singleton in Ha as ->.
       iExists c, i.
       iSplit; [iPureIntro; exact Hc |].
       iSplit; [iPureIntro; exact Hi |].
@@ -732,22 +732,22 @@ Section UkConsOutGen.
     intros Ha. iIntros "(Hlk & %Hs & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].
     iSplit.
     { iPureIntro. unfold cons_short in *. apply Forall_singleton.
-      exact (proj1 (Forall_forall _ _) Hs a (proj1 (elem_of_list_In _ _) Ha)). }
+      exact (proj1 (Forall_forall _ _) Hs a (proj1 (list_elem_of_In _ _) Ha)). }
     iDestruct "Hd" as "[Hd | HT]"; [| by iRight]. iLeft.
     iDestruct "Hd" as (ps cs s0 pos) "(%Hw & Hpin & Hd)".
     iExists ps, cs, s0, pos.
     iSplit; [iPureIntro; exact Hw |]. iSplitL "Hpin"; [iExact "Hpin" |].
     iDestruct "Hd" as "[(%codes & %Hnw & %Hal & %Hadm & Hc)
                       | (%c & %i & %Hi & %Hil & %Hadm & %Hal & Hc)]".
-    - iLeft. subst alts. apply elem_of_list_fmap in Ha as (c & -> & Hc).
+    - iLeft. subst alts. apply list_elem_of_fmap in Ha as (c & -> & Hc).
       iExists [c]. iSplit; [iPureIntro; exact Hnw |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; apply Forall_singleton;
-               exact (proj1 (Forall_forall _ _) Hadm c (proj1 (elem_of_list_In _ _) Hc)) |].
+               exact (proj1 (Forall_forall _ _) Hadm c (proj1 (list_elem_of_In _ _) Hc)) |].
       iDestruct "Hc" as "[Hc #Hrn]". iFrame "Hc".
       iApply (cons_rnd_sub with "Hrn").
-      intros x Hx. apply elem_of_list_singleton in Hx as ->. exact Hc.
-    - iRight. subst alts. apply elem_of_list_singleton in Ha as ->.
+      intros x Hx. apply list_elem_of_singleton in Hx as ->. exact Hc.
+    - iRight. subst alts. apply list_elem_of_singleton in Ha as ->.
       iExists c, i.
       iSplit; [iPureIntro; exact Hi |].
       iSplit; [iPureIntro; exact Hil |].
@@ -785,7 +785,7 @@ Section UkConsOutGen.
     - (* UNFILED: the block's first byte files the code *)
       destruct codes as [| c [| c' codes]]; cbn [fmap list_fmap] in Hal;
         try discriminate.
-      assert (HcC : c ∈ C) by (apply Hsub; by apply elem_of_list_singleton).
+      assert (HcC : c ∈ C) by (apply Hsub; by apply list_elem_of_singleton).
       injection Hal as Hx. subst x.
       rewrite Forall_singleton in Hadm. destruct Hadm as [Hok Hterm].
       pose proof (lookup_lt_Some _ _ _ Hb) as Hlen.
@@ -798,7 +798,7 @@ Section UkConsOutGen.
       { exact (lm_wr_blk_nonnil M ps cs s0 I pos Hwb). }
       { exact Hr. } { lia. } { exact Hpin0. } { exact HP. }
       { exact Hok. } { exact Hterm. } { exact Hb'. }
-      { iApply "Hrn". iPureIntro. by apply elem_of_list_singleton. }
+      { iApply "Hrn". iPureIntro. by apply list_elem_of_singleton. }
       iIntros "[(Ht & _ & #Hcs' & _) | #HT]";
         last by iApply (cons_dev_atc_taint C v I _ Hs' with "Hlk HT").
       iSplitR; [iExact "Hlk" |].
@@ -938,7 +938,7 @@ Section UkConsOutGen.
       iSplitL "Hpin"; [iExact "Hpin" |].
       iDestruct "Hc" as "[Hc #Hrn]".
       rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iFrame "Hc".
-      iRight. iApply "Hrn". iPureIntro. by apply elem_of_list_singleton.
+      iRight. iApply "Hrn". iPureIntro. by apply list_elem_of_singleton.
     - injection Hal as Hx.
       apply (f_equal length) in Hx. rewrite length_drop in Hx. cbn [length] in Hx.
       iExists ps, cs, s0, pos, c.
@@ -991,12 +991,12 @@ Section UkConsOutGen.
       rewrite Forall_singleton in Hadm.
       iExists ps, cs, s0, pos, c.
       iSplit; [iPureIntro; exact Hw |].
-      iSplit; [iPureIntro; apply Hsub; by apply elem_of_list_singleton |].
+      iSplit; [iPureIntro; apply Hsub; by apply list_elem_of_singleton |].
       iSplit; [iPureIntro; exact Hadm |].
       iSplitL "Hpin"; [iExact "Hpin" |].
       iDestruct "Hc" as "[Hc #Hrn]".
       rewrite -Hx. cbn [length]. rewrite /cons_cur. cbn [lm_blkcs]. iFrame "Hc".
-      iRight. iApply "Hrn". iPureIntro. by apply elem_of_list_singleton.
+      iRight. iApply "Hrn". iPureIntro. by apply list_elem_of_singleton.
     - injection Hal as Hx.
       apply (f_equal length) in Hx. rewrite length_drop in Hx. cbn [length] in Hx.
       iExists ps, cs, s0, pos, c.

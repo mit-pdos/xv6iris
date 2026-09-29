@@ -41,7 +41,7 @@
       of L it is appending.  What pins it is that the writer is the ONLY
       writer, and the only way to say that in the logic is an exclusive
       permit that CARRIES the cursor.  So the protocol has a write cursor
-      [wcur pn c] (half of a [ghost_var]; the body holds the other half at
+      [wcur pn c] (half of a [ghost_var_frac]; the body holds the other half at
       [length (ps_ws s)]) and, symmetrically, a read cursor [rcur pn c] at
       [ps_rp s].  They compose across echo's several [write]s and cat's
       several [read]s, which is exactly what the design asked the builders
@@ -50,7 +50,7 @@
       (["ps_ws s = []"] or the persistent "the token went in") exists to let
       sh conclude "echo never wrote" from the start token; with the cursor
       that is [wcur pn 0] against the body's [wcur pn (length (ps_ws s))],
-      one [ghost_var] agreement ([pipe_body_P2] below).  So [wtok pn] IS the
+      one [ghost_var_frac] agreement ([pipe_body_P2] below).  So [wtok pn] IS the
       write permit at 0, no one-shot is minted for it, and the body has one
       conjunct fewer.
 
@@ -116,7 +116,7 @@ Record pnames := MkPNames {
   pn_hist  : gname;   (* the [mono_list] of bytes written *)
   pn_eof   : gname;   (* the reader's one-shot snapshot *)
   pn_ro    : gname;   (* the writer's "the read end was seen shut" shot *)
-  pn_wcur  : gname;   (* the write permit, a [ghost_var nat] in halves *)
+  pn_wcur  : gname;   (* the write permit, a [ghost_var_frac nat] in halves *)
   pn_rcur  : gname;   (* the read permit, likewise *)
   pn_sideL : gname;   (* sh's left-child token *)
   pn_sideR : gname;   (* sh's right-child token *)
@@ -174,16 +174,16 @@ Section PipeProto.
   Definition ro_shot (pn : pnames) : iProp Σ :=
     own (pn_ro pn) (Cinr (to_agree ()) : pipe_roR).
 
-  (* THE TWO PERMITS.  Half of each [ghost_var] sits in the body at the
+  (* THE TWO PERMITS.  Half of each [ghost_var_frac] sits in the body at the
      state's own cursor, the other half is the process's exclusive right to
      move it -- and its exact knowledge of where it is. *)
   Definition wcur (pn : pnames) (c : nat) : iProp Σ :=
-    ghost_var (pn_wcur pn) (1/2) c.
+    ghost_var_frac (pn_wcur pn) (1/2) c.
   Definition rcur (pn : pnames) (c : nat) : iProp Σ :=
-    ghost_var (pn_rcur pn) (1/2) c.
+    ghost_var_frac (pn_rcur pn) (1/2) c.
 
   (* ...at the start.  [wtok] is design SS3's "writer's start token": it is
-     the write permit at cursor 0, which is what makes (P2) a [ghost_var]
+     the write permit at cursor 0, which is what makes (P2) a [ghost_var_frac]
      agreement instead of a second one-shot. *)
   Definition wtok (pn : pnames) : iProp Σ := wcur pn 0.
   Definition rtok (pn : pnames) : iProp Σ := rcur pn 0.
@@ -1953,7 +1953,7 @@ Section PipeProto.
     - reflexivity.
     - reflexivity.
     - intros j Hj. split; [ | reflexivity ].
-      rewrite /pst_next /=. rewrite lookup_take; [ | lia ].
+      rewrite /pst_next /=. rewrite lookup_take_lt; [ | lia ].
       apply list_lookup_lookup_total_lt. lia.
     - rewrite /pst_eof /pst_empty /=. split; [ | reflexivity ].
       rewrite length_take. lia.
@@ -2454,7 +2454,7 @@ Section PipeProto.
   Proof using .
     intros HL. iIntros "#Hinv".
     iApply (flow_chain_excl L None [] (pn, γp, fun D => D) (pn, γp, fun D => D) HL
-              ltac:(apply elem_of_list_here) with "[]").
+              ltac:(apply list_elem_of_here) with "[]").
     cbn [app flow_invs flowF fst snd]. iSplitR; [ iExact "Hinv" | done ].
   Qed.
 

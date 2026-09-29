@@ -495,9 +495,9 @@ Section ProofIdup.
                   (IcacheInv.iref_pin_rows k (iref_word M k) lo tstk
                      ={⊤ ∖ ↑minstretN ∖ ↑icacheN, ⊤ ∖ ↑minstretN}=∗
                    itable_half M ∗
-                   mono_nat_auth_own (icfg_istmp k) (1/2) tstk))%I)
+                   mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk))%I)
               (itable_half M ∗
-               mono_nat_auth_own (icfg_istmp k) (1/2) tstk)%I
+               mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstk)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj) _
               with "Hcg Hpc [] [] [Hhalf Hstk]").
@@ -586,7 +586,7 @@ Section ProofIdup.
                  runit false (bv_unsigned inum) ∗
                  runit false (bv_unsigned inum) ∗
                  (∃ tstn : nat, ⌜(losh <= tstn)%nat⌝ ∗
-                    mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                     TsoGhost.llb loglen_name tstn)))%I)
               ((IcacheInv.pinw_store_post k
                   (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32) losh ∗
@@ -602,7 +602,7 @@ Section ProofIdup.
                  runit false (bv_unsigned inum) ∗
                  runit false (bv_unsigned inum) ∗
                  (∃ tstn : nat, ⌜(losh <= tstn)%nat⌝ ∗
-                    mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                     TsoGhost.llb loglen_name tstn)))%I)
               ((itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
                 isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
@@ -613,7 +613,7 @@ Section ProofIdup.
                 runit false (bv_unsigned inum) ∗
                 runit false (bv_unsigned inum) ∗
                 (∃ tstn : nat, ⌜(losh <= tstn)%nat⌝ ∗
-                   mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+                   mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
                    TsoGhost.llb loglen_name tstn))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
               ltac:(solve_ndisj) _
@@ -673,7 +673,7 @@ Section ProofIdup.
     { intros j Hj. rewrite lookup_insert_ne;
         [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
-    { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert.
+    { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert_eq.
       iSplitL "Hrd Hc".
       { rewrite /ic_slot_row.
         iExists tb. iSplitL; [| iExact "Hllbb"].
@@ -700,7 +700,7 @@ Section ProofIdup.
     (* the ledger's [icnt] half goes back at the GROWN count, and the mirror
        half goes back into [frz_park]'s OFF arm -- which is where this proof
        found it, since the ON arm was refuted before the store. *)
-    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
+    { rewrite /islot2 lookup_insert_eq Hcik. iFrame "Hiu Hgid Hicnt".
       iSplitR "Hmir Hsel Hpin"; [| iApply (frz_park_intro_off with "Hmir Hsel Hpin") ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
     iAssert (itable_res2_llb CtxIdDefs.cur_ctx fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) with "[Hhalf Hstampsllb Hiauth Hipool Hslots Hpool]" as "HRres".
@@ -723,7 +723,7 @@ Section ProofIdup.
       - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
       - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-        + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+        + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
           injection Hj as _ Hn. subst nj. exact Hno422.
         + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
           by apply (Hcnt' j qj). }

@@ -270,9 +270,9 @@ Section NameiEraCursor.
      wants the halves split against a client invariant; that is N-4's
      business, not this file's.) *)
   Definition nxe_P (γw : gname) (k : nat) (d : Z) : iProp Σ :=
-    ghost_var γw 1 (k, d).
+    ghost_var_frac γw 1 (k, d).
   Definition nxe_Pmiss (γw : gname) (k : nat) (d : Z) : iProp Σ :=
-    ghost_var γw 1 (k, d).
+    ghost_var_frac γw 1 (k, d).
 
   Lemma nxe_hop_c (γw : gname) (k : nat) (s : fname) :
     ⊢ ex_hop fsc_fs (nxe_P γw) (nxe_Pmiss γw) k s.

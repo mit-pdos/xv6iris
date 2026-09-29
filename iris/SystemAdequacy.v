@@ -32,6 +32,7 @@ From stdpp Require Import gmap finite list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
 From iris.program_logic Require Import language lifting adequacy.
+From iris.program_logic Require Import language. (* after [adequacy]: Iris master's [adequacy] brings stdpp's [relations.nsteps] into scope *)
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
@@ -252,7 +253,7 @@ Proof. rewrite /app_clone_raw. apply _. Qed.
    comes in satisfying it ([AppDur.app_dur_raw]) and the repacked one
    [r_s] goes back satisfying it.
    ...AND LENT THE MACHINE'S STARTED AUTH (sync SY3-A3bc, design 4.5 ruling
-   (iii)): the swap holds [mono_nat_auth_own γst 1 (gen + 1)] for the era
+   (iii)): the swap holds [mono_nat_auth_own_frac γst 1 (gen + 1)] for the era
    generation [gen] it runs at, and passes it in and takes it back -- what
    lets an application bound its durable copy's era certificate (the
    union's re-base bumps its commit-era counter to [S gen] under it).  At
@@ -262,9 +263,9 @@ Definition app_xfer_boot_raw {Σ : gFunctors} {N : Type} (HSt : mono_natG Σ)
     (A : N -> FsAbsDefs.aview -> iProp Σ) (Okc : N -> Prop) (B : N -> iProp Σ)
     (Tn Tn' : iProp Σ) (γst : gname) (gen : nat) : iProp Σ :=
   (□ (∀ (r : N) (av : FsAbsDefs.aview) (n : nat),
-        ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own Σ HSt γst 1 n -∗
+        ⌜n = (gen + 1)%nat⌝ -∗ @mono_nat_auth_own Σ HSt γst (DfracOwn 1) n -∗
         ⌜Okc r⌝ -∗ Tn -∗ ▷ A r av ==∗
-        ◇ (@mono_nat_auth_own Σ HSt γst 1 n ∗ Tn' ∗
+        ◇ (@mono_nat_auth_own Σ HSt γst (DfracOwn 1) n ∗ Tn' ∗
            ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r')))%I.
 
 Global Instance app_xfer_boot_raw_persistent {Σ} {N} (HSt : mono_natG Σ)
@@ -378,12 +379,12 @@ Proof. iEmpIntro. Qed.
 Definition app_dur_at {Σ : gFunctors} `{!fsTopG Σ} {N : Type}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N) : iProp Σ :=
   (∃ I : gmap Z FsNode.fs_node,
-     ghost_map_auth gt (1/2) I ∗ A r (FsAbsDefs.abs_view I))%I.
+     ghost_map_auth_frac gt (1/2) I ∗ A r (FsAbsDefs.abs_view I))%I.
 
 Lemma app_dur_at_pack {Σ} `{!fsTopG Σ} {N}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N)
     (I : gmap Z FsNode.fs_node) :
-  ghost_map_auth gt (1/2) I -∗ ▷ A r (FsAbsDefs.abs_view I) -∗
+  ghost_map_auth_frac gt (1/2) I -∗ ▷ A r (FsAbsDefs.abs_view I) -∗
   ▷ app_dur_at A gt r.
 Proof.
   iIntros "Hh Hp". iNext. rewrite /app_dur_at. iExists I. iFrame "Hh Hp".
@@ -392,8 +393,8 @@ Qed.
 Lemma app_dur_at_agree {Σ} `{!fsTopG Σ} {N}
     (A : N -> FsAbsDefs.aview -> iProp Σ) (gt : gname) (r : N)
     (q : Qp) (I : gmap Z FsNode.fs_node) :
-  ghost_map_auth gt q I -∗ ▷ app_dur_at A gt r -∗
-    ◇ (ghost_map_auth gt q I ∗ ghost_map_auth gt (1/2) I ∗
+  ghost_map_auth_frac gt q I -∗ ▷ app_dur_at A gt r -∗
+    ◇ (ghost_map_auth_frac gt q I ∗ ghost_map_auth_frac gt (1/2) I ∗
        ▷ A r (FsAbsDefs.abs_view I)).
 Proof.
   iIntros "Hk Hg". rewrite /app_dur_at.
@@ -1515,7 +1516,7 @@ Theorem xv6_power_adequacy_gen Σ
        (app-instances.md section 6 ruling 1): born by [Hbirth] before the
        crash slot, and its yield owned by the trace slot from birth *)
     (HPt : forall (γobs : gname) (c : CT),
-       Clt c ∗ ghost_var γobs (1/2) ([] : list mobs)
+       Clt c ∗ ghost_var_frac γobs (1/2) ([] : list mobs)
          ⊢ |==> Pt γobs c)
     (* ...AND ON THE POWER-ON ARM IT FOUNDS THE ERA'S TWO PORT CLAIMS (lane
        CONS-IO milestone E): the transport founded them until e5-design
@@ -1526,9 +1527,9 @@ Theorem xv6_power_adequacy_gen Σ
                    (dk : Z -> bv 8),
        trace_shape h on ->
        ⊢ disk_img_auth_sized γd XV6_DISK_BYTES dk -∗ ▷ Pt γobs c -∗
-         ghost_var γobs (1/2) h ==∗
+         ghost_var_frac γobs (1/2) h ==∗
            ◇ (disk_img_auth_sized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗
-              ghost_var γobs (1/2)
+              ghost_var_frac γobs (1/2)
                 (h ++ [if on then ObsPowerOff else ObsPowerOn])%list ∗
               (if on then emp
                else ai_cons (Ai c) (Datatypes.S (obs_boots h)) []
@@ -1539,9 +1540,9 @@ Theorem xv6_power_adequacy_gen Σ
     (* THE RETURN PATH (SY3-A1 re-cut), passed through to
        [RiscvAdequacy.riscv_power_adequacy]'s [Hback] *)
     (Hback : forall (γobs : gname) (c : CT) (h : list mobs),
-       ⊢ ▷ Pt γobs c -∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list -∗
+       ⊢ ▷ Pt γobs c -∗ ghost_var_frac γobs (1/2) (h ++ [ObsPowerOn])%list -∗
          Tnn' c (Datatypes.S (obs_boots h)) ==∗
-         ◇ (▷ Pt γobs c ∗ ghost_var γobs (1/2) (h ++ [ObsPowerOn])%list
+         ◇ (▷ Pt γobs c ∗ ghost_var_frac γobs (1/2) (h ++ [ObsPowerOn])%list
             ∗ Tnn'' c (Datatypes.S (obs_boots h))))
     (* ...AND SINCE lane APP-IFACE item (c) (review-echo-plan finding 3) IT
        IS STATED AT THE ERA'S OWN UART NAMES.  It used to be quantified over
@@ -1577,7 +1578,7 @@ Theorem xv6_power_adequacy_gen Σ
                   γd γsw γreg γstart c)
                (Tk c) (Hk c)
                γobs T (Pt γobs c) γhist (Ai c) CT c) g' -∗
-         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
+         ghost_var_frac γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot app_names app_fs app_okc cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
          ▷ Pt γobs c -∗

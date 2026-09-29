@@ -673,17 +673,17 @@ Proof.
   (* the argument vector's address is the [spv] the commit block wrote *)
   rewrite <- Hspv.
   split_and!.
-  { unfold tf_w. apply list_lookup_total_insert.
+  { unfold tf_w. apply list_lookup_total_insert_eq.
     rewrite Htf !length_insert. exact Hlt14. }
   { unfold tf_w. rewrite Htf.
     rewrite (list_lookup_total_insert_ne _ _ _ _ Hn06).
     rewrite (list_lookup_total_insert_ne _ _ _ _ Hn36).
-    apply list_lookup_total_insert. rewrite length_insert. exact Hlt6. }
+    apply list_lookup_total_insert_eq. rewrite length_insert. exact Hlt6. }
   { unfold tf_w. rewrite Htf.
     rewrite (list_lookup_total_insert_ne _ _ _ _ Hn01).
     rewrite (list_lookup_total_insert_ne _ _ _ _ Hn31).
     rewrite (list_lookup_total_insert_ne _ _ _ _ Hn61).
-    apply list_lookup_total_insert. exact Hlt15. }
+    apply list_lookup_total_insert_eq. exact Hlt15. }
   { exact Hlo. }
   { exact Hhi. }
   { exact Hstok. }

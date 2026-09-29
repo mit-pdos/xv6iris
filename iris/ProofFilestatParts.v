@@ -152,7 +152,6 @@ Proof.
   unfold bv_modulus in Hhi. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hhi.
   pose proof (fst_z_rem8_no_wrap _ (conj Hlo Hhi) H8) as Hnw.
   unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (H2 : bv_unsigned (mword_of_int (Z.of_nat 2) : mword 64) = 2%Z)
@@ -511,8 +510,7 @@ Qed.
 Lemma fst_addv32_unsigned (a b : mword 32) :
   bv_unsigned (add_vec a b) = bv_wrap 32 (bv_unsigned a + bv_unsigned b).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   change (MachineWord.MachineWord.Z_idx 32) with 32%N. reflexivity.
 Qed.

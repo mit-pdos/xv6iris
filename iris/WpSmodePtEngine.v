@@ -48,7 +48,7 @@ Lemma se39_unsigned_e (a : SailStdpp.Values.mword 64) :
 Proof.
   cbn [bits_of_virtaddr].
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned. unfold bv_signed.
   rewrite (subrange_dec_unsigned_lo0 a (Z.sub 39 1) 549755813888
              ltac:(lia) ltac:(vm_compute; reflexivity)).

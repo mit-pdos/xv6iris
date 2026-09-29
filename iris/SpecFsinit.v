@@ -460,8 +460,8 @@ Definition wp_fsinit_sconf_body
   lh_n_pa ↦₄ v_n -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) -∗
   (* ---- initlog's FsBlocks material ---- *)
-  ghost_map_auth (fs_cache fsc_fs) 1 L -∗
-  ghost_map_auth (fs_dirty fsc_fs) 1 D -∗
+  ghost_map_auth_frac (fs_cache fsc_fs) 1 L -∗
+  ghost_map_auth_frac (fs_dirty fsc_fs) 1 D -∗
   ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) -∗
   fs_chalf fsc_fs (log_hdr_bno fsc_logst) bs_hdr -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS,

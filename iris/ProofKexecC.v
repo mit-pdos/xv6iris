@@ -185,7 +185,7 @@ Section KexecCSetup.
   Proof using .
     intros Hc vpn' Hlt.
     destruct (decide (vpn' = vpn)) as [-> | Hne].
-    - rewrite lookup_insert. eauto.
+    - rewrite lookup_insert_eq. eauto.
     - rewrite lookup_insert_ne; [| exact (not_eq_sym Hne)]. apply Hc; exact Hlt.
   Qed.
 
@@ -1993,7 +1993,7 @@ Section KexecCExitM1.
       assert (Heq : pa_stk sp0 (46 - c) = pa_stk (pa_stk sp0 (45 - c)) 1).
       { rewrite pa_stk_assoc. f_equal. lia. }
       iEval (rewrite Heq) in "Hlast".
-      iDestruct (stack_own_1_intro (pa_stk sp0 (45 - c)) (f c) with "Hlast") as "Hone".
+      iDestruct (stack_own_1_intro (KTR := KT1) (pa_stk sp0 (45 - c)) (f c) with "Hlast") as "Hone".
       replace (46 - S c)%nat with (45 - c)%nat by lia.
       replace (S c) with (1 + c)%nat by lia.
       rewrite (stack_own_app (KTR := KT1) (pa_stk sp0 (45 - c)) 1 c).
@@ -2421,6 +2421,7 @@ Section KexecCLoop.
   Local Lemma kxc_sp_le_top (top : Z) (len : nat -> nat) (i : nat) :
     kxc_sp top len i <= top.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     induction i as [| i IH].
     - change (kxc_sp top len 0) with top. lia.
     - rewrite kxc_sp_S. unfold kxc_round16.
@@ -4185,7 +4186,7 @@ Section KexecCClose.
       assert (Heq : pa_stk sp0 (46 - n) = pa_stk (pa_stk sp0 (45 - n)) 1).
       { rewrite pa_stk_assoc. f_equal. lia. }
       iEval (rewrite Heq) in "Hlast".
-      iDestruct (stack_own_1_intro (pa_stk sp0 (45 - n)) w with "Hlast") as "Hone".
+      iDestruct (stack_own_1_intro (KTR := KT1) (pa_stk sp0 (45 - n)) w with "Hlast") as "Hone".
       replace (46 - S n)%nat with (45 - n)%nat by lia.
       replace (S n) with (1 + n)%nat by lia.
       rewrite (stack_own_app (KTR := KT1) (pa_stk sp0 (45 - n)) 1 n).

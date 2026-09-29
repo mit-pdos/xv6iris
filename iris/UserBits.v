@@ -20,7 +20,7 @@ Local Open Scope Z_scope.
 Lemma uint_unsigned_n (n : Z) (a : mword n) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -39,12 +39,11 @@ Lemma uint_add_vec_int_mod4096 (va : mword 64) (j : Z) :
 Proof.
   intro Hj.
   rewrite !uint_unsigned.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 64) = j).
-  { unfold mword_of_int, Values.to_word, get_word.
+  { unfold mword_of_int.
     cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn. lia. }
@@ -62,12 +61,11 @@ Lemma uint_add_vec_int_small (a : mword 64) (j : Z) :
   bv_unsigned (add_vec_int a j) = bv_unsigned a + j.
 Proof.
   intros Hj Hfit.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 64) = j).
-  { unfold mword_of_int, Values.to_word, get_word.
+  { unfold mword_of_int.
     cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn.
@@ -287,12 +285,12 @@ Proof.
   apply eq_vec_true_iff.
   apply bv_eq.
   unfold access_vec_dec, access_mword_dec, concat_vec.
-  cbv [to_word get_word autocast].
+  cbv [autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (20 + 1)) (20 + 1)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
   rewrite bv_extract_unsigned.
   erewrite bv_concat_unsigned by (cbn; lia).
   cbn.
@@ -312,12 +310,12 @@ Proof.
   apply eq_vec_true_iff.
   apply bv_eq.
   unfold access_vec_dec, access_mword_dec, concat_vec.
-  cbv [to_word get_word autocast].
+  cbv [autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (12 + 1)) (12 + 1)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
   rewrite bv_extract_unsigned.
   erewrite bv_concat_unsigned by (cbn; lia).
   cbn.
@@ -382,7 +380,7 @@ Lemma access0_unsigned_64 (w : mword 64) :
 Proof.
   unfold access_vec_dec, access_mword_dec.
   unfold MachineWord.MachineWord.slice.
-  cbv [get_word].
+  idtac.
   rewrite bv_extract_unsigned.
   rewrite Z.shiftr_0_r.
   unfold bv_wrap.
@@ -395,7 +393,7 @@ Lemma access0_unsigned_21 (w : mword 21) :
 Proof.
   unfold access_vec_dec, access_mword_dec.
   unfold MachineWord.MachineWord.slice.
-  cbv [get_word].
+  idtac.
   rewrite bv_extract_unsigned.
   rewrite Z.shiftr_0_r.
   unfold bv_wrap.
@@ -408,7 +406,7 @@ Lemma access0_unsigned_13 (w : mword 13) :
 Proof.
   unfold access_vec_dec, access_mword_dec.
   unfold MachineWord.MachineWord.slice.
-  cbv [get_word].
+  idtac.
   rewrite bv_extract_unsigned.
   rewrite Z.shiftr_0_r.
   unfold bv_wrap.
@@ -446,13 +444,13 @@ Proof.
   intros Hpc Himm.
   apply eq_vec_true_iff. apply bv_eq.
   rewrite access0_unsigned_64.
-  unfold add_vec, word_binop, with_word', to_word, get_word.
-  unfold SailStdpp.Values.with_word.
+  unfold add_vec, word_binop.
+  idtac.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite mod2_wrap by (cbn; lia).
-  unfold sign_extend', Operators_mwords.sign_extend, exts_vec, to_word, get_word.
-  unfold MachineWord.MachineWord.sign_extend, Values.to_word.
+  unfold sign_extend', Operators_mwords.sign_extend, exts_vec.
+  unfold MachineWord.MachineWord.sign_extend.
   rewrite bv_sign_extend_unsigned.
   rewrite Zplus_mod.
   rewrite mod2_wrap by (cbn; lia).
@@ -470,13 +468,13 @@ Proof.
   intros Hpc Himm.
   apply eq_vec_true_iff. apply bv_eq.
   rewrite access0_unsigned_64.
-  unfold add_vec, word_binop, with_word', to_word, get_word.
-  unfold SailStdpp.Values.with_word.
+  unfold add_vec, word_binop.
+  idtac.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite mod2_wrap by (cbn; lia).
-  unfold sign_extend', Operators_mwords.sign_extend, exts_vec, to_word, get_word.
-  unfold MachineWord.MachineWord.sign_extend, Values.to_word.
+  unfold sign_extend', Operators_mwords.sign_extend, exts_vec.
+  unfold MachineWord.MachineWord.sign_extend.
   rewrite bv_sign_extend_unsigned.
   rewrite Zplus_mod.
   rewrite mod2_wrap by (cbn; lia).
@@ -590,13 +588,13 @@ Lemma concat16_16_unsigned (x y : mword 16) :
   bv_unsigned (concat_vec x y : mword 32) = bv_unsigned x * 65536 + bv_unsigned y.
 Proof.
   unfold concat_vec.
-  cbv [Operators_mwords.word_binop Operators_mwords.with_word' to_word get_word
-       SailStdpp.Values.with_word autocast].
+  cbv [Operators_mwords.word_binop 
+       autocast].
   cbn.
   destruct (Z.eq_dec (Z.of_N (16 + 16)) (16 + 16)) as [e2 | ne]; [| exfalso; exact (ne eq_refl)].
   rewrite (TypeCasts.cast_Z_refl (H := e2)).
   unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold MachineWord.MachineWord.concat, Values.to_word.
+  unfold MachineWord.MachineWord.concat.
   erewrite bv_concat_unsigned by (cbn; lia).
   change (Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 16.
   rewrite Z.shiftl_mul_pow2 by lia.
@@ -627,7 +625,7 @@ Lemma zext32_16_unsigned (h : mword 16) :
   bv_unsigned (zero_extend' 32 h : mword 32) = bv_unsigned h.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
 Qed.
 

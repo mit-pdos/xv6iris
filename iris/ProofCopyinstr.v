@@ -836,7 +836,7 @@ Section ProofCopyinstr.
       assert (Hdi : (done + i < maxn)%nat) by lia.
       assert (Hcur : pa_add (pa_add dst done) i = pa_add dst (done + i))
         by apply pa_add_assoc.
-      iDestruct (bb_byte_acc dst maxn (done + i) f (DfracOwn 1) Hdi with "Hdst")
+      iDestruct (bb_byte_acc (KTR := ktb) dst maxn (done + i) f (DfracOwn 1) Hdi with "Hdst")
         as "[Hdb Hdback]".
       iApply (wp_sb_s_sconf (kt := KT1) (ktd := ktb) (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
                 (mword_of_int 0 : mword 12) I3 Kv (f (done + i)%nat) b
@@ -1366,7 +1366,7 @@ Section ProofCopyinstr.
             by apply pa_add_assoc.
           iDestruct (sie_cap_gpr_x0 Mn (K - 12)%nat b pcur Rx0 ltac:(vm_compute; reflexivity)
                        with "Hcg") as "[%Hz0 Hcg]".
-          iDestruct (bb_byte_acc dst maxn (done + i') g (DfracOwn 1) Hdi with "Hdst")
+          iDestruct (bb_byte_acc (KTR := ktb) dst maxn (done + i') g (DfracOwn 1) Hdi with "Hdst")
             as "[Hdb Hdback]".
           iApply (wp_sb_s_sconf (kt := KT1) (ktd := ktb) (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
                     (mword_of_int 0 : mword 12) Mn (K - 12)%nat (g (done + i')%nat) b
@@ -1929,7 +1929,7 @@ Section ProofCopyinstr.
                      with "Hpt") as %Hwfins.
         assert (Hlins : (uptd_insert Pc (svpn_of va0) r).(ud_um) !! (svpn_of va0)
                         = Some (vmfault_pte r))
-          by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+          by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert_eq).
         iDestruct (proc_ptm_page_bytes (uptd_insert Pc (svpn_of va0) r) (uint szv) M
                      (svpn_of va0) (vmfault_pte r) Hlins with "Hpt") as %Hbytes.
         assert (Hpgm : forall j : nat, (j < 4096)%nat ->

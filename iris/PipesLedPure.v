@@ -99,7 +99,7 @@ Section lm_led.
     { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
         [reflexivity | rewrite /nlines in Hj; lia]. }
     assert (Htk : forall j, j < nlines I -> take (nlines I) cs !!! j = cs !!! j).
-    { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
+    { intros j Hj. rewrite !list_lookup_total_alt lookup_take_lt; [done | lia]. }
     assert (Hup : lm_upto M (take (nlines I) cs) s (bodies_of I) i
                   = lm_upto M cs s (bodies_of (I ++ [b])) i).
     { apply (lm_upto_ext M); [intros j Hj; apply Htk; lia |].
@@ -127,7 +127,7 @@ Section lm_led.
     split; [exact (lm_disc_input_prefix M B _ _ Hpre Hd) |].
     set (n := nlines (ins seg)).
     assert (Htk : forall j, j < n -> take n cs !!! j = cs !!! j).
-    { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
+    { intros j Hj. rewrite !list_lookup_total_alt lookup_take_lt; [done | lia]. }
     exists ps, (take n cs).
     split; [exact (lm_alts_ok_take s _ _ cs Hpre Hl) |].
     split; [exact (lm_d4_take_snoc cs s (ins seg) b Hd4) |].

@@ -522,7 +522,7 @@ Qed.
 (* ...and at a stage list of filters (cut G3): one stage in front of a
    tail that starts a fresh word, and the last stage alone *)
 Lemma suf_filt_bar (F : filt) : fd_bar ∈ suf_filt F.
-Proof using. rewrite /suf_filt. apply elem_of_list_further, elem_of_list_here. Qed.
+Proof using. rewrite /suf_filt. apply list_elem_of_further, list_elem_of_here. Qed.
 
 Lemma wl_words_filt_app (F : filt) (L : list (bv 8)) (R : list (list (bv 8))) :
   filt_ok F -> wl_words L = [] :: R ->
@@ -810,7 +810,7 @@ Qed.
 Lemma lines_of_nopipe I l : l ∈ lines_of I -> uline_nopipe l.
 Proof using.
   rewrite /lines_of. intro Hl.
-  apply elem_of_list_fmap in Hl as (b & -> & _).
+  apply list_elem_of_fmap in Hl as (b & -> & _).
   exact (uline_of_nopipe b).
 Qed.
 
@@ -1998,7 +1998,7 @@ Proof using.
   - apply Forall_forall. intros b Hb.
     pose proof (wl_line_byte_val_fn ws b Hwf Hb) as Hv. rewrite /nodollar. lia.
   - right. exists (wl_body ws). split; [| reflexivity].
-    intros Hin. apply elem_of_list_lookup_1 in Hin as [i Hi].
+    intros Hin. apply list_elem_of_lookup_1 in Hin as [i Hi].
     destruct (Forall_lookup_1 _ _ _ _ (wl_body_bytes_fn ws Hwf) Hi) as [Hb | Hb].
     + exact (proj2 (fn_nodollar_nonl _ Hb) eq_refl).
     + apply (f_equal bv_unsigned) in Hb. rewrite wl_sp_val wl_nl_val in Hb. discriminate Hb.
@@ -2408,7 +2408,7 @@ Lemma sessf_take ps cs s I q :
 Proof using.
   intros Hq. rewrite /sessf. do 2 f_equal.
   apply alt_seq_f_cs_ext. intros j Hj.
-  rewrite list_lookup_total_alt lookup_take; [| lia].
+  rewrite list_lookup_total_alt lookup_take_lt; [| lia].
   by rewrite -list_lookup_total_alt.
 Qed.
 
@@ -2576,7 +2576,7 @@ Proof using. constructor. Qed.
 
 Lemma disc_f_seg h seg : disc_f h -> seg ∈ cycles_of h -> disc_seg_f seg.
 Proof using.
-  intros Hd Hin. apply elem_of_list_lookup in Hin as [i Hi].
+  intros Hd Hin. apply list_elem_of_lookup in Hin as [i Hi].
   destruct (Forall_lookup_1 _ _ _ _ Hd Hi) as (s & _ & Hs & _). exact Hs.
 Qed.
 
@@ -2673,8 +2673,8 @@ Qed.
 Lemma echof_lines_in_names I : Forall (fun p => uname p.1) (echof_lines_in I).
 Proof using.
   apply Forall_forall. intros [N ws] Hws.
-  apply elem_of_list_omap in Hws as (l & Hl & Hws).
-  apply elem_of_list_fmap in Hl as (b & -> & _).
+  apply list_elem_of_omap in Hws as (l & Hl & Hws).
+  apply list_elem_of_fmap in Hl as (b & -> & _).
   destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Hws;
     [cbn in Hws | cbv in Hws; discriminate Hws].
   destruct l as [ws' | ws' N' | N' | p fs | ws' |]; try discriminate Hws.
@@ -2685,8 +2685,8 @@ Lemma echof_cycs_names (segs : list (list mobs)) :
   Forall (fun p => uname p.1) (concat (echof_cyc <$> segs)).
 Proof using.
   apply Forall_forall. intros p Hp.
-  apply elem_of_list_In, in_concat in Hp as (l & Hl & Hpl).
-  apply elem_of_list_In in Hl, Hpl. apply elem_of_list_fmap in Hl as (seg & -> & _).
+  apply list_elem_of_In, in_concat in Hp as (l & Hl & Hpl).
+  apply list_elem_of_In in Hl, Hpl. apply list_elem_of_fmap in Hl as (seg & -> & _).
   exact (proj1 (Forall_forall _ _) (echof_lines_in_names (ins seg)) p Hpl).
 Qed.
 
@@ -2702,8 +2702,8 @@ Lemma echof_lines_in_ok I :
   disc_input_f I -> Forall (fun p => uname p.1 /\ line_ok p.2) (echof_lines_in I).
 Proof using.
   intro Hd. apply Forall_forall. intros [N ws] Hws.
-  apply elem_of_list_omap in Hws as (l & Hl & Hws).
-  apply elem_of_list_lookup in Hl as [i Hi].
+  apply list_elem_of_omap in Hws as (l & Hl & Hws).
+  apply list_elem_of_lookup in Hl as [i Hi].
   rewrite /lines_of list_lookup_fmap in Hi.
   destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
   cbn in Hi. injection Hi as <-.
@@ -3210,7 +3210,7 @@ Qed.
 Lemma demo_f2_adm : fadm_boot [(fd_nm, fd_ws)] {[fd_nm := fd_content]}.
 Proof using.
   rewrite /fadm_boot map_Forall_singleton. exists fd_ws, fd_sel_all.
-  split; [apply elem_of_list_here |]. split; [| reflexivity].
+  split; [apply list_elem_of_here |]. split; [| reflexivity].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
@@ -3231,7 +3231,7 @@ Qed.
 Lemma demo_f3_adm : fadm_boot [(fd_nm, fd_ws)] {[fd_nm := fd_content1]}.
 Proof using.
   rewrite /fadm_boot map_Forall_singleton. exists fd_ws, [0%nat].
-  split; [apply elem_of_list_here |]. split; [| reflexivity].
+  split; [apply list_elem_of_here |]. split; [| reflexivity].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
@@ -3355,10 +3355,10 @@ Lemma fd_fsm_shape (a : ralt) :
                     = Some (subseq (echo_chunks fd_ws) sel).
 Proof using.
   intro Ha. destruct a; try (by destruct Ha); cbn [fsm].
-  - right. exists sel. split; [exact Ha | apply lookup_insert].
-  - right. exists []. split; [apply sel_ok_nil | apply lookup_insert].
+  - right. exists sel. split; [exact Ha | apply lookup_insert_eq].
+  - right. exists []. split; [apply sel_ok_nil | apply lookup_insert_eq].
   - left. apply lookup_empty.
-  - right. exists []. split; [apply sel_ok_nil |]. rewrite lookup_empty. apply lookup_insert.
+  - right. exists []. split; [apply sel_ok_nil |]. rewrite lookup_empty. apply lookup_insert_eq.
   - left. apply lookup_empty.
   - (* ROom: identity *) left. apply lookup_empty.
 Qed.

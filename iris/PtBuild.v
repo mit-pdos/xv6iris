@@ -453,7 +453,7 @@ Proof.
   intros (Hmap & Hblk) Hl0 Hv Hl Hnap Hpb. split.
   - intros v wv Hlk.
     destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite lookup_insert in Hlk. injection Hlk as <-.
+    + rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       exists p2, p1.
       exact (ptree_set_leaf0_maps_self t vpn p2 p1 w0 w Hl0 Hv Hl Hnap Hpb).
     + rewrite lookup_insert_ne in Hlk; [| exact (fun He => Hne (eq_sym He))].
@@ -462,7 +462,7 @@ Proof.
       exact (ptree_set_leaf_maps_other t vpn v q2 q1 wv w Hne Hq).
   - intros v Hlk.
     destruct (decide (v = vpn)) as [-> | Hne].
-    { rewrite lookup_insert in Hlk. discriminate. }
+    { rewrite lookup_insert_eq in Hlk. discriminate. }
     rewrite lookup_insert_ne in Hlk; [| exact (fun He => Hne (eq_sym He))].
     exact (ptree_set_leaf0_blocks_other t vpn v p2 p1 w0 w Hne Hl0 (Hblk v Hlk)).
 Qed.
@@ -502,7 +502,7 @@ Proof.
   intros (Hmap & Hblk) Hl0. split.
   - intros v wv Hlk.
     destruct (decide (v = vpn)) as [-> | Hne].
-    { rewrite lookup_delete in Hlk. discriminate. }
+    { rewrite lookup_delete_eq in Hlk. discriminate. }
     rewrite lookup_delete_ne in Hlk; [| exact (fun He => Hne (eq_sym He))].
     destruct (Hmap v wv Hlk) as (q2 & q1 & Hq).
     exists q2, q1.
@@ -1779,7 +1779,7 @@ Proof.
     rewrite !autocast_id. exact (subrange64_unsigned_53_10 w). }
   apply bv_eq.
   rewrite page_base_unsigned. rewrite Hunb.
-  unfold shiftl, shiftr, with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
@@ -1829,7 +1829,7 @@ Proof.
   { rewrite autocast_id.
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
     change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
@@ -1846,13 +1846,12 @@ Proof.
   apply bv_eq.
   rewrite (mk_pte_unsigned _ PTE_PTR ltac:(unfold PTE_PTR; lia)).
   rewrite Hppn.
-  unfold or_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold or_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.or.
   rewrite bv_or_unsigned.
   replace (bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64)) with 1
     by (vm_compute; reflexivity).
-  unfold shiftl, shiftr, with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
@@ -1897,7 +1896,7 @@ Proof.
   { rewrite autocast_id.
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
     change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
@@ -1959,10 +1958,9 @@ Proof.
     with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 2 (svpn_of va)) * 8)
     by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 2 (svpn_of va)))).
   rewrite Hidx.
-  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec, and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
-  unfold shiftl, shiftr, with_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
@@ -2045,10 +2043,9 @@ Proof.
     with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 1 (svpn_of va)) * 8)
     by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 1 (svpn_of va)))).
   rewrite Hidx.
-  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec, and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
-  unfold shiftl, shiftr, with_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
@@ -2130,10 +2127,9 @@ Proof.
     with (bv_unsigned b * 4096 + bv_unsigned (vpn_idx 0 (svpn_of va)) * 8)
     by (symmetry; exact (pte_addr_at_unsigned b (vpn_idx 0 (svpn_of va)))).
   rewrite Hidx.
-  unfold add_vec, and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec, and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add, MachineWord.MachineWord.and.
-  unfold shiftl, shiftr, with_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_add_unsigned. rewrite bv_shiftl_unsigned.
@@ -2204,8 +2200,7 @@ Lemma andi1_unsigned (w : mword 64) :
   bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)) : mword 64)
   = Z.b2z (Z.odd (bv_unsigned w)).
 Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
   match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
@@ -2274,8 +2269,7 @@ Lemma andi17_unsigned (w : mword 64) :
   bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) : mword 64)
   = Z.land (bv_unsigned w) 17.
 Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
   match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
@@ -2401,8 +2395,7 @@ Lemma andi14_unsigned (w : mword 64) :
   bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 14 : mword 12)) : mword 64)
   = Z.land (bv_unsigned w) 14.
 Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
   match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
@@ -2443,8 +2436,7 @@ Lemma andi4_unsigned (w : mword 64) :
   bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 4 : mword 12)) : mword 64)
   = Z.land (bv_unsigned w) 4.
 Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold and_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned.
   match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
@@ -2513,12 +2505,11 @@ Local Lemma pb_add_vec_int27_wrap (a : mword 27) (j : Z) :
   bv_unsigned (add_vec_int a j) = bv_wrap 27 (bv_unsigned a + j).
 Proof.
   intros Hj.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 27) = j).
-  { unfold mword_of_int, Values.to_word, get_word. cbn.
+  { unfold mword_of_int. cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn. lia. }
   rewrite Hjv. reflexivity.
@@ -2591,7 +2582,7 @@ Local Lemma pb_subrange64_unsigned_11_0 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0.
@@ -2722,7 +2713,7 @@ Proof.
     all: try (vm_compute; reflexivity).
     all: f_equal; vm_compute; reflexivity. }
   rewrite Hred. apply bv_eq.
-  unfold shiftl, with_word, get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 52))) with 52
@@ -2750,7 +2741,7 @@ Proof.
   rewrite autocast_id.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
   change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
@@ -2771,12 +2762,11 @@ Local Lemma pb_add_vec_int44_wrap (a : mword 44) (j : Z) :
   bv_unsigned (add_vec_int a j) = bv_wrap 44 (bv_unsigned a + j).
 Proof.
   intros Hj.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (Hjv : bv_unsigned (mword_of_int j : mword 44) = j).
-  { unfold mword_of_int, Values.to_word, get_word. cbn.
+  { unfold mword_of_int. cbn.
     rewrite Z_to_bv_unsigned. apply bv_wrap_small.
     unfold bv_modulus. cbn. lia. }
   rewrite Hjv. reflexivity.
@@ -2865,14 +2855,13 @@ Proof.
   apply bv_eq.
   rewrite (mk_pte_unsigned _ (Z.lor perm 1) Hf).
   rewrite pb_subrange_55_12_unsigned; [| exact Hlt].
-  unfold or_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
+  unfold or_vec, Operators_mwords.word_binop.
   unfold MachineWord.MachineWord.or.
   rewrite !bv_or_unsigned.
   replace (bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64)) with 1
     by (vm_compute; reflexivity).
   rewrite Hw5.
-  unfold shiftl, shiftr, with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftl_unsigned. rewrite bv_shiftr_unsigned.
@@ -2969,7 +2958,7 @@ Proof.
   rewrite !add_vec64_unsigned. rewrite !moi64_unsigned.
   rewrite Ha2.
   rewrite bv_wrap_add_idemp_l.
-  replace (bv_wrap 64 (bv_signed (get_word (mword_of_int 2048 : mword 12))))
+  replace (bv_wrap 64 (bv_signed (mword_of_int 2048 : mword 12)))
     with 18446744073709549568 by (vm_compute; reflexivity).
   replace (bv_wrap 64 (Z.of_nat npages * 4096 + 18446744073709549568)
              + 18446744073709549568 + bv_unsigned va)
@@ -3981,9 +3970,9 @@ Lemma sum_list_with_le {A} (f f' : A -> nat) (l : list A) :
 Proof.
   induction l as [| a l IH]; cbn; intros Hle.
   - lia.
-  - assert (f' a <= f a)%nat by (apply Hle, elem_of_list_here).
+  - assert (f' a <= f a)%nat by (apply Hle, list_elem_of_here).
     assert (sum_list_with f' l <= sum_list_with f l)%nat as IHl
-      by (apply IH; intros x Hx; apply Hle, elem_of_list_further, Hx).
+      by (apply IH; intros x Hx; apply Hle, list_elem_of_further, Hx).
     lia.
 Qed.
 

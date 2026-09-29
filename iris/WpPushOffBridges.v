@@ -50,8 +50,7 @@ Proof.
   f_equal.
   apply bv_eq.
   rewrite trunc32_unsigned.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (HK : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)) : mword 64) = (2^64 - 1)%Z)
     by (vm_compute; reflexivity).
@@ -126,7 +125,7 @@ Proof.
   apply (f_equal bv_unsigned) in HS.
   unfold _get_Mstatus_SIE, subrange_vec_dec in HS.
   rewrite autocast_refl in HS.
-  unfold to_word_idx, to_word, get_word in HS.
+  unfold to_word_idx in HS.
   rewrite MachineWord.MachineWord.cast_idx_refl in HS.
   unfold MachineWord.MachineWord.slice in HS.
   rewrite bv_extract_unsigned in HS.
@@ -167,7 +166,6 @@ Proof.
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))).
   rewrite trunc32_unsigned.
   unfold and_vec, shift_bits_right, shiftr, Operators_mwords.word_binop,
-    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.and, MachineWord.MachineWord.logical_shift_right.
   rewrite bv_and_unsigned. rewrite bv_shiftr_unsigned.
   match goal with |- context [Z.shiftr _ (bv_unsigned ?am)] =>

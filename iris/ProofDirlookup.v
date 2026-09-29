@@ -237,7 +237,7 @@ Qed.
 Lemma dlk_add_vec_0 (x : mword 64) :
   add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
 Proof.
-  unfold add_vec, word_binop, with_word', with_word, MachineWord.MachineWord.add.
+  unfold add_vec, word_binop, MachineWord.MachineWord.add.
   apply bv_add_0_r. vm_compute. reflexivity.
 Qed.
 
@@ -891,9 +891,9 @@ Section ProofDirlookupMain.
         rewrite /R5 upd_ne; [| dlk_xne N18].
         exact (HR4o c Hc N2 N8). }
     (* ---- the [de] scratch record: two frame slots as sixteen bytes ---- *)
-    iDestruct (dlk_slots_bytes sp0 u12 u11 with "Hb12 Hb11") as "[%Hal Hdeb]".
+    iDestruct (dlk_slots_bytes (KTR := KT1) sp0 u12 u11 with "Hb12 Hb11") as "[%Hal Hdeb]".
     destruct Hal as [Hal12 Hal11].
-    iDestruct (dlk_bytes_name with "Hdeb") as (dolds0) "Hde".
+    iDestruct (dlk_bytes_name (KTR := KT1) with "Hdeb") as (dolds0) "Hde".
     (* ================================================================= *)
     (*  THE SHARED TAIL at +0x96 -- nine restores, the pop, [c.ret].      *)
     (*                                                                    *)
@@ -1060,8 +1060,8 @@ Section ProofDirlookupMain.
       iEval (rewrite HT7) in "Hb7". iEval (rewrite HT8) in "Hb8".
       iEval (rewrite HT9) in "Hb9".
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
-      iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
-      iDestruct (dlk_bytes_slots sp0 Hal12 Hal11 with "Hdeb2") as (w12 w11) "[Hc12 Hc11]".
+      iDestruct (dlk_name_bytes (KTR := KT1) with "Hde") as "Hdeb2".
+      iDestruct (dlk_bytes_slots (KTR := KT1) sp0 Hal12 Hal11 with "Hdeb2") as (w12 w11) "[Hc12 Hc11]".
       iAssert (stack_own (KTR := KT1) sp0 12) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hc11 Hc12]" as "Hstk".
       { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].

@@ -900,7 +900,7 @@ Section ProofPMS.
     { rewrite /F1 upd_eq. rewrite Hmr1_9.
       assert (Hsx : sign_extend' 64 (mword_of_int 368 : mword 12) = (mword_of_int 368 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite Hsx. apply bv_eq.
-      unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+      unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
       rewrite bv_add_unsigned.
       assert (Hii : (0 <= 368 * Z.of_nat i)%Z /\ (368 * Z.of_nat i <= 368 * 64)%Z) by (split; [apply Z.mul_nonneg_nonneg; lia | apply Z.mul_le_mono_nonneg_l; lia]).
       assert (Hsi : (0 <= 368 * Z.of_nat (S i))%Z /\ (368 * Z.of_nat (S i) <= 368 * 64)%Z) by (split; [apply Z.mul_nonneg_nonneg; lia | apply Z.mul_le_mono_nonneg_l; lia]).

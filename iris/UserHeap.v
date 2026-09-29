@@ -631,7 +631,7 @@ Section UserHeap.
   (* that a function which does not call sbrk carries its half through      *)
   (* untouched and never mentions [sz] in its spec at all.                  *)
   (* ===================================================================== *)
-  Definition usz (γs : gname) (sz : Z) : iProp Σ := ghost_var γs (1/2) sz.
+  Definition usz (γs : gname) (sz : Z) : iProp Σ := ghost_var_frac γs (1/2) sz.
 
   Lemma usz_agree (γs : gname) (sz sz' : Z) :
     usz γs sz -∗ usz γs sz' -∗ ⌜ sz = sz' ⌝.
@@ -676,7 +676,7 @@ Section UserHeap.
           walker must never own (claude-notes/design/icache.md) *)
        ⌜ forall a : Z, is_Some (Mt !! a) -> ~ uw_addr (pm) a ⌝ ∗
        ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (pm) a ⌝ ∗
-       ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗
+       ghost_map_auth_frac γt 1 Mt ∗ ghost_map_auth_frac γd 1 Md ∗
        (* THE BREAK, and THE SLACK ABOVE IT.  NOTE [0 <= sz] is deliberately
           NOT asserted: the bundle carries only [usz_ok sz], which does not
           rule out a negative break, and nothing here needs it -- addresses
@@ -687,7 +687,7 @@ Section UserHeap.
           That is what lets the user-facing sbrk be BYTE-granular: [sbrk 8]
           hands out eight bytes off the slack whether or not a fresh page
           came from the kernel, and [sbrk (-8)] takes eight back into it. *)
-       ghost_var γs (1/2) sz ∗
+       ghost_var_frac γs (1/2) sz ∗
        (* THE SLACK IS EXACTLY THE DATA AT OR ABOVE THE BREAK, and the
           equality is what makes the break a boundary of OWNERSHIP: below it
           the process holds the fragments, at or above it the invariant
@@ -837,7 +837,7 @@ Section UserHeap.
       intros k. rewrite (Hsl k).
       assert (Hdk : is_Some (<[a := b']> Md !! k) <-> is_Some (Md !! k)).
       { destruct (decide (k = a)) as [-> | Hne].
-        - rewrite lookup_insert. split; intros _;
+        - rewrite lookup_insert_eq. split; intros _;
             [ exact (mk_is_Some _ _ HMd) | exact (mk_is_Some _ _ eq_refl) ].
         - rewrite lookup_insert_ne; [ reflexivity | exact (not_eq_sym Hne) ]. }
       rewrite Hdk. reflexivity.

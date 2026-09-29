@@ -336,7 +336,7 @@ Qed.
 (* WpGprLoad.v : sign_extend *)
 Lemma sign_extend'_id (a : mword 64) : sign_extend' 64 a = a.
 Proof.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
        MachineWord.MachineWord.sign_extend].
   apply bv_eq_signed. rewrite bv_sign_extend_signed; [ reflexivity | lia ].
 Qed.
@@ -351,8 +351,8 @@ Lemma data2_id (v : mword 64) :
   update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v = v.
 Proof.
   apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
   erewrite bv_concat_unsigned by (cbn; lia).
   erewrite bv_concat_unsigned by (cbn; lia).
   rewrite !bv_unsigned_N_0.
@@ -957,7 +957,7 @@ Proof.
   change (8*8-1) with 63. change (8*8) with 64. change (63 - 0 + 1) with 64.
   rewrite autocast_id.
   unfold subrange_vec_dec. change (63 - 0 + 1) with 64. rewrite autocast_id.
-  unfold to_word_idx, to_word, get_word, MachineWord.slice.
+  unfold to_word_idx, MachineWord.slice.
   rewrite MachineWord.cast_idx_refl.
   apply bv_eq. rewrite bv_extract_unsigned.
   change (Z.of_N (MachineWord.Z_idx 0)) with 0. rewrite Z.shiftr_0_r.
@@ -1563,7 +1563,7 @@ Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed
 (* WpGprRvc.v : sext6_12_64 *)
 Lemma sext6_12_64 (x : mword 6) : sign_extend' 64 (sign_extend' 12 x) = sign_extend' 64 x.
 Proof.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
        MachineWord.MachineWord.sign_extend].
   apply bv_eq_signed.
   rewrite bv_sign_extend_signed; [| done].

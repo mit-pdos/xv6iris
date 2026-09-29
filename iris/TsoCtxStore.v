@@ -60,14 +60,14 @@ Section ctx.
     dom Pold = dom Pnew ->
     (forall k, k ∈ D -> (k.1 <= i)%nat) ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    ghost_map_auth ts_name 1 TM -∗
+    ghost_map_auth_frac ts_name 1 TM -∗
     dset_auth (ctx_dirty_name ξ) 1 D -∗
     ([∗ map] a ↦ _ ∈ Pold, phys_free a (DfracOwn 1)) ==∗
     ∃ D' : gset (nat * Arch.pa),
       ⌜dom Pnew ⊆ dom mem⌝ ∗
       ⌜forall k, k ∈ D' <-> (k ∈ D \/ (k.1 = S i /\ k.2 ∈ dom Pnew))⌝ ∗
       gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-      ghost_map_auth ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
+      ghost_map_auth_frac ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
       dset_auth (ctx_dirty_name ξ) 1 D' ∗
       ([∗ map] a ↦ v ∈ Pnew,
          phys_pointsto a (DfracOwn 1) v ∗ a ↪[ts_name] (S i, ts_pay_none) ∗
@@ -269,7 +269,7 @@ Section ctx.
       iSplitR.
       { iPureIntro. intros j. rewrite Hlog.
         destruct (decide (j = length g.(glog))) as [->|Hne].
-        - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+        - rewrite lookup_insert_eq. symmetry. by apply list_lookup_middle.
         - rewrite lookup_insert_ne; last congruence. rewrite HLM.
           destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
           + by rewrite lookup_app_l.
@@ -335,11 +335,11 @@ Section ctx.
       (Pold Pnew mem : gmap Arch.pa (bv 8)) (TM : gmap Arch.pa ts_elem) :
     dom Pold = dom Pnew ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    ghost_map_auth ts_name 1 TM -∗
+    ghost_map_auth_frac ts_name 1 TM -∗
     ([∗ map] a ↦ v ∈ Pold, phys_ledger a (DfracOwn 1) v) ==∗
     ⌜dom Pnew ⊆ dom mem⌝ ∗
     gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-    ghost_map_auth ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
+    ghost_map_auth_frac ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
     ([∗ map] a ↦ v ∈ Pnew, phys_ledger_at a (DfracOwn 1) v (S i)).
   Proof using .
     revert Pold. induction Pnew as [|a vn P2 Hfresh IH] using map_ind;
@@ -406,7 +406,7 @@ Section ctx.
   Proof using .
     apply map_eq. intros k. rewrite pin_tm_lookup.
     destruct (decide (k = a)) as [->|Hne].
-    - by rewrite !lookup_insert.
+    - by rewrite !lookup_insert_eq.
     - rewrite !lookup_insert_ne // pin_tm_lookup //.
   Qed.
 
@@ -414,7 +414,7 @@ Section ctx.
       (Pold Pnew mem : gmap Arch.pa (bv 8)) (TM : gmap Arch.pa ts_elem) :
     dom Pold = dom Pnew ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
-    ghost_map_auth ts_name 1 TM -∗
+    ghost_map_auth_frac ts_name 1 TM -∗
     pin_map_own Pold (DfracOwn 1) Bg Sf ==∗
     ⌜dom Pnew ⊆ dom mem⌝ ∗
     (* the OLD elements, so the caller can re-establish the pin tie on the
@@ -422,7 +422,7 @@ Section ctx.
     ⌜forall a, a ∈ dom Pnew ->
        exists t, TM !! a = Some ((t, ts_pay_pin (Sf a) (Bg a)) : ts_elem)⌝ ∗
     gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
-    ghost_map_auth ts_name 1 (pin_tm i Bg Sf Pnew ∪ TM) ∗
+    ghost_map_auth_frac ts_name 1 (pin_tm i Bg Sf Pnew ∪ TM) ∗
     ([∗ map] a ↦ v ∈ Pnew, phys_ledger_pin a (DfracOwn 1) v (S i) (Bg a) (Sf a)).
   Proof using .
     revert Pold. rewrite /pin_map_own.
@@ -567,7 +567,7 @@ Section ctx.
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
-      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_eq. symmetry. by apply list_lookup_middle.
       - rewrite lookup_insert_ne; last congruence. rewrite HLM.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
@@ -680,7 +680,7 @@ Section ctx.
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
-      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_eq. symmetry. by apply list_lookup_middle.
       - rewrite lookup_insert_ne; last congruence. rewrite HLM.
         destruct (decide (j < length g.(glog))%nat) as [Hlt|Hge].
         + by rewrite lookup_app_l.
@@ -729,7 +729,7 @@ Section ctx.
     assert (Hdom : dom Pold = dom Pnew).
     { rewrite /Pold dom_intersection_L. set_solver. }
     assert (Hdisj : Pold ##ₘ mm ∖ Pold)
-      by apply (map_disjoint_difference_r mm Pold Pold), reflexivity.
+      by apply (map_disjoint_difference_r1 mm Pold Pold), reflexivity.
     assert (Hsplit : mm = Pold ∪ (mm ∖ Pold))
       by (symmetry; by apply map_difference_union).
     assert (Hdisj2 : Pnew ##ₘ mm ∖ Pold).
@@ -770,8 +770,8 @@ Section ctx.
     induction l as [|x xs IH]; intros Hnd.
     - by rewrite big_sepM_empty.
     - cbn [fmap list_fmap] in Hnd.
-      pose proof (list_relations.NoDup_cons_1_1 _ _ Hnd) as Hx.
-      pose proof (list_relations.NoDup_cons_1_2 _ _ Hnd) as Hnd2.
+      pose proof (list_relations.list.NoDup_cons_1_1 _ _ Hnd) as Hx.
+      pose proof (list_relations.list.NoDup_cons_1_2 _ _ Hnd) as Hnd2.
       cbn [foldr]. rewrite big_sepM_insert; last first.
       { apply not_elem_of_dom. rewrite tso_foldr_ins_dom dom_empty_L.
         rewrite right_id_L elem_of_list_to_set. exact Hx. }
@@ -1107,7 +1107,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + move => Sv' B' Heq. discriminate Heq.
@@ -1142,7 +1142,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + by move => Sv' B' Heq.
@@ -1314,7 +1314,7 @@ Section ctx.
     (* split the new cells: the rest and the window *)
     rewrite -{1}(map_difference_union (snap_of base n vnew) w Hsub).
     assert (Hdisj2 : snap_of base n vnew ##ₘ w ∖ snap_of base n vnew)
-      by (apply map_disjoint_difference_r; reflexivity).
+      by (apply map_disjoint_difference_r1; reflexivity).
     rewrite (big_sepM_union _ _ _ Hdisj2).
     iDestruct "Hnew" as "[Hwin $]".
     rewrite -(phys_ledger_at_win_map base n vnew _ _ Hn).
@@ -1358,7 +1358,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + by move => Sv' B' Heq.
@@ -1393,7 +1393,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + by move => Sv' B' Heq.

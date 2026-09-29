@@ -235,8 +235,8 @@ Section ProofSysSbrk.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     iEval (rewrite -E5) in "Hb5".
     iEval (rewrite -E6) in "Hb6".
-    iDestruct (stack_own_4_intro sp0 ra0 s00 s10 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
-    iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 s10 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
+    iDestruct (stack_own_2_intro (KTR := KT1) (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
     iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
     { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
@@ -534,8 +534,8 @@ Section ProofSysSbrk.
     iEval (rewrite (stack_own_split (KTR := KT1) sp0 4 6 H46)) in "Hframe".
     iEval (change (6 - 4)%nat with 2%nat) in "Hframe".
     iDestruct "Hframe" as "[Hf14 Hf56]".
-    iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
-    iDestruct (stack_own_2_elim with "Hf56") as (u5 u6) "[Hs5 Hs6]".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hf56") as (u5 u6) "[Hs5 Hs6]".
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     iEval (rewrite E5) in "Hs5".
@@ -609,8 +609,8 @@ Section ProofSysSbrk.
     assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* the two [int] locals: the two halves of slot 5 *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hs5") as %Hal5.
-    iDestruct (ctx_word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hs5") as %Hal5.
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hs5") as "[Hs5lo Hs5hi]".
     (* ---- +0x0a: addi a1,s0,-40 -- a1 := &n ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x0a))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -1006,7 +1006,7 @@ Section ProofSysSbrk.
                                 | split; [exact Hs
                                          | split; [exact Hm' | reflexivity]]]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
     assert (Hnoteager : ~ sbrk_eager v1).
     { unfold sbrk_eager. intro He.
@@ -1098,7 +1098,7 @@ Section ProofSysSbrk.
                                 | split; [exact Hs
                                          | split; [exact Hm' | reflexivity]]]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
     (*  THE LAZY PATH: n >= 0 and t <> SBRK_EAGER.                        *)
     (* ================================================================= *)
@@ -1258,7 +1258,7 @@ Section ProofSysSbrk.
         rewrite /Y1 upd_ne; [| congruence]. apply HthrL4; assumption.
       - left. repeat split; reflexivity.
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- it fits ---- *)
     assert (Hfits : (bv_unsigned (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) <= 274877898752)%Z).
     { rewrite HL4a4 HL4a5 in Hbltu1. unfold zopz0zI_u in Hbltu1.
@@ -1489,7 +1489,7 @@ Section ProofSysSbrk.
       split; [reflexivity |].
       split; [exact Hszle | split; [reflexivity | reflexivity]].
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-      iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi").
+      iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.
 
 End ProofSysSbrk.

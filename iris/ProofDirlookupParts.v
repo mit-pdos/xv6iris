@@ -96,7 +96,7 @@ Lemma dlk_sext_zext_16_32_64 (x : mword 16) :
   sign_extend' 64 (zero_extend' 32 x : mword 32) = (zero_extend' 64 x : mword 64).
 Proof.
   cbv [sign_extend' zero_extend' Operators_mwords.sign_extend Operators_mwords.zero_extend
-       Operators_mwords.exts_vec Operators_mwords.extz_vec to_word get_word
+       Operators_mwords.exts_vec Operators_mwords.extz_vec 
        MachineWord.MachineWord.sign_extend MachineWord.MachineWord.zero_extend].
   apply bv_eq.
   rewrite bv_sign_extend_unsigned.
@@ -127,7 +127,7 @@ Lemma dlk_zext64_unsigned (x : mword 16) :
   bv_unsigned (zero_extend' 64 x : mword 64) = bv_unsigned x.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   apply bv_zero_extend_unsigned. vm_compute. discriminate.
 Qed.
 
@@ -135,7 +135,7 @@ Lemma dlk_zext32_unsigned (x : mword 16) :
   bv_unsigned (zero_extend' 32 x : mword 32) = bv_unsigned x.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   apply bv_zero_extend_unsigned. vm_compute. discriminate.
 Qed.
 

@@ -765,7 +765,7 @@ Section ProofMemmove.
     assert (Hp02 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x00) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (v1 v2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := kt) with "Hframe") as (v1 v2) "[Hb1 Hb2]".
     assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (unfold m1; apply upd_eq).
     assert (Hpa1 : add_vec (m1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))

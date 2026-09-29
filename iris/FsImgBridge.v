@@ -145,7 +145,7 @@ Proof.
   cbn [bm_dir bm_ind bm_ent]. cbv zeta.
   destruct (Nat.ltb_spec k 12) as [Hd|Hd].
   - rewrite decide_True by lia.
-    rewrite !list_lookup_total_alt, lookup_take by exact Hd. reflexivity.
+    rewrite !list_lookup_total_alt, lookup_take_lt by exact Hd. reflexivity.
   - rewrite decide_False by lia.
     rewrite list_lookup_total_alt, list_lookup_fmap.
     rewrite (list_lookup_lookup_total_lt (fs_ind_ents P dn) (k - 12)%nat)
@@ -189,7 +189,7 @@ Lemma log_region_bound (ls b : Z) :
   b ∈ log_region_set ls -> ls <= b <= ls + Z.of_nat LOGBLOCKS.
 Proof.
   unfold log_region_set. rewrite elem_of_union. intros [Hs | Hh].
-  - rewrite elem_of_list_to_set, elem_of_list_fmap in Hs.
+  - rewrite elem_of_list_to_set, list_elem_of_fmap in Hs.
     destruct Hs as (i & -> & Hi). apply elem_of_seq in Hi.
     unfold log_slot_bno. lia.
   - apply elem_of_singleton in Hh. unfold log_hdr_bno in Hh. lia.
@@ -375,7 +375,7 @@ Proof.
                   (Z.of_nat FS_NDIRECT)) as [Hle|Hgt]; [| lia].
       exfalso. apply Hnz. exact (fio_ind_zero P sb dn Hok Hle). }
     rewrite (proj2 (Z.ltb_lt _ _) Hgt).
-    apply elem_of_app. left. apply elem_of_list_singleton. reflexivity.
+    apply elem_of_app. left. apply list_elem_of_singleton. reflexivity.
   - unfold fs_blk_addr in Hnz |- *.
     destruct (Nat.ltb_spec i FS_NDIRECT) as [Hd|Hd].
     + assert (Hlt : Z.of_nat i < fs_nblk (bv_unsigned (di_size dn))).
@@ -385,7 +385,7 @@ Proof.
         exfalso. apply Hnz.
         exact (fio_direct_zero P sb dn Hok i Hd ltac:(lia)). }
       apply elem_of_app. right. apply elem_of_app. left.
-      apply elem_of_list_fmap. exists i. split; [reflexivity |].
+      apply list_elem_of_fmap. exists i. split; [reflexivity |].
       assert (Hmin : Z.of_nat i < Z.min (fs_nblk (bv_unsigned (di_size dn)))
                                         (Z.of_nat FS_NDIRECT)).
       { apply Z.min_glb_lt; [exact Hlt |].
@@ -403,7 +403,7 @@ Proof.
         exfalso. apply Hnz.
         exact (fio_ent_zero P sb dn Hok (i - FS_NDIRECT)%nat Hj ltac:(lia)). }
       apply elem_of_app. right. apply elem_of_app. right.
-      apply elem_of_list_fmap. exists (i - FS_NDIRECT)%nat.
+      apply list_elem_of_fmap. exists (i - FS_NDIRECT)%nat.
       split; [reflexivity |].
       apply elem_of_seq. split; [lia |]. rewrite Nat.add_0_l.
       apply Nat2Z.inj_lt. rewrite Z2Nat.id by lia. exact Hlt.

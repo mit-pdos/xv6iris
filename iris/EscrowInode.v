@@ -102,12 +102,12 @@ Section EscrowInode.
      machines are untied and the recycle cannot produce the marker at all. *)
   Definition escA_body (γfs : fs_names) (ge gr gd : gname) (z : Z)
       (rg : frzidx) : iProp Σ :=
-    ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post rg z
+    ( (mono_nat_auth_own_frac ge 1 ST_EMPTY ∗ ifreeze_post rg z
        ∗ (∃ n : fs_node, ⌜fn_nlink n = 0%nat⌝
             ∗ top_frag (fs_gamma_L γfs) z n))
-    ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ crp_elem z CrpDep
+    ∨ (mono_nat_auth_own_frac ge 1 ST_FILLED ∗ crp_elem z CrpDep
        ∗ ifreeze_off z ∗ redeem_ticketA gd)
-    ∨ (mono_nat_auth_own ge 1 ST_REDEEMED ∗ redeem_ticketA gr
+    ∨ (mono_nat_auth_own_frac ge 1 ST_REDEEMED ∗ redeem_ticketA gr
        ∗ redeem_ticketA gd) )%I.
 
   Definition escAN (z : Z) : namespace := (nroot .@ "icescA") .@ z.
@@ -195,7 +195,7 @@ Section EscrowInode.
     iInv "Hinv" as ">Hbody" "Hcl".
     iDestruct "Hbody"
       as "[(Hauth & _ & _) | [(Hauth & Hmk & Hoff & Hd) | (Hauth & Htick2 & _)]]".
-    - iDestruct (mono_nat_lb_own_valid with "Hauth Hcom") as %[_ Hle]. lia.
+    - iDestruct (mono_nat_auth_lb_own_valid with "Hauth Hcom") as %[_ Hle]. lia.
     - iMod (mono_nat_own_update ST_REDEEMED with "Hauth") as "[Hauth _]".
       { lia. }
       iMod ("Hcl" with "[Hauth Htick Hd]") as "_".

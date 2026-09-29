@@ -1005,7 +1005,7 @@ Proof using.
       with (lm_step ulmG (lm_upto ulmG cs s (bodies_of I_ab) 1)
               (lm_of ulmG (bodies_of I_ab !!! 1)) (lm_at ulmG cs 1)).
     rewrite Hr1 ab_b1. cbn [ulmG ulm lm_of lm_step ustep]. rewrite ab_line1. cbn [fsm].
-    apply lookup_insert. }
+    apply lookup_insert_eq. }
   (* the wire past the honest prefix is the cat round's continuation *)
   rewrite ab_wire Heq in Hpre.
   rewrite /I_ab /nl1 (lm_sess_snoc_nl ulmG ps cs s J_ab) in Hpre.
@@ -1141,7 +1141,7 @@ Example demo_sync_neg (s : fstate) (a : ualt) :
 Proof using.
   intros Ha. destruct (demo_sync_only s a Ha) as [-> | [-> | [-> | ->]]];
     change (lm_cont ulmG) with ucont; cbn [ucont cont];
-    repeat first [apply elem_of_list_here | apply elem_of_list_further].
+    repeat first [apply list_elem_of_here | apply list_elem_of_further].
 Qed.
 
 (* e.g. a transcript showing [sync] answered by [x] and the prompt *)

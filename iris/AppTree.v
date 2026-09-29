@@ -22,7 +22,7 @@
    fraction).
 
    TWO DEVIATIONS FROM THE DESIGN PAGE'S SKETCH, both simplifications:
-   (1) the authority is WHOLE ([ghost_map_auth r 1]) and not a half.  The
+   (1) the authority is WHOLE ([ghost_map_auth_frac r 1]) and not a half.  The
        half in the sketch was copied off [AppInv.app_body]'s tie to the
        kernel's map, where the OTHER half is the kernel's; here nobody
        else holds one, and an owner's move is a [ghost_map_update], which
@@ -203,7 +203,7 @@ Local Open Scope Z_scope.
    statement's trusted base.
 
    TWO [ghost_mapG] INSTANCES IS A HAZARD, and it bit once: a bare [∅]
-   under [ghost_map_auth] no longer determines its key and value types,
+   under [ghost_map_auth_frac] no longer determines its key and value types,
    so a landed statement that wrote one ([tree_body_empty]) resolved to
    the WRONG map and its own proof stopped applying.  Annotate the map
    literal wherever one appears. *)
@@ -270,7 +270,7 @@ Lemma own_wf_root (av : aview) :
 Proof.
   intros Hwf Hd. rewrite /root_own. split_and!; [exact Hwf | ..].
   - intros g r t Hg. destruct (decide (g = 1%positive)) as [-> | Hne].
-    + rewrite lookup_singleton in Hg. injection Hg as <- <-. exact Hd.
+    + rewrite lookup_singleton_eq in Hg. injection Hg as <- <-. exact Hd.
     + rewrite lookup_singleton_ne in Hg; [discriminate | congruence].
   - intros g1 g2 r1 t1 r2 t2 Hne H1 H2. exfalso.
     destruct (decide (g1 = 1%positive)) as [-> | H1e].
@@ -284,7 +284,7 @@ Lemma root_of_own_wf (av : aview) :
 Proof.
   intros (_ & Hroots & _).
   apply (Hroots 1%positive FsImg.ROOTINO (MkTTree ∅ 0)).
-  rewrite /root_own lookup_singleton //.
+  rewrite /root_own lookup_singleton_eq //.
 Qed.
 
 (* the root's reading, which is what the transport actually wants *)
@@ -379,7 +379,7 @@ Proof.
              <[g := (root, t')]> own !! g0 = Some (r0, t0) ->
              exists t1, own !! g0 = Some (r0, t1)).
   { intros g0 r0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-    - rewrite lookup_insert in H0. injection H0 as <- <-. by exists t.
+    - rewrite lookup_insert_eq in H0. injection H0 as <- <-. by exists t.
     - rewrite lookup_insert_ne in H0; [| congruence]. by exists t0. }
   split_and!; [exact Hwf | ..].
   - intros g0 r0 t0 H0. destruct (Hlk g0 r0 t0 H0) as (t1 & H1).
@@ -509,7 +509,7 @@ Proof.
     apply (own_wf_unl_tgt av root_own i a Ha Hnl Hno);
       [| exact (own_wf_root av (proj1 Hwf) Hr)].
     intros g r0 t0 H0 ->. destruct (decide (g = 1%positive)) as [-> | Hne].
-    + rewrite /root_own lookup_singleton in H0. injection H0 as Hc _.
+    + rewrite /root_own lookup_singleton_eq in H0. injection H0 as Hc _.
       exact (Hri (eq_sym Hc)).
     + rewrite /root_own lookup_singleton_ne in H0; [discriminate | congruence].
 Qed.
@@ -541,7 +541,7 @@ Proof.
              exact (own_wf_write av root_own i off new bs0 nl Hi
                       (own_wf_root av (proj1 Hwf) Hr)) ].
   intros g0 root0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-  - rewrite lookup_insert in H0. injection H0 as <- <-.
+  - rewrite lookup_insert_eq in H0. injection H0 as <- <-.
     exact (subtree_delta_write av root i t off new bs0 nl Ht Hi Hd).
   - rewrite lookup_insert_ne in H0; [| congruence].
     rewrite (subtree_delta_write_out av root0 i off new
@@ -574,7 +574,7 @@ Proof.
              exact (own_wf_create av root_own d nm i c e nl Hnm Hd Hi Hleaf
                       (own_wf_root av (proj1 Hwf) Hr)) ].
   intros g0 root0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-  - rewrite lookup_insert in H0. injection H0 as <- <-.
+  - rewrite lookup_insert_eq in H0. injection H0 as <- <-.
     exact (subtree_delta_create av root d nm i c t e nl Ht Hnm Hd Hnone Hi
              Hleaf Hdd).
   - rewrite lookup_insert_ne in H0; [| congruence].
@@ -611,7 +611,7 @@ Proof.
              exact (own_wf_unl_ent av root_own d nm dec e nl Hd
                       (own_wf_root av (proj1 Hwf) Hr)) ].
   intros g0 root0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-  - rewrite lookup_insert in H0. injection H0 as <- <-.
+  - rewrite lookup_insert_eq in H0. injection H0 as <- <-.
     exact (subtree_delta_unl_ent av root d nm dec t e nl Ht Hd Hdd).
   - rewrite lookup_insert_ne in H0; [| congruence].
     rewrite (subtree_delta_unl_ent_out av root0 d nm dec
@@ -644,7 +644,7 @@ Proof.
              exact (own_wf_trunc av root_own i bs0 nl Hi
                       (own_wf_root av (proj1 Hwf) Hr)) ].
   intros g0 root0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-  - rewrite lookup_insert in H0. injection H0 as <- <-.
+  - rewrite lookup_insert_eq in H0. injection H0 as <- <-.
     exact (subtree_delta_trunc av root i t bs0 nl Ht Hi Hd).
   - rewrite lookup_insert_ne in H0; [| congruence].
     rewrite (subtree_delta_trunc_out av root0 i
@@ -707,29 +707,29 @@ Proof.
              g0 <> g /\ own !! g0 = Some (r0, t0)).
   { intros g0 r0 t0 Hne H0. rewrite lookup_insert_ne in H0; [| congruence].
     destruct (decide (g0 = g)) as [-> | Hg0].
-    - rewrite lookup_delete in H0. discriminate.
+    - rewrite lookup_delete_eq in H0. discriminate.
     - rewrite lookup_delete_ne in H0; [| congruence].
       split; assumption. }
   split.
   - split_and!; [exact Hwf0 | ..].
     + intros g0 r0 t0 H0. destruct (decide (g0 = g')) as [-> | Hne].
-      * rewrite lookup_insert in H0. injection H0 as <- <-.
+      * rewrite lookup_insert_eq in H0. injection H0 as <- <-.
         exact (tree_sub_dir av root root' t e Ht Hr').
       * destruct (Hlk g0 r0 t0 Hne H0) as (_ & H1).
         exact (Hroots g0 r0 t0 H1).
     + intros g1 g2 r1 t1 r2 t2 Hne H1 H2.
       destruct (decide (g1 = g')) as [-> | Hne1].
-      * rewrite lookup_insert in H1. injection H1 as <- <-.
+      * rewrite lookup_insert_eq in H1. injection H1 as <- <-.
         destruct (Hlk g2 r2 t2 (fun Hc => Hne (eq_sym Hc)) H2) as (Hd2 & K2).
         exact (Hout2 g2 r2 t2 Hd2 K2).
       * destruct (Hlk g1 r1 t1 Hne1 H1) as (Hd1 & K1).
         destruct (decide (g2 = g')) as [-> | Hne2].
-        { rewrite lookup_insert in H2. injection H2 as <- <-.
+        { rewrite lookup_insert_eq in H2. injection H2 as <- <-.
           exact (Hout g1 r1 t1 Hd1 K1). }
         destruct (Hlk g2 r2 t2 Hne2 H2) as (Hd2 & K2).
         exact (Hnn g1 g2 r1 t1 r2 t2 Hne K1 K2).
   - intros g0 r0 t0 H0. destruct (decide (g0 = g')) as [-> | Hne].
-    + rewrite lookup_insert in H0. injection H0 as <- <-. exact Ht'.
+    + rewrite lookup_insert_eq in H0. injection H0 as <- <-. exact Ht'.
     + destruct (Hlk g0 r0 t0 Hne H0) as (_ & H1). exact (Hex g0 r0 t0 H1).
 Qed.
 
@@ -765,22 +765,22 @@ Proof.
              g0 <> g /\ own !! g0 = Some (r0, t0)).
   { intros g0 r0 t0 Hne H0. rewrite lookup_insert_ne in H0; [| congruence].
     destruct (decide (g0 = g)) as [-> | Hg0].
-    - rewrite lookup_delete in H0. discriminate.
+    - rewrite lookup_delete_eq in H0. discriminate.
     - rewrite lookup_delete_ne in H0; [| congruence]. split; assumption. }
   split_and!; [exact Hwf0 | ..].
   - intros g0 r0 t0 H0. destruct (decide (g0 = g')) as [-> | Hne].
-    + rewrite lookup_insert in H0. injection H0 as <- <-.
+    + rewrite lookup_insert_eq in H0. injection H0 as <- <-.
       exact (tree_sub_dir av root root' t e Ht Hr').
     + destruct (Hlk g0 r0 t0 Hne H0) as (_ & H1).
       exact (Hroots g0 r0 t0 H1).
   - intros g1 g2 r1 t1 r2 t2 Hne H1 H2.
     destruct (decide (g1 = g')) as [-> | Hne1].
-    + rewrite lookup_insert in H1. injection H1 as <- <-.
+    + rewrite lookup_insert_eq in H1. injection H1 as <- <-.
       destruct (Hlk g2 r2 t2 (fun Hc => Hne (eq_sym Hc)) H2) as (Hd2 & K2).
       exact (Hout2 g2 r2 t2 Hd2 K2).
     + destruct (Hlk g1 r1 t1 Hne1 H1) as (Hd1 & K1).
       destruct (decide (g2 = g')) as [-> | Hne2].
-      { rewrite lookup_insert in H2. injection H2 as <- <-.
+      { rewrite lookup_insert_eq in H2. injection H2 as <- <-.
         exact (Hout g1 r1 t1 Hd1 K1). }
       destruct (Hlk g2 r2 t2 Hne2 H2) as (Hd2 & K2).
       exact (Hnn g1 g2 r1 t1 r2 t2 Hne K1 K2).
@@ -1086,7 +1086,7 @@ Proof.
   intros Hi Heq. rewrite /top_write Hi in Heq.
   pose proof (f_equal tv_nodes Heq) as Hn. cbn [tv_nodes] in Hn.
   pose proof (f_equal (fun m : gmap Z absnode => m !! i) Hn) as Hl.
-  cbn beta in Hl. rewrite lookup_insert Hi in Hl. by injection Hl as ->.
+  cbn beta in Hl. rewrite lookup_insert_eq Hi in Hl. by injection Hl as ->.
 Qed.
 
 Lemma top_trunc_id_inv (t : ttree) (i : Z) (bs0 : list (bv 8)) :
@@ -1095,7 +1095,7 @@ Proof.
   intros Hi Heq. rewrite /top_trunc Hi in Heq.
   pose proof (f_equal tv_nodes Heq) as Hn. cbn [tv_nodes] in Hn.
   pose proof (f_equal (fun m : gmap Z absnode => m !! i) Hn) as Hl.
-  cbn beta in Hl. rewrite lookup_insert Hi in Hl. by injection Hl as ->.
+  cbn beta in Hl. rewrite lookup_insert_eq Hi in Hl. by injection Hl as ->.
 Qed.
 
 (* the owner's own tree records the view's bytes at a node of its subtree *)
@@ -1195,7 +1195,7 @@ Proof.
     rewrite (tedge_del_lookup_at (tv_nodes t) d nm e' Hd) Hd in Hl.
     injection Hl as Hde.
     assert (Hx : delete nm e' !! nm = e' !! nm) by (by rewrite Hde).
-    rewrite lookup_delete Hnm in Hx. discriminate.
+    rewrite lookup_delete_eq Hnm in Hx. discriminate.
   - rewrite (nclose_lookup_out (tedge_del d nm (tv_nodes t)) (tv_root t) d Hr)
       in Hl.
     rewrite Hd in Hl. discriminate.
@@ -1385,7 +1385,7 @@ Section AppTree.
      LEDGER carries it for the whole run ([tree_R]), which is what lets
      [al_pow] mint a licence at EVERY era rather than only at the first. *)
   Definition tree_cl (c : tree_fixed) : iProp Σ :=
-    (∃ M : gmap nat unit, ghost_map_auth c 1 M)%I.
+    (∃ M : gmap nat unit, ghost_map_auth_frac c 1 M)%I.
 
   Global Instance tree_cl_timeless c : Timeless (tree_cl c).
   Proof using . rewrite /tree_cl. apply _. Qed.
@@ -1413,7 +1413,7 @@ Section AppTree.
      cannot taint the claim.  (The authority's own row for a LIVE licence
      is exclusive, which is what makes [tree_turn] linear.) *)
   Lemma tree_taint_needs_a_row (c : tree_fixed) (M : gmap nat unit) :
-    ghost_map_auth c 1 M -∗ tree_taint c -∗ ⌜M <> ∅⌝.
+    ghost_map_auth_frac c 1 M -∗ tree_taint c -∗ ⌜M <> ∅⌝.
   Proof using .
     iIntros "Ha (%k & Hk)".
     iDestruct (ghost_map_lookup with "Ha Hk") as %Hlk.
@@ -1471,7 +1471,7 @@ Section AppTree.
      is mid-move has none. *)
   Definition tree_body (r : tree_names) (av : aview) : iProp Σ :=
     (∃ own : gmap gname (Z * ttree),
-       ghost_map_auth (tn_own r) 1 own ∗ ghost_map_auth (tn_tk r) 1 own
+       ghost_map_auth_frac (tn_own r) 1 own ∗ ghost_map_auth_frac (tn_tk r) 1 own
        ∗ ⌜own_wf av own⌝ ∗ ⌜adir_at av FsImg.ROOTINO⌝
        ∗ ⌜aview_rooted av⌝ ∗ ⌜own_rooted av own⌝
        ∗ ([∗ map] g ↦ p ∈ own, tree_slot r av g p))%I.
@@ -1490,7 +1490,7 @@ Section AppTree.
       (own : gmap gname (Z * ttree)) :
     own_wf av own -> tree_exact av own -> adir_at av FsImg.ROOTINO ->
     aview_rooted av -> own_rooted av own ->
-    ghost_map_auth (tn_own r) 1 own -∗ ghost_map_auth (tn_tk r) 1 own -∗
+    ghost_map_auth_frac (tn_own r) 1 own -∗ ghost_map_auth_frac (tn_tk r) 1 own -∗
     ([∗ map] g ↦ p ∈ own, g ↪[tn_tk r]{# (1/2)%Qp} p) -∗
     tree_body r av.
   Proof using .
@@ -1591,11 +1591,11 @@ Section AppTree.
     aview_tree_wf av -> adir_at av FsImg.ROOTINO -> aview_rooted av ->
     (* THE EMPTY MAPS ARE ANNOTATED, and they have to be since lane TL-5:
        [treeG] carries TWO [ghost_mapG] instances now (the ownership map
-       and the era-licence registry), so a bare [∅] under [ghost_map_auth]
+       and the era-licence registry), so a bare [∅] under [ghost_map_auth_frac]
        no longer determines its key and value types and resolution may
        pick the registry's. *)
-    ghost_map_auth (tn_own r) 1 (∅ : gmap gname (Z * ttree)) -∗
-    ghost_map_auth (tn_tk r) 1 (∅ : gmap gname (Z * ttree)) -∗
+    ghost_map_auth_frac (tn_own r) 1 (∅ : gmap gname (Z * ttree)) -∗
+    ghost_map_auth_frac (tn_tk r) 1 (∅ : gmap gname (Z * ttree)) -∗
     tree_body r av.
   Proof using .
     intros Hwf Hr Hro. iIntros "Ha Hk".
@@ -1644,8 +1644,8 @@ Section AppTree.
      era-0 mints and the transport's first deed are both this. *)
   Lemma tree_mint_singleton (g : gname) (root : Z) (t : ttree) :
     ⊢ |==> ∃ r : tree_names,
-        ghost_map_auth (tn_own r) 1 ({[ g := (root, t) ]} : gmap gname (Z * ttree))
-        ∗ ghost_map_auth (tn_tk r) 1 ({[ g := (root, t) ]} : gmap gname (Z * ttree))
+        ghost_map_auth_frac (tn_own r) 1 ({[ g := (root, t) ]} : gmap gname (Z * ttree))
+        ∗ ghost_map_auth_frac (tn_tk r) 1 ({[ g := (root, t) ]} : gmap gname (Z * ttree))
         ∗ g ↪[tn_tk r]{# (1/2)%Qp} (root, t)
         ∗ tree_deed r g root t ∗ tree_tkt r g root t.
   Proof using .
@@ -1782,13 +1782,13 @@ Section AppTree.
               ({[ 1%positive := (FsImg.ROOTINO, t0) ]}
                  : gmap gname (Z * ttree))).
     { intros g0 r0 t1 H0. destruct (decide (g0 = 1%positive)) as [-> | Hne].
-      - rewrite lookup_singleton in H0. injection H0 as <- <-. exact Hsub.
+      - rewrite lookup_singleton_eq in H0. injection H0 as <- <-. exact Hsub.
       - rewrite lookup_singleton_ne in H0; [discriminate | congruence]. }
     assert (Hor0 : own_rooted av
               ({[ 1%positive := (FsImg.ROOTINO, t0) ]}
                  : gmap gname (Z * ttree))).
     { intros g0 r0 t1 H0. destruct (decide (g0 = 1%positive)) as [-> | Hne].
-      - rewrite lookup_singleton in H0. injection H0 as <- <-.
+      - rewrite lookup_singleton_eq in H0. injection H0 as <- <-.
         apply nreach_refl.
       - rewrite lookup_singleton_ne in H0; [discriminate | congruence]. }
     assert (Hwf0 : own_wf av
@@ -1797,7 +1797,7 @@ Section AppTree.
     { split_and!.
       - exact Hwf.
       - intros g0 r0 t1 H0. destruct (decide (g0 = 1%positive)) as [-> | Hne].
-        + rewrite lookup_singleton in H0. injection H0 as <- <-. exact Hr.
+        + rewrite lookup_singleton_eq in H0. injection H0 as <- <-. exact Hr.
         + rewrite lookup_singleton_ne in H0; [discriminate | congruence].
       - intros g1 g2 r1 t1 r2 t2 Hne H1 H2. exfalso.
         destruct (decide (g1 = 1%positive)) as [-> | H1e].
@@ -2345,10 +2345,10 @@ Section AppTree.
     iSplit.
     { iPureIntro. exact (own_rooted_retree av' own g root t t' Hlk Hor). }
     iApply (big_sepM_delete _ (<[g := (root, t')]> own) g (root, t')
-              (lookup_insert own g (root, t'))).
+              (lookup_insert_eq own g (root, t'))).
     iSplitR "Hm".
     - rewrite /tree_slot /=. iFrame "Htk2". iLeft. by iPureIntro.
-    - rewrite delete_insert_delete. iExact "Hm".
+    - rewrite delete_insert_eq. iExact "Hm".
   Qed.
 
   (* ...and the REFUND (design section 7.2's "THE REFUND ARM"): a syscall
@@ -2418,17 +2418,17 @@ Section AppTree.
     iMod (tree_mint_singleton g root t) as (r) "(Ha & Hk & Htk & Hd & Ht2)".
     assert (Hex0 : tree_exact av ({[ g := (root, t) ]} : gmap gname (Z * ttree))).
     { intros g0 r0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-      - rewrite lookup_singleton in H0. injection H0 as <- <-. exact Ht.
+      - rewrite lookup_singleton_eq in H0. injection H0 as <- <-. exact Ht.
       - rewrite lookup_singleton_ne in H0; [discriminate | congruence]. }
     assert (Hor0 : own_rooted av ({[ g := (root, t) ]} : gmap gname (Z * ttree))).
     { intros g0 r0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-      - rewrite lookup_singleton in H0. injection H0 as <- <-. exact Hrr.
+      - rewrite lookup_singleton_eq in H0. injection H0 as <- <-. exact Hrr.
       - rewrite lookup_singleton_ne in H0; [discriminate | congruence]. }
     assert (Hwf0 : own_wf av ({[ g := (root, t) ]} : gmap gname (Z * ttree))).
     { split_and!.
       - exact Hwf.
       - intros g0 r0 t0 H0. destruct (decide (g0 = g)) as [-> | Hne].
-        + rewrite lookup_singleton in H0. injection H0 as <- <-.
+        + rewrite lookup_singleton_eq in H0. injection H0 as <- <-.
           by apply subtree_Some_inv in Ht as (Hd & _).
         + rewrite lookup_singleton_ne in H0; [discriminate | congruence].
       - intros g1 g2 r1 t1 r2 t2 Hne H1 H2. exfalso.

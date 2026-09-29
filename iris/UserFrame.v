@@ -177,7 +177,7 @@ Proof. rewrite /Du_w /Du_r => H. by rewrite H. Qed.
    case split. *)
 Lemma u_gpr_mem (i : Z) : 1 <= i < 32 -> (R_bitvector_64 (gpr_of_Z i) : register) ∈ u_gpr_list.
 Proof.
-  intros Hi. rewrite /u_gpr_list. apply elem_of_list_fmap.
+  intros Hi. rewrite /u_gpr_list. apply list_elem_of_fmap.
   exists i. split; [reflexivity |]. apply elem_of_seqZ. lia.
 Qed.
 
@@ -346,7 +346,7 @@ Lemma u_uint_mword5 (i : Z) : 0 <= i < 32 -> uint (mword_of_int i : mword 5) = i
 Proof.
   intro Hi.
   pose proof (bv_unsigned_in_range _ (mword_of_int i : mword 5)) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [| exact (proj1 Hr)].
   unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
   rewrite Z_to_bv_small; [reflexivity |].
@@ -360,7 +360,7 @@ Qed.
 Lemma u_uint5_bv (a : mword 5) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 

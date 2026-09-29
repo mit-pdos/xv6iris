@@ -184,7 +184,7 @@ Section UkShRedirChild.
       assert (Hfd1' : UkShRedirBody.ushs_fd1f ty
                 (<[1%nat := FdOpen false true ty]>
                    (<[1%nat := FdClosed]> ld))).
-      { rewrite /UkShRedirBody.ushs_fd1f. apply list_lookup_insert.
+      { rewrite /UkShRedirBody.ushs_fd1f. apply list_lookup_insert_eq.
         rewrite length_insert. exact Hlen1. }
       assert (Hfd2' : UkSh.ush_fd2p
                 (<[1%nat := FdOpen false true ty]>

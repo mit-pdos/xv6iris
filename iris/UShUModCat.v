@@ -316,7 +316,7 @@ Section UShUModCat.
       { rewrite /fown /fdeed /FileOpen.fdq. iFrame "Hdq Htk". }
       assert (Hc' : dst_content s = lm_step U (ust cs s0 I) (ul I) (lm_dec U a))
         by (rewrite Hul (ustep_id_cat _ nm); exact Hcon).
-      apply elem_of_cons in Ha as [-> | Ha]; [| apply elem_of_list_singleton in Ha as ->].
+      apply elem_of_cons in Ha as [-> | Ha]; [| apply list_elem_of_singleton in Ha as ->].
       - iApply (uWcf0_of_posts_alt ug r s0 I (ualt_code (UR RCRan)) v v cs s
                   (ulm_aprs_R I RCRan Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl)
                   ltac:(rewrite Hul; reflexivity) ltac:(by vm_compute) Hlen Hpos Hc' with "[] Hpost Hown Hup Hty Hpin Hcs").

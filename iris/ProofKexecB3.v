@@ -4426,7 +4426,7 @@ Section KexecB3Main.
               aslen afun pidv U eb dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
-              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+              (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
               w67 ef P Mi (mword_of_int 0 : mword 64) (m !!! Regidx Rs11)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               with "Htext Hfab Hst4 [Hc1ae]").

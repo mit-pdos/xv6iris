@@ -56,7 +56,7 @@ Section first_out.
     destruct (trace_shape_cycles h Hsh) as (cs & Hcs).
     assert (Hin : open_seg h ∈ cycles_of h)
       by (rewrite /cycles_of Hcs; apply epu_elem_of_rev_head).
-    apply elem_of_list_lookup in Hin as [i Hi].
+    apply list_elem_of_lookup in Hin as [i Hi].
     exact (Forall_lookup_1 _ _ _ _ Hd Hi).
   Qed.
 

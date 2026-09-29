@@ -194,7 +194,7 @@ Lemma forallb_seq (f : nat -> bool) (n k : nat) :
   List.forallb f (seq 0 n) = true -> (k < n)%nat -> f k = true.
 Proof.
   intros H Hk. rewrite List.forallb_forall in H. apply H.
-  apply elem_of_list_In, elem_of_seq. lia.
+  apply list_elem_of_In, elem_of_seq. lia.
 Qed.
 
 (* ====================================================================== *)
@@ -522,7 +522,7 @@ Proof.
   rewrite Nat2Z.inj_succ in Hi. cbn [fs_nodes_upto].
   destruct (decide (i = Z.of_nat m)) as [->|Hne].
   - destruct (node_at P sb (Z.of_nat m)) as [nd|] eqn:Hn.
-    + rewrite lookup_insert. reflexivity.
+    + rewrite lookup_insert_eq. reflexivity.
     + apply fs_nodes_upto_lookup_out. right. lia.
   - destruct (node_at P sb (Z.of_nat m)) as [nd|] eqn:Hn.
     + rewrite lookup_insert_ne by congruence. apply IH. lia.
@@ -672,7 +672,7 @@ Proof.
   unfold file_bytes. rewrite list_lookup_fmap.
   destruct (Nat.lt_ge_cases j n) as [Hj|Hj].
   - rewrite lookup_seq_lt by exact Hj. cbn [fmap option_fmap option_map].
-    rewrite lookup_take by exact Hj.
+    rewrite lookup_take_lt by exact Hj.
     rewrite (fs_take_blocks_lookup data 0 nb j Hlen) by lia.
     rewrite Nat.mul_0_l, Nat.add_0_l. reflexivity.
   - rewrite (lookup_ge_None_2 (seq 0 n) j) by (rewrite length_seq; lia).
@@ -933,7 +933,7 @@ Proof.
   apply fs_log_clean_spec in Hc.
   assert (Hb : take 4 (P (sb_logstart sb)) !!! j = bv_0 8).
   { apply (assemble_bytes_zero_byte _ j Hc). rewrite length_take. lia. }
-  rewrite <- Hb, !list_lookup_total_alt, lookup_take by exact Hj.
+  rewrite <- Hb, !list_lookup_total_alt, lookup_take_lt by exact Hj.
   reflexivity.
 Qed.
 
@@ -1252,7 +1252,7 @@ Proof.
               ltac:(lia)) as [a Ha'].
   rewrite (list_lookup_total_correct _ _ _ Ha').
   apply Z.eqb_eq. apply Ha.
-  apply elem_of_list_In, elem_of_list_lookup_2 with k. exact Ha'.
+  apply list_elem_of_In, list_elem_of_lookup_2 with k. exact Ha'.
 Qed.
 
 (* **THE ONE REGION-WIDE HYPOTHESIS.**  [fsimg_wf] cannot see [nib], so the
@@ -1290,7 +1290,7 @@ Lemma fs_live_set_elem_of (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
       /\ bv_unsigned (di_type (fs_dinode P sb z)) <> 0.
 Proof.
   unfold fs_live_set. rewrite elem_of_list_to_set.
-  rewrite elem_of_list_In, filter_In, <- elem_of_list_In, elem_of_list_fmap.
+  rewrite list_elem_of_In, filter_In, <- list_elem_of_In, list_elem_of_fmap.
   split.
   - intros [(k & -> & Hk) Hnz].
     apply elem_of_seq in Hk. apply negb_true_iff in Hnz.
@@ -1351,8 +1351,8 @@ Lemma fs_used_blocks_inode (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z)
   b ∈ fs_used_blocks P sb.
 Proof.
   intros Hi Hnz Hb. unfold fs_used_blocks.
-  apply elem_of_list_join. eexists. split; [exact Hb |].
-  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  apply list_elem_of_join. eexists. split; [exact Hb |].
+  apply list_elem_of_fmap. exists (Z.to_nat i). split.
   - rewrite Z2Nat.id by lia.
     destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
       [| reflexivity].
@@ -1583,7 +1583,7 @@ Lemma fs_used_blocks_nodup_inode (P : Z -> list (bv 8)) (sb : fs_sb)
 Proof.
   intros Hnd Hi Hnz. unfold fs_used_blocks in Hnd.
   apply (NoDup_mjoin_elem _ _ Hnd).
-  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  apply list_elem_of_fmap. exists (Z.to_nat i). split.
   - rewrite Z2Nat.id by lia.
     destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
       [| reflexivity].
@@ -1637,16 +1637,16 @@ Proof.
   - (* the indirect block, which heads the list exactly when there is one *)
     destruct (Z.ltb_spec (Z.of_nat FS_NDIRECT)
                 (fs_nblk (bv_unsigned (di_size dn)))) as [Hgt|Hle].
-    + apply elem_of_list_singleton in Hb as ->.
+    + apply list_elem_of_singleton in Hb as ->.
       exact (fio_ind P sb dn Hok Hgt).
     + exfalso. exact (proj1 (elem_of_nil b) Hb).
   - apply elem_of_app in Hb as [Hb | Hb].
     + (* a direct entry, below both [nb] and NDIRECT *)
-      apply elem_of_list_fmap in Hb as (k & -> & Hk).
+      apply list_elem_of_fmap in Hb as (k & -> & Hk).
       apply elem_of_seq in Hk.
       apply (fio_direct P sb dn Hok k); unfold FS_NDIRECT in *; lia.
     + (* an indirect entry: [nb - NDIRECT] of them, and [nb <= MAXFILE] *)
-      apply elem_of_list_fmap in Hb as (j & -> & Hj).
+      apply list_elem_of_fmap in Hb as (j & -> & Hj).
       apply elem_of_seq in Hj.
       apply (fio_ent P sb dn Hok j);
         unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *; lia.
@@ -1692,12 +1692,12 @@ Proof.
   - exact (Hne eq_refl).
   - injection H1 as Hl1. subst l1.
     apply (NoDup_app_cross y (mjoin ls) x Hnd Hx1).
-    apply elem_of_list_join. exists l2.
-    split; [exact Hx2 | exact (elem_of_list_lookup_2 ls m2 l2 H2)].
+    apply list_elem_of_join. exists l2.
+    split; [exact Hx2 | exact (list_elem_of_lookup_2 ls m2 l2 H2)].
   - injection H2 as Hl2. subst l2.
     apply (NoDup_app_cross y (mjoin ls) x Hnd Hx2).
-    apply elem_of_list_join. exists l1.
-    split; [exact Hx1 | exact (elem_of_list_lookup_2 ls m1 l1 H1)].
+    apply list_elem_of_join. exists l1.
+    split; [exact Hx1 | exact (list_elem_of_lookup_2 ls m1 l1 H1)].
   - destruct (NoDup_app_split y (mjoin ls) Hnd) as (_ & Hr).
     exact (IH m1 m2 Hr H1 H2 ltac:(lia) Hx1 Hx2).
 Qed.
@@ -1826,7 +1826,7 @@ Lemma fs_bmap_set_elem (n : nat) (bmb : list (bv 8)) (b : Z) :
   <-> (0 <= b < 8 * Z.of_nat n /\ fs_bit bmb b = true).
 Proof.
   unfold fs_bmap_set. rewrite elem_of_list_to_set.
-  rewrite elem_of_list_In, filter_In, <- elem_of_list_In, elem_of_seqZ.
+  rewrite list_elem_of_In, filter_In, <- list_elem_of_In, elem_of_seqZ.
   split; intros [H1 H2]; (split; [lia | exact H2]).
 Qed.
 
@@ -2360,13 +2360,13 @@ Lemma fs_all_tickets_range (P : Z -> list (bv 8)) (sb : fs_sb) (t : Z) :
   0 < t < sb_ninodes sb.
 Proof.
   intros Hw Ht. unfold fs_all_tickets in Ht.
-  apply elem_of_list_join in Ht as (l & Hl & Hls).
-  apply elem_of_list_fmap in Hls as (i & -> & Hi).
+  apply list_elem_of_join in Ht as (l & Hl & Hls).
+  apply list_elem_of_fmap in Hls as (i & -> & Hi).
   apply elem_of_seq in Hi as [_ Hi].
   unfold fs_dir_tickets_at in Hl. cbv zeta in Hl.
   destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat i))) =? T_DIR_z)
     eqn:Hty; [| by apply elem_of_nil in Hl].
-  apply elem_of_list_omap in Hl as (k & Hk & Hkt).
+  apply list_elem_of_omap in Hl as (k & Hk & Hkt).
   apply elem_of_seq in Hk as [_ Hk].
   unfold fs_rec_ticket in Hkt. cbv zeta in Hkt.
   destruct (dir_liveb (fs_data_of P (fs_dinode P sb (Z.of_nat i))) k
@@ -2391,8 +2391,8 @@ Proof.
   assert (Hnil : List.filter (fun t => bool_decide (t = z)) L = []).
   { induction L as [| a L IH]; [reflexivity |].
     cbn [List.filter].
-    rewrite (bool_decide_eq_false_2 (a = z) (H a (elem_of_list_here a L))).
-    apply IH. intros t Ht. apply H. apply elem_of_list_further. exact Ht. }
+    rewrite (bool_decide_eq_false_2 (a = z) (H a (list_elem_of_here a L))).
+    apply IH. intros t Ht. apply H. apply list_elem_of_further. exact Ht. }
   rewrite Hnil. reflexivity.
 Qed.
 
@@ -2616,7 +2616,7 @@ Proof.
       reflexivity.
   - apply Z.leb_le. exact (fdi_size P sb dn Hd).
   - rewrite List.forallb_forall. intros k Hk.
-    apply elem_of_list_In, elem_of_seq in Hk. cbv beta zeta.
+    apply list_elem_of_In, elem_of_seq in Hk. cbv beta zeta.
     destruct (Z.ltb_spec (Z.of_nat k)
                 (fs_nblk (bv_unsigned (di_size dn)))) as [Hlt | Hge].
     + apply fs_addr_ok_spec.
@@ -2635,7 +2635,7 @@ Proof.
         exact (fdi_ind_ok P sb dn Hd Hnz).
     + apply fs_addr_ok_spec. exact (fdi_ind P sb dn Hd Hgt).
   - rewrite List.forallb_forall. intros j Hj.
-    apply elem_of_list_In, elem_of_seq in Hj. cbv beta zeta.
+    apply list_elem_of_In, elem_of_seq in Hj. cbv beta zeta.
     destruct (Z.ltb_spec (Z.of_nat j)
                 (fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT))
       as [Hlt | Hge].
@@ -2682,7 +2682,7 @@ Proof.
   split; [split; [split |] |].
   - split; [exact Hty | exact Hsz].
   - rewrite List.forallb_forall. intros k Hk.
-    apply elem_of_list_In, elem_of_seq in Hk.
+    apply list_elem_of_In, elem_of_seq in Hk.
     pose proof (forallb_seq _ FS_NDIRECT k Hdir ltac:(lia)) as Hk'.
     cbv beta zeta in Hk' |- *.
     destruct (Z.of_nat k <? fs_nblk (bv_unsigned (di_size dn)));
@@ -2690,7 +2690,7 @@ Proof.
   - destruct (fs_nblk (bv_unsigned (di_size dn)) <=? Z.of_nat FS_NDIRECT);
       [rewrite Hind; reflexivity | exact Hind].
   - rewrite List.forallb_forall. intros j Hj.
-    apply elem_of_list_In, elem_of_seq in Hj.
+    apply list_elem_of_In, elem_of_seq in Hj.
     pose proof (forallb_seq _ FS_NINDIRECT j Hent ltac:(lia)) as Hj'.
     cbv beta zeta in Hj' |- *.
     destruct (Z.of_nat j
@@ -2724,7 +2724,7 @@ Lemma fs_inodes_wf_dwf (P : Z -> list (bv 8)) (sb : fs_sb) :
 Proof.
   intros H. unfold fs_inodes_dwf.
   rewrite List.forallb_forall. intros x Hin.
-  apply elem_of_list_In, elem_of_seq in Hin.
+  apply list_elem_of_In, elem_of_seq in Hin.
   pose proof (forallb_seq _ _ x H ltac:(lia)) as Hx.
   cbv beta zeta in Hx. cbv beta zeta.
   destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x))) =? 0);
@@ -2764,16 +2764,16 @@ Lemma filter_all_true {A : Type} (p : A -> bool) (l : list A) :
   (forall x : A, x ∈ l -> p x = true) -> List.filter p l = l.
 Proof.
   induction l as [| a l IH]; intros H; [reflexivity |].
-  cbn [List.filter]. rewrite (H a (elem_of_list_here a l)).
-  f_equal. apply IH. intros x Hx. apply H, elem_of_list_further, Hx.
+  cbn [List.filter]. rewrite (H a (list_elem_of_here a l)).
+  f_equal. apply IH. intros x Hx. apply H, list_elem_of_further, Hx.
 Qed.
 
 Lemma filter_all_false {A : Type} (p : A -> bool) (l : list A) :
   (forall x : A, x ∈ l -> p x = false) -> List.filter p l = [].
 Proof.
   induction l as [| a l IH]; intros H; [reflexivity |].
-  cbn [List.filter]. rewrite (H a (elem_of_list_here a l)).
-  apply IH. intros x Hx. apply H, elem_of_list_further, Hx.
+  cbn [List.filter]. rewrite (H a (list_elem_of_here a l)).
+  apply IH. intros x Hx. apply H, list_elem_of_further, Hx.
 Qed.
 
 Lemma fmap_seq_split {A : Type} (f : nat -> A) (m r : nat) :
@@ -2794,11 +2794,11 @@ Proof.
   replace n with (m + (n - m))%nat by lia.
   rewrite (fmap_seq_split f m (n - m)), List.filter_app.
   rewrite (filter_all_true _ (f <$> seq 0 m)).
-  2:{ intros x Hx. apply elem_of_list_fmap in Hx as (k & -> & Hk).
+  2:{ intros x Hx. apply list_elem_of_fmap in Hx as (k & -> & Hk).
       apply elem_of_seq in Hk.
       apply negb_true_iff, Z.eqb_neq, Hlo. lia. }
   rewrite (filter_all_false _ (f <$> seq m (n - m))).
-  2:{ intros x Hx. apply elem_of_list_fmap in Hx as (k & -> & Hk).
+  2:{ intros x Hx. apply list_elem_of_fmap in Hx as (k & -> & Hk).
       apply elem_of_seq in Hk.
       apply negb_false_iff, Z.eqb_eq, Hhi; lia. }
   apply List.app_nil_r.
@@ -2831,8 +2831,8 @@ Proof.
   cbn [List.filter] in Hnd.
   assert (Hkeep : forall (m : nat), l !! m = Some x ->
             x ∈ List.filter p l).
-  { intros m Hm. apply elem_of_list_In, List.filter_In.
-    split; [apply elem_of_list_In, (elem_of_list_lookup_2 l m x Hm) | exact Hp]. }
+  { intros m Hm. apply list_elem_of_In, List.filter_In.
+    split; [apply list_elem_of_In, (list_elem_of_lookup_2 l m x Hm) | exact Hp]. }
   destruct i as [| i']; destruct j as [| j']; cbn [lookup list_lookup] in Hi, Hj.
   - reflexivity.
   - injection Hi as ->. exfalso.
@@ -2932,14 +2932,14 @@ Proof.
   apply elem_of_cons in Hb as [-> | Hb].
   - exists FS_MAXFILE. split; [lia | rewrite fs_slot_max; reflexivity].
   - apply elem_of_app in Hb as [Hb | Hb].
-    + apply elem_of_list_fmap in Hb as (k & -> & Hk).
+    + apply list_elem_of_fmap in Hb as (k & -> & Hk).
       apply elem_of_seq in Hk.
       assert (HkD : (k < FS_NDIRECT)%nat) by lia.
       assert (HkM : (k < FS_MAXFILE)%nat) by lia.
       exists k. split; [lia |].
       rewrite (fs_slot_lt P dn k HkM). unfold fs_blk_addr.
       rewrite (proj2 (Nat.ltb_lt k FS_NDIRECT) HkD). reflexivity.
-    + apply elem_of_list_lookup in Hb as (j & Hj).
+    + apply list_elem_of_lookup in Hb as (j & Hj).
       assert (Hjl : (j < FS_NINDIRECT)%nat).
       { apply lookup_lt_Some in Hj. rewrite fs_ind_ents_length in Hj.
         exact Hj. }
@@ -2961,8 +2961,8 @@ Lemma fs_inode_ents_slot (P : Z -> list (bv 8)) (dn : dinode) (i : nat) :
   fs_slot P dn i ∈ fs_inode_ents P dn.
 Proof.
   intros Hi Hnz. unfold fs_inode_ents.
-  apply elem_of_list_In, List.filter_In. split.
-  - apply elem_of_list_In, elem_of_list_lookup.
+  apply list_elem_of_In, List.filter_In. split.
+  - apply list_elem_of_In, list_elem_of_lookup.
     exists (fs_run_ix i). exact (fs_slot_list_lookup P dn i Hi).
   - apply negb_true_iff, Z.eqb_neq. exact Hnz.
 Qed.
@@ -2973,8 +2973,8 @@ Lemma fs_inode_ents_elem (P : Z -> list (bv 8)) (dn : dinode) (b : Z) :
   exists i : nat, (i <= FS_MAXFILE)%nat /\ fs_slot P dn i = b /\ b <> 0.
 Proof.
   unfold fs_inode_ents. intros Hb.
-  apply elem_of_list_In, List.filter_In in Hb as (Hin & Hnz).
-  apply elem_of_list_In in Hin.
+  apply list_elem_of_In, List.filter_In in Hb as (Hin & Hnz).
+  apply list_elem_of_In in Hin.
   destruct (fs_slot_list_elem P dn b Hin) as (i & Hi & Heq).
   exists i. split; [exact Hi |]. split; [exact Heq |].
   apply negb_true_iff, Z.eqb_neq in Hnz. exact Hnz.
@@ -3055,8 +3055,8 @@ Qed.
 Lemma elem_of_perm {A : Type} (l1 l2 : list A) (x : A) :
   l1 ≡ₚ l2 -> x ∈ l1 -> x ∈ l2.
 Proof.
-  intros Hp Hx. apply elem_of_list_In.
-  apply (Permutation_in _ Hp). apply elem_of_list_In. exact Hx.
+  intros Hp Hx. apply list_elem_of_In.
+  apply (Permutation_in _ Hp). apply list_elem_of_In. exact Hx.
 Qed.
 
 Lemma filter_nz_mid (A B : list Z) (a : Z) :
@@ -3119,7 +3119,7 @@ Proof.
   - destruct (fs_run_ix_surj k Hk) as (i & Hi & <-).
     rewrite (fs_slot_list_lookup P' dn' i Hi).
     destruct (decide (i = j)) as [-> | Hne].
-    + rewrite list_lookup_insert
+    + rewrite list_lookup_insert_eq
         by (rewrite fs_slot_list_length; exact Hjl).
       rewrite Ha. reflexivity.
     + rewrite list_lookup_insert_ne
@@ -3175,8 +3175,8 @@ Lemma fs_ent_blocks_inode (P : Z -> list (bv 8)) (sb : fs_sb) (i b : Z) :
   b ∈ fs_ent_blocks P sb.
 Proof.
   intros Hi Hnz Hb. unfold fs_ent_blocks.
-  apply elem_of_list_join. eexists. split; [exact Hb |].
-  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  apply list_elem_of_join. eexists. split; [exact Hb |].
+  apply list_elem_of_fmap. exists (Z.to_nat i). split.
   - rewrite Z2Nat.id by lia.
     destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
       [| reflexivity].
@@ -3191,7 +3191,7 @@ Lemma fs_ent_blocks_nodup_inode (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
 Proof.
   intros Hnd Hi Hnz. unfold fs_ent_blocks in Hnd.
   apply (NoDup_mjoin_elem _ _ Hnd).
-  apply elem_of_list_fmap. exists (Z.to_nat i). split.
+  apply list_elem_of_fmap. exists (Z.to_nat i). split.
   - rewrite Z2Nat.id by lia.
     destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
       [| reflexivity].

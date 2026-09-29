@@ -774,6 +774,7 @@ Section kptnode.
     wpte_obl_at (pt_addr0 p1 vpn) m0
       (mwrite_req8_con (pt_addr0 p1 vpn) (autocast (T := mword) m0')) True.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hmaps Hvar.
     rewrite /wpte_obl_at.
     iIntros "#Hat #Hlb0 #Hkinv" (σ img log V) "%Hrb (Hreg & Hgh & Hdev) Htso".

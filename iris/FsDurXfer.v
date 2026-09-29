@@ -691,7 +691,7 @@ Section FsRuns.
       rewrite /blk_owned /xr_dat /xr_blk /xr_off /xr_bs /=. iIntros "$".
       iPureIntro. apply (Hlen p.1 p.2).
       apply elem_of_map_to_list. rewrite -surjective_pairing.
-      exact (elem_of_list_lookup_2 _ _ _ Hp).
+      exact (list_elem_of_lookup_2 _ _ _ Hp).
     - rewrite /xr_ind /ind_owned. case_decide as Hz; [done |].
       rewrite /phi_runs big_sepL_singleton /blk_owned /=.
       iFrame "Hi". iPureIntro. exact (Hind Hz).
@@ -765,7 +765,7 @@ Section FsRuns.
     iIntros "H". iApply (big_sepL_mono with "H"). intros k p Hp. simpl.
     iApply (inode_phi_of_runs Γ sb p.1 p.2).
     apply (Hlens p.1 p.2). apply elem_of_map_to_list.
-    rewrite -surjective_pairing. exact (elem_of_list_lookup_2 _ _ _ Hp).
+    rewrite -surjective_pairing. exact (list_elem_of_lookup_2 _ _ _ Hp).
   Qed.
 
 End FsRuns.
@@ -817,7 +817,7 @@ Section FsPool.
         iExists (<[b := bs]> PM). iSplitR.
         * iPureIntro. split.
           -- intros x. destruct (decide (x = b)) as [-> | Hne].
-             ++ rewrite lookup_insert. split.
+             ++ rewrite lookup_insert_eq. split.
                 ** intros _. split; [apply elem_of_cons; by left | exact Hbu].
                 ** intros _. by eexists.
              ++ rewrite lookup_insert_ne; [| done]. rewrite (Hdom x). split.
@@ -826,7 +826,7 @@ Section FsPool.
                 ** intros [Hx Hxu]. apply elem_of_cons in Hx as [-> | Hx];
                      [contradiction | by split].
           -- intros x cs. destruct (decide (x = b)) as [-> | Hne].
-             ++ rewrite lookup_insert. intros Hc. injection Hc as <-.
+             ++ rewrite lookup_insert_eq. intros Hc. injection Hc as <-.
                 exact Hlen.
              ++ rewrite lookup_insert_ne; [| done]. exact (Hlens x cs).
         * rewrite big_sepM_insert; [| exact HPMb]. iFrame.
@@ -856,7 +856,7 @@ Section FsPool.
         iIntros "[Hb HPM]". iSplitL "Hb"; [by iExists bs |].
         iApply (IH (delete b PM) Hnd with "HPM"). split.
         * intros x. destruct (decide (x = b)) as [-> | Hne].
-          -- rewrite lookup_delete. split.
+          -- rewrite lookup_delete_eq. split.
              ++ intros [? Hc]. discriminate.
              ++ intros [Hx _]. contradiction.
           -- rewrite lookup_delete_ne; [| done]. rewrite (Hdom x). split.
@@ -877,7 +877,7 @@ Section FsPool.
     apply big_sepL_proper. intros k p Hp.
     assert (Hin : PM !! p.1 = Some p.2).
     { apply elem_of_map_to_list. rewrite -surjective_pairing.
-      exact (elem_of_list_lookup_2 _ _ _ Hp). }
+      exact (list_elem_of_lookup_2 _ _ _ Hp). }
     rewrite /blk_owned /xr_blk /xr_off /xr_bs /=.
     iSplit; [iIntros "[_ $]" | iIntros "$"; iPureIntro; exact (Hlens _ _ Hin)].
   Qed.
@@ -1009,7 +1009,7 @@ Section FsFoot.
   Proof using .
     intros Hsub.
     assert (Hd : M ##ₘ Mh ∖ M).
-    { apply map_disjoint_difference_r. reflexivity. }
+    { apply map_disjoint_difference_r1. reflexivity. }
     rewrite /phi_map -{1}(map_difference_union M Mh Hsub).
     rewrite big_sepM_union; [done | exact Hd].
   Qed.
@@ -1121,7 +1121,7 @@ Section Xfer.
      fact about that record the TRANSPORT owns, which is why it stayed
      here when the record itself moved down. *)
   Lemma snap_gamma_agree (g gl gt : gname) (B : gmap Z (bv 8)) :
-    phi_agree (snap_gamma g gl gt) (ghost_map_auth g 1 B) B.
+    phi_agree (snap_gamma g gl gt) (ghost_map_auth_frac g 1 B) B.
   Proof using .
     intros dq a v. rewrite /snap_gamma /=.
     iIntros "[Ha Hv]". iApply (ghost_map_lookup with "Ha Hv").
@@ -1144,7 +1144,7 @@ Section Xfer.
   (* ---------------------------------------------------------------- *)
   Lemma fs_footprint_install_facts (g gl gt : gname) (B : gmap Z (bv 8))
       (S : fs_state_rec) :
-    ghost_map_auth g 1 B -∗
+    ghost_map_auth_frac g 1 B -∗
     fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S -∗
     ∃ PM, ⌜xf_shape S PM /\ xr_disj (xr_fs S PM)
            /\ xr_union (xr_fs S PM) ⊆ B⌝.
@@ -1157,7 +1157,7 @@ Section Xfer.
     { iSplit;
         [iApply (phi_runs_disj _ (snap_gamma_excl g gl gt) with "Hr")
         | iExact "Hr"]. }
-    iDestruct (phi_runs_in (snap_gamma g gl gt) (ghost_map_auth g 1 B) B
+    iDestruct (phi_runs_in (snap_gamma g gl gt) (ghost_map_auth_frac g 1 B) B
                  (snap_gamma_agree g gl gt B) _ Hdisj with "Hba Hr") as %Hin.
     iPureIntro. exists PM. split; [exact Hshape | split; [exact Hdisj | exact Hin]].
   Qed.
@@ -1209,7 +1209,7 @@ Section Xfer.
       (gl gt : gname) :
     xf_shape S PM -> xr_disj (xr_fs S PM) ->
     ⊢ |==> ∃ g : gname,
-        ghost_map_auth g 1 (xr_union (xr_fs S PM))
+        ghost_map_auth_frac g 1 (xr_union (xr_fs S PM))
         ∗ fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof using .
     intros Hshape Hdisj.
@@ -1236,7 +1236,7 @@ Section Xfer.
     ~ ✓ (dq ⋅ dq) ->
     A -∗ fs_footprint Γ dq S ==∗
       ∃ (g : gname) (B : gmap Z (bv 8)),
-        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ dq S ∗ ghost_map_auth g 1 B
+        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ dq S ∗ ghost_map_auth_frac g 1 B
         ∗ fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof using .
     intros Hdq. iIntros "HA Hf".
@@ -1277,8 +1277,8 @@ Section Xfer.
         ⌜B ⊆ M⌝
         ∗ A
         ∗ fs_state Γ (DfracOwn q) S
-        ∗ ghost_map_auth g 1 B
-        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ghost_map_auth_frac g 1 B
+        ∗ ghost_map_auth_frac gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof using .
@@ -1321,8 +1321,8 @@ Section Xfer.
         ⌜B ⊆ M⌝
         ∗ A
         ∗ fs_state Γ (DfracOwn q) S ∗ own (γlink Γ) (link_tok_elem r v)
-        ∗ ghost_map_auth g 1 B
-        ∗ ghost_map_auth gt 1 (fss_inodes S)
+        ∗ ghost_map_auth_frac g 1 B
+        ∗ ghost_map_auth_frac gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
         ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
         ∗ own gl (link_tok_elem r v).

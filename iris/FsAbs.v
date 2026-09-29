@@ -25,14 +25,14 @@
                 node.  That is why there is no cancellation arm anywhere
                 below: a share is not a cancellable lend.
      [astate]   is THE γtop AUTHORITY ITSELF, read through [abs_of]
-                ([abs_view]): [astate Γ av] is [ghost_map_auth (γtop Γ) 1 I]
+                ([abs_view]): [astate Γ av] is [ghost_map_auth_frac (γtop Γ) 1 I]
                 for the [I] whose reading is [av].  No new invariant, no
                 [aviewN] (section 9 Q3, ruled) -- and, since durable-disk EV,
                 no [fs_state] leg either (see below).
 
    WHERE THE AUTHORITY LIVES, AND WHY [fs_view] IS GONE (durable-disk EV).
    The EV campaign deleted [FsState.fs_view] -- the old
-   [∃ S, ghost_map_auth (γtop Γ) 1 (fss_inodes S) ∗ fs_state Γ S] bundle --
+   [∃ S, ghost_map_auth_frac (γtop Γ) 1 (fss_inodes S) ∗ fs_state Γ S] bundle --
    and put the live γtop authority in ITS OWN invariant,
    [InodeRegion.ftop_inv γfs = inv ftopN (ftop_body γfs)], whose body holds
    the RAW map [I : gmap Z fs_node] beside the arming registry [icfg_lk] and
@@ -52,7 +52,7 @@
 
      (2) [fs_view_astate], the old equivalence, is replaced by an ACCESSOR
          against the authority's real home: [astate_intro]/[astate_elim] are
-         the (trivial) intro and elim against a raw [ghost_map_auth], and
+         the (trivial) intro and elim against a raw [ghost_map_auth_frac], and
          [ftop_astate_acc] / [ftop_astate_ro] in section 5 borrow [astate]
          out of [ftop_body] -- the shape an AU proof uses after opening
          [ftopN].  The live Γ is [FsBytesGamma.fs_gamma_L γfs] and the gname
@@ -301,7 +301,7 @@ Section FsAbsCarrier.
      reader holds and eliminated only up to that fraction.  Reads
      (agreement) work at any fraction, which is all a reading needs. *)
   Definition astate_q Γ (q : Qp) (av : aview) : iProp Σ :=
-    (∃ I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝)%I.
+    (∃ I, ghost_map_auth_frac (γtop Γ) q I ∗ ⌜av = abs_view I⌝)%I.
 
   Definition astate Γ (av : aview) : iProp Σ := (∃ q : Qp, astate_q Γ q av)%I.
 
@@ -313,26 +313,26 @@ Section FsAbsCarrier.
 
   (* INTRO AND ELIM AGAINST THE AUTHORITY.  This is all that is left of the
      old [fs_view_astate] equivalence once the authority moved into
-     [InodeRegion.ftop_inv]: [astate] is a READING of [ghost_map_auth], so
+     [InodeRegion.ftop_inv]: [astate] is a READING of [ghost_map_auth_frac], so
      both directions are the definition.  The borrow off [ftop_body] itself
      is [ftop_astate_acc] (section 5). *)
   Lemma astate_q_intro Γ (q : Qp) I :
-    ghost_map_auth (γtop Γ) q I ⊢ astate_q Γ q (abs_view I).
+    ghost_map_auth_frac (γtop Γ) q I ⊢ astate_q Γ q (abs_view I).
   Proof using . iIntros "Ha". iExists I. by iFrame. Qed.
 
   Lemma astate_q_elim Γ (q : Qp) av :
-    astate_q Γ q av ⊢ ∃ I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
+    astate_q Γ q av ⊢ ∃ I, ghost_map_auth_frac (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
   Proof using . by iIntros "H". Qed.
 
   Lemma astate_of_q Γ (q : Qp) av : astate_q Γ q av ⊢ astate Γ av.
   Proof using . iIntros "H". iExists q. iExact "H". Qed.
 
   Lemma astate_intro Γ (q : Qp) I :
-    ghost_map_auth (γtop Γ) q I ⊢ astate Γ (abs_view I).
+    ghost_map_auth_frac (γtop Γ) q I ⊢ astate Γ (abs_view I).
   Proof using . iIntros "Ha". iApply astate_of_q. iApply astate_q_intro. iExact "Ha". Qed.
 
   Lemma astate_elim Γ av :
-    astate Γ av ⊢ ∃ (q : Qp) I, ghost_map_auth (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
+    astate Γ av ⊢ ∃ (q : Qp) I, ghost_map_auth_frac (γtop Γ) q I ∗ ⌜av = abs_view I⌝.
   Proof using . iIntros "H". iDestruct "H" as (q) "H". iExists q. iExact "H". Qed.
 
   (* A HELD FRAGMENT AGREES WITH THE AUTHORITY'S ROW. *)
@@ -969,7 +969,7 @@ Section FsAbsFtop.
       ∃ av, astate_q (fs_gamma_L γfs) (1/2) av
           ∗ (∀ I' : gmap Z fs_node,
                ⌜forall i n, I' !! i = Some n -> inode_local i n⌝ -∗
-               ghost_map_auth (fs_top γfs) (1/2) I' -∗ ftop_body γfs).
+               ghost_map_auth_frac (fs_top γfs) (1/2) I' -∗ ftop_body γfs).
   Proof using .
     iIntros "Hb". rewrite /ftop_body.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
@@ -988,7 +988,7 @@ Section FsAbsFtop.
     ftop_body γfs -∗
       ∃ I : gmap Z fs_node,
         astate_q (fs_gamma_L γfs) (1/2) (abs_view I)
-        ∗ (ghost_map_auth (fs_top γfs) (1/2) I -∗ ftop_body γfs).
+        ∗ (ghost_map_auth_frac (fs_top γfs) (1/2) I -∗ ftop_body γfs).
   Proof using .
     iIntros "Hb". rewrite /ftop_body.
     iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".

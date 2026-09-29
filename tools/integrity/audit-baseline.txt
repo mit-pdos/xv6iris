@@ -1,0 +1,50 @@
+# Print Assumptions baseline: the DISTINCT axiom names each audit must print, exactly
+# (claude-notes/durable-notes.md "The adequacy-print baseline"). Changing this file is a
+# trust-sensitive change (integrity.py blocks it on main): a MISSING name means a Link was
+# proved -- update here in the same commit; a NEW name means an axiom leaked into a cone.
+
+[audit-only] SystemAssumptions.v
+FunctionalExtensionality.functional_extensionality_dep
+PrimInt63.eqb
+PrimInt63.int
+PrimInt63.land
+PrimInt63.lor
+PrimInt63.lsl
+PrimInt63.lsr
+PrimInt63.sub
+PrimString.cat
+PrimString.get
+PrimString.string
+xv6iris_extras.resv_is_valid
+xv6iris_extras.resv_matches
+
+[audit-tree-only] TreeAssumptions.v
+FunctionalExtensionality.functional_extensionality_dep
+PrimInt63.eqb
+PrimInt63.int
+PrimInt63.land
+PrimInt63.lor
+PrimInt63.lsl
+PrimInt63.lsr
+PrimInt63.sub
+PrimString.cat
+PrimString.get
+PrimString.string
+xv6iris_extras.resv_is_valid
+xv6iris_extras.resv_matches
+
+[audit-union-only] UnionAssumptions.v
+FunctionalExtensionality.functional_extensionality_dep
+PrimInt63.eqb
+PrimInt63.int
+PrimInt63.land
+PrimInt63.lor
+PrimInt63.lsl
+PrimInt63.lsr
+PrimInt63.sub
+PrimString.cat
+PrimString.get
+PrimString.length
+PrimString.string
+xv6iris_extras.resv_is_valid
+xv6iris_extras.resv_matches

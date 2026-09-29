@@ -1369,7 +1369,7 @@ Section SyscallVocab.
   Proof using .
     unfold subrange_vec_dec. rewrite autocast_id.
     unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+    unfold MachineWord.MachineWord.slice.
     rewrite bv_extract_unsigned.
     change (MachineWord.MachineWord.Z_idx 0) with 0%N.
     rewrite Z.shiftr_0_r.
@@ -1616,7 +1616,7 @@ Section SyscallVocab.
     intros Hn. rewrite and_vec64_unsigned.
     assert (H1 : bv_unsigned (mword_of_int 1 : mword 64) = 1) by (vm_compute; reflexivity).
     rewrite H1.
-    unfold shiftr, SailStdpp.Values.with_word, get_word,
+    unfold shiftr,
       MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (Hk : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
@@ -3012,13 +3012,13 @@ Section SyscallRet.
     assert (Hstored : sysc_fd_ok (us_V U)
               (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
               sts sts').
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hfdrow. }
     (* ...and pipe's joined row makes the same move, for the same reason *)
     assert (Hpipestored : sysc_pipe_ok (us_V U) (us_M U) (us_M U')
               (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
               sts sts').
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hpiperow. }
     (* ...and the cwd clause's return value moves from the register to the
        slot the same way *)
@@ -3026,7 +3026,7 @@ Section SyscallRet.
                          /\ uint (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
                                   !!! tf_arg_idx 0) = 0)
                         \/ pv_cwi (us_V U') = pv_cwi (us_V U)).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hcwi. }
     (* ...and sbrk's answer makes the same move *)
     assert (Hsbstored : sysc_num (us_V U) <> 12
@@ -3039,7 +3039,7 @@ Section SyscallRet.
                (uint (pv_sz (us_V U'))
                 = uint (pv_sz (us_V U))
                   + sint (usys_sbrk_arg (pv_tf (us_V U))))%Z))).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hsbr. }
     (* ...and fork's answer makes the same move, off the same word *)
     assert (Hfkstored : sysc_num (us_V U) <> UsysMemOk.USYS_fork
@@ -3047,31 +3047,31 @@ Section SyscallRet.
            = (mword_of_int (-1) : mword 64)
       \/ (1 <= sint (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
                         !!! tf_arg_idx 0) <= PIDMAX)%Z).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hfk. }
     (* ...and read's answer makes the same move, off the same word *)
     assert (Hrdstored : sysc_num (us_V U) <> UsysMemOk.USYS_read
       \/ usys_read_ret (pv_tf (us_V U))
             (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hrd. }
     (* ...and getpid's answer makes the same move, off the same word *)
     assert (Hpidstored : sysc_ret_pid (us_V U)
               (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)
               pid).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hpidrow. }
     (* ...and the mask row makes the same move, off the same word *)
     assert (Hsecstored : usys_secc_ok (sysc_num (us_V U)) (pv_tf (us_V U))
               (pv_secc (us_V U)) (pv_secc (us_V U'))
               (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U')) !!! tf_arg_idx 0)).
-    { rewrite list_lookup_total_insert; [| exact Hi14].
+    { rewrite list_lookup_total_insert_eq; [| exact Hi14].
       rgne. exact Hsecrow. }
     (* ...and the syscall channel's row makes the same move from the
        register to the slot, by the very word the [sd] just wrote *)
     assert (Hsoword : <[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))
                         !!! tf_arg_idx 0 = rget E Ra0)
-      by (rewrite list_lookup_total_insert; [reflexivity | exact Hi14]).
+      by (rewrite list_lookup_total_insert_eq; [reflexivity | exact Hi14]).
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.syscall + 0x46) : mword 64) 4
                    = mword_of_int (KernelSyms.syscall + 0x4a)) by pcw.
     iEval (rewrite Hp3e) in "Hpc".
@@ -5765,7 +5765,7 @@ Section SyscallArms.
     { iDestruct "Hid" as "[Hc _]". iExact "Hc". }
     (* ---- the closer, walked down syscall's own frame ---- *)
     iDestruct "Hcont" as "[_ Hkcl]".
-    iDestruct (stack_own_4_intro (m !!! Regidx csp_rs1)
+    iDestruct (stack_own_4_intro (KTR := KT1) (m !!! Regidx csp_rs1)
                  with "Hra Hs0 Hs1 Hs2") as "Hfr".
     iDestruct (kstack_closer_frame pj (m !!! Regidx csp_rs1)
                  (trap_res true + av)%nat 4 ltac:(unfold trap_res; lia)
@@ -7280,9 +7280,9 @@ Section SyscallArms.
         { intros Hz.
           pose proof (proj1 (Hag0 fd0 (fnode k0) (FdOpen true false (FdPipe γq))
                                ltac:(rewrite list_lookup_insert_ne; [| lia];
-                                     apply list_lookup_insert; exact Hfd0lt)
+                                     apply list_lookup_insert_eq; exact Hfd0lt)
                                ltac:(rewrite list_lookup_insert_ne; [| lia];
-                                     apply list_lookup_insert;
+                                     apply list_lookup_insert_eq;
                                      exact (lookup_lt_Some _ _ _ Hcl0))) Hz)
             as Hbad.
           discriminate Hbad. }

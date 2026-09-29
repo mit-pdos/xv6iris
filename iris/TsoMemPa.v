@@ -206,7 +206,7 @@ Qed.
 Lemma own_pub_le h log : (own_pub h log ≤ length log)%nat.
 Proof.
   apply foldr_max_le. apply Forall_forall => x Hx.
-  apply elem_of_list_In, elem_of_lookup_imap in Hx.
+  apply list_elem_of_In, elem_of_lookup_imap in Hx.
   destruct Hx as (i & y & -> & Hlk).
   apply lookup_lt_Some in Hlk. case_bool_decide => /=; lia.
 Qed.
@@ -285,7 +285,7 @@ Lemma coh_win_max_ge c pa n (j : nat) :
   (N.of_nat j < n)%N → (c (pa_add pa j) ≤ coh_win_max c pa n)%nat.
 Proof.
   intros Hj. rewrite /coh_win_max. apply foldr_max_ge.
-  apply elem_of_list_fmap. exists j. split; [done|].
+  apply list_elem_of_fmap. exists j. split; [done|].
   assert (Hj' : (j < N.to_nat n)%nat).
   { apply Nat.compare_lt_iff. rewrite -{1}(Nat2N.id j) -N2Nat.inj_compare.
     by apply N.compare_lt_iff. }
@@ -296,8 +296,8 @@ Lemma coh_win_max_le c pa n (L : nat) :
   (∀ a, c a ≤ L)%nat → (coh_win_max c pa n ≤ L)%nat.
 Proof.
   intros Hc. rewrite /coh_win_max. apply foldr_max_le.
-  apply Forall_forall => x Hx. apply elem_of_list_In in Hx.
-  apply elem_of_list_fmap in Hx as (j & -> & _). apply Hc.
+  apply Forall_forall => x Hx. apply list_elem_of_In in Hx.
+  apply list_elem_of_fmap in Hx as (j & -> & _). apply Hc.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -509,7 +509,7 @@ Lemma all_own_app h log m :
   all_own h log → pm_tid m = h → all_own h (log ++ [m]).
 Proof.
   move => Hl Hm m0 /elem_of_app [Hin|Hin]; first by apply Hl.
-  by apply elem_of_list_singleton in Hin as ->.
+  by apply list_elem_of_singleton in Hin as ->.
 Qed.
 
 (** Every in-range timestamp is visible to the sole author, at any view. *)
@@ -519,7 +519,7 @@ Proof.
   move => Hown Ht. destruct t as [|i]; first by apply visibleb_below; lia.
   destruct (log !! i) as [m|] eqn:Hlk.
   - eapply visibleb_own; [exact Hlk|].
-    apply Hown. by eapply elem_of_list_lookup_2.
+    apply Hown. by eapply list_elem_of_lookup_2.
   - exfalso. apply lookup_ge_None_1 in Hlk. simpl in Ht. lia.
 Qed.
 
@@ -561,7 +561,7 @@ Lemma unwritten_app_inv log m a :
 Proof.
   move => Hu. split.
   - move => m0 Hin. apply Hu. apply elem_of_app. by left.
-  - apply Hu. apply elem_of_app. right. by apply elem_of_list_singleton.
+  - apply Hu. apply elem_of_app. right. by apply list_elem_of_singleton.
 Qed.
 
 Lemma log_byte_unwritten img log a t :
@@ -569,7 +569,7 @@ Lemma log_byte_unwritten img log a t :
 Proof.
   move => Hu Ht. destruct t as [|i]; first lia.
   rewrite /log_byte. destruct (log !! i) as [m|] eqn:Hlk; last done.
-  apply Hu. by eapply elem_of_list_lookup_2.
+  apply Hu. by eapply list_elem_of_lookup_2.
 Qed.
 
 Lemma read_down_unwritten img log h tv a t :
@@ -2347,12 +2347,12 @@ Proof.
       injection Hlk as <-.
       have Hi : i = length log by lia.
       exists f. apply elem_of_app. right. rewrite Hi.
-      apply elem_of_list_singleton. reflexivity.
+      apply list_elem_of_singleton. reflexivity.
   - move => q g Hin. apply elem_of_app in Hin. destruct Hin as [Hin | Hin].
     + have [Hgt [i [m0 [Hq [Hlk [Htid0 Hw]]]]]] := H1b q g Hin.
       split; [exact Hgt|]. exists i, m0.
       split_and!; [exact Hq | exact (lookup_app_l_Some _ _ _ _ Hlk) | exact Htid0 | exact Hw].
-    + apply elem_of_list_singleton in Hin. injection Hin as -> ->.
+    + apply list_elem_of_singleton in Hin. injection Hin as -> ->.
       split; [lia|]. exists (length log), msg.
       split_and!; [reflexivity | apply list_lookup_middle; reflexivity | exact Htid | exact Hall].
   - move => k Hk.

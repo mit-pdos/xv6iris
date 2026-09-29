@@ -192,7 +192,7 @@ Lemma catf_loop_env_fdin fdin din S (out : dspec) (alts : list bytes) files path
   pe_fd (catf_loop_env fdin din S out alts files paths) !! fdin = Some din.
 Proof using.
   intros H1 H2. cbv [catf_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-  rewrite lookup_insert_ne; [| lia]. apply lookup_singleton.
+  rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq.
 Qed.
 
 (* the open of f: a descriptor the process did not hold, at a device no
@@ -207,9 +207,9 @@ Proof using.
   { split; intros ->; simplify_map_eq. }
   assert (d <> 0%nat) as Hd0.
   { intros ->. apply (Hfr 2). cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-    apply lookup_singleton. }
+    apply lookup_singleton_eq. }
   assert (d <> 1%nat) as Hd1.
-  { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert. }
+  { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert_eq. }
   cbv [env_set_dev env_bind catf_env catf_loop_env pe_fd pe_dev pe_files pe_paths]. f_equal.
   - apply map_eq. intros k.
     destruct (decide (k = fd)) as [-> |]; [by simplify_map_eq |].
@@ -248,7 +248,7 @@ Proof using.
   - rewrite HS in Hin.
     eapply cf_write_h with (d := 1%nat) (alts := outs) (a := (b :: c') ++ S').
     { done. }
-    { cbv [catf_loop_env pe_fd]. apply lookup_insert. }
+    { cbv [catf_loop_env pe_fd]. apply lookup_insert_eq. }
     { cbv [catf_loop_env pe_fd pe_dev]. rewrite decide_False; [| lia].
       first [ by rewrite decide_True | done ]. }
     { exact Hin. }
@@ -259,7 +259,7 @@ Proof using.
     + rewrite catf_loop_env_out1. cbv beta.
       rewrite decide_False; [| lia].
       eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := alts).
-      { cbv [catf_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert. }
+      { cbv [catf_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert_eq. }
       { cbv [catf_loop_env pe_fd pe_dev]. by rewrite decide_True. }
       { rewrite app_nil_r. exact Hdg. }
       intros alts' Hin'. rewrite catf_loop_env_cons. apply cf_exit. intros d.
@@ -285,9 +285,9 @@ Proof using.
     { cbv [catf_env pe_fd] in Hnone. split; intros ->; simplify_map_eq. }
     assert (d <> 0%nat) as Hd0.
     { intros ->. apply (Hfr 2). cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-      apply lookup_singleton. }
+      apply lookup_singleton_eq. }
     assert (d <> 1%nat) as Hd1.
-    { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert. }
+    { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert_eq. }
     apply catf_loop_conforms; [exact Hd0 | exact Hd1 | exact Hf1 | exact Hf2 | exact Haw | exact Hc |].
     intros outs' Hin.
     eapply cf_close with (d := d).
@@ -300,7 +300,7 @@ Proof using.
     destruct (decide (d' = d)); [exact I | by left].
   - cbv beta. rewrite decide_True; [| lia].
     eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := alts).
-    { cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+    { cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
     { reflexivity. }
     { rewrite app_nil_r. exact Hao. }
     intros alts' Hin. rewrite catf_env_cons. apply cf_exit. intros d.
@@ -329,7 +329,7 @@ Proof using.
   eapply cf_open_absent; [by left | unfold mode_create; vm_compute; intros H; exact (H eq_refl) | exact Hf |].
   cbv beta. rewrite decide_True; [| lia].
   eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := alts).
-  { cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+  { cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
   { reflexivity. }
   { rewrite app_nil_r. exact Hao. }
   intros alts' Hin. rewrite catf_env_cons. apply cf_exit. intros d.
@@ -409,23 +409,23 @@ Lemma catp_loop_env_fdin fdin din S (x : dspec) files paths :
   pe_fd (catp_loop_env fdin din S x files paths) !! fdin = Some din.
 Proof using.
   intros H1 H2. cbv [catp_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-  rewrite lookup_insert_ne; [| lia]. apply lookup_singleton.
+  rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq.
 Qed.
 
 Lemma catp_loop_env_fd1 fdin din S (x : dspec) files paths :
   pe_fd (catp_loop_env fdin din S x files paths) !! prod_out = Some 0%nat.
-Proof using. cbv [catp_loop_env pe_fd prod_out]. apply lookup_insert. Qed.
+Proof using. cbv [catp_loop_env pe_fd prod_out]. apply lookup_insert_eq. Qed.
 
 Lemma catp_loop_env_fd2 fdin din S (x : dspec) files paths :
   pe_fd (catp_loop_env fdin din S x files paths) !! prod_err = Some 0%nat.
 Proof using.
-  cbv [catp_loop_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert.
+  cbv [catp_loop_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert_eq.
 Qed.
 
 Lemma catp_env_fd2 (x : dspec) files paths :
   pe_fd (catp_env x files paths) !! prod_err = Some 0%nat.
 Proof using.
-  cbv [catp_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton.
+  cbv [catp_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq.
 Qed.
 
 (* the open of f: a descriptor the process did not hold, at a device no
@@ -439,7 +439,7 @@ Proof using.
   assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
   { split; intros ->; simplify_map_eq. }
   assert (d <> 0%nat) as Hd0.
-  { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert. }
+  { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert_eq. }
   cbv [env_set_dev env_bind catp_env catp_loop_env pe_fd pe_dev pe_files pe_paths]. f_equal.
   - apply map_eq. intros k.
     destruct (decide (k = fd)) as [-> |]; [by simplify_map_eq |].
@@ -593,7 +593,7 @@ Proof using.
     assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
     { cbv [catp_env pe_fd] in Hnone. split; intros ->; simplify_map_eq. }
     assert (d <> 0%nat) as Hd0.
-    { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert. }
+    { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert_eq. }
     apply catp_loop_conforms; [exact Hd0 | exact Hf1 | exact Hf2 | exact Hdw | exact Hdn
                               | exact Hc |].
     intros outs' xs' Hin.
@@ -947,7 +947,7 @@ Proof using.
   intros [[-> ->] | (Hw & a0 & Ha0 & [z ->] & ->)] Ha [y ->] Hbs; right.
   - split; [exact Hbs |]. exists (bs ++ y).
     split; [exact Ha | split; [by exists y | reflexivity]].
-  - apply elem_of_list_singleton in Ha. rewrite drop_app_length in Ha. subst z.
+  - apply list_elem_of_singleton in Ha. rewrite drop_app_length in Ha. subst z.
     split; [intros Hn; apply app_eq_nil in Hn as [-> _]; by apply Hw |].
     exists (w ++ bs ++ y). split; [exact Ha0 |].
     split; [by exists y; rewrite app_assoc |].
@@ -959,7 +959,7 @@ Lemma dev_after_done (alts : list bytes) (w : bytes) (A : list bytes) :
   dev_after alts w A -> w <> [] -> [] ∈ A -> w ∈ alts /\ A = [[]].
 Proof using.
   intros [[-> _] | (_ & a & Ha & [z ->] & ->)] Hw Hin; [exfalso; exact (Hw eq_refl) |].
-  apply elem_of_list_singleton in Hin. rewrite drop_app_length in Hin. subst z.
+  apply list_elem_of_singleton in Hin. rewrite drop_app_length in Hin. subst z.
   rewrite app_nil_r in Ha |- *. split; [exact Ha | by rewrite drop_all].
 Qed.
 
@@ -1009,7 +1009,7 @@ Inductive ep_st (files : bytes -> option bytes) (E : penv) (t : proc) : Prop :=
   | eps : ep_env files E -> ep_tree t -> ep_st files E t.
 
 Lemma pipe_env_fd1 (spec : dspec) files : pe_fd (pipe_env spec files) !! 1 = Some 0%nat.
-Proof using. cbv [pipe_env pe_fd]. apply lookup_singleton. Qed.
+Proof using. cbv [pipe_env pe_fd]. apply lookup_singleton_eq. Qed.
 Lemma pipe_env_dev0 (spec : dspec) files : pe_dev (pipe_env spec files) 0 = spec.
 Proof using. reflexivity. Qed.
 
@@ -1044,7 +1044,7 @@ Proof using.
     + cbn [echo_words exit_ re_step]. intros Hdr. specialize (Hdr 0%nat).
       unfold echo_exit. destruct HE as [| o]; [by right |]. left.
       rewrite pipe_env_dev0 in Hdr. change ([] ∈ [o]) in Hdr.
-      apply elem_of_list_singleton in Hdr. subst o. reflexivity.
+      apply list_elem_of_singleton in Hdr. subst o. reflexivity.
     + cbn [echo_words]. apply ep_write_step; [exact HE |]. intros _.
       exact (et_sep wl_nl []).
     + cbn [echo_words]. apply ep_write_step; [exact HE |]. intros _.
@@ -1066,14 +1066,14 @@ Qed.
 
 Lemma copy_env_fd0 (spec : dspec) alts files paths :
   pe_fd (copy_env spec alts files paths) !! 0 = Some 1%nat.
-Proof using. cbv [copy_env pe_fd]. apply lookup_insert. Qed.
+Proof using. cbv [copy_env pe_fd]. apply lookup_insert_eq. Qed.
 Lemma copy_env_fd1 (spec : dspec) alts files paths :
   pe_fd (copy_env spec alts files paths) !! 1 = Some 1%nat.
-Proof using. cbv [copy_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert. Qed.
+Proof using. cbv [copy_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert_eq. Qed.
 Lemma copy_env_fd2 (spec : dspec) alts files paths :
   pe_fd (copy_env spec alts files paths) !! 2 = Some 0%nat.
 Proof using.
-  cbv [copy_env pe_fd]. do 2 (rewrite lookup_insert_ne; [| lia]). apply lookup_singleton.
+  cbv [copy_env pe_fd]. do 2 (rewrite lookup_insert_ne; [| lia]). apply lookup_singleton_eq.
 Qed.
 Lemma copy_env_dev0 (spec : dspec) alts files paths :
   pe_dev (copy_env spec alts files paths) 0 = DOut alts.
@@ -1202,16 +1202,16 @@ Definition catf_exit (f : bytes) (outs alts : list bytes) files (E' : penv) : Pr
 
 Lemma catf_loop_env_fd1 fdin din S (out : dspec) alts files paths :
   pe_fd (catf_loop_env fdin din S out alts files paths) !! 1 = Some 1%nat.
-Proof using. cbv [catf_loop_env pe_fd]. apply lookup_insert. Qed.
+Proof using. cbv [catf_loop_env pe_fd]. apply lookup_insert_eq. Qed.
 Lemma catf_loop_env_fd2 fdin din S (out : dspec) alts files paths :
   pe_fd (catf_loop_env fdin din S out alts files paths) !! 2 = Some 0%nat.
-Proof using. cbv [catf_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert. Qed.
+Proof using. cbv [catf_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert_eq. Qed.
 Lemma catf_loop_env_dev1 fdin din S (out : dspec) alts files paths :
   pe_dev (catf_loop_env fdin din S out alts files paths) 1 = out.
 Proof using. reflexivity. Qed.
 Lemma catf_env_fd2 (out : dspec) alts files paths :
   pe_fd (catf_env out alts files paths) !! 2 = Some 0%nat.
-Proof using. cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. Qed.
+Proof using. cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. Qed.
 
 Lemma cf_st_closed (f : bytes) (outs alts : list bytes) files (E : penv) (t : proc) :
   cf_st f outs alts files E t -> re_step (catf_exit f outs alts files) (cf_st f outs alts files) E t.
@@ -1229,9 +1229,9 @@ Proof using.
         { cbv [catf_env pe_fd] in Hnone. split; intros ->; simplify_map_eq. }
         assert (d <> 0%nat) as Hd0.
         { intros ->. apply (Hfr 2). cbv [catf_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-          apply lookup_singleton. }
+          apply lookup_singleton_eq. }
         assert (d <> 1%nat) as Hd1.
-        { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert. }
+        { intros ->. apply (Hfr 1). cbv [catf_env pe_fd]. apply lookup_insert_eq. }
         apply (cfs_loop f outs alts files fd d content [] content outs Hf eq_refl (dev_after_nil _)).
         exact (conj Hf1 (conj Hf2 (conj Hd0 Hd1))).
       * rewrite decide_True; [| lia].

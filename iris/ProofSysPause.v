@@ -189,7 +189,7 @@ Proof. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; apply bv_eq; v
 Lemma sp_add_vec_0 (x : mword 64) :
   add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
 Proof.
-  unfold add_vec, word_binop, with_word', with_word, MachineWord.MachineWord.add.
+  unfold add_vec, word_binop, MachineWord.MachineWord.add.
   apply bv_add_0_r. vm_compute. reflexivity.
 Qed.
 
@@ -1906,11 +1906,11 @@ Section ProofSysPause.
     iDestruct "S7" as (w7) "Hs7".
     (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
        4-byte tower through the shim, and the join crosses back. *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hs7") as %Hal7.
-    iDestruct (ctx_word_pointsto_split4 with "Hs7") as "[Hs7lo Hs7hi]".
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hs7") as %Hal7.
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hs7") as "[Hs7lo Hs7hi]".
     iAssert (sp_join7 sp0) with "[Hs7lo]" as "Hjoin7".
     { rewrite /sp_join7. iIntros (nv) "Hhi". iExists _.
-      iApply (ctx_word_pointsto_join4 _ _ _ _ _ Hal7 with "Hs7lo Hhi"). }
+      iApply (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal7 with "Hs7lo Hhi"). }
     (* +0x02 c.sdsp ra,56(sp) *)
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1)
                     (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000"))) = pa_stk sp0 1)

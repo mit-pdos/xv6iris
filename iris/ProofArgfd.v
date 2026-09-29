@@ -359,8 +359,8 @@ Section ProofArgfd.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     iEval (rewrite -E5) in "Hb5".
     iEval (rewrite -E6) in "Hb6".
-    iDestruct (stack_own_4_intro sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
-    iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
+    iDestruct (stack_own_2_intro (KTR := KT1) (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
     iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
     { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
@@ -484,8 +484,8 @@ Section ProofArgfd.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
-    iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
-    iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hf56") as (w5 w6) "[Hs5 Hs6]".
     iEval (rewrite E5) in "Hs5". iEval (rewrite E6) in "Hs6".
     (* ---- +0x02 .. +0x08: save ra / s0 / s1 / s2 ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
@@ -679,9 +679,9 @@ Section ProofArgfd.
     { rewrite /M6 upd_ne; [| vm_compute; discriminate].
       rewrite /M5 upd_ne; [| vm_compute; discriminate]. exact HM4s2. }
     (* the [int fd] local: the UPPER word of frame slot 5 *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hs5") as %Hal5.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hs5") as %Hal5.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hs5") as "[Hs5lo Hs5hi]".
     iEval (rewrite -HM6a1) in "Hs5hi".
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
@@ -1059,7 +1059,7 @@ Section ProofArgfd.
                       = mword_of_int (KernelSyms.argfd + 0x46))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt) in "Hpc".
-        iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
+        iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         assert (HDsp : D !!! Regidx csp_rs1 = pa_stk sp0 6)
           by (rewrite /D upd_ne; [exact HC5sp | vm_compute; discriminate]).
         assert (HDa0 : D !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64))
@@ -1150,7 +1150,7 @@ Section ProofArgfd.
         assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x44) : mword 64) 2
                         = mword_of_int (KernelSyms.argfd + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp46) in "Hpc".
-        iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
+        iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
         assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 6)
           by (rewrite /E1 upd_ne; [exact HC5sp | vm_compute; discriminate]).
         assert (HE1a0 : E1 !!! Regidx (mword_of_int 10 : mword 5) = (zero_reg : mword 64))
@@ -1216,7 +1216,7 @@ Section ProofArgfd.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt2) in "Hpc".
       iEval (rewrite Haddrfd) in "Hs5hi".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal5 with "Hs5lo Hs5hi") as "Hs5".
       assert (HFsp : F !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite /F upd_ne; [exact HA2sp | vm_compute; discriminate]).
       assert (HFa0 : F !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64))

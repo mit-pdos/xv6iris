@@ -152,8 +152,8 @@ Section UsertrapRes.
      an existential here would only have to be identified with those pins
      again at the first agreement. *)
   Definition ut_ghosts : iProp Σ :=
-    (ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
-     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+    (ghost_var_frac sie_gname (1/2) ('b"0" : mword 1) ∗
+     ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1))%I.
 
@@ -316,7 +316,7 @@ Section UsertrapRes.
       sie_cap_gpr KT1 m av false pj ∗
       cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
-      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+      ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
       kpt_on cpu_id ∗
       sret_bits ('b"0" : mword 1) ('b"1" : mword 1).
   Proof using .
@@ -385,7 +385,7 @@ Section UsertrapRes.
   Lemma ut_exit_ms_ok (ms : mword 64) :
     sconf_msown ms -∗
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     ⌜ usertrap_ret_ms ms ⌝.
   Proof using .
     iIntros "(Hms & Hhalf & Htie & %Hmsf) Htrav Hq".
@@ -437,7 +437,7 @@ Section UsertrapRes.
     stval ↦ᵣ st -∗
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
     ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
@@ -1996,7 +1996,7 @@ Section UsertrapRes.
   Definition ut_csrs_raw (ep sc st : mword 64) : iProp Σ :=
     (sepc ↦ᵣ ep ∗ scause ↦ᵣ sc ∗ stval ↦ᵣ st ∗
      stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) ∗
-     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
      kpt_on cpu_id)%I.
 
@@ -2232,7 +2232,7 @@ Proof.
      context-free, so the copy that came in is the copy that goes out. *)
   iDestruct (devintr_caps_any_uart1 with "Hdca0") as "#Hu1".
   iDestruct "Hextra0" as "(_ & #Hpav & _ & _)".
-  iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
+  iDestruct (fs_ready_disk (XI := Xc) with "Hfs") as "[#Hdinv Hdex]".
   iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
   iDestruct (disk_geom_agree_x cur_ctx Xc (fsc_disk) (un_pd N) (un_pav N)
                (un_pu N) pd pav pu with "Hdg0 Hdg2") as %(Hpd & Hpav & Hpu).
@@ -2240,7 +2240,7 @@ Proof.
                with "Hprocs") as (ks2) "#Hkst2".
   iDestruct (is_kstack_agree_x cur_ctx Xc (un_pj N) (un_ks N) ks2
                with "Hkst0 Hkst2") as %Hks.
-  iDestruct (fs_ready_kmem with "Hfs") as "[#Hkml #Hkav]".
+  iDestruct (fs_ready_kmem (XI := Xc) with "Hfs") as "[#Hkml #Hkav]".
   iAssert (devintr_caps_any (XI := Xc) (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N)
              (un_s N) (un_pd N) (un_pav N) (un_pu N)) as "#Hdca".
   { rewrite /devintr_caps_any.
@@ -2266,7 +2266,7 @@ Proof.
     iSplitR; [iExists ipw; iFrame "Hipcx Higw" | iExact "Hu1"]. }
   rewrite /ut_caps.
   iSplitR; [iExact "Hprocs"|].
-  iSplitR; [iApply (fs_ready_data with "Hfs")|].
+  iSplitR; [iApply (fs_ready_data (XI := Xc) with "Hfs")|].
   iSplitR; [rewrite Hks; iExact "Hkst2"|].
   iSplitR; [iExact "Hdca"|].
   iSplitR; [iExact "Hpe"|].
@@ -2274,10 +2274,10 @@ Proof.
   iSplitR; [iExact "Hft"|].
   iSplitR; [iExact "Hkml"|].
   iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
-  iSplitR; [iApply (fs_ready_bio with "Hfs")|].
-  iSplitR; [iApply (fs_ready_log with "Hfs")|].
-  iSplitR; [iApply (fs_ready_seam with "Hfs")|].
-  iSplitR; [iApply (fs_ready_gen with "Hfs")|].
+  iSplitR; [iApply (fs_ready_bio (XI := Xc) with "Hfs")|].
+  iSplitR; [iApply (fs_ready_log (XI := Xc) with "Hfs")|].
+  iSplitR; [iApply (fs_ready_seam (XI := Xc) with "Hfs")|].
+  iSplitR; [iApply (fs_ready_gen (XI := Xc) with "Hfs")|].
   iSplitR; [iExact "Hdinv"|].
   iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdg2"|].
   iSplitR; [iExact "Hkav"|].

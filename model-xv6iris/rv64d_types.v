@@ -342,13 +342,13 @@ Defined.
 
 Notation "{[ r 'with' 'float_bits_sign' := e ]}" :=
   match r with Build_float_bits _ _ (_ as f1) (_ as f2) =>
-    Build_float_bits _ e f1 f2 end (at level 1).
+    Build_float_bits _ e f1 f2 end (at level 0).
 Notation "{[ r 'with' 'float_bits_exp' := e ]}" :=
   match r with Build_float_bits _ (_ as f0) _ (_ as f2) =>
-    Build_float_bits _ f0 e f2 end (at level 1).
+    Build_float_bits _ f0 e f2 end (at level 0).
 Notation "{[ r 'with' 'float_bits_mantissa' := e ]}" :=
   match r with Build_float_bits _ (_ as f0) (_ as f1) _ =>
-    Build_float_bits _ f0 f1 e end (at level 1).
+    Build_float_bits _ f0 f1 e end (at level 0).
 #[export]
 Instance dummy_float_bits {n : Z} : Inhabited (float_bits n) := {
   inhabitant := {|
@@ -1217,7 +1217,7 @@ abstract (
 Defined.
 
 Notation "{[ r 'with' 'RISCV_strong_access_variety' := e ]}" :=
-  {| RISCV_strong_access_variety := e |} (at level 1, only parsing).
+  {| RISCV_strong_access_variety := e |} (at level 0, only parsing).
 #[export]
 Instance dummy_RISCV_strong_access : Inhabited (RISCV_strong_access) := {
   inhabitant := {| RISCV_strong_access_variety := inhabitant
@@ -1827,11 +1827,11 @@ abstract (
 Defined.
 
 Notation "{[ r 'with' 'mul_op_result_part' := e ]}" :=
-  match r with Build_mul_op _ (_ as f1) (_ as f2) => Build_mul_op e f1 f2 end (at level 1).
+  match r with Build_mul_op _ (_ as f1) (_ as f2) => Build_mul_op e f1 f2 end (at level 0).
 Notation "{[ r 'with' 'mul_op_signed_rs1' := e ]}" :=
-  match r with Build_mul_op (_ as f0) _ (_ as f2) => Build_mul_op f0 e f2 end (at level 1).
+  match r with Build_mul_op (_ as f0) _ (_ as f2) => Build_mul_op f0 e f2 end (at level 0).
 Notation "{[ r 'with' 'mul_op_signed_rs2' := e ]}" :=
-  match r with Build_mul_op (_ as f0) (_ as f1) _ => Build_mul_op f0 f1 e end (at level 1).
+  match r with Build_mul_op (_ as f0) (_ as f1) _ => Build_mul_op f0 f1 e end (at level 0).
 #[export]
 Instance dummy_mul_op : Inhabited (mul_op) := {
   inhabitant := {|
@@ -3878,13 +3878,13 @@ Defined.
 
 Notation "{[ r 'with' 'PMAMisalignedExceptions_load_store' := e ]}" :=
   match r with Build_PMAMisalignedExceptions _ (_ as f1) (_ as f2) =>
-    Build_PMAMisalignedExceptions e f1 f2 end (at level 1).
+    Build_PMAMisalignedExceptions e f1 f2 end (at level 0).
 Notation "{[ r 'with' 'PMAMisalignedExceptions_vector' := e ]}" :=
   match r with Build_PMAMisalignedExceptions (_ as f0) _ (_ as f2) =>
-    Build_PMAMisalignedExceptions f0 e f2 end (at level 1).
+    Build_PMAMisalignedExceptions f0 e f2 end (at level 0).
 Notation "{[ r 'with' 'PMAMisalignedExceptions_amo' := e ]}" :=
   match r with Build_PMAMisalignedExceptions (_ as f0) (_ as f1) _ =>
-    Build_PMAMisalignedExceptions f0 f1 e end (at level 1).
+    Build_PMAMisalignedExceptions f0 f1 e end (at level 0).
 #[export]
 Instance dummy_PMAMisalignedExceptions : Inhabited (PMAMisalignedExceptions) := {
   inhabitant := {|
@@ -4006,52 +4006,52 @@ Defined.
 
 Notation "{[ r 'with' 'PMA_mem_type' := e ]}" :=
   match r with Build_PMA _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA e f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA e f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_cacheable' := e ]}" :=
   match r with Build_PMA (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 e f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 e f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_coherent' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 e f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 e f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_executable' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 e f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 e f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_readable' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 e f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 e f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_writable' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 e f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 e f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_read_idempotent' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 e f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 e f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_write_idempotent' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 e f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 e f8 f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_misaligned_exceptions' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) _ (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 e f9 f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 e f9 f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_atomic_support' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) _ (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 e f10 f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 e f10 f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_reservability' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) _ (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 e f11 f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 e f11 f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_supports_cbo_zero' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) _ (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 e f12 f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 e f12 f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_supports_pte_read' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) _ (_ as f13) (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 e f13 f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 e f13 f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_supports_pte_write' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) _ (_ as f14) (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 e f14 f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 e f14 f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_misaligned_atomicity_granule_size_exp' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) _ (_ as f15) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 e f15 end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 e f15 end (at level 0).
 Notation "{[ r 'with' 'PMA_vector_misaligned_atomicity_granule_size_exp' := e ]}" :=
   match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) _ =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 e end (at level 1).
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 e end (at level 0).
 #[export]
 Instance dummy_PMA : Inhabited (PMA) := {
   inhabitant := {|
@@ -4106,16 +4106,16 @@ Defined.
 
 Notation "{[ r 'with' 'PMA_Region_base' := e ]}" :=
   match r with Build_PMA_Region _ (_ as f1) (_ as f2) (_ as f3) =>
-    Build_PMA_Region e f1 f2 f3 end (at level 1).
+    Build_PMA_Region e f1 f2 f3 end (at level 0).
 Notation "{[ r 'with' 'PMA_Region_size' := e ]}" :=
   match r with Build_PMA_Region (_ as f0) _ (_ as f2) (_ as f3) =>
-    Build_PMA_Region f0 e f2 f3 end (at level 1).
+    Build_PMA_Region f0 e f2 f3 end (at level 0).
 Notation "{[ r 'with' 'PMA_Region_attributes' := e ]}" :=
   match r with Build_PMA_Region (_ as f0) (_ as f1) _ (_ as f3) =>
-    Build_PMA_Region f0 f1 e f3 end (at level 1).
+    Build_PMA_Region f0 f1 e f3 end (at level 0).
 Notation "{[ r 'with' 'PMA_Region_include_in_device_tree' := e ]}" :=
   match r with Build_PMA_Region (_ as f0) (_ as f1) (_ as f2) _ =>
-    Build_PMA_Region f0 f1 f2 e end (at level 1).
+    Build_PMA_Region f0 f1 f2 e end (at level 0).
 #[export]
 Instance dummy_PMA_Region : Inhabited (PMA_Region) := {
   inhabitant := {|
@@ -4293,16 +4293,16 @@ Defined.
 
 Notation "{[ r 'with' 'GlobalMisalignedExceptions_load_store' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions _ (_ as f1) (_ as f2) (_ as f3) =>
-    Build_GlobalMisalignedExceptions e f1 f2 f3 end (at level 1).
+    Build_GlobalMisalignedExceptions e f1 f2 f3 end (at level 0).
 Notation "{[ r 'with' 'GlobalMisalignedExceptions_vector' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) _ (_ as f2) (_ as f3) =>
-    Build_GlobalMisalignedExceptions f0 e f2 f3 end (at level 1).
+    Build_GlobalMisalignedExceptions f0 e f2 f3 end (at level 0).
 Notation "{[ r 'with' 'GlobalMisalignedExceptions_amo' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) (_ as f1) _ (_ as f3) =>
-    Build_GlobalMisalignedExceptions f0 f1 e f3 end (at level 1).
+    Build_GlobalMisalignedExceptions f0 f1 e f3 end (at level 0).
 Notation "{[ r 'with' 'GlobalMisalignedExceptions_lrsc' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) (_ as f1) (_ as f2) _ =>
-    Build_GlobalMisalignedExceptions f0 f1 f2 e end (at level 1).
+    Build_GlobalMisalignedExceptions f0 f1 f2 e end (at level 0).
 #[export]
 Instance dummy_GlobalMisalignedExceptions : Inhabited (GlobalMisalignedExceptions) := {
   inhabitant := {|
@@ -5466,13 +5466,13 @@ Defined.
 
 Notation "{[ r 'with' 'sync_exception_trap' := e ]}" :=
   match r with Build_sync_exception _ (_ as f1) (_ as f2) =>
-    Build_sync_exception e f1 f2 end (at level 1).
+    Build_sync_exception e f1 f2 end (at level 0).
 Notation "{[ r 'with' 'sync_exception_excinfo' := e ]}" :=
   match r with Build_sync_exception (_ as f0) _ (_ as f2) =>
-    Build_sync_exception f0 e f2 end (at level 1).
+    Build_sync_exception f0 e f2 end (at level 0).
 Notation "{[ r 'with' 'sync_exception_ext' := e ]}" :=
   match r with Build_sync_exception (_ as f0) (_ as f1) _ =>
-    Build_sync_exception f0 f1 e end (at level 1).
+    Build_sync_exception f0 f1 e end (at level 0).
 #[export]
 Instance dummy_sync_exception : Inhabited (sync_exception) := {
   inhabitant := {|
@@ -11355,10 +11355,10 @@ Defined.
 
 Notation "{[ r 'with' 'Phys_Mem_Access_Info_splittable' := e ]}" :=
   match r with Build_Phys_Mem_Access_Info _ (_ as f1) =>
-    Build_Phys_Mem_Access_Info e f1 end (at level 1).
+    Build_Phys_Mem_Access_Info e f1 end (at level 0).
 Notation "{[ r 'with' 'Phys_Mem_Access_Info_granule_size_exp' := e ]}" :=
   match r with Build_Phys_Mem_Access_Info (_ as f0) _ =>
-    Build_Phys_Mem_Access_Info f0 e end (at level 1).
+    Build_Phys_Mem_Access_Info f0 e end (at level 0).
 #[export]
 Instance dummy_Phys_Mem_Access_Info : Inhabited (Phys_Mem_Access_Info) := {
   inhabitant := {|
@@ -11488,25 +11488,25 @@ Defined.
 
 Notation "{[ r 'with' 'TLB_Entry_asid' := e ]}" :=
   match r with Build_TLB_Entry _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_TLB_Entry e f1 f2 f3 f4 f5 f6 end (at level 1).
+    Build_TLB_Entry e f1 f2 f3 f4 f5 f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_global' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_TLB_Entry f0 e f2 f3 f4 f5 f6 end (at level 1).
+    Build_TLB_Entry f0 e f2 f3 f4 f5 f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_vpn' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_TLB_Entry f0 f1 e f3 f4 f5 f6 end (at level 1).
+    Build_TLB_Entry f0 f1 e f3 f4 f5 f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_levelMask' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) =>
-    Build_TLB_Entry f0 f1 f2 e f4 f5 f6 end (at level 1).
+    Build_TLB_Entry f0 f1 f2 e f4 f5 f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_ppn' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) =>
-    Build_TLB_Entry f0 f1 f2 f3 e f5 f6 end (at level 1).
+    Build_TLB_Entry f0 f1 f2 f3 e f5 f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_pte' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) =>
-    Build_TLB_Entry f0 f1 f2 f3 f4 e f6 end (at level 1).
+    Build_TLB_Entry f0 f1 f2 f3 f4 e f6 end (at level 0).
 Notation "{[ r 'with' 'TLB_Entry_pteAddr' := e ]}" :=
   match r with Build_TLB_Entry (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ =>
-    Build_TLB_Entry f0 f1 f2 f3 f4 f5 e end (at level 1).
+    Build_TLB_Entry f0 f1 f2 f3 f4 f5 e end (at level 0).
 #[export]
 Instance dummy_TLB_Entry : Inhabited (TLB_Entry) := {
   inhabitant := {|
@@ -11564,22 +11564,22 @@ Defined.
 
 Notation "{[ r 'with' 'PTW_Output_ppn' := e ]}" :=
   match r with Build_PTW_Output _ _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) =>
-    Build_PTW_Output _ e f1 f2 f3 f4 f5 end (at level 1).
+    Build_PTW_Output _ e f1 f2 f3 f4 f5 end (at level 0).
 Notation "{[ r 'with' 'PTW_Output_pte' := e ]}" :=
   match r with Build_PTW_Output _ (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) =>
-    Build_PTW_Output _ f0 e f2 f3 f4 f5 end (at level 1).
+    Build_PTW_Output _ f0 e f2 f3 f4 f5 end (at level 0).
 Notation "{[ r 'with' 'PTW_Output_pteAddr' := e ]}" :=
   match r with Build_PTW_Output _ (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) =>
-    Build_PTW_Output _ f0 f1 e f3 f4 f5 end (at level 1).
+    Build_PTW_Output _ f0 f1 e f3 f4 f5 end (at level 0).
 Notation "{[ r 'with' 'PTW_Output_level' := e ]}" :=
   match r with Build_PTW_Output _ (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) =>
-    Build_PTW_Output _ f0 f1 f2 e f4 f5 end (at level 1).
+    Build_PTW_Output _ f0 f1 f2 e f4 f5 end (at level 0).
 Notation "{[ r 'with' 'PTW_Output_pbmt' := e ]}" :=
   match r with Build_PTW_Output _ (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) =>
-    Build_PTW_Output _ f0 f1 f2 f3 e f5 end (at level 1).
+    Build_PTW_Output _ f0 f1 f2 f3 e f5 end (at level 0).
 Notation "{[ r 'with' 'PTW_Output_global' := e ]}" :=
   match r with Build_PTW_Output _ (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ =>
-    Build_PTW_Output _ f0 f1 f2 f3 f4 e end (at level 1).
+    Build_PTW_Output _ f0 f1 f2 f3 f4 e end (at level 0).
 #[export]
 Instance dummy_PTW_Output {v : Z} (*is_sv_mode v*) : Inhabited (PTW_Output v) := {
   inhabitant := {|
@@ -11969,28 +11969,28 @@ Defined.
 
 Notation "{[ r 'with' 'pma_check_opts_zama16b' := e ]}" :=
   match r with Build_pma_check_opts _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
-    Build_pma_check_opts e f1 f2 f3 f4 f5 f6 f7 end (at level 1).
+    Build_pma_check_opts e f1 f2 f3 f4 f5 f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_ziccamoa' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
-    Build_pma_check_opts f0 e f2 f3 f4 f5 f6 f7 end (at level 1).
+    Build_pma_check_opts f0 e f2 f3 f4 f5 f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_ziccamoc' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
-    Build_pma_check_opts f0 f1 e f3 f4 f5 f6 f7 end (at level 1).
+    Build_pma_check_opts f0 f1 e f3 f4 f5 f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_ziccif' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
-    Build_pma_check_opts f0 f1 f2 e f4 f5 f6 f7 end (at level 1).
+    Build_pma_check_opts f0 f1 f2 e f4 f5 f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_zicclsm' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) =>
-    Build_pma_check_opts f0 f1 f2 f3 e f5 f6 f7 end (at level 1).
+    Build_pma_check_opts f0 f1 f2 f3 e f5 f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_ziccrse' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) =>
-    Build_pma_check_opts f0 f1 f2 f3 f4 e f6 f7 end (at level 1).
+    Build_pma_check_opts f0 f1 f2 f3 f4 e f6 f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_ssccptr' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) =>
-    Build_pma_check_opts f0 f1 f2 f3 f4 f5 e f7 end (at level 1).
+    Build_pma_check_opts f0 f1 f2 f3 f4 f5 e f7 end (at level 0).
 Notation "{[ r 'with' 'pma_check_opts_svadu' := e ]}" :=
   match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ =>
-    Build_pma_check_opts f0 f1 f2 f3 f4 f5 f6 e end (at level 1).
+    Build_pma_check_opts f0 f1 f2 f3 f4 f5 f6 e end (at level 0).
 #[export]
 Instance dummy_pma_check_opts : Inhabited (pma_check_opts) := {
   inhabitant := {|
@@ -14599,83 +14599,83 @@ Record regstate := {
 Notation "{[ r 'with' 'HartState_s' := e ]}" :=
   match r with Build_regstate _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate e f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'Privilege_s' := e ]}" :=
   match r with Build_regstate (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 e f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_1_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 e f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_128_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 e f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_192_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 e f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_3_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 e f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_32_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 e f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_320_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 e f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_4_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) _ (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 e f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_5_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) _ (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 e f10 f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_64_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) _ (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 e f11 f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_704_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) _ (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 e f12 f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bitvector_exp_8_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) _ (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 e f13 f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'bool_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) _ (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 e f14 f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'list_PMA_Region_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) _ (_ as f15) (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 e f15 f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'option_bitvector_64_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) _ (_ as f16) (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 e f16 f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'vector_32_bitvector_64_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) _ (_ as f17) (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 e f17 f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'vector_64_bitvector_64_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) _ (_ as f18) (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 e f18 f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'vector_64_bitvector_8_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) _ (_ as f19) =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 e f19
-      end (at level 1).
+      end (at level 0).
 Notation "{[ r 'with' 'vector_64_option_TLB_Entry_s' := e ]}" :=
   match r with Build_regstate (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) (_ as f16) (_ as f17) (_ as f18) _ =>
     Build_regstate f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 e
-      end (at level 1).
+      end (at level 0).
 
 Definition init_regstate : regstate := Build_regstate
   inhabitant

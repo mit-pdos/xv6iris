@@ -411,7 +411,7 @@ Proof.
      this one. *)
   assert (Hu : SailStdpp.Operators_mwords.uint w = bv_unsigned w).
   { pose proof (bv_unsigned_in_range 64 w) as [Hr0 _].
-    unfold SailStdpp.Operators_mwords.uint, SailStdpp.Values.get_word,
+    unfold SailStdpp.Operators_mwords.uint,
       MachineWord.MachineWord.word_to_N.
     rewrite Z2N.id; [ reflexivity | exact Hr0 ]. }
   unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
@@ -1883,7 +1883,7 @@ Qed.
 Lemma elem_of_footprint (pa : Arch.pa) (n : N) (a : Arch.pa) :
   a ∈ footprint pa n <-> exists j : nat, (N.of_nat j < n)%N /\ a = pa_add pa j.
 Proof.
-  unfold footprint. rewrite elem_of_list_to_set elem_of_list_fmap.
+  unfold footprint. rewrite elem_of_list_to_set list_elem_of_fmap.
   split.
   - intros (j & -> & Hj). apply elem_of_seq in Hj. exists j. split; [lia|done].
   - intros (j & Hj & ->). exists j. split; [done|]. apply elem_of_seq. lia.
@@ -1897,8 +1897,8 @@ Local Lemma foldr_ins_lookup_out (l : list nat) (pa : Arch.pa)
 Proof.
   induction l as [|j l IH]; intros Hne; [reflexivity|].
   cbn [foldr]. rewrite lookup_insert_ne.
-  - apply IH. intros i Hi. apply Hne, elem_of_list_further, Hi.
-  - apply Hne, elem_of_list_here.
+  - apply IH. intros i Hi. apply Hne, list_elem_of_further, Hi.
+  - apply Hne, list_elem_of_here.
 Qed.
 
 Local Lemma foldr_ins_lookup_Some (l : list nat) (pa : Arch.pa)
@@ -1910,11 +1910,11 @@ Proof.
   induction l as [|j l IH]; intros H.
   { rewrite lookup_empty in H. discriminate H. }
   cbn [foldr] in H. destruct (decide (pa_add pa j = a)) as [<-|Hne].
-  - rewrite lookup_insert in H. injection H as <-.
-    exists j. split_and!; [apply elem_of_list_here|done|done].
+  - rewrite lookup_insert_eq in H. injection H as <-.
+    exists j. split_and!; [apply list_elem_of_here|done|done].
   - rewrite lookup_insert_ne in H; [|exact Hne].
     destruct (IH H) as (i & Hi & -> & ->).
-    exists i. split_and!; [apply elem_of_list_further, Hi|done|done].
+    exists i. split_and!; [apply list_elem_of_further, Hi|done|done].
 Qed.
 
 
@@ -1972,7 +1972,7 @@ Lemma elem_of_others_resv (gr : CPU -> option resv) (cpu c : CPU)
 Proof.
   intros Hne Hc Ha. unfold others_resv. apply elem_of_union_list.
   exists (resv_dom gr c). split.
-  - apply elem_of_list_fmap. exists c. split; [|apply elem_of_enum].
+  - apply list_elem_of_fmap. exists c. split; [|apply elem_of_enum].
     by case_decide.
   - unfold resv_dom. by rewrite Hc.
 Qed.
@@ -1983,7 +1983,7 @@ Lemma elem_of_all_resv (gr : CPU -> option resv) (c : CPU) (rr : resv)
 Proof.
   intros Hc Ha. unfold all_resv. apply elem_of_union_list.
   exists (resv_dom gr c). split.
-  - apply elem_of_list_fmap. exists c. split; [done|apply elem_of_enum].
+  - apply list_elem_of_fmap. exists c. split; [done|apply elem_of_enum].
   - unfold resv_dom. by rewrite Hc.
 Qed.
 

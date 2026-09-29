@@ -559,7 +559,7 @@ Section ProcInv.
     iIntros (v') "Hnew". iSplitR.
     { iPureIntro. rewrite length_insert. exact Hlen. }
     rewrite (big_sepL_delete _ (<[fd := v']> fs) fd v').
-    2:{ apply list_lookup_insert. eapply lookup_lt_Some; exact Hfd. }
+    2:{ apply list_lookup_insert_eq. eapply lookup_lt_Some; exact Hfd. }
     iFrame "Hnew".
     rewrite -(big_sepL_delete_insert _ fs fd v v' Hfd). iFrame "Hrest".
   Qed.
@@ -835,7 +835,7 @@ Section ProcInv.
     cbn [bits_of_virtaddr].
     rewrite subrange64_unsigned_11_0. change (2 ^ 12) with 4096.
     assert (Hmv : bv_unsigned (mword_of_int (TRAPFRAME + off) : mword 64) = TRAPFRAME + off).
-    { unfold mword_of_int, Values.to_word, get_word. cbn.
+    { unfold mword_of_int. cbn.
       rewrite Z_to_bv_unsigned. apply bv_wrap_small.
       unfold bv_modulus. cbn. unfold TRAPFRAME. lia. }
     rewrite Hmv.
@@ -3092,7 +3092,7 @@ Section ProcInv.
   Proof using .
     iIntros (Hfd Hlen Hk Hty) "Hcore Ho Href Ha Hfr".
     assert (Hlk : pv_ofile (upd_ofile (us_V U) fd (fnode k)) !! fd = Some (fnode k)).
-    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hlen. exact Hfd. }
+    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert_eq. rewrite Hlen. exact Hfd. }
     (* THE ONE GHOST STEP OF AN OPEN: the descriptor fdalloc made non-null is
        now OPEN, at the type of the file being installed.  Both halves are
        required, which is why this accessor -- and so sys_open / sys_pipe /
@@ -3622,6 +3622,7 @@ Section ProcInv.
        ∃ ws' : list (mword 64), ⌜length ws' = length ws⌝ ∗
          [∗ list] i ↦ w ∈ ws', pa_add a (8 * i)%nat ↦₈ w).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     assert (Hshift : forall (b : mword 64) (l : list (mword 64)),
       ([∗ list] i ↦ x ∈ l, pa_add b (8 * S i)%nat ↦₈ x)
       ⊣⊢ ([∗ list] i ↦ x ∈ l, pa_add (pa_add b 8) (8 * i)%nat ↦₈ x)).

@@ -275,9 +275,9 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-          iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hro") as "Hro".
           iFrame "Hrw Hro".
           iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -301,7 +301,7 @@ Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
       iFrame "Hfile HS". iPureIntro. split_and!; reflexivity.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
 
 Qed.
@@ -574,9 +574,9 @@ Qed.
                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_rw_ext_D (CID := CID) SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
-          iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+          iDestruct (sda_ro_ext (CID := CID) _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
                        pcfg paddr tlbv tvx) with "Hro") as "Hro".
           iFrame "Hrw Hro".
           iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
@@ -609,7 +609,7 @@ Qed.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (bt) "(-> & -> & -> & HS)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iSpecialize ("Hcont" $! CID with "[%]"); [ exact Hs | ].
       iApply ("Hcont" $! bt with "Hcg' Hpc' HS").
 

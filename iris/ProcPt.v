@@ -41,8 +41,7 @@ Local Open Scope Z_scope.
 (* [RiscvExtras.avi0] at an arbitrary width (its proof is width-generic). *)
 Lemma avi_0_gen (n : Z) (a : mword n) : add_vec_int a 0 = a.
 Proof.
-  unfold add_vec_int, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, mword_of_int,
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop, mword_of_int,
          MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
   apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.
   rewrite bv_wrap_0 Z.add_0_r. apply bv_wrap_small. apply bv_unsigned_in_range.
@@ -82,7 +81,7 @@ Lemma ppt_map_eq (tfp : mword 44) :
 Proof. unfold ppt_map. rewrite pt_insert_run_1 ppt_m1_eq. reflexivity. Qed.
 
 Lemma ppt_m1_tramp : ppt_m1 !! tramp_vpn = Some (mappages_pte tramp_ppn 10 0).
-Proof. rewrite ppt_m1_eq. apply lookup_insert. Qed.
+Proof. rewrite ppt_m1_eq. apply lookup_insert_eq. Qed.
 
 Lemma ppt_m1_tf : ppt_m1 !! tf_vpn = None.
 Proof.
@@ -93,12 +92,12 @@ Qed.
 Lemma ppt_map_tramp (tfp : mword 44) :
   ppt_map tfp !! tramp_vpn = Some (mappages_pte tramp_ppn 10 0).
 Proof.
-  rewrite ppt_map_eq. rewrite lookup_insert_ne; [apply lookup_insert | exact tf_vpn_ne_tramp].
+  rewrite ppt_map_eq. rewrite lookup_insert_ne; [apply lookup_insert_eq | exact tf_vpn_ne_tramp].
 Qed.
 
 Lemma ppt_map_tf (tfp : mword 44) :
   ppt_map tfp !! tf_vpn = Some (mappages_pte tfp 6 0).
-Proof. rewrite ppt_map_eq. apply lookup_insert. Qed.
+Proof. rewrite ppt_map_eq. apply lookup_insert_eq. Qed.
 
 Lemma ppt_map_other (tfp : mword 44) (vpn : mword 27) :
   vpn <> tramp_vpn -> vpn <> tf_vpn -> ppt_map tfp !! vpn = None.

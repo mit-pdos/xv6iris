@@ -128,9 +128,7 @@ Require Export CtxIdDefs.  (* [CtxId] / [CurCtx] -- this file's own
 Local Lemma tso_add_vec_unsigned (x y : SailStdpp.Values.mword 64) :
   bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, SailStdpp.Values.to_word,
-    SailStdpp.Values.get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
@@ -248,14 +246,14 @@ Section ctx.
      the borrow. *)
   Definition ctx_at (ξ : CtxId) (q : Qp) (B : nat)
       (D : gset (nat * Arch.pa)) : iProp Σ :=
-    (mono_nat_auth_own (ctx_bound_name ξ) q B ∗
+    (mono_nat_auth_own_frac (ctx_bound_name ξ) q B ∗
      dset_auth (ctx_dirty_name ξ) q D)%I.
 
   Lemma ctx_at_halves ξ B D :
     ctx_at ξ 1 B D ⊣⊢ ctx_at ξ (1/2) B D ∗ ctx_at ξ (1/2) B D.
   Proof using .
     rewrite /ctx_at.
-    rewrite (fractional_half (mono_nat_auth_own (ctx_bound_name ξ) 1 B)).
+    rewrite (fractional_half (mono_nat_auth_own_frac (ctx_bound_name ξ) 1 B)).
     rewrite (dset_halves (ctx_dirty_name ξ) D).
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
@@ -272,12 +270,12 @@ Section ctx.
   (* [TsoGhost.llb_valid] at a FRACTION of the authority.  [ctx_dom] holds
      half of the bound authority ([ctx_at ξ (1/2) …]) and still has to read
      the clean arm off a fact, so the whole-authority form does not serve.
-     Same proof; [mono_nat_lb_own_valid] is fraction-generic already. *)
+     Same proof; [mono_nat_auth_lb_own_valid] is fraction-generic already. *)
   Local Lemma llb_valid_q (γ : gname) (q : Qp) (n K : nat) :
-    mono_nat_auth_own γ q n -∗ llb γ K -∗ ⌜(K ≤ n)%nat⌝.
+    mono_nat_auth_own_frac γ q n -∗ llb γ K -∗ ⌜(K ≤ n)%nat⌝.
   Proof using .
     iIntros "Ha [Hlb|%Hz]".
-    - by iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ ?].
+    - by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ ?].
     - iPureIntro. lia.
   Qed.
 
@@ -697,8 +695,8 @@ Section ctx.
   Proof using .
     rewrite !ctx_pointsto_unseal.
     iIntros "H1 H2".
-    iDestruct (ctx_pointsto_mem_proj with "H1") as "H1".
-    iDestruct (ctx_pointsto_mem_proj with "H2") as "H2".
+    iDestruct (ctx_pointsto_mem_proj (KTR := kt1) with "H1") as "H1".
+    iDestruct (ctx_pointsto_mem_proj (KTR := kt2) with "H2") as "H2".
     iApply (mem_pointsto_agree with "H1 H2").
   Qed.
 
@@ -708,8 +706,8 @@ Section ctx.
   Proof using .
     rewrite !ctx_pointsto_unseal.
     iIntros "H1 H2".
-    iDestruct (ctx_pointsto_mem_proj with "H1") as "H1".
-    iDestruct (ctx_pointsto_mem_proj with "H2") as "H2".
+    iDestruct (ctx_pointsto_mem_proj (KTR := kt1) with "H1") as "H1".
+    iDestruct (ctx_pointsto_mem_proj (KTR := kt2) with "H2") as "H2".
     iApply (mem_pointsto_ne with "H1 H2").
   Qed.
 
@@ -3219,7 +3217,7 @@ Section ctx.
     iSplitR; last (iPureIntro; split; [exact HLM | exact (conj Hmm Hera)]).
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
-    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+    - rewrite lookup_insert_eq in Hlk. injection Hlk as <-.
       split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.

@@ -40,14 +40,14 @@
               counted reference owns one unit of mass at key (identity,
               stamp of the last deposit it witnessed); shares own part of a
               unit.  Row (I): every live key names the box's identity.
-     cnt      ghost_var nat -- half in the box, half beside L1's refcount.
-     slot_d   ghost_var slot_reg -- THE L1 SLOT REGISTER {| td; win; ident;
+     cnt      ghost_var_frac nat -- half in the box, half beside L1's refcount.
+     slot_d   ghost_var_frac slot_reg -- THE L1 SLOT REGISTER {| td; win; ident;
               x |}, half in the box, half in L1's payload row.  The only
               state L1 and the box share.  [x] names the witness the open
               window's P_rest sits at (F10), so (b) re-deposits a header
               at the SAME x -- the bcache header ignores it, the icache's
               valid re-deposit needs it.
-     slot_p   ghost_var l2_reg -- THE L2 SLOT REGISTER {| tp; hold |},
+     slot_p   ghost_var_frac l2_reg -- THE L2 SLOT REGISTER {| tp; hold |},
               half in the box, half in L2's payload row (at rest) or in the
               L2 holder's handle (during a checkout).  [hold] records
               exactly the fragment the checkout parked in the OUT_L2 arm --
@@ -203,7 +203,7 @@ Section helpers.
     revert m2. induction m1 as [|p q m1 Hp IH] using map_ind; intros m2 Hincl.
     { rewrite qsum_empty. apply qsum_nonneg. }
     pose proof (proj1 (gincl_lookup_iff _ _) Hincl) as Hl.
-    pose proof (Hl p) as Hp2. rewrite lookup_insert in Hp2.
+    pose proof (Hl p) as Hp2. rewrite lookup_insert_eq in Hp2.
     destruct (proj1 (gincl_option_iff _ _) Hp2) as [Hc | (a & b & Ha & Hb & Hab)]; [discriminate|].
     injection Ha as <-.
     assert (Hqle : (Qp_to_Qc q <= Qp_to_Qc b)%Qc).
@@ -212,7 +212,7 @@ Section helpers.
       - apply (proj1 (ufrac_included q b)) in Hlt. apply Qclt_le_weak. by apply Qp.to_Qc_inj_lt. }
     assert (Hrest : m1 ≼ delete p m2).
     { apply (proj2 (gincl_lookup_iff m1 (delete p m2))). intros i. destruct (decide (i = p)) as [->|Hne].
-      - rewrite Hp lookup_delete. apply (proj2 (gincl_option_iff None None)). by left.
+      - rewrite Hp lookup_delete_eq. apply (proj2 (gincl_option_iff None None)). by left.
       - rewrite lookup_delete_ne; [|done]. pose proof (Hl i) as Hi.
         by rewrite lookup_insert_ne in Hi. }
     rewrite (qsum_insert _ _ _ Hp) (qsum_delete _ _ _ Hb).
@@ -230,10 +230,10 @@ Section helpers.
     destruct (m !! p) as [q0|] eqn:Hp.
     - assert (Heq : {[p := q]} ⋅ m = <[p := (q ⋅ q0)]> (delete p m)).
       { apply map_eq. intros i. rewrite lookup_op. destruct (decide (i = p)) as [->|Hne].
-        - rewrite lookup_singleton lookup_insert Hp. by rewrite -Some_op.
+        - rewrite lookup_singleton_eq lookup_insert_eq Hp. by rewrite -Some_op.
         - rewrite lookup_singleton_ne; [|done]. rewrite lookup_insert_ne; [|done].
           rewrite lookup_delete_ne; [|done]. by rewrite left_id_L. }
-      rewrite Heq qsum_insert; [| apply lookup_delete].
+      rewrite Heq qsum_insert; [| apply lookup_delete_eq].
       rewrite (qsum_delete m p q0 Hp). rewrite ufrac_op Qp.to_Qc_inj_add. by rewrite Qcplus_assoc.
     - rewrite -insert_singleton_op; [| exact Hp]. by apply qsum_insert.
   Qed.
@@ -252,14 +252,14 @@ Section helpers.
     apply elem_of_dom in Hp as [q Hq]. apply not_elem_of_dom in Hnot.
     assert (Hincl' : m1 ≼ delete p m2).
     { apply (proj2 (gincl_lookup_iff m1 (delete p m2))). intros i. destruct (decide (i = p)) as [->|Hne].
-      - rewrite Hnot lookup_delete. apply (proj2 (gincl_option_iff None None)). by left.
+      - rewrite Hnot lookup_delete_eq. apply (proj2 (gincl_option_iff None None)). by left.
       - rewrite lookup_delete_ne; [|done]. exact (proj1 (gincl_lookup_iff m1 m2) Hincl i). }
     apply qsum_incl_le in Hincl'. rewrite (qsum_delete m2 p q Hq) in Heq.
     rewrite Heq in Hincl'. exact (Qc_plus_pos_not_le _ _ (Qp_prf q) Hincl').
   Qed.
   Lemma singleton_ne_empty_map (p : id * nat) (q : ufrac) : ({[p := q]} : gmap (id * nat) ufrac) ≠ ∅.
   Proof using .
-    intros Hc. apply (f_equal (lookup p)) in Hc. rewrite lookup_singleton lookup_empty in Hc. discriminate.
+    intros Hc. apply (f_equal (lookup p)) in Hc. rewrite lookup_singleton_eq lookup_empty in Hc. discriminate.
   Qed.
 
   (* ---- max_stamp ---- *)
@@ -342,11 +342,11 @@ Section helpers.
       rewrite lookup_empty.
       apply (local_update_unital_discrete (A := optionUR ufracR)). intros z Hv Hz. by split. }
     destruct (proj1 (gincl_singleton_l m p d) Hincl) as (y & Hy & Hle).
-    apply leibniz_equiv in Hy. rewrite lookup_singleton lookup_empty.
+    apply leibniz_equiv in Hy. rewrite lookup_singleton_eq lookup_empty.
     destruct (proj1 (gincl_Some_iff d y) Hle) as [Heq | Hlt].
     - apply leibniz_equiv in Heq. subst y.
       assert (Hsub : (d - d)%Qp = None) by (apply Qp.sub_None; reflexivity).
-      rewrite /msub_key Hy Hsub lookup_delete.
+      rewrite /msub_key Hy Hsub lookup_delete_eq.
       apply (local_update_unital_discrete (A := optionUR ufracR)). intros z _ Hz.
       destruct z as [r|].
       { exfalso. rewrite -Some_op in Hz. apply (inj Some) in Hz. apply leibniz_equiv in Hz.
@@ -354,7 +354,7 @@ Section helpers.
       split; [done | by rewrite left_id].
     - apply (proj1 (ufrac_included d y)) in Hlt. apply Qp.lt_sum in Hlt as [r Hr]. subst y.
       assert (Hsub : (d + r - d)%Qp = Some r) by (by apply Qp.sub_Some).
-      rewrite /msub_key Hy Hsub lookup_insert.
+      rewrite /msub_key Hy Hsub lookup_insert_eq.
       apply (local_update_unital_discrete (A := optionUR ufracR)). intros z _ Hz.
       destruct z as [r'|]; last first.
       { exfalso. rewrite right_id in Hz. apply (inj Some) in Hz. apply leibniz_equiv in Hz.
@@ -373,7 +373,7 @@ Section helpers.
       rewrite /msub_key Hy Hsub. by rewrite -(qsum_delete m p d Hy).
     - apply (proj1 (ufrac_included d y)) in Hlt. apply Qp.lt_sum in Hlt as [r Hr]. subst y.
       assert (Hsub : (d + r - d)%Qp = Some r) by (by apply Qp.sub_Some).
-      rewrite /msub_key Hy Hsub. rewrite -(insert_delete_insert m p r) qsum_insert; [| apply lookup_delete].
+      rewrite /msub_key Hy Hsub. rewrite -(insert_delete_eq m p r) qsum_insert; [| apply lookup_delete_eq].
       rewrite (qsum_delete m p (d + r)%Qp Hy) Qp.to_Qc_inj_add. by rewrite Qcplus_assoc.
   Qed.
   Lemma dom_msub_key_sub m (p : id * nat) (d : ufrac) : dom (msub_key m p d) ⊆ dom m.
@@ -431,10 +431,10 @@ Section helpers.
     destruct (m !! p) as [q0|] eqn:Hp.
     - assert (Heq : {[p := q]} ⋅ m = <[p := (q ⋅ q0)]> (delete p m)).
       { apply map_eq. intros i. rewrite lookup_op. destruct (decide (i = p)) as [->|Hne].
-        - rewrite lookup_singleton lookup_insert Hp. by rewrite -Some_op.
+        - rewrite lookup_singleton_eq lookup_insert_eq Hp. by rewrite -Some_op.
         - rewrite lookup_singleton_ne; [|done]. rewrite lookup_insert_ne; [|done].
           rewrite lookup_delete_ne; [|done]. by rewrite left_id_L. }
-      rewrite Heq max_stamp_insert; [| apply lookup_delete].
+      rewrite Heq max_stamp_insert; [| apply lookup_delete_eq].
       rewrite {2}/max_stamp (map_fold_delete_L max_step 0%nat p q0 m
                 (fun j1 j2 z1 z2 y _ _ _ => max_step_comm j1 j2 z1 z2 y) Hp).
       unfold max_step at 1. fold (max_stamp (delete p m)). lia.
@@ -505,9 +505,9 @@ Section box.
   (* ---- the ghosts, named ------------------------------------------- *)
   Definition stamps_auth γ m : iProp Σ := own (bx_stamps γ) (● m).
   Definition stamps_frag γ m : iProp Σ := own (bx_stamps γ) (◯ m).
-  Definition cnt_half γ (c : nat) : iProp Σ := ghost_var (bx_cnt γ) (1/2) c.
-  Definition slotd_half γ (r : slot_reg id X) : iProp Σ := ghost_var (bx_slotd γ) (1/2) r.
-  Definition slotp_half γ (s : l2_reg id) : iProp Σ := ghost_var (bx_slotp γ) (1/2) s.
+  Definition cnt_half γ (c : nat) : iProp Σ := ghost_var_frac (bx_cnt γ) (1/2) c.
+  Definition slotd_half γ (r : slot_reg id X) : iProp Σ := ghost_var_frac (bx_slotd γ) (1/2) r.
+  Definition slotp_half γ (s : l2_reg id) : iProp Σ := ghost_var_frac (bx_slotp γ) (1/2) s.
 
   (* ---- the reference: ONE spelling, ghost-only (§3.3) --------------- *)
   (* a counted reference has [qsum m = 1]; a share has any positive mass *)
@@ -1674,9 +1674,9 @@ Section box.
   (* ================================================================== *)
   Lemma box_alloc_at `{CID : CpuId} (N : namespace) γ (ξ : CtxId) (i0 : id) (E : coPset) :
     stamps_auth γ ∅ -∗
-    ghost_var (bx_cnt γ) 1 0%nat -∗
-    ghost_var (bx_slotd γ) 1 (inhabitant : slot_reg id X) -∗
-    ghost_var (bx_slotp γ) 1 (inhabitant : l2_reg id) -∗
+    ghost_var_frac (bx_cnt γ) 1 0%nat -∗
+    ghost_var_frac (bx_slotd γ) 1 (inhabitant : slot_reg id X) -∗
+    ghost_var_frac (bx_slotp γ) 1 (inhabitant : l2_reg id) -∗
     own_context ξ -∗
     (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
     own_context ξ ∗
@@ -1719,7 +1719,7 @@ Section box.
     own_context ξ -∗
     stamps_auth γ ∅ -∗
     cnt_half γ 0 -∗
-    (∃ r0 : slot_reg id X, ghost_var (bx_slotd γ) 1 r0) -∗
+    (∃ r0 : slot_reg id X, ghost_var_frac (bx_slotd γ) 1 r0) -∗
     slotp_half γ (L2Reg 0 None) -∗
     (∃ x, P_hdr i0 x ξ ∗ P_rest x ξ) ={E}=∗
     own_context ξ ∗

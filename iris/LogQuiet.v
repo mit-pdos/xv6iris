@@ -106,7 +106,7 @@ Section LogQuiet.
      idiom at a half.  (The commit's [ProofEndOp.eo_snap_law_of_auth] and the
      ghost commit both read it.) *)
   Lemma eo_cache_body_sub (γfs : fs_names) (L C : gmap Z (list (bv 8))) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     ([∗ map] b ↦ bs ∈ C, b ↪[fs_cache γfs]{#(1/2)} bs) -∗ ⌜C ⊆ L⌝.
   Proof using .
     iIntros "Ha HC". rewrite map_subseteq_spec. iIntros (k v Hk).
@@ -124,8 +124,8 @@ Section LogQuiet.
      committed map: a clean header, and row (b) over the whole home set *)
   Definition log_quiet (γ : log_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (M : log_mirror) : iProp Σ :=
-    (ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) ∗
-     ghost_map_auth (fs_cache γfs) 1 L ∗
+    (ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) ∗
+     ghost_map_auth_frac (fs_cache γfs) 1 L ∗
      log_mirror_half M ∗
      ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
      ⌜log_mirror_tie_body M L cov logstart ∅⌝)%I.
@@ -250,7 +250,7 @@ Section LogQuiet.
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
     { rewrite Hsw. iExact "Hswlb". }
-    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    iAssert (mono_nat_auth_own_frac (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
     { rewrite Hstn. iExact "Hsa". }
     rewrite /log_mirror_half.
     iDestruct (fs_arm_acc γs cov ls dk gen_id riscv_eraGS n M Hn

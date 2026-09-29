@@ -1789,7 +1789,7 @@ Section IntrEngine.
       ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝ ∗
       hw_config ∗ minstret_inv ∗
       cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ mst0 ∗
-      ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗ sret_tie mst0 ∗
+      ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗ sret_tie mst0 ∗
       mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ MENVCFG_S.
   Proof using .
     iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -1806,7 +1806,7 @@ Section IntrEngine.
     and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
     hw_config -∗ minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ mst0 -∗
-    ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗ sret_tie mst0 -∗
+    ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) -∗ sret_tie mst0 -∗
     mie ↦ᵣ MIE_S -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ MENVCFG_S -∗ sconf.
   Proof using .
     intros Hmsf Hmm.
@@ -1846,7 +1846,7 @@ Section IntrEngine.
        ⌜ and_vec MIE_S (not_vec mdv) = zeros' 64 ⌝ ∗
        hw_config ∗ minstret_inv ∗
        cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ ms ∗
-       ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗ sret_tie ms ∗
+       ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) ∗ sret_tie ms ∗
        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv ∗ menvcfg ↦ᵣ MENVCFG_S)%I.
 
   Lemma sconf_at_priv_open : sconf -∗ ∃ ms : mword 64, sconf_at_priv ms.
@@ -1875,7 +1875,7 @@ Section IntrEngine.
     and_vec MIE_S (not_vec mdv) = zeros' 64 ->
     hw_config -∗ minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗ mstatus ↦ᵣ ms -∗
-    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗ sret_tie ms -∗
+    ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms) -∗ sret_tie ms -∗
     mie ↦ᵣ MIE_S -∗ mideleg ↦ᵣ mdv -∗ menvcfg ↦ᵣ MENVCFG_S -∗ sconf_at ms.
   Proof using .
     intros Hmsf Hmm.
@@ -2590,7 +2590,7 @@ Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
   (∃ (m' : regfile) (av' : nat),
-     ghost_var sie_gname (1/2)
+     ghost_var_frac sie_gname (1/2)
        (_get_Mstatus_SIE (register_lookup mstatus rs2)) ∗
      sret_tie (register_lookup mstatus rs2) ∗
      strans_res_at (register_lookup satp rs2) (register_lookup tlb rs2) ∗
@@ -2619,7 +2619,7 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
                    ⌜ sconf_ms_facts ms' ⌝ ∗
                    ⌜ and_vec MIE_S (not_vec mdv') = zeros' 64 ⌝ ∗
                    mstatus ↦ᵣ ms' ∗
-                   ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms') ∗
+                   ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE ms') ∗
                    sret_tie ms' ∗
                    mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv' ∗ menvcfg ↦ᵣ MENVCFG_S ∗
                    sie_cap kt m' av' b' p ∗ gpr_file (tp_pin m') ∗
@@ -2635,7 +2635,7 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI 
                    ⌜ s_cause_ok sc ⌝ ∗ ⌜ sconf_ms_facts mstT ⌝ ∗
                    ⌜ and_vec MIE_S (not_vec mdvT) = zeros' 64 ⌝ ∗
                    mstatus ↦ᵣ mstT ∗
-                   ghost_var sie_gname (1/2) (_get_Mstatus_SIE mstT) ∗
+                   ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mstT) ∗
                    sret_tie mstT ∗
                    mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdvT ∗ menvcfg ↦ᵣ MENVCFG_S ∗
                    sret_bits ('b"1" : mword 1) ('b"1" : mword 1) ∗
@@ -2789,12 +2789,12 @@ Proof.
                       (intr_ret kt p b' R)
                       (wp_next true p (fun CID =>
                          intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))
-                       ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                       ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                        ∗ sret_tie mst0
                        ∗ stack_own (KTR := kt) (m !!! Regidx csp_rs1)
                            (trap_res true + av)
-                       ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1)
-                       ∗ ghost_var sie_gname (1/4) vb ∗ stvec ↦ᵣ handler
+                       ∗ ghost_var_frac sie_gname (1/4/2)%Qp ('b"1" : mword 1)
+                       ∗ ghost_var_frac sie_gname (1/4) vb ∗ stvec ↦ᵣ handler
                        ∗ (∃ v : mword 64, sepc ↦ᵣ v)
                        ∗ (∃ v : mword 64, scause ↦ᵣ v)
                        ∗ (∃ v : mword 64, stval ↦ᵣ v)

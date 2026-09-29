@@ -229,7 +229,7 @@ Section ProofCreateMkdir.
        this half FIRES the parent leg, at the last element of its own path
        buffer, so it owes [Nm] at that name and nothing else. *)
     (forall nm : fname,
-       list_basics.last (path_elems (bview plen pfun)) = Some nm -> Nm nm) ->
+       list_basics.list.last (path_elems (bview plen pfun)) = Some nm -> Nm nm) ->
     (* THE NODE PREDICATE'S PURE PREMISE (lane INIT-FILE, the UNARM
        ruling): this half is the T_DIR sub-branch, and its three [fail:]
        entries unarm a DIRECTORY row that may already carry a dot -- a
@@ -1333,7 +1333,7 @@ Section ProofCreateMkdir.
                      (cr_first_miss_dotdot dat1 (cr_low16 cinum) Hwin1)
                      Hholes1 Hholes2 (Hcap1 Hccap) (Hcap2 (Hcap1 Hccap))).
           rewrite Hc1ents Hddname0 Hdl16 /dots_ents.
-          apply insert_commute. exact (not_eq_sym Hdd_ne). }
+          apply insert_insert_ne. exact (not_eq_sym Hdd_ne). }
         assert (Hrowc0 : abs_of (era_node (cr_setf dnc major minor
                                              (mword_of_int 1 : mword 16)) bmc datc)
                          = Some (MkAnode (ADir ∅) 1%nat)).
@@ -2032,7 +2032,7 @@ Section ProofCreateMkdir.
             rewrite Hents3.
             destruct (decide (tz = bname 14 nf)) as [-> | Hne].
             - split_and!; [| exact Hnfd'm | exact Hnfdd'm].
-              rewrite Hins3 lookup_insert. by eexists.
+              rewrite Hins3 lookup_insert_eq. by eexists.
             - destruct (Hdok0 tz ltac:(destruct (proj1 (elem_of_union _ _ _) Htz)
                                         as [Hc | Hc];
                                       [exfalso; apply Hne;

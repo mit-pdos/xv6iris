@@ -391,7 +391,7 @@ Section BitmapRes.
   Local Lemma pool_home_pure (γfs : fs_names) (L : gmap Z (bv 8))
       (home : gset Z) (size : Z) (u : gset Z) :
     bytes_dom L home ->
-    ghost_map_auth (fs_bytes γfs) 1 L -∗
+    ghost_map_auth_frac (fs_bytes γfs) 1 L -∗
     free_pool (fs_gamma_L γfs) size u -∗
     ⌜forall x : Z, 0 <= x < size -> x ∉ u -> x ∈ home⌝.
   Proof using .

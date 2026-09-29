@@ -551,7 +551,6 @@ Proof.
   unfold bv_modulus in Hhi. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hhi.
   pose proof (z_rem4_no_wrap _ (conj Hlo Hhi) H4) as Hnw.
   unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   assert (H2 : bv_unsigned (mword_of_int (Z.of_nat 2) : mword 64) = 2%Z)
@@ -1084,8 +1083,8 @@ Section ProofSysMknodBody.
     (* slot 19, carved into the two [int] cells.  The 8-alignment comes out
        FIRST -- the halves no longer carry it and the join wants it back
        (durable-notes, "A C LOCAL TAKEN BY ADDRESS"). *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hf19") as %Hal19.
-    iDestruct (ctx_word_pointsto_split4 with "Hf19") as "[Hmin Hmaj]".
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hf19") as %Hal19.
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hf19") as "[Hmin Hmaj]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (rewrite HM1sp; apply mn_frm1).
@@ -1599,7 +1598,7 @@ Section ProofSysMknodBody.
                    (aligned8_aligned4 _ Hal19) with "Hminlo Hminhi") as "Hmin".
       iDestruct (word4_pointsto_join2 (KTR := KT1) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
       iApply (wp_cli_s_sconf (CID := CID22) (mword_of_int (MN + 0x3a)) Ra1
                 (mword_of_int 3 : mword 6)
@@ -1751,7 +1750,7 @@ Section ProofSysMknodBody.
                                  (bv_unsigned (hw_lo (arg_int32 v2))))
                      P Pmiss Farm (pfam_triv (fun _ _ _ _ => True%I)) Fun Fok Fex
                      (fun (nm : fname)
-                          (H : list_basics.last (path_elems (bview pk bf))
+                          (H : list_basics.list.last (path_elems (bview pk bf))
                                = Some nm) =>
                         npar_nm_intro (us_M U) v0 (bview pk bf) nm Hpof H)
                      (* THE NODE PREDICATE'S TWO PREMISES: at [T_DEVICE] the
@@ -2049,7 +2048,7 @@ Section ProofSysMknodBody.
                         (sign_extend' 64 (mword_of_int 42 : mword 13))
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b
@@ -2164,7 +2163,7 @@ Section MknodStable.
   Lemma mkr_chain_at Γ (I : gmap Z fs_node) (avc : aview) (ds : list Z)
       (ps : list fname) (j : nat) :
     (j < length ps)%nat ->
-    ghost_map_auth (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
+    ghost_map_auth_frac (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
       ⌜abs_view I !! (ds !!! j) = avc !! (ds !!! j)⌝.
   Proof using .
     intros Hj. iIntros "Ha Hc".
@@ -2182,7 +2181,7 @@ Section MknodStable.
   Lemma mkr_chain_run Γ (I : gmap Z fs_node) (avc : aview) (root : Z)
       (ps : list fname) (ds : list Z) :
     arun avc root ps ds ->
-    ghost_map_auth (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
+    ghost_map_auth_frac (γtop Γ) (1/2) I -∗ mkr_chain Γ avc ds ps -∗
       ⌜arun (abs_view I) root ps ds⌝.
   Proof using .
     intros Hr. iIntros "Ha #Hc".

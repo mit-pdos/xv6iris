@@ -16,8 +16,8 @@ Local Open Scope Z_scope.
 Lemma subrange64_id (a : mword 64) : subrange_vec_dec a (Z.sub xlen 1) 0 = a.
 Proof.
   apply bv_eq. unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   change (MachineWord.MachineWord.Z_idx (Z.sub xlen 1 - 0 + 1)) with 64%N.

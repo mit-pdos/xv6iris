@@ -119,7 +119,7 @@ Section blkN.
     intros Hw. rewrite tmN_snoc. destruct (TERM w (srcN md w)) eqn:Ht;
       [| by rewrite orb_false_r].
     assert (Hs : tmN md sel = true).
-    { rewrite /tmN existsb_exists. exists w. split; [by apply elem_of_list_In | exact Ht]. }
+    { rewrite /tmN existsb_exists. exists w. split; [by apply list_elem_of_In | exact Ht]. }
     by rewrite Hs.
   Qed.
 
@@ -127,8 +127,8 @@ Section blkN.
     (forall x, x ∈ sel -> md' x = md x) -> tmN md' sel = tmN md sel.
   Proof using.
     intros Hx. rewrite /tmN. induction sel as [| y s IH]; [reflexivity |].
-    cbn [existsb]. rewrite /srcN (Hx y (elem_of_list_here y s)).
-    f_equal. apply IH. intros x Hin. apply Hx. by apply elem_of_list_further.
+    cbn [existsb]. rewrite /srcN (Hx y (list_elem_of_here y s)).
+    f_equal. apply IH. intros x Hin. apply Hx. by apply list_elem_of_further.
   Qed.
 
   (* ---- the committed sources' laws ---- *)
@@ -149,6 +149,7 @@ Section blkN.
 
   Lemma sel_wfN_rmd md sel : sel_wfN (srcN md) sel -> sel_wfN (srcN (rmd md sel)) sel.
   Proof using.
+    clear TERM TOK. (* unused; else Rocq counts it as used (asks for Proof using … TERM TOK) *)
     intros Hwf x. destruct (decide (x ∈ sel)) as [Hx | Hx].
     - rewrite srcN_rmd; [apply Hwf | exact Hx].
     - rewrite (cntN_nil_notin sel x Hx). lia.
@@ -176,7 +177,7 @@ Section blkN.
     x <> w -> cmtN (mdupd md w s) (sel ++ [w]) x = cmtN md sel x.
   Proof using.
     intros Hne. rewrite /cmtN /mdupd decide_False; [| exact Hne].
-    apply bool_decide_ext. rewrite elem_of_app elem_of_list_singleton.
+    apply bool_decide_ext. rewrite elem_of_app list_elem_of_singleton.
     split; [intros [[Hx | Hx] | Hx]; [by left | by destruct (Hne Hx) | by right]
            | intros [Hx | Hx]; [by left; left | by right]].
   Qed.
@@ -184,13 +185,13 @@ Section blkN.
   Lemma cmtN_fire_self md sel w s : cmtN (mdupd md w s) (sel ++ [w]) w = true.
   Proof using.
     rewrite /cmtN bool_decide_true; [done |]. left. apply elem_of_app. right.
-    by apply elem_of_list_singleton.
+    by apply list_elem_of_singleton.
   Qed.
 
   Lemma cmtN_step md sel w x : w ∈ sel -> cmtN md (sel ++ [w]) x = cmtN md sel x.
   Proof using.
     intros Hw. rewrite /cmtN. apply bool_decide_ext.
-    rewrite elem_of_app elem_of_list_singleton.
+    rewrite elem_of_app list_elem_of_singleton.
     split; [intros [[Hx | ->] | Hx]; [by left | by left | by right]
            | intros [Hx | Hx]; [by left; left | by right]].
   Qed.
@@ -207,10 +208,10 @@ Section blkN.
   (* ================================================================= *)
 
   Definition wcurN (γc : W -> gname) (w : W) (q : Qp) (c : nat) : iProp Σ :=
-    ghost_var (γc w) q c.
+    ghost_var_frac (γc w) q c.
   Definition wmodeN (γm : W -> gname) (w : W) (q : Qp)
       (o : option (list (bv 8))) : iProp Σ :=
-    ghost_var (γm w) q o.
+    ghost_var_frac (γm w) q o.
 
   Global Instance wcurN_timeless γc w q c : Timeless (wcurN γc w q c).
   Proof using. rewrite /wcurN. apply _. Qed.
@@ -282,7 +283,7 @@ Section blkN.
     wstN γc γm md sel w
     ∗ (wstN γc γm md' sel' w -∗ [∗ list] x ∈ ws, wstN γc γm md' sel' x).
   Proof using Hnd.
-    intros Hw Hfr. destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    intros Hw Hfr. destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iIntros "Hb".
     iDestruct (big_sepL_lookup_acc_impl i w Hi with "Hb") as "[$ Hcl]".
     iIntros "Hw". iApply ("Hcl" $! (fun _ x => wstN γc γm md' sel' x) with "[] Hw").
@@ -298,7 +299,7 @@ Section blkN.
     w ∈ ws -> cmtN md sel w = true -> md w = Some s ->
     ([∗ list] x ∈ ws, wstN γc γm md sel x) -∗ dep w s.
   Proof using.
-    intros Hw Hc Hs. destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    intros Hw Hc Hs. destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iIntros "Hb". iDestruct (big_sepL_lookup _ _ i w Hi with "Hb") as "(_ & _ & Hd)".
     rewrite Hc /srcN Hs. iExact "Hd".
   Qed.
@@ -307,7 +308,7 @@ Section blkN.
   Lemma blkN_done_not γc w q c :
     w ∈ ws -> wcurN γc w q c -∗ blkN_done γc -∗ False.
   Proof using.
-    intros Hw. destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    intros Hw. destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iIntros "H1 Hd". iDestruct (big_sepL_lookup _ _ i w Hi with "Hd") as (c') "H2".
     rewrite /wcurN. iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
     exfalso. apply (Qp.not_add_le_r q 1). exact Hq.
@@ -320,7 +321,7 @@ Section blkN.
   Lemma ghost_vars_alloc {A : Type} `{!ghost_varG Σ A} (l : list W) (a : A) :
     stdpp.base.NoDup l ->
     ⊢ |==> ∃ γ : W -> gname,
-        [∗ list] w ∈ l, ghost_var (γ w) (1/2) a ∗ ghost_var (γ w) (1/2) a.
+        [∗ list] w ∈ l, ghost_var_frac (γ w) (1/2) a ∗ ghost_var_frac (γ w) (1/2) a.
   Proof using EqW.
     induction l as [| x l IH]; intros Hl.
     - iModIntro. iExists (fun _ => 1%positive). done.
@@ -333,7 +334,7 @@ Section blkN.
       rewrite big_sepL_cons. rewrite decide_True; [| done]. iFrame "Hx1 Hx2".
       iApply (big_sepL_impl with "Hl"). iModIntro. iIntros (j y Hj) "Hy".
       assert (Hyx : y <> x).
-      { intros ->. apply Hx. exact (elem_of_list_lookup_2 _ _ _ Hj). }
+      { intros ->. apply Hx. exact (list_elem_of_lookup_2 _ _ _ Hj). }
       rewrite decide_False; [| exact Hyx]. iExact "Hy".
   Qed.
 
@@ -417,7 +418,7 @@ Section blkN.
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
     pose proof Hfam as (Hin & Hmin & Hfd & Hwf & Hinvn).
     (* the writer's own share: cursor 0, unfired *)
-    destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iAssert (⌜cntN sel w = 0%nat /\ md w = None⌝)%I as %[Hc0 Hmw].
     { iDestruct (big_sepL_lookup _ _ i w Hi with "Hb") as "(Hc & Hm & _)".
       rewrite /wcurN /wmodeN.
@@ -463,7 +464,7 @@ Section blkN.
           iFrame.
         - iPureIntro. split_and!.
           + intros x Hx. apply elem_of_app in Hx as [Hx | Hx]; [exact (Hin x Hx) |].
-            apply elem_of_list_singleton in Hx as ->. exact Hw.
+            apply list_elem_of_singleton in Hx as ->. exact Hw.
           + intros x Hx. rewrite /md' /mdupd in Hx. case_decide as Hq; [subst x; exact Hw |].
             exact (Hmin x Hx).
           + apply sel_firedN_snoc; [exact (sel_firedN_mdupd md sel w s Hfd) |].
@@ -484,7 +485,7 @@ Section blkN.
       assert (Hfam' : famN md' sel').
       { split_and!.
         - intros x Hx. apply elem_of_app in Hx as [Hx | Hx]; [exact (Hin x Hx) |].
-          apply elem_of_list_singleton in Hx as ->. exact Hw.
+          apply list_elem_of_singleton in Hx as ->. exact Hw.
         - intros x Hx. rewrite /md' /mdupd in Hx. case_decide as Hq; [subst x; exact Hw |].
           exact (Hmin x Hx).
         - apply sel_firedN_snoc; [exact (sel_firedN_mdupd md sel w s Hfd) |].
@@ -550,7 +551,7 @@ Section blkN.
     { iDestruct (blkN_done_not γc w with "HcW Hdone") as %[]. exact Hw. }
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
     pose proof Hfam as (Hin & Hmin & Hfd & Hwf & Hinvn).
-    destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iAssert (⌜cntN sel w = c /\ md w = Some s⌝)%I as %[Hcw Hmw].
     { iDestruct (big_sepL_lookup _ _ i w Hi with "Hb") as "(Hc & Hm & _)".
       rewrite /wcurN /wmodeN.
@@ -571,7 +572,7 @@ Section blkN.
     assert (Hfam' : famN md sel').
     { split_and!.
       - intros x Hx. apply elem_of_app in Hx as [Hx | Hx]; [exact (Hin x Hx) |].
-        apply elem_of_list_singleton in Hx as ->. exact Hw.
+        apply list_elem_of_singleton in Hx as ->. exact Hw.
       - exact Hmin.
       - apply sel_firedN_snoc; [exact Hfd | rewrite Hmw; by eexists].
       - exact Hwf'.
@@ -588,7 +589,7 @@ Section blkN.
         exact (proj1 Hinvn Ht). }
     assert (HTw : TERM w s = true -> tmN md sel = true).
     { intros HT. rewrite /tmN existsb_exists. exists w.
-      split; [by apply elem_of_list_In | by rewrite /srcN Hmw]. }
+      split; [by apply list_elem_of_In | by rewrite /srcN Hmw]. }
     iMod ("Hecl" $! k (default [] o) H (pendN md sel) b (tmN md sel) (tmN md sel)
             with "[%] [%] HPW Hres") as "(Hres & HPW & #HTK)".
     { done. }
@@ -625,13 +626,13 @@ Section blkN.
     induction hs as [| x hs IH]; intros Hin.
     - iIntros "_ _". iPureIntro. intros x Hx. by apply elem_of_nil in Hx.
     - iIntros "Hb [[Hc Hm] Hh]".
-      destruct (elem_of_list_lookup_1 ws x.1.1 (Hin x (elem_of_list_here x hs))) as (i & Hi).
+      destruct (list_elem_of_lookup_1 ws x.1.1 (Hin x (list_elem_of_here x hs))) as (i & Hi).
       iAssert (⌜md x.1.1 = Some x.1.2 /\ cntN sel x.1.1 = x.2⌝)%I as %Hx.
       { iDestruct (big_sepL_lookup _ _ i _ Hi with "Hb") as "(Hc' & Hm' & _)".
         rewrite /wcurN /wmodeN.
         iDestruct (ghost_var_agree with "Hc Hc'") as %Hc.
         iDestruct (ghost_var_agree with "Hm Hm'") as %Hm. by iPureIntro. }
-      iDestruct (IH (fun y Hy => Hin y (elem_of_list_further _ _ _ Hy)) with "Hb Hh") as %Hr.
+      iDestruct (IH (fun y Hy => Hin y (list_elem_of_further _ _ _ Hy)) with "Hb Hh") as %Hr.
       iPureIntro. intros y Hy. apply elem_of_cons in Hy as [-> | Hy]; [exact Hx | exact (Hr y Hy)].
   Qed.
 
@@ -670,7 +671,7 @@ Section blkN.
     { iDestruct (blkN_done_not γc w with "HcW Hdone") as %[]. exact Hw. }
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
     pose proof Hfam as (Hin & Hmin & Hfd & Hwf & Hinvn).
-    destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iAssert (⌜cntN sel w = c /\ md w = Some s⌝)%I as %[Hcw Hmw].
     { iDestruct (big_sepL_lookup _ _ i w Hi with "Hb") as "(Hc & Hm & _)".
       rewrite /wcurN /wmodeN.
@@ -694,7 +695,7 @@ Section blkN.
     assert (Hfam' : famN md sel').
     { split_and!.
       - intros x Hx. apply elem_of_app in Hx as [Hx | Hx]; [exact (Hin x Hx) |].
-        apply elem_of_list_singleton in Hx as ->. exact Hw.
+        apply list_elem_of_singleton in Hx as ->. exact Hw.
       - exact Hmin.
       - apply sel_firedN_snoc; [exact Hfd | rewrite Hmw; by eexists].
       - exact Hwf'.
@@ -711,7 +712,7 @@ Section blkN.
         exact (proj1 Hinvn Ht). }
     assert (HTw : TERM w s = true -> tmN md sel = true).
     { intros HT. rewrite /tmN existsb_exists. exists w.
-      split; [by apply elem_of_list_In | by rewrite /srcN Hmw]. }
+      split; [by apply list_elem_of_In | by rewrite /srcN Hmw]. }
     iMod ("Hecl" $! k (default [] o) H (pendN md sel) b (tmN md sel) (tmN md sel)
             with "[%] [%] HPW Hres") as "(Hres & HPW & #HTK)".
     { done. }
@@ -762,7 +763,7 @@ Section blkN.
     { iDestruct (blkN_done_not γc w with "HcW Hdone") as %[]. exact Hw. }
     iDestruct "Hfam" as (md sel) "(HPW & Hb & %Hfam)".
     pose proof Hfam as (Hin & Hmin & Hfd & Hwf & Hinvn).
-    destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi).
+    destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi).
     iAssert (⌜cntN sel w = 0%nat /\ md w = None⌝)%I as %[Hc0 Hmw].
     { iDestruct (big_sepL_lookup _ _ i w Hi with "Hb") as "(Hc & Hm & _)".
       rewrite /wcurN /wmodeN.
@@ -835,7 +836,7 @@ Section blkN.
     iDestruct "Hin" as ">Hin". rewrite {1}/blkN_body.
     iDestruct "Hin" as "[Hfam | Hdone]"; last first.
     { destruct ws as [| w0 ws'] eqn:Hws; [by destruct (Hne eq_refl) |].
-      assert (Hw0 : w0 ∈ ws) by (rewrite Hws; apply elem_of_list_here).
+      assert (Hw0 : w0 ∈ ws) by (rewrite Hws; apply list_elem_of_here).
       assert (Hi0 : ws !! 0%nat = Some w0) by (by rewrite Hws).
       rewrite -Hws.
       iDestruct (big_sepL_lookup_acc _ _ 0%nat w0 Hi0 with "Hall") as "[[Hc0 _] _]".
@@ -855,10 +856,10 @@ Section blkN.
     iDestruct (big_sepL_sep with "Hab") as "[Hcur Hp]".
     iDestruct (big_sepL_pure_1 with "Hp") as %Hp.
     assert (Hall : forall w, w ∈ ws -> md w = Some (sw w) /\ cntN sel w = length (sw w)).
-    { intros w Hw. destruct (elem_of_list_lookup_1 ws w Hw) as (i & Hi). exact (Hp i w Hi). }
+    { intros w Hw. destruct (list_elem_of_lookup_1 ws w Hw) as (i & Hi). exact (Hp i w Hi). }
     assert (Htm : tmN md sel = false).
     { apply not_true_iff_false. rewrite /tmN existsb_exists. intros (x & Hx & Ht).
-      apply elem_of_list_In in Hx. pose proof (Hin x Hx) as Hxw.
+      apply list_elem_of_In in Hx. pose proof (Hin x Hx) as Hxw.
       destruct (Hall x Hxw) as [Hmx _]. rewrite /srcN Hmx /= (HT x Hxw) in Ht. discriminate Ht. }
     pose proof (compatN_of_runS _ _ (proj1 Hinvn Htm)) as Hcomp.
     assert (Hblk : blkN ws RUN (pendN md sel)).

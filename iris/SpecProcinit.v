@@ -95,8 +95,7 @@ Definition pacur (i : nat) : mword 64 := acur KernelSyms.proc proc_size i.
 Lemma proc_addr_acur (i : nat) : proc_addr i = pacur i.
 Proof.
   unfold proc_addr, pacur, acur, proc_base, proc_size.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   apply bv_eq. rewrite bv_add_unsigned.
   unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
   rewrite !Z_to_bv_unsigned. by rewrite bv_wrap_add_idemp.

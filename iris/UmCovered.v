@@ -83,7 +83,7 @@ Proof.
   pose proof (NoDup_cons_1_1 _ _ Hnd) as Hnin.
   pose proof (NoDup_cons_1_2 _ _ Hnd) as Hnd'.
   apply NoDup_cons_2.
-  - intros Hin. apply elem_of_list_fmap in Hin as (y & Hfy & Hy).
+  - intros Hin. apply list_elem_of_fmap in Hin as (y & Hfy & Hy).
     apply Hnin.
     assert (Hay : a = y).
     { apply Hinj; [ apply elem_of_cons; left; reflexivity

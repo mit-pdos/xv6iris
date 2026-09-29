@@ -465,7 +465,7 @@ Section StartedInv.
       { iPureIntro. intros tvr Hle. rewrite -Hgtv in Hle.
         destruct (Hrel tvr Hle) as [[Hfl _] | (T & g0 & Hin & _ & _ & Hrd0 & _)].
         - exists started_clear. intros j Hj. apply (Hfl j). lia.
-        - apply elem_of_list_singleton in Hin. injection Hin as -> ->.
+        - apply list_elem_of_singleton in Hin. injection Hin as -> ->.
           exists started_set. intros j Hj. apply (Hrd0 j). lia. }
       iIntros (tvr v) "%Hle %Hrdv". rewrite -Hgtv in Hle.
       iRight. iExists i. iFrame "Hidx HP". iPureIntro.
@@ -477,7 +477,7 @@ Section StartedInv.
         rewrite Hgimg Hglog in Hfl. rewrite Hrdv in Hfl.
         injection Hfl as Hb. apply bv_eq. exact Hb.
       + (* the hit: the one history entry, at or under this read's view *)
-        apply elem_of_list_singleton in Hin. injection Hin as -> ->.
+        apply list_elem_of_singleton in Hin. injection Hin as -> ->.
         right. split.
         * apply (bv_eq_of_bytes (n := 4%N)). intros j Hj.
           assert (Hj4 : (j < 4)%nat) by lia.

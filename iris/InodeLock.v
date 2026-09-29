@@ -5,7 +5,7 @@
    ---- WHAT USED TO BE HERE, AND WHERE IT WENT -------------------------
 
    This file used to hold the whole icache SEAM -- [inode_parked] (the
-   resource an inode's sleeplock protected) and the [inode_key] ghost_var
+   resource an inode's sleeplock protected) and the [inode_key] ghost_var_frac
    shadow that named its existentially-quantified [dn]/[bm], plus
    [inode_locked], the bundle ilock produced.  All three are gone, and the
    design note records why:
@@ -21,7 +21,7 @@
      letting a caller state ilock's on-disk agreement premise
      conditionally -- disappeared with that premise (§11.3).  It could not
      have survived in any case: with N reference holders only two
-     [ghost_var] halves exist, so "the caller supplies one" is
+     [ghost_var_frac] halves exist, so "the caller supplies one" is
      unsatisfiable for the second holder.
    * [inode_locked] is now [IcacheEscrow.ic_loaded] plus the two identity
      halves and the valid cell -- i.e. exactly what [ic_swap_park] takes,

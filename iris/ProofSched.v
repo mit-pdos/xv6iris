@@ -86,7 +86,7 @@ Proof.
                         (zero_extend' 64 (concat_vec uimm ('b"000")))
                 = (mword_of_int (- (8 * Z.of_nat j)) : mword 64)).
   { apply bv_eq. rewrite H.
-    unfold mword_of_int, Values.to_word, get_word. cbn.
+    unfold mword_of_int. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
   unfold pa_stk, add_vec_int. rewrite add_vec_assoc. rewrite Heq. reflexivity.
 Qed.

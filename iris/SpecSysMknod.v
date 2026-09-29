@@ -466,7 +466,7 @@ Section SysMknod.
        ⌜arg_path_of M pv pl⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ∃ (av : aview) (d : Z) (nm : fname) (ents : gmap fname Z) (nl : nat),
-         ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+         ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
          ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
          P (length (npar_elems pl)) d ∗
          pf_at (dlookup_commit_at Γ appE) Fex ∗
@@ -505,7 +505,7 @@ Section SysMknod.
                            (P (length (npar_elems pl))) Farm) Fok
                 ∗ ((∃ (av : aview) (i : Z) (nm : fname)
                       (ents : gmap fname Z) (nl : nat),
-                      ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                      ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                       ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                       ⌜ents !! nm = Some i⌝ ∗
                       Fex.(pf_recv) av d nm i)
@@ -609,7 +609,7 @@ Section SysMknod.
       (Fok Fex : pfam Σ (aview -> Z -> fname -> Z -> iProp Σ)) : iProp Σ :=
     (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
        (ents : gmap fname Z) (nl : nat),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
        ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
        ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
        ⌜arun av root ps ds⌝ ∗
@@ -641,7 +641,7 @@ Section SysMknod.
          ∨ ∃ ic : Z, cre_child_pair Farm Fun ic))
      ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
           (ents : gmap fname Z) (nl : nat),
-          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+          ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
           ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
           ⌜ents !! nm = Some i⌝ ∗
           ⌜arun av root ps ds⌝ ∗

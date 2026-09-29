@@ -114,7 +114,7 @@ Section UkSeccEntry.
       cbv zeta. rewrite Hfd.
       case_decide as Hdec; [ | exfalso; apply Hdec; unfold NOFILE; lia ].
       change (Z.to_nat 2) with 2%nat.
-      rewrite <- (lookup_take fdv NSTD 2%nat ltac:(unfold NSTD; lia)).
+      rewrite <- (lookup_take_lt fdv NSTD 2%nat ltac:(unfold NSTD; lia)).
       rewrite Htk Hl2. reflexivity. }
     rewrite Hst. rewrite /secc_row. done.
   Qed.

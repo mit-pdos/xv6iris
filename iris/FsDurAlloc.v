@@ -561,21 +561,21 @@ Proof. rewrite /fp_inums elem_of_elements elem_of_dom //. Qed.
 Lemma fp_recs_elem (S : fs_state_rec) (x : fp_slot) :
   x ∈ fp_recs S -> exists i, x = FpRec i /\ is_Some (fss_inodes S !! i).
 Proof.
-  rewrite /fp_recs. intros (i & -> & Hi)%elem_of_list_fmap.
+  rewrite /fp_recs. intros (i & -> & Hi)%list_elem_of_fmap.
   exists i. split; [reflexivity | by apply fp_inums_elem].
 Qed.
 
 Lemma fp_inds_elem (S : fs_state_rec) (x : fp_slot) :
   x ∈ fp_inds S -> exists i, x = FpInd i /\ is_Some (fss_inodes S !! i).
 Proof.
-  rewrite /fp_inds. intros (i & -> & Hi)%elem_of_list_fmap.
+  rewrite /fp_inds. intros (i & -> & Hi)%list_elem_of_fmap.
   exists i. split; [reflexivity | by apply fp_inums_elem].
 Qed.
 
 Lemma fp_pools_elem (S : fs_state_rec) (x : fp_slot) :
   x ∈ fp_pools S -> exists b, x = FpPool b /\ 0 <= b < sb_size (fss_sb S).
 Proof.
-  rewrite /fp_pools. intros (b & -> & Hb)%elem_of_list_fmap.
+  rewrite /fp_pools. intros (b & -> & Hb)%list_elem_of_fmap.
   apply elem_of_seqZ in Hb. exists b. split; [reflexivity | lia].
 Qed.
 
@@ -584,8 +584,8 @@ Lemma fp_blks_elem (S : fs_state_rec) (x : fp_slot) :
   exists i k, x = FpBlk i k /\ is_Some (fss_inodes S !! i)
            /\ is_Some (fn_blk (fss_inodes S !!! i) !! k).
 Proof.
-  rewrite /fp_blks. intros (i & Hx & Hi)%elem_of_list_bind.
-  apply elem_of_list_fmap in Hx as (k & -> & Hk).
+  rewrite /fp_blks. intros (i & Hx & Hi)%list_elem_of_bind.
+  apply list_elem_of_fmap in Hx as (k & -> & Hk).
   exists i, k. split; [reflexivity |].
   split; [by apply fp_inums_elem |].
   apply elem_of_elements, elem_of_dom in Hk. exact Hk.
@@ -615,7 +615,7 @@ Lemma NoDup_fmap_inj {A B : Type} (f : A -> B) (l : list A) :
 Proof.
   intros Hinj Hnd. induction Hnd as [| x l Hx Hnd IH]; [constructor |].
   rewrite fmap_cons. constructor; [| exact IH].
-  intros Hin. apply elem_of_list_fmap in Hin as (y & Hy & Hyl).
+  intros Hin. apply list_elem_of_fmap in Hin as (y & Hy & Hyl).
   apply Hinj in Hy as ->. exact (Hx Hyl).
 Qed.
 
@@ -636,8 +636,8 @@ Proof.
   assert (HB : base.NoDup (fp_blks S)).
   { rewrite /fp_blks. apply NoDup_bind.
     - intros i1 i2 y _ _ Hy1 Hy2.
-      apply elem_of_list_fmap in Hy1 as (k1 & -> & _).
-      apply elem_of_list_fmap in Hy2 as (k2 & Hk & _). congruence.
+      apply list_elem_of_fmap in Hy1 as (k1 & -> & _).
+      apply list_elem_of_fmap in Hy2 as (k2 & Hk & _). congruence.
     - intros i _.
       apply (NoDup_fmap_inj (FpBlk i) _ ltac:(intros a b H; congruence)).
       apply (NoDup_elements (dom (fn_blk (fss_inodes S !!! i)))).
@@ -756,7 +756,7 @@ Section Ledger.
     assert (HB : B = f x ∪ B ∖ f x)
       by (symmetry; exact (map_difference_union (f x) B Hfx)).
     rewrite {1}HB big_sepM_union;
-      [| apply map_disjoint_difference_r; reflexivity].
+      [| apply map_disjoint_difference_r1; reflexivity].
     rewrite big_sepL_cons. iIntros "[$ Hrest]".
     iApply (IH (B ∖ f x) Hnd with "Hrest").
     - intros y Hy. apply map_subseteq_spec. intros a v Hav.
@@ -940,7 +940,7 @@ Section AllocSnap.
      are handed straight to the cut *)
   Lemma snap_bytes_alloc (B : gmap Z (bv 8)) :
     ⊢ |==> ∃ g : gname,
-        ghost_map_auth g 1 B ∗ ([∗ map] a ↦ v ∈ B, a ↪[g] v).
+        ghost_map_auth_frac g 1 B ∗ ([∗ map] a ↦ v ∈ B, a ↪[g] v).
   Proof using .
     iMod (ghost_map_alloc B) as (g) "[Ha Hel]".
     iModIntro. iExists g. iFrame.

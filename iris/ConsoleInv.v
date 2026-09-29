@@ -426,7 +426,7 @@ Lemma cons_gtop_elem (R : list (list mobs * bv 8)) (g : list mobs) :
 Proof.
   rewrite /cons_gtop. destruct (R !! (length R - 1)%nat) as [[g' c]|] eqn:Hg;
     [| discriminate].
-  cbn. intro He. injection He as <-. exists c. by eapply elem_of_list_lookup_2.
+  cbn. intro He. injection He as <-. exists c. by eapply list_elem_of_lookup_2.
 Qed.
 
 (* every history the ring holds is at or below its top -- the chain says so *)
@@ -472,7 +472,7 @@ Proof.
                                ConsLog.gap_ok (L ++ [e]) h1 h2).
   { intros h1 h2 [Hl | (e' & He' & Ha & Hb & Hc)].
     - left. intros e0 H0 H1 H2. apply elem_of_app in H0 as [H0 | H0];
-        [ exact (Hl e0 H0 H1 H2) | apply elem_of_list_singleton in H0 as ->;
+        [ exact (Hl e0 H0 H1 H2) | apply list_elem_of_singleton in H0 as ->;
           exact He ].
     - right. exists e'. split_and!;
         [ apply elem_of_app; by left | exact Ha | exact Hb | exact Hc ]. }
@@ -485,7 +485,7 @@ Proof.
     + destruct Hgp as (e' & He' & Hn & Ha & Hb). exists e'.
       split_and!; [ apply elem_of_app; by left | exact Hn | exact Ha | exact Hb ].
     + intros e0 H0 H1. apply elem_of_app in H0 as [H0 | H0];
-        [ exact (Hgp e0 H0 H1) | apply elem_of_list_singleton in H0 as ->;
+        [ exact (Hgp e0 H0 H1) | apply list_elem_of_singleton in H0 as ->;
           exact He ].
 Qed.
 
@@ -521,7 +521,7 @@ Proof.
   intros Hab [Hl | (e' & He' & Ha & Hb & Hc)].
   - left. intros e1 H1 H2 H3. apply elem_of_app in H1 as [H1 | H1];
       [ exact (Hl e1 H1 H2 H3) |].
-    apply elem_of_list_singleton in H1 as ->. exfalso.
+    apply list_elem_of_singleton in H1 as ->. exfalso.
     destruct H3 as [_ Hl3]. destruct Hab as [_ Hl2]. lia.
   - right. exists e'. split_and!;
       [ apply elem_of_app; by left | exact Ha | exact Hb | exact Hc ].
@@ -554,7 +554,7 @@ Proof.
       exact (cons_gap_ok_snoc_above L [] h0 e0 (Hlift 0%nat h0 c0 H0)
                (Hg0 h0 c0 H0)).
   - cbn [cons_gp_ok]. exists e0. split_and!;
-      [ apply elem_of_app; right; apply elem_of_list_singleton; reflexivity
+      [ apply elem_of_app; right; apply list_elem_of_singleton; reflexivity
       | exact Hne | exact Hgt | exact Her ].
 Qed.
 
@@ -584,7 +584,7 @@ Proof.
   { intros h1 h2 Hh2 [Hl | (e' & He' & Ha & Hb & Hc)].
     - left. intros e1 H1 H2 H3. apply elem_of_app in H1 as [H1 | H1];
         [ exact (Hl e1 H1 H2 H3) |].
-      apply elem_of_list_singleton in H1 as ->. exfalso.
+      apply list_elem_of_singleton in H1 as ->. exfalso.
       rewrite He0h in H3. destruct H3 as [_ Hlt3]. destruct Hh2 as [_ Hlt2]. lia.
     - right. exists e'. split_and!;
         [ apply elem_of_app; by left | exact Ha | exact Hb | exact Hc ]. }
@@ -598,8 +598,8 @@ Proof.
     intros p Hp. apply elem_of_app in Hp as [Hp | Hp].
     + destruct (Hlg p Hp) as (e1 & H1 & H2 & H3). exists e1.
       split_and!; [ apply elem_of_app; by left | exact H2 | exact H3 ].
-    + apply elem_of_list_singleton in Hp as ->. exists e0.
-      split_and!; [ apply elem_of_app; right; apply elem_of_list_singleton;
+    + apply list_elem_of_singleton in Hp as ->. exists e0.
+      split_and!; [ apply elem_of_app; right; apply list_elem_of_singleton;
                     reflexivity | reflexivity | reflexivity ].
   - split.
     + (* the pairs INSIDE the ring, and the one that ENDS at the new byte *)
@@ -630,7 +630,7 @@ Proof.
                        | exact Her ].
         -- left. intros e1 H1e H2e H3e. apply elem_of_app in H1e as [H1e | H1e].
            ++ apply (Hgp e1 H1e). rewrite Hgti. exact H2e.
-           ++ apply elem_of_list_singleton in H1e as ->. exfalso.
+           ++ apply list_elem_of_singleton in H1e as ->. exfalso.
               rewrite He0h in H3e. destruct H3e as [_ Hlt]. lia.
     + (* the FIRST entry: the ring's own, or the new byte if the ring was
          empty (which is only ever true before the first byte ever typed) *)
@@ -647,7 +647,7 @@ Proof.
                        | right; exact (Habove e' He') | exact Her ].
         -- left. intros e1 H1e H2e H3e. apply elem_of_app in H1e as [H1e | H1e].
            ++ apply (Hgp e1 H1e). by rewrite Hgt0.
-           ++ apply elem_of_list_singleton in H1e as ->. exfalso.
+           ++ apply list_elem_of_singleton in H1e as ->. exfalso.
               rewrite He0h in H3e. destruct H3e as [_ Hlt]. lia.
   - (* THE ACCUMULATOR IS RESET, and vacuously so: the new top IS the log's
        top, and nothing is above it. *)
@@ -655,7 +655,7 @@ Proof.
     rewrite (cons_gtop_snoc R (h, c)) in H2. cbn in H2. exfalso.
     apply elem_of_app in H1 as [H1 | H1].
     + destruct (Habove e1 H1) as [_ Hl1]. destruct H2 as [_ Hl2]. lia.
-    + apply elem_of_list_singleton in H1 as ->. rewrite He0h in H2.
+    + apply list_elem_of_singleton in H1 as ->. rewrite He0h in H2.
       destruct H2 as [_ Hl2]. lia.
 Qed.
 
@@ -752,11 +752,11 @@ Proof.
   intros Hlg Hch. rewrite ConsLog.echoed_count_eq.
   assert (Hsub : (fst <$> R) ⊆+ (LogEntryDefs.le_hist <$> base.filter ConsLog.log_echoed L)).
   { apply NoDup_submseteq; [exact (cons_chain_nodup R Hch) |].
-    intros x Hx. apply elem_of_list_fmap in Hx as [[h b] [-> Hp]].
+    intros x Hx. apply list_elem_of_fmap in Hx as [[h b] [-> Hp]].
     destruct (Hlg (h, b) Hp) as (e & He & Hpe & Hec).
-    apply elem_of_list_fmap. exists e. split.
+    apply list_elem_of_fmap. exists e. split.
     - injection Hpe as <- _. reflexivity.
-    - apply elem_of_list_filter. split; [exact Hec | exact He]. }
+    - apply list_elem_of_filter. split; [exact Hec | exact He]. }
   apply submseteq_length in Hsub.
   by rewrite !length_fmap in Hsub.
 Qed.
@@ -1110,8 +1110,8 @@ Proof.
   pose proof (cons_slot_end r e) as Hend.
   destruct (Z.eq_dec k (bv_unsigned (sub_vec e r))) as [Heq | Hne].
   - subst k. exists h, b. rewrite <- Hend.
-    rewrite list_lookup_insert; [| rewrite Hlt; apply cons_slot_lt].
-    rewrite list_lookup_insert; [| rewrite Hlb; apply cons_slot_lt].
+    rewrite list_lookup_insert_eq; [| rewrite Hlt; apply cons_slot_lt].
+    rewrite list_lookup_insert_eq; [| rewrite Hlb; apply cons_slot_lt].
     split_and!; [reflexivity | exact Hends | reflexivity].
   - destruct (Hrow k ltac:(lia)) as (h0 & b0 & Ht0 & He0 & Hb0).
     assert (Hslt : cons_slot r k <> cons_slot e 0).
@@ -1290,8 +1290,8 @@ Proof.
     rewrite Hkey. rewrite <- Hend.
     exists h, b. split_and!; [| | exact Hends |].
     + rewrite lookup_app_r; [| lia]. rewrite Nat.sub_diag. reflexivity.
-    + rewrite list_lookup_insert; [reflexivity | rewrite Hlt; apply cons_slot_lt].
-    + rewrite list_lookup_insert; [reflexivity | rewrite Hlb; apply cons_slot_lt].
+    + rewrite list_lookup_insert_eq; [reflexivity | rewrite Hlt; apply cons_slot_lt].
+    + rewrite list_lookup_insert_eq; [reflexivity | rewrite Hlb; apply cons_slot_lt].
 Qed.
 
 (* (3) THE EDIT, backspace and C('U'): [cons.e] moves back one and the
@@ -1467,14 +1467,14 @@ Lemma cons_era_snoc (l : list (list mobs * bv 8)) (k : nat)
   cons_era l k -> obs_boots h = k -> cons_era (l ++ [(h, c)])%list k.
 Proof.
   intros He Hh p Hp. apply elem_of_app in Hp as [Hp | Hp]; [by apply He |].
-  apply elem_of_list_singleton in Hp. subst p. exact Hh.
+  apply list_elem_of_singleton in Hp. subst p. exact Hh.
 Qed.
 
 Lemma cons_era_lookup (l : list (list mobs * bv 8)) (k p : nat)
     (h : list mobs) (b : bv 8) :
   cons_era l k -> l !! p = Some (h, b) -> obs_boots h = k.
 Proof.
-  intros He Hl. exact (He (h, b) (elem_of_list_lookup_2 l p (h, b) Hl)).
+  intros He Hl. exact (He (h, b) (list_elem_of_lookup_2 l p (h, b) Hl)).
 Qed.
 
 Lemma cons_placed_0 (l : list (list mobs * bv 8)) (lo k : nat) :
@@ -1718,17 +1718,17 @@ Section ConsoleInv.
      console's input, which is what makes "one reader" a resource instead of
      a hope about the process tree. *)
   Definition cons_cursor (cn : cons_names) (n : nat) : iProp Σ :=
-    ghost_var cn.(cn_rd) (1/2) n.
+    ghost_var_frac cn.(cn_rd) (1/2) n.
   (* the LEASE HOLDER's half of the cursor.  It is one HALF of the reader
      token now: the token also carries the boundary's consumed sequence
      ([cons_dl] below, and [cons_reader] with it, after the dirty marker
      it mentions). *)
   Definition cons_rdtok (cn : cons_names) (n : nat) : iProp Σ :=
-    ghost_var cn.(cn_rd) (1/2) n.
+    ghost_var_frac cn.(cn_rd) (1/2) n.
 
   (* THE BOUNDARY'S CONSUMED SEQUENCE, the ring's spelling of
      [WpUart.uart_deliv]'s other half (app-echo.md, lane CONS-IO,
-     milestone B).  Spelled here as the [ghost_var] at the uart's own name
+     milestone B).  Spelled here as the [ghost_var_frac] at the uart's own name
      for [cons_hi]'s reason: this file sits below [WpUart] and the two
      unfold to one proposition.
 
@@ -1741,7 +1741,7 @@ Section ConsoleInv.
      the lag is nobody's business but the holder's. *)
   Definition cons_deliv (cn : cons_names)
       (dv : list (list mobs * bv 8)) : iProp Σ :=
-    ghost_var (un_deliv cn.(cn_uart)) (1/2) dv.
+    ghost_var_frac (un_deliv cn.(cn_uart)) (1/2) dv.
 
   (* ...AND THE LOG'S EXACT MIRROR ([WpUart.uart_logm]'s other half), which
      the RING does carry.  A PAIR AND NOT A BOUND (ruling F4): the gap
@@ -1752,7 +1752,7 @@ Section ConsoleInv.
      port invariant together when it does. *)
   Definition cons_logm (cn : cons_names)
       (L : list LogEntryDefs.log_entry) : iProp Σ :=
-    ghost_var (un_logm cn.(cn_uart)) (1/2) L.
+    ghost_var_frac (un_logm cn.(cn_uart)) (1/2) L.
 
   (* ...AND THE DELIVERED COUNT, WHICH THE RING DOES SEE (relax-d2, lane
      K2).  [cons_deliv]'s kernel half rides the LEASE, so the ring cannot
@@ -1764,13 +1764,13 @@ Section ConsoleInv.
      [WpUart.uart_inv_cons_read], where the reader holds cons.lock and
      opens the port invariant together. *)
   Definition cons_dlcnt (cn : cons_names) (n : nat) : iProp Σ :=
-    ghost_var (un_dlcnt cn.(cn_uart)) (1/2) n.
+    ghost_var_frac (un_dlcnt cn.(cn_uart)) (1/2) n.
   (* the ring's half of the high-water mark.  THE SAME PROPOSITION as
      [WpUart.uart_rx_hi (cn_uart cn) (1/2)], spelled here because this file
      sits below [WpUart] and must not depend on it; the two unfold to one
-     [ghost_var] at one name. *)
+     [ghost_var_frac] at one name. *)
   Definition cons_hi (cn : cons_names) (hh : option (list mobs)) : iProp Σ :=
-    ghost_var (un_rxhi cn.(cn_uart)) (1/2) hh.
+    ghost_var_frac (un_rxhi cn.(cn_uart)) (1/2) hh.
 
   Global Instance cons_stored_lb_persistent cn st :
     Persistent (cons_stored_lb cn st).
@@ -1988,7 +1988,7 @@ Section ConsoleInv.
      number OUT OF A PERSISTENT SUPPLY ([□ ssupply] in both laws).  A
      deposit that demanded an exclusive token is therefore not merely
      unprovable: taken as a premise under a [□] it is INCONSISTENT (open it
-     three times and hold [ghost_var γ (1/2) _] thrice), so the arm has to
+     three times and hold [ghost_var_frac γ (1/2) _] thrice), so the arm has to
      be payable from something persistent.  What the kernel does instead is
      RECORD that such a read happened, at the price of the credential the
      generic slot already holds, and let the token holder learn it.
@@ -2030,11 +2030,11 @@ Section ConsoleInv.
   (* THE RING'S MARKER and the CLEAN TOKEN it is made from.  One [mono_nat]
      at [cn_dirty]: the authority at 0 is the exclusive clean token, minted
      in the boot fupd beside the ring; the lower bound at 1 is the marker.
-     The two are incompatible ([mono_nat_lb_own_valid] gives [1 <= 0]),
+     The two are incompatible ([mono_nat_auth_lb_own_valid] gives [1 <= 0]),
      which is what lets a holder of the marker rule out the escrow's clean
      arm.  Both are timeless. *)
   Definition cons_clean_tok (cn : cons_names) : iProp Σ :=
-    mono_nat_auth_own cn.(cn_dirty) 1 0%nat.
+    mono_nat_auth_own_frac cn.(cn_dirty) 1 0%nat.
   Definition cons_dirty_lb (cn : cons_names) : iProp Σ :=
     mono_nat_lb_own cn.(cn_dirty) 1%nat.
 
@@ -2049,7 +2049,7 @@ Section ConsoleInv.
     cons_clean_tok cn -∗ cons_dirty_lb cn -∗ False.
   Proof using .
     rewrite /cons_clean_tok /cons_dirty_lb. iIntros "Ha Hlb".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
   Qed.
 
   (* ---- THE LEASE, AND WHY IT CARRIES [dl] (ruling F1) ------------------
@@ -2126,7 +2126,7 @@ Section ConsoleInv.
      accessors can strip the invariant's later off the timeless half
      without unfolding anything. *)
   Definition cons_cred_body (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
-    (mono_nat_auth_own cn.(cn_dirty) 1 0%nat
+    (mono_nat_auth_own_frac cn.(cn_dirty) 1 0%nat
      ∨ (mono_nat_lb_own cn.(cn_dirty) 1%nat ∗ □ Wd))%I.
 
   Definition cons_cred_inv (cn : cons_names) (Wd : iProp Σ) : iProp Σ :=
@@ -2187,7 +2187,7 @@ Section ConsoleInv.
     iInv "Hinv" as "Hbody" "Hclose".
     iEval (rewrite /cons_cred_body) in "Hbody".
     iDestruct "Hbody" as "[>Htok | [_ #Hcred]]".
-    - iDestruct (mono_nat_lb_own_valid with "Htok Hlb") as %[_ Hle]. lia.
+    - iDestruct (mono_nat_auth_lb_own_valid with "Htok Hlb") as %[_ Hle]. lia.
     - iMod ("Hclose" with "[]") as "_".
       { iNext. rewrite /cons_cred_body. iRight.
         iSplitR; [ iExact "Hlb" | iExact "Hcred" ]. }
@@ -2393,22 +2393,22 @@ Section ConsoleInv.
      cons_dlcnt cn 0%nat ∗
      cons_reader cn 0%nat ∗ cons_clean_tok cn)%I.
 
-  (* The [un_rxhi] half is spelled as its [ghost_var] rather than as
+  (* The [un_rxhi] half is spelled as its [ghost_var_frac] rather than as
      [WpUart.uart_rx_hi], because this file sits below [WpUart]; the two
      are one proposition ([cons_hi]'s note). *)
   (* THE TWO NEW HALVES COME IN RAW (lane CONS-IO, milestone B, §2h): the
      UART mint made them ([WpUart.uart_ghosts_alloc] at [Uart0]) and this
-     file sits below [WpUart], so they are spelled as their [ghost_var]s,
+     file sits below [WpUart], so they are spelled as their [ghost_var_frac]s,
      exactly as the high-water half above is.  The consumed sequence goes
      into the READER TOKEN (ruling F1) and the log's mirror into the ring;
      BootShared hands both over where it already hands the mark, and no
      other boot file changes. *)
   (* [k] is the era the ring is founded in, recorded in the names *)
   Lemma cons_ghosts_alloc (γu : uart_names) (k : nat) :
-    ghost_var (un_rxhi γu) (1/2) (None : option (list mobs)) -∗
-    ghost_var (un_deliv γu) (1/2) (@nil (list mobs * bv 8)) -∗
-    ghost_var (un_logm γu) (1/2) (@nil LogEntryDefs.log_entry) -∗
-    ghost_var (un_dlcnt γu) (1/2) 0%nat ==∗
+    ghost_var_frac (un_rxhi γu) (1/2) (None : option (list mobs)) -∗
+    ghost_var_frac (un_deliv γu) (1/2) (@nil (list mobs * bv 8)) -∗
+    ghost_var_frac (un_logm γu) (1/2) (@nil LogEntryDefs.log_entry) -∗
+    ghost_var_frac (un_dlcnt γu) (1/2) 0%nat ==∗
       ∃ cn : cons_names, ⌜cn_uart cn = γu⌝ ∗ ⌜cn_era cn = k⌝ ∗
         cons_ghosts_boot cn.
   Proof using .

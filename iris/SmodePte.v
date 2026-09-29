@@ -239,7 +239,7 @@ Proof.
     + apply Z.eqb_eq in Hjm. subst j.
       rewrite nth_lookup.
       replace (Z.to_nat (63 - m)) with k by reflexivity.
-      rewrite (list_lookup_insert xs k t Hk). reflexivity.
+      rewrite (list_lookup_insert_eq xs k t Hk). reflexivity.
     + apply Z.eqb_neq in Hjm.
       rewrite nth_lookup.
       rewrite list_lookup_insert_ne.

@@ -67,8 +67,8 @@ Proof using.
     apply (open_seg_prefix_boots y.1 h).
     - exact (hist_chain_prefix E j (pred n) y (h, b) Hch
                ltac:(apply lookup_lt_Some in Hy; lia) Hy Hlast).
-    - rewrite (Hb y (elem_of_list_lookup_2 _ _ _ Hy)).
-      symmetry. exact (Hb (h, b) (elem_of_list_lookup_2 _ _ _ Hlast)).
+    - rewrite (Hb y (list_elem_of_lookup_2 _ _ _ Hy)).
+      symmetry. exact (Hb (h, b) (list_elem_of_lookup_2 _ _ _ Hlast)).
     - exact Hsh. }
   pose proof (E_length_le_hist (seg_of E) (open_seg h) Hidx Hpre) as Hle.
   pose proof (E_bytes_of_hist (seg_of E) (open_seg h) Hidx Hpre Hle) as Hby.

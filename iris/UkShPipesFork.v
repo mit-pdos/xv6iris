@@ -44,7 +44,7 @@ Proof using.
     rewrite big_sepL_cons decide_True //. iFrame "Hx".
     iApply (big_sepL_impl with "Hl"). iIntros "!>" (i z Hz) "H".
     rewrite decide_False; [done |]. intros ->. apply Hx.
-    by eapply elem_of_list_lookup_2.
+    by eapply list_elem_of_lookup_2.
 Qed.
 
 (* ===================================================================== *)

@@ -310,7 +310,7 @@ Lemma gpr_matches_ins (ρ : nat -> mword 64) (vr : gmap regidx sval)
   gpr_matches ρ (<[r := sv]> vr) m.
 Proof.
   intros He Hm r' sv' H. destruct (decide (r' = r)) as [->|Hne].
-  - rewrite lookup_insert in H. injection H as <-. exact He.
+  - rewrite lookup_insert_eq in H. injection H as <-. exact He.
   - rewrite lookup_insert_ne in H;
       [exact (Hm _ _ H)|intro Heq; apply Hne; symmetry; exact Heq].
 Qed.
@@ -323,7 +323,7 @@ Lemma gpr_matches_insert (ρ : nat -> mword 64) (vr : gmap regidx sval)
   gpr_matches ρ (<[r := sv]> vr) (<[r := w]> m).
 Proof.
   intros -> Hm r' sv' H. destruct (decide (r' = r)) as [->|Hne].
-  - rewrite lookup_insert in H. injection H as <-. apply upd_eq.
+  - rewrite lookup_insert_eq in H. injection H as <-. apply upd_eq.
   - rewrite lookup_insert_ne in H;
       [|intro Heq; apply Hne; symmetry; exact Heq].
     rewrite upd_ne;
@@ -883,7 +883,7 @@ Section VcGenSIris.
     agree_off vr mf m0 -> agree_off (<[r := sv]> vr) (<[r := w]> mf) m0.
   Proof using .
     intros H r' Hr'. destruct (decide (r' = r)) as [->|Hne].
-    - rewrite lookup_insert in Hr'. discriminate.
+    - rewrite lookup_insert_eq in Hr'. discriminate.
     - rewrite lookup_insert_ne in Hr'; [|congruence].
       rewrite upd_ne; [|congruence]. exact (H _ Hr').
   Qed.

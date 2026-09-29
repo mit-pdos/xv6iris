@@ -179,7 +179,7 @@ Proof.
                 = (mword_of_int (z / 1024) : mword 32)).
   { unfold shift_bits_right.
     apply bv_eq.
-    unfold shiftr, SailStdpp.Values.with_word, get_word,
+    unfold shiftr,
       MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (H10 : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -226,7 +226,7 @@ Proof.
              = shiftr v 32).
   { intro v. unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hl Hr. apply bv_eq.
-  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned bv_shiftl_unsigned.

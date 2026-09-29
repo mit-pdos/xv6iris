@@ -405,8 +405,8 @@ Definition filts_okb (fs : list filt) : bool := forallb (fun F => bool_decide (f
 Lemma filts_okb_true (fs : list filt) : filts_okb fs = true <-> Forall filt_ok fs.
 Proof using.
   unfold filts_okb. rewrite forallb_forall, Forall_forall. split.
-  - intros H F HF. apply (bool_decide_eq_true_1 _ (H F (proj1 (elem_of_list_In _ _) HF))).
-  - intros H F HF. apply bool_decide_eq_true_2. apply H. exact (proj2 (elem_of_list_In _ _) HF).
+  - intros H F HF. apply (bool_decide_eq_true_1 _ (H F (proj1 (list_elem_of_In _ _) HF))).
+  - intros H F HF. apply bool_decide_eq_true_2. apply H. exact (proj2 (list_elem_of_In _ _) HF).
 Qed.
 
 Definition adm_u_g (l : pline') : bool :=

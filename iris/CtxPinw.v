@@ -38,9 +38,7 @@ Local Lemma cpw_add_vec_unsigned (a b : SailStdpp.Values.mword 64) :
   bv_unsigned (add_vec a b)
   = bv_wrap 64 (bv_unsigned a + bv_unsigned b).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, SailStdpp.Values.to_word,
-    SailStdpp.Values.get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 

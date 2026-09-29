@@ -216,7 +216,7 @@ Qed.
 Lemma w_filts_bar (fs : list filt) : fs <> [] -> FileDisc.fd_w_bar ∈ FileDisc.w_filts fs.
 Proof using.
   destruct fs as [| F fs]; [by intros H; destruct (H eq_refl) |]. intros _.
-  rewrite FileDisc.w_filts_cons. apply elem_of_app. left. apply elem_of_list_here.
+  rewrite FileDisc.w_filts_cons. apply elem_of_app. left. apply list_elem_of_here.
 Qed.
 
 (* the producers' words determine them *)
@@ -255,7 +255,7 @@ Proof using.
        exact (Hnb (proj1 (Forall_forall _ _) (FileDisc.secc_ok_wf ws' Hok) _ Hin)). }
   5: { (* LSync: its one word is [sync] *)
        exfalso. rewrite (FileDisc.uline_ws_body _ Hok) in Hin. cbn [FileDisc.uline_ws] in Hin.
-       apply elem_of_list_singleton in Hin. revert Hin. by vm_compute. }
+       apply list_elem_of_singleton in Hin. revert Hin. by vm_compute. }
   - (* LEcho: its words are alphanumeric, and the bar is not *)
     exfalso. cbn [FileDisc.line_body] in Hin.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hin.
@@ -269,7 +269,7 @@ Proof using.
     + apply elem_of_cons in Hin as [Hin | Hin].
       * apply (f_equal (fun w : list (bv 8) => bv_unsigned (w !!! 0%nat))) in Hin.
         vm_compute in Hin. discriminate Hin.
-      * apply elem_of_list_singleton in Hin.
+      * apply list_elem_of_singleton in Hin.
         exact (fn_word_ne_bar N' (FileDisc.uname_lex N' Hu') (eq_sym Hin)).
   - (* LCat: [cat] and [N] *)
     exfalso. cbn [FileDisc.line_body] in Hin.
@@ -277,7 +277,7 @@ Proof using.
     apply elem_of_cons in Hin as [Hin | Hin].
     + apply (f_equal (fun w : list (bv 8) => bv_unsigned (w !!! 0%nat))) in Hin.
         vm_compute in Hin. discriminate Hin.
-    + apply elem_of_list_singleton in Hin.
+    + apply list_elem_of_singleton in Hin.
       exact (fn_word_ne_bar N' (FileDisc.uname_lex N' Hok) (eq_sym Hin)).
   - (* LPipe: the words determine the producer and the stages *)
     destruct Hok as (Hok' & Hn' & HF' & _).

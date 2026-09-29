@@ -97,7 +97,7 @@ Local Ltac s_prep :=
          _get_Sstatus_XS, _get_Sstatus_SPP, _get_Sstatus_SPIE;
   unfold subrange_vec_dec;
   rewrite !autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite !MachineWord.MachineWord.cast_idx_refl;
   unfold MachineWord.MachineWord.slice.
 
@@ -105,7 +105,7 @@ Local Lemma and_vec_testbit (a b : mword 64) (p : Z) :
   Z.testbit (bv_unsigned (and_vec a b)) p
   = andb (Z.testbit (bv_unsigned a) p) (Z.testbit (bv_unsigned b) p).
 Proof.
-  unfold and_vec, word_binop, with_word', with_word, to_word, get_word.
+  unfold and_vec, word_binop.
   unfold MachineWord.MachineWord.and.
   rewrite bv_and_unsigned. apply Z.land_spec.
 Qed.
@@ -114,7 +114,7 @@ Local Lemma or_vec_testbit (a b : mword 64) (p : Z) :
   Z.testbit (bv_unsigned (or_vec a b)) p
   = orb (Z.testbit (bv_unsigned a) p) (Z.testbit (bv_unsigned b) p).
 Proof.
-  unfold or_vec, word_binop, with_word', with_word, to_word, get_word.
+  unfold or_vec, word_binop.
   unfold MachineWord.MachineWord.or.
   rewrite bv_or_unsigned. apply Z.lor_spec.
 Qed.

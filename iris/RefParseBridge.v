@@ -425,10 +425,10 @@ Lemma ref_at_notin_bar (len : nat) (f : nat -> bv 8) (p s : nat) (toks : list (b
 Proof using.
   intros Hone Hs Hsym Hbar Hin. destruct (ushq_one_some_at _ _ _ Hone) as [ Hp _ ].
   rewrite (ref_at_lt len f s ltac:(lia)) in Hin.
-  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
+  apply list_elem_of_lookup_1 in Hin as [ k Hk ].
   pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb.
   rewrite (ushq_one_le_sym len f p s Hone Hs Hb) in Hk.
-  exact (Hbar (elem_of_list_lookup_2 _ _ _ Hk)).
+  exact (Hbar (list_elem_of_lookup_2 _ _ _ Hk)).
 Qed.
 
 (* on the pipe line the loop DOES stop at the '|', which is in the stop set
@@ -621,7 +621,7 @@ Proof using.
   intros (Hok & Hlen & Hbytes) j Hj. cbn beta. rewrite (Hbytes j Hj).
   assert (Hjl : j < length (wl_line ws)) by lia.
   pose proof (wl_line_byte_val ws (wl_line ws !!! j) (EchoDisc.line_ok_wf ws Hok)
-                (elem_of_list_lookup_2 _ _ _ (list_lookup_lookup_total_lt (wl_line ws) j Hjl))) as Hv.
+                (list_elem_of_lookup_2 _ _ _ (list_lookup_lookup_total_lt (wl_line ws) j Hjl))) as Hv.
   intro E. apply (f_equal bv_unsigned) in E. rewrite ubyte0_val in E. lia.
 Qed.
 
@@ -835,12 +835,12 @@ Lemma ref_at_notin_bar_loc (len : nat) (f : nat -> bv 8) (c p s : nat) (toks : l
 Proof using.
   intros (Hp & Hfp & Hns) Hcs Hsp Hsym Hbar Hin.
   rewrite (ref_at_lt len f s ltac:(lia)) in Hin.
-  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
+  apply list_elem_of_lookup_1 in Hin as [ k Hk ].
   pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb. cbn beta in Hb.
   destruct (lt_dec s p) as [ Hlt | Hge ].
   - rewrite (Hns s (conj Hcs Hlt)) in Hb. discriminate Hb.
   - assert (E : s = p) by lia. subst s. rewrite Hfp in Hk.
-    exact (Hbar (elem_of_list_lookup_2 _ _ _ Hk)).
+    exact (Hbar (list_elem_of_lookup_2 _ _ _ Hk)).
 Qed.
 
 (* the argument loop at a local bar: [ref_args_of_toks_at] with the

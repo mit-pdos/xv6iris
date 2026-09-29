@@ -1,7 +1,7 @@
 (* ===================================================================== *)
 (* UserConsole.v -- THE PROGRAM SIDE OF THE CONSOLE READER'S CURSOR.      *)
 (*                                                                        *)
-(* The console ring's consumption cursor is a [ghost_var] in two halves:   *)
+(* The console ring's consumption cursor is a [ghost_var_frac] in two halves:   *)
 (* the ring keeps one ([ConsoleInv.cons_cursor], inside [cons_res]) and    *)
 (* the other IS THE READER TOKEN ([ConsoleInv.cons_reader]) -- the         *)
 (* exclusive right to consume the console's input.  A verified reader has  *)
@@ -17,7 +17,7 @@
 (*   last -- which needs the cursor's VALUE as a resource the program      *)
 (*   holds in its hand, not one buried in a payload.                       *)
 (*                                                                        *)
-(* THE POSITION PAIR IS WHAT RESOLVES THAT.  A SECOND ghost_var pair       *)
+(* THE POSITION PAIR IS WHAT RESOLVES THAT.  A SECOND ghost_var_frac pair       *)
 (* [upos]/[upos_a], minted fresh per child at the token's current          *)
 (* position: the PROGRAM's half [upos] travels beside the run (through     *)
 (* the fork's child arm and across the exec in                             *)
@@ -140,13 +140,13 @@ Section UserConsole.
   (* the PROGRAM's half: a separable resource sh carries round [gets],
      frames across unrelated calls, and hands to the read that moves it *)
   Definition upos (γ : gname) (n : nat) : iProp Σ :=
-    mono_nat_auth_own γ (1/2) n.
+    mono_nat_auth_own_frac γ (1/2) n.
 
   (* ...and the half that RIDES IN THE PAYLOAD, beside the token.  It is
      what makes the payload's existential position the program's own: the
      program agrees the two and neither can move without the other. *)
   Definition upos_a (γ : gname) (n : nat) : iProp Σ :=
-    mono_nat_auth_own γ (1/2) n.
+    mono_nat_auth_own_frac γ (1/2) n.
 
   (* THE POSITION ONLY GROWS (seccomp design 10.12, lane S5b): a persistent
      lower bound on it.  What lets the seccomp transition read record the
@@ -165,7 +165,7 @@ Section UserConsole.
 
   Lemma upos_lb_le (γ : gname) (n m : nat) : upos γ n -∗ upos_lb γ m -∗ ⌜(m <= n)%nat⌝.
   Proof using .
-    iIntros "H Hl". by iDestruct (mono_nat_lb_own_valid with "H Hl") as %[_ ?].
+    iIntros "H Hl". by iDestruct (mono_nat_auth_lb_own_valid with "H Hl") as %[_ ?].
   Qed.
 
   Global Instance upos_timeless γ n : Timeless (upos γ n).
@@ -200,7 +200,7 @@ Section UserConsole.
     upos γ n -∗ upos_a γ n ==∗ upos γ n' ∗ upos_a γ n'.
   Proof using .
     intros Hle. iIntros "H1 H2". rewrite /upos /upos_a.
-    iAssert (mono_nat_auth_own γ 1 n) with "[H1 H2]" as "H".
+    iAssert (mono_nat_auth_own_frac γ 1 n) with "[H1 H2]" as "H".
     { iEval (rewrite -Qp.half_half). iSplitL "H1"; [iExact "H1" | iExact "H2"]. }
     iMod (mono_nat_own_update n' Hle with "H") as "[H _]".
     iEval (rewrite -Qp.half_half) in "H". iDestruct "H" as "[$ $]". done.
@@ -236,10 +236,10 @@ Section UserConsole.
      TOKENLESS read leaves: it pops without linking, and the marker it sets
      retires the correspondence for good. *)
   Definition ucons_rdtok (cn : cons_names) (n : nat) : iProp Σ :=
-    ghost_var cn.(cn_rd) (1/2) n.
+    ghost_var_frac cn.(cn_rd) (1/2) n.
   Definition ucons_deliv (cn : cons_names)
       (dv : list (list mobs * bv 8)) : iProp Σ :=
-    ghost_var (un_deliv cn.(cn_uart)) (1/2) dv.
+    ghost_var_frac (un_deliv cn.(cn_uart)) (1/2) dv.
   Definition ucons_dirty_lb (cn : cons_names) : iProp Σ :=
     mono_nat_lb_own cn.(cn_dirty) 1%nat.
 

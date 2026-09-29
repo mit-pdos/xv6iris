@@ -1161,8 +1161,7 @@ Section ProofPrintk.
   Proof using .
     intro H. apply eq_vec_true_iff in H.
     apply (f_equal bv_unsigned) in H.
-    unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
-      SailStdpp.Values.to_word, to_word, get_word, MachineWord.MachineWord.zero_extend in H.
+    unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec, MachineWord.MachineWord.zero_extend in H.
     rewrite bv_zero_extend_unsigned in H; [ | vm_compute; intro Hc; discriminate Hc ].
     change (bv_unsigned (zero_reg : mword 64)) with 0 in H.
     apply bv_eq. rewrite H. vm_compute. reflexivity.
@@ -2207,9 +2206,9 @@ Section ProofPrintk.
     iEval (rewrite Hpe4) in "Hpc".
     (* +0xe4 c.lw a0,0(a5) : the argument -- a 4-byte read of an 8-byte slot *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
-    iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt) with "Hslot") as %Halv.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := kt) with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget D4 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HD4a5.
@@ -2223,7 +2222,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_d8 with "Htext"). }
     iIntros (CID6 Hst6) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 (KTR := kt) _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (D5 := <[Regidx a0_idx := regval_into_reg (sign_extend' 64 (pk_lo m k))]> D4).
@@ -3318,9 +3317,9 @@ Section ProofPrintk.
     iEval (rewrite Hpa122) in "Hpc".
     (* the argument: the LOW half of the slot, read unsigned *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
-    iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt) with "Hslot") as %Halv.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := kt) with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3334,7 +3333,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_116 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 (KTR := kt) _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (S2 := <[Regidx a0_idx := regval_into_reg (zero_extend' 64 (pk_lo m k))]> S1).
@@ -3456,9 +3455,9 @@ Section ProofPrintk.
     iEval (rewrite Hpa174) in "Hpc".
     (* the argument: the LOW half of the slot, read unsigned *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
-    iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt) with "Hslot") as %Halv.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := kt) with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget S1 a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite HS1a5.
@@ -3472,7 +3471,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_168 with "Htext"). }
     iIntros (CID3 Hst3) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 (KTR := kt) _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (S2 := <[Regidx a0_idx := regval_into_reg (zero_extend' 64 (pk_lo m k))]> S1).
@@ -3578,9 +3577,9 @@ Section ProofPrintk.
     iEval (rewrite Hp206) in "Hpc".
     (* the argument: the low half of the slot *)
     iDestruct (pk_va_acc sp0 m k Hk with "Hva") as "[Hslot Hvacl]".
-    iDestruct (ctx_word_pointsto_aligned_p with "Hslot") as %Halv.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt) with "Hslot") as %Halv.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hslot") as "[Hlo Hhi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := kt) with "Hslot") as "[Hlo Hhi]".
     iEval (rewrite -/(pk_lo m k)) in "Hlo".
     assert (Hlwa : add_vec (rget V a5_idx) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_stk sp0 (7 - k)).
     { rgne. rewrite Hva5.
@@ -3594,7 +3593,7 @@ Section ProofPrintk.
               with "Hcg Hpc [] Hlo").
     { iApply (pki_1fa with "Htext"). }
     iIntros (CID1 Hst1) "Hcg Hpc Hlo". iEval (rewrite Hlwa) in "Hlo".
-    iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
+    iDestruct (ctx_word_pointsto_join4 (KTR := kt) _ _ _ _ _ Halv with "Hlo Hhi") as "Hslot".
     rewrite word_of_words_id.
     iDestruct ("Hvacl" with "Hslot") as "Hva".
     set (C1 := <[Regidx a0_idx := regval_into_reg (sign_extend' 64 (pk_lo m k))]> V).
@@ -4966,8 +4965,7 @@ Section ProofPrintk.
   Proof using .
     destruct (pk_N_bound c) as [Hnn Hb].
     apply bv_eq. rewrite /pk_byte.
-    unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
-      SailStdpp.Values.to_word, to_word, get_word, MachineWord.MachineWord.zero_extend.
+    unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec, MachineWord.MachineWord.zero_extend.
     rewrite bv_zero_extend_unsigned; [ | vm_compute; intro Hc; discriminate Hc ].
     rewrite Z_to_bv_unsigned moi64_mod.
     unfold bv_wrap. change (bv_modulus 8) with 256.

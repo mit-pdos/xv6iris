@@ -169,11 +169,11 @@ Qed.
 
 Local Ltac st_bit_open :=
   cbv [st_va5_40 or_vec and_vec Operators_mwords.word_binop
-       Operators_mwords.with_word' SailStdpp.Values.with_word];
+       ];
   unfold MachineWord.MachineWord.and, MachineWord.MachineWord.or;
   unfold subrange_vec_dec; rewrite !autocast_id;
-  unfold to_word_idx, to_word; rewrite !MachineWord.MachineWord.cast_idx_refl;
-  unfold get_word, MachineWord.MachineWord.slice;
+  unfold to_word_idx; rewrite !MachineWord.MachineWord.cast_idx_refl;
+  unfold MachineWord.MachineWord.slice;
   apply bv_eq; rewrite !bv_extract_unsigned;
   rewrite bv_or_unsigned bv_and_unsigned;
   replace (bv_unsigned st_mask_and) with 0xffffffffffffe7ff
@@ -435,7 +435,7 @@ Local Ltac st_guu :=
          _update_MEnvcfg_PBMTE;
   unfold subrange_vec_dec, update_subrange_vec_dec;
   rewrite !autocast_refl;
-  unfold to_word_idx, to_word, get_word;
+  unfold to_word_idx;
   rewrite !MachineWord.MachineWord.cast_idx_refl.
 
 Local Ltac st_gu_disj :=
@@ -484,11 +484,11 @@ Lemma st_LPE_or_bit63 (x : mword 64) :
 Proof.
   unfold _get_MEnvcfg_LPE, ti_menv1.
   cbv [or_vec Operators_mwords.word_binop
-       Operators_mwords.with_word' SailStdpp.Values.with_word].
+       ].
   unfold MachineWord.MachineWord.or.
   unfold subrange_vec_dec. rewrite !autocast_id.
-  unfold to_word_idx, to_word. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   apply bv_eq. rewrite !bv_extract_unsigned. rewrite bv_or_unsigned.
   replace (bv_unsigned ti_bit63) with 0x8000000000000000 by (vm_compute; reflexivity).
   unfold bv_wrap, bv_modulus.
@@ -524,11 +524,11 @@ Lemma st_LPE_or_adue (x : mword 64) :
 Proof.
   unfold _get_MEnvcfg_LPE.
   cbv [or_vec Operators_mwords.word_binop
-       Operators_mwords.with_word' SailStdpp.Values.with_word].
+       ].
   unfold MachineWord.MachineWord.or.
   unfold subrange_vec_dec. rewrite !autocast_id.
-  unfold to_word_idx, to_word. rewrite !MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   apply bv_eq. rewrite !bv_extract_unsigned. rewrite bv_or_unsigned.
   replace (bv_unsigned st_adue_bit) with 0x2000000000000000 by (vm_compute; reflexivity).
   unfold bv_wrap, bv_modulus.
@@ -617,7 +617,7 @@ Proof.
     + apply Z.eqb_eq in Hjm. subst j.
       rewrite nth_lookup.
       replace (Z.to_nat (63 - m)) with k by reflexivity.
-      rewrite (list_lookup_insert xs k t Hk). reflexivity.
+      rewrite (list_lookup_insert_eq xs k t Hk). reflexivity.
     + apply Z.eqb_neq in Hjm.
       rewrite nth_lookup.
       rewrite list_lookup_insert_ne.

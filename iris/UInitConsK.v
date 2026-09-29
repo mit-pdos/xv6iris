@@ -683,9 +683,9 @@ Section UInitConsK.
                      = <[fd := init_cons_fd]> (uvis_fd W))
         by exact (eq_trans (eq_sym Hfdv1) Hfdv0).
       assert (Hst : FdOpen rd wr t = init_cons_fd).
-      { pose proof (list_lookup_insert (uvis_fd W) fd (FdOpen rd wr t) Hfdlt)
+      { pose proof (list_lookup_insert_eq (uvis_fd W) fd (FdOpen rd wr t) Hfdlt)
           as Hl1.
-        pose proof (list_lookup_insert (uvis_fd W) fd init_cons_fd Hfdlt)
+        pose proof (list_lookup_insert_eq (uvis_fd W) fd init_cons_fd Hfdlt)
           as Hl2.
         rewrite Hins in Hl1. rewrite Hl2 in Hl1.
         injection Hl1 as Hrd Hwr Ht.

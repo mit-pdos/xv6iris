@@ -57,7 +57,7 @@ Lemma lm_disc_input_U_no_cr (I : list (bv 8)) (j : nat) :
 Proof using.
   intros Hd Hj.
   assert (Hin : I !!! j ∈ I).
-  { apply elem_of_list_lookup_2 with j. apply list_lookup_lookup_total_lt. exact Hj. }
+  { apply list_elem_of_lookup_2 with j. apply list_lookup_lookup_total_lt. exact Hj. }
   pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_on) I (I !!! j) Hd Hin) as Hv.
   rewrite /cons_xlate. rewrite decide_False; [reflexivity |].
   intro Hq. apply (f_equal bv_unsigned) in Hq.
@@ -113,7 +113,7 @@ Section union_read_inst.
     cons_window sl (length I) dd g0 hs ->
     sl `prefix_of` sl' ->
     (forall j : nat, (j < dc)%nat -> ws !! j = sl' !! (length I + j)%nat) ->
-    list_basics.last ws = Some y ->
+    list_basics.list.last ws = Some y ->
     ([∗ list] hh ∈ hs, riscv_rx_tag hh) -∗
     ucons_swallow cn False sl dd dc -∗
     ucons_stored_lb cn sl' -∗
@@ -245,7 +245,7 @@ Section union_read_inst.
     { destruct (decide (dc = 0%nat)) as [Hdc0 | Hdc0].
       { assert (HJnil : J = []) by (apply nil_length_inv; lia).
         rewrite HJnil app_nil_r. iLeft. iExact "Hw0". }
-      destruct (list_basics.last ws) as [y |] eqn:Hlast; last first.
+      destruct (list_basics.list.last ws) as [y |] eqn:Hlast; last first.
       { exfalso. apply last_None in Hlast. subst ws. cbn in Hlws. lia. }
       iDestruct (uri_last_tag fsc_cons I ws sl sl' hs dd dc g0 y
                    Hddc Hlws Hwinf Hpre2 Hwsj Hlast

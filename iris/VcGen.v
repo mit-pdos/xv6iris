@@ -284,8 +284,8 @@ Lemma trunc32_unsigned (w : mword 64) :
 Proof.
   rewrite trunc32_subrange.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   change (MachineWord.MachineWord.Z_idx (31 - 0 + 1)) with 32%N.
@@ -304,7 +304,7 @@ Lemma trunc32_sext (w : mword 32) : trunc32 (sign_extend' 64 w) = w.
 Proof.
   apply bv_eq. rewrite trunc32_unsigned.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   rewrite bv_wrap_bv_wrap; [|lia].
@@ -316,8 +316,7 @@ Qed.
 Lemma trunc32_add (a b : mword 64) :
   trunc32 (add_vec a b) = add_vec (trunc32 a) (trunc32 b).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   apply bv_eq.
   rewrite trunc32_unsigned.
   rewrite bv_add_unsigned.
@@ -346,8 +345,7 @@ Proof.
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite HK.
   apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned.
   rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
   rewrite (moi32_small 1 ltac:(lia)).
@@ -381,7 +379,7 @@ Qed.
 Lemma mword_of_int_uint32 (w : mword 32) : mword_of_int (uint w) = w.
 Proof.
   unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   pose proof (bv_unsigned_in_range _ w) as Hr.
   rewrite Z2N.id; [|lia].
   change (MachineWord.MachineWord.Z_idx 32) with 32%N.
@@ -392,8 +390,7 @@ Lemma avi_assoc32 (a : mword 32) (x y : Z) :
   add_vec (add_vec a (mword_of_int x)) (mword_of_int y)
   = add_vec a (mword_of_int (x + y)).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, mword_of_int,
+  unfold add_vec, Operators_mwords.word_binop, mword_of_int,
          MachineWord.MachineWord.add, MachineWord.MachineWord.Z_to_word.
   apply bv_eq. rewrite !bv_add_unsigned !Z_to_bv_unsigned.
   change (MachineWord.MachineWord.Z_idx 32) with 32%N.
@@ -530,7 +527,7 @@ Proof.
   apply functional_extensionality; intro r'.
   unfold vregs_den, insert, regfile_insert, rf_upd.
   destruct (bool_decide (r' = r)) eqn:Hb.
-  - apply bool_decide_eq_true in Hb as ->. rewrite lookup_total_insert. reflexivity.
+  - apply bool_decide_eq_true in Hb as ->. rewrite lookup_total_insert_eq. reflexivity.
   - apply bool_decide_eq_false in Hb.
     rewrite lookup_total_insert_ne; [reflexivity | congruence].
 Qed.
@@ -578,7 +575,7 @@ Definition vregs_init : gmap regidx sval :=
 Lemma mword5_of_uint (i : mword 5) : mword_of_int (uint i) = i.
 Proof.
   unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   pose proof (bv_unsigned_in_range _ i) as Hr.
   rewrite Z2N.id; [|lia].
   change (MachineWord.MachineWord.Z_idx 5) with 5%N.

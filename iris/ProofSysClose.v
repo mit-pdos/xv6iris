@@ -249,7 +249,7 @@ Section ProofSysClose.
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       by (rewrite Hwv; exact HT3sp).
     (* rebundle the four slots *)
-    iDestruct (stack_own_4_intro sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.sys_close + 0x40))
               (mword_of_int 2 : mword 6) T3 (av - 4)%nat 4 b Hpop
@@ -369,7 +369,7 @@ Section ProofSysClose.
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
     (* the four frame slots *)
-    iDestruct (stack_own_4_elim with "Hframe") as (v1 v2 w3 w4) "(Hs1 & Hs2 & Hs3 & Hs4)".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hframe") as (v1 v2 w3 w4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     (* ---- +0x02: c.sdsp ra,24(sp) ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
@@ -525,9 +525,9 @@ Section ProofSysClose.
     assert (Hnzfd : M6 !!! Regidx (mword_of_int 11 : mword 5) <> (zero_reg : mword 64)).
     { rewrite HM6a1 sc_addr_fd_base. apply stack_off_nonzero; [exact Hspb | lia]. }
     (* carve the [int fd] cell out of the upper half of frame slot 3 *)
-    iDestruct (ctx_word_pointsto_aligned_p with "Hs3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := KT1) with "Hs3") as %Hal3.
     (* A6.58: [↦₄]/[↦₂] ARE the context towers; the halving stays in tier. *)
-    iDestruct (ctx_word_pointsto_split4 with "Hs3") as "[Hs3lo Hs3hi]".
+    iDestruct (ctx_word_pointsto_split4 (KTR := KT1) with "Hs3") as "[Hs3lo Hs3hi]".
     iEval (rewrite -HM6a1) in "Hs3hi".
     iEval (rewrite -HM6a2) in "Hs4".
     (* ---- argfd(0, &fd, &f) ---- *)
@@ -615,7 +615,7 @@ Section ProofSysClose.
       (* nothing was written: rejoin the two halves of frame slot 3 *)
       iEval (rewrite HM6a1) in "Hfdcell".
       iEval (rewrite HM6a2) in "Hfcell".
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
@@ -929,7 +929,7 @@ Section ProofSysClose.
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }
       (* rejoin frame slot 3 *)
-      iDestruct (ctx_word_pointsto_join4 _ _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
       (* the epilogue's register facts *)
       assert (HR8a5 : R8 !!! Regidx (mword_of_int 15 : mword 5) = (zero_reg : mword 64))
         by (rewrite /R8 upd_eq; reflexivity).

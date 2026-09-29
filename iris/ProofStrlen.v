@@ -225,7 +225,7 @@ Section ProofStrlen.
                    = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv; exact HT2sp).
-    iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.strlen + 0x24))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
@@ -431,7 +431,7 @@ Section ProofStrlen.
     - (* ---- rem = 0: [S t = k], so the byte read IS the terminator ---- *)
       assert (Htk : (S t = k)%nat) by lia.
       assert (Hlt : (S t < n)%nat) by lia.
-      iDestruct (bb_byte_acc s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
+      iDestruct (bb_byte_acc (KTR := kts) s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
       iApply (sl_probe M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte").
       iIntros (CIDp Hspp Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
@@ -492,7 +492,7 @@ Section ProofStrlen.
         rewrite (Hpthr r N3 N4 N5). apply Hthr; assumption.
     - (* ---- rem = S rem: [S t < k], so the byte is not the terminator ---- *)
       assert (Hlt : (S t < n)%nat) by lia.
-      iDestruct (bb_byte_acc s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
+      iDestruct (bb_byte_acc (KTR := kts) s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
       iApply (sl_probe M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte").
       iIntros (CIDp Hspp Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
@@ -560,7 +560,7 @@ Section ProofStrlen.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.strlen + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (u1 u2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (u1 u2) "[Hb1 Hb2]".
     (* the two slot addresses in the [c.sdsp] / [c.ldsp] displacement spelling *)
     assert (Hpa1 : add_vec (R1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
@@ -627,7 +627,7 @@ Section ProofStrlen.
     { rewrite /R2 upd_ne; [| reg_neq]. rewrite /R1 upd_ne; [reflexivity | reg_neq]. }
     assert (HR2a0' : rget R2 Ra0 = s) by (rgne; exact HR2a0).
     assert (H0n : (0 < n)%nat) by lia.
-    iDestruct (bb_byte_acc s n 0%nat f dq H0n with "Hbuf") as "[Hbyte Hback]".
+    iDestruct (bb_byte_acc (KTR := kts) s n 0%nat f dq H0n with "Hbuf") as "[Hbyte Hback]".
     iApply (wp_lbu_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.strlen + 0x08)) Ra5 Ra0
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat (f 0%nat : mword 8) b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)

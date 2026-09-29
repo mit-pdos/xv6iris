@@ -58,7 +58,7 @@ Lemma sub128_63 (x : mword (2*64)) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0. rewrite Z.shiftr_0_r.
@@ -71,7 +71,7 @@ Lemma sub128_127 (x : mword (0+2*64-1+1)) :
 Proof.
   unfold subrange_vec_dec. rewrite autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0. rewrite Z.shiftr_0_r.
@@ -134,7 +134,7 @@ Lemma srai4 (z : Z) : (0 <= z < 9223372036854775808)%Z ->
   = mword_of_int (z / 16).
 Proof.
   intro Hz. apply bv_eq.
-  unfold shift_bits_right_arith, arith_shiftr, with_word, get_word, MachineWord.MachineWord.arith_shift_right.
+  unfold shift_bits_right_arith, arith_shiftr, MachineWord.MachineWord.arith_shift_right.
   rewrite bv_ashiftr_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
                   (MachineWord.MachineWord.Z_idx (int_of_mword false (subrange_vec_dec (mword_of_int 4 : mword 6) 5 0))))) with 4
@@ -154,7 +154,7 @@ Lemma slli13 (z : Z) : (0 <= z)%Z -> (z * 8192 < 18446744073709551616)%Z ->
   = mword_of_int (z * 8192).
 Proof.
   intros Hz0 Hz. apply bv_eq.
-  unfold shift_bits_left, shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
+  unfold shift_bits_left, shiftl, MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
                   (MachineWord.MachineWord.Z_idx (int_of_mword false (subrange_vec_dec (mword_of_int 13 : mword 6) 5 0))))) with 13
@@ -199,8 +199,7 @@ Proof.
   rewrite (moi64_small v ltac:(lia)).
   set (w := add_vec (mword_of_int (8192 * Z.of_nat i) : mword 32) (mword_of_int 8192 : mword 32)).
   assert (Hw : bv_unsigned w = v).
-  { unfold w, v, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  { unfold w, v, add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
     rewrite bv_add_unsigned.
     assert (Ha : bv_unsigned (mword_of_int (8192 * Z.of_nat i) : mword 32) = 8192 * Z.of_nat i).
     { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
@@ -215,7 +214,7 @@ Proof.
     apply bv_wrap_small. unfold bv_modulus.
     change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 32))%Z with 4294967296%Z. lia. }
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   unfold bv_signed. rewrite Hw.

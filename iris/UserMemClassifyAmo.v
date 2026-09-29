@@ -1078,8 +1078,7 @@ Qed.
 Lemma add_sub_cancel (a b : mword 64) : add_vec a (sub_vec b a) = b.
 Proof.
   apply bv_eq.
-  unfold add_vec, sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word,
+  unfold add_vec, sub_vec, Operators_mwords.word_binop,
     MachineWord.MachineWord.add, MachineWord.MachineWord.sub.
   rewrite bv_add_unsigned. rewrite bv_sub_unsigned.
   rewrite bv_wrap_add_idemp_r.

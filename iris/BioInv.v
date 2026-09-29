@@ -148,7 +148,7 @@ Proof.
   apply gmap_local_update. intros i.
   destruct (decide (i = k)) as [->|Hne]; last first.
   { rewrite lookup_insert_ne // lookup_singleton_ne //. }
-  rewrite lookup_insert lookup_singleton lookup_empty HM.
+  rewrite lookup_insert_eq lookup_singleton_eq lookup_empty HM.
   apply local_update_unital_discrete. intros z _ Hz.
   rewrite left_id in Hz. rewrite -Hz.
   split.
@@ -182,8 +182,8 @@ Proof.
     pose proof (lookup_insert_ne M k i (orem, n) Hki) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-  pose proof (lookup_singleton (M:=gmap nat) k (o, 1%positive)) as Hs.
-  pose proof (lookup_insert M k (orem, n)) as Hm.
+  pose proof (lookup_singleton_eq (M:=gmap nat) k (o, 1%positive)) as Hs.
+  pose proof (lookup_insert_eq M k (orem, n)) as Hm.
   apply local_update_discrete. intros mz Hv Hz.
   rewrite HM in Hz, Hv. rewrite Hs in Hz. rewrite Hm.
   destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -281,7 +281,7 @@ Section BioInv.
      ([ghost_varG Σ nat] has several members in the bundle; the box's is
      kalloc's) -- what the boot mints before the names record exists *)
   Definition bcnt_var (γ : gname) (c : nat) : iProp Σ :=
-    ghost_var (ghost_varG0 := kalloc_count_inG) γ (1/2) c.
+    ghost_var (ghost_varG0 := kalloc_count_inG) γ (DfracOwn (1/2)) c.
 
   (* a COUNTED reference's stamps: one unit at the stamp of the last deposit
      it witnessed, with that stamp's llb (the R1 presentation at every
@@ -564,7 +564,7 @@ Section BioInv.
     assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
     rewrite Hz in Hc. revert Hc.
     cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-         to_word get_word MachineWord.MachineWord.sign_extend].
+         MachineWord.MachineWord.sign_extend].
     rewrite bv_sign_extend_unsigned. rewrite Hs.
     unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
     rewrite E64. rewrite Z.mod_small; [lia|]. lia.
@@ -591,7 +591,7 @@ Section BioInv.
   Lemma bcache_cached_spec (bnos : nat -> mword 32) (b : Z) :
     b ∈ bcache_cached bnos <-> exists j, (j < NBUF)%nat /\ b = uint (bnos j).
   Proof using .
-    rewrite /bcache_cached elem_of_list_to_set elem_of_list_fmap.
+    rewrite /bcache_cached elem_of_list_to_set list_elem_of_fmap.
     split.
     - intros (j & -> & Hj). apply elem_of_seq in Hj. exists j.
       split; [lia | done].
@@ -1382,7 +1382,7 @@ Section BioBox.
      half with its witnesses, bounded by the sleeplock's floor slot. ---- *)
   Definition bslp_raw (γo γp : gname) (ξ : CtxId) : iProp Σ :=
     (lock_tok_excl γo ∗
-     ∃ s : l2_reg bio_id, ghost_var γp (1/2) s ∗ ⌜lr_hold s = None⌝ ∗
+     ∃ s : l2_reg bio_id, ghost_var_frac γp (1/2) s ∗ ⌜lr_hold s = None⌝ ∗
        TsoCtx.ctx_floor ξ (lr_tp s))%I.
   Definition bslp (bn : bio_names) (k : nat) : CtxId -> iProp Σ :=
     bslp_raw (bn_own bn k) (bn_regp bn k).
@@ -1572,7 +1572,7 @@ Section BioBox.
     bstm_auth bn k ∅ -∗
     reg_cnt bn k 0 -∗
     reg_park bn k (L2Reg 0 None) -∗
-    (∃ r0 : slot_reg bio_id bio_x, ghost_var (bn_regd bn k) 1 r0) -∗
+    (∃ r0 : slot_reg bio_id bio_x, ghost_var_frac (bn_regd bn k) 1 r0) -∗
     b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
     b_dev (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (mword_of_int 0 : mword 32) -∗
@@ -1636,23 +1636,23 @@ Section BioBox.
     iMod (seq_fun_alloc E (fun _ γ => own γ (● (∅ : gmapUR (bio_id * nat) ufracR))) NBUF 0 with "Hstm")
       as (fstm) "Hstm2".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
-               ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
-               ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I as "Hgp".
+               ghost_var_frac γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+               ghost_var_frac γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I as "Hgp".
     { iApply big_sepL_intro. iIntros "!>" (i k _).
       iMod (ghost_var_alloc (L2Reg 0 None : l2_reg bio_id)) as (γ) "H".
       iModIntro. iExists γ. iEval (rewrite -{1}Qp.half_half) in "H". iDestruct "H" as "[$ $]". }
-    iMod (seq_fun_alloc E (fun _ γ => ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
-                                      ghost_var γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I
+    iMod (seq_fun_alloc E (fun _ γ => ghost_var_frac γ (1/2) (L2Reg 0 None : l2_reg bio_id) ∗
+                                      ghost_var_frac γ (1/2) (L2Reg 0 None : l2_reg bio_id))%I
             NBUF 0 with "Hgp") as (fregp) "Hregp".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
-               ghost_var γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
+               ghost_var_frac γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
                                 : slot_reg bio_id bio_x))%I as "Hgd".
     { iApply big_sepL_intro. iIntros "!>" (i k _).
       iMod (ghost_var_alloc (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
                                : slot_reg bio_id bio_x)) as (γ) "H".
       iModIntro. iExists γ. iExact "H". }
     iMod (seq_fun_alloc E
-            (fun _ γ => ghost_var γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
+            (fun _ γ => ghost_var_frac γ 1 (SlotReg 0 false (mword_of_int 0 : mword 32, mword_of_int 0 : mword 32) None
                                           : slot_reg bio_id bio_x)) NBUF 0 with "Hgd")
       as (fregd) "Hregd".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ γ : gname,
@@ -1676,7 +1676,7 @@ Section BioBox.
                own_context cur_ctx -∗
                ((sl_fresh (buf_lock (bnode k)) "buffer"%string ∗
                  lock_tok_excl (fown k)) ∗
-                ghost_var (fregp k) (1/2) (L2Reg 0 None : l2_reg bio_id))
+                ghost_var_frac (fregp k) (1/2) (L2Reg 0 None : l2_reg bio_id))
                ={E}=∗ own_context cur_ctx ∗
                (∃ p : gname * gname,
                   is_sleeplock_genl (fst p) (snd p) (buf_lock (bnode k))

@@ -244,7 +244,7 @@ Qed.
 Lemma wh_uint32 (a : SailStdpp.Values.mword 32) : uint a = bv_unsigned a.
 Proof.
   pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
@@ -481,7 +481,7 @@ Section WriteHeadDefs.
         proc_priv_bare (proc_addr j) pidv Upr -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-        ghost_map_auth (fs_cache γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
+        ghost_map_auth_frac (fs_cache γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
         fs_chalf γfs (log_hdr_bno logstart) bs' -∗
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
         ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
@@ -567,7 +567,7 @@ Section WriteHeadBlocks.
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
     (logstart ↪[fs_dirty γfs]{#(1/2)} d0) -∗
     (if d0 then ∃ q : Qp, bref bn k q dev bno else True) -∗
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     fs_chalf γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -1078,7 +1078,7 @@ Section WriteHeadBlocks.
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
     (logstart ↪[fs_dirty γfs]{#(1/2)} d0) -∗
     (if d0 then ∃ q : Qp, bref bn kk q dev bno else True) -∗
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     fs_chalf γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗

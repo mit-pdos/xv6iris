@@ -56,7 +56,7 @@ Proof. solve_inG. Qed.
 Definition disk_img_auth `{!diskImgG Σ} (γi : gname) (dk : Z -> bv 8)
     : iProp Σ :=
   (∃ dmap : gmap Z (bv 8),
-     ghost_map_auth γi 1 dmap ∗ ⌜disk_view dmap dk⌝)%I.
+     ghost_map_auth_frac γi 1 dmap ∗ ⌜disk_view dmap dk⌝)%I.
 
 (* ---------------------------------------------------------------------- *)
 (* THE POINTS-TO, at a bare gname.  [DiskPtsto.disk_byte]/[disk_bytes] are  *)
@@ -120,7 +120,7 @@ Section DiskImgPtsto.
   Lemma disk_img_bytes_read (γi : gname) (dmap : gmap Z (bv 8))
       (dk : Z -> bv 8) (o : Z) (bs : list (bv 8)) :
     disk_view dmap dk ->
-    ghost_map_auth γi 1 dmap -∗ disk_img_bytes γi o bs -∗
+    ghost_map_auth_frac γi 1 dmap -∗ disk_img_bytes γi o bs -∗
     ⌜disk_read dk o (length bs) = bs⌝.
   Proof using .
     iIntros (Hview) "Hauth Hbs".
@@ -153,9 +153,9 @@ Section DiskImgPtsto.
   Lemma disk_img_bytes_update_gen (γi : gname) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
     length bs' = length bs ->
-    ghost_map_auth γi 1 dmap -∗ disk_img_bytes γi o bs ==∗
+    ghost_map_auth_frac γi 1 dmap -∗ disk_img_bytes γi o bs ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth γi 1 dmap' ∗ disk_img_bytes γi o bs' ∗
+      ghost_map_auth_frac γi 1 dmap' ∗ disk_img_bytes γi o bs' ∗
       ⌜forall (j : nat) (b : bv 8), bs' !! j = Some b ->
          dmap' !! (o + Z.of_nat j)%Z = Some b⌝ ∗
       ⌜forall x : Z,
@@ -183,7 +183,7 @@ Section DiskImgPtsto.
       + intros j b0 Hj. destruct j as [|j].
         * cbn in Hj. injection Hj as <-.
           assert (Hz : o + Z.of_nat 0%nat = o) by lia. rewrite Hz.
-          rewrite (Hc o); [ apply lookup_insert | ].
+          rewrite (Hc o); [ apply lookup_insert_eq | ].
           intros k Hk Heq. lia.
         * cbn in Hj.
           assert (Hs : o + Z.of_nat (S j) = o + 1 + Z.of_nat j) by lia.
@@ -200,9 +200,9 @@ Section DiskImgPtsto.
   Lemma disk_img_bytes_update (γi : gname) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
     length bs' = length bs ->
-    ghost_map_auth γi 1 dmap -∗ disk_img_bytes γi o bs ==∗
+    ghost_map_auth_frac γi 1 dmap -∗ disk_img_bytes γi o bs ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth γi 1 dmap' ∗ disk_img_bytes γi o bs' ∗
+      ghost_map_auth_frac γi 1 dmap' ∗ disk_img_bytes γi o bs' ∗
       ⌜forall dk : Z -> bv 8,
          disk_view dmap dk -> disk_view dmap' (disk_write dk o bs')⌝.
   Proof using .
@@ -237,9 +237,9 @@ Section DiskImgPtsto.
       (dk : Z -> bv 8) (o : Z) (n : nat) :
     disk_view dmap dk ->
     (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
-    ghost_map_auth γi 1 dmap ==∗
+    ghost_map_auth_frac γi 1 dmap ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth γi 1 dmap' ∗
+      ghost_map_auth_frac γi 1 dmap' ∗
       disk_img_bytes γi o (disk_read dk o n) ∗
       ⌜disk_view dmap' dk⌝.
   Proof using .
@@ -254,7 +254,7 @@ Section DiskImgPtsto.
         assert (Ho : o + Z.of_nat 0%nat = o) by lia. rewrite Ho in Hf. exact Hf. }
       assert (Hview' : disk_view (<[o := dk o]> dmap) dk).
       { intros x b Hx. destruct (decide (x = o)) as [->|Hne].
-        - rewrite lookup_insert in Hx. by injection Hx as <-.
+        - rewrite lookup_insert_eq in Hx. by injection Hx as <-.
         - rewrite lookup_insert_ne in Hx; [| exact (fun e => Hne (eq_sym e)) ].
           exact (Hview x b Hx). }
       assert (Hfresh' : forall j : nat, (j < n)%nat ->
@@ -277,9 +277,9 @@ Section DiskImgPtsto.
     disk_view dmap dk ->
     (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
     (forall (x : Z) (b : bv 8), dmap !! x = Some b -> True) ->
-    ghost_map_auth γi 1 dmap ==∗
+    ghost_map_auth_frac γi 1 dmap ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth γi 1 dmap' ∗
+      ghost_map_auth_frac γi 1 dmap' ∗
       disk_img_bytes γi o (disk_read dk o n) ∗
       ⌜disk_view dmap' dk⌝ ∗
       ⌜forall (x : Z) (b : bv 8), dmap' !! x = Some b ->
@@ -296,7 +296,7 @@ Section DiskImgPtsto.
         assert (Ho : o + Z.of_nat 0%nat = o) by lia. rewrite Ho in Hf. exact Hf. }
       assert (Hview' : disk_view (<[o := dk o]> dmap) dk).
       { intros x b Hx. destruct (decide (x = o)) as [->|Hne].
-        - rewrite lookup_insert in Hx. by injection Hx as <-.
+        - rewrite lookup_insert_eq in Hx. by injection Hx as <-.
         - rewrite lookup_insert_ne in Hx; [| exact (fun e => Hne (eq_sym e)) ].
           exact (Hview x b Hx). }
       assert (Hfresh' : forall j : nat, (j < n)%nat ->
@@ -355,7 +355,7 @@ Section DiskImgPtsto.
   Definition disk_img_auth_sized (γi : gname) (N : nat) (dk : Z -> bv 8)
       : iProp Σ :=
     (∃ dmap : gmap Z (bv 8),
-       ghost_map_auth γi 1 dmap ∗ ⌜disk_view dmap dk⌝ ∗
+       ghost_map_auth_frac γi 1 dmap ∗ ⌜disk_view dmap dk⌝ ∗
        ⌜forall (o : Z) (b : bv 8), dmap !! o = Some b -> 0 <= o < Z.of_nat N⌝)%I.
 
   Global Instance disk_img_auth_sized_timeless γi N dk :

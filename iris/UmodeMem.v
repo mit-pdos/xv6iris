@@ -267,11 +267,11 @@ Lemma upa_keys_dom (M : gmap Z (bv 8)) (x : Z) :
   x ∈ (map_to_list M).*1 <-> x ∈ dom M.
 Proof.
   split.
-  - intros Hx. apply elem_of_list_fmap in Hx as [[k v] [Heq Hkv]].
+  - intros Hx. apply list_elem_of_fmap in Hx as [[k v] [Heq Hkv]].
     cbn in Heq. subst x. apply elem_of_map_to_list in Hkv.
     by eapply elem_of_dom_2.
   - intros Hx. apply elem_of_dom in Hx as [v Hv].
-    apply elem_of_list_fmap. exists (x, v). split; [reflexivity |].
+    apply list_elem_of_fmap. exists (x, v). split; [reflexivity |].
     by apply elem_of_map_to_list.
 Qed.
 
@@ -291,7 +291,7 @@ Lemma upa_map_lookup (pt : uptd) (M : gmap Z (bv 8)) (va : Z) (b : bv 8) :
 Proof.
   intros Hinj Hva. rewrite /upa_map.
   apply elem_of_list_to_map_1; [ by apply upa_list_nodup |].
-  rewrite /upa_list. apply elem_of_list_fmap.
+  rewrite /upa_list. apply list_elem_of_fmap.
   exists (va, b). split; [reflexivity |]. by apply elem_of_map_to_list.
 Qed.
 
@@ -300,7 +300,7 @@ Lemma upa_map_lookup_inv (pt : uptd) (M : gmap Z (bv 8)) (a : Arch.pa) (b : bv 8
   exists va : Z, uva_pa pt va = a /\ M !! va = Some b.
 Proof.
   intros Ha. rewrite /upa_map in Ha. apply elem_of_list_to_map_2 in Ha.
-  rewrite /upa_list in Ha. apply elem_of_list_fmap in Ha as [[va b'] [Heq Hin]].
+  rewrite /upa_list in Ha. apply list_elem_of_fmap in Ha as [[va b'] [Heq Hin]].
   cbn in Heq. injection Heq as -> ->.
   exists va. split; [reflexivity |]. by apply elem_of_map_to_list.
 Qed.
@@ -315,7 +315,7 @@ Proof. rewrite /upa_map dom_list_to_map_L upa_list_keys. reflexivity. Qed.
 Lemma upa_map_dom_elem (pt : uptd) (M : gmap Z (bv 8)) (a : Arch.pa) :
   a ∈ dom (upa_map pt M) <-> exists va : Z, va ∈ dom M /\ uva_pa pt va = a.
 Proof.
-  rewrite upa_map_dom elem_of_list_to_set elem_of_list_fmap. split.
+  rewrite upa_map_dom elem_of_list_to_set list_elem_of_fmap. split.
   - intros [va [Heq Hva]]. exists va.
     split; [ by apply upa_keys_dom | by symmetry ].
   - intros [va [Hva Heq]]. exists va.

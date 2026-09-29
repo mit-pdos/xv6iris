@@ -74,13 +74,13 @@ Section CreateNm.
        ⌜Nm nm⌝ -∗
        cre_arm_fired Farm i -∗
        Pd d -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗ Pd d ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗ Pd d ∗
          app_step d I (delta_create d nm i (cf d i) (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_create d nm i (cf d i) (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm i))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) d nm i))%I.
 
   Definition acre_commit_at_nm Γ (E : coPset) (c : absnode)
       (Nm : fname -> Prop)
@@ -186,7 +186,7 @@ Section CreateNm.
      interchangeable exactly as [SpecSysMknod.mknod_acre_inst] does for
      the cursor. *)
   Definition nlast_elem (pl : list (bv 8)) : option fname :=
-    list_basics.last (path_elems pl).
+    list_basics.list.last (path_elems pl).
 
   Definition npar_nm (M : gmap Z (bv 8)) (pv : mword 64) (nm : fname) : Prop :=
     forall pl : list (bv 8),
@@ -231,13 +231,13 @@ Section CreateNm.
     (∀ (I : gmap Z fs_node) (c : absnode),
        ⌜abs_view I !! i = Some (MkAnode c 1%nat)⌝ -∗
        ⌜Nd c⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
          app_step i I (delta_unarm i (abs_view I)) ∗
          (∀ I' : gmap Z fs_node,
             ⌜abs_view I' = delta_unarm i (abs_view I)⌝ -∗
-            ghost_map_auth (γtop Γ) (1/2) I' ={E}=∗
-            ghost_map_auth (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ={E}=∗
+            ghost_map_auth_frac (γtop Γ) (1/2) I' ∗ Φ (abs_view I) i))%I.
 
   Definition aunarm_of_arm_nd Γ (E : coPset) (Nd : absnode -> Prop)
       (Farm : pfam Σ (aview -> Z -> iProp Σ))

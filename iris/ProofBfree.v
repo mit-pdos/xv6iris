@@ -213,8 +213,8 @@ Qed.
 Lemma bf_xor_vec64_unsigned (x y : mword 64) :
   bv_unsigned (xor_vec x y) = Z.lxor (bv_unsigned x) (bv_unsigned y).
 Proof.
-  cbv [xor_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word].
+  cbv [xor_vec Operators_mwords.word_binop 
+       ].
   unfold MachineWord.MachineWord.xor. apply bv_xor_unsigned.
 Qed.
 
@@ -222,7 +222,7 @@ Lemma bf_zext8_unsigned (x : mword 8) :
   bv_unsigned (zero_extend' 64 x : mword 64) = bv_unsigned x.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       Values.to_word get_word MachineWord.MachineWord.zero_extend].
+       MachineWord.MachineWord.zero_extend].
   rewrite bv_zero_extend_unsigned. reflexivity.
   first [ lia | vm_compute; discriminate | done ].
 Qed.
@@ -248,7 +248,7 @@ Proof.
   rewrite Hs.
   assert (Hq : shiftr w 13 = (mword_of_int (bv_unsigned w / 8192) : mword 32)).
   { apply bv_eq.
-    unfold shiftr, SailStdpp.Values.with_word, get_word,
+    unfold shiftr,
       MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (H13 : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -332,7 +332,7 @@ Proof.
                = shiftl (mword_of_int x : mword 64) 51).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftl, SailStdpp.Values.with_word, get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)
@@ -361,7 +361,7 @@ Proof.
                = shiftr (mword_of_int y : mword 64) 54).
   { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)

@@ -69,14 +69,14 @@ Proof using.
   revert ss b. induction n as [| n IH]; intros ss b Hb; cbn [pde_merges_n] in Hb;
     apply elem_of_app in Hb as [Hb | Hb].
   - case_decide; [| by apply elem_of_nil in Hb].
-    apply elem_of_list_singleton in Hb as ->. by apply ma_done.
+    apply list_elem_of_singleton in Hb as ->. by apply ma_done.
   - by apply elem_of_nil in Hb.
   - case_decide; [| by apply elem_of_nil in Hb].
-    apply elem_of_list_singleton in Hb as ->. by apply ma_done.
-  - apply elem_of_list_join in Hb as (L & Hb & HL).
-    apply elem_of_list_fmap in HL as (i & -> & _). cbv beta in Hb.
+    apply list_elem_of_singleton in Hb as ->. by apply ma_done.
+  - apply list_elem_of_join in Hb as (L & Hb & HL).
+    apply list_elem_of_fmap in HL as (i & -> & _). cbv beta in Hb.
     destruct (ss !! i) as [[| x s] |] eqn:Hi; try by apply elem_of_nil in Hb.
-    apply elem_of_list_fmap in Hb as (b' & -> & Hb').
+    apply list_elem_of_fmap in Hb as (b' & -> & Hb').
     exact (ma_take ss i x s b' Hi (IH _ _ Hb')).
 Qed.
 
@@ -85,11 +85,11 @@ Lemma pde_merges_n_complete (ss : list bytes) (b : bytes) :
 Proof using.
   induction 1 as [ss HF | ss i x s b Hi Hm IH]; intros n Hn.
   - destruct n; cbn [pde_merges_n]; apply elem_of_app; left;
-      (rewrite decide_True; [apply elem_of_list_here | exact HF]).
+      (rewrite decide_True; [apply list_elem_of_here | exact HF]).
   - destruct n as [| n]; [simpl in Hn; lia |]. cbn [pde_merges_n]. apply elem_of_app. right.
-    apply elem_of_list_join. exists (cons x <$> pde_merges_n n (<[i:=s]> ss)). split.
-    + apply elem_of_list_fmap. exists b. split; [reflexivity | apply IH; simpl in Hn; lia].
-    + apply elem_of_list_fmap. exists i. split; [cbv beta; by rewrite Hi |].
+    apply list_elem_of_join. exists (cons x <$> pde_merges_n n (<[i:=s]> ss)). split.
+    + apply list_elem_of_fmap. exists b. split; [reflexivity | apply IH; simpl in Hn; lia].
+    + apply list_elem_of_fmap. exists i. split; [cbv beta; by rewrite Hi |].
       apply elem_of_seq. split; [lia | exact (lookup_lt_Some _ _ _ Hi)].
 Qed.
 
@@ -191,8 +191,8 @@ Proof using.
   induction H as [W pr s | W pr s i x t u Hi H IH | W pr s x u HF H IH | W pr s x u H IH];
     intros W' HP.
   - constructor.
-  - assert (Hin : (x :: t) ∈ W') by (rewrite -HP; exact (elem_of_list_lookup_2 _ _ _ Hi)).
-    apply elem_of_list_lookup_1 in Hin as [j Hj].
+  - assert (Hin : (x :: t) ∈ W') by (rewrite -HP; exact (list_elem_of_lookup_2 _ _ _ Hi)).
+    apply list_elem_of_lookup_1 in Hin as [j Hj].
     apply (pmt_w W' pr s j x t u Hj). apply IH.
     exact (pde_perm_insert W W' i j (x :: t) t HP Hi Hj).
   - apply pmt_p; [| exact (IH W' HP)].
@@ -213,13 +213,13 @@ Definition pde_mo : list bytes := [dg_execR; cat_dg_write].
 
 Lemma pde_midok_mo (m : bytes) : pde_midok m -> m = [] \/ m ∈ pde_mo.
 Proof using.
-  intros [-> | [-> | ->]]; [right; apply elem_of_list_here | by left
-                           | right; apply elem_of_list_further, elem_of_list_here].
+  intros [-> | [-> | ->]]; [right; apply list_elem_of_here | by left
+                           | right; apply list_elem_of_further, list_elem_of_here].
 Qed.
 
 Lemma pde_mo_midok (m : bytes) : m ∈ pde_mo -> pde_midok m.
 Proof using.
-  unfold pde_mo, pde_midok. intros Hm. apply elem_of_list_In in Hm.
+  unfold pde_mo, pde_midok. intros Hm. apply list_elem_of_In in Hm.
   destruct Hm as [<- | [<- | []]]; auto.
 Qed.
 
@@ -271,7 +271,7 @@ Proof using.
     destruct (IH _ _ _ _ Hr) as (Mu & HF & Hp).
     exists (Mu ++ [x :: t]). split.
     + apply Forall_app. split; [exact HF |]. apply Forall_singleton. split; [exact Hcm |].
-      apply elem_of_list_In. exact Hm.
+      apply list_elem_of_In. exact Hm.
     + rewrite app_assoc.
       apply (pmt_w ((op ++ Mu) ++ [x :: t]) pr sr (length (op ++ Mu)) x t u).
       * by apply list_lookup_middle.
@@ -299,10 +299,10 @@ Proof using.
   induction 1 as [W pr sr | W pr sr i x t u Hi H IH | W pr sr x u HF H IH | W pr sr x u H IH];
     intros op Mu cm HP HMu; [reflexivity | | |]; unfold bytes in *.
   - assert (Hin : (x :: t) ∈ op ++ Mu)
-      by (rewrite -HP; exact (elem_of_list_lookup_2 _ _ _ Hi)).
+      by (rewrite -HP; exact (list_elem_of_lookup_2 _ _ _ Hi)).
     cbn [pde_chk]. rewrite !orb_true_iff.
     apply elem_of_app in Hin as [Hin | Hin].
-    + left. left. left. apply elem_of_list_lookup_1 in Hin as [j Hj].
+    + left. left. left. apply list_elem_of_lookup_1 in Hin as [j Hj].
       apply existsb_exists. exists j. split.
       { apply in_seq. split; [lia | exact (lookup_lt_Some _ _ _ Hj)]. }
       cbv beta. rewrite Hj. cbv beta iota. rewrite bool_decide_true; [| reflexivity]. cbn [andb].
@@ -310,12 +310,12 @@ Proof using.
       rewrite -insert_app_l; [| exact (lookup_lt_Some _ _ _ Hj)].
       apply (pde_perm_insert W (op ++ Mu) i j (x :: t) t HP Hi).
       rewrite lookup_app_l; [exact Hj | exact (lookup_lt_Some _ _ _ Hj)].
-    + left. left. right. apply elem_of_list_lookup_1 in Hin as [k Hk].
+    + left. left. right. apply list_elem_of_lookup_1 in Hin as [k Hk].
       pose proof (Forall_lookup_1 _ _ _ _ HMu Hk) as Hmk.
       destruct cm; cbv beta iota in Hmk; [| discriminate Hmk].
       apply andb_true_iff. split; [reflexivity |].
       apply existsb_exists. exists (x :: t). split.
-      { destruct Hmk as [Hq | Hin']; [discriminate Hq | apply elem_of_list_In; exact Hin']. }
+      { destruct Hmk as [Hq | Hin']; [discriminate Hq | apply list_elem_of_In; exact Hin']. }
       cbv beta iota. rewrite bool_decide_true; [| reflexivity]. cbn [andb].
       apply (IH (op ++ [t]) (delete k Mu) true); [| by apply Forall_delete].
       assert (Hl : (op ++ Mu) !! (length op + k) = Some (x :: t)).
@@ -595,23 +595,23 @@ Lemma pde_cands_complete (l : pline') (a : plalt) :
 Proof using.
   intros H. cbn [lm_ok pipes_lmE pipes_lm] in H. rewrite /pde_cands.
   destruct H as [[-> | [-> | ->]] | [_ Hok]].
-  - apply elem_of_app. left. apply elem_of_list_here.
-  - apply elem_of_app. left. apply elem_of_list_further, elem_of_list_here.
-  - apply elem_of_app. left. apply elem_of_list_further, elem_of_list_further, elem_of_list_here.
+  - apply elem_of_app. left. apply list_elem_of_here.
+  - apply elem_of_app. left. apply list_elem_of_further, list_elem_of_here.
+  - apply elem_of_app. left. apply list_elem_of_further, list_elem_of_further, list_elem_of_here.
   - destruct a as [| b | b].
-    + apply elem_of_app. left. apply elem_of_list_here.
+    + apply elem_of_app. left. apply list_elem_of_here.
     + destruct Hok as (ss & Hr & Hm).
       apply elem_of_app. right. apply elem_of_app. left.
-      apply elem_of_list_fmap. exists b. split; [reflexivity |].
-      apply elem_of_list_bind. exists ss.
+      apply list_elem_of_fmap. exists b. split; [reflexivity |].
+      apply list_elem_of_bind. exists ss.
       split; [by apply elem_of_pde_merges | by apply line_runs_spec].
     + destruct Hok as [_ (b' & (W & s & Wm & sp & Hlt & HW & Hsp & Hb) & Hbb)].
       apply elem_of_app. right. apply elem_of_app. right.
-      apply elem_of_list_fmap. exists b. split; [reflexivity |].
-      apply elem_of_list_bind. exists (W, s). split; [| by apply line_terms_spec].
-      apply elem_of_list_bind. exists Wm. split; [| by apply elem_of_pde_merges].
-      apply elem_of_list_bind. exists sp. split; [| by apply prefixes_spec].
-      apply elem_of_list_bind. exists b'. split; [by apply prefixes_spec | by apply elem_of_pde_merges].
+      apply list_elem_of_fmap. exists b. split; [reflexivity |].
+      apply list_elem_of_bind. exists (W, s). split; [| by apply line_terms_spec].
+      apply list_elem_of_bind. exists Wm. split; [| by apply elem_of_pde_merges].
+      apply list_elem_of_bind. exists sp. split; [| by apply prefixes_spec].
+      apply list_elem_of_bind. exists b'. split; [by apply prefixes_spec | by apply elem_of_pde_merges].
 Qed.
 
 Fixpoint pde_prod (Ls : list (list nat)) : list (list nat) :=
@@ -623,9 +623,9 @@ Fixpoint pde_prod (Ls : list (list nat)) : list (list nat) :=
 Lemma pde_prod_intro (cs : list nat) (Ls : list (list nat)) :
   Forall2 (fun c L => c ∈ L) cs Ls -> cs ∈ pde_prod Ls.
 Proof using.
-  induction 1 as [| c L cs Ls Hc _ IH]; [by apply elem_of_list_singleton |].
-  cbn [pde_prod]. apply elem_of_list_bind. exists c. split; [| exact Hc].
-  apply elem_of_list_fmap. exists cs. split; [reflexivity | exact IH].
+  induction 1 as [| c L cs Ls Hc _ IH]; [by apply list_elem_of_singleton |].
+  cbn [pde_prod]. apply list_elem_of_bind. exists c. split; [| exact Hc].
+  apply list_elem_of_fmap. exists cs. split; [reflexivity | exact IH].
 Qed.
 
 (* ===================================================================== *)

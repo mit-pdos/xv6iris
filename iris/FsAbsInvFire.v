@@ -283,7 +283,7 @@ Section FsAbsInvFire.
      [□ ssupply], and has to hold at EVERY number for an arbitrary program:
      a console arm demanding the reader token would not merely be
      unprovable there -- taken as a [□] premise it is INCONSISTENT (open it
-     three times and hold [ghost_var γ (1/2) _] thrice), which would make
+     three times and hold [ghost_var_frac γ (1/2) _] thrice), which would make
      every generic corollary vacuous while the audit still printed the
      thirteen.  So the arm is payable from a PERSISTENT credential, and the
      one the generic slot already runs on is the one it takes. *)

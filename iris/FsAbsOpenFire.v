@@ -402,7 +402,7 @@ Section OpenFire.
     { rewrite (abs_view_insert_row I i n' _ Hnz' Habs') /=.
       case_decide as Hz.
       - pose proof (arow_at_gone _ _ _ Hrow Hz) as Hnone.
-        rewrite (delta_trunc_absent _ _ Hnone). exact (delete_notin _ _ Hnone).
+        rewrite (delta_trunc_absent _ _ Hnone). exact (delete_id _ _ Hnone).
       - by rewrite (delta_trunc_file (abs_view I) i bs0 nl (arow_at_live _ _ _ Hrow Hz)). }
     iMod (fupd_mask_subseteq appE) as "Hcl2"; [rewrite /appE; solve_ndisj |].
     iMod ("Hcm" $! I bs0 nl with "[//] Hta") as "(Hta & Hstep & Hph2)".
@@ -418,7 +418,7 @@ Section OpenFire.
     { iNext. rewrite /ftop_body. iExists (<[i := n']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros j mm Hj Hun. destruct (decide (j = i)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl j mm Hj Hun). }
     iModIntro. iFrame "Hf". iExists (abs_view I).

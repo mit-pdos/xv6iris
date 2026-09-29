@@ -253,7 +253,7 @@ Section Read.
      [FsDurSnap.fs_snap] and their thirty-odd readings. *)
   Definition snap_auth (g : gname)
       (D : gmap Z (list (bv 8))) : iProp Σ :=
-    (∃ B : gmap Z (bv 8), ghost_map_auth g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝)%I.
+    (∃ B : gmap Z (bv 8), ghost_map_auth_frac g 1 B ∗ ⌜B ⊆ fs_dbytes D⌝)%I.
 
   Global Instance snap_auth_timeless g D : Timeless (snap_auth g D).
   Proof using . rewrite /snap_auth. apply _. Qed.

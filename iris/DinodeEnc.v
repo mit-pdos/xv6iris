@@ -305,7 +305,7 @@ Proof.
   rewrite (diblk_bytes_lookup (<[k := d]> ds) k j
              (dinode_wf_insert ds k d Hall Hd)
              ltac:(rewrite length_insert; exact Hk) Hj).
-  rewrite list_lookup_total_insert by exact Hk. reflexivity.
+  rewrite list_lookup_total_insert_eq by exact Hk. reflexivity.
 Qed.
 
 Lemma diblk_bytes_insert_other (ds : list dinode) (k : nat) (d : dinode) (i : nat) :

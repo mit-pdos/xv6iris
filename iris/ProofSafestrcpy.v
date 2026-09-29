@@ -532,7 +532,7 @@ Section ProofSafestrcpy.
                    = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv; exact HT2sp).
-    iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
+    iDestruct (stack_own_2_intro (KTR := KT1) sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x32))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
@@ -661,7 +661,7 @@ Section ProofSafestrcpy.
       iEval (rewrite Ht2a) in "Hpc".
       (* ---- +0x2a: sb zero,0(a5), a5 still at [d] ---- *)
       pose proof (ssc_d_lt_n n d 0%nat Hn0 Hsum) as Hdlt.
-      iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
+      iDestruct (bb_byte_acc (KTR := kts) s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
       assert (Ha5' : forall CID' : CpuId, rget (CID := CID') M Ra5 = pa_add s d)
         by (intros CID'; rgne; exact Ha5).
       iDestruct (sie_cap_gpr_x0 M (K - 2)%nat b p Rz
@@ -766,7 +766,7 @@ Section ProofSafestrcpy.
       (* the ONE place the source is read: [d < ns] comes from [ssc_src_ok]
          plus the invariant's [bb_nonul f d], not from [d < n]. *)
       pose proof (ssc_cursor_lt f n ns d Hsok Hnn Hdlt1) as Hdns.
-      iDestruct (bb_byte_acc t ns d f dq Hdns with "Hsrc") as "[Hsb Hsback]".
+      iDestruct (bb_byte_acc (KTR := ktt) t ns d f dq Hdns with "Hsrc") as "[Hsb Hsback]".
       iApply (wp_lbu_s_sconf (kt := KT1) (ktd := ktt) (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
                 (mword_of_int 4095 : mword 12) Q2 (K - 2)%nat (f d : mword 8) b (dqm := dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -789,7 +789,7 @@ Section ProofSafestrcpy.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq24) in "Hpc".
       (* ---- +0x24: sb a4,-1(a5) ---- *)
-      iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdn with "Hdst") as "[Hdb Hdback]".
+      iDestruct (bb_byte_acc (KTR := kts) s n d h (DfracOwn 1) Hdn with "Hdst") as "[Hdb Hdback]".
       iApply (wp_sb_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.safestrcpy + 0x24)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) Q3 (K - 2)%nat (h d) b
                 with "Hcg Hpc [] [Hdb]").
@@ -830,7 +830,7 @@ Section ProofSafestrcpy.
         iEval (rewrite Hq2a) in "Hpc".
         (* ---- +0x2a: sb zero,0(a5) -- the SECOND nul, at [d + 1] ---- *)
         pose proof (ssc_Sd_lt_n n d rem Hn0 Hsum) as HSdn.
-        iDestruct (bb_byte_acc s n (S d) h' (DfracOwn 1) HSdn with "Hdst") as "[Hdb2 Hdback2]".
+        iDestruct (bb_byte_acc (KTR := kts) s n (S d) h' (DfracOwn 1) HSdn with "Hdst") as "[Hdb2 Hdback2]".
         assert (HQ3a5'' : forall CID' : CpuId, rget (CID := CID') Q3 Ra5 = pa_add s (S d))
           by (intros CID'; rgne; exact HQ3a5).
         iDestruct (sie_cap_gpr_x0 Q3 (K - 2)%nat b p Rz
@@ -912,7 +912,7 @@ Section ProofSafestrcpy.
     assert (Hp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.safestrcpy + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
-    iDestruct (stack_own_2_elim with "Hframe") as (u1 u2) "[Hb1 Hb2]".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hframe") as (u1 u2) "[Hb1 Hb2]".
     assert (Hpa1 : add_vec (R1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 1).

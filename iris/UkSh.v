@@ -212,7 +212,7 @@ Proof.
   intros Hlen [wr Hc].
   destruct (decide (k = 0%nat)) as [-> | Hne].
   - exists true.
-    rewrite list_lookup_insert;
+    rewrite list_lookup_insert_eq;
       [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
   - exists wr. rewrite list_lookup_insert_ne; [ exact Hc | exact Hne ].
 Qed.
@@ -246,7 +246,7 @@ Proof.
   - (* slot 0 is closed, so it IS the slot the scan found *)
     rewrite (ush_fd0p_scan l k Hcl Hk).
     left. exists true.
-    rewrite list_lookup_insert;
+    rewrite list_lookup_insert_eq;
       [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
 Qed.
 
@@ -282,7 +282,7 @@ Proof.
   intros Hlen [rb Hc].
   destruct (decide (k = 2%nat)) as [-> | Hne].
   - exists true.
-    rewrite list_lookup_insert;
+    rewrite list_lookup_insert_eq;
       [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
   - exists rb. rewrite list_lookup_insert_ne; [ exact Hc | exact Hne ].
 Qed.
@@ -303,7 +303,7 @@ Proof.
   intros Hlen [rb Hc].
   destruct (decide (k = 1%nat)) as [-> | Hne].
   - exists true.
-    rewrite list_lookup_insert;
+    rewrite list_lookup_insert_eq;
       [ reflexivity | rewrite Hlen; unfold NSTD; lia ].
   - exists rb. rewrite list_lookup_insert_ne; [ exact Hc | exact Hne ].
 Qed.
@@ -345,7 +345,7 @@ Lemma ush_lcl_cons (l : list fdstate) (j : nat) :
 Proof.
   intros Hlen Hj [Hop Hcl]. split.
   - intros i Hi. destruct (decide (i = j)) as [-> | Hne].
-    + rewrite list_lookup_insert; [ reflexivity | rewrite Hlen; exact Hj ].
+    + rewrite list_lookup_insert_eq; [ reflexivity | rewrite Hlen; exact Hj ].
     + rewrite list_lookup_insert_ne; [ apply Hop; lia | intro H; apply Hne; symmetry; exact H ].
   - intros i Hi. rewrite list_lookup_insert_ne; [ apply Hcl; lia | lia ].
 Qed.
@@ -416,7 +416,7 @@ Proof.
   intros Hwf Hj. apply (wl_line_byte_val ws _ Hwf).
   destruct (lookup_lt_is_Some_2 (wl_line ws) j Hj) as [b Hb].
   rewrite list_lookup_total_alt Hb. cbn [default from_option].
-  exact (elem_of_list_lookup_2 (wl_line ws) j b Hb).
+  exact (list_elem_of_lookup_2 (wl_line ws) j b Hb).
 Qed.
 
 (* ...and no byte of the line is the NUL [gets] plants past it, which is
@@ -433,7 +433,7 @@ Proof.
   { apply (wl_line_byte_val_fn ws _ Hwf).
     destruct (lookup_lt_is_Some_2 (wl_line ws) j Hj) as [b Hb].
     rewrite list_lookup_total_alt Hb. cbn [default from_option].
-    exact (elem_of_list_lookup_2 (wl_line ws) j b Hb). }
+    exact (list_elem_of_lookup_2 (wl_line ws) j b Hb). }
   rewrite Hc in Hv.
   rewrite (_ : bv_unsigned ubyte0 = 0%Z) in Hv; [ lia | by vm_compute ].
 Qed.
@@ -504,12 +504,12 @@ Proof.
   assert (Hin : FileDisc.line_bytes lu !!! j ∈ FileDisc.line_bytes lu).
   { destruct (lookup_lt_is_Some_2 (FileDisc.line_bytes lu) j Hj) as [b Hb].
     rewrite list_lookup_total_alt Hb. cbn [default from_option].
-    exact (elem_of_list_lookup_2 _ j b Hb). }
+    exact (list_elem_of_lookup_2 _ j b Hb). }
   set (b := FileDisc.line_bytes lu !!! j) in *.
   (* the four-constructor enumeration is [FileDisc.line_bytes_bytes]'s now:
      the twelve lines it replaces were this same case split done here *)
   assert (Hb : FileDisc.fbody_byte b \/ b = FileDisc.fd_bar \/ b = wl_nl).
-  { apply elem_of_list_lookup in Hin as [q Hq].
+  { apply list_elem_of_lookup in Hin as [q Hq].
     exact (proj1 (Forall_lookup _ _)
              (FileDisc.line_bytes_bytes lu Hok) q b Hq). }
   destruct Hb as [Hfb | [-> | ->]].
@@ -633,7 +633,7 @@ Lemma ush_disc_snoc_val (I : list (bv 8)) (b : bv 8) :
   \/ (97 <= bv_unsigned b <= 122)%Z.
 Proof.
   intro Hd. apply (disc_input_byte_val (I ++ [b]) b Hd).
-  apply elem_of_app. right. by apply elem_of_list_singleton.
+  apply elem_of_app. right. by apply list_elem_of_singleton.
 Qed.
 
 (* ...AND THE ONE CONSEQUENCE THE WALK ACTUALLY SPENDS (lane LINK-GEN-5):
@@ -673,7 +673,7 @@ Proof. intros H Heq. apply H. rewrite Heq. exact wl_nl_val. Qed.
    does this whether or not the power is on. *)
 Lemma ush_elem_of_rev_head {A} (x : A) (l : list A) : x ∈ rev (x :: l).
 Proof.
-  cbn. apply elem_of_app. right. by apply elem_of_list_singleton.
+  cbn. apply elem_of_app. right. by apply list_elem_of_singleton.
 Qed.
 
 Lemma ush_cycles_snoc_in (h : list mobs) (b : bv 8) :
@@ -698,7 +698,7 @@ Proof.
     - rewrite cons_xlate_cr in Hx. vm_compute in Hx. discriminate Hx.
     - rewrite (cons_xlate_other b Hne) in Hx. exact Hx. }
   destruct (ush_cycles_snoc_in h0 b) as (s0 & Hin).
-  apply elem_of_list_lookup in Hin as [i Hi].
+  apply list_elem_of_lookup in Hin as [i Hi].
   pose proof (disc_seg'_proj _ (Forall_lookup_1 _ _ _ _ Hd Hi)) as Hseg.
   rewrite /disc_seg ins_app ins_in in Hseg.
   pose proof (ush_disc_snoc_val (ins s0) b Hseg) as Hv. lia.
@@ -2691,6 +2691,7 @@ Section UkSh.
     rest_of I0 = [] ->
     Pm I0 -∗ ush_gets_line_at Dsc l I0 [] f.
   Proof using .
+    clear dependent Wb. clear dependent Wc. clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN Wb Wc) *)
     intro Hr0. iIntros "Hp". rewrite /ush_gets_line_at. iLeft.
     iSplitR.
     { iPureIntro. rewrite /ush_gline_p_at. split_and!.
@@ -2824,6 +2825,7 @@ Section UkSh.
     Pm (I0 ++ J ++ [wl_nl]) ={⊤}=∗
     ush_gets_done_at Dl l (S (length J)) f.
   Proof using HT ush_at_of_pm_taint ush_wb_read ush_wc_read.
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros (Hr0 & Hnl & Hlt & Hfdc & Hby & _) HD Hws Hlen Hli Hfnl.
     (* the boundary the line closed, and its last line *)
     assert (Hrest : rest_of (I0 ++ J) = J).
@@ -2897,6 +2899,7 @@ Section UkSh.
        = S (length J)
     /\ ush_line_at (FileDisc.LEcho (wl_words J)) f 0%nat (S (length J)).
   Proof using .
+    clear - J f. (* unused; else Rocq counts it as used (asks for Proof using … GEN Pm Wb Wc Σ) *)
     intros Hbody Hby Hfnl.
     assert (Hline : wl_line (wl_words J) = J ++ [wl_nl]).
     { rewrite /wl_line (proj1 Hbody). reflexivity. }
@@ -3010,6 +3013,7 @@ Section UkSh.
      ∨ (⌜ (bv_signed r <= 0)%Z ⌝ ∗ ⌜ l !! 0%nat = Some FdClosed ⌝ ∗ Pm I)
      ∨ (T ∗ ush_pos)).
   Proof using HT ush_at_of_pm_taint.
+    clear dependent Wb. clear dependent Wc. clear GEN. (* unused; else Rocq counts GEN Wb Wc as used (asks for Proof using … GEN Wb Wc) *)
     iIntros "#Hlaw [Hw | [(%Hm1 & %Hcl & Hp) | [#HT Hp]]]"; last first.
     { iRight. iRight. iFrame "HT Hp". }
     { iRight. iLeft.
@@ -3316,6 +3320,7 @@ Section UkSh.
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     intros k. induction k as [| k IH ];
       intros j h mc f nn HN Ha0 Ha64 Hc Hpre Ha5 Ha4;
       iIntros "#Hcode Hbs Hrun Hcont".
@@ -3513,6 +3518,7 @@ Section UkSh.
     urun N h m (mword_of_int ShSyms.memset) (2 + nn) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     intros Halo Hahi0 Ha0 Ha2 HN0 HN31. iIntros "#Hcode #Ht0 Hpay Hrun".
     rewrite shp_memset.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
@@ -3774,6 +3780,7 @@ Section UkSh.
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     intros Ha0 Ha2 HN0 HN31. iIntros "#Hcode Hbs Hrun Hcont".
     rewrite shp_memset.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
@@ -5087,6 +5094,7 @@ Section UkSh.
     uint r = 2 \/ uint r = 3 \/ uint r = 4 \/ uint r = 8 \/ uint r = 9 \/
     (18 <= uint r <= 27).
   Proof using .
+    clear - r. (* unused; else Rocq counts it as used (asks for Proof using … GEN Wc Σ) *)
     unfold ucallee_saved_idx. intro H.
     repeat (apply orb_prop in H as [H | H]).
     all: try (apply Z.eqb_eq in H; lia).
@@ -7129,6 +7137,7 @@ Section UkSh.
   Local Lemma ush_regs_upd (m : regfile) (r : mword 5) (v : mword 64) :
     ush_regs m -> ush_reg_free r = true -> ush_regs (<[Regidx r := v]> m).
   Proof using .
+    clear - m r v. (* unused; else Rocq counts it as used (asks for Proof using … GEN Wc Σ) *)
     intros (H2 & H3 & H4 & H5 & H6) Hf.
     unfold ush_reg_free in Hf. apply negb_true_iff in Hf.
     assert (Hne : forall (q : mword 5) (z : Z), uint q = z -> 18 <= z <= 22 ->
@@ -7895,6 +7904,7 @@ Section UkSh.
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     intros Hbz Hregs Hs1 Hrng Htgt. iIntros "#Hcode Hb Hrun Hcont".
     assert (Hbzr : 0 <= bz < 256).
     { rewrite <- Hbz. pose proof (bv_unsigned_in_range 8 b) as Hr8.
@@ -8100,6 +8110,7 @@ Section UkSh.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
+    clear dependent Wc. (* unused; else Rocq counts it as used (asks for Proof using … Wc) *)
     assert (Hbf : sh_buf = 8224) by (vm_compute; reflexivity).
     assert (Hnb : sh_nbuf = 100%nat) by (vm_compute; reflexivity).
     intros d. induction d as [| d IH ];
@@ -8959,6 +8970,7 @@ Section UkSh.
     uv_btaken BGE (mword_of_int 2 : mword 64)
       (mword_of_int (Z.of_nat k) : mword 64) = true.
   Proof using .
+    clear - k. (* unused; else Rocq counts it as used (asks for Proof using … Wc Σ) *)
     intro Hk. unfold NSTD in Hk. cbn [uv_btaken].
     rewrite (moi_ge_s 2 (Z.of_nat k) ltac:(unfold Z63; lia)
                ltac:(unfold Z63; lia)).

@@ -57,7 +57,7 @@
    THE POSTCONDITION consequently hands back no device fragment at all.  What
    it hands back instead is what a driver needs and can only get here: the
    publisher token [disk_pub γv 0] -- which is ALSO the witness that the queue
-   is live, since [virtio_proto]'s not-live arm holds the [dn_np] ghost_var at
+   is live, since [virtio_proto]'s not-live arm holds the [dn_np] ghost_var_frac at
    the FULL fraction and every [virtio_proto_*_acc] refutes that arm from the
    caller's half -- and the frozen [disk_cfg γv (virtio_init_cfg pd pav pu)]
    that [DiskInv.disk_geom] is built from.
@@ -157,7 +157,7 @@ Definition vdi_post
        DMA lease has been paid into [disk_inv]'s [virtio_proto] at the final
        STATUS write, and what comes out is the publisher token at 0 -- nothing
        has been published, and holding it is ALSO the proof that the protocol
-       is in its live arm (the not-live arm owns the [dn_np] ghost_var whole) --
+       is in its live arm (the not-live arm owns the [dn_np] ghost_var_frac whole) --
        together with the frozen configuration [DiskInv.disk_geom] is built on. *)
     disk_pub γv 0%nat -∗
     (* ...and the READ WATERMARK's other half, at 0: the handler presents it

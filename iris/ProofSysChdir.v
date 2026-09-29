@@ -336,7 +336,7 @@ Lemma sc_sext16_inj `{XI : CurCtx} (x y : mword 16) :
 Proof.
   intros H. apply (f_equal bv_signed) in H.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+       MachineWord.MachineWord.sign_extend] in H.
   rewrite !bv_sign_extend_signed in H;
     [| apply N.leb_le; vm_compute; reflexivity ..].
   apply bv_eq_signed. exact H.

@@ -335,7 +335,7 @@ Section UShCatFStage.
       rewrite /cif_xkQ. iIntros "[#HT | [Hf Hdq]]"; [by iLeft |].
       rewrite big_sepL_singleton. cbn [cif_final snd].
       iDestruct "Hf" as "[[Hp Hcf] | (%x & %Hx & Hwf)]"; last first.
-      { apply elem_of_list_singleton in Hx as ->.
+      { apply list_elem_of_singleton in Hx as ->.
         iRight. iLeft. iFrame "HsL".
         iSplitL "Hdq"; [rewrite /lrd; iExact "Hdq" |]. rewrite /lrep. iExists (Some (cat_dg_open f)).
         iFrame "Hwf". iLeft. iPureIntro. by exists (cat_dg_open f). }

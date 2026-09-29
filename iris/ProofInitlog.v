@@ -430,7 +430,7 @@ Section InitlogDefs.
   Proof using .
     intros Hle. apply list_eq. intros i.
     destruct (decide (i < 4)%nat) as [Hi | Hi].
-    - rewrite lookup_take; [| lia]. rewrite lookup_drop.
+    - rewrite lookup_take_lt; [| lia]. rewrite lookup_drop.
       rewrite (list_lookup_lookup_total_lt bs (o + i)%nat); [| lia].
       destruct i as [|[|[|[|i']]]]; try lia; cbn.
       + rewrite Nat.add_0_r //.
@@ -521,7 +521,7 @@ Section InitlogDefs.
      layer holds BOTH at boot, so this costs nothing) *)
   Lemma il_fsb_lookup (γfs : fs_names) (L : gmap Z (list (bv 8)))
       (b : Z) (bs : list (bv 8)) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗ fs_chalf γfs b bs -∗ ⌜L !! b = Some bs⌝.
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗ fs_chalf γfs b bs -∗ ⌜L !! b = Some bs⌝.
   Proof using .
     rewrite /fs_chalf. iIntros "Ha Hb".
     iApply (ghost_map_lookup with "Ha Hb").
@@ -531,7 +531,7 @@ Section InitlogDefs.
      install needs is EVERY slot's content named in [L] (durable-disk 1a) *)
   Lemma il_fsb_all (γfs : fs_names) (L : gmap Z (list (bv 8)))
       (f : nat -> Z) (ys : nat -> list (bv 8)) (l : list nat) :
-    ghost_map_auth (fs_cache γfs) 1 L -∗
+    ghost_map_auth_frac (fs_cache γfs) 1 L -∗
     ([∗ list] k ∈ l, fs_chalf γfs (f k) (ys k)) -∗
     ⌜forall k : nat, k ∈ l -> L !! f k = Some (ys k)⌝.
   Proof using .
@@ -660,7 +660,7 @@ Section InitlogBlocks.
     = (mword_of_int (z * 4) : SailStdpp.Values.mword 64).
   Proof using .
     intros Hz0 Hz. apply bv_eq.
-    unfold shift_bits_left, shiftl, with_word, get_word,
+    unfold shift_bits_left, shiftl,
            MachineWord.MachineWord.logical_shift_left.
     rewrite bv_shiftl_unsigned.
     replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
@@ -1215,13 +1215,13 @@ Section ProofInitlog.
     assert (Hentne : forall (i : nat) (bb : Z),
               (hdr_dec bs_hdr).2 !! i = Some bb -> bb <> log_hdr_bno logstart).
     { intros i bb Hi.
-      destruct (Hin bb (elem_of_list_lookup_2 _ _ _ Hi)) as [_ Hout].
+      destruct (Hin bb (list_elem_of_lookup_2 _ _ _ Hi)) as [_ Hout].
       intros ->. exact (Hout (log_hdr_in_region logstart)). }
     assert (Hentslot : forall (i k : nat) (bb : Z),
               (hdr_dec bs_hdr).2 !! i = Some bb -> (k < LOGBLOCKS)%nat ->
               bb <> log_slot_bno logstart k).
     { intros i k bb Hi Hk.
-      destruct (Hin bb (elem_of_list_lookup_2 _ _ _ Hi)) as [_ Hout].
+      destruct (Hin bb (list_elem_of_lookup_2 _ _ _ Hi)) as [_ Hout].
       intros ->. exact (Hout (log_slot_in_region logstart k Hk)). }
     assert (HWlen : length ((hdr_dec bs_hdr).2) = (hdr_dec bs_hdr).1)
       by apply hdr_dec_length.
@@ -2056,7 +2056,7 @@ Section ProofInitlog.
               uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)).
     { intros w Hw. apply Hin. rewrite -(il_W_uint bs_hdr).
       change (map uint ?l) with (uint <$> l).
-      apply elem_of_list_fmap_1. exact Hw. }
+      apply list_elem_of_fmap_2. exact Hw. }
     iDestruct (cpu_own_transport CID27 CID29 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* THE COMPLEMENT'S SPAN IS WIDER THAN [cpu_own]'S, because brelse does
@@ -2108,7 +2108,7 @@ Section ProofInitlog.
       assert (Hklt : (i < LOGBLOCKS)%nat).
       { apply lookup_lt_Some in Hi. rewrite il_W_length in Hi. lia. }
       split.
-      - apply elem_of_list_to_set. eapply elem_of_list_lookup_2. exact Hwsi.
+      - apply elem_of_list_to_set. eapply list_elem_of_lookup_2. exact Hwsi.
       - rewrite (Hxvslot i (uint w) Hwsi). symmetry. exact (Hysmir i Hklt). }
     iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs γpr
               cov logstart dev true ((hdr_dec bs_hdr).1)
@@ -2146,7 +2146,7 @@ Section ProofInitlog.
       assert (Hnei : forall (k : nat) (bb : Z), (k < i)%nat ->
                 (hdr_dec bs_hdr).2 !! k = Some bb -> bb <> log_hdr_bno logstart)
         by (intros k bb _ Hk; exact (Hentne k bb Hk)).
-      destruct (Hwok' w (elem_of_list_lookup_2 _ _ _ Hwi)) as [Hbcov Hblog].
+      destruct (Hwok' w (list_elem_of_lookup_2 _ _ _ Hwi)) as [Hbcov Hblog].
       assert (HWle : (length ((hdr_dec bs_hdr).2) <= LOGBLOCKS)%nat)
         by (rewrite HWlen; exact Hbnd).
       assert (HMi : lm_hdr (lm_install M ((hdr_dec bs_hdr).2)
@@ -2192,7 +2192,7 @@ Section ProofInitlog.
     { intros c Hcs N2 N8 N9 N18 N19.
       rewrite (callee_saved_lookup Hcs3_cs c Hcs).
       exact (HC2cs c Hcs N2 N8 N9 N18 N19). }
-    iAssert (ghost_map_auth (fs_dirty γfs) 1 D) with "[HDauth]" as "HDauth";
+    iAssert (ghost_map_auth_frac (fs_dirty γfs) 1 D) with "[HDauth]" as "HDauth";
       [iExact "HDauth"|].
     iAssert (bslots 2) with "[Hs2]" as "Hs2"; [iExact "Hs2"|].
     (* ===== +0x68 auipc a5,0x1e / +0x6c sw zero,1924(a5) : log.lh.n := 0 ===== *)
@@ -2642,7 +2642,7 @@ Section ProofInitlog.
         rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hbhdr)).
         rewrite (lm_upd_view_ne _ _ _ _ Hbhdr).
         destruct (decide (bb ∈ (hdr_dec bs_hdr).2)) as [Hin'|Hout'].
-        - apply elem_of_list_lookup in Hin' as [jj Hjj].
+        - apply list_elem_of_lookup in Hin' as [jj Hjj].
           assert (Hjlt : (jj < (hdr_dec bs_hdr).1)%nat)
             by (rewrite -HWlen; exact (lookup_lt_Some _ _ _ Hjj)).
           assert (Hmapjj : map uint (il_W bs_hdr ((hdr_dec bs_hdr).1)) !! jj
@@ -2659,14 +2659,14 @@ Section ProofInitlog.
                     il_W bs_hdr ((hdr_dec bs_hdr).1) !! i = Some w0 ->
                     uint w0 <> bb).
           { intros i w0 Hi Heq. apply Hout'. rewrite -(il_W_uint bs_hdr) -Heq.
-            exact (elem_of_list_lookup_2 _ i _ (it_map_lookup _ i w0 Hi)). }
+            exact (list_elem_of_lookup_2 _ i _ (it_map_lookup _ i w0 Hi)). }
           rewrite (it_rec_L_miss (il_W bs_hdr ((hdr_dec bs_hdr).1))
                      (fun k : nat => ys !!! k) L bb Hmiss).
           assert (Hmiss2 : forall (i : nat) (c : Z),
                     (i < (hdr_dec bs_hdr).1)%nat ->
                     (hdr_dec bs_hdr).2 !! i = Some c -> c <> bb).
           { intros i c _ Hi Heq. apply Hout'. subst c.
-            exact (elem_of_list_lookup_2 _ i _ Hi). }
+            exact (list_elem_of_lookup_2 _ i _ Hi). }
           rewrite (lm_install_miss M ((hdr_dec bs_hdr).2)
                      (fun k : nat => ys !!! k) ((hdr_dec bs_hdr).1) bb
                      HnnW Hmiss2).

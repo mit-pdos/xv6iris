@@ -78,6 +78,7 @@ From stdpp Require Import gmap finite list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
 From iris.program_logic Require Import language lifting adequacy.
+From iris.program_logic Require Import language. (* after [adequacy]: Iris master's [adequacy] brings stdpp's [relations.nsteps] into scope *)
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
@@ -626,7 +627,7 @@ Theorem xv6_app_adequacy Σ
                γobs T (obs_ledger_at (app_R A c) γobs) γhist
                (app_ifc A c)
                (app_fixed A) c) g' -∗
-         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
+         ghost_var_frac γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ xv6_slot (app_names A) (app_pred A) (app_okc A) cov (FsImg.sb_logstart sb)
              γd γsw γreg γstart c -∗
          ▷ obs_ledger_at (app_R A c) γobs -∗

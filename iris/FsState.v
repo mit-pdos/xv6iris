@@ -454,7 +454,7 @@ Section FsState.
       rewrite (Heq j) lookup_op.
       destruct (decide (j = i)) as [-> | Hne].
       + pose proof (IH i) as IHi. rewrite Hi in IHi. simpl in IHi.
-        rewrite lookup_singleton lookup_insert IHi right_id //.
+        rewrite lookup_singleton_eq lookup_insert_eq IHi right_id //.
       + rewrite lookup_singleton_ne; [| done].
         rewrite lookup_insert_ne; [| done].
         rewrite left_id. exact (IH j).
@@ -541,7 +541,7 @@ Section FsState.
       iExists f'. iSplitR.
       { iPureIntro. intros j m Hj.
         destruct (decide (j = i)) as [-> | Hne].
-        - rewrite lookup_insert in Hj. injection Hj as <-.
+        - rewrite lookup_insert_eq in Hj. injection Hj as <-.
           rewrite /lc_D /lc_v /lc_tyf Hfi //.
         - rewrite lookup_insert_ne // in Hj.
           rewrite /lc_D /lc_v /lc_tyf -(Hext j ltac:(by eexists)).
@@ -568,7 +568,7 @@ Section FsState.
       set (f' := fun z => if decide (z = i) then (DD, (vv, P)) else f z).
       assert (Hext : forall j, is_Some (delete i I !! j) -> f j = f' j).
       { intros j [m Hj]. rewrite /f'. destruct (decide (j = i)) as [-> |];
-          [rewrite lookup_delete in Hj; discriminate | done]. }
+          [rewrite lookup_delete_eq in Hj; discriminate | done]. }
       assert (Hfi : f' i = (DD, (vv, P))) by (rewrite /f' decide_True //).
       exists f'. split.
       + intros j m Hj. destruct (decide (j = i)) as [-> | Hne'].
@@ -688,7 +688,7 @@ Section FsState.
   Lemma fs_boot_alloc_at (IL IT : gmap Z fs_node) (f : link_choice) :
     link_elem_ok IL f -> ✓ link_elem IL f ->
     ⊢ |==> ∃ gl gt : gname,
-        ghost_map_auth gt 1 IT
+        ghost_map_auth_frac gt 1 IT
         ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
         ∗ fs_links gl IL.
   Proof using .
@@ -767,7 +767,7 @@ Section FsState.
      validity premise at all, because nothing is outstanding. *)
   Lemma fs_boot_alloc_full (IL IT : gmap Z fs_node) (fv : Z -> ity) :
     ⊢ |==> ∃ gl gt : gname,
-        ghost_map_auth gt 1 IT
+        ghost_map_auth_frac gt 1 IT
         ∗ ([∗ map] i ↦ n ∈ IT, i ↪[gt] n)
         ∗ fs_links_full gl IL fv.
   Proof using .
@@ -787,7 +787,7 @@ Section FsState.
       (f : link_choice) (r : Z) (v : ity) :
     link_elem_ok I f -> ✓ (link_elem I f ⋅ link_tok_elem r v) ->
     ⊢ |==> ∃ gl gt : gname,
-        ghost_map_auth gt 1 I
+        ghost_map_auth_frac gt 1 I
         ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
         ∗ fs_links gl I
         ∗ own gl (link_tok_elem r v).
@@ -808,7 +808,7 @@ Section FsState.
   Lemma fs_boot_alloc (I : gmap Z fs_node) (f : link_choice) :
     link_elem_ok I f -> ✓ link_elem I f ->
     ⊢ |==> ∃ gl gt : gname,
-        ghost_map_auth gt 1 I
+        ghost_map_auth_frac gt 1 I
         ∗ ([∗ map] i ↦ n ∈ I, i ↪[gt] n)
         ∗ fs_links gl I.
   Proof using . exact (fs_boot_alloc_at I I f). Qed.
@@ -897,10 +897,10 @@ Section FsState.
       + rewrite lookup_insert_ne // in Hj. exact (Hreg j m Hj).
     - intros j Hj. destruct (Hdom j Hj) as [m Hm].
       destruct (decide (j = i)) as [-> | Hne].
-      * exists n'. by rewrite lookup_insert.
+      * exists n'. by rewrite lookup_insert_eq.
       * exists m. by rewrite lookup_insert_ne.
     - intros j m Hj. destruct (decide (j = i)) as [-> | Hne].
-      + rewrite lookup_insert in Hj. injection Hj as <-. exact Hdl.
+      + rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hdl.
       + rewrite lookup_insert_ne // in Hj. exact (Hdlo j m Hj).
   Qed.
 

@@ -311,11 +311,11 @@ Proof.
   rewrite elem_of_union elem_of_singleton !ci_inums_spec. split.
   - intros (k2 & p & Hk2 & ->).
     destruct (decide (k2 = k)) as [->|Hne].
-    + rewrite lookup_insert in Hk2. injection Hk2 as <-. by left.
+    + rewrite lookup_insert_eq in Hk2. injection Hk2 as <-. by left.
     + rewrite lookup_insert_ne in Hk2; [| by apply not_eq_sym].
       right. by exists k2, p.
   - intros [-> | (k2 & p & Hk2 & ->)].
-    + exists k, (d, i). rewrite lookup_insert. split; [reflexivity | reflexivity].
+    + exists k, (d, i). rewrite lookup_insert_eq. split; [reflexivity | reflexivity].
     + exists k2, p. rewrite lookup_insert_ne;
         [ split; [exact Hk2 | reflexivity] |].
       intros ->. rewrite Hk in Hk2. discriminate.
@@ -1451,7 +1451,7 @@ Section ProofIget.
                            TsoCtx.ctx_wrote CtxIdDefs.cur_ctx loA
                              (i_ref (ientry e)) ∗
                            (∃ tstn : nat, ⌜(loA <= tstn)%nat⌝ ∗
-                              mono_nat_auth_own (icfg_istmp e) (1/2) tstn ∗
+                              mono_nat_auth_own_frac (icfg_istmp e) (1/2) tstn ∗
                               TsoGhost.llb loglen_name tstn)) ∗
                         IcacheRef.frzsel e (1/2)%Qp false ∗
                         iname fsc_ireg fsc_fs icfg_ist inum l ∗
@@ -1616,7 +1616,7 @@ Section ProofIget.
                          with "[%] [%] [Hid1 Hislot Hgid Hicnt1 Hmir0 Hsel HpinT]") as "Hslots".
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-            { rewrite /islot2 !lookup_insert Hp1.
+            { rewrite /islot2 !lookup_insert_eq Hp1.
               rewrite /islot_rest_at ig_quarter_rest /inode_ident.
               iDestruct "Hid1" as "[Hidd Hidn]".
               (* the peeled half, now at 1: the recycle is where an inum's
@@ -1635,7 +1635,7 @@ Section ProofIget.
                 [reflexivity | by apply not_eq_sym]. }
             { intros i Hi. rewrite lookup_insert_ne;
                 [reflexivity | by apply not_eq_sym]. }
-            { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert.
+            { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert_eq.
               iSplitL "Hrd Hc".
               { rewrite /ic_slot_row Hp1.
                 iExists Tb. iSplitL; [| iExact "HllbT"].
@@ -1652,7 +1652,7 @@ Section ProofIget.
                 + intros i Hi. destruct (decide (i = e)) as [->|Hne]; [exact He|].
                   rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
                 + intros i qi ni Hi. destruct (decide (i = e)) as [->|Hne].
-                  * rewrite lookup_insert in Hi. apply Some_inj in Hi.
+                  * rewrite lookup_insert_eq in Hi. apply Some_inj in Hi.
                     injection Hi as _ Hn. subst ni. vm_compute. discriminate.
                   * rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
                     by apply (Hcnt' i qi).
@@ -1663,12 +1663,12 @@ Section ProofIget.
                   intros k1 k2 p1 p2 Hp1' Hp2' Heq.
                   destruct (decide (k1 = e)) as [->|Hn1];
                     destruct (decide (k2 = e)) as [->|Hn2]; try reflexivity.
-                  * rewrite lookup_insert in Hp1'. injection Hp1' as <-.
+                  * rewrite lookup_insert_eq in Hp1'. injection Hp1' as <-.
                     rewrite lookup_insert_ne in Hp2'; [| by apply not_eq_sym].
                     exfalso. apply Hnotin.
                     apply ci_inums_spec. exists k2, p2. split; [exact Hp2'|].
                     cbn [snd] in Heq. exact Heq.
-                  * rewrite lookup_insert in Hp2'. injection Hp2' as <-.
+                  * rewrite lookup_insert_eq in Hp2'. injection Hp2' as <-.
                     rewrite lookup_insert_ne in Hp1'; [| by apply not_eq_sym].
                     exfalso. apply Hnotin.
                     apply ci_inums_spec. exists k1, p1. split; [exact Hp1'|].
@@ -1677,12 +1677,12 @@ Section ProofIget.
                     rewrite lookup_insert_ne in Hp2'; [| by apply not_eq_sym].
                     exact (Hinj k1 k2 p1 p2 Hp1' Hp2' Heq).
                 + intros k1 p1 Hp1'. destruct (decide (k1 = e)) as [->|Hn1].
-                  * rewrite lookup_insert in Hp1'. injection Hp1' as <-.
+                  * rewrite lookup_insert_eq in Hp1'. injection Hp1' as <-.
                     simpl. exact Hnib.
                   * rewrite lookup_insert_ne in Hp1'; [| by apply not_eq_sym].
                     exact (Hrange k1 p1 Hp1').
                 + intros k1 p1 Hp1'. destruct (decide (k1 = e)) as [->|Hn1].
-                  * rewrite lookup_insert in Hp1'. injection Hp1' as <-. reflexivity.
+                  * rewrite lookup_insert_eq in Hp1'. injection Hp1' as <-. reflexivity.
                   * rewrite lookup_insert_ne in Hp1'; [| by apply not_eq_sym].
                     exact (Hdv k1 p1 Hp1').
               - iFrame "Hipool Hslots".
@@ -1843,9 +1843,9 @@ Section ProofIget.
                       (IcacheInv.iref_pin_rows j (iref_word M j) lo tstj
                          ={⊤ ∖ ↑minstretN ∖ ↑icacheN, ⊤ ∖ ↑minstretN}=∗
                        itable_half M ∗
-                       mono_nat_auth_own (icfg_istmp j) (1/2) tstj))%I)
+                       mono_nat_auth_own_frac (icfg_istmp j) (1/2) tstj))%I)
                   (itable_half M ∗
-                   mono_nat_auth_own (icfg_istmp j) (1/2) tstj)%I
+                   mono_nat_auth_own_frac (icfg_istmp j) (1/2) tstj)%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
                   ltac:(nz) ltac:(rdok) ltac:(solve_ndisj) _
                   with "Hcg Hpc [] [] [Hhalf Hstj]").
@@ -2188,7 +2188,7 @@ Section ProofIget.
                        icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                        runit (is_claim l) (bv_unsigned inum) ∗
                        (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-                          mono_nat_auth_own (icfg_istmp j) (1/2) tstn ∗
+                          mono_nat_auth_own_frac (icfg_istmp j) (1/2) tstn ∗
                           TsoGhost.llb loglen_name tstn)))%I)
                   ((∃ (g : gname) (lo : nat),
                       ⌜(lo <= tstjc)%nat⌝ ∗
@@ -2206,7 +2206,7 @@ Section ProofIget.
                        icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                        runit (is_claim l) (bv_unsigned inum) ∗
                        (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-                          mono_nat_auth_own (icfg_istmp j) (1/2) tstn ∗
+                          mono_nat_auth_own_frac (icfg_istmp j) (1/2) tstn ∗
                           TsoGhost.llb loglen_name tstn)))%I)
                   ((itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
                     isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
@@ -2214,7 +2214,7 @@ Section ProofIget.
                        ⌜(lo <= tstjc)%nat⌝ ∗
                        IcacheInv.iref_tok_genlo j (qj'/2)%Qp g lo ∗
                        (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-                          mono_nat_auth_own (icfg_istmp j) (1/2) tstn ∗
+                          mono_nat_auth_own_frac (icfg_istmp j) (1/2) tstn ∗
                           TsoGhost.llb loglen_name tstn)) ∗
                     IcacheRef.frzsel j (1/2)%Qp false ∗
                     iname fsc_ireg fsc_fs icfg_ist inum l ∗
@@ -2283,7 +2283,7 @@ Section ProofIget.
         { intros i Hi. rewrite lookup_insert_ne;
             [reflexivity | by apply not_eq_sym]. }
         { intros i Hi. reflexivity. }
-        { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert.
+        { rewrite /itable_slot_res_llb /ic_slot_row_llb /icM_count !lookup_insert_eq.
           iSplitL "Hrd Hc".
           { rewrite /ic_slot_row.
             iExists tb. iSplitL; [| iExact "Hllbb"].
@@ -2303,7 +2303,7 @@ Section ProofIget.
                      with "[%] [%] [Hid1 Hiu Hgidj Hicnt Hmirj Hselj Hpinj]") as "Hslots".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
         { intros i Hi. reflexivity. }
-        { rewrite /islot2 lookup_insert Hcij. iFrame "Hiu Hgidj Hicnt".
+        { rewrite /islot2 lookup_insert_eq Hcij. iFrame "Hiu Hgidj Hicnt".
           iSplitR "Hmirj Hselj Hpinj";
             [| iApply (frz_park_intro_off with "Hmirj Hselj Hpinj")].
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
@@ -2325,7 +2325,7 @@ Section ProofIget.
           - intros i Hi. destruct (decide (i = j)) as [->|Hne]; [exact Hk|].
             rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
           - intros i qi ni Hi. destruct (decide (i = j)) as [->|Hne].
-            + rewrite lookup_insert in Hi. apply Some_inj in Hi.
+            + rewrite lookup_insert_eq in Hi. apply Some_inj in Hi.
               injection Hi as _ Hn. subst ni. exact Hno422.
             + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
               by apply (Hcnt' i qi). }

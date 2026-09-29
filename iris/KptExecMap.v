@@ -123,7 +123,7 @@ Proof.
   unfold kpt_exec_pa.
   destruct (Z.leb (bv_unsigned tramp_vpn * 4096) (uint pc)) eqn:Hle.
   2:{ intro H; exact H. }
-  unfold mword_of_int, Values.to_word, get_word. cbn.
+  unfold mword_of_int. cbn.
   rewrite Z_to_bv_unsigned. rewrite RiscvExtras.uint_unsigned.
   intro H.
   pose proof (bv_unsigned_in_range _ pc) as [Hlo Hhi].

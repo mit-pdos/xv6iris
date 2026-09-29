@@ -111,14 +111,14 @@ Lemma delta_create_parent (av : aview) (d : Z) (nm : fname)
 Proof.
   intros Hd Hne. rewrite /delta_create Hd /=.
   rewrite lookup_insert_ne; [| congruence].
-  by rewrite lookup_insert.
+  by rewrite lookup_insert_eq.
 Qed.
 
 Lemma delta_create_child (av : aview) (d : Z) (nm : fname)
     (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) :
   av !! d = Some (MkAnode (ADir ents) nl) ->
   delta_create d nm i c av !! i = Some (MkAnode c 1%nat).
-Proof. intros Hd. rewrite /delta_create Hd /=. by rewrite lookup_insert. Qed.
+Proof. intros Hd. rewrite /delta_create Hd /=. by rewrite lookup_insert_eq. Qed.
 
 Lemma delta_create_other (av : aview) (d : Z) (nm : fname) (i : Z)
     (c : absnode) (j : Z) :
@@ -170,7 +170,7 @@ Proof.
     intros e He. discriminate He. }
   destruct Hp as (Hd & Hnm & Hi).
   rewrite /delta_create Hd /= Nat.add_0_r.
-  rewrite (insert_commute _ i d); [| congruence].
+  rewrite (insert_insert_ne _ i d); [| congruence].
   by rewrite (insert_id av i (MkAnode (ADev ma mi) 1%nat) Hi).
 Qed.
 
@@ -187,7 +187,7 @@ Lemma delta_create_armed (av : aview) (d : Z) (nm : fname)
 Proof.
   intros (Hd & Hnm & Hi) Hne.
   rewrite /delta_create Hd /=.
-  rewrite (insert_commute _ i d); [| congruence].
+  rewrite (insert_insert_ne _ i d); [| congruence].
   by rewrite (insert_id av i (MkAnode c 1%nat) Hi).
 Qed.
 
@@ -249,7 +249,7 @@ Definition delta_ent (d : Z) (nm : fname) (i : Z) (av : aview) : aview :=
 
 Lemma delta_arm_lookup_at (av : aview) (i : Z) (c : absnode) :
   delta_arm i c av !! i = Some (MkAnode c 1%nat).
-Proof. rewrite /delta_arm lookup_insert //. Qed.
+Proof. rewrite /delta_arm lookup_insert_eq //. Qed.
 
 Lemma delta_arm_lookup_same (av : aview) (i : Z) (c : absnode) (j : Z) :
   j <> i -> delta_arm i c av !! j = av !! j.
@@ -260,7 +260,7 @@ Proof. intros Hj. rewrite /delta_arm lookup_insert_ne //. Qed.
 Lemma delta_arm_unarm (av : aview) (i : Z) (c : absnode) :
   av !! i = None -> delta_unarm i (delta_arm i c av) = av.
 Proof.
-  intros Hi. rewrite /delta_unarm /delta_arm delete_insert //.
+  intros Hi. rewrite /delta_unarm /delta_arm delete_insert_id //.
 Qed.
 
 (* ...and [i ∉ dom av] is that precondition's [dom] spelling *)
@@ -270,7 +270,7 @@ Proof. apply not_elem_of_dom. Qed.
 
 Lemma delta_unarm_lookup_at (av : aview) (i : Z) :
   delta_unarm i av !! i = None.
-Proof. rewrite /delta_unarm lookup_delete //. Qed.
+Proof. rewrite /delta_unarm lookup_delete_eq //. Qed.
 
 Lemma delta_unarm_lookup_same (av : aview) (i j : Z) :
   j <> i -> delta_unarm i av !! j = av !! j.
@@ -286,7 +286,7 @@ Lemma delta_dots_lookup_at (av : aview) (i d : Z) (ents : gmap fname Z) (nl : na
   av !! i = Some (MkAnode (ADir ents) nl) ->
   delta_dots i d av !! i
   = Some (MkAnode (ADir (<[DOT := i]> (<[DOTDOT := d]> ents))) nl).
-Proof. intros Hi. rewrite (delta_dots_dir _ _ _ _ _ Hi) lookup_insert //. Qed.
+Proof. intros Hi. rewrite (delta_dots_dir _ _ _ _ _ Hi) lookup_insert_eq //. Qed.
 
 Lemma delta_dots_lookup_same (av : aview) (i d j : Z) :
   j <> i -> delta_dots i d av !! j = av !! j.
@@ -323,7 +323,7 @@ Proof. intros Hi. rewrite /delta_dot Hi //=. Qed.
 Lemma delta_dot_lookup_at (av : aview) (i : Z) (ents : gmap fname Z) (nl : nat) :
   av !! i = Some (MkAnode (ADir ents) nl) ->
   delta_dot i av !! i = Some (MkAnode (ADir (<[DOT := i]> ents)) nl).
-Proof. intros Hi. rewrite (delta_dot_dir _ _ _ _ Hi) lookup_insert //. Qed.
+Proof. intros Hi. rewrite (delta_dot_dir _ _ _ _ Hi) lookup_insert_eq //. Qed.
 
 Lemma delta_dot_lookup_same (av : aview) (i j : Z) :
   j <> i -> delta_dot i av !! j = av !! j.
@@ -374,7 +374,7 @@ Lemma delta_ent_lookup_at (av : aview) (d : Z) (nm : fname) (i : Z)
   delta_ent d nm i av !! d
   = Some (MkAnode (ADir (<[nm := i]> ents)) (nl + acre_bump c)%nat).
 Proof.
-  intros Hd Hi. rewrite (delta_ent_dir _ _ _ _ _ _ _ _ Hd Hi) lookup_insert //.
+  intros Hd Hi. rewrite (delta_ent_dir _ _ _ _ _ _ _ _ Hd Hi) lookup_insert_eq //.
 Qed.
 
 Lemma delta_ent_lookup_same (av : aview) (d : Z) (nm : fname) (i j : Z) :
@@ -408,7 +408,7 @@ Proof.
   assert (Hne : d <> i) by (intros ->; rewrite Hd in Hi; discriminate Hi).
   rewrite /delta_create Hd /=.
   rewrite (delta_ent_dir _ d nm i ents nl c 1%nat).
-  - rewrite /delta_arm. apply insert_commute. congruence.
+  - rewrite /delta_arm. apply insert_insert_ne. congruence.
   - rewrite (delta_arm_lookup_same _ _ _ _ Hne). exact Hd.
   - apply delta_arm_lookup_at.
 Qed.
@@ -482,7 +482,7 @@ Lemma delta_write_lookup (av : aview) (i : Z) (off : nat)
   delta_write i off new av !! i
   = Some (MkAnode (AFile (blk_splice off new bs0)) nl).
 Proof.
-  intros Hi. rewrite (delta_write_file _ _ _ _ _ _ Hi) lookup_insert //.
+  intros Hi. rewrite (delta_write_file _ _ _ _ _ _ Hi) lookup_insert_eq //.
 Qed.
 
 Lemma delta_write_other (av : aview) (i : Z) (off : nat)
@@ -543,7 +543,7 @@ Lemma delta_trunc_lookup (av : aview) (i : Z) (bs0 : list (bv 8))
   av !! i = Some (MkAnode (AFile bs0) nl) ->
   delta_trunc i av !! i = Some (MkAnode (AFile []) nl).
 Proof.
-  intros Hi. rewrite (delta_trunc_file av i bs0 nl Hi) lookup_insert //.
+  intros Hi. rewrite (delta_trunc_file av i bs0 nl Hi) lookup_insert_eq //.
 Qed.
 
 Lemma delta_trunc_other (av : aview) (i j : Z) :
@@ -645,7 +645,7 @@ Lemma delta_unl_ent_parent (av : aview) (d : Z) (nm : fname) (dec : nat)
   av !! d = Some (MkAnode (ADir ents) nl) ->
   delta_unl_ent d nm dec av !! d
   = Some (MkAnode (ADir (delete nm ents)) (nl - dec)%nat).
-Proof. intros Hd. rewrite /delta_unl_ent Hd /=. by rewrite lookup_insert. Qed.
+Proof. intros Hd. rewrite /delta_unl_ent Hd /=. by rewrite lookup_insert_eq. Qed.
 
 Lemma delta_unl_ent_other (av : aview) (d : Z) (nm : fname) (dec : nat)
     (j : Z) :
@@ -673,7 +673,7 @@ Lemma delta_unl_tgt_target (av : aview) (t : Z) (a : anode) :
 Proof.
   intros Ht Hnl. rewrite (delta_unl_tgt_unfold av t a Ht).
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [lia |].
-  by rewrite lookup_insert.
+  by rewrite lookup_insert_eq.
 Qed.
 
 (* the LAST link: the row leaves *)
@@ -683,7 +683,7 @@ Lemma delta_unl_tgt_last (av : aview) (t : Z) (a : anode) :
 Proof.
   intros Ht Hnl. rewrite (delta_unl_tgt_unfold av t a Ht).
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [| lia].
-  by rewrite lookup_delete.
+  by rewrite lookup_delete_eq.
 Qed.
 
 Lemma delta_unl_tgt_other (av : aview) (t j : Z) :
@@ -721,8 +721,8 @@ Lemma delta_unlink_parent (av : aview) (d : Z) (nm : fname)
 Proof.
   intros Hd Ht Hne. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
-  - rewrite lookup_delete_ne; [| congruence]. by rewrite lookup_insert.
-  - rewrite lookup_insert_ne; [| congruence]. by rewrite lookup_insert.
+  - rewrite lookup_delete_ne; [| congruence]. by rewrite lookup_insert_eq.
+  - rewrite lookup_insert_ne; [| congruence]. by rewrite lookup_insert_eq.
 Qed.
 
 Lemma delta_unlink_target (av : aview) (d : Z) (nm : fname)
@@ -734,7 +734,7 @@ Lemma delta_unlink_target (av : aview) (d : Z) (nm : fname)
 Proof.
   intros Hd Ht Hnl. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [lia |].
-  by rewrite lookup_insert.
+  by rewrite lookup_insert_eq.
 Qed.
 
 (* the LAST link: the target's row leaves the view (E2-V2) *)
@@ -746,7 +746,7 @@ Lemma delta_unlink_last (av : aview) (d : Z) (nm : fname)
 Proof.
   intros Hd Ht Hnl. rewrite (delta_unlink_unfold av d nm ents nl t a Hd Ht).
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)); [| lia].
-  by rewrite lookup_delete.
+  by rewrite lookup_delete_eq.
 Qed.
 
 Lemma delta_unlink_other (av : aview) (d : Z) (nm : fname) (t j : Z) :
@@ -777,11 +777,11 @@ Proof.
   destruct (decide ((an_nlink a - 1)%nat = 0%nat)).
   - rewrite lookup_delete_ne; [| congruence].
     destruct (decide (j = d)) as [-> | Hjd].
-    { rewrite lookup_insert Hd. split; intros _; by eexists. }
+    { rewrite lookup_insert_eq Hd. split; intros _; by eexists. }
     by rewrite lookup_insert_ne; [| congruence].
   - rewrite lookup_insert_ne; [| congruence].
     destruct (decide (j = d)) as [-> | Hjd].
-    { rewrite lookup_insert Hd. split; intros _; by eexists. }
+    { rewrite lookup_insert_eq Hd. split; intros _; by eexists. }
     by rewrite lookup_insert_ne; [| congruence].
 Qed.
 
@@ -826,7 +826,7 @@ Definition delta_link (d : Z) (nm : fname) (t : Z) (a : anode)
 
 Lemma delta_link_tgt_lookup_at (av : aview) (t : Z) (a : anode) :
   delta_link_tgt t a av !! t = Some (MkAnode (an_node a) (an_nlink a + 1)%nat).
-Proof. rewrite /delta_link_tgt lookup_insert //. Qed.
+Proof. rewrite /delta_link_tgt lookup_insert_eq //. Qed.
 
 Lemma delta_link_tgt_lookup_same (av : aview) (t : Z) (a : anode) (j : Z) :
   j <> t -> delta_link_tgt t a av !! j = av !! j.
@@ -842,7 +842,7 @@ Lemma delta_link_ent_lookup_at (av : aview) (d : Z) (nm : fname) (t : Z)
     (ents : gmap fname Z) (nl : nat) :
   av !! d = Some (MkAnode (ADir ents) nl) ->
   delta_link_ent d nm t av !! d = Some (MkAnode (ADir (<[nm := t]> ents)) nl).
-Proof. intros Hd. rewrite (delta_link_ent_dir _ _ _ _ _ _ Hd) lookup_insert //. Qed.
+Proof. intros Hd. rewrite (delta_link_ent_dir _ _ _ _ _ _ Hd) lookup_insert_eq //. Qed.
 
 Lemma delta_link_ent_lookup_same (av : aview) (d : Z) (nm : fname) (t j : Z) :
   j <> d -> delta_link_ent d nm t av !! j = av !! j.
@@ -865,12 +865,12 @@ Lemma delta_link_untgt_tgt (av : aview) (t : Z) (a : anode) :
 Proof.
   intros Hrow. destruct a as [n k].
   rewrite /delta_link_untgt /delta_link_tgt. cbn [an_node an_nlink].
-  erewrite delta_unl_tgt_unfold; [| apply lookup_insert]. cbn [an_node an_nlink].
+  erewrite delta_unl_tgt_unfold; [| apply lookup_insert_eq]. cbn [an_node an_nlink].
   destruct (arow_at_cases _ _ _ Hrow) as [[Hz Hnone] | [Hnz Hsome]].
   - cbn [an_nlink] in Hz. case_decide as Hc; [| exfalso; lia].
-    rewrite delete_insert; [reflexivity | exact Hnone].
+    rewrite delete_insert_id; [reflexivity | exact Hnone].
   - cbn [an_nlink] in Hnz. case_decide as Hc; [exfalso; lia |].
-    rewrite insert_insert. replace (k + 1 - 1)%nat with k by lia.
+    rewrite insert_insert_eq. replace (k + 1 - 1)%nat with k by lia.
     apply insert_id. exact Hsome.
 Qed.
 
@@ -894,7 +894,7 @@ Lemma delta_link_parent (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
   av !! d = Some (MkAnode (ADir ents) nl) -> d <> t ->
   delta_link d nm t a av !! d = Some (MkAnode (ADir (<[nm := t]> ents)) nl).
 Proof.
-  intros Hd Hne. rewrite (delta_link_split _ _ _ _ _ _ _ Hd Hne) lookup_insert //.
+  intros Hd Hne. rewrite (delta_link_split _ _ _ _ _ _ _ Hd Hne) lookup_insert_eq //.
 Qed.
 
 Lemma delta_link_target (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
@@ -903,7 +903,7 @@ Lemma delta_link_target (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode)
   delta_link d nm t a av !! t = Some (MkAnode (an_node a) (an_nlink a + 1)%nat).
 Proof.
   intros Hd Hne. rewrite (delta_link_split _ _ _ _ _ _ _ Hd Hne).
-  rewrite lookup_insert_ne; [| exact Hne]. rewrite lookup_insert //.
+  rewrite lookup_insert_ne; [| exact Hne]. rewrite lookup_insert_eq //.
 Qed.
 
 Lemma delta_link_other (av : aview) (d : Z) (nm : fname) (t : Z) (a : anode) (j : Z) :

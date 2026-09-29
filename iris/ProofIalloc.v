@@ -228,7 +228,7 @@ Proof.
                = shiftr (mword_of_int (bv_unsigned w) : mword 64) 4).
   { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)

@@ -68,7 +68,7 @@ Import Defs.
 
 Lemma and_vec_zeros64_r (x : mword 64) : and_vec x (zeros' 64) = zeros' 64.
 Proof.
-  cbv [and_vec word_binop with_word' with_word]. unfold MachineWord.MachineWord.and.
+  cbv [and_vec word_binop ]. unfold MachineWord.MachineWord.and.
   apply bv_eq. rewrite bv_and_unsigned.
   assert (H0 : bv_unsigned (zeros' 64) = 0) by reflexivity. rewrite H0. apply Z.land_0_r.
 Qed.
@@ -1025,7 +1025,7 @@ Section SmodeCoreIris.
      cur_privilege ↦ᵣ{ dq } Supervisor ∗
      (∃ mstatus0 : mword 64,
         mstatus ↦ᵣ{ dq } mstatus0 ∗
-        ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
+        ghost_var_frac γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
         ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
         ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
         ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
@@ -1050,7 +1050,7 @@ Section SmodeCoreIris.
     cur_privilege ↦ᵣ{ dq } Supervisor ∗
     (∃ mstatus0 : mword 64,
        mstatus ↦ᵣ{ dq } mstatus0 ∗
-       ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
+       ghost_var_frac γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
        ⌜ eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ⌝ ∗
        ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
        ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
@@ -1086,7 +1086,7 @@ Section SmodeCoreIris.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
+    ghost_var_frac γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
@@ -1124,7 +1124,7 @@ Section SmodeCoreIris.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ mstatus0 -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
+    ghost_var_frac γ (1/2) (_get_Mstatus_SIE mstatus0) -∗
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
@@ -1162,7 +1162,7 @@ Section SmodeCoreIris.
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ Supervisor ∗
      mstatus ↦ᵣ mstatus0 ∗
-     ghost_var γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
+     ghost_var_frac γ (1/2) (_get_Mstatus_SIE mstatus0) ∗
      mie ↦ᵣ mie_v ∗
      mideleg ↦ᵣ mdv0 ∗
      menvcfg ↦ᵣ menvcfg0).

@@ -1126,7 +1126,7 @@ Section WfiLeaf.
                                (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
                                MENVCFG_S tv)))
               (fun rs2 => (gpr_file (tp_pin m) ∗ intr_count 0 false ∗
-                 ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
+                 ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
                  sret_tie mst0 ∗ sie_cap_rest kt m n b p ∗
                  strans_res_at satp0 (register_lookup tlb rs2) ∗
                  resv_any cpu_id)%I)
@@ -1174,12 +1174,12 @@ Section WfiLeaf.
                                   mseccfg0 (mword_of_int 0) pmar0 elp0 satp0
                                   MIE_S mdv0 MENVCFG_S tv))
                     (fun rs2 => (gpr_file (tp_pin m) ∗ intr_count 0 false ∗
-                       ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
+                       ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
                        sret_tie mst0 ∗ sie_cap_rest kt m n b p ∗
                        strans_res_at satp0 (register_lookup tlb rs2) ∗
                        resv_any cpu_id)%I)
                     (gpr_file (tp_pin m) ∗ intr_count 0 false ∗
-                     ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
+                     ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
                      sret_tie mst0 ∗ sie_cap_rest kt m n b p)%I
                     eq_refl Hmisaval eq_refl Helpnp HSIE Hmm
                     (pma_all_ram Hpmaall) HA Hord HX Hcov
@@ -1255,7 +1255,7 @@ Section WfiLeaf.
         rewrite HrsP. apply register_lookup_set. }
       iApply (wfi_wait_loop (zero_extend' 32 w0)
                 (gpr_file (tp_pin m) ∗ intr_count 0 false ∗
-                 ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
+                 ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0) ∗
                  sret_tie mst0 ∗ sie_cap_rest kt m n b p ∗
                  strans_res_at satp0 (register_lookup tlb rs2))%I
                 rs3 Hhart3

@@ -98,7 +98,7 @@ Set Printing Depth 40.
    and the proofmode context there is the syscall-altitude one. *)
 Lemma su_last_of_npar (pl : list (bv 8)) (nf : nat -> bv 8) :
   (exists es e, nameiparent_of pl es e /\ bname 14 nf = e) ->
-  list_basics.last (path_elems pl) = Some (bname 14 nf).
+  list_basics.list.last (path_elems pl) = Some (bname 14 nf).
 Proof.
   intros (es & e & Hnp & Hb). rewrite /nameiparent_of in Hnp.
   rewrite Hnp Hb. apply last_snoc.

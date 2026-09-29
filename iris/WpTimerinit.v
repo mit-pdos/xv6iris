@@ -144,7 +144,7 @@ Proof.
          sys_mcounteren_writable_bits, and_vec, or_vec, word_binop,
          zero_extend', sign_extend', zero_extend, sign_extend, extz_vec, exts_vec.
   mw_prep.
-  unfold with_word', with_word, MachineWord.and, MachineWord.or,
+  unfold MachineWord.and, MachineWord.or,
          MachineWord.zero_extend, MachineWord.sign_extend.
   zn_norm.
   apply (bv_eq_testbit 1); intros k Hk;

@@ -359,7 +359,7 @@ Lemma cons_absent_arm (i : Z) (ma mi : Z) (av : aview) :
 Proof.
   intros Habs. rewrite /cons_absent /astep /aents /delta_arm.
   destruct (decide (i = FsImg.ROOTINO)) as [-> | Hne].
-  - rewrite lookup_insert /= /anode_ents /=. reflexivity.
+  - rewrite lookup_insert_eq /= /anode_ents /=. reflexivity.
   - rewrite lookup_insert_ne; [| congruence]. exact Habs.
 Qed.
 
@@ -403,7 +403,7 @@ Proof.
   apply file_pin_of_parts.
   - rewrite /astep /aents.
     destruct (decide (d = FsImg.ROOTINO)) as [-> | Hdne].
-    + rewrite lookup_insert /= /anode_ents /=.
+    + rewrite lookup_insert_eq /= /anode_ents /=.
       rewrite Hroot in Hd. injection Hd as Hents Hnl. subst rents.
       rewrite lookup_insert_ne; [exact Hnm |].
       intros <-. by rewrite Hnm in Hfresh.
@@ -426,8 +426,8 @@ Proof.
   rewrite (delta_create_dev av FsImg.ROOTINO fname_console ents nl i
              CONSOLE 0 Hpre).
   apply cons_present_of_parts.
-  - rewrite /astep /aents lookup_insert /= /anode_ents /=.
-    apply lookup_insert.
+  - rewrite /astep /aents lookup_insert_eq /= /anode_ents /=.
+    apply lookup_insert_eq.
   - rewrite lookup_insert_ne; [| congruence].
     rewrite /cons_dev. exact Hchild.
 Qed.
@@ -446,7 +446,7 @@ Proof.
   rewrite (delta_create_dev av d nmn ents nl i ma mi Hpre).
   rewrite /cons_absent /astep /aents.
   destruct (decide (d = FsImg.ROOTINO)) as [-> | Hdne].
-  - rewrite lookup_insert /= /anode_ents /=.
+  - rewrite lookup_insert_eq /= /anode_ents /=.
     rewrite /cons_absent /astep /aents Hd /= /anode_ents /= in Habs.
     rewrite lookup_insert_ne; [exact Habs |].
     intros ->. destruct Hother as [Hc | Hc]; [exact (Hc eq_refl) | exact (Hc eq_refl)].
@@ -468,7 +468,7 @@ Proof.
   apply cons_present_of_parts.
   - rewrite /astep /aents.
     destruct (decide (d = FsImg.ROOTINO)) as [-> | Hdne].
-    + rewrite lookup_insert /= /anode_ents /=.
+    + rewrite lookup_insert_eq /= /anode_ents /=.
       rewrite Hroot in Hd. injection Hd as Hents Hnl. subst rents.
       rewrite lookup_insert_ne; [exact Hnm |].
       (* the console's own name cannot be the created one: [cre_pre] says
@@ -544,7 +544,7 @@ Lemma cons_absent_unarm (i : Z) (av : aview) :
 Proof.
   intros Habs. rewrite /cons_absent /astep /aents /delta_unarm.
   destruct (decide (i = FsImg.ROOTINO)) as [-> | Hne].
-  - by rewrite lookup_delete /=.
+  - by rewrite lookup_delete_eq /=.
   - rewrite lookup_delete_ne; [exact Habs | congruence].
 Qed.
 
@@ -634,7 +634,7 @@ Proof.
   destruct (av !! i) as [a |] eqn:Hi; last first.
   { left. rewrite /delta_trunc Hi. reflexivity. }
   destruct a as [n nl]. destruct n as [bs | e | ma mi].
-  - right. rewrite /aents /delta_trunc Hi /= lookup_insert /= /anode_ents /=.
+  - right. rewrite /aents /delta_trunc Hi /= lookup_insert_eq /= /anode_ents /=.
     reflexivity.
   - left. rewrite /delta_trunc Hi /=. reflexivity.
   - left. rewrite /delta_trunc Hi /=. reflexivity.

@@ -64,7 +64,7 @@ Lemma sub64_63 (x : mword (0+64-1+1)) :
 Proof.
   unfold subrange_vec_dec. rewrite pi_autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0. rewrite Z.shiftr_0_r.
@@ -92,8 +92,7 @@ Lemma moi_add (a b : Z) :
   add_vec (mword_of_int a : mword 64) (mword_of_int b) = mword_of_int (a + b).
 Proof.
   apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. rewrite !moi64_mod.
   unfold bv_wrap. change (bv_modulus 64) with 18446744073709551616.
   rewrite Zplus_mod_idemp_l, Zplus_mod_idemp_r. reflexivity.
@@ -104,7 +103,7 @@ Lemma sub64_31 (x : mword 64) :
 Proof.
   unfold subrange_vec_dec. rewrite pi_autocast_id.
   unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
+  unfold MachineWord.MachineWord.slice.
   rewrite bv_extract_unsigned.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   change (Z.of_N 0) with 0. rewrite Z.shiftr_0_r.
@@ -116,8 +115,7 @@ Lemma sext32_64_small (k : Z) : 0 <= k < 2^31 ->
   sign_extend' 64 (mword_of_int k : mword 32) = (mword_of_int k : mword 64).
 Proof.
   intro Hk. apply bv_eq.
-  unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec,
-    SailStdpp.Values.to_word, to_word, get_word, MachineWord.MachineWord.sign_extend.
+  unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec, MachineWord.MachineWord.sign_extend.
   rewrite bv_sign_extend_unsigned.
   assert (Hu : bv_unsigned (mword_of_int k : mword 32) = k).
   { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
@@ -172,7 +170,7 @@ Proof.
              = shiftr x 60)
     by (unfold shift_bits_right; f_equal; vm_compute; reflexivity).
   rewrite Hr, uint_unsigned.
-  unfold shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftr,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   assert (H60 : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 60)) = 60).
@@ -329,8 +327,7 @@ Lemma add_sub_cancel (S : mword 64) (k : Z) :
   sub_vec (add_vec S (mword_of_int k)) (mword_of_int k) = S.
 Proof.
   apply bv_eq.
-  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
+  unfold sub_vec, Operators_mwords.word_binop, MachineWord.MachineWord.sub.
   rewrite bv_sub_unsigned. rewrite add_vec64_unsigned, moi64_unsigned.
   rewrite bv_wrap_sub_idemp_l.
   replace (bv_unsigned S + bv_wrap 64 k - bv_wrap 64 k) with (bv_unsigned S) by ring.

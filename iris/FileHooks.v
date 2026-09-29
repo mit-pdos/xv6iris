@@ -40,11 +40,11 @@ Definition fline (I : list (bv 8)) : uline :=
 Lemma fline_echof_in (I : list (bv 8)) (ws : list (list (bv 8))) (N : list (bv 8)) :
   (0 < nlines I)%nat -> fline I = LEchoF ws N -> (N, ws) ∈ echof_lines_in I.
 Proof using.
-  intros Hp Hf. rewrite /echof_lines_in. apply elem_of_list_omap.
+  intros Hp Hf. rewrite /echof_lines_in. apply list_elem_of_omap.
   exists (LEchoF ws N). split; [ | reflexivity ].
-  rewrite /lines_of -Hf /fline. apply elem_of_list_fmap.
+  rewrite /lines_of -Hf /fline. apply list_elem_of_fmap.
   eexists. split; [ reflexivity | ].
-  apply elem_of_list_lookup. exists (nlines I - 1)%nat.
+  apply list_elem_of_lookup. exists (nlines I - 1)%nat.
   apply list_lookup_lookup_total_lt. rewrite /nlines in Hp |- *. lia.
 Qed.
 

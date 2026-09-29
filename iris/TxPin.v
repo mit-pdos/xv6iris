@@ -103,7 +103,7 @@ Section TxPin.
      authority for that map is EMPTY ([LogInv.log_tx_empty_of_ops] reads it
      off the ledger), so the state the park witnesses cannot be standing. *)
   Lemma tx_pin_no_ops (γ : log_names) (t : nat) (q : Qp) :
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗ tx_pin γ t q -∗ False.
+    ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗ tx_pin γ t q -∗ False.
   Proof using .
     iIntros "Ha Hp". rewrite /tx_pin.
     iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
@@ -112,7 +112,7 @@ Section TxPin.
 
   (* ...at an optional park: it is empty. *)
   Lemma tx_pin_o_no_ops (γ : log_names) (o : option (nat * Qp)) :
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
     tx_pin_o γ o -∗ ⌜o = None⌝.
   Proof using .
     iIntros "Ha Hp". destruct o as [p |]; [| done].
@@ -124,7 +124,7 @@ Section TxPin.
      witness. *)
   Lemma tx_pins_no_ops (γ : log_names) `{Countable K}
       (M : gmap K (nat * Qp)) :
-    ghost_map_auth (ln_tx γ) 1 (∅ : gmap nat unit) -∗
+    ghost_map_auth_frac (ln_tx γ) 1 (∅ : gmap nat unit) -∗
     tx_pins γ M -∗ ⌜M = ∅⌝.
   Proof using .
     iIntros "Ha HM". rewrite /tx_pins.

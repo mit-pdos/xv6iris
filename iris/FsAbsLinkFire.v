@@ -288,7 +288,7 @@ Section LinkFire.
     { iNext. rewrite /ftop_body. iExists (<[t := nt']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = t)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hf". iExists (abs_view I).
@@ -351,7 +351,7 @@ Section LinkFire.
     { iNext. rewrite /ftop_body. iExists (<[d := np']> I), A.
       iFrame "Hta Hla Hpark". iPureIntro.
       intros jj mm Hj Hun. destruct (decide (jj = d)) as [-> | Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_eq in Hj. injection Hj as <-. exact Hloc.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         exact (Hcl jj mm Hj Hun). }
     iModIntro. iFrame "Hf". iExists (abs_view I).

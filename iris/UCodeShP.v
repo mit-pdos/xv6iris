@@ -196,7 +196,7 @@ Lemma shp_bytes_key_lt (k : Z) (b : bv 8) :
 Proof using .
   intro Hk.
   apply elem_of_list_to_map_2 in Hk.
-  apply elem_of_list_In in Hk.
+  apply list_elem_of_In in Hk.
   refine (list_key_lt _ 8192 k b _ Hk).
   vm_compute. reflexivity.
 Qed.
@@ -206,7 +206,7 @@ Lemma shp_bytes_key_nonneg (k : Z) (b : bv 8) :
 Proof using .
   intro Hk.
   apply elem_of_list_to_map_2 in Hk.
-  apply elem_of_list_In in Hk.
+  apply list_elem_of_In in Hk.
   refine (list_key_nonneg _ k b _ Hk).
   vm_compute. reflexivity.
 Qed.
@@ -216,7 +216,7 @@ Lemma shp_data_key_lt (k : Z) (b : bv 8) :
 Proof using .
   intro Hk.
   apply elem_of_list_to_map_2 in Hk.
-  apply elem_of_list_In in Hk.
+  apply list_elem_of_In in Hk.
   refine (list_key_lt _ 12288 k b _ Hk).
   vm_compute. reflexivity.
 Qed.
@@ -226,7 +226,7 @@ Lemma shp_data_key_nonneg (k : Z) (b : bv 8) :
 Proof using .
   intro Hk.
   apply elem_of_list_to_map_2 in Hk.
-  apply elem_of_list_In in Hk.
+  apply list_elem_of_In in Hk.
   refine (list_key_nonneg _ k b _ Hk).
   vm_compute. reflexivity.
 Qed.

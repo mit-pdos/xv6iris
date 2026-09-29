@@ -1,8 +1,8 @@
-(* OffGv.v -- THE OFFSET SHADOW: a ghost_var over Z whose value is a file's
+(* OffGv.v -- THE OFFSET SHADOW: a ghost_var_frac over Z whose value is a file's
    [f->off], its two halves, and the two shapes the USER half takes.
 
    THE GHOST.  [FdSlots.FdInode inum γo] names, beside its inum, a
-   [ghost_var Z] that tracks the file's offset.  The kernel owns ONE HALF
+   [ghost_var_frac Z] that tracks the file's offset.  The kernel owns ONE HALF
    of it, inside the file's off box ([FileOffCell.off_resident]: the cell,
    its bound, and [off_gv γo (1/2) v]); the other half is the process's.
    So an offset advance -- fileread's / filewrite's [f->off += r], at the
@@ -31,7 +31,7 @@
 
    PINNED CLASS.  [ghost_varG Σ Z] has a second member in [xv6G] ([uioG]'s
    break ghost), so every statement about the shadow goes through [off_gv],
-   never a bare [ghost_var] at [Z] -- two paths to one [inG] are two
+   never a bare [ghost_var_frac] at [Z] -- two paths to one [inG] are two
    propositions that print identically (durable-notes). *)
 From Stdlib Require Import ZArith.
 From iris.proofmode Require Import proofmode.
@@ -43,7 +43,7 @@ Section OffGv.
   Context `{!offboxG Σ}.
 
   Definition off_gv (γo : gname) (q : Qp) (z : Z) : iProp Σ :=
-    ghost_var (ghost_varG0 := offbox_offG) γo q z.
+    ghost_var (ghost_varG0 := offbox_offG) γo (DfracOwn q) z.
 
   Global Instance off_gv_timeless γo q z : Timeless (off_gv γo q z).
   Proof using . rewrite /off_gv. apply _. Qed.
@@ -147,7 +147,7 @@ Section OffUser.
      hand back ([off_ret] below), and what the fire's settle produces
      ([UserOff.off_settle]): the kernel's half at the value the cell
      holds, or -- once a fire has run at a HELD row with no link -- the
-     application's taint and NO GHOST AT ALL, permanently (a [ghost_var]
+     application's taint and NO GHOST AT ALL, permanently (a [ghost_var_frac]
      half cannot be re-minted at an existing name, the pipe's "no fresh
      authority at an existing name").
 

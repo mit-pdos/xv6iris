@@ -75,7 +75,7 @@
    i.e. literally SpecIunlock v2's precondition and literally what
    [ic_swap_park] consumes.  The record is ∃-bound because nothing outside
    ilock knows it: v1's caller named it through the [inode_key] shadow, and
-   §13.1 retires the shadow (with N reference holders only two ghost_var
+   §13.1 retires the shadow (with N reference holders only two ghost_var_frac
    halves exist, so "the caller supplies one" is unsatisfiable for the
    second holder -- the same multi-holder trap as v1's [i_ref] premise).
    readi/writei instantiate from the existential exactly as they already do

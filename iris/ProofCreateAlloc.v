@@ -223,7 +223,7 @@ Section ProofCreateAlloc.
        this half FIRES the parent leg, at the last element of its own path
        buffer, so it owes [Nm] at that name and nothing else. *)
     (forall nm : fname,
-       list_basics.last (path_elems (bview plen pfun)) = Some nm -> Nm nm) ->
+       list_basics.list.last (path_elems (bview plen pfun)) = Some nm -> Nm nm) ->
     (K_create <= K)%nat ->
     icfg_dev = ROOTDEV ->
     log_geom_ok fsc_cov fsc_logst ->

@@ -59,22 +59,22 @@ Section LogHelp.
      the collect). *)
   Definition esc (Q : iProp Σ) (γw : gname) : iProp Σ :=
     ((Q ∗ mono_nat_lb_own γw 1%nat) ∨
-     mono_nat_auth_own γw (1/2) 0%nat ∨
-     mono_nat_auth_own γw 1 1%nat)%I.
+     mono_nat_auth_own_frac γw (1/2) 0%nat ∨
+     mono_nat_auth_own_frac γw 1 1%nat)%I.
 
   (* ONE ENTRY of the slot, at the cells [nc], [out], [cmt]. *)
   Definition log_help_entry (nc : mword 32) (out : nat) (cmt : bool)
       (w : nat) (e : gname * mword 32) : iProp Σ :=
     (∃ Q : iProp Σ, inv (helpN .@ w) (esc Q e.1) ∗
-       ((riscv_sync_hook gen_id Q ∗ mono_nat_auth_own e.1 (1/2) 0%nat ∗
+       ((riscv_sync_hook gen_id Q ∗ mono_nat_auth_own_frac e.1 (1/2) 0%nat ∗
          ⌜e.2 = nc⌝ ∗ ⌜cmt = true \/ out ≠ 0%nat⌝) ∨
-        mono_nat_auth_own e.1 1 1%nat))%I.
+        mono_nat_auth_own_frac e.1 1 1%nat))%I.
 
   (* THE SLOT, as [LogInv.log_res] holds it at its own three cells. *)
   Definition log_help (γ : log_names) (nc : mword 32) (out : nat) (cmt : bool)
       : iProp Σ :=
     (∃ m : gmap nat (gname * mword 32),
-       ghost_map_auth (ln_help γ) 1 m ∗
+       ghost_map_auth_frac (ln_help γ) 1 m ∗
        [∗ map] w ↦ e ∈ m, log_help_entry nc out cmt w e)%I.
 
   (* ---------------------------------------------------------------- *)
@@ -85,14 +85,14 @@ Section LogHelp.
      ghost commit produced go in; the escrow is left holding [Q ∗ ◯ 1] and
      the full authority at one comes out for the Done arm. *)
   Lemma esc_flip (w : nat) (Q : iProp Σ) (γw : gname) :
-    inv (helpN .@ w) (esc Q γw) -∗ mono_nat_auth_own γw (1/2) 0%nat -∗ Q ={⊤}=∗
-    mono_nat_auth_own γw 1 1%nat.
+    inv (helpN .@ w) (esc Q γw) -∗ mono_nat_auth_own_frac γw (1/2) 0%nat -∗ Q ={⊤}=∗
+    mono_nat_auth_own_frac γw 1 1%nat.
   Proof using .
     iIntros "#Hinv Hh HQ".
     iInv "Hinv" as "Hb" "Hclose". rewrite /esc.
     iDestruct "Hb" as "[[_ >#Hlb] | [>Hh2 | >Hf]]".
-    - iDestruct (mono_nat_lb_own_valid with "Hh Hlb") as %[_ Hle]. lia.
-    - iAssert (mono_nat_auth_own γw 1 0%nat) with "[Hh Hh2]" as "Hfull".
+    - iDestruct (mono_nat_auth_lb_own_valid with "Hh Hlb") as %[_ Hle]. lia.
+    - iAssert (mono_nat_auth_own_frac γw 1 0%nat) with "[Hh Hh2]" as "Hfull".
       { iEval (rewrite -Qp.half_half). iSplitL "Hh"; [iExact "Hh" | iExact "Hh2"]. }
       iMod (mono_nat_own_update 1%nat with "Hfull") as "[Hfull #Hlb]"; [lia|].
       iMod ("Hclose" with "[HQ]") as "_".
@@ -229,7 +229,7 @@ Section LogHelp.
 
   (* THE GENESIS: the empty map [LogDefs.log_free_tok] hands over. *)
   Lemma log_help_empty (γ : log_names) (nc : mword 32) (out : nat) (cmt : bool) :
-    ghost_map_auth (ln_help γ) 1 (∅ : gmap nat (gname * mword 32)) -∗
+    ghost_map_auth_frac (ln_help γ) 1 (∅ : gmap nat (gname * mword 32)) -∗
     log_help γ nc out cmt.
   Proof using .
     iIntros "Ha". rewrite /log_help. iExists ∅. iFrame "Ha".

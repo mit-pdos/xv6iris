@@ -18,7 +18,7 @@
      "[ftop_astate_ro]'s [give-back] wants the SAME [I] the borrow named,
       and nothing in [astate Γ av] says the returned map is that one"
 
-   [astate Γ av] is [∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝]
+   [astate Γ av] is [∃ I, ghost_map_auth_frac (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝]
    and [abs_view] is not injective ([abs_of] forgets the block map, the
    size's slack, and every field [FsStateInode.inode_local] constrains), so
    an authority that comes back out of a client's fupd is an authority at
@@ -26,7 +26,7 @@
    [ftop_clean] is a statement about the RECORDS.  Read-onlyness does not
    help: the loss happens on the way OUT, in the existential of [astate],
    before the client does anything at all.  So [aread_commit_at] borrows
-   the [ghost_map_auth] itself, exactly as [SysOpenDefs]'s
+   the [ghost_map_auth_frac] itself, exactly as [SysOpenDefs]'s
    [aopen_commit_at] and [FsAbsMknodFire]'s [dlookup_commit_at] do.
 
    ==== THE ONE PIECE, AND ITS REFUND ==================================
@@ -232,7 +232,7 @@ Section ReadFire.
   Implicit Types Γ : fs_view_names Σ.
 
   (* SINGLE-PHASE AND READ-ONLY at the RAW MAP: the caller hands the very
-     same [ghost_map_auth] back, which is what [ftop_astate_ro]'s give-back
+     same [ghost_map_auth_frac] back, which is what [ftop_astate_ro]'s give-back
      wants and what [astate]'s existential destroys (header). *)
   (* ...WITH THE OFFSET'S HALF LENT AND RETURNED UNMOVED: the one fupd
      covers the bytes and the offset together (the offset-shadow fold;
@@ -250,8 +250,8 @@ Section ReadFire.
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre (abs_view I) i off a⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
        (* THE HALF COMES BACK AT ONE OF TWO VALUES (lane WRITE-RELAY, for
           lane SKELETON's [Hoff_link]), the write nodes' shape at the read:
           UNMOVED, which is all a client with no user half can do, or
@@ -293,8 +293,8 @@ Section ReadFire.
       (Φ : aview -> nat -> anode -> nat -> iProp Σ) : iProp Σ :=
     (∀ (I : gmap Z fs_node) (off : nat) (a : anode) (d : nat),
        ⌜ard_pre (abs_view I) i off a⌝ -∗
-       ghost_map_auth (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
-       ghost_map_auth (γtop Γ) (1/2) I ∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I -∗ off_link γo (Z.of_nat off) ={E}=∗
+       ghost_map_auth_frac (γtop Γ) (1/2) I ∗
        off_link γo (Z.of_nat (off + d)) ∗
        Φ (abs_view I) off a d)%I.
 
@@ -334,7 +334,7 @@ Section ReadFire.
      hand back the very map it was given -- wrapping and unwrapping loses
      it (that is the whole finding this file exists for). *)
   Lemma arf_auth_nview Γ (qa : Qp) (I : gmap Z fs_node) (q : Qp) (i : Z) (a : anode) :
-    ghost_map_auth (γtop Γ) qa I -∗ nview Γ q i a -∗
+    ghost_map_auth_frac (γtop Γ) qa I -∗ nview Γ q i a -∗
     ⌜abs_view I !! i = Some a⌝.
   Proof using .
     iIntros "Ha Hn".

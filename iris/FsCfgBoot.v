@@ -297,7 +297,7 @@ Lemma img_nodes_lookup_inv (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
 Proof.
   intros Hz. rewrite /img_nodes in Hz.
   apply elem_of_list_to_map_2 in Hz.
-  apply elem_of_list_fmap in Hz as (y & Heq & Hy).
+  apply list_elem_of_fmap in Hz as (y & Heq & Hy).
   injection Heq as -> <-. split; [by apply elem_of_elements | reflexivity].
 Qed.
 
@@ -307,7 +307,7 @@ Lemma img_nodes_lookup (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
 Proof.
   intros Hz. rewrite /img_nodes.
   apply elem_of_list_to_map; [apply img_nodes_nodup |].
-  apply elem_of_list_fmap. exists z. split; [reflexivity |].
+  apply list_elem_of_fmap. exists z. split; [reflexivity |].
   by apply elem_of_elements.
 Qed.
 
@@ -485,7 +485,7 @@ Qed.
 Lemma ireg_blk_set_spec (ist : Z) (nib : nat) (b : Z) :
   b ∈ ireg_blk_set ist nib <-> ist <= b < ist + Z.of_nat nib.
 Proof.
-  rewrite /ireg_blk_set elem_of_list_to_set elem_of_list_fmap. split.
+  rewrite /ireg_blk_set elem_of_list_to_set list_elem_of_fmap. split.
   - intros (bi & -> & Hbi). apply elem_of_seq in Hbi. lia.
   - intros Hb. exists (Z.to_nat (b - ist)).
     split; [lia | apply elem_of_seq; lia].

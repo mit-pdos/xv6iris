@@ -448,9 +448,9 @@ Section SpecFileclose.
     rewrite big_sepL_cons. iSplitR.
     - rewrite /fileclose_cpay.
       destruct st as [| rb wb [i g om | gp | mj]]; try by iEmpIntro.
-      exfalso. exact (Hnp _ (elem_of_list_here _ _) rb wb gp eq_refl).
+      exfalso. exact (Hnp _ (list_elem_of_here _ _) rb wb gp eq_refl).
     - iApply IH. intros st' Hin. apply Hnp.
-      apply elem_of_list_further. exact Hin.
+      apply list_elem_of_further. exact Hin.
   Qed.
 
   Lemma fileclose_cpays_taint sts : app_taint -∗ fileclose_cpays sts.

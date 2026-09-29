@@ -262,8 +262,8 @@ Section ProofSysDup.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     iEval (rewrite -E5) in "Hb5".
     iEval (rewrite -E6) in "Hb6".
-    iDestruct (stack_own_4_intro sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
-    iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
+    iDestruct (stack_own_4_intro (KTR := KT1) sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
+    iDestruct (stack_own_2_intro (KTR := KT1) (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
     iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
     { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
@@ -370,8 +370,8 @@ Section ProofSysDup.
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
     rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
-    iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
-    iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
+    iDestruct (stack_own_2_elim (KTR := KT1) with "Hf56") as (w5 w6) "[Hs5 Hs6]".
     iEval (rewrite E5) in "Hs5". iEval (rewrite E6) in "Hs6".
     (* ---- +0x02: c.sdsp ra,40(sp) ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
@@ -1014,7 +1014,7 @@ Section ProofSysDup.
        filedup handed back two halves; one settles the destination descriptor
        fdalloc filled, the other the source we borrowed from. *)
     assert (Hlk1 : pv_ofile (upd_ofile (us_V U) fd1 (fnode k)) !! fd1 = Some (fnode k)).
-    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hoflen. exact Hfd1N. }
+    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert_eq. rewrite Hoflen. exact Hfd1N. }
     assert (Hlk0' : pv_ofile (upd_ofile (us_V U) fd1 (fnode k)) !! fd0 = Some (fnode k)).
     { cbn [upd_ofile pv_ofile pv_fdg]. rewrite list_lookup_insert_ne; [| exact Hne01].
       rewrite Hlk0 Hfvk. reflexivity. }

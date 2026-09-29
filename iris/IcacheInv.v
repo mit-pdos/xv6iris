@@ -281,7 +281,7 @@ Proof.
   apply gmap_local_update. intros i.
   destruct (decide (i = k)) as [->|Hne]; last first.
   { rewrite lookup_insert_ne // lookup_singleton_ne //. }
-  rewrite lookup_insert lookup_singleton lookup_empty HM.
+  rewrite lookup_insert_eq lookup_singleton_eq lookup_empty HM.
   apply local_update_unital_discrete. intros z Hv Hz.
   rewrite left_id in Hz. rewrite -Hz.
   split.
@@ -559,7 +559,7 @@ Section IcacheGhost.
     live_slot M k = live_slot (<[k := (qt, n')]> M) k.
   Proof using .
     intros HM. rewrite /live_slot /live_norm /live_frzn HM.
-    by rewrite (lookup_insert M k (qt, n')).
+    by rewrite (lookup_insert_eq M k (qt, n')).
   Qed.
 
   (* WEAPON (i): any positive live slice refutes the frozen alternative --
@@ -873,7 +873,7 @@ Section IcacheGhost.
     iModIntro. iExists g. iFrame "Hp Hh Hout Hq".
     iApply live_slot_of_norm.
     rewrite (live_norm_some (<[k := (q, 1%positive)]> M) k q 1%positive c
-               (lookup_insert M k (q, 1%positive))
+               (lookup_insert_eq M k (q, 1%positive))
                (proj2 (Qp.sub_Some (1/2)%Qp q c) Hc)).
     iFrame "Harm". iExists g. iExact "Hc".
   Qed.
@@ -906,7 +906,7 @@ Section IcacheGhost.
     iApply live_slot_of_norm.
     rewrite (live_norm_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                (qt + qn)%Qp (Pos.succ n) c
-               (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))
+               (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))
                (proj2 (Qp.sub_Some (1/2)%Qp (qt + qn) c) Hc)).
     iFrame.
   Qed.
@@ -932,7 +932,7 @@ Section IcacheGhost.
     iApply live_slot_of_norm.
     rewrite (live_norm_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                (qt + qn)%Qp (Pos.succ n) c
-               (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))
+               (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))
                (proj2 (Qp.sub_Some (1/2)%Qp (qt + qn) c) Hc)).
     iFrame.
   Qed.
@@ -953,7 +953,7 @@ Section IcacheGhost.
       by rewrite Epre Hsub Qp.add_assoc (Qp.add_comm q qr). }
     iApply live_slot_of_norm.
     rewrite (live_norm_some (<[k := (qr, n)]> M) k qr n (q + c)%Qp
-               (lookup_insert M k (qr, n)) Hpost).
+               (lookup_insert_eq M k (qr, n)) Hpost).
     iFrame "Harm".
     iDestruct (live_frac0_join with "Hc Hq") as "Hqc".
     iEval (rewrite (Qp.add_comm c q)) in "Hqc". iExact "Hqc".
@@ -982,7 +982,7 @@ Section IcacheGhost.
     iEval (rewrite Hsum) in "Hone".
     iDestruct (frzsel_join with "Harm Hsel") as "Hs".
     iEval (rewrite Qp.half_half) in "Hs".
-    iApply (live_slot_none_intro (delete k M) k (lookup_delete M k)
+    iApply (live_slot_none_intro (delete k M) k (lookup_delete_eq M k)
               with "Hone Hs").
   Qed.
 
@@ -1005,7 +1005,7 @@ Section IcacheGhost.
     iEval (rewrite Qp.half_half) in "Hs".
     iMod (frzsel_flip k true false with "Hs") as "Hs".
     iModIntro.
-    iApply (live_slot_none_intro (delete k M) k (lookup_delete M k)
+    iApply (live_slot_none_intro (delete k M) k (lookup_delete_eq M k)
               with "Hone Hs").
   Qed.
 
@@ -1196,7 +1196,7 @@ Section IcacheGhost.
     iAssert (live_gen k (1/2)%Qp g) with "[Hh]" as "Hh"; [by iExists 0%nat|].
     iModIntro. iExists g. iFrame "Ha Hsl Hh Hp Hsel".
     rewrite (isl_slot_some (<[k := (q, 1%positive)]> M) k q 1%positive
-               (lookup_insert M k (q, 1%positive))).
+               (lookup_insert_eq M k (q, 1%positive))).
     iFrame "Hisl".
     rewrite /iref_tok0 /iref_frag. iFrame.
   Qed.
@@ -1228,7 +1228,7 @@ Section IcacheGhost.
     iModIntro. iFrame "Ha Hsel Hsl".
     rewrite (isl_slot_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                (qt + qn)%Qp (Pos.succ n)
-               (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))).
+               (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))).
     iFrame "Hisl".
     rewrite /iref_tok0 /iref_frag. iFrame.
   Qed.
@@ -1257,7 +1257,7 @@ Section IcacheGhost.
     iModIntro. iFrame "Ha Hs Hsl".
     rewrite (isl_slot_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                (qt + qn)%Qp (Pos.succ n)
-               (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))).
+               (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))).
     iFrame "Hisl".
     rewrite /iref_tok0 /iref_frag. iFrame.
   Qed.
@@ -1278,7 +1278,7 @@ Section IcacheGhost.
        be re-read at the updated map. *)
     rewrite (isl_slot_some M k qt n HM)
             (isl_slot_some (<[k := (qt, Pos.succ n)]> M) k qt (Pos.succ n)
-               (lookup_insert M k (qt, Pos.succ n))).
+               (lookup_insert_eq M k (qt, Pos.succ n))).
     iAssert (slh_tok (icfg_isl k) (q/2)%Qp ∗ slh_tok (icfg_isl k) (q/2)%Qp)%I
       with "[Hsh]" as "[Hs1 Hs2]".
     { rewrite -slh_tok_split Qp.div_2. iExact "Hsh". }
@@ -1323,7 +1323,7 @@ Section IcacheGhost.
        exactly as its fraction does. *)
     rewrite (isl_slot_some M k qt (Pos.succ n) HM)
             (isl_slot_some (<[k := (qr, n)]> M) k qr n
-               (lookup_insert M k (qr, n))).
+               (lookup_insert_eq M k (qr, n))).
     rewrite Hsub (comm Qp.add q qr).
     iMod (slh_return (icfg_isl k) qr q with "Hisl Hsh") as "$".
     rewrite /iref_frag.
@@ -1335,8 +1335,8 @@ Section IcacheGhost.
       pose proof (lookup_insert_ne M k i (qr, n) Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (q, 1%positive)) as Hs.
-    pose proof (lookup_insert M k (qr, n)) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (q, 1%positive)) as Hs.
+    pose proof (lookup_insert_eq M k (qr, n)) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz, Hv. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -1379,7 +1379,7 @@ Section IcacheGhost.
     (* THE LAST reference's share returns and leaves the AUTHORITATIVE ZERO,
        which is what a free slot's [isl_slot] is -- and what iput needs. *)
     rewrite (isl_slot_some M k qt 1%positive HM)
-            (isl_slot_none (delete k M) k (lookup_delete M k)).
+            (isl_slot_none (delete k M) k (lookup_delete_eq M k)).
     iMod (slh_return_last (icfg_isl k) qt with "Hisl Hsh") as "$".
     rewrite /iref_frag.
     iApply (own_update_2 _ _ _ (● (delete k M)) with "Ha Hf").
@@ -1390,8 +1390,8 @@ Section IcacheGhost.
       pose proof (lookup_delete_ne M k i Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (qt, 1%positive)) as Hs.
-    pose proof (lookup_delete M k) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (qt, 1%positive)) as Hs.
+    pose proof (lookup_delete_eq M k) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -1425,7 +1425,7 @@ Section IcacheGhost.
     (* THE LAST reference's share returns and leaves the AUTHORITATIVE ZERO,
        which is what a free slot's [isl_slot] is -- and what iput needs. *)
     rewrite (isl_slot_some M k qt 1%positive HM)
-            (isl_slot_none (delete k M) k (lookup_delete M k)).
+            (isl_slot_none (delete k M) k (lookup_delete_eq M k)).
     iMod (slh_return_last (icfg_isl k) qt with "Hisl Hsh") as "$".
     rewrite /iref_frag.
     iApply (own_update_2 _ _ _ (● (delete k M)) with "Ha Hf").
@@ -1436,8 +1436,8 @@ Section IcacheGhost.
       pose proof (lookup_delete_ne M k i Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (qt, 1%positive)) as Hs.
-    pose proof (lookup_delete M k) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (qt, 1%positive)) as Hs.
+    pose proof (lookup_delete_eq M k) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -1519,7 +1519,7 @@ Section IcacheRefInv.
     | Some (qt, _) =>
         (∃ (g : gname) (lo tst : nat),
            ⌜(lo <= tst)%nat⌝ ∗
-           mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+           mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
            iref_pin_rows k (iref_word M k) lo tst ∗
            ((∃ c : Qp, ⌜(1/2 - qt)%Qp = Some c⌝ ∗
                IcacheRef.live_genlo k c g lo ∗ frzsel k (1/2)%Qp false)
@@ -1607,7 +1607,7 @@ Section IcacheRefInv.
     ∃ (qt : Qp) (n : positive) (tst : nat) (c : Qp),
       ⌜M !! k = Some (qt, n)⌝ ∗ ⌜(1/2 - qt)%Qp = Some c⌝ ∗
       ⌜(lo <= tst)%nat⌝ ∗
-      mono_nat_auth_own (icfg_istmp k) (1/2) tst ∗
+      mono_nat_auth_own_frac (icfg_istmp k) (1/2) tst ∗
       iref_pin_rows k (iref_word M k) lo tst ∗
       IcacheRef.live_genlo k c g lo ∗ frzsel k (1/2)%Qp false ∗
       IcacheRef.live_genlo k s g lo.
@@ -1669,13 +1669,13 @@ Section IcacheRefInv.
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
     is_Some (M !! k) ->
     itable_inv_pinw -∗ itable_half M -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     |={Eo, Eo ∖ ↑icacheN}=> ∃ lo : nat,
       ⌜(lo <= tstp)%nat⌝ ∗
       iref_pin_rows k (iref_word M k) lo tstp ∗
       (iref_pin_rows k (iref_word M k) lo tstp
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half M ∗ mono_nat_auth_own (icfg_istmp k) (1/2) tstp).
+         itable_half M ∗ mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp).
   Proof using .
     iIntros (HE Hk His) "#Hinv Hhalf Hstp".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -2000,7 +2000,7 @@ Section IcacheRefInv.
     iFrame "Hcell". iIntros "Hcell".
     iApply (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
     iSplitL "Hcell".
-    { rewrite /iref_word lookup_delete. iExact "Hcell". }
+    { rewrite /iref_word lookup_delete_eq. iExact "Hcell". }
     iApply (big_sepL_impl with "Hrest").
     iIntros "!>" (j x Hjx) "H".
     destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
@@ -3092,7 +3092,7 @@ Section IcacheRefInvReg.
     frzsel k (1/2)%Qp false -∗
     iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     TsoGhost.llb loglen_name tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=> ∃ (g : gname) (lo : nat),
       ⌜(lo <= tstp)%nat⌝ ∗
@@ -3106,7 +3106,7 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum) ∗
          (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-            mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+            mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
             TsoGhost.llb loglen_name tstn)).
   Proof using .
     iIntros (HE HER HEL Hin HMk Hq Hno)
@@ -3169,25 +3169,25 @@ Section IcacheRefInvReg.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+          + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
             injection Hj as _ Hn. subst nj. exact Hno.
           + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%]").
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_insert.
+      rewrite /pinw_slot lookup_insert_eq.
       iExists g, lo, (Nat.max tstp tst').
       iSplitR; [iPureIntro; lia|].
       iFrame "Hst".
       iSplitL "Hpin".
-      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      { rewrite /iref_word lookup_insert_eq. iExact "Hpin". }
       iLeft. iExists c'. iSplitR; [by iPureIntro|]. iFrame "Hres Hselh". }
     iModIntro.
     iFrame "Hhalf Hsel Hoff Hcnt Hu".
     iSplitL "Hislot".
     { rewrite (isl_slot_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                  (qt + qn)%Qp (Pos.succ n)
-                 (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))).
+                 (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))).
       iExact "Hislot". }
     iSplitL "Hfr Hqn Hshare".
     { rewrite /iref_tok_genlo /iref_frag. iFrame. }
@@ -3209,7 +3209,7 @@ Section IcacheRefInvReg.
        exactly as its fraction does. *)
     rewrite (isl_slot_some M k qt (Pos.succ n) HM)
             (isl_slot_some (<[k := (qr, n)]> M) k qr n
-               (lookup_insert M k (qr, n))).
+               (lookup_insert_eq M k (qr, n))).
     rewrite Hsub (comm Qp.add q qr).
     iMod (slh_return (icfg_isl k) qr q with "Hisl Hsh") as "$".
     rewrite /iref_frag.
@@ -3221,8 +3221,8 @@ Section IcacheRefInvReg.
       pose proof (lookup_insert_ne M k i (qr, n) Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (q, 1%positive)) as Hs.
-    pose proof (lookup_insert M k (qr, n)) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (q, 1%positive)) as Hs.
+    pose proof (lookup_insert_eq M k (qr, n)) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz, Hv. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -3259,7 +3259,7 @@ Section IcacheRefInvReg.
        be re-read at the updated map. *)
     rewrite (isl_slot_some M k qt n HM)
             (isl_slot_some (<[k := (qt, Pos.succ n)]> M) k qt (Pos.succ n)
-               (lookup_insert M k (qt, Pos.succ n))).
+               (lookup_insert_eq M k (qt, Pos.succ n))).
     iAssert (slh_tok (icfg_isl k) (q/2)%Qp ∗ slh_tok (icfg_isl k) (q/2)%Qp)%I
       with "[Hsh]" as "[Hs1 Hs2]".
     { rewrite -slh_tok_split Qp.div_2. iExact "Hsh". }
@@ -3327,7 +3327,7 @@ Section IcacheRefInvReg.
     itable_half M -∗ iref_tok_genlo k q g lo -∗ isl_slot M k -∗
     runit bfl (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     TsoGhost.llb loglen_name tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       ⌜(lo <= tstp)%nat⌝ ∗
@@ -3337,7 +3337,7 @@ Section IcacheRefInvReg.
          itable_half (<[k := (qr, n)]> M) ∗ isl_slot (<[k := (qr, n)]> M) k ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat n) ∗
          (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-            mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+            mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
             TsoGhost.llb loglen_name tstn)).
   Proof using .
     iIntros (HE HER Hin HMk Hsub)
@@ -3391,7 +3391,7 @@ Section IcacheRefInvReg.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+          + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
             injection Hj as _ Hn. subst nj.
             pose proof (Hcnt' k qt (Pos.succ n) HMk) as Hns.
             rewrite Pos2Z.inj_succ in Hns. lia.
@@ -3399,12 +3399,12 @@ Section IcacheRefInvReg.
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (<[k := (qr, n)]> M) with "[%]").
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_insert.
+      rewrite /pinw_slot lookup_insert_eq.
       iExists g0, lo0, (Nat.max tstp tst').
       iSplitR; [iPureIntro; lia|].
       iFrame "Hst".
       iSplitL "Hpin".
-      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      { rewrite /iref_word lookup_insert_eq. iExact "Hpin". }
       iLeft. iExists c'. iSplitR; [by iPureIntro|]. iFrame "Hres Hselh". }
     iModIntro.
     iFrame "Hhalf Hislot Hcnt".
@@ -3430,7 +3430,7 @@ Section IcacheRefInvReg.
     itable_half M -∗ iref_tok_genlo k q g lo -∗ isl_slot M k -∗
     iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     TsoGhost.llb loglen_name tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       ⌜(lo <= tstp)%nat⌝ ∗
@@ -3444,7 +3444,7 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum) ∗
          (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-            mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+            mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
             TsoGhost.llb loglen_name tstn)).
   Proof using .
     iIntros (HE HER HEL Hin HMk Hno)
@@ -3495,18 +3495,18 @@ Section IcacheRefInvReg.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+          + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
             injection Hj as _ Hn. subst nj. exact Hno.
           + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (<[k := (qt, Pos.succ n)]> M) with "[%]").
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_insert.
+      rewrite /pinw_slot lookup_insert_eq.
       iExists g0, lo0, (Nat.max tstp tst').
       iSplitR; [iPureIntro; lia|].
       iFrame "Hst".
       iSplitL "Hpin".
-      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      { rewrite /iref_word lookup_insert_eq. iExact "Hpin". }
       iLeft. iExists c. iSplitR; [by iPureIntro|]. iFrame "Hres Hselh". }
     iModIntro.
     iFrame "Hhalf Hislot Ht1 Ht2 Hoff Hcnt Hu".
@@ -3538,7 +3538,7 @@ Section IcacheRefInvReg.
     frzm_h (bv_unsigned inum) false -∗
     runit bfl (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     TsoGhost.llb loglen_name tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       ⌜(lo <= tstp)%nat⌝ ∗
@@ -3552,7 +3552,7 @@ Section IcacheRefInvReg.
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit bfl (bv_unsigned inum) ∗ runit bfl (bv_unsigned inum) ∗
          (∃ tstn : nat, ⌜(lo <= tstn)%nat⌝ ∗
-            mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+            mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
             TsoGhost.llb loglen_name tstn)).
   Proof using .
     iIntros (HE HER Hin HMk Hq Hno)
@@ -3607,25 +3607,25 @@ Section IcacheRefInvReg.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+          + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
             injection Hj as _ Hn. subst nj. exact Hno.
           + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%]").
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_insert.
+      rewrite /pinw_slot lookup_insert_eq.
       iExists g0, lo0, (Nat.max tstp tst').
       iSplitR; [iPureIntro; lia|].
       iFrame "Hst".
       iSplitL "Hpin".
-      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      { rewrite /iref_word lookup_insert_eq. iExact "Hpin". }
       iLeft. iExists c'. iSplitR; [by iPureIntro|]. iFrame "Hres Hselh". }
     iModIntro.
     iFrame "Hhalf Hlv Hmir Hcnt Hu Hu2".
     iSplitL "Hislot".
     { rewrite (isl_slot_some (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k
                  (qt + qn)%Qp (Pos.succ n)
-                 (lookup_insert M k ((qt + qn)%Qp, Pos.succ n))).
+                 (lookup_insert_eq M k ((qt + qn)%Qp, Pos.succ n))).
       iExact "Hislot". }
     iSplitL "Hfr Hqn Hshare".
     { rewrite /iref_tok_genlo /iref_frag. iFrame. }
@@ -3794,7 +3794,7 @@ Section IcacheRefInvReg.
     rewrite own_op. iDestruct "H" as "[Ha Hfr]".
     iModIntro. iFrame "Ha".
     rewrite (isl_slot_some (<[k := (q, 1%positive)]> M) k q 1%positive
-               (lookup_insert M k (q, 1%positive))).
+               (lookup_insert_eq M k (q, 1%positive))).
     iFrame "Hisl". rewrite /iref_frag. iFrame.
   Qed.
 
@@ -3836,7 +3836,7 @@ Section IcacheRefInvReg.
     iname γi γfs inodestart inum l -∗
     ifreeze_off (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
-    mono_nat_auth_own (icfg_istmp k) 1 tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) 1 tstp -∗
     TsoGhost.llb loglen_name tstp -∗
     TsoGhost.llb loglen_name loA -∗
     iref_pin_rows k (mword_of_int 1 : mword 32) loA loA -∗
@@ -3852,7 +3852,7 @@ Section IcacheRefInvReg.
       icnt_half (bv_unsigned inum) 1%nat ∗
       runit (is_claim l) (bv_unsigned inum) ∗
       (∃ tstn : nat, ⌜(loA <= tstn)%nat⌝ ∗
-         mono_nat_auth_own (icfg_istmp k) (1/2) tstn ∗
+         mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstn ∗
          TsoGhost.llb loglen_name tstn).
   Proof using .
     iIntros (HE HER HEL Hin Hk HMk Hq)
@@ -3898,7 +3898,7 @@ Section IcacheRefInvReg.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+          + rewrite lookup_insert_eq in Hj. apply Some_inj in Hj.
             injection Hj as _ Hn. subst nj.
             assert (E422 : Z.of_nat IrefSlots.IREFSLOTS = 422%Z)
               by (vm_compute; reflexivity).
@@ -3907,12 +3907,12 @@ Section IcacheRefInvReg.
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (<[k := (q, 1%positive)]> M) with "[%]").
       { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_insert.
+      rewrite /pinw_slot lookup_insert_eq.
       iExists g', loA, (Nat.max tstp loA).
       iSplitR; [iPureIntro; lia|].
       iFrame "Hstin".
       iSplitL "Hpin".
-      { rewrite /iref_word lookup_insert. iExact "Hpin". }
+      { rewrite /iref_word lookup_insert_eq. iExact "Hpin". }
       iLeft. iExists c. iSplitR; [by iPureIntro|]. iFrame "Hres Hselin". }
     iModIntro.
     iFrame "Hhalf Hislot Hselout Hl Hoff Hcnt Hu".
@@ -3933,7 +3933,7 @@ Section IcacheRefInvReg.
     (* THE LAST reference's share returns and leaves the AUTHORITATIVE ZERO,
        which is what a free slot's [isl_slot] is -- and what iput needs. *)
     rewrite (isl_slot_some M k qt 1%positive HM)
-            (isl_slot_none (delete k M) k (lookup_delete M k)).
+            (isl_slot_none (delete k M) k (lookup_delete_eq M k)).
     iMod (slh_return_last (icfg_isl k) qt with "Hisl Hsh") as "$".
     rewrite /iref_frag.
     iApply (own_update_2 _ _ _ (● (delete k M)) with "Ha Hf").
@@ -3944,8 +3944,8 @@ Section IcacheRefInvReg.
       pose proof (lookup_delete_ne M k i Hki) as Hm.
       apply local_update_discrete. intros mz Hv Hz.
       rewrite Hs in Hz. rewrite Hm. split; [exact Hv | exact Hz]. }
-    pose proof (lookup_singleton (M:=gmap nat) k (qt, 1%positive)) as Hs.
-    pose proof (lookup_delete M k) as Hm.
+    pose proof (lookup_singleton_eq (M:=gmap nat) k (qt, 1%positive)) as Hs.
+    pose proof (lookup_delete_eq M k) as Hm.
     apply local_update_discrete. intros mz Hv Hz.
     rewrite HM in Hz. rewrite Hs in Hz. rewrite Hm.
     destruct mz as [[[qf nf]|]|]; simpl in Hz.
@@ -3981,7 +3981,7 @@ Section IcacheRefInvReg.
     runit bfl (bv_unsigned inum) -∗
     ifreeze ph (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
     frz_mir ph (bv_unsigned inum) -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       ⌜(lo <= tstp)%nat⌝ ∗
       iref_pin_rows k (iref_word M k) lo tstp ∗
@@ -3991,7 +3991,7 @@ Section IcacheRefInvReg.
          ifreeze (frz_close ph) (bv_unsigned inum) ∗
          icnt_half (bv_unsigned inum) 0%nat ∗
          frz_mir_back ph (frz_close ph) (bv_unsigned inum) ∗
-         mono_nat_auth_own (icfg_istmp k) 1 tstp ∗
+         mono_nat_auth_own_frac (icfg_istmp k) 1 tstp ∗
          P).
   Proof using .
     iIntros (HE HER Hin HMk)
@@ -4050,16 +4050,16 @@ Section IcacheRefInvReg.
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_delete in Hj. by destruct Hj.
+          + rewrite lookup_delete_eq in Hj. by destruct Hj.
           + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
             by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_delete in Hj. discriminate Hj.
+          + rewrite lookup_delete_eq in Hj. discriminate Hj.
           + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (delete k M) with "[%]").
       { intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_delete.
+      rewrite /pinw_slot lookup_delete_eq.
       iExists g0, lo0. iFrame "Hfull Hself". }
     iModIntro. iFrame "Hhalf Hislot Hfz2 Hcnt Hmirb Hstf HP".
   Qed.
@@ -4085,7 +4085,7 @@ Section IcacheRefInvReg.
     runit bfl (bv_unsigned inum) -∗
     ifreeze_pre rg (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
     frzm_h (bv_unsigned inum) true -∗
-    mono_nat_auth_own (icfg_istmp k) (1/2) tstp -∗
+    mono_nat_auth_own_frac (icfg_istmp k) (1/2) tstp -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=> ∃ (g : gname) (lo : nat),
       ⌜(lo <= tstp)%nat⌝ ∗
       iref_pin_rows k (iref_word M k) lo tstp ∗
@@ -4095,7 +4095,7 @@ Section IcacheRefInvReg.
          ifreeze_post rg (bv_unsigned inum) ∗
          icnt_half (bv_unsigned inum) 0%nat ∗
          frzm_h (bv_unsigned inum) false ∗
-         mono_nat_auth_own (icfg_istmp k) 1 tstp ∗
+         mono_nat_auth_own_frac (icfg_istmp k) 1 tstp ∗
          P).
   Proof using .
     iIntros (HE HER Hin HMk)
@@ -4146,17 +4146,17 @@ Section IcacheRefInvReg.
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
         - intros j Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_delete in Hj. by destruct Hj.
+          + rewrite lookup_delete_eq in Hj. by destruct Hj.
           + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
             by apply Hdom.
         - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-          + rewrite lookup_delete in Hj. discriminate Hj.
+          + rewrite lookup_delete_eq in Hj. discriminate Hj.
           + rewrite lookup_delete_ne in Hj; [|by apply not_eq_sym].
             by apply (Hcnt' j qj). }
       iApply ("Hback" $! (delete k M) with "[%]").
       { intros j Hj. rewrite lookup_delete_ne;
           [reflexivity | by apply not_eq_sym]. }
-      rewrite /pinw_slot lookup_delete.
+      rewrite /pinw_slot lookup_delete_eq.
       iExists g0, lo0. iFrame "Hfull Hself". }
     iModIntro.
     iFrame "Hhalf Hislot Hcnt Hstf HP".

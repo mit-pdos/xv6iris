@@ -199,10 +199,10 @@ Section twin2.
     - iClear "H2". iApply (llb_le with "H1"). lia.
   Qed.
 
-  Lemma llb_valid n K : mono_nat_auth_own γloglen 1 n -∗ llb K -∗ ⌜(K ≤ n)%nat⌝.
+  Lemma llb_valid n K : mono_nat_auth_own_frac γloglen 1 n -∗ llb K -∗ ⌜(K ≤ n)%nat⌝.
   Proof using .
     iIntros "Ha [Hlb|%Hz]".
-    - by iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ ?].
+    - by iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ ?].
     - iPureIntro. lia.
   Qed.
 
@@ -269,14 +269,14 @@ Section twin2.
       [ctx_dom] borrows; agreement across halves is what pins the borrow). *)
   Definition ctx_at (ξ : CtxId) (q : Qp) (B : nat)
       (D : gmap (nat * Z) unit) : iProp Σ :=
-    (mono_nat_auth_own (tc_bnd ξ) q B ∗ ghost_map_auth (tc_dirty ξ) q D)%I.
+    (mono_nat_auth_own_frac (tc_bnd ξ) q B ∗ ghost_map_auth_frac (tc_dirty ξ) q D)%I.
 
   Lemma ctx_at_halves ξ B D :
     ctx_at ξ 1 B D ⊣⊢ ctx_at ξ (1/2) B D ∗ ctx_at ξ (1/2) B D.
   Proof using .
     rewrite /ctx_at.
-    rewrite (fractional_half (mono_nat_auth_own (tc_bnd ξ) 1 B)).
-    rewrite (fractional_half (ghost_map_auth (tc_dirty ξ) 1 D)).
+    rewrite (fractional_half (mono_nat_auth_own_frac (tc_bnd ξ) 1 B)).
+    rewrite (fractional_half (ghost_map_auth_frac (tc_dirty ξ) 1 D)).
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
 
@@ -402,11 +402,11 @@ Section twin2.
   Definition tso_interp (img : gmap Z (bv 8)) (log : list wmsg)
       (tvs : agent → nat) : iProp Σ :=
     (∃ (HM : gmap Z (nat * bv 8)) (LM : gmap nat wmsg),
-      ghost_map_auth γheap 1 HM ∗
+      ghost_map_auth_frac γheap 1 HM ∗
       ⌜∀ a t v, HM !! a = Some (t, v) → latest (img_fun img) log a t v⌝ ∗
-      ghost_map_auth γlogm 1 LM ∗
+      ghost_map_auth_frac γlogm 1 LM ∗
       ⌜∀ i, LM !! i = log !! i⌝ ∗
-      mono_nat_auth_own γloglen 1 (length log) ∗
+      mono_nat_auth_own_frac γloglen 1 (length log) ∗
       view_auth tvs ∗
       ⌜∀ h, (tvs h ≤ length log)%nat⌝)%I.
 
@@ -465,7 +465,7 @@ Section twin2.
       - by apply Hvis. }
     iDestruct "Hbit" as "[Hcl | Hdt]".
     - (* clean: t ≤ B ≤ K ≤ tvs h ≤ tv' *)
-      iDestruct (mono_nat_lb_own_valid with "Hb Hcl") as %[_ HtB].
+      iDestruct (mono_nat_auth_lb_own_valid with "Hb Hcl") as %[_ HtB].
       iPureIntro. move => tv' Htv'. apply visibleb_below. lia.
     - (* dirty: the bundle's justification *)
       iDestruct (ghost_map_lookup with "Hd Hdt") as %HDt.
@@ -534,7 +534,7 @@ Section twin2.
     iSplitR.
     { iPureIntro. intros a0 t0 v0.
       destruct (decide (a0 = a)) as [->|Hne].
-      - rewrite lookup_insert. intros [= <- <-].
+      - rewrite lookup_insert_eq. intros [= <- <-].
         apply TsoCtxTwin.latest_app_new.
       - rewrite lookup_insert_ne; last congruence.
         intros HH0. rewrite /store_log.
@@ -543,7 +543,7 @@ Section twin2.
     iSplitR.
     { iPureIntro. intros i. rewrite /store_log.
       destruct (decide (i = length log)) as [->|Hne].
-      - rewrite lookup_insert. symmetry. by apply list_lookup_middle.
+      - rewrite lookup_insert_eq. symmetry. by apply list_lookup_middle.
       - rewrite lookup_insert_ne; last congruence.
         rewrite HLM.
         destruct (decide (i < length log)%nat) as [Hlt|Hge].
@@ -574,7 +574,7 @@ Section twin2.
     iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
     { iDestruct "Hbit" as "[Hcl | Hdt]".
       - (* clean: t ≤ B ≤ B' *)
-        iDestruct (mono_nat_lb_own_valid with "Hb Hcl") as %[_ HtB].
+        iDestruct (mono_nat_auth_lb_own_valid with "Hb Hcl") as %[_ HtB].
         iPureIntro. lia.
       - (* dirty: t ≤ W ≤ B' *)
         iDestruct (ghost_map_lookup with "Hd Hdt") as %HDt.

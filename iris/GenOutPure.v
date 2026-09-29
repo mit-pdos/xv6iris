@@ -221,7 +221,7 @@ Section gen_out_pure.
     lm_E_disc E -> E !! j = Some x -> echo_of x.2 = x.2.
   Proof using B.
     intros HE Hx. apply (lm_echo_of_disc (snd <$> E) x.2 HE).
-    apply elem_of_list_lookup_2 with j. by rewrite list_lookup_fmap Hx.
+    apply list_elem_of_lookup_2 with j. by rewrite list_lookup_fmap Hx.
   Qed.
 
   Lemma lm_E_disc_of_hist (E : list (list mobs * bv 8)) (Sg : list mobs) :

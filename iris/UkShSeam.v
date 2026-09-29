@@ -399,14 +399,14 @@ Lemma ref_nulcut_ends (len : nat) (f : nat -> bv 8) (t : ushp_cmd) :
 Proof using.
   induction t as [ toks | c IH q e0 mode fd | l IHl r IHr | l IHl r IHr | c IH ];
     cbn [ushp_toks_ok ref_nulcut]; intros Hok e He.
-  - apply elem_of_list_In, in_map_iff in He. destruct He as (tk & <- & Hin).
-    apply elem_of_list_In in Hin.
-    destruct (elem_of_list_lookup_1 _ _ Hin) as (i & Hi).
+  - apply list_elem_of_In, in_map_iff in He. destruct He as (tk & <- & Hin).
+    apply list_elem_of_In in Hin.
+    destruct (list_elem_of_lookup_1 _ _ Hin) as (i & Hi).
     destruct (Forall_lookup_1 _ _ _ _ Hok Hi) as (_ & Hle & _ & Hend).
     exact (conj Hle Hend).
   - destruct Hok as [ Hc Htk ]. apply elem_of_app in He. destruct He as [ He | He ].
     + exact (IH Hc e He).
-    + apply elem_of_list_singleton in He. subst e.
+    + apply list_elem_of_singleton in He. subst e.
       destruct Htk as (_ & Hle & _ & Hend). exact (conj Hle Hend).
   - destruct Hok as [ Hl Hr ]. apply elem_of_app in He.
     destruct He as [ He | He ]; [ exact (IHl Hl e He) | exact (IHr Hr e He) ].
@@ -470,9 +470,9 @@ Proof using.
                     <> ubyte0)).
     { intros i tk Hi. destruct tk as [ q e ]. cbn [fst snd].
       apply (ref_cut_tok_ok len f js q e Hnn Hjs (Forall_lookup_1 _ _ _ _ Hok Hi)).
-      apply Hsub. apply elem_of_list_In, in_map_iff. exists (q, e).
+      apply Hsub. apply list_elem_of_In, in_map_iff. exists (q, e).
       split; [ reflexivity | ].
-      apply elem_of_list_In. exact (elem_of_list_lookup_2 _ _ _ Hi). }
+      apply list_elem_of_In. exact (list_elem_of_lookup_2 _ _ _ Hi). }
     split_and!.
     + intros i tk Hi. exact (proj1 (Htk i tk Hi)).
     + intros i tk Hi. exact (proj1 (proj2 (Htk i tk Hi))).
@@ -480,7 +480,7 @@ Proof using.
   - destruct Hok as [ Hc Htk ]. split.
     + apply IH; [ exact Hc | ]. intros x Hx. apply Hsub. apply elem_of_app. left. exact Hx.
     + apply (ref_cut_tok_ok len f js q e Hnn Hjs Htk).
-      apply Hsub. apply elem_of_app. right. apply elem_of_list_singleton. reflexivity.
+      apply Hsub. apply elem_of_app. right. apply list_elem_of_singleton. reflexivity.
   - destruct Hok as [ Hl Hr ].
     split; [ apply IHl; [ exact Hl | ] | apply IHr; [ exact Hr | ] ];
       intros x Hx; apply Hsub; apply elem_of_app; [ left | right ]; exact Hx.

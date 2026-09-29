@@ -202,8 +202,8 @@ Proof. destruct b; vm_compute; reflexivity. Qed.
 Lemma xor_vec64_unsigned (x y : mword 64) :
   bv_unsigned (xor_vec x y) = Z.lxor (bv_unsigned x) (bv_unsigned y).
 Proof.
-  cbv [xor_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word].
+  cbv [xor_vec Operators_mwords.word_binop 
+       ].
   unfold MachineWord.MachineWord.xor. apply bv_xor_unsigned.
 Qed.
 
@@ -265,7 +265,7 @@ Qed.
 Lemma moi32_small (z : Z) :
   0 <= z < Z32 -> bv_unsigned (mword_of_int z : mword 32) = z.
 Proof.
-  intros Hz. unfold mword_of_int, Values.to_word, get_word. cbn.
+  intros Hz. unfold mword_of_int. cbn.
   rewrite Z_to_bv_unsigned. unfold bv_wrap.
   rewrite Zmod32. apply Z.mod_small. exact Hz.
 Qed.
@@ -404,7 +404,7 @@ Proof.
     split; [ exact H0 | ].
     eapply Z.lt_le_trans; [ exact H1 | vm_compute; discriminate ].
   - apply bv_eq.
-    unfold mword_of_int, Values.to_word, get_word. cbn.
+    unfold mword_of_int. cbn.
     rewrite Z_to_bv_unsigned. unfold bv_wrap. symmetry.
     apply Z.mod_small. exact (bv_unsigned_in_range _ r).
 Qed.

@@ -425,9 +425,9 @@ Lemma dl_trunc16_unsigned (w : mword 64) :
 Proof.
   rewrite dl_trunc16_subrange.
   unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, SailStdpp.Values.to_word.
+  unfold to_word_idx.
   rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold SailStdpp.Values.get_word, MachineWord.MachineWord.slice.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx 0) with 0%N.
   rewrite bv_extract_0_unsigned.
   change (MachineWord.MachineWord.Z_idx (15 - 0 + 1)) with 16%N.
@@ -496,7 +496,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma dl_add_vec_0 (x : mword 64) :
   add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
 Proof.
-  unfold add_vec, word_binop, with_word', with_word, MachineWord.MachineWord.add.
+  unfold add_vec, word_binop, MachineWord.MachineWord.add.
   apply bv_add_0_r. vm_compute. reflexivity.
 Qed.
 
@@ -647,6 +647,7 @@ Section DlBuf.
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] g j) ⊢ ∃ w : bv 16, a ↦₂[KT1] w.
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
     iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) _ Hal).
@@ -1562,7 +1563,7 @@ Section ProofDirlinkMain.
     (* ---- the [de] scratch record: frame slots 10 and 9 as sixteen bytes ---- *)
     iDestruct (dl_slots_bytes sp0 u10 u9 with "Hb10 Hb9") as "[%Hal Hdeb]".
     destruct Hal as [Hal10 Hal9].
-    iDestruct (dlk_bytes_name with "Hdeb") as (dolds0) "Hde".
+    iDestruct (dlk_bytes_name (KTR := KT1) with "Hdeb") as (dolds0) "Hde".
     (* ================================================================= *)
     (*  THE SHARED EPILOGUE at +0x9c -- five restores, the pop, [c.ret].  *)
     (*  Both arms have s1/s3/s4 back at the caller's values by the time   *)
@@ -1659,7 +1660,7 @@ Section ProofDirlinkMain.
       iEval (rewrite HT4) in "Hb4". iEval (rewrite HT7) in "Hb7".
       iEval (rewrite HT8) in "Hb8".
       (* ---- the [de] buffer goes back to being two frame slots ---- *)
-      iDestruct (dlk_name_bytes with "Hde") as "Hdeb2".
+      iDestruct (dlk_name_bytes (KTR := KT1) with "Hde") as "Hdeb2".
       iDestruct (dl_bytes_slots sp0 Hal10 Hal9 with "Hdeb2") as (w10 w9) "[Hc10 Hc9]".
       iAssert (stack_own (KTR := KT1) sp0 10) with
         "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hc9 Hc10]" as "Hstk".

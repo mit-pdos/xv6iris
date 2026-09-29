@@ -877,7 +877,7 @@ Section SysOpenArms.
     (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
        (* the path is the caller's own argument 0, as on the plain side *)
        ⌜arg_path_of M pv pl⌝ ∗
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
        cur_kept vom P (length (npar_elems pl)) d ∗
        ((* FRESH *)
         (∃ (av : aview) (ents : gmap fname Z) (nl : nat),
@@ -982,7 +982,7 @@ Section SysOpenArms.
                ∗ ((* (a) create succeeded FRESH; open failed past it *)
                   (∃ (av : aview) (i : Z) (nm : fname)
                      (ents : gmap fname Z) (nl : nat),
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                      ⌜cre_pre av d nm ents nl i (AFile [])⌝ ∗
                      ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
                      cre_rcpt_kept vom Fok av d nm i
@@ -999,7 +999,7 @@ Section SysOpenArms.
                        found node; -1 does not say which *)
                   (∃ (av : aview) (i : Z) (nm : fname)
                      (ents : gmap fname Z) (nl : nat),
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+                     ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
                      ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
                      ⌜ents !! nm = Some i⌝ ∗
                      cre_rcpt_kept vom Fex av d nm i
@@ -1297,7 +1297,7 @@ Section SysOpenArms.
       ∗ open_post_fail_create Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft)
      ∨ (∃ (pl : list (bv 8)) (d i : Z) (nm : fname),
           ⌜arg_path_of M pv pl⌝ ∗
-          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+          ⌜list_basics.list.last (path_elems pl) = Some nm⌝ ∗
           cur_kept vom P (length (npar_elems pl)) d ∗
           ((* FRESH *)
            (∃ (av : aview) (ents : gmap fname Z) (nl : nat),

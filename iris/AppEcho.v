@@ -220,8 +220,8 @@ Section EchoLedger.
      empty -- [EchoOut.echo_led_init]'s two arguments, which is what makes
      the ledger's first state derivable from the birth alone. *)
   Definition echo_cl (γcl : echo_fixed) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint γcl) 1 0%nat
-     ∗ ghost_map_auth (eg_pin γcl) 1 (∅ : gmap nat era_pins))%I.
+    (mono_nat_auth_own_frac (eg_taint γcl) 1 0%nat
+     ∗ ghost_map_auth_frac (eg_pin γcl) 1 (∅ : gmap nat era_pins))%I.
 
   (* THE BIRTH STEP: run first by the power theorem, before the crash slot,
      so both the crash predicate and the ledger can name the counter *)
@@ -269,7 +269,7 @@ Section EchoLedger.
     intros Hd. iIntros "H Hlb".
     rewrite /echo_R /EchoOut.echo_led /echo_taint decide_True; last exact Hd.
     iDestruct "H" as "(Ha & _ & _)".
-    iDestruct (mono_nat_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
+    iDestruct (mono_nat_auth_lb_own_valid with "Ha Hlb") as %[_ Hle]. lia.
   Qed.
 
   (* THE CONCLUSION, READ OFF THE LEDGER (lane ECHO-OUT part 5, [Hphi]'s

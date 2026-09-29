@@ -205,7 +205,7 @@ Qed.
 
 (* ...and the created NAME is `console` *)
 Lemma init_cons_last :
-  list_basics.last (path_elems init_cons_pl) = Some fname_console.
+  list_basics.list.last (path_elems init_cons_pl) = Some fname_console.
 Proof. rewrite init_cons_path_elems /cons_path. reflexivity. Qed.
 
 Section UInitCons.

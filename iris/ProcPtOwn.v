@@ -171,7 +171,7 @@ Qed.
 
 Local Lemma ppo_shiftr10 (v : mword 64) : bv_unsigned (shiftr v 10) = bv_unsigned v / 1024.
 Proof.
-  unfold shiftr, with_word, get_word, MachineWord.MachineWord.logical_shift_right.
+  unfold shiftr, MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word
              (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
@@ -182,7 +182,7 @@ Qed.
 Lemma ppo_shiftl12 (v : mword 64) :
   bv_unsigned (shiftl v 12) = bv_unsigned v * 4096 mod 18446744073709551616.
 Proof.
-  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
+  unfold shiftl, MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word
              (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
@@ -225,7 +225,7 @@ Lemma ppo_shiftl52 (v : mword 64) :
   bv_unsigned (shiftl v 52)
   = bv_unsigned v * 4503599627370496 mod 18446744073709551616.
 Proof.
-  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
+  unfold shiftl, MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word
              (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 52))) with 52
@@ -294,7 +294,7 @@ Lemma elem_of_um_ppns (um : gmap (mword 27) (mword 64)) (ppn : mword 44) :
   ppn ∈ um_ppns um <-> exists vpn w, um !! vpn = Some w /\ pte_ppn w = ppn.
 Proof.
   unfold um_ppns.
-  rewrite elem_of_list_to_set elem_of_list_fmap.
+  rewrite elem_of_list_to_set list_elem_of_fmap.
   split.
   - intros [[vpn w] [Heq Hin]]. cbn in Heq.
     exists vpn, w. split; [| exact (eq_sym Heq)].
@@ -312,7 +312,7 @@ Lemma elem_of_page_pas (ppn : mword 44) (a : Arch.pa) :
   a ∈ page_pas ppn <-> exists j, (j < 4096)%nat /\ a = pa_add (page_base ppn) j.
 Proof.
   unfold page_pas.
-  rewrite elem_of_list_to_set elem_of_list_fmap.
+  rewrite elem_of_list_to_set list_elem_of_fmap.
   split.
   - intros [j [Heq Hin]]. apply elem_of_seq in Hin.
     exists j. split; [lia | exact Heq].
@@ -331,12 +331,12 @@ Proof.
   rewrite elem_of_union_list.
   split.
   - intros (X & HX & Ha).
-    apply elem_of_list_fmap in HX. destruct HX as (ppn & -> & Hppn).
+    apply list_elem_of_fmap in HX. destruct HX as (ppn & -> & Hppn).
     exists ppn. split; [| exact Ha].
     apply elem_of_elements. exact Hppn.
   - intros (ppn & Hppn & Ha).
     exists (page_pas ppn). split; [| exact Ha].
-    apply elem_of_list_fmap. exists ppn. split; [reflexivity |].
+    apply list_elem_of_fmap. exists ppn. split; [reflexivity |].
     apply elem_of_elements. exact Hppn.
 Qed.
 
@@ -516,7 +516,7 @@ Proof.
   - intros Hq. apply elem_of_union in Hq. apply elem_of_um_ppns.
     destruct Hq as [Hq | Hq].
     + apply elem_of_singleton in Hq. exists vpn, w.
-      split; [apply lookup_insert | exact (eq_sym Hq)].
+      split; [apply lookup_insert_eq | exact (eq_sym Hq)].
     + apply elem_of_um_ppns in Hq. destruct Hq as (v & x & Hl & Hq).
       exists v, x. split; [| exact Hq].
       rewrite lookup_insert_ne; [exact Hl |].
@@ -1016,8 +1016,8 @@ Lemma svpn_of_unsigned_gen (a : mword 64) :
 Proof.
   unfold svpn_of. cbn [bits_of_virtaddr]. rewrite autocast_id.
   unfold subrange_vec_dec at 1. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
+  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
   change (MachineWord.MachineWord.Z_idx pagesize_bits) with 12%N.
   rewrite bv_extract_unsigned.
   fold (subrange_vec_dec a (Z.sub 39 1) 0).
@@ -1911,7 +1911,7 @@ Proof.
   - intros Hin. apply elem_of_um_ppns in Hin. destruct Hin as (v & y & Hlv & Hqy).
     apply elem_of_um_ppns.
     destruct (decide (v = vpn)) as [-> | Hne].
-    + exists vpn, x. split; [apply lookup_insert |].
+    + exists vpn, x. split; [apply lookup_insert_eq |].
       assert (Hyw : y = w) by congruence.
       rewrite Hq. rewrite <- Hqy. rewrite Hyw. reflexivity.
     + exists v, y. split;
@@ -2407,7 +2407,7 @@ Qed.
 Lemma elem_of_vpn_run (vpn0 : mword 27) (k : nat) (v : mword 27) :
   v ∈ vpn_run vpn0 k <-> exists i, (i < k)%nat /\ v = vpn_at vpn0 i.
 Proof.
-  unfold vpn_run. rewrite elem_of_list_to_set elem_of_list_fmap. split.
+  unfold vpn_run. rewrite elem_of_list_to_set list_elem_of_fmap. split.
   - intros (i & Hv & Hi). apply elem_of_seq in Hi.
     exists i. split; [lia | exact Hv].
   - intros (i & Hi & Hv). exists i. split; [exact Hv |].
@@ -2423,7 +2423,7 @@ Proof.
   { apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & _). lia. }
   cbn [um_del_run].
   destruct (decide (v = vpn_at vpn0 k)) as [-> | Hne].
-  { apply lookup_delete. }
+  { apply lookup_delete_eq. }
   rewrite (lookup_delete_ne _ _ _ (not_eq_sym Hne)).
   apply IH. apply elem_of_vpn_run.
   apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & Hv).
@@ -2634,7 +2634,7 @@ Proof.
   - exact Hlt.
   - rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
     rewrite Hv in Hs. discriminate.
-  - rewrite lookup_insert in Hs. injection Hs as <-. exists r. reflexivity.
+  - rewrite lookup_insert_eq in Hs. injection Hs as <-. exists r. reflexivity.
   - rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
     rewrite Hv in Hs. discriminate.
 Qed.
@@ -3744,7 +3744,7 @@ Section ProcPt.
         apply lookup_insert_Some. right.
         split; [intros ->; rewrite Hn in Hl; discriminate | exact Hl].
       + exists vpn, (uvm_pte perm r), j.
-        split_and!; [apply lookup_insert | exact Hj | reflexivity].
+        split_and!; [apply lookup_insert_eq | exact Hj | reflexivity].
   Qed.
 
   Lemma uva_dom_insert (P : uptd) (vpn : mword 27) (r : mword 64) :
@@ -4595,7 +4595,7 @@ Section ProcPt.
       - exact (um_inj_insert P.(ud_um) vpn (vmfault_pte r) Hinj Hfresh).
       - exact Htfv. }
     assert (Hl' : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r))
-      by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+      by (unfold uptd_insert, uptd_insert_perm; cbn [ud_um]; apply lookup_insert_eq).
     iDestruct (umem_lazy_fault P sz M vpn r bs Hmwf Hunone Hlive Hzero
                  with "Hm [Hpg]") as "Hm".
     { iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
@@ -4684,7 +4684,7 @@ Section ProcPt.
       - exact (um_inj_insert P.(ud_um) vpn (uvm_pte perm r) Hinj Hfresh).
       - exact Htfv. }
     assert (Hl' : (uptd_insert_perm P perm vpn r).(ud_um) !! vpn = Some (uvm_pte perm r))
-      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert_eq).
     iDestruct (umem_lazy_grow P sz sz' M vpn Hunone Hlv with "Hm") as "Hm".
     iDestruct (umem_lazy_fault_perm P perm sz'
                  (M ∪ gset_to_gmap (bv_0 8) (upage_dom vpn)) vpn r bs
@@ -4727,6 +4727,7 @@ Section ProcPt.
     proc_ptm (uptd_insert_perm P perm vpn r) sz
              (umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs).
   Proof using .
+    clear GEN. (* unused; else Rocq counts it as used (asks for Proof using … GEN) *)
     intros Hperm Hwf Hview Hnone Hlt Hrep Hbase Hval Hlive.
     pose proof Hwf as (Hmwf & Hawf & Hpwf & Hinj & Htfv).
     destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
@@ -4767,7 +4768,7 @@ Section ProcPt.
       - exact (um_inj_insert P.(ud_um) vpn (uvm_pte perm r) Hinj Hfresh).
       - exact Htfv. }
     assert (Hl' : (uptd_insert_perm P perm vpn r).(ud_um) !! vpn = Some (uvm_pte perm r))
-      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert_eq).
     iDestruct (umem_lazy_fill P perm sz M vpn r bs
                  Hmwf Hunone Hlive with "Hm [Hpg]") as "Hm".
     { iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
@@ -5001,7 +5002,7 @@ Section ProcPt.
   Proof using .
     intros Hval Hbase.
     assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r))
-      by (unfold uptd_insert; cbn [ud_um]; apply lookup_insert).
+      by (unfold uptd_insert; cbn [ud_um]; apply lookup_insert_eq).
     assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r)
       by (rewrite pte_ppn_vmfault; exact (page_base_of_valid r Hval)).
     pose proof (proc_ptm_page_acc (uptd_insert P vpn r) sz M vpn
@@ -5349,7 +5350,7 @@ Section ProcPt.
     proc_pt_own P ⊢ proc_pt_own (uptd_delete P vpn).
   Proof using .
     intros Hl. rewrite /proc_pt_own /uptd_delete. cbn [ud_um].
-    rewrite (delete_notin _ _ Hl). reflexivity.
+    rewrite (delete_id _ _ Hl). reflexivity.
   Qed.
 
   (* ---- the CLEAR-U step, at every altitude --------------------------- *)
@@ -5378,7 +5379,7 @@ Section ProcPt.
     - intros (v0 & w0 & j & Hl0 & Hj & Hva).
       destruct (decide (v0 = vpn)) as [Hv | Hne].
       + exists v0, x, j.
-        split_and!; [rewrite Hv; apply lookup_insert | exact Hj | exact Hva].
+        split_and!; [rewrite Hv; apply lookup_insert_eq | exact Hj | exact Hva].
       + exists v0, w0, j.
         split_and!; [rewrite lookup_insert_ne; [exact Hl0 | congruence]
                     | exact Hj | exact Hva].
@@ -5397,7 +5398,7 @@ Section ProcPt.
   Proof using .
     intros Hl Hq. unfold uva_pa, uptd_set. cbn [ud_um].
     destruct (decide (svpn_of (mword_of_int va : mword 64) = vpn)) as [Heq | Hne].
-    - rewrite Heq lookup_insert Hl. apply bv_eq.
+    - rewrite Heq lookup_insert_eq Hl. apply bv_eq.
       rewrite !u_walk_pa_unsigned Hq. reflexivity.
     - rewrite lookup_insert_ne; [reflexivity | congruence].
   Qed.
@@ -5699,7 +5700,7 @@ Section ProcPt.
   Proof using .
     intros Hval.
     assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r)).
-    { unfold uptd_insert. cbn [ud_um]. apply lookup_insert. }
+    { unfold uptd_insert. cbn [ud_um]. apply lookup_insert_eq. }
     assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r).
     { rewrite pte_ppn_vmfault. exact (page_base_of_valid r Hval). }
     (* rewrite FORWARD in the instance -- [rewrite <- Hpb] in the goal would

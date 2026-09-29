@@ -126,7 +126,7 @@ Lemma ind_bytes_insert_same (e : list (bv 32)) (i : nat) (v : bv 32) (j : nat) :
 Proof.
   intros Hi Hj.
   rewrite ind_bytes_lookup; [| rewrite length_insert; exact Hi | exact Hj].
-  rewrite list_lookup_total_insert by exact Hi. reflexivity.
+  rewrite list_lookup_total_insert_eq by exact Hi. reflexivity.
 Qed.
 
 Lemma ind_bytes_insert_other (e : list (bv 32)) (i : nat) (v : bv 32) (k : nat) :

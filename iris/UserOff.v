@@ -12,7 +12,7 @@
      uoff γo off := off_gv γo (1/2) (Z.of_nat off)
 
    -- the user half HELD, at a value the program knows.  Everything about
-   the shadow still goes through [off_gv], never a bare [ghost_var] at [Z]
+   the shadow still goes through [off_gv], never a bare [ghost_var_frac] at [Z]
    (the pinned-class rule, [OffGv.v]'s header).
 
    ONE-WAY DOOR.  [uoff_park] turns a held half back into the parked

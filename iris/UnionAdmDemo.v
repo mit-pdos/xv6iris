@@ -311,7 +311,7 @@ Proof using.
       with (lm_step U (lm_upto U cs ∅ (bodies_of I_s0) 1)
               (lm_of U (bodies_of I_s0 !!! 1)) (lm_at U cs 1)).
     rewrite Hr1 s0_b1. cbn [ulmG ulm lm_of lm_step ustep]. rewrite ab_line1. cbn [fsm].
-    apply lookup_insert. }
+    apply lookup_insert_eq. }
   assert (HTok : fstate_ok T).
   { apply (lm_upto_st_ok U ulmG_laws cs ∅ (bodies_of I_s0) 2 fstate_ok_empty).
     - intros i Hi. apply (lml_body_line ulmG_laws).
@@ -425,7 +425,7 @@ Proof using.
   intros Hin N. destruct (decide (N = txt_a)) as [-> | Hne].
   - right. exists ws_a, (sel_all (echo_chunks ws_a)).
     split_and!; [by rewrite drop_0 | apply sel_all_ok |].
-    rewrite /st_a lookup_singleton. vm_compute. reflexivity.
+    rewrite /st_a lookup_singleton_eq. vm_compute. reflexivity.
   - left. rewrite /st_a lookup_singleton_ne; [| done]. by rewrite lookup_empty.
 Qed.
 
@@ -442,7 +442,7 @@ Proof using.
     apply adm_a0.
     rewrite (_ : ulines_before h_na 1 = [LEchoF ws_a txt_a; LEchoF ws_b txt_a]);
       [| vm_compute; reflexivity].
-    apply elem_of_list_here.
+    apply list_elem_of_here.
   - rewrite cyc_na. constructor; [exact n0_good |].
     constructor; [exact c1_good_a | constructor].
 Qed.
@@ -473,7 +473,7 @@ Proof using.
     apply adm_a0.
     rewrite (_ : ulines_before h_fa 1 = [LEchoF ws_a txt_a; LEchoF ws_b txt_a; LSync]);
       [| vm_compute; reflexivity].
-    apply elem_of_list_here.
+    apply list_elem_of_here.
   - rewrite cyc_fa. constructor; [exact f0_good |].
     constructor; [exact c1_good_a | constructor].
 Qed.

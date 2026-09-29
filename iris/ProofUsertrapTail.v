@@ -491,7 +491,7 @@ Section UtRet2.
     (∃ v : mword 64, stval ↦ᵣ v) -∗
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ uservec_tvec -∗
-    ghost_var sie_gname (1/4) vb -∗
+    ghost_var_frac sie_gname (1/4) vb -∗
     kpt_on cpu_id -∗
     (* the four kernel words prepare_return just wrote, as the residue
        states them -- see [UsertrapRes.ut_tfk] *)

@@ -8,7 +8,7 @@
    Uniqueness is ghost-map library agreement ([kmap_at_agree]).
 
    This file keeps everything that needs [kmap_M0] (KptPt): the AUTH
-   ([kmap_auth M] = bare [ghost_map_auth]), the lookup/insert working
+   ([kmap_auth M] = bare [ghost_map_auth_frac]), the lookup/insert working
    lemmas, and the persistent STATIC-CLAIMS bundle [kmap_static_claims]
    (every identity mapping's fragment, minted+persisted at adequacy init and
    carried in [hw_config]) with its extraction lemma [kmap_static_claims_at].
@@ -52,7 +52,7 @@ Section KMap.
   (* The bare auth.                                                         *)
   (* ===================================================================== *)
   Definition kmap_auth (M : gmap (mword 27) (mword 44 * kperm)) : iProp Σ :=
-    ghost_map_auth kmap_name 1 M.
+    ghost_map_auth_frac kmap_name 1 M.
 
   Global Instance kmap_auth_timeless M : Timeless (kmap_auth M).
   Proof using . apply _. Qed.

@@ -109,7 +109,7 @@ Section WpUartgetc.
   Proof using .
     unfold lsr_ldval_of, extend_value.
     cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-         to_word get_word MachineWord.MachineWord.zero_extend].
+         MachineWord.MachineWord.zero_extend].
     rewrite bv_zero_extend_unsigned;
       [reflexivity | first [ done | vm_compute; discriminate | lia ] ].
   Qed.

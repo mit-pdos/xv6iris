@@ -1485,7 +1485,7 @@ Proof using.
 Qed.
 
 Ltac pdd_elem :=
-  solve [ repeat first [ apply elem_of_list_here | apply elem_of_list_further ] ].
+  solve [ repeat first [ apply list_elem_of_here | apply list_elem_of_further ] ].
 
 (* ====================================================================== *)
 (*  1.  THE INTERLEAVINGS ONE [PBoth] ROUND ADMITS                         *)
@@ -1511,7 +1511,7 @@ Lemma elem_of_choose (n k : nat) (sel : list bool) :
 Proof using.
   revert k sel. induction n as [| n IH]; intros k sel; cbn [choose].
   - case_decide as Hk.
-    + rewrite elem_of_list_singleton. split.
+    + rewrite list_elem_of_singleton. split.
       * intros ->. cbn [length count_true]. split; [reflexivity | lia].
       * intros [Hl _]. by apply nil_length_inv in Hl.
     + rewrite elem_of_nil. split; [done |].
@@ -1519,17 +1519,17 @@ Proof using.
       cbn [count_true] in Hc. lia.
   - rewrite elem_of_app. split.
     + intros [Hin | Hin].
-      * apply elem_of_list_fmap in Hin as (s & -> & Hs).
+      * apply list_elem_of_fmap in Hin as (s & -> & Hs).
         apply IH in Hs as [Hl Hc]. cbn [length count_true]. split; lia.
       * destruct k as [| k']; [by apply elem_of_nil in Hin |].
-        apply elem_of_list_fmap in Hin as (s & -> & Hs).
+        apply list_elem_of_fmap in Hin as (s & -> & Hs).
         apply IH in Hs as [Hl Hc]. cbn [length count_true]. split; lia.
     + intros [Hl Hc]. destruct sel as [| b s]; [cbn [length] in Hl; lia |].
       cbn [length] in Hl. destruct b; cbn [count_true] in Hc.
       * destruct k as [| k']; [lia |]. right.
-        apply elem_of_list_fmap. exists s. split; [reflexivity |].
+        apply list_elem_of_fmap. exists s. split; [reflexivity |].
         apply IH. split; lia.
-      * left. apply elem_of_list_fmap. exists s. split; [reflexivity |].
+      * left. apply list_elem_of_fmap. exists s. split; [reflexivity |].
         apply IH. split; lia.
 Qed.
 
@@ -1550,8 +1550,8 @@ Proof using.
     intros (l & Hl & _). by apply elem_of_nil in Hl.
   - rewrite elem_of_app IH. split.
     + intros [H | (l' & Hl' & Hx)].
-      * exists l. split; [apply elem_of_list_here | exact H].
-      * exists l'. split; [by apply elem_of_list_further | exact Hx].
+      * exists l. split; [apply list_elem_of_here | exact H].
+      * exists l'. split; [by apply list_elem_of_further | exact Hx].
     + intros (l' & Hl' & Hx). apply elem_of_cons in Hl' as [-> | Hl'].
       * by left.
       * right. by exists l'.
@@ -1564,10 +1564,10 @@ Lemma elem_of_sels_len (n : nat) (sel : list bool) :
   sel ∈ sels_len n <-> length sel = n.
 Proof using.
   rewrite /sels_len pdd_elem_of_concat. split.
-  - intros (l & Hl & Hx). apply elem_of_list_fmap in Hl as (k & -> & _).
+  - intros (l & Hl & Hx). apply list_elem_of_fmap in Hl as (k & -> & _).
     exact (proj1 (proj1 (elem_of_choose n k sel) Hx)).
   - intro Hlen. exists (choose n (count_true sel)). split.
-    + apply elem_of_list_fmap. exists (count_true sel).
+    + apply list_elem_of_fmap. exists (count_true sel).
       split; [reflexivity |]. apply elem_of_seq.
       pose proof (count_true_le sel). lia.
     + apply elem_of_choose. split; [exact Hlen | reflexivity].
@@ -1580,10 +1580,10 @@ Lemma elem_of_all_sels (n : nat) (sel : list bool) :
   sel ∈ all_sels n <-> (length sel <= n)%nat.
 Proof using.
   rewrite /all_sels pdd_elem_of_concat. split.
-  - intros (l & Hl & Hx). apply elem_of_list_fmap in Hl as (m & -> & Hm).
+  - intros (l & Hl & Hx). apply list_elem_of_fmap in Hl as (m & -> & Hm).
     apply elem_of_seq in Hm. apply elem_of_sels_len in Hx. lia.
   - intro Hle. exists (sels_len (length sel)). split.
-    + apply elem_of_list_fmap. exists (length sel).
+    + apply list_elem_of_fmap. exists (length sel).
       split; [reflexivity |]. apply elem_of_seq. lia.
     + by apply elem_of_sels_len.
 Qed.
@@ -1595,7 +1595,7 @@ Definition forkS_sels : list (list bool) :=
 Lemma elem_of_forkS_sels (ws : list (list (bv 8))) (sel : list bool) :
   sel ∈ forkS_sels <-> palt_ok (LPipe ws) (PForkS sel).
 Proof using.
-  rewrite /forkS_sels elem_of_list_In filter_In -elem_of_list_In. split.
+  rewrite /forkS_sels list_elem_of_In filter_In -list_elem_of_In. split.
   - intros [_ Hb]. apply bool_decide_eq_true in Hb. exact Hb.
   - intro Hok. split.
     + apply elem_of_all_sels.
@@ -1644,27 +1644,27 @@ Proof using.
   intro H. rewrite /palt_cands elem_of_app.
   destruct l as [ws | ws]; destruct a as [k | | | | sel | | sel |];
     cbn [palt_ok] in H; try done.
-  - left. apply elem_of_list_fmap. exists (PEcho k). split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists (PEcho k). split; [reflexivity |].
     cbn [palt_fix_cands].
     assert (Hk : k = 0%nat \/ k = 1%nat \/ k = 2%nat \/ k = 3%nat) by lia.
     destruct Hk as [-> | [-> | [-> | ->]]]; pdd_elem.
-  - left. apply elem_of_list_fmap. exists (PEcho k). split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists (PEcho k). split; [reflexivity |].
     rewrite H. cbn [palt_fix_cands]. pdd_elem.
-  - left. apply elem_of_list_fmap. exists PRan. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists PRan. split; [reflexivity |].
     cbn [palt_fix_cands]. pdd_elem.
-  - left. apply elem_of_list_fmap. exists PExecL. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists PExecL. split; [reflexivity |].
     cbn [palt_fix_cands]. pdd_elem.
-  - left. apply elem_of_list_fmap. exists PExecR. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists PExecR. split; [reflexivity |].
     cbn [palt_fix_cands]. pdd_elem.
   - right. apply elem_of_app. left.
-    apply elem_of_list_fmap. exists sel. split; [reflexivity |].
+    apply list_elem_of_fmap. exists sel. split; [reflexivity |].
     apply elem_of_choose. exact H.
-  - left. apply elem_of_list_fmap. exists PPipe. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists PPipe. split; [reflexivity |].
     cbn [palt_fix_cands]. pdd_elem.
   - right. apply elem_of_app. right.
-    apply elem_of_list_fmap. exists sel. split; [reflexivity |].
+    apply list_elem_of_fmap. exists sel. split; [reflexivity |].
     apply (elem_of_forkS_sels ws sel). exact H.
-  - left. apply elem_of_list_fmap. exists PSilent. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists PSilent. split; [reflexivity |].
     cbn [palt_fix_cands]. pdd_elem.
 Qed.
 
@@ -1675,15 +1675,15 @@ Lemma elem_of_palt_cands l c :
 Proof using.
   split.
   - rewrite /palt_cands elem_of_app. intros [Hin | Hin].
-    + apply elem_of_list_fmap in Hin as (a & -> & Ha).
+    + apply list_elem_of_fmap in Hin as (a & -> & Ha).
       rewrite !palt_of_code. split; [| reflexivity].
       exact (proj1 (Forall_forall _ _) (palt_fix_cands_ok l) a Ha).
     + destruct l as [ws | ws]; [by apply elem_of_nil in Hin |].
       apply elem_of_app in Hin as [Hin | Hin].
-      * apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
+      * apply list_elem_of_fmap in Hin as (sel & -> & Hsel).
         rewrite !palt_of_code. split; [| reflexivity].
         cbn [palt_ok]. by apply elem_of_choose.
-      * apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
+      * apply list_elem_of_fmap in Hin as (sel & -> & Hsel).
         rewrite !palt_of_code. split; [| reflexivity].
         by apply (elem_of_forkS_sels ws sel).
   - intros [Hok Hc]. rewrite Hc. exact (palt_cands_alt l (palt_of c) Hok).
@@ -1709,19 +1709,19 @@ Lemma elem_of_alts_cands_p (ls : list pline) (cs : list nat) :
   cs ∈ alts_cands_p ls <-> Forall2 (fun l c => c ∈ palt_cands l) ls cs.
 Proof using.
   revert cs. induction ls as [| l ls IH]; intros cs; cbn [alts_cands_p].
-  - rewrite elem_of_list_singleton. split.
+  - rewrite list_elem_of_singleton. split.
     + intros ->. constructor.
     + intro H. by apply Forall2_nil_inv_l in H.
-  - rewrite elem_of_list_fmap. split.
+  - rewrite list_elem_of_fmap. split.
     + intros ([c cs'] & -> & Hp). cbn [fst snd].
-      apply elem_of_list_In, in_prod_iff in Hp as [Hc Hcs].
-      apply elem_of_list_In in Hc. apply elem_of_list_In, IH in Hcs.
+      apply list_elem_of_In, in_prod_iff in Hp as [Hc Hcs].
+      apply list_elem_of_In in Hc. apply list_elem_of_In, IH in Hcs.
       by constructor.
     + intro H. apply Forall2_cons_inv_l in H as (c & cs' & Hc & Hcs & ->).
       exists (c, cs'). split; [reflexivity |].
-      apply elem_of_list_In, in_prod_iff. split.
-      * by apply elem_of_list_In.
-      * by apply elem_of_list_In, IH.
+      apply list_elem_of_In, in_prod_iff. split.
+      * by apply list_elem_of_In.
+      * by apply list_elem_of_In, IH.
 Qed.
 
 Lemma alts_cands_p_alts_ok (I : list (bv 8)) (cs : list nat) :

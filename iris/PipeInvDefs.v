@@ -199,8 +199,7 @@ Proof. unfold pipe_count_ok, pipe_count. vm_compute. discriminate. Qed.
 Local Lemma add_vec32_unsigned (x y : mword 32) :
   bv_unsigned (add_vec x y) = bv_wrap 32 (bv_unsigned x + bv_unsigned y).
 Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  unfold add_vec, Operators_mwords.word_binop, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
@@ -420,7 +419,7 @@ Proof.
     symmetry. apply Zplus_mod.
   - clear Hnr Hnw Hne. intros k Hk. rewrite length_app in Hk. simpl in Hk.
     destruct (decide (k = length ws)) as [-> | Hne'].
-    + rewrite list_lookup_insert; [| rewrite Hlen; apply Nat.mod_upper_bound; lia].
+    + rewrite list_lookup_insert_eq; [| rewrite Hlen; apply Nat.mod_upper_bound; lia].
       rewrite lookup_app_r; [| lia]. rewrite Nat.sub_diag. reflexivity.
     + rewrite list_lookup_insert_ne.
       * rewrite lookup_app_l; [| lia]. apply Hbs. lia.

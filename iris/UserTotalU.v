@@ -1253,7 +1253,7 @@ Section UserTotalU.
     bv_unsigned (access_vec_dec w 0) = bv_unsigned w mod 2.
   Proof using .
     unfold access_vec_dec, access_mword_dec.
-    unfold MachineWord.MachineWord.slice. cbv [get_word].
+    unfold MachineWord.MachineWord.slice. idtac.
     rewrite bv_extract_unsigned. rewrite Z.shiftr_0_r.
     unfold bv_wrap.
     change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
@@ -1267,12 +1267,12 @@ Section UserTotalU.
   Proof using .
     apply eq_vec_true_iff. apply bv_eq.
     unfold access_vec_dec, access_mword_dec, concat_vec.
-    cbv [to_word get_word autocast]. cbn.
+    cbv [autocast]. cbn.
     match goal with |- context[Z.eq_dec ?a ?b] => destruct (Z.eq_dec a b) as [e2 | ne] end;
       [| exfalso; exact (ne eq_refl)].
     rewrite (TypeCasts.cast_Z_refl (H := e2)).
     unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-    unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+    unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
     rewrite bv_extract_unsigned.
     (erewrite bv_concat_unsigned; [ | cbn; lia ]).
     cbn. rewrite Z.shiftr_0_r. rewrite Z.lor_0_r.
@@ -1287,12 +1287,12 @@ Section UserTotalU.
   Proof using .
     apply eq_vec_true_iff. apply bv_eq.
     unfold access_vec_dec, access_mword_dec, concat_vec.
-    cbv [to_word get_word autocast]. cbn.
+    cbv [autocast]. cbn.
     match goal with |- context[Z.eq_dec ?a ?b] => destruct (Z.eq_dec a b) as [e2 | ne] end;
       [| exfalso; exact (ne eq_refl)].
     rewrite (TypeCasts.cast_Z_refl (H := e2)).
     unfold to_word_idx. rewrite !MachineWord.MachineWord.cast_idx_refl.
-    unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat, Values.to_word.
+    unfold MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
     rewrite bv_extract_unsigned.
     (erewrite bv_concat_unsigned; [ | cbn; lia ]).
     cbn. rewrite Z.shiftr_0_r. rewrite Z.lor_0_r.
@@ -1321,7 +1321,7 @@ Section UserTotalU.
   Lemma even_jimm_21 (imm : mword 11) :
     bv_unsigned (sign_extend' 21 (concat_vec imm ('b"0" : mword 1))) mod 2 = 0.
   Proof using .
-    cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+    cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
          MachineWord.MachineWord.sign_extend].
     rewrite bv_sign_extend_unsigned.
     (rewrite mod2_wrap; [ | cbn; lia ]). unfold bv_signed.
@@ -1331,7 +1331,7 @@ Section UserTotalU.
   Lemma even_jimm_13 (imm : mword 8) :
     bv_unsigned (sign_extend' 13 (concat_vec imm ('b"0" : mword 1))) mod 2 = 0.
   Proof using .
-    cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+    cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec 
          MachineWord.MachineWord.sign_extend].
     rewrite bv_sign_extend_unsigned.
     (rewrite mod2_wrap; [ | cbn; lia ]). unfold bv_signed.

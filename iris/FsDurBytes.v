@@ -36,7 +36,7 @@
    THIS IS ALSO THE ONLY PLACE THE RECORD CAN SIT WITHOUT TWO [ghost_map]
    CLASS PATHS IN SCOPE AT ONCE.  The logged instance's bridge
    ([FsBytesGamma.fs_gamma_L]) is stated over [fsLogG]'s byte map; put
-   [diskImgG] beside it and [ghost_map_auth (fs_bytes γfs) 1 Lb] resolves
+   [diskImgG] beside it and [ghost_map_auth_frac (fs_bytes γfs) 1 Lb] resolves
    through the wrong class and no agreement law applies (the trap
    [FsDurSnap.fs_bytes_auth]'s section was written to dodge, durable-disk
    lane H).  Section 2 carries no [ghost_map] class at all, so section 3
@@ -96,7 +96,7 @@ Qed.
 
 Lemma dbytes_ok_head (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
   dbytes_ok (<[b := bs]> D) -> (length bs <= BSIZE)%nat.
-Proof. intros Hok. apply (Hok b bs). apply lookup_insert. Qed.
+Proof. intros Hok. apply (Hok b bs). apply lookup_insert_eq. Qed.
 
 (* TWO BLOCKS' BYTE RANGES ARE DISJOINT.  The whole content of the length
    premise: a block starts at a multiple of the stride and is no longer
@@ -183,7 +183,7 @@ Proof.
     split.
     + intros [[Hge Hk] | Hin].
       * exists b0, bs0, (Z.to_nat (a - b0 * Z.of_nat BSIZE)).
-        split; [apply lookup_insert |].
+        split; [apply lookup_insert_eq |].
         split; [exact Hk |].
         rewrite Z2Nat.id; lia.
       * apply (proj1 (IH a v HokD)) in Hin as (b & bs & k & Hb & Hk & ->).
@@ -271,7 +271,7 @@ Section DbytesGen.
         by exact (dbytes_ok_full _ Hlen).
       assert (HokD : dbytes_ok D) by exact (dbytes_ok_insert D b bs Hb Hok).
       assert (Hlb : length bs = BSIZE)
-        by exact (Hlen b bs (lookup_insert _ _ _)).
+        by exact (Hlen b bs (lookup_insert_eq _ _ _)).
       assert (HlenD : forall c cs, D !! c = Some cs -> length cs = BSIZE).
       { intros c cs Hc. apply (Hlen c cs).
         rewrite lookup_insert_ne; [exact Hc |].

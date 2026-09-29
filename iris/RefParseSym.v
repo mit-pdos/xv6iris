@@ -157,7 +157,7 @@ Lemma ref_at_notin (len : nat) (f : nat -> bv 8) (s : nat) (toks : list (bv 8)) 
   ref_at len f s ∉ toks.
 Proof using.
   intros Hns Hsym Hin. unfold ref_symtoks in Hsym.
-  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
+  apply list_elem_of_lookup_1 in Hin as [ k Hk ].
   pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb.
   unfold ref_at in Hb. destruct (bool_decide (s < len)) eqn:E.
   - apply bool_decide_eq_true_1 in E. rewrite (Hns E) in Hb. discriminate.
@@ -309,9 +309,9 @@ Proof using.
   - intros [ j Hj ].
     pose proof (ushp_find_some_val tlen 0 j tf b Hj) as Hb.
     pose proof (ushp_find_ge tlen 0 tf b j Hj) as Hrng.
-    apply elem_of_list_fmap. exists j. split; [ exact (eq_sym Hb) | ].
+    apply list_elem_of_fmap. exists j. split; [ exact (eq_sym Hb) | ].
     apply elem_of_seq. lia.
-  - intro Hin. apply elem_of_list_fmap in Hin as (j & Hb & Hj).
+  - intro Hin. apply list_elem_of_fmap in Hin as (j & Hb & Hj).
     apply elem_of_seq in Hj.
     exact (ushp_find_some_of tlen 0 j tf b ltac:(lia) (eq_sym Hb)).
 Qed.
@@ -923,10 +923,10 @@ Lemma ref_at_notin_gt (len : nat) (f : nat -> bv 8) (p s : nat) (toks : list (bv
 Proof using.
   intros Hone Hs Hsym Hgt Hin. destruct (ushs_one_some_at _ _ _ Hone) as [ Hp _ ].
   rewrite (ref_at_lt len f s ltac:(lia)) in Hin.
-  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
+  apply list_elem_of_lookup_1 in Hin as [ k Hk ].
   pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb.
   rewrite (ushs_one_le_sym len f p s Hone Hs Hb) in Hk.
-  exact (Hgt (elem_of_list_lookup_2 _ _ _ Hk)).
+  exact (Hgt (list_elem_of_lookup_2 _ _ _ Hk)).
 Qed.
 
 (* on the redirect line the argument loop does NOT stop at the '>': '>' is
@@ -1143,7 +1143,7 @@ Lemma ref_peek_scope_miss (len : nat) (f : nat -> bv 8) (i : nat) (toks : list (
 Proof using.
   intros Hsc Hout. apply ref_peek_miss. intro Hin.
   set (s := ref_skip len f i) in *.
-  destruct (elem_of_list_lookup_1 _ _ Hin) as [ k Hk ].
+  destruct (list_elem_of_lookup_1 _ _ Hin) as [ k Hk ].
   destruct (Forall_lookup_1 _ _ _ _ Hout Hk) as (Hsym & Hnb & Hng).
   destruct (lt_dec s len) as [ Hlt | Hge ].
   - rewrite (ref_at_lt len f s Hlt) in Hsym, Hnb, Hng.

@@ -167,9 +167,9 @@ Proof using.
   - replace (length w - length stem)%nat with 0%nat in Hwt by lia.
     rewrite take_0 app_nil_r in Hwt.
     destruct w as [| b w'].
-    + exists txt_a. split; [do 5 apply elem_of_list_further; apply elem_of_list_here |].
+    + exists txt_a. split; [do 5 apply list_elem_of_further; apply list_elem_of_here |].
       exact txt_a_name.
-    + exists txt_ext. split; [do 4 apply elem_of_list_further; apply elem_of_list_here |].
+    + exists txt_ext. split; [do 4 apply list_elem_of_further; apply list_elem_of_here |].
       exists (b :: w'). split; [reflexivity |]. split; [split; [discriminate |] | lia].
       rewrite Hwt. apply Forall_take. exact Hw.
   - rewrite (take_ge stem) in Hwt; [| lia].
@@ -177,7 +177,7 @@ Proof using.
     exists (drop k txt_ext). split.
     + assert (Hk : (1 <= k <= 4)%nat) by lia.
       destruct k as [| [| [| [| [| k]]]]]; try lia;
-        repeat first [ apply elem_of_list_here | apply elem_of_list_further ].
+        repeat first [ apply list_elem_of_here | apply list_elem_of_further ].
     + exists stem. split; [| split; [split; [exact Hne | exact Hw] | exact Hl]].
       rewrite Hwt -app_assoc take_drop. reflexivity.
 Qed.

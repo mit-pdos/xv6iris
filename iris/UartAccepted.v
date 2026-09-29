@@ -134,7 +134,7 @@ Definition out_wire_ok (u : uart_state) : Prop :=
 
 (* a fresh UART has neither *)
 Lemma out_wire_ok_uart0 : out_wire_ok uart0_state.
-Proof. rewrite /out_wire_ok /=. apply stdpp.list_relations.sublist_nil_l. Qed.
+Proof. rewrite /out_wire_ok /=. apply stdpp.list_relations.list.sublist_nil_l. Qed.
 
 (* THE DRAIN, the one transition that moves either list: the popped byte is
    appended to [u_out] always and to [u_wire] only when it really left the
@@ -148,8 +148,8 @@ Proof.
   rewrite /out_wire_ok Hw Ho.
   destruct (uart_loopback u).
   - (* under LOOP the wire stands still while [u_out] grows *)
-    by apply stdpp.list_relations.sublist_inserts_r.
-  - apply stdpp.list_relations.sublist_app; [exact Hok | reflexivity].
+    by apply stdpp.list_relations.list.sublist_inserts_r.
+  - apply stdpp.list_relations.list.sublist_app; [exact Hok | reflexivity].
 Qed.
 
 (* ...and what it says about the ACCEPTED history, which is [u_out] followed
@@ -158,7 +158,7 @@ Lemma out_wire_ok_acc (u : uart_state) :
   out_wire_ok u -> u_wire u `sublist_of` uart_acc u.
 Proof.
   intros Hok. rewrite /uart_acc. etrans; [exact Hok|].
-  by apply stdpp.list_relations.sublist_inserts_r.
+  by apply stdpp.list_relations.list.sublist_inserts_r.
 Qed.
 
 Lemma uart_step_out_wire_ok (i : uart_id) (d : dev_state) (κ : list mobs)
@@ -277,7 +277,7 @@ Proof.
   destruct (g2.(gpow)) eqn:Hpw2.
   - rewrite (Hwire eq_refl i). exact (out_wire_ok_acc _ (Hok Hpw2 i)).
   - rewrite (trace_shape_off_open_seg κs Hsh) /=.
-    apply stdpp.list_relations.sublist_nil_l.
+    apply stdpp.list_relations.list.sublist_nil_l.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -313,7 +313,7 @@ Qed.
 Lemma out_accepted_split (w tr0 rest : list (bv 8)) :
   w `sublist_of` (tr0 ++ rest) ->
   exists w1 w2, w = w1 ++ w2 /\ w1 `sublist_of` tr0 /\ w2 `sublist_of` rest.
-Proof. by rewrite stdpp.list_relations.sublist_app_r. Qed.
+Proof. by rewrite stdpp.list_relations.list.sublist_app_r. Qed.
 
 (* THE LOCATING STEP, at a single accepted history: an observed output that
    is a sublist of [acc] splits at any prefix [tr0] of [acc], and the part

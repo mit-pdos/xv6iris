@@ -146,9 +146,9 @@ Lemma dirty_clear_in (D : gmap Z bool) (ws : list Z) (z : Z) :
 Proof.
   induction ws as [|w ws IH]; [inversion 1|].
   rewrite elem_of_cons. intros [->|Hz]; cbn [dirty_clear foldr].
-  - by rewrite lookup_insert.
+  - by rewrite lookup_insert_eq.
   - destruct (decide (w = z)) as [->|Hne].
-    + by rewrite lookup_insert.
+    + by rewrite lookup_insert_eq.
     + rewrite lookup_insert_ne //. by apply IH.
 Qed.
 
@@ -231,8 +231,8 @@ Lemma op_sum_delete (om : gmap nat op_entry) (i : nat) (e : op_entry) :
   op_sum om = (e.1.1 + op_sum (delete i om))%nat.
 Proof.
   intros Hi.
-  rewrite -{1}(insert_delete om i e Hi).
-  apply op_sum_insert, lookup_delete.
+  rewrite -{1}(insert_delete_id om i e Hi).
+  apply op_sum_insert, lookup_delete_eq.
 Qed.
 
 (* the conservative bound begin_op's guard reasons with: every entry is
@@ -246,7 +246,7 @@ Proof.
   intros Hb.
   rewrite op_sum_insert // map_size_insert_None //.
   assert (Hu : (e.1.1 <= b)%nat).
-  { apply (Hb i). rewrite lookup_insert //. }
+  { apply (Hb i). rewrite lookup_insert_eq //. }
   assert (Hrest : (op_sum om <= size om * b)%nat).
   { apply IH. intros j v Hj. apply (Hb j).
     rewrite lookup_insert_ne; [exact Hj|].
@@ -264,10 +264,10 @@ Lemma op_sum_spend (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
 Proof.
   intros Hi.
   assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
-    by apply lookup_insert.
+    by apply lookup_insert_eq.
   rewrite (op_sum_delete om i (S u, Sb, e0) Hi).
   rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
-  rewrite delete_insert_delete. cbn. lia.
+  rewrite delete_insert_eq. cbn. lia.
 Qed.
 
 (* ABSORBING changes the set only, so the sum is untouched -- which is the
@@ -280,10 +280,10 @@ Lemma op_sum_absorb (om : gmap nat op_entry) (i u : nat) (Sb Sb' : gset Z)
 Proof.
   intros Hi.
   assert (Hj : <[i := (u, Sb', e0)]> om !! i = Some (u, Sb', e0))
-    by apply lookup_insert.
+    by apply lookup_insert_eq.
   rewrite (op_sum_delete om i (u, Sb, e0) Hi).
   rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
-  rewrite delete_insert_delete. reflexivity.
+  rewrite delete_insert_eq. reflexivity.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -321,13 +321,13 @@ Proof.
     + intros (i & e & Hi & _). rewrite lookup_empty in Hi. discriminate.
   - intros i e m r Hi IH. split.
     + intros Hb. apply elem_of_union in Hb as [Hb | Hb].
-      * exists i, e. rewrite lookup_insert. done.
+      * exists i, e. rewrite lookup_insert_eq. done.
       * apply IH in Hb as (j & e' & Hj & Hb).
         exists j, e'. rewrite lookup_insert_ne; [done|].
         intros ->. rewrite Hi in Hj. discriminate.
     + intros (j & e' & Hj & Hb).
       destruct (decide (j = i)) as [->|Hne].
-      * rewrite lookup_insert in Hj. injection Hj as <-.
+      * rewrite lookup_insert_eq in Hj. injection Hj as <-.
         apply elem_of_union_l. exact Hb.
       * rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
         apply elem_of_union_r. apply IH. exists j, e'. done.
@@ -353,7 +353,7 @@ Proof.
   intros Hgrow b Hb. apply op_pending_elem_of.
   apply op_pending_elem_of in Hb as (j & e & Hj & Hb).
   destruct (decide (j = i)) as [->|Hne].
-  - exists i, e'. rewrite lookup_insert. split; [reflexivity|].
+  - exists i, e'. rewrite lookup_insert_eq. split; [reflexivity|].
     exact (Hgrow e Hj b Hb).
   - exists j, e. rewrite lookup_insert_ne; [done | exact (not_eq_sym Hne)].
 Qed.
@@ -978,7 +978,7 @@ Section LogInv.
   Proof using .
     intros -> Htie Hhit Hmiss HLw b Hb _.
     destruct (decide (b ∈ (list_to_set W : gset Z))) as [Hin|Hout].
-    - apply elem_of_list_to_set, elem_of_list_lookup in Hin as [j Hj].
+    - apply elem_of_list_to_set, list_elem_of_lookup in Hin as [j Hj].
       rewrite (HLw j b Hj) (Hhit j b Hj) //.
     - rewrite (Hmiss b Hb Hout). exact (Htie b Hb Hout).
   Qed.
@@ -1040,8 +1040,8 @@ Section LogInv.
        ([∗ list] i ∈ seq n (LOGBLOCKS - n),
           ∃ junk : SailStdpp.Values.mword 32, lh_block i ↦₄ junk) ∗
        (* the freeze-by-auth: both FsBlocks auths live HERE *)
-       ghost_map_auth (fs_cache γfs) 1 L ∗
-       ghost_map_auth (fs_dirty γfs) 1 D ∗
+       ghost_map_auth_frac (fs_cache γfs) 1 L ∗
+       ghost_map_auth_frac (fs_dirty γfs) 1 D ∗
        (* the log side's dirty halves, over the WHOLE covered range,
           recording exactly W's membership (the bio payloads hold the
           other halves) *)
@@ -1107,7 +1107,7 @@ Section LogInv.
        l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
        l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
        l_ncommit ↦₄ nc ∗
-       ghost_map_auth (ln_ops γ) 1 om ∗
+       ghost_map_auth_frac (ln_ops γ) 1 om ∗
        ⌜size om = out⌝ ∗
        ⌜forall i e, om !! i = Some e -> (e.1.1 <= MAXOPBLOCKS)%nat⌝ ∗
        (* from the guard: (out+1)*MAXOPBLOCKS <= LOGBLOCKS at every
@@ -1115,7 +1115,7 @@ Section LogInv.
        ⌜(out <= 3)%nat⌝ ∗
        ⌜cmt = true -> out = 0%nat⌝ ∗
        (* THE EPOCH AND THE APPEND REGISTRY (fs-log.md §G.2/§G.9) *)
-       mono_nat_auth_own (ln_ep γ) 1 E ∗
+       mono_nat_auth_own_frac (ln_ep γ) 1 E ∗
        (* GENESIS IS EPOCH ONE, AND THE COUNTER NEVER GOES BACK (§G.20).
           [log_epoch_alloc] starts at one on purpose, but a [mono_nat] auth
           says nothing about its own value, so without this clause the fact
@@ -1151,7 +1151,7 @@ Section LogInv.
           named, so nothing can relate that id to the ledger entry the same
           end_op retires -- but both retires drop exactly one row, which is
           all the commit reads ([log_tx_empty_of_ops]). *)
-       ghost_map_auth (ln_tx γ) 1 T ∗
+       ghost_map_auth_frac (ln_tx γ) 1 T ∗
        ⌜size T = size om⌝ ∗
        (* THE HELPING SLOT (sync K3-4, claude-notes/design/sync.md §4.2;
           [LogHelp.log_help]): the [sys_sync] waiters' hooks, deposited
@@ -1461,11 +1461,11 @@ Section LogCtx.
      pays for the bound with nothing. *)
   Lemma log_begin_step (γ : log_names) (om : gmap nat op_entry) (E : nat) :
     (1 <= E)%nat ->
-    ghost_map_auth (ln_ops γ) 1 om -∗
-    mono_nat_auth_own (ln_ep γ) 1 E ==∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗
+    mono_nat_auth_own_frac (ln_ep γ) 1 E ==∗
     ∃ i, ⌜om !! i = None⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E)]> om) ∗
-      mono_nat_auth_own (ln_ep γ) 1 E ∗
+      ghost_map_auth_frac (ln_ops γ) 1 (<[i := (MAXOPBLOCKS, ∅, E)]> om) ∗
+      mono_nat_auth_own_frac (ln_ep γ) 1 E ∗
       log_opSe γ MAXOPBLOCKS ∅ E.
   Proof using .
     intros Hpos. iIntros "Ha Hep".
@@ -1500,9 +1500,9 @@ Section LogCtx.
      sum drops by one ([op_sum_spend]). *)
   Lemma log_spend_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
       (e0 : nat) (b : Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ (S u) Sb e0 ==∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opSe γ (S u) Sb e0 ==∗
     ∃ i, ⌜om !! i = Some (S u, Sb, e0)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+      ghost_map_auth_frac (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof using .
     iIntros "Ha He". rewrite /log_opSe.
@@ -1524,7 +1524,7 @@ Section LogCtx.
      [e.1.2 ⊆ LB] clause to place [b] in the header. *)
   Lemma log_absorb_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
       (e0 : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
     ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝.
   Proof using .
     iIntros "Ha (He & _ & _)". iDestruct "He" as (i) "He".
@@ -1545,9 +1545,9 @@ Section LogCtx.
      case split on WHICH credit was presented. *)
   Lemma log_record_step γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
       (e0 : nat) (b : Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 ==∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 ==∗
     ∃ i, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
+      ghost_map_auth_frac (ln_ops γ) 1 (<[i := (u, Sb ∪ {[b]}, e0)]> om) ∗
       log_opSe γ u (Sb ∪ {[b]}) e0.
   Proof using .
     iIntros "Ha He". rewrite /log_opSe.
@@ -1568,9 +1568,9 @@ Section LogCtx.
   (* ...AND THE ALREADY-LOGGED BLOCK SET COMES BACK WITH IT, which is what
      end_op's re-deposit shrinks [op_pending] by ([op_pending_delete]). *)
   Lemma log_end_step γ (om : gmap nat op_entry) (u : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u ==∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opb γ u ==∗
     ∃ i Sb e0, ⌜om !! i = Some (u, Sb, e0)⌝ ∗
-      ghost_map_auth (ln_ops γ) 1 (delete i om).
+      ghost_map_auth_frac (ln_ops γ) 1 (delete i om).
   Proof using .
     iIntros "Ha He". rewrite /log_opb /log_opS /log_opSe.
     iDestruct "He" as (Sb e0) "(He & _ & _)". iDestruct "He" as (i) "He".
@@ -1586,9 +1586,9 @@ Section LogCtx.
   (* begin_op's mint, beside the ledger's.  Free: allocation at a fresh id,
      and the id never leaves this proof. *)
   Lemma log_tx_mint (γ : log_names) (T : gmap nat unit) :
-    ghost_map_auth (ln_tx γ) 1 T ==∗
+    ghost_map_auth_frac (ln_tx γ) 1 T ==∗
     ∃ t, ⌜T !! t = None⌝ ∗
-      ghost_map_auth (ln_tx γ) 1 (<[t := tt]> T) ∗ log_tx γ.
+      ghost_map_auth_frac (ln_tx γ) 1 (<[t := tt]> T) ∗ log_tx γ.
   Proof using .
     iIntros "Ha".
     set (t := fresh (dom T)).
@@ -1605,8 +1605,8 @@ Section LogCtx.
      this same end_op retires.  Both retires drop exactly one row, which is
      what [log_res]'s [size T = size om] is stated to survive. *)
   Lemma log_tx_retire (γ : log_names) (T : gmap nat unit) :
-    ghost_map_auth (ln_tx γ) 1 T -∗ log_tx γ ==∗
-    ∃ t, ⌜T !! t = Some tt⌝ ∗ ghost_map_auth (ln_tx γ) 1 (delete t T).
+    ghost_map_auth_frac (ln_tx γ) 1 T -∗ log_tx γ ==∗
+    ∃ t, ⌜T !! t = Some tt⌝ ∗ ghost_map_auth_frac (ln_tx γ) 1 (delete t T).
   Proof using .
     iIntros "Ha He". rewrite /log_tx. iDestruct "He" as (t) "He".
     iDestruct (ghost_map_lookup with "Ha He") as %Ht.
@@ -1653,8 +1653,8 @@ Section LogCtx.
     bytes_tie Lb C ->
     bytes_dom Lb (fs_home_set cov logstart) ->
     log_ctx γ bn γfs cov logstart dev -∗
-    ghost_map_auth (fs_bytes γfs) 1 Lb -∗
-    ghost_map_auth (ln_tx γ) 1 T -∗
+    ghost_map_auth_frac (fs_bytes γfs) 1 Lb -∗
+    ghost_map_auth_frac (ln_tx γ) 1 T -∗
     (* the era's token, checked out of [log_res] with the batch (sync
        K3-3): the law puts it into the pair *)
     riscv_sync_tok gen_id ={⊤ ∖ ↑fsbN}=∗
@@ -1665,8 +1665,8 @@ Section LogCtx.
          FsCrash.fs_crash_seam_at G cov logstart ∗
          snap_law_out G (riscv_sync_tok gen_id) gen_id C
            (fs_home_set cov logstart))
-      ∗ ghost_map_auth (fs_bytes γfs) 1 Lb
-      ∗ ghost_map_auth (ln_tx γ) 1 T.
+      ∗ ghost_map_auth_frac (fs_bytes γfs) 1 Lb
+      ∗ ghost_map_auth_frac (ln_tx γ) 1 T.
   Proof using .
     intros Hsz Hom Hdom Hlens Htie Hdm. iIntros "#Hctx Hb Ht HT".
     rewrite (log_tx_empty_of_ops om T Hsz Hom).
@@ -1683,7 +1683,7 @@ Section LogCtx.
      existential *)
   Lemma log_opSe_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z)
       (e0 : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opSe γ u Sb e0 -∗
     ⌜(1 <= size om)%nat⌝.
   Proof using .
     iIntros "Ha He". rewrite /log_opSe.
@@ -1698,7 +1698,7 @@ Section LogCtx.
   Qed.
 
   Lemma log_opS_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
     ⌜(1 <= size om)%nat⌝.
   Proof using .
     iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (e0) "He".
@@ -1706,7 +1706,7 @@ Section LogCtx.
   Qed.
 
   Lemma log_op_positive γ (om : gmap nat op_entry) (u : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_op γ u -∗
     ⌜(1 <= size om)%nat⌝.
   Proof using .
     iIntros "Ha [He _]". rewrite /log_opb /log_opS.
@@ -1717,7 +1717,7 @@ Section LogCtx.
   (* ...and the same fact off the BUDGET half alone, which is what a walk
      between the arm and the disarm of a row holds *)
   Lemma log_opb_positive γ (om : gmap nat op_entry) (u : nat) :
-    ghost_map_auth (ln_ops γ) 1 om -∗ log_opb γ u -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗ log_opb γ u -∗
     ⌜(1 <= size om)%nat⌝.
   Proof using .
     iIntros "Ha He". rewrite /log_opb /log_opS.
@@ -1747,7 +1747,7 @@ Section LogCtx.
     (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
     (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
     (e0 <= e)%nat ->
-    ghost_map_auth (ln_ops γ) 1 om -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗
     own (ln_lg γ) (● X) -∗
     log_opSe γ u Sb e0 -∗
     logged_at γ e b -∗
@@ -1782,7 +1782,7 @@ Section LogCtx.
     (forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat) ->
     (forall c : Z, ((E, c) : nat * Z) ∈ X -> c ∈ LB) ->
     (forall i x, om !! i = Some x -> x.1.2 ⊆ LB) ->
-    ghost_map_auth (ln_ops γ) 1 om -∗
+    ghost_map_auth_frac (ln_ops γ) 1 om -∗
     own (ln_lg γ) (● X) -∗
     log_opSe γ u Sb e0 -∗
     log_credit γ cr Sb e0 b -∗
@@ -1819,7 +1819,7 @@ Section LogCtx.
      physical moves, and no live entry can be falsified because [out = 0]
      there forces [om = ∅]. *)
   Lemma log_epoch_bump (γ : log_names) (E : nat) :
-    mono_nat_auth_own (ln_ep γ) 1 E ==∗ mono_nat_auth_own (ln_ep γ) 1 (S E).
+    mono_nat_auth_own_frac (ln_ep γ) 1 E ==∗ mono_nat_auth_own_frac (ln_ep γ) 1 (S E).
   Proof using .
     iIntros "H". iMod (mono_nat_own_update (S E) with "H") as "[$ _]";
       [lia | done].
@@ -1839,7 +1839,7 @@ Section LogCtx.
      the log ever compares an epoch to a literal: the invariant's clauses
      are [e0 = E] and [e' <= E], and the bump only raises. *)
   Lemma log_epoch_alloc :
-    ⊢ |==> ∃ γe : gname, mono_nat_auth_own γe 1 1%nat.
+    ⊢ |==> ∃ γe : gname, mono_nat_auth_own_frac γe 1 1%nat.
   Proof using .
     iMod (mono_nat_own_alloc 1%nat) as (γ) "[Ha _]".
     iModIntro. iExists γ. iFrame.
@@ -1854,7 +1854,7 @@ Section LogCtx.
   Qed.
 
   Lemma log_ledger_alloc :
-    ⊢ |==> ∃ γops : gname, ghost_map_auth γops 1 (∅ : gmap nat op_entry).
+    ⊢ |==> ∃ γops : gname, ghost_map_auth_frac γops 1 (∅ : gmap nat op_entry).
   Proof using .
     iMod (ghost_map_alloc_empty (K:=nat) (V:=op_entry)) as (γ) "Ha".
     iModIntro. iExists γ. iFrame.

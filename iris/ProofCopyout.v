@@ -1722,7 +1722,7 @@ Section ProofCopyout.
                    (umem_wr Mu dstva0 done src_bytes) with "Hpt") as
         (t' m') "(%Hrep' & %Hview' & %Hbase' & %Hwf' & Hptree & Hown)".
       assert (Hum' : Pd.(ud_um) !! svpn_of va0 = Some (vmfault_pte r))
-        by (rewrite /Pd /uptd_insert; cbn [ud_um]; apply lookup_insert).
+        by (rewrite /Pd /uptd_insert; cbn [ud_um]; apply lookup_insert_eq).
       assert (Hsome' : m' !! svpn_of va0 <> None).
       { intro Hn'. destruct (proj1 (proj1 Hview' (svpn_of va0)) Hn') as (_ & _ & Hun).
         rewrite Hum' in Hun. discriminate. }

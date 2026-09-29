@@ -210,7 +210,7 @@ End FetchOk4Cert.
 Lemma mword9_uint_range (x : mword 9) : (0 <= uint x < 512)%Z.
 Proof.
   pose proof (bv_unsigned_in_range _ x) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [| exact (proj1 Hr)].
   change (bv_modulus (MachineWord.MachineWord.Z_idx 9)) with 512%Z in Hr.
   exact Hr.
@@ -219,7 +219,7 @@ Qed.
 Lemma mword9_uint_id (x : mword 9) : (mword_of_int (uint x) : mword 9) = x.
 Proof.
   pose proof (bv_unsigned_in_range _ x) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N,
+  unfold uint, MachineWord.MachineWord.word_to_N,
          SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
   rewrite Z2N.id; [| exact (proj1 Hr)].
   apply Z_to_bv_bv_unsigned.
@@ -416,7 +416,7 @@ Proof.
   intros Hd (l1 & l2 & -> & ->) Hdom Hdom'.
   assert (HX1 : X ##ₘ ⋃ l1).
   { apply symmetry, map_disjoint_union_list_l, Forall_forall.
-    intros m Hm. apply elem_of_list_In in Hm.
+    intros m Hm. apply list_elem_of_In in Hm.
     revert Hd. clear -Hm. revert Hm. induction l1 as [| m0 l1 IH]; intros Hm Hd;
       [ by apply elem_of_nil in Hm |].
     destruct Hd as [Hhd Htl]. apply elem_of_cons in Hm as [-> | Hm].
@@ -457,18 +457,18 @@ Lemma fmap_agree_off {A} (K : list A) (f g : A -> pamap) :
   (forall i, i ∈ K -> g i = f i) -> (g <$> K) = (f <$> K).
 Proof.
   induction K as [| a K IH]; intros Hfg; [reflexivity |].
-  cbn [fmap list_fmap]. rewrite (Hfg a (elem_of_list_here a K)).
+  cbn [fmap list_fmap]. rewrite (Hfg a (list_elem_of_here a K)).
   rewrite IH; [ reflexivity |].
-  intros i Hi. apply Hfg. by apply elem_of_list_further.
+  intros i Hi. apply Hfg. by apply list_elem_of_further.
 Qed.
 
 Lemma fmap_agree_off_l {A} (K : list A) (h h' : A -> list pamap) :
   (forall i, i ∈ K -> h' i = h i) -> (h' <$> K) = (h <$> K).
 Proof.
   induction K as [| a K IH]; intros Hfg; [reflexivity |].
-  cbn [fmap list_fmap]. rewrite (Hfg a (elem_of_list_here a K)).
+  cbn [fmap list_fmap]. rewrite (Hfg a (list_elem_of_here a K)).
   rewrite IH; [ reflexivity |].
-  intros i Hi. apply Hfg. by apply elem_of_list_further.
+  intros i Hi. apply Hfg. by apply list_elem_of_further.
 Qed.
 
 Lemma nodup_split {A} `{EqDecision A} (L L1 L2 : list A) (i0 : A) :
@@ -476,11 +476,11 @@ Lemma nodup_split {A} `{EqDecision A} (L L1 L2 : list A) (i0 : A) :
   (forall i, i ∈ L1 -> i <> i0) /\ (forall i, i ∈ L2 -> i <> i0).
 Proof.
   intros Hnd ->.
-  apply stdpp.list_relations.NoDup_app in Hnd as (H1 & Hcross & H2).
-  apply (proj1 (stdpp.list_relations.NoDup_cons i0 L2)) in H2 as [Hni H2].
+  apply stdpp.list_relations.list.NoDup_app in Hnd as (H1 & Hcross & H2).
+  apply (proj1 (stdpp.list_relations.list.NoDup_cons i0 L2)) in H2 as [Hni H2].
   split.
   - intros i Hi Heq. rewrite Heq in Hi.
-    exact (Hcross i0 Hi (elem_of_list_here _ _)).
+    exact (Hcross i0 Hi (list_elem_of_here _ _)).
   - intros i Hi Heq. rewrite Heq in Hi. exact (Hni Hi).
 Qed.
 
@@ -490,7 +490,7 @@ Lemma fmap_upd_at {A} `{EqDecision A} (L : list A) (f g : A -> pamap) (i0 : A) :
   maps_upd_at (f i0) (g i0) (f <$> L) (g <$> L).
 Proof.
   intros Hnd Hin Hfg.
-  apply elem_of_list_split in Hin as (L1 & L2 & ->).
+  apply list_elem_of_split in Hin as (L1 & L2 & ->).
   destruct (nodup_split (L1 ++ i0 :: L2)%list L1 L2 i0 Hnd eq_refl) as [Hn1 Hn2].
   exists (f <$> L1), (f <$> L2).
   rewrite !fmap_app. cbn [fmap list_fmap]. split; [reflexivity |].
@@ -498,7 +498,7 @@ Proof.
              (fun i Hi => Hfg i ltac:(rewrite elem_of_app; by left) (Hn1 i Hi))).
   by rewrite (fmap_agree_off L2 f g
                 (fun i Hi => Hfg i
-                   ltac:(rewrite elem_of_app; right; by apply elem_of_list_further)
+                   ltac:(rewrite elem_of_app; right; by apply list_elem_of_further)
                    (Hn2 i Hi))).
 Qed.
 
@@ -510,7 +510,7 @@ Lemma concat_upd_at {A} `{EqDecision A} (L : list A) (h h' : A -> list pamap)
   maps_upd_at X Y (concat (h <$> L)) (concat (h' <$> L)).
 Proof.
   intros Hnd Hin Hfg Hupd.
-  apply elem_of_list_split in Hin as (L1 & L2 & ->).
+  apply list_elem_of_split in Hin as (L1 & L2 & ->).
   destruct (nodup_split (L1 ++ i0 :: L2)%list L1 L2 i0 Hnd eq_refl) as [Hn1 Hn2].
   rewrite !fmap_app. cbn [fmap list_fmap]. rewrite !concat_app.
   cbn [concat].
@@ -518,7 +518,7 @@ Proof.
              (fun i Hi => Hfg i ltac:(rewrite elem_of_app; by left) (Hn1 i Hi))).
   rewrite (fmap_agree_off_l L2 h h'
              (fun i Hi => Hfg i
-                ltac:(rewrite elem_of_app; right; by apply elem_of_list_further)
+                ltac:(rewrite elem_of_app; right; by apply list_elem_of_further)
                 (Hn2 i Hi))).
   apply maps_upd_at_app_l. by apply maps_upd_at_app_r.
 Qed.
@@ -532,7 +532,7 @@ Lemma uint_mword9 (j : Z) : (0 <= j < 512)%Z -> uint (mword_of_int j : mword 9) 
 Proof.
   intro Hj.
   pose proof (bv_unsigned_in_range _ (mword_of_int j : mword 9)) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  unfold uint, MachineWord.MachineWord.word_to_N.
   rewrite Z2N.id; [| exact (proj1 Hr)].
   unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
   rewrite Z_to_bv_small; [reflexivity |].

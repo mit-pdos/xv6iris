@@ -221,7 +221,7 @@ Section WPDead.
     iIntros "#Hdead". iLöb as "IH".
     iApply wp_lift_step; first by destruct e.
     iIntros (g ns κ κs nt) "((Hgauth & Hsi) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hdead") as %[_ Hge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hdead") as %[_ Hge].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
     assert (Hnl : ~ thread_live g gen).
     { intros [_ Heq]. lia. }
@@ -395,13 +395,13 @@ Section TsoBundle.
       (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg) (V : agent -> nat)
       : iProp Σ :=
     (∃ (TM : gmap Arch.pa ts_elem) (LM : gmap nat pwmsg),
-       ghost_map_auth (era_ts_name E) 1 TM ∗
+       ghost_map_auth_frac (era_ts_name E) 1 TM ∗
        ⌜dom TM = dom mem⌝ ∗
        (* one conjunct; see [RiscvPtsto.tso_interp_at]'s note *)
        ⌜∀ a e, TM !! a = Some e → ts_ok img mem log a e⌝ ∗
-       ghost_map_auth (era_logm_name E) 1 LM ∗
+       ghost_map_auth_frac (era_logm_name E) 1 LM ∗
        ⌜∀ i, LM !! i = log !! i⌝ ∗
-       mono_nat_auth_own (era_loglen_name E) 1 (length log) ∗
+       mono_nat_auth_own_frac (era_loglen_name E) 1 (length log) ∗
        view_auth (era_view_name E) V ∗
        ⌜mem = flat img log⌝ ∗
        ⌜∀ h, (V h ≤ length log)%nat⌝ ∗
@@ -779,8 +779,8 @@ Section WPExec.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { (* DEAD -- the birth bound rules out the unborn side *)
@@ -930,8 +930,8 @@ Section WPExec.
     iIntros "#(Hborn & Hstarted & Hrege) Hfrag H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { (* DEAD -- the birth bound rules out the unborn side *)
@@ -1130,8 +1130,8 @@ Section WPDev.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { assert (Hlt : gen_id < g.(ggen)) by lia.
@@ -1273,8 +1273,8 @@ Section WPDev.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { assert (Hlt : gen_id < g.(ggen)) by lia.
@@ -1367,8 +1367,8 @@ Section WPDev.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
-    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
-    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_auth_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
     { assert (Hlt : gen_id < g.(ggen)) by lia.

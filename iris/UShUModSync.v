@@ -262,7 +262,7 @@ Section UShUModSync.
     rewrite /FileLinksLine.flw. iDestruct "Hw" as (vf') "[#Hvf' #Hfl]".
     iDestruct (file_era_pin_agree with "Hvf Hvf'") as %<-.
     set (ls := (fe_base vf ++ UnionAdm.ulines_in I)%list).
-    assert (Hlst : stdpp.list_basics.last ls = Some LSync).
+    assert (Hlst : stdpp.list_basics.list.last ls = Some LSync).
     { rewrite /ls last_app (ulines_in_last I Hpos) Hul. reflexivity. }
     assert (Hls : length ls = (length (fe_base vf) + nlines I)%nat).
     { rewrite /ls length_app UnionAdm.ulines_in_length. reflexivity. }

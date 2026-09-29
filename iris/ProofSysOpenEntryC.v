@@ -528,7 +528,7 @@ Section ProofSysOpenEntryC.
               P Pmiss Phiarm (pfam_triv (fun _ _ _ _ => True%I)) Phiun
               Phiok Phiex
               (fun (nm : fname)
-                   (H : list_basics.last (PathElems.path_elems (bview plen bp))
+                   (H : list_basics.list.last (PathElems.path_elems (bview plen bp))
                         = Some nm) =>
                  npar_nm_intro Mim pvv (bview plen bp) nm Hpof H)
               (fun _ => I) (fun _ _ => I)

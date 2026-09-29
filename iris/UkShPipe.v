@@ -1873,7 +1873,7 @@ Section UkShPipe.
                      fd1 0%nat (FdOpen true false (FdPipe γp)) Hlow0
                      with "Hal") as "[%Hfd1 Hstd]".
         rewrite /UserFd.ustd_after Hlow0.
-        rewrite list_insert_insert.
+        rewrite list_insert_insert_eq.
         iDestruct (ushpi_own_hi (ukn_fd N') (<[0%nat := FdOpen true false
                       (FdPipe γp)]> ld) a (FdOpen true false (FdPipe γp)) Hage
                      with "Hown") as "Hha".
@@ -2160,7 +2160,7 @@ Section UkShPipe.
                    fd1 1%nat (FdOpen false true (FdPipe γp)) Hlow1
                    with "Hal") as "[%Hfd1 Hstd]".
       rewrite /UserFd.ustd_after Hlow1.
-      rewrite list_insert_insert.
+      rewrite list_insert_insert_eq.
       iDestruct (ushpi_own_hi (ukn_fd N') (<[1%nat := FdOpen false true
                     (FdPipe γp)]> ld) b (FdOpen false true (FdPipe γp)) Hbge
                    with "Hown") as "Hhb".
@@ -3507,7 +3507,7 @@ Section UkShPipe.
                   (FdOpen true false (FdPipe γp)) st1 ∅
                   ((6 * (Nat.max (ush_ht cl) (ush_ht cr) - ush_ht cr) + n)%nat)
                   Hpx' Ha0'
-                  (list_lookup_insert ld 0%nat _ H0lt)
+                  (list_lookup_insert_eq ld 0%nat _ H0lt)
                   ltac:(rewrite (list_lookup_insert_ne ld 0%nat 1%nat _
                                    ltac:(lia)); exact Hl1)
                   ltac:(discriminate) Hne1 Hnp1

@@ -226,7 +226,7 @@ Proof.
   assert (Hsh : shift_bits_right (mword_of_int z : mword 32) (mword_of_int 31 : mword 5)
                 = (mword_of_int (if Z_lt_dec z 0 then 1 else 0) : mword 32)).
   { unfold shift_bits_right. apply bv_eq.
-    unfold shiftr, SailStdpp.Values.with_word, get_word,
+    unfold shiftr,
       MachineWord.MachineWord.logical_shift_right.
     rewrite bv_shiftr_unsigned.
     assert (H31 : bv_unsigned (MachineWord.MachineWord.N_to_word
@@ -321,7 +321,7 @@ Lemma fr_sext16_moi (w : mword 16) :
 Proof.
   apply bv_eq.
   cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
+       MachineWord.MachineWord.sign_extend].
   rewrite bv_sign_extend_unsigned.
   unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
   reflexivity.
@@ -364,7 +364,7 @@ Proof.
                = shiftl (mword_of_int r : mword 64) 4).
   { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
   rewrite Hs. apply bv_eq.
-  unfold shiftl, SailStdpp.Values.with_word, get_word,
+  unfold shiftl,
     MachineWord.MachineWord.logical_shift_left.
   rewrite bv_shiftl_unsigned.
   assert (Hm64 : bv_modulus (MachineWord.MachineWord.Z_idx 64)
@@ -399,7 +399,7 @@ Proof.
                  = shiftr y 48).
   { intro y. unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
   rewrite Hl Hr. apply bv_eq.
-  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
+  unfold shiftl, shiftr,
     MachineWord.MachineWord.logical_shift_left,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned bv_shiftl_unsigned.

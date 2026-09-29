@@ -1247,8 +1247,8 @@ Section ProofVirtioDiskRw.
        split stays inside it -- forgetting to the raw window here loses the
        ledger residue and the return leg is the direction the flip makes
        false ([ByteBuf.ctx_word_pointsto_split4] is the tower's own). *)
-    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p with "H11") as %Hal11.
-    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p with "H12") as %Hal12.
+    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p (KTR := KT1) with "H11") as %Hal11.
+    iDestruct (TsoCtx.ctx_word_pointsto_aligned_p (KTR := KT1) with "H12") as %Hal12.
     iSplitR; [ iPureIntro; split; [exact Hal11 | exact Hal12] |].
     iEval (rewrite ctx_word_pointsto_split4) in "H11".
     iEval (rewrite ctx_word_pointsto_split4) in "H12".

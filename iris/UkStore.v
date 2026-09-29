@@ -131,12 +131,12 @@ Proof.
   - apply map_subseteq_spec. intros x b Hx.
     destruct (decide (x ∈ ((fun j : nat => (a + Z.of_nat j)%Z) <$> seq 0 (Z.to_nat k))))
       as [Hin | Hno].
-    + apply elem_of_list_fmap in Hin as (j & -> & Hj).
+    + apply list_elem_of_fmap in Hin as (j & -> & Hj).
       apply elem_of_seq in Hj.
       rewrite (uM_store_lookup Mp a k v j ltac:(lia)) in Hx.
       rewrite (uM_store_lookup M a k v j ltac:(lia)). exact Hx.
     + assert (Hne : forall j : nat, (j < Z.to_nat k)%nat -> x <> (a + Z.of_nat j)%Z).
-      { intros j Hj He. apply Hno. apply elem_of_list_fmap. exists j.
+      { intros j Hj He. apply Hno. apply list_elem_of_fmap. exists j.
         split; [ exact He | apply elem_of_seq; lia ]. }
       rewrite (uM_store_lookup_ne Mp a k v x Hne) in Hx.
       rewrite (uM_store_lookup_ne M a k v x Hne).
@@ -492,6 +492,7 @@ Section UkStorePostFetch.
       (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
                         uv_step_post C R rsE (Step_Execute (r, ib'))) ib).
   Proof using .
+    clear Qp. (* unused; else Rocq counts it as used (asks for Proof using … Qp) *)
     intros Hkw Hred Hexp Hva Hwval Hl Hchk Hcanon Hal HMb Hntx Hinj Hg1
       Hpins2 Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2 Lmie2 Lmdl2 Lmedl2 Lmenv2
       Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2 Lmi2 Hagd2 Htok' Hpure.

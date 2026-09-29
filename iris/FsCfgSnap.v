@@ -280,10 +280,10 @@ Lemma elem_of_snap_live_blocks (S : fs_state_rec) (A : gset Z) (b : Z) :
   <-> exists i : Z, i ∈ A /\ b ∈ snap_blk_set (snap_node S i).
 Proof.
   rewrite /snap_live_blocks elem_of_union_list. split.
-  - intros (X & HX & Hb). apply elem_of_list_fmap in HX as (i & -> & Hi).
+  - intros (X & HX & Hb). apply list_elem_of_fmap in HX as (i & -> & Hi).
     apply elem_of_elements in Hi. by exists i.
   - intros (i & Hi & Hb). exists (snap_blk_set (snap_node S i)). split.
-    + apply elem_of_list_fmap. exists i. split; [reflexivity |].
+    + apply list_elem_of_fmap. exists i. split; [reflexivity |].
       by apply elem_of_elements.
     + exact Hb.
 Qed.
@@ -496,7 +496,7 @@ Section SnapLinks.
     rewrite dom_insert_L.
     rewrite (big_sepS_insert
                (fun z => Phi z (<[k := v]> m !!! z)) (dom m) k Hkd).
-    rewrite lookup_total_insert.
+    rewrite lookup_total_insert_eq.
     rewrite IH. f_equiv.
     apply big_sepS_proper. intros z Hz.
     assert (Hzk : k <> z) by (intros <-; exact (Hkd Hz)).
@@ -1036,7 +1036,7 @@ Section SnapMint.
        to mint them at [∅]/[[]] and set each one to the snapshot's own
        reading before handing the family to the pool.  Those readings ride in
        the era fragment the pool already gets, so nothing is minted here. *)
-    iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
+    iDestruct (region_of_seq (fun z => mono_nat_auth_own_frac (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
     (* ---- 4. the block layer's ghosts, and the FILE SYSTEM's two ----- *)

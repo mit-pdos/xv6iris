@@ -1322,7 +1322,7 @@ Section KexecABody.
     iDestruct (kxc_elf_slots_of_stack sp0 with "Helf") as "Helf".
     iDestruct (kxc_slots_elf sp0 with "Helf") as "[%Hal Helfb]".
     iEval (rewrite /bytes_own) in "Helfb".
-    iDestruct (bb_any_named (pa_stk sp0 54) 64 with "Helfb") as (fb) "Helfb".
+    iDestruct (bb_any_named (KTR := KT1) (pa_stk sp0 54) 64 with "Helfb") as (fb) "Helfb".
     (* ---- +0x03a: li a4,64 ---- *)
     iApply (wp_li4_s_sconf (mword_of_int (KXA + 0x03a)) Ra4
               (mword_of_int 64 : mword 12)
@@ -1745,7 +1745,7 @@ Section KexecABody.
            this is where the named buffer goes back into [stack_own] *)
         iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
         { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-          rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
+          rewrite /bytes_own. iApply (bb_named_any (KTR := KT1) with "Helfb"). }
         iApply (wp_beq_fall_s_sconf (mword_of_int (KXA + 0x060))
                   (mword_of_int 48 : mword 13) Ra5 Ra4 Q12 (K - 68)%nat eb
                   ltac:(nz) ltac:(nz) Emag with "Hcg Hpc []").
@@ -1920,7 +1920,7 @@ Section KexecABody.
       iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-        rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
+        rewrite /bytes_own. iApply (bb_named_any (KTR := KT1) with "Helfb"). }
       (* same re-anchoring as the bad-magic tail: [T.kxc_bad64] runs at [CID11] *)
       assert (Hcr11 : true = false \/ proc_addr jp = zero_reg ->
                       (CID11 : CPU) = (CID0 : CPU)) by wp_next_chain.

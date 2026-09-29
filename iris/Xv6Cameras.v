@@ -149,7 +149,7 @@ Proof. solve_inG. Qed.
 (*  2.  THE PAGE ALLOCATOR  (theory: KallocInv.v)                         *)
 (* ===================================================================== *)
 
-(* ghost state for the page-count layer: a nat-valued ghost_var (the count,
+(* ghost state for the page-count layer: a nat-valued ghost_var_frac (the count,
    γk.1) and a pair at γk.2 whose FIRST component is the one-shot
    boot->steady seal and whose SECOND is a persistent agree on the NAME of
    the allocator's event ledger (a mono-list of [KallocEv.kev], the third
@@ -300,7 +300,7 @@ Inductive hstate :=
    [mono_natG] IS NOT A FIELD HERE either.  It was, and [riscvFixedGS] owns
    one too ([riscvF_genGS], the generation counter) -- so any scope holding
    [riscvGS] and this class had TWO paths to one [inG], and
-   [mono_nat_auth_own γ] built at one would not frame against the other
+   [mono_nat_auth_own_frac γ] built at one would not frame against the other
    while printing identically.  That is what made [RiscvAdequacy]'s
    [Section power] unprovable once it took the bundle. *)
 Class diskGhostG (Σ : gFunctors) := DiskGhostG {
@@ -310,7 +310,7 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
   (* THE STAGED HEAD.  xv6 publishes in two instructions -- it stores the
      descriptor head into [avail->ring[idx % NUM]], fences, and only then
      bumps [avail->idx] -- and the device invariant closes between them.
-     This [ghost_var] is how the publisher carries "the cell already names
+     This [ghost_var_frac] is how the publisher carries "the cell already names
      my chain" across that gap: the invariant holds one half beside the
      protocol state and couples it to [vp_ring] at the publish position, the
      publisher the other.  [None] at rest; the ring store sets it, the index
@@ -353,7 +353,7 @@ Proof. solve_inG. Qed.
 (* ===================================================================== *)
 
 (*   mono_list (bv 8)   the accepted output trace, monotone
-     ghost_var  (list (bv 8))  EXCLUSIVE ownership of the transmitter
+     ghost_var_frac  (list (bv 8))  EXCLUSIVE ownership of the transmitter
      dfrac_agree bool   DLAB -- freezable to a persistent fact              *)
 Class uartGhostG (Σ : gFunctors) := UartGhostG {
   uart_ghost_listG :: inG Σ (mono_listR (leibnizO (bv 8)));
@@ -379,7 +379,7 @@ Class uartGhostG (Σ : gFunctors) := UartGhostG {
   uart_ghost_rxhiG :: ghost_varG Σ (option (list mobs));
   (* THE CONSOLE RING'S COMMITTED SEQUENCE ([ConsoleInv.cons_stored_auth]):
      the append-only log of (history, byte) pairs consoleread consumes, and
-     the READER'S CURSOR into it ([ConsoleInv.cons_reader], a [ghost_var]
+     the READER'S CURSOR into it ([ConsoleInv.cons_reader], a [ghost_var_frac]
      over the number of bytes consumed).  They are console state and not
      UART state, but they are cameras of the same receive path and a class
      of their own would have to be bound in every file that names
@@ -390,19 +390,19 @@ Class uartGhostG (Σ : gFunctors) := UartGhostG {
      mono_list mirror of the accepted-input log ([WpUart.in_log_auth]),
      whose persistent lower bound is what the ring carries to state the
      read contract's gap fact; and the CONSUMED sequence
-     ([WpUart.uart_deliv] / [ConsoleInv.cons_deliv]), the ghost_var pair
+     ([WpUart.uart_deliv] / [ConsoleInv.cons_deliv]), the ghost_var_frac pair
      that ties the boundary's [dl] to the ring's consumed count.  The
      high-water history of the log reuses [uart_ghost_rxhiG] above -- it is
      the same [option (list mobs)] camera. *)
   cons_ghost_inlogG :: inG Σ (mono_listR (leibnizO LogEntryDefs.log_entry));
   cons_ghost_delivG :: ghost_varG Σ (list (list mobs * bv 8));
   (* ...AND THE LOG'S EXACT MIRROR ([WpUart.uart_logm] /
-     [ConsoleInv.cons_logm], lane CONS-IO milestone B): a [ghost_var] over
+     [ConsoleInv.cons_logm], lane CONS-IO milestone B): a [ghost_var_frac] over
      the SAME list the [mono_list] above mirrors, because the ring needs
      equality with the log and not a bound (see [UartNames.un_logm]). *)
   cons_ghost_logmG :: ghost_varG Σ (list LogEntryDefs.log_entry);
   (* THE CONSOLEINTR ARM IN PROGRESS ([WpUart.uart_arm], redesign R2): a
-     [ghost_var] PAIR over "which arm consoleintr is inside, and how much of
+     [ghost_var_frac] PAIR over "which arm consoleintr is inside, and how much of
      its echo has gone out".  One half sits in the port invariant, the other
      rides the PLIC payload beside the receive token -- so opening an arm has
      the pure side condition "no arm is in progress", proved by the two
@@ -827,7 +827,7 @@ Inductive ic_dep : Type :=
   (* [(t, qt)] ARE FIELDS, for [DepTx]'s reason verbatim (durable-disk
      B''-tx5): iput's freeze window (+0x5e..+0x70) parks a SHARE of its
      transaction's [LogDefs.ln_tx] element in [IcacheEscrow.ic_out_frz], so a
-     commit refutes the arm outright, and the descriptor -- a [ghost_var]
+     commit refutes the arm outright, and the descriptor -- a [ghost_var_frac]
      whose other half the freer carries -- pins the share to the one the
      freer must get back.  The escrow's OTHER two windows carry no descriptor
      and use [IcacheRef.hpn_h] instead. *)
@@ -842,7 +842,7 @@ Inductive ic_dep : Type :=
      [ln_tx] authority ([IcacheEscrow.ic_out_no_write_arm]).
 
      [(t, q)] ARE FIELDS, not existentials, and that is the whole mechanism:
-     [IcacheEscrow.ic_deposit] is a [ghost_var] whose other half the holder
+     [IcacheEscrow.ic_deposit] is a [ghost_var_frac] whose other half the holder
      carries, so the descriptor PINS the arm's transaction and share to the
      holder's, and the park hands back exactly what the checkout parked.  An
      existentially-keyed share cannot re-identify: two halves of one
@@ -1091,7 +1091,7 @@ Proof. solve_inG. Qed.
    [FdSlots.fd_frags] ([WaitInv.ch_frag]).  That is what makes the two
    halves findable: a lock holder that also holds a row learns the map's
    entry by [ghost_map_lookup], where two halves of a per-process
-   [ghost_var] would leave it unable to say WHICH entry of the payload is
+   [ghost_var_frac] would leave it unable to say WHICH entry of the payload is
    its own.  A row is installed under the lock ([ghost_map_insert] at a
    name allocated cofinitely against the domain) and deleted there when the
    incarnation is reaped.
@@ -1119,7 +1119,7 @@ Proof. solve_inG. Qed.
    process's children do not die with it: kexit hands them to <init>
    (kernel/proc.c's [reparent]), and the generations that were handed over
    that way are the second thing <wait_lock> owns ([WaitInv.orphans_own]).
-   It is a plain [ghost_var] at a MAP FROM THE NEW PARENT'S ADDRESS to the
+   It is a plain [ghost_var_frac] at a MAP FROM THE NEW PARENT'S ADDRESS to the
    generations reparented to it -- a second children table, keyed the way
    the row values are, and the column a lock holder may move without
    holding anybody's row.  Its name is carried here beside the map's,
@@ -1272,8 +1272,8 @@ Proof. solve_inG. Qed.
    parker.  [anchorR]: the context anchor's append-only generation ledger
    ([auth] of a [gmap nat (agree nat)]; fragments are core-id, hence
    persistent).  The two pair registers ([reg_park]/[reg_drop]) are
-   [ghost_var]s over [nat * nat]; the count-sync register is a
-   [ghost_var nat], already a member through [kallocG].  ONE bundle so the
+   [ghost_var_frac]s over [nat * nat]; the count-sync register is a
+   [ghost_var_frac nat], already a member through [kallocG].  ONE bundle so the
    ~100 files stating [bio_ctx]/[bio_init] keep [!xv6G Σ] as their only
    binder (the rule at the head of this file). *)
 Definition presPair : ofe := prodO natO natO.
@@ -1420,7 +1420,7 @@ Proof.
            (λ t, BoxNames t.1.1.1 t.1.1.2 t.1.2 t.2)).
   by intros [].
 Qed.
-(* [offbox_offG] is the OFFSET SHADOW's class: a [ghost_var] over [Z] whose
+(* [offbox_offG] is the OFFSET SHADOW's class: a [ghost_var_frac] over [Z] whose
    value is the boxed [f->off] word ([FileOffCell.off_resident]), named per
    publish by [FdSlots.FdInode]'s [γo].  [ghost_varG Σ Z] has another
    member in the bundle ([uioG]'s [uio_brkG]), so every use PINS this one

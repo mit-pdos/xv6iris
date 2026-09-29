@@ -114,11 +114,11 @@ Lemma elem_of_sel_cands (n : nat) (sel : list nat) :
   sel ∈ sel_cands n <-> StronglySorted lt sel /\ Forall (fun j => j < n) sel.
 Proof using.
   revert sel. induction n as [| n IH]; intros sel; cbn [sel_cands].
-  - rewrite elem_of_list_singleton. split.
+  - rewrite list_elem_of_singleton. split.
     + intros ->. split; constructor.
     + intros [_ HF]. destruct sel as [| j sel]; [reflexivity |].
       exfalso. apply Forall_cons_1 in HF as [Hj _]. cbn beta in Hj. lia.
-  - rewrite elem_of_app elem_of_list_fmap. split.
+  - rewrite elem_of_app list_elem_of_fmap. split.
     + intros [Hin | (u & -> & Hu)].
       * apply IH in Hin as [Hs HF]. split; [exact Hs |].
         apply (fdd_Forall_lt_weaken sel n (S n) ltac:(lia) HF).
@@ -185,16 +185,16 @@ Proof using.
 Qed.
 
 Ltac fdd_elem :=
-  solve [ repeat first [ apply elem_of_list_here | apply elem_of_list_further ] ].
+  solve [ repeat first [ apply list_elem_of_here | apply list_elem_of_further ] ].
 
 Lemma elem_of_ralt_cands l c : c ∈ ralt_cands l -> ralt_ok l (ralt_dec c).
 Proof using.
   rewrite /ralt_cands elem_of_app. intros [Hin | Hin].
-  - apply elem_of_list_fmap in Hin as (a & -> & Ha).
+  - apply list_elem_of_fmap in Hin as (a & -> & Ha).
     rewrite ralt_dec_enc.
     exact (proj1 (Forall_forall _ _) (ralt_fix_cands_ok l) a Ha).
   - destruct l as [ws | ws N | N | ws npc | ws |]; try (by apply elem_of_nil in Hin).
-    apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
+    apply list_elem_of_fmap in Hin as (sel & -> & Hsel).
     rewrite ralt_dec_enc. cbn [ralt_ok].
     by apply (sel_ok_cands (echo_chunks ws) sel).
 Qed.
@@ -206,37 +206,37 @@ Proof using.
   destruct l as [ws | ws N | N | ws npc | ws |];
     destruct (ralt_dec c) as [k | sel | | | | | | | | | | | |];
     cbn [ralt_ok] in H; try done.
-  - left. apply elem_of_list_fmap. exists (REcho k). split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists (REcho k). split; [reflexivity |].
     assert (Hk : k = 0%nat \/ k = 1%nat \/ k = 3%nat) by lia.
     cbn [ralt_fix_cands]. destruct Hk as [-> | [-> | ->]]; fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
-  - right. apply elem_of_list_fmap. exists sel. split; [reflexivity |].
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - right. apply list_elem_of_fmap. exists sel. split; [reflexivity |].
     by apply sel_ok_cands.
-  - left. apply elem_of_list_fmap. exists RFExec. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RFOpenU. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RFOpenM. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RFFork. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCRan. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCNoOpen. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCExec. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RFExec. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RFOpenU. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RFOpenM. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RFFork. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCRan. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCNoOpen. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCExec. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
   (* ...and the dead [LPipe] arm, which is [LCat]'s five verbatim *)
-  - left. apply elem_of_list_fmap. exists RCRan. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCNoOpen. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCExec. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCRan. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCNoOpen. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCExec. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
   (* ...and the [seccomp] line's three (the shell's own) *)
-  - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RSExec. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RSExec. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
   (* ...and the [sync] line's four *)
-  - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RSyncRan. split; [reflexivity |]. fdd_elem.
-  - left. apply elem_of_list_fmap. exists RSyncExec. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RSyncRan. split; [reflexivity |]. fdd_elem.
+  - left. apply list_elem_of_fmap. exists RSyncExec. split; [reflexivity |]. fdd_elem.
 Qed.
 
 (* ---- the resolution lists, line by line ----------------------------- *)
@@ -253,19 +253,19 @@ Lemma elem_of_alts_cands (ls : list uline) (cs : list nat) :
   cs ∈ alts_cands ls <-> Forall2 (fun l c => c ∈ ralt_cands l) ls cs.
 Proof using.
   revert cs. induction ls as [| l ls IH]; intros cs; cbn [alts_cands].
-  - rewrite elem_of_list_singleton. split.
+  - rewrite list_elem_of_singleton. split.
     + intros ->. constructor.
     + intro H. by apply Forall2_nil_inv_l in H.
-  - rewrite elem_of_list_fmap. split.
+  - rewrite list_elem_of_fmap. split.
     + intros ([c cs'] & -> & Hp). cbn [fst snd].
-      apply elem_of_list_In, in_prod_iff in Hp as [Hc Hcs].
-      apply elem_of_list_In in Hc. apply elem_of_list_In, IH in Hcs.
+      apply list_elem_of_In, in_prod_iff in Hp as [Hc Hcs].
+      apply list_elem_of_In in Hc. apply list_elem_of_In, IH in Hcs.
       by constructor.
     + intro H. apply Forall2_cons_inv_l in H as (c & cs' & Hc & Hcs & ->).
       exists (c, cs'). split; [reflexivity |].
-      apply elem_of_list_In, in_prod_iff. split.
-      * by apply elem_of_list_In.
-      * by apply elem_of_list_In, IH.
+      apply list_elem_of_In, in_prod_iff. split.
+      * by apply list_elem_of_In.
+      * by apply list_elem_of_In, IH.
 Qed.
 
 Lemma alts_cands_alts_ok (I : list (bv 8)) (cs : list nat) :
@@ -402,11 +402,11 @@ Qed.
 
 Lemma elem_of_substrings {A} (m l : list A) : infixed m l -> m ∈ substrings l.
 Proof using.
-  intros (u & v & ->). rewrite /substrings. apply elem_of_list_fmap.
+  intros (u & v & ->). rewrite /substrings. apply list_elem_of_fmap.
   exists (length u, length m). split.
   - cbn [fst snd].
     by rewrite drop_app_length take_app_length.
-  - apply elem_of_list_In, in_prod; apply in_seq; rewrite !length_app; lia.
+  - apply list_elem_of_In, in_prod; apply in_seq; rewrite !length_app; lia.
 Qed.
 
 (* ====================================================================== *)

@@ -1017,7 +1017,7 @@ Proof.
 Qed.
 
 (* a descriptor's device in a literal environment *)
-Ltac fdlk := first [ apply lookup_insert | apply lookup_singleton
+Ltac fdlk := first [ apply lookup_insert_eq | apply lookup_singleton_eq
                    | by rewrite lookup_insert_ne; [| lia]
                    | by simplify_map_eq ].
 
@@ -1180,7 +1180,7 @@ Proof.
   eapply cf_read with (d := din) (S := S).
   { unfold cat_bufsz. lia. }
   { cbv [cat_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-    rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+    rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
   { cbv [cat_env pe_fd pe_dev]. rewrite decide_False; [| exact Hd]. first [ by rewrite decide_True | done ]. }
   intros c S' (HS & Hlen & Hnil). rewrite cat_env_in; [| exact Hd].
   destruct c as [| b c'].
@@ -1190,7 +1190,7 @@ Proof.
   - rewrite HS in Hin.
     eapply cf_write with (d := 0%nat) (alts := alts) (a := (b :: c') ++ S').
     { done. }
-    { cbv [cat_env cat_env0 pe_fd]. apply lookup_insert. }
+    { cbv [cat_env cat_env0 pe_fd]. apply lookup_insert_eq. }
     { cbv [cat_env pe_fd pe_dev]. by rewrite decide_True. }
     { exact Hin. }
     { by eexists. }
@@ -1217,7 +1217,7 @@ Proof.
   assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
   { split; intros ->; simplify_map_eq. }
   assert (d <> 0%nat) as Hd0.
-  { intros ->. apply (Hfr 1). cbv [cat_env0 pe_fd]. apply lookup_insert. }
+  { intros ->. apply (Hfr 1). cbv [cat_env0 pe_fd]. apply lookup_insert_eq. }
   cbv [env_set_dev env_bind cat_env0 cat_env pe_fd pe_dev pe_files pe_paths]. f_equal.
   - apply map_eq. intros k.
     destruct (decide (k = fd)) as [-> |]; [by simplify_map_eq |].
@@ -1241,12 +1241,12 @@ Proof.
     assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
     { cbv [cat_env0 pe_fd] in Hnone. split; intros ->; simplify_map_eq. }
     assert (d <> 0%nat) as Hd0.
-    { intros ->. apply (Hfr 1). cbv [cat_env0 pe_fd]. apply lookup_insert. }
+    { intros ->. apply (Hfr 1). cbv [cat_env0 pe_fd]. apply lookup_insert_eq. }
     apply cat_loop_conforms; [exact Hd0 | exact Hf1 | exact Hf2 | by left |].
     intros alts' Hin.
     eapply cf_close with (d := d).
     { cbv [cat_env pe_fd]. rewrite lookup_insert_ne; [| lia].
-      rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+      rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
     { (* an input: the close owes nothing *)
       intros _. cbv [cat_env pe_dev]. repeat case_decide; exact I. }
     simpl. apply cf_exit. intros d'. unfold drained. cbv [env_unbind cat_env pe_dev].
@@ -1254,7 +1254,7 @@ Proof.
     destruct (decide (d' = d)); [exact I | by left].
   - cbv beta. rewrite decide_True; [| lia].
     eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := [content; cat_dg_open f]).
-    { cbv [cat_env cat_env0 pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+    { cbv [cat_env cat_env0 pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
     { reflexivity. }
     { rewrite app_nil_r. by right; left. }
     intros alts' Hin. rewrite cat_env0_out. apply cat_env0_exit. exact Hin.
@@ -1268,7 +1268,7 @@ Proof.
   eapply cf_open_absent; [by left | unfold mode_create; vm_compute; intros H; exact (H eq_refl) | exact Hf |].
   cbv beta. rewrite decide_True; [| lia].
   eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := [cat_dg_open f]).
-  { cbv [cat_env cat_env0 pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton. }
+  { cbv [cat_env cat_env0 pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton_eq. }
   { reflexivity. }
   { rewrite app_nil_r. by left. }
   intros alts' Hin. rewrite cat_env0_out. apply cat_env0_exit. exact Hin.
@@ -1449,7 +1449,7 @@ Proof.
   eapply cf_read_copy with (d := 1%nat) (F := flt_id) (h := h) (Rr := R) (S := S) (p := []).
   { unfold cat_bufsz. lia. }
   { reflexivity. }
-  { cbv [copy_env pe_fd]. apply lookup_insert. }
+  { cbv [copy_env pe_fd]. apply lookup_insert_eq. }
   { cbv [copy_env pe_fd pe_dev]. rewrite decide_False; [| lia]. first [ by rewrite decide_True | done ]. }
   2: { rewrite copy_env_set. exact Hrest_end. }
   intros c S' (HS & Hlen & Hnil') Hne. rewrite copy_env_set.
@@ -1457,7 +1457,7 @@ Proof.
   eapply cf_write_copy with (d := 1%nat) (F := flt_id) (h := h) (Rr := R ++ b :: c') (S := S') (p := b :: c').
   { done. }
   { reflexivity. }
-  { cbv [copy_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert. }
+  { cbv [copy_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert_eq. }
   { cbv [copy_env pe_fd pe_dev]. rewrite decide_False; [| lia]. first [ by rewrite decide_True | done ]. }
   { by exists []; rewrite app_nil_r. }
   - rewrite drop_all, copy_env_set. cbv beta.
@@ -1466,7 +1466,7 @@ Proof.
   - intros Hh. rewrite copy_env_set. cbv beta.
     rewrite decide_False; [| lia].
     eapply write_bytes_conforms with (d := 0%nat) (S' := []) (alts := alts).
-    { cbv [copy_env pe_fd]. do 2 (rewrite lookup_insert_ne; [| lia]). apply lookup_singleton. }
+    { cbv [copy_env pe_fd]. do 2 (rewrite lookup_insert_ne; [| lia]). apply lookup_singleton_eq. }
     { cbv [copy_env pe_fd pe_dev]. by rewrite decide_True. }
     { rewrite app_nil_r. exact (Hdg Hh). }
     intros alts' Hin'. rewrite copy_env_out. apply copy_env_exit; [exact Hin' | exact I].

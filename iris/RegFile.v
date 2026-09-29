@@ -68,7 +68,7 @@ Proof.
   intros. unfold lookup_total, regfile_lookup_total, insert, regfile_insert, rf_upd.
   rewrite bool_decide_eq_false_2 //. Qed.
 
-(* [insert_insert] analogue (funext) *)
+(* [insert_insert_eq] analogue (funext) *)
 Lemma upd_upd (f : regfile) (k : regidx) (a b : mword 64) :
   <[k := a]> (<[k := b]> f) = <[k := a]> f.
 Proof.
@@ -84,7 +84,7 @@ Next Obligation.
   apply NoDup_fmap_2; [intros ?? [=]; congruence | apply NoDup_enum].
 Qed.
 Next Obligation.
-  intros [b]. apply elem_of_list_fmap. exists b. split; [done | apply elem_of_enum].
+  intros [b]. apply list_elem_of_fmap. exists b. split; [done | apply elem_of_enum].
 Qed.
 
 (* ================================================================== *)
@@ -98,7 +98,7 @@ Proof.
   unfold rf_to_gmap. apply elem_of_list_to_map_1.
   - rewrite -list_fmap_compose. apply NoDup_fmap_2_strong; [| apply NoDup_enum].
     intros x y ?? [=]; done.
-  - apply elem_of_list_fmap. exists r. split; [done | apply elem_of_enum].
+  - apply list_elem_of_fmap. exists r. split; [done | apply elem_of_enum].
 Qed.
 
 Lemma rf_to_gmap_dom (f : regfile) (r : regidx) : r ∈ dom (rf_to_gmap f).
@@ -109,7 +109,7 @@ Lemma rf_to_gmap_upd (f : regfile) (k : regidx) (v : mword 64) :
 Proof.
   apply map_eq; intro j. rewrite rf_to_gmap_lookup.
   destruct (decide (j = k)) as [->|Hne].
-  - rewrite lookup_insert. f_equal. apply upd_eq.
+  - rewrite lookup_insert_eq. f_equal. apply upd_eq.
   - rewrite lookup_insert_ne // rf_to_gmap_lookup. f_equal. by apply upd_ne.
 Qed.
 

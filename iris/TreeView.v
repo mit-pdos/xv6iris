@@ -128,10 +128,10 @@ Lemma hide_dots_lookup_Some (e : gmap fname Z) (s : fname) (i : Z) :
 Proof.
   rewrite /hide_dots. intros Hs.
   destruct (decide (s = DOT)) as [-> | Hd].
-  { rewrite lookup_delete in Hs. discriminate. }
+  { rewrite lookup_delete_eq in Hs. discriminate. }
   rewrite lookup_delete_ne in Hs; [| congruence].
   destruct (decide (s = DOTDOT)) as [-> | Hdd].
-  { rewrite lookup_delete in Hs. discriminate. }
+  { rewrite lookup_delete_eq in Hs. discriminate. }
   rewrite lookup_delete_ne in Hs; [| congruence].
   split; [split; assumption | exact Hs].
 Qed.
@@ -148,7 +148,7 @@ Lemma hide_dots_insert_dots (e : gmap fname Z) (i d : Z) :
 Proof.
   rewrite /hide_dots (delete_insert_ne _ DOTDOT DOT);
     [| intros Hc; exact (dot_ne_dotdot (eq_sym Hc))].
-  rewrite !delete_insert_delete //.
+  rewrite !delete_insert_eq //.
 Qed.
 
 Lemma hide_dots_insert_dot (e : gmap fname Z) (i : Z) :
@@ -156,7 +156,7 @@ Lemma hide_dots_insert_dot (e : gmap fname Z) (i : Z) :
 Proof.
   rewrite /hide_dots (delete_insert_ne _ DOTDOT DOT);
     [| intros Hc; exact (dot_ne_dotdot (eq_sym Hc))].
-  rewrite delete_insert_delete //.
+  rewrite delete_insert_eq //.
 Qed.
 
 (* ...and a PROPER insert or delete commutes with the hiding *)
@@ -172,7 +172,7 @@ Qed.
 Lemma hide_dots_delete (e : gmap fname Z) (s : fname) :
   hide_dots (delete s e) = delete s (hide_dots e).
 Proof.
-  rewrite /hide_dots (delete_commute e DOTDOT s) (delete_commute _ DOT s) //.
+  rewrite /hide_dots (delete_delete e DOTDOT s) (delete_delete _ DOT s) //.
 Qed.
 
 (* THE PROJECTION [absnode -> absnode]: the node's content with the dots
@@ -410,11 +410,11 @@ Lemma elem_of_nexpand (m : gmap Z absnode) (X : gset Z) (i : Z) :
 Proof.
   rewrite /nexpand elem_of_union elem_of_union_list. split.
   - intros [Hi | (Y & HY & Hi)]; [by left | right].
-    apply elem_of_list_fmap in HY as (d & -> & Hd).
+    apply list_elem_of_fmap in HY as (d & -> & Hd).
     exists d. split; [by apply elem_of_elements | exact Hi].
   - intros [Hi | (d & Hd & Hi)]; [by left | right].
     exists (nkids m d). split; [| exact Hi].
-    apply elem_of_list_fmap. exists d. split; [reflexivity |].
+    apply list_elem_of_fmap. exists d. split; [reflexivity |].
     by apply elem_of_elements.
 Qed.
 
@@ -1034,7 +1034,7 @@ Proof.
   rewrite /nreach_set_ext elem_of_union elem_of_union_list. split.
   - intros [Hi | (X & HX & Hi)].
     + by apply elem_of_nreach_set in Hi as [? _].
-    + apply elem_of_list_fmap in HX as (d & -> & Hd).
+    + apply list_elem_of_fmap in HX as (d & -> & Hd).
       apply elem_of_elements, elem_of_nreach_set in Hd as [Hrd _].
       apply elem_of_nkids_all in Hi as (s & Hs & Hst).
       exact (nreach_hop m r d s i Hrd Hs Hst).
@@ -1048,7 +1048,7 @@ Proof.
     rewrite npath_snoc in Hw.
     destruct (npath m r q) as [d |] eqn:Hd; [| discriminate].
     exists (nkids_all m d). split.
-    + apply elem_of_list_fmap. exists d. split; [reflexivity |].
+    + apply list_elem_of_fmap. exists d. split; [reflexivity |].
       apply elem_of_elements, elem_of_nreach_set. split.
       * by exists q.
       * right. exact (nstep_dom m d s i Hw).
@@ -1123,7 +1123,7 @@ Lemma tedge_ins_lookup_at (m : gmap Z absnode) (d : Z) (nm : fname) (i : Z)
     (e : gmap fname Z) :
   m !! d = Some (ADir e) ->
   tedge_ins d nm i m !! d = Some (ADir (<[nm := i]> e)).
-Proof. intros Hd. rewrite /tedge_ins Hd lookup_insert //. Qed.
+Proof. intros Hd. rewrite /tedge_ins Hd lookup_insert_eq //. Qed.
 
 Lemma tedge_del_lookup_ne (m : gmap Z absnode) (d : Z) (nm : fname) (j : Z) :
   j <> d -> tedge_del d nm m !! j = m !! j.
@@ -1136,7 +1136,7 @@ Lemma tedge_del_lookup_at (m : gmap Z absnode) (d : Z) (nm : fname)
     (e : gmap fname Z) :
   m !! d = Some (ADir e) ->
   tedge_del d nm m !! d = Some (ADir (delete nm e)).
-Proof. intros Hd. rewrite /tedge_del Hd lookup_insert //. Qed.
+Proof. intros Hd. rewrite /tedge_del Hd lookup_insert_eq //. Qed.
 
 (* the edits are CONGRUENCES: they read only the edited node's row *)
 Lemma tedge_del_cong (m1 m2 : gmap Z absnode) (d : Z) (nm : fname) (j : Z) :
@@ -1147,7 +1147,7 @@ Proof.
   destruct (m1 !! d) as [n |]; [| exact Hj].
   destruct n as [bs | e | ma mi]; [exact Hj | | exact Hj].
   destruct (decide (j = d)) as [-> | Hne];
-    [rewrite !lookup_insert // | rewrite !lookup_insert_ne //].
+    [rewrite !lookup_insert_eq // | rewrite !lookup_insert_ne //].
 Qed.
 
 Lemma tedge_ins_cong (m1 m2 : gmap Z absnode) (d : Z) (nm : fname) (i j : Z) :
@@ -1158,7 +1158,7 @@ Proof.
   destruct (m1 !! d) as [n |]; [| exact Hj].
   destruct n as [bs | e | ma mi]; [exact Hj | | exact Hj].
   destruct (decide (j = d)) as [-> | Hne];
-    [rewrite !lookup_insert // | rewrite !lookup_insert_ne //].
+    [rewrite !lookup_insert_eq // | rewrite !lookup_insert_ne //].
 Qed.
 
 Lemma nstep_of_lookup (m m' : gmap Z absnode) (j : Z) (s : fname) :
@@ -1172,7 +1172,7 @@ Lemma nstep_tedge_ins_at (m : gmap Z absnode) (d : Z) (nm : fname) (i : Z)
   = (if decide (s = nm) then Some i else nstep m d s).
 Proof.
   intros Hd. rewrite /nstep /nents (tedge_ins_lookup_at m d nm i e Hd) Hd /=.
-  case_decide as Hs; [subst s; rewrite lookup_insert // | rewrite lookup_insert_ne //].
+  case_decide as Hs; [subst s; rewrite lookup_insert_eq // | rewrite lookup_insert_ne //].
 Qed.
 
 Lemma nstep_tedge_del_at (m : gmap Z absnode) (d : Z) (nm : fname)
@@ -1182,7 +1182,7 @@ Lemma nstep_tedge_del_at (m : gmap Z absnode) (d : Z) (nm : fname)
   = (if decide (s = nm) then None else nstep m d s).
 Proof.
   intros Hd. rewrite /nstep /nents (tedge_del_lookup_at m d nm e Hd) Hd /=.
-  case_decide as Hs; [subst s; rewrite lookup_delete // | rewrite lookup_delete_ne //].
+  case_decide as Hs; [subst s; rewrite lookup_delete_eq // | rewrite lookup_delete_ne //].
 Qed.
 
 (* the deleting edit never adds an edge: [nreach] can only shrink *)
@@ -1399,12 +1399,12 @@ Proof.
   assert (He : forall j, nents m j = nents (<[i := c]> m) j).
   { intros j. rewrite !nents_unfold.
     destruct (decide (j = i)) as [-> | Hj]; [| by rewrite lookup_insert_ne].
-    rewrite lookup_insert Hi /= Hc //. }
+    rewrite lookup_insert_eq Hi /= Hc //. }
   apply map_eq. intros j. destruct (decide (nreach m r j)) as [Hj | Hj].
   - rewrite (nclose_lookup_in _ r j); last first.
     { by apply (nreach_nents_cong m (<[i := c]> m) r j He). }
     destruct (decide (j = i)) as [-> | Hne].
-    + rewrite !lookup_insert //.
+    + rewrite !lookup_insert_eq //.
     + rewrite !lookup_insert_ne // (nclose_lookup_in m r j Hj) //.
   - rewrite (nclose_lookup_out _ r j); last first.
     { intros Hc'. apply Hj. by apply (nreach_nents_cong m (<[i := c]> m) r j He). }
@@ -1488,7 +1488,7 @@ Proof.
   { intros j s c0 Hs. destruct (decide (j = d)) as [-> | Hj]; last first.
     { rewrite (nstep_of_lookup m' m0 j s (tedge_ins_lookup_ne m0 d nm i j Hj)).
       destruct (decide (j = i)) as [-> | Hji].
-      - rewrite (nstep_leaf m0 i c s ltac:(rewrite /m0 lookup_insert //) Hleaf Hs).
+      - rewrite (nstep_leaf m0 i c s ltac:(rewrite /m0 lookup_insert_eq //) Hleaf Hs).
         intros Hc; discriminate.
       - rewrite (nstep_of_lookup m0 m j s ltac:(rewrite /m0 lookup_insert_ne //)).
         by left. }
@@ -1529,9 +1529,9 @@ Proof.
     rewrite (nclose_lookup_in m r d Hrd) //.
   - rewrite (tedge_ins_lookup_ne (<[i := c]> (nclose m r)) d nm i j Hj).
     destruct (decide (j = i)) as [-> | Hji].
-    + rewrite lookup_insert (nclose_lookup_in m' r i Hri) /m'.
+    + rewrite lookup_insert_eq (nclose_lookup_in m' r i Hri) /m'.
       rewrite (tedge_ins_lookup_ne m0 d nm i i ltac:(congruence)).
-      rewrite /m0 lookup_insert //.
+      rewrite /m0 lookup_insert_eq //.
     + rewrite lookup_insert_ne //.
       destruct (decide (nreach m r j)) as [Hrj | Hrj].
       * rewrite (nclose_lookup_in m' r j (Hout j Hrj)) /m'.
@@ -1778,9 +1778,9 @@ Proof.
     by (apply (nreach_agree (tview av) m1 r Hag); exact Hrd).
   assert (Hd1 : m1 !! d = Some (ADir (hide_dots e)))
     by (rewrite /m1 lookup_delete_ne; [exact Htd | congruence]).
-  assert (Hi1 : m1 !! i = None) by (rewrite /m1 lookup_delete //).
+  assert (Hi1 : m1 !! i = None) by (rewrite /m1 lookup_delete_eq //).
   assert (Hback : <[i := tnode_of a]> m1 = tview av)
-    by (rewrite /m1 insert_delete //).
+    by (rewrite /m1 insert_delete_id //).
   rewrite /subtree /subtree_nodes (tview_delta_ent av d nm i e nl a Hnm Hd Hi).
   destruct (tedge_ins_dir (tview av) d nm i r e0 Hr) as (e' & Hr').
   rewrite Hr' /top_ins Hroot Hnodes /subtree_nodes.
@@ -2174,7 +2174,7 @@ Lemma nstep_content_edit (m : gmap Z absnode) (i : Z) (c c0 : absnode)
 Proof.
   intros Hi Hc. rewrite /nstep !nents_unfold.
   destruct (decide (d = i)) as [-> | Hd]; [| by rewrite lookup_insert_ne].
-  rewrite lookup_insert Hi /= Hc //.
+  rewrite lookup_insert_eq Hi /= Hc //.
 Qed.
 
 Lemma nuniq_parent_content_edit (m : gmap Z absnode) (i : Z) (c c0 : absnode) :
@@ -2234,7 +2234,7 @@ Proof.
   - rewrite (nstep_of_lookup _ (<[i := c]> m) x s (tedge_ins_lookup_ne _ d nm i x Hx))
       in Hst.
     destruct (decide (x = i)) as [-> | Hxi].
-    + assert (Hii : <[i := c]> m !! i = Some c) by (rewrite lookup_insert //).
+    + assert (Hii : <[i := c]> m !! i = Some c) by (rewrite lookup_insert_eq //).
       rewrite (nstep_leaf (<[i := c]> m) i c s Hii Hleaf Hs) in Hst.
       discriminate.
     + left. rewrite (nstep_of_lookup (<[i := c]> m) m x s (Hins x Hxi)) in Hst.
@@ -2355,7 +2355,7 @@ Lemma nstep_ins_leaf (m : gmap Z absnode) (i : Z) (c : absnode)
   nstep (<[i := c]> m) x s = nstep m x s.
 Proof.
   intros Hi Hleaf Hs.
-  assert (Hii : <[i := c]> m !! i = Some c) by (rewrite lookup_insert //).
+  assert (Hii : <[i := c]> m !! i = Some c) by (rewrite lookup_insert_eq //).
   destruct (decide (x = i)) as [-> | Hx].
   - rewrite (nstep_leaf (<[i := c]> m) i c s Hii Hleaf Hs).
     rewrite /nstep nents_unfold Hi //.
@@ -2414,7 +2414,7 @@ Proof.
   assert (Hsub : forall x s j, nstep (delete tg (tview av)) x s = Some j ->
                    nstep (tview av) x s = Some j).
   { intros x s j. destruct (decide (x = tg)) as [-> | Hx].
-    - rewrite /nstep nents_unfold lookup_delete /=. intros Hcc; discriminate.
+    - rewrite /nstep nents_unfold lookup_delete_eq /=. intros Hcc; discriminate.
     - rewrite (nstep_of_lookup _ (tview av) x s (lookup_delete_ne _ tg x
                  (fun Hcc => Hx (eq_sym Hcc)))). exact (fun H => H). }
   rewrite /aview_tree_wf /aview_uniq_parent aview_closed_nstep
@@ -2462,7 +2462,7 @@ Section OwnPres.
                (tview av) r r'); [| exact Hr].
       intros j. symmetry. rewrite !nents_unfold.
       destruct (decide (j = i)) as [-> | Hj]; [| by rewrite lookup_insert_ne].
-      rewrite lookup_insert Hti //.
+      rewrite lookup_insert_eq Hti //.
   Qed.
 
   (* ...AND ITS TWIN AT [delta_trunc], line for line (lane TL-3's
@@ -2495,7 +2495,7 @@ Section OwnPres.
         [| exact Hr].
       intros j. symmetry. rewrite !nents_unfold.
       destruct (decide (j = i)) as [-> | Hj]; [| by rewrite lookup_insert_ne].
-      rewrite lookup_insert Hti //.
+      rewrite lookup_insert_eq Hti //.
   Qed.
 
   (* CREATE: the fresh inum is a NEW LEAF under an existing root, and it
@@ -2612,7 +2612,7 @@ Section OwnPres.
       rewrite Hview in Hr.
       apply (nreach_mono_edges (delete tg (tview av)) (tview av) r); [| exact Hr].
       intros x s c0 Hs. destruct (decide (x = tg)) as [-> | Hx].
-      + rewrite /nstep nents_unfold lookup_delete /=. intros Hcc; discriminate.
+      + rewrite /nstep nents_unfold lookup_delete_eq /=. intros Hcc; discriminate.
       + rewrite (nstep_of_lookup _ (tview av) x s (lookup_delete_ne _ tg x
                    (fun Hcc => Hx (eq_sym Hcc)))). exact (fun H0 => H0).
   Qed.
@@ -3418,7 +3418,7 @@ Proof.
   rewrite -(nstep_tview (delta_unl_tgt tg av) x s Hs) Hview in Hst.
   assert (Hold : nstep (tview av) x s = Some j).
   { destruct (decide (x = tg)) as [-> | Hx].
-    - rewrite /nstep nents_unfold lookup_delete /= in Hst. discriminate.
+    - rewrite /nstep nents_unfold lookup_delete_eq /= in Hst. discriminate.
     - rewrite (nstep_of_lookup _ (tview av) x s
                  (lookup_delete_ne _ tg x (fun Hc => Hx (eq_sym Hc)))) in Hst.
       exact Hst. }
@@ -3444,7 +3444,7 @@ Proof.
   rewrite -(nstep_tview (delta_unarm i av) x s Hs) Hview in Hst.
   assert (Hold : nstep (tview av) x s = Some j).
   { destruct (decide (x = i)) as [-> | Hx].
-    - rewrite /nstep nents_unfold lookup_delete /= in Hst. discriminate.
+    - rewrite /nstep nents_unfold lookup_delete_eq /= in Hst. discriminate.
     - rewrite (nstep_of_lookup _ (tview av) x s
                  (lookup_delete_ne _ i x (fun Hc => Hx (eq_sym Hc)))) in Hst.
       exact Hst. }
@@ -3705,7 +3705,7 @@ Section OwnRootedPres.
   Proof using .
     intros Hg Hro g0 r0 t0 H0.
     destruct (decide (g0 = g)) as [-> | Hne].
-    - rewrite lookup_insert in H0. injection H0 as <- _. exact (Hro g root t Hg).
+    - rewrite lookup_insert_eq in H0. injection H0 as <- _. exact (Hro g root t Hg).
     - rewrite lookup_insert_ne in H0; [| congruence]. exact (Hro g0 r0 t0 H0).
   Qed.
 
@@ -3721,7 +3721,7 @@ Section OwnRootedPres.
   Proof using .
     intros Hg Ht Hd Hro g0 r0 t0 H0.
     destruct (decide (g0 = g')) as [-> | Hne].
-    - rewrite lookup_insert in H0. injection H0 as <- _.
+    - rewrite lookup_insert_eq in H0. injection H0 as <- _.
       exact (nreach_trans (tview av) FsImg.ROOTINO root root'
                (Hro g root t Hg) (subtree_dom_reach av root t root' Ht Hd)).
     - rewrite lookup_insert_ne in H0; [| congruence].

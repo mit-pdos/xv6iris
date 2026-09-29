@@ -679,7 +679,7 @@ Section UShURoundLaws.
     assert (Hlt : (5 + p < length PipeDisc.alt_forkc)%nat)
       by exact (lookup_lt_Some _ _ _ Hb5).
     assert (Hhin : forall x, x ∈ heldN i sw -> x.1.1 ∈ wids (lcats lR)).
-    { intros x Hx. rewrite /heldN elem_of_list_fmap in Hx.
+    { intros x Hx. rewrite /heldN list_elem_of_fmap in Hx.
       destruct Hx as (j & -> & Hj). apply elem_of_seq in Hj.
       cbn [fst]. apply wids_elem. lia. }
     iApply (pprompt_forkN_h (wids (lcats lR)) (wids_NoDup _) (ucl ug) Hcons
@@ -749,7 +749,7 @@ Section UShURoundLaws.
       iMod (pipesV_file (ugn_pipe ug) U pview_unionU (ucparams ug) v I sR lR HlR Hfc Ha Hl
               (⊤ ∖ ↑uartN Uart0) pnsN (S gen_id) γc γm termw (tokN (files_of sR) lR)
               dep Hdtl sw ltac:(solve_ndisj)
-              ltac:(intros w Hw; apply elem_of_list_lookup in Hw as [j Hj];
+              ltac:(intros w Hw; apply list_elem_of_lookup in Hw as [j Hj];
                     exact (Hterm j w Hj))
               with "Hinv [Hc Hm]") as (pre) "[HPW %Hbl]".
       { iApply big_sepL_sep. iFrame "Hc Hm". }

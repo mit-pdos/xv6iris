@@ -16,7 +16,7 @@
    and [cpu_own 1 eb p emp] -- both PINNED at [b = false]: [cpu_own]'s own
    [1] level unconditionally holds the ghost eighth at '0' (the [S _] arm of
    [IntrDefs.intr_count]), which forces any co-held [sie_cap]/[sie_arm]
-   fragment to agree at [false] by ghost_var agreement (exactly [Swconf]'s own
+   fragment to agree at [false] by ghost_var_frac agreement (exactly [Swconf]'s own
    reasoning in SwtchCtx.v) -- and its continuation (the content of
    [valid_context P Ao oldc]) receives, on a later resumption at hart [h],
    [sie_cap_gpr@h m av false p] at a fresh file [m] with its

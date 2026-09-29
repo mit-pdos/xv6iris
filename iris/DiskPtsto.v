@@ -25,7 +25,7 @@
 (*   dn_nc   -- mono_nat over the completed count: an interrupt handler's  *)
 (*              used-index read mints a persistent lower bound that        *)
 (*              survives to its later per-slot reads;                      *)
-(*   dn_np   -- ghost_var nat over the published count: the OTHER half     *)
+(*   dn_np   -- ghost_var_frac nat over the published count: the OTHER half     *)
 (*              lives in the vdisk_lock's resource, so only a lock holder  *)
 (*              can publish, and a lock holder KNOWS the published index.  *)
 (*                                                                         *)
@@ -63,14 +63,14 @@ Record disk_names := DiskNames {
      ownership, and two of them at one position agree. *)
   dn_ord   : gname;
   (* THE HANDLER'S READ WATERMARK ([disk.used_idx] in virtio_disk_intr).  A
-     [ghost_var nat]: the invariant holds one half at [vp_nr], the disk lock's
+     [ghost_var_frac nat]: the invariant holds one half at [vp_nr], the disk lock's
      resource the other.  It is the credential that says the record being
      reclaimed is the one at the watermark -- which is what keeps the unread
      used records a contiguous run, and hence what says a completion can
      never overwrite one the driver still owes a look (finding 5). *)
   dn_nr    : gname;
   (* THE STAGED HEAD, between the ring store and the index bump.  A
-     [ghost_var (option (bv 16))]: the invariant holds one half and couples
+     [ghost_var_frac (option (bv 16))]: the invariant holds one half and couples
      it to the cell at the publish position, the publisher the other.  See
      [Xv6Cameras.disk_stage_inG] for why the gap exists at all. *)
   dn_stage : gname;
@@ -84,8 +84,8 @@ Record disk_names := DiskNames {
      its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
   dn_perm  : gname;
   (* A6.126 §6 (the release arm's reader side, ported onto the pop-era
-     protocol): the used index's two floor stamps [ghost_var nat], the
-     READER floor [ghost_var nat] -- halves in VirtioProto's live arm and in
+     protocol): the used index's two floor stamps [ghost_var_frac nat], the
+     READER floor [ghost_var_frac nat] -- halves in VirtioProto's live arm and in
      DiskInv.disk_res -- and the positions of the completions in the era
      LOG, a ghost map whose fragments are persistent
      ([VirtioProto.disk_done_pos]; typing rides [disk_ord_inG]). *)
@@ -129,7 +129,7 @@ Section DiskPtsto.
      touches [v_cfg], so the pair is stable across device steps), and the two
      halves recombine to the exclusive fraction exactly at the live flip,
      which is what [disk_cfg_set] consumes.  One cell serves both roles: a
-     separate ghost_var over the same object would be redundant. *)
+     separate ghost_var_frac over the same object would be redundant. *)
   Definition disk_cfg_is (γ : disk_names) (dq : dfrac) (c : virtio_cfg)
     : iProp Σ := own (dn_cfg γ) (to_dfrac_agree dq (c : leibnizO virtio_cfg)).
 
@@ -246,7 +246,7 @@ Section DiskPtsto.
   Lemma disk_bytes_read (γ : disk_names) (dmap : gmap Z (bv 8))
       (dk : Z -> bv 8) (o : Z) (bs : list (bv 8)) :
     disk_view dmap dk ->
-    ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs -∗
+    ghost_map_auth_frac (dn_img γ) 1 dmap -∗ disk_bytes γ o bs -∗
     ⌜disk_read dk o (length bs) = bs⌝.
   Proof using . exact (disk_img_bytes_read (dn_img γ) dmap dk o bs). Qed.
 
@@ -259,9 +259,9 @@ Section DiskPtsto.
   Lemma disk_bytes_update (γ : disk_names) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
     length bs' = length bs ->
-    ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
+    ghost_map_auth_frac (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
+      ghost_map_auth_frac (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
       ⌜forall dk : Z -> bv 8,
          disk_view dmap dk -> disk_view dmap' (disk_write dk o bs')⌝.
   Proof using . exact (disk_img_bytes_update (dn_img γ) dmap o bs bs'). Qed.
@@ -272,9 +272,9 @@ Section DiskPtsto.
   Lemma disk_bytes_update_gen (γ : disk_names) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
     length bs' = length bs ->
-    ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
+    ghost_map_auth_frac (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
+      ghost_map_auth_frac (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
       ⌜forall (j : nat) (b : bv 8), bs' !! j = Some b ->
          dmap' !! (o + Z.of_nat j)%Z = Some b⌝ ∗
       ⌜forall x : Z,
@@ -288,9 +288,9 @@ Section DiskPtsto.
       (dk : Z -> bv 8) (o : Z) (n : nat) :
     disk_view dmap dk ->
     (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
-    ghost_map_auth (dn_img γ) 1 dmap ==∗
+    ghost_map_auth_frac (dn_img γ) 1 dmap ==∗
     ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth (dn_img γ) 1 dmap' ∗
+      ghost_map_auth_frac (dn_img γ) 1 dmap' ∗
       disk_bytes γ o (disk_read dk o n) ∗
       ⌜disk_view dmap' dk⌝.
   Proof using . exact (disk_img_bytes_mint (dn_img γ) dmap dk o n). Qed.

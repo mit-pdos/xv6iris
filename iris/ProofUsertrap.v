@@ -269,7 +269,7 @@ Section UtEntry.
                    = mword_of_int (UT + 0x2)) by pcw.
     iEval (rewrite Hp02) in "Hpc".
     iEval (rewrite Hsp) in "Hframe".
-    iDestruct (stack_own_4_elim with "Hframe") as (w1 w2 w3 w4) "(Hb1 & Hb2 & Hb3 & Hb4)".
+    iDestruct (stack_own_4_elim (KTR := KT1) with "Hframe") as (w1 w2 w3 w4) "(Hb1 & Hb2 & Hb3 & Hb4)".
     (* the four slot addresses, from the PUSHED sp -- [stk_frm] at d = 4 *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
@@ -744,7 +744,7 @@ Section UtDispatch.
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var_frac sie_gname (1/4) ('b"0" : mword 1) -∗
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     kpt_on cpu_id -∗
     ut_env SY.syscall_env N U sts cs pid -∗

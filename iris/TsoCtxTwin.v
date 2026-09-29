@@ -259,10 +259,10 @@ Section twin.
       (tvs : agent → nat) (run : gmap agent CtxId)
       (parked : gmap CtxId nat) : iProp Σ :=
     ∃ (HM : gmap Z (nat * bv 8)) (LL : gmap (CtxId * Z) nat),
-      ghost_map_auth γheap 1 HM ∗
-      ghost_map_auth γledger 1 LL ∗
-      ghost_map_auth γrun 1 run ∗
-      ghost_map_auth γpark 1 parked ∗
+      ghost_map_auth_frac γheap 1 HM ∗
+      ghost_map_auth_frac γledger 1 LL ∗
+      ghost_map_auth_frac γrun 1 run ∗
+      ghost_map_auth_frac γpark 1 parked ∗
       ⌜twin_wf (img_fun img) log tvs run parked HM LL⌝.
 
   (* ---------------------------------------------------------------- *)
@@ -324,7 +324,7 @@ Section twin.
     - (* latest *)
       move => a0 t0 v0.
       destruct (decide (a0 = a)) as [->|Hne].
-      + rewrite lookup_insert. intros [= <- <-]. apply latest_app_new.
+      + rewrite lookup_insert_eq. intros [= <- <-]. apply latest_app_new.
       + rewrite lookup_insert_ne; last congruence.
         move => HH0. rewrite /store_log.
         apply latest_app_frame; last by apply (Hlat _ _ _ HH0).
@@ -332,7 +332,7 @@ Section twin.
     - (* bound *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξ, a))) as [[= -> ->]|Hne].
-      + rewrite lookup_insert. intros [= <-].
+      + rewrite lookup_insert_eq. intros [= <-].
         rewrite /store_log length_app /=. lia.
       + rewrite lookup_insert_ne; last congruence.
         move => HL0. have := Hbnd _ _ _ HL0.
@@ -340,7 +340,7 @@ Section twin.
     - (* sees *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξ, a))) as [[= -> ->]|Hne].
-      + rewrite lookup_insert. intros [= <-].
+      + rewrite lookup_insert_eq. intros [= <-].
         left. exists h. split; first done.
         rewrite /store_log.
         apply (visibleb_own _ _ _ (length log) (WMsg a [w] h)).
@@ -363,10 +363,10 @@ Section twin.
       destruct (decide ((ξ1, a0) = (ξ, a))) as [[= -> ->]|Hne1].
       + destruct (decide ((ξ2, a) = (ξ, a))) as [[= ->]|Hne2].
         * move => _ _. done.
-        * rewrite lookup_insert. rewrite lookup_insert_ne; last congruence.
+        * rewrite lookup_insert_eq. rewrite lookup_insert_ne; last congruence.
           move => _ HL2. symmetry. exact (Huniq _ _ _ _ _ HL2 HLa).
       + destruct (decide ((ξ2, a0) = (ξ, a))) as [[= -> ->]|Hne2].
-        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert.
+        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert_eq.
           move => HL1 _. exact (Huniq _ _ _ _ _ HL1 HLa).
         * rewrite !lookup_insert_ne; [|congruence..].
           move => HL1 HL2. exact (Huniq _ _ _ _ _ HL1 HL2).
@@ -412,14 +412,14 @@ Section twin.
     - (* bound *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξ', a))) as [[= -> ->]|Hne0].
-      + rewrite lookup_insert. intros [= <-]. exact Hbt.
+      + rewrite lookup_insert_eq. intros [= <-]. exact Hbt.
       + rewrite lookup_insert_ne; last congruence.
         rewrite lookup_delete_Some. move => [_ HL0].
         exact (Hbnd _ _ _ HL0).
     - (* sees *)
       move => ξ0 a0 t0.
       destruct (decide ((ξ0, a0) = (ξ', a))) as [[= -> ->]|Hne0].
-      + rewrite lookup_insert. intros [= <-].
+      + rewrite lookup_insert_eq. intros [= <-].
         left. exists h'. split; first done.
         apply visibleb_below. lia.
       + rewrite lookup_insert_ne; last congruence.
@@ -433,13 +433,13 @@ Section twin.
       destruct (decide ((ξ1, a0) = (ξ', a))) as [[= -> ->]|Hne1].
       + destruct (decide ((ξ2, a) = (ξ', a))) as [[= ->]|Hne2].
         * move => _ _. done.
-        * rewrite lookup_insert. rewrite lookup_insert_ne; last congruence.
+        * rewrite lookup_insert_eq. rewrite lookup_insert_ne; last congruence.
           rewrite lookup_delete_Some.
           move => _ [Hne2' HL2]. exfalso.
           have : ξ2 = ξ by exact (Huniq _ _ _ _ _ HL2 HLa).
           congruence.
       + destruct (decide ((ξ2, a0) = (ξ', a))) as [[= -> ->]|Hne2].
-        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert.
+        * rewrite lookup_insert_ne; last congruence. rewrite lookup_insert_eq.
           rewrite lookup_delete_Some.
           move => [Hne1' HL1] _. exfalso.
           have : ξ1 = ξ by exact (Huniq _ _ _ _ _ HL1 HLa).
@@ -478,7 +478,7 @@ Section twin.
       move => ξ0 a0 t0 HL0.
       destruct (decide (ξ0 = ξ)) as [->|Hne].
       + right. exists (length log).
-        rewrite lookup_insert. split; first done.
+        rewrite lookup_insert_eq. split; first done.
         exact (Hbnd _ _ _ HL0).
       + destruct (Hsees _ _ _ HL0) as [(h0 & Hh0 & Hv0) | (T & HT & Hle)].
         * left. exists h0. split; last done.
@@ -490,7 +490,7 @@ Section twin.
     - (* parked_le *)
       move => ξ0 T.
       destruct (decide (ξ0 = ξ)) as [->|Hne].
-      + rewrite lookup_insert. intros [= <-]. lia.
+      + rewrite lookup_insert_eq. intros [= <-]. lia.
       + rewrite lookup_insert_ne; last congruence. exact (Hple ξ0 T).
     - (* run_inj *)
       move => h1 h2 ξ0.
@@ -529,7 +529,7 @@ Section twin.
     - (* sees *)
       move => ξ0 a0 t0 HL0.
       destruct (decide (ξ0 = ξ)) as [->|Hne].
-      + left. exists h'. rewrite lookup_insert. split; first done.
+      + left. exists h'. rewrite lookup_insert_eq. split; first done.
         destruct (Hsees _ _ _ HL0) as [(h0 & Hh0 & _) | (T0 & HT0 & Hle)].
         * exfalso. exact (Hpnr _ _ _ HpT Hh0).
         * apply visibleb_below.
@@ -547,10 +547,10 @@ Section twin.
       destruct (decide (h1 = h')) as [->|Hne1];
         destruct (decide (h2 = h')) as [->|Hne2].
       + done.
-      + rewrite lookup_insert.
+      + rewrite lookup_insert_eq.
         rewrite lookup_insert_ne; last congruence.
         intros [= <-] HR2. exfalso. exact (Hpnr _ _ _ HpT HR2).
-      + rewrite lookup_insert.
+      + rewrite lookup_insert_eq.
         rewrite lookup_insert_ne; last congruence.
         move => HR1. intros [= <-]. exfalso. exact (Hpnr _ _ _ HpT HR1).
       + rewrite !lookup_insert_ne; [|congruence..].
@@ -558,7 +558,7 @@ Section twin.
     - (* parked_not_run *)
       move => ξ0 T0 h0. rewrite lookup_delete_Some. move => [Hne0 HT0].
       destruct (decide (h0 = h')) as [->|Hneh].
-      + rewrite lookup_insert. congruence.
+      + rewrite lookup_insert_eq. congruence.
       + rewrite lookup_insert_ne; last congruence.
         exact (Hpnr _ _ _ HT0).
     - exact Huniq.

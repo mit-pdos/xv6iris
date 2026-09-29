@@ -825,7 +825,7 @@ Section Snap.
      with no binder shared and no application anything in here. *)
   Definition fs_snap Γ (g : gname) D S : iProp Σ :=
     (snap_auth g D
-     ∗ ghost_map_auth (γtop Γ) (1/2) (fss_inodes S)
+     ∗ ghost_map_auth_frac (γtop Γ) (1/2) (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
      ∗ fs_state Γ (DfracOwn 1) S
      ∗ (∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))
@@ -839,7 +839,7 @@ Section Snap.
      (round C): what every producer of a snapshot hands out beside it, and
      what the application's durable claim owns. *)
   Definition snap_guest (gt : gname) (I : gmap Z fs_node) : iProp Σ :=
-    ghost_map_auth gt (1/2) I.
+    ghost_map_auth_frac gt (1/2) I.
 
   Global Instance snap_guest_timeless gt I : Timeless (snap_guest gt I).
   Proof using . rewrite /snap_guest. apply _. Qed.
@@ -847,7 +847,7 @@ Section Snap.
   (* the tie, read: any fraction of the snapshot's map authority agrees with
      the snapshot's own node map *)
   Lemma fs_snap_top_agree Γ (g : gname) D S (q : Qp) (I : gmap Z fs_node) :
-    fs_snap Γ g D S -∗ ghost_map_auth (γtop Γ) q I -∗ ⌜I = fss_inodes S⌝.
+    fs_snap Γ g D S -∗ ghost_map_auth_frac (γtop Γ) q I -∗ ⌜I = fss_inodes S⌝.
   Proof using .
     rewrite /fs_snap. iIntros "(_ & Hta & _) Hh".
     iDestruct (ghost_map_auth_agree with "Hh Hta") as %Heq.
@@ -858,8 +858,8 @@ Section Snap.
      back -- what the boot agrees a lent guest against *)
   Lemma fs_snap_top_acc Γ (g : gname) D S :
     fs_snap Γ g D S -∗
-      ghost_map_auth (γtop Γ) (1/2) (fss_inodes S) ∗
-      (ghost_map_auth (γtop Γ) (1/2) (fss_inodes S) -∗ fs_snap Γ g D S).
+      ghost_map_auth_frac (γtop Γ) (1/2) (fss_inodes S) ∗
+      (ghost_map_auth_frac (γtop Γ) (1/2) (fss_inodes S) -∗ fs_snap Γ g D S).
   Proof using .
     rewrite /fs_snap. iIntros "(Hba & Hta & Htf & HS & Hlk & %Hsh)".
     iFrame "Hta". iIntros "Hta".
@@ -983,8 +983,8 @@ Section Snap.
      stated at that same [I] -- so the caller never names the snapshot's
      state. *)
   Lemma P_dur_at_clone (gt : gname) D (I : gmap Z fs_node) :
-    P_dur_at gt D -∗ ghost_map_auth gt (1/2) I ==∗
-      P_dur_at gt D ∗ ghost_map_auth gt (1/2) I
+    P_dur_at gt D -∗ ghost_map_auth_frac gt (1/2) I ==∗
+      P_dur_at gt D ∗ ghost_map_auth_frac gt (1/2) I
       ∗ ∃ gt' : gname, P_dur_at gt' D ∗ snap_guest gt' I.
   Proof using .
     iIntros "HD Hg". rewrite {1}/P_dur_at.
@@ -995,7 +995,7 @@ Section Snap.
     rewrite /snap_auth. iDestruct "Hba" as (B) "[Hba %Hin]".
     iDestruct "Hlk" as (kv) "Hlk".
     iMod (P_dur_alloc_xfer (snap_gamma g gl gt) (snap_gamma_excl g gl gt)
-            (ghost_map_auth g 1 B) B (snap_gamma_agree g gl gt B) 1%Qp S D kv
+            (ghost_map_auth_frac g 1 B) B (snap_gamma_agree g gl gt B) 1%Qp S D kv
             qp_half_lt_1 Hsh Hin with "Hba HS Hlk")
       as "(Hba & HS & Hlk & Hnew)".
     iModIntro. iSplitR "Hg Hnew"; [| iSplitL "Hg"; [iExact "Hg" | iExact "Hnew"]].
@@ -1677,7 +1677,7 @@ Lemma log_region_range (ls b : Z) :
   b ∈ log_region_set ls -> ls <= b <= ls + Z.of_nat LOGBLOCKS.
 Proof.
   rewrite /log_region_set elem_of_union. intros [Hs | Hh].
-  - rewrite elem_of_list_to_set elem_of_list_fmap in Hs.
+  - rewrite elem_of_list_to_set list_elem_of_fmap in Hs.
     destruct Hs as (i & -> & Hi). apply elem_of_seq in Hi.
     rewrite /log_slot_bno. lia.
   - apply elem_of_singleton in Hh. rewrite /log_hdr_bno in Hh. lia.
@@ -1689,7 +1689,7 @@ Proof.
   intros [Hlo Hhi]. rewrite /log_region_set elem_of_union.
   destruct (decide (b = ls)) as [-> | Hne].
   - right. apply elem_of_singleton. reflexivity.
-  - left. rewrite elem_of_list_to_set elem_of_list_fmap.
+  - left. rewrite elem_of_list_to_set list_elem_of_fmap.
     exists (Z.to_nat (b - ls - 1)). split.
     + rewrite /log_slot_bno. lia.
     + apply elem_of_seq. lia.

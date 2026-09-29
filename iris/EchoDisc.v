@@ -287,10 +287,10 @@ Proof.
   induction bs as [| l bs IH]; intro Hb.
   { rewrite wl_join_nil in Hb. by apply elem_of_nil in Hb. }
   rewrite wl_join_cons in Hb. apply elem_of_app in Hb as [Hb | Hb].
-  - right. exists l. split; [apply elem_of_list_here | exact Hb].
+  - right. exists l. split; [apply list_elem_of_here | exact Hb].
   - apply elem_of_cons in Hb as [-> | Hb]; [by left |].
     destruct (IH Hb) as [-> | (l' & Hl' & Hb')]; [by left |].
-    right. exists l'. split; [by apply elem_of_list_further | exact Hb'].
+    right. exists l'. split; [by apply list_elem_of_further | exact Hb'].
 Qed.
 
 Lemma disc_input_byte I b :
@@ -301,7 +301,7 @@ Proof.
   apply elem_of_app in Hin as [Hin | Hin].
   - destruct (join_elem_of (bodies_of I) b Hin) as [-> | (l & Hl & Hbl)];
       [by right | left].
-    apply elem_of_list_lookup in Hl as [k Hk].
+    apply list_elem_of_lookup in Hl as [k Hk].
     destruct (disc_input_body I k l Hd Hk) as [Hbody Hok].
     pose proof (wl_body_bytes (wl_words l) (line_ok_wf _ Hok)) as Hfb.
     rewrite Hbody in Hfb.
@@ -335,7 +335,7 @@ Proof.
   intros Hd Hj. apply (disc_input_byte_val I _ Hd).
   destruct (lookup_lt_is_Some_2 I j Hj) as [b Hb].
   rewrite list_lookup_total_alt Hb. cbn [default from_option].
-  exact (elem_of_list_lookup_2 I j b Hb).
+  exact (list_elem_of_lookup_2 I j b Hb).
 Qed.
 
 Lemma disc_input_byte_ncr I j :
@@ -1053,7 +1053,7 @@ Proof.
   intro Hwf.
   destruct (lookup_lt_is_Some_2 (wl_line ws) 0%nat (wl_line_pos ws)) as [b Hb].
   exists b. split; [exact Hb |].
-  pose proof (wl_line_byte_val ws b Hwf (elem_of_list_lookup_2 _ _ _ Hb)). lia.
+  pose proof (wl_line_byte_val ws b Hwf (list_elem_of_lookup_2 _ _ _ Hb)). lia.
 Qed.
 
 Lemma line_prompt_not_out (ws : list (list (bv 8))) :
@@ -1453,7 +1453,7 @@ Qed.
 Lemma pro_idx_take cs q i : (i <= q)%nat -> pro_idx (take q cs) i = pro_idx cs i.
 Proof.
   intros Hi. apply (pro_idx_ext _ _ q); [| lia].
-  intros j Hj. rewrite list_lookup_total_alt lookup_take; [| lia].
+  intros j Hj. rewrite list_lookup_total_alt lookup_take_lt; [| lia].
   by rewrite -list_lookup_total_alt.
 Qed.
 
@@ -1781,7 +1781,7 @@ Lemma sess_take ps cs I q :
 Proof.
   intros Hq. rewrite /sess. do 2 f_equal.
   apply alt_seq_ext. intros j Hj.
-  rewrite list_lookup_total_alt lookup_take; [| lia].
+  rewrite list_lookup_total_alt lookup_take_lt; [| lia].
   by rewrite -list_lookup_total_alt.
 Qed.
 
@@ -2125,21 +2125,21 @@ Lemma elem_of_bounded_lists (k n : nat) (cs : list nat) :
   cs ∈ bounded_lists k n <-> length cs = n /\ Forall (fun c => c < k) cs.
 Proof.
   revert cs. induction n as [|n IH]; intros cs; cbn.
-  - rewrite elem_of_list_singleton. split.
+  - rewrite list_elem_of_singleton. split.
     + intros ->. split; [done|constructor].
     + intros [Hl _]. by apply nil_length_inv.
-  - rewrite elem_of_list_fmap. split.
+  - rewrite list_elem_of_fmap. split.
     + intros ([c cs'] & -> & Hp). cbn.
-      apply elem_of_list_In in Hp. apply in_prod_iff in Hp as [Hc Hcs].
-      apply in_seq in Hc. apply elem_of_list_In in Hcs.
+      apply list_elem_of_In in Hp. apply in_prod_iff in Hp as [Hc Hcs].
+      apply in_seq in Hc. apply list_elem_of_In in Hcs.
       apply IH in Hcs as [Hl Hf].
       split; [by rewrite /= Hl|]. rewrite Forall_cons. split; [lia|exact Hf].
     + intros [Hl Hf]. destruct cs as [|c cs']; [done|].
       rewrite Forall_cons in Hf. destruct Hf as [Hc Hf].
       exists (c, cs'). split; [done|].
-      apply elem_of_list_In, in_prod_iff. split.
+      apply list_elem_of_In, in_prod_iff. split.
       * apply in_seq. lia.
-      * apply elem_of_list_In, IH. split; [by injection Hl|exact Hf].
+      * apply list_elem_of_In, IH. split; [by injection Hl|exact Hf].
 Qed.
 
 Lemma Forall_imap_pair {A} (P : nat -> A -> Prop) (l : list A) :
@@ -2171,24 +2171,24 @@ Lemma elem_of_cont_lists (n : nat) (g : list nat) :
   g ∈ cont_lists n <-> length g = n /\ Forall pro_cont g.
 Proof.
   revert g. induction n as [|n IH]; intros g; cbn [cont_lists].
-  - rewrite elem_of_list_singleton. split.
+  - rewrite list_elem_of_singleton. split.
     + intros ->. split; [done|constructor].
     + intros [Hl _]. by apply nil_length_inv.
-  - rewrite elem_of_list_fmap. split.
+  - rewrite list_elem_of_fmap. split.
     + intros ([c g'] & -> & Hp). cbn.
-      apply elem_of_list_In in Hp. apply in_prod_iff in Hp as [Hc Hg].
-      apply elem_of_list_In in Hg. apply IH in Hg as [Hl Hf].
+      apply list_elem_of_In in Hp. apply in_prod_iff in Hp as [Hc Hg].
+      apply list_elem_of_In in Hg. apply IH in Hg as [Hl Hf].
       split; [by rewrite /= Hl|]. rewrite Forall_cons. split; [| exact Hf].
-      apply elem_of_list_In in Hc. rewrite /pro_cont.
+      apply list_elem_of_In in Hc. rewrite /pro_cont.
       apply elem_of_cons in Hc as [-> | Hc]; [by left |].
-      apply elem_of_list_singleton in Hc. by right.
+      apply list_elem_of_singleton in Hc. by right.
     + intros [Hl Hf]. destruct g as [|c g']; [done|].
       rewrite Forall_cons in Hf. destruct Hf as [Hc Hf].
       exists (c, g'). split; [done|].
-      apply elem_of_list_In, in_prod_iff. split.
-      * apply elem_of_list_In. destruct Hc as [-> | ->];
-          [apply elem_of_list_here | by apply elem_of_list_further, elem_of_list_here].
-      * apply elem_of_list_In, IH. split; [by injection Hl|exact Hf].
+      apply list_elem_of_In, in_prod_iff. split.
+      * apply list_elem_of_In. destruct Hc as [-> | ->];
+          [apply list_elem_of_here | by apply list_elem_of_further, list_elem_of_here].
+      * apply list_elem_of_In, IH. split; [by injection Hl|exact Hf].
 Qed.
 
 Definition pro_grp_cands (m : nat) : list (list nat) :=
@@ -2206,24 +2206,24 @@ Lemma elem_of_pro_grp_cands (m : nat) (g : list nat) (t : nat) :
   Forall pro_cont g -> (length g <= m)%nat -> (t = 0%nat \/ t = 2%nat) ->
   (g ++ [t]) ∈ pro_grp_cands m.
 Proof.
-  intros Hg Hk Ht. rewrite /pro_grp_cands elem_of_list_join.
+  intros Hg Hk Ht. rewrite /pro_grp_cands list_elem_of_join.
   exists (mjoin ((fun g => [g ++ [0%nat]; g ++ [2%nat]]) <$> cont_lists (length g))).
   split.
-  - rewrite elem_of_list_join. exists [g ++ [0%nat]; g ++ [2%nat]]. split.
+  - rewrite list_elem_of_join. exists [g ++ [0%nat]; g ++ [2%nat]]. split.
     + destruct Ht as [-> | ->];
-        [ apply elem_of_list_here | by apply elem_of_list_further, elem_of_list_here ].
-    + apply elem_of_list_fmap. exists g. split; [reflexivity |].
+        [ apply list_elem_of_here | by apply list_elem_of_further, list_elem_of_here ].
+    + apply list_elem_of_fmap. exists g. split; [reflexivity |].
       apply elem_of_cont_lists. by split.
-  - apply elem_of_list_fmap. exists (length g). split; [reflexivity |].
-    apply elem_of_list_In, in_seq. lia.
+  - apply list_elem_of_fmap. exists (length g). split; [reflexivity |].
+    apply list_elem_of_In, in_seq. lia.
 Qed.
 
 Lemma elem_of_pro_cands_app (R m : nat) (g rest : list nat) :
   g ∈ pro_grp_cands m -> rest ∈ pro_cands R m -> (g ++ rest) ∈ pro_cands (S R) m.
 Proof.
-  intros Hg Hr. cbn [pro_cands]. apply elem_of_list_fmap.
+  intros Hg Hr. cbn [pro_cands]. apply list_elem_of_fmap.
   exists (g, rest). split; [reflexivity |].
-  apply elem_of_list_In, in_prod; by apply elem_of_list_In.
+  apply list_elem_of_In, in_prod; by apply list_elem_of_In.
 Qed.
 
 Lemma pro_cont_bound (a : nat) : pro_cont a -> (a < length pro_alts)%nat.
@@ -2232,15 +2232,15 @@ Proof. intros [-> | ->]; rewrite pro_alts_length; lia. Qed.
 Lemma pro_grp_cands_Forall m g :
   g ∈ pro_grp_cands m -> Forall (fun a => (a < length pro_alts)%nat) g.
 Proof.
-  rewrite /pro_grp_cands elem_of_list_join. intros (l & Hg & Hl).
-  apply elem_of_list_fmap in Hl as (k & -> & _).
-  rewrite elem_of_list_join in Hg. destruct Hg as (l2 & Hg & Hl2).
-  apply elem_of_list_fmap in Hl2 as (g0 & -> & Hg0).
+  rewrite /pro_grp_cands list_elem_of_join. intros (l & Hg & Hl).
+  apply list_elem_of_fmap in Hl as (k & -> & _).
+  rewrite list_elem_of_join in Hg. destruct Hg as (l2 & Hg & Hl2).
+  apply list_elem_of_fmap in Hl2 as (g0 & -> & Hg0).
   apply elem_of_cont_lists in Hg0 as [_ Hc].
   assert (Hrep : Forall (fun a => (a < length pro_alts)%nat) g0).
   { eapply Forall_impl; [exact Hc |]. exact pro_cont_bound. }
   apply elem_of_cons in Hg as [-> | Hg];
-    [| apply elem_of_list_singleton in Hg; rewrite Hg];
+    [| apply list_elem_of_singleton in Hg; rewrite Hg];
     (apply Forall_app; split; [exact Hrep |];
      apply Forall_singleton; rewrite pro_alts_length; lia).
 Qed.
@@ -2249,17 +2249,17 @@ Lemma pro_cands_Forall R m g :
   g ∈ pro_cands R m -> Forall (fun a => (a < length pro_alts)%nat) g.
 Proof.
   revert g. induction R as [| R IH]; intros g Hg; cbn [pro_cands] in Hg.
-  - apply elem_of_list_singleton in Hg as ->. constructor.
-  - apply elem_of_list_fmap in Hg as ([g1 g2] & -> & Hp). cbn.
-    apply elem_of_list_In, in_prod_iff in Hp as [H1 H2].
+  - apply list_elem_of_singleton in Hg as ->. constructor.
+  - apply list_elem_of_fmap in Hg as ([g1 g2] & -> & Hp). cbn.
+    apply list_elem_of_In, in_prod_iff in Hp as [H1 H2].
     apply Forall_app. split.
-    + by apply (pro_grp_cands_Forall m), elem_of_list_In.
-    + by apply IH, elem_of_list_In.
+    + by apply (pro_grp_cands_Forall m), list_elem_of_In.
+    + by apply IH, list_elem_of_In.
 Qed.
 
 Lemma pro_cands_nonempty (R m : nat) : exists g, g ∈ pro_cands R m.
 Proof.
-  induction R as [| R IH]; [exists []; by apply elem_of_list_singleton |].
+  induction R as [| R IH]; [exists []; by apply list_elem_of_singleton |].
   destruct IH as [g Hg]. exists (([] ++ [0%nat]) ++ g).
   apply elem_of_pro_cands_app; [| exact Hg].
   apply elem_of_pro_grp_cands; [constructor | cbn; lia | by left].
@@ -2322,7 +2322,7 @@ Lemma pro_canon (R m : nat) : forall ps : list nat,
     /\ (forall r, (r < R)%nat -> pro_of (pro_from r ps0) = pro_of (pro_from r ps)).
 Proof.
   induction R as [| R IH]; intros ps HF Hb.
-  { exists []. split; [by apply elem_of_list_singleton |].
+  { exists []. split; [by apply list_elem_of_singleton |].
     split; [reflexivity |]. intros r Hr. lia. }
   destruct (Hb 0%nat ltac:(lia)) as [Hr0 Hm0]. cbn [pro_from] in Hm0.
   assert (Hd : pro_done ps) by (apply (pro_from_done 0%nat ps); exact Hr0).
@@ -2429,11 +2429,11 @@ Lemma nlines_max_mem (l : list (list mobs)) :
 Proof.
   induction l as [| q l IH]; intro Hne; [done |].
   rewrite nlines_max_cons. destruct l as [| q1 l1].
-  { exists q. split; [apply elem_of_list_here |]. cbn [nlines_max]. lia. }
+  { exists q. split; [apply list_elem_of_here |]. cbn [nlines_max]. lia. }
   destruct (IH ltac:(discriminate)) as (p & Hp & Hpe).
   destruct (decide (nlines (ins q) <= nlines_max (q1 :: l1))%nat) as [Hle | Hgt].
-  - exists p. split; [by apply elem_of_list_further | lia].
-  - exists q. split; [apply elem_of_list_here | lia].
+  - exists p. split; [by apply list_elem_of_further | lia].
+  - exists q. split; [apply list_elem_of_here | lia].
 Qed.
 
 (* ---- the constructor the literals below spend ---- *)
