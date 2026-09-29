@@ -9,7 +9,7 @@ NO LEAN LOCALLY (gcp_rule.txt). Push to origin lean-v2 on green (user OK'd, Sept
 Relaunched Sept 29 (new session 354a8854, stanford profile) — old agentId -> lane worktree:
 - runsys+H-io: LANDED 30ec3d48d (+ wp_uk_ecall_exec, USH_RUN_SYS_P discharged). Was: (a0c5fc0f93fc75880 / H-io aa9fd031a53a1cbe1) -> lane-runsys: fix udepwfStd isplit in
   UkReadPipe/UkWriteLeaf/UkReadCons, UK_SYS_IO, xpostRead/Write pt rows + UK_POST_ROWS, pipe_read_end
-- H-file+H-pipe (a0b34ea2a188b69a0) -> lane-hfp (+ -c -f1 -f2 -p1 -p2 -r)
+- H-file+H-pipe: LANDED a79626d12 (params left: union_residuals.md)
 - sh-run: LANDED 0efc05af3 (residual: wp_uk_ecall_exec, see union_residuals.md)
 - U1-F file claims: LANDED 91556290f (follow-ups in union_residuals.md)
 - BootReset phase 3: LANDED 5d020b1eb (trusted reset table retired; SLeft leftover record)
@@ -22,3 +22,4 @@ New lanes Sept 29: P-echo LANDED 38812aaaa (UkTreeEntry echo entries wait on Exe
 Still to start in U3: R-prog, R-pipes, R-round, I-init (after H-file/H-pipe, U1-F, R-sh); then Union* (U1-P rest), U4 top.
 land.sh: `postpush` mode redoes the main-tree ff + seed after a manual push; fetch/push retry (GitHub ssh auth flaky Sept 29).
 Union* lane (lane-u1punion) started Sept 29 after U1-F.
+Lane gaps (lane-gaps) started Sept 29: udepwfK uszOk, open_recv_gimg/uimg_view, read_win/at, udepw_law_of_sup*, echo_node_img, image entries.
