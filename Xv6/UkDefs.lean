@@ -109,6 +109,37 @@ def UkExecRetire (C : UCfg) (P : UPtd) (T : BMap) (i : instruction) (len : Int) 
       uxRun ufFoot T orc (ucNpcS s len) (execute i) = some (RETIRE_SUCCESS, s', orc') ∧
       UkPost C P T m' pc' V' s'
 
+/-- **A trapping execute fact** (the ECALL; a store to a mapped read-only
+page): from every engine machine at `m`, `pc`, `V` with `nextPC` at
+`pc + len`, every oracle's walk of `execute i` returns a payload-free trap at
+User of cause `e` at `pc`, landing on an engine machine whose GPRs, PC and
+pages are unchanged. -/
+def UkExecTrap (C : UCfg) (P : UPtd) (T : BMap) (i : instruction) (len : Int) (m : RegMap)
+    (pc : BitVec 64) (V : Nat → List (BitVec 8)) (e : ExceptionType) : Prop :=
+  ∀ s : UWSt, UkLand C P T s → ukRegs s.file m → s.file .PC = pc → ukView P.um s.mm T = V →
+    ∀ orc : UOrc, ∃ (exc : sync_exception) (s' : UWSt) (orc' : UOrc),
+      uxRun ufFoot T orc (ucNpcS s len) (execute i) = some (.Trap (Privilege.User, exc, pc), s', orc') ∧
+      exc.trap = e ∧ exc.ext = none ∧
+      UkLand C P T s' ∧ ukRegs s'.file m ∧ s'.file .PC = pc ∧ ukView P.um s'.mm T = V
+
+/-- **The fetch fact** (Rocq `UmodeFetch`'s four geometries): from every
+engine machine at pc `pc` and pages `V`, every oracle's `fetch ()` returns
+`fr`, landing on an engine machine whose file moved only at the TLB and
+whose pages are unchanged. -/
+def UkFetchFact (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat → List (BitVec 8))
+    (fr : FetchResult) : Prop :=
+  ∀ s : UWSt, UkLand C P T s → s.file .PC = pc → ukView P.um s.mm T = V →
+    ∀ orc : UOrc, ∃ (s' : UWSt) (orc' : UOrc),
+      uxRun ufFoot T orc s (fetch ()) = some (fr, s', orc') ∧
+      UkLand C P T s' ∧ (∀ r, r ≠ .tlb → s'.file r = s.file r) ∧ ukView P.um s'.mm T = V
+
+/-- **The pages after a store** of the low `n` bytes of `v` at user virtual
+address `a` (inside one page): Rocq `uM_store` at the page view. -/
+def ukViewStore (V : Nat → List (BitVec 8)) (a n : Nat) (v : BitVec 64) : Nat → List (BitVec 8) :=
+  fun k => if k = a / 4096 then
+      (V k).mapIdx (fun j b => if a % 4096 ≤ j ∧ j < a % 4096 + n then nthByte (n := 8) v (j - a % 4096) else b)
+    else V k
+
 /-! ## §3 The stamped address space (Rocq `UmodeText` §3–§4) -/
 
 section stamped
