@@ -830,8 +830,12 @@ Definition wp_writei_sconf_body
       dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
+      (* ...AT A LATER EVENT COUNT on the user arm (permit sweep L1b): the
+         block's counter is lent to either_copyin, which may step it.  The
+         kernel arm lends nothing and its block comes back verbatim. *)
       (if user
-       then proc_priv_core pj pidv (us_upt U P')
+       then ∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗
+            proc_priv_core pj pidv (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             proc_priv_bare pj pidv U) -∗
       bslots 3 -∗
@@ -1144,8 +1148,12 @@ Definition wp_writei_gen_body
       dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
+      (* ...AT A LATER EVENT COUNT on the user arm (permit sweep L1b): the
+         block's counter is lent to either_copyin, which may step it.  The
+         kernel arm lends nothing and its block comes back verbatim. *)
       (if user
-       then proc_priv_core pj pidv (us_upt U P')
+       then ∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗
+            proc_priv_core pj pidv (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             proc_priv_bare pj pidv U) -∗
       bslots 3 -∗

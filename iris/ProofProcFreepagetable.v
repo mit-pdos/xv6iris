@@ -61,6 +61,7 @@ Require Import CodeProcFreepagetable.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import SpecUvmunmap SpecUvmfree.
 Require Import SpecProcFreepagetable.
+Require Import SlotGen.   (* [act_lend] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
@@ -174,7 +175,7 @@ Module ProcFreepagetableProof (UvmunmapFixed : UVMUNMAP_FIXED) (Uvmfree : UVMFRE
   : PROC_FREEPAGETABLE.
 
 Section ProofProcFreepagetable.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -230,14 +231,17 @@ Section ProofProcFreepagetable.
   Lemma wp_proc_freepagetable_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks kl.
   Proof using .
     cbv beta delta [wp_proc_freepagetable_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hlend Hcont".
+    (* the lend (permit sweep L2) in the shape the callees hand back *)
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists kl. iFrame "Hlend". done. }
 
     (* the three callee stack budgets, discharged once (never inline) *)
     assert (HKuu : (22 <= K - 4)%nat) by lia.
@@ -530,17 +534,21 @@ Section ProofProcFreepagetable.
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
     iDestruct (cpu_own_transport CID CID14 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
+    iDestruct "Hlend" as (klc1 Hklc1) "Hlend".
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa B5
               (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) tramp_vpn
               (K - 4)%nat eb p ilvl b
-              _ HKuu Hilvl HB5a0
+              _ klc1 HKuu Hilvl HB5a0
               ltac:(rewrite HB5a1; exact pf_tramp_align)
               HB5a2 HB5a3
               ltac:(rewrite HB5a1; exact pf_tramp_svpn)
               (or_introl eq_refl)
               ltac:(rewrite HB5a1; exact pf_tramp_range)
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
-    iIntros (CID15 Hs15 mr1) "Hcg Hcpu Hpc %Hcs1 Hpt".
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
+    iIntros (CID15 Hs15 mr1) "Hcg Hcpu Hlend Hpc %Hcs1 Hpt".
+    iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
     iEval (rewrite (upt_fixed_both_del_tramp P.(ud_tfp))) in "Hpt".
     assert (Hret20 : ret_pc (B5 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x20)).
     { rewrite HB5ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -683,17 +691,21 @@ Section ProofProcFreepagetable.
       by (rewrite /C6 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID15 CID22 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
+    iDestruct "Hlend" as (klc2 Hklc2) "Hlend".
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa C6
               {[tf_vpn := pte_tf P.(ud_tfp)]} P.(ud_root) P.(ud_um) tf_vpn
               (K - 4)%nat eb p ilvl b
-              _ HKuu Hilvl HC6a0
+              _ klc2 HKuu Hilvl HC6a0
               ltac:(rewrite HC6a1; exact pf_tf_align)
               HC6a2 HC6a3
               ltac:(rewrite HC6a1; exact pf_tf_svpn)
               (or_intror eq_refl)
               ltac:(rewrite HC6a1; exact pf_tf_range)
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
-    iIntros (CID23 Hs23 mr2) "Hcg Hcpu Hpc %Hcs2 Hpt".
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
+    iIntros (CID23 Hs23 mr2) "Hcg Hcpu Hlend Hpc %Hcs2 Hpt".
+    iDestruct "Hlend" as (klr2 Hklr2) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists klr2. iFrame "Hlend". iPureIntro. lia. }
     (* the table is BARE now: no trampoline, no trapframe, just the user map *)
     iEval (rewrite (upt_fixed_tf_del_tf P.(ud_tfp)) -/(bare_pt P.(ud_root) P.(ud_um)))
       in "Hpt".
@@ -774,14 +786,18 @@ Section ProofProcFreepagetable.
       by (rewrite /D2 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID23 CID26 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
+    iDestruct "Hlend" as (klc3 Hklc3) "Hlend".
     iApply (Uvmfree.wp_uvmfree_sconf γa D2 P.(ud_root) P.(ud_um)
               (K - 4)%nat eb p ilvl b
-              _ HKuf Hilvl HD2a0
+              _ klc3 HKuf Hilvl HD2a0
               ltac:(rewrite HD2a1; exact Hbnd)
               ltac:(rewrite HD2a1; exact Hdom)
-              with "Hcg Hcpu Htext Hpc Hpt Henv").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID27 Hs27 mr3) "Hcg Hcpu Hpc %Hcs3".
+    iIntros (CID27 Hs27 mr3) "Hcg Hcpu Hlend Hpc %Hcs3".
+    iDestruct "Hlend" as (klr3 Hklr3) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists klr3. iFrame "Hlend". iPureIntro. lia. }
     assert (Hret3a : ret_pc (D2 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x3a)).
     { rewrite HD2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret3a) in "Hpc".
@@ -930,7 +946,7 @@ Section ProofProcFreepagetable.
     iDestruct (cpu_own_transport CID27 CID33 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID33 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 with "Hcg Hcpu Hpc [%]").
+    iApply ("Hcont" $! E4 with "Hcg Hcpu Hlend Hpc [%]").
     unfold callee_saved. split_and!;
         first [ exact HE4sp | exact HE4s0 | exact HE4s1 | exact HE4s2
               | apply HE4thr; vm_compute; first [reflexivity | discriminate] ].
@@ -945,16 +961,16 @@ Section ProofProcFreepagetable.
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : Z) (M : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat)
+    : wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks k.
   Proof using .
     cbv beta delta [wp_proc_freepagetable_mem_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
-    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hlend Hcont".
     iDestruct (proc_ptm_pt P szv M with "Hpt") as "Hpt".
-    iApply (wp_proc_freepagetable_sconf γa mm P K eb p ilvl b lks
+    iApply (wp_proc_freepagetable_sconf γa mm P K eb p ilvl b lks k
               HK Hilvl Hroot Hbnd Hbelow Hlkbelow
-              with "Hcg Hcpu Htext Hpc Hpt Henv Hcont").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hcont").
   Qed.
 
 End ProofProcFreepagetable.

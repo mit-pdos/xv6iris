@@ -1824,11 +1824,13 @@ Section ProofSysUnlinkW3.
                                         Hislots".
         iDestruct ("Hpre" with "Hpidq") as "Hpriv".
         iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
+        iApply ("Hcont" $! mf P1 (pv_ev (us_V U)) with "[%] [%] [%] Hcg Hown Htce Hcce Hpc
                   Hbsl Hsbb Hsbi Hsbs [Hislots] Hpriv
                   [HP Hcent Hctgt Hex Hcmiss]").
         { exact Hcsf. }
         { exact Hupt1. }
+        (* no lend past argstr: the walk's own count (permit sweep L1b) *)
+        { lia. }
         { rewrite su_slots2. iExact "Hislots". }
         { rewrite /unlink_arms /unlink_post_fail. iRight.
           iSplitR; [iPureIntro; rewrite Ha0f; reflexivity |].

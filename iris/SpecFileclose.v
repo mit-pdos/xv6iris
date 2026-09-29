@@ -695,20 +695,23 @@ Definition wp_fileclose_sconf_body
      obligation it adds is on the CALLER, which must supply its
      continuation hart-generically.) *)
   wp_next true p (fun (CID : CpuId) =>
-    ∀ mr,
+    ∀ mr (k' : nat),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
+    (* THE EVENT COUNTER (permit sweep L1b): the pipe arm lends the block's counter to pipeclose, which may step it,
+       so the block comes back at a count at least the one it left at *)
+    ⌜(pv_ev (us_V Upr) <= k')%nat⌝ -∗
     fd_slot -∗
     iref_slot -∗
     fileclose_env_out fn on st -∗
     (* the link fired if this was the whole reference; otherwise the payment
        back, or fired anyway if this close happened to be the last *)
     fileclose_cpost q st Φc -∗
-    proc_priv_bare p pidv Upr -∗
+    proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')) -∗
     mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

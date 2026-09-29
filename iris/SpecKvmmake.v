@@ -21,6 +21,7 @@ Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [wchG]: mappages' lend, the permit sweep L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 
@@ -42,13 +43,17 @@ Require Import CtxIdDefs.
    unrefutable.
    stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44 (PROVISIONAL,
    pending the decode pass). *)
-Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (48 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
   (* kvmmake kallocs the root table and every kvmmap page: "kmem" (13). *)
+  (* THE BOOT HART HAS NO CURRENT PROC (permit sweep L2): the kernel page
+     table is built at [c->proc = 0], so mappages' lend is the left
+     disjunct ([SlotGen.act_lend_zero]) -- the boot lends nothing. *)
+  p = (zero_reg : mword 64) ->
   locks_below lks "kmem" ->
   sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
@@ -74,7 +79,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 
 Module Type KVMMAKE.
   Parameter wp_kvmmake_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 End KVMMAKE.

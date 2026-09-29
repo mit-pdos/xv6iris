@@ -156,11 +156,14 @@ Section SpecEitherCopyout.
         the only thing that touches [M], and this equation pins both what
         changed and what did not.  The DESCRIPTOR still grows, which is
         what the ∃ [P'] and [uptd_ext] are. *)
-          ∃ (P' : uptd) (d : nat),
+          ∃ (P' : uptd) (d : nat) (k' : nat),
             ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗
             ⌜either_copyout_ran (pv_upt (us_V U)) dst len r d⌝ ∗
+            (* THE EVENT COUNTER (permit sweep L1b): the block's counter is
+               lent to copyout, which may step it *)
+            ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗
             proc_priv_core p pid
-              (upd_usM (us_upt U P') (umem_wr (us_M U) dst d src_bytes))
+              (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) dst d src_bytes))
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
           [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] src_bytes j)%I.
 

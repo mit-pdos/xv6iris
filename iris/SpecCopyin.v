@@ -87,6 +87,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
@@ -275,11 +276,11 @@ Lemma copyin_read_ret (P : uptd) (M : gmap Z (bv 8)) (srcva : mword 64)
   \/ res = (mword_of_int (-1) : mword 64).
 Proof. intros [[H1 H2] | [H1 _]]; [ by left | by right ]. Qed.
 
-Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
     (dst_olds : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyin in
   let dst := mm !!! Regidx (mword_of_int 12) in
   let srcva := mm !!! Regidx (mword_of_int 13) in
@@ -298,11 +299,15 @@ Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN
   pc_is pcE -∗
   proc_ptm P (uint szv) M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L1b): the caller's event counter, for the
+     kalloc a lazy fault inside the copy makes *)
+  act_lend p k -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     proc_ptm P' (uint szv) M -∗
     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
@@ -314,10 +319,10 @@ Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN
 
 Module Type COPYIN.
   Parameter wp_copyin_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
       (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyin_sconf_mem_body ktb γa mm P M szv len dst_olds K lvl eb p b lks.
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) (k : nat),
+      wp_copyin_sconf_mem_body ktb γa mm P M szv len dst_olds K lvl eb p b lks k.
 End COPYIN.

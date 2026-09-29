@@ -101,7 +101,7 @@ Notation KF := KernelSyms.kfork (only parsing).
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) = V.
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) (pv_ev V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -157,7 +157,7 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U)) (pv_lazy (us_V U)) (pv_secc (us_V U))))).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns (pv_cwi (us_V U)) (pv_gen (us_V U)) (pv_chg (us_V U)) (pv_lazy (us_V U)) (pv_secc (us_V U)) (pv_ev (us_V U))))).
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs & Hgh) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
@@ -647,7 +647,7 @@ Section KforkB4Proof.
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
                   (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat) (pv_cwi Vc2)
-                  (pv_gen Vc2) (pv_chg Vc2) (pv_lazy Vc2) (pv_secc Vc2)).
+                  (pv_gen Vc2) (pv_chg Vc2) (pv_lazy Vc2) (pv_secc Vc2) (pv_ev Vc2)).
     (* ------------------------------------------------------------- *)
     (* +0xbe: ld a5,360(s5) -- a5 := p->seccomp (upstream a083670).   *)
     (* The parent's mask cell, borrowed out of its block and put back *)

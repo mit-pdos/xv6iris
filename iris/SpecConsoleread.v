@@ -222,7 +222,7 @@ Definition wp_consoleread_sconf_body
        byte the UART delivered, translated by [ConsoleInv.cons_xlate], with
        its tag. *)
   ∀ (mf : regfile) (r : Z) (P' : uptd) (d dc cur : nat) (bs : nat -> bv 8)
-      (hs : list (list mobs)) (sl : list (list mobs * bv 8)),
+      (hs : list (list mobs)) (sl : list (list mobs * bv 8)) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
@@ -380,11 +380,14 @@ Definition wp_consoleread_sconf_body
               and the ring's era ([ConsoleInv.cons_swallow_placed]). *)
            ∗ cons_swallow_placed sl cur (cn_era cn) d dc) -∗
       cons_out cn Wd ord cur dc -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the loop lends the block's counter to either_copyout, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid
-        (upd_usM (us_upt U P') (umem_wr (us_M U) dst d bs)) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) dst d bs)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

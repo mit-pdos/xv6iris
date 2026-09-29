@@ -1278,15 +1278,18 @@ Definition wp_filewrite_sconf_body
        backs a page already in the view reading 0.  So the block comes back
        at the caller's own [us_M U]; only the DESCRIPTOR grows.
        (image campaign, tier 3.) *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): every arm lends the block's counter to a copy, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (us_upt U P') -∗
+      proc_priv_core pj pidv (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       filewrite_env_out fn st -∗
       (* ---- THE ARMED OUTPUT, KEYED ON [st] ([filewrite_arms]) ----
          The blanket [⌜filewrite_ret n r⌝], and beside it what the arm the

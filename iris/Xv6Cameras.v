@@ -1166,6 +1166,14 @@ Definition sgen_map : Type :=
   gmap (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
 Definition sgenUR : ucmra :=
   gmapUR (SailStdpp.Values.mword 64) (dfrac_agreeR (leibnizO gname)).
+(* THE PER-SLOT EVENT COUNTERS (design ni-strong-instance.md §7): one
+   exclusive [nat] per slot address, [SlotGen.act_cnt], the permit an
+   actor-labelled ledger append consumes.  Named here for [sgen_map]'s
+   reason (the [Countable (mword 64)] instance is fixed once). *)
+Definition act_map : Type :=
+  gmap (SailStdpp.Values.mword 64) (dfrac_agreeR natO).
+Definition actUR : ucmra :=
+  gmapUR (SailStdpp.Values.mword 64) (dfrac_agreeR natO).
 (* THE ORPHAN COLUMN'S TYPE, named here for [sgen_map]'s reason: it is a
    second children table, keyed by the ADDRESS a reparent handed a
    generation to, and spelling [gmap (mword 64) _] in another file resolves
@@ -1193,7 +1201,8 @@ Class wchGpreS (Σ : gFunctors) :=
     wpr_pre_inG :: ghost_mapG Σ Z gname;
     wip_pre_inG :: inG Σ ipidUR;
     wpl_pre_inG :: inG Σ (mono_listR (leibnizO pev));
-    wzl_pre_inG :: inG Σ (mono_listR (leibnizO zev)) }.
+    wzl_pre_inG :: inG Σ (mono_listR (leibnizO zev));
+    wact_pre_inG :: inG Σ actUR }.
 (* THE PID LEDGER (NI-LEDGER-REST, design ni-pid-ledger.md D2): a mono-list
    of [PidEv.pev], the actor-labelled history of every pid allocation and
    release, whose authority lives in <pid_lock>'s payload beside the pid
@@ -1214,6 +1223,8 @@ Class wchG (Σ : gFunctors) :=
          wip_inG :: inG Σ ipidUR;
          wpl_inG :: inG Σ (mono_listR (leibnizO pev));
          wzl_inG :: inG Σ (mono_listR (leibnizO zev));
+         (* the per-slot event counters (design ni-strong-instance.md §7) *)
+         wact_inG :: inG Σ actUR;
          wch_name : gname;
          worph_name : gname;
          wsg_name : gname;
@@ -1243,12 +1254,15 @@ Class wchG (Σ : gFunctors) :=
             [diskGhostG]). *)
          wtk_name : gname;
          (* THE ZOMBIE LEDGER'S NAME (design ni-zombie-ledger.md D2). *)
-         wzl_name : gname }.
+         wzl_name : gname;
+         (* THE PER-SLOT EVENT COUNTERS' NAME (design ni-strong-instance.md
+            §7): [SlotGen.act_cnt], born in [WaitInv.children_res_alloc]. *)
+         wact_name : gname }.
 Global Instance wchG_preS `{!wchG Σ} : wchGpreS Σ :=
   {| wch_pre_inG := wch_inG; worph_pre_inG := worph_inG;
      wsg_pre_inG := wsg_inG; wpr_pre_inG := wpr_inG;
      wip_pre_inG := wip_inG; wpl_pre_inG := wpl_inG;
-     wzl_pre_inG := wzl_inG |}.
+     wzl_pre_inG := wzl_inG; wact_pre_inG := wact_inG |}.
 Definition wchΣ : gFunctors :=
   #[ ghost_mapΣ gname (SailStdpp.Values.mword 64 * gset gname);
      ghost_varΣ orph_map;
@@ -1256,7 +1270,8 @@ Definition wchΣ : gFunctors :=
      ghost_mapΣ Z gname;
      GFunctor ipidUR;
      GFunctor (mono_listR (leibnizO pev));
-     GFunctor (mono_listR (leibnizO zev)) ].
+     GFunctor (mono_listR (leibnizO zev));
+     GFunctor actUR ].
 Global Instance subG_wchΣ {Σ} : subG wchΣ Σ -> wchGpreS Σ.
 Proof. solve_inG. Qed.
 

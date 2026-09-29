@@ -86,6 +86,7 @@ Require Import SpecFetchstr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SlotGen.   (* [act_lend_borrow]: the permit sweep, L1b *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Import Defs.
@@ -667,7 +668,7 @@ Section ProofFetchstr.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     (* ---- the ONE borrow out of [proc_priv] ---- *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
-    iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
+    iDestruct (proc_priv_copy_ev with "Hpriv") as "(Hszc & Hptc & Hpt & Hev & Hpback)".
     (* ---- +0x18: c.mv a4,s2 -- a4 := max (the psz shifted every argument
        down one register, xv6 4f2fc8b) ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.fetchstr + 0x18))
@@ -829,13 +830,16 @@ Section ProofFetchstr.
        and the pages it faults in were already in the lazy view, so [us_M U]
        comes back on the nose and the block re-closes at it. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    (* the lend (permit sweep L1b): the block's counter, borrowed *)
+    iDestruct (act_lend_borrow with "Hev") as "[Hlend Hlback]".
     iApply (Copyinstr.wp_copyinstr_sconf_mem ktb γa A5 (pv_upt (us_V U)) (us_M U)
               (pv_sz (us_V U)) maxn buf_olds
-              (av - 6)%nat n eb p b lks
+              (av - 6)%nat n eb p b lks (pv_ev (us_V U))
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
-              with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hbuf").
     all: try lkbelow.
-    iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+    iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+    iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
     rewrite HA5a3 in Hret.
     iEval (rewrite HA5a2) in "Hbuf".
     assert (Hpc26 : ret_pc (A5 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x26))
@@ -856,7 +860,7 @@ Section ProofFetchstr.
        [us_upt U P'] and the postcondition needs no existential. *)
     iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxr";
       [iPureIntro; exact Hext|].
-    iDestruct ("Hpback" $! P' (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
+    iDestruct ("Hpback" $! P' (us_M U) kc2 with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
     (* ---- +0x24: bltz a0 -- copyinstr's answer decides the branch ---- *)
     destruct Hret as [[H0 (k & Hkmax & Hcstr & Hgot)] | Hm1].
     - (* ======= copyinstr returned 0: fall through to strlen ======= *)
@@ -951,9 +955,10 @@ Section ProofFetchstr.
          [Hcont]. *)
       iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
+      iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
+      { exact Hkc2. }
       { left. exists k. split; [exact Hkmax|]. split; [exact Hcstr | exact Hfa0]. }
       { intros k0 Hk0 Hans. rewrite Hfa0 in Hans.
         assert (Hk031 : (Z.of_nat k0 < 2 ^ 31)%Z).
@@ -1017,9 +1022,10 @@ Section ProofFetchstr.
       iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
+      iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").
       { exact Hcsf. }
       { exact Hext. }
+      { exact Hkc2. }
       { right. exact Hfa0. }
       { intros k0 Hk0 Hans. exfalso. rewrite Hfa0 in Hans.
         assert (Hk031 : (Z.of_nat k0 < 2 ^ 31)%Z).

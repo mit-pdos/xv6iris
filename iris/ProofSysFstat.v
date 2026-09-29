@@ -707,14 +707,15 @@ Section ProofSysFstat.
          window is EMPTY -- [d := 0], any [bs] does, [umem_wr _ _ 0 _]
          reduces to the entry image on the nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
-                0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
+                0%nat (fun _ => bv_0 8) (pv_ev (us_V U))
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { lia. }
       { exact Hmfa0. }
-      { cbn [umem_wr]. rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+      { lia. }
+      { cbn [umem_wr]. rewrite upd_ev_id upd_usV_id us_upt_id upd_usM_id. iExact "Hpriv". }
       { iApply (filestat_fs_env_out with "Henv"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
@@ -817,8 +818,8 @@ Section ProofSysFstat.
                 ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID20 Hs20 mf rv P' dw bsw)
-        "%Hcsf %Hupt %Hrvok %Hdwle %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
+      iIntros (CID20 Hs20 mf rv P' dw bsw kev)
+        "%Hcsf %Hupt %Hrvok %Hdwle %Hrva %Hkev Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "Henv".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -831,12 +832,12 @@ Section ProofSysFstat.
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
       iDestruct (proc_priv_join γf pj pidv
-                   (upd_usM (us_upt U P')
+                   (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) kev)) P')
                       (umem_wr (us_M U) (S3 !!! Regidx Ra1) dw bsw))
                    with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
-      { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }
+      { cbn [upd_upt upd_ev pv_ofile pv_fdg]. iExact "Howe". }
       (* the window's base is filestat's own -- rewrite it to [v1], the
          name the postcondition uses *)
       iEval (rewrite HS3a1) in "Hpriv".
@@ -867,13 +868,14 @@ Section ProofSysFstat.
       iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P' dw bsw
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
+      iApply ("Hcont" $! mg rv P' dw bsw kev
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }
       { exact Hdwle. }
       { exact Hmga0. }
+      { exact Hkev. }
   Qed.
 
 End ProofSysFstat.

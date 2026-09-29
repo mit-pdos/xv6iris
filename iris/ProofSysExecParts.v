@@ -964,13 +964,15 @@ Section SysExecHead.
          BUNDLE names.  Leaving it a fresh forall severs that. *)
       ∀ (M : regfile) (P' : uptd) (plen : nat)
         (pfun : nat -> bv 8)
-        (rest : nat -> bv 8) (v60 : mword 64),
+        (rest : nat -> bv 8) (v60 : mword 64) (k' : nat),
         ((⌜ callee_saved m M /\ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' /\
-             (M !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64) ⌝ ∗
+             (M !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64) /\
+             (* the event count argstr handed back (permit sweep L1b) *)
+             (pv_ev (us_V U) <= k')%nat ⌝ ∗
            sie_cap_gpr KT1 M K b (proc_addr jp) ∗
            cpu_own 0 eb (proc_addr jp) b lks ∗
            pc_is (ret_pc (m !!! Regidx Rra : mword 64)) ∗
-           proc_priv γf (proc_addr jp) pid (us_upt U P'))
+           proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P'))
          ∨
          (⌜ sx_sp (m !!! Regidx csp_rs1 : mword 64) M /\
             (M !!! Regidx Rs0 : mword 64) = (m !!! Regidx csp_rs1 : mword 64) /\
@@ -983,11 +985,12 @@ Section SysExecHead.
                ([SpecSysExec.exec_path_of]). *)
             copyinstr_got (us_M U) v0 pfun plen /\
             sx_alp (m !!! Regidx csp_rs1 : mword 64) /\
-            sx_ala (m !!! Regidx csp_rs1 : mword 64) ⌝ ∗
+            sx_ala (m !!! Regidx csp_rs1 : mword 64) /\
+            (pv_ev (us_V U) <= k')%nat ⌝ ∗
           pc_is (mword_of_int (SX + 0x28) : mword 64) ∗
           sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
           cpu_own 0 eb (proc_addr jp) b lks ∗
-          proc_priv γf (proc_addr jp) pid (us_upt U P') ∗
+          proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') ∗
           (* the frame: ra and s0 spilled, s1..s7 and slot 10 still free,
              the path buffer holding its NUL-terminated string, the argv
              array untouched, and the two out-parameter cells *)
@@ -1317,7 +1320,7 @@ Section SysExecHead.
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
-    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hextz Hcg Hcnt Hpc Hpriv Hbuf %Hret %Hgot0".
+    iIntros (CID13 Hq13 M11 P' bnew kev) "%Hcs11 %Hextz %Hkev Hcg Hcnt Hpc Hpriv Hbuf %Hret %Hgot0".
     pose proof Hextz as Hext.
     iEval (rewrite HM10a1) in "Hbuf".
     assert (Hpc020 : ret_pc (M10 !!! Regidx Rra : mword 64)
@@ -1400,7 +1403,7 @@ Section SysExecHead.
       iDestruct (cpu_own_transport CID13 CID16 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hout" $! CID16 with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! M13 P' k bnew (fun j => bnew (S k + j)%nat) u60).
+      iApply ("Hout" $! M13 P' k bnew (fun j => bnew (S k + j)%nat) u60 kev).
       iRight.
       (* the relay lands: argstr's content clause, keyed on the answer, at
          the [k] the answer names *)
@@ -1408,7 +1411,7 @@ Section SysExecHead.
         by (exact (Hgot0 k Hklt Hka0)).
       iSplitR; [iPureIntro; split_and!;
         [ exact HM13sp | exact HM13s0 | exact HM13thr | exact Hext
-        | exact Hklt | exact Hkstr | exact Hpgot | exact Halp | exact Hala ] |].
+        | exact Hklt | exact Hkstr | exact Hpgot | exact Halp | exact Hala | exact Hkev ] |].
       iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
       iSplitL "Hcnt"; [iExact "Hcnt" |]. iSplitL "Hpriv"; [iExact "Hpriv" |].
       iSplitL "F1"; [iExact "F1" |]. iSplitL "F2"; [iExact "F2" |].
@@ -1461,9 +1464,9 @@ Section SysExecHead.
       iDestruct (cpu_own_transport CID13 CID17 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hout" $! CID17 with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! mf P' 0%nat bnew bnew u60). iLeft.
+      iApply ("Hout" $! mf P' 0%nat bnew bnew u60 kev). iLeft.
       iSplitR; [iPureIntro; split_and!;
-        [ exact Hcsf | exact Hext | rewrite Hfa0; exact HM13a0 ] |].
+        [ exact Hcsf | exact Hext | rewrite Hfa0; exact HM13a0 | exact Hkev ] |].
       iSplitL "Hcg"; [iExact "Hcg" |]. iSplitL "Hcnt"; [iExact "Hcnt" |].
       iSplitL "Hpc"; [iExact "Hpc" | iExact "Hpriv"].
   Qed.
@@ -2930,17 +2933,20 @@ Section SysExecState.
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64)
-      (M : regfile) (P : uptd) (i : nat)
+      (M : regfile) (P : uptd) (k : nat) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (uvf : nat -> mword 64)
       (pcv : mword 64) : iProp Σ :=
-    (⌜ (i < 32)%nat /\ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P /\ sx_ok pg alen afun i /\
+    (⌜ (i < 32)%nat /\ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P /\
+       (* the block's event count: each round's fetches lend it (permit
+          sweep L1b) *)
+       (pv_ev (us_V U) <= k)%nat /\ sx_ok pg alen afun i /\
        sx_avok (us_M U) uav uvf alen afun i /\
        sx_regs sp0 m M i ⌝ ∗
      pc_is pcv ∗
      sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) b lks ∗
-     proc_priv γf (proc_addr jp) pid (us_upt U P) ∗
+     proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k)) P) ∗
      sx_carry sp0 m plen pfun rest ∗
      (pa_stk sp0 59) ↦₈[KT1] uav ∗
      (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
@@ -2953,14 +2959,15 @@ Section SysExecState.
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64)
-      (M : regfile) (P : uptd) (t : nat)
+      (M : regfile) (P : uptd) (k : nat) (t : nat)
       (pg : nat -> mword 64) (afun : nat -> nat -> bv 8) : iProp Σ :=
-    (⌜ (t <= 32)%nat /\ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P /\ sx_pgok pg t /\
+    (⌜ (t <= 32)%nat /\ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P /\
+       (pv_ev (us_V U) <= k)%nat /\ sx_pgok pg t /\
        sx_bregs sp0 m M ⌝ ∗
      pc_is (mword_of_int (SX + 0x92) : mword 64) ∗
      sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) ∗
      cpu_own 0 eb (proc_addr jp) b lks ∗
-     proc_priv γf (proc_addr jp) pid (us_upt U P) ∗
+     proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k)) P) ∗
      sx_carry sp0 m plen pfun rest ∗
      (pa_stk sp0 59) ↦₈[KT1] uav ∗
      (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) ∗
@@ -2972,26 +2979,27 @@ Section SysExecState.
   Lemma sx_body_intro (γf : gname) (jp : nat) (pid : mword 32) (U : ustate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
-      (uav : mword 64) (M : regfile) (P : uptd) (i : nat)
+      (uav : mword 64) (M : regfile) (P : uptd) (k : nat) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (uvf : nat -> mword 64)
       (pcv : mword 64) :
-    (i < 32)%nat -> uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P -> sx_ok pg alen afun i ->
+    (i < 32)%nat -> uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P ->
+    (pv_ev (us_V U) <= k)%nat -> sx_ok pg alen afun i ->
     sx_avok (us_M U) uav uvf alen afun i ->
     sx_regs sp0 m M i ->
     pc_is pcv -∗
     sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
-    proc_priv γf (proc_addr jp) pid (us_upt U P) -∗
+    proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k)) P) -∗
     sx_carry sp0 m plen pfun rest -∗
     (pa_stk sp0 59) ↦₈[KT1] uav -∗
     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv0 sp0 i pg -∗
     sx_pages pg afun 0 i -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-            M P i pg alen afun uvf pcv.
+            M P k i pg alen afun uvf pcv.
   Proof using .
-    intros H1 H2 H3 H4 H5.
+    intros H1 H2 H6 H3 H4 H5.
     iIntros "Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Harr Hpgs". rewrite /sx_body.
     iSplitR; [iPureIntro; split_and!; assumption |].
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
@@ -3004,22 +3012,23 @@ Section SysExecState.
   Lemma sx_bad_intro (γf : gname) (jp : nat) (pid : mword 32) (U : ustate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
-      (uav : mword 64) (M : regfile) (P : uptd) (t : nat)
+      (uav : mword 64) (M : regfile) (P : uptd) (k : nat) (t : nat)
       (pg : nat -> mword 64) (afun : nat -> nat -> bv 8) :
-    (t <= 32)%nat -> uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P -> sx_pgok pg t ->
+    (t <= 32)%nat -> uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P ->
+    (pv_ev (us_V U) <= k)%nat -> sx_pgok pg t ->
     sx_bregs sp0 m M ->
     pc_is (mword_of_int (SX + 0x92) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
-    proc_priv γf (proc_addr jp) pid (us_upt U P) -∗
+    proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k)) P) -∗
     sx_carry sp0 m plen pfun rest -∗
     (pa_stk sp0 59) ↦₈[KT1] uav -∗
     (∃ w : mword 64, (pa_stk sp0 60) ↦₈[KT1] w) -∗
     sx_argv0 sp0 t pg -∗
     sx_pages pg afun 0 t -∗
-    sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav M P t pg afun.
+    sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav M P k t pg afun.
   Proof using .
-    intros H1 H2 H3 H4.
+    intros H1 H2 H5 H3 H4.
     iIntros "Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Harr Hpgs". rewrite /sx_bad.
     iSplitR; [iPureIntro; split_and!; assumption |].
     iSplitL "Hpc"; [iExact "Hpc" |]. iSplitL "Hcg"; [iExact "Hcg" |].
@@ -3108,7 +3117,7 @@ Section SysExecStep.
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64)
-      (M : regfile) (P : uptd) (i : nat)
+      (M : regfile) (P : uptd) (kc : nat) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (uvf : nat -> mword 64) :
     (K_sys_exec <= K)%nat ->
@@ -3116,16 +3125,16 @@ Section SysExecStep.
     kernel_text -∗
     kalloc_env fsc_kalloc None -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-            M P i pg alen afun uvf (mword_of_int (SX + 0x56) : mword 64) -∗
+            M P kc i pg alen afun uvf (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       (* this round's fetchaddr and fetchstr fault user pages in: the
          descriptor grows, the image does not *)
-      ∀ (M' : regfile) (P' : uptd) (i' : nat)
+      ∀ (M' : regfile) (P' : uptd) (k' : nat) (i' : nat)
         (pg' : nat -> mword 64) (alen' : nat -> nat)
         (afun' : nat -> nat -> bv 8) (uvf' : nat -> mword 64),
         ((⌜i' = S i⌝ ∗
           sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-                  M' P' i' pg' alen' afun' uvf'
+                  M' P' k' i' pg' alen' afun' uvf'
                   (mword_of_int (SX + 0x56) : mword 64))
          (* THE BREAK CARRIES THE TERMINATING NULL.  The [c.beqz] at +0x06e
             IS the test on the word this round read at [uargv + 8i], so the
@@ -3134,10 +3143,10 @@ Section SysExecStep.
          ∨ (⌜uimg_word_at (us_M U) (uint (add_vec_int uav (8 * Z.of_nat i')))
                 (mword_of_int 0 : mword 64)⌝ ∗
             sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-                    M' P' i' pg' alen' afun' uvf'
+                    M' P' k' i' pg' alen' afun' uvf'
                     (mword_of_int (SX + 0xb6) : mword 64))
          ∨ sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav
-                  M' P' i' pg' afun') -∗
+                  M' P' k' i' pg' afun') -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -3145,7 +3154,7 @@ Section SysExecStep.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
     iIntros "#Htext #Hka Hst Hout".
     rewrite /sx_body.
-    iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %Havok & %HR) & Hpc & Hcg & Hcnt & Hpriv
+    iDestruct "Hst" as "((%Hi32 & %Hext & %Hkev & %Hok & %Havok & %HR) & Hpc & Hcg & Hcnt & Hpriv
                          & Hcarry & F59 & F60 & Harr & Hpgs)".
     iAssert (kalloc_env fsc_kalloc None) as "#Hka2"; [iExact "Hka" |].
     iDestruct "Hka2" as (γk) "(#Hlk & #Hav)".
@@ -3264,11 +3273,17 @@ Section SysExecStep.
     iDestruct (cpu_own_transport CID0 CID5 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Fetchaddr.wp_fetchaddr_sconf fsc_kalloc γf N5 (K - 60)%nat eb (proc_addr jp)
-              pid (us_upt U P) u0 b lks Kfa
+              pid (us_upt (upd_usV U (upd_ev (us_V U) kc)) P) u0 b lks Kfa
               with "Hcg Hcnt Htext Hpc Hpriv Hka F60").
-    iIntros (CID6 Hq6 mf Pa) "%Hcsa %Hexta Hcg Hcnt Hpc Hpriv Hfa".
-    assert (Hupa : us_upt (us_upt U P) Pa = us_upt U Pa) by reflexivity.
+    iIntros (CID6 Hq6 mf Pa ka) "%Hcsa %Hexta %Hkea Hcg Hcnt Hpc Hpriv Hfa".
+    (* fetchaddr handed the block's counter back at [ka] (permit sweep L1b) *)
+    assert (Hupa : us_upt (upd_usV (us_upt (upd_usV U (upd_ev (us_V U) kc)) P)
+                              (upd_ev (us_V (us_upt (upd_usV U (upd_ev (us_V U) kc)) P)) ka)) Pa
+                   = us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa)
+      by (destruct U as [Vx Mx]; destruct Vx; reflexivity).
     iEval (rewrite Hupa) in "Hpriv".
+    assert (Hkea' : (pv_ev (us_V U) <= ka)%nat)
+      by (destruct U as [Vx Mx]; destruct Vx; cbn in Hkea, Hkev |- *; lia).
     assert (Hexta' : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pa)
       by (apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U)) P Pa);
           [exact Hext | exact Hexta]).
@@ -3298,9 +3313,9 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf Pa i pg alen afun uvf). iRight. iRight.
+      iApply ("Hout" $! mf Pa ka i pg alen afun uvf). iRight. iRight.
       iApply (sx_bad_intro (CID0 := CID7) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                mf Pa i pg afun ltac:(lia) Hexta'
+                mf Pa ka i pg afun ltac:(lia) Hexta' Hkea'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m mf i HR6)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
       iExists u0. iExact "F60". }
@@ -3310,7 +3325,7 @@ Section SysExecStep.
        here. *)
     destruct Hfa2 as [Hr Hfok].
     iDestruct "F60" as (u1) "[F60 %Hgot1]".
-    change (us_M (us_upt U P)) with (us_M U) in Hgot1.
+    change (us_M (us_upt (upd_usV U (upd_ev (us_V U) kc)) P)) with (us_M U) in Hgot1.
     rewrite HN5a0 in Hgot1.
     destruct Hr as [Hr0 | Hrm1]; last first.
     { (* -1 again: the same [bad:] *)
@@ -3326,9 +3341,9 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf Pa i pg alen afun uvf). iRight. iRight.
+      iApply ("Hout" $! mf Pa ka i pg alen afun uvf). iRight. iRight.
       iApply (sx_bad_intro (CID0 := CID7) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                mf Pa i pg afun ltac:(lia) Hexta'
+                mf Pa ka i pg afun ltac:(lia) Hexta' Hkea'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m mf i HR6)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
       iExists u1. iExact "F60". }
@@ -3387,7 +3402,7 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID9 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! Q1 Pa i pg alen afun uvf). iRight. iLeft.
+      iApply ("Hout" $! Q1 Pa ka i pg alen afun uvf). iRight. iLeft.
       (* THE EXIT TEST IS THE READING.  [Hgot1] says the word this round
          fetched at [uargv + 8i] IS the process's, and the branch was taken
          because that word is zero -- which is [exec_args_of]'s [avf na = 0]
@@ -3395,8 +3410,8 @@ Section SysExecStep.
       iSplitR.
       { iPureIntro. rewrite -Hu1z. exact (Hgot1 Hr0). }
       iApply (sx_body_intro (CID0 := CID9) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                Q1 Pa i pg alen afun uvf (mword_of_int (SX + 0xb6) : mword 64)
-                Hi32 Hexta' Hok Havok HRq1
+                Q1 Pa ka i pg alen afun uvf (mword_of_int (SX + 0xb6) : mword 64)
+                Hi32 Hexta' Hkea' Hok Havok HRq1
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
       iExists u1. iExact "F60". }
     (* ---- a real pointer: allocate a page for its string ---- *)
@@ -3502,9 +3517,9 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID14 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID11 CID14 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! Q3 Pa i pg alen afun uvf). iRight. iRight.
+      iApply ("Hout" $! Q3 Pa ka i pg alen afun uvf). iRight. iRight.
       iApply (sx_bad_intro (CID0 := CID14) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                Q3 Pa i pg afun ltac:(lia) Hexta'
+                Q3 Pa ka i pg afun ltac:(lia) Hexta' Hkea'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m Q3 i HRq3)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
       iExists u1. iExact "F60". }
@@ -3604,19 +3619,23 @@ Section SysExecStep.
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Fetchstr.wp_fetchstr_sconf KT0 fsc_kalloc γf Q6 (K - 60)%nat 0%nat eb
-              (proc_addr jp) pid (us_upt U Pa) 4096%nat fpg b lks
+              (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
-    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hextsz Hcg Hcnt Hpc Hpriv Hpg %Hfr %Hsgot".
+    iIntros (CID18 Hq18 mg Ps bnew ks) "%Hcsg %Hextsz %Hkes Hcg Hcnt Hpc Hpriv Hpg %Hfr %Hsgot".
     (* WHICH STRING the page now holds: fetchstr relays copyinstr's content
        clause at the address it was handed, which is [u1] -- the very
        pointer this round read out of the argv vector.  The clause is keyed
        on the answer, so it is read back at the [kk] the answer names. *)
     rewrite HQ6a0 in Hsgot.
-    change (us_M (us_upt U Pa)) with (us_M U) in Hsgot.
+    change (us_M (us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa)) with (us_M U) in Hsgot.
     pose proof Hextsz as Hexts.
-    assert (Hups : us_upt (us_upt U Pa) Ps = us_upt U Ps)
+    assert (Hups : us_upt (upd_usV (us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa)
+                              (upd_ev (us_V (us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa)) ks)) Ps
+                   = us_upt (upd_usV U (upd_ev (us_V U) ks)) Ps)
       by (destruct U as [Vx Mx]; destruct Vx; reflexivity).
+    assert (Hkes' : (pv_ev (us_V U) <= ks)%nat)
+      by (destruct U as [Vx Mx]; destruct Vx; cbn in Hkes, Hkea' |- *; lia).
     iEval (rewrite Hups) in "Hpriv".
     assert (Hexts' : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Ps)
       by (apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U)) Pa Ps);
@@ -3665,9 +3684,9 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID19 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID19 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mg Ps (S i) pg' alen afun' uvf). iRight. iRight.
+      iApply ("Hout" $! mg Ps ks (S i) pg' alen afun' uvf). iRight. iRight.
       iApply (sx_bad_intro (CID0 := CID19) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                mg Ps (S i) pg' afun' ltac:(lia) Hexts'
+                mg Ps ks (S i) pg' afun' ltac:(lia) Hexts' Hkes'
                 (sx_pgok_push pg i (mr !!! Regidx Ra0 : mword 64)
                    (sx_ok_pgok pg alen afun i Hok) Hpnz Hpv)
                 (sx_regs_bregs sp0 m mg i HRg)
@@ -3779,10 +3798,10 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! R2 Ps (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).
+      iApply ("Hout" $! R2 Ps ks (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).
       iRight. iRight.
       iApply (sx_bad_intro (CID0 := CID22) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-                R2 Ps (S i) pg' afun' ltac:(lia) Hexts'
+                R2 Ps ks (S i) pg' afun' ltac:(lia) Hexts' Hkes'
                 (sx_ok_pgok pg' (sx_upd alen i kk) afun' (S i) Hokpush)
                 (sx_regs_bregs sp0 m R2 (S i) HRR)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
@@ -3804,12 +3823,12 @@ Section SysExecStep.
     iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
     iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply ("Hout" $! R2 Ps (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).
+    iApply ("Hout" $! R2 Ps ks (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)).
     iLeft. iSplitR; [iPureIntro; reflexivity |].
     iApply (sx_body_intro (CID0 := CID22) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
-              R2 Ps (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)
+              R2 Ps ks (S i) pg' (sx_upd alen i kk) afun' (sx_upd uvf i u1)
               (mword_of_int (SX + 0x56) : mword 64)
-              ltac:(lia) Hexts' Hokpush Havokpush HRR
+              ltac:(lia) Hexts' Hkes' Hokpush Havokpush HRR
               with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
     iExists u1. iExact "F60".
   Qed.
@@ -3830,31 +3849,31 @@ Section SysExecStep.
       (uav : mword 64) :
     (K_sys_exec <= K)%nat ->
     locks_below lks "kmem" ->
-    forall (W : nat) (M : regfile) (P : uptd) (i : nat)
+    forall (W : nat) (M : regfile) (P : uptd) (k : nat) (i : nat)
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (uvf : nat -> mword 64),
     (32 - i <= W)%nat ->
     kernel_text -∗
     kalloc_env fsc_kalloc None -∗
     sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-            M P i pg alen afun uvf (mword_of_int (SX + 0x56) : mword 64) -∗
+            M P k i pg alen afun uvf (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M' : regfile) (P' : uptd) (i' : nat)
+      ∀ (M' : regfile) (P' : uptd) (k' : nat) (i' : nat)
         (pg' : nat -> mword 64) (alen' : nat -> nat)
         (afun' : nat -> nat -> bv 8) (uvf' : nat -> mword 64),
         ((⌜uimg_word_at (us_M U) (uint (add_vec_int uav (8 * Z.of_nat i')))
               (mword_of_int 0 : mword 64)⌝ ∗
           sx_body γf jp pid U K eb b lks sp0 m plen pfun rest uav
-                  M' P' i' pg' alen' afun' uvf'
+                  M' P' k' i' pg' alen' afun' uvf'
                   (mword_of_int (SX + 0xb6) : mword 64))
          ∨ sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav
-                  M' P' i' pg' afun') -∗
+                  M' P' k' i' pg' afun') -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros HK Hlb.
     intro W. revert CID0.
-    induction W as [| W IH]; intros CID0 M P i pg alen afun uvf Hfuel.
+    induction W as [| W IH]; intros CID0 M P k i pg alen afun uvf Hfuel.
     { (* no fuel is not a case: the head is entered only at [i < 32] *)
       iIntros "#Htext #Hka Hst Hout". rewrite /sx_body.
       iDestruct "Hst" as "((%Hi32 & _) & _)". exfalso. lia. }
@@ -3862,22 +3881,22 @@ Section SysExecStep.
     iAssert (⌜(i < 32)%nat⌝)%I as "%Hi32".
     { rewrite /sx_body. iDestruct "Hst" as "((%H & _) & _)". iPureIntro. exact H. }
     iApply (sx_step (CID0 := CID0) γf jp pid U K eb b lks sp0 m plen
-              pfun rest uav M P i pg alen afun uvf HK Hlb
+              pfun rest uav M P k i pg alen afun uvf HK Hlb
               with "Htext Hka Hst [Hout]").
-    iIntros (CIDn Hqn M' P' i' pg' alen' afun' uvf')
+    iIntros (CIDn Hqn M' P' k' i' pg' alen' afun' uvf')
       "[[%Hsi Hhead] | [[%Hnul Hbrk] | Hbad]]".
     - (* the BACK EDGE, re-entered at the hart the iteration ended on *)
       assert (Hcr : b = false \/ proc_addr jp = zero_reg ->
                 (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDn b (proc_addr jp) _ Hcr
                    with "Hout") as "Hout".
-      iApply (IH CIDn M' P' i' pg' alen' afun' uvf' ltac:(lia)
+      iApply (IH CIDn M' P' k' i' pg' alen' afun' uvf' ltac:(lia)
                 with "Htext Hka Hhead Hout").
     - iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! M' P' i' pg' alen' afun' uvf'). iLeft.
+      iApply ("Hout" $! M' P' k' i' pg' alen' afun' uvf'). iLeft.
       iSplitR; [iPureIntro; exact Hnul | iExact "Hbrk"].
     - iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! M' P' i' pg' alen' afun' uvf'). iRight. iExact "Hbad".
+      iApply ("Hout" $! M' P' k' i' pg' alen' afun' uvf'). iRight. iExact "Hbad".
   Qed.
 
 End SysExecStep.
@@ -4289,7 +4308,7 @@ Section SysExecBadTail.
       (γf : gname) (jp : nat) (pid : mword 32) (U : ustate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
-      (uav : mword 64) (M : regfile) (P : uptd) (t : nat)
+      (uav : mword 64) (M : regfile) (P : uptd) (k : nat) (t : nat)
       (pg : nat -> mword 64) (afun : nat -> nat -> bv 8) :
     (K_sys_exec <= K)%nat ->
     locks_below lks "kmem" ->
@@ -4298,16 +4317,17 @@ Section SysExecBadTail.
     sx_alp sp0 ->
     kernel_text -∗
     kalloc_env fsc_kalloc None -∗
-    sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav M P t pg afun -∗
+    sx_bad γf jp pid U K eb b lks sp0 m plen pfun rest uav M P k t pg afun -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P⌝ -∗
+        ⌜(pv_ev (us_V U) <= k)%nat⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv γf (proc_addr jp) pid (us_upt U P) -∗
+        proc_priv γf (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) k)) P) -∗
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -4315,7 +4335,7 @@ Section SysExecBadTail.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
     iIntros "#Htext #Hka Hst Hout".
     rewrite /sx_bad.
-    iDestruct "Hst" as "((%Ht32 & %Hext & %Hpgok & %HB) & Hpc & Hcg & Hcnt &
+    iDestruct "Hst" as "((%Ht32 & %Hext & %Hkev & %Hpgok & %HB) & Hpc & Hcg & Hcnt &
                          Hpriv & Hcarry & F59 & F60 & Harr & Hpgs)".
     destruct HB as (Hsp & Hthr & Hs0 & Hs1 & Hs4).
     iDestruct (sx_carry_open sp0 m plen pfun rest with "Hcarry")
@@ -4399,10 +4419,11 @@ Section SysExecBadTail.
       iSpecialize ("Hout" $! CID5 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID2 CID5 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf with "[%] [%] [%] Hcg Hcnt Hpc Hpriv").
+      iApply ("Hout" $! mf with "[%] [%] [%] [%] Hcg Hcnt Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hfa0 HM4a0. exact HM3a0. }
       { exact Hext. }
+      { exact Hkev. }
     - (* the fall-through at +0x0a4: the same, plus a [c.j] to the epilogue *)
       iEval (rewrite Hpf) in "Hpc".
       rewrite (_ : (SX + 0x96 + 14)%Z = (SX + 0xa4)%Z); [| lia].
@@ -4453,10 +4474,11 @@ Section SysExecBadTail.
       iSpecialize ("Hout" $! CID6 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID2 CID6 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf with "[%] [%] [%] Hcg Hcnt Hpc Hpriv").
+      iApply ("Hout" $! mf with "[%] [%] [%] [%] Hcg Hcnt Hpc Hpriv").
       { exact Hcsf. }
       { rewrite Hfa0 HM4a0. exact HM3a0. }
       { exact Hext. }
+      { exact Hkev. }
   Qed.
 
 End SysExecBadTail.

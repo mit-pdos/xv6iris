@@ -2258,7 +2258,10 @@ Section BootCarveMain.
                  (* ...and the mask, the BSS zero (userinit stores [secc_all]
                     into the first process; every other slot's mask comes
                     from kfork's copy) *)
-                 (zero_reg : mword 64)),
+                 (zero_reg : mword 64)
+                 (* ...and the event counter, junk until the seal writes
+                    the boot count (design ni-strong-instance.md §7) *)
+                 0),
         (mword_of_int 0 : mword 32).
       cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg
            pv_lazy pv_secc].

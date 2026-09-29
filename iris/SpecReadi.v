@@ -438,9 +438,13 @@ Definition wp_readi_sconf_body
          untouched tail still holds what the caller put there.  The pid
          fraction goes back the way it came -- with the kernel arm's buffer,
          or inside the user arm's block. *)
+      (* ...AT A LATER EVENT COUNT on the user arm (permit sweep L1b): the
+         block's counter is lent to either_copyout, which may step it.  The
+         kernel arm lends nothing and its block comes back verbatim. *)
       (if user
-       then proc_priv_core pj pidv
-              (upd_usM (us_upt U P')
+       then ∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗
+            proc_priv_core pj pidv
+              (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
                  (umem_wr (us_M U) dst tot (rd_bytes data off)))
        else ([∗ list] i ∈ seq 0 n,
               pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗

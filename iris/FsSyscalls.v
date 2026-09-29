@@ -299,16 +299,19 @@ Definition wp_sys_mkdir_friendly_body
   wp_next true pj (fun (CID : CpuId) =>
   (* the image moves: argstr's fetchstr faults user pages in -- milestone J
      item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (k' : nat),
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* the event counter (permit sweep L1b): argstr lends it, so the
+         block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       ⌜ns' = ns⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       fs_res ns' dqb dqs dqbs dqn -∗
-      proc_priv γf pj pid (us_upt U P') -∗
+      proc_priv γf pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 
@@ -393,17 +396,18 @@ Module FsSysMkdir (M : SYSMKDIR).
     { rewrite /cpu_claim_ext. done. }
     { iApply (SpecSysMkdir.mkdir_au_at_unit with "Hsup"). }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf ns' P')
-      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
+    iIntros (mf ns' P' kev)
+      "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret _".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf ns' P'
-              with "[%] [%] [%] [%] Hcg Hown Hpc
+    iApply ("Hcont" $! mf ns' P' kev
+              with "[%] [%] [%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpriv").
     - exact Hret.
     - exact Hcs.
     - exact Hupt.
+    - exact Hkev.
     - exact Hns'.
     - rewrite /fs_res. iFrame.
   Qed.
@@ -489,15 +493,18 @@ Definition wp_sys_chdir_friendly_body
   proc_priv γf pj pid U -∗
   wp_next true pj (fun (CID : CpuId) =>
   (* the image moves: argstr's fetchstr faults user pages in *)
-  ∀ (mf : regfile) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* the event counter (permit sweep L1b): argstr lends it, so the
+         block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
       fs_res 2 dqb dqs dqbs dqn -∗
-      sys_chdir_post γf pj pid (us_upt U P')
+      sys_chdir_post γf pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
@@ -559,17 +566,18 @@ Module FsSysChdir (M : SYSCHDIR).
     { rewrite /cpu_claim_ext. done. }
     { iApply fsabs_chdir_pre. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf P')
-      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Harms".
+    iIntros (mf P' kev)
+      "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Harms".
     (* THE BRIDGE, once: the arms imply the blanket the friendly post is. *)
     iDestruct (chdir_arms_landed with "Harms") as "Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf P'
-              with "[%] [%] Hcg Hown Hpc
+    iApply ("Hcont" $! mf P' kev
+              with "[%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpost").
     - exact Hcs.
     - exact Hupt.
+    - exact Hkev.
     - rewrite /fs_res. iFrame.
   Qed.
 

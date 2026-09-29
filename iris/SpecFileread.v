@@ -1945,7 +1945,8 @@ Definition wp_fileread_sconf_body
        existential.  A caller reads its own untouched bytes back with
        [UserPtTree.umem_wr_lookup_out], which is what the shared shape is
        for. *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8)
+      (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
@@ -1960,12 +1961,15 @@ Definition wp_fileread_sconf_body
       ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
        \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): every arm lends the block's counter to a copy, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
       proc_priv_core pj pidv
-        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P') (umem_wr (us_M U) addr d bs)) -∗
       fileread_env_out fn st -∗
       (* ---- THE ARMED OUTPUT, KEYED ON [st] ([fileread_arms]) ----
          The blanket [⌜fileread_ret n r⌝], and beside it what the arm the

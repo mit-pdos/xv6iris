@@ -305,7 +305,7 @@ Section CwBodies.
       (Pe : uptd) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        (* the image does not move: either_copyin is same-[U] *)
-       ∀ (mf : regfile) (r : Z) (P' : uptd),
+       ∀ (mf : regfile) (r : Z) (P' : uptd) (kv : nat),
          ⌜callee_saved m0 mf⌝ -∗
          ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
@@ -317,10 +317,13 @@ Section CwBodies.
                 (uint (add_vec_int (m0 !!! Regidx (mword_of_int 11 : mword 5))
                          (Z.of_nat d)))⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
+         (* THE EVENT COUNTER (permit sweep L1b): each round lends the
+            block's counter to either_copyin *)
+         ⌜(pv_ev (us_V U) <= kv)%nat⌝ -∗
          sie_cap_gpr KT1 mf av true (proc_addr jp) -∗
          cpu_own 0%nat eb (proc_addr jp) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
-         proc_priv_core (proc_addr jp) pid (us_upt U P') -∗
+         proc_priv_core (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) kv)) P') -∗
          (* THE CALLER'S CURSOR AT THE RETURNED COUNT (diff item 2) *)
          Q (Z.to_nat r) -∗
          mWP (Loop : expr riscv_lang)))%I.
@@ -328,17 +331,20 @@ Section CwBodies.
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
   Lemma cw_ret_weaken `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (pid : mword 32) (U : ustate) (P1 : uptd) (n : Z) (lks : gset string)
-      (Q : nat -> iProp Σ) (Pe : uptd) :
+      (eb : bool) (pid : mword 32) (U : ustate) (P1 : uptd) (k1 : nat) (n : Z)
+      (lks : gset string) (Q : nat -> iProp Σ) (Pe : uptd) :
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
+    (* ...and the count only rose (permit sweep L1b) *)
+    (pv_ev (us_V U) <= k1)%nat ->
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks Q Pe -∗
-    cw_ret (CID0 := CID0) jp m0 av eb pid (us_upt U P1) n lks Q Pe.
+    cw_ret (CID0 := CID0) jp m0 av eb pid (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1)
+      n lks Q Pe.
   Proof using .
-    intro Hext. rewrite /cw_ret /wp_next.
+    intros Hext Hk1. rewrite /cw_ret /wp_next.
     iIntros "H" (CID) "%Hg".
     iSpecialize ("H" $! CID with "[%]"); [exact Hg|].
-    iIntros (mf r P') "%Hcs %Hx %Hr %Hsh %Ha0".
-    iApply ("H" $! mf r P' with "[%] [%] [%] [%] [%]").
+    iIntros (mf r P' kv) "%Hcs %Hx %Hr %Hsh %Ha0 %Hkv".
+    iApply ("H" $! mf r P' kv with "[%] [%] [%] [%] [%] [%]").
     - exact Hcs.
     - exact (uptd_ext_sz_trans _ _ _ _ Hext Hx).
     - exact Hr.
@@ -346,6 +352,7 @@ Section CwBodies.
          weakening does not move (lane TRAP-ROWS, T1) *)
       exact Hsh.
     - exact Ha0.
+    - cbn in Hkv. lia.
   Qed.
 
   (* =================================================================== *)
@@ -519,15 +526,17 @@ Section CwBodies.
                  with "Hcnt") as "Hcnt".
     rewrite /cw_ret.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E5 r (pv_upt (us_V U)) with "[%] [%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv] Hrcpt").
+    iApply ("Hcont" $! E5 r (pv_upt (us_V U)) (pv_ev (us_V U))
+              with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv] Hrcpt").
     - exact Hcs.
     - apply uptd_ext_sz_refl.
     - exact Hr.
     - exact Hshort.
     - exact HE5a0.
+    - lia.
     - (* the round trip that moved nothing: [us_upt_id] folds the
          descriptor write, and there is no image write left to fold. *)
-      rewrite us_upt_id. iExact "Hpriv".
+      rewrite upd_ev_id upd_usV_id us_upt_id. iExact "Hpriv".
   Qed.
 
   (* the whole of what the pop needs: the nine spill slots plus the four the
@@ -1259,7 +1268,8 @@ Section CwBodies.
       iDestruct "Hpost" as "(%Hrv & Hpv & Hb1)".
       (* either_copyin is SAME-image, so the block comes back at [us_M U]
          and consolewrite's loop carries no moved image at all. *)
-      iDestruct "Hpv" as (P1) "(%Hext1 & Hpriv)".
+      iDestruct "Hpv" as (P1 k1) "(%Hext1 & %Hk1 & Hpriv)".
+      cbn in Hk1.
       (* the content seam (RULING A): the run comes back with its equation
          to the process's image, guarded by the [0] exit. *)
       iDestruct "Hb1" as (fb') "[%Hfbc Hb1]".
@@ -1385,7 +1395,7 @@ Section CwBodies.
         assert (HD3ra : D3 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CW + 0x54) : mword 64) 4)
           by (rewrite /D3 upd_eq; reflexivity).
-        iDestruct (cw_priv_pid pj pid (us_upt U P1) with "Hpriv") as "[Hpid Hpback]".
+        iDestruct (cw_priv_pid pj pid (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1) with "Hpriv") as "[Hpid Hpback]".
         iDestruct (cpu_own_transport CIDc7 CIDcb 0%nat eb pj true 
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         (* THE CHUNK'S CONTENT (RULING A).  We are on the arm where
@@ -1525,11 +1535,11 @@ Section CwBodies.
           { iApply (cnwi_5c with "Ht"). }
           iApply bi.later_intro. iIntros (CIDce Hsce) "Hcg Hpc".
           iEval (rewrite Htgt) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks Q Pe Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 k1 n lks Q Pe Hext1 Hk1
                        with "Hcont") as "Hcont".
           iDestruct (cons_out_chain_cursor with "Hrcpt'") as "Hrcpt'".
           iApply (cw_exit_done (CID := CIDce) CID0 jp m0 F1 av eb sp0 pid
-                    (us_upt U P1) n (nn + i)%Z lks Q Pe
+                    (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1) n (nn + i)%Z lks Q Pe
                     Hm0sp ltac:(destruct HF1regs as (Y1 & _); exact Y1)
                     HF1s1 HF1s11 ltac:(lia)
                     (* the loop RAN OUT: [r = n], so there is no short
@@ -1551,12 +1561,12 @@ Section CwBodies.
           assert (Pbk : add_vec_int (mword_of_int (CW + 0x5c) : mword 64) 4
                         = mword_of_int (CW + 0x60)) by pcw.
           iEval (rewrite Pbk) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n _ Q Pe Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 k1 n _ Q Pe Hext1 Hk1
                        with "Hcont") as "Hcont".
-          iApply (IH CIDce F1 (us_upt U P1) (nn + i)%Z
+          iApply (IH CIDce F1 (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1) (nn + i)%Z
                     ltac:(lia) ltac:(lia)
                     (* the image tie survives the descriptor's move by
-                       conversion: [us_M (us_upt U P1)] IS [us_M U]. *)
+                       conversion: [us_M (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1)] IS [us_M U]. *)
                     HMu
                     (* ...and the descriptor's move composes (T1) *)
                     ltac:(apply (uptd_ext_trans Pe (pv_upt (us_V U)) P1 Hpext);
@@ -1581,11 +1591,11 @@ Section CwBodies.
         { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
           iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
-        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks Q Pe Hext1
+        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 k1 n lks Q Pe Hext1 Hk1
                      with "Hcont") as "Hcont".
         iDestruct (cons_out_chain_cursor with "Hrcpt") as "Hrcpt".
         iApply (cw_exit_break (CID := CIDc8) CID0 jp m0 mf1 av eb sp0 pid
-                  (us_upt U P1) n i lks Q Pe
+                  (us_upt (upd_usV U (upd_ev (us_V U) k1)) P1) n i lks Q Pe
                   Hm0sp Csp Cs1 Hs11c ltac:(lia)
                   (* THE SHORT ANSWER'S REASON (lane TRAP-ROWS, T1).
                      [Hrm1]'s right half is the failing byte at

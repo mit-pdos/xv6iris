@@ -71,6 +71,7 @@ Require Import ProcPtOwn.
 Require Import SpecUvmcreate SpecMappages SpecUvmfree SpecUvmunmap SpecProcPagetable.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -134,7 +135,7 @@ Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
 
 Section ProofProcPagetable.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -228,15 +229,18 @@ Section ProofProcPagetable.
 
   Lemma wp_proc_pagetable_core (γa : gname) (γk : gname * gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
-      (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks.
+      (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks kl.
   Proof using .
     cbv beta delta [wp_proc_pagetable_core_body].
     intros pp tfp ret_tgt Hlvl HK Htfal Htfb Hlkbelow.
     pose proof (ppt_cap_bounds K HK) as (Hc4 & Hc18 & Hc32 & Hc36 & Hc22).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hlend Hcont".
+    (* the lend (permit sweep L2) in the shape every exit hands back *)
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists kl. iFrame "Hlend". done. }
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb2 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
@@ -327,13 +331,14 @@ Section ProofProcPagetable.
           /\ ppt_thr mm me ⌝ -∗
         sie_cap_gpr KT1 me (K - 4)%nat b p -∗
         cpu_own lvl eb p b lks -∗
+        (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k') -∗
         pc_is (mword_of_int (KernelSyms.proc_pagetable + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
         ppt_post γa γk on tfp rv -∗
         mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hc1 Hc2 Hc3 Hc4]" as "EPI".
     { iIntros (CIDe Hse me rv).
-      iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcnt Hpc Htfcell Hpost".
+      iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcnt Hlend Hpc Htfcell Hpost".
       (* the instruction facts must be re-posed INSIDE with FRESH NAMES: the
          outer [iPoseProof]s are spatial and the [with "[...]"] selection
          does not carry them in (claude-notes/durable-notes.md). *)
@@ -441,7 +446,7 @@ Section ProofProcPagetable.
       iDestruct (cpu_own_transport CIDe CID35 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CID35 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E5 with "Hcg Hcnt Hpc Htfcell Hpost [%]").
+      iApply ("Hcont" $! E5 with "Hcg Hcnt Hlend Hpc Htfcell Hpost [%]").
       { (* callee_saved mm E5 *)
         (* the four frame registers are restored explicitly from the stack;
            everything else callee-saved rides the threaded [ppt_thr]. *)
@@ -597,7 +602,7 @@ Section ProofProcPagetable.
       iDestruct (cpu_own_transport CIDuv CIDd1 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("EPI" $! CIDd1 with "[%]"); [wp_next_chain|].
-      iApply ("EPI" $! M1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
+      iApply ("EPI" $! M1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
       { split_and!; [exact HM1sp | exact HM1s1 | exact HM1thr]. }
       { iRight. iFrame "Henv0". iPureIntro; split_and!; [reflexivity |].
         exists 0%nat. split; [lia |].
@@ -715,8 +720,9 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages wants [Hcnt] at CID18. *)
     iDestruct (cpu_own_transport CIDuv CID18 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    iDestruct "Hlend" as (klc1 Hklc1) "Hlend".
     iApply (MP.wp_mappages_sconf KT1 γa γk M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
-              _ Hlvl Hc32
+              _ klc1 Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HM9a3; apply bv_eq; vm_compute; reflexivity)
@@ -725,9 +731,12 @@ Section ProofProcPagetable.
               ltac:(rewrite HM9a3; rewrite uint_unsigned; apply (proj1 (Z.ltb_lt _ _)); vm_compute; reflexivity)
               (pt_rep0_empty b0)
               ltac:(intros i Hi; apply lookup_empty)
-              with "Hcg Hcnt Htext Hpc Hptree Henv").
+              with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDmp1 Hsmp1 mr1 t1 k1 g1) "Hcg Hcnt Hpc Hptree %Hnodes1 Henv %Hcs1 %Hbase1 %Hrep1 %Hmono1 %Hg1miss %Hret1".
+    iIntros (CIDmp1 Hsmp1 mr1 t1 k1 g1) "Hcg Hcnt Hlend Hpc Hptree %Hnodes1 Henv %Hcs1 %Hbase1 %Hrep1 %Hmono1 %Hg1miss %Hret1".
+    iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
     assert (Hretm1 : ret_pc (M9 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x2e)).
     { rewrite /M9 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretm1) in "Hpc".
@@ -823,14 +832,18 @@ Section ProofProcPagetable.
         iDestruct (kalloc_env_at_env with "Henv0") as "#Henv0b".
         iDestruct (cpu_own_transport CIDmp1 CIDa4 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        iDestruct "Hlend" as (klc2 Hklc2) "Hlend".
         iApply (UF.wp_uvmfree_sconf γa T3 b0 ∅ (K - 4)%nat eb p lvl b
-                  _ Hc36 Hlvl HT3a0
+                  _ klc2 Hc36 Hlvl HT3a0
                   ltac:(rewrite HT3a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
-                  with "Hcg Hcnt Htext Hpc Hbare Henv0b").
+                  with "Hcg Hcnt Htext Hpc Hbare Henv0b Hlend").
         all: try lkbelow.
-        iIntros (CIDa5 Hsa5 mr3) "Hcg Hcnt Hpc %Hcsuf".
+        iIntros (CIDa5 Hsa5 mr3) "Hcg Hcnt Hlend Hpc %Hcsuf".
+        iDestruct "Hlend" as (klr2 Hklr2) "Hlend".
+        iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+        { iExists klr2. iFrame "Hlend". iPureIntro. lia. }
         assert (Hret62 : ret_pc (T3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x62)).
         { rewrite HT3ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hret62) in "Hpc".
@@ -867,7 +880,7 @@ Section ProofProcPagetable.
         iDestruct (cpu_own_transport CIDa5 CIDa7 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("EPI" $! CIDa7 with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! U1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
+        iApply ("EPI" $! U1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
         { split_and!; [exact HU1sp | exact HU1s1 | exact HU1thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
             [ reflexivity | exact (ppt_fail_n1 on g1 Hg1 Havz1) ]. } }
@@ -985,8 +998,9 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages#2 wants [Hcnt] at CID27. *)
     iDestruct (cpu_own_transport CIDmp1 CID27 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    iDestruct "Hlend" as (klc3 Hklc3) "Hlend".
     iApply (MP.wp_mappages_sconf KT1 γa γk N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
-              _ Hlvl Hc32
+              _ klc3 Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HN8a3; exact Htfal)
@@ -996,9 +1010,12 @@ Section ProofProcPagetable.
               Hrepm1
               ltac:(intros i Hi; rewrite Hsvpn2; rewrite (ppt_lt1 i Hi);
                     rewrite vpn_at_0; exact ppt_m1_tf)
-              with "Hcg Hcnt Htext Hpc Hptree Henv").
+              with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDmp2 Hsmp2 mr2 t2 k2 g2) "Hcg Hcnt Hpc Hptree %Hnodes2 Henv %Hcs2 %Hbase2 %Hrep2 %Hmono2 %Hg2miss %Hret2".
+    iIntros (CIDmp2 Hsmp2 mr2 t2 k2 g2) "Hcg Hcnt Hlend Hpc Hptree %Hnodes2 Henv %Hcs2 %Hbase2 %Hrep2 %Hmono2 %Hg2miss %Hret2".
+    iDestruct "Hlend" as (klr3 Hklr3) "Hlend".
+    iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+    { iExists klr3. iFrame "Hlend". iPureIntro. lia. }
     assert (Hretm2 : ret_pc (N8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x48)).
     { rewrite /N8 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretm2) in "Hpc".
@@ -1139,17 +1156,21 @@ Section ProofProcPagetable.
         iDestruct (kalloc_env_at_env with "Henv0") as "#Henv0b".
         iDestruct (cpu_own_transport CIDmp2 CIDb8 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        iDestruct "Hlend" as (klc4 Hklc4) "Hlend".
         iApply (UUF.wp_uvmunmap_fixed_sconf γa V7 upt_fixed_tramp b0 ∅ tramp_vpn
                   (K - 4)%nat eb p lvl b
-                  _ Hc22 Hlvl HV7a0
+                  _ klc4 Hc22 Hlvl HV7a0
                   ltac:(rewrite HV7a1; apply bv_eq; vm_compute; reflexivity)
                   HV7a2 HV7a3
                   ltac:(rewrite HV7a1; apply bv_eq; vm_compute; reflexivity)
                   (or_introl eq_refl)
                   ltac:(rewrite HV7a1; rewrite uint_unsigned;
                         apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
-                  with "Hcg Hcnt Htext Hpc Hupt Henv0b").
-        iIntros (CIDb9 Hsb9 mr3) "Hcg Hcnt Hpc %Hcsuu Hupt".
+                  with "Hcg Hcnt Htext Hpc Hupt Henv0b Hlend").
+        iIntros (CIDb9 Hsb9 mr3) "Hcg Hcnt Hlend Hpc %Hcsuu Hupt".
+        iDestruct "Hlend" as (klr4 Hklr4) "Hlend".
+        iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+        { iExists klr4. iFrame "Hlend". iPureIntro. lia. }
         (* dropping the only fixed leaf leaves a BARE table -- uvmfree's *)
         iEval (rewrite upt_fixed_tramp_del_tramp) in "Hupt".
         assert (Hret78 : ret_pc (V7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x78)).
@@ -1208,14 +1229,18 @@ Section ProofProcPagetable.
           by (rewrite /W6 upd_eq; reflexivity).
         iDestruct (cpu_own_transport CIDb9 CIDc3 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
+        iDestruct "Hlend" as (klc5 Hklc5) "Hlend".
         iApply (UF.wp_uvmfree_sconf γa W6 b0 ∅ (K - 4)%nat eb p lvl b
-                  _ Hc36 Hlvl HW6a0
+                  _ klc5 Hc36 Hlvl HW6a0
                   ltac:(rewrite HW6a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
-                  with "Hcg Hcnt Htext Hpc Hupt Henv0b").
+                  with "Hcg Hcnt Htext Hpc Hupt Henv0b Hlend").
         all: try lkbelow.
-        iIntros (CIDc4 Hsc4 mr4) "Hcg Hcnt Hpc %Hcsuf2".
+        iIntros (CIDc4 Hsc4 mr4) "Hcg Hcnt Hlend Hpc %Hcsuf2".
+        iDestruct "Hlend" as (klr5 Hklr5) "Hlend".
+        iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
+        { iExists klr5. iFrame "Hlend". iPureIntro. lia. }
         assert (Hret80 : ret_pc (W6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x80)).
         { rewrite HW6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hret80) in "Hpc".
@@ -1252,7 +1277,7 @@ Section ProofProcPagetable.
         iDestruct (cpu_own_transport CIDc4 CIDc6 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("EPI" $! CIDc6 with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! W7 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
+        iApply ("EPI" $! W7 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hlend Hpc Htfcell []").
         { split_and!; [exact HW7sp | exact HW7s1 | exact HW7thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
             [ reflexivity | exact (ppt_fail_n2 on g1 g2 Hg1 Hg2 Havz2) ]. } }
@@ -1287,7 +1312,7 @@ Section ProofProcPagetable.
                  with "Hcnt") as "Hcnt".
     iSpecialize ("EPI" $! CID28 with "[%]"); [wp_next_chain|].
     iApply ("EPI" $! mr2 (zero_extend' 64 (concat_vec (pt_base t2) (zeros' 12 : mword 12)))
-              with "[%] Hcg Hcnt Hpc Htfcell [Hptree Henv]").
+              with "[%] Hcg Hcnt Hlend Hpc Htfcell [Hptree Henv]").
     { split_and!; [exact Hmr2sp | exact Hs1fin | exact Hmr2thr]. }
     { iLeft. iExists t2. iFrame "Hptree Henv".
       iPureIntro; split_and!;
@@ -1311,28 +1336,28 @@ Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES)
 Module Core := ProcPagetableCore UV MP UF UUF.
 
 Section SealProcPagetable.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_proc_pagetable_sconf (γa : gname) (γk : gname * gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
-      (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks.
+      (p : mword 64) (on : option nat) (b : bool) (lks : gset string) (kl : nat)
+    : wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks kl.
   Proof using .
     cbv beta delta [wp_proc_pagetable_sconf_body].
     intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb Hlkbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
-    iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
-    iApply (Core.wp_proc_pagetable_core γa γk mm tf dqtf lvl K eb p (Some nb) b lks
-              Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv [Hcont]").
+    iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hlend Hcont".
+    iApply (Core.wp_proc_pagetable_core γa γk mm tf dqtf lvl K eb p (Some nb) b lks kl
+              Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv Hlend [Hcont]").
     all: try lkbelow.
-    iIntros (CIDr Hsr mr) "Hcg Hcnt Hpc Htfcell Hpost %Hcs".
+    iIntros (CIDr Hsr mr) "Hcg Hcnt Hlend Hpc Htfcell Hpost %Hcs".
     iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrep & %Hnt & Henv)
                            | (_ & %Hfail & _)]";
       [| destruct Hfail as (n & Hn & Hz);
          exfalso; exact (ppt_fail_refute nb n Hnb Hn Hz)].
     iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mr t with "Hcg Hcnt Hpc Htfcell Hptree [%] [%] [%] Henv [%]").
+    iApply ("Hcont" $! mr t with "Hcg Hcnt Hlend Hpc Htfcell Hptree [%] [%] [%] Henv [%]").
     { exact Hrv. }
     { exact Hrep. }
     { exact Hnt. }

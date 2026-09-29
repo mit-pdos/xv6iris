@@ -66,7 +66,8 @@ Module NameiRootBoot : NAMEI_ROOT_BOOT.
                  1%positive            (* the fd-state name: junk in a dummy *)
                  (zero_reg : mword 64) [] 0 1%positive 1%positive
                  true (* the dummy's lazy bit; lane LAZY-FLAG *)
-                 (zero_reg : mword 64) (* ...and its mask *))
+                 (zero_reg : mword 64) (* ...and its mask *)
+                 0 (* ...and its event counter *))
               HK Hn Hdev Hnib Hlks
               with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg
                     Hisl Hp0 Hp1 Hcont").

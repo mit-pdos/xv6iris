@@ -154,6 +154,7 @@ Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import TsoCtx.
@@ -206,6 +207,27 @@ Section KexecBBody.
   Local Ltac regne := reg_ne_side.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
+
+  (* THE TRAPFRAME CELL AND THE EVENT COUNTER, borrowed together (permit
+     sweep L2): proc_pagetable reads the cell and takes the lend, so this
+     stretch needs both out of the block at once.  The cell goes out WHOLE
+     (proc_pagetable's contract is generic in its fraction), which keeps the
+     proof a plain regrouping of [proc_priv_core]'s conjuncts. *)
+  Lemma kxc_priv_tf_ev (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) ∗
+    act_cnt pa (pv_ev (us_V U)) ∗
+    (∀ k : nat, p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt (us_V U))) -∗
+       act_cnt pa k -∗ proc_priv γf pa pid (upd_usV U (upd_ev (us_V U) k))).
+  Proof using .
+    destruct U as [[f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13] M].
+    rewrite /proc_priv /proc_priv_core /proc_ptm_at.
+    cbn [upd_usV upd_ev us_V us_M pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd
+         pv_name pv_cwi pv_gen pv_chg pv_lazy pv_secc pv_ev].
+    iIntros "[(%A & %B & Hpid & Hf & (Hpg & Htfc & Hptt) & Htfp & %C & Hc & Hft & Hgq & Hxs & Hev & Hgh) Ho]".
+    iFrame "Htfc Hev". iIntros (k) "Htfc Hev".
+    iFrame. iPureIntro; split_and!; assumption.
+  Qed.
 
   (* =================================================================== *)
   (*  +0x090 .. +0x0cc, PLUS the [bad:] tail at +0x31c.                   *)
@@ -298,11 +320,14 @@ Section KexecBBody.
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)) (w13 w67 : mword 64),
+      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)) (w13 w67 : mword 64)
+        (U' : ustate),
+        (* proc_pagetable took the block's counter (permit sweep L2) *)
+        ⌜ev_after U U'⌝ -∗
         kxc_at_1a2 jp gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                   plen pfun na avf aslen afun pidv U' eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -312,17 +337,18 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U' m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         mWP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)),
+      ∀ (M : regfile) (P : uptd) (Mi : gmap Z (bv 8)) (U' : ustate),
+        ⌜ev_after U U'⌝ -∗
         kxc_at_12c jp gf
  kf qf sf gyf loyf tlyf inumf dnf bmf datl
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv U eb dqb dqs dqa dqpv dqas
+                   plen pfun na avf aslen afun pidv U' eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -333,7 +359,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K b
+          KexecOkQ.kexec_closer Q QF gf fsc_kalloc (proc_addr jp) pidv U' m (ret_pc ra0) K b
                eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         mWP (Loop : expr riscv_lang)) -∗
@@ -470,8 +496,9 @@ Section KexecBBody.
     (* ---- the trapframe cell, lent out of the process's block ---- *)
     iDestruct (proc_priv_tfp_valid gf (proc_addr jp) pidv U with "Hpriv")
       as %Hpvtf.
-    iDestruct (proc_priv_trapframe gf (proc_addr jp) pidv U with "Hpriv")
-      as "(Htfc & Hpvbk)".
+    iDestruct (kxc_priv_tf_ev gf (proc_addr jp) pidv U with "Hpriv")
+      as "(Htfc & Hev & Hpvbk)".
+    iDestruct (act_lend_of_cnt with "Hev") as "Hlend".
     set (tfr := page_base (ud_tfp (pv_upt (us_V U)))).
     set (tfp := (autocast (T := mword) (subrange_vec_dec tfr 55 12) : mword 44)).
     assert (Hbasetf : page_base tfp = tfr)
@@ -492,14 +519,21 @@ Section KexecBBody.
     iDestruct "Hkadup" as (γkx) "[#Hkalk #Hkaav]".
     iAssert (kalloc_env_at fsc_kalloc γkx None) as "#Hkan".
     { iApply (kalloc_env_at_intro with "Hkalk Hkaav"). }
-    iApply (PPT.wp_proc_pagetable_core fsc_kalloc γkx G2 tfr (DfracOwn (1/4)) 0%nat
-              (K - 68)%nat eb (proc_addr jp) None eb lks
+    iApply (PPT.wp_proc_pagetable_core fsc_kalloc γkx G2 tfr (DfracOwn 1) 0%nat
+              (K - 68)%nat eb (proc_addr jp) None eb lks (pv_ev (us_V U))
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
-              with "Hcg Hcnt Htext Hpc [Htfc] Hkan").
+              with "Hcg Hcnt Htext Hpc [Htfc] Hkan Hlend").
     all: try lkbelow.
     { iEval (rewrite HG2a0). iExact "Htfc". }
-    iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc Htfc Hppt %Hcspt".
+    iIntros (CID4 Hsq4 mr) "Hcg Hcnt (%kb & %Hkb & Hlend) Hpc Htfc Hppt %Hcspt".
+    (* the counter comes home at [kb]: the block closes at [Ub] below, and
+       kexec's exit follows it there *)
+    iDestruct (act_lend_back with "Hlend") as "Hev"; [exact (proc_addr_nonzero jp Hjp)|].
+    iSpecialize ("Hpvbk" $! kb).
+    pose (Ub := upd_usV U (upd_ev (us_V U) kb)).
+    assert (HUb : ev_after U Ub) by (exists kb; split; [exact Hkb | reflexivity]).
+    iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Ub with "Hcont") as "Hcont"; [exact HUb|].
     iEval (rewrite HG2a0) in "Htfc".
     assert (Hpc98 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KXB + 0x098))
       by (rewrite HG2ra; pcw).
@@ -774,7 +808,7 @@ Section KexecBBody.
         { iApply (kxc_0ae with "Htext"). }
         iIntros (CID15 Hsq15). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt1f2) in "Hpc".
-        iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
+        iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID4 CID15 0%nat eb (proc_addr jp) eb
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID3 CID15 eb (proc_addr jp)
@@ -808,7 +842,7 @@ Section KexecBBody.
         assert (Hnoloads : kxb_walk_ok (kxc_fb datl dnf) ef ->
                   elf_loads (kxc_fb datl dnf) = [])
           by (intros Hwk; exact (kxb_walk_phnum0 _ ef Hwk Hphnzero)).
-        iApply ("Hcont1a2" $! G4 P ∅ v13 v67 with "[-Hcont] Hcont").
+        iApply ("Hcont1a2" $! G4 P ∅ v13 v67 Ub HUb with "[-Hcont] Hcont").
         rewrite /kxc_at_1a2.
         iSplitR.
         { iPureIntro. split_and!;
@@ -1113,7 +1147,7 @@ Section KexecBBody.
         { iApply (kxc_0cc with "Htext"). }
         iIntros (CID24 Hsq24). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt12c) in "Hpc".
-        iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
+        iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
         iDestruct (cpu_own_transport CID4 CID24 0%nat eb (proc_addr jp) eb
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID3 CID24 eb (proc_addr jp)
@@ -1139,7 +1173,7 @@ Section KexecBBody.
           rewrite Ht in Ephn. discriminate. }
         assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z)
           by (rewrite uint_unsigned moi64_unsigned; vm_compute; reflexivity).
-        iApply ("Hcont12c" $! G11 P ∅ with "[-Hcont] Hcont").
+        iApply ("Hcont12c" $! G11 P ∅ Ub HUb with "[-Hcont] Hcont").
         rewrite /kxc_at_12c.
         (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
            no callee-saved register still holds kexec's entry value, so the
@@ -1274,7 +1308,7 @@ Section KexecBBody.
       { iApply (kxc_318 with "Htext"). }
       iIntros (CID8 Hsq8). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
-      iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
+      iDestruct ("Hpvbk" with "Htfc Hev") as "Hpriv".
       iDestruct (cpu_own_transport CID4 CID8 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID3 CID8 eb (proc_addr jp)
@@ -1298,7 +1332,7 @@ Section KexecBBody.
       iApply (A.kxc_bad64 Q QF gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf loyf tlyf inumf dnf bmf n2
-                plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
+                plen pfun na avf alen aslen afun pidv Ub dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
                 (ex_intro _ KexecOkQ.KfNoMem Hqfnm) HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr

@@ -31,6 +31,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKvmmap.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
@@ -38,7 +39,7 @@ Local Open Scope Z_scope.
 Module KvmmapProof (Mappages : MAPPAGES) : KVMMAP.
 
 Section ProofKvmmap.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !wchG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
@@ -51,7 +52,7 @@ Section ProofKvmmap.
   Proof using .
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hex Hlkbelow.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hex Hp0 Hlkbelow.
     destruct Hex as (nb & Hon & Hnbk). subst on.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
@@ -221,7 +222,9 @@ Section ProofKvmmap.
        them.  ONE line, no case split on [b]. ---- *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf KT0 γa γk P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
+    (* the boot lends nothing (permit sweep L2): [p] is 0 *)
+    iAssert (act_lend p 0) as "Hlend"; [rewrite Hp0; iApply act_lend_zero|].
+    iApply (Mappages.wp_mappages_sconf KT0 γa γk P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks 0
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)
@@ -231,10 +234,10 @@ Section ProofKvmmap.
               ltac:(rewrite HP6a3; exact Hpab)
               Hrep
               ltac:(rewrite HP6a1; exact Hnone)
-              with "Hcg Hcnt Htext Hpc Hptree Henv").
+              with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
     iIntros (CID9 Hs9 mr t' k g)
-      "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpresent %Hmiss %Hpay".
+      "Hcg Hcnt _ Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpresent %Hmiss %Hpay".
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x0e) : mword 64) 4).
     { rewrite /P6 upd_eq. reflexivity. }

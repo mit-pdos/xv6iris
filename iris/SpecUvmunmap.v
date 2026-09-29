@@ -70,6 +70,7 @@ Require Import KptExecMap TrampPt.
 Require Import ProcPtOwn.
 Require Import BarePt.
 From Kernel Require KernelSyms.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L2 *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import CtxIdDefs.
@@ -95,11 +96,11 @@ Require Import CtxIdDefs.
 
    uvmfree passes [szn := 0]; uvmdealloc passes the new size; the two
    rollback callers pass the size they had before the growth. *)
-Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -122,10 +123,14 @@ Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{G
   pc_is pcE -∗
   proc_ptm P sz M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_ptm (uptd_del_run P vpn0 npages) szn
@@ -145,11 +150,11 @@ Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{G
    generalisation: which one applies is decided by whether the caller is
    shrinking the process ([wp_uvmunmap_mem_sconf]) or undoing a growth
    that never became visible (this one). *)
-Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (sz : Z) (M : gmap Z (bv 8))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -171,10 +176,14 @@ Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
   pc_is pcE -∗
   proc_ptm P sz M -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_ptm (uptd_del_run P vpn0 npages) sz
@@ -184,19 +193,19 @@ Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_live_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (sz : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks k.
   Parameter wp_uvmunmap_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks k.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -212,11 +221,11 @@ End UVMUNMAP.
 (* the [proc_pt] statement above, unchanged.                              *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -240,10 +249,14 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
@@ -252,12 +265,12 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks k.
 End UVMUNMAP_BARE.
 
 (* --------------------------------------------------------------------- *)
@@ -293,12 +306,12 @@ End UVMUNMAP_BARE.
 (* [ProofUvmunmap.UvmunmapCore] is generic in [do_free] and seals here.    *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (v : mword 27)
     (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -324,10 +337,14 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
   pc_is pcE -∗
   uptg fx uroot um -∗
   kalloc_env γa None -∗
+  (* THE LEND (permit sweep L2): the caller's event counter, for the
+     allocator the callee reaches *)
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uptg (delete v fx) uroot um -∗
@@ -336,11 +353,11 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
 
 Module Type UVMUNMAP_FIXED.
   Parameter wp_uvmunmap_fixed_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
+      wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks k.
 End UVMUNMAP_FIXED.

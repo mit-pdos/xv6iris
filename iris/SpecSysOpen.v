@@ -1880,9 +1880,12 @@ Definition wp_sys_open_frame
   (* THE IMAGE DOES NOT MOVE ([SpecSysOpen]'s note): sys_open only READS
      user memory, so the binders are [(mf, ns', P')] and the block returns
      at [us_upt U P'] -- no [M'].  [uptd_ext_sz] is argstr's own report. *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the failing arms' fileclose lends the block's counter to pipeclose, which may step it,
+         so the block comes back at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -1897,7 +1900,7 @@ Definition wp_sys_open_frame
       iref_slots ns' -∗
       (* the armed post on the final process state and the returned a0
          (implies the landed [sys_open_post]) *)
-      ARMS (us_upt U P')
+      ARMS (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).

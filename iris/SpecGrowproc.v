@@ -175,14 +175,19 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (* growproc's whole effect on user memory is [p->sz] moving; see
        [growproc_ok]'s header for why the lazy view makes this an
        equation rather than an existential. *)
-    ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)),
+    ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz (us_V U)) n (pv_upt (us_V U)) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5)) (us_M U) M'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1a): growproc lends the block's
+         counter to uvmalloc, which may step it, so the block comes back at
+         a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
+      proc_priv γf p pid
+        (upd_usM (upd_usV U (upd_ev (upd_sz (upd_upt (us_V U) P') szv') k')) M') -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).
 

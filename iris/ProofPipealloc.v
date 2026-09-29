@@ -147,6 +147,10 @@ Section ProofPipealloc.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpe
               Hslota Hslotb Hc0 Hc1 Hpbare Hiru Hcont".
+    (* the block at a count at least the entry's (permit sweep L1b): the
+       error paths lend its counter to fileclose *)
+    iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
+    { iExists (pv_ev (us_V Upr)). rewrite upd_ev_id upd_usV_id. iFrame "Hpbare". done. }
     (* the one fact [ext_chain] runs on.  Do NOT [subst] [b] or [eb] -- both
        are spelled by name in every leaf-instruction argument below. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -358,13 +362,16 @@ Section ProofPipealloc.
         (* the block comes back BEFORE the post, so a caller that leaves the
            post as its trailing goal -- which every arm below does -- does not
            have to open a bullet for it. *)
-        proc_priv_bare p pidv Upr -∗
+        (* at a count at least the entry's (permit sweep L1b): the error
+           paths' fileclose may step it *)
+        (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k'))) -∗
         iref_slot -∗
         pipealloc_post γf γk on pf0 pf1 res -∗
         mWP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
     { rewrite /EPI.
       iIntros (CIDe Hbe mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hpbare Hiru Hpost".
+      iDestruct "Hpbare" as (kx) "[%Hkx Hpbare]".
       iDestruct "Hslots" as (w4 w5) "[Hs4c Hs5c]".
       iEval (rewrite HspR1) in "Hr40". iEval (rewrite HspR1) in "Hr32".
       iEval (rewrite HspR1) in "Hr24". iEval (rewrite HspR1) in "Hr0".
@@ -488,7 +495,8 @@ Section ProofPipealloc.
       iDestruct (cpu_claim_ext_transport CIDe CIDf6 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDf6 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! P5 with "Hcg Hcnt Hextc Hextm Hpc [%] [Hpost] Hpbare Hiru").
+      iApply ("Hcont" $! P5 kx with "Hcg Hcnt Hextc Hextm Hpc [%] [%] [Hpost] Hpbare Hiru").
+      2:{ exact Hkx. }
       2:{ rewrite HP5a0. iExact "Hpost". }
       { assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                   c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs4 -> c <> Rra ->
@@ -564,7 +572,9 @@ Section ProofPipealloc.
         fd_slot -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        proc_priv_bare p pidv Upr -∗
+        (* at a count at least the entry's (permit sweep L1b): the error
+           paths' fileclose may step it *)
+        (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k'))) -∗
         iref_slot -∗
         mWP (Loop : expr riscv_lang)))%I).
     set (T4C := (wp_next (CID0 := CID) true p (fun (CIDu : CpuId) =>
@@ -589,7 +599,9 @@ Section ProofPipealloc.
         (∃ w : mword 64, pf0 ↦₈[KT1] w) -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        proc_priv_bare p pidv Upr -∗
+        (* at a count at least the entry's (permit sweep L1b): the error
+           paths' fileclose may step it *)
+        (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k'))) -∗
         iref_slot -∗
         mWP (Loop : expr riscv_lang)))%I).
     iAssert (EPI ∧ T8)%I with "[Hepi]" as "HK1".
@@ -740,8 +752,9 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
+        iDestruct "Hpbare" as (kx) "[%Hkx Hpbare]".
         iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp _ inhabitant on U4 n eb p (K - 6)%nat b lks
-                  (emp%I : iProp Σ) pidv Upr
+                  (emp%I : iProp Σ) pidv (upd_usV Upr (upd_ev (us_V Upr) kx))
                   ltac:(lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href1 Hpbare Hiru [] []").
         all: try lkbelow.
@@ -752,7 +765,9 @@ Section ProofPipealloc.
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
-        iIntros (CIDt6 Hst6 mr) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins Hunit1 Hiru _ _ Hpbare".
+        iIntros (CIDt6 Hst6 mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit1 Hiru _ _ Hpbare".
+        iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
+        { iExists kx2. iSplit; [iPureIntro; cbn in Hkx2; lia|]. iExact "Hpbare". }
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -824,8 +839,9 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
+      iDestruct "Hpbare" as (kx) "[%Hkx Hpbare]".
       iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp _ inhabitant on V1 n eb p (K - 6)%nat b lks
-                (emp%I : iProp Σ) pidv Upr
+                (emp%I : iProp Σ) pidv (upd_usV Upr (upd_ev (us_V Upr) kx))
                 ltac:(lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href0 Hpbare Hiru [] []").
       all: try lkbelow.
@@ -835,7 +851,9 @@ Section ProofPipealloc.
       { iApply fileclose_env_none. }
       { iApply fileclose_cpay_none. }
       (* the READ end's unit, banked for T8 *)
-      iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins Hunit0 Hiru _ _ Hpbare".
+      iIntros (CIDu2 Hsu2 mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit0 Hiru _ _ Hpbare".
+      iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
+      { iExists kx2. iSplit; [iPureIntro; cbn in Hkx2; lia|]. iExact "Hpbare". }
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".

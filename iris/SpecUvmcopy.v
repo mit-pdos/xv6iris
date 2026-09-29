@@ -82,6 +82,7 @@ Require Import PtAdBits.
 Require Import PtBuild KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import SlotGen.   (* [act_lend]: the permit sweep, L1a *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
@@ -111,11 +112,11 @@ Require Import CtxIdDefs.
    is what they read before the copy put anything there.  That is
    [SpecUvmunmap.wp_uvmunmap_live_sconf], and it is why uvmunmap needs
    two memory-indexed contracts rather than one. *)
-Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
     (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) (k : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -139,10 +140,12 @@ Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GE
   proc_ptm Pold szold Mold -∗
   proc_ptm Pnew sznew Mnew -∗
   kalloc_env γa None -∗
+  act_lend p k -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
+    (∃ k' : nat, ⌜(k <= k')%nat⌝ ∗ act_lend p k') -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     (* the parent's table AND its view come back verbatim *)
@@ -170,11 +173,11 @@ Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GE
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    forall `{!riscvGS Σ, !xv6G Σ, !wchG Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
+      (ilvl : nat) (b : bool) (lks : gset string) (k : nat),
       wp_uvmcopy_mem_sconf_body γa mm Pold Pnew szold sznew Mold Mnew
-        K eb p ilvl b lks.
+        K eb p ilvl b lks k.
 End UVMCOPY.

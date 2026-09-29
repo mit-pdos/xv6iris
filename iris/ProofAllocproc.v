@@ -88,6 +88,7 @@ Require Import SpecAcquire SpecRelease PidLock SpecKalloc SpecProcPagetable Spec
 Require Import SpecFreeproc.
 Require Import SpecProcinit.
 Require Import SpecAllocproc.
+Require Import SlotGen.   (* [act_lend] *)
 Require Import PidEv.   (* [PAlloc]: the event [ap_pid_post]'s receipt names *)
 Require Import CodeAllocproc.
 From Kernel Require KernelInstrs KernelSyms.
@@ -1508,14 +1509,18 @@ Section ProofAllocproc.
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (kev : nat)
+    : wp_allocproc_core_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev.
   Proof using .
     cbv beta delta [wp_allocproc_core_led_body].
     intros pcE ret_tgt HK Hlvl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hlend Hcont".
+    (* the lend (permit sweep L1a), carried at a count at least [kev]: the
+       two freeproc tails take it and hand it back at their own count *)
+    iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
+    { iExists kev. iFrame "Hlend". iPureIntro; lia. }
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     iAssert (procs_inv γs) as "#Hpinv". { iExact "Hprocs". }
     (* ================= PROLOGUE (32-byte frame, 4 slots) ================= *)
@@ -1853,6 +1858,7 @@ Section ProofAllocproc.
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
                        pc_is ret_tgt -∗
+                       (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k') -∗
                        allocproc_post_led γa γk γf γs lvl eb pme on op tk b lks mr K Q
                          (mr !!! Regidx ap_a0) -∗
                        mWP (Loop : expr riscv_lang)) -∗
@@ -1865,12 +1871,13 @@ Section ProofAllocproc.
                       can be carried at all: each slot's own copy went back
                       into its lock at the release. *)
                    procs_avail_at op tk -∗
+                   (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k') -∗
                    ([∗ list] i ∈ seq 0 k, pslot_used i) -∗
                    pc_is (mword_of_int (KernelSyms.allocproc + 0x1c)) -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk k Mk) "%Hfuel %Hk _ _ _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 k Hfuel Hk). }
-      iIntros (CIDk Hsk k Mk) "%Hfuel %Hk %Hregs Htl Hcont Hcg Hcpu Henv Hpav #Hacc Hpc".
+      { iIntros (CIDk Hsk k Mk) "%Hfuel %Hk _ _ _ _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 k Hfuel Hk). }
+      iIntros (CIDk Hsk k Mk) "%Hfuel %Hk %Hregs Htl Hcont Hcg Hcpu Henv Hpav Hlend #Hacc Hpc".
       destruct Hregs as (Hksp & Hks1 & Hks2 & Hkrest).
       iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γl Hγl].
@@ -2009,7 +2016,7 @@ Section ProofAllocproc.
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hxb & Hrest)".
         iModIntro.
         iDestruct "Hrest" as (V pid0)
-          "([%Hof [%Hcwd [%Hszb [%Hpid00 %Hlzv]]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hfrag)".
+          "([%Hof [%Hcwd [%Hszb [%Hpid00 %Hlzv]]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hev & Hfrag)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv & Hkrow0)".
         (* THE UNUSED SLOT'S FLAG IS ZERO, and allocproc has to read it
            (lane SELF-KILL, §4b'): it is about to found this payload's
@@ -2305,20 +2312,23 @@ Section ProofAllocproc.
           (* p->lock is still held: freeproc's own held set (opaque -- it
              acquires nothing, so no order premise) is
              [{["proc"]} ∪ lks]. *)
+          iDestruct "Hlend" as (kev1) "[%Hkev1 Hlend]".
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa T2 k γl V γg pidn USED ch None None
-                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
+                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks) kev1
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell] Henvb Hlend").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hkrow". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. iEval (rewrite -Htfz). iExact "Htfcell". }
           iApply wp_next_off_intro.
-          iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
+          iIntros (mfp) "Hcg Hcpu (%kev2 & %Hkev2 & Hlend) Hpc %Hcsfp Hheld Hdorm".
+          iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
+          { iExists kev2. iFrame "Hlend". iPureIntro; lia. }
           assert (Hp8c : ret_pc (T2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0xe6))
             by (rewrite HT2ra; apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp8c) in "Hpc".
@@ -2451,7 +2461,7 @@ Section ProofAllocproc.
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
-          iApply ("Hcont" $! Mf with "[%] Hpcf").
+          iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
           rewrite /allocproc_post_led. iRight. iRight.
@@ -2524,15 +2534,19 @@ Section ProofAllocproc.
            scope, so this call supplies no order proof for it -- left as-is
            rather than guessed at; flagging for whoever owns
            SpecProcPagetable.v. *)
+        iDestruct "Hlend" as (klc1 Hklc1) "Hlend".
         iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa γk F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme (avail_dec on) false
-                  ({["proc"]} ∪ lks)
+                  ({["proc"]} ∪ lks) klc1
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K36 K HK); lia)
                   (ap_tf_align tfr Hpvtf) (ap_tf_bound tfr Hpvtf)
-                  with "Hcg Hcpu Htext Hpc [Htfcell] Henv").
+                  with "Hcg Hcpu Htext Hpc [Htfcell] Henv Hlend").
         all: try lkbelow.
         { iEval (rewrite HF6a0). iExact "Htfcell". }
         iApply wp_next_off_intro.
-        iIntros (mpt) "Hcg Hcpu Hpc Htfcell Hppt %Hcspt".
+        iIntros (mpt) "Hcg Hcpu Hlend Hpc Htfcell Hppt %Hcspt".
+        iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
+        iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
+        { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
         iEval (rewrite HF6a0) in "Htfcell".
         assert (Hp52 : ret_pc (F6 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0xac))
           by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
@@ -2677,22 +2691,25 @@ Section ProofAllocproc.
           { rewrite Hbasetf. iExact "Hpgown". }
           (* p->lock is still held: freeproc's own held set is
              [{["proc"]} ∪ lks]. *)
+          iDestruct "Hlend" as (kev1) "[%Hkev1 Hlend]".
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa U2 k γl V γg pidn USED ch None (Some (tfp, tfws))
-                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
+                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks) kev1
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell Htfpage] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell Htfpage] Henvb Hlend").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hkrow". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. cbn [fst snd].
             iEval (rewrite -Hbasetf) in "Htfcell". iFrame "Htfcell Htfpage".
             iPureIntro. rewrite Hbasetf. exact Hpvtf. }
           iApply wp_next_off_intro.
-          iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
+          iIntros (mfp) "Hcg Hcpu (%kev2 & %Hkev2 & Hlend) Hpc %Hcsfp Hheld Hdorm".
+          iAssert (∃ k' : nat, ⌜(kev <= k')%nat⌝ ∗ act_lend pme k')%I with "[Hlend]" as "Hlend".
+          { iExists kev2. iFrame "Hlend". iPureIntro; lia. }
           assert (Hp9c : ret_pc (U2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0xf6))
             by (rewrite HU2ra; apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp9c) in "Hpc".
@@ -2822,7 +2839,7 @@ Section ProofAllocproc.
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
-          iApply ("Hcont" $! Mf with "[%] Hpcf").
+          iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
           rewrite /allocproc_post_led. iRight. iRight.
@@ -3127,7 +3144,7 @@ Section ProofAllocproc.
                         empty user map. *)
                      ltac:(cbn [us_V upd_gen pv_lazy pv_secc]; rewrite Hlzv;
                            intro Hc; discriminate Hc)
-                     with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
+                     with "Hpidown Hfields Hptat [Htfpage] Hofiles Hev") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
         iEval (rewrite /ap_tail) in "Htl".
         iApply ("Htl" $! (trap_res b) false CIDf H5 (proc_addr k) with "[%] Hcg Hpc").
@@ -3159,7 +3176,7 @@ Section ProofAllocproc.
         iDestruct (pslot_used_at_intro k Hk with "Hmkk") as "#Hmk".
         iModIntro.
         iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" $! Mf with "[%] Hpcf").
+        iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
         { exact Hcsf. }
         iEval (rewrite Ha0f).
         (* the post is now THREE-way; the found arm is the middle one *)
@@ -3359,7 +3376,7 @@ Section ProofAllocproc.
              ([ProcAvail.procs_avail_zero]) -- the fact the arm reports. *)
           iDestruct (procs_avail_zero_at op tk with "[Hacc'] Hpav") as "[%Hz Hpav]";
             [rewrite -Hend; iExact "Hacc'" |].
-          iApply ("Htl" $! 0%nat b CIDn R4 (zero_reg : mword 64) with "[%] Hcg Hpc [Hcpu Henv Hpav Hcont]").
+          iApply ("Htl" $! 0%nat b CIDn R4 (zero_reg : mword 64) with "[%] Hcg Hpc [Hcpu Henv Hpav Hcont Hlend]").
           { split; [rewrite /R4 upd_ne; [exact HR3csp | vm_compute; discriminate]|].
             split; [rewrite /R4; apply upd_eq|].
             intros r Hr Ncsp N8 N9 N18.
@@ -3369,7 +3386,7 @@ Section ProofAllocproc.
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
-          iApply ("Hcont" $! Mf with "[%] Hpcf").
+          iApply ("Hcont" $! Mf with "[%] Hpcf Hlend").
           { exact Hcsf. }
           iEval (rewrite Ha0f).
           rewrite /allocproc_post_led. iLeft. iFrame "Hcgf Hcpu Henv Hpav".
@@ -3393,7 +3410,7 @@ Section ProofAllocproc.
           iDestruct (cpu_own_transport CIDg CIDi lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("IHf" $! CIDi with "[%]"); [wp_next_chain|].
-          iApply ("IHf" $! (S k) R3 with "[%] [%] [%] Htl Hcont Hcg Hcpu Henv Hpav Hacc' Hpc").
+          iApply ("IHf" $! (S k) R3 with "[%] [%] [%] Htl Hcont Hcg Hcpu Henv Hpav Hlend Hacc' Hpc").
           * exact (ap_fuelS k fuel Hfuel).
           * exact HkS.
           * split; [exact HR3csp|]. split; [exact HR3s1|]. split; [exact HR3s2|].
@@ -3403,7 +3420,7 @@ Section ProofAllocproc.
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hloop" $! NPROC).
     iSpecialize ("Hloop" $! CID10 with "[%]"); [wp_next_chain|].
-    iApply ("Hloop" $! 0%nat A5 with "[%] [%] [%] Htail Hcont Hcg Hcpu [Henv] Hpav [] Hpc").
+    iApply ("Hloop" $! 0%nat A5 with "[%] [%] [%] Htail Hcont Hcg Hcpu [Henv] Hpav Hlend [] Hpc").
     - exact ap_fuel_init.
     - exact ap_zero_lt.
     - split; [exact HA5csp|]. split; [exact HA5s1|]. split; [exact HA5s2|].
@@ -3418,17 +3435,17 @@ Section ProofAllocproc.
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (kev : nat)
+    : wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev.
   Proof using .
     cbv beta delta [wp_allocproc_core_body].
     intros pcE ret_tgt HK Hlvl Hbelow.
-    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
-    iApply (wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hlend Hcont".
+    iApply (wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev
               HK Hlvl Hbelow
-              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc [Hpost]"); [exact Hcs|].
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
+    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 
@@ -3460,20 +3477,20 @@ Section SealAllocproc.
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (kev : nat)
+    : wp_allocproc_sconf_led_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev.
   Proof using .
     cbv beta delta [wp_allocproc_sconf_led_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
-    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
-    iApply (Core.wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme (Some nb) op tk b lks Q
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hlend Hcont".
+    iApply (Core.wp_allocproc_core_led γa γk γp γf γs m lvl K eb pme (Some nb) op tk b lks Q kev
               HK Hlvl Hbelow
-              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
     all: try lkbelow.
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
+    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
     iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx|].
-    iApply ("Hcont" $! mr with "[%] Hpc [Hpost]"); [exact Hcs|].
+    iApply ("Hcont" $! mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     iDestruct "Hpost" as "[Hnull | [Hfound | Hdead]]".
     - iLeft. iExact "Hnull".
     - iRight. iLeft. iExact "Hfound".
@@ -3487,17 +3504,17 @@ Section SealAllocproc.
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat) (tk : bool)
-      (b : bool) (lks : gset string) (Q : Z -> iProp Σ)
-    : wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q.
+      (b : bool) (lks : gset string) (Q : Z -> iProp Σ) (kev : nat)
+    : wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev.
   Proof using .
     cbv beta delta [wp_allocproc_sconf_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
-    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
-    iApply (wp_allocproc_sconf_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q
+    iIntros "#HKp Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hlend Hcont".
+    iApply (wp_allocproc_sconf_led γa γk γp γf γs m lvl K eb pme on op tk b lks Q kev
               HK Hlvl Hex Hbelow
-              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
-    iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc [Hpost]"); [exact Hcs|].
+              with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
+    iIntros (CIDx Hsx mr) "%Hcs Hpc Hlend Hpost".
+    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 

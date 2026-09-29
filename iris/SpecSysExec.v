@@ -354,7 +354,10 @@ Section SysExecAU.
       (V : pprivate) (r : mword 64) : iProp Σ :=
     (∃ U' : ustate,
        proc_priv γf pj pid U' ∗
-       ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = V /\ us_M U' = M⌝
+       ((⌜r = (mword_of_int (-1) : mword 64) /\
+           (* the event count only rose (permit sweep) *)
+           (exists k' : nat, (pv_ev V <= k')%nat /\ us_V U' = upd_ev V k') /\
+           us_M U' = M⌝
          ∗ sys_exec_post_fail Fs Γ γfs cw secc Q P Pmiss Fo M pv av sts cs pid)
         ∨ (∃ (pl : list (bv 8)) (na : nat) (alen : nat -> nat)
              (afun : nat -> nat -> bv 8),
@@ -455,9 +458,14 @@ Definition wp_sys_exec_sconf_body
   sys_exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Q P Pmiss Fo (us_M U) v0 v1 sts
     cs pid -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): the argument fetches
+         (fetchaddr, fetchstr) lend the block's counter to copyin /
+         copyinstr, which may step it, so the arms start from a count at
+         least the entry's (and kexec's failure arm raises it further) *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -472,7 +480,7 @@ Definition wp_sys_exec_sconf_body
          arguments as read off the entry image, and -- on success at a
          loadable file -- the caller's slot at the resume key *)
       sys_exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) γf pj pid Q P Pmiss Fo (us_M U) v0 v1 sts
-        gn cs (upd_upt (us_V U) P')
+        gn cs (upd_upt (upd_ev (us_V U) k') P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).

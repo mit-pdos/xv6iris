@@ -462,10 +462,14 @@ Section ProofSysOpenAlloc.
       iDestruct (iref_slots_combine (nsj - 1 + 1) 1 with "Hisl Hislot") as "Hisl".
       replace (nsj - 1 + 1 + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
+      (* this arm lends nothing: the count it came in at (permit sweep L1b) *)
+      iSpecialize ("Hcont" $! mf (S nsj) (pv_ev (us_V U))).
+      iEval (rewrite upd_ev_id upd_usV_id) in "Hcont".
+      iApply ("Hcont" with "[%] [%] [%] Hcg Hown Htce Hcce
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
+      { lia. }
       { iApply (so_arm_fail omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
@@ -606,7 +610,9 @@ Section ProofSysOpenAlloc.
       iEval (rewrite Htg70) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
       iDestruct (so_flat_close with "Hflat") as "Hload".
-      iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
+      (* the bare block comes back from fileclose at a raised count
+         (permit sweep L1b), so its closer takes any *)
+      iDestruct (proc_priv_core_bare_ev_acc with "Hcore") as "[Hpbare Hcback]".
       iDestruct "Hkeep" as (loK tlK) "(%HleK & #HflK & Hkeep)".
       iDestruct (inode_ref_short_gen_forget _ _ _ _ _ _ _ _ HleK
                    with "HflK Hkeep") as "Hkeep".
@@ -637,21 +643,23 @@ Section ProofSysOpenAlloc.
          nothing ([SpecFileclose.fileclose_cpay_none]) *)
       { iApply fileclose_cpay_none. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy". iIntros (mf)
-        "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
+      iIntros (CIDy) "%Hqy". iIntros (mf kev)
+        "%Hcsf %Ha0f %Hkev Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot Hfds Hfout".
-      iDestruct ("Hcback" with "Hpbare") as "Hcore".
+      iDestruct ("Hcback" $! kev with "Hpbare") as "Hcore".
       iDestruct (proc_priv_join with "Hcore Howe") as "Hpriv".
       (* [so_tail_f] hands back TWO: the loan fileclose repaid and the unit
          iput released.  With the one taken off the top, that is [S nsj]. *)
       iDestruct (iref_slots_combine (nsj - 1) 2 with "Hisl Hislot") as "Hisl".
       replace (nsj - 1 + 2)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf (S nsj) with "[%] [%] Hcg Hown Htce Hcce
+      iApply ("Hcont" $! mf (S nsj) kev with "[%] [%] [%] Hcg Hown Htce Hcce
                 Hpc Hsbb Hsbi Hbsl Hisl [Hpriv Hfds Hfrag HP Hobs Htc]").
       { exact Hcsf. }
       { reflexivity. }
-      { iApply (so_arm_fail omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft U sts _ pl
+      { exact Hkev. }
+      { iApply (so_arm_fail omo gf (proc_addr jx) pidv Mim pvv vom P Pmiss Fo Ft
+                  (upd_usV U (upd_ev (us_V U) kev)) sts _ pl
                   (bv_unsigned inum) (era_node dn bm data) Hpof Ha0f
                   with "Hpriv Hfrag Hfds HP Hobs Htc"). } }
     (* ---- fdalloc installed the descriptor ---- *)

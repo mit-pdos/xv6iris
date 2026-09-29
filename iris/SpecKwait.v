@@ -238,7 +238,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
        is keyed at.  A caller reads its own untouched bytes back with
        [UserPtTree.umem_wr_lookup_out]. *)
     ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
-      (cs' : gset gname),
+      (cs' : gset gname) (k' : nat),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -273,8 +273,14 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
+      (* THE CALLER'S EVENT COUNT ONLY ROSE (permit sweep, design
+         ni-strong-instance.md §7): the reap's freeproc takes the reaper's
+         counter -- the reaper is the actor of the slot's release -- so the
+         block comes back at a count at least the one it went in at. *)
+      ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
       proc_priv γf pj pid
-        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+           (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
       (* THE ROW COMES BACK AT WHAT THE REAP LEFT IT.  A reap takes ONE
          generation out of the caller's reading -- the one it reaped, and
          [WaitInv.children_inv_reap] takes it out of both columns of the
@@ -318,7 +324,7 @@ Definition wp_kwait_led_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   SlotGen.init_pid_is (mword_of_int 1 : mword 32) -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (xw : mword 32)
-      (cs' : gset gname),
+      (cs' : gset gname) (k' : nat),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
@@ -331,8 +337,14 @@ Definition wp_kwait_led_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
+      (* THE CALLER'S EVENT COUNT ONLY ROSE (permit sweep, design
+         ni-strong-instance.md §7): the reap's freeproc takes the reaper's
+         counter -- the reaper is the actor of the slot's release -- so the
+         block comes back at a count at least the one it went in at. *)
+      ⌜ (pv_ev (us_V U) <= k')%nat ⌝ -∗
       proc_priv γf pj pid
-        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
+        (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k')) P')
+           (umem_wr (us_M U) addr d (fun i => nth_byte xw i))) -∗
       ch_frag (pv_chg (us_V U)) pj cs' -∗
       mWP (Loop : expr riscv_lang)) -∗
   mWP (Loop : expr riscv_lang).

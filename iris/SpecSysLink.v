@@ -584,12 +584,16 @@ Definition wp_sys_link_sconf_body
      already in the block's view, as lazy pages reading 0, so vmfault does
      not move it either.  Only the DESCRIPTOR grows, and the block comes
      back at the image it was handed. *)
-  ∀ (mf : regfile) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd) (k' : nat),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: the two fetchstrs fault user pages
          in.  [uptd_ext_sz] is argstr's own report, composed across the pair by
          [ProcPtOwn.uptd_ext_sz_trans]. *)
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      (* THE EVENT COUNTER (permit sweep L1b): argstr lends the block's
+         counter to copyinstr, which may step it, so the block comes back
+         at a count at least the one it left at *)
+      ⌜(pv_ev (us_V U) <= k')%nat⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -605,7 +609,7 @@ Definition wp_sys_link_sconf_body
       (* the allowance, whole: see the header's reference ledger *)
       iref_slots sys_link_slots -∗
       (* the process block, at the same everything but the page table *)
-      proc_priv γf pj pid (us_upt U P') -∗
+      proc_priv γf pj pid (us_upt (upd_usV U (upd_ev (us_V U) k')) P') -∗
       ⌜sys_link_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       (* ...and the legs' receipts, keyed on that answer *)
       link_arms (fs_gamma_L fsc_fs) Ftgt Fent Funt
