@@ -81,12 +81,11 @@ theorem ust_close (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t
     iapply Hk
     iapply ust_close_trap cpu C P Rut t0 mm0 s h $$ HS Hfr Ha Hres
 
-/-- **The optional tick** after a cycle (the machine picks): only the clock
-cells move. -/
-theorem ust_tickOpt (cpu : CPU) (C : UCfg) (P : UPtd) (t0 : PTree) (tick : Bool) (s : UWSt)
+/-- **The optional tick** after a cycle (the machine picks), over any byte
+frame (the engine's and the safety tier's): only the clock cells move. -/
+theorem ust_tickOpt (cpu : CPU) (C : UCfg) {ξ : CtxId} (BF : UByteFrame GF ξ) (tick : Bool) (s : UWSt)
     (hm : UcMisa ufFoot s) (Φ : IProp GF) :
-    uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s ∗
-      (∀ s', ⌜ucClockAgree s s'⌝ -∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s' -∗ Φ)
+    uFr (ufRegF cpu C) BF s ∗ (∀ s', ⌜ucClockAgree s s'⌝ -∗ uFr (ufRegF cpu C) BF s' -∗ Φ)
     ⊢ swp cpu (if tick then tick_clock () else pure ()) (fun _ => Φ) := by
   cases tick with
   | false =>
@@ -97,7 +96,7 @@ theorem ust_tickOpt (cpu : CPU) (C : UCfg) (P : UPtd) (t0 : PTree) (tick : Bool)
   | true =>
     simp only [if_true]
     iintro ⟨Hfr, HK⟩
-    iapply swp_ucTick (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_ucTick s hm
+    iapply swp_ucTick (ufRegF cpu C) BF ufFoot_ucTick s hm
     iframe Hfr
     iintro %s' %ha Hfr
     iapply HK $$ %s' %ha Hfr

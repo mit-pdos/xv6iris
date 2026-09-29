@@ -14,7 +14,7 @@ re-seal `userInv` / `userTrapFrame`.  The cycle is UCycleSwp's
 * the FETCH arm: the fetch (`UstFetchSpec`, U2-F's deliverable), then by the
   fetch result: a fault → `ust_armOb_fetchFail`; a word or halfword →
   decode (`decodeU_total32/16`, total, transported to the walker by
-  `uc_runRW_of_runRead`) and execute (`UstExecTotal`, U3-A's deliverable)
+  `runRW_of_runRead`) and execute (`UstExecTotal`, U3-A's deliverable)
   through the cycle's tail (`swp_ucAfterFetch_base`/`_rvc`, MachCSL/UCycleSwp),
   then the arm of the outcome (`ust_armOb_exec`).
 
@@ -87,7 +87,7 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     obtain ⟨hl', hal⟩ := hout
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total32 w
     have hdec : ∀ orc, runRW ufFoot orc s' (ext_decode w) = some (i, s', orc) := fun orc =>
-      uc_runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
+      runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
     obtain ⟨E, hEx, hE⟩ := ustExecOk_fn C P t0 mm0 (hX.base t0 mm0 s' i hl' hal hdi)
     iapply swp_ucAfterFetch_base (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' w i
       (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) hdec E hEx
@@ -99,7 +99,7 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     obtain ⟨hl', hal⟩ := hout
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total16 h
     have hdec : ∀ orc, runRW ufFoot orc s' (ext_decode_compressed h) = some (i, s', orc) := fun orc =>
-      uc_runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
+      runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
     obtain ⟨E, hEx, hE⟩ := ustExecOk_fn C P t0 mm0 (hX.rvc t0 mm0 s' i hl' hal hdi)
     iapply swp_ucAfterFetch_rvc (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' h i
       (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) (uf_ucMisa C P s' hl'.cfg) hdec E hEx
@@ -144,7 +144,7 @@ theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTota
   unfold ucCyclePost
   icases Hpost with ⟨%st, %s2, %hq, Hfr, -⟩
   have hL := ust_land_of_q st s2 hq.1
-  iapply ust_tickOpt cpu C P t0 tick _ (uf_ucMisa C P _ (ust_at_cfg hL))
+  iapply ust_tickOpt cpu C (ubFrame curCtx (ubUAddrs P t0)) tick _ (uf_ucMisa C P _ (ust_at_cfg hL))
   iframe Hfr
   iintro %s3 %hag Hfr
   iapply HK $$ %s3 %(ust_at_clock hL hag) Hfr

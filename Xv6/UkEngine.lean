@@ -101,25 +101,6 @@ theorem uk_uvb_x0 [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
   ihave Hg := uexec_gprFile_congr cpu m m' h $$ Hg
   iframe
 
-/-- **The optional tick** over any byte frame (`UserStepClose.ust_tickOpt`). -/
-theorem uk_tickOpt (cpu : CPU) (C : UCfg) {ξ : CtxId} (BF : UByteFrame GF ξ) (tick : Bool) (s : UWSt)
-    (hm : UcMisa ufFoot s) (Φ : IProp GF) :
-    uFr (ufRegF cpu C) BF s ∗ (∀ s', ⌜ucClockAgree s s'⌝ -∗ uFr (ufRegF cpu C) BF s' -∗ Φ)
-    ⊢ swp cpu (if tick then tick_clock () else pure ()) (fun _ => Φ) := by
-  cases tick with
-  | false =>
-    simp only [Bool.false_eq_true, if_false]
-    iintro ⟨Hfr, HK⟩
-    iapply swp_ret
-    iapply HK $$ %s %(ucClockAgree_refl s) Hfr
-  | true =>
-    simp only [if_true]
-    iintro ⟨Hfr, HK⟩
-    iapply swp_ucTick (ufRegF cpu C) BF ufFoot_ucTick s hm
-    iframe Hfr
-    iintro %s' %ha Hfr
-    iapply HK $$ %s' %ha Hfr
-
 /-! ## §3 The goal and the engine -/
 
 /-- **Rocq `uk_ih`**: the leaf at every section realizing `π` and `sz`. -/
@@ -217,7 +198,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     rcases hcase with ⟨⟨-, V', hpost, -⟩, hL⟩ | ⟨sc, stv, htl, -, -⟩
     · rw [hL]; exact (ukFinal_epi hpost).land.cfg
     · exact htl.cfg
-  iapply uk_tickOpt h C (ubFrame curCtx D) tick _ (uf_ucMisa C pt _ hcfgL)
+  iapply ust_tickOpt h C (ubFrame curCtx D) tick _ (uf_ucMisa C pt _ hcfgL)
   iframe Hfr
   iintro %s3 %hag Hfr
   rcases hcase with ⟨⟨hret, V', hpost, hM'⟩, hL⟩ | ⟨sc, stv, htl, hpcL, hwhy⟩

@@ -30,7 +30,7 @@ values) through `uxc_zca`/`uxc_zicfilp`/`uxc_fiom`.
 values, so they are closed by the KERNEL (`kernel_rfl`) at the pinned state
 `⟨drefU, rs, mm, rv⟩` over the read-only list footprint of `drefU`'s four
 registers, and moved to an arbitrary footprint and state by the read-only
-transfer `uxc_runRW_ro` (a walk that writes no register and reads only `Lr`
+transfer `runRW_ro` (a walk that writes no register and reads only `Lr`
 gives the same answer from every state whose file agrees on `Lr`).  The
 family walks themselves are stepped by `simp only` over their (small)
 bodies with the bind leaves; the only symbolic values that reach a branch are
@@ -89,95 +89,6 @@ theorem uxcNpc_file_other (s : UWSt) (t : BitVec 64) (r : Register) (hr : r ≠ 
     (uxcNpc s t).file r = s.file r := by
   rw [uxcNpc_file, RegFile.set_other _ _ _ _ hr]
 
-/-! ## The read-only transfer -/
-
-/-- **Read-only transfer**: a walk over the read-only list footprint `Lr`
-(no register written, no wire read) gives the same answer from any state
-whose file agrees on `Lr`, over any footprint reading `Lr`; the byte map and
-reservation bit land where the reference walk put them. -/
-theorem uxc_runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr, D.Dr r = true)
-    (m : SailM X) :
-    ∀ (orc orc' : UOrc) (s₀ s s₀' : UWSt) (x : X),
-      (∀ r ∈ Lr, s₀.file r = s.file r) → s₀.mm = s.mm → s₀.rv = s.rv →
-      runRW (uFootL [] Lr []) orc s₀ m = some (x, s₀', orc') →
-      runRW D orc s m = some (x, { s with mm := s₀'.mm, rv := s₀'.rv }, orc') := by
-  induction m with
-  | pure y =>
-    intro orc orc' s₀ s s₀' x _ hm hr h
-    simp only [runRW, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl, rfl⟩ := h
-    rw [hm, hr]
-    rfl
-  | impure call k ih =>
-    intro orc orc' s₀ s s₀' x hf hm hr h
-    cases call with
-    | error e => simp only [runRW, reduceCtorEq] at h
-    | ok o =>
-      cases o with
-      | regRead r =>
-        by_cases hc : Lr.contains r = true
-        · have hrL : r ∈ Lr := List.contains_iff_mem.1 hc
-          have h0 : (uFootL [] Lr []).Dr r = true := by
-            simp only [uFootL, List.contains_nil, Bool.false_or, hc]
-          rw [runRW_regRead_dr _ _ _ _ _ h0] at h
-          have e := runRW_regRead_dr D orc s r k (hD r hrL)
-          rw [e, ← hf r hrL]
-          exact ih _ _ _ _ _ _ _ hf hm hr h
-        · simp only [runRW, uFootL, List.contains_nil, Bool.false_or, hc, Bool.false_eq_true,
-            if_false, reduceCtorEq] at h
-      | regWrite r v =>
-        simp only [runRW, uFootL, List.contains_nil, Bool.false_eq_true, if_false, reduceCtorEq] at h
-      | memRead n vs req =>
-        simp only [runRW] at h ⊢
-        rw [hm] at h
-        by_cases h1 : akIfetch req.access_kind = true
-        · simp only [h1, ↓reduceIte, reduceCtorEq] at h
-        · simp only [h1, Bool.false_eq_true, ↓reduceIte] at h ⊢
-          by_cases h2 : n < 2 ^ 64
-          · simp only [h2, ↓reduceIte] at h ⊢
-            by_cases h3 : akExcl req.access_kind = true
-            · simp only [h3, ↓reduceIte] at h ⊢
-              cases hw : bmRead s.mm req.pa n with
-              | none => simp only [hw, reduceCtorEq] at h
-              | some w =>
-                simp only [hw] at h ⊢
-                exact ih _ _ _ { s₀ with mm := s.mm, rv := true } { s with rv := true } _ _ hf rfl rfl h
-            · simp only [h3, Bool.false_eq_true, ↓reduceIte] at h ⊢
-              cases hw : bmRead s.mm req.pa n with
-              | none => simp only [hw, reduceCtorEq] at h
-              | some w =>
-                simp only [hw] at h ⊢
-                exact ih _ _ _ s₀ s _ _ hf hm hr h
-          · simp only [h2, ↓reduceIte, reduceCtorEq] at h
-      | memWrite n vs req =>
-        simp only [runRW] at h ⊢
-        rw [hm] at h
-        by_cases h2 : n < 2 ^ 64
-        · simp only [h2, ↓reduceIte] at h ⊢
-          cases hv : req.value with
-          | none => simp only [hv, reduceCtorEq] at h
-          | some w' =>
-            simp only [hv] at h ⊢
-            by_cases h3 : bmOwned s.mm req.pa n = true
-            · simp only [h3, ↓reduceIte] at h ⊢
-              exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
-                { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl h
-            · simp only [h3, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
-        · simp only [h2, ↓reduceIte, reduceCtorEq] at h
-      | barrier _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | cacheOp _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | tlbi _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | translationStart _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | translationEnd _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | takeException _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | returnException _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | cycleCount => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | getCycleCount => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | message _ => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | choose p => exact ih _ _ _ _ _ _ _ hf hm hr h
-      | readRam _ _ _ => simp only [runRW, reduceCtorEq] at h
-      | writeRam _ _ _ _ => simp only [runRW, reduceCtorEq] at h
-
 /-- The configuration read footprint (read-only, `drefU`'s registers). -/
 def uxcCfgFoot : UFoot := uFootL [] uxcCfgRegs []
 
@@ -199,7 +110,7 @@ theorem uxc_cfg_walk {X : Type} {D : UFoot} (hD : UxcFoot D) (m : SailM X) (x : 
     (s : UWSt) (hU : UxcCfg s)
     (h0 : runRW uxcCfgFoot orc (uxcRef s) m = some (x, uxcRef s, orc)) :
     runRW D orc s m = some (x, s, orc) :=
-  uxc_runRW_ro uxcCfgRegs D hD.cfg m orc orc (uxcRef s) s (uxcRef s) x (uxcRef_file s hU) rfl rfl h0
+  runRW_ro uxcCfgRegs D hD.cfg m orc orc (uxcRef s) s (uxcRef s) x (uxcRef_file s hU) rfl rfl h0
 
 /-! ## The three configuration sub-walks -/
 

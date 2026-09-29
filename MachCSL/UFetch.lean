@@ -125,12 +125,12 @@ theorem uft_runRead_Ziccif :
 theorem uft_Zca {D : UFoot} {s : UWSt} (hp : UwkPins D s.file) (o : UOrc) :
     uftRun D o s (currentlyEnabled extension.Ext_Zca) = some (true, s, o) :=
   uftRun_of_runRW D _ o s _
-    (uc_runRW_of_runRead D ucDrefMisa o s (UcMisa.dref ⟨hp.dmisa, hp.misa⟩) _ _ _ uc_runRead_Zca)
+    (runRW_of_runRead D ucDrefMisa o s (UcMisa.dref ⟨hp.dmisa, hp.misa⟩) _ _ _ uc_runRead_Zca)
 
 theorem uft_Ziccif {D : UFoot} {s : UWSt} (hp : UwkPins D s.file) (o : UOrc) :
     uftRun D o s (currentlyEnabled extension.Ext_Ziccif) = some (true, s, o) :=
   uftRun_of_runRW D _ o s _
-    (uc_runRW_of_runRead D ucDrefMisa o s (UcMisa.dref ⟨hp.dmisa, hp.misa⟩) _ _ _ uft_runRead_Ziccif)
+    (runRW_of_runRead D ucDrefMisa o s (UcMisa.dref ⟨hp.dmisa, hp.misa⟩) _ _ _ uft_runRead_Ziccif)
 
 /-! ## §1 The physical read of an instruction (Rocq `UserFetchCert` §1, the
 read node driven by the ifetch leaf) -/

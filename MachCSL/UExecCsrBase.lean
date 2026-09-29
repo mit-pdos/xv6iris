@@ -34,7 +34,7 @@ any value with `FS = 0`), the shape of lane U1-X2's `UxcFoot`/`UxcCfg`.
 
 **The bridge.**  A read-only stretch is walked by `DecodeBridge.runRead` at the
 table (a closed, kernel-evaluable computation even over all 4096 csr numbers);
-`uxr_runRW_of_runRead` lifts it to `runRW` at any state whose file agrees with
+`runRW_of_runRead` lifts it to `runRW` at any state whose file agrees with
 the table, footprint reading it: the state and the oracle come back
 unchanged.
 -/
@@ -97,50 +97,10 @@ theorem UxrCfg.val {s : UWSt} (hc : UxrCfg s) (r : Register) (v : RegisterType r
   cases r <;> simp only [uxrPin, hwVal, reduceCtorEq, Option.some.injEq] at h <;> subst h
   all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mstateen0, hc.sstateen0]
 
-/-! ## The read-only bridge -/
-
-/-- **A read-only walk at a table lifts to `runRW`** at any state whose file
-agrees with the table on its domain, the footprint reading the domain: the
-state and the oracle come back unchanged (Rocq: a `goodb` walk is a `goodmb`
-walk at `mm := ∅` that writes nothing). -/
-theorem uxr_runRW_of_runRead {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt)
-    (d : (r : Register) → Option (RegisterType r))
-    (hd : ∀ r v, d r = some v → D.Dr r = true ∧ s.file r = v) :
-    ∀ (m : SailM X) (x : X) (b : Bool), runRead d m = some (x, b) → runRW D orc s m = some (x, s, orc) := by
-  intro m
-  induction m with
-  | pure y =>
-    intro x b h
-    simp only [runRead, Option.some.injEq, Prod.mk.injEq] at h
-    rw [← h.1]; rfl
-  | impure call k ih =>
-    intro x b h
-    cases call with
-    | error e => simp [runRead] at h
-    | ok o =>
-      cases o <;> simp only [runRead, reduceCtorEq] at h
-      case regRead r =>
-        cases hdr : d r with
-        | none => rw [hdr] at h; simp at h
-        | some v =>
-          rw [hdr] at h
-          obtain ⟨hD, hv⟩ := hd r v hdr
-          simp only [Option.map_eq_some_iff, Prod.mk.injEq] at h
-          obtain ⟨⟨x', b'⟩, h', hx, -⟩ := h
-          simp only at hx; subst hx
-          rw [runRW_regRead_dr D orc s r k hD, hv]
-          exact ih v x' b' h'
-      all_goals
-        simp only [Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, -⟩ := h
-        simp only at hx; subst hx
-        simp only [runRW]
-        exact ih _ x' b' h'
-
 /-- The bridge at the CSR table. -/
 theorem uxr_runRW_of_pin {X : Type} {D : UFoot} {s : UWSt} (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc)
     (m : SailM X) (x : X) (b : Bool) (h : runRead (uxrPin s.file) m = some (x, b)) :
     runRW D orc s m = some (x, s, orc) :=
-  uxr_runRW_of_runRead D orc s _ (fun r v hv => ⟨hD r (uxrPin_dom _ r v hv), hc.val r v hv⟩) m x b h
+  runRW_of_runRead D _ orc s (fun r v hv => ⟨hD r (uxrPin_dom _ r v hv), hc.val r v hv⟩) m x b h
 
 end MachCSL

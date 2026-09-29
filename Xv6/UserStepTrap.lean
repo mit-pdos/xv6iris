@@ -97,6 +97,40 @@ abbrev UstTower (sX : UWSt) (m : SailM Unit) (sc' stv' sep' : BitVec 64) : Prop 
     ⊢ swp cpu m Φ
 
 set_option maxRecDepth 10000 in
+/-- **The trapping arm, at any landing predicate and constant rider** (the
+engine's `ukQ` and the safety tier's `ustQ` both instantiate it): a tower run
+from `sX` lands on `ustTrapS sX …`. -/
+theorem ust_trapArmGen (D : List PAddr) (Rr : IProp GF) (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P sX.file)
+    (hp : sX.file .cur_privilege = Privilege.User) (hact : sX.file .hart_state = .HART_ACTIVE ())
+    (st : Step) (m : SailM Unit) (sc' stv' sep' : BitVec 64) (htow : UstTower (GF := GF) cpu C sX m sc' stv' sep')
+    (hb : ∀ s2, ucArmBody (ufRegF cpu C) (ubFrame curCtx D) (fun _ _ => Rr) st s2 =
+      swp cpu m (fun _ => iprop(⌜s2.file .hart_state = .HART_ACTIVE ()⌝ ∗
+        uFr (ufRegF cpu C) (ubFrame curCtx D) s2 ∗ Rr)))
+    (hq : Q st (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec)) :
+    hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
+      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (fun _ _ => Rr) st := by
+  unfold ucArmOb
+  iintro ⟨#Hhw, Hfr, HR⟩
+  iexists ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec
+  rw [hb]
+  isplitr
+  · ipureintro; exact hq
+  unfold uFr
+  icases Hfr with ⟨HF, HB, Hc, Hr⟩
+  icases uf_trapCells cpu C P sX.file hc $$ HF with ⟨Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, Hcl⟩
+  rw [hp]
+  iapply htow _
+  iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+  inext
+  iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+  ihave HF := Hcl $$ %Privilege.Supervisor %(utrapMs 0#1 (sX.file .mstatus)) %sc' %stv' %sep' %C.stvec
+    Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
+  rw [ustTrapS_mm, ustTrapS_rv, ustTrapS_file]
+  isplitr
+  · ipureintro
+    rw [ufTrapSet_other _ _ _ _ _ _ _ _ (by decide)]; exact hact
+  iframe
+
 /-- **The trapping arm, generic** (Rocq's four trap closers' shared half): a
 tower run from a user machine `sX` lands on `ustTrapS sX …`, which is a
 trapped machine, with the frames. -/
@@ -107,29 +141,10 @@ theorem ust_trapArm (sX : UWSt) (hl : UstLand C P t0 mm0 sX) (st : Step) (m : Sa
         uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s2 ∗ ustR st s2)))
     (hq : ∀ s2, UstTrapped C P t0 mm0 s2 → ustQ C P t0 mm0 st s2) :
     hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) sX ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR st := by
-  have ht := ustTrapped_trapS hl sc' stv' sep'
-  unfold ucArmOb
-  iintro ⟨#Hhw, Hfr⟩
-  iexists ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) sc' stv' sep' C.stvec
-  rw [hb]
-  isplitr
-  · ipureintro; exact hq _ ht
-  unfold uFr
-  icases Hfr with ⟨HF, HB, Hc, Hr⟩
-  icases uf_trapCells cpu C P sX.file hl.cfg $$ HF with ⟨Hp, Hms, Hsc, Hstv, Hsep, Hstvec, Hmd, Hpc, Hnpc, Hcl⟩
-  rw [hl.priv]
-  iapply htow _
-  iframe Hhw Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
-  inext
-  iintro Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
-  ihave HF := Hcl $$ %Privilege.Supervisor %(utrapMs 0#1 (sX.file .mstatus)) %sc' %stv' %sep' %C.stvec
-    Hp Hms Hsc Hstv Hsep Hstvec Hmd Hpc Hnpc
-  rw [ustTrapS_mm, ustTrapS_rv, ustTrapS_file]
-  unfold ustR
-  isplitr
-  · ipureintro; exact ht.act
-  iframe
+      ucArmOb (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustQ C P t0 mm0) ustR st :=
+  (sep_mono .rfl sep_emp.2).trans
+    (ust_trapArmGen cpu C P (ubUAddrs P t0) iprop(emp) (ustQ C P t0 mm0) sX hl.cfg hl.priv hl.act st m
+      sc' stv' sep' htow hb (hq _ (ustTrapped_trapS hl sc' stv' sep')))
 
 /-- **The interrupt arm** (Rocq `swp_handle_interrupt_u`): the dispatch
 picked `(i, Supervisor)`. -/

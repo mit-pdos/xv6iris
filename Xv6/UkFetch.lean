@@ -86,10 +86,10 @@ set_option hygiene false in
 /-- The gates of a user fetch, as text-map sub-walk facts. -/
 macro "ukf_gates" hP:term:max hd:term:max : tactic => `(tactic| (
   have hz : ∀ o, uxRun _ _ o s (currentlyEnabled extension.Ext_Zca) = some (true, s, o) := fun o =>
-    uxw_of_runRW _ _ _ o s _ $hd (uc_runRW_of_runRead _ ucDrefMisa o s
+    uxw_of_runRW _ _ _ o s _ $hd (runRW_of_runRead _ ucDrefMisa o s
       (UcMisa.dref ⟨($hP).wk.dmisa, ($hP).wk.misa⟩) _ _ _ uc_runRead_Zca)
   have hzic : ∀ o, uxRun _ _ o s (currentlyEnabled extension.Ext_Ziccif) = some (true, s, o) := fun o =>
-    uxw_of_runRW _ _ _ o s _ $hd (uc_runRW_of_runRead _ ucDrefMisa o s
+    uxw_of_runRW _ _ _ o s _ $hd (runRW_of_runRead _ ucDrefMisa o s
       (UcMisa.dref ⟨($hP).wk.dmisa, ($hP).wk.misa⟩) _ _ _ uft_runRead_Ziccif)
   have hdpc := ($hP).dpc))
 

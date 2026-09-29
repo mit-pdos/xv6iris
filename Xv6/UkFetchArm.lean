@@ -209,14 +209,14 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
     rcases hdec with ⟨w, rfl, rfl, b, hrd⟩ | ⟨h, i₀, b, rfl, rfl, hrd, hexa⟩
     · obtain ⟨r, s2, o2, hw, hout⟩ := hX s1 hl1 hr1 hp1 hv1 orc
       have hdecw : runRW ufFoot orc s1 (ext_decode w) = some (i, s1, orc) :=
-        uc_runRW_of_runRead ufFoot udrefU orc s1 hdref _ i b hrd
+        runRW_of_runRead ufFoot udrefU orc s1 hdref _ i b hrd
       have hnx : ∀ j, r ≠ ExecuteAs j := uk_notExecAs (hout.elim (fun h => Or.inl h.1)
         (fun ⟨exc, h, _⟩ => Or.inr ⟨exc, h⟩))
       exact ⟨_, s2, o2, uk_afterFetch_base orc o2 s1 s2 w i r hd1 help hdecw
         (uk_execAs_direct orc o2 _ s2 i r hnx hw), r, _, rfl, hout⟩
     · obtain ⟨r, s2, o2, hw, hout⟩ := hX s1 hl1 hr1 hp1 hv1 orc
       have hdech : runRW ufFoot orc s1 (ext_decode_compressed h) = some (i₀, s1, orc) :=
-        uc_runRW_of_runRead ufFoot udrefU orc s1 hdref _ i₀ b hrd
+        runRW_of_runRead ufFoot udrefU orc s1 hdref _ i₀ b hrd
       exact ⟨_, s2, o2, uk_afterFetch_rvc orc o2 s1 s2 h i₀ r hd1 help (uf_ucMisa C P s1 hl1.cfg) hdech
         ((uk_execAs_redirect orc _ i₀ i hexa).trans hw), r, _, rfl, hout⟩
   iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1

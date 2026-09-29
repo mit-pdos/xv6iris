@@ -331,7 +331,7 @@ theorem ustLand_s0 (v : UfVals) (mm : BMap) (hu : UfUser v) (ha : v.hs = .HART_A
   ⟨hwf, ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, ha, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
 
 /-- The decoder's reference registers, off a user file (for
-`uc_runRW_of_runRead`). -/
+`runRW_of_runRead`). -/
 theorem ust_drefU_hd (s : UWSt) (hc : UfCfg C P s.file) (hp : s.file .cur_privilege = Privilege.User) :
     ∀ r v, drefU r = some v → ufFoot.Dr r = true ∧ s.file r = v := by
   intro r v h

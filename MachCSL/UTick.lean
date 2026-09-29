@@ -71,7 +71,7 @@ theorem uc_currentlyEnabled_Sstc {X : Type} {s : UWSt} (hm : UcMisa D s) (orc : 
     (k : Bool → SailM X) :
     runRW D orc s (currentlyEnabled extension.Ext_Sstc >>= k) = runRW D orc s (k true) :=
   runRW_bind_some D _ _ orc orc s s true
-    (uc_runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_Sstc)
+    (runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_Sstc)
 
 /-- The callback's `read_mip`: `mip` and the two wires, nothing moved. -/
 theorem uc_readMip {X : Type} (hT : UcTickFoot D) {s : UWSt} (hm : UcMisa D s) (orc : UOrc)

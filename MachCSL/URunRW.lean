@@ -1074,4 +1074,162 @@ theorem UWSt.file_pin (pin : RegPin) (f : RegFile) (mm : BMap) (rv : Bool)
 
 end frames
 
+/-! ## Read-only transfer
+
+The one home of the read-only walk facts: a `runRead` walk at a reference
+map lifts to `runRW` (`runRW_of_runRead`), and a `runRW` walk over a
+read-only list footprint transfers to any agreeing state (`runRW_ro`). -/
+
+section rotransfer
+
+/-- **Read-walk transport** (the walker twin of DecodeBridge's read
+congruence): a read-only walk at a reference map `dref` is a walk of `runRW`
+at every state agreeing with `dref` on registers the footprint reads --
+state and oracle untouched. -/
+theorem runRW_of_runRead (D : UFoot) (dref : (r : Register) → Option (RegisterType r)) {X : Type}
+    (orc : UOrc) (s : UWSt) (hd : ∀ r v, dref r = some v → D.Dr r = true ∧ s.file r = v) :
+    ∀ (m : SailM X) (x : X) (b : Bool), runRead dref m = some (x, b) → runRW D orc s m = some (x, s, orc) := by
+  intro m
+  induction m with
+  | pure y => intro x b h; simp only [runRead, Option.some.injEq, Prod.mk.injEq] at h; rw [← h.1]; rfl
+  | impure call k ih =>
+    intro x b h
+    cases call with
+    | error e => simp [runRead] at h
+    | ok o =>
+      cases o with
+      | regRead r =>
+        simp only [runRead] at h
+        cases hr : dref r with
+        | none => rw [hr] at h; cases h
+        | some v =>
+          rw [hr] at h
+          dsimp only at h
+          obtain ⟨hdr, hf⟩ := hd r v hr
+          rw [runRW_regRead_dr D orc s r k hdr, hf]
+          cases hk : runRead dref (k v) with
+          | none => rw [hk] at h; cases h
+          | some p =>
+            rw [hk] at h
+            simp only [Option.map_some, Option.some.injEq] at h
+            obtain ⟨x', b'⟩ := p
+            simp only [Prod.mk.injEq] at h
+            obtain ⟨rfl, -⟩ := h
+            exact ih v x' b' hk
+      | barrier _ | cacheOp _ | tlbi _ | translationStart _ | translationEnd _ | takeException _
+      | returnException _ | cycleCount | message _ =>
+        simp only [runRead] at h
+        cases hk : runRead dref (k ()) with
+        | none => rw [hk] at h; cases h
+        | some p =>
+          rw [hk] at h
+          simp only [Option.map_some, Option.some.injEq] at h
+          obtain ⟨x', b'⟩ := p
+          simp only [Prod.mk.injEq] at h
+          obtain ⟨rfl, -⟩ := h
+          simp only [runRW]
+          exact ih () x' b' hk
+      | getCycleCount =>
+        simp only [runRead] at h
+        cases hk : runRead dref (k (0 : Nat)) with
+        | none => rw [hk] at h; cases h
+        | some p =>
+          rw [hk] at h
+          simp only [Option.map_some, Option.some.injEq] at h
+          obtain ⟨x', b'⟩ := p
+          simp only [Prod.mk.injEq] at h
+          obtain ⟨rfl, -⟩ := h
+          simp only [runRW]
+          exact ih (0 : Nat) x' b' hk
+      | _ => simp [runRead] at h
+
+/-- **Read-only transfer**: a walk over the read-only list footprint `Lr`
+(no register written, no wire read) gives the same answer from any state
+whose file agrees on `Lr`, over any footprint reading `Lr`; the byte map and
+reservation bit land where the reference walk put them. -/
+theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr, D.Dr r = true)
+    (m : SailM X) :
+    ∀ (orc orc' : UOrc) (s₀ s s₀' : UWSt) (x : X),
+      (∀ r ∈ Lr, s₀.file r = s.file r) → s₀.mm = s.mm → s₀.rv = s.rv →
+      runRW (uFootL [] Lr []) orc s₀ m = some (x, s₀', orc') →
+      runRW D orc s m = some (x, { s with mm := s₀'.mm, rv := s₀'.rv }, orc') := by
+  induction m with
+  | pure y =>
+    intro orc orc' s₀ s s₀' x _ hm hr h
+    simp only [runRW, Option.some.injEq, Prod.mk.injEq] at h
+    obtain ⟨rfl, rfl, rfl⟩ := h
+    rw [hm, hr]
+    rfl
+  | impure call k ih =>
+    intro orc orc' s₀ s s₀' x hf hm hr h
+    cases call with
+    | error e => simp only [runRW, reduceCtorEq] at h
+    | ok o =>
+      cases o with
+      | regRead r =>
+        by_cases hc : Lr.contains r = true
+        · have hrL : r ∈ Lr := List.contains_iff_mem.1 hc
+          have h0 : (uFootL [] Lr []).Dr r = true := by
+            simp only [uFootL, List.contains_nil, Bool.false_or, hc]
+          rw [runRW_regRead_dr _ _ _ _ _ h0] at h
+          have e := runRW_regRead_dr D orc s r k (hD r hrL)
+          rw [e, ← hf r hrL]
+          exact ih _ _ _ _ _ _ _ hf hm hr h
+        · simp only [runRW, uFootL, List.contains_nil, Bool.false_or, hc, Bool.false_eq_true,
+            if_false, reduceCtorEq] at h
+      | regWrite r v =>
+        simp only [runRW, uFootL, List.contains_nil, Bool.false_eq_true, if_false, reduceCtorEq] at h
+      | memRead n vs req =>
+        simp only [runRW] at h ⊢
+        rw [hm] at h
+        by_cases h1 : akIfetch req.access_kind = true
+        · simp only [h1, ↓reduceIte, reduceCtorEq] at h
+        · simp only [h1, Bool.false_eq_true, ↓reduceIte] at h ⊢
+          by_cases h2 : n < 2 ^ 64
+          · simp only [h2, ↓reduceIte] at h ⊢
+            by_cases h3 : akExcl req.access_kind = true
+            · simp only [h3, ↓reduceIte] at h ⊢
+              cases hw : bmRead s.mm req.pa n with
+              | none => simp only [hw, reduceCtorEq] at h
+              | some w =>
+                simp only [hw] at h ⊢
+                exact ih _ _ _ { s₀ with mm := s.mm, rv := true } { s with rv := true } _ _ hf rfl rfl h
+            · simp only [h3, Bool.false_eq_true, ↓reduceIte] at h ⊢
+              cases hw : bmRead s.mm req.pa n with
+              | none => simp only [hw, reduceCtorEq] at h
+              | some w =>
+                simp only [hw] at h ⊢
+                exact ih _ _ _ s₀ s _ _ hf hm hr h
+          · simp only [h2, ↓reduceIte, reduceCtorEq] at h
+      | memWrite n vs req =>
+        simp only [runRW] at h ⊢
+        rw [hm] at h
+        by_cases h2 : n < 2 ^ 64
+        · simp only [h2, ↓reduceIte] at h ⊢
+          cases hv : req.value with
+          | none => simp only [hv, reduceCtorEq] at h
+          | some w' =>
+            simp only [hv] at h ⊢
+            by_cases h3 : bmOwned s.mm req.pa n = true
+            · simp only [h3, ↓reduceIte] at h ⊢
+              exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
+                { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl h
+            · simp only [h3, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
+        · simp only [h2, ↓reduceIte, reduceCtorEq] at h
+      | barrier _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | cacheOp _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | tlbi _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | translationStart _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | translationEnd _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | takeException _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | returnException _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | cycleCount => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | getCycleCount => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | message _ => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | choose p => exact ih _ _ _ _ _ _ _ hf hm hr h
+      | readRam _ _ _ => simp only [runRW, reduceCtorEq] at h
+      | writeRam _ _ _ _ => simp only [runRW, reduceCtorEq] at h
+
+end rotransfer
+
 end MachCSL

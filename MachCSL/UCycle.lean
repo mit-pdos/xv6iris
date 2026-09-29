@@ -36,7 +36,7 @@ on symbolic data (`minstret_increment`, the dispatch's pending test) are
 split in the proof (`cases`), never handed to the kernel.  The closed reads
 (`currentlyEnabled Ext_S`/`Ext_Zca`, `is_landing_pad_expected`) are
 evaluated once at a closed reference map by `runRead` and transported to any
-state agreeing with it (`uc_runRW_of_runRead`, the walker twin of
+state agreeing with it (`runRW_of_runRead`, the walker twin of
 DecodeBridge's read congruence).
 -/
 import MachCSL.UCycleDefs
@@ -96,67 +96,6 @@ theorem ucRW_writeReg_pure (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterT
     (h : D.Dw r = true) : runRW D orc s (writeReg r v) = some ((), s.setR r v, orc) := by
   show runRW D orc s (FreeM.impure (.ok (.regWrite r v)) FreeM.pure) = _
   simp only [runRW, h, if_true]; rfl
-
-/-- **Read-walk transport** (the walker twin of DecodeBridge's read
-congruence): a read-only walk at a reference map `dref` is a walk of `runRW`
-at every state agreeing with `dref` on registers the footprint reads --
-state and oracle untouched. -/
-theorem uc_runRW_of_runRead (dref : (r : Register) → Option (RegisterType r)) {X : Type}
-    (orc : UOrc) (s : UWSt) (hd : ∀ r v, dref r = some v → D.Dr r = true ∧ s.file r = v) :
-    ∀ (m : SailM X) (x : X) (b : Bool), runRead dref m = some (x, b) → runRW D orc s m = some (x, s, orc) := by
-  intro m
-  induction m with
-  | pure y => intro x b h; simp only [runRead, Option.some.injEq, Prod.mk.injEq] at h; rw [← h.1]; rfl
-  | impure call k ih =>
-    intro x b h
-    cases call with
-    | error e => simp [runRead] at h
-    | ok o =>
-      cases o with
-      | regRead r =>
-        simp only [runRead] at h
-        cases hr : dref r with
-        | none => rw [hr] at h; cases h
-        | some v =>
-          rw [hr] at h
-          dsimp only at h
-          obtain ⟨hdr, hf⟩ := hd r v hr
-          rw [runRW_regRead_dr D orc s r k hdr, hf]
-          cases hk : runRead dref (k v) with
-          | none => rw [hk] at h; cases h
-          | some p =>
-            rw [hk] at h
-            simp only [Option.map_some, Option.some.injEq] at h
-            obtain ⟨x', b'⟩ := p
-            simp only [Prod.mk.injEq] at h
-            obtain ⟨rfl, -⟩ := h
-            exact ih v x' b' hk
-      | barrier _ | cacheOp _ | tlbi _ | translationStart _ | translationEnd _ | takeException _
-      | returnException _ | cycleCount | message _ =>
-        simp only [runRead] at h
-        cases hk : runRead dref (k ()) with
-        | none => rw [hk] at h; cases h
-        | some p =>
-          rw [hk] at h
-          simp only [Option.map_some, Option.some.injEq] at h
-          obtain ⟨x', b'⟩ := p
-          simp only [Prod.mk.injEq] at h
-          obtain ⟨rfl, -⟩ := h
-          simp only [runRW]
-          exact ih () x' b' hk
-      | getCycleCount =>
-        simp only [runRead] at h
-        cases hk : runRead dref (k (0 : Nat)) with
-        | none => rw [hk] at h; cases h
-        | some p =>
-          rw [hk] at h
-          simp only [Option.map_some, Option.some.injEq] at h
-          obtain ⟨x', b'⟩ := p
-          simp only [Prod.mk.injEq] at h
-          obtain ⟨rfl, -⟩ := h
-          simp only [runRW]
-          exact ih (0 : Nat) x' b' hk
-      | _ => simp [runRead] at h
 
 end steps
 
@@ -390,14 +329,14 @@ theorem uc_currentlyEnabled_S {X : Type} {s : UWSt} (hm : UcMisa D s) (orc : UOr
     (k : Bool → SailM X) :
     runRW D orc s (currentlyEnabled extension.Ext_S >>= k) = runRW D orc s (k true) :=
   runRW_bind_some D _ _ orc orc s s true
-    (uc_runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_S)
+    (runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_S)
 
 /-- The `Ext_Zca` gate is open. -/
 theorem uc_currentlyEnabled_Zca {X : Type} {s : UWSt} (hm : UcMisa D s) (orc : UOrc)
     (k : Bool → SailM X) :
     runRW D orc s (currentlyEnabled extension.Ext_Zca >>= k) = runRW D orc s (k true) :=
   runRW_bind_some D _ _ orc orc s s true
-    (uc_runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_Zca)
+    (runRW_of_runRead D ucDrefMisa orc s hm.dref _ _ _ uc_runRead_Zca)
 
 /-- What the dispatch reads: the privilege, `mip`/`mie`/`mideleg`, `mstatus`
 (hoisted by the model's `do`-notation, see UDispatch), `misa`; and the two
@@ -527,14 +466,14 @@ theorem uc_decode32 (orc : UOrc) (s : UWSt)
     (hd : ∀ r v, drefU r = some v → D.Dr r = true ∧ s.file r = v) (w : BitVec 32) :
     ∃ i, decodableU i = true ∧ runRW D orc s (ext_decode w) = some (i, s, orc) := by
   obtain ⟨i, b, h, hi⟩ := decodeU_total32 w
-  exact ⟨i, hi, uc_runRW_of_runRead D drefU orc s hd _ _ _ h⟩
+  exact ⟨i, hi, runRW_of_runRead D drefU orc s hd _ _ _ h⟩
 
 /-- The same for a 16-bit halfword (`decodableUC`). -/
 theorem uc_decode16 (orc : UOrc) (s : UWSt)
     (hd : ∀ r v, drefU r = some v → D.Dr r = true ∧ s.file r = v) (h : BitVec 16) :
     ∃ i, decodableUC i = true ∧ runRW D orc s (ext_decode_compressed h) = some (i, s, orc) := by
   obtain ⟨i, b, h', hi⟩ := decodeU_total16 h
-  exact ⟨i, hi, uc_runRW_of_runRead D drefU orc s hd _ _ _ h'⟩
+  exact ⟨i, hi, runRW_of_runRead D drefU orc s hd _ _ _ h'⟩
 
 /-! ## §6 Whole cycles of an ACTIVE hart -/
 
