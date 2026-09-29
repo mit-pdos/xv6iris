@@ -120,7 +120,7 @@ Section PipeKillMark.
      proc_priv_core pa pid U).
   Proof using .
     iIntros "H". iEval (rewrite proc_priv_core_bare) in "H".
-    iDestruct "H" as "(Hb & %Hlz & Hc & Hft & Hgq & Hxs & Hgh)".
+    iDestruct "H" as "(Hb & %Hlz & Hc & Hft & Hgq & Hxs & Hev & Hgh)".
     iDestruct (proc_priv_bare_pid with "Hb") as "[Hq Hbback]".
     iDestruct "Hgh" as "[Hat Ht]".
     iDestruct (gen_halves_at_reg with "Hat") as "[Hpr Hgback]".
@@ -130,7 +130,7 @@ Section PipeKillMark.
     iIntros "Hq Hpr Ht". rewrite proc_priv_core_bare.
     iSplitL "Hbback Hq"; [ iApply ("Hbback" with "Hq") | ].
     iSplitR; [ iPureIntro; exact Hlz | ].
-    iFrame "Hc Hft Hgq Hxs". rewrite /gen_halves_priv.
+    iFrame "Hc Hft Hgq Hxs Hev". rewrite /gen_halves_priv.
     iSplitL "Hgback Hpr"; [ iApply ("Hgback" with "Hpr") | iExact "Ht" ].
   Qed.
 

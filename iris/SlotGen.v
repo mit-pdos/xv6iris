@@ -112,6 +112,45 @@ Fixpoint sg_boot_map (g0 : gname) (k n : nat) : sgen_map :=
               (sg_boot_map g0 (S k) n')
   end.
 
+(* THE EVENT COUNTER'S ELEMENT (design ni-strong-instance.md §7): one slot
+   at count [k], owned whole -- [act_cnt] is exclusive. *)
+Definition act_one (pa : mword 64) (k : nat) : act_map :=
+  {[ pa := to_dfrac_agree (DfracOwn 1) (k : natO) ]}.
+
+Lemma act_el_valid (k : nat) : ✓ (to_dfrac_agree (DfracOwn 1) (k : natO)).
+Proof.
+  rewrite /to_dfrac_agree pair_valid. split; [apply dfrac_valid_own_1 |].
+  rewrite -(agree_idemp (to_agree (k : natO))).
+  rewrite to_agree_op_valid. reflexivity.
+Qed.
+
+Fixpoint act_boot_map (k n : nat) : act_map :=
+  match n with
+  | O => ∅
+  | S n' => <[ proc_addr k := to_dfrac_agree (DfracOwn 1) (0%nat : natO) ]>
+              (act_boot_map (S k) n')
+  end.
+
+Lemma act_boot_map_lookup_None (j n i : nat) :
+  (j + n <= NPROC)%nat -> (i < j)%nat ->
+  act_boot_map j n !! proc_addr i = None.
+Proof.
+  revert j. induction n as [|n IH]; intros j Hjn Hij; cbn [act_boot_map].
+  - apply lookup_empty.
+  - rewrite lookup_insert_None. split.
+    + apply IH; lia.
+    + intro Hpa.
+      assert (Hje : j = i) by (apply proc_addr_inj; [lia | lia | exact Hpa]).
+      lia.
+Qed.
+
+Lemma act_boot_map_valid (j n : nat) : ✓ (act_boot_map j n : actUR).
+Proof.
+  revert j. induction n as [|n IH]; intros j; cbn [act_boot_map].
+  - assert (H0 : ✓ (ε : actUR)) by apply ucmra_unit_valid. exact H0.
+  - apply insert_valid; [ apply act_el_valid | apply IH ].
+Qed.
+
 (* two fractions of one slot's entry compose into one *)
 Lemma sg_one_op (pa : mword 64) (dq dq' : dfrac) (g : gname) :
   sg_one pa dq g ⋅ sg_one pa dq' g ≡ sg_one pa (dq ⋅ dq') g.
@@ -231,6 +270,38 @@ Section SlotGen.
     rewrite /sg_one. apply singleton_update, cmra_update_exclusive.
     apply sg_el_valid, dfrac_valid_own_1.
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SLOT'S EVENT COUNTER (design ni-strong-instance.md §7).          *)
+  (* ------------------------------------------------------------------ *)
+  (* An exclusive [nat] per slot, with no authority and no tie: the
+     permit an actor-labelled ledger append consumes, stepped by its
+     holder.  Born at 0 for every slot ([act_rows_alloc]), parked in the
+     dormant block ([ProcDefs.proc_dormant]) and carried by the running
+     process's block ([ProcInv.proc_priv_core]) at [pv_ev]. *)
+  Definition act_cnt (pa : mword 64) (k : nat) : iProp Σ :=
+    own wact_name (act_one pa k : actUR).
+
+  Global Instance act_cnt_timeless pa k : Timeless (act_cnt pa k).
+  Proof using . apply _. Qed.
+
+  Lemma act_cnt_excl pa k k' : act_cnt pa k -∗ act_cnt pa k' -∗ False.
+  Proof using .
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite /act_one singleton_op singleton_valid in Hv.
+    iPureIntro. exact (exclusive_l _ _ Hv).
+  Qed.
+
+  Lemma act_cnt_update pa k k' : act_cnt pa k ==∗ act_cnt pa k'.
+  Proof using .
+    rewrite /act_cnt. iApply own_update.
+    rewrite /act_one. apply singleton_update, cmra_update_exclusive.
+    apply act_el_valid.
+  Qed.
+
+  Lemma act_cnt_step pa k : act_cnt pa k ==∗ act_cnt pa (S k).
+  Proof using . apply act_cnt_update. Qed.
 
   (* ...AND THE ONE-WAY DISCARD, WHICH <INIT> ALONE TAKES (lane
      TRAP-ROWS-3/4, T4(b)).  userinit has no parent to hold the three
@@ -935,6 +1006,35 @@ Section SlotGenBoot.
       [ apply sg_boot_map_valid |].
     iModIntro. iExists γ.
     iApply (sg_boot_split γ g0 0 NPROC ltac:(lia) with "H").
+  Qed.
+
+  Lemma act_boot_split (γ : gname) (j n : nat) :
+    (j + n <= NPROC)%nat ->
+    own γ (act_boot_map j n : actUR) ⊢
+    [∗ list] i ∈ seq j n, own γ (act_one (proc_addr i) 0 : actUR).
+  Proof using .
+    revert j. induction n as [|n IH]; intros j Hjn.
+    - iIntros "_". done.
+    - iIntros "H". cbn [act_boot_map].
+      rewrite insert_singleton_op;
+        [| apply (act_boot_map_lookup_None (S j) n j); lia].
+      rewrite own_op. iDestruct "H" as "[Hhd Htl]".
+      replace (seq j (S n)) with (j :: seq (S j) n) by reflexivity.
+      rewrite big_sepL_cons.
+      iSplitL "Hhd"; [ iExact "Hhd" |].
+      iApply (IH (S j) ltac:(lia) with "Htl").
+  Qed.
+
+  (* the NPROC event counters, each at 0, at a fresh name which
+     [WaitInv.children_res_alloc] installs as [wact_name]. *)
+  Lemma act_rows_alloc :
+    ⊢ |==> ∃ γ : gname,
+        [∗ list] i ∈ seq 0 NPROC, own γ (act_one (proc_addr i) 0 : actUR).
+  Proof using .
+    iMod (own_alloc (act_boot_map 0 NPROC : actUR)) as (γ) "H";
+      [ apply act_boot_map_valid |].
+    iModIntro. iExists γ.
+    iApply (act_boot_split γ 0 NPROC ltac:(lia) with "H").
   Qed.
 
 End SlotGenBoot.

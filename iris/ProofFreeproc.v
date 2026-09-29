@@ -903,7 +903,7 @@ Section ProofFreeproc.
                            (* the parked block is DORMANT, so its lazy bit
                               is [true] -- raising it is free, the claim at
                               [true] promises nothing (lane LAZY-FLAG, K2) *)
-                           (pv_cwi V) g (pv_chg V) true (pv_secc V))
+                           (pv_cwi V) g (pv_chg V) true (pv_secc V) (pv_ev V))
                   (mword_of_int 0 : mword 32) (pv_sz V) (mword_of_int 0 : mword 32)
                   ltac:(vm_compute; reflexivity) ltac:(reflexivity)
                   with "[Hpid Hsz Hcwd Hnm Hsecc Hof Hunits Hspare Hkst Hctx] [Hrow] [Hsg] [Hxs2] [Hpg] [Htf]").

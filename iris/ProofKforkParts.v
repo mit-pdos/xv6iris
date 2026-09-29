@@ -750,7 +750,7 @@ Section KforkFreeproc.
     intros Hof Hcwd.
     iIntros "Hpv Hsp Hir Hbs Hctx Hkst".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
-    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Ho)".
+    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hev & Ho)".
     iDestruct (proc_ofiles_null_split γf (pv_fdg (us_V U)) pa (pv_ofile (us_V U)) Hof with "Ho")
       as "[Hcells Hunits]".
     rewrite /proc_ptm_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -758,7 +758,7 @@ Section KforkFreeproc.
     cbn [fst snd].
     iSplitR "Hpg Hptt Htfc Htfp".
     { iSplitR; [iPureIntro; split_and!; [exact Hof | exact Hcwd | exact Hszb]|].
-      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hbs Hkst Hctx". }
+      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hbs Hkst Hev Hctx". }
     iSplitL "Hpg Hptt".
     { (* [SpecFreeproc.fp_pt] is at the MAPPED tier ([proc_pt_any]); the
          block's conjunct is the lazy view, and [proc_ptm_pt] is the

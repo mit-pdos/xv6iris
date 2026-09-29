@@ -1672,7 +1672,10 @@ Section WaitInv.
      zomb_led_auth [] ∗
      [∗ list] i ∈ seq 0 NPROC,
        ∃ γ0 g : gname,
-         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g)%I.
+         ch_frag γ0 (proc_addr i) ∅ ∗ slot_gen (proc_addr i) (DfracOwn 1) g ∗
+         (* the slot's event counter, born at 0 (design
+            ni-strong-instance.md §7) *)
+         act_cnt (proc_addr i) 0)%I.
 
   Definition children_boot : iProp Σ :=
     (init_pid_tok (mword_of_int 0 : mword 32) ∗ children_boot_rows)%I.
@@ -1965,10 +1968,13 @@ Section WaitInvBoot.
        ni-zombie-ledger.md D2): nothing has exited *)
     iMod (own_alloc (●ML ([] : list (leibnizO zev)))) as (γzl) "Hzl";
       [ apply mono_list_auth_valid | ].
-    iModIntro. iExists (WchG Σ _ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl γtk γzl).
+    (* ...and the NPROC event counters, each at 0 (design
+       ni-strong-instance.md §7) *)
+    iMod act_rows_alloc as (γact) "Hact".
+    iModIntro. iExists (WchG Σ _ _ _ _ _ _ _ _ γ γo γsg γpr γip γnp γpl γtk γzl γact).
     rewrite /children_boot /children_boot_rows /children_res_boot
             /children_own_at /orphans_own
-            /pid_reg_auth /pid_led_auth /tick_cnt /zomb_led_auth /slot_gen /init_pid_tok /SlotGen.nextpid_pend.
+            /pid_reg_auth /pid_led_auth /tick_cnt /zomb_led_auth /slot_gen /act_cnt /init_pid_tok /SlotGen.nextpid_pend.
     iSplitR "Hnp"; [| iExact "Hnp"].
     iSplitL "Hip"; [iExact "Hip" |].
     iSplitL "Ha"; [iExists m'; iFrame "Ha"; iPureIntro; exact Hok |].
@@ -1977,9 +1983,10 @@ Section WaitInvBoot.
     iSplitL "Hpl"; [iExact "Hpl" |].
     iSplitL "Htk"; [iExact "Htk" |].
     iSplitL "Hzl"; [iExact "Hzl" |].
+    iDestruct (big_sepL_sep_2 with "Hsg Hact") as "Hsg".
     iDestruct (big_sepL_sep_2 with "Hrows Hsg") as "H".
-    iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) Hsg]".
-    iExists γ0, γ. iFrame "Hrow Hsg".
+    iApply (big_sepL_mono with "H"). iIntros (k i _) "[(%γ0 & Hrow) [Hsg Hact]]".
+    iExists γ0, γ. iFrame "Hrow Hsg Hact".
   Qed.
 End WaitInvBoot.
 

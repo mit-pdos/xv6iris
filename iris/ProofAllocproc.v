@@ -2009,7 +2009,7 @@ Section ProofAllocproc.
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hxb & Hrest)".
         iModIntro.
         iDestruct "Hrest" as (V pid0)
-          "([%Hof [%Hcwd [%Hszb [%Hpid00 %Hlzv]]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hfrag)".
+          "([%Hof [%Hcwd [%Hszb [%Hpid00 %Hlzv]]]] & Hpidhalf & Hfields & Hofiles & Hrow & Hsg & Hev & Hfrag)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv & Hkrow0)".
         (* THE UNUSED SLOT'S FLAG IS ZERO, and allocproc has to read it
            (lane SELF-KILL, §4b'): it is about to found this payload's
@@ -2308,13 +2308,13 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa T2 k γl V γg pidn USED ch None None
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hkrow". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. iEval (rewrite -Htfz). iExact "Htfcell". }
           iApply wp_next_off_intro.
@@ -2680,13 +2680,13 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γp γa U2 k γl V γg pidn USED ch None (Some (tfp, tfws))
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) Hk (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell Htfpage] Henvb").
+                    with "Hcg Hcpu Htext Hpc Hpidlk [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hkrow] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx] Hrow Hsg Hpr Hxb [Hpgcell] [Htfcell Htfpage] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hkrow". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hbsp Hkst Hev Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. cbn [fst snd].
             iEval (rewrite -Hbasetf) in "Htfcell". iFrame "Htfcell Htfpage".
@@ -3127,7 +3127,7 @@ Section ProofAllocproc.
                         empty user map. *)
                      ltac:(cbn [us_V upd_gen pv_lazy pv_secc]; rewrite Hlzv;
                            intro Hc; discriminate Hc)
-                     with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
+                     with "Hpidown Hfields Hptat [Htfpage] Hofiles Hev") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
         iEval (rewrite /ap_tail) in "Htl".
         iApply ("Htl" $! (trap_res b) false CIDf H5 (proc_addr k) with "[%] Hcg Hpc").

@@ -120,6 +120,12 @@ Record pprivate := MkPPriv {
      every other [upd_*] below preserves it.  LAST in the record, so every
      positional [MkPPriv] only gained a trailing argument. *)
   pv_secc  : mword 64;
+  (* THE PROCESS'S EVENT COUNTER (lane NI-STRONG-INSTANCE §7): the number of
+     actor-labelled ledger appends made with this slot's permit
+     ([SlotGen.act_cnt pa (pv_ev V)], which the block carries).  A GHOST
+     FIELD, NOT A CELL, like [pv_lazy]: nothing in [struct proc] stores it.
+     LAST, so every positional [MkPPriv] only gained a trailing argument. *)
+  pv_ev    : nat;
 }.
 
 (* the mask that allows everything -- userinit's [p->seccomp = ~0ULL] *)
@@ -129,38 +135,47 @@ Definition secc_all : mword 64 := mword_of_int (-1).
 Definition upd_secc (V : pprivate) (m : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
           (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V)
-          (and_vec (pv_secc V) m).
+          (and_vec (pv_secc V) m) (pv_ev V).
 
 (* ...and the raw store of a whole mask, for the two writers that do not AND
    (userinit's [secc_all], kfork's copy of the parent's). *)
 Definition set_secc (V : pprivate) (m : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) m.
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) m (pv_ev V).
 
 Lemma set_secc_id (V : pprivate) : set_secc V (pv_secc V) = V.
 Proof. destruct V; reflexivity. Qed.
 
+(* the event counter's ghost write -- the permit's holder steps it once per
+   actor-labelled append (design ni-strong-instance.md §7). *)
+Definition upd_ev (V : pprivate) (k : nat) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) k.
+
+Lemma upd_ev_id (V : pprivate) : upd_ev V (pv_ev V) = V.
+Proof. destruct V; reflexivity. Qed.
+
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) (pv_ev V).
 
 (* the inum alone -- chdir's second write, beside the pointer's *)
 Definition upd_cwi (V : pprivate) (z : Z) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) z (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
+          (pv_name V) z (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V) (pv_ev V).
 
 (* THE GENERATION, INSTALLED: allocproc's mint of a fresh incarnation
    ([ChildTok.gen_alloc]) writes the name it chose into the block. *)
 Definition upd_gen (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) g (pv_chg V) (pv_lazy V) (pv_secc V).
+          (pv_name V) (pv_cwi V) g (pv_chg V) (pv_lazy V) (pv_secc V) (pv_ev V).
 
 (* ...AND THE CHILDREN ROW'S NAME, installed by whoever creates the process
    at the moment it holds <wait_lock> and can put the row in the map
    ([SpecKfork]'s [acquire(&wait_lock); np->parent = p]). *)
 Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) g (pv_lazy V) (pv_secc V).
+          (pv_name V) (pv_cwi V) (pv_gen V) g (pv_lazy V) (pv_secc V) (pv_ev V).
 
 (* ...AND THE LAZY BIT, the one field a SYSCALL writes without any C store
    behind it: sbrk's LAZY arm raises [p->sz] with the table untouched, which
@@ -168,7 +183,7 @@ Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
    ([SpecSysSbrk]'s own row).  exec's success clears it ([upd_exec]). *)
 Definition upd_lazy (V : pprivate) (b : bool) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) b (pv_secc V).
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) b (pv_secc V) (pv_ev V).
 
 Lemma upd_lazy_id (V : pprivate) : upd_lazy V (pv_lazy V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -716,6 +731,11 @@ Section ProcDefs.
           under the <wait_lock> kexit holds at the store), so what it parks
           is an EMPTY row -- and the reap therefore has nothing to reset. *)
        ch_frag (pv_chg V) pa ∅ ∗
+       (* THE SLOT'S EVENT COUNTER ([SlotGen.act_cnt], design
+          ni-strong-instance.md §7) at the block's own [pv_ev]: born at 0
+          at boot, handed out with the block by allocproc, parked here
+          again at exit.  Context-free, on the row's footing. *)
+       act_cnt pa (pv_ev V) ∗
        (* ...AND THE SLOT'S PIECES OF THE TWO EXCLUSIVE GENERATION GHOSTS
           ([SlotGen.gen_halves_dorm]), beside the row and on its footing.
           At UNUSED the slot owns this slot's current generation WHOLE --
@@ -807,6 +827,11 @@ Section ProcDefs.
           under the <wait_lock> kexit holds at the store), so what it parks
           is an EMPTY row -- and the reap therefore has nothing to reset. *)
        ch_frag (pv_chg V) pa ∅ ∗
+       (* THE SLOT'S EVENT COUNTER ([SlotGen.act_cnt], design
+          ni-strong-instance.md §7) at the block's own [pv_ev]: born at 0
+          at boot, handed out with the block by allocproc, parked here
+          again at exit.  Context-free, on the row's footing. *)
+       act_cnt pa (pv_ev V) ∗
        (* the slot's pieces of the two generation ghosts -- see
           [proc_dormant] *)
        gen_halves_dorm pa pid (pv_gen V) st ∗
@@ -831,11 +856,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof using .
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hgh Hxs Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hev & Hgh & Hxs & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hev Hgh Hxs Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hgh Hxs Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hev & Hgh & Hxs & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hch Hev Hgh Hxs Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
@@ -928,7 +953,7 @@ Qed.
   Proof using .
     iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
     iDestruct "H" as (V pid)
-      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hgh & Hxs & Haddr)".
+      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hch & Hev & Hgh & Hxs & Haddr)".
     (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
     iMod (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
     iMod (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
