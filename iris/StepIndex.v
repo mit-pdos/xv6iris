@@ -14,7 +14,7 @@
    natSI] holds, so the finite-only later laws are available.  The ordinal
    phase of the port switches this line to [ordI]
    ([transfinite.stepindex.ordinals]); local-plan/transfinite-integration.md. *)
-From iris.algebra Require Export stepindex.
+From iris.algebra Require Import stepindex.
 From iris.algebra Require Import stepindex_finite.
 
 #[export] Instance xv6_sidx : sidx := natSI.
