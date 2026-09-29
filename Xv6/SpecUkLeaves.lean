@@ -474,8 +474,9 @@ end Leaves
 
 /-- **`UK_LEAVES`** (union brief DU2): the per-instruction leaves of the
 verified user engine, as one assumed interface, quantified over the ambient
-instances as `SpecUser.USER` is.  Proved by the user_layer lane
-(`LinkUkLeaves`); until then a PARAMETER of the union theorem. -/
+instances as `SpecUser.USER` is.  PROVED: `LinkUkLeaves.ukLeaves_holds` (the
+engine `UkEngine` over USER's tower; the icache stamp minted at userret's
+`fence.i`). -/
 structure UK_LEAVES : Prop where
   wp_uk_rtype : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkRtypeBody (hlc := hlc) (GF := GF)

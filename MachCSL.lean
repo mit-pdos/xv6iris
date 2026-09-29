@@ -196,3 +196,10 @@ import MachCSL.UMemExec
 import MachCSL.UMemAmoPhys
 import MachCSL.UMemPfWalk
 import MachCSL.UMemPfPhys
+import MachCSL.CtxX
+import MachCSL.URunX
+import MachCSL.URunXWalk
+import MachCSL.UIcache
+import MachCSL.UIcacheFence
+import MachCSL.UIcacheFencei
+import MachCSL.URunXSwp

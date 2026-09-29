@@ -56,9 +56,11 @@ the per-cpu cells, the running token, the kernel table's shared invariant
    (∀ C with `loopOk C P`), instead of Rocq's raw cells over
    `utlb_inv_pt uroot tfp um`; the repackaging is Rocq's
    `userret_to_user_state` (UserKernelBridge), done here.
-3. **No icache stamp** (UserExec deviation 7): Rocq's `Pimg`/`Qimg` and the
-   `ifence_step` run at the `fence.i` are dropped; `userPtInvX` is
-   `userPtInv`.
+3. **The icache stamp** (UserExec deviation 7): Rocq's `Pimg`/`Qimg` and the
+   `ifence_step` run at the `fence.i` are the proof's (`UserretEntryPt`,
+   `ProofUserret`): the continuation's `userPtInvX` holds the TEXT pages
+   stamped (MachCSL `ctxByteX`) at the instruction view the `fence.i` raised
+   (`iviewLb`).
 4. The trapframe is the kernel's `tfPageAt P.tfp ws` (virtual word cells at
    the running context), converted to physical form inside the proof (the
    page is a RAM page the kernel maps to itself), not Rocq's 31 physical
