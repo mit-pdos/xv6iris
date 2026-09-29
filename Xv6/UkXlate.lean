@@ -118,7 +118,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
   have hdw : ufFoot.Dw .tlb = true := ufFoot_wr _ (by decide)
   have hL := ukm_leaves_of_um P hm.wf _ lw hlw
   obtain ⟨addr, w, hw, had⟩ := hrep.2.2.2.1 vpn lw hL
-  have had' : utlbAD lw w := had
+  have had' : pteAD lw w := had
   have hlok := uft_leaves_ok P hm.wf hv _ lw hL
   have hok := uftLeafOk_AD hlok.1 had'
   have hN : ∀ addr w, t.walk 2 vpn = some (addr, w) → _get_PTE_Ext_N (uwkExt w) = 0#1 := by
@@ -129,7 +129,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
   have hpermEq : uwkPermOk acc false w = uwkPermOk acc false lw := by
     obtain ⟨a, d, e⟩ := had'
     rw [e, utlb_permOk_setAD]
-  have hppn : uwkPpn w = ptePpn lw := utlbAD_ppn had'
+  have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had'
   have hmem := ukm_treeMem hm addr w (PTree.walk_mem_entries 2 t vpn addr w hw)
   cases hperm : uwkPermOk acc false lw with
   | false =>
@@ -140,7 +140,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
     rw [hwalk orc, hw]
     simp only [uwkWalkRes, hok.inv, hpermEq, hperm, Bool.false_eq_true, if_false]
   | true =>
-    have hres : ukmRes acc lw = .Ok (uwkPpn w, .PBMT_PMA, ()) := by
+    have hres : ukmRes acc lw = .Ok (ptePpn w, .PBMT_PMA, ()) := by
       simp only [ukmRes, hperm, if_true, hppn]
     rw [hres]
     have hperm' : uwkPermOk acc false w = true := hpermEq.trans hperm
@@ -156,9 +156,9 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
       refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hm ?_,
         fun x hx => uft_file_tlb _ _ _ _ _ x hx, rfl⟩
       rw [uft_file_tlb_same]
-      exact utlbInv_fill t _ htlb vpn addr w w hw (utlbAD_refl w)
+      exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)
     | some x =>
-      have hadx : utlbAD w x := utlbAD_trans (utlbAD_symm had') (ume_update_AD hpl had' hu)
+      have hadx : pteAD w x := pteAD_trans (pteAD_symm had') (ume_update_AD hpl had' hu)
       have hokx := uftLeafOk_AD hok hadx
       have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w w x x hmem.2 _ hacc false sum hu
         hok.inv (uft_nonleaf hok) hok.n0 hperm' hu
@@ -168,7 +168,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
       refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) _ hm' ?_,
         fun y hy => uft_file_tlb _ _ _ _ _ y hy, hview⟩
       rw [uft_file_tlb_same]
-      exact utlbInv_after t _ _ htlb vpn addr w x hw hadx (uft_ne_zero hokx) (Or.inr rfl)
+      exact utlbOk_after t _ _ htlb vpn addr w x hw hadx (uft_ne_zero hokx) (Or.inr rfl)
 
 set_option maxHeartbeats 1000000 in
 /-- **The hit**, precise. -/
@@ -185,7 +185,7 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
   have hrep := hm.rep
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
   have hdw : ufFoot.Dw .tlb = true := ufFoot_wr _ (by decide)
-  obtain ⟨addr, w, w', hw, had', rfl⟩ := utlbInv_hit t _ htlb vpn ent hslot hmt
+  obtain ⟨addr, w, w', hw, had', rfl⟩ := utlbOk_hit t _ htlb vpn ent hslot hmt
   obtain ⟨lw', hlw', had⟩ := uft_walk_leaf hrep hw
   have hL := ukm_leaves_of_um P hm.wf _ lw hlw
   rw [hL] at hlw'
@@ -198,16 +198,16 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
     obtain ⟨a, d, e⟩ := had'
     obtain ⟨a', d', e'⟩ := had
     rw [e, utlb_permOk_setAD, e', utlb_permOk_setAD]
-  have hppn : uwkPpn w = ptePpn lw := utlbAD_ppn had
+  have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had
   cases hperm : uwkPermOk acc false lw with
   | false =>
     have hres : ukmRes acc lw = .Err (.PTW_No_Permission (), ()) := by
       simp only [ukmRes, hperm, Bool.false_eq_true, if_false]
     rw [hres]
-    exact ⟨s, fun orc => utlb_hit_denied ufFoot orc s hwk vpn _ hacc false sum (uwkPpn w) w' addr hok'.inv
+    exact ⟨s, fun orc => utlb_hit_denied ufFoot orc s hwk vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
       (hpermEq.trans hperm), ukmOut_refl hl⟩
   | true =>
-    have hres : ukmRes acc lw = .Ok (uwkPpn w, .PBMT_PMA, ()) := by
+    have hres : ukmRes acc lw = .Ok (ptePpn w, .PBMT_PMA, ()) := by
       simp only [ukmRes, hperm, if_true, hppn]
     rw [hres]
     have hperm' : uwkPermOk acc false w' = true := hpermEq.trans hperm
@@ -216,32 +216,32 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
       rw [e', utlb_permOk_setAD]; exact hperm
     cases hu : update_PTE_Bits w' acc with
     | none =>
-      exact ⟨_, fun orc => utlb_hit_keep ufFoot orc orc s s hwk vpn _ hacc false sum (uwkPpn w) w' addr hok'.inv
+      exact ⟨_, fun orc => utlb_hit_keep ufFoot orc orc s s hwk vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
         hperm' (uwk_upd_none ufFoot orc s vpn addr w' _ false sum hu), ukmOut_refl hl⟩
     | some x =>
       cases hum : update_PTE_Bits w acc with
       | some m' =>
-        have hadm : utlbAD w m' := utlbAD_trans (utlbAD_symm had) (ume_update_AD hpl had hum)
+        have hadm : pteAD w m' := pteAD_trans (pteAD_symm had) (ume_update_AD hpl had hum)
         have hokm := uftLeafOk_AD hok hadm
         have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w' w m' x hmem.2 _ hacc false sum hu
           hok.inv (uft_nonleaf hok) hok.n0 hpermw hum
         obtain ⟨hm', hview⟩ :=
           ukm_setLeaf hm vpn addr w m' hw (uft_ne_zero hokm) (uft_ptRep_setLeaf hrep hw hadm hokm)
-        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (uwkPpn w) w'
+        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (ptePpn w) w'
           addr m' hok'.inv hperm' (hupd orc), ?_⟩
         refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) _ hm' ?_,
           fun y hy => uft_file_tlb _ _ _ _ _ y hy, hview⟩
         rw [uft_file_tlb_same]
-        exact utlbInv_after t _ _ htlb vpn addr w m' hw hadm (uft_ne_zero hokm) (Or.inr rfl)
+        exact utlbOk_after t _ _ htlb vpn addr w m' hw hadm (uft_ne_zero hokm) (Or.inr rfl)
       | none =>
         have hupd := fun orc => uwk_upd_keep ufFoot orc s hwk vpn addr hmem.1 w' w x hmem.2 _ hacc false sum hu
           hok.inv (uft_nonleaf hok) hok.n0 hpermw hum
-        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (uwkPpn w) w'
+        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (ptePpn w) w'
           addr w hok'.inv hperm' (hupd orc), ?_⟩
         refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hm ?_,
           fun y hy => uft_file_tlb _ _ _ _ _ y hy, rfl⟩
         rw [uft_file_tlb_same]
-        exact utlbInv_fill t _ htlb vpn addr w w hw (utlbAD_refl w)
+        exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)
 
 /-- **`translate` of a user access to a mapped page**, precise (the lookup,
 then the hit or the miss). -/

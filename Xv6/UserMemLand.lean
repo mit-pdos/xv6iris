@@ -65,8 +65,8 @@ theorem ume_page {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 44
       inRam (paOf ppn va) n ∧ ummOwned mm (paOf ppn va) n := by
   obtain ⟨k, lw, w, hk, had, rfl⟩ := hpg
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw hk
-  have hppn : uwkPpn w = ptePpn lw := utlbAD_ppn had
-  have he : paOf (uwkPpn w) va = pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) := by
+  have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had
+  have he : paOf (ptePpn w) va = pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) := by
     rw [hppn, uft_paOf_eq, uft_off_eq, hpa]
   refine ⟨k, lw, hk, he, ?_, ?_⟩
   · rw [he, hpa]
@@ -81,7 +81,7 @@ theorem ume_pa_al {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 4
     (paOf ppn va).toNat % w = 0 := by
   obtain ⟨k, lw, w', hk, had, rfl⟩ := hpg
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw hk
-  have hppn : uwkPpn w' = ptePpn lw := utlbAD_ppn had
+  have hppn : ptePpn w' = ptePpn lw := pteAD_ptePpn had
   rw [hppn, uft_paOf_eq, uft_off_eq]
   have hal0 : (pageAddr (ptePpn lw)).toNat % 4096 = 0 := by
     have h12 : BitVec.extractLsb' 0 12 (pageAddr (ptePpn lw)) = 0#12 := by

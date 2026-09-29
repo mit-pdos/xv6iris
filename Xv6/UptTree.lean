@@ -47,11 +47,6 @@ theorem uptPteAD_kLeaf' (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1) 
     pteAD (kLeaf ppn perm a d) (kLeaf ppn perm a' d') :=
   ⟨a', d', by simp only [kLeaf, pteSetAD_pteSetAD]⟩
 
-theorem uptPteAD_trans {u v w : BitVec 64} (h1 : pteAD u v) (h2 : pteAD v w) : pteAD u w := by
-  obtain ⟨a, d, rfl⟩ := h1
-  obtain ⟨a', d', rfl⟩ := h2
-  exact ⟨a', d', by simp only [pteSetAD_pteSetAD]⟩
-
 /-- The page number a kernel-shaped leaf names. -/
 theorem uptPtePpn_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) :
     ptePpn (kLeaf ppn perm a d) = ppn := by
@@ -155,7 +150,7 @@ theorem uptPtRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (h : ptRep t L) (
       rw [hw'] at heq
       obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj heq)
       refine ⟨addr', kLeaf ppn perm a' d', PTree.walk_setLeaf_path_eq 2 t vpn vpn' _ hne hp _ _ hw', ?_⟩
-      exact uptPteAD_trans hv' (uptPteAD_kLeaf' ppn perm a d a' d')
+      exact pteAD_trans hv' (uptPteAD_kLeaf' ppn perm a d a' d')
     · exact ⟨addr', v', by rw [PTree.walk_setLeaf_other 2 t vpn vpn' _ hp]; exact hw', hv'⟩
   · intro vpn' hl
     by_cases hp : t.path 2 vpn = t.path 2 vpn'

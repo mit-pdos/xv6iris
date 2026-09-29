@@ -285,13 +285,6 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
 
 /-! ## The leaf `uvmalloc` writes -/
 
-/-- Every word is its own `A`/`D` variant. -/
-theorem pteAD_refl (c : BitVec 64) : pteAD c c := by
-  refine ⟨BitVec.extractLsb' 6 1 c, BitVec.extractLsb' 7 1 c, ?_⟩
-  simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
-
 theorem isLeafPte_iff (w : BitVec 64) :
     isLeafPte w ↔ (w.getLsbD 0 = true ∧ w &&& 0xE#64 ≠ 0#64) := by
   unfold isLeafPte PTE_V

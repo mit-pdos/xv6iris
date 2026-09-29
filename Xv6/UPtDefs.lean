@@ -14,7 +14,7 @@ bits (`pteAD`).
 -/
 import Xv6.PtOwn
 import Xv6.KallocDefs
-import MachCSL.UWalk
+import MachCSL.UTlb
 
 namespace Xv6
 
@@ -42,8 +42,6 @@ def PTE_U : BitVec 64 := 16#64
 def pteFlags (w : BitVec 64) : BitVec 64 := w &&& 0x3FF#64
 /-- `PTE2PA`. -/
 def pte2pa (w : BitVec 64) : BitVec 64 := (w >>> 10) <<< 12
-/-- The page number of a PTE. -/
-def ptePpn (w : BitVec 64) : BitVec 44 := BitVec.extractLsb' 10 44 w
 /-- What `mappages` stores: `PA2PTE(pa) | perm | PTE_V`. -/
 def uLeaf (ppn : BitVec 44) (perm : BitVec 64) : BitVec 64 :=
   (BitVec.setWidth 64 ppn <<< 10) ||| perm ||| 1#64
@@ -57,8 +55,6 @@ leaf (`N`, bit 63) and has `PBMT = 0` (bits 61–62), so the walk at U is the
 plain Sv39 walk and its TLB entry is `tlbEntryOf`'s (`global := false`).  The
 `A`/`D` bits the hardware sets do not touch them (`uLeafPins_setAD`). -/
 def uLeafPins (w : BitVec 64) : Prop := w &&& 0xE000000000000020#64 = 0#64
-/-- `v` is `c` up to the `A`/`D` bits (the hardware sets them). -/
-def pteAD (c v : BitVec 64) : Prop := ∃ a d : BitVec 1, v = pteSetAD c a d
 
 /-- `PGROUNDUP` on sizes. -/
 def pgRoundUpN (n : Nat) : Nat := (n + 4095) / 4096 * 4096

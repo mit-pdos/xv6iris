@@ -13,7 +13,7 @@ entry or `translate_TLB_miss` on the table's root.  The walk and the
 write-back are `UWalk`'s (`uwk_pt_walk`, `uwk_upd_*`), taken here as
 hypotheses of the same equation shape.
 
-**The invariant** `utlbInv t tlb` is Xv6's `utlbOk` (UserExec; Rocq
+**The invariant** `utlbOk t tlb` is Xv6's `utlbOk` (UserExec; Rocq
 `utlb_inv_pt`'s TLB row) stated in MachCSL generically: every resident slot
 caches, up to the `A`/`D` bits, a leaf the tree's walk reaches, at the slot
 its `vpn` hashes to.  A fill after a walk, a refresh after a write-back,
@@ -144,34 +144,35 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
     (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
       some (.Ok (po, ()), s', orc')) :
     runRW D orc s (translate_TLB_miss 39 0#16 root vpn acc .User mxr sum ()) =
-      some (.Ok (uwkPpn w, .PBMT_PMA, ()),
+      some (.Ok (ptePpn w, .PBMT_PMA, ()),
         UWSt.mk (s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn)
-          (some (tlbEntryOf 0#16 vpn (uwkPpn w) (po.getD w) addr)))) s'.rs s'.mm s'.rv,
+          (some (tlbEntryOf 0#16 vpn (ptePpn w) (po.getD w) addr)))) s'.rs s'.mm s'.rv,
         orc') := by
   cases po <;> uwk_run -bv [tlbHash_eq] <;>
     simp only [uwkOut, tlbHash_eq, Option.getD_none, Option.getD_some] <;>
     reduce_closed_widths <;> simp only [tlbEntryOf] <;> congr <;>
-    simp only [sign_extend, zero_extend, ones, sail_ones, Sail.BitVec.signExtend, Sail.BitVec.zeroExtend, uwkPpn] <;>
+    simp only [sign_extend, zero_extend, ones, sail_ones, Sail.BitVec.signExtend, Sail.BitVec.zeroExtend, ptePpn] <;>
     bv_decide
 
-/-! ## §4 The user TLB invariant (Rocq `UptTree.utlb_inv_pt`'s TLB row;
-Xv6 `UserExec.utlbOk`, stated here generically) -/
+/-! ## §4 The user TLB invariant (Rocq `PtTree.tlb_ok_pt`, the TLB row of
+`UptTree.utlb_inv_pt`) -/
 
-/-- `v` is `c` up to the `A`/`D` bits (Xv6 `pteAD`). -/
-def utlbAD (c v : BitVec 64) : Prop := ∃ a d : BitVec 1, v = pteSetAD c a d
+/-- `v` is `c` up to the `A`/`D` bits (the hardware sets them; Rocq's
+`∃ a d, … pte_set_ad p0 a d`). -/
+def pteAD (c v : BitVec 64) : Prop := ∃ a d : BitVec 1, v = pteSetAD c a d
 
-theorem utlbAD_refl (c : BitVec 64) : utlbAD c c := by
+theorem pteAD_refl (c : BitVec 64) : pteAD c c := by
   refine ⟨BitVec.extractLsb' 6 1 c, BitVec.extractLsb' 7 1 c, ?_⟩
   simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
     BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
   bv_decide
 
-theorem utlbAD_trans {u v w : BitVec 64} (h1 : utlbAD u v) (h2 : utlbAD v w) : utlbAD u w := by
+theorem pteAD_trans {u v w : BitVec 64} (h1 : pteAD u v) (h2 : pteAD v w) : pteAD u w := by
   obtain ⟨a, d, rfl⟩ := h1
   obtain ⟨a', d', rfl⟩ := h2
   exact ⟨a', d', by rw [pteSetAD_pteSetAD]⟩
 
-theorem utlbAD_symm {u v : BitVec 64} (h : utlbAD u v) : utlbAD v u := by
+theorem pteAD_symm {u v : BitVec 64} (h : pteAD u v) : pteAD v u := by
   obtain ⟨a, d, rfl⟩ := h
   refine ⟨BitVec.extractLsb' 6 1 u, BitVec.extractLsb' 7 1 u, ?_⟩
   simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
@@ -179,36 +180,36 @@ theorem utlbAD_symm {u v : BitVec 64} (h : utlbAD u v) : utlbAD v u := by
   bv_decide
 
 /-- `A`/`D` variants name the same page. -/
-theorem utlbAD_ppn {c v : BitVec 64} (h : utlbAD c v) : uwkPpn v = uwkPpn c := by
+theorem pteAD_ptePpn {c v : BitVec 64} (h : pteAD c v) : ptePpn v = ptePpn c := by
   obtain ⟨a, d, rfl⟩ := h
-  simp only [uwkPpn, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
+  simp only [ptePpn, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
     BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
   bv_decide
 
-/-- **The user TLB invariant**: every resident slot caches, up to the `A`/`D`
-bits, a leaf the tree's walk reaches, at the slot its `vpn` hashes to (Xv6
-`utlbOk`, definitionally: `ptePpn` is `uwkPpn`, `pteAD` is `utlbAD`). -/
-def utlbInv (t : PTree) (tlb : Tlb) : Prop :=
+/-- **The user TLB fact** (Rocq `PtTree.tlb_ok_pt` at ASID 0): every
+resident slot caches, up to the `A`/`D` bits, a leaf the tree's walk
+reaches, at the slot its `vpn` hashes to. -/
+def utlbOk (t : PTree) (tlb : Tlb) : Prop :=
   ∀ (i : Nat) (hi : i < 2 ^ 6) (ent : TLB_Entry), tlb[i] = some ent →
     ∃ (vpn : BitVec 27) (addr w w' : BitVec 64),
-      tlbHash vpn = i ∧ t.walk 2 vpn = some (addr, w) ∧ utlbAD w w' ∧
-      ent = tlbEntryOf 0#16 vpn (uwkPpn w) w' addr
+      tlbHash vpn = i ∧ t.walk 2 vpn = some (addr, w) ∧ pteAD w w' ∧
+      ent = tlbEntryOf 0#16 vpn (ptePpn w) w' addr
 
 /-- The flushed TLB. -/
-theorem utlbInv_reset (t : PTree) : utlbInv t (vectorInit none) := by
+theorem utlbOk_reset (t : PTree) : utlbOk t (vectorInit none) := by
   intro i hi ent h
   rw [vectorInit, Vector.getElem_replicate] at h
   exact absurd h (by simp)
 
 /-- **A hit is sound**: a resident entry matching the page caches the leaf
 the tree's walk of the page reaches (up to `A`/`D`), at the walk's entry. -/
-theorem utlbInv_hit (t : PTree) (tlb : Tlb) (h : utlbInv t tlb) (vpn : BitVec 27) (ent : TLB_Entry)
+theorem utlbOk_hit (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27) (ent : TLB_Entry)
     (hslot : tlb[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
     (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
-    ∃ (addr w w' : BitVec 64), t.walk 2 vpn = some (addr, w) ∧ utlbAD w w' ∧
-      ent = tlbEntryOf 0#16 vpn (uwkPpn w) w' addr := by
+    ∃ (addr w w' : BitVec 64), t.walk 2 vpn = some (addr, w) ∧ pteAD w w' ∧
+      ent = tlbEntryOf 0#16 vpn (ptePpn w) w' addr := by
   obtain ⟨vpn₁, addr, w, w', -, hw, had, rfl⟩ := h (tlbHash vpn) (tlbHash_lt vpn) ent hslot
-  have hm' := match_tlbEntryOf vpn₁ vpn (uwkPpn w) w' addr
+  have hm' := match_tlbEntryOf vpn₁ vpn (ptePpn w) w' addr
   simp only [sign_extend, Sail.BitVec.signExtend] at hm'
   rw [hm', decide_eq_true_eq] at hm
   subst hm
@@ -218,11 +219,11 @@ theorem utlbInv_hit (t : PTree) (tlb : Tlb) (h : utlbInv t tlb) (vpn : BitVec 27
 form of Xv6 `uptTlbOk_after`): the leaf the walk of `vpn` reaches is
 replaced by an `A`/`D` variant `v`, and the page's slot is left alone or
 refilled with `v`. -/
-theorem utlbInv_after (t : PTree) (tlb tlb' : Tlb) (h : utlbInv t tlb) (vpn : BitVec 27)
-    (addr w v : BitVec 64) (hw : t.walk 2 vpn = some (addr, w)) (hv : utlbAD w v) (hv0 : v ≠ 0#64)
-    (hafter : tlb' = tlb ∨ tlb' = vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn (uwkPpn w) v addr))) :
-    utlbInv (t.setLeaf 2 vpn v) tlb' := by
-  have hold : utlbInv (t.setLeaf 2 vpn v) tlb := by
+theorem utlbOk_after (t : PTree) (tlb tlb' : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27)
+    (addr w v : BitVec 64) (hw : t.walk 2 vpn = some (addr, w)) (hv : pteAD w v) (hv0 : v ≠ 0#64)
+    (hafter : tlb' = tlb ∨ tlb' = vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn (ptePpn w) v addr))) :
+    utlbOk (t.setLeaf 2 vpn v) tlb' := by
+  have hold : utlbOk (t.setLeaf 2 vpn v) tlb := by
     intro i hi ent hget
     obtain ⟨vpn₁, addr₁, w₁, w₁', hh, hw₁, had, hent⟩ := h i hi ent hget
     by_cases hp : t.path 2 vpn = t.path 2 vpn₁
@@ -230,8 +231,8 @@ theorem utlbInv_after (t : PTree) (tlb tlb' : Tlb) (h : utlbInv t tlb) (vpn : Bi
       rw [hw₁] at heq
       obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj heq)
       refine ⟨vpn₁, addr₁, v, w₁', hh, PTree.walk_setLeaf_path_eq 2 t vpn vpn₁ v hv0 hp _ _ hw₁,
-        utlbAD_trans (utlbAD_symm hv) had, ?_⟩
-      rw [hent, utlbAD_ppn hv]
+        pteAD_trans (pteAD_symm hv) had, ?_⟩
+      rw [hent, pteAD_ptePpn hv]
     · exact ⟨vpn₁, addr₁, w₁, w₁', hh, by rw [PTree.walk_setLeaf_other 2 t vpn vpn₁ v hp]; exact hw₁, had, hent⟩
   rcases hafter with rfl | rfl
   · exact hold
@@ -239,14 +240,14 @@ theorem utlbInv_after (t : PTree) (tlb tlb' : Tlb) (h : utlbInv t tlb) (vpn : Bi
     rw [vectorUpdate, Vector.getElem_set! hi] at hget
     split at hget
     · rename_i heq
-      refine ⟨vpn, addr, v, v, heq, PTree.walk_setLeaf_self 2 t vpn v hv0 _ _ hw, utlbAD_refl v, ?_⟩
-      rw [← Option.some.inj hget, utlbAD_ppn hv]
+      refine ⟨vpn, addr, v, v, heq, PTree.walk_setLeaf_self 2 t vpn v hv0 _ _ hw, pteAD_refl v, ?_⟩
+      rw [← Option.some.inj hget, pteAD_ptePpn hv]
     · exact hold i hi ent hget
 
 /-- **A refill without a write-back** preserves the invariant. -/
-theorem utlbInv_fill (t : PTree) (tlb : Tlb) (h : utlbInv t tlb) (vpn : BitVec 27) (addr w w' : BitVec 64)
-    (hw : t.walk 2 vpn = some (addr, w)) (hw' : utlbAD w w') :
-    utlbInv t (vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn (uwkPpn w) w' addr))) := by
+theorem utlbOk_fill (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27) (addr w w' : BitVec 64)
+    (hw : t.walk 2 vpn = some (addr, w)) (hw' : pteAD w w') :
+    utlbOk t (vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn (ptePpn w) w' addr))) := by
   intro i hi ent hget
   rw [vectorUpdate, Vector.getElem_set! hi] at hget
   split at hget

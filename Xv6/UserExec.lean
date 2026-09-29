@@ -167,21 +167,6 @@ def trapMstatusOk (ms : BitVec 64) : Prop :=
 /-- **Rocq `WpIntrCore.stvec_base`**: the direct-mode trap target. -/
 def stvecBase (v : BitVec 64) : BitVec 64 := v &&& ~~~3#64
 
-/-- **The user TLB fact** (Rocq `utlb_inv_pt`'s TLB row; deviation 5): every
-resident slot caches, up to the `A`/`D` bits, a leaf the tree's walk
-reaches, at the slot its `vpn` hashes to. -/
-def utlbOk (t : PTree) (tlb : Tlb) : Prop :=
-  ∀ (i : Nat) (hi : i < 2 ^ 6) (ent : TLB_Entry), tlb[i] = some ent →
-    ∃ (vpn : BitVec 27) (addr w w' : BitVec 64),
-      tlbHash vpn = i ∧ t.walk 2 vpn = some (addr, w) ∧ pteAD w w' ∧
-      ent = tlbEntryOf 0#16 vpn (ptePpn w) w' addr
-
-/-- The flushed TLB (userret's `sfence.vma`) is sound for any table. -/
-theorem utlbOk_reset (t : PTree) : utlbOk t (vectorInit none) := by
-  intro i hi ent h
-  rw [vectorInit, Vector.getElem_replicate] at h
-  exact absurd h (by simp)
-
 /-! ## §2 The resources -/
 
 section UserExec

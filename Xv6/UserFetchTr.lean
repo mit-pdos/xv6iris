@@ -11,7 +11,7 @@ assembled from lane U1-P1's facts -- the lookup (`utlb_lookup_*`), the hit
 through `utlb_translate_of_hit/_of_miss` -- and its landing is shown to be a
 user machine again: the file moved only at `tlb`, the tree moved only by an
 `A`/`D` write-back of the walked leaf (`ubMemStep_setLeaf`), the TLB sound
-for it (`utlbInv_after`/`_fill`).  A success is a page of a user leaf
+for it (`utlbOk_after`/`_fill`).  A success is a page of a user leaf
 (the fetch windows owned RAM, `UserFetchLeaf.uft_page`); a fault is a
 permission or invalid-entry fault (a page fault at the fetch).  Then
 `translateAddr` (`UTranslate.utr_translateAddr_ok/_err/_noncanon`) gives
@@ -50,8 +50,8 @@ theorem uft_land {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s s2 : UWSt} (
    by rw [hf _ (by decide)]; exact hl.act, ⟨t', hs, ht⟩⟩
 
 /-- The fetch's write-back is an `A`/`D` variant of the leaf. -/
-theorem uft_update_AD {lw w x : BitVec 64} (had : utlbAD lw w)
-    (hu : update_PTE_Bits w (.InstructionFetch ()) = some x) : utlbAD lw x := by
+theorem uft_update_AD {lw w x : BitVec 64} (had : pteAD lw w)
+    (hu : update_PTE_Bits w (.InstructionFetch ()) = some x) : pteAD lw x := by
   obtain ⟨a, d, rfl⟩ := had
   rw [update_PTE_Bits_pteSetAD lw a d (.InstructionFetch ()) rfl] at hu
   split at hu
@@ -64,7 +64,7 @@ theorem uft_getElem! (tlb : Tlb) (vpn : BitVec 27) :
 
 /-- What a translation's success says: the page of a user leaf. -/
 def UftPageOf (P : UPtd) (ppn : BitVec 44) : Prop :=
-  ∃ (k : Nat) (lw w : BitVec 64), Iris.Std.PartialMap.get? P.um k = some lw ∧ utlbAD lw w ∧ ppn = uwkPpn w
+  ∃ (k : Nat) (lw w : BitVec 64), Iris.Std.PartialMap.get? P.um k = some lw ∧ pteAD lw w ∧ ppn = ptePpn w
 
 /-- **The outcome of the tree-level translation**: a landing user machine
 whose file moved only at `tlb`; a success is a user page, a fault not an
@@ -137,23 +137,23 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
         simp only [Bool.and_eq_true] at hperm
         exact hperm.1
       have hum := hlok.2 hU
-      have hpage : UftPageOf P (uwkPpn w) := ⟨_, lw, w, hum, had, rfl⟩
+      have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hum, had, rfl⟩
       have hmem := uft_treeMem hwf addr w (PTree.walk_mem_entries 2 t vpn addr w hw)
       cases hu : update_PTE_Bits w (.InstructionFetch ()) with
       | none =>
-        refine ⟨.Ok (uwkPpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
+        refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
           _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ false sum hu), ?_⟩
         refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]
-          exact utlbInv_fill t _ htlb vpn addr w w hw (utlbAD_refl w)
+          exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)
         · cases h; exact ⟨rfl, hpage⟩
       | some x =>
-        have hadx : utlbAD w x := utlbAD_trans (utlbAD_symm had) (uft_update_AD had hu)
+        have hadx : pteAD w x := pteAD_trans (pteAD_symm had) (uft_update_AD had hu)
         have hokx := uftLeafOk_AD hok hadx
         have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w w x x hmem.2 _ rfl false sum hu hok.inv
           (uft_nonleaf hok) hok.n0 hperm hu
-        refine ⟨.Ok (uwkPpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s _ hdr hdw _ rfl vpn t.base
+        refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s _ hdr hdw _ rfl vpn t.base
           _ false sum w addr (some x) (hwalk' orc) (hupd orc), ?_⟩
         have hstep' : UbMemStep P t0 (t.setLeaf 2 vpn x) mm0 (bmWrite s.mm addr 8 x) :=
           ubMemStep_trans P t0 t _ mm0 s.mm _ hstep
@@ -161,7 +161,7 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
         refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) _ hstep' ?_, fun y hy => uft_file_tlb _ _ _ _ _ y hy,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]
-          exact utlbInv_after t _ _ htlb vpn addr w x hw hadx (uft_ne_zero hokx) (Or.inr rfl)
+          exact utlbOk_after t _ _ htlb vpn addr w x hw hadx (uft_ne_zero hokx) (Or.inr rfl)
         · cases h; exact ⟨rfl, hpage⟩
 
 end tr

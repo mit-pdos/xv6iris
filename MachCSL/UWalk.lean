@@ -67,8 +67,8 @@ macro "uwk_pins" hp:term:max : tactic => `(tactic| (
 abbrev uwkFl (w : BitVec 64) : BitVec 8 := Mk_PTE_Flags (Sail.BitVec.extractLsb w 7 0)
 abbrev uwkExt (w : BitVec 64) : BitVec 10 := ext_bits_of_PTE w
 
-/-- The page number of an entry. -/
-def uwkPpn (w : BitVec 64) : BitVec 44 := BitVec.extractLsb' 10 44 w
+/-- The page number of an entry (Rocq `ProcPtOwn.pte_ppn`). -/
+def ptePpn (w : BitVec 64) : BitVec 44 := BitVec.extractLsb' 10 44 w
 
 /-- **Rocq `pte_invalid`/`pte_valid`**: the verdict of `pte_is_invalid` at
 xv6's configuration (`menvcfg.SSE = 0`, `PBMTE = 0`; Svnapot, Svpbmt and
@@ -249,7 +249,7 @@ def uwkG (w : BitVec 64) : Bool := _get_PTE_Flags_G (uwkFl w) == 1#1
 
 /-- The walk's report for a level-0 leaf. -/
 def uwkOut (w : BitVec 64) (addr : BitVec 64) (g : Bool) : PTW_Output 39 :=
-  { ppn := uwkPpn w, pte := w, pteAddr := .Physaddr addr, level := 0, pbmt := .PBMT_PMA, global := g }
+  { ppn := ptePpn w, pte := w, pteAddr := .Physaddr addr, level := 0, pbmt := .PBMT_PMA, global := g }
 
 /-- A valid entry is not `W` without `R` (so the permission check's
 assertion holds). -/
@@ -280,8 +280,8 @@ theorem uwk_G_kPtr (b : BitVec 44) : uwkG (kPtr b) = false := by
   simp only [uwkG, kPtr, mkPte, ptrFlags, _get_PTE_Flags_G, Mk_PTE_Flags, Sail.BitVec.extractLsb]
   bv_decide
 
-theorem uwk_ppn_kPtr (b : BitVec 44) : uwkPpn (kPtr b) = b := by
-  simp only [uwkPpn, kPtr, mkPte]; bv_decide
+theorem uwk_ppn_kPtr (b : BitVec 44) : ptePpn (kPtr b) = b := by
+  simp only [ptePpn, kPtr, mkPte]; bv_decide
 
 /-- A leaf (some of `R`/`W`/`X`) is not a pointer. -/
 theorem uwk_leaf_of_rwx (w : BitVec 64) (h : w &&& 0xE#64 ≠ 0#64) : pte_is_non_leaf (uwkFl w) = false := by
@@ -316,7 +316,7 @@ theorem uwk_walk_ptr (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
     (hok : pteAddrOk (pteAddr base (vpnIdx vpn lvl))) (hr : bmRead s.mm (pteAddr base (vpnIdx vpn lvl)) 8 = some w)
     (hinv : uwkInv w = false) (hnl : pte_is_non_leaf (uwkFl w) = true)
     (r : Option (Result (PTW_Output 39 × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hsub : runRW D orc s (pt_walk 39 vpn acc .User mxr sum (uwkPpn w) (lvl - 1) (g || uwkG w) ()) = r) :
+    (hsub : runRW D orc s (pt_walk 39 vpn acc .User mxr sum (ptePpn w) (lvl - 1) (g || uwkG w) ()) = r) :
     runRW D orc s (pt_walk 39 vpn acc .User mxr sum base lvl g ()) = r := by
   uwk_pins hp
   obtain rfl | rfl : lvl = 1 ∨ lvl = 2 := by omega

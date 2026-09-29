@@ -41,9 +41,9 @@ set_option linter.unusedSectionVars false
 def UftLeavesValid (P : UPtd) : Prop :=
   ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false
 
-/-- `utlbOk` is MachCSL's `utlbInv` (`ptePpn` is `uwkPpn`, `pteAD` is
-`utlbAD`). -/
-theorem uft_utlbOk_iff (t : PTree) (tlb : Tlb) : utlbOk t tlb ↔ utlbInv t tlb := Iff.rfl
+/-- `utlbOk` is MachCSL's `utlbOk` (`ptePpn` is `ptePpn`, `pteAD` is
+`pteAD`). -/
+theorem uft_utlbOk_iff (t : PTree) (tlb : Tlb) : utlbOk t tlb ↔ utlbOk t tlb := Iff.rfl
 
 /-! ## §1 The class of a leaf -/
 
@@ -82,12 +82,12 @@ theorem uftLeafOk_setAD {w : BitVec 64} (h : UftLeafOk w) (a d : BitVec 1) : Uft
       Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
     bv_decide
 
-theorem uftLeafOk_AD {c v : BitVec 64} (h : UftLeafOk c) (had : utlbAD c v) : UftLeafOk v := by
+theorem uftLeafOk_AD {c v : BitVec 64} (h : UftLeafOk c) (had : pteAD c v) : UftLeafOk v := by
   obtain ⟨a, d, rfl⟩ := had
   exact uftLeafOk_setAD h a d
 
 /-- `U` survives the `A`/`D` bits. -/
-theorem uft_U_AD {c v : BitVec 64} (had : utlbAD c v) : uwkU v = uwkU c := by
+theorem uft_U_AD {c v : BitVec 64} (had : pteAD c v) : uwkU v = uwkU c := by
   obtain ⟨a, d, rfl⟩ := had
   simp only [uwkU, uwk_bit_to_bool, pteSetAD, _get_PTE_Flags_U, Mk_PTE_Flags, Sail.BitVec.extractLsb,
     Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A,
@@ -160,7 +160,7 @@ theorem uft_leaves_ok (P : UPtd) (hwf : uptWf P) (hv : UftLeavesValid P) (k : Na
 represented map. -/
 theorem uft_walk_leaf {t : PTree} {L : RegMapF (BitVec 64)} (hrep : ptRep t L) {vpn : BitVec 27}
     {addr w : BitVec 64} (hw : t.walk 2 vpn = some (addr, w)) :
-    ∃ lw, Iris.Std.PartialMap.get? L vpn.toNat = some lw ∧ utlbAD lw w := by
+    ∃ lw, Iris.Std.PartialMap.get? L vpn.toNat = some lw ∧ pteAD lw w := by
   cases hl : Iris.Std.PartialMap.get? L vpn.toNat with
   | none => rw [hrep.2.2.2.2 vpn hl] at hw; cases hw
   | some lw =>
@@ -172,7 +172,7 @@ theorem uft_walk_leaf {t : PTree} {L : RegMapF (BitVec 64)} (hrep : ptRep t L) {
 /-- **The write-back keeps the representation** (the generic form of
 `uptPtRep_setLeaf`): an `A`/`D` variant of the reached word. -/
 theorem uft_ptRep_setLeaf {t : PTree} {L : RegMapF (BitVec 64)} (hrep : ptRep t L) {vpn : BitVec 27}
-    {addr w v : BitVec 64} (hw : t.walk 2 vpn = some (addr, w)) (had : utlbAD w v) (hok : UftLeafOk v) :
+    {addr w v : BitVec 64} (hw : t.walk 2 vpn = some (addr, w)) (had : pteAD w v) (hok : UftLeafOk v) :
     ptRep (t.setLeaf 2 vpn v) L := by
   obtain ⟨hwf, hnd, hpv, hmap, hblk⟩ := hrep
   have hne := uft_ne_zero hok
@@ -185,7 +185,7 @@ theorem uft_ptRep_setLeaf {t : PTree} {L : RegMapF (BitVec 64)} (hrep : ptRep t 
     · have heq : t.walk 2 vpn' = some (addr, w) := (PTree.walk_of_path_eq 2 t vpn vpn' hp).symm.trans hw
       rw [hw'] at heq
       obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj heq)
-      exact ⟨addr', v, PTree.walk_setLeaf_path_eq 2 t vpn vpn' _ hne hp _ _ hw', uptPteAD_trans hv' had⟩
+      exact ⟨addr', v, PTree.walk_setLeaf_path_eq 2 t vpn vpn' _ hne hp _ _ hw', pteAD_trans hv' had⟩
     · exact ⟨addr', v', by rw [PTree.walk_setLeaf_other 2 t vpn vpn' _ hp]; exact hw', hv'⟩
   · intro vpn' hl
     by_cases hp : t.path 2 vpn = t.path 2 vpn'
@@ -243,12 +243,12 @@ theorem uft_off_eq (va : BitVec 64) : (va &&& 0xFFF#64) = BitVec.ofNat 64 (va.to
 /-- **The fetch windows of a granting user leaf are owned RAM** (Rocq
 `u_mem_wf_owned_data` + `addr_is_ram` at the fetch address). -/
 theorem uft_page {P : UPtd} {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) (k : Nat) (lw : BitVec 64)
-    (h : Iris.Std.PartialMap.get? P.um k = some lw) (w : BitVec 64) (had : utlbAD lw w) (va : BitVec 64)
+    (h : Iris.Std.PartialMap.get? P.um k = some lw) (w : BitVec 64) (had : pteAD lw w) (va : BitVec 64)
     (n : Nat) (hn : n = 2 ∨ n = 4) (hal : va.toNat % n = 0) :
-    inRam (paOf (uwkPpn w) va) n ∧ (paOf (uwkPpn w) va).toNat % n = 0 ∧
-      bmOwned mm (paOf (uwkPpn w) va) n = true := by
+    inRam (paOf (ptePpn w) va) n ∧ (paOf (ptePpn w) va).toNat % n = 0 ∧
+      bmOwned mm (paOf (ptePpn w) va) n = true := by
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw h
-  have hppn : uwkPpn w = ptePpn lw := utlbAD_ppn had
+  have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had
   rw [hppn, uft_paOf_eq, uft_off_eq]
   have hoff : va.toNat % 4096 + n ≤ 4096 := by rcases hn with rfl | rfl <;> omega
   have hram := ub_inRam_page (ptePpn lw) hv (va.toNat % 4096) n hoff

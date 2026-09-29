@@ -73,12 +73,6 @@ theorem uLeaf_setAD (ppn : BitVec 44) (perm : BitVec 64) (a d : BitVec 1) :
 
 /-! ## The `A`/`D` slack -/
 
-theorem pteAD_refl (w : BitVec 64) : pteAD w w := by
-  refine ⟨BitVec.extractLsb' 6 1 w, BitVec.extractLsb' 7 1 w, ?_⟩
-  simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
-
 /-- `A`/`D` are bits 6 and 7: the page and the low six flag bits survive. -/
 theorem pteAD_pte2pa {c v : BitVec 64} (h : pteAD c v) :
     pte2pa v = pte2pa c ∧ pteFlags v &&& 0x3F#64 = pteFlags c &&& 0x3F#64 := by
@@ -87,12 +81,6 @@ theorem pteAD_pte2pa {c v : BitVec 64} (h : pteAD c v) :
     (simp only [pte2pa, pteFlags, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
       Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
      bv_decide)
-
-theorem pteAD_ptePpn {c v : BitVec 64} (h : pteAD c v) : ptePpn v = ptePpn c := by
-  obtain ⟨a, d, rfl⟩ := h
-  simp only [ptePpn, pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-    Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
-  bv_decide
 
 theorem pteAD_isLeafPte {c v : BitVec 64} (h : pteAD c v) (hc : isLeafPte c) : isLeafPte v := by
   obtain ⟨a, d, rfl⟩ := h
