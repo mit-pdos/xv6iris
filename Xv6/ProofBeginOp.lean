@@ -338,46 +338,56 @@ theorem bo_batch_lhn (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet 
   · ipureintro; exact h4
   iframe Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest
 
-/-- The `cmt = false` arm of `logResAt`, named. -/
+/-- The `cmt = false` arm of `logResAt`, named, at the outstanding count
+`out` (its quiescence clause reads it, sync K1). -/
 def boBatch (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (om : RegMapF OpEntry) (E : Nat)
-    (X : RegMapF (Nat × Nat)) (ξ : CtxId) : IProp GF := iprop%
+    (X : RegMapF (Nat × Nat)) (out : Nat) (ξ : CtxId) : IProp GF := iprop%
   ∃ (n : Nat) (LB : List Nat),
     ⌜n + opSum om ≤ LOGBLOCKS⌝ ∗
     ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
     ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
+    ⌜out = 0 → n = 0⌝ ∗
+    eraSyncTok (hlc := hlc) (GF := GF) ∗
     logStateAt γb γfs cov ls n LB (opPending om) ξ
 
 theorem boBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (om : RegMapF OpEntry) (E : Nat)
-    (X : RegMapF (Nat × Nat)) (ξ : CtxId) :
-    boBatch (GF := GF) γ γb γfs cov ls om E X ξ ⊢
+    (X : RegMapF (Nat × Nat)) (out : Nat) (ξ : CtxId) :
+    boBatch (GF := GF) γ γb γfs cov ls om E X out ξ ⊢
       ∃ (n : Nat) (LB : List Nat),
         ⌜n + opSum om ≤ LOGBLOCKS⌝ ∗
         ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
         ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
+        ⌜out = 0 → n = 0⌝ ∗
+        eraSyncTok (hlc := hlc) (GF := GF) ∗
         logStateAt γb γfs cov ls n LB (opPending om) ξ := by
   unfold boBatch; iintro H; iexact H
 
 theorem boBatch_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (om : RegMapF OpEntry) (E : Nat)
-    (X : RegMapF (Nat × Nat)) (ξ : CtxId) (n : Nat) (LB : List Nat) (pend : Nat → Prop)
+    (X : RegMapF (Nat × Nat)) (out : Nat) (ξ : CtxId) (n : Nat) (LB : List Nat)
+    (pend : Nat → Prop)
     (h1 : n + opSum om ≤ LOGBLOCKS)
     (h2 : ∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB)
-    (h3 : ∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB) :
-    logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
-      boBatch γ γb γfs cov ls om E X ξ := by
+    (h3 : ∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB)
+    (hq : out = 0 → n = 0) :
+    eraSyncTok (hlc := hlc) (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
+      boBatch γ γb γfs cov ls om E X out ξ := by
   have hpend : logStateAt (GF := GF) γb γfs cov ls n LB (opPending om) ξ =
       logStateAt γb γfs cov ls n LB pend ξ := rfl
   unfold boBatch
-  iintro H
+  iintro ⟨HT, H⟩
   iexists n, LB
-  isplitr [H]
+  isplitr [H HT]
   · ipureintro; exact h1
-  isplitr [H]
+  isplitr [H HT]
   · ipureintro; exact h2
-  isplitr [H]
+  isplitr [H HT]
   · ipureintro; exact h3
+  isplitr [H HT]
+  · ipureintro; exact hq
+  iframe HT
   rw [← hpend]
   iexact H
 
@@ -392,7 +402,6 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
       wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
       (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-      logFlushedBank (hlc := hlc) γ E ∗
       ⌜(FiniteMap.toList om).length = out⌝ ∗
       ⌜∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS⌝ ∗ ⌜out ≤ 3⌝ ∗
       ⌜∀ i, nxo ≤ i → PartialMap.get? om i = none⌝ ∗ ⌜1 ≤ E⌝ ∗
@@ -401,46 +410,45 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       ⌜∀ i p, PartialMap.get? X i = some p → p.1 ≤ E⌝ ∗
       ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
       ⌜(FiniteMap.toList T).length = (FiniteMap.toList om).length⌝ ∗
-      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
-          boBatch γ γb γfs cov ls om E X ξ) ∨
-        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ ⌜out = 0⌝)) := by
+      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out false ∗
+          boBatch γ γb γfs cov ls om E X out ξ) ∨
+        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out true ∗
+          ⌜out = 0⌝)) := by
   unfold logResAt boBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
     Hout, Hcmt, Hnc, Hops, %hlen, %hp, %hfresho, Hep, %hE, Hreg, %hfreshl, %hlive, %hcap,
-    Htx, %hfresht, %hTlen, #Hbank, Harm⟩
+    Htx, %hfresht, %hTlen, Hhelp, Harm⟩
   obtain ⟨hbud, hout3, hcmt0⟩ := hp
   iexists out, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hnc Hops Hep Hreg Htx
-  isplitr
-  · iexact Hbank
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hlen
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hbud
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hout3
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hfresho
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hE
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hfreshl
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hlive
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hcap
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hfresht
-  isplitr [Hcmt Harm]
+  isplitr [Hcmt Harm Hhelp]
   · ipureintro; exact hTlen
   cases cmt
   · ileft
     isimp only [Bool.false_eq_true, if_false] at Hcmt
     isimp only [Bool.false_eq_true, if_false] at Harm
-    iframe Hcmt Harm
+    iframe Hcmt Harm Hhelp
   · iright
     isimp only [if_true] at Hcmt
-    iframe Hcmt
+    iframe Hcmt Hhelp
     ipureintro
     exact hcmt0 rfl
 
@@ -463,33 +471,32 @@ theorem bo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logFlushedBank (hlc := hlc) γ E ∗
-    (if cmt then iprop(emp) else boBatch γ γb γfs cov ls om E X ξ)
+    logHelp (hlc := hlc) γ nc out cmt ∗
+    (if cmt then iprop(emp) else boBatch γ γb γfs cov ls om E X out ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt boBatch
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank, Harm⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp, Harm⟩
   iexists out, cmt, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hlen
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hp
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hfresho
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hE
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hfreshl
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hlive
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hcap
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hfresht
-  isplitr [Harm]
+  isplitr [Harm Hhelp]
   · ipureintro; exact hTlen
-  isplitr [Harm]
-  · iexact Hbank
+  iframe Hhelp
   iexact Harm
 
 /-- The `committing = 0` re-close. -/
@@ -511,8 +518,8 @@ theorem bo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logFlushedBank (hlc := hlc) γ E ∗
-    boBatch γ γb γfs cov ls om E X ξ
+    logHelp (hlc := hlc) γ nc out false ∗
+    boBatch γ γb γfs cov ls om E X out ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   bo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, by simp⟩ hfresho hE hfreshl hlive hcap hfresht hTlen
@@ -537,16 +544,13 @@ theorem bo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logFlushedBank (hlc := hlc) γ E
+    logHelp (hlc := hlc) γ nc out true
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
   iapply (bo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
   isimp only [if_true]
-  iframe Hout Hcmt Hnc Hops Hep Hreg Htx
-  isplitr
-  · iexact Hbank
-  iempintro
+  iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
 
 /-! ## The loop's proposition -/
 
@@ -1162,14 +1166,14 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   icases bo_res_elim γ γb γfs cov ls curCtx $$ Hpay
     with ⟨%out, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-      Hout, Hnc, Hops, Hep, Hreg, Htx, #Hbank,
+      Hout, Hnc, Hops, Hep, Hreg, Htx,
       %hlen, %hbud, %hout3, %hfresho, %hE, %hfreshl, %hlive, %hcap, %hfresht, %hTlen, Harm⟩
   isimp only [wordAtN_cur] at Hout
-  icases Harm with ⟨⟨Hcmt, Hbatch⟩ | ⟨Hcmt, %hout0⟩⟩
+  icases Harm with ⟨⟨Hcmt, Hhelp, Hbatch⟩ | ⟨Hcmt, Hhelp, %hout0⟩⟩
   · -- ============ log.committing == 0 ============
     isimp only [wordAtN_cur] at Hcmt
-    icases boBatch_elim γ γb γfs cov ls om E X curCtx $$ Hbatch
-      with ⟨%n, %LB, %hsum, %hsets, %hregLB, Hst⟩
+    icases boBatch_elim γ γb γfs cov ls om E X out curCtx $$ Hbatch
+      with ⟨%n, %LB, %hsum, %hsets, %hregLB, %hquiet, Hstok, Hst⟩
     icases bo_batch_lhn γb γfs cov ls n LB (opPending om) curCtx $$ Hst
       with ⟨%hn30, Hn, Hclose⟩
     isimp only [wordAtN_cur] at Hn
@@ -1288,9 +1292,13 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
         exact logReserveOk n out om hlen hbud (boGuardSum out n hg)
       isimp only [← wordAtN_cur] at Hn
       ihave Hst := Hclose $$ Hn
+      -- the new operation is outstanding, so the log is not quiescent, and
+      -- begin_op does not commit: the sync token stays home (sync K1/K3-3)
       ihave Hbatch := boBatch_intro γ γb γfs cov ls
-        (PartialMap.insert om nxo ((MAXOPBLOCKS, ([] : List Nat), E) : OpEntry)) E X curCtx
-        n LB (opPending om) hsum' hsets' hregLB $$ Hst
+        (PartialMap.insert om nxo ((MAXOPBLOCKS, ([] : List Nat), E) : OpEntry)) E X (out + 1)
+        curCtx n LB (opPending om) hsum' hsets' hregLB (fun h => absurd h (by omega))
+        $$ [Hstok Hst]
+      · iframe Hstok Hst
       isimp only [← wordAtN_cur] at Hout
       isimp only [← wordAtN_cur] at Hcmt
       ihave Hpay := bo_res_intro_f γ γb γfs cov ls curCtx (out + 1) nc
@@ -1298,10 +1306,11 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
         (PartialMap.insert T nxt ()) (nxo + 1) (nxt + 1) nxl
         (by rw [hlenI, hlen]) hbud' (by omega) hfresh' hE hfreshl hlive' hcap
         (fresh_insert T nxt () hfresht) (by rw [hlenI, hlenT, hTlen])
-        $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+        $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch]
       case' _ =>
         iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-        iexact Hbank
+        -- the helping slot at `out + 1 ≠ 0` (`Xv6.logHelp_cells`)
+        iapply logHelp_cells γ nc out (out + 1) false false (fun _ => Or.inr (by omega)) $$ Hhelp
       -- the exit: release and the epilogue
       iapply (bo_exit_body RE c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp _ jp
         hjp hproc hK hnoff hlocks htier hint ?hRx) $$ [- $Hk $Hpc]
@@ -1325,16 +1334,16 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       -- re-close the payload VERBATIM and park
       isimp only [← wordAtN_cur] at Hn
       ihave Hst := Hclose $$ Hn
-      ihave Hbatch := boBatch_intro γ γb γfs cov ls om E X curCtx n LB (opPending om)
-        hsum hsets hregLB $$ Hst
+      ihave Hbatch := boBatch_intro γ γb γfs cov ls om E X out curCtx n LB (opPending om)
+        hsum hsets hregLB hquiet $$ [Hstok Hst]
+      · iframe Hstok Hst
       isimp only [← wordAtN_cur] at Hout
       isimp only [← wordAtN_cur] at Hcmt
       ihave Hpay := bo_res_intro_f γ γb γfs cov ls curCtx out nc om E X T nxo nxt nxl
         hlen hbud hout3 hfresho hE hfreshl hlive hcap hfresht hTlen
-        $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+        $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch]
       case' _ =>
-        iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-        iexact Hbank
+        iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hbatch
       iapply (bo_park2 SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp _
         hjp hproc hK hnoff hlocks htier hint ?hRy)
         $$ [- $Hk $Hpc]
@@ -1363,10 +1372,9 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     isimp only [← wordAtN_cur] at Hcmt
     ihave Hpay := bo_res_intro_t γ γb γfs cov ls curCtx out nc om E X T nxo nxt nxl
       hlen hbud hout3 hout0 hfresho hE hfreshl hlive hcap hfresht hTlen
-      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx]
+      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp]
     case' _ =>
-      iframe Hout Hcmt Hnc Hops Hep Hreg Htx
-      iexact Hbank
+      iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
     iapply (bo_park1 SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp _
       hjp hproc hK hnoff hlocks htier hint ?hRz)
       $$ [- $Hk $Hpc]
