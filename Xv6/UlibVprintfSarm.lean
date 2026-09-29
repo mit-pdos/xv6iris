@@ -13,7 +13,7 @@
 
 The string's bytes are paid one `putc` each by the chain `ulibPaySeq` over
 the argument's bytes (Rocq's middle chain).  The argument word is read at
-a fraction and handed back.
+a fraction and handed back; so is the string (any fraction `sdq`).
 -/
 import Xv6.UlibVprintfPct
 
@@ -162,7 +162,7 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
       ulibVprintfCode L.toUlibRun base -∗ L.uwordq dq apz (BitVec.ofNat 64 sa) -∗
       ulibStr L sdq sa slen sf -∗ L.utextB (a + (p + 1)) c -∗ Cm1 -∗
       L.urun m (base + 0x29e#64) (4 + n) -∗
-      (∀ m' : RegMap, L.uwordq dq apz (BitVec.ofNat 64 sa) -∗
+      (∀ m' : RegMap, L.uwordq dq apz (BitVec.ofNat 64 sa) -∗ ulibStr L sdq sa slen sf -∗
         ⌜ulibVpInv m0 m' a fd (BitVec.ofNat 64 apz + 8#64) 0#64 (p + 1)⌝ -∗ ⌜m' 9#5 = c.zeroExtend 64⌝ -∗
         Cm2 -∗ L.urun m' (base + 0x10e#64) (4 + n) -∗ L.goal) -∗
       L.goal := by
@@ -197,13 +197,14 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     iapply (ulibS_lbuq L _ (ulibVprintf_i2a8 L.toUlibRun base) 0x2ac rfl _ _ sdq (sa + 0) ubyte0
       (by decide) (by decide) (by simp only [Nat.add_zero]; ulib_regs; rw [ulibOfNat_toNat _ (by omega)])) $$ Hc Hn Hrun
     iintro Hn Hrun
+    ihave Hstr := Hcl $$ Hn
     iapply (ulibS_brT L _ (ulibVprintf_i2ac L.toUlibRun base) 0x2dc (by decide) hb (by decide) _ _
       (by ulib_regs <;> rfl)) $$ Hc Hrun
     iintro Hrun
     iapply (ulibVprintf_sexit L base hb m0 _ a fd (BitVec.ofNat 64 apz) p c n hbnd 0x2dc (Or.inr rfl)
       (ulibVpInv_set 11#5 (by decide) _ hinv1)) $$ Hc Hb Hrun
     iintro %m' %hinv' %hs1 Hrun
-    iapply Hk $$ %m' Hw %hinv' %hs1 [Hpay HCm] Hrun
+    iapply Hk $$ %m' Hw Hstr %hinv' %hs1 [Hpay HCm] Hrun
     iapply (ulibPaySeq_zero_elim _ _ _ _ _ _ _) $$ Hpay HCm
   | succ k =>
     -- +0x2a8  lbu a1,0(s1) : the first byte ; +0x2ac  beqz a1 : not taken
@@ -218,11 +219,11 @@ theorem ulibVprintf_sarm {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     iapply (ulibVprintf_sloop (hlc := hlc) P L base hb m0 a fd (BitVec.ofNat 64 apz)
       (BitVec.ofNat 64 apz + 8#64) p sdq sa (k + 1) sf n Cm2 hsa k 0 _ Cm1 (by omega)
       (ulibVpInv_set 11#5 (by decide) _ hinv1) (by ulib_regs <;> simp) (by ulib_regs)) $$ Hpay Hpc Hc Hstr HCm Hrun
-    iintro %m1 %hinv1' _ HCm2 Hrun
+    iintro %m1 %hinv1' Hstr HCm2 Hrun
     iapply (ulibVprintf_sexit L base hb m0 _ a fd (BitVec.ofNat 64 apz) p c n hbnd 0x2bc (Or.inl rfl)
       hinv1') $$ Hc Hb Hrun
     iintro %m' %hinv' %hs1 Hrun
-    iapply Hk $$ %m' Hw %hinv' %hs1 HCm2 Hrun
+    iapply Hk $$ %m' Hw Hstr %hinv' %hs1 HCm2 Hrun
 
 end
 

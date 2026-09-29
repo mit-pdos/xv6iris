@@ -14,9 +14,10 @@ PORTED (reached): `loads_ascending_b`, `loads_ascending_of_b`,
 `phdr_loadable_b`, `phdrs_loadable_of_b`, `ehdr_phoff_b`, `ehdr_phoff_of_b`.
 Plus the Lean-side assembly `kexecLoadable_of_rows` (see deviation 2).
 NOT PORTED here: `kexec_loadable_b`/`kexec_loadable_of_b` (unreached),
-`sh_elf_loadable`/`init_elf_loadable`/`*_anode_loadable` (I-init's; the
-program instances echo/cat/grep/seccomp live beside their Rocq homes,
-`UShEcho`/`UShCat`/`UShGrep`/`UShSecc`).
+`*_anode_loadable` (the program instances echo/cat/grep/seccomp live beside
+their Rocq homes, `UShEcho`/`UShCat`/`UShGrep`/`UShSecc`).  §2 (lane U4):
+`init_elf_loadable`, `sh_elf_loadable` -- the two instances I-init's
+`initBootBundle_of_pinned` / `init_exec_sup_of_sh_slot_at` take.
 
 ## Deviations from Rocq
 
@@ -31,6 +32,7 @@ program instances echo/cat/grep/seccomp live beside their Rocq homes,
 -/
 import Xv6.KexecLoad
 import Xv6.ElfRows
+import Xv6.ElfUser
 
 namespace Xv6
 
@@ -90,5 +92,17 @@ theorem kexecLoadable_of_rows (f : ElfBytes) (L : List ElfPhdr) (hwf : elfWf f =
   refine ⟨hwf, ehdrPhoff_of_b f hph, ?_, ?_⟩
   · rw [hld]; exact phdrsLoadable_of_b L hrow
   · rw [hld]; exact loadsAscending_of_b L hasc
+
+/-! ## 2. /init's and sh's instances (lane U4) -/
+
+/-- **Rocq `ElfLoadable.init_elf_loadable`**. -/
+theorem initElfLoadable : kexecLoadable User.Init.elf :=
+  kexecLoadable_of_rows _ _ User.Init.elf_wf User.Init.elf_loads
+    (by rw [User.Init.elf_read]; decide +kernel) (by decide) (by decide)
+
+/-- **Rocq `ElfLoadable.sh_elf_loadable`**. -/
+theorem shElfLoadable : kexecLoadable User.Sh.elf :=
+  kexecLoadable_of_rows _ _ User.Sh.elf_wf User.Sh.elf_loads
+    (by rw [User.Sh.elf_read]; decide +kernel) (by decide) (by decide)
 
 end Xv6

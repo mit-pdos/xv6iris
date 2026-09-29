@@ -95,6 +95,38 @@ def wp_ulibFprintfS_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (f
       L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
     L.goal
 
+/-- **`wp_ulibFprintfS`, the string at ANY fraction `sdq`, handed back**
+(the general form, `SpecUlibVprintf.wp_ulibVprintfSG_body`'s; sh's
+`fprintf` is it at sh's image, `LinkShFprintf`). -/
+def wp_ulibFprintfSG_body (L : UlibRunP GF) (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8)
+    (sdq : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF) :
+    Prop :=
+  base.toNat % 2 = 0 →
+  a + len + 2 < 2 ^ 31 →
+  q + 2 < len →
+  (f q).toNat = 37 →
+  (f (q + 1)).toNat = 115 →
+  (∀ j, j < len → j ≠ q → (f j).toNat ≠ 37) →
+  (f (q + 2)).toNat ≠ 100 →
+  (f (q + 2)).toNat ≠ 117 →
+  (f (q + 2)).toNat ≠ 120 →
+  (q + 3 < len → (f (q + 3)).toNat ≠ 100 ∧ (f (q + 3)).toNat ≠ 117 ∧ (f (q + 3)).toNat ≠ 120) →
+  sa ≠ 0 →
+  m 11#5 = BitVec.ofNat 64 a →
+  m 12#5 = BitVec.ofNat 64 sa →
+  ⊢ ulibPaySeq L.toUlibRun base (m 10#5) f 0 q Ci Cm1 -∗
+    ulibPaySeq L.toUlibRun base (m 10#5) sf 0 slen Cm1 Cm2 -∗
+    ulibPaySeq L.toUlibRun base (m 10#5) f (q + 2) (len - (q + 2)) Cm2 Co -∗
+    ulibPutcCode L.toUlibRun base -∗ ulibVprintfCode L.toUlibRun base -∗
+    ulibFprintfCode L.toUlibRun base -∗
+    ulibTextStr L a len f -∗
+    ulibStr L sdq sa slen sf -∗
+    Ci -∗
+    L.urun m (ulibFprintfAt base) (10 + (12 + (4 + n))) -∗
+    (∀ m' : RegMap, ulibStr L sdq sa slen sf -∗ ⌜ulibCalleeSaved m m'⌝ -∗ Co -∗
+      L.urun m' (ulibRetPc (m 1#5)) (10 + (12 + (4 + n))) -∗ L.goal) -∗
+    L.goal
+
 end
 
 /-- The interface of `fprintf`: every load address. -/
@@ -109,5 +141,9 @@ structure ULIB_FPRINTF : Prop where
     (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (sa slen : Nat) (sf : Nat → BitVec 8)
     (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
     wp_ulibFprintfS_body L base a len q f sa slen sf m n Ci Cm1 Cm2 Co
+  wp_ulibFprintfSG : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (L : UlibRunP GF)
+    (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (sdq : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8)
+    (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
+    wp_ulibFprintfSG_body L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co
 
 end Xv6

@@ -68,6 +68,14 @@ Rocq's header on the laws, kept because the reasons are the content:
 7. The conclusion is over `nsteps` (`-<κs>->ₜₚ^[n]`), as
    `xv6PowerAdequacyGen`'s; `xv6AppAdequacyTriv_xv6GF` takes `US : USER`
    (D24), where Rocq's closed corollary has `USER` as a module parameter.
+8. **`al_tx`/`al_rx`/`al_echo` also take the generation-counter equation
+   `MachFixedGS.mono = MachGpreS.mono_pre`** (lane U4, as `al_programs`
+   already did).  The applications' definitions are elaborated under an
+   ambient `[MachGS]` whose `mono_nat` camera is the only `MonoNatG` source
+   (`EscrowDefs` deviation 2), so an application's record is built at the
+   pre-era instance `AppPreGS.appPreGS` and read at the era's instance
+   through this equation (`AppPreGS.preGS_transport`).  Discharged by `rfl`
+   at the literal, as the other equations.
 -/
 import Xv6.SystemAdequacy
 
@@ -111,6 +119,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   /-- THE DRAIN AT EVERY PORT (Rocq `al_tx`): a byte that reached the wire
   moves the ledger, the port's claim lent at a witness prefix and given back. -/
   al_tx : ∀ [MachGS hlc GF] [Fscfg] (c : A.fixed) (i : UartId) (γ : UartNames),
+    MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
     (i = .uart0 → fscUart = γ) →
     ⊢@{IProp GF} iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState) (ho : List Obs)
         (H : ConsHist),
@@ -125,6 +134,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   /-- THE ARRIVAL AT EVERY PORT (Rocq `al_rx`): the ledger takes the input
   and hands back its tag. -/
   al_rx : ∀ [MachGS hlc GF] [Fscfg] (c : A.fixed) (i : UartId) (γ : UartNames),
+    MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
     (i = .uart0 → fscUart = γ) →
     ⊢@{IProp GF} iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState),
       ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.accept u b ∧ traceShape h true ∧
@@ -154,6 +164,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     MachFixedGS.consRes (hlc := hlc) (GF := GF) = A.cons c →
     MachFixedGS.wild (hlc := hlc) (GF := GF) = (A.ifc c).wild →
     MachFixedGS.rdwild (hlc := hlc) (GF := GF) = (A.ifc c).rdwild →
+    MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
     EraEcho (hlc := hlc) (GF := GF)
 
 section inst
@@ -207,7 +218,7 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
         γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl rfl)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       AL.al_echo (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl)
+        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl rfl)
     (fun γobs c => obsLedgerAt_alloc_cl (A.R c) γobs (A.cl c) (AL.al_R0 c))
     (fun γd γobs c h on dk hs =>
       obsLedgerAt_step (A.R c) (A.cons c) (A.turn c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk
@@ -221,7 +232,7 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
       intro E gen cP cI Fc i γ hu
       letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
       exact uartObsPermit_ledger i (A.R c) (A.tag c) (A.cons c) γ rfl rfl rfl
-        (AL.al_tx c i γ hu) (AL.al_rx c i γ hu))
+        (AL.al_tx c i γ rfl hu) (AL.al_rx c i γ rfl hu))
     A.phi Hphi Hgen0 Hpow0 Himg n κs t2 g2 hsteps
 
 end gen
@@ -306,12 +317,12 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
       · iempintro
       · isplitl [] <;> iempintro
     · simp only [↓reduceIte]; isplitl <;> iempintro
-  al_tx := fun c i γ _ => by
+  al_tx := fun c i γ _ _ => by
     dsimp only [appTriv, Xv6App.cons, appIfaceTriv]
     iintro !> %h %b %u %u' %ho %H %_ Hc HG HR
     imodintro
     iframe Hc HG
-  al_rx := fun c i γ _ => by
+  al_rx := fun c i γ _ _ => by
     dsimp only [appTriv, Xv6App.tag, appIfaceTriv, rxTagTriv]
     iintro !> %h %b %u %u' %_ HG HR
     imodintro
@@ -321,7 +332,7 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
     · itrivial
   al_xfer := fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl)
   al_programs := fun c _ hkill hcons _ _ _ => appTriv_initBoot US c hkill hcons
-  al_echo := fun c _ _ hcons _ _ => by
+  al_echo := fun c _ _ hcons _ _ _ => by
     intro E gen cP cI
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     exact consEchoShift_triv hcons

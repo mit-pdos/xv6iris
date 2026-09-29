@@ -308,3 +308,16 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - KERNEL HAZARD (all lanes): intro'ing a proof-mode hyp whose head is the xv6 instance's unreduced post
   (UexecSG.spostAt (self := uexecSGXv6) … / xv6Spost …) costs ~6 s/leaf and can deterministic-timeout;
   read the post via a Lean-level entailment onto the continuation's premise (consOpen_post_pre pattern).
+
+## U4 (landed Sept 29) — the union theorem is closed
+- `Xv6.unionAdequacyClosed` (LinkUInitUnion): hypotheses Hgen0/Hpow0/Hdisk only; axioms = baseline
+  (propext, Classical.choice, Quot.sound, 503 bv_decide certs). `_leaves` variant takes UL.
+- CONE-AUDIT BLIND SPOT: the U0-X glob walk misses typeclass-resolved references; ~300 decls reached only via
+  the `union_laws_at` instance were trimmed as "unreached" and are now ported as *Seal*.lean companions
+  (re-walk script: lane-u4union/scratch/globwalk2.py). Stale "CONE TRIM / not ported (unreached)" headers in
+  UnionOut, UnionOutLed, GenOut*, EchoOut, FileOut*, PipeOut*, LineModel*, AppFile*, PipesLedPure … need updating.
+- krelax (af31d1908): consEvOk gains Rocq's cons_ev_ok K1/K2/K3; UartState.recvd; obsWf input tie; consResCur
+  delivered-count row; al_rx uses Uart.accept.
+- AppLaws deviation 8: al_tx/al_rx/al_echo take `MachFixedGS.mono = MachGpreS.mono_pre` (appUnion built at
+  placeholder AppPreGS.appPreGS, read back via preGS_transport).
+- Stale: SpecShFprintf.lean "BLOCKED" note; fprintf + R-pipes/R-round/I-init parameter entries above are discharged.
