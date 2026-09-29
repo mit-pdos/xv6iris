@@ -389,8 +389,11 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
     swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart ∗
-    fsBank (hlc := hlc) (GF := GF) ∗ logMirrorHalf (hlc := hlc) M ∗
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
+    snapLawGhost (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+      (eraSyncHook (hlc := hlc) (GF := GF)) ∗
+    crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF) ∗
+    logMirrorHalf (hlc := hlc) M ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗
     logFreeTok γ ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -414,22 +417,21 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bslots 2 -∗
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hswlb, #Hpark, #Hlaw, #Hnb,
-    Hmir, #Hm1, #Hm2, Hfresh, Htok,
+  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hswlb, #Hpark, #Hlaw, #Hlawg,
+    #Hcinv, #Hcert, Hmir, #Hm1, #Hm2, Hfresh, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the boot pack, with the era's mirror half at the clean picture and row (b)
   ihave Hbatch := logStateAt_boot γb γfs V.cov logstart (opPending (∅ : RegMapF OpEntry))
       L D bsh M hMhdr hMtie $$ [Hmir HlhN Hjunk HL HD Hd Hhdr Hslots Hpool]
   case' _ => iframe
-  icases logFreeTok_split γ $$ Htok with ⟨Hlkf, Hops, Hep, Hreg, Htx⟩
-  -- THE GENESIS BANK (Rocq's): the copy the clear took, at epoch one
-  icases logFlushedBank_mk γ 1 $$ Hep Hnb with ⟨Hep, #Hbank⟩
+  -- the helping slot's empty authority and THE ERA'S SYNC TOKEN go into the
+  -- first `logResAt` (Rocq sync K3-3/K3-4)
+  icases logFreeTok_split γ $$ Htok with ⟨Hlkf, ⟨Hops, Hep, Hreg, Htx⟩, Hhelp, Hstok⟩
   ihave Hres := logResAt_boot γ γb γfs V.cov logstart vNc
-      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hstok Hbatch]
   case' _ =>
-    iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-    iexact Hbank
+    iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hstok Hbatch
   -- the seal, AT THE GIVEN NAME `γ.lk` (Rocq `newlock_at`)
   iapply wpLoop_fupd
   imod (kctx_newlockAt cpu _ γ.lk logAddr "log" (logResAt γ γb γfs V.cov logstart))
@@ -437,8 +439,9 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · iframe Hm1 Hm2
     iframe
   imodintro
-  ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow Hswlb Hpark Hlaw]
-  case' _ => iframe Hlk Hfroz Hrow Hswlb Hpark Hlaw
+  ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev
+    $$ [Hlk Hfroz Hrow Hswlb Hpark Hlaw Hlawg Hcinv Hcert]
+  case' _ => iframe Hlk Hfroz Hrow Hswlb Hpark Hlaw Hlawg Hcinv Hcert
   -- the epilogue
   ihave Hframe := (show frame6s3 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
         (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ⊢
@@ -499,7 +502,7 @@ theorem initlog_proof
   simp only [initlogAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hseam, #Hcert, Hborn, Hpid, #Hbinv, Hexc,
     Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
-    HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, Hnext⟩
+    HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, #Hlawgf, #Hcinv, Hnext⟩
   icases genCert_parts $$ Hcert with ⟨-, -, #Hreg⟩
   icases (show logMirrorBorn (hlc := hlc) (GF := GF) M ⊢
       logMirrorHalf (hlc := hlc) M ∗
@@ -877,8 +880,7 @@ theorem initlog_proof
   iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
       (itRecL (ilW bs) Lw L) pidv dqp
       (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd
-          (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) (logHdrBno logstart) bs') ∗
-        fsBank (hlc := hlc) (GF := GF)))
+          (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) (logHdrBno logstart) bs')))
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1 $Hfam]
   rotate_right 1
@@ -904,9 +906,8 @@ theorem initlog_proof
   -- the handle is spent at `[]`, and the discarded element is the permanent
   -- certificate `Xv6.logCtx` carries.
   iapply wpLoop_fupd
-  -- the clear's receipt: the mirror half at the clean picture, and the GENESIS
-  -- durability copy (both timeless)
-  icases HQ with ⟨>Hmir3, >#Hnb⟩
+  -- the clear's receipt: the mirror half at the clean picture (timeless)
+  icases HQ with >Hmir3
   ihave Hsealed := excSeal (GF := GF) γfs.exc $$ Hexc
   imod Hsealed with #Hseal
   -- BLOCK 1 IS PARKED, and the law is composed with the park (Rocq's
@@ -915,6 +916,7 @@ theorem initlog_proof
   imodintro
   ihave #Hparked := sbParked_of_park γfs sbrec hsbok $$ Hpark
   ihave #Hlaw := Hlawf $$ Hpark
+  ihave #Hlawg := Hlawgf $$ Hpark
   ihave #Hrow := fsBytesAnyAt_of γfs (fsHomeList V.cov logstart) $$ Hat Hseal
   have hM3hdr : lmHdr (lmUpd (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs))
       (logHdrBno logstart) bs') logstart = (0, []) := by
@@ -933,7 +935,7 @@ theorem initlog_proof
       ((g25.trans f25).trans ((d25.trans b25).trans a25'))
       ((g26.trans f26).trans ((d26.trans b26).trans a26'))
       ((g27.trans f27).trans ((d27.trans b27).trans a27')))
-    $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hswlb $Hparked $Hlaw $Hnb $Hmir3
+    $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hswlb $Hparked $Hlaw $Hlawg $Hcinv $Hcert $Hmir3
          $Hm1 $Hm2 $Hfresh $Htok
          $Hout $Hcmt $Hnc $HlhN $Hjunk $HL $HD $Hd $Hch $Hslots $Hpool $Hs2 $Hnext]
   k_norm_g

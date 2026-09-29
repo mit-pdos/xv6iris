@@ -167,8 +167,16 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   bslots ((LOGBLOCKS + 2) + 2) ∗
   -- BLOCK 1'S BYTE RUN, AT FULL FRACTION (Rocq's): parked in `sbN` here
   fsblock γfs.bytes SB_BNO bsSb ∗
-  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park
-  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart) ∗
+  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
+  -- the era's sync token (sync K3-3)
+  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
+      (eraSyncTok (hlc := hlc) (GF := GF))) ∗
+  -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
+  -- park for the same reason, and the crash invariant the ghost commit opens;
+  -- both parked into `logCtx` beside `genCert`
+  □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
+      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
+  crashInv (hlc := hlc) (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -264,8 +272,16 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   bslots ((LOGBLOCKS + 2) + 2) ∗
   -- BLOCK 1'S BYTE RUN, AT FULL FRACTION (Rocq's): parked in `sbN` here
   fsblock γfs.bytes SB_BNO bsSb ∗
-  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park
-  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart) ∗
+  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
+  -- the era's sync token (sync K3-3)
+  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
+      (eraSyncTok (hlc := hlc) (GF := GF))) ∗
+  -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
+  -- park for the same reason, and the crash invariant the ghost commit opens;
+  -- both parked into `logCtx` beside `genCert`
+  □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
+      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
+  crashInv (hlc := hlc) (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -318,9 +334,9 @@ theorem INITLOG.wp_initlog (A : INITLOG) {hlc : HasLC} {GF : BundledGFunctors} [
   unfold wp_initlog_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hs, Hc, Hm, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, Hb1, Hlaw, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hs, Hc, Hm, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, Hb1, Hlaw, Hlawg, Hcinv, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 Hs Hc Hm H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 Hb1 Hlaw
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 Hs Hc Hm H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 Hb1 Hlaw Hlawg Hcinv
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
   iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
