@@ -1,6 +1,7 @@
 # The per-process key history (NI-LEDGER-REST, `uhist`)
 
-STATUS: DESIGN PASS, 2026-09-28 (Fable, for the owner's ruling).  The
+STATUS: LANDED 2026-09-29 (rulings R1-R3 as recommended, owner, 2026-09-28;
+5634a3874; §5 below is the as-landed record).  The
 last item of M1 ([`../projects/noninterference.md`](../projects/noninterference.md)
 §6: "a per-process key history `uhist : mono_list uvis` beside
 `proc_priv`, appended at trap-out and resume; the invariant 'every
@@ -152,3 +153,45 @@ the led contracts, which is M0's re-cut (the consumers), not M1's.
   consumer yet; M2's export will take it from the loop) vs exported now
   through the loop's Löb hypothesis (a statement change to the loop's
   contract for nothing yet).
+
+## 5. As landed (2026-09-29, 5634a3874)
+
+- **The camera is an ENCODED ledger.**  D2 said "a member of `xv6G`";
+  the attempt found that `UexecSlot` (the key record) and everything
+  above it DEPEND on `Xv6Cameras`, so no camera there can name
+  `uround`, and the fallback (a class bound only by the residue file)
+  would have changed every `USERTRAP_RES` binder.  The ruling in flight:
+  `Xv6Cameras.uledG := inG Σ (mono_listR (leibnizO positive))`, a
+  gname-free member of `xv6G` (`xv6_uled`, `uledΣ`); `uhist_auth γ h :=
+  own γ (●ML (encode <$> h))`, with `Countable uvis` (and `uperm`,
+  `offmode`, `pipe_names`, `fdtype`, `fdstate`, which had `EqDecision`
+  but no `Countable`) derived in `UhistDefs.v`; prefix and
+  comparability come back through `encode`'s injectivity
+  (`fmap_app_inv`, `list_fmap_inj`).  The same camera serves any later
+  ledger over a type defined above the camera file.
+- **Files** (16, +182 / -31): `UhistDefs.v` (no longer pure: it holds
+  the ghost, because `SpecUsertrap` does not import `UsertrapRes` and
+  the `Parameter` must name it; `uhist_own γ := ∃ h, uhist_auth γ h ∗
+  ⌜uhist_wf h⌝`), `Xv6Cameras.v`/`Xv6G.v`, `UsertrapRes.v` (`un_uh`,
+  `park_own`, `ut_own_nopt`/`ut_own` gain `uhist_own (un_uh N)` last,
+  `ut_own_nopt_uhist`, `ut_res_bare_uhist_acc`; `ut_own_rebuild`, an
+  internal lemma, takes the history as a premise), `SpecUsertrap.v`
+  (the `Parameter`), `ProofUsertrap.v` and `UtResFits.v` (the two
+  implementations of `usertrap_res_bare`, one line each — two files
+  the design's count missed), the four seals, `ProofKforkB5.v` /
+  `ProofUserinit.v` (the mint, the constructor, `park_own`),
+  `ProofUserretClosed.v` (the append, on a copy of `Hround'` since the
+  residue is spent before the relation's rewrites), and two files that
+  take `ut_own` apart by pattern: `ProofUsertrapSys.v` (the 8-way
+  destruct gains the history and passes it to the rebuild) and
+  `ProofUsertrapTail.v` (`ut_own_nm` gains the conjunct; its exit-path
+  destruct drops it).
+- **Gate.**  989 files (the bundle changed), 0 errors; audits 13/13/14.
+- **What it gives, and what remains.**  Every process's residue now
+  carries its list of rounds, each lawful at the key level: the "run of
+  the abstract machine" half of M1's invariant, in the logic.  The
+  lower bound is minted and dropped at each append (R3); the "at the
+  event history" half waits for the syscall arms to take the led
+  contracts (M0's re-cut), at which point the round can be recorded
+  beside the ledgers' receipts.
+

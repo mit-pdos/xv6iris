@@ -318,7 +318,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   (cause, trapped key, resumed key) in the trap residue beside the
   block, named by the residue's own name record, appended once per
   round by the trap loop, with "every round is lawful" as the
-  invariant.  Rulings R1-R3 pending.
+  invariant.  LANDED 2026-09-29 (the camera an encoded ledger over
+  `positive`, since the key record sits above the camera file); §5 is
+  the as-landed record.  With it M1 is complete.
 - **[`program-specs.md`](design/program-specs.md)** — THE PROGRAMS' SPECS
   AS INTERACTION TREES (proposal): why the landed walks are already trees
   in the wrong vocabulary, where `Out fd S`/`In fd S` stop being general

@@ -34,7 +34,7 @@ M1's ledgers are fresh ground and go first.
   event vocabulary + ledger file; `SpecKalloc`'s rows deterministic in
   the ledger; callers served by the invariant (not per-caller
   fragments).  Rulings R1-R5 taken as recommended (owner, 2026-09-28).
-- [ ] **NI-LEDGER-REST** (M1 remainder): `nextpid` — coordinate with
+- [x] **NI-LEDGER-REST** (M1 remainder, COMPLETE 2026-09-29): `nextpid` — coordinate with
   the landed TRAP-ROWS `upid`/`ukn_pid` work, the U tier already sees
   pid numbers — then `ticks`, the zombie set; then the per-process key
   history `uhist : mono_list uvis` beside `proc_priv`.  PID LEDGER
@@ -63,7 +63,17 @@ M1's ledgers are fresh ground and go first.
   [`design/ni-uhist.md`](../design/ni-uhist.md) — a ghost list of rounds
   `(sc, W, W')` in the residue beside the block, named by `ut_names`,
   appended once per round by the trap loop with the round relation as
-  its invariant; rulings R1-R3 open.
+  its invariant.  UHIST LANDED 2026-09-29 (5634a3874; as-landed record in
+  the design note §5 — the camera is an ENCODED ledger over `positive`,
+  a gname-free `xv6G` member, because the key record sits above the
+  camera file).  **M1 IS COMPLETE**: the four ledgers and the
+  per-process history, all as receipts/invariants beside landed
+  contracts, no consumer yet.  NEXT, in order of value: (1) the first
+  consumers — the dispatcher's rows reading the receipts (`usys_det`,
+  M0), which waits on upstream's post-Qed re-cut of the claim files;
+  (2) the permit sweep for the strong instance
+  (`design/ni-strong-instance.md` §3, 69+7 contracts), now sizeable
+  against the full vocabulary; (3) M2's export.
 - [ ] **NI-STRONG-INSTANCE** (§3.1): a process before its first syscall
   appends no events.  DESIGN PASS 2026-09-28,
   [`design/ni-strong-instance.md`](../design/ni-strong-instance.md): NOT
