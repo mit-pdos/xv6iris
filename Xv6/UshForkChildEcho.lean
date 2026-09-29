@@ -2,7 +2,7 @@
 **The fork arm's child law at the echo line** (Rocq
 `UkShEcho.ushf_child_law_holds_at_D`, pinned `1900b8a43`; the glue sh-exec
 left for sh-run): `UshForkDefs.ushfChildLaw X ushDg` -- the forked child's
-walk from 0x9c0 at the paid payload `ushfWq X I` -- out of sh-exec's child
+walk from 0x99c at the paid payload `ushfWq X I` -- out of sh-exec's child
 walk at echo's alternative, the era's supply and diagnostic law read at the
 era's guard `D`.
 

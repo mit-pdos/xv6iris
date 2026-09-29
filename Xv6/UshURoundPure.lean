@@ -212,7 +212,7 @@ theorem usecc_lp_of_at (wsx : List (List (BitVec 8))) (f : Nat → BitVec 8) (k 
 theorem usecc_execfail_bytes0 : ushExecfailBytes altExecsecc cmdSeccomp := by
   refine ⟨by decide, by decide, by decide, by decide, ?_⟩
   intro p h1 h2
-  exact ushBytes_of_forallb (ushLit 0x12b8) (fun q => altExecsecc[q + (cmdSeccomp.length - 2)]!) 7 8
+  exact ushBytes_of_forallb (ushLit 0x1298) (fun q => altExecsecc[q + (cmdSeccomp.length - 2)]!) 7 8
     (by decide) p h1 (by omega)
 
 /-- **Rocq `usecc_execfail_bytes`**. -/

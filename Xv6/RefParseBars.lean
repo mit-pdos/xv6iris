@@ -327,6 +327,24 @@ theorem ushRoom_ptree (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) 
   rw [ushPpRoom_ptree, ushqPtree_ht]
   omega
 
+/-- **Rocq `ushq_ptree_pp_deep`**: the deepest out-of-memory panic under
+parsepipe at a pipeline, six words per bar over parseexec's twenty-two. -/
+theorem ushPpDeep_ptree (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
+    ushPpDeep (ushqPtree a rest) = 28 + 6 * rest.length := by
+  induction rest generalizing a with
+  | nil => rfl
+  | cons b rest ih =>
+    simp only [ushqPtree, ushPpDeep, ih, List.length_cons]
+    rw [show ushPexDeep (.exec a) = 22 from rfl]
+    omega
+
+/-- ...and under parsecmd. -/
+theorem ushDeep_ptree (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) :
+    ushDeep (ushqPtree a rest) = 42 + 6 * rest.length := by
+  unfold ushDeep ushPlDeep
+  rw [ushPpDeep_ptree]
+  omega
+
 /-- ...and Rocq's N-stage budget (`UkShPipesCmd.wp_kshp_parsecmd_pipes`) is
 the general room plus eight words and the slack. -/
 theorem ushRoom_bars (a : List (Nat × Nat)) (rest : List (List (Nat × Nat))) (k : Nat) :

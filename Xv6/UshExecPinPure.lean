@@ -156,14 +156,14 @@ command's name. -/
 theorem catfExecfailBytes : ushExecfailBytes altExecR fdWCat := by
   refine ⟨by decide, by decide, by decide, by decide, ?_⟩
   intro p h1 h2
-  exact ushBytes_of_forallb (ushLit 0x12b8) (fun q => altExecR[q + (fdWCat.length - 2)]!) 7 8 (by decide) p h1
+  exact ushBytes_of_forallb (ushLit 0x1298) (fun q => altExecR[q + (fdWCat.length - 2)]!) 7 8 (by decide) p h1
     (by omega)
 
 /-- **Rocq `grep_execfail_bytes`**: ...and `exec grep failed`. -/
 theorem grepExecfailBytes : ushExecfailBytes (filtAlt (.FGrep [])) fdWGrep := by
   refine ⟨by decide, by decide, by decide, by decide, ?_⟩
   intro p h1 h2
-  exact ushBytes_of_forallb (ushLit 0x12b8) (fun q => (filtAlt (.FGrep []))[q + (fdWGrep.length - 2)]!) 7 8
+  exact ushBytes_of_forallb (ushLit 0x1298) (fun q => (filtAlt (.FGrep []))[q + (fdWGrep.length - 2)]!) 7 8
     (by decide) p h1 (by omega)
 
 /-- **Rocq `filt_execfail_bytes`**. -/

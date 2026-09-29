@@ -52,7 +52,7 @@ theorem wp_ushChildPipesG (UL : UK_LEAVES) (SP : SH_PARSECMD) (N : UkNames GF) (
     (hbars : UshqBars len f 0 a rest) (hK : i + 2 * rest.length + 1 ≤ K) (hs1 : m.get 9#5 = BitVec.ofNat 64 s0)
     (hs0 : 0 < s0) (hs64 : s0 + len + 1 < 2 ^ 64) (hs38 : s0 + len < 2 ^ 38) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ Cp -∗ □ (Cp -∗ N.pay (-1)) -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ Cp -∗ ushpOom (hlc := hlc) N Cp (20 + (6 + k)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (rest.length * 6 + k)) -∗
       (∀ (h' : CPU) (m' : RegMap) (q : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗
         ushCmd N.d q (ushqStages s0 len f a rest) -∗ ustr N.d dw ushWsA 5 ushpWsF -∗

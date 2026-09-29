@@ -1,7 +1,7 @@
 /-
 **Proof of sh's forked child at the disciplined line** (Rocq
 `UkShEcho.wp_kshm_child_x_holds`, `wp_kshm_child_x_v_holds`,
-`wp_kshm_child_echo_holds`, pinned `1900b8a43`), RE-POINTED at the general
+`wp_kshm_child_echo_holds`, Rocq main at xv6 d66e41c), RE-POINTED at the general
 parser (DU8, see `SpecShChildExec`).
 
     0x99c  mv  a0,s1        the line
@@ -67,19 +67,28 @@ theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (
   -- 0x99e  jal ra,parsecmd
   iapply ushS_jal UL N (ushEI_99e N.t) 0x84a 0x9a2 h1 _ _ $$ Hc Hrun
   iintro %h2 Hrun
+  -- the exit resource down the parser's walk is the LEND and the LEDGER: the out-of-memory
+  -- law takes both where `cmdalloc` panics; its budget is the room less the EXEC node's
+  -- deepest panic (60 - 42)
+  ihave #Hpxw0 := ushpOom_wand N iprop(Cr ∗ ustd N.fd ld) iprop(Cr ∗ TabF N.fd ld) (18 + (8 + (E.ush_Dg + n)))
+    $$ [] Hcq
+  · imodintro
+    iintro ⟨Hc', Hs⟩
+    iframe
+    iapply hTab $$ Hs
+  ihave #Hpxw := ushpOom_mono N iprop(Cr ∗ TabF N.fd ld) (18 + (8 + (E.ush_Dg + n)))
+    (ushRoom (.exec (ushEchoToks ws)) + (8 + (E.ush_Dg + n)) - ushDeep (.exec (ushEchoToks ws)))
+    (by rw [ushRoom_exec, show ushDeep (.exec (ushEchoToks ws)) = 42 from rfl]; omega) $$ Hpxw0
   rw [show (0x84a : Nat) = User.Sh.Sym.«parsecmd» from rfl,
     show 60 + (8 + (E.ush_Dg + n)) = ushRoom (.exec (ushEchoToks ws)) + (8 + (E.ush_Dg + n)) by
       rw [ushRoom_exec]]
   -- THE PARSER THEOREM, at the reference's EXEC answer
   iapply SP.wp_shParser N h2 _ dw dv s0 len f (.exec (ushEchoToks ws)) (ushmFresh N sz) (usz N.s (sz + 65536))
-    Cr (8 + (E.ush_Dg + n)) ?pa0 (refSymScope_nosym len f hns0) href trivial hchain hs0 hs64
-    $$ Hc Hline Hws Hsy HM [] Hcr Hrun
+    iprop(Cr ∗ TabF N.fd ld) (8 + (E.ush_Dg + n)) ?pa0 (refSymScope_nosym len f hns0) href trivial hchain hs0 hs64
+    $$ Hc Hline Hws Hsy HM Hpxw [Hcr Hstd] Hrun
   case pa0 => ureg
-  · imodintro
-    iintro Hc'
-    rw [hpeq]
-    iapply Hcq $$ Hc'
-  iintro %p Htree Hcut %hcut Hws Hsy %h3 %m3 %hcs3 %ha03 HM' Hcr Hrun
+  · iframe
+  iintro %p Htree Hcut %hcut Hws Hsy %h3 %m3 %hcs3 %ha03 HM' ⟨Hcr, Hstd⟩ Hrun
   rw [show (ukWr (ukWr m 10#5 (BitVec.ofNat 64 s0)) 1#5 (BitVec.ofNat 64 0x9a2)).get 1#5 =
       BitVec.ofNat 64 0x9a2 by ureg, ush_retPc 0x9a2 (by decide) (by decide)]
   -- 0x9a2  jal ra,runcmd

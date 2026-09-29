@@ -1554,6 +1554,7 @@ import Xv6.UshATree
 import Xv6.SpecShCmdalloc
 import Xv6.ProofShCmdalloc
 import Xv6.LinkShCmdalloc
+import Xv6.UshOomPaid
 import Xv6.UshArgsWalk
 import Xv6.UshCode
 import Xv6.UshGettokArms

@@ -70,7 +70,7 @@ theorem wp_ushParsecmdPipes (SC : SH_PARSECMD) (N : UkNames GF) (UM : Nat → IP
     (hb : UshqBars len f 0 a rest) (hK : i + 2 * rest.length + 1 ≤ K) (ha0 : m.get 10#5 = BitVec.ofNat 64 s0)
     (hs0 : 0 < s0) (hs64 : s0 + len + 1 < 2 ^ 64) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ □ (Pex -∗ N.pay (-1)) -∗ Pex -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ ushpOom (hlc := hlc) N Pex (20 + (6 + k)) -∗ Pex -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsecmd»)
         (8 + (6 + (6 + (16 + (24 + (8 + (rest.length * 6 + k))))))) -∗
       (∀ t : Nat, ushTree N s0 t (ushqPtree a rest) -∗
@@ -87,9 +87,11 @@ theorem wp_ushParsecmdPipes (SC : SH_PARSECMD) (N : UkNames GF) (UM : Nat → IP
   have hch : ushMallocChain (hlc := hlc) N (ushpNodes (ushqPtree a rest)) (UM i) (UM (i + 2 * rest.length + 1)) := by
     rw [ushqPtree_nodes, show i + 2 * rest.length + 1 = i + (2 * rest.length + 1) by omega]
     exact ushq_chain N UM K Hchain _ i (by omega)
+  ihave #Hpx' := ushpOom_mono N Pex (20 + (6 + k)) (ushRoom (ushqPtree a rest) + (8 + k) - ushDeep (ushqPtree a rest))
+    (by rw [ushRoom_ptree, ushDeep_ptree]; omega) $$ Hpx
   rw [← ushRoom_bars a rest k]
   iapply SC.wp_shParser N h m dw dv s0 len f (ushqPtree a rest) (UM i) (UM (i + 2 * rest.length + 1)) Pex (8 + k)
-    ha0 (ushqBars_scope hb) href (ushqPtree_cat a rest) hch hs0 hs64 $$ Hc Hstr Hws Hsy HM Hpx Hpay Hrun
+    ha0 (ushqBars_scope hb) href (ushqPtree_cat a rest) hch hs0 hs64 $$ Hc Hstr Hws Hsy HM Hpx' Hpay Hrun
   iintro %t Htree Hline - Hws Hsy %h' %m' %hcs %ha0' HM' Hpay Hrun
   rw [← ushqNulfolds_zeroAt a rest (ushpExt len f)]
   iapply Hk $$ %t Htree Hline Hws Hsy %h' %m' %hcs %ha0' HM' Hpay Hrun

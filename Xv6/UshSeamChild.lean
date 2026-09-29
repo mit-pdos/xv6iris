@@ -1,6 +1,6 @@
 /-
 **THE CHILD: parse the line, then hand runcmd the tree** (Rocq `UkShSeam.v`
-(C)–(C3), pinned `1900b8a43`): sh's forked child, main's code 0x99c..0x9a2.
+(C)–(C3), Rocq main at xv6 d66e41c): sh's forked child, main's code 0x99c..0x9a2.
 
     0x99c  c.mv a0,s1        the line
     0x99e  jal  ra,parsecmd  -> the node, at the reference's answer
@@ -60,7 +60,7 @@ theorem wp_ushRefChild (UL : UK_LEAVES) (SP : SH_PARSECMD) (UM UM' : IProp GF) (
     (hcat : ushpCat t) (hch : ushMallocChain (hlc := hlc) N (ushpNodes t) UM UM') (hs0 : 0 < s0)
     (hs64 : s0 + len + 1 < 2 ^ 64) (hs38 : s0 + len < 2 ^ 38) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ □ (Cr -∗ N.pay (-1)) -∗ Cr -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗ ushpOom (hlc := hlc) N Cr (ushRoom t + k - ushDeep t) -∗ Cr -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (ushRoom t + k) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗ ⌜ucalleeSaved m m'⌝ -∗
         ushCmd N.d p (ushcmdOfTree s0 (ushZeroAt (refNulcut t) (ushpExt len f)) t) -∗
@@ -114,12 +114,15 @@ theorem wp_ushRefChildExec (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) 
       □ (uKillCred (hlc := hlc) -∗ N.pay (-1)) -∗ ushJtab N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗
       ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwdAny N.cwd -∗
       uchAny N.ch -∗ UM -∗ (UM' -∗ usz N.s szv) -∗
+      ushpOom (hlc := hlc) N (N.pay (-1)) (8 + (Dg + n) - 2) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (60 + (8 + (Dg + n))) -∗ wpLoop h := by
-  iintro #Hdp #Hc #Hxs #Hkw #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Husz Hrun
+  iintro #Hdp #Hc #Hxs #Hkw #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Husz #Hoom Hrun
   rw [show 60 + (8 + (Dg + n)) = ushRoom (.exec toks) + (8 + (Dg + n)) from rfl]
+  ihave #Hoom' := ushpOom_mono N (N.pay (-1)) (8 + (Dg + n) - 2)
+    (ushRoom (.exec toks) + (8 + (Dg + n)) - ushDeep (.exec toks))
+    (by rw [show ushRoom (.exec toks) = 60 from rfl, show ushDeep (.exec toks) = 42 from rfl]; omega) $$ Hoom
   iapply wp_ushRefChild UL SP UM UM' N h m dw dv s0 len f (.exec toks) (8 + (Dg + n)) (N.pay (-1)) hs1 hsc href
-    trivial hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM [] [] Hrun
-  · imodintro; iintro H; iexact H
+    trivial hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM Hoom' [] Hrun
   · iapply hpx
   iintro %h' %m' %p %ha0 %_ #Htree _ _ _ HM' _ Hrun
   ihave Hsz := Husz $$ HM'
@@ -145,7 +148,7 @@ theorem wp_ushRefChildRedir (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD)
     ⊢ ushCode N.t -∗ ushJtab N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ustr N.d dv ushSymA 7 ushpSymF -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ UM -∗
       ushOpenCallG (hlc := hlc) N cwdv ⟨s0 + q, e - q, fun j => g (q + j)⟩ rrModeGt (ld.set 1 .closed) H K Kf -∗
-      □ (Cr -∗ N.pay (-1)) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
+      ushpOom (hlc := hlc) N iprop(Cr ∗ ustd N.fd ld) (4 + (Dg + n) - 2) -∗ (Cr -∗ H ∗ Cr') -∗ Cr -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       ((∀ (h' : CPU) (m' : RegMap) (p : Nat) (ty : FdType), ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
           ushCmd N.d p (.exec (ushArgs s0 g toks)) -∗
@@ -158,14 +161,23 @@ theorem wp_ushRefChildRedir (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD)
       wpLoop h := by
   subst hg
   iintro #Hc #Hjt Hline Hws Hsy Hstd Hcwd HM Hopen #Hpxw Hsplit Hcr Hrun Hk
-  rw [show 68 + (8 + (Dg + n)) = ushRoom (.redir (.exec toks) q e rrModeGt 1) + (8 + (Dg + n)) from rfl]
-  iapply wp_ushRefChild UL SP UM UM' N h m dw dv s0 len f (.redir (.exec toks) q e rrModeGt 1) (8 + (Dg + n)) Cr
-    hs1 hsc href ⟨trivial, rfl, rfl⟩ hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM Hpxw Hcr Hrun
+  -- a REDIR line's room is 72 (the redirect's cmdalloc): the parse runs at `4 + (Dg + n)`, the
+  -- ledger crossing it beside the lend (the out-of-memory panic prints on fd 2)
+  rw [show 68 + (8 + (Dg + n)) = ushRoom (.redir (.exec toks) q e rrModeGt 1) + (4 + (Dg + n)) by
+    rw [show ushRoom (.redir (.exec toks) q e rrModeGt 1) = 72 from rfl]; omega]
+  ihave #Hpxw' := ushpOom_mono N iprop(Cr ∗ ustd N.fd ld) (4 + (Dg + n) - 2)
+    (ushRoom (.redir (.exec toks) q e rrModeGt 1) + (4 + (Dg + n)) - ushDeep (.redir (.exec toks) q e rrModeGt 1))
+    (by rw [show ushRoom (.redir (.exec toks) q e rrModeGt 1) = 72 from rfl,
+          show ushDeep (.redir (.exec toks) q e rrModeGt 1) = 62 from rfl]; omega) $$ Hpxw
+  iapply wp_ushRefChild UL SP UM UM' N h m dw dv s0 len f (.redir (.exec toks) q e rrModeGt 1) (4 + (Dg + n))
+    iprop(Cr ∗ ustd N.fd ld) hs1 hsc href ⟨trivial, rfl, rfl⟩ hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM Hpxw' [Hcr Hstd]
+    Hrun
+  · iframe
   simp only [ushcmdOfTree]
-  iintro %h' %m' %p %ha0 %_ #Htree _ _ _ HM' Hcr Hrun
+  iintro %h' %m' %p %ha0 %_ #Htree _ _ _ HM' ⟨Hcr, Hstd⟩ Hrun
   icases Hsplit $$ Hcr with ⟨HH, Hcr⟩
-  rw [show ushRoom (.redir (.exec toks) q e rrModeGt 1) + (8 + (Dg + n)) = 6 + (Dg + (70 + n)) by
-    show 68 + _ = _; omega]
+  rw [show ushRoom (.redir (.exec toks) q e rrModeGt 1) + (4 + (Dg + n)) = 6 + (Dg + (70 + n)) by
+    show 72 + _ = _; omega]
   iapply SR.wp_shRedirArmG Dg hps N (.exec (ushArgs s0 (ushZeroAt (refNulcut (.redir (.exec toks) q e rrModeGt 1)) (ushpExt len f)) toks))
     ⟨s0 + q, e - q, fun j => ushZeroAt (refNulcut (.redir (.exec toks) q e rrModeGt 1)) (ushpExt len f) (q + j)⟩ rrModeGt
     h' m' p cwdv ld st1 (70 + n) H K Kf (by unfold rrModeGt; omega) ha0 hst1 hne hnp
@@ -198,7 +210,7 @@ theorem wp_ushRefChildPipe (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) 
       ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ usz N.s szv -∗ ustd N.fd ld -∗
       ucwd N.cwd cwdv -∗ uch N.ch Sc -∗ UM -∗ Cr -∗ □ (uKillCred (hlc := hlc) -∗ Qc (-1)) -∗
       (∀ γp : PipeNames, UM' -∗ Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ Rk γp)) -∗
-      ushPipeCall (hlc := hlc) N ld R -∗
+      ushPipeCall (hlc := hlc) N ld R -∗ ushpOom (hlc := hlc) N Cr (8 + (Dg + (2 + n)) - 2) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (8 + (Dg + n))) -∗
       (∀ (N' : UkNames GF) (h' : CPU) (m' : RegMap) (γ' : GName) (γp : PipeNames) (q : Nat),
         ⌜N'.pay = Qc⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ myPay γ' Qc -∗ ushCode N'.t -∗ ushJtab N'.t -∗
@@ -222,12 +234,15 @@ theorem wp_ushRefChildPipe (UL : UK_LEAVES) (SP : SH_PARSECMD) (SR : SH_RUNCMD) 
         urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xea) (2 + (Dg + (68 + n))) -∗ wpLoop h') -∗
       wpLoop h := by
   subst hg
-  iintro #Hdp #Hc #Hjt Hline Hws Hsy Hsz Hstd Hcwd Hch HM Hcr #Hkw Hsplit Hpipe Hrun HcL HcR Hpar
+  iintro #Hdp #Hc #Hjt Hline Hws Hsy Hsz Hstd Hcwd Hch HM Hcr #Hkw Hsplit Hpipe #Hoom Hrun HcL HcR Hpar
   rw [show 68 + (8 + (Dg + n)) = ushRoom (.pipe (.exec toksl) (.exec toksr)) + (8 + (Dg + (2 + n))) by
     show 68 + _ = 66 + _; omega]
+  ihave #Hoom' := ushpOom_mono N Cr (8 + (Dg + (2 + n)) - 2)
+    (ushRoom (.pipe (.exec toksl) (.exec toksr)) + (8 + (Dg + (2 + n))) - ushDeep (.pipe (.exec toksl) (.exec toksr)))
+    (by rw [show ushRoom (.pipe (.exec toksl) (.exec toksr)) = 66 from rfl,
+          show ushDeep (.pipe (.exec toksl) (.exec toksr)) = 48 from rfl]; omega) $$ Hoom
   iapply wp_ushRefChild UL SP UM UM' N h m dw dv s0 len f (.pipe (.exec toksl) (.exec toksr)) (8 + (Dg + (2 + n)))
-    Cr hs1 hsc href ⟨trivial, trivial⟩ hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM [] Hcr Hrun
-  · imodintro; iintro _; iapply hpx
+    Cr hs1 hsc href ⟨trivial, trivial⟩ hch hs0 hs64 hs38 $$ Hc Hline Hws Hsy HM Hoom' Hcr Hrun
   simp only [ushcmdOfTree]
   iintro %h' %m' %p %ha0 %_ #Htree _ _ _ HM' Hcr Hrun
   rw [show ushRoom (.pipe (.exec toksl) (.exec toksr)) + (8 + (Dg + (2 + n))) = 6 + (2 + (Dg + (68 + n))) by

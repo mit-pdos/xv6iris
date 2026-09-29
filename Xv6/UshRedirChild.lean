@@ -1,6 +1,6 @@
 /-
 **The redirect child's walk, 0x99c to its exits** (Rocq
-`UkShRedirChild.wp_kshm_child_file_redir`, pinned `1900b8a43`).  A stage
+`UkShRedirChild.wp_kshm_child_file_redir`, Rocq main at xv6 d66e41c).  A stage
 file (main's child code at 0x99c and runcmd's arms).
 
 `UshRedirSeam.wp_ushChildAllocRedirG` (parse, close(1), the open as the
@@ -66,7 +66,8 @@ theorem wp_kshm_child_file_redir {A : Type} (UL : UK_LEAVES) (HS : UK_SYS_P) (HF
         ushExecSupEchoAt (ushExecEnvOf UL HS HF SR.wp_shRuncmdEntry) (ushsFd1f ty) ws Q iprop(Cr' ∗ K' ty)) -∗
       (∀ ty : FdType, ushdExecfailLaw (hlc := hlc) iprop(Cr' ∗ K' ty) Cx) -∗ □ (Cx -∗ Q (-1)) -∗
       ushExecfailLawAt (hlc := hlc) (altOpenfailN file) (13 + file.length) iprop(Kf a ∗ Cr') Cd -∗
-      □ (Cd -∗ Q (-1)) -∗ □ (Cr -∗ Q (-1)) -∗ (Cr -∗ Dd a ∗ Cr') -∗ Cr -∗
+      □ (Cd -∗ Q (-1)) -∗ ushpOom (hlc := hlc) N' iprop(Cr ∗ ustd N'.fd ld) (4 + (ushDg + n) - 2) -∗
+      (Cr -∗ Dd a ∗ Cr') -∗ Cr -∗
       urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
   obtain ⟨hred, htoks, hpos, htlen⟩ := ush_line_toks_holds_redir ws file fb 0 len hline
   have hok := hline.1
@@ -94,11 +95,10 @@ theorem wp_kshm_child_file_redir {A : Type} (UL : UK_LEAVES) (HS : UK_SYS_P) (HF
   iintro #Hcode #Hjt Hstr Hws Hsy Hstd Hcwd Hch HM Hopen #Hrd Hsup #Hxl #Hcx #Hol #Hcd #Hpx Hsplit Hcr Hrun
   iapply wp_ushChildAllocRedirG UL SP SR HM ushDg hps N' h m dw dv s0 ROOTINO len (fun j => fb (0 + j)) (wlToks ws)
     gp fe sz ld st1 n (Dd a) K (Kf a) Cr Cr' hs1 hred htoks hpos htlen hs0 hs64 hs38 hst1 hne hnp hszlo hszal
-    hszok $$ Hcode Hjt [Hstr] Hws Hsy Hstd Hcwd HM [Hopen] [] Hsplit Hcr Hrun
+    hszok $$ Hcode Hjt [Hstr] Hws Hsy Hstd Hcwd HM [Hopen] Hpx Hsplit Hcr Hrun
   · simp only [Nat.zero_add]; iexact Hstr
   · rw [← hfuptr]
     iapply ush_open_call_g_of_call2 N' fu file rrModeGt (ld.set 1 .closed) K Dd Kf a hfu hful hfub hfdl $$ Hopen
-  · imodintro; iintro Hc; rw [hpeq]; iapply Hpx $$ Hc
   isplitl [Hsup Hch]
   · -- the open SUCCEEDED: exec /echo at fd 1 = the file
     iintro %hf %mf %q %ty %ha0f #Hsub Hstd Hcwd HK HM2 Hcr Hrun
