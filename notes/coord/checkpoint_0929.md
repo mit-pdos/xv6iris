@@ -29,3 +29,7 @@ Sept 29 evening: R-round LANDED 3660681e5; Sail regen (short-circuit backend, hZ
 secc entry LANDED (see log). Running: R-pipes (+ R-prog's held UshCatFStage*), I-init. Next: U4 top.
 R-pipes LANDED 9c3d47b72 (with R-prog's UshCatFStage*). Running: I-init, U4 (lane-u4union). Wave U3 complete except I-init.
 I-init LANDED (see log). Wave U3 COMPLETE. Running: U4 (lane-u4union), LinkUkLeaves (worktree).
+In flight (session 354a8854, stanford profile; transcripts under /root/.claude-stanford/projects/-shared-lean-xv6/354a8854-3bc9-489e-ae3f-4c1cf0ea94ea/subagents/):
+- U4 top: agent a6e72870d0b8146b8, worktree lane-u4union (was writing UInitUnionCC).
+- LinkUkLeaves: agent a84509f955ac87499, worktree agent-a84509f955ac87499 (branch worktree-agent-a84509f955ac87499).
+Both resumed after a session-limit cut-off. dead_lane_tail.py reads kmit-profile transcripts: point D at the stanford dir for these.
