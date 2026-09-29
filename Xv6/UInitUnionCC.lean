@@ -1,5 +1,5 @@
 /-
-**THE UNION ERA'S CONSOLE CREDENTIAL AND ITS TEN LAWS** (lane U4) -- Rocq
+**THE UNION ERA'S CONSOLE CREDENTIAL AND ITS NINE LAWS** (lane U4) -- Rocq
 `UInitUnionCC.v` §1-§2 (`/shared/xv6rocq/iris/UInitUnionCC.v` @ 1900b8a43):
 `union_H`, `union_Wwild`, `union_wild_pay`, `union_cc` (with its two
 timeless facts), `uicc_lcred_of_pban`, `union_wp_line`, `union_wbn_to`,
@@ -238,7 +238,8 @@ theorem unionCc_rdX (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) :
       ushRdXAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres (fgnEcho ug.ugnFile)
         (uWbf (hlc := hlc) ug r s0) := rfl
 
-/-! ## 2. The ten laws (Rocq `union_cc_holds`, at I-init's record) -/
+/-! ## 2. The nine laws (Rocq `union_cc_holds`, at I-init's record; DRIFT SY1:
+the block-owed conversion, law 7 at the pin, is gone) -/
 
 /-- **Rocq `union_cc_holds`** (deviation 2). -/
 theorem union_cc_holds (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
@@ -257,7 +258,7 @@ theorem union_cc_holds (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : 
     file_taint_of_sup_at (hlc := hlc) (GF := GF) ug.ugnFile r heq
   have hwbi := uWbf_inp (hlc := hlc) (GF := GF) ug r s0
   have hrdX := unionCc_rdX (hlc := hlc) (GF := GF) ug r s0
-  refine ⟨?rl, ?pm1, ?pm3, ?pmwb, ?wc, ?wbwc, ?wbl, ?wbr, ?bd, ?pw⟩
+  refine ⟨?rl, ?pm1, ?pm3, ?pmwb, ?wc, ?wbwc, ?wbr, ?bd, ?pw⟩
   · -- (1) the read leaf at the index
     intro γp N l hpay
     rw [hrdX] at hpay
@@ -284,9 +285,7 @@ theorem union_cc_holds (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : 
     exact uWcu_read (hlc := hlc) (GF := GF) ug r s0 γp I l hnl
   · intro I
     exact uHwbwc_u (hlc := hlc) (GF := GF) ug r s0 (uptermShape ug) (updoneShape ug) I
-  · intro I
-    exact uHwbl_u (hlc := hlc) (GF := GF) ug r s0 (uptermShape ug) (updoneShape ug) I
-  · -- (8) a line read at an unwritten prompt is the taint
+  · -- (7) a line read at an unwritten prompt is the taint
     intro γp I l hnl
     dsimp only [unionCc]
     change ⊢ ushMidAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres (fgnEcho ug.ugnFile) γp
@@ -304,14 +303,14 @@ theorem union_cc_holds (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : 
     · iexfalso
       iapply (uwild_read_absurd (hlc := hlc) (GF := GF) ug s0 γp I l) $$ Hm
       iexact Hw
-  · -- (9) the cursor's boundary
+  · -- (8) the cursor's boundary
     intro γp N l i hpay
     rw [hrdX] at hpay
     exact ushPosbOfLendAt (hlc := hlc) (GF := GF) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres
       (fgnEcho ug.ugnFile)
       (initShCtx (unionCc (hlc := hlc) (GF := GF) ug r s0) γp (fileTaint (hlc := hlc) ug.ugnFile.fgnCl))
       N l i rfl hpay (uWcu_inp (hlc := hlc) (GF := GF) ug r s0) hwbi
-  · -- (10) THE STEP: the prologue credential carries the hold
+  · -- (9) THE STEP: the prologue credential carries the hold
     intro n
     dsimp only [unionCc]
     iintro Hp

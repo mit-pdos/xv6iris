@@ -49,6 +49,7 @@ import Xv6.UexecSecc
 import Xv6.UshSecc
 import Xv6.LinkUexecWp
 import Xv6.UkSeccEntry
+import Xv6.UshOomPaid
 
 namespace Xv6
 
@@ -153,7 +154,7 @@ theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
     ⊢ udep (hlc := hlc) (GF := GF) -∗ shSeccSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       useccompShape (hlc := hlc) ug I -∗
       ushExecSupEchoAtV E (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs (.LSecc wsx))
-        (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+        (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0))
         (useccompShape (hlc := hlc) ug I) vw := by
   have hhead : (ulineWs (.LSecc wsx))[0]! = seccPl := by
     show (ulineWs (.LSecc wsx))[0]! = cmdSeccomp
@@ -161,16 +162,15 @@ theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
   unfold shSeccSlot
   iintro #Hdep #Hslot #Hsh
   ihave #Hwp := (UexecGen US).uexec_wp_gen (hlc := hlc) (GF := GF)
-  ihave #HQ : iprop(□ ∀ _s : Int, iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+  ihave #HQ : iprop(□ ∀ _s : Int, (uWcu (hlc := hlc) ug r s0 PT PD I 0))
     $$ []
   · imodintro
     iintro %_
-    iright
     iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
   iapply shExecSupXOfEntryV (ushExecPinEcho_holds E) (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld)
     (ulineWs (.LSecc wsx)) seccPl era0SeccPins [ROOTINO, SECC_INO] SECC_INO User.Seccomp.elf
     (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0)
+    (uWcu (hlc := hlc) ug r s0 PT PD I 0)
     (useccompShape (hlc := hlc) ug I) vw (usecc_ws_exec_ok wsx hok) hhead seccElfLoadable shSeccPinResolves
     $$ [] [] Hslot
   · imodintro
@@ -178,7 +178,7 @@ theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
     obtain ⟨-, -, rb2, hr2⟩ := hrows
     ihave #Hrows := ushViewSeccRows (hlc := hlc) (GF := GF) vw sts hvok htab
     ihave He := seccImageEntry_of_leaves UL (consLicenceAt_of_useccTok ug hwild hcons) (ulineWs (.LSecc wsx)) M Mv sa t gn sts ROOTINO cs pidv
-      (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0)) rb2 hps
+      (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0)) rb2 hps
       (usecc_ws_exec_ok wsx hok) himg hag hbytes hlen hr2 $$ HQ Hwp Hnp Hdep
     iapply imageEntryPayMono _ _ _ _ _ _ _ _ _ _ _ _ $$ [] He
     imodintro
@@ -191,11 +191,10 @@ theorem usecc_exec_sup (UL : UK_LEAVES) (US : USER)
     · iexact Hrows
   · imodintro
     iintro -
-    iright
     iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
 
 /-- **Rocq `uHchild_secc`**: THE seccomp CHILD'S LAW. -/
-theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (US : USER)
+theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : SH_CHILD_EXEC) (US : USER)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF) (γp : GName)
@@ -232,16 +231,15 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (U
     ihave ⟨Hd, -⟩ := ushPreAt_open ug r s0 I $$ Hpre
     icases ushDeedAt_open ug r upreTie s0 I $$ Hd with (⟨%cs, %s, %v', -, -, -, -, -, %hnw⟩ | #HT)
     · exact absurd (hw.symm.trans hnw) (by decide)
-    · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x9c0)
+    · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
         (68 + (8 + (ushDg + n))) (by decide) $$ [] HT Hrun
       imodintro
       iintro %W #HT' Hmy
       rw [hpeq]
-      iapply Hgen $$ %(iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+      iapply Hgen $$ %((uWcu (hlc := hlc) ug r s0 PT PD I 0))
         %W HT' Hmy
       imodintro
       iintro #Hk
-      iright
       iapply uWcu_taint ug r s0 PT PD I 0 v0 $$ Hpin0 [Hk]
       iapply uHktaint ug hkill $$ Hk
   -- ---- the wild arm ----
@@ -252,7 +250,7 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (U
     have H := SC.wp_shChildXGen (ushURoundEnv (hlc := hlc) (GF := GF) UL HF) hps
       (fun γ ld => ustdAt γ ld vw) (fun γ ld => ustdAt_ustd γ ld vw)
       (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld) (ulineWs (.LSecc wsx)) altExecsecc
-      (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+      (fun _ => (uWcu (hlc := hlc) ug r s0 PT PD I 0))
       (useccompShape (hlc := hlc) ug I) (useccompShape (hlc := hlc) ug I)
       N' hc h m dw dv sa len gb sz ld (n + 8) hpeq hs1 (usecc_xline wsx gb len hlat)
       (usecc_execfail_bytes wsx) hsa hs64 hs38 hszlo hszal hszok hrows hrows.2.2
@@ -260,26 +258,29 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC) (U
     rw [show 68 + (8 + (ushDg + n)) = 60 + (8 + (ushDg + (n + 8))) by omega]
     iapply H $$ Hcode [] [] [] [] Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM [] Hrun
     · iapply usecc_exec_sup UL US hps ug r s0 PT PD hwild hcons hrdw I wsx vw hsok hvok $$ Hdep Hslot Hsh
-    · imodintro
-      iintro -
-      iright
-      iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
+    · -- the parse ran out of memory: "out of memory" through the era's licence,
+      -- the shape unmoved (DRIFT SY1, Rocq 7adb0cba2)
+      iapply ushp_oom_of_diag SP N' _ _ ld _ (by unfold ushDg; omega) hrows.2.2 $$ [] [] Hcode
+      · iapply usecc_execfail_law UL ug hcons I
+      · imodintro
+        iintro -
+        rw [hpeq]
+        beta_reduce
+        iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
     · iapply usecc_execfail_law UL ug hcons I
     · imodintro
       iintro -
-      iright
       iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
     · iexact Hsh
-  · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x9c0)
+  · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
       (68 + (8 + (ushDg + n))) (by decide) $$ [] HT Hrun
     imodintro
     iintro %W #HT' Hmy
     rw [hpeq]
-    iapply Hgen $$ %(iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+    iapply Hgen $$ %((uWcu (hlc := hlc) ug r s0 PT PD I 0))
       %W HT' Hmy
     imodintro
     iintro -
-    iright
     iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
 
 end UShURoundSecc

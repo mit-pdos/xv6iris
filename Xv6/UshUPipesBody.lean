@@ -64,8 +64,6 @@ theorem ushq_body_law_upipes (E : UPipesEng (hlc := hlc) (GF := GF))
       ushfChildLawAt (hlc := hlc) (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushDg pipesLpcg (68 + ushDpipe) -∗
       ushPanicLaw (hlc := hlc) (uWcu ug r s0 (uptermShape ug) (updoneShape ug)) (uWbf ug r s0) -∗
       ushfBodyLaw (hlc := hlc) N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushLineUpipe sz := by
-  have hwbl : ∀ I : List (BitVec 8), ⊢ (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3 -∗ (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 0 :=
-    fun I => uHwbl_u ug r s0 (uptermShape ug) (updoneShape ug) I
   have hpl : ushPanicLaw (hlc := hlc) (uWcu (hlc := hlc) (GF := GF) ug r s0 (uptermShape ug) (updoneShape ug))
       (uWbf (hlc := hlc) ug r s0) =
       ushPanicLaw (hlc := hlc) (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wb :=
@@ -85,7 +83,7 @@ theorem ushq_body_law_upipes (E : UPipesEng (hlc := hlc) (GF := GF))
     -- `echo ws | F1 | .. | Fn` -- the pipe era's body walk
     iapply wp_ushBodyPipe E.UL E.SF E.SP E.hps N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) pipesLpg (68 + ushDpipe) h m f k len
       (ulineWs (.LPipe (.PrEcho ws) np)) sz l n (Nat.le_refl _) pipesLpg0 hregs hs1 ha5 hnn hnul hkl2
-      (pipesLpg_of_at ws np f k len hlat) hszlo hszal hszok hpm1 hpmwb hwbl
+      (pipesLpg_of_at ws np f k len hlat) hszlo hszal hszok hpm1 hpmwb
       $$ Hgen Hhead Hcode Hjt Hkl Hche Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
   | PrCatF g =>
     -- `cat f | F1 | .. | Fn` -- the cat body walk at the pipeline's line
@@ -93,7 +91,7 @@ theorem ushq_body_law_upipes (E : UPipesEng (hlc := hlc) (GF := GF))
     obtain ⟨hb0, hb1, hl2⟩ := pipesLpcg_bytes _ f k len ⟨g, np, hu, rfl, hlat⟩
     iapply wp_ushBodyCaWith E.UL N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) (Xv6.wp_ushForkPipe E.UL E.SF E.SP E.hps N (Xu (hlc := hlc) (GF := GF) ug r s0 γp))
       pipesLpcg (68 + ushDpipe) h m f k len (ulineWs (.LPipe (.PrCatF g) np)) sz l n (Nat.le_refl _) hregs hs1
-      ha5 hnn hnul hkl2 (pipesLpcg_of_at g np f k len hu hlat) hb0 hb1 hl2 hszlo hszal hszok hpm1 hpmwb hwbl
+      ha5 hnn hnul hkl2 (pipesLpcg_of_at g np f k len hu hlat) hb0 hb1 hl2 hszlo hszal hszok hpm1 hpmwb
       $$ Hgen Hhead Hcode Hjt Hkl Hchc Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 /-- **Rocq `sh_round_holds_union_closed`**: THE ROUND LAW WITH NO PREMISE --
@@ -118,8 +116,6 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
       (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v) -∗
       (∃ jo : Option Nat, fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo) -∗
       ushRestLAt (hlc := hlc) N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushLineUnion (shRsh N.t N.d N.s) := by
-  have hwbl : ∀ I : List (BitVec 8), ⊢ (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3 -∗ (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 0 :=
-    fun I => uHwbl_u ug r s0 (uptermShape ug) (updoneShape ug) I
   rw [hRsh, show iprop(ushlDat N.d ∗ usz N.s (kexecSz User.Sh.elf)) = ushlR N (kexecSz User.Sh.elf)
     from rfl]
   iintro #Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc ⟨%v, #Hp⟩ #Hmade
@@ -143,7 +139,7 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
   ihave #Hbody := ushq_body_law_union E.UL E.SP E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp N (kexecSz User.Sh.elf)
     shSz_lo shSz_al shSz_ok $$ Hkl Hchl Hred Hcatl Hsecl Hplaw Hpipes
   ihave #Hb := ushf_rest_of_body_at_pipe N (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushLineUnion (kexecSz User.Sh.elf) shSz_lo shSz_al
-    shSz_ok hwbl $$ Hbody
+    shSz_ok $$ Hbody
   unfold ushRestLAt
   iapply Hb $$ %l %hc
 

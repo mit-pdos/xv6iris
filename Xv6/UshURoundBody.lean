@@ -95,13 +95,11 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
       ushPanicLaw (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wc
         (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wb := rfl
   rw [hpl]
-  have hwbl : ∀ I : List (BitVec 8), ⊢ (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wc I 3 -∗
-      (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp).Wc I 0 := fun I => uHwbl_u ug r s0 PT PD I
   iintro #Hkl #Hchl #Hred #Hcatl #Hsecl #Hplaw #Hpipes
   ihave #Hecho := ushf_body_law_echo_pipe UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) sz
-    hszlo hszal hszok hwbl $$ Hkl Hchl Hplaw
+    hszlo hszal hszok $$ Hkl Hchl Hplaw
   ihave #Hcat := ushf_body_law_cat_pipe UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) sz
-    hszlo hszal hszok hwbl $$ Hkl Hcatl Hplaw
+    hszlo hszal hszok $$ Hkl Hcatl Hplaw
   ihave #Hchr := ushf_child_law_at_of_redir (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg $$ Hred
   unfold ushfBodyLaw
   imodintro
@@ -116,7 +114,7 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
     -- the same walk at the redirect child's law
     iapply wp_ushBodyPipe UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushsLp 68 h m f k len
       (ulineWs (.LEchoF ws Nf)) sz l n (by unfold ushDpipe; omega) ushs_lp0 hregs hs1 ha5 hnn hnul hkl
-      (ushs_lp_of_at ws Nf f k len hlat) hszlo hszal hszok hpm1 hpmwb hwbl
+      (ushs_lp_of_at ws Nf f k len hlat) hszlo hszal hszok hpm1 hpmwb
       $$ Hgen Hhead HC Hjt Hkl Hchr Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
   | LCat Nf =>
     -- the 'c' arm at the cat body twin
@@ -130,7 +128,7 @@ theorem ushq_body_law_union (UL : UK_LEAVES) (SP : SH_PANIC)
     -- the wild child, at the generic body twin
     iapply wp_ushBodyPipeNc UL SF SP hps N (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) useccLp 68 h m f k len
       (ulineWs (.LSecc ws)) sz l n (by unfold ushDpipe; omega) usecc_lp0 hregs hs1 ha5 hnn hnul hkl
-      (usecc_lp_of_at ws f k len hlat) hszlo hszal hszok hpm1 hpmwb hwbl
+      (usecc_lp_of_at ws f k len hlat) hszlo hszal hszok hpm1 hpmwb
       $$ Hgen Hhead HC Hjt Hkl Hsecl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 end UShURoundBody

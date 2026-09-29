@@ -281,7 +281,7 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
       shEchoSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo -∗
       ushExecSupEcho (ushURoundEnv (hlc := hlc) (GF := GF) UL HF) (lastWs I)
-        (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+        (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
         (uWcu (hlc := hlc) ug r s0 PT PD I 3) := by
   have hok := lineOk_execOk HDI.1
   have hhead : (lastWs I)[0]! = echoPl := by
@@ -295,7 +295,7 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
   iapply shExecSupXOfEntry (ushExecPinEcho_holds (ushURoundEnv (hlc := hlc) (GF := GF) UL HF))
     (ushURoundEnv (hlc := hlc) (GF := GF) UL HF).ush_fd1p (lastWs I) echoPl era0EchoPins [ROOTINO, ECHO_INO]
     ECHO_INO User.Echo.elf (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0)
+    (uWcu (hlc := hlc) ug r s0 PT PD I 0)
     (uWcu (hlc := hlc) ug r s0 PT PD I 3) hok hhead echoElfLoadable shEchoPinResolves $$ [] [] Hslot
   · -- THE ENTRY, at the lend
     imodintro
@@ -311,7 +311,7 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
     · ihave ⟨Hdq, Htk⟩ := ufown_split r s $$ Hown
       ihave He := uecho_cons_image_entry UL hlic ug hcons (lastWs I) M Mv sa t gb sts ROOTINO cs pidv v s0 I r
         (1 : Qp).half s rb jo
-        (fun _ => iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+        (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
         (ftkt r s) (fun _ _ => rfl) heq HDI.1 himg hbytes hag hflen rfl hl1 HDI.2 (ush_line_len _ HDI.1)
         $$ [] [] [] [] Hmade Hinv Hpin Hnp Hdep
       · imodintro
@@ -323,7 +323,6 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
       · -- THE BLOCK'S END PAYS THE EXIT: the deed comes back and PRE with it
         imodintro
         iintro Hpost Hdq Htk
-        iright
         iapply uwc0 ug r s0 PT PD I v HDI $$ Hpin Hpost [Hdq Htk]
         iapply ushPreAt_intro ug r s0 I
         isplitl [Hdq Htk]
@@ -335,7 +334,6 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
         · iexact Hwit
       · imodintro
         iintro #HT
-        iright
         iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin HT
       unfold imageEntry
       iapply He $$ %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp [Hc Hdq Htk]
@@ -345,17 +343,15 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
       · iexact Hdq
       · iexact Htk
     · -- the deed's taint arm: the slot's generic continuation
-      iapply Hgen $$ %(iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0))
+      iapply Hgen $$ %(uWcu (hlc := hlc) ug r s0 PT PD I 0)
         %W' HT Hmp
       imodintro
       iintro #Hk
-      iright
       iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin [Hk]
       iapply uHktaint ug hkill $$ Hk
   · -- the killed child pays with the taint, at the lend's pin
     imodintro
     iintro #Hk
-    iright
     iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin [Hk]
     iapply uHktaint ug hkill $$ Hk
 
@@ -403,7 +399,7 @@ theorem uHchild_echo (UL : UK_LEAVES) (HF : USH_FPRINTF)
 
 /-- **Rocq `ush_child_law_union`**: THE ECHO CHILD'S LAW at the widened
 credential (deviations 1, 4). -/
-theorem ush_child_law_union (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_EXEC)
+theorem ush_child_law_union (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : SH_CHILD_EXEC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
@@ -420,8 +416,9 @@ theorem ush_child_law_union (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_E
         (fun I => ((unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkExfb I).length - 2)
         (uWcu (hlc := hlc) ug r s0 PT PD) -∗
       ushExecSupEchoWqAt (ushURoundEnv (hlc := hlc) (GF := GF) UL HF) unionD (uWcu (hlc := hlc) ug r s0 PT PD) -∗
+      ushOomLawWqAtD (hlc := hlc) unionD (uWcu (hlc := hlc) ug r s0 PT PD) -∗
       ushfChildLaw (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg :=
-    ushf_child_law_holds_at_D UL (ukSysP_holds UL) HF (wp_ushRuncmdEntry UL) SC hps
+    ushf_child_law_holds_at_D UL (ukSysP_holds UL) HF SP (wp_ushRuncmdEntry UL) SC hps
       (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) unionD
       (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkExfb
       (fun I => ((unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkExfb I).length - 2)
@@ -430,6 +427,11 @@ theorem ush_child_law_union (UL : UK_LEAVES) (HF : USH_FPRINTF) (SC : SH_CHILD_E
   ihave #Hxl := uHexecfail_D UL HF ug r s0 PT PD $$ Hlk
   ihave #Hsup := uHchild_echo UL HF hlic ug r s0 PT PD heq hcons hkill $$ Hdep Hslot Hmade
   iapply H $$ Hxl Hsup
+  -- the out-of-memory death, at the widened credential (Rocq 7adb0cba2)
+  unfold ushOomLawWqAtD
+  imodintro
+  iintro %I %HD
+  iapply uHoom ug r s0 PT PD UL I (union_D_nw I HD) (union_D_pos I HD) $$ Hlk
 
 end UShURoundEcho
 

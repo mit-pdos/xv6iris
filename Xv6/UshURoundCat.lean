@@ -9,7 +9,9 @@ entry into the round's cursor, the pins agreed, the choice lists agreed by
 length; what cat produces (its two alternatives `RCRan` / `RCNoOpen`) and
 the deed's ticket pay the round (`uWcf0_of_posts_alt`).  Around the exec,
 sh's child walk (`wp_kshm_child_x_holds`, sh-exec's `SH_CHILD_EXEC`): a
-child that died before the exec hands back the lend whole (`uHwbl_f`), a
+child whose parse ran out of memory prints the record's `ROom` diagnostic
+and folds at it with the deed as found (`uoom_law_deed` through
+`ushp_oom_of_diag`; DRIFT SY1, Rocq 7adb0cba2), a
 failed exec prints the record's `RCExec` diagnostic
 (`UshPanicLaws.ushDiagLaw_hold_at_alt`) and folds at that alternative
 (`uWcf0_of_post_alt`).
@@ -49,6 +51,7 @@ import Xv6.UkUnionEntriesCat
 import Xv6.UshExecPinHolds
 import Xv6.UshExecEnvRun
 import Xv6.SpecShChildExec
+import Xv6.UshOomPaid
 
 namespace Xv6
 
@@ -135,7 +138,6 @@ theorem uX_wq_of (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   unfold ushfWq
   rw [hW]
   iintro H
-  iright
   iapply uWcu_of ug r s0 PT PD I 0 $$ H
 
 /-- ...and the taint pays it (Rocq `uWcu_taint'`). -/
@@ -147,7 +149,6 @@ theorem uX_wq_taint (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   unfold ushfWq
   rw [hW]
   iintro #Hp #HT
-  iright
   iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hp HT
 
 /-- The fork's lend at a line of a known kind: the block-owed credential and
@@ -159,23 +160,6 @@ theorem uX_wc3 (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     ⊢ X.Wc I 3 -∗ iprop(uWcl (hlc := hlc) (GF := GF) ug s0 I 3 ∗ ushPreAt (hlc := hlc) ug r s0 I) := by
   rw [hW]
   exact uWcu_3_nw ug r s0 PT PD I hnw
-
-/-- The lend, whole, folded back at the boundary (Rocq's "the child died
-before the exec" arm). -/
-theorem ucat_pre_back (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) (cs : List Nat)
-    (s : Dst) (v : EraPins) (htie : upreTie cs s0 I (dstContent s)) (hnw : uwild (ul I) = false) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗ fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ csLb v cs -∗
-      ulineWit (hlc := hlc) ug I -∗ uWcf (hlc := hlc) ug r s0 I 0 := by
-  iintro Hc Hd #Hty #Hpin #Hcs #Hwit
-  iapply uHwbl_f ug r s0 I
-  rw [show (3 : Nat) = 0 + 3 from rfl, uWcf_S3]
-  isplitl [Hc]
-  · iexact Hc
-  unfold ushPreAt
-  isplitl [Hd]
-  · iapply ushDeed_intro ug r upreTie s0 I cs s v htie hnw $$ Hd Hty Hpin Hcs
-  · iexact Hwit
 
 /-- The record's `RCExec` diagnostic at the cat line: `exec cat failed`. -/
 theorem ucat_execfail_law (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
@@ -357,7 +341,7 @@ theorem ucat_exec_sup (UL : UK_LEAVES)
 
 /-- **Rocq `uHchild_cat`** at any shell context whose family is `uWcu`
 (deviation 1): THE cat CHILD'S LAW. -/
-theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF))
+theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF))
     (SC : SH_CHILD_EXEC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
@@ -403,11 +387,15 @@ theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEnt
     · -- exec /cat
       iapply ucat_exec_sup ug r s0 PT PD UL hlic heq hcons hkill E X hW I nm s v' cs jo hu hul htie hpos
         $$ Hdep Hslot Hmade Hpin' Hcs Hty
-    · -- the child died before the exec: the lend, whole
-      imodintro
-      iintro ⟨Hc, Hd⟩
-      iapply uX_wq_of ug r s0 PT PD X hW I
-      iapply ucat_pre_back ug r s0 I cs s v' htie hnw $$ Hc Hd Hty Hpin' Hcs Hwit
+    · -- the parse ran out of memory: "out of memory", the deed as found
+      iapply ushp_oom_of_diag SP N' _ _ ld _ (by unfold ushDg; omega) hrows.2.2 $$ [] [] Hcode
+      · iapply uoom_law_deed ug r s0 PT PD UL I cs s v' hnw htie hpos $$ Hlk Hty Hpin' Hcs
+      · imodintro
+        iintro H
+        rw [hpeq]
+        unfold ushfWq
+        rw [hW]
+        iexact H
     · -- exec failed: the diagnostic at `RCExec`
       iapply ucat_execfail_law UL ug r s0 I nm s hul $$ Hlk
     · imodintro
@@ -421,7 +409,7 @@ theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEnt
     ihave ⟨%v0, #Hpin0, -⟩ := uWcl_elim ug s0 I 3 $$ Hc
     unfold shCatSlot
     icases Hslot with ⟨-, -, #Hgen⟩
-    iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x9c0) _ (by decide)
+    iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c) _ (by decide)
       $$ [] HT Hrun
     imodintro
     iintro %W #HT' Hmy
@@ -434,7 +422,7 @@ theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEnt
 
 /-- **Rocq `uHchild_cat`**: THE cat CHILD'S LAW at the union round's shell
 context (UshURoundBody's `ushURoundCtx`). -/
-theorem uHchild_cat (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF))
+theorem uHchild_cat (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF))
     (SC : SH_CHILD_EXEC) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
@@ -445,7 +433,7 @@ theorem uHchild_cat (UL : UK_LEAVES) (HF : USH_FPRINTF) (hent : wpShRuncmdEntryB
       shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       (∃ jo : Option Nat, fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo) -∗
       ushfChildLawAt (hlc := hlc) (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) ushDg ushsLpCat 68 :=
-  uHchild_cat_at ug r s0 PT PD UL HF hent SC hps hlic heq hcons hkill (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) rfl
+  uHchild_cat_at ug r s0 PT PD UL HF SP hent SC hps hlic heq hcons hkill (ushURoundCtx (hlc := hlc) ug r s0 PT PD γp) rfl
 
 end UShURoundCat
 

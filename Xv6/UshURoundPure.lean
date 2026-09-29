@@ -262,6 +262,16 @@ theorem union_D_of_line (I : List (BitVec 8)) (ws : List (List (BitVec 8))) (hok
 theorem union_D_nw (I : List (BitVec 8)) (h : unionD I) : uwild (ul I) = false := by
   rw [h.2]; rfl
 
+/-- **Rocq `union_D_pos`** (DRIFT SY1, 7adb0cba2): under the echo guard the
+input has a complete line. -/
+theorem union_D_pos (I : List (BitVec 8)) (h : unionD I) : 0 < nlines I := by
+  have h2 := lineOk_ge2 _ h.1
+  unfold lastWs at h2
+  unfold nlines
+  cases hb : bodiesOf I with
+  | nil => rw [hb] at h2; simp [wlWords_nil] at h2
+  | cons b bs => simp
+
 /-- **Rocq `union_D_nopipe`**. -/
 theorem union_D_nopipe (I : List (BitVec 8)) (h : unionD I) : ulineNopipe (ul I) := by
   rw [h.2]; exact ulineNopipe_echo _

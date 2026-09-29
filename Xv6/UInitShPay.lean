@@ -94,8 +94,10 @@ instance shPayState_persistent (Rsh : GName → GName → GName → IProp GF) (n
     Persistent (shPayState Rsh n0) := by
   unfold shPayState; infer_instance
 
-/-- **Rocq `cons_cred_holds_at`** (deviation 2): THE TEN LAWS THE CONSOLE'S
-SUPPLY ASKS OF THE CREDENTIAL, at the input discipline `Dsc`.  `Q` below is
+/-- **Rocq `cons_cred_holds_at`** (deviation 2): THE NINE LAWS THE CONSOLE'S
+SUPPLY ASKS OF THE CREDENTIAL, at the input discipline `Dsc`.  (DRIFT SY1,
+Rocq 7adb0cba2: the conversion `Hwbl` of a block owed back to a boundary
+credential is gone -- sync design section 2.)  `Q` below is
 the round's exit payload `uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr))`. -/
 structure ConsCredHoldsAt (cn : ConsNames) (T : IProp GF) (Dsc : List (BitVec 8) → Prop) (Cr : ConsCred GF) :
     Prop where
@@ -123,18 +125,16 @@ structure ConsCredHoldsAt (cn : ConsNames) (T : IProp GF) (Dsc : List (BitVec 8)
       |={⊤}=> (Cr.ccMid γp (I ++ l ++ [wlNl]) ∗ Cr.ccWc (I ++ l ++ [wlNl]) 3)
   /-- (6) conversion (`Hwbwc`, `UshLaws.wb_wc`) -/
   wbwc : ∀ I : List (BitVec 8), ⊢ Cr.ccWb I -∗ Cr.ccWc I 0
-  /-- (7) conversion (`Hwbl`, `UshLaws.wc_blk_line`) -/
-  wbl : ∀ I : List (BitVec 8), ⊢ Cr.ccWc I 3 -∗ Cr.ccWc I 0
-  /-- (8) conversion (`Hwbr`, `UshLaws.wb_read`) -/
+  /-- (7) conversion (`Hwbr`, `UshLaws.wb_read`) -/
   wbr : ∀ (γp : GName) (I l : List (BitVec 8)), wlNl ∉ l →
     ⊢ Cr.ccMid γp (I ++ l ++ [wlNl]) -∗ Cr.ccWb I -∗ Cr.ccMid γp (I ++ l ++ [wlNl]) ∗ T
-  /-- (9) the cursor's boundary (`Hbd`) -/
+  /-- (8) the cursor's boundary (`Hbd`) -/
   bd : ∀ (γp : GName) (N : UkNames GF) (l : List FdState) (i : Nat),
     N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
     ⊢ upos (hlc := hlc) γp i -∗ uconsPay (hlc := hlc) cn γp T Cr.ccRd (-1) -∗
       ((∃ I : List (BitVec 8), ⌜I.length = i⌝ ∗ ushWcp (initShCtx Cr γp T) l I 0) ∨ T) -∗
       ushPosb (hlc := hlc) N (initShCtx Cr γp T) l 0
-  /-- (10) the lend's conversion at the shell's entry (`Hpw`) -/
+  /-- (9) the lend's conversion at the shell's entry (`Hpw`) -/
   pw : ∀ n : Nat, ⊢ Cr.ccWp n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ Cr.ccWc I 0
 
 /-- The seven laws UkSh's section assumes, at the round's record. -/
@@ -143,7 +143,6 @@ theorem consCredHoldsAt_laws {cn : ConsNames} {T : IProp GF} {Dsc : List (BitVec
     (hpay : N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr))) :
     UshLaws (hlc := hlc) N (initShCtx Cr γp T) where
   wb_wc := H.wbwc
-  wc_blk_line := H.wbl
   pm_of_at n := H.pm1 γp N n hpay
   at_of_pm_taint I := H.pm3 γp N I hpay
   at_of_pm_wb I := H.pmwb γp N I hpay

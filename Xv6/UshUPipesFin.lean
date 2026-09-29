@@ -164,7 +164,6 @@ theorem ufin (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   rw [uD_Qtop, uD_FAM]
   simp only [uD_wdone, uD_terT]
   iintro ⟨⟨#Hpin, #Hlb, #Hcw, Hk⟩, #Hinv, Hq⟩
-  iright
   icases Hq with (#HT | ⟨Hall, HRd⟩ | ⟨%i, %hi, Hter, Hws⟩)
   · iapply uWcu_taint ug r s0 (uptermShape ug) (updoneShape ug) I 0 v $$ Hpin HT
   · -- COMMITTED: every writer at its whole source, the loan back
@@ -302,7 +301,6 @@ theorem uup_genw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     dsimp only [Xu, ushURoundCtx]
     rw [hkill]
     iintro #Hpin0 !> #Hk
-    iright
     iapply uWcu_taint ug r s0 (uptermShape ug) (updoneShape ug) I 0 v0 $$ Hpin0 Hk
   unfold shCatSlot
   iintro ⟨-, -, #Hgen⟩ #Hpin0
