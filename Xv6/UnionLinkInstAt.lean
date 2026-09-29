@@ -301,7 +301,6 @@ noncomputable def unionLinkInstAt (ug : UnionGn) (s0 : Fstate) : LinkRec hlc GF 
   genLinkInst (unionParamsAt ug s0) (unionXAt ug s0) (unionLinks ug) (union_links_gl_at ug s0)
     (fun k v I b Φ hb => union_X_dollar_at ug s0 k v I b Φ hb) (ureadRet ug) (uread_ret_res ug)
     (fturnPreAt ug.ugnFile s0) (uturn0_at ug s0) (urresw ug) (urresw_res_at ug s0)
-    (ualtCode (.UR .RFSilent))
 
 end UnionLinkInstAt
 

@@ -24,7 +24,7 @@ The section's `(M) (L) (K) (B) (sd)` are Lean section variables in Rocq's
 order; the hooks `K` appear explicitly wherever the statement names them
 (`lmAltsPad`) or the proof uses them (`include K`), the byte laws `B`
 through `include`.  (The landed file's note that `K` is used by no reached
-declaration no longer holds after the seal: `lmAltsPad` reads `lmhNoc`.)
+declaration no longer holds after the seal: `lmAltsPad` reads `lmhExf`.)
 
 Deviations: spelling only (`replicate (S d) 0` is `List.replicate (d + 1) 0`,
 `st so` is `gsState M sd so`).
@@ -45,9 +45,13 @@ variable (M : LModel) (K : LmHooks M) (B : LmByteLaws M)
 /-- Rocq `gstage0`: the empty stage. -/
 def gstage0 : GStage M := ⟨[], [], [], [], none⟩
 
-/-- Rocq `lm_alts_pad`: the choice list padded with each line's SILENT round. -/
+/-- Rocq `lm_alts_pad`: the choice list padded with each line's EXEC FAILURE
+(`lmhExf`): admissible at every line and state, never a panic, never
+coverage-ending, which is all a pad entry needs.  (DRIFT SY1, Rocq 3d74ec49f:
+it used to be the silent round, which a model need not have -- `lmhNoc` is
+optional.) -/
 def lmAltsPad (I : List (BitVec 8)) (cs : List Nat) : List Nat :=
-  cs ++ ((bodiesOf I).drop cs.length).map (fun b => K.lmhNoc (M.lmOf b))
+  cs ++ ((bodiesOf I).drop cs.length).map (fun b => K.lmhExf (M.lmOf b))
 
 /-- Rocq `lm_D_from_app`. -/
 theorem lmDFrom_app (ps cs : List Nat) (s : M.lmSt) (pre : List (BitVec 8))
@@ -140,11 +144,11 @@ theorem lmEDisc_of_hist (E : List (List Obs × BitVec 8)) (Sg : List Obs) (hidx 
   rw [eBytes_of_hist E Sg hidx hpre hlen]
   exact lmDiscInput_prefix B _ _ (List.take_prefix _ _) hd
 
-/-- Rocq `lm_alts_pad_at`: inside the pad, the entry is the line's silent
-round. -/
+/-- Rocq `lm_alts_pad_at`: inside the pad, the entry is the line's exec
+failure. -/
 theorem lmAltsPad_at (I : List (BitVec 8)) (cs : List Nat) (j : Nat) (hge : cs.length ≤ j)
     (hlt : j < nlines I) :
-    (lmAltsPad M K I cs)[j]! = K.lmhNoc (M.lmOf ((bodiesOf I)[j]!)) := by
+    (lmAltsPad M K I cs)[j]! = K.lmhExf (M.lmOf ((bodiesOf I)[j]!)) := by
   have hlt' : j < (bodiesOf I).length := hlt
   unfold lmAltsPad
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_append_right hge, List.getElem?_map,
@@ -184,7 +188,7 @@ theorem lmAltsPad_ok (s : M.lmSt) (I : List (BitVec 8)) (cs : List Nat)
     exact hok
   · unfold lmAt
     rw [lmAltsPad_at M K I cs i (by omega) hi]
-    exact K.lmhNocOk _ _
+    exact K.lmhExfOk _ _
 
 include B in
 /-- Rocq `lm_alts_pad_panic`: the pad changes no panic bit on the input's
@@ -196,7 +200,7 @@ theorem lmAltsPad_panic (I : List (BitVec 8)) (cs : List Nat) (j : Nat) (hj : j 
   · rw [lmPanic_ge M B cs j (by omega)]
     unfold lmAt
     rw [lmAltsPad_at M K I cs j (by omega) hj]
-    exact K.lmhNocNopanic _
+    exact K.lmhExfNopanic _
 
 include B in
 /-- Rocq `lm_alts_pad_pro_idx`. -/
@@ -212,7 +216,7 @@ theorem lmAltsPad_term (I : List (BitVec 8)) (cs : List Nat) (j : Nat) (hge : cs
     (hj : j < nlines I) : M.lmTerm (lmAt M (lmAltsPad M K I cs) j) = false := by
   unfold lmAt
   rw [lmAltsPad_at M K I cs j hge hj]
-  exact K.lmhFreeTerm _ (K.lmhNocFree _)
+  exact K.lmhFreeTerm _ (K.lmhExfFree _)
 
 /-- Rocq `lm_pending_ps_mono`. -/
 theorem lmPending_ps_mono (ps ps' cs : List Nat) (s : M.lmSt) (E : List (List Obs × BitVec 8))

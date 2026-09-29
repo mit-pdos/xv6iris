@@ -1,12 +1,14 @@
 /-
 THE FILE MODEL'S HOOKS, PURE (app-both M3b) -- a port of Rocq
 `FileHooks.v` (`/shared/xv6rocq/iris/FileHooks.v`, pinned `1900b8a43`), row
-U0-2 of `notes/briefs/union.md`.  Pure.
+U0-2 of `notes/briefs/union.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f,
+f31dfba4c): `lmhNoc` is `none` at every line (`fnoc_none` discharges its four
+laws); `fnoc_of` and its laws are deleted.
 
 Rocq's header: `FileLinksLine`'s section S0, moved below `FileOut`
 unchanged: the line the input's last complete body parses to, the
 state-free alternatives, the named alternatives (the fork panic, the exec
-failure with its bytes, the silent round), the continuation's shape lemmas,
+failure with its bytes; no silent round), the continuation's shape lemmas,
 and `fileHooks : LmHooks fileLm`.  The generic claim (`GenOut.gcl`) needs
 the hooks, and the file's claim sits below the link families that used to
 carry them.
@@ -92,7 +94,7 @@ def fexfb : Uline → List (BitVec 8)
 /-! ### The two per-line alternatives, and the "nobody chose" one -/
 
 theorem fpanOf_ok (l : Uline) : raltOk l (raltDec (fpanOf l)) := by
-  cases l <;> simp only [fpanOf, raltDec_enc] <;> first | trivial | (rw [raltDec_lt4 3 (by omega)]; show 3 < 4; omega)
+  cases l <;> simp only [fpanOf, raltDec_enc] <;> first | trivial | (rw [raltDec_lt4 3 (by omega)]; exact ⟨by omega, by omega⟩)
 
 theorem fpanOf_free (l : Uline) : fstateFree (raltDec (fpanOf l)) = true := by
   cases l <;> simp only [fpanOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 3 (by omega)]; rfl)
@@ -101,7 +103,7 @@ theorem fpanOf_panic (l : Uline) : raltPanic (raltDec (fpanOf l)) = true := by
   cases l <;> simp only [fpanOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 3 (by omega)]; rfl)
 
 theorem fexfOf_ok (l : Uline) : raltOk l (raltDec (fexfOf l)) := by
-  cases l <;> simp only [fexfOf, raltDec_enc] <;> first | trivial | (rw [raltDec_lt4 1 (by omega)]; show 1 < 4; omega)
+  cases l <;> simp only [fexfOf, raltDec_enc] <;> first | trivial | (rw [raltDec_lt4 1 (by omega)]; exact ⟨by omega, by omega⟩)
 
 theorem fexfOf_free (l : Uline) : fstateFree (raltDec (fexfOf l)) = true := by
   cases l <;> simp only [fexfOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 1 (by omega)]; rfl)
@@ -112,25 +114,10 @@ theorem fexfOf_nopanic (l : Uline) : raltPanic (raltDec (fexfOf l)) = false := b
 theorem cont_fexf (s : Fstate) (l : Uline) : cont s l (raltDec (fexfOf l)) = fexfb l := by
   cases l <;> simp only [fexfOf, fexfb, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 1 (by omega)]; rfl)
 
-/-- the alternative a round takes when NOBODY wrote: all print `uPrompt` -/
-def fnocOf : Uline → Nat
-  | .LEcho _ => 2
-  | .LEchoF _ _ => raltEnc .RFSilent
-  | .LCat _ => raltEnc .RCSilent
-  | .LPipe _ _ => raltEnc .RCSilent
-  | .LSecc _ => raltEnc .RCSilent
-
-theorem fnocOf_ok (l : Uline) : raltOk l (raltDec (fnocOf l)) := by
-  cases l <;> simp only [fnocOf, raltDec_enc] <;> first | trivial | (rw [raltDec_lt4 2 (by omega)]; show 2 < 4; omega)
-
-theorem fnocOf_free (l : Uline) : fstateFree (raltDec (fnocOf l)) = true := by
-  cases l <;> simp only [fnocOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 2 (by omega)]; rfl)
-
-theorem fnocOf_nopanic (l : Uline) : raltPanic (raltDec (fnocOf l)) = false := by
-  cases l <;> simp only [fnocOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 2 (by omega)]; rfl)
-
-theorem cont_fnoc (s : Fstate) (l : Uline) : cont s l (raltDec (fnocOf l)) = uPrompt := by
-  cases l <;> simp only [fnocOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 2 (by omega)]; rfl)
+/-- **Rocq `fnoc_none`**: NO SILENT ROUND -- the model has none at any line
+(`raltOk` never admits `REcho 2`; a line sh forks for admits `ROom` instead),
+so the hook's `none` makes its four laws vacuous. -/
+theorem fnoc_none {P : Prop} (c : Nat) (h : (none : Option Nat) = some c) : P := nomatch h
 
 /-! ### What a writer knows of a continuation -/
 
@@ -141,7 +128,7 @@ theorem cont_prompt (s : Fstate) (l : Uline) (a : Ralt) (hok : raltOk l a)
     cases l with
     | LEcho ws =>
       simp only [raltPanic, decide_eq_false_iff_not] at hp
-      have hk : k < 4 := hok
+      have hk : k < 4 := hok.1
       match k, hk, hp with
       | 0, _, _ => exact ⟨_, lineAltsOf_0 ws⟩
       | 1, _, _ => exact ⟨wlLine dgExec, lineAltsOf_1 ws⟩
@@ -156,14 +143,13 @@ theorem cont_prompt (s : Fstate) (l : Uline) (a : Ralt) (hok : raltOk l a)
   | RFFork => simp [raltPanic] at hp
   | RCFork => simp [raltPanic] at hp
   | RFRan _ => exact ⟨[], rfl⟩
-  | RFSilent => exact ⟨[], rfl⟩
-  | RCSilent => exact ⟨[], rfl⟩
   | RFExec => exact ⟨_, rfl⟩
   | RFOpenU => exact ⟨_, rfl⟩
   | RFOpenM => exact ⟨_, rfl⟩
   | RCNoOpen => exact ⟨_, rfl⟩
   | RCExec => exact ⟨_, rfl⟩
   | RSExec => exact ⟨_, rfl⟩
+  | ROom => exact ⟨_, rfl⟩
 
 theorem cont_nonnil_dec (s : Fstate) (l : Uline) (a : Ralt) (h : raltOk l a ∨ a = raltDec 0) :
     cont s l a ≠ [] := by
@@ -177,7 +163,7 @@ noncomputable def fileHooks : LmHooks fileLm where
   lmhPan := fpanOf
   lmhExf := fexfOf
   lmhExfb := fexfb
-  lmhNoc := fnocOf
+  lmhNoc := fun _ => none
   lmhFreeCont := cont_stateFree
   lmhFreeTerm := fun _ _ => rfl
   lmhFreeOk := fun _ _ _ _ _ h => h
@@ -188,10 +174,10 @@ noncomputable def fileHooks : LmHooks fileLm where
   lmhExfFree := fexfOf_free
   lmhExfNopanic := fexfOf_nopanic
   lmhExfCont := cont_fexf
-  lmhNocOk := fun _ => fnocOf_ok
-  lmhNocFree := fnocOf_free
-  lmhNocNopanic := fnocOf_nopanic
-  lmhNocCont := cont_fnoc
+  lmhNocOk := fun _ _ c h => fnoc_none c h
+  lmhNocFree := fun _ c h => fnoc_none c h
+  lmhNocNopanic := fun _ c h => fnoc_none c h
+  lmhNocCont := fun _ _ c h => fnoc_none c h
   lmhContPrompt := fun s l a hok hp _ => cont_prompt s l a hok hp
   lmhContNonnil := cont_nonnil_dec
 

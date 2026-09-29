@@ -92,7 +92,7 @@ noncomputable def pipesHooks : LmHooks (pipesLm fc adm) where
   lmhPan _ := plaltCode PLPanic
   lmhExf l := plaltCode (PLRun (plExfb l))
   lmhExfb l := plExfb l ++ uPrompt
-  lmhNoc _ := plaltCode (PLRun [])
+  lmhNoc _ := some (plaltCode (PLRun []))
   lmhFreeCont _ _ _ _ _ := rfl
   lmhFreeTerm a h := phk_free_term a h
   lmhFreeOk _ _ _ _ _ h := h
@@ -103,10 +103,14 @@ noncomputable def pipesHooks : LmHooks (pipesLm fc adm) where
   lmhExfFree l := (phk_code_free fc adm (PLRun (plExfb l))).trans rfl
   lmhExfNopanic l := (phk_code_panic fc adm (PLRun (plExfb l))).trans rfl
   lmhExfCont s l := phk_code_cont fc adm s l (PLRun (plExfb l))
-  lmhNocOk := phk_noc_ok fc adm
-  lmhNocFree _ := (phk_code_free fc adm (PLRun [])).trans rfl
-  lmhNocNopanic _ := (phk_code_panic fc adm (PLRun [])).trans rfl
-  lmhNocCont s l := phk_code_cont fc adm s l (PLRun [])
+  lmhNocOk s l c h := lmhNoc_some (fun c => (pipesLm fc adm).lmOk s l ((pipesLm fc adm).lmDec c)) _ c
+    (phk_noc_ok fc adm s l) h
+  lmhNocFree _ c h := lmhNoc_some (fun c => (!plterm ((pipesLm fc adm).lmDec c)) = true) _ c
+    ((phk_code_free fc adm (PLRun [])).trans rfl) h
+  lmhNocNopanic _ c h := lmhNoc_some (fun c => (pipesLm fc adm).lmPanic ((pipesLm fc adm).lmDec c) = false) _ c
+    ((phk_code_panic fc adm (PLRun [])).trans rfl) h
+  lmhNocCont s l c h := lmhNoc_some (fun c => (pipesLm fc adm).lmCont s l ((pipesLm fc adm).lmDec c) = uPrompt) _ c
+    (phk_code_cont fc adm s l (PLRun [])) h
   lmhContPrompt := phk_cont_prompt fc adm
   lmhContNonnil := phk_cont_nonnil fc adm
 

@@ -13,6 +13,9 @@ pipeline shapes (`pvAdm`), the model's code of a pipeline alternative
 2. CONE TRIM (8 of 13 reached): `pview_pipes` (the pipeline application's
    own view) and its four conversion lemmas are not ported (unreached: the
    union's view is `UnionView.pview_union`).
+3. DRIFT SY1 (Rocq 3d74ec49f): the unused `pv_onto` is deleted -- an
+   admitted alternative at a pipeline line need not be a pipeline one: the
+   union admits the shell's out-of-memory death at every line.
 -/
 import Xv6.PipesDisc
 
@@ -35,7 +38,6 @@ structure PView (M : LModel) where
   pvPanic : ∀ pl a, M.lmPanic (M.lmDec (pvEnc pl a)) = plpanic a
   pvTerm : ∀ pl a, M.lmTerm (M.lmDec (pvEnc pl a)) = plterm a
   pvStep : ∀ s l pl a, pvLine l = some pl → M.lmStep s l (M.lmDec (pvEnc pl a)) = s
-  pvOnto : ∀ s l pl x, pvLine l = some pl → M.lmOk s l x → ∃ a, x = M.lmDec (pvEnc pl a)
 
 section view
 variable {M : LModel} (V : PView M)

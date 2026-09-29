@@ -12,7 +12,7 @@ section parameter (here the explicit `heq : fileAppIs g.fgnCl r`).
 
 ## Ported (11/11 reached)
 
-`fsm_panic`, `fsm_fnoc`, `ush_line_len`, the local notation `T` (spelled
+`fsm_panic`, `ush_line_len`, the local notation `T` (spelled
 `fileTaint g.fgnCl`), `redir_K` (`UshFileRedir.redirK`), `redir_Kf`
 (`UshFileRedir.redirKf`), `redir_K_inum` (`UshFileRedir.redirK_inum`),
 `Xv6.shOpen_pc`, `ucallee_saved_a0a7`, `Hopen_hand`
@@ -20,7 +20,8 @@ section parameter (here the explicit `heq : fileAppIs g.fgnCl r`).
 
 ## Dropped
 
-Nothing (every declaration is reached).
+`fsm_fnoc` (DRIFT SY1, Rocq f31dfba4c: no user; the model has no silent
+alternative).
 
 ## Deviations from Rocq
 
@@ -76,11 +77,6 @@ set_option linter.unusedSectionVars false
 /-- **Rocq `fsm_panic`**: a panic alternative moves no file, at any line. -/
 theorem fsm_panic (s : Fstate) (l : Uline) (a : Ralt) (h : raltPanic a = true) : fsm s l a = s := by
   cases l <;> cases a <;> first | rfl | (simp [raltPanic] at h)
-
-/-- **Rocq `fsm_fnoc`**: the line's silent alternative moves no file (at a
-redirect line this IS RULING HOLD-POS: `RFSilent`'s effect is identity). -/
-theorem fsm_fnoc (s : Fstate) (l : Uline) : fsm s l (raltDec (fnocOf l)) = s := by
-  cases l <;> simp only [fnocOf, raltDec_enc] <;> first | rfl | (rw [raltDec_lt4 2 (by omega)]; rfl)
 
 /-- **Rocq `ush_line_len`**: the words' line after the command fits a C int
 (`UkPipesEntriesDefs.pe_line_len`, restated to keep the round off the

@@ -1,7 +1,10 @@
 /-
 **THE LINK RECORD** -- the console-side program tier's view of an era,
 off the application's own links.  A port of Rocq `LinkRec.v`
-(`/shared/xv6rocq/iris/LinkRec.v`, pinned 1900b8a43).
+(`/shared/xv6rocq/iris/LinkRec.v`, pinned 1900b8a43).  DRIFT SY1 (Rocq
+3d74ec49f): `lk_noc`, `lk_line_of_blk0`, `lk_prompt_dollar` and the
+`lk_lpr_blk_line`/`lk_lcred_blk_line` corollaries are deleted (the settled
+round's silent filing).
 
 Rocq's header, abridged (the reasons are the content):
 
@@ -93,7 +96,6 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkPan : List (BitVec 8) → Nat
   lkExf : List (BitVec 8) → Nat
   lkExfb : List (BitVec 8) → List (BitVec 8)
-  lkNoc : Nat
   -- ---- the credential families ----
   lkBan : Nat → EraPins → List (BitVec 8) → Nat → IProp GF
   lkOwed : Nat → EraPins → List (BitVec 8) → IProp GF
@@ -164,7 +166,6 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkSpT_sp : ∀ k v I, ⊢ lkSpT k v I -∗ lkSp k v I
   lkOpenT_open : ∀ k v I, ⊢ lkOpenT k v I -∗ lkOpen k v I
   lkBlk_0 : ∀ k v I a a', ⊢ lkBlk k v I a 0 -∗ lkBlk k v I a' 0
-  lkLine_of_blk0 : ∀ k v I a, ⊢ lkBlk k v I a 0 -∗ lkLine k v I
   lkLine_of_post : ∀ k v I a, lkApr I a →
     ⊢ lkBlk k v I a ((lkAb I a).length - 2) -∗ lkLine k v I
   lkLine_of_pro : ∀ k v I, ⊢ lkPro k v I -∗ lkLine k v I
@@ -181,11 +182,10 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   lkBan_done_line : ∀ k v I, ⊢ lkBan k v I uBanner.length -∗ lkLine k v I
   lkBan_inp : ∀ k v I,
     ⊢ lkBan k v I 0 -∗ lkBan k v I 0 ∗ ((inpLb v I ∗ ⌜restOf I = []⌝) ∨ lkT)
-  -- ---- the shell's prompt, at the loose shapes ----
-  lkPrompt_dollar : ∀ k v I b (Φ : IProp GF),
-    b = uPrompt[0]! →
-    ⊢ (⌜¬ lkWild I⌝ ∨ lkT) -∗ lkPin k v -∗ lkLinks -∗ lkOwed k v I -∗
-      (lkSp k v I -∗ Φ) -∗ outLink .uart0 k b Φ
+  -- ---- the shell's prompt, at the loose shapes.  (No law files a '$' at a
+  -- settled round's block-owed credential: that would be a silent
+  -- alternative, which a line sh forks for does not have; the round's own
+  -- block files it, `lkPrompt_dollar_post`.) ----
   lkPrompt_space : ∀ k v I b (Φ : IProp GF),
     b = uPrompt[1]! →
     ⊢ lkPin k v -∗ lkLinks -∗ lkSp k v I -∗
@@ -399,20 +399,6 @@ theorem lkLcred_of_ban (k : Nat) (I : List (BitVec 8)) :
   rw [L.lkLpr_0]
   iapply L.lkLine_of_pro k v I
   iapply L.lkBan_pro k v I $$ Hb
-
-/-- the block owed IS a boundary credential (Rocq `lk_lpr_blk_line`) -/
-theorem lkLpr_blk_line (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ L.lkLpr k v I 3 -∗ L.lkLpr k v I 0 := by
-  rw [show (3 : Nat) = 0 + 3 from rfl, L.lkLpr_S3, L.lkLpr_0]
-  exact L.lkLine_of_blk0 k v I 0
-
-theorem lkLcred_blk_line (k : Nat) (I : List (BitVec 8)) :
-    ⊢ lkLcred L k I 3 -∗ lkLcred L k I 0 := by
-  unfold lkLcred
-  iintro ⟨%v, #Hpin, Hc⟩
-  iexists v
-  iframe Hpin
-  iapply lkLpr_blk_line L k v I $$ Hc
 
 /-- what a child's block hands back, at whatever alternative it took (Rocq
 `lk_lcred_of_post_a`) -/

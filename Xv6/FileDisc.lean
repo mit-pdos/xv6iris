@@ -1,7 +1,10 @@
 /-
 THE FILE APPLICATION'S PURE MODEL, part 2 -- sections 2-7 of Rocq
 `FileDisc.v` (`/shared/xv6rocq/iris/FileDisc.v`, pinned `1900b8a43`), row
-U0-2 of `notes/briefs/union.md`.  Pure.  Part 1 (the lines and the parser)
+U0-2 of `notes/briefs/union.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f,
+f31dfba4c; main 456141b5b): no silent alternative (`RFSilent`/`RCSilent`
+deleted, `REcho 2` admitted nowhere), the out-of-memory alternative `ROom`
+(code 18, `altOom`) at every forked line.  Part 1 (the lines and the parser)
 is `Xv6/FileDiscLine.lean`.
 
 Rocq's header, abridged: `EchoDisc` models a session in which every round
@@ -211,9 +214,22 @@ def dgExecSecc : List (List (BitVec 8)) :=
   [[101#8, 120#8, 101#8, 99#8], cmdSeccomp, [102#8, 97#8, 105#8, 108#8, 101#8, 100#8]]
 def altExecsecc : List (BitVec 8) := wlLine dgExecSecc ++ uPrompt
 
+/-- `["out", "of", "memory"]`: sh's child died of OUT OF MEMORY in `parsecmd`
+(upstream d66e41c, "sh: panic when out of memory": `cmdalloc`'s
+`panic("out of memory")` prints `out of memory` on fd 2 and exits the child;
+sh then prints its prompt).  A word line, like the exec diagnostics. -/
+def dgOom : List (List (BitVec 8)) :=
+  [[111#8, 117#8, 116#8], [111#8, 102#8], [109#8, 101#8, 109#8, 111#8, 114#8, 121#8]]
+def altOom : List (BitVec 8) := wlLine dgOom ++ uPrompt
+
 /-- ONE ALTERNATIVE DECIDES A ROUND: what the console shows and what becomes
 of the named file.  `REcho` is the echo application's four, with no file
-effect; the `RF*` are the redirect line's and the `RC*` are cat's. -/
+effect (a line admits three of them: never the silent index 2, see
+`raltOk`); the `RF*` are the redirect line's and the `RC*` are cat's.
+THERE IS NO SILENT ALTERNATIVE at any line (Rocq sync design section 2): the
+one way such a command does not run and the console still shows only sh's
+output is the child's out-of-memory death in `parsecmd`, and since upstream
+d66e41c that death PRINTS -- `ROom`, shared by every forked line shape. -/
 inductive Ralt where
   /-- the echo application's four; files unchanged -/
   | REcho (a : Nat)
@@ -225,8 +241,6 @@ inductive Ralt where
   | RFOpenU
   /-- "open N failed\n$ "; the file := [] (created) at an ABSENT file -/
   | RFOpenM
-  /-- "$ "; files unchanged (RULING HOLD-POS) -/
-  | RFSilent
   /-- "fork\n"; files unchanged -/
   | RFFork
   /-- the file's content, or cat's diagnostic; then "$ " -/
@@ -235,12 +249,14 @@ inductive Ralt where
   | RCNoOpen
   /-- "exec cat failed\n$ " -/
   | RCExec
-  /-- "$ " -/
-  | RCSilent
   /-- "fork\n" -/
   | RCFork
-  /-- "exec seccomp failed\n$ " -/
+  /-- "exec seccomp failed\n$ " -- the shell's exec failure at a `seccomp`
+  line; its fork panic is `RCFork`, whose bytes name no command -/
   | RSExec
+  /-- "out of memory\n$ "; files unchanged -- the child died in `parsecmd`,
+  before any open -/
+  | ROom
   deriving DecidableEq
 
 instance : Inhabited Ralt := ⟨.REcho 0⟩
@@ -318,26 +334,27 @@ are LITERALLY the echo application's. -/
 def raltEnc : Ralt → Nat
   | .REcho k => if k < 4 then k else 4 + 12 * (k - 4)
   | .RFExec => 5 | .RFOpenU => 6 | .RFOpenM => 7
-  | .RFSilent => 8 | .RFFork => 9
+  | .RFFork => 9
   | .RCRan => 10 | .RCNoOpen => 11 | .RCExec => 12
-  | .RCSilent => 13 | .RCFork => 14
+  | .RCFork => 14
   | .RFRan sel => 15 + 12 * fdEncList sel
   | .RSExec => 17
+  -- 18 is 6 mod 12: clear of `RFRan`'s class (3) and `REcho`'s (4)
+  | .ROom => 18
 
 def raltDec (n : Nat) : Ralt :=
   if n < 4 then .REcho n
   else if n = 5 then .RFExec
   else if n = 6 then .RFOpenU
   else if n = 7 then .RFOpenM
-  else if n = 8 then .RFSilent
   else if n = 9 then .RFFork
   else if n = 10 then .RCRan
   else if n = 11 then .RCNoOpen
   else if n = 12 then .RCExec
-  else if n = 13 then .RCSilent
   else if n = 14 then .RCFork
   else if n % 12 = 3 then .RFRan (fdDecList ((n - 15) / 12) ((n - 15) / 12))
   else if n = 17 then .RSExec
+  else if n = 18 then .ROom
   else .REcho (4 + (n - 4) / 12)
 
 theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
@@ -351,14 +368,13 @@ theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
       simp only [raltDec]
       rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
         if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega)]
+        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega)]
       congr 1; omega
   | RFRan sel =>
     simp only [raltEnc, raltDec]
     rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
       if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-      if_neg (by omega), if_neg (by omega), if_neg (by omega), if_pos (by omega)]
+      if_neg (by omega), if_pos (by omega)]
     have e : (15 + 12 * fdEncList sel - 15) / 12 = fdEncList sel := by omega
     rw [e, fdDecList_enc sel _ (Nat.le_refl _)]
   | _ => rfl
@@ -374,28 +390,33 @@ def raltPanic : Ralt → Bool
   | .RCFork => true
   | _ => false
 
-/-- WHICH ALTERNATIVES A LINE SHAPE ADMITS, and `sel`'s shape.  The pipeline
-arm is DEAD (`linesOf` never yields `LPipe`) and is `LCat`'s five; the
-seccomp arm is the shell's own three. -/
+/-- WHICH ALTERNATIVES A LINE SHAPE ADMITS, and `sel`'s shape.  Every forked
+line admits `ROom`, and no line admits `REcho 2` -- the bare prompt, nothing
+run -- at any words, the parser's fallback `LEcho []` included: a BLANK input
+line re-prompts in sh's parent with no fork (sh.c:164), and under the
+discipline it is only the taint's arm.  The pipeline arm is DEAD (`linesOf`
+never yields `LPipe`) and is `LCat`'s five; the seccomp arm is the shell's
+own: its fork panic, its exec failure, the child's out-of-memory death. -/
 def raltOk : Uline → Ralt → Prop
-  | .LEcho _, .REcho k => k < 4
+  | .LEcho _, .REcho k => k < 4 ∧ k ≠ 2
+  | .LEcho _, .ROom => True
   | .LEcho _, _ => False
   | .LEchoF ws _, .RFRan sel => selOk (echoChunks ws) sel
   | .LEchoF _ _, .RFExec | .LEchoF _ _, .RFOpenU | .LEchoF _ _, .RFOpenM
-  | .LEchoF _ _, .RFSilent | .LEchoF _ _, .RFFork => True
+  | .LEchoF _ _, .RFFork | .LEchoF _ _, .ROom => True
   | .LEchoF _ _, _ => False
-  | .LCat _, .RCRan | .LCat _, .RCNoOpen | .LCat _, .RCExec | .LCat _, .RCSilent
-  | .LCat _, .RCFork => True
+  | .LCat _, .RCRan | .LCat _, .RCNoOpen | .LCat _, .RCExec | .LCat _, .RCFork
+  | .LCat _, .ROom => True
   | .LCat _, _ => False
   | .LPipe _ _, .RCRan | .LPipe _ _, .RCNoOpen | .LPipe _ _, .RCExec
-  | .LPipe _ _, .RCSilent | .LPipe _ _, .RCFork => True
+  | .LPipe _ _, .RCFork | .LPipe _ _, .ROom => True
   | .LPipe _ _, _ => False
-  | .LSecc _, .RCFork | .LSecc _, .RSExec | .LSecc _, .RCSilent => True
+  | .LSecc _, .RCFork | .LSecc _, .RSExec | .LSecc _, .ROom => True
   | .LSecc _, _ => False
 
 /-- THE FILE EFFECT.  `RFOpenM` is guarded at an ABSENT file (xv6's
-`sys_open` truncates only after `filealloc` has succeeded); `RFSilent`'s
-effect is IDENTITY (RULING HOLD-POS). -/
+`sys_open` truncates only after `filealloc` has succeeded); `ROom`'s effect
+is IDENTITY: the child dies in `parsecmd`, before the redirect's open. -/
 def fsm (s : Fstate) : Uline → Ralt → Fstate
   | .LEchoF ws N, .RFRan sel => s.insert N (subseq (echoChunks ws) sel)
   | .LEchoF _ N, .RFExec => s.insert N []
@@ -425,16 +446,15 @@ def cont (s : Fstate) (l : Uline) : Ralt → List (BitVec 8)
   | .RFExec => altExecfail
   | .RFOpenU => altOpenfailN (lname l)
   | .RFOpenM => altOpenfailN (lname l)
-  | .RFSilent => uPrompt
   | .RFFork => altPanic
   | .RCRan => match s[lname l]? with
     | some bs => bs ++ uPrompt
     | none => altCatopenN (lname l)
   | .RCNoOpen => altCatopenN (lname l)
   | .RCExec => altExeccat
-  | .RCSilent => uPrompt
   | .RCFork => altPanic
   | .RSExec => altExecsecc
+  | .ROom => altOom
 
 theorem fstateOk_fsm (s : Fstate) (l : Uline) (a : Ralt) (hs : fstateOk s) (hl : ulineOk l)
     (ha : raltOk l a) : fstateOk (fsm s l a) := by
@@ -546,6 +566,9 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
   have hes : wlWf dgExecSecc := by
     intro w hw; simp [dgExecSecc, cmdSeccomp] at hw
     rcases hw with rfl | rfl | rfl <;> exact ⟨by simp, by simp [wlAlnum]⟩
+  have hoom : wlWf dgOom := by
+    intro w hw; simp [dgOom] at hw
+    rcases hw with rfl | rfl | rfl <;> exact ⟨by simp, by simp [wlAlnum]⟩
   have hpr : ∃ u : List (BitVec 8), uPrompt = u ++ uPrompt ∧ (∀ b ∈ u, nodollar b)
       ∧ (wlNl ∉ u ∨ ∃ v, wlNl ∉ v ∧ u = v ++ [wlNl]) :=
     ⟨[], rfl, by simp, Or.inl (by simp)⟩
@@ -555,20 +578,20 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
     cases l with
     | LEcho ws =>
       simp only [raltPanic, decide_eq_false_iff_not] at hp
-      have hk : k < 4 := ha
-      match k, hk, hp with
-      | 0, _, _ =>
+      have hk : k < 4 := ha.1
+      have h2 : k ≠ 2 := ha.2
+      match k, hk, hp, h2 with
+      | 0, _, _, _ =>
         exact ⟨wlLine (ws.drop 1), lineAltsOf_0 ws,
           wlLine_shape' _ (lbForall_drop _ 1 ws (lineOk_wf _ hl))⟩
-      | 1, _, _ => exact ⟨wlLine dgExec, lineAltsOf_1 _, wlLine_shape' _ hex⟩
-      | 2, _, _ => exact hpr
-      | 3, _, h3 => exact absurd rfl h3
+      | 1, _, _, _ => exact ⟨wlLine dgExec, lineAltsOf_1 _, wlLine_shape' _ hex⟩
+      | 2, _, _, h2 => exact absurd rfl h2
+      | 3, _, h3, _ => exact absurd rfl h3
     | _ => exact absurd ha id
   | RFRan _ => exact hpr
   | RFExec => exact ⟨wlLine dgExec, rfl, wlLine_shape' _ hex⟩
   | RFOpenU => exact ⟨wlLine (dgOpenN (lname l)), rfl, wlLine_shape_fn _ hop⟩
   | RFOpenM => exact ⟨wlLine (dgOpenN (lname l)), rfl, wlLine_shape_fn _ hop⟩
-  | RFSilent => exact hpr
   | RFFork => simp [raltPanic] at hp
   | RCRan =>
     -- cat ran: the content, or its own diagnostic
@@ -580,9 +603,9 @@ theorem cont_shape (s : Fstate) (l : Uline) (a : Ralt) (hl : ulineOk l) (hs : fs
     · exact ⟨dgCatopenN (lname l), rfl, dgCatopenN_shape _ (lname_fn l hl)⟩
   | RCNoOpen => exact ⟨dgCatopenN (lname l), rfl, dgCatopenN_shape _ (lname_fn l hl)⟩
   | RCExec => exact ⟨wlLine dgExecCat, rfl, wlLine_shape' _ hec⟩
-  | RCSilent => exact hpr
   | RCFork => simp [raltPanic] at hp
   | RSExec => exact ⟨wlLine dgExecSecc, rfl, wlLine_shape' _ hes⟩
+  | ROom => exact ⟨wlLine dgOom, rfl, wlLine_shape' _ hoom⟩
 
 /-! ## 4.  THE SESSION, WITH THE FILE STATE THREADED -/
 

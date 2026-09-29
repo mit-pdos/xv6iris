@@ -10,9 +10,10 @@ over the model's own vocabulary, so they hold at every line shape, the
 pipelines included.  Pure.
 
 CONE (UShURoundDefs S0, reached): `ul`, `ust`, `upre_tie`, `udone_tie`,
-`upend_tie_at`, `upend_tie`, `ustep_noc`, `ustep_panic`,
+`upend_tie_at`, `upend_tie`, `ulm_step_oom`, `ulm_apr_oom`, `ulm_ab_oom`,
+`ustep_panic`,
 `ucont_prompt_nopanic`, `ulm_after_snoc`, `udone_tie_snoc`,
-`udone_tie_of_pend`, `upend_tie_of_pre`, `udone_tie_of_pre_prefix`,
+`udone_tie_of_pend`, `udone_tie_of_pre_prefix`,
 `udone_tie_of_pre_ban`, `upre_tie_of_done`, `ustep_id_echo`, `ustep_id_cat`.
 Unreached, NOT ported: `udone_tie_of_pre_id`, `upre_tie_inhabited`,
 `udone_tie_inhabited`, `ulm_dec_R`.
@@ -21,7 +22,10 @@ Unreached, NOT ported: `udone_tie_of_pre_id`, `upre_tie_inhabited`,
 
 1. Names: `upre_tie`/`udone_tie`/`upend_tie(_at)` are `upreTie`/`udoneTie`/
    `upendTie(At)`; `lm_step U` is `ulmG.lmStep` (likewise `lmDec`, `lmOk`,
-   `lmTerm`, `lmCont`, `lmPanic`), `lmh_noc K` is `ulmGHooks.lmhNoc`.
+   `lmTerm`, `lmCont`, `lmPanic`).
+3. DRIFT SY1 (Rocq 3d74ec49f, 7adb0cba2): `ustep_noc` and `upend_tie_of_pre`
+   (the silent alternative's PEND) are deleted; the out-of-memory
+   alternative's `ulm_step_oom`/`ulm_apr_oom`/`ulm_ab_oom` are new.
 2. `ush_uwild_nil` (new): Rocq's `vm_compute` of `uwild (ul []) = false`
    (used by `UshURoundDefs.ush_done_head`), stated once.
 -/
@@ -67,16 +71,20 @@ def upendTie (cs : List Nat) (sb : Fstate) (I : List (BitVec 8)) (c : Fstate) : 
 
 /-! ### the identity steps -/
 
-/-- **Rocq `ustep_noc`**: the silent alternative moves no file, at every line. -/
-theorem ustep_noc (s : Fstate) (l : Uline) :
-    ulmG.lmStep s l (ulmG.lmDec (ulmGHooks.lmhNoc l)) = s := by
-  show ustep s l (ualtDec (unoc l)) = s
-  cases l with
-  | LPipe p n => simp only [unoc]; rw [ualtDec_code]; cases p <;> rfl
-  | LEcho ws => simp only [unoc]; rw [ualtDec_R]; exact fsm_fnoc s (.LEcho ws)
-  | LEchoF ws N => simp only [unoc]; rw [ualtDec_R]; exact fsm_fnoc s (.LEchoF ws N)
-  | LCat N => simp only [unoc]; rw [ualtDec_R]; exact fsm_fnoc s (.LCat N)
-  | LSecc ws => simp only [unoc]; rw [ualtDec_R]; exact fsm_fnoc s (.LSecc ws)
+/-- **Rocq `ulm_step_oom`**: THE OUT-OF-MEMORY ALTERNATIVE (sync design
+section 2) -- admissible at every line, state-free and not a panic -- moves no
+file. -/
+theorem ulm_step_oom (s : Fstate) (l : Uline) : ulmG.lmStep s l (ulmG.lmDec uoom) = s :=
+  uoom_step s l
+
+/-- **Rocq `ulm_apr_oom`** -/
+theorem ulm_apr_oom (I : List (BitVec 8)) : lmApr ulmG ulmGHooks I uoom :=
+  ⟨uoom_ok admUG _ _, uoom_free, uoom_nopanic⟩
+
+/-- **Rocq `ulm_ab_oom`**: its bytes, `altOom`. -/
+theorem ulm_ab_oom (I : List (BitVec 8)) : lmAb ulmG ulmGHooks I uoom = altOom := by
+  rw [lmAb_is ulmG ulmGHooks I uoom (ulm_apr_oom I).1 (ulm_apr_oom I).2.1]
+  exact uoom_cont (∅ : Fstate) (lmLineAt ulmG I)
 
 /-- **Rocq `ustep_panic`**: a panic alternative moves no file, at every line. -/
 theorem ustep_panic (s : Fstate) (l : Uline) (a : ulmG.lmAlt) (h : ulmG.lmPanic a = true) :
@@ -136,17 +144,6 @@ alternative the deed decided. -/
 theorem udone_tie_of_pend (cs : List Nat) (sb : Fstate) (I : List (BitVec 8)) (c : Fstate) (a : Nat)
     (h : upendTieAt cs sb I c a) : udoneTie (cs ++ [a]) sb I c :=
   udone_tie_snoc cs a sb I c h.1 h.2.1 h.2.2.2.2.2
-
-/-- **Rocq `upend_tie_of_pre`**: PEND-of-PRE at the line's silent
-alternative. -/
-theorem upend_tie_of_pre (cs : List Nat) (sb : Fstate) (I : List (BitVec 8)) (c : Fstate)
-    (hp : 0 < nlines I) (h : upreTie cs sb I c) :
-    upendTieAt cs sb I c (ulmGHooks.lmhNoc (ul I)) := by
-  obtain ⟨hl, hc⟩ := h
-  refine ⟨hl, hp, ulmGHooks.lmhNocOk _ _, ulmGHooks.lmhFreeTerm _ (ulmGHooks.lmhNocFree _),
-    ulmGHooks.lmhNocCont _ _, ?_⟩
-  rw [ustep_noc]
-  exact hc
 
 /-- **Rocq `udone_tie_of_pre_prefix`**: at a FILED list, the holder of PRE
 meets a list one longer that extends its own, and the filed alternative's step

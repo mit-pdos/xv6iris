@@ -2,7 +2,10 @@
 THE UNION MODEL -- a port of Rocq `UnionDisc.v`
 (`/shared/xv6rocq/iris/UnionDisc.v`, 871 lines, pinned `1900b8a43`; cuts C9b,
 C9b2; design union.md section 1 with review amendments B2 and S3), row U0-5
-of `notes/briefs/union.md`.  Pure.
+of `notes/briefs/union.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f, f31dfba4c):
+a pipeline admits `UR ROom` (sh's node-0 child parses the line and may die of
+out-of-memory there, saying so), `uok_pipe` has that arm, `unoc` is `some`
+at pipelines only, and the out-of-memory code `uoom` with its laws.
 
 Rocq's header, abridged: ONE line model `ulm adm admS` for every line shape
 the shell reads -- `echo ws`, `echo ws > f`, `cat f` (the file model's lines
@@ -17,8 +20,8 @@ alone.
   no state (`uok_echo_st`), so its exec alternative is FREE; at a `cat f`
   pipeline the same block is admissible exactly when `f` holds it.
 * THE CROSS CASES ARE `False` (amendment B2): a pipeline line admits no `UR`
-  alternative, a file line no pipeline one, an echo pipeline no `UPC` one and
-  a `cat f` pipeline no `UPE` one.
+  alternative but `UR ROom` (sync design section 2), a file line no pipeline
+  one, an echo pipeline no `UPC` one and a `cat f` pipeline no `UPE` one.
 * THE ADMISSION `adm` IS A PARAMETER; `admUG` is the union application's
   (every echo pipeline, every `cat g | ..` at a name of the file class, each
   filter `cat` or `grep w` of one alphanumeric word); `admSOn` is the seccomp
@@ -149,7 +152,9 @@ def ustep (s : Fstate) (l : Uline) : Ualt → Fstate
 whose producer matches the alternative's: the shell's own three (`plsafe`)
 at every state, or an admitted line's run at the content `s` gives `f`.  At a
 `seccomp` line: the shell's own three and the terminal arm at any NONEMPTY
-`u`.  Every cross case is `False` (amendment B2). -/
+`u`.  Every cross case is `False` (amendment B2), but at a pipeline the one
+file alternative `ROom`: the shell parses the line in its first child
+(`runcmd(parsecmd(cmd))`), which may die of out-of-memory there and says so. -/
 def uok (adm : Pline' → Bool) (s : Fstate) : Uline → Ualt → Prop
   | .LPipe (.PrEcho ws) n, UPE x =>
     plsafe (LPipes (.PrEcho ws) n) x
@@ -157,6 +162,7 @@ def uok (adm : Pline' → Bool) (s : Fstate) : Uline → Ualt → Prop
   | .LPipe (.PrCatF f) n, UPC x =>
     plsafe (LPipes (.PrCatF f) n) x
     ∨ (adm (LPipes (.PrCatF f) n) = true ∧ plaltOk (filesOf s) (LPipes (.PrCatF f) n) x)
+  | .LPipe _ _, UR r => r = .ROom
   | .LPipe _ _, _ => False
   | .LSecc ws, UR r => raltOk (.LSecc ws) r
   | .LSecc _, US u => u ≠ []
@@ -184,12 +190,14 @@ theorem uok_upl (adm : Pline' → Bool) (s : Fstate) (p : Producer) (n : List Fi
     ↔ plsafe (LPipes p n) x ∨ (adm (LPipes p n) = true ∧ plaltOk (filesOf s) (LPipes p n) x) := by
   cases p <;> exact Iff.rfl
 
-/-- every alternative a pipeline admits is its producer's -/
+/-- every alternative a pipeline admits is the out-of-memory death or its
+producer's -/
 theorem uok_pipe (adm : Pline' → Bool) (s : Fstate) (p : Producer) (n : List Filt) (a : Ualt)
     (h : uok adm s (.LPipe p n) a) :
-    ∃ x, a = upl p x
+    a = UR .ROom
+    ∨ ∃ x, a = upl p x
       ∧ (plsafe (LPipes p n) x ∨ (adm (LPipes p n) = true ∧ plaltOk (filesOf s) (LPipes p n) x)) := by
-  cases p <;> cases a <;> first | exact ⟨_, rfl, h⟩ | cases h
+  cases p <;> cases a <;> first | exact Or.inr ⟨_, rfl, h⟩ | (cases h; exact Or.inl rfl) | cases h
 
 /-! ### An echo pipeline reads no state -/
 
@@ -275,6 +283,7 @@ theorem uok_echo_st (adm : Pline' → Bool) (s s' : Fstate) (ws : List (List (Bi
     rcases h with hs | ⟨ha, hb⟩
     · exact Or.inl hs
     · exact Or.inr ⟨ha, plaltOk_echo_fc _ _ ws n x hb⟩
+  | UR r => exact h
   | _ => cases h
 
 /-! ## 2.  THE LINES: the file's parser, then the pipeline's, then the seccomp line's -/
@@ -508,7 +517,7 @@ theorem ulm_st_step (s : Fstate) (l : Uline) (a : Ualt) (hs : fstateOk s) (hl : 
   cases a with
   | UR r =>
     cases l with
-    | LPipe p n => cases p <;> cases ha
+    | LPipe p n => cases p <;> (cases ha; exact hs)
     | _ => exact fstateOk_fsm s _ r hs hl ha
   | _ => exact hs
 
@@ -532,7 +541,8 @@ theorem ulm_term_merge (s : Fstate) (l : Uline) (a : Ualt) (hs : fstateOk s)
   cases l with
   | LSecc ws => trivial
   | LPipe p n =>
-    obtain ⟨x, rfl, hx⟩ := uok_pipe adm s p n a hok
+    rcases uok_pipe adm s p n a hok with rfl | ⟨x, rfl, hx⟩
+    · cases ht
     rw [upl_term] at ht
     rw [upl_cont]
     cases x with
@@ -560,9 +570,11 @@ theorem ulm_cont_shape (s : Fstate) (l : Uline) (a : Ualt) (hs : fstateOk s)
   obtain ⟨hl, _⟩ := hl
   cases l with
   | LPipe p n =>
-    -- a pipeline alternative at a pipeline: the pipeline model's law at the
-    -- round's content function
-    obtain ⟨x, rfl, hx⟩ := uok_pipe adm s p n a hok
+    -- the out-of-memory death at a pipeline: the file model's law at its
+    -- dead arm, which admits it; a pipeline alternative: the pipeline
+    -- model's law at the round's content function
+    rcases uok_pipe adm s p n a hok with rfl | ⟨x, rfl, hx⟩
+    · exact fileLm_laws.lmlContShape s (.LPipe p n) .ROom hs hl trivial hp rfl
     rw [upl_panic] at hp
     rw [upl_term] at ht
     rw [upl_cont]
@@ -587,7 +599,8 @@ theorem ulm_term_st (s : Fstate) (l : Uline) (c : Ualt) (hok : uok adm s l c)
   cases l with
   | LSecc ws => exact ⟨US [wlNl], by simp [uok], rfl⟩
   | LPipe p n =>
-    obtain ⟨x, rfl, hx⟩ := uok_pipe adm s p n c hok
+    rcases uok_pipe adm s p n c hok with rfl | ⟨x, rfl, hx⟩
+    · cases ht
     rw [upl_term] at ht
     cases x with
     | PLPanic => cases ht
@@ -670,7 +683,7 @@ theorem ulmG_laws : LmLaws ulmG := ulm_laws admUG admSOn
 over every line.  At `UR` the file's `fstateFree` is free.  At `UPE` every
 non-terminal alternative is free (an echo pipeline's admission reads no
 state).  At `UPC` only the genuinely state-free ones are: the panic, the
-silent round and `exec cat failed`; a `PLTerm` is never free. -/
+empty run and `exec cat failed`; a `PLTerm` is never free. -/
 
 /-- **Rocq `ufree`**. -/
 def ufree : Ualt → Bool
@@ -733,6 +746,7 @@ theorem ufree_ok (s s' : Fstate) (l : Uline) (a : Ualt) (hfr : ufree a = true)
             · exact Or.inl (Or.inr (Or.inl rfl))
             · exact Or.inl (Or.inr (Or.inr rfl))
           | PLTerm _ => cases hfr
+      | UR r => exact hok
       | _ => cases hok
   | LSecc ws => cases a <;> first | exact hok | cases hfr
   | _ => cases a <;> first | exact hok | cases hok
@@ -752,10 +766,16 @@ def uexfb : Uline → List (BitVec 8)
   | .LPipe p n => plExfb (LPipes p n) ++ uPrompt
   | l => fexfb l
 
-/-- **Rocq `unoc`**: the silent round, per line. -/
-def unoc : Uline → Nat
-  | .LPipe p _ => ualtCode (upl p (PLRun []))
-  | l => 4 * fnocOf l
+/-- **Rocq `unoc`**: the silent round, at a pipeline only: its `PLRun []` (a
+pipeline that printed nothing, one of `plsafe`'s three).  No file line has
+one (`FileHooks`' `none`). -/
+def unoc : Uline → Option Nat
+  | .LPipe p _ => some (ualtCode (upl p (PLRun [])))
+  | _ => none
+
+/-- **Rocq `uoom`**: ...and the out-of-memory death, admitted at EVERY line:
+every line sh reads but the blank one is parsed in a child. -/
+def uoom : Nat := ualtCode (UR .ROom)
 
 theorem upan_ok (s : Fstate) (l : Uline) : uok adm s l (ualtDec (upan l)) := by
   cases l with
@@ -803,37 +823,64 @@ theorem uexf_cont (s : Fstate) (l : Uline) : ucont s l (ualtDec (uexf l)) = uexf
   | LPipe p n => simp only [uexf, uexfb]; rw [ualtDec_code, upl_cont]; rfl
   | _ => simp only [uexf, uexfb]; rw [ualtDec_R, ucont_UR]; exact cont_fexf _ _
 
-theorem unoc_ok (s : Fstate) (l : Uline) : uok adm s l (ualtDec (unoc l)) := by
+/-- **Rocq `unoc_pipe`** -/
+theorem unoc_pipe (l : Uline) (c : Nat) (hc : unoc l = some c) :
+    ∃ p n, l = .LPipe p n ∧ c = ualtCode (upl p (PLRun [])) := by
   cases l with
-  | LPipe p n =>
-    simp only [unoc]; rw [ualtDec_code]
-    exact (uok_upl adm s p n _).2 (Or.inl (Or.inr (Or.inl rfl)))
-  | _ => simp only [unoc]; rw [ualtDec_R]; exact uok_UR adm s _ _ (fun _ _ h => by cases h) (fnocOf_ok _)
+  | LPipe p n => simp only [unoc, Option.some.injEq] at hc; exact ⟨p, n, rfl, hc.symm⟩
+  | _ => cases hc
 
-theorem unoc_free (l : Uline) : ufree (ualtDec (unoc l)) = true := by
-  cases l with
-  | LPipe p n =>
-    simp only [unoc]; rw [ualtDec_code]
-    cases p with
-    | PrEcho _ => rfl
-    | PrCatF _ => simp [ufree, upl]
-  | _ => simp only [unoc]; rw [ualtDec_R, ufree_UR]; exact fnocOf_free _
+theorem unoc_ok (s : Fstate) (l : Uline) (c : Nat) (hc : unoc l = some c) :
+    uok adm s l (ualtDec c) := by
+  obtain ⟨p, n, rfl, rfl⟩ := unoc_pipe l c hc
+  rw [ualtDec_code]
+  exact (uok_upl adm s p n _).2 (Or.inl (Or.inr (Or.inl rfl)))
 
-theorem unoc_nopanic (l : Uline) : upanic (ualtDec (unoc l)) = false := by
-  cases l with
-  | LPipe p n => simp only [unoc]; rw [ualtDec_code, upl_panic]; rfl
-  | _ => simp only [unoc]; rw [ualtDec_R, upanic_UR]; exact fnocOf_nopanic _
+theorem unoc_free (l : Uline) (c : Nat) (hc : unoc l = some c) : ufree (ualtDec c) = true := by
+  obtain ⟨p, n, rfl, rfl⟩ := unoc_pipe l c hc
+  rw [ualtDec_code]
+  cases p with
+  | PrEcho _ => rfl
+  | PrCatF _ => simp [ufree, upl]
 
-theorem unoc_cont (s : Fstate) (l : Uline) : ucont s l (ualtDec (unoc l)) = uPrompt := by
+theorem unoc_nopanic (l : Uline) (c : Nat) (hc : unoc l = some c) : upanic (ualtDec c) = false := by
+  obtain ⟨p, n, rfl, rfl⟩ := unoc_pipe l c hc
+  rw [ualtDec_code, upl_panic]; rfl
+
+theorem unoc_cont (s : Fstate) (l : Uline) (c : Nat) (hc : unoc l = some c) :
+    ucont s l (ualtDec c) = uPrompt := by
+  obtain ⟨p, n, rfl, rfl⟩ := unoc_pipe l c hc
+  rw [ualtDec_code, upl_cont]; rfl
+
+/-! ### THE OUT-OF-MEMORY DEATH: admissible at every line and state, free, not
+a panic, never coverage-ending, and it moves nothing -/
+
+theorem uoom_dec : ualtDec uoom = UR .ROom := ualtDec_code (UR .ROom)
+
+theorem uoom_ok (s : Fstate) (l : Uline) : uok adm s l (ualtDec uoom) := by
+  rw [uoom_dec]
   cases l with
-  | LPipe p n => simp only [unoc]; rw [ualtDec_code, upl_cont]; rfl
-  | _ => simp only [unoc]; rw [ualtDec_R, ucont_UR]; exact cont_fnoc _ _
+  | LPipe p n => cases p <;> rfl
+  | _ => trivial
+
+theorem uoom_free : ufree (ualtDec uoom) = true := by rw [uoom_dec]; rfl
+
+theorem uoom_nopanic : upanic (ualtDec uoom) = false := by rw [uoom_dec]; rfl
+
+theorem uoom_term : uterm (ualtDec uoom) = false := by rw [uoom_dec]; rfl
+
+theorem uoom_cont (s : Fstate) (l : Uline) : ucont s l (ualtDec uoom) = altOom := by
+  rw [uoom_dec]; rfl
+
+theorem uoom_step (s : Fstate) (l : Uline) : ustep s l (ualtDec uoom) = s := by
+  rw [uoom_dec]; cases l <;> rfl
 
 theorem ucont_prompt (s : Fstate) (l : Uline) (a : Ualt) (hok : uok adm s l a)
     (hp : upanic a = false) (ht : uterm a = false) : ∃ u, ucont s l a = u ++ uPrompt := by
   cases l with
   | LPipe p n =>
-    obtain ⟨x, rfl, _⟩ := uok_pipe adm s p n a hok
+    rcases uok_pipe adm s p n a hok with rfl | ⟨x, rfl, _⟩
+    · exact cont_prompt s (.LPipe p n) .ROom trivial hp
     rw [upl_panic] at hp
     rw [upl_term] at ht
     rw [upl_cont]
@@ -860,7 +907,7 @@ theorem ucont_nonnil (s : Fstate) (l : Uline) (a : Ualt) (ha : uok adm s l a ∨
     rcases ha with hok | hq
     · left
       cases l with
-      | LPipe p n => cases p <;> cases hok
+      | LPipe p n => cases p <;> (cases hok; trivial)
       | _ => exact hok
     · cases hq; exact Or.inr rfl
   | US u =>
@@ -875,7 +922,8 @@ theorem ucont_nonnil (s : Fstate) (l : Uline) (a : Ualt) (ha : uok adm s l a ∨
     rcases ha with hok | hq
     · cases l with
       | LPipe p n =>
-        obtain ⟨x', hx', hx⟩ := uok_pipe adm s p n _ hok
+        rcases uok_pipe adm s p n _ hok with hx' | ⟨x', hx', hx⟩
+        · cases hx'
         cases p with
         | PrCatF _ => cases hx'
         | PrEcho _ =>
@@ -894,7 +942,8 @@ theorem ucont_nonnil (s : Fstate) (l : Uline) (a : Ualt) (ha : uok adm s l a ∨
     rcases ha with hok | hq
     · cases l with
       | LPipe p n =>
-        obtain ⟨x', hx', hx⟩ := uok_pipe adm s p n _ hok
+        rcases uok_pipe adm s p n _ hok with hx' | ⟨x', hx', hx⟩
+        · cases hx'
         cases p with
         | PrEcho _ => cases hx'
         | PrCatF _ =>

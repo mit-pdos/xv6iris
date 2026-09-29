@@ -36,7 +36,7 @@ Nothing here reads the wild interface itself.
 2. **Section `Context`s are explicit arguments.**  Rocq's section parameters
    (`G`, the per-shape block arm `X` with `X_tl`, the tier's links `LINKS`
    with `LINKS_pers`/`LINKS_gl`, `X_dollar`, the read receipt `RR`/`RR_res`,
-   the turn `TURN`/`turn0`, the residue `RRES`…, `NOC`) are arguments of the
+   the turn `TURN`/`turn0`, the residue `RRES`…) are arguments of the
    declarations that use them, in Rocq's order, as they are after Rocq's
    section closes.  The families are stated with `G` explicit.
 3. The Rocq `tl_leaf` dispatch (a search-cost workaround) is Lean's
@@ -367,19 +367,6 @@ theorem gwcPost_of_blk (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat)
     iframe Htn Hps Hcs HE Hf
     ipureintro; exact hw
   · iright; iexact Hc
-
-theorem gwcLine_of_blk0 (X : Nat → EraPins → List (BitVec 8) → IProp GF)
-    (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
-    ⊢ gwcBlk G k v I a 0 -∗ gwcLine G X k v I := by
-  iintro Hc
-  unfold gwcLine
-  iright; ileft
-  iexists G.gK.lmhNoc (lmLineAt M I)
-  isplitr
-  · ipureintro; exact lmApr_aprs M G.gK _ _ (lmApr_noc M G.gK I)
-  iapply gwcPost_of_blk G k v I _ (lmApr_noc M G.gK I)
-  rw [lmAb_noc M G.gK I, Xv6.wrPrompt_len]
-  iapply gwcBlk_0 G k v I a _ $$ Hc
 
 theorem gwcLine_of_post (X : Nat → EraPins → List (BitVec 8) → IProp GF)
     (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) (ha : lmApr M G.gK I a) :
@@ -838,58 +825,38 @@ theorem gheadDollar (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ 
     ipureintro; exact lmWrSp_head M G.gL s0
   · iright; iexact HT
 
-/-- the shell's prompt at the loose shapes (Rocq `gprompt_dollar`) -/
-theorem gpromptDollar (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ glinks G)
+/-- the shell's prompt at the loose shapes: at the PROLOGUE's credential
+(Rocq `gprompt_dollar_pro`).  A settled round whose block is still owed is not
+here -- its '$' would file a silent alternative, which a line sh forks for
+does not have; the round's own block files it (`gpromptDollar_posts`). -/
+theorem gpromptDollar_pro (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ glinks G)
     (k : Nat) (v : EraPins) (I : List (BitVec 8)) (b : BitVec 8) (Φ : IProp GF)
     (hb : b = uPrompt[0]!) :
-    ⊢ (⌜¬ G.gwild I⌝ ∨ G.gT) -∗ G.gPIN k v -∗ LINKS -∗ gwcOwed G k v I -∗
+    ⊢ G.gPIN k v -∗ LINKS -∗ gwcPro G k v I -∗
       (gwcSp G k v I -∗ Φ) -∗ outLink .uart0 k b Φ := by
-  iintro Hnw #Hpin #Hlk Hc HΦ
+  iintro #Hpin #Hlk Hc HΦ
   ihave #Hgl := hgl $$ Hlk
   unfold glinks glBlk glPro glTaint
-  icases Hgl with ⟨-, #Hblk, #Hpro, -, #Ht⟩
-  icases Hnw with (%hnw | #HT)
-  rotate_left
-  · iapply Ht $$ %k %v %b %Φ Hpin HT
-    iintro #HT'; iapply HΦ; iapply gwcSp_taint G k v I $$ HT'
-  unfold gwcOwed
+  icases Hgl with ⟨-, -, #Hpro, -, #Ht⟩
+  unfold gwcPro
   icases Hc with (⟨%ps, %cs, %s0, %P, %hw, Hc⟩ | Hh | #HT)
   · unfold gcur
     icases Hc with ⟨Htn, #Hps, #Hcs, #HE, #Hf⟩
-    rcases hw with hw | hw
-    · -- the round's prologue is open: the '$' files alternative 0
-      have hsp := lmWrPro_dollar M G.gL ps cs s0 I P hw
-      obtain ⟨hpin0, hm, hdv, hr, hnd, hP⟩ := hw
-      iapply Hpro $$ %k %v %P %0 %b %ps %cs %s0 %I %Φ %hm %hr %(by omega) %hpin0 %hnd %hP
-        %(by rw [proAlts_length]; omega) %(by rw [ll_proAlts_0, hb]; exact wrPrompt_head)
-        Hpin Hf Htn Hps Hcs HE
-      iintro Hres
-      iapply HΦ
-      unfold gwcSp gcur
-      icases Hres with (⟨Htn', Hps', Hcs', HE'⟩ | #HT)
-      · ileft
-        iexists ps ++ [0], cs, s0, P + 1
-        iframe Htn' Hps' Hcs' HE' Hf
-        ipureintro; exact hsp
-      · iright; iexact HT
-    · -- the round is settled: the '$' is the line's block-first byte
-      have hsp := lmWrBlk_dollar M G.gK ps cs s0 I P hw
-      have hne := lmWrBlk_nonnil M ps cs s0 I P hw
-      obtain ⟨hpin0, hm, hdv, hP⟩ := hw
-      have hb0 : (lmAbs M s0 cs I (G.gK.lmhNoc (lmLineAt M I)))[0]? = some b := by
-        unfold lmAbs; rw [G.gK.lmhNocCont, hb]; exact wrPrompt_head
-      iapply Hblk $$ %k %v %P %(G.gK.lmhNoc (lmLineAt M I)) %b %ps %cs %s0 %I %Φ %hnw %hne %hm
-        %(by omega) %hpin0 %hP %(G.gK.lmhNocOk _ (lmLineAt M I))
-        %(G.gK.lmhFreeTerm _ (G.gK.lmhNocFree (lmLineAt M I))) %hb0 Hpin Hf Htn Hps Hcs HE
-      iintro Hres
-      iapply HΦ
-      unfold gwcSp gcur
-      icases Hres with (⟨Htn', Hps', Hcs', HE'⟩ | #HT)
-      · ileft
-        iexists ps, cs ++ [G.gK.lmhNoc (lmLineAt M I)], s0, P + 1
-        iframe Htn' Hps' Hcs' HE' Hf
-        ipureintro; exact hsp
-      · iright; iexact HT
+    -- the round's prologue is open: the '$' files alternative 0
+    have hsp := lmWrPro_dollar M G.gL ps cs s0 I P hw
+    obtain ⟨hpin0, hm, hdv, hr, hnd, hP⟩ := hw
+    iapply Hpro $$ %k %v %P %0 %b %ps %cs %s0 %I %Φ %hm %hr %(by omega) %hpin0 %hnd %hP
+      %(by rw [proAlts_length]; omega) %(by rw [ll_proAlts_0, hb]; exact wrPrompt_head)
+      Hpin Hf Htn Hps Hcs HE
+    iintro Hres
+    iapply HΦ
+    unfold gwcSp gcur
+    icases Hres with (⟨Htn', Hps', Hcs', HE'⟩ | #HT)
+    · ileft
+      iexists ps ++ [0], cs, s0, P + 1
+      iframe Htn' Hps' Hcs' HE' Hf
+      ipureintro; exact hsp
+    · iright; iexact HT
   · iapply gheadDollar G LINKS hgl k v I b Φ hb $$ Hpin Hlk Hh HΦ
   · iapply Ht $$ %k %v %b %Φ Hpin HT
     iintro #HT'; iapply HΦ; iapply gwcSp_taint G k v I $$ HT'
@@ -927,9 +894,9 @@ theorem gpromptDollar_ban (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS
     (hb : b = uPrompt[0]!) :
     ⊢ (⌜¬ G.gwild I⌝ ∨ G.gT) -∗ G.gPIN k v -∗ LINKS -∗ gwcBan G k v I 0 -∗
       (gwcSp G k v I -∗ Φ) -∗ outLink .uart0 k b Φ := by
-  iintro Hnw #Hpin #Hlk Hc HΦ
-  ihave Hc := gwcBan_owed G k v I $$ Hc
-  iapply gpromptDollar G LINKS hgl k v I b Φ hb $$ Hnw Hpin Hlk Hc HΦ
+  iintro - #Hpin #Hlk Hc HΦ
+  ihave Hc := gwcBan_pro G k v I $$ Hc
+  iapply gpromptDollar_pro G LINKS hgl k v I b Φ hb $$ Hpin Hlk Hc HΦ
 
 /-- the prompt at the TIGHT shapes (Rocq `gprompt_dollar_post`) -/
 theorem gpromptDollar_post (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ glinks G)
@@ -1267,7 +1234,9 @@ theorem gbanReadTaint_rres (RRES : EraPins → List (BitVec 8) → IProp GF)
 
 /-- THE GENERIC ERA'S LINK RECORD (Rocq `gen_link_inst`): every field is the
 family or law above, at the tier's links `LINKS`, per-shape arm `X`, read
-receipt `RR`, turn `TURN`, residue `RRES` and silent code `NOC`. -/
+receipt `RR`, turn `TURN` and residue `RRES`.  (DRIFT SY1, Rocq 3d74ec49f:
+the silent code `NOC`, which the record carried as a constant and nothing
+read, is gone with `lkNoc`.) -/
 noncomputable def genLinkInst
     (X : Nat → EraPins → List (BitVec 8) → IProp GF) [X_tl : ∀ k v I, Timeless (X k v I)]
     (LINKS : IProp GF) [LINKS_pers : Persistent LINKS] (hgl : ⊢ LINKS -∗ glinks G)
@@ -1281,8 +1250,7 @@ noncomputable def genLinkInst
       (∃ v : EraPins, G.gPIN k v ∗ gwcBan G k v [] 0))
     (RRES : EraPins → List (BitVec 8) → IProp GF)
     [RRES_pers : ∀ v I, Persistent (RRES v I)] [RRES_tl : ∀ v I, Timeless (RRES v I)]
-    (hres : ∀ v I, ⊢ RRES v I -∗ gwcRres G v I)
-    (NOC : Nat) : LinkRec hlc GF where
+    (hres : ∀ v I, ⊢ RRES v I -∗ gwcRres G v I) : LinkRec hlc GF where
   lkT := G.gT
   lkPin := G.gPIN
   lkEpin := G.gPIN
@@ -1293,7 +1261,6 @@ noncomputable def genLinkInst
   lkPan := fun I => G.gK.lmhPan (lmLineAt M I)
   lkExf := fun I => G.gK.lmhExf (lmLineAt M I)
   lkExfb := fun I => G.gK.lmhExfb (lmLineAt M I)
-  lkNoc := NOC
   lkBan := gwcBan G
   lkOwed := gwcOwed G
   lkSp := gwcSp G
@@ -1355,7 +1322,6 @@ noncomputable def genLinkInst
   lkSpT_sp := gwcSpT_sp G
   lkOpenT_open := gwcOpenT_open G
   lkBlk_0 := gwcBlk_0 G
-  lkLine_of_blk0 := gwcLine_of_blk0 G X
   lkLine_of_post := gwcLine_of_post G X
   lkLine_of_pro := gwcLine_of_pro G X
   lkLend_of_blk0 := gwcLend_of_blk0 G
@@ -1365,7 +1331,6 @@ noncomputable def genLinkInst
   lkBan_done := gwcBan_done G
   lkBan_done_line := gwcBan_done_line G X
   lkBan_inp := gwcBan_inp G
-  lkPrompt_dollar := gpromptDollar G LINKS hgl
   lkPrompt_space := gpromptSpace G LINKS hgl
   lkPrompt_dollar_ban := gpromptDollar_ban G LINKS hgl
   lkRead := fun k v I l hl => gwc_read G k v I l hl

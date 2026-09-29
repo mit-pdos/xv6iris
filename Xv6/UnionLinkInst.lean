@@ -416,7 +416,6 @@ noncomputable def unionLinkInst (ug : UnionGn) : LinkRec hlc GF :=
   genLinkInst (unionParams ug) (unionX ug) (unionLinks ug) (union_links_gl ug)
     (fun k v I b Φ hb => union_X_dollar ug k v I b Φ hb) (ureadRet ug) (uread_ret_res ug)
     (fturnPre ug.ugnFile) (uturn0 ug) (urresw ug) (urresw_res ug)
-    (ualtCode (.UR .RFSilent))
 
 end UnionLinkInst
 

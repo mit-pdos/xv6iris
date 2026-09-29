@@ -1,13 +1,16 @@
 /-
 THE WRITER'S PURE READING OF A LINE MODEL, once -- a port of Rocq
 `LineModelLinks.v` (`/shared/xv6rocq/iris/LineModelLinks.v`, 1653 lines,
-pinned `1900b8a43`), row U0-1 of `notes/briefs/union.md`.  Pure.
+pinned `1900b8a43`), row U0-1 of `notes/briefs/union.md`.  Pure.  DRIFT
+SY1 (Rocq 3d74ec49f): `lmhNoc` is OPTIONAL (`Option Nat`, its laws under
+`some`), and `lmWrBlk_dollar` files any alternative whose block is the bare
+prompt.
 
 Rocq's header, abridged: what the console credential families spend of the
 model is PURE -- the block an alternative owes at the line that was typed
-(`lmAb`), which alternatives end in the prompt (`lmApr`), the three
+(`lmAb`), which alternatives end in the prompt (`lmApr`), the
 alternatives the shell's own code names (the fork panic, the exec failure,
-the silent one), and the facts about the stream (`LineModel.lmProcStream`)
+and a silent one where the model has one), and the facts about the stream (`LineModel.lmProcStream`)
 that the write links ask for.  Proved here ONCE over the model, from a
 record of HOOKS (`LmHooks`).
 
@@ -97,17 +100,27 @@ theorem ll_proOf_open_snoc_eq (ps : List Nat) (a : Nat) (hnd : ¬ proDone ps) :
 
 /-! ## §1 The hooks: what the shell's own code names in a model -/
 
+/-- **Rocq `lmh_noc_some`**: an instance whose silent round is TOTAL (`some`
+at every line) proves the `lmhNoc` laws from its landed per-line ones through
+this. -/
+theorem lmhNoc_some (P : Nat → Prop) (x c : Nat) (hP : P x) (hc : some x = some c) : P c := by
+  cases hc; exact hP
+
 structure LmHooks (M : LModel) where
   /-- the alternatives whose output is a function of the LINE alone -/
   lmhFree : M.lmAlt → Bool
   /-- the state `lmAb` reads a state-free continuation at -/
   lmhSt0 : M.lmSt
   /-- per line: the CODE of the shell's fork panic, of the exec failure (with
-  its bytes), and of the silent round -/
+  its bytes), and -- WHERE THE MODEL HAS ONE -- of a silent round, the bare
+  prompt and nothing moved.  It is optional (Rocq sync design section 2): at
+  a line sh forks for, the command that did not run says so
+  (`FileDisc.ROom`), and a model with a silent alternative there would read
+  "did not run" into any transcript -/
   lmhPan : M.lmLine → Nat
   lmhExf : M.lmLine → Nat
   lmhExfb : M.lmLine → List (BitVec 8)
-  lmhNoc : M.lmLine → Nat
+  lmhNoc : M.lmLine → Option Nat
   lmhFreeCont : ∀ s s' l a, lmhFree a = true → M.lmCont s l a = M.lmCont s' l a
   lmhFreeTerm : ∀ a, lmhFree a = true → M.lmTerm a = false
   lmhFreeOk : ∀ s s' l a, lmhFree a = true → M.lmOk s l a → M.lmOk s' l a
@@ -118,10 +131,10 @@ structure LmHooks (M : LModel) where
   lmhExfFree : ∀ l, lmhFree (M.lmDec (lmhExf l)) = true
   lmhExfNopanic : ∀ l, M.lmPanic (M.lmDec (lmhExf l)) = false
   lmhExfCont : ∀ s l, M.lmCont s l (M.lmDec (lmhExf l)) = lmhExfb l
-  lmhNocOk : ∀ s l, M.lmOk s l (M.lmDec (lmhNoc l))
-  lmhNocFree : ∀ l, lmhFree (M.lmDec (lmhNoc l)) = true
-  lmhNocNopanic : ∀ l, M.lmPanic (M.lmDec (lmhNoc l)) = false
-  lmhNocCont : ∀ s l, M.lmCont s l (M.lmDec (lmhNoc l)) = uPrompt
+  lmhNocOk : ∀ s l c, lmhNoc l = some c → M.lmOk s l (M.lmDec c)
+  lmhNocFree : ∀ l c, lmhNoc l = some c → lmhFree (M.lmDec c) = true
+  lmhNocNopanic : ∀ l c, lmhNoc l = some c → M.lmPanic (M.lmDec c) = false
+  lmhNocCont : ∀ s l c, lmhNoc l = some c → M.lmCont s l (M.lmDec c) = uPrompt
   /-- what a WRITER knows of a continuation: it ends in the prompt... -/
   lmhContPrompt : ∀ s l a, M.lmOk s l a → M.lmPanic a = false → M.lmTerm a = false →
     ∃ u, M.lmCont s l a = u ++ uPrompt
@@ -557,12 +570,15 @@ theorem lmAb_exf (I : List (BitVec 8)) :
 theorem lmApr_exf (I : List (BitVec 8)) : lmApr M K I (K.lmhExf (lmLineAt M I)) :=
   ⟨K.lmhExfOk _ _, K.lmhExfFree _, K.lmhExfNopanic _⟩
 
-theorem lmAb_noc (I : List (BitVec 8)) : lmAb M K I (K.lmhNoc (lmLineAt M I)) = uPrompt := by
-  rw [lmAb_is M K I _ (K.lmhNocOk _ _) (K.lmhNocFree _)]
-  exact K.lmhNocCont _ _
+/-- ...and the silent round, at a line whose model has one -/
+theorem lmAb_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
+    lmAb M K I c = uPrompt := by
+  rw [lmAb_is M K I _ (K.lmhNocOk _ _ _ hc) (K.lmhNocFree _ _ hc)]
+  exact K.lmhNocCont _ _ _ hc
 
-theorem lmApr_noc (I : List (BitVec 8)) : lmApr M K I (K.lmhNoc (lmLineAt M I)) :=
-  ⟨K.lmhNocOk _ _, K.lmhNocFree _, K.lmhNocNopanic _⟩
+theorem lmApr_noc (I : List (BitVec 8)) (c : Nat) (hc : K.lmhNoc (lmLineAt M I) = some c) :
+    lmApr M K I c :=
+  ⟨K.lmhNocOk _ _ _ hc, K.lmhNocFree _ _ hc, K.lmhNocNopanic _ _ hc⟩
 
 theorem lmWrBlk_nonnil (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat)
     (h : lmWrBlk M ps cs s0 I P) : I ≠ [] := by
@@ -728,21 +744,24 @@ theorem lmWrPro_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P
   · rw [proRounds_app, ll_proRounds_one]; omega
   · rw [hup, hP, lookup_app_shift]; rfl
 
-/-- (2) the LINE's choice byte at a settled round. -/
-theorem lmWrBlk_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat)
+/-- (2) the LINE's choice byte at a settled round: the shell's '$' is the
+block's first byte and files an alternative whose block is the bare prompt
+(the line's silent round, where its model has one). -/
+theorem lmWrBlk_dollar (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : Nat) (c : Nat)
+    (hc : lmApr M K I c) (hcb : lmAb M K I c = uPrompt)
     (hw : lmWrBlk M ps cs s0 I P) :
-    lmWrSp M ps (cs ++ [K.lmhNoc (lmLineAt M I)]) s0 I (P + 1) := by
+    lmWrSp M ps (cs ++ [c]) s0 I (P + 1) := by
   have hst := lmWrBlk_started M ps cs s0 I P hw
-  have hnp := K.lmhNocNopanic (lmLineAt M I)
-  have hpend : lmPendingAt M ps (cs ++ [K.lmhNoc (lmLineAt M I)]) s0 I = uPrompt := by
-    rw [lmWrBlk_pending M K ps cs s0 I P _ hw (lmApr_noc M K I)]; exact lmAb_noc M K I
-  have hlow := lmWrBlk_low M ps cs s0 I P (K.lmhNoc (lmLineAt M I)) hw
-  have hpinS := lmWrBlk_pin_snoc M ps cs s0 I P (K.lmhNoc (lmLineAt M I)) hw
+  have hnp : M.lmPanic (M.lmDec c) = false := hc.2.2
+  have hpend : lmPendingAt M ps (cs ++ [c]) s0 I = uPrompt := by
+    rw [lmWrBlk_pending M K ps cs s0 I P _ hw hc]; exact hcb
+  have hlow := lmWrBlk_low M ps cs s0 I P c hw
+  have hpinS := lmWrBlk_pin_snoc M ps cs s0 I P c hw
   obtain ⟨hpin, hm, hdv, hP⟩ := hw
-  have hup : lmProcStream M ps (cs ++ [K.lmhNoc (lmLineAt M I)]) s0 I
+  have hup : lmProcStream M ps (cs ++ [c]) s0 I
       = lmProcBefore M ps cs s0 I ++ uPrompt := by
     rw [lmProcStream, hlow, hpend]
-  have hlen : (lmProcStream M ps (cs ++ [K.lmhNoc (lmLineAt M I)]) s0 I).length = P + 1 + 1 := by
+  have hlen : (lmProcStream M ps (cs ++ [c]) s0 I).length = P + 1 + 1 := by
     rw [hup, List.length_append, Xv6.wrPrompt_len, hP]
   refine ⟨⟨hpinS, hm, ?_, ?_, hlen.symm⟩, ?_⟩
   · rw [List.length_append, hdv]; rfl

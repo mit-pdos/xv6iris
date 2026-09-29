@@ -234,16 +234,26 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
         have hn : nlines I = cs.length + 1 := hw.1.2.2.1
         cases hi : (lmAbs ulmG s0 cs I a).length - 2 with
         | zero =>
-          -- the prompt is the block's first byte: still owed, deed PEND
+          -- the prompt is the block's first byte: still owed, deed PEND at
+          -- the block's own alternative `a` (its step the identity)
           rw [show lmBlkcs cs a 0 = cs from rfl, Nat.add_zero]
           ihave %hcs := ucs_lb_agree_len v cs cs' (by omega) $$ Hcs Hcs'
           subst hcs
+          have hapr' := hapr
+          obtain ⟨pre, hpre⟩ := lmAbs_prompt ulmG ulmGHooks s0 cs I a hapr'
+          have hpr : ulmG.lmCont (ust cs s0 I) (ul I) (ulmG.lmDec a) = uPrompt := by
+            have h0 : pre.length = 0 := by
+              rw [hpre, List.length_append, wrPrompt_len] at hi; omega
+            have : lmAbs ulmG s0 cs I a = uPrompt := by
+              rw [hpre, List.eq_nil_of_length_eq_zero h0]; rfl
+            exact this
           iright
           isplitl [Htn]
           · iapply uWcl3_close ug s0 I v ps cs P hw $$ Hpin
             iapply ugcur_intro $$ Htn Hps Hcs HE Hf
           · iapply ushDeed_intro ug r upendTie s0 I cs s v
-              ⟨_, upend_tie_of_pre cs s0 I _ (by omega) htie⟩ hnw $$ Hd Hty Hpin Hcs
+              ⟨a, htie.1, by omega, hapr.1 _, hapr.2.2, hpr, by rw [hid]; exact htie.2⟩ hnw
+              $$ Hd Hty Hpin Hcs
         | succ i =>
           -- a byte before the prompt: the alternative is filed, deed DONE
           have hbc : lmBlkcs cs a (i + 1) = cs ++ [a] := rfl

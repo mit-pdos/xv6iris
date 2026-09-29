@@ -44,7 +44,7 @@ theorem cont_nonnil (s : Fstate) (l : Uline) (a : Ralt) (ha : raltOk l a ∨ a =
     have hk : k < 4 := by
       rcases ha with ha | ha
       · cases l with
-        | LEcho ws => exact ha
+        | LEcho ws => exact ha.1
         | _ => exact absurd ha id
       · cases ha; omega
     exact lineAltsOf_nonnil (ulineWs l) k hk
@@ -56,13 +56,12 @@ theorem cont_nonnil (s : Fstate) (l : Uline) (a : Ralt) (ha : raltOk l a ∨ a =
   | RFFork => simp [cont, altPanic, wlLine]
   | RCFork => simp [cont, altPanic, wlLine]
   | RFRan _ => simp [cont, uPrompt]
-  | RFSilent => simp [cont, uPrompt]
-  | RCSilent => simp [cont, uPrompt]
   | RFExec => exact hsuf _
   | RFOpenU => exact hsuf _
   | RFOpenM => exact hsuf _
   | RCNoOpen => exact hsuf _
   | RCExec => exact hsuf _
   | RSExec => exact hsuf _
+  | ROom => exact hsuf _
 
 end Xv6

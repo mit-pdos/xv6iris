@@ -7,9 +7,8 @@ Rocq's header, abridged: `UnionDisc.ulm adm admS` read at its pipeline lines
 (`PipesView.PView`): a line `LPipe p fs` is the pipeline `LPipes p fs`, its
 content function at the round's state is `filesOf`, and a pipeline
 alternative is coded as the union's `UPE` (an echo pipeline) or `UPC` (a
-`cat f` one).  Every law holds at EVERY admission: the cross cases of `uok`
-are `False` (amendment B2), so an admitted alternative at a pipeline line is
-a pipeline one (`pvOnto`).  THE ENCODING IS THE MODEL'S, per line: `uvAlt`
+`cat f` one).  Every law holds at EVERY admission.  (DRIFT SY1, Rocq
+3d74ec49f: `pv_onto` is gone; a pipeline admits `UR ROom`.)  THE ENCODING IS THE MODEL'S, per line: `uvAlt`
 cases on the line's producer (C9b2's split).
 
 Names: Rocq's, camelCased (`uv_line` → `uvLine`, `pview_union` →
@@ -82,13 +81,6 @@ noncomputable def pviewUnion (adm : Pline' → Bool) (admS : List (List (BitVec 
   pvStep s l pl a hl := by
     obtain ⟨p, n, rfl, rfl⟩ := uvLine_some l pl hl
     show ustep s _ (ualtDec _) = _
-    rw [uv_dec]
-    cases p <;> rfl
-  pvOnto s l pl x hl hok := by
-    obtain ⟨p, n, rfl, rfl⟩ := uvLine_some l pl hl
-    obtain ⟨a, rfl, _⟩ := uok_pipe adm s p n x hok
-    refine ⟨a, ?_⟩
-    show _ = ualtDec _
     rw [uv_dec]
     cases p <;> rfl
 
