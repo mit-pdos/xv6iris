@@ -25,3 +25,5 @@ Union* lane (lane-u1punion) started Sept 29 after U1-F.
 Lane gaps LANDED a338b2dde (open items in union_residuals.md). Was: udepwfK uszOk, open_recv_gimg/uimg_view, read_win/at, udepw_law_of_sup*, echo_node_img, image entries.
 Sept 29 later: R-sh LANDED 1daabddd7; Union* LANDED d707ae720 (+ UnionReadInstAt follow-up); running: R-prog (lane-rprog), R-pipes (lane-rpipes), gaps (lane-gaps), sail-regen (worktree). Not started: R-round, I-init, U4, LinkUkLeaves.
 R-prog LANDED (see log) except UshCatFStage* (with R-pipes).
+Sept 29 evening: R-round LANDED 3660681e5; Sail regen (short-circuit backend, hZkr gone) LANDED 05b568a0e;
+secc entry LANDED (see log). Running: R-pipes (+ R-prog's held UshCatFStage*), I-init. Next: U4 top.
