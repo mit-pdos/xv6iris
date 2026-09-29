@@ -3179,7 +3179,11 @@ Section ProofAllocproc.
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv Hkrow". }
         iFrame "Hkst".
-        iFrame "Hpark Hpriv Hgen Hsg Hpr Hfrag Hrow Hxb Hmk Hspare Hirsp Hbsp Hks".
+        iFrame "Hpark Hpriv Hgen Hsg Hpr Hfrag Hrow Hxb Hmk Hspare Hirsp Hbsp".
+        (* [is_kstack] now leads the goal.  Not [iFrame "Hks"]: [Hks] is
+           persistent, and Iris's [iFrame] tries a persistent hypothesis
+           against EVERY conjunct of this post (a minute and a half here). *)
+        iSplitR; [iExact "Hks"|].
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

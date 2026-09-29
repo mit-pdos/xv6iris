@@ -66,7 +66,28 @@
 From Ltac2 Require Import Ltac2.
 From Ltac2 Require Constr Control Std List Array Ident Int Bool FSet.
 From Stdlib Require Import ZArith Lia.
+From Stdlib Require ZifyNat ZifyN.
 Require Export SetShrink.
+
+(* ---------------------------------------------------------------------- *)
+(** ** [lia] does NOT expand [mod]/[div]
+
+    Stdlib's [ZifyNat] and [ZifyN] redefine
+    [zify_convert_to_euclidean_division_equations_flag] to [true], and an
+    Ltac [::=] takes effect for every file that merely LOADS the module.
+    stdpp's [bitvector.definitions] requires [ZifyNat] (since stdpp master,
+    2026), so without the line below every [lia]/[nia] downstream of it --
+    nearly the whole tree -- rewrites each [x mod m] and [x / m] into a fresh
+    quotient and remainder with five guarded side conditions.  No proof here
+    needs that; it makes [lia] a few percent slower everywhere and [nia]
+    unboundedly slow on a context holding [_ mod 2 ^ 64] terms (one [nia] in
+    ProofItruncParts.v went from a fraction of a second to not finishing).
+
+    The two modules are required above so that they are loaded BEFORE this
+    redefinition in every file that loads this one; a later [Require] of them
+    is a no-op and cannot turn the flag back on.  A proof that wants the
+    expansion says [Z.to_euclidean_division_equations] itself. *)
+Ltac Zify.zify_convert_to_euclidean_division_equations_flag ::= constr:(false).
 
 (* ---------------------------------------------------------------------- *)
 (** ** COST

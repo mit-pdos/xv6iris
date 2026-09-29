@@ -345,6 +345,7 @@ Proof.
   split.
   - constructor; rewrite ?uint_unsigned;
       try (rewrite Z.rem_mod_nonneg; [ | lia | lia ]); try lia.
+    + exact (Hmod n1 ltac:(lia) ltac:(lia)).
     + intros Hpos.
       destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.
@@ -358,6 +359,9 @@ Proof.
       apply Hb. lia.
   - constructor; rewrite ?uint_unsigned ?Hu1;
       try (rewrite Z.rem_mod_nonneg; [ | lia | lia ]); try lia.
+    + rewrite Zminus_mod Hal Hn1r. reflexivity.
+    + replace (bv_unsigned sp0 - n1 - n2) with (bv_unsigned sp0 - (n1 + n2)) by lia.
+      pose proof (Hmod (n1 + n2) ltac:(lia) ltac:(lia)). lia.
     + intros Hpos.
       destruct (Hleaf ltac:(lia)) as (w & Hw & Hst & Hld & Hwb).
       exists w. split_and!; try assumption.

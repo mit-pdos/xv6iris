@@ -879,6 +879,7 @@ Proof.
   split.
   - constructor; try (rewrite !uint_unsigned; assumption); try lia.
     + rewrite uint_unsigned. rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hal.
+    + rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hn1r.
     + rewrite uint_unsigned. rewrite Z.rem_mod_nonneg; [ | lia | lia ]. lia.
     + rewrite uint_unsigned. lia.
     + intros Hp. destruct (Hleaf ltac:(lia)) as (q & Hq & Hw). exists q. split; [ | exact Hw ].
@@ -901,6 +902,7 @@ Proof.
   - constructor; try lia.
     + rewrite uint_unsigned, Hlow. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
       rewrite Zminus_mod, Hal, Hn1r. reflexivity.
+    + rewrite Z.rem_mod_nonneg; [ | lia | lia ]. exact Hn2r.
     + rewrite uint_unsigned, Hlow. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
       replace (bv_unsigned sp0 - n1 - n2) with (bv_unsigned sp0 - (n1 + n2)) by lia. lia.
     + rewrite uint_unsigned, Hlow. lia.
