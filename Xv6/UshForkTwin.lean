@@ -61,30 +61,25 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-! ## Helpers -/
 
 /-- What the fork left in the parent's hand, beside the set it grew to. -/
-theorem ushf_fansOf (N : UkNames GF) (Q : Int → IProp GF) (Rc : IProp GF) (r : BitVec 64) :
-    ushFork1Ans N ∅ Q Rc r ⊢ ∃ Sw : ExtTreeSet GName compare, uch N.ch Sw ∗ ushfFans ∅ Q Rc Sw := by
+theorem ushf_fansOf (N : UkNames GF) (Q : Int → IProp GF) (Rc : IProp GF) (r : BitVec 64) (hr : r ≠ -1#64) :
+    ushFork1Ans N ∅ Q Rc r ⊢ ∃ Sw : ExtTreeSet GName compare, uch N.ch Sw ∗ ushfFans ∅ Q Sw := by
   unfold ushFork1Ans ushfFans
-  iintro (⟨-, Hch, HRc⟩ | ⟨%γ, %pidv, -, -, -, Htok, Hch⟩)
-  · iexists ∅
-    iframe Hch
-    ileft
-    iframe HRc
-    ipureintro; rfl
+  iintro (⟨%hr1, -, -⟩ | ⟨%γ, %pidv, -, -, -, Htok, Hch⟩)
+  · exact absurd hr1 hr
   · iexists (∅ ∪ {γ})
     iframe Hch
-    iright
     iexists γ, pidv
     iframe Htok
     ipureintro; rfl
 
 /-- `ushf_wait_empty`, the two answers kept. -/
-theorem ushf_wait_empty_keep (Q : Int → IProp GF) (Rc : IProp GF) (Sw Sw' : ExtTreeSet GName compare)
+theorem ushf_wait_empty_keep (Q : Int → IProp GF) (Sw Sw' : ExtTreeSet GName compare)
     (ret : BitVec 64) (pidv : BitVec 32) (hne : pidv ≠ 1#32) (hm1 : ret = -1#64 → Sw' = ∅) :
-    ushfFans ∅ Q Rc Sw ∗ uwaitAnsPid (GF := GF) ret Sw Sw' pidv ⊢
-      ⌜Sw' = ∅⌝ ∗ (ushfFans ∅ Q Rc Sw ∗ uwaitAnsPid ret Sw Sw' pidv) := by
+    ushfFans ∅ Q Sw ∗ uwaitAnsPid (GF := GF) ret Sw Sw' pidv ⊢
+      ⌜Sw' = ∅⌝ ∗ (ushfFans ∅ Q Sw ∗ uwaitAnsPid ret Sw Sw' pidv) := by
   refine pure_elim (Sw' = ∅) ?_ (fun h => ?_)
   · iintro ⟨Hf, Ha⟩
-    iapply ushf_wait_empty Q Rc Sw Sw' ret pidv hne hm1 $$ Hf Ha
+    iapply ushf_wait_empty Q Sw Sw' ret pidv hne hm1 $$ Hf Ha
   · iintro H
     iframe H
     ipureintro; exact h
@@ -135,7 +130,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
         ushPid N' -∗ ushmFresh N' sz -∗
         urun (hlc := hlc) N' hB mA (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + (ushDpipe + n)))) -∗ wpLoop hB) -∗
       (∀ (Sw Sw' : ExtTreeSet GName compare) (ret : BitVec 64) (pidv : BitVec 32), ⌜pidv ≠ 1#32⌝ -∗
-        ⌜ret = -1#64 → Sw' = ∅⌝ -∗ ushfFans ∅ Q Rc Sw -∗ uwaitAnsPid ret Sw Sw' pidv -∗ Pex -∗
+        ⌜ret = -1#64 → Sw' = ∅⌝ -∗ ushfFans ∅ Q Sw -∗ uwaitAnsPid ret Sw Sw' pidv -∗ Pex -∗
         ▷ ushPosb (hlc := hlc) N X l 0) -∗
       ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x908) (16 + (ushDbody + n)) -∗ wpLoop h := by
@@ -163,7 +158,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
     iintro %hA %mA %rA %hr0 %hrm %hcs %ha0 Hans HP Hsz Hustd Hcwd - HPex Hrun
     unfold ushfPay
     icases HP with ⟨-, -, Hdat, Hbuf⟩
-    icases ushf_fansOf N Q Rc rA $$ Hans with ⟨%Sw, Hch, Hfans⟩
+    icases ushf_fansOf N Q Rc rA hrm $$ Hans with ⟨%Sw, Hch, Hfans⟩
     -- 0x90c  c.beqz a0 -- NOT taken
     iapply ushS_brN UL N (ushRI_90c N.t) 0x90e hA mA _ (by rw [ha0, RegMap.get_zero]; simp [ukBtaken, hr0])
       $$ HC Hrun
@@ -180,7 +175,7 @@ theorem wp_ushForkCorePipe (UL : UK_LEAVES) (SF : SH_FORK1)
       (by rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_same _ _ _ (by decide)]; rfl) $$ HC Hrun Hch Hpid
     iintro %ret %Sw' %pidv %hpv Hpid %hneg1 Hans Hch
     have hpv1 := ushf_pid_ne_1 pidv pid hpv hpid1
-    icases ushf_wait_empty_keep Q Rc Sw Sw' ret pidv hpv1 hneg1 $$ [Hfans Hans] with ⟨%hSw', Hfans, Hans⟩
+    icases ushf_wait_empty_keep Q Sw Sw' ret pidv hpv1 hneg1 $$ [Hfans Hans] with ⟨%hSw', Hfans, Hans⟩
     · iframe Hfans Hans
     subst hSw'
     ihave Hpos := Hre $$ %Sw %∅ %ret %pidv %hpv1 %hneg1 Hfans Hans HPex
@@ -226,7 +221,7 @@ the child's payload) or the taint (the generic slot). -/
 theorem wp_ushForkPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T] : ushKshfForkLaw (hlc := hlc) N X := by
-  intro Lp Dc h m f k len ws sz l n hDc hregs hs1 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl
+  intro Lp Dc h m f k len ws sz l n hDc hregs hs1 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb
   unfold ushfKillLaw ushfChildLawAt
   iintro #Hgen Hhead #HC #Hjt #Hkl #Hchl #Hplaw %hfd0 Hbst Hdat Hsz Hbuf Hrun
   unfold ushBstate
@@ -242,7 +237,6 @@ theorem wp_ushForkPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
       · imodintro
         iintro Hk
         unfold ushfWq
-        iright
         iapply Hkl $$ %np Hk
       · -- THE PANIC, PAID
         iintro %h' %m' %r %hmsg %hr1 Hans Hustd' Hpm' Hrun'
@@ -266,14 +260,7 @@ theorem wp_ushForkPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
       · -- the re-entry, with the pieces back in hand
         iintro %Sw %Sw' %ret %pidv %hpv1 %hm1 Hfans Hans Hpm
         unfold ushfFans
-        icases Hfans with (⟨%hSw, HRc⟩ | ⟨%γ, %pidc, %hSw, Htok⟩)
-        · inext
-          iapply ushPosb_of_wc N X l 0 np hb.1 $$ Hpm [HRc]
-          unfold ushWcp
-          ileft
-          isplitr
-          · ipureintro; exact hrow
-          · iapply hwbl np $$ HRc
+        icases Hfans with ⟨%γ, %pidc, %hSw, Htok⟩
         · subst hSw
           unfold uwaitAnsPid uwaitAnsAt waitAns
           icases Hans with ⟨%gn, %b, %rv, %xs, %hr, (⟨%hneg, -⟩ | ⟨%γ', %hrng, %hin, Hesc, -⟩)⟩
@@ -296,9 +283,7 @@ theorem wp_ushForkPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
               isplitr
               · ipureintro; exact hrow
               · unfold ushfWq
-                icases HQ with (HQ | HQ)
-                · iapply hwbl np $$ HQ
-                · iexact HQ
+                iexact HQ
             · exact absurd heq hpv1
     · exact absurd hcl.2 (by omega)
   · -- THE TAINT: sh's code is left here
@@ -318,8 +303,7 @@ theorem wp_ushBodyPipeNc (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     (hnul : f (k + len) = ubyte0) (hkl : k + len < shNbuf) (hline : Lp ws (fun j => f (k + j)) 0 len)
     (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
     (hpm1 : ∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I)
-    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length)
-    (hwbl : ∀ I : List (BitVec 8), ⊢ X.Wc I 3 -∗ X.Wc I 0) :
+    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length) :
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
@@ -334,7 +318,7 @@ theorem wp_ushBodyPipeNc (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
   iapply ushS_brT UL N (ushRI_956 N.t) 0x908 h m _ hb $$ HC Hrun
   iintro %h1 Hrun
   iapply wp_ushForkPipe UL SF SP hps N X Lp Dc h1 m f k len ws sz l n hDc hregs hs1 hnn hnul hkl hline hszlo hszal
-    hszok hpm1 hpmwb hwbl $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
+    hszok hpm1 hpmwb $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 /-- **Rocq `wp_kshm_body_pipe`**: at a line whose first byte is 'e'. -/
 theorem wp_ushBodyPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
@@ -348,15 +332,14 @@ theorem wp_ushBodyPipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     (hnul : f (k + len) = ubyte0) (hkl : k + len < shNbuf) (hline : Lp ws (fun j => f (k + j)) 0 len)
     (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
     (hpm1 : ∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I)
-    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length)
-    (hwbl : ∀ I : List (BitVec 8), ⊢ X.Wc I 3 -∗ X.Wc I 0) :
+    (hpmwb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length) :
     ⊢ ushGenSlot (hlc := hlc) N X -∗ ushlHead (hlc := hlc) N X l sz -∗ ushCode N.t -∗ ushJtab N.t -∗
       ushfKillLaw (hlc := hlc) X -∗ ushfChildLawAt (hlc := hlc) X ushDg Lp Dc -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ⌜ushFd0p l⌝ -∗ ushBstate (hlc := hlc) N X l ws -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h :=
   wp_ushBodyPipeNc UL SF SP hps N X Lp Dc h m f k len ws sz l n hDc
     (fun ws' g k' len' hl => by rw [hlp0 ws' g k' len' hl]; decide)
-    hregs hs1 ha5 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb hwbl
+    hregs hs1 ha5 hnn hnul hkl hline hszlo hszal hszok hpm1 hpmwb
 
 /-! ## The echo era's body law, and the rest of the body from a body law -/
 
@@ -370,8 +353,7 @@ theorem ushLineIs_shift0 (ws : List (List (BitVec 8))) (f : Nat → BitVec 8) (k
 theorem ushf_body_law_echo_pipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T] (sz : Nat)
-    (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536))
-    (hwbl : ∀ I : List (BitVec 8), ⊢ X.Wc I 3 -∗ X.Wc I 0) :
+    (hszlo : 8344 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536)) :
     ⊢ ushfKillLaw (hlc := hlc) X -∗ ushfChildLaw (hlc := hlc) X ushDg -∗ ushPanicLaw (hlc := hlc) X.Wc X.Wb -∗
       ushfBodyLaw (hlc := hlc) N X ushLineEcho sz := by
   unfold ushfChildLaw ushfBodyLaw
@@ -382,14 +364,13 @@ theorem ushf_body_law_echo_pipe (UL : UK_LEAVES) (SF : SH_FORK1) (SP : SH_PANIC)
   obtain ⟨ws, rfl⟩ := hd
   iapply wp_ushBodyPipe UL SF SP hps N X ushLineIs 60 h m f k len (ulineWs (.LEcho ws)) sz l n (by unfold ushDpipe; omega)
     (fun ws' g k' len' hl => ushf_lp0_echo ws' g k' len' hl) hregs hs1 ha5 hnn hnul hkl
-    (ushLineIs_shift0 ws f k len hlat) hszlo hszal hszok hpm1 hpmwb hwbl
+    (ushLineIs_shift0 ws f k len hlat) hszlo hszal hszok hpm1 hpmwb
     $$ Hgen Hhead HC Hjt Hkl Hchl Hplaw %hfd0 Hstd Hdat Hsz Hbuf Hrun
 
 /-- **Rocq `ushf_rest_of_body_at_pipe`**: the rest-of-body obligation from a
 body law (the line, or the taint's generic slot). -/
 theorem ushf_rest_of_body_at_pipe (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat)
-    (_hszlo : 8344 ≤ sz) (_hszal : pgRoundUpN sz = sz) (_hszok : uszOk (sz + 65536))
-    (_hwbl : ∀ I : List (BitVec 8), ⊢ X.Wc I 3 -∗ X.Wc I 0) :
+    (_hszlo : 8344 ≤ sz) (_hszal : pgRoundUpN sz = sz) (_hszok : uszOk (sz + 65536)) :
     ⊢ ushfBodyLaw (hlc := hlc) N X D sz -∗ ushRestLAt (hlc := hlc) N X D (ushlR N sz) := by
   unfold ushfBodyLaw ushRestLAt ushRestLineAt ushlR
   iintro #Hbody

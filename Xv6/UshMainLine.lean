@@ -89,11 +89,10 @@ theorem ushLineOk_cons (ws : List (List (BitVec 8))) (hok : lineOk ws) : ∃ r, 
   | nil => simp at h
   | cons w r => simp at h; exact ⟨r, by rw [h]⟩
 
-/-- **Rocq `ush_uline_head_nonblank`**: a line's first byte is not a blank
-(it is `e`, `c` or `s`). -/
-theorem ushUline_head_nonblank (lu : Uline) (hok : ulineOk lu) :
-    (lineBytes lu)[0]!.toNat ≠ 9 ∧ (lineBytes lu)[0]!.toNat ≠ 32 := by
-  have hv : (lineBytes lu)[0]!.toNat = 101 ∨ (lineBytes lu)[0]!.toNat = 99 ∨ (lineBytes lu)[0]!.toNat = 115 := by
+/-- **Rocq `ush_uline_head_val`**: the head byte itself -- [e]cho, [c]at, or
+[s]eccomp. -/
+theorem ushUline_head_val (lu : Uline) (hok : ulineOk lu) :
+    (lineBytes lu)[0]!.toNat = 101 ∨ (lineBytes lu)[0]!.toNat = 99 ∨ (lineBytes lu)[0]!.toNat = 115 := by
     cases lu with
     | LEcho ws =>
       obtain ⟨r, rfl⟩ := ushLineOk_cons ws hok
@@ -124,7 +123,17 @@ theorem ushUline_head_nonblank (lu : Uline) (hok : ulineOk lu) :
       right; right
       rw [lineBytes_body]; simp only [lineBody]
       rw [ushWlBody_head _ _ (by simp [cmdSeccomp])]; rfl
-  omega
+
+/-- **Rocq `ush_uline_head_nonblank`**: a line's first byte is not a blank
+(it is `e`, `c` or `s`). -/
+theorem ushUline_head_nonblank (lu : Uline) (hok : ulineOk lu) :
+    (lineBytes lu)[0]!.toNat ≠ 9 ∧ (lineBytes lu)[0]!.toNat ≠ 32 := by
+  have := ushUline_head_val lu hok; omega
+
+/-- **Rocq `ush_uline_head_nonnl`** (7adb0cba2): ...and it is not the newline --
+an admissible line is never blank. -/
+theorem ushUline_head_nonnl (lu : Uline) (hok : ulineOk lu) : (lineBytes lu)[0]!.toNat ≠ 10 := by
+  have := ushUline_head_val lu hok; omega
 
 /-- **Rocq `ush_nl_of_val`**. -/
 theorem ushNl_of_val (b : BitVec 8) (h : b.toNat = 10) : b = wlNl := BitVec.eq_of_toNat_eq h

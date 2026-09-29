@@ -122,16 +122,18 @@ theorem ushMain_done_line (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (Dl 
 /-- **0x952, the tail** (Rocq `wp_ksh_loop`'s shared tail): a blank line
 goes round the loop again on the Löb hypothesis; anything else is main's
 body, `ushRestLAt`. -/
-theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X)
+theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T]
+    (L : UshLaws (hlc := hlc) N X)
     (Dl : Uline → Prop) (R : IProp GF) (l : List FdState) (h : CPU) (mm : RegMap) (g : Nat → BitVec 8)
-    (kk i2 n0 : Nat) (ws : List (List (BitVec 8))) (hrm : ushRegs mm) (hkk : kk ≤ i2) (hi2 : i2 < shNbuf)
+    (lu : Uline) (kk i2 n0 : Nat) (ws : List (List (BitVec 8))) (hrm : ushRegs mm) (hkk : kk ≤ i2) (hi2 : i2 < shNbuf)
     (hnul : g i2 = ubyte0) (hsm : mm.get 9#5 = BitVec.ofNat 64 (shBuf + kk))
     (ham : mm.get 15#5 = BitVec.ofNat 64 (g kk).toNat) (hfd0 : ushFd0p l) :
     ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗ ushRestLAt (hlc := hlc) N X Dl R -∗
-      ▷ ushLoopHead (hlc := hlc) N X R l -∗ ushRestLineAt X Dl ws g kk -∗ ushBstate (hlc := hlc) N X l ws -∗
+      ▷ ushLoopHead (hlc := hlc) N X R l -∗ (⌜Dl lu ∧ i2 = (lineBytes lu).length ∧ ushLineAt lu g 0 i2⌝ ∨ X.T) -∗
+      ushRestLineAt X Dl ws g kk -∗ ushBstate (hlc := hlc) N X l ws -∗
       R -∗ ubytes N.d shBuf shNbuf g -∗
       urun (hlc := hlc) N h mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop h := by
-  iintro #Hc #Hjt #Hgen #Hrest IH Hrl Hstd HR Hbs Hrun
+  iintro #Hc #Hjt #Hgen #Hrest IH #Hline #Hrl Hstd HR Hbs Hrun
   ihave #Hi := ushMI_952 N.t $$ Hc
   iapply wp_uk_btype UL N h mm _ false 8130#13 20#5 15#5 .BEQ _ (fun _ => by decide) $$ Hi Hrun
   inext
@@ -143,9 +145,42 @@ theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
     iapply Hrest $$ %l %(inferInstanceAs (UknConst N)) %L.pm_of_at %L.at_of_pm_wb Hc Hjt Hgen IH %h1 %mm %g %kk
       %i2 %n0 %ws %hrm %hsm %ham %⟨hkk, hi2, hnul⟩ %hfd0 Hrl Hstd HR Hbs Hrun
   · rw [if_pos rfl, show BitVec.ofNat 64 0x952 + BitVec.signExtend 64 8130#13 = BitVec.ofNat 64 0x914 from by decide]
+    -- a blank line: round the command loop again -- UNDER THE TAINT.  The byte at `kk` is the
+    -- newline, and a line the read delivered clean has a letter there: the rest line's own
+    -- head (`ushUline_head_nonnl`), read over the NUL-free window the read's line gives it
+    have hb10 : (g kk).toNat = 10 := by
+      rw [ham, hrm.2.2.1] at htk
+      have e := beq_iff_eq.1 htk
+      have := congrArg BitVec.toNat e
+      simp only [BitVec.toNat_ofNat] at this
+      have hlt := (g kk).isLt
+      omega
+    ihave #HTk : X.T $$ []
+    · icases Hline with (%hl | #HT)
+      · unfold ushRestLineAt
+        icases Hrl with (Hrl1 | #HT)
+        · obtain ⟨-, -, hok, hlen, hby⟩ := hl
+          have hkki : kk < i2 := by
+            rcases Nat.lt_or_ge kk i2 with h' | h'
+            · exact h'
+            · have e : kk = i2 := by omega
+              subst e; rw [hnul] at hb10; exact absurd hb10 (by decide)
+          ihave %hx := Hrl1 $$ %(i2 - kk) %(fun j hj => by
+              have e := hby (kk + j) (by omega)
+              rw [Nat.zero_add] at e
+              rw [e]
+              exact ushUline_no_nul lu (kk + j) hok (by omega))
+            %(by rw [show kk + (i2 - kk) = i2 by omega]; exact hnul)
+          obtain ⟨lx, -, -, hokx, hlenx, hbyx⟩ := hx
+          exfalso
+          apply ushUline_head_nonnl lx hokx
+          rw [← hbyx 0 (by omega), Nat.add_zero]
+          exact hb10
+        · iexact HT
+      · iexact HT
     unfold ushLoopHead
     iapply IH $$ %h1 %mm %g %n0 %hrm %hfd0 [Hstd] HR Hbs Hrun
-    iapply ushPstate_of_bstate N X L l ws $$ Hstd
+    iapply ushPstate_of_bstate_taint N X L l ws $$ HTk Hstd
 
 /-- **0x920..0x936** (Rocq `wp_ksh_loop` after the `bltz`): the first
 byte's blank tests; the scan on a leading blank (the taint's), the tail
@@ -167,8 +202,8 @@ theorem ushMain_line (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
       ushRestLineAt X Dl (ulineWs lu) g kk -∗ ubytes N.d shBuf shNbuf g -∗
       urun (hlc := hlc) N hh mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop hh) $$ [Hstd HR IH]
   · iintro %hh %mm %kk %hrm %hkk %hsm %ham Hrl Hbs Hrun
-    iapply ushMain_tail UL N X L Dl R l hh mm g kk i2 n0 _ hrm hkk hi2 hnul hsm ham hfd0
-      $$ Hc Hjt Hgen Hrest IH Hrl Hstd HR Hbs Hrun
+    iapply ushMain_tail UL N X L Dl R l hh mm g lu kk i2 n0 _ hrm hkk hi2 hnul hsm ham hfd0
+      $$ Hc Hjt Hgen Hrest IH Hline Hrl Hstd HR Hbs Hrun
   -- 0x920  lbu a5,0(s2)
   icases ubytesq_acc N.d (DFrac.own 1) shBuf shNbuf g 0 (by decide) $$ Hbs with ⟨Hb, Hcl⟩
   iapply ushS_lbu UL N (ushMI_920 N.t) 0x924 h mR _ (DFrac.own 1) (shBuf + 0) (g 0)

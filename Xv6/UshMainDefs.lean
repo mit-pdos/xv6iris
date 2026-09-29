@@ -23,7 +23,7 @@ abstract continuation `ushRestLAt` that takes the loop head as a premise.
    where Rocq's closed section abstracts over the ones a definition uses);
    `T`'s persistence (Rocq `HT`) is an instance premise `[Persistent X.T]`
    where Rocq's proofs use it.  The section HYPOTHESES are two `Prop`
-   records: `UshLaws N X` (Rocq `ush_wb_wc`, `ush_wc_blk_line`,
+   records: `UshLaws N X` (Rocq `ush_wb_wc`,
    `ush_pm_of_at`, `ush_at_of_pm_taint`, `ush_at_of_pm_wb`, `ush_wb_read`,
    `ush_wc_read`) and `UshDisc Dsc Dl` (Rocq `Hdsc_ncr`, `Hdsc_short`,
    `Hdsc_line`); a lemma takes the record whose fields it uses (Rocq's
@@ -241,8 +241,6 @@ lease** (deviation 1). -/
 structure UshLaws (N : UkNames GF) (X : UshCtx GF) : Prop where
   /-- Rocq `ush_wb_wc` -/
   wb_wc : ∀ I : List (BitVec 8), ⊢ X.Wb I -∗ X.Wc I 0
-  /-- Rocq `ush_wc_blk_line` -/
-  wc_blk_line : ∀ I : List (BitVec 8), ⊢ X.Wc I 3 -∗ X.Wc I 0
   /-- Rocq `ush_pm_of_at` -/
   pm_of_at : ∀ n : Nat,
     ⊢ ushAt (hlc := hlc) N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease (hlc := hlc) N X I
@@ -387,25 +385,6 @@ theorem ushPosb_taint (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (p : N
   unfold ushPosb
   iright
   iframe
-
-/-- **Rocq `ush_posb_blk_line`**: the body's slot back at the head's index. -/
-theorem ushPosb_blk_line (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (l : List FdState) :
-    ushPosb (hlc := hlc) N X l 3 ⊢ ushPosb (hlc := hlc) N X l 0 := by
-  unfold ushPosb
-  iintro (⟨%I, %hn, H, Hc⟩ | H)
-  · ileft
-    iexists I
-    iframe H
-    isplitr
-    · ipureintro; exact hn
-    · unfold ushWcp
-      icases Hc with (⟨%hrow, Hc⟩ | ⟨%hcl, -⟩)
-      · ileft
-        isplitr
-        · ipureintro; exact hrow
-        · iapply L.wc_blk_line I $$ Hc
-      · exact absurd hcl.2 (by omega)
-  · iright; iexact H
 
 /-! ## §7 What a read answers -/
 
@@ -762,14 +741,24 @@ def ushPstate (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : IProp GF :=
 def ushBstate (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) : IProp GF :=
   iprop(ushStd N X l ∗ ucwd N.cwd ROOTINO ∗ uch N.ch ∅ ∗ ushPid N ∗ ushPosw (hlc := hlc) N X l ws)
 
-/-- **Rocq `ush_pstate_of_bstate`**. -/
-theorem ushPstate_of_bstate (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (l : List FdState)
-    (ws : List (List (BitVec 8))) : ushBstate (hlc := hlc) N X l ws ⊢ ushPstate (hlc := hlc) N X l := by
+/-- **Rocq `ush_pstate_of_bstate_taint`** (7adb0cba2): back to the head's
+state, where nothing was written -- a blank line's back edge -- UNDER THE
+TAINT, the one place that edge is taken (the read's clean arm delivers an
+admissible line, whose first byte is never the newline).  The block owed is
+not converted: the cursor goes back through the taint's arm. -/
+theorem ushPstate_of_bstate_taint (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws (hlc := hlc) N X)
+    (l : List FdState) (ws : List (List (BitVec 8))) :
+    ⊢ X.T -∗ ushBstate (hlc := hlc) N X l ws -∗ ushPstate (hlc := hlc) N X l := by
   unfold ushBstate ushPstate
-  iintro ⟨Hstd, Hcwd, Hch, Hpid, Hpos⟩
+  iintro #HT ⟨Hstd, Hcwd, Hch, Hpid, Hpos⟩
   iframe Hstd Hcwd Hch Hpid
-  iapply ushPosb_blk_line N X L l
-  iapply ushPosb_of_posw N X l ws $$ Hpos
+  unfold ushPosw ushPosb
+  iright
+  isplitr
+  · iexact HT
+  icases Hpos with (⟨%I, -, Hpm, -⟩ | ⟨-, Hp⟩)
+  · iapply ushPos_of_pm N X L I $$ HT Hpm
+  · iexact Hp
 
 /-- **Rocq `ush_loop_head`**: the command loop's head at 0x914, over the
 opaque `R` a turn carries. -/

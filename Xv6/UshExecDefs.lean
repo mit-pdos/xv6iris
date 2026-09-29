@@ -245,7 +245,7 @@ guard `D` admits, at the fork's payload (`UkShFork.ushf_wq Wc I`, inlined,
 deviation 3) and lend `Wc I 3`. -/
 def ushExecSupEchoWqAt (D : List (BitVec 8) → Prop) (Wc : List (BitVec 8) → Nat → IProp GF) : IProp GF :=
   iprop(□ ∀ I : List (BitVec 8), ⌜D I⌝ -∗
-    ushExecSupEcho E (lastWs I) (fun _ => iprop(Wc I 3 ∨ Wc I 0)) (Wc I 3))
+    ushExecSupEcho E (lastWs I) (fun _ => Wc I 0) (Wc I 3))
 
 /-- **Rocq `ush_execfail_law_wq_at_D`**: the diagnostic's law under the
 same guard, from the block owed to the block written up to its prompt. -/

@@ -13,8 +13,13 @@ WHAT CROSSES: the text and its jump table, the loop's data half (the two
 lexer tables and the allocator's first-call state, sh-main's `ushlDat`) and
 the whole line buffer (`ushfPay`).  WHAT THE PARENT LENDS: the credential at
 the body's slot (`X.Wc I 3`); WHAT THE CHILD HANDS BACK through its exit:
-`ushfWq X I` (the block done, or still owed); a KILLED child pays it with the
-taint (`ushfKillLaw`).  THE CHILD'S WALK is a law the body takes
+`ushfWq X I` (the block done); a KILLED child pays it with the
+taint (`ushfKillLaw`).  Since Rocq 7adb0cba2 (sync design section 2) the
+payload is the credential AFTER the block and nothing else: every way a
+child ends prints first (the program, a failed exec's diagnostic, and since
+upstream d66e41c the parse's out-of-memory panic), so no child hands the
+lend back untouched, and the fork's whole-lend arm is refuted by fork1's
+returning arm.  THE CHILD'S WALK is a law the body takes
 (`ushfChildLawAt`, at a line shape `Lp` and a room `Dc`).
 
 ## Deviations from Rocq
@@ -156,8 +161,9 @@ instance ushfPay_forkable (f : Nat → BitVec 8) : Forkable (GF := GF) (ushfPay 
 
 /-! ## §3 The lend and the payload -/
 
-/-- **Rocq `ushf_wq`**: what the child hands back through its exit. -/
-def ushfWq (X : UshCtx GF) (I : List (BitVec 8)) : IProp GF := iprop(X.Wc I 3 ∨ X.Wc I 0)
+/-- **Rocq `ushf_wq`** (main): what the child hands back through its exit --
+the credential after the block, and nothing else. -/
+def ushfWq (X : UshCtx GF) (I : List (BitVec 8)) : IProp GF := X.Wc I 0
 
 instance ushfWq_timeless (X : UshCtx GF) [hW : ∀ I p, Timeless (X.Wc I p)] (I : List (BitVec 8)) :
     Timeless (ushfWq X I) := by
@@ -194,26 +200,26 @@ instance ushfChildLawAt_persistent (X : UshCtx GF) (Dg : Nat)
 /-- **Rocq `ushf_child_law`**: echo's line, echo's room. -/
 def ushfChildLaw (X : UshCtx GF) (Dg : Nat) : IProp GF := ushfChildLawAt (hlc := hlc) X Dg ushLineIs 60
 
-/-- **Rocq `ushf_fans`**: what the fork left in the parent's hand. -/
-def ushfFans (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF) (Rc : IProp GF)
+/-- **Rocq `ushf_fans`** (main): what the fork left in the parent's hand --
+the token of the child it forked (the row's whole-lend arm, at `-1`, is
+refuted: fork1 panics there, and its returning arm is not `-1`). -/
+def ushfFans (Sc : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (Sw : ExtTreeSet GName compare) : IProp GF :=
-  iprop((⌜Sw = Sc⌝ ∗ Rc) ∨ ∃ (γ : GName) (pidc : BitVec 32), ⌜Sw = Sc ∪ {γ}⌝ ∗ childTok γ pidc Q)
+  iprop(∃ (γ : GName) (pidc : BitVec 32), ⌜Sw = Sc ∪ {γ}⌝ ∗ childTok γ pidc Q)
 
 /-- **Rocq `ushf_wait_empty`**: the set after the wait is empty again. -/
-theorem ushf_wait_empty (Q : Int → IProp GF) (Rc : IProp GF) (Sw Sw' : ExtTreeSet GName compare)
+theorem ushf_wait_empty (Q : Int → IProp GF) (Sw Sw' : ExtTreeSet GName compare)
     (ret : BitVec 64) (pidv : BitVec 32) (hne : pidv ≠ 1#32) (hm1 : ret = -1#64 → Sw' = ∅) :
-    ⊢ ushfFans ∅ Q Rc Sw -∗ uwaitAnsPid ret Sw Sw' pidv -∗ ⌜Sw' = ∅⌝ := by
+    ⊢ ushfFans ∅ Q Sw -∗ uwaitAnsPid ret Sw Sw' pidv -∗ ⌜Sw' = ∅⌝ := by
   unfold ushfFans uwaitAnsPid uwaitAnsAt waitAns
   iintro Hfans ⟨%gn, %b, %rv, %xs, %hr, (⟨%hf, -⟩ | ⟨%γ', %hrng, %hoci, -, -⟩)⟩
   · ipureintro; apply hm1; rw [hr, hf.1]; exact sext_neg1_64
   · rcases hoci with hin | heq
-    · icases Hfans with (⟨%hSw, -⟩ | ⟨%γ, %pidc, %hSw, -⟩)
-      · subst hSw
-        exact absurd hin Std.ExtTreeSet.not_mem_empty
-      · ipureintro
-        subst hSw
-        rw [hrng.1, ush_mem_one γ γ' hin]
-        exact ush_set_one_del γ
+    · icases Hfans with ⟨%γ, %pidc, %hSw, -⟩
+      ipureintro
+      subst hSw
+      rw [hrng.1, ush_mem_one γ γ' hin]
+      exact ush_set_one_del γ
     · exact absurd heq hne
 
 /-! ## The body, as a law over the lines an era admits -/
