@@ -299,3 +299,12 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 ## R-pipes (landed Sept 29, with R-prog's UshCatFStage*) — parameters still taken
 - UPipesEng: UL MS HM SP SW HF US hps hudep hlic (SW only in ProofShSysWait; hudep only at uprogSGFree);
   I-init's UInitSh.sh_Rsh as `shRsh` + `hRsh` in sh_round_holds_union_closed.
+
+## I-init (landed Sept 29) — parameters still taken
+- HS : INIT_START (UInitKernelSlot; from initStart_holds / init_linked_ulib), SS : SH_START (UInitShSlot),
+  US : USER (file_gen_mint; now userProof), hlic (file_init_deps/file_gen_mint).
+- initElfLoadable / sh_elf_loadable (Rocq ElfLoadable.init_/sh_elf_loadable): R-prog landed Xv6/ElfLoadable
+  (§1 + cat/grep); add init/sh there.
+- KERNEL HAZARD (all lanes): intro'ing a proof-mode hyp whose head is the xv6 instance's unreduced post
+  (UexecSG.spostAt (self := uexecSGXv6) … / xv6Spost …) costs ~6 s/leaf and can deterministic-timeout;
+  read the post via a Lean-level entailment onto the continuation's premise (consOpen_post_pre pattern).

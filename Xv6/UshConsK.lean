@@ -39,14 +39,20 @@ unported, UkRunSys residuals) fed by `UConsOpen.cons_sup_console` /
 `cons_sup_absent` (unported: wait on UInitCons) and read back by
 `spost_at_open_elim_at` + `UInitCons.init_cons_recv`/`init_cons_open_fd`
 (console arm) or `UConsOpen.cons_open_dead_recv` (absent arm).  Those
-compositions are taken as the two fields `openConsoleCall` /
-`openAbsentCall` of `ShConsOpenCalls`, stated GENERICALLY over the caller's
-literal (its code image `ro`, the path's address `pv` and the path reading
-`hpath`, exactly the arguments Rocq's `cons_sup_*` take) so /init's twin
-can share them; their answers are the leaves' own three/two arms.  The
-record also carries lane I-init's `UInitCons.init_cons_laws` as a field
-(`initConsLaws`, with its persistence).  `UInitCons.init_cons_abs_law` is
-taken UNFOLDED (`init_cons_pin_law cons_absent T K`).
+compositions are the two fields `openConsoleCall` / `openAbsentCall` of
+`ShConsOpenCalls`, stated GENERICALLY over the caller's literal (its code
+image `ro`, the path's address `pv` and the path reading `hpath`, exactly
+the arguments Rocq's `cons_sup_*` take) so /init's twin shares them; their
+answers are the leaves' own three/two arms.  `openConsoleCall` takes the
+laws at ANY credential fact `Pv` (`UInitCons.initConsLawsAt echoFsPure
+(consMade r) Pv T K`), as Rocq's `cons_sup_console` does (/init's FLAG arm
+runs it at `Pv = consPresentAt i0`).  THE RECORD IS DISCHARGED at the
+kernel's instance by lane I-init: `UConsOpenCalls.shConsOpenCalls_holds UL :
+ShConsOpenCalls GF fscFs` (over the gaps lane's landed
+`wp_uk_ecall_open_recv_img_at` and `UConsOpenSup`'s suppliers); its former
+field `initConsLaws` (+ persistence) is `UInitCons.initConsLaws`.
+`UInitCons.init_cons_abs_law` is taken UNFOLDED (`init_cons_pin_law
+cons_absent T K`).
 
 ## Deviations from Rocq
 
@@ -72,6 +78,7 @@ import Xv6.UshMainStubs
 import Xv6.UStrImg
 import Xv6.AppEcho
 import Xv6.AppInv
+import Xv6.UInitCons
 
 namespace Xv6
 
@@ -171,26 +178,24 @@ end UshConsK
 the header): Rocq `wp_uk_ecall_open_recv_img_at` fed by `cons_sup_console`
 and read back by `spost_at_open_elim_at` + `init_cons_recv` +
 `init_cons_open_fd` (`openConsoleCall`); fed by `cons_sup_absent` and read
-back by `cons_open_dead_recv` (`openAbsentCall`); and lane I-init's
-`init_cons_laws` (`initConsLaws`).  Generic over the caller's literal: its
-code image `ro`, the path's address `pv` and the path reading. -/
+back by `cons_open_dead_recv` (`openAbsentCall`).  Generic over the
+caller's literal: its code image `ro`, the path's address `pv` and the path
+reading; the console arm at any credential fact `Pv`.  Discharged by
+`UConsOpenCalls.shConsOpenCalls_holds`. -/
 structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors) [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [DiskG GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) where
-  /-- Rocq `UInitCons.init_cons_laws` -/
-  initConsLaws : IProp GF → IProp GF → EchoNames → IProp GF
-  /-- Rocq `UInitCons.init_cons_laws_persistent` -/
-  initConsLaws_persistent : ∀ T K r, Persistent (initConsLaws T K r)
   /-- the open at the RESOLVING pin: the descriptor the ledger decided, open
   at the console device; or `-1` with the ledger back; or the taint -/
-  openConsoleCall : ∀ (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timeless T] (r : EchoNames) (i : Nat)
-    (ro : ElfMem) (pv : Nat),
+  openConsoleCall : ∀ (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timeless T] (Pv : Aview → Prop)
+    (r : EchoNames) (i : Nat) (ro : ElfMem) (pv : Nat),
     (∀ (E : ElfMem) (Mv : Nat → List (BitVec 8)), uimgSub ro E → imgAgrees E Mv → argPathOf Mv pv fnameConsole) →
-    ∀ (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat),
+    pv < 2 ^ 64 → ∀ (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat),
     UkSysP.usysno m = 15 → m.get 10#5 = BitVec.ofNat 64 pv → m.get 11#5 = BitVec.ofNat 64 2 →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ initConsLaws T K r -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗ ukCode N.t ro -∗
+    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗
+      ukCode N.t ro -∗
       uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
       ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64),
@@ -205,7 +210,7 @@ structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors) [MachGS hlc GF] 
   openAbsentCall : ∀ (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timeless T] [Persistent K] [Timeless K]
     (ro : ElfMem) (pv : Nat),
     (∀ (E : ElfMem) (Mv : Nat → List (BitVec 8)), uimgSub ro E → imgAgrees E Mv → argPathOf Mv pv fnameConsole) →
-    ∀ (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat),
+    pv < 2 ^ 64 → ∀ (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat),
     UkSysP.usysno m = 15 → m.get 10#5 = BitVec.ofNat 64 pv → m.get 11#5 = BitVec.ofNat 64 2 →
     (pc + 4#64) &&& 1#64 = 0#64 →
     ⊢ □ (∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜consAbsent v⌝ ∨ T)) -∗
@@ -238,9 +243,9 @@ theorem shOpen_regs (m : RegMap) (ha : m.get 10#5 = BitVec.ofNat 64 shConsPv ∧
 sh's console arm -- the laws and the flag, never the key. -/
 theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsOpenCalls (hlc := hlc) GF γfs)
     (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] [Timeless X.T] (K : IProp GF) (r : EchoNames) (i : Nat) :
-    ⊢ P.initConsLaws X.T K r -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗
+    ⊢ initConsLaws X.T K r -∗ consMade r i -∗ appInv (hlc := hlc) γfs -∗
       □ ushOpenConsoleLeaf (hlc := hlc) N X := by
-  haveI := P.initConsLaws_persistent X.T K r
+  unfold initConsLaws
   iintro #Hlaws #Hmade #Hinv
   imodintro
   unfold ushOpenConsoleLeaf
@@ -252,7 +257,7 @@ theorem sh_open_console_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShCons
   unfold stubRet
   obtain ⟨hn, ha0, ha1⟩ := shOpen_regs m ha
   -- 0xcc8  ecall: the receipt-keeping open at sh's own literal
-  iapply P.openConsoleCall N X.T K r i User.Sh.code.byte shConsPv shConsPath_of h1
+  iapply P.openConsoleCall N X.T K consAbsent r i User.Sh.code.byte shConsPv shConsPath_of (by decide) h1
     (ukWr m 17#5 (BitVec.ofInt 64 15)) _ l v avail hn ha0 ha1 (by rw [hpc]; decide)
     $$ Hlaws Hmade Hinv Hc Hi Hrun Hcwd Hstd
   rw [hpc]
@@ -280,7 +285,7 @@ theorem sh_open_absent_leaf_holds (UL : UK_LEAVES) (γfs : FsNames) (P : ShConsO
   unfold stubRet
   obtain ⟨hn, ha0, ha1⟩ := shOpen_regs m ha
   -- 0xcc8  ecall: the dead walk hands the credential back
-  iapply P.openAbsentCall N X.T K User.Sh.code.byte shConsPv shConsPath_of h1
+  iapply P.openAbsentCall N X.T K User.Sh.code.byte shConsPv shConsPath_of (by decide) h1
     (ukWr m 17#5 (BitVec.ofInt 64 15)) _ l v avail hn ha0 ha1 (by rw [hpc]; decide)
     $$ Habs Hinv Hc Hi Hrun Hcwd Hstd HK
   rw [hpc]
