@@ -36,6 +36,7 @@ CONE (UShURound S3): `uHchild_redir`.
 4. The payload `ushfWq (ushURoundCtx …) I` is `uredirWq … I` by `rfl`
    (`hpeq'`).
 -/
+import Xv6.UshOomPaid
 import Xv6.UshURoundRedirDiag
 import Xv6.UshURoundBody
 import Xv6.UshRedirChild
@@ -78,7 +79,7 @@ theorem uredir_genw (T : IProp GF) (N' : UkNames GF) (Q : IProp GF) (hpeq : N'.p
   iapply Hgen $$ %Q %W HT Hmy Hk
 
 /-- THE WALK, the deed and the line's witness open (deviation 3). -/
-theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : USH_MEMSET) (HM : SH_MALLOC)
+theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP : SH_PANIC) (MS : USH_MEMSET) (HM : SH_MALLOC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
@@ -119,7 +120,7 @@ theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : US
   have hbase : ushmBase + 16 ≤ sz := by
     have e : ushmBase + 16 = 8344 := rfl
     omega
-  iintro #Hlk #Hdep #Hslot #Hmade #Hinv #Hpin' #Hcs #Hty #Hfl Hcode Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM Hc Hd
+  iintro #Hlk #Hdep #Hslot #Hmade #Hinv #Hpin' #Hcs #Hty #Hfl #Hcode Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM Hc Hd
     Hrun
   iapply wp_kshm_child_file_redir (A := Unit) UL HS HF (shParsecmd_linked UL MS) (shRuncmd_linked UL) HM
     (shRuncmdExec_linked UL) hps N' (hc := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)) h m dw dv sa len ws
@@ -145,17 +146,22 @@ theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : US
       $$ Hlk Hpin' Hcs Hty Hfl
   · imodintro
     iintro H
-    iright
     iexact H
   · -- open failed
     iapply uredir_openfail_law ug r s0 PT PD UL I ws file v' cs ls s hfile hin hokws hul htie hpos
       $$ Hlk Hpin' Hcs Hty Hfl
   · imodintro
     iintro H
-    iright
     iexact H
-  · -- the child died before the open: the lend, whole
-    iapply uredir_died ug r s0 PT PD I cs s v' ls htie hnw hall $$ Hpin' Hcs Hty Hfl
+  · -- the parse ran out of memory: "out of memory", the deed as found (the
+    -- parse precedes the open; DRIFT SY1, Rocq 7adb0cba2)
+    have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
+    iapply ushp_oom_of_diag SP N' _ _ ld (4 + (ushDg + n) - 2) (by omega) hfd2 $$ [] [] Hcode
+    · iapply uoom_law_deed ug r s0 PT PD UL I cs s v' hnw htie hpos $$ Hlk Hty Hpin' Hcs
+    · imodintro
+      iintro H
+      simp only [hpeq]
+      iexact H
   · iintro ⟨Hc, Hd⟩
     isplitl [Hd]
     · iexact Hd
@@ -166,7 +172,7 @@ theorem uredir_walk (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : US
 
 /-- **Rocq `uHchild_redir`**: THE REDIRECT CHILD'S LAW, at the union round's
 shell context (deviations 1-4). -/
-theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : USH_MEMSET) (HM : SH_MALLOC)
+theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP : SH_PANIC) (MS : USH_MEMSET) (HM : SH_MALLOC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF))
     (γp : GName)
@@ -221,7 +227,7 @@ theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (MS : 
     icases Hwit with ((%hnil | ⟨%ls, #Hfl, %hall⟩) | #HT)
     · have hf : False := by rw [hnil] at hinl; simp at hinl
       exact hf.elim
-    · iapply uredir_walk ug r s0 PT PD UL HS HF MS HM hps hlic heq hkill N' h m dw dv sa len ws file fb sz ld n
+    · iapply uredir_walk ug r s0 PT PD UL HS HF SP MS HM hps hlic heq hkill N' h m dw dv sa len ws file fb sz ld n
         I jo cs s v' ls hpeq' hs1 hline hfile hs0 hs64 hs38 hszlo hszal hszok hrows hul hpos htie (hall _ hinl)
         hall $$ Hlk Hdep Hslot Hmade Hinv Hpin' Hcs Hty Hfl Hcode Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM Hc Hd Hrun
     · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c) _ (by decide)

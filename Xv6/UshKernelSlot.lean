@@ -24,7 +24,7 @@ the argument block (`hroom`).
    `start` is `SpecShStart`/`ProofShStart`, and this file is not a `Link`).
 2. **The section context is `UshMainDefs.UshCtx`** (`X`: Rocq's `γp`, `T`,
    `Wc`, `Wb`, `Pm`).  The seven Coq-level laws Rocq passes one by one
-   (`Hwc`, `Hwbwc`, `Hwbl`, `Hwbr` unguarded; `Hpm1`, `Hpm3`, `Hpmwb`
+   (`Hwc`, `Hwbwc`, `Hwbr` unguarded -- `Hwbl` gone, DRIFT SY1; `Hpm1`, `Hpm3`, `Hpmwb`
    guarded by the payload equation) are ONE guarded record
    `HL : ∀ N, N.pay = Q → UshLaws N X` (UshMainDefs deviation 1; the
    unguarded four are simply available at every guarded `N`).  The three

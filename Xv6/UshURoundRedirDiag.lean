@@ -219,36 +219,6 @@ theorem uredir_openfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordlin
       · iexact Hc
       · iexact HT
 
-/-- The child DIED before the open: the lend, whole (Rocq's last law
-bullet). -/
-theorem uredir_died (I : List (BitVec 8)) (cs : List Nat) (s : Dst) (v' : EraPins) (ls : List Fwline)
-    (htie : upreTie cs s0 I (dstContent s)) (hnw : uwild (ul I) = false)
-    (hall : ∀ w, w ∈ echofLinesIn I → w ∈ ls) :
-    ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
-      fTyped ug.ugnFile.fgnCl s -∗ flLb ug.ugnFile.fgnCl ls -∗
-      □ (iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) -∗ uredirWq (hlc := hlc) ug r s0 PT PD I) := by
-  have h3 : uWcf (hlc := hlc) (GF := GF) ug r s0 I 3 =
-      iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ ushPreAt (hlc := hlc) ug r s0 I) := uWcf_S3 ug r s0 I 0
-  iintro #Hpin' #Hcs #Hty #Hfl
-  imodintro
-  iintro ⟨Hc, Hd⟩
-  iright
-  iapply uWcu_of ug r s0 PT PD I 0
-  iapply uHwbl_f ug r s0 I
-  rw [h3]
-  isplitl [Hc]
-  · iexact Hc
-  unfold ushPreAt
-  isplitl [Hd]
-  · iapply ushDeed_intro ug r upreTie s0 I cs s v' htie hnw $$ Hd Hty Hpin' Hcs
-  · unfold ulineWit flw
-    ileft
-    iright
-    iexists ls
-    isplitr
-    · iexact Hfl
-    · ipureintro; exact hall
-
 end UShURoundRedirDiag
 
 end Xv6

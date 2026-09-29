@@ -120,17 +120,17 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
     from rfl]
   iintro #Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc ⟨%v, #Hp⟩ #Hmade
   ihave #Hkl := ush_kill_law_u ug r s0 (uptermShape ug) (updoneShape ug) hkill v (Xu (hlc := hlc) (GF := GF) ug r s0 γp) rfl $$ Hp
-  ihave #Hchl := ush_child_law_union E.UL E.HF E.SC E.hps E.hlic ug r s0 (uptermShape ug) (updoneShape ug) γp heq hcons hkill
+  ihave #Hchl := ush_child_law_union E.UL E.HF E.SP E.SC E.hps E.hlic ug r s0 (uptermShape ug) (updoneShape ug) γp heq hcons hkill
     $$ Hlk Hdep Hslot Hmade
-  ihave #Hred := uHchild_redir ug r s0 (uptermShape ug) (updoneShape ug) E.UL E.HS E.HF E.MS E.HM E.hps E.hlic γp heq hkill
+  ihave #Hred := uHchild_redir ug r s0 (uptermShape ug) (updoneShape ug) E.UL E.HS E.HF E.SP E.MS E.HM E.hps E.hlic γp heq hkill
     $$ Hlk Hdep Hslot Hmade
-  ihave #Hcatl := uHchild_cat ug r s0 (uptermShape ug) (updoneShape ug) E.UL E.HF E.hent E.SC E.hps E.hlic heq hcons hkill γp
+  ihave #Hcatl := uHchild_cat ug r s0 (uptermShape ug) (updoneShape ug) E.UL E.HF E.SP E.hent E.SC E.hps E.hlic heq hcons hkill γp
     $$ Hlk Hdep Hcat Hmade
-  ihave #Hsecl := uHchild_secc E.UL E.HF E.SC E.US E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hwild hrdw hkill hcons
+  ihave #Hsecl := uHchild_secc E.UL E.HF E.SP E.SC E.US E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hwild hrdw hkill hcons
     $$ Hdep Hsecc
   ihave #Hplaw := uHpanic ug r s0 (uptermShape ug) (updoneShape ug) E.UL $$ Hlk
-  ihave #Hche := upipes_child_law_echo E ug r s0 γp heq hcons hkill $$ Hslot Hcat Hgrep
-  ihave #Hchc := upipes_child_law_catf E ug r s0 γp heq hcons hkill $$ Hslot Hcat Hgrep Hmade
+  ihave #Hche := upipes_child_law_echo E ug r s0 γp heq hcons hkill $$ Hlk Hslot Hcat Hgrep
+  ihave #Hchc := upipes_child_law_catf E ug r s0 γp heq hcons hkill $$ Hlk Hslot Hcat Hgrep Hmade
   unfold ushRestLAt
   iintro !> %l %hc
   haveI := hc

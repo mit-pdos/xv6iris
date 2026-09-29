@@ -20,6 +20,7 @@ the loan `True`.
 3. The casts between the node law's projections (`D.FAM`, `D.T`, …) and the
    union's names are `.rfl` lemmas (`UshUPipesKit`), applied as `ihave`s.
 -/
+import Xv6.UshOomPaid
 import Xv6.UshUPipesKit
 import Xv6.PipesCutMain
 
@@ -60,12 +61,13 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
     (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :
-    ⊢ shEchoSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
+    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
+      shEchoSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       shGrepSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
       ushfChildLawAt (hlc := hlc) (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushDg pipesLpg (68 + ushDpipe) := by
   unfold ushfChildLawAt
-  iintro #Hes #Hcs #Hgs
+  iintro #Hlk #Hes #Hcs #Hgs
   imodintro
   iintro %N' %h %m %dw %dv %sa %len %wsf %gb %sz %ld %nn %I %hpeq %hs1 %hlp %hlws %hfbk %hs0 %hs64 %hs38 %hszlo
     %hszal %hszok %hrows #Hcode #Hjt Hstr Hws Hsy Hstd Hcwd Hch Hpid HM Hcp Hrun
@@ -73,7 +75,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   obtain ⟨ws, fs, hwsf, hlat⟩ := hlp
   obtain ⟨hok_u, hlen, hby⟩ := id hlat
   obtain ⟨hok, hn, hF, -⟩ := id hok_u
-  have hn16 := upls_fs_le (.PrEcho ws) fs hok_u
+  have hn16 := upls_fs_le15 (.PrEcho ws) fs hok_u
   have hlws' : lastWs I = ulineWs (.LPipe (.PrEcho ws) fs) := by rw [← hlws]; exact hwsf
   have hul := ul_pipe ul (fun _ => rfl) I (.PrEcho ws) fs hfbk hok_u hlws'
   have hpos := unlines_pos I (.PrEcho ws) fs hok hlws'
@@ -81,6 +83,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   obtain ⟨hfd0c, hfd1p, hfd2p⟩ := hrows
   ihave ⟨%hlen3, Hstd⟩ := BI.persistent_entails_right (ustd_len N'.fd ld) $$ Hstd
   have hnone := pls_fdLowest_none ld hlen3 hfd0c hfd1p hfd2p
+  have hfd2u := hfd2p
   obtain ⟨wr0, hl0⟩ := hfd0c
   obtain ⟨rb1, hl1⟩ := hfd1p
   obtain ⟨rb2, hl2⟩ := hfd2p
@@ -102,15 +105,23 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   iapply wp_ushChildPipesG E.UL E.SPc N' (ushqUm N' sz) 340
     (ushq_um_chain E.HM E.hps N' sz (by have h8 : ushmBase + 16 ≤ 8344 := (by decide); omega) hszal hszok)
     h m dw dv sa len gb (wlToks ws) (uRT ws (F :: fs')) 0 (96 + nn - 6 * (fs'.length + 1))
-    ((Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
-    $$ Hcode Hstr Hws Hsy HM Hcp [] Hrun
-  · imodintro
-    iintro H
-    rw [hpeq]
-    unfold ushfWq
-    ileft
-    iexact H
-  iintro %h' %m' %q %ha0' #Hcmd - - HM3 Hcp Hrun
+    iprop((Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3 ∗ ustd N'.fd ld) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
+    $$ Hcode Hstr Hws Hsy HM [Hcp Hstd] [] Hrun
+  · isplitl [Hcp]
+    · iexact Hcp
+    · iexact Hstd
+  · -- the parse ran out of memory: "out of memory" on the lend (DRIFT SY1,
+    -- Rocq 7adb0cba2)
+    iapply ushp_oom_of_diag E.SP N' _ _ ld _ (by unfold ushDg; omega) hfd2u $$ [] [] Hcode
+    · rw [Xu_Wc]
+      iapply uHoom ug r s0 (uptermShape ug) (updoneShape ug) E.UL I (by rw [hul]; rfl) hpos $$ Hlk
+    · imodintro
+      iintro H
+      rw [hpeq]
+      dsimp only [ushfWq]
+      rw [Xu_Wc]
+      iexact H
+  iintro %h' %m' %q %ha0' #Hcmd - - HM3 ⟨Hcp, Hstd⟩ Hrun
   ihave Hsz := uup_um_usz N' sz (uRT ws (F :: fs')).length $$ HM3
   -- THE LEND AND THE DEED, opened (or the taint)
   have hnw : uwild (ul I) = false := by rw [hul]; rfl

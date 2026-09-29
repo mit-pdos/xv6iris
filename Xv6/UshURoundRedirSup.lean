@@ -64,7 +64,7 @@ variable (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 
 /-- The round's payload at `I` (deviation 2: `UkShFork.ushf_wq Wcu I`). -/
 noncomputable abbrev uredirWq (I : List (BitVec 8)) : IProp GF :=
-  iprop(uWcu (hlc := hlc) ug r s0 PT PD I 3 ∨ uWcu (hlc := hlc) ug r s0 PT PD I 0)
+  uWcu (hlc := hlc) ug r s0 PT PD I 0
 
 /-- The converse of `uHktaint` (Rocq's `rewrite Hkill` in place). -/
 theorem uHktaint_inv
@@ -85,7 +85,6 @@ theorem uredir_killq
   imodintro
   iintro #Hk
   ihave #HT := uHktaint ug hkill $$ Hk
-  iright
   iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin HT
 
 /-- ...and so does the taint. -/
@@ -95,7 +94,6 @@ theorem uredir_taintq (I : List (BitVec 8)) (v : EraPins) :
   iintro #Hpin
   imodintro
   iintro #HT
-  iright
   iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin HT
 
 /-- Deviation 4: the fired cursor at the empty selection. -/
@@ -127,11 +125,9 @@ theorem uredir_exit_pay (I : List (BitVec 8)) (ws : Wordline) (nm : Fname) (i : 
   unfold efExit efq fileCur
   icases Hx with ⟨Hc, %sel, Hcur⟩
   icases Hcur with (⟨Hq, -⟩ | ⟨#HT, -⟩)
-  · iright
-    iapply uWcu_of ug r s0 PT PD I 0
+  · iapply uWcu_of ug r s0 PT PD I 0
     iapply uredir_ran_exit ug r s0 I ws nm i sel v' cs sp hu hul htp hlen hpos $$ Hc Hpin' Hcs Hty Hq
-  · iright
-    iapply uWcu_taint ug r s0 PT PD I 0 v' $$ Hpin' HT
+  · iapply uWcu_taint ug r s0 PT PD I 0 v' $$ Hpin' HT
 
 /-- THE ENTRY AT ONE IMAGE (deviation 1): the receipt read, the union's
 redirect entry at `f`'s inode. -/

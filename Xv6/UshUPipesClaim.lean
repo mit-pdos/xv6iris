@@ -33,7 +33,7 @@ pc0 RT GS STG REST PWC Pm` are spelled out, or are the abbreviations below.
    `wild`.  R-round's declarations are its LANDED ones (3660681e5:
    `UshURoundTies/Defs/Wide/Shapes/Pure/Body/Echo/Cat/Redir/Secc`, root
    namespace `Xv6`: `ul ust upreTie uWcl ushDeedAt ushPreAt uWcf uWcf_S3
-   ucs_lb_agree_len uWcu uWcu_3_nw uWcu_taint uHwbl_u uHpanic ush_kill_law_u
+   ucs_lb_agree_len uWcu uWcu_3_nw uWcu_taint uHoom uHpanic ush_kill_law_u
    uptermShape updoneShape ushLinePipeU ushLineUpipe ushLineUnion
    ushRdwildOfShape ush_child_law_union uHchild_redir uHchild_cat
    uHchild_secc ushq_body_law_union`); the union's sh record is R-round's

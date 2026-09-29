@@ -264,8 +264,7 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
       · iapply usecc_execfail_law UL ug hcons I
       · imodintro
         iintro -
-        rw [hpeq]
-        beta_reduce
+        simp only [hpeq]
         iapply uWcu_wild ug r s0 PT PD I 0 $$ Hsh
     · iapply usecc_execfail_law UL ug hcons I
     · imodintro

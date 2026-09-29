@@ -21,7 +21,7 @@ CONE (UShURoundDefs S1-S2, reached): `uWcl`, `uWbl`, `uWcl_timeless`,
 `uWbf_timeless`, `ush_done_head`, `uHcltaint`, `uWcf_taint`,
 `ucs_lb_prefix_len`, `ucs_lb_agree_len`, `union_X_at_nopipe`, `uWcl3_close`,
 `uWcf0_of_pre_line_id`, `uWcf0_of_posts_alt`, `uWcf0_of_post_alt`,
-`uHwbl_f`, `uHwbwc_f`, `ush_done_of_pre_ban`.  Unreached, NOT ported as
+`uWcf0_of_post_pre_id`, `uHwbwc_f`, `ush_done_of_pre_ban` (DRIFT SY1: `uHwbl_f` gone).  Unreached, NOT ported as
 top-level instances: `uhd_T_pers0`, `uhd_T_tl0` (Lean's `fileTaint` has its
 instances), `uline_wit_persistent`/`_timeless`, `useccomp_shape_persistent`,
 `uWcf_timeless`'s `tl_leaf` tactic (the instances are by `infer_instance`);
