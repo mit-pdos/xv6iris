@@ -1456,7 +1456,7 @@ Section ProofWalk.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (wi_42 with "Htext"). }
-        iIntros (CIDb6' Hsb6'). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDb6' Hsb6') "_". iNext. iIntros "Hcg Hpc".
         assert (Hbk26 : add_vec (mword_of_int (KernelSyms.walk + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (KernelSyms.walk + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk26) in "Hpc".
         assert (Hchainb2 : b = false \/ p = zero_reg -> (CIDb6' : CPU) = (CID : CPU)) by wp_next_chain.
@@ -1650,7 +1650,7 @@ Section ProofWalk.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wi_42 with "Htext"). }
-          iIntros (CIDc2' Hsc2'). iNext. iIntros "Hcg Hpc".
+          iIntros (CIDc2' Hsc2') "_". iNext. iIntros "Hcg Hpc".
           assert (Hbk26 : add_vec (mword_of_int (KernelSyms.walk + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (KernelSyms.walk + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hbk26) in "Hpc".
           assert (Hchainc2 : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CID : CPU)) by wp_next_chain.

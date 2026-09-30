@@ -251,8 +251,8 @@ Lemma kfork_cont_ev `{!riscvGS Σ, FSC : fscfg}
          (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
        mWP (Loop : expr riscv_lang))%I).
 Proof.
-  iIntros (Hk) "H". iIntros (CID Hs) "_". iIntros (mr) "Hcs Hpc Hpost".
-  iApply ("H" $! CID Hs mr with "Hcs Hpc [Hpost]").
+  iIntros (Hk) "H". iIntros (CID Hs) "Hlc". iIntros (mr) "Hcs Hpc Hpost".
+  iSpecialize ("H" $! CID Hs with "Hlc"). iApply ("H" $! mr with "Hcs Hpc [Hpost]").
   iApply (kfork_post_ev kp with "Hpost"). exact Hk.
 Qed.
 

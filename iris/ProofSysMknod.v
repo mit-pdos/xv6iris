@@ -2534,10 +2534,10 @@ Section MknodStableWp.
         + (* the child's legs go down unenriched: they name an inum, not a
              run *)
           iExact "Hchild". }
-    iIntros (CID' Hch mf ns' P' kA)
+    iIntros (CID' Hch) "Hlc". iIntros (mf ns' P' kA)
       "%Hcs %Hupt %HkA Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs Hsbb
        %Hns Hiref Hpriv Harms".
-    iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hch |].
+    iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hch |].
     iApply ("Hcont" $! mf ns' P' kA
               with "[%] [%] [%] Hcg Hown Htcsr Hclaim Hpc Hbsl Hsbn Hsbi Hsbs
                     Hsbb [%] Hiref Hpriv [Harms]").

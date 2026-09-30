@@ -3683,7 +3683,7 @@ Section KexecCLoop.
                   (mword_of_int 8 : mword 12) U2 (K - 68)%nat eb
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
         { iApply (kxc_25a with "Htext"). }
-        iIntros (CID26' Hs26') "Hcg Hpc".
+        iIntros (CID26' Hs26') "_ Hcg Hpc".
         pose (U3 := <[Regidx Ra5 := regval_into_reg
                       (add_vec (rget U2 Rs10) (sign_extend' 64 (mword_of_int 8 : mword 12)))]> U2).
         assert (HU3a5 : U3 !!! Regidx Ra5 = pa_add av (8 * S c)).
@@ -3734,7 +3734,7 @@ Section KexecCLoop.
                   (mword_of_int 3584 : mword 12) U3 (K - 68)%nat (pa_add av (8 * c)) eb
                   with "Hcg Hpc [] Hf64").
         { iApply (kxc_25e with "Htext"). }
-        iIntros (CID27' Hs27') "Hcg Hpc Hf64".
+        iIntros (CID27' Hs27') "_ Hcg Hpc Hf64".
         iEval (rewrite Hargvslot260) in "Hf64".
         iEval (rewrite (rget_ne (CID := CID26') U3 Ra5 ltac:(nz)) HU3a5) in "Hf64".
         assert (Hpp262 : add_vec_int (mword_of_int (KXC + 0x25e) : mword 64) 4
@@ -3761,7 +3761,7 @@ Section KexecCLoop.
                   (mword_of_int 8 : mword 12) U3 (K - 68)%nat (avf (S c)) eb
                   (dqm := dqa) ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Han").
         { iApply (kxc_262 with "Htext"). }
-        iIntros (CID28' Hs28') "Hcg Hpc Han". iEval (rewrite Hnextaddr) in "Han".
+        iIntros (CID28' Hs28') "_ Hcg Hpc Han". iEval (rewrite Hnextaddr) in "Han".
         iDestruct ("Hargvback2" with "Han") as "Hargv".
         pose (U4 := <[Regidx Ra0 := regval_into_reg (avf (S c))]> U3).
         assert (HU4a0 : U4 !!! Regidx Ra0 = avf (S c)) by (rewrite /U4; apply upd_eq).

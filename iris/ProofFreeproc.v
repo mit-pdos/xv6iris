@@ -1253,8 +1253,8 @@ Section ProofFreeproc.
     iApply (wp_freeproc_led_sconf γp γa mm j γl V g pid st ch opt otf K eb pme ilvl lks kev
               HK Hj Hilvl Ha0 Hbelow_pid
               with "Hcg Hcpu Htext Hpc Hplk Hheld Hrest Hrow Hsg Hpr Hxb Hpg Htf Henv Hlend").
-    rewrite /wp_next. iIntros (CID' Hs mr) "Hcg Hcpu Hlend Hpc %Hcs _".
-    iApply ("Hcont" $! CID' Hs mr with "Hcg Hcpu Hlend Hpc [%]"); exact Hcs.
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mr) "Hcg Hcpu Hlend Hpc %Hcs _".
+    iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mr with "Hcg Hcpu Hlend Hpc [%]"); exact Hcs.
   Qed.
 
 End ProofFreeproc.

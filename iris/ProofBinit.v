@@ -780,8 +780,8 @@ Section ProofBinit.
               bcache_lru bhead (blist 0 NBUF) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hlock Hcpu]" as "Hpost".
-    { iIntros (CID' Hs' mr) "Hcg Hpc %Hcs Hfresh Hlru".
-      iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hs'|].
+    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hfresh Hlru".
+      iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh Hlru"). }
     (* the loop-setup instructions have each moved the hart; re-anchor
        [Hpost] to the loop's own entry hart [CID26] before entering it. *)

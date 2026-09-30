@@ -1365,7 +1365,7 @@ Section CwBodies.
                   ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cnwi_52 with "Ht"). }
-        iIntros (CIDca' Hsca') "Hcg Hpc".
+        iIntros (CIDca' Hsca') "_ Hcg Hpc".
         set (D2b := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> D2).
         change (<[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> D2) with D2b.
         assert (P54 : add_vec_int (mword_of_int (CW + 0x52) : mword 64) 2

@@ -627,8 +627,8 @@ Section ProofSysUptime.
     iIntros "Hcg Hcnt Htext Hpc Hlock Hcont".
     iApply (wp_sys_uptime_led_sconf γl m n eb p av b lks Hn Hav Hfresh
               with "Hcg Hcnt Htext Hpc Hlock").
-    rewrite /wp_next. iIntros (CID' Hs mf t) "%Hpost _".
-    iApply ("Hcont" $! CID' Hs mf t with "[%]"); exact Hpost.
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mf t) "%Hpost _".
+    iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mf t with "[%]"); exact Hpost.
   Qed.
 
 End ProofSysUptime.

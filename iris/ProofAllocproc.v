@@ -3450,7 +3450,7 @@ Section ProofAllocproc.
               HK Hlvl Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
     iIntros (CIDx Hsx) "Hlc". iIntros (mr) "%Hcs Hpc Hlend Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hlc Hpc Hlend [Hpost]"); [exact Hcs|].
+    iSpecialize ("Hcont" $! CIDx Hsx with "Hlc"). iApply ("Hcont" $! mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 
@@ -3519,7 +3519,7 @@ Section SealAllocproc.
               HK Hlvl Hex Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav Hlend").
     iIntros (CIDx Hsx) "Hlc". iIntros (mr) "%Hcs Hpc Hlend Hpost".
-    iApply ("Hcont" $! CIDx Hsx mr with "[%] Hlc Hpc Hlend [Hpost]"); [exact Hcs|].
+    iSpecialize ("Hcont" $! CIDx Hsx with "Hlc"). iApply ("Hcont" $! mr with "[%] Hpc Hlend [Hpost]"); [exact Hcs|].
     by iApply allocproc_post_led_post.
   Qed.
 

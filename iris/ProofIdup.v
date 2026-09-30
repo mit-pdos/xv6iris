@@ -1018,8 +1018,8 @@ Section ProofIdup.
               with "Hcg Hcnt Htext Hpc Hlock Hinv Hrinv Hislot Hshr Hru
                     [Hcont Hkeep]").
     iEval (rewrite /wp_next).
-    iIntros (CID') "%Hq".
-    iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
+    iIntros (CID') "%Hq Hlc".
+    iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hq |].
     iIntros (mr) "Hcg Hcnt Hpc %Hpost Hshr (%qn & Hnew) Hru Hru2".
     (* THE GATHER: the share comes back at the fraction it left at, so the
        caller's package closes at the fraction it came in with. *)

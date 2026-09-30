@@ -1141,7 +1141,7 @@ Section ProofCopyin.
                                 | (rewrite Hcmp; apply Nat.eqb_neq; exact Hmore) ])
                     with "Hcg Hpc []").
           { iApply (cii_56 with "Htext"). }
-          iIntros (CIDg4' Hsg4') "Hcg Hpc".
+          iIntros (CIDg4' Hsg4') "_ Hcg Hpc".
           assert (Hp5a : add_vec_int (mword_of_int (KernelSyms.copyin + 0x56) : mword 64) 4
                          = mword_of_int (KernelSyms.copyin + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp5a) in "Hpc".
@@ -1437,7 +1437,7 @@ Section ProofCopyin.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (cii_6e with "Htext"). }
-    iIntros (CIDv3' Hsv3') "Hcg Hpc".
+    iIntros (CIDv3' Hsv3') "_ Hcg Hpc".
     set (V4 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget V3 Rs7))]> V3).
     assert (Hp70 : add_vec_int (mword_of_int (KernelSyms.copyin + 0x6e) : mword 64) 2
                    = mword_of_int (KernelSyms.copyin + 0x70)) by (apply bv_eq; vm_compute; reflexivity).

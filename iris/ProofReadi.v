@@ -2635,8 +2635,8 @@ Section ReadiMain.
       rewrite /rd_cont.
       iIntros (CIDq Hq) "Hlc". iIntros (mf tot P' kv) "%Hcs %Hext %Hkv %Htot %Harm Hcg Hcnt Hextc Hextm Hpc
                                       Hidev Hmeta Hmap Hblocks Hdst Hsl".
-      iApply ("Hcont" $! CIDq Hq mf tot P'
-                with "[%] Hlc [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks
+      iSpecialize ("Hcont" $! CIDq Hq with "Hlc"). iApply ("Hcont" $! mf tot P'
+                with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks
                       [Hdst] Hsl").
       { exact Hcs. } { exact Hext. } { exact Htot. } { exact Harm. }
       rewrite /rd_dst /rd_img. destruct user.

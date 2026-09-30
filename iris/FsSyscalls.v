@@ -396,12 +396,12 @@ Module FsSysMkdir (M : SYSMKDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iApply (SpecSysMkdir.mkdir_au_at_unit with "Hsup"). }
-    iIntros (CIDn) "%Hgd _".
+    iIntros (CIDn) "%Hgd Hlc".
     iIntros (mf ns' P' kev)
       "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret _".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
-                 with "Hcont") as "Hcont".
+                 with "Hcont Hlc") as "Hcont".
     iApply ("Hcont" $! mf ns' P' kev
               with "[%] [%] [%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpriv").
@@ -566,13 +566,13 @@ Module FsSysChdir (M : SYSCHDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iApply fsabs_chdir_pre. }
-    iIntros (CIDn) "%Hgd _".
+    iIntros (CIDn) "%Hgd Hlc".
     iIntros (mf P' kev)
       "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Harms".
     (* THE BRIDGE, once: the arms imply the blanket the friendly post is. *)
     iDestruct (chdir_arms_landed with "Harms") as "Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
-                 with "Hcont") as "Hcont".
+                 with "Hcont Hlc") as "Hcont".
     iApply ("Hcont" $! mf P' kev
               with "[%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpost").

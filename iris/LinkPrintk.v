@@ -64,8 +64,8 @@ Module PrintkGen : PRINTK_GEN.
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
               with "Hcap Hcpu Htext Hkdata Hpc Hfmt Hdescs Hprlk Hpre").
     all: try lkbelow.
-    iIntros (CID2 Hpin) "_".
-    iDestruct ("Hcont" $! CID2 Hpin) as "Hcont2".
+    iIntros (CID2 Hpin) "Hlc".
+    iDestruct ("Hcont" $! CID2 Hpin with "Hlc") as "Hcont2".
     iIntros (mf) "Hcap2 Hcpu2 Hpc2 %Hpost Hfmt2 Hdescs2".
     iApply ("Hcont2" $! mf with "Hcap2 Hpc2 [%] Hcpu2 Hfmt2 Hdescs2").
     { destruct Hpost as (Hcs & Hra & _). done. }

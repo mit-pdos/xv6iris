@@ -3381,8 +3381,8 @@ Section IallocMain.
                     Hsbn Hsbi Hireg Hiopen Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
                     Hitb2 Hitbl Hesc Hiref HopS Htxc [Hcont Htx]").
     all: try lkbelow.
-    iIntros (CID') "%Hq".
-    iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hq |].
+    iIntros (CID') "%Hq Hlc".
+    iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hq |].
     iIntros (mf alloc kslot q inum dn') "%Hcs Hcg Hcnt Hpc Hsbn Hsbi Hppid
               Hsl Harm".
     iApply ("Hcont" $! mf alloc kslot q inum dn'

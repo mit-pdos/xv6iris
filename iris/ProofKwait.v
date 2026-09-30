@@ -4164,8 +4164,8 @@ Section ProofKwaitMain.
     iApply (wp_kwait_led_sconf γa γp γf γw γs j γl m av eb b pid U lks cs
               Hj Hgl Hav Heb Hbelow
               with "Hcg Hown Htext Hpc Hpinv Hlk Henv Hplk Hpriv Hmyrow Hipis").
-    rewrite /wp_next. iIntros (CID' Hs mf P' rv d xw cs' k') "%Hr %Hext %Hd %Hnull %Hfull Hans".
-    iApply ("Hcont" $! CID' Hs mf P' rv d xw cs' k' with "[%] [%] [%] [%] [%] [Hans]");
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mf P' rv d xw cs' k') "%Hr %Hext %Hd %Hnull %Hfull Hans".
+    iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mf P' rv d xw cs' k' with "[%] [%] [%] [%] [%] [Hans]");
       [ exact Hr | exact Hext | exact Hd | exact Hnull | exact Hfull | ].
     iApply (wait_ans_led_post with "Hans").
   Qed.

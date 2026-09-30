@@ -854,8 +854,8 @@ Section ProofKalloc.
     iIntros "Hcg Hcnt Htext Hpc Hlock Havail Hcont".
     iApply (wp_kalloc_led_sconf γl γk fl m on n eb p K b lks HK Hfl Hn Hfresh
               with "Hcg Hcnt Htext Hpc Hlock Havail").
-    rewrite /wp_next. iIntros (CID' Hs mr) "Hcg Hcnt Hpc %Hcs Hpost".
-    iApply ("Hcont" $! CID' Hs mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpost".
+    iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
     by iApply kalloc_post_led_post.
   Qed.
 

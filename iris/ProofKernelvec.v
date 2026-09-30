@@ -1719,7 +1719,7 @@ Section KernelvecHandler.
     all: try lkbelow.
     { iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
-    iIntros (CIDn Hsn) "_". iIntros (mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
+    iIntros (CIDn Hsn) "Hlc". iIntros (mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
     assert (Hret : ret_pc (kv_m2 (tp_pin m) !!! Regidx (mword_of_int 1 : mword 5))
                    = (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. rewrite upd_eq. unfold ret_pc, regval_into_reg.
@@ -1886,7 +1886,7 @@ Section KernelvecHandler.
     { iApply (kv_i38 with "Htext"). }
     iIntros "Hcg Hpc".
     (* ---- and the post is the engine's own precondition, at THIS hart ---- *)
-    iDestruct (wp_next_at true p _ CIDn Hsn with "Hnext") as "Hnext".
+    iDestruct (wp_next_at true p _ CIDn Hsn with "Hnext Hlc") as "Hnext".
     iEval (rewrite /ihs_post_of) in "Hnext".
     iEval (rewrite Hpc0) in "Hpc".
     iApply ("Hnext" with "[Hcg] Hpc").

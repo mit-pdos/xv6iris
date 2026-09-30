@@ -856,8 +856,8 @@ Section ProofIinit.
               ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hlock Hcpu]" as "Hpost".
-    { iIntros (CID' Hs' mr) "Hcg Hpc %Hcs Hfresh".
-      iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hs'|].
+    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hfresh".
+      iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh"). }
     (* the loop is entered at the hart the loop-setup leaves migrated to
        (CID19); [Hpost] is still anchored at wp_iinit_sconf's own entry

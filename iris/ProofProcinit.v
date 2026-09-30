@@ -1534,8 +1534,8 @@ Section ProofProcinit.
               ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpidfresh Hwaitfresh]" as "Hpost".
-    { iIntros (CID' Hs' mr) "Hcg Hpc %Hcs Hready".
-      iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hs'|].
+    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hready".
+      iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hpidfresh Hwaitfresh Hready"). }
     (* enter the loop at cursor 0 with NPROC units of fuel, at the hart the
        loop-setup leaves migrated to; [Hpost] is still anchored at
