@@ -546,7 +546,7 @@ Section ProofScheduler.
               ltac:(lia) Hpush with "Hcg Hpc []").
     { iApply (schi_00 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hframe Hpc".
+    iIntros "_ Hcg Hframe Hpc".
     set (A0 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))))]> m).
@@ -596,7 +596,7 @@ Section ProofScheduler.
     { iApply (schi_02 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb1). iExact "Hf1". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
@@ -606,7 +606,7 @@ Section ProofScheduler.
     { iApply (schi_04 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb2). iExact "Hf2". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x06))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
@@ -616,7 +616,7 @@ Section ProofScheduler.
     { iApply (schi_06 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb3). iExact "Hf3". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc08 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x08))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc08) in "Hpc".
@@ -626,7 +626,7 @@ Section ProofScheduler.
     { iApply (schi_08 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb4). iExact "Hf4". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc0a : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x0a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0a) in "Hpc".
@@ -636,7 +636,7 @@ Section ProofScheduler.
     { iApply (schi_0a with "Htext"). }
     { iEval (rewrite HcspA0 -Hb5). iExact "Hf5". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc0c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x0c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
@@ -646,7 +646,7 @@ Section ProofScheduler.
     { iApply (schi_0c with "Htext"). }
     { iEval (rewrite HcspA0 -Hb6). iExact "Hf6". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc0e : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x0e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0e) in "Hpc".
@@ -656,7 +656,7 @@ Section ProofScheduler.
     { iApply (schi_0e with "Htext"). }
     { iEval (rewrite HcspA0 -Hb7). iExact "Hf7". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc10 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
@@ -666,7 +666,7 @@ Section ProofScheduler.
     { iApply (schi_10 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb8). iExact "Hf8". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc12 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x12))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
@@ -676,7 +676,7 @@ Section ProofScheduler.
     { iApply (schi_12 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb9). iExact "Hf9". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x14))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -686,7 +686,7 @@ Section ProofScheduler.
     { iApply (schi_14 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb10). iExact "Hf10". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x16))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -698,7 +698,7 @@ Section ProofScheduler.
     { iApply (schi_16 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb11). iExact "Hf11". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc _".
+    iIntros "_ Hcg Hpc _".
     assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x18))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
@@ -709,7 +709,7 @@ Section ProofScheduler.
               ltac:(rdok) with "Hcg Hpc []").
     { iApply (schi_18 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A1 := <[Regidx Rs0 := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))))]> A0).
     change (<[Regidx Rs0 := regval_into_reg
@@ -728,7 +728,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_1a with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     (* NO [rgne] here: the source register IS tp, so the written value stays
        spelled [rget A1 Rtp] and [rget_tp] is what reads it. *)
     set (A2 := <[Regidx Ra5 := regval_into_reg (add_vec zero_reg (rget A1 Rtp))]> A1).
@@ -742,7 +742,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_1c with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A3 := <[Regidx Ra5 := regval_into_reg
         (sign_extend' 64 (subrange_vec_dec
@@ -771,7 +771,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_1e with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A4 := <[Regidx Rs5 := regval_into_reg (mycpu_a5 cid_word)]> A3).
     change (<[Regidx Rs5 := regval_into_reg (mycpu_a5 cid_word)]> A3) with A4.
     assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x22))
@@ -786,7 +786,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_22 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A5 := <[Regidx Ra4 := regval_into_reg
         (add_vec (mword_of_int (KernelSyms.scheduler + 0x22) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))]> A4).
     change (<[Regidx Ra4 := regval_into_reg
@@ -800,7 +800,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_26 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A6 := <[Regidx Ra4 := regval_into_reg
         (add_vec (A5 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1542 : mword 12)))]> A5).
@@ -822,7 +822,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_2a with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A7 := <[Regidx Ra4 := regval_into_reg (add_vec (A6 !!! Regidx Ra4) (A6 !!! Regidx Rs5))]> A6).
     change (<[Regidx Ra4 := regval_into_reg (add_vec (A6 !!! Regidx Ra4) (A6 !!! Regidx Rs5))]> A6) with A7.
@@ -850,7 +850,7 @@ Section ProofScheduler.
     { iApply (schi_2c with "Htext"). }
     { iEval (rewrite Hrec_proc0r). iExact "Hproc". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc Hproc".
+    iIntros "_ Hcg Hpc Hproc".
     iEval (rewrite Hrec_proc0r) in "Hproc".
     assert (Hpc30 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x2c) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x30))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -863,7 +863,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_30 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A8 := <[Regidx Ra4 := regval_into_reg
         (add_vec (mword_of_int (KernelSyms.scheduler + 0x30) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))]> A7).
     change (<[Regidx Ra4 := regval_into_reg
@@ -877,7 +877,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_34 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A9 := <[Regidx Ra4 := regval_into_reg
         (add_vec (A8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1584 : mword 12)))]> A8).
@@ -900,7 +900,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_38 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A10 := <[Regidx Rs5 := regval_into_reg (add_vec (A9 !!! Regidx Rs5) (A9 !!! Regidx Ra4))]> A9).
     change (<[Regidx Rs5 := regval_into_reg (add_vec (A9 !!! Regidx Rs5) (A9 !!! Regidx Ra4))]> A9) with A10.
@@ -919,7 +919,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_3a with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A11 := <[Regidx Rs8 := regval_into_reg (sign_extend' 64 (RUNNING : mword 32))]> A10).
     change (<[Regidx Rs8 := regval_into_reg (sign_extend' 64 (RUNNING : mword 32))]> A10) with A11.
     assert (Hpc3c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x3a) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x3c))
@@ -948,7 +948,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_3c with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A12 := <[Regidx Rs6 := regval_into_reg
         (add_vec (mword_of_int (KernelSyms.scheduler + 0x3c) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))]> A11).
     change (<[Regidx Rs6 := regval_into_reg
@@ -962,7 +962,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_40 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A13 := <[Regidx Rs6 := regval_into_reg
         (add_vec (A12 !!! Regidx Rs6) (sign_extend' 64 (mword_of_int 1516 : mword 12)))]> A12).
@@ -987,7 +987,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_44 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A14 := <[Regidx Ra5 := regval_into_reg
         (shift_bits_left (A13 !!! Regidx Ra5) (subrange_vec_dec (mword_of_int 7 : mword 6) (Z.sub log2_xlen 1) 0))]> A13).
@@ -1012,7 +1012,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_46 with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A15 := <[Regidx Rs4 := regval_into_reg (add_vec (A14 !!! Regidx Rs6) (A14 !!! Regidx Ra5))]> A14).
     change (<[Regidx Rs4 := regval_into_reg (add_vec (A14 !!! Regidx Rs6) (A14 !!! Regidx Ra5))]> A14) with A15.
@@ -1039,7 +1039,7 @@ Section ProofScheduler.
               with "Hcg Hpc []").
     { iApply (schi_4a with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iIntros "Hcg Hpc".
+    iIntros "_ Hcg Hpc".
     set (A16 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> A15).
     change (<[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> A15) with A16.
     assert (Hpc4c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x4a) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x4c))
@@ -1091,7 +1091,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_4e with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs1))]> Mt).
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs1))]> Mt) with T0.
@@ -1104,7 +1104,7 @@ Section ProofScheduler.
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (schi_50 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (T1 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) 4)]> T0).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) 4)]> T0) with T1.
       assert (Hqrl : add_vec (mword_of_int (KernelSyms.scheduler + 0x50) : mword 64) (sign_extend' 64 (mword_of_int 2092632 : mword 21))
@@ -1139,7 +1139,7 @@ Section ProofScheduler.
          at its last instruction -- and the scheduler thread has no proc, so the
          idle hatch collapses it. *)
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros (mr) "Hcg Hpc %Hcsrl Hcpu".
+      iIntros "_". iIntros (mr) "Hcg Hpc %Hcsrl Hcpu".
       (* the release drops the ONE rank this loop iteration took, so the round
          re-enters the loop head at the empty set -- which is what the next
          [intr_on] (and [sc_flip_pre]) requires. *)
@@ -1163,7 +1163,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_54 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (T2 := <[Regidx Rs1 := regval_into_reg
           (add_vec (mr !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 368 : mword 12)))]> mr).
@@ -1210,7 +1210,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_58 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "_ Hcg Hpc".
         assert (Hq7e : add_vec (mword_of_int (KernelSyms.scheduler + 0x58) : mword 64) (sign_extend' 64 (mword_of_int 54 : mword 13))
                        = mword_of_int (KernelSyms.scheduler + 0x8e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq7e) in "Hpc".
@@ -1228,7 +1228,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_58 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         assert (Hq58 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x58) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x5c))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq58) in "Hpc".
@@ -1255,7 +1255,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_5c with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (M0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M !!! Regidx Rs1))]> M).
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M !!! Regidx Rs1))]> M) with M0.
@@ -1268,7 +1268,7 @@ Section ProofScheduler.
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (schi_5e with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (M1 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) 4)]> M0).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) 4)]> M0) with M1.
       assert (Hraq : add_vec (mword_of_int (KernelSyms.scheduler + 0x5e) : mword 64) (sign_extend' 64 (mword_of_int 2092482 : mword 21))
@@ -1295,7 +1295,7 @@ Section ProofScheduler.
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its
          first instruction, before push_off disables) -- idle hatch again. *)
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR _ Hcpu Hpay".
+      iIntros "_". iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR _ Hcpu Hpay".
       (* acquire hands back [{[rank "proc"]} ∪ ∅]; normalise it to the literal
          singleton every in-lock site below (and [Tail]) is written at. *)
       assert (Hequn : ({["proc"]} : gset string) ∪ ∅ = {["proc"]})
@@ -1334,7 +1334,7 @@ Section ProofScheduler.
       { iApply (schi_62 with "Htext"). }
       { iEval (rewrite Hrec_st). iExact "Hstate". }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc Hstate".
+      iIntros "_ Hcg Hpc Hstate".
       iEval (rewrite Hrec_st) in "Hstate".
       set (M2 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 st)]> macq).
       change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 st)]> macq) with M2.
@@ -1377,7 +1377,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_64 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "_ Hcg Hpc".
         assert (Hr4e : add_vec (mword_of_int (KernelSyms.scheduler + 0x64) : mword 64) (sign_extend' 64 (mword_of_int 8170 : mword 13))
                        = mword_of_int (KernelSyms.scheduler + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr4e) in "Hpc".
@@ -1412,7 +1412,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_64 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         assert (Hr68 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x64) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x68))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr68) in "Hpc".
@@ -1448,7 +1448,7 @@ Section ProofScheduler.
         { iApply (schi_68 with "Htext"). }
         { iEval (rewrite HM2s1r sc_state_addr). iExact "Hstate". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hstate".
+        iIntros "_ Hcg Hpc Hstate".
         iEval (rewrite HM2s1r sc_state_addr HM2s8r) in "Hstate".
         assert (Hr6c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x68) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x6c))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1467,7 +1467,7 @@ Section ProofScheduler.
         { iApply (schi_6c with "Htext"). }
         { iEval (rewrite HM2s4r). iExact "Hproc". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hproc".
+        iIntros "_ Hcg Hpc Hproc".
         iEval (rewrite HM2s4r HM2s1rr) in "Hproc".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr70 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x6c) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x70))
@@ -1479,7 +1479,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_70 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (M3 := <[Regidx Ra1 := regval_into_reg
             (add_vec (M2 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 96 : mword 12)))]> M2).
@@ -1494,7 +1494,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_74 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (M4 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M3 !!! Regidx Rs5))]> M3).
         change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M3 !!! Regidx Rs5))]> M3) with M4.
@@ -1507,7 +1507,7 @@ Section ProofScheduler.
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (schi_76 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         set (Mc := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x76) : mword 64) 4)]> M4).
         change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x76) : mword 64) 4)]> M4) with Mc.
         assert (Hrsw : add_vec (mword_of_int (KernelSyms.scheduler + 0x76) : mword 64) (sign_extend' 64 (mword_of_int 1524 : mword 21))
@@ -1652,7 +1652,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_7a with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         set (N0 := <[Regidx Ra5 := regval_into_reg (add_vec zero_reg (rget m' Rtp))]> m').
         change (<[Regidx Ra5 := regval_into_reg (add_vec zero_reg (rget m' Rtp))]> m') with N0.
         assert (Hr7c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x7a) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0x7c))
@@ -1664,7 +1664,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_7c with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (N1 := <[Regidx Ra5 := regval_into_reg
             (sign_extend' 64 (subrange_vec_dec
@@ -1686,7 +1686,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_7e with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (N2 := <[Regidx Ra5 := regval_into_reg
             (shift_bits_left (N1 !!! Regidx Ra5) (subrange_vec_dec (mword_of_int 7 : mword 6) (Z.sub log2_xlen 1) 0))]> N1).
@@ -1707,7 +1707,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_80 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (N3 := <[Regidx Ra5 := regval_into_reg (add_vec (N2 !!! Regidx Ra5) (N2 !!! Regidx Rs6))]> N2).
         change (<[Regidx Ra5 := regval_into_reg (add_vec (N2 !!! Regidx Ra5) (N2 !!! Regidx Rs6))]> N2) with N3.
@@ -1728,7 +1728,7 @@ Section ProofScheduler.
         { iApply (schi_82 with "Htext"). }
         { iEval (rewrite HN3intr). iExact "Hint". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hint".
+        iIntros "_ Hcg Hpc Hint".
         iEval (rewrite HN3intr) in "Hint".
         (* the stored word IS [intena_val false] -- that is what makes the
            give-back land at the [false] index. *)
@@ -1778,7 +1778,7 @@ Section ProofScheduler.
         { iApply (schi_86 with "Htext"). }
         { iEval (rewrite Hm's4r). iExact "Hproc". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hproc".
+        iIntros "_ Hcg Hpc Hproc".
         iEval (rewrite Hm's4r) in "Hproc".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr8a : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x86) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x8a))
@@ -1790,7 +1790,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_8a with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         iEval (repeat rgne) in "Hcg".
         set (M5 := <[Regidx Rs9 := regval_into_reg (add_vec zero_reg (N3 !!! Regidx Rs7))]> N3).
         change (<[Regidx Rs9 := regval_into_reg (add_vec zero_reg (N3 !!! Regidx Rs7))]> N3) with M5.
@@ -1875,7 +1875,7 @@ Section ProofScheduler.
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (schi_8c with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "_ Hcg Hpc".
         assert (Hr4a2 : add_vec (mword_of_int (KernelSyms.scheduler + 0x8c) : mword 64)
                           (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2017 : mword 11) ('b"0"))))
                         = mword_of_int (KernelSyms.scheduler + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1996,7 +1996,7 @@ Section ProofScheduler.
                   M (av - 12 - kv_frame_slots)%nat with "Hcg Hpc []").
         { iApply (schi_96 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros (ms1) "%Hmsf1 Hcg Hpc".
+        iIntros "_". iIntros (ms1) "%Hmsf1 Hcg Hpc".
         iEval (rewrite Ho8a') in "Hpc".
         iApply ("Hk" with "Hcg Hpc").
       - (* ---- disabled: the ONE real enable, funded from the entry budget ---- *)
@@ -2011,7 +2011,7 @@ Section ProofScheduler.
         { rewrite /cpu_claim_ext. iApply cpu_claim_idle. }
         { iApply (schi_96 with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros (ms1) "%Hmsf1 Hcg Hpc".
+        iIntros "_". iIntros (ms1) "%Hmsf1 Hcg Hpc".
         iEval (rewrite Ho8a') in "Hpc".
         iApply ("Hk" with "Hcg Hpc"). }
     (* ================================================================== *)
@@ -2045,7 +2045,7 @@ Section ProofScheduler.
          zero_reg] -- the scheduler runs with [c->proc == 0], so it is the
          idle claim ([IntrDefs.cpu_claim_idle]) and carries nothing.  Dropped
          here rather than threaded: the next [intr_on] round re-derives it. *)
-      iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs _ Hcells Hpc".
+      iIntros "_". iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs _ Hcells Hpc".
       iEval (rewrite -(sc_carve av Hav)) in "Hcg".
       assert (Ho8e : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x9a) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x9e))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -2060,7 +2060,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_9e with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (B0 := <[Regidx Rs9 := regval_into_reg (zero_reg : mword 64)]> M).
       change (<[Regidx Rs9 := regval_into_reg (zero_reg : mword 64)]> M) with B0.
       assert (Ho90 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x9e) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0xa0))
@@ -2072,7 +2072,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_a0 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (B1 := <[Regidx Rs1 := regval_into_reg
           (add_vec (mword_of_int (KernelSyms.scheduler + 0xa0) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B0).
       change (<[Regidx Rs1 := regval_into_reg
@@ -2086,7 +2086,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_a4 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (B2 := <[Regidx Rs1 := regval_into_reg
           (add_vec (B1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 2488 : mword 12)))]> B1).
@@ -2105,7 +2105,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_a8 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (B3 := <[Regidx Rs3 := regval_into_reg (sign_extend' 64 (RUNNABLE : mword 32))]> B2).
       change (<[Regidx Rs3 := regval_into_reg (sign_extend' 64 (RUNNABLE : mword 32))]> B2) with B3.
       assert (Ho9a : add_vec_int (mword_of_int (KernelSyms.scheduler + 0xa8) : mword 64) 2 = mword_of_int (KernelSyms.scheduler + 0xaa))
@@ -2117,7 +2117,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_aa with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       set (B4 := <[Regidx Rs2 := regval_into_reg
           (add_vec (mword_of_int (KernelSyms.scheduler + 0xaa) : mword 64) (auipc_off (mword_of_int 0x16 : mword 20)))]> B3).
       change (<[Regidx Rs2 := regval_into_reg
@@ -2131,7 +2131,7 @@ Section ProofScheduler.
                 with "Hcg Hpc []").
       { iApply (schi_ae with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros "Hcg Hpc".
+      iIntros "_ Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (B5 := <[Regidx Rs2 := regval_into_reg
           (add_vec (B4 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 1454 : mword 12)))]> B4).
@@ -2192,7 +2192,7 @@ Section ProofScheduler.
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (schi_b2 with "Htext"). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros "_ Hcg Hpc".
       assert (Ho58 : add_vec (mword_of_int (KernelSyms.scheduler + 0xb2) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2005 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.scheduler + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2219,7 +2219,7 @@ Section ProofScheduler.
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (schi_8e with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iNext. iIntros "Hcg Hpc".
+        iNext. iIntros "_ Hcg Hpc".
         assert (Hb86 : add_vec (mword_of_int (KernelSyms.scheduler + 0x8e) : mword 64) (sign_extend' 64 (mword_of_int 8 : mword 13))
                        = mword_of_int (KernelSyms.scheduler + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hb86) in "Hpc".
@@ -2235,7 +2235,7 @@ Section ProofScheduler.
                   with "Hcg Hpc []").
         { iApply (schi_8e with "Htext"). }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc".
+        iIntros "_ Hcg Hpc".
         assert (Hb82 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x8e) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x92))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hb82) in "Hpc".
@@ -2266,7 +2266,7 @@ Section ProofScheduler.
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (schi_4c with "Htext"). }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros "_ Hcg Hpc".
     assert (Hpc96 : add_vec (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 37 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.scheduler + 0x96)) by (apply bv_eq; vm_compute; reflexivity).

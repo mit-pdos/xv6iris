@@ -1507,14 +1507,14 @@ Section ProofPushOff.
                 with "Hcg Htext Hpc [Hr8] [Hr0]").
       { iEval (rewrite HcspP6). iExact "Hr8". }
       { iEval (rewrite HcspP6). iExact "Hr0". }
-      iApply wp_next_off_intro.
+      iApply wp_next_off_intro_lc. iIntros "Hlc".
       iIntros (mf) "Hcg Hpc %Hmf".
       assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
       iEval (rewrite Hav2) in "Hcg".
       subst mf.
       (* still nested: neq nv1 0 = true, so n = S n'; the token rides
          through un-flipped, repacked one level lower. *)
-      iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
+      iApply ("Hcont" with "Hlc Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
       { (* cpu_own (S n') eb p false *)
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
         iSplitL "Hnoff Hint Hlks Hproc Hcsrs".
@@ -1691,12 +1691,12 @@ Section ProofPushOff.
                   with "Hcg Htext Hpc [Hr8] [Hr0]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
-        iApply wp_next_off_intro.
+        iApply wp_next_off_intro_lc. iIntros "Hlc".
         iIntros (mf) "Hcg Hpc %Hmf".
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
+        iApply ("Hcont" with "Hlc Hcg [Hnoff Hint Hlks Htok Hproc Hcsrs] Hpc [%]").
         { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
           iSplitL "Hnoff Hint Hlks Hproc Hcsrs".
           { iSplitL "Hnoff Hint Hproc";

@@ -2095,8 +2095,8 @@ Section ProofAcquiresleep.
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc []").
       { iApply (asl_52 with "Htext"). }
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc.
+      iIntros "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (Q42 !!! Regidx (mword_of_int 1 : mword 5)) = ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
         by (rewrite HQ42ra; reflexivity).
@@ -2113,7 +2113,7 @@ Section ProofAcquiresleep.
         rewrite /E5 /E4 /E3. repeat (rewrite upd_ne; [| congruence]).
         rewrite (callee_saved_lookup Hmp_cs c Hcs).
         rewrite /E2 /E1. repeat (rewrite upd_ne; [| congruence]). reflexivity. }
-      iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok HX HR Hpid").
+      iSpecialize ("Hcont" with "Hlc"). iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok HX HR Hpid").
       { unfold callee_saved.
         split. { (* sp *) rewrite /Q42 upd_eq. rewrite Hwv. exact Hsp0. }
         split. { (* s0 *) rewrite /Q42 upd_ne; [| reg_neq]. rewrite /Q40 upd_ne; [| reg_neq]. rewrite /Q3e upd_ne; [| reg_neq]. rewrite /Q3c upd_eq. reflexivity. }
@@ -2708,8 +2708,8 @@ Section ProofAcquiresleep.
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc []").
       { iApply (asl_52 with "Htext"). }
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc.
+      iIntros "Hlc Hcg Hpc".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (Q42 !!! Regidx (mword_of_int 1 : mword 5)) = ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
         by (rewrite HQ42ra; reflexivity).
@@ -2726,7 +2726,7 @@ Section ProofAcquiresleep.
         rewrite /E5 /E4 /E3. repeat (rewrite upd_ne; [| congruence]).
         rewrite (callee_saved_lookup Hmp_cs c Hcs).
         rewrite /E2 /E1. repeat (rewrite upd_ne; [| congruence]). reflexivity. }
-      iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok HX HflkE HR Hpid").
+      iSpecialize ("Hcont" with "Hlc"). iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok HX HflkE HR Hpid").
       { unfold callee_saved.
         split. { (* sp *) rewrite /Q42 upd_eq. rewrite Hwv. exact Hsp0. }
         split. { (* s0 *) rewrite /Q42 upd_ne; [| reg_neq]. rewrite /Q40 upd_ne; [| reg_neq]. rewrite /Q3e upd_ne; [| reg_neq]. rewrite /Q3c upd_eq. reflexivity. }

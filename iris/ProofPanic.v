@@ -197,7 +197,7 @@ Section PanicSpin.
               m K b ltac:(rewrite Htgt; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pni_26 with "Ht"). }
-    iApply wp_next_intro. iIntros (CIDx). iNext.
+    iNext. iApply wp_next_intro. iIntros (CIDx).
     iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     iApply ("IH" $! CIDx m K b p with "Hcg Hpc").
