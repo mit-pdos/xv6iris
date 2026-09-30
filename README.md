@@ -293,6 +293,7 @@ make test-tools    # unit tests of the Python tools (tools/tests/)
 tools/ci/timed_build.sh LOG --clean    # the build, with a timed log for the profile
 tools/ci/reports.sh LOG                # profile, proof coverage (blocking), dead code
 tools/ci/dead_imports.sh               # dead `import` lines (informational)
+tools/ci/vtest.sh check-ci             # device conformance: the model against the checked-in captures
 ```
 
 Proof coverage (`tools/proof_coverage.py`) joins the pinned images to the
@@ -301,6 +302,14 @@ when a `Link*` theorem concludes a whole-function contract whose entry pc is
 the function's address and the top theorems (`tools/ci/roots.txt`) reach it.
 Every kernel function must be, except the rows of
 `tools/ci/coverage_allow.txt`.
+
+Device conformance (`vtest-lean/`, `tools/vtest/`) re-checks the machine
+model -- the Sail hart as the language runs it, the two UARTs, the PLIC, the
+virtio disk -- against 150 behaviours captured from QEMU, the VisionFive 2
+board and the CVA6 RTL: each capture is a theorem that the language has an
+execution showing what the platform showed (`RunAgrees`), proved by compiled
+evaluation behind a proved link to the step relation.  It is not part of the
+proof build; `tools/vtest/README.md` says what is claimed and what is trusted.
 
 The model is generated from the MachCSL fork of sail-riscv
 (`zeldovich/sail-riscv`, branch `xv6`, commit `070832a1`), the same source and
