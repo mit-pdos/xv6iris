@@ -45,3 +45,6 @@ Drift wave 1 LANDED ba83943d6 (A: d66e41c sh/fs.img + cmdalloc; B: page-boundary
 Drift wave 2 agents: D2-sync (theme C) abb8735cb04a11faf; D2-dur (themes D+F, final shape) a43e5a6272fb47a89. Next: E (App fields/laws, UnionAdm, union_phi_sync, union_sync_cut_neg), then I+J.
 D2-sync LANDED 1f01806c5; D2-dur LANDED (sys_sync hook form, LogHelp/LogQuiet/LogGhostCommit, HartCustody; F deletions).
 Drift wave 3: D3-app (theme E) agent a7c81c0f7b9bd7f51 (worktree). Then I+J.
+MILESTONE: drift theme E LANDED (tip 48785caa2): unionAdequacyClosed concludes unionPhiSync; unionSyncCutNeg, unionResults proved.
+Lean now matches Rocq main 456141b5b except themes I+J (NI ledgers / permit sweep) — awaiting user decision.
+Open small items: union_residuals.md still describes pre-hook SY2 shape.
