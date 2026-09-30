@@ -1,0 +1,46 @@
+# The user functions that are proven and linked (tools/proof_coverage.py).
+# `--check` fails if one of them stops being so: coverage may grow, never
+# shrink.  Regenerate with `tools/proof_coverage.py --update-baseline`
+# and review the diff -- a removed row is a lost proof.
+Cat:cat
+Cat:fprintf
+Cat:main
+Cat:start
+Echo:main
+Echo:start
+Echo:strlen
+Grep:fprintf
+Grep:grep
+Grep:main
+Grep:match
+Grep:matchhere
+Grep:matchstar
+Grep:memmove
+Grep:printf
+Grep:start
+Grep:strchr
+Init:main
+Init:printf
+Init:start
+Seccomp:fprintf
+Seccomp:main
+Seccomp:start
+Sh:cmdalloc
+Sh:fork1
+Sh:fprintf
+Sh:free
+Sh:getcmd
+Sh:gets
+Sh:main
+Sh:malloc
+Sh:memset
+Sh:panic
+Sh:parsecmd
+Sh:runcmd
+Sh:sbrk
+Sh:start
+Sh:sys_sbrk
+Sh:wait
+Sh:write
+Sync:main
+Sync:start

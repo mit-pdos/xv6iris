@@ -1,0 +1,12 @@
+# Whole-function contracts that are NOT entered through a pc premise
+# (tools/proof_coverage.py).  A trap vector is entered by a trap, so its
+# contract NAMES the vector's address (in the handler spec, in stvec) instead
+# of pinning `pcIs` at it, and no rule can discover it.  Rows:
+#
+#   <image>:<function> <Link theorem>   # why it is not a pc-premise contract
+#
+# Every row is VERIFIED on each run: the theorem must exist, be in a Link
+# module, be reached by the top theorems, and the interface it concludes must
+# name the function's entry address.  A row that stops holding is an error.
+kernel:kernelvec   Xv6.Kernelvec     # S-mode trap vector: the contract is the installed handler spec `ihs ⟨env, cpu, kernelvecAddr⟩` (Rocq kernelvec_handler_spec)
+kernel:_trampoline Xv6.uservec_link  # = uservec, the user trap vector at TRAMPOLINE: entered from user mode by a trap, stated over the user state with stvec at the vector (Rocq wp_uservec_pt)

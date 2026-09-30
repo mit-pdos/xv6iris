@@ -280,6 +280,28 @@ tools/check_layering.sh                                        # Spec/Proof/Link
 python3 tools/gen_model_facts.py && python3 tools/gen_platform.py
 ```
 
+## Checks and reports
+
+`make help` lists the entry points (targets are in `tools/ci/*.mk`; each
+script's header says what it guarantees and when it fails).
+
+```sh
+make lint          # layering, no sorry/axiom/native_decide, module drift, pins   (no toolchain)
+make check-gen     # every generated file equals its generator's output           (no toolchain)
+make test-tools    # unit tests of the Python tools (tools/tests/)
+# after `lake build Xv6 MachCSL`, on the build machine:
+tools/ci/timed_build.sh LOG --clean    # the build, with a timed log for the profile
+tools/ci/reports.sh LOG                # profile, proof coverage (blocking), dead code
+tools/ci/dead_imports.sh               # dead `import` lines (informational)
+```
+
+Proof coverage (`tools/proof_coverage.py`) joins the pinned images to the
+elaborated environment (`tools/ci/EnvFacts.lean`): a function is *proven*
+when a `Link*` theorem concludes a whole-function contract whose entry pc is
+the function's address and the top theorems (`tools/ci/roots.txt`) reach it.
+Every kernel function must be, except the rows of
+`tools/ci/coverage_allow.txt`.
+
 The model is generated from the MachCSL fork of sail-riscv
 (`zeldovich/sail-riscv`, branch `xv6`, commit `070832a1`), the same source and
 configuration as the Rocq prototype; the kernel image is `mit-pdos/xv6-riscv`

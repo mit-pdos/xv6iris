@@ -1,0 +1,18 @@
+# Kernel functions that are NOT "proven, linked and reached by the top
+# theorems", each with the reason (tools/proof_coverage.py --check).  Rows:
+#
+#   kernel:<function>   # reason
+#
+# Every kernel function outside this list must be proven, or the check fails.
+# A row for a function that IS proven, or that is not in the image, is an
+# error too, so the list cannot go stale.  The report prints each function's
+# call-site count in the image next to its row.
+#
+# -- linked, but outside the cone: nothing in this kernel calls them, so no
+#    caller's proof (hence no top theorem) uses the contract.  0 call sites.
+kernel:memcmp      # proved and linked (LinkMemcmp); no call site in the image
+kernel:memcpy      # proved and linked (LinkMemcpy); no call site in the image
+kernel:procdump    # proved and linked (LinkProcdump); no call site in the image
+# -- no contract at all
+kernel:spin        # entry.S's 2-byte `j spin` after `jal start`: start's contract continues at main and never returns, so the instruction is never reached; no contract is stated (Rocq proves wp_spin)
+kernel:unreachable # the verified xv6 branch's trap for impossible arms; no contract is stated: the callers' proofs treat the arm that reaches it as dead (e.g. Xv6/BfreeMid.lean, Xv6/BmapParts.lean refute the branch) rather than call it

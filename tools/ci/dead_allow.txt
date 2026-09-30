@@ -1,0 +1,20 @@
+# Extra liveness roots for the dead-code report (tools/find_dead.py): things
+# that are deliberately not reached by the top theorems.  Entries:
+#   decl <fully.qualified.Name>     one declaration
+#   module <Module.Name>            every declaration of a module
+#   prefix <Namespace>              every declaration under a namespace
+# Everything an entry reaches counts as live ("allowlist").  An entry that
+# matches nothing is an error (stale rows do not accumulate).
+
+# -- demos and smoke tests: results in their own right, outside every cone
+module Xv6.UnionDemo             # anti-vacuity `decide` demos for the union model (DU9)
+module Xv6.UnionAdmDemo          # the boot relation after a sync, run on transcripts (Rocq UnionAdmDemo.v)
+module MachCSL.Hello             # smoke test: iris-lean's proof mode is wired up
+module MachCSL.URunRWDemo        # the D50 go/no-go spike for runRW
+module Xv6.UserTextSpikeEcho     # the DU3 spike on echo's dumped text
+
+# -- kernel functions that are proved and linked but that nothing in this
+#    kernel image calls (tools/ci/coverage_allow.txt has the same three)
+decl Xv6.Memcmp
+decl Xv6.Memcpy
+decl Xv6.Procdump
