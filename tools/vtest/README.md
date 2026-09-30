@@ -125,12 +125,11 @@ imported by `Vtest.lean`, so CI stays green while its row says `no proof`.
 What fails CI is an imported module that stopped compiling -- a proof that
 used to hold, or the harness.
 
-Current state: QEMU 66 pass (65 agree, 1 stuck), JH7110 23, CVA6 19 (18 agree,
-1 stuck).  Rocq's green set is QEMU 64, JH7110 23, CVA6 19: the same runs,
-minus the three narrow-virtio runs of the finding below, plus the five hart-1
-variants (`core_smoke`, `core_regs_{fcsr,hpm,pmp,scsr}` on hart 1), for which
-the Rocq tool does not generate a proof.  Every other run that is red here is
-red in Rocq.
+Current state (after the narrow-virtio fix below): QEMU 69 pass (68 agree, 1
+stuck), JH7110 23, CVA6 19 (18 agree, 1 stuck).  Rocq's green set is QEMU 64,
+JH7110 23, CVA6 19: the same runs, plus the five hart-1 variants
+(`core_smoke`, `core_regs_{fcsr,hpm,pmp,scsr}` on hart 1), for which the Rocq
+tool does not generate a proof.  Every run that is red here is red in Rocq.
 
 ## Layout
 
@@ -237,12 +236,11 @@ proof uses and says one of:
 ## Findings: where the Lean model differed from Rocq's
 
 The suite's first full run found ONE behavioural difference between the Lean
-device model and Rocq's.  It is OPEN at this commit (the three runs have no
-proof) and fixed Rocq-literally by the next one:
+device model and Rocq's, and it has been fixed Rocq-literally:
 
-| capture(s) | Lean model | Rocq model / QEMU |
-|---|---|---|
-| `disk_ident_rd1`, `disk_ident_rd2`, `disk_ident_wr1` | a 1- or 2-byte access to the virtio-mmio window is STUCK (`Virtio.readN`/`writeN` answer only at width 4) | a narrow read answers 0 and a narrow write is dropped (Rocq `DevModel.dev_read`/`dev_write`, its finding 15) |
+| capture(s) | Lean model (before) | Rocq model / QEMU | fix |
+|---|---|---|---|
+| `disk_ident_rd1`, `disk_ident_rd2`, `disk_ident_wr1` | a 1- or 2-byte access to the virtio-mmio window was STUCK (`Virtio.readN`/`writeN` answered only at width 4) | a narrow read answers 0 and a narrow write is dropped (Rocq `DevModel.dev_read`/`dev_write`, its finding 15) | `MachCSL/Dev/Virtio.lean`: `readN`/`writeN` answer the narrow widths as Rocq does; `MachCSL/DiskOf.lean` follows |
 
 Everything else agrees run for run with the Rocq suite: every run green there
 is green here, and every run red there is red here, for the reason the Rocq

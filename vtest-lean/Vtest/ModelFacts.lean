@@ -66,6 +66,20 @@ theorem model_write_gated (v : VirtioState) (r : VioReq) (h : BitVec 16)
     Bool.or_eq_true, Bool.not_eq_true'] at hok
   exact hok
 
+/-- A NARROW access to the virtio window is answered, not stuck: a one- or
+two-byte read is zero and leaves the device alone (Rocq `dev_read`, finding
+15; the captures `disk_ident_rd1` and `disk_ident_rd2`). -/
+theorem model_virtio_narrow_read (v : VirtioState) (off : Nat) :
+    Virtio.readN v off 1 = some (0, v) ∧ Virtio.readN v off 2 = some (0, v) :=
+  ⟨rfl, rfl⟩
+
+/-- ...and a narrow write reaches no register: it is dropped (the capture
+`disk_ident_wr1`). -/
+theorem model_virtio_narrow_write (v : VirtioState) (off : Nat) (b : BitVec (8 * 1))
+    (w : BitVec (8 * 2)) :
+    Virtio.writeN v off 1 b = some v ∧ Virtio.writeN v off 2 w = some v :=
+  ⟨rfl, rfl⟩
+
 /-! ## The TLB (the retired `PtTlb.v`) -/
 
 /-- The model's TLB is 64 entries, direct-mapped on the low six bits of the

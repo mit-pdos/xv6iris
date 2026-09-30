@@ -69,7 +69,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-! ## The MMIO window, as the fabric sees it
 
 The device signature's `read`/`write` are `Virtio.readN`/`writeN`, which
-accept 4-byte accesses only.  These two lemmas are the bridge from the
+reach a register at 4-byte accesses only.  These two lemmas are the bridge from the
 model's 32-bit `Virtio.read`/`Virtio.write` to them. -/
 
 theorem virtio_readN4 (v : VirtioState) (off : Nat) (w : BitVec 32)

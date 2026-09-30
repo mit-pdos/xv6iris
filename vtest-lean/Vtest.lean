@@ -138,7 +138,10 @@ import Vtest.QEMU.DiskIdentPass
 import Vtest.QEMU.DiskIdentQnumPass
 import Vtest.QEMU.DiskIdentQresetPass
 import Vtest.QEMU.DiskIdentQselPass
+import Vtest.QEMU.DiskIdentRd1Pass
+import Vtest.QEMU.DiskIdentRd2Pass
 import Vtest.QEMU.DiskIdentShmselPass
+import Vtest.QEMU.DiskIdentWr1Pass
 import Vtest.QEMU.DiskIntrPass
 import Vtest.QEMU.DiskOrderPass
 import Vtest.QEMU.DiskRwPass

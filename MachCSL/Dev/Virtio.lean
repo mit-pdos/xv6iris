@@ -327,12 +327,25 @@ def write (v : VirtioState) (off : Nat) (w : BitVec 32) : Option VirtioState :=
 /-- Recast a bit-vector along a width equation. -/
 def castW {m n : Nat} (h : m = n) (w : BitVec m) : BitVec n := h ▸ w
 
-/-- The window is 32-bit only. -/
+/-- The registers are all 32 bits wide, and none of them is read-sensitive.
+A NARROWER access (one or two bytes) is not an error but it is not a register
+read either: the transport is 32-bit and the machine answers ZERO, leaving
+the device alone (Rocq `DevModel.dev_read`, its conformance finding 15: the
+model used to be stuck there, so a driver that read a status byte with `lb`
+had no model execution; the captures `disk_ident_rd1`/`disk_ident_rd2` of
+`vtest-lean/` are what hold this line to the hardware). -/
 def readN (v : VirtioState) (off : Nat) (n : Nat) : Option (BitVec (8 * n) × VirtioState) :=
-  if h : n = 4 then (read v off).map fun w => (castW (by omega : 32 = 8 * n) w, v) else none
+  if h : n = 4 then (read v off).map fun w => (castW (by omega : 32 = 8 * n) w, v)
+  else if n = 1 ∨ n = 2 then some (0, v)
+  else none
 
+/-- ...and a narrow WRITE reaches no register: it is dropped, which is what
+the machine does with it (Rocq `DevModel.dev_write`, finding 15; the capture
+`disk_ident_wr1`). -/
 def writeN (v : VirtioState) (off : Nat) (n : Nat) (w : BitVec (8 * n)) : Option VirtioState :=
-  if h : n = 4 then write v off (castW (by omega : 8 * n = 32) w) else none
+  if h : n = 4 then write v off (castW (by omega : 8 * n = 32) w)
+  else if n = 1 ∨ n = 2 then some v
+  else none
 
 /-! ### The image, the cache, and what a read delivers -/
 

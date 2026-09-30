@@ -74,7 +74,12 @@ theorem Virtio.writeN_disk (v v' : VirtioState) (off n : Nat) (w : BitVec (8 * n
   unfold Virtio.writeN at h
   split at h
   · exact Virtio.write_disk v v' off _ h
-  · exact absurd h (by simp)
+  · -- a narrow write is dropped: the device, and with it the image, is unchanged
+    split at h
+    · simp only [Option.some.injEq] at h
+      subst h
+      rfl
+    · exact absurd h (by simp)
 
 theorem Virtio.readN_state (v v' : VirtioState) (off n : Nat) (w : BitVec (8 * n))
     (h : Virtio.readN v off n = some (w, v')) : v' = v := by
@@ -83,7 +88,11 @@ theorem Virtio.readN_state (v v' : VirtioState) (off n : Nat) (w : BitVec (8 * n
   · cases hr : Virtio.read v off with
     | none => rw [hr] at h; exact absurd h (by simp)
     | some x => rw [hr] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h; exact h.2.symm
-  · exact absurd h (by simp)
+  · -- a narrow read answers zero and leaves the device alone
+    split at h
+    · simp only [Option.some.injEq, Prod.mk.injEq] at h
+      exact h.2.symm
+    · exact absurd h (by simp)
 
 theorem devRead_diskOf (ds ds' : DevStates) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (h : devRead ds pa n = some (w, ds')) : diskOf ds' = diskOf ds := by

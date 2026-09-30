@@ -3,9 +3,10 @@ MachCSL: supervisor-mode MMIO at WORD width -- the 4-byte twins of the
 byte rules of `MachCSL.WpSmodeDev`.
 
 The virtio-mmio window (`MachCSL.Dev.Virtio`) is a bank of 32-bit
-registers: `Virtio.readN`/`Virtio.writeN` answer only at `n = 4`, so the
-disk driver's `lw`/`sw` to `0x10001000 + off` are the only shapes that
-reach the device.  This file is `WpSmodeDev` at width 4:
+registers: `Virtio.readN`/`Virtio.writeN` reach a register only at `n = 4`
+(a one- or two-byte access reads zero and writes nothing), so the disk
+driver's `lw`/`sw` to `0x10001000 + off` are the only shapes that reach the
+device.  This file is `WpSmodeDev` at width 4:
 
 * `devWordOk`: what a four-byte device access needs of the bus (a device
   address, 4-aligned, inside the I/O PMA region, past the CLINT);
