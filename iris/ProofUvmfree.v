@@ -428,7 +428,7 @@ Section ProofUvmfree.
         bare_pt uroot ∅ -∗
         mWP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hgap]" as "Hjoin".
-    { iIntros (CIDj Hcrossj) "_"; iIntros (mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hlend Hpc Hpt".
+    { iIntros (CIDj Hcrossj); iIntros (mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hlend Hpc Hpt".
       (* +0x0e c.mv a0,s1 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmfree + 0x0e)) Ra0 Rs1 mj (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)

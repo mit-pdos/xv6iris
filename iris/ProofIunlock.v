@@ -497,7 +497,7 @@ Section ProofIunlockMain.
       rewrite /ic_handle /ic_deposit2 Hid (ic_body_of_shr k d s dev inum g lo Hdshr)
               (ic_pay_live_of_shr k d s dev inum g lo Hdshr) /live_gen.
       iFrame "Hhold Hbid Hblv Hd Htok". iExists lo. iExact "Hlg". }
-    iIntros (refv CID14 Hq14) "Hcg Hpc Hqv (Hvalid & Hdep)".
+    iIntros (refv CID14 Hq14) "_ Hcg Hpc Hqv (Hvalid & Hdep)".
     iDestruct "Hqv" as (V0) "[_ %Href]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))

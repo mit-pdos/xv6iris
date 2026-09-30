@@ -2461,7 +2461,7 @@ Section ProofIlockMain.
       iSplitL "Hrows Hcl". { iFrame "Hfl". iExists w, tst. iFrame. }
       iIntros "[_ HRes]". iDestruct "HRes" as (w2 tst2) "[Hrows Hcl]".
       iMod ("Hcl" with "Hrows") as "Hrt". iModIntro. iFrame "Hrt". }
-    iIntros (refv CID8 Hq8) "Hcg Hpc Hqv Hrt".
+    iIntros (refv CID8 Hq8) "_ Hcg Hpc Hqv Hrt".
     iDestruct "Hqv" as (V0) "[_ %Hrefp]".
     iAssert (inode_shr_genlo_bare k s icfg_dev inum g lo) with "[Hrt Hrid]"
       as "Href".

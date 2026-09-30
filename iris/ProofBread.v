@@ -758,7 +758,7 @@ Section BreadBlocks.
       iIntros "Hvld". iEval (rewrite Hva) in "Hvld". iModIntro.
       iExists vb0, bs0. iSplitR; [by iPureIntro|].
       iFrame "Hvld Hbdev Hbuf Hpay". }
-    iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
+    iIntros (vld CIDt1 Hst1) "_ Hcg Hpc H".
     iDestruct "H" as (vb bs) "(%Hpin & Hvld & Hbdev & Hbuf & Hpay)".
     iDestruct (cpu_own_transport CID0 CIDt1 0%nat eb (proc_addr j) eb 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

@@ -1363,7 +1363,7 @@ Section ProofAllocprocPid.
               iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string nextpid_res_at Rr n eb p av
                         ({["nextpid"]} ∪ lks) (ap_lka Rr HRra0) Hav
                         with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
-              iIntros (CIDrel Hsrel) "Hlc"; iIntros (mrel) "Hcg Hpc %Hcsrel Hcpu".
+              iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hcsrel Hcpu".
               rewrite Hbeq in Hsrel.
               iEval (rewrite Hbeq) in "Hcg".
               assert (Hsetback : ({["nextpid"]} ∪ lks) ∖ {["nextpid"]} = lks)
@@ -2458,7 +2458,7 @@ Section ProofAllocproc.
             intros r Hr Ncsp N8 N9 N18.
             rewrite /T5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
-          iIntros (CIDp Hsp) "Hlc"; iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
+          iIntros (CIDp Hsp) "_"; iIntros (Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
           iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%] Hlc"); [wp_next_chain|].

@@ -813,12 +813,12 @@ Section ProofCopyinstr.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (csi_b0 with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDn4 Hsn4) "_ Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDn4 Hsn4) "Hlc Hcg Hpc".
       assert (Htgt40 : add_vec (mword_of_int (KernelSyms.copyinstr + 0xb0) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 200 : mword 8) ('b"0"))))
                 = mword_of_int (KernelSyms.copyinstr + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt40) in "Hpc".
-      iSpecialize ("HK" $! CIDn4 with "[]"); [ iPureIntro; wp_next_chain | ].
+      iSpecialize ("HK" $! CIDn4 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
       iDestruct "HK" as "[HNUL _]".
       iApply ("HNUL" $! I3 i f with "[%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hsrc Hdst");
         [exact Hin | exact Hnul | exact Hpfx | exact Hcp | exact Hz
