@@ -704,7 +704,7 @@ Section UShEcho.
     exec_ok ws ->
     uheap gt gd gs M pm sz -∗ ush_cmd gd t (UkShEcho.echo_cmd ws s0 g) -∗
     ⌜ echo_node_img ws M s0 t g ⌝.
-  Proof.
+  Proof using GEN.
     intro Hok. iIntros "Hheap #Hc".
     iDestruct (UkShEcho.echo_cmd_addr ws with "Hc") as %[Htr _].
     iDestruct (UkShEcho.echo_cmd_cap ws gd t s0 g with "Hc") as "#Hwc".
@@ -727,7 +727,7 @@ Section UShEcho.
     line_ok ws ->
     uheap gt gd gs M pm sz -∗ ush_cmd gd t (UkShEcho.echo_cmd ws s0 g) -∗
     ⌜ echo_node_img ws M s0 t g ⌝.
-  Proof.
+  Proof using GEN.
     intro Hok__.
     exact (echo_node_img_of_cmd_x ws gt gd gs M pm sz s0 t g (line_ok_exec_ok _ Hok__)).
   Qed.
@@ -876,7 +876,7 @@ Section UShEcho.
   Lemma echo_uargv_shape_x (ws : list (list (bv 8))) (s0 : Z) (g : nat -> bv 8) :
     exec_ok ws -> 0 < s0 -> UkShEcho.echo_argv_bytes ws g ->
     uargv_shape (UkShMain.ush_args s0 g (UkShEcho.echo_toks ws)).
-  Proof.
+  Proof using GEN.
     intros Hok Hs0 Hbytes.
     pose proof (exec_ok_len ws Hok) as Hlm. unfold line_max in Hlm.
     split.
@@ -907,7 +907,7 @@ Section UShEcho.
   Lemma echo_uargv_shape (ws : list (list (bv 8))) (s0 : Z) (g : nat -> bv 8) :
     line_ok ws -> 0 < s0 -> UkShEcho.echo_argv_bytes ws g ->
     uargv_shape (UkShMain.ush_args s0 g (UkShEcho.echo_toks ws)).
-  Proof.
+  Proof using GEN.
     intro Hok__.
     exact (echo_uargv_shape_x ws s0 g (line_ok_exec_ok _ Hok__)).
   Qed.
@@ -917,7 +917,7 @@ Section UShEcho.
   Lemma echo_node_img_s0_pos_x (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (g : nat -> bv 8) :
     exec_ok ws -> echo_node_img ws M s0 t g -> 0 < s0.
-  Proof.
+  Proof using GEN.
     intros Hok (_ & Hri & _ & _ & _ & _).
     pose proof (Hri 0%nat (exec_ok_pos ws Hok)) as Hr.
     rewrite (UkShEcho.echo_off_0 ws) in Hr. cbn in Hr. lia.
@@ -926,7 +926,7 @@ Section UShEcho.
   Lemma echo_node_img_s0_pos (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (g : nat -> bv 8) :
     line_ok ws -> echo_node_img ws M s0 t g -> 0 < s0.
-  Proof.
+  Proof using GEN.
     intro Hok__.
     exact (echo_node_img_s0_pos_x ws M s0 t g (line_ok_exec_ok _ Hok__)).
   Qed.
@@ -1002,7 +1002,7 @@ Section UShEcho.
     exec_ok ws -> 0 < s0 -> UkShEcho.echo_argv_bytes ws g ->
     ush_cmd gd t (UkShEcho.echo_cmd ws s0 g) -∗
     uargv_exec gd (t + 8) (UkShMain.ush_args s0 g (UkShEcho.echo_toks ws)).
-  Proof.
+  Proof using GEN.
     intros Hok Hs0 Hbytes. iIntros "#Hc".
     iApply (uargv_exec_of_cmd gd t (UkShMain.ush_args s0 g (UkShEcho.echo_toks ws))
               (echo_uargv_shape_x ws s0 g Hok Hs0 Hbytes)).
@@ -1014,7 +1014,7 @@ Section UShEcho.
     line_ok ws -> 0 < s0 -> UkShEcho.echo_argv_bytes ws g ->
     ush_cmd gd t (UkShEcho.echo_cmd ws s0 g) -∗
     uargv_exec gd (t + 8) (UkShMain.ush_args s0 g (UkShEcho.echo_toks ws)).
-  Proof.
+  Proof using GEN.
     intro Hok__.
     exact (echo_uargv_exec_of_cmd_x ws gd t s0 g (line_ok_exec_ok _ Hok__)).
   Qed.
@@ -1045,7 +1045,7 @@ Section UShEcho.
             afun i j = wl_line ws !!! (UkShEcho.echo_off ws i + j)%nat).
 
   Lemma echo_args_det_x_holds (ws : list (list (bv 8))) : echo_args_det_x ws.
-  Proof.
+  Proof using GEN.
     intros Hok M s0 t g na alen afun Himg Hbytes Hargs.
     (* the [i]th element of the node's vector, named once *)
     assert (Hnth : forall i : nat, (i < length ws)%nat ->
@@ -1091,7 +1091,7 @@ Section UShEcho.
             afun i j = wl_line ws !!! (UkShEcho.echo_off ws i + j)%nat).
 
   Lemma echo_args_det_holds (ws : list (list (bv 8))) : echo_args_det ws.
-  Proof.
+  Proof using GEN.
     intro Hok. exact (echo_args_det_x_holds ws (line_ok_exec_ok ws Hok)).
   Qed.
 
@@ -1146,7 +1146,7 @@ Section UShEcho.
         my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W'.
 
   Lemma echo_slot_of_kexec_holds : echo_slot_of_kexec.
-  Proof.
+  Proof using ghost_varG1.
     intros na alen afun sts W' Hok Hroom Hfdl Hlzf Hscf.
     destruct (echo_kexec_pages na alen afun sts W' Hok)
       as (Hpc & Hsub & Hx & Hwr & Hrp).
@@ -1235,7 +1235,7 @@ Section UShEcho.
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
       cw ProcDefs.secc_all cs pidv (fun _ : Z => True)%I emp uslot.
-  Proof.
+  Proof using ghost_varG1.
     intros Hok Himg Hbytes Hfdl. iIntros "#Hwr #Hnpw #Hdep".
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
     destruct (echo_args_det_holds ws Hok M s0 t g na alen afun Himg Hbytes

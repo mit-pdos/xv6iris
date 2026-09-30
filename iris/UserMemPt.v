@@ -421,7 +421,7 @@ Section UserMemPtGeneric.
     (forall j : nat, (N.of_nat j < Z.to_N k)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
     exec (checked_mem_read (Load Data) pbmt User (Physaddr addr) k false false false false)
          s = Some (Ok (w, default_meta), s).
-  Proof.
+  Proof using Hk Hread_plain.
     intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
     assert (Hcp : exec (check_pma_with_pmp_priority (Load Data) pbmt User
                           (Physaddr addr) k false) s = Some (Ok pma_ok_aligned, s)).
@@ -498,7 +498,7 @@ Section UserMemPtGeneric.
     register_lookup cur_privilege s.(sregs) = User ->
     exec (mem_read (Load Data) pbmt (Physaddr addr) k false false false)
          s = Some (Ok w, s).
-  Proof.
+  Proof using Hk Hread_plain.
     intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes Hmprv Hpriv.
     unfold mem_read.
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).

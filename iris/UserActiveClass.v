@@ -2336,7 +2336,7 @@ Section UserActiveClass.
     (forall (va : mword 64) (mi : bool), base_exec_total_u pt va mi) ->
     (forall (va : mword 64) (mi : bool), rvc_exec_total_u pt va mi) ->
     hw_config -∗ active_class C pt Rut Ei.
-  Proof.
+  Proof using Rut_ctx.
     intros Hbase Hrvc.
     iIntros "#Hhw". rewrite /active_class. iModIntro.
     iIntros (rs1 rsA t mm usatp pcfg paddr mcenv scenv hpm).
@@ -2585,7 +2585,7 @@ Section UserActiveClass.
     (forall (va : mword 64) (mi : bool), base_exec_total_u pt va mi) ->
     (forall (va : mword 64) (mi : bool), rvc_exec_total_u pt va mi) ->
     hw_config -∗ minstret_inv -∗ wire_inv -∗ user_step_obligation_active C pt Rut.
-  Proof.
+  Proof using Rut_ctx.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv".
     iApply (wp_user_step_active C pt Rut with "Hhw Hmin Hwinv").
     iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) Hbase Hrvc
@@ -2600,7 +2600,7 @@ Section UserActiveClass.
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Rut_ctx.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv Hinv Htrap".
     iApply (wp_user_exec_active C pt Rut with "Hhw [] Hinv Htrap").
     iApply (user_step_obligation_active_holds Hbase Hrvc with "Hhw Hmin Hwinv").

@@ -272,7 +272,7 @@ Section ProofUserinit.
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string)
     : wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
-  Proof.
+  Proof using ufdG0.
     cbv beta delta [wp_userinit_sconf_body].
     intros pcE ret_tgt HK Hnb Hdev Hnib Hpj0 Hbelow.
     destruct (uin_kb K HK) as (Kap & Knm & Krl & K4 & Kpop).

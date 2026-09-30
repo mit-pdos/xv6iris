@@ -8147,7 +8147,7 @@ Section SyscallArms.
       (m M : regfile) (fdep : sfam) :
     (1 <= k <= 23)%nat ->
     sysc_arm_goal k γf γw pj γs j γl fn dqi ip pid U sts gn cs lks av m M fdep.
-  Proof.
+  Proof using ufdG0.
     intro Hk.
     destruct (decide (k = 1%nat)) as [-> | Hne1].
     { exact (sysc_arm_fork γf γw pj γs j γl fn dqi ip pid U sts gn cs lks av m M fdep). }

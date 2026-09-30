@@ -1934,7 +1934,7 @@ Section WaitInvBoot.
      children map, and the boot routes the two to different groups. *)
   Lemma children_res_alloc :
     ⊢ |==> ∃ _ : wchG Σ, children_boot ∗ SlotGen.nextpid_pend.
-  Proof.
+  Proof using wchGpreS0.
     iMod (ghost_map_alloc (∅ : gmap gname (mword 64 * gset gname))) as (γ) "[Ha _]".
     iMod (ch_rows_alloc γ NPROC 0 ∅ ltac:(lia)
             ltac:(intros γ0 pa S H; rewrite lookup_empty in H; discriminate)

@@ -456,32 +456,32 @@ Section echo_links_line.
     end.
 
   Global Instance ewc_blk_timeless v I a i : Timeless (ewc_blk v I a i).
-  Proof. rewrite /ewc_blk. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_blk. tl_leaf. Qed.
   Global Instance ewc_post_timeless v I a : Timeless (ewc_post v I a).
-  Proof. rewrite /ewc_post. apply ewc_blk_timeless. Qed.
+  Proof using Timeless0. rewrite /ewc_post. apply ewc_blk_timeless. Qed.
   Global Instance ewc_panic_timeless v I i : Timeless (ewc_panic v I i).
-  Proof. rewrite /ewc_panic. apply ewc_blk_timeless. Qed.
+  Proof using Timeless0. rewrite /ewc_panic. apply ewc_blk_timeless. Qed.
   Global Instance ewc_pro_timeless v I : Timeless (ewc_pro v I).
-  Proof. rewrite /ewc_pro. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_pro. tl_leaf. Qed.
   Global Instance ewc_sp_t_timeless v I : Timeless (ewc_sp_t v I).
-  Proof. rewrite /ewc_sp_t. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_sp_t. tl_leaf. Qed.
   Global Instance ewc_open_t_timeless v I : Timeless (ewc_open_t v I).
-  Proof. rewrite /ewc_open_t. tl_leaf. Qed.
+  Proof using Timeless0. rewrite /ewc_open_t. tl_leaf. Qed.
   Global Instance ewc_line_timeless v I : Timeless (ewc_line v I).
-  Proof.
+  Proof using Timeless0.
     rewrite /ewc_line.
     apply bi.or_timeless; [apply ewc_pro_timeless |].
     apply bi.exist_timeless; intro.
     apply bi.sep_timeless; [apply bi.pure_timeless | apply ewc_post_timeless].
   Qed.
   Global Instance ewc_lpr_timeless v I p : Timeless (ewc_lpr v I p).
-  Proof.
+  Proof using Timeless0.
     rewrite /ewc_lpr. destruct p as [| [| [| p]]];
       [apply ewc_line_timeless | apply ewc_sp_t_timeless
       | apply ewc_open_t_timeless | apply ewc_blk_timeless].
   Qed.
   Global Instance ewc_lcred_timeless k I p : Timeless (ewc_lcred k I p).
-  Proof.
+  Proof using Timeless0.
     rewrite /ewc_lcred. apply bi.exist_timeless; intro.
     apply bi.sep_timeless; [apply era_pin_timeless | apply ewc_lpr_timeless].
   Qed.
@@ -656,7 +656,7 @@ Section echo_links_line.
     era_pin γ k v -∗ echo_links T γ -∗ ewc_post v I a -∗
     (ewc_sp_t v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Ha Hb. iIntros "#Hpin #Hlk Hc HΦ".
     pose proof (line_alts_len_ge2 (last_ws I) a Ha) as Hlen.
     assert (Hby : line_alts_of (last_ws I) !!! a
@@ -679,7 +679,7 @@ Section echo_links_line.
     era_pin γ k v -∗ echo_links T γ -∗ ewc_sp_t v I -∗
     (ewc_open_t v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (echo_links_w with "Hlk") as "#Hw".
     iDestruct (echo_links_taint with "Hlk") as "#Ht".
@@ -710,7 +710,7 @@ Section echo_links_line.
     era_pin γ k v -∗ echo_links T γ -∗ ewc_line v I -∗
     (ewc_sp_t v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     rewrite /ewc_line. iDestruct "Hc" as "[Hc | Hc]"; last first.
     { iDestruct "Hc" as (a) "[%Ha Hc]".
@@ -905,7 +905,7 @@ Section echo_links_line.
   (* =================================================================== *)
   Lemma ewc_ban_done_line (v : era_pins) (I : list (bv 8)) :
     EchoLinks.ewc_ban T v I (length u_banner) -∗ ewc_line v I.
-  Proof.
+  Proof using Persistent0.
     rewrite /EchoLinks.ewc_ban. iIntros "[Hl | #HT]";
       last by iApply ewc_line_taint.
     iDestruct "Hl" as (ps cs P) "(%Hw & Htn & #Hps & #Hcs & #HE)".
@@ -978,7 +978,7 @@ Section echo_links_line.
       era_pin γ k v
       ∗ ((∃ ps cs P : _, ⌜wr_blk_t ps cs I P⌝ ∗ turn v P ∗ ps_lb v ps
             ∗ cs_lb v cs ∗ inp_lb v I) ∨ T).
-  Proof.
+  Proof using Persistent0.
     rewrite /ewc_lcred. iIntros "Hc". iDestruct "Hc" as (v) "[#Hpin Hc]".
     iExists v. iFrame "Hpin". cbn [ewc_lpr].
     iApply (ewc_blk_0_lend v I 0%nat with "Hc").

@@ -285,7 +285,7 @@ Section BootSecondary.
     own_context cur_ctx -∗
     started_inv γi ξd (main_dep γd γv) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using fileG0 ufdG0.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted".
@@ -492,7 +492,7 @@ Section BootPrimary.
     kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using ufdG0.
     intros Hreset Hz Hprun Hlen Hlive Hl0 Hl1 Hcnu Hcne Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim #Hecho Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
              Hfs Hmir Hirslot Hirauth #Hcert #Hcinv #Hseam

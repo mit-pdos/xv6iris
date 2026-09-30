@@ -146,7 +146,7 @@ Section echo_links_ban.
     era_pin γ k v -∗ echo_links T γ -∗ EchoLinks.ewc_ban T v I 0%nat -∗
     (EchoLinksLine.ewc_sp_t T v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iApply (EchoLinksLine.echo_prompt_dollar_line T γ k v I b Φ Hb
               with "Hpin Hlk [Hc] HΦ").
@@ -167,7 +167,7 @@ Section echo_links_ban.
       (I : list (bv 8)) (a : nat) (ws : list (list mobs * bv 8)) :
     (a < 3)%nat -> length I = n -> (0 < length ws)%nat ->
     EchoLinksLine.ewc_post T v I a -∗ read_ret T k v n ws -∗ T.
-  Proof.
+  Proof using Persistent0.
     intros Ha HIn Hws. iIntros "Hc Hr".
     rewrite /EchoLinksLine.ewc_post /EchoLinksLine.ewc_blk.
     iDestruct "Hc" as "[Hl | #HT]"; [| done].
@@ -199,7 +199,7 @@ Section echo_links_ban.
       (I : list (bv 8)) (ws : list (list mobs * bv 8)) :
     length I = n -> (0 < length ws)%nat ->
     EchoLinksLine.ewc_line T v I -∗ read_ret T k v n ws -∗ T.
-  Proof.
+  Proof using Persistent0.
     intros HIn Hws. iIntros "Hc Hr".
     rewrite /EchoLinksLine.ewc_line. iDestruct "Hc" as "[Hc | Hc]".
     - iDestruct (EchoLinksLine.ewc_pro_owed with "Hc") as "Hc".
@@ -213,7 +213,7 @@ Section echo_links_ban.
       (I : list (bv 8)) (ws : list (list mobs * bv 8)) :
     length I = n -> (0 < length ws)%nat ->
     EchoLinks.ewc_ban T v I 0%nat -∗ read_ret T k v n ws -∗ T.
-  Proof.
+  Proof using Persistent0.
     intros HIn Hws. iIntros "Hc Hr".
     iDestruct (EchoLinks.ewc_ban_owed with "Hc") as "Hc".
     iApply (EchoLinks.ewc_owed_read_taint T k v n I ws HIn Hws with "Hc Hr").

@@ -75,7 +75,7 @@ Section KvminitBody.
   Lemma wp_kvminit_sconf_gen (γa : gname) (γk : gname * gname) (mm : regfile)
       (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
     wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks.
-  Proof.
+  Proof using wp_kvmmake.
     unfold wp_kvminit_sconf_body.
     intros Hlvl HK Hex Hp0 Hlkbelow.
     destruct Hex as (nb & Hon & Hnbk). subst lvl. subst on.

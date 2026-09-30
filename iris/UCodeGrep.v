@@ -8871,7 +8871,7 @@ Section UCodeGrep.
   Global Typeclasses Opaque grep_rodata.
 
   Lemma grep_rodata_of_text : utext_all gt M pm -∗ grep_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                grep_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -8887,7 +8887,7 @@ Section UCodeGrep.
   Qed.
 
   Lemma grep_code_of_text : utext_all gt M pm -∗ grep_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                GrepInstrs.grep_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

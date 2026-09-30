@@ -28,7 +28,7 @@ Section Probe.
 
   Lemma probe_transitive (a b c : Z) (H1 : P x)
     (H2 : a <= b) (H3 : b <= c) : a <= c.
-  Proof. lia_fast. Qed.
+  Proof using T. lia_fast. Qed.
 
   (* a bare equation between two Z variables: arithmetic by its TYPE only *)
   Lemma probe_bare_eq (a b : Z) (H1 : P x) (H2 : P y) (Heq : a = b) (Hb : 0 <= b) :
@@ -63,9 +63,9 @@ Section Probe.
   Lemma probe_ineq_nat (m n : nat) (H1 : P x) (Hmn : (m <= n)%nat) : (m <= n)%nat.
   Proof using T. lia_fast. Qed.
   Lemma probe_ineq_nat_lt (m n : nat) (H1 : P x) (Hmn : (m < n)%nat) : (m < n)%nat.
-  Proof. lia_fast. Qed.
+  Proof using T. lia_fast. Qed.
   Lemma probe_ineq_nat_absurd (H1 : P x) (H2 : P y) (Hbad : (1 <= 0)%nat) : False.
-  Proof. lia_fast. Qed.
+  Proof using T. lia_fast. Qed.
   Lemma probe_ineq_Z (m n : Z) (H1 : P x) (Hmn : m <= n) : m <= n.
   Proof using T. lia_fast. Qed.
   Lemma probe_ineq_N (m n : N) (H1 : P x) (Hmn : N.le m n) : N.le m n.
@@ -80,7 +80,7 @@ Section Probe.
      that IS a Prop still goes. *)
   Lemma probe_keeps_data (a b : Z) (u : U) (Hnoise : P x)
     (Ha : a = b + 1) (Hb : 0 <= b) : 0 <= a.
-  Proof.
+  Proof using T.
     lia_shrink.
     lazymatch goal with _ : U |- _ => idtac end.
     Fail lazymatch goal with _ : P x |- _ => idtac end.
@@ -97,14 +97,14 @@ Section Probe.
      is that the rest still goes and the solve still closes. *)
   Lemma probe_dependent_survivor (a b : Z) (Hnoise : P x) (r : R Hnoise)
     (Ha : a = b + 1) (Hb : 0 <= b) : 0 <= a.
-  Proof. lia_fast. Qed.
+  Proof using T. lia_fast. Qed.
 
   (* ... and the same shape where the survivor is an ARITHMETIC Prop, so the
      bisection runs with the hypothesis [lia] actually needs on the far side
      of the failing [clear]. *)
   Lemma probe_dependent_arith (a : Z) (Hnoise : P x) (Hb : 0 <= f Hnoise)
     (Ha : a = f Hnoise) : 0 <= a.
-  Proof. lia_fast. Qed.
+  Proof using T. lia_fast. Qed.
 
   (* a hypothesis under a binder.  lia does not instantiate a universally
      quantified hypothesis, so NEITHER arm proves this -- the check is that

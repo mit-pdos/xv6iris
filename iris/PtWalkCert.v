@@ -2151,7 +2151,7 @@ Section PtAdue.
   Lemma goodmb_add_to_TLB_pt (asid : mword 16) (vpn : mword 27) (pp : mword 44)
       (pte : mword 64) (ptea : physaddr) (g : bool) (s : mstate) (mm : pamap) :
     goodmb Dr Dw (add_to_TLB 39 asid vpn pp pte ptea 0 g) s mm = true.
-  Proof.
+  Proof using HDt HWt.
     unfold add_to_TLB. cbn zeta.
     gmm_rr tlb HDt.
     unfold Defs.bind0. gmm_wr tlb HWt.
@@ -2161,7 +2161,7 @@ Section PtAdue.
 
   Lemma goodmb_write_TLB (idx : Z) (en : TLB_Entry) (s : mstate) (mm : pamap) :
     goodmb Dr Dw (write_TLB idx en) s mm = true.
-  Proof.
+  Proof using HDt HWt.
     unfold write_TLB. gmm_rr tlb HDt. try unfold Defs.bind0.
     first [ gmm_wr tlb HWt; apply goodmb_returnm
           | etransitivity; [ apply goodmb_write_reg | exact HWt ] ].
@@ -2222,7 +2222,7 @@ Section PtAdue.
     sw.(sregs) = s.(sregs) ->
     goodmb Dr Dw (translate_TLB_hit 39 asid vpn acc pv mxr do_sum tt idx
                     (u_walk_entry vpn q2 q1 q0 asid)) s mm = true.
-  Proof.
+  Proof using HDme HDt HWt.
     intros Hchk Hchkg Hgate Hpb Hmenv HADUE Hrdx Hrdxg Hv0 Hl0 Hnap Hchkm Hlfg
            Hmisa HPBMTE Hvar Hupd Hwrite Hwriteg Hswregs.
     unfold translate_TLB_hit. cbn zeta.
@@ -2369,7 +2369,7 @@ Section PtAdue.
     update_PTE_Bits (m0 : mword 64) acc = None ->
     goodmb Dr Dw (translate_TLB_hit 39 asid vpn acc pv mxr do_sum tt idx
                     (u_walk_entry vpn q2 q1 q0 asid)) s mm = true.
-  Proof.
+  Proof using HDme HDt HWt.
     intros Hchk Hchkg Hgate Hpb Hmenv HADUE Hrdx Hrdxg Hv0 Hl0 Hnap Hchkm Hlfg
            Hmisa HPBMTE Hvar Hupd.
     unfold translate_TLB_hit. cbn zeta.
@@ -2514,7 +2514,7 @@ Section PtAdue.
             (p0' : mword 64)) s mm = true ->
     sw.(sregs) = s.(sregs) ->
     goodmb Dr Dw (translate_TLB_miss 39 asid root vpn acc pv mxr do_sum tt) s mm = true.
-  Proof.
+  Proof using HDme HDt HWt.
     intros HDmi Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hchk Hg2 Hg1 Hg0 Hgchk Hupd
            Hrd2 Hrd2g Hrd1 Hrd1g Hrd0 Hrd0g Hrdx Hrdxg
            Hmisa Hmenv HPBMTE HADUE Hwrite Hwriteg Hswregs.

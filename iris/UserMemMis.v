@@ -1119,7 +1119,7 @@ Section GmMemWriteEaSplit.
     exec (write_kind_of_flags false false false) s = Some (wk, s) ->
     goodmb Dr Dw (mem_write_ea (Physaddr pa) width acc pbmt false false false) s mm
       = true.
-  Proof.
+  Proof using HN Hpmp Hpmpg.
     intros HDm HDc Heffg Heff Hpacg Hpac Hsplitg Hsplit Hwkfg Hwkf.
     assert (Hmst : goodmb Dr Dw (Defs.read_reg mstatus : M _) s mm = true)
       by (rewrite goodmb_read_reg; exact HDm).

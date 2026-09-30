@@ -1726,7 +1726,7 @@ Section box.
     ∃ T_boot : nat,
       is_box N γ ∗
       slotd_half γ (SlotReg T_boot false i0 None) ∗ llb loglen_name T_boot.
-  Proof.
+  Proof using H0 H1.
     iIntros "Hrun Hst Hc Hd Hp Hbun". iDestruct "Hd" as (r0) "Hd".
     iMod ctx_stamped_alloc as (ξb) "Hpk".
     iMod (ctx_deposit (in_arm i0) ξ ξb 0 with "Hrun Hpk [Hbun]")

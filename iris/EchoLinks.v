@@ -818,11 +818,11 @@ Section echo_links.
         ∗ cs_lb v cs ∗ inp_lb v I) ∨ T)%I.
 
   Global Instance ewc_owed_timeless v I : Timeless (ewc_owed v I).
-  Proof. rewrite /ewc_owed. apply _. Qed.
+  Proof using Timeless0. rewrite /ewc_owed. apply _. Qed.
   Global Instance ewc_sp_timeless v I : Timeless (ewc_sp v I).
   Proof using Timeless0. rewrite /ewc_sp. apply _. Qed.
   Global Instance ewc_open_timeless v I : Timeless (ewc_open v I).
-  Proof. rewrite /ewc_open. apply _. Qed.
+  Proof using Timeless0. rewrite /ewc_open. apply _. Qed.
 
   Lemma ewc_owed_taint v I : T -∗ ewc_owed v I.
   Proof using . iIntros "HT". rewrite /ewc_owed. by iRight. Qed.
@@ -852,7 +852,7 @@ Section echo_links.
     (∃ v : era_pins, era_pin γ k v ∗ ewc_pr v I p)%I.
 
   Global Instance ewc_cred_timeless k I p : Timeless (ewc_cred k I p).
-  Proof. rewrite /ewc_cred. apply _. Qed.
+  Proof using Timeless0. rewrite /ewc_cred. apply _. Qed.
 
   (* ...AND THE ONE PLACE THE CREDENTIAL IS BORN: round 0, at the EMPTY
      input, with the banner filed, no line resolved and the writer
@@ -898,7 +898,7 @@ Section echo_links.
         ∗ cs_lb v cs ∗ inp_lb v I) ∨ T)%I.
 
   Global Instance ewc_ban_timeless v I i : Timeless (ewc_ban v I i).
-  Proof. rewrite /ewc_ban. apply _. Qed.
+  Proof using Timeless0. rewrite /ewc_ban. apply _. Qed.
 
   Lemma ewc_ban_taint v I i : T -∗ ewc_ban v I i.
   Proof using . iIntros "HT". rewrite /ewc_ban. by iRight. Qed.
@@ -909,7 +909,7 @@ Section echo_links.
     era_pin γ k v -∗ echo_links -∗ ewc_ban v I i -∗
     (ewc_ban v I (S i) -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (echo_links_w with "Hlk") as "#Hw".
     iDestruct (echo_links_pro with "Hlk") as "#Hpro".
@@ -1013,7 +1013,7 @@ Section echo_links.
     b = u_prompt !!! 0%nat ->
     era_pin γ k v -∗ echo_links -∗ ewc_owed v I -∗ (ewc_sp v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (echo_links_blk with "Hlk") as "#Hblk".
     iDestruct (echo_links_pro with "Hlk") as "#Hpro".
@@ -1068,7 +1068,7 @@ Section echo_links.
     b = u_prompt !!! 1%nat ->
     era_pin γ k v -∗ echo_links -∗ ewc_sp v I -∗ (ewc_open v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (echo_links_w with "Hlk") as "#Hw".
     iDestruct (echo_links_taint with "Hlk") as "#Ht".
@@ -1099,7 +1099,7 @@ Section echo_links.
     b = u_prompt !!! 0%nat ->
     era_pin γ k v -∗ echo_links -∗ ewc_ban v I 0%nat -∗ (ewc_sp v I -∗ Φ) -∗
     out_link Uart0 k b Φ.
-  Proof.
+  Proof using Persistent0.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iApply (echo_prompt_dollar k v I b Φ Hb with "Hpin Hlk [Hc] HΦ").
     by iApply ewc_ban_owed.
@@ -1141,7 +1141,7 @@ Section echo_links.
     length I = n -> (0 < length ws)%nat ->
     ewc_owed v I -∗ read_ret T k v n ws -∗
     T ∗ ewc_owed v I ∗ read_ret T k v n ws.
-  Proof.
+  Proof using Persistent0.
     intros HIn Hws. iIntros "Hc Hr".
     rewrite /ewc_owed. iDestruct "Hc" as "[Hl | #HT]"; last first.
     { iSplitR; [iExact "HT" |]. iSplitR "Hr"; [by iRight | iExact "Hr"]. }
@@ -1175,7 +1175,7 @@ Section echo_links.
       (I : list (bv 8)) (ws : list (list mobs * bv 8)) :
     length I = n -> (0 < length ws)%nat ->
     ewc_owed v I -∗ read_ret T k v n ws -∗ T.
-  Proof.
+  Proof using Persistent0.
     intros HIn Hws. iIntros "Hc Hr".
     iDestruct (ewc_owed_read_refute k v n I ws HIn Hws with "Hc Hr")
       as "($ & _ & _)".

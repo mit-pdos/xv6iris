@@ -9004,7 +9004,7 @@ Section UCodeShP.
   Global Typeclasses Opaque shp_rodata.
 
   Lemma shp_rodata_of_text : utext_all gt M pm -∗ shp_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                shp_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -9020,7 +9020,7 @@ Section UCodeShP.
   Qed.
 
   Lemma shp_code_of_text : utext_all gt M pm -∗ shp_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                ShInstrs.sh_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

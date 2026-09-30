@@ -624,7 +624,7 @@ Section ParkCap.
     (* the child's rows with the block WHOLE -- the steady mode's shape *)
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U true -∗
     |==> own_context cur_ctx ∗ proc_ctx (un_s N) (un_pj N).
-  Proof.
+  Proof using ufdG0.
     iIntros (Hwf Hrest)
       "Hrun #Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hdone0 Hfrag Hch Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).

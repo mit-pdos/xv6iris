@@ -5556,7 +5556,7 @@ Section UCodeInit.
   Global Typeclasses Opaque init_rodata.
 
   Lemma init_rodata_of_text : utext_all gt M pm -∗ init_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                init_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -5572,7 +5572,7 @@ Section UCodeInit.
   Qed.
 
   Lemma init_code_of_text : utext_all gt M pm -∗ init_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                InitInstrs.init_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

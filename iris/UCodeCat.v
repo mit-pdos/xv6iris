@@ -5902,7 +5902,7 @@ Section UCodeCat.
   Global Typeclasses Opaque cat_rodata.
 
   Lemma cat_rodata_of_text : utext_all gt M pm -∗ cat_rodata gt.
-  Proof.
+  Proof using Hsub2 Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                cat_ro !! a = Some b -> M !! a = Some b).
     { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
@@ -5918,7 +5918,7 @@ Section UCodeCat.
   Qed.
 
   Lemma cat_code_of_text : utext_all gt M pm -∗ cat_code gt.
-  Proof.
+  Proof using Hsub Hx.
     assert (Hin : forall (a : Z) (b : bv 8),
                CatInstrs.cat_bytes !! a = Some b -> M !! a = Some b)
       by exact Hsub.

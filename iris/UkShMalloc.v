@@ -279,7 +279,7 @@ Section UkShMalloc.
          (ret_pc (m !!! Regidx ra_idx)) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Harg Heag Hn0 Hsz0 Hszok Hal.
     iIntros "#Hcode Hrun Hsz Hcont".
     unfold ShSyms.sys_sbrk.
@@ -4614,7 +4614,7 @@ Section UkShMalloc.
          urun N h' m' (ret_pc (m !!! Regidx ra_idx)) (10 + avail) -∗
          mWP (Loop : expr riscv_lang)) -∗
       mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using Hpsok_free.
     intros Hszlo Hszal Hszok h m nbytes avail Ha0 Hnb0 Hnbhi.
     iIntros "#Hcode (Hfreep & [%fb Hbase] & Hsz) Hrun Hcont".
     iDestruct (ushm_code_shp γt with "Hcode") as "#Hmcode".

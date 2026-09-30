@@ -804,7 +804,7 @@ Section stepfull.
       (fun _ => ∃ rs3 : regstate, ⌜wait_post (Drw ∪ Dro) rs rs3⌝ ∗
                   hreg_frame rs3 Drw ∗ hreg_frame_ro Df rs3 Dro ∗
                   resv_any cpu_id ∗ R)%I.
-  Proof.
+  Proof using XI.
     intros Hdisj HDr HDw Hip Hie Hhs HDpriv HDhart HDmc HDcfg HWmi HDmi
       HWms HDms HWpc HDpc HDnpc Hhart.
     iIntros "#Hcert Hany Hrw Hro HR".
@@ -1050,7 +1050,7 @@ Section stepfull.
          resv_any cpu_id -∗ Psi -∗
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof.
+  Proof using XI.
     intros Hdisj HDr HDw Hip Hie Hhs HWcy HWti HWip HDpriv HDhart HDmc HDcfg
       HWmi HDmi HWms HDms HWpc HDpc HDnpc Hhart.
     iIntros "#Hcert Hany Hrw Hro HPsi Hcont".
