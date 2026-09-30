@@ -3777,8 +3777,8 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iDestruct (wp_next_here with "Hcont") as "Hcont".
-      iApply ("Hcont" $! ms with "[%] Hlc Hcg' Hpc'"). exact Hmsf.
+      iDestruct (wp_next_here with "Hcont Hlc") as "Hcont".
+      iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
   Lemma wp_csrsi_sstatus_x0_enable_s_sconf
@@ -3896,7 +3896,7 @@ Section WpSconfCsr.
        continuation hands on is then about THAT hart. *)
     rename CID into CID0.
     iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -4072,7 +4072,7 @@ Section WpSconfCsr.
     iNext.
     rename CID into CID0.
     iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
@@ -4271,7 +4271,7 @@ Section WpSconfCsr.
       iNext.
       rename CID into CID0.
       iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl.
-      iSplitR "Hcont".
+      iSplitR "Hcont Hlc".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
@@ -4433,8 +4433,8 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) k eb p ∗
                    cpu_priv_pay (CID := CIDr) false p)%I
                 with "Hcg Hpc Hinstr [Hcnt Hcont]").
-      iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-      iSplitR "Hcont".
+      iNext. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+      iSplitR "Hcont Hlc".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (ms0 mdv0)
           "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Hspp & Hmie &
