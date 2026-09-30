@@ -179,7 +179,7 @@ Section ProofSysGetpid.
     iApply (Myproc.wp_myproc_sconf Bj (av - 2)%nat n eb p b
               _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID6 Hs6) "_". iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
+    iIntros (CID6 Hs6) "_"; iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_getpid + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).

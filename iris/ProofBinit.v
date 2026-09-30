@@ -569,7 +569,7 @@ Section ProofBinit.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iIntros (CID14 Hs14) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iIntros (CID14 Hs14) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
     iEval (rewrite HR7a0 HR7a1) in "Hlname".
     iMod (lock_name_intro with "Hstr_bcache Hlname") as "#Hlnm".
@@ -780,7 +780,7 @@ Section ProofBinit.
               bcache_lru bhead (blist 0 NBUF) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hlock Hcpu]" as "Hpost".
-    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hfresh Hlru".
+    { iIntros (CID' Hs') "Hlc"; iIntros (mr) "Hcg Hpc %Hcs Hfresh Hlru".
       iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh Hlru"). }
     (* the loop-setup instructions have each moved the hart; re-anchor
@@ -972,7 +972,7 @@ Section ProofBinit.
       { iEval (rewrite HM4a0). iExact "Hf4". }
       { iEval (rewrite HM4a0). iExact "Hf5". }
       { iEval (rewrite HM4a0). iExact "Hf6p". }
-      iIntros (CIDm7 Hsm7) "_". iIntros (msl) "Hcg Hpc %Hslcs Hg1 Hg2 Hg3 Hg4 Hg5 Hg6".
+      iIntros (CIDm7 Hsm7) "_"; iIntros (msl) "Hcg Hpc %Hslcs Hg1 Hg2 Hg3 Hg4 Hg5 Hg6".
       iEval (rewrite HM4a0) in "Hg1". iEval (rewrite HM4a0) in "Hg2".
       iEval (rewrite HM4a0) in "Hg3". iEval (rewrite HM4a0) in "Hg4".
       iEval (rewrite HM4a0) in "Hg5". iEval (rewrite HM4a0) in "Hg6".
@@ -1107,7 +1107,7 @@ Section ProofBinit.
         iDestruct (wp_next_shift Hshiftexit with "Hpost") as "Hpost".
         iApply (biepi (CID0 := CIDexit) m N2 K b pcur ltac:(lia) HN2sp HN2cs
                   with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6").
-        iIntros (CIDy Hsy) "Hlc". iIntros (mr) "Hcg Hpc %Hcs".
+        iIntros (CIDy Hsy) "Hlc"; iIntros (mr) "Hcg Hpc %Hcs".
         iSpecialize ("Hpost" $! CIDy with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hpost" $! mr with "Hcg Hpc [//] Hdone Hlru").
       - (* more buffers: bne TAKEN -> back edge to +0x50 at cursor S j *)

@@ -370,9 +370,9 @@ Section KforkB3Proof.
           mWP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_". iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
+      { iIntros (CIDk Hsk) "_"; iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_". iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
+      iIntros (CIDk Hsk) "_"; iIntros (i M) "%Hfuel %Hi %Hregs Hqx Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
       destruct Hregs as (Hcsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hthr).
       (* --------------------------------------------------------------- *)
       (*  Htail: the increment+test at +0x8e..+0x92, shared by both arms *)
@@ -393,7 +393,7 @@ Section KforkB3Proof.
           fd_frags (pv_fdg (us_V U0)) (kfk_at stsP fdt0 (S i)) -∗
           mWP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDta Hsta) "_". iIntros (Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
+      { iIntros (CIDta Hsta) "_"; iIntros (Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2 Hpfrag Hcfrag".
         destruct Hregst as (Ht0 & Ht0' & Ht1 & Ht2 & Ht3 & Ht4 & Ht5 & Htthr).
         (* ---- +0x8e: c.addi s1,s1,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x8e)) Rs1 (mword_of_int 8 : mword 6)
@@ -678,7 +678,7 @@ Section KforkB3Proof.
                   _ HK14 Hn HL2a0k Hbelow
                   with "Hcg Hown Htext Hpc Hft Hfds Href").
         all: try lkbelow.
-        iIntros (CIDo Hsto) "_". iIntros (mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
+        iIntros (CIDo Hsto) "_"; iIntros (mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
         destruct Hcsmr as [Hcsmr Hmra0].
         assert (Hpc9e : ret_pc (L2 !!! Regidx Rra) = mword_of_int (KF + 0x9e)).
         { rewrite HL2ra. apply bv_eq. vm_compute. reflexivity. }

@@ -164,7 +164,7 @@ Section KvminitBody.
               ltac:(exists nb; split; [reflexivity | exact Hnbk]) Hp0
               with "Hcg Hcnt Htext Hpc Henv").
     all: try lkbelow.
-    iIntros (CID6 Hs6) "_". iIntros (mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
+    iIntros (CID6 Hs6) "_"; iIntros (mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
     assert (Hret0c : ret_pc (J !!! Regidx (mword_of_int 1)) = mword_of_int (KernelSyms.kvminit + 0x0c)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0c) in "Hpc".

@@ -986,7 +986,7 @@ Section UwBodies.
         ∧ uw_exit_cont (CID0 := CID0) prt γu j m0 av true sp0 buf n f dq pidv dqp Φ lks ) -∗
       mWP (Loop : expr riscv_lang)))%I with "[]" as "Turn".
     { iLöb as "IH".
-      iIntros (CIDh Hsh) "_". iIntros (M1) "%Hregs1 Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont".
+      iIntros (CIDh Hsh) "_"; iIntros (M1) "%Hregs1 Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hcont".
       pose proof Hregs1 as Hregs1'.
       destruct Hregs1' as (Hsp & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & W24 & W25 & W26 & W27).
       (* --- +0x48  c.mv a0,s5 --- *)
@@ -1026,7 +1026,7 @@ Section UwBodies.
                 ltac:(lia) Hfresh
                 with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkuart.
-      iIntros (CIDp Hsp') "_". iIntros (MP) "%HcsP Hcg Hcnt Hpc".
+      iIntros (CIDp Hsp') "_"; iIntros (MP) "%HcsP Hcg Hcnt Hpc".
       iEval (rewrite HQ2ra P4e) in "Hpc".
       assert (HregsP : uw_loop_regs prt m0 MP (pa_stk sp0 8) buf n i).
       { apply (uw_loop_regs_cs prt m0 Q2 MP); [exact HcsP|].
@@ -1072,7 +1072,7 @@ Section UwBodies.
                 with "Hcg Hcnt Ht Hpc [Hlk]").
       all: try lkuart.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
-      iIntros (CIDacq Hsacq) "_". iIntros (ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+      iIntros (CIDacq Hsacq) "_"; iIntros (ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
       iEval (rewrite HQ4ra P54) in "Hpc".
       assert (HregsA : uw_loop_regs prt m0 MA (pa_stk sp0 8) buf n i).
       { apply (uw_loop_regs_cs prt m0 Q4 MA); [exact HcsA|].
@@ -1185,7 +1185,7 @@ Section UwBodies.
                   ltac:(lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu l with "Hown"). }
-        iIntros (CIDr Hsr) "_". iIntros (MR) "Hcg Hpc %HcsR Hcnt".
+        iIntros (CIDr Hsr) "_"; iIntros (MR) "Hcg Hpc %HcsR Hcnt".
         (* the release/park window: nothing is held across sleep() *)
         pose proof (locks_below_not_elem lks (uart_lock_name prt)
                       ltac:(lkuart)) as Hnotin.
@@ -1220,7 +1220,7 @@ Section UwBodies.
         all: try lkuart.
         { rewrite /trap_csrs_ext. done. }
         { rewrite /cpu_claim_ext. done. }
-        iIntros (CIDs Hss) "_". iIntros (MS) "%HcsS Hcg Hcnt Hpc _ _".
+        iIntros (CIDs Hss) "_"; iIntros (MS) "%HcsS Hcg Hcnt Hpc _ _".
         iEval (rewrite HK3ra P44) in "Hpc".
         assert (HregsS : uw_loop_regs prt m0 MS (pa_stk sp0 8) buf n i).
         { apply (uw_loop_regs_cs prt m0 K3 MS); [exact HcsS|].
@@ -1353,7 +1353,7 @@ Section UwBodies.
                   ltac:(lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu ((l ++ [f i])%list) with "Hown"). }
-        iIntros (CIDr2 Hsr2) "_". iIntros (MR2) "Hcg Hpc %HcsR2 Hcnt".
+        iIntros (CIDr2 Hsr2) "_"; iIntros (MR2) "Hcg Hpc %HcsR2 Hcnt".
         (* the byte's own turn is BALANCED: what it acquired it released *)
         pose proof (locks_below_not_elem lks (uart_lock_name prt)
                       ltac:(lkuart)) as Hnotin2.
@@ -1471,23 +1471,23 @@ Section UwBodies.
     induction k as [|k IH].
     - intros i Hik. iIntros "#Ht #Huinv #Hbw #Htxl #Hpinv".
       rewrite /uw_head.
-      iIntros (CIDh Hsh) "_". iIntros (M) "%Hregs Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hexit".
+      iIntros (CIDh Hsh) "_"; iIntros (M) "%Hregs Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 prt γl γu γs j γlp m0 M av eb sp0 buf n f dq
                 pidv dqp Φ i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
                 with "Ht Huinv Hbw Htxl Hpinv Hcg Hcnt Hpc Hpid Hch Hfull Hbuf [Hexit]").
       iSplit.
       + (* the back edge is dead: this was the last byte *)
-        rewrite /uw_next_cont. iIntros (CIDx Hsx) "_". iIntros (M') "%Hlt". exfalso. lia.
+        rewrite /uw_next_cont. iIntros (CIDx Hsx) "_"; iIntros (M') "%Hlt". exfalso. lia.
       + iExact "Hexit".
     - intros i Hik. iIntros "#Ht #Huinv #Hbw #Htxl #Hpinv".
       rewrite /uw_head.
-      iIntros (CIDh Hsh) "_". iIntros (M) "%Hregs Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hexit".
+      iIntros (CIDh Hsh) "_"; iIntros (M) "%Hregs Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 prt γl γu γs j γlp m0 M av eb sp0 buf n f dq
                 pidv dqp Φ i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
                 with "Ht Huinv Hbw Htxl Hpinv Hcg Hcnt Hpc Hpid Hch Hfull Hbuf [Hexit]").
       iSplit.
       + rewrite /uw_next_cont.
-        iIntros (CIDx Hsx) "_". iIntros (M') "%Hlt %Hregs' Hcg Hcnt Hpc Hpid Hch Hfull Hbuf".
+        iIntros (CIDx Hsx) "_"; iIntros (M') "%Hlt %Hregs' Hcg Hcnt Hpc Hpid Hch Hfull Hbuf".
         iPoseProof (IH (S i) ltac:(lia) with "Ht Huinv Hbw Htxl Hpinv") as "Next".
         rewrite /uw_head.
         iSpecialize ("Next" $! CIDx with "[%]"); [wp_next_chain|].
@@ -1935,7 +1935,7 @@ Section ProofUartwrite.
       { exact HA13regs. }
       (* ============ the loop's exit: +0x78 -> the epilogue ============ *)
       rewrite /uw_exit_cont.
-      iIntros (CIDx Hsx) "_". iIntros (M') "%Hregs' Hcg Hcnt Hpc Hpid Hout Hfull Hbuf".
+      iIntros (CIDx Hsx) "_"; iIntros (M') "%Hregs' Hcg Hcnt Hpc Hpid Hout Hfull Hbuf".
       pose proof Hregs' as Hregs''.
       destruct Hregs'' as (Wsp & Ws1 & Ws2 & Ws3 & Ws4 & Ws5 & Ws6 & Ws7 & W24 & W25 & W26 & W27).
       iApply (uw_tail (CID := CIDx) CID γu j m M' av eb sp0 Φ
@@ -1944,7 +1944,7 @@ Section ProofUartwrite.
                 ltac:(wp_next_chain)
                 with "Ht Hcg Hcnt Hpc Hpid Hout Hfull Hbuf [Hcont]").
       rewrite /uw_ret.
-      iIntros (CIDz Hsz) "Hlc". iIntros (mf) "%Hcs Hcg Hcnt Hpc Hbuf Hpid Hout2".
+      iIntros (CIDz Hsz) "Hlc"; iIntros (mf) "%Hcs Hcg Hcnt Hpc Hbuf Hpid Hout2".
       iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hbuf] Hpid [Hout2]").
       + exact Hcs.

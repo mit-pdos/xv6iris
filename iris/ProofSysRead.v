@@ -513,7 +513,7 @@ Section ProofSysRead.
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
-    iIntros (CID8 Hs8) "_". iIntros (A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
+    iIntros (CID8 Hs8) "_"; iIntros (A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
     iEval (rewrite HM5a1) in "Hs5".
     iDestruct ("Hpback" with "Htfc Htfp") as "Hpriv".
     assert (Hpc12 : ret_pc (M5 !!! Regidx Rra)
@@ -592,7 +592,7 @@ Section ProofSysRead.
               ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
     { iEval (rewrite HB3a1). iExact "Hs4hi". }
-    iIntros (CID12 Hs12) "_". iIntros (A1) "%HcsA1 Hcg Hcpu Hpc Htfc Htfp Hs4hi".
+    iIntros (CID12 Hs12) "_"; iIntros (A1) "%HcsA1 Hcg Hcpu Hpc Htfc Htfp Hs4hi".
     iEval (rewrite HB3a1) in "Hs4hi".
     iDestruct ("Hpback" with "Htfc Htfp") as "Hpriv".
     assert (Hpc1c : ret_pc (B3 !!! Regidx Rra)
@@ -700,7 +700,7 @@ Section ProofSysRead.
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
-    iIntros (CID17 Hs17) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
+    iIntros (CID17 Hs17) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
     assert (Hpc28 : ret_pc (N4 !!! Regidx Rra)
                     = mword_of_int (KernelSyms.sys_read + 0x28))
       by (rewrite HN4ra; apply bv_eq; vm_compute; reflexivity).
@@ -800,7 +800,7 @@ Section ProofSysRead.
                 sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
-      iIntros (CID21 Hs21) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID21 Hs21) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
      iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%] Hlc"); [wp_next_chain|].
@@ -976,7 +976,7 @@ Section ProofSysRead.
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv Hrow Hin HP").
       all: try lkbelow.
-      iIntros (CID25 Hs25) "_". iIntros (mf rv P' dw bsw kev)
+      iIntros (CID25 Hs25) "_"; iIntros (mf rv P' dw bsw kev)
         "%Hcsf %Hupt %Hdwle %Htie %Hrva %Hkev Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
@@ -1027,7 +1027,7 @@ Section ProofSysRead.
       iApply (sr_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
-      iIntros (CID26 Hs26) "Hlc". iIntros (mg) "[%Hcsg %Hmga0] Hcg Hpc".
+      iIntros (CID26 Hs26) "Hlc"; iIntros (mg) "[%Hcsg %Hmga0] Hcg Hpc".
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%] Hlc"); [wp_next_chain|].

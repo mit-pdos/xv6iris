@@ -433,7 +433,7 @@ Section ProofUserinit.
               with "HKu Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav []").
     { (* the boot lends nothing (permit sweep L1a) *)
       rewrite Hpj0. iApply SlotGen.act_lend_zero. }
-    iIntros (CID7 Hq7) "_". iIntros (mr1) "%Hcsap Hpc _ Hpost".
+    iIntros (CID7 Hq7) "_"; iIntros (mr1) "%Hcsap Hpc _ Hpost".
     assert (Hpc0e : ret_pc (R3 !!! Regidx Rra : mword 64)
                     = mword_of_int (UI + 0x0e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc0e) in "Hpc".
@@ -1030,7 +1030,7 @@ Section ProofUserinit.
               ({["proc"]} ∪ lks) Hlka Krl
               with "Hcg Htext Hpc [] Htok HR Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    iIntros (CID20 Hq20) "_". iIntros (mr3) "Hcg Hpc %Hcsrl Hcpu".
+    iIntros (CID20 Hq20) "_"; iIntros (mr3) "Hcg Hpc %Hcsrl Hcpu".
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; exact Hbelow]) in "Hcpu".
     assert (Hpc38 : ret_pc (R11 !!! Regidx Rra : mword 64)

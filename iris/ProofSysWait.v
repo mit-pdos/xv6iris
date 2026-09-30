@@ -246,7 +246,7 @@ Section ProofSysWait.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 w3 (DfracOwn (1/4)) b
               _ sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3").
-    iIntros (CID8 Hk8) "_". iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
+    iIntros (CID8 Hk8) "_"; iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
     iEval (rewrite HA4a1) in "Hb3".
     iDestruct ("Hback" with "Htf Hpage") as "Hpriv".
     assert (Hpp12 : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SW + 0x12))
@@ -302,7 +302,7 @@ Section ProofSysWait.
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hplk Hpriv Hmyrow Hipis").
     all: try lkbelow.
-    iIntros (CID11 Hk11) "_". iIntros (Mkw P' rv d xw cs' kev)
+    iIntros (CID11 Hk11) "_"; iIntros (Mkw P' rv d xw cs' kev)
       "%Hkw %Hext %Hdle %Hnull %Hfull Hans Hcg Hcpu Hpc %Hkev Hpriv Hmyrow".
     rewrite HB2a0 in Hnull. rewrite HB2a0 in Hfull.
     destruct Hkw as (HcsKw & HKwa0).

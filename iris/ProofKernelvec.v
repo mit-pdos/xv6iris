@@ -1719,7 +1719,7 @@ Section KernelvecHandler.
     all: try lkbelow.
     { iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
-    iIntros (CIDn Hsn) "Hlc". iIntros (mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
+    iIntros (CIDn Hsn) "Hlc"; iIntros (mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
     assert (Hret : ret_pc (kv_m2 (tp_pin m) !!! Regidx (mword_of_int 1 : mword 5))
                    = (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. rewrite upd_eq. unfold ret_pc, regval_into_reg.

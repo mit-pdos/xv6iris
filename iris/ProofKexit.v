@@ -693,9 +693,9 @@ Section KexitLoop.
                     iref_slot -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_". iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      { iIntros (CIDk Hsk) "_"; iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_". iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      iIntros (CIDk Hsk) "_"; iIntros (fd M U) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
       destruct Hregs as (Hs1 & Hs2 & Hs3 & Hs4 & Hsp & Hdom).
       (* [eb = b] at level 0, for the COMPLEMENT's transport guards only --
          [trap_csrs_ext_transport] / [cpu_claim_ext_transport] are indexed by
@@ -719,7 +719,7 @@ Section KexitLoop.
                    iref_slot -∗
                    mWP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst) "_". iIntros (Mt Ut) "%Hmt %Hnt Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      { iIntros (CIDt Hst) "_"; iIntros (Mt Ut) "%Hmt %Hnt Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
         destruct Hmt as (Ht9 & Ht18 & Ht19 & Ht20 & Htsp & Htdom).
         iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbt. cbn in Hbt.
         (* +0x38 c.addi s1,s1,8 : the cursor moves to &p->ofile[fd+1] *)
@@ -972,7 +972,7 @@ Section KexitLoop.
                   with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hiru Hfcenv Hcpay").
         all: try lkbelow.
         { iExact "Hpbare". }
-        iIntros (CIDo Hso) "_". iIntros (mr kev) "Hcg Hown Htce Hcce Hpc %Hcs %Hkev Hfdslot Hiru Hout _ Hpbare".
+        iIntros (CIDo Hso) "_"; iIntros (mr kev) "Hcg Hown Htce Hcce Hpc %Hcs %Hkev Hfdslot Hiru Hout _ Hpbare".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
         assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KX + 0x46))
@@ -1251,7 +1251,7 @@ Section KexitPark.
     all: try lkbelow.
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
-    iIntros (CIDa Hsa) "_". iIntros (msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres _ Hown Hpay".
+    iIntros (CIDa Hsa) "_"; iIntros (msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres _ Hown Hpay".
     (* ONE WIDE HOP: acquire does not thread the complement, so it is moved
        across the whole prologue-plus-acquire stretch at once, from where it
        came in to the hart the lock was won on. *)
@@ -2007,7 +2007,7 @@ Section KexitRest.
               ltac:(lkbelow)
               with "Hcg Hown Htce Hcce Htext Hpc Hlog Hpbare Hprocs").
     all: try lkbelow.
-    iIntros (CID2 Hs2) "_". iIntros (mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpbare Hop".
+    iIntros (CID2 Hs2) "_"; iIntros (mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpbare Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x50))
       by (rewrite HQ0ra; apply bv_eq; vm_compute; reflexivity).
@@ -2091,7 +2091,7 @@ Section KexitRest.
                     Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
-    iIntros (CID5 Hs5) "_". iIntros (mip n') "%Hcsip Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
+    iIntros (CID5 Hs5) "_"; iIntros (mip n') "%Hcsip Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
                                Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
@@ -2142,7 +2142,7 @@ Section KexitRest.
               Hfresh_log
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hseam Hgen Hpbare Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
-    iIntros (CID7 Hs7) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpbare".
+    iIntros (CID7 Hs7) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpbare".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).
@@ -2275,7 +2275,7 @@ Section ProofKexit.
     (* ---- prologue ---- *)
     iApply (kx_prologue (CID := CID0) m av b pj ltac:(lia) Hdom
               with "Hcg Htext Hpc").
-    iIntros (CIDp Hsp) "_". iIntros (M) "[%Hs4 [%HMsp %HdomM]] Hcg Hpc Hframe".
+    iIntros (CIDp Hsp) "_"; iIntros (M) "[%Hs4 [%HMsp %HdomM]] Hcg Hpc Hframe".
     (* ---- THE FRAME BECOMES PART OF THE DONATION.  kexit never returns, so
        its six saved cells are dead at the park; wrapping the caller's closer
        around them ([kstack_closer_frame]) is what re-anchors the closer at
@@ -2317,7 +2317,7 @@ Section ProofKexit.
     iApply (Myproc.wp_myproc_sconf (CID := CID1) A0 (av - 6)%nat 0 eb pj b lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    iIntros (CID2 Hs2) "_". iIntros (ms mp) "%Hmsf Hcg Hown Hpc %Hmp".
+    iIntros (CID2 Hs2) "_"; iIntros (ms mp) "%Hmsf Hcg Hown Hpc %Hmp".
     destruct Hmp as [Hcsmp Ha0mp].
     assert (Hpc16 : ret_pc (A0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x16))
@@ -2600,7 +2600,7 @@ Section ProofKexit.
          [kx_rest] -- which wants the whole [IREFSPARE]. *)
       iDestruct (iref_slots_split 1 (IREFSPARE - 1) with "Hir") as "[Hiru0 Hir]".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hcloser Hrow HQ]").
-      { iIntros (CIDx Hsx) "_". iIntros (Mx Ux) "%Hxregs %Hxof %Hxcwd %Hxchg %Hxgen %Hxtf Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
+      { iIntros (CIDx Hsx) "_"; iIntros (Mx Ux) "%Hxregs %Hxof %Hxcwd %Hxchg %Hxgen %Hxtf Hcg Hown Htce Hcce Hpc Hpriv Hfrag Hpenv Hfenv Hiru".
         (* THE ROW, RE-SPELLED AT THE EXIT'S BLOCK.  The loop's own
            [kx_nulled] carries the children-ghost name unchanged, so the row
            kexit entered with is a row of [Ux]'s block. *)

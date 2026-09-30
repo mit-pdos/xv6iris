@@ -413,7 +413,7 @@ Section ProofPanic.
     all: try lkbelow.
     { rewrite HP5a0. iExact "Hhdr". }
     { done. }
-    iIntros (CID10 Hs10) "_". iIntros (mf) "Hcg Hown Hpc %Hcs1 _ _".
+    iIntros (CID10 Hs10) "_"; iIntros (mf) "Hcg Hown Hpc %Hcs1 _ _".
     destruct Hcs1 as (Hcs & _ & _).
     assert (Hpc18 : ret_pc (P5 !!! Regidx Rra : mword 64)
                     = mword_of_int (PA + 0x18)) by (rewrite HP5ra; pcw).
@@ -507,7 +507,7 @@ Section ProofPanic.
     all: try lkbelow.
     { rewrite HQ3a0. iExact "Hfmt". }
     { rewrite big_sepL_singleton Hva. iExact "Hmsg". }
-    iIntros (CID15 Hs15) "_". iIntros (mg) "Hcg Hown Hpc %Hcs2 _ _".
+    iIntros (CID15 Hs15) "_"; iIntros (mg) "Hcg Hown Hpc %Hcs2 _ _".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra : mword 64)
                     = mword_of_int (PA + 0x26)) by (rewrite HQ3ra; pcw).
     iEval (rewrite Hpc26) in "Hpc".

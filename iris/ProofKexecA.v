@@ -332,7 +332,7 @@ Section KexecAUABody.
     (* ---- +0x000 .. +0x01c ---- *)
     iApply (kxc_prologue m K eb (proc_addr jp) sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1 with "Hcg Htext Hpc").
-    iIntros (CIDp Hsp1) "_". iIntros (M1) "%HM1 Hcg Hpc Hframe".
+    iIntros (CIDp Hsp1) "_"; iIntros (M1) "%HM1 Hcg Hpc Hframe".
     destruct HM1 as (HM1sp & HM1s0 & HM1s2 & HM1a0 & HM1a1 & HM1thr).
     (* ---- +0x020: jal ra,myproc ---- *)
     assert (Htmp : add_vec (mword_of_int (KXA + 0x020) : mword 64)
@@ -361,7 +361,7 @@ Section KexecAUABody.
     iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat eb (proc_addr jp) eb lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
-    iIntros (CIDm Hsm) "_". iIntros (ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
+    iIntros (CIDm Hsm) "_"; iIntros (ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
     destruct Hmp as (Hcsm & Hm2a0).
     assert (Hpc24 : ret_pc (N1 !!! Regidx Rra) = mword_of_int (KXA + 0x024))
       by (rewrite HN1ra; pcw).
@@ -410,7 +410,7 @@ Section KexecAUABody.
               U ltac:(lia) Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlogc Hppid Hprocs").
     all: try lkbelow.
-    iIntros (CIDb Hsb) "_". iIntros (M3) "%Hcsb Hcg Hcnt Hextc Hclmc Hpc Hppid Hlog".
+    iIntros (CIDb Hsb) "_"; iIntros (M3) "%Hcsb Hcg Hcnt Hextc Hclmc Hpc Hppid Hlog".
     assert (Hpc2a : ret_pc (N3 !!! Regidx Rra) = mword_of_int (KXA + 0x02a))
       by (rewrite HN3ra; pcw).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -492,7 +492,7 @@ Section KexecAUABody.
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcref Hpath Hbs Hirs [$Hlog $Htx] Hstart").
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
-    iIntros (CIDn Hsn) "_". iIntros (M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
+    iIntros (CIDn Hsn) "_"; iIntros (M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
              Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 [Hlog Htx] Harm".
     iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
@@ -660,7 +660,7 @@ Section KexecAUABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
-      iIntros (CIDe1 Hse1) "_". iIntros (M5) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
+      iIntros (CIDe1 Hse1) "_"; iIntros (M5) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
       assert (Hpc8c : ret_pc (P1 !!! Regidx Rra) = mword_of_int (KXA + 0x08c))
         by (rewrite HP1ra; pcw).
       iEval (rewrite Hpc8c) in "Hpc".
@@ -721,7 +721,7 @@ Section KexecAUABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
                Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
       iDestruct ("Hkw" $! CIDf with "Hcont Hfail") as "Hcont".
@@ -1184,7 +1184,7 @@ Section KexecAUAMain.
       iIntros "H". iApply (kxa_fail_dead Fs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
                              na alen afun sts cs pidv (bview plen pfun) with "H"). }
     (* ---- the seam at +0x032: [kxc_a2_r] takes it, at the receipt ---- *)
-    iIntros (CIDs Hss) "_". iIntros (M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
+    iIntros (CIDs Hss) "_"; iIntros (M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
     iApply (LA.kxc_a2_r (CID0 := CIDs) Q QF gs jp gl pd pav pu gf

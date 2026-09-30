@@ -640,7 +640,7 @@ Section ProofCreateFound.
     (* nameiparent is eb-generic now; create is still at [eb = true]. *)
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDnp Hsnp) "_". iIntros (mnp n1 Sb1 okp nfp ipv w)
+    iIntros (CIDnp Hsnp) "_"; iIntros (mnp n1 Sb1 okp nfp ipv w)
       "%Hcsnp Hcg Hcnt _ _ Hpc Hsbb Hsbi Hppid Hcref Hpath Hnb14
        Hbsl %Hsb1 %Hwmem %Hnp1 [Hop Htx] Hres".
     iEval (rewrite HR7a0) in "Hpath".
@@ -785,7 +785,7 @@ Section ProofCreateFound.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. iExact "Htp". }
-      iIntros (CIDil Hqil) "_". iIntros (mil dnl bml fld)
+      iIntros (CIDil Hqil) "_"; iIntros (mil dnl bml fld)
         "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep Hoffr
          Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
       iEval (rewrite /ic_dep_held /=) in "Hload".
@@ -929,7 +929,7 @@ Section ProofCreateFound.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (cbn beta iota). iEmpIntro. }
-        iIntros (CIDup Hqup) "_". iIntros (mup n2 Sb2 wg)
+        iIntros (CIDup Hqup) "_"; iIntros (mup n2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
            %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl Htp".
         iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
@@ -984,7 +984,7 @@ Section ProofCreateFound.
         iApply ("Ht" $! G3 u5 nfj with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
         { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor G3 HG3regs). }
-        iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDup CIDf 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* the slot ledger comes back whole: nameiparent took two and gave
@@ -1231,7 +1231,7 @@ Section ProofCreateFound.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { done. }
-        iIntros (CIDdl Hsdl) "_". iIntros (mdl found kk kslot qq)
+        iIntros (CIDdl Hsdl) "_"; iIntros (mdl found kk kslot qq)
           "%Hcsdl Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hnb14 Hppid Hbs1
            Hdlnk Hdiat Hres2".
         iEval (rewrite HD4a1) in "Hnb14".
@@ -1421,7 +1421,7 @@ Section ProofCreateFound.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { iEval (cbn beta iota). iEmpIntro. }
-          iIntros (CIDu1 Hqu1) "_". iIntros (mu1 n2 Sb2 wf1)
+          iIntros (CIDu1 Hqu1) "_"; iIntros (mu1 n2 Sb2 wf1)
             "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
              %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl Htp".
           assert (Hpcu1 : ret_pc (F3 !!! Regidx Rra : mword 64)
@@ -1509,7 +1509,7 @@ Section ProofCreateFound.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /ic_dep_side. iExact "Htp". }
-          iIntros (CIDic Hqic) "_". iIntros (mic dnc bmc flc)
+          iIntros (CIDic Hqic) "_"; iIntros (mic dnc bmc flc)
             "%Hcsic _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep Hoffrc
              Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrc Hruc %Hilkpc".
           iEval (rewrite /ic_dep_held /=) in "Hcload".
@@ -1592,7 +1592,7 @@ Section ProofCreateFound.
                        mWP (Loop : expr riscv_lang)))%I
             with "[]" as "#Hfbad".
           { iModIntro.
-            iIntros (CIDb Hsb) "_". iIntros (Mb)
+            iIntros (CIDb Hsb) "_"; iIntros (Mb)
               "%HBr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                Hcslkd Hcdep Hoffrc Hcidev Hciinum Hcivalid Hcload Hcshotb
                Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs Hsbb Hppid Hppback Hpath Hbsl
@@ -1666,7 +1666,7 @@ Section ProofCreateFound.
             { rewrite Heb /trap_csrs_ext. done. }
             { rewrite Heb /cpu_claim_ext. done. }
             { iEval (cbn beta iota). iEmpIntro. }
-            iIntros (CIDU2 HqU2) "_". iIntros (mu2 n3 Sb3 wf2)
+            iIntros (CIDU2 HqU2) "_"; iIntros (mu2 n3 Sb3 wf2)
               "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
                %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2 Htp".
             iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
@@ -1722,7 +1722,7 @@ Section ProofCreateFound.
             iApply ("Ht" $! B3 u5 nfjb with
                       "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
             { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor B3 HB3regs). }
-            iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+            iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
             iDestruct (cpu_own_transport CIDU2 CIDf 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (iref_slots_combine with "Hisl2 Hisl") as "Hisl".
@@ -1997,7 +1997,7 @@ Section ProofCreateFound.
                 iApply ("Ht" $! FB u5 nfj with
                           "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
                 { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor FB HFBregs). }
-                iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+                iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
                 iDestruct (cpu_own_transport CIDic CIDf 0%nat eb (proc_addr j) b
                              ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                 iDestruct (iref_slots_combine with "Hisl Hislr") as "Hisl".
@@ -2243,7 +2243,7 @@ Section ProofCreateFound.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (cbn beta iota). iEmpIntro. }
-        iIntros (CIDup Hqup) "_". iIntros (mup n2 Sb2 wg)
+        iIntros (CIDup Hqup) "_"; iIntros (mup n2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
            %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl Htp".
         iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
@@ -2298,7 +2298,7 @@ Section ProofCreateFound.
         iApply ("Ht" $! J3 u5 nfj with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
         { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor J3 HJ3regs). }
-        iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDup CIDf 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* the slot ledger comes back whole: nameiparent took two and gave
@@ -2557,7 +2557,7 @@ Section ProofCreateFound.
       iApply ("Ht" $! N1 u5 nfj with
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
       { exact (cr_tregs_of_regs m sp0 _ _ ty major minor N1 HN1regs). }
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDnp CIDf 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (iref_slots_combine with "Hisl2 Hislr") as "Hisl".

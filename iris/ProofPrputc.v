@@ -221,7 +221,7 @@ Section ProofPrputc.
     iApply (wp_uartputc (CID0 := CID7) γl1 γ1 T3 (K - 2)%nat n eb b p lks
               HK18 HT3a0 Hn Hbelow
               with "Hcg Hcpu Htext Hpc Huinv Hbase Htxl").
-    iIntros (CID8 Hs8) "_". iIntros (mf) "Hcg Hcpu Hpc %Hcs".
+    iIntros (CID8 Hs8) "_"; iIntros (mf) "Hcg Hcpu Hpc %Hcs".
     destruct Hcs as [Hcs Hra].
     assert (Hret : ret_pc (T3 !!! Regidx ra_idx) = mword_of_int (KernelSyms.prputc + 0x10)).
     { rewrite /T3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -394,7 +394,7 @@ Section PrputcSealed.
               with "Hcg Hcpu Htext Hpc Huinv Hbase Htxl []").
     { iApply store_chain_of_out_chain.
       iApply (out_chain_triv Uart1 _ _ emp%I eq_refl). done. }
-    iIntros (CID1 Hs1) "Hlc". iIntros (mf) "Hcg Hcpu Hpc %Hcs _".
+    iIntros (CID1 Hs1) "Hlc"; iIntros (mf) "Hcg Hcpu Hpc %Hcs _".
     iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [exact Hs1|].
     iApply ("Hcont" $! mf with "Hcg Hcpu Hpc [%]"). exact Hcs.
   Qed.

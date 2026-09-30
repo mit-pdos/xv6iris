@@ -661,7 +661,7 @@ Section ProofSysMkdirM1Tail.
               Upr HKeo Hgeom Hj Hgl ltac:(lkbelow)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID2 Hq2) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID2 Hq2) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc44 : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (MD + 0x44)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpc44) in "Hpc".
@@ -903,7 +903,7 @@ Section ProofSysMkdirBody.
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID6 Hq6) "_". iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpbare Hop".
+    iIntros (CID6 Hq6) "_"; iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpbare Hop".
     assert (Hpc0c : ret_pc (M3 !!! Regidx Rra : mword 64)
                     = mword_of_int (MD + 0x0c)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc0c) in "Hpc".
@@ -1032,7 +1032,7 @@ Section ProofSysMkdirBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM7a1). iExact "Hbuf". }
-    iIntros (CID11 Hq11) "_". iIntros (mas P' bf kA) "%Hcsas %Hupt %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
+    iIntros (CID11 Hq11) "_"; iIntros (mas P' bf kA) "%Hcsas %Hupt %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     iEval (rewrite HM7a1) in "Hbuf".
     assert (Hpc1a : ret_pc (M7 !!! Regidx Rra : mword 64)
                     = mword_of_int (MD + 0x1a)) by (rewrite HM7ra; pcw).
@@ -1241,7 +1241,7 @@ Section ProofSysMkdirBody.
                       Hbmres Hpriv [Hbufk] Hprocs Hdev Hgeo Hdlk Hbsl Hir HopS Htx
                       Htr Hdlkc Hcre").
       { iEval (rewrite HN4a0). iExact "Hbufk". }
-      iIntros (CID18 Hq18) "_". iIntros (mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
+      iIntros (CID18 Hq18) "_"; iIntros (mcr ok made kk qi ss gy inum dn bm un1 Sb1 ns1)
         "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
          %Hns1 Hir %Hun1 HopS Hok".
       iEval (rewrite HN4a0) in "Hbufk".
@@ -1351,7 +1351,7 @@ Section ProofSysMkdirBody.
            persistent. *)
         { iExact "Hiopen". }
         { iApply (log_opS_opb with "HopS"). }
-        iIntros (CID21 Hq21) "_". iIntros (miu n2)
+        iIntros (CID21 Hq21) "_"; iIntros (miu n2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
            Hop Hislot".
         assert (Hpc32 : ret_pc (P0 !!! Regidx Rra : mword 64)
@@ -1394,7 +1394,7 @@ Section ProofSysMkdirBody.
                         Hpbare Hprocs Hdev Hgeo Hdlk Hop").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CID23 Hq23) "_". iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpbare".
+        iIntros (CID23 Hq23) "_"; iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpbare".
         assert (Hpc36 : ret_pc (P1 !!! Regidx Rra : mword 64)
                         = mword_of_int (MD + 0x36)) by (rewrite HP1ra; pcw).
         iEval (rewrite Hpc36) in "Hpc".

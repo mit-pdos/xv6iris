@@ -2148,7 +2148,7 @@ Section ProofCreateMain.
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iIntros "#Htext". iModIntro.
-    iIntros (CIDt Hst) "_". iIntros (Mt w5 dnew)
+    iIntros (CIDt Hst) "_"; iIntros (Mt w5 dnew)
       "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb Hqc".
     destruct HTr as [HTsp HTthr].
     (* +0x70 c.mv a0,s2 : the answer register *)

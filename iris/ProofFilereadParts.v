@@ -782,7 +782,7 @@ Section ProofFilereadParts.
     (* the s1/s3 restore *)
     iApply (fr_rest2 (CID0 := CID2) W2 K sp0 v1 v3 zc zd ze p b HW2sp Hcd Hde
               with "Hcg Hpc Hic Hid Hb3 Hb5").
-    iIntros (CID3 Hs3) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+    iIntros (CID3 Hs3) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
     destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
     (* the c.j into the epilogue: the alignment side condition is about the
        TARGET, so the equation is rewritten BEFORE [vm_compute]. *)

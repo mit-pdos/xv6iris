@@ -964,7 +964,7 @@ Section ProofCopyin.
                   with "Hcg Htext Hpc [Hsrc] [Hdc]").
         { iEval (rewrite HD5a1). iExact "Hsrc". }
         { iEval (rewrite HD5a0). iExact "Hdc". }
-        iIntros (CIDmm Hsmm) "_". iIntros (mfm) "Hcg Hpc Hsrc Hdc %Hmma0 %Hmmcs".
+        iIntros (CIDmm Hsmm) "_"; iIntros (mfm) "Hcg Hpc Hsrc Hdc %Hmma0 %Hmmcs".
         iEval (rewrite HD5a1) in "Hsrc".
         iEval (rewrite HD5a0) in "Hdc".
         assert (Hret4c : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.copyin + 0x4c)).
@@ -1305,7 +1305,7 @@ Section ProofCopyin.
     { rewrite HW4a0 Hbase Hrootc. reflexivity. }
     iApply (Walkaddr.wp_walkaddr_sconf W4 t m_ad (K - 12) (DfracOwn 1) b p
               ltac:(lia) HW4root Hrep with "Hcg Htext Hpc Hptree").
-    iIntros (CIDw5 Hsw5) "_". iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwv".
+    iIntros (CIDw5 Hsw5) "_"; iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwv".
     rewrite HW4a1 in Hwv.
     iDestruct (proc_ptm_rebuild Pc (uint szv) M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
     assert (Hret66 : ret_pc (W4 !!! Regidx Rra) = mword_of_int (KernelSyms.copyin + 0x66)).
@@ -1485,7 +1485,7 @@ Section ProofCopyin.
               _ kx ltac:(lia) HV5tp HV5a0' HV5a1' Hszb Hlvl
               with "Hcg Hcnt Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDvf Hsvf) "_". iIntros (mv) "Hcg Hcnt Hlend Hpc %Hvcs Hvpost".
+    iIntros (CIDvf Hsvf) "_"; iIntros (mv) "Hcg Hcnt Hlend Hpc %Hvcs Hvpost".
     iDestruct "Hlend" as (ky Hky) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists ky. iFrame "Hlend". iPureIntro. lia. }
@@ -2027,13 +2027,13 @@ Section ProofCopyin.
               HR10s4 HR10s5 HR10s6 HR10s7 HR10s8 HR10s9 HR10s10 HR10s11
               Hlkbelow
               with "Hcg Hcnt Hlend Htext Hpc Hpt Henv Hdst").
-    iIntros (CIDl Hsl) "_". iIntros (mj res P' g) "%Hjsp %Hjs11 %Hja0 %Hres %Hjext
+    iIntros (CIDl Hsl) "_"; iIntros (mj res P' g) "%Hjsp %Hjs11 %Hja0 %Hres %Hjext
                             Hcg Hcnt Hlend Hpc Hpt Hdst".
     iApply (ci_epilogue (CID0 := CIDl) mm mj K lvl eb b res sp0 p lks
               ltac:(lia) ltac:(reflexivity)
               Hjsp Hja0 Hjs11
               with "Hcg Hcnt Htext Hpc Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12").
-    iIntros (CIDe Hse) "Hlc". iIntros (mf) "Hcg Hcnt Hpc %Hcs %Hfa0".
+    iIntros (CIDe Hse) "Hlc"; iIntros (mf) "Hcg Hcnt Hpc %Hcs %Hfa0".
     iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mf P' g with "Hcg Hcnt Hlend Hpc Hpt Hdst [%] [%] [%]").
     - exact Hcs.

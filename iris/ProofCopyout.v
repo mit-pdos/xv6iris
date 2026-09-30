@@ -417,7 +417,7 @@ Section ProofCopyout.
     iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 G4 t m_ad n (DfracOwn 1) b pcur
               Hn HG4a0 HG4a2 ltac:(rewrite HG4a1; exact Hva0b) Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CID5 Hsk5) "_". iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwpay".
+    iIntros (CID5 Hsk5) "_"; iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwpay".
     rewrite HG4a1 in Hwpay.
     assert (Hret82 : ret_pc (G4 !!! Regidx Rra) = mword_of_int (KernelSyms.copyout + 0x82)).
     { rewrite HG4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1047,7 +1047,7 @@ Section ProofCopyout.
                   with "Hcg Htext Hpc [HsB] [HpB]").
         { iEval (rewrite HU5a1). iExact "HsB". }
         { iEval (rewrite HU5a0). iExact "HpB". }
-        iIntros (CIDc6 Hsc6) "_". iIntros (mv) "Hcg Hpc HsB HpB %Hmva0 %Hmvcs".
+        iIntros (CIDc6 Hsc6) "_"; iIntros (mv) "Hcg Hpc HsB HpB %Hmva0 %Hmvcs".
         iEval (rewrite HU5a1) in "HsB".
         iEval (rewrite HU5a0) in "HpB".
         assert (Hret46 : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.copyout + 0x46)).
@@ -1452,7 +1452,7 @@ Section ProofCopyout.
     iApply (Walkaddr.wp_walkaddr_sconf V4 t m_ad (K - 14)%nat (DfracOwn 1) b p
               ltac:(lia) HV4root Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CIDg4 Hsg4) "_". iIntros (mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
+    iIntros (CIDg4 Hsg4) "_"; iIntros (mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
     rewrite HV4a1 in Hwapay.
     assert (Hret64 : ret_pc (V4 !!! Regidx Rra) = mword_of_int (KernelSyms.copyout + 0x64)).
     { rewrite HV4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1614,7 +1614,7 @@ Section ProofCopyout.
                 ltac:(lia) (rget_tp F5) HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv Hlend").
       all: try lkbelow.
-      iIntros (CIDm6 Hsm6) "_". iIntros (mf) "Hcg Hcnt Hlend Hpc %Hvfcs Hvfpay".
+      iIntros (CIDm6 Hsm6) "_"; iIntros (mf) "Hcg Hcnt Hlend Hpc %Hvfcs Hvfpay".
       iDestruct "Hlend" as (ky Hky) "Hlend".
       iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
       { iExists ky. iFrame "Hlend". iPureIntro. lia. }
@@ -1750,7 +1750,7 @@ Section ProofCopyout.
                       exact HV1s1)
                 HF6s7 Hva0b Hrep' Hsome'
                 with "Hcg Htext Hpc Hptree").
-      iIntros (CIDms2 Hsms2) "_". iIntros (Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
+      iIntros (CIDms2 Hsms2) "_"; iIntros (Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
       assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
                 Mf !!! Regidx c = F6 !!! Regidx c).
       { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
@@ -1887,7 +1887,7 @@ Section ProofCopyout.
                     exact HV1s1)
               HR1s7 Hva0b Hrep ltac:(rewrite Hsome; discriminate)
               with "Hcg Htext Hpc Hptree").
-    iIntros (CIDh2 Hsh2) "_". iIntros (Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
+    iIntros (CIDh2 Hsh2) "_"; iIntros (Mf wr) "%Hcsf %Hverd Hcg Hpc Hptree".
     assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
               Mf !!! Regidx c = R1 !!! Regidx c).
     { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
@@ -2529,7 +2529,7 @@ Section ProofCopyout.
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
         mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hk13 Hk14]" as "Hepi".
-    { iIntros (CIDe0 Hse0) "_". iIntros (mj res P' Mu')
+    { iIntros (CIDe0 Hse0) "_"; iIntros (mj res P' Mu')
         "(%Hjsp & %Hja0 & %Hjres & %Hjext) Hcg Hcnt Hlend Hpc Hpt Hsrc".
       assert (HspE0 : mj !!! Regidx csp_rs1 = spr) by exact Hjsp.
       iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.copyout + 0xa0)) (mword_of_int 13 : mword 6) Rra

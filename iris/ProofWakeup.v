@@ -244,9 +244,9 @@ Section ProofWakeup.
                    vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
+      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
+      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11 & Hdom).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       (* ---- shared tail [pc = wakeup+0x30]: p++ (0x30 addi s1,s1,360), then the
@@ -263,7 +263,7 @@ Section ProofWakeup.
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    mWP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst) "_". iIntros (Mt) "%Hmt Hcg Hown Hpc Hframe".
+      { iIntros (CIDt Hst) "_"; iIntros (Mt) "%Hmt Hcg Hown Hpc Hframe".
         destruct Hmt as (Ht1 & Htsp & Ht18 & Ht19 & Ht20 & Ht21 & Ht22 & Ht23 & Ht24 & Ht25 & Ht26 & Ht27 & Htdom).
         (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
         assert (Hrgt9 : rget (CID := CIDt) Mt (mword_of_int 9 : mword 5)
@@ -412,7 +412,7 @@ Section ProofWakeup.
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
-      iIntros (CIDf Hsf) "_". iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
+      iIntros (CIDf Hsf) "_"; iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
       (* acquire returned: pc = wakeup+0x3e, cpu_own (S lvl) + trap_csrs_pay lvl eb.
          FROM HERE TO THE RELEASE the index is the literal [false] (a held lock
          pins noff >= 1), so no leaf can migrate and everything stays at CIDf. *)
@@ -520,7 +520,7 @@ Section ProofWakeup.
                   ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
-        iIntros (CIDg Hsg) "Hlc". iIntros (mr) "Hcg Hpc %Hpinsr Hown".
+        iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "Hcg Hpc %Hpinsr Hown".
         (* each iteration is BALANCED: what it acquired it released, so the
            set release hands back collapses to the loop invariant's [lks]. *)
         pose proof (locks_below_not_elem lks "proc" Hfresh) as Hnotin.
@@ -866,7 +866,7 @@ Section ProofWakeup.
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
     iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
-    iIntros (CIDpro Hspro) "_". iIntros (M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
+    iIntros (CIDpro Hspro) "_"; iIntros (M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM19 & HM20 & HM21 & HM18 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
@@ -885,7 +885,7 @@ Section ProofWakeup.
                   with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hf0 Hcont]").
     { (* exit continuation = epilogue at wakeup+0x54 *)
-      iIntros (CIDex Hsex) "_". iIntros (Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
+      iIntros (CIDex Hsex) "_"; iIntros (Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
                        Hcg Hown Htextx Hpc Hframe".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
       iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Mexit K
@@ -903,7 +903,7 @@ Section ProofWakeup.
       { iEval (rewrite Hecsp). iExact "Hf2". }
       { iEval (rewrite Hecsp). iExact "Hf1". }
       { iEval (rewrite Hecsp). iExact "Hf0". }
-      iIntros (CIDend Hsend) "Hlc". iIntros (Mf) "%Hepi Hcg Hpc".
+      iIntros (CIDend Hsend) "Hlc"; iIntros (Mf) "%Hepi Hcg Hpc".
       destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hf21v & Hfcsp & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
       (* the epilogue's restored sp equals the caller's sp0 (the -64/+60+4 cancel) *)
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)

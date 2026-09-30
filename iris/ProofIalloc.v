@@ -1049,7 +1049,7 @@ Section IallocOut.
               with "Hcg Htext Hkdata Hpc Hcnt Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HQ9a0. iExact "Hstr". }
-    iIntros (CID10 Hq10) "_". iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
+    iIntros (CID10 Hq10) "_"; iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
     destruct Hcsp as (Hcs1 & Hraeq).
     assert (Hpc7e : ret_pc (Q9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x7e))
@@ -1333,7 +1333,7 @@ Section IallocClaim.
               b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HW3a1 HW3a2
               with "Hcg Htext Hpc Hby").
-    iIntros (CID5 Hq5) "_". iIntros (mM) "Hcg Hpc Hby %Hcsm".
+    iIntros (CID5 Hq5) "_"; iIntros (mM) "Hcg Hpc Hby %Hcsm".
     iEval (rewrite HW3a0) in "Hby".
     assert (Hpc94 : ret_pc (W3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0x94)) by (rewrite HW3ra; pcw).
@@ -1539,7 +1539,7 @@ Section IallocClaim.
        slot this names used to be [_]: [ireg_claim_au]'s closing wand has
        delivered [iclaim] since increment I and ialloc dropped it on the
        floor.  It now travels the claim arm out to [ia_arms]. *)
-    iIntros (CID9 Hq9) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcsl HopS Hclaim Hlk Hsl".
+    iIntros (CID9 Hq9) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcsl HopS Hclaim Hlk Hsl".
     (* the block log_write just logged IS [IBLOCK inum inodestart]: that is
        [Hbno], and it is what makes the growth DETERMINATE. *)
     iEval (rewrite Hbno) in "HopS".
@@ -1632,7 +1632,7 @@ Section IallocClaim.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID12 Hq12) "_". iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID12 Hq12) "_"; iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpca4 : ret_pc (W7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0xa4)) by (rewrite HW7ra; pcw).
     iEval (rewrite Hpca4) in "Hpc".
@@ -1760,7 +1760,7 @@ Section IallocClaim.
     all: try lkbelow.
     (* SIMP-2: iget's post is ONE row ([IcacheRef.inode_refb]); the two
        halves are what the claim arm carries on, so split at the intro. *)
-    iIntros (CID16 Hq16) "_". iIntros (mI kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hclaim".
+    iIntros (CID16 Hq16) "_"; iIntros (mI kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hclaim".
     (* the minted unit, at the CLAIM flavour and KEPT there (RULING C'):
        [runit (is_claim (ClaimL ty))] IS [runit_claim], which is what
        [ireg_withdraw]'s ClaimK arm converts at create's fill. *)
@@ -2074,12 +2074,12 @@ Section IallocScan.
     iIntros (fuel).
     iInduction fuel as [|fuel] "IH".
     - (* ---- FUEL 0: unreachable, [inum < ninodes] leaves at least one turn ---- *)
-      iIntros (CIDl Hql) "_".
+      iIntros (CIDl Hql) "_";
       iIntros (Ml inum CIDc) "%Hfuel %Hinum %Hsp %Hthr %Hs2 %Hs4 %Hs5 %Hs6".
       iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont".
       exfalso. lia.
     - (* ---- FUEL S: one turn of the loop ---- *)
-      iIntros (CIDl Hql) "_".
+      iIntros (CIDl Hql) "_";
       iIntros (Ml inum CIDc) "%Hfuel %Hinum %Hsp %Hthr %Hs2 %Hs4 %Hs5 %Hs6".
       iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont".
       pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
@@ -2281,7 +2281,7 @@ Section IallocScan.
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
       { rewrite /cpu_claim_ext. done. }
-      iIntros (CID6 Hq6) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
+      iIntros (CID6 Hq6) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
       destruct Hfacts as [Hcsb HmBa0].
       assert (Hpc40 : ret_pc (G4 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.ialloc + 0x40)) by (rewrite HG4ra; pcw).
@@ -2652,7 +2652,7 @@ Section IallocScan.
                   ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
         all: try lkbelow.
-        iIntros (CID15 Hq15) "_". iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
+        iIntros (CID15 Hq15) "_"; iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
         assert (Hpc58 : ret_pc (GB !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.ialloc + 0x58)) by (rewrite HGBra; pcw).
         iEval (rewrite Hpc58) in "Hpc".

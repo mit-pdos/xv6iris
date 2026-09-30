@@ -1015,7 +1015,7 @@ Section ProofSafestrcpy.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HR2sp HR2a0 HR2thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID6 Hs6) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID6 Hs6) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf g with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
@@ -1162,12 +1162,12 @@ Section ProofSafestrcpy.
                 HR7sp HR7a0 HR7a1' HR7a3 HR7a5'
                 HR7thr
                 with "Hcg Htext Hpc Hsrc Hdst").
-      iIntros (CID11 Hs11) "_". iIntros (Mt hf) "%Hex %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
+      iIntros (CID11 Hs11) "_"; iIntros (Mt hf) "%Hex %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
       iApply (ssc_tail mm Mt K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID12 Hs12) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID12 Hs12) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID12 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf hf with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.

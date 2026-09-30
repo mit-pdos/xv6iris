@@ -546,7 +546,7 @@ Section ProofProcFreepagetable.
               (or_introl eq_refl)
               ltac:(rewrite HB5a1; exact pf_tramp_range)
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
-    iIntros (CID15 Hs15) "_". iIntros (mr1) "Hcg Hcpu Hlend Hpc %Hcs1 Hpt".
+    iIntros (CID15 Hs15) "_"; iIntros (mr1) "Hcg Hcpu Hlend Hpc %Hcs1 Hpt".
     iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
@@ -703,7 +703,7 @@ Section ProofProcFreepagetable.
               (or_intror eq_refl)
               ltac:(rewrite HC6a1; exact pf_tf_range)
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
-    iIntros (CID23 Hs23) "_". iIntros (mr2) "Hcg Hcpu Hlend Hpc %Hcs2 Hpt".
+    iIntros (CID23 Hs23) "_"; iIntros (mr2) "Hcg Hcpu Hlend Hpc %Hcs2 Hpt".
     iDestruct "Hlend" as (klr2 Hklr2) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr2. iFrame "Hlend". iPureIntro. lia. }
@@ -795,7 +795,7 @@ Section ProofProcFreepagetable.
               ltac:(rewrite HD2a1; exact Hdom)
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID27 Hs27) "_". iIntros (mr3) "Hcg Hcpu Hlend Hpc %Hcs3".
+    iIntros (CID27 Hs27) "_"; iIntros (mr3) "Hcg Hcpu Hlend Hpc %Hcs3".
     iDestruct "Hlend" as (klr3 Hklr3) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr3. iFrame "Hlend". iPureIntro. lia. }

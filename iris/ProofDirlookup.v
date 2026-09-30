@@ -908,7 +908,7 @@ Section ProofDirlookupMain.
     iAssert (□ wp_next (CID0 := CID) true pj (fun CIDt : CpuId =>
                dl_tail_body m sp0 pj ret_tgt K eb b lks CIDt))%I with "[]" as "#Htail".
     { iModIntro.
-      iIntros (CIDt Hst) "_". iIntros (Mt uu10 dnew) "%HTr Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
+      iIntros (CIDt Hst) "_"; iIntros (Mt uu10 dnew) "%HTr Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                       Hb8 Hb9 Hb10 Hde Hqc".
       destruct HTr as [HTsp HTthr].
       (* +0x96 c.ldsp ra,88(sp) *)
@@ -1248,7 +1248,7 @@ Section ProofDirlookupMain.
       iApply ("Ht" $! R13 u10 dolds0 with
                 "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hde").
       { exact HR13tr. }
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf false 0%nat 0%nat 1%Qp with
                 "[%] Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbslot
@@ -1269,7 +1269,7 @@ Section ProofDirlookupMain.
             dq dqd dqn pofv pidv fn dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-        { iIntros (CIDl Hsl) "_". iIntros (i Ml dol mt10)
+        { iIntros (CIDl Hsl) "_"; iIntros (i Ml dol mt10)
             "%Hfuel %Hilt16 %Hnone %Hregs Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
              Hb8 Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
              Hislot Hlinks Hdi Hqc".
@@ -1277,7 +1277,7 @@ Section ProofDirlookupMain.
           assert (Hile : (i <= nrec)%nat)
             by exact (dlk_le_nrec (bv_unsigned (di_size dn)) i Hsznn Hilt16).
           lia. }
-        iIntros (CIDl Hsl) "_". iIntros (i Ml dol mt10)
+        iIntros (CIDl Hsl) "_"; iIntros (i Ml dol mt10)
           "%Hfuel %Hilt16 %Hnone %Hregs Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
            Hb8 Hb9 Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot
            Hislot Hlinks Hdi Hqc".
@@ -1292,7 +1292,7 @@ Section ProofDirlookupMain.
                      eb hasp lks Upr dq dqd dqn pofv pidv fn dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
-        { iIntros (CIDp Hsp) "_". iIntros (Mp dol' mt10')
+        { iIntros (CIDp Hsp) "_"; iIntros (Mp dol' mt10')
             "%Hpregs %Hnone2 Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
              Hb10 Hde Hidev Hmeta Hmap Hblocks Hnm Hpoff Hppid Hbslot Hislot
              Hlinks Hdi Hqc".
@@ -1425,7 +1425,7 @@ Section ProofDirlookupMain.
                       "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                        Hde").
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * S i) Q3 HQ3regs). }
-            iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
+            iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
             iSpecialize ("Hqc" $! CIDf with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hqc" $! mf false 0%nat 0%nat 1%Qp with
                       "[%] Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid
@@ -1645,7 +1645,7 @@ Section ProofDirlookupMain.
                   with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hrow Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
-        iIntros (CIDrd Hsrd) "_". iIntros (mrd tot P')
+        iIntros (CIDrd Hsrd) "_"; iIntros (mrd tot P')
           "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks
            Hdst2 Hbslot".
         iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -1911,7 +1911,7 @@ Section ProofDirlookupMain.
           iApply (NC.wp_namecmp_sconf KT1 KT1 N4 fn (dir_name data i) (K - 12)%nat
                     dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
-          iIntros (CIDnc Hsnc) "_". iIntros (mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
+          iIntros (CIDnc Hsnc) "_"; iIntros (mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
           iEval (rewrite HN4a0) in "Hnm".
           iEval (rewrite HN4a1) in "Hdenm".
           assert (Hncregs : dlk_regs m sp0 ip nb pf (16 * i) mnc)
@@ -2208,7 +2208,7 @@ Section ProofDirlookupMain.
                       with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hislot
                             Hlic").
             all: try lkbelow.
-            iIntros (CIDig Hsig) "_". iIntros (mig kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hlic".
+            iIntros (CIDig Hsig) "_"; iIntros (mig kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hlic".
             iDestruct ("Hlicback" with "Hlic") as "[Hlinks Hdi]".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)
@@ -2251,7 +2251,7 @@ Section ProofDirlookupMain.
                       with "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                             Hde").
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * i) mig Higregs). }
-            iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
+            iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hcnt Hextc Hclmc Hpc".
             iSpecialize ("Hqc" $! CIDf with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hqc" $! mf true i kslot q with
                       "[%] Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid

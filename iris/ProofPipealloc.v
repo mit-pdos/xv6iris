@@ -371,7 +371,7 @@ Section ProofPipealloc.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDe Hbe) "_". iIntros (mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hpbare Hiru Hpost".
+      iIntros (CIDe Hbe) "_"; iIntros (mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hpbare Hiru Hpost".
       iDestruct "Hpbare" as (kx) "[%Hkx Hpbare]".
       iDestruct "Hslots" as (w4 w5) "[Hs4c Hs5c]".
       iEval (rewrite HspR1) in "Hr40". iEval (rewrite HspR1) in "Hr32".
@@ -607,7 +607,7 @@ Section ProofPipealloc.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert (EPI ∧ T8)%I with "[Hepi]" as "HK1".
     { iSplit; [iExact "Hepi"|]. rewrite /T8.
-      iIntros (CIDt Hbt) "_". iIntros (Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav Hpbare Hiru".
+      iIntros (CIDt Hbt) "_"; iIntros (Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav Hpbare Hiru".
       (* the value sitting in *f1 is what the last branch tests *)
       iAssert (∃ x : mword 64, pf1 ↦₈[KT1] x ∗
                  (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
@@ -766,7 +766,7 @@ Section ProofPipealloc.
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
-        iIntros (CIDt6 Hst6) "_". iIntros (mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit1 Hiru _ _ Hpbare".
+        iIntros (CIDt6 Hst6) "_"; iIntros (mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit1 Hiru _ _ Hpbare".
         iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
         { iExists kx2. iSplit; [iPureIntro; cbn in Hkx2; lia|]. iExact "Hpbare". }
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xb6))
@@ -812,7 +812,7 @@ Section ProofPipealloc.
     { iSplit; [iDestruct "HK1" as "[$ _]"|].
       iSplit; [iDestruct "HK1" as "[_ $]"|].
       iDestruct "HK1" as "[_ Ht8]". rewrite /T4C.
-      iIntros (CIDu Hbu) "_". iIntros (Mt k0) "(%Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Href0 Hslots Hcell0 Hcell1 Hav Hpbare Hiru".
+      iIntros (CIDu Hbu) "_"; iIntros (Mt k0) "(%Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Href0 Hslots Hcell0 Hcell1 Hav Hpbare Hiru".
       (* +0xa4 jal ra,fileclose *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.pipealloc + 0xa4)) Rra (mword_of_int 0x1ffc28 : mword 21)
                 Mt (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -852,7 +852,7 @@ Section ProofPipealloc.
       { iApply fileclose_env_none. }
       { iApply fileclose_cpay_none. }
       (* the READ end's unit, banked for T8 *)
-      iIntros (CIDu2 Hsu2) "Hlc". iIntros (mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit0 Hiru _ _ Hpbare".
+      iIntros (CIDu2 Hsu2) "Hlc"; iIntros (mr kx2) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins %Hkx2 Hunit0 Hiru _ _ Hpbare".
       iAssert (∃ k' : nat, ⌜(pv_ev (us_V Upr) <= k')%nat⌝ ∗ proc_priv_bare p pidv (upd_usV Upr (upd_ev (us_V Upr) k')))%I with "[Hpbare]" as "Hpbare".
       { iExists kx2. iSplit; [iPureIntro; cbn in Hkx2; lia|]. iExact "Hpbare". }
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))
@@ -912,7 +912,7 @@ Section ProofPipealloc.
               ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hslota").
     all: try lkbelow.
-    iIntros (CID12 Hs12) "_". iIntros (mB) "Hcg Hcnt Hpc %HcsB Hpost0".
+    iIntros (CID12 Hs12) "_"; iIntros (mB) "Hcg Hcnt Hpc %HcsB Hpost0".
     assert (Hpc1c : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x1c))
       by (rewrite HmAra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
@@ -1022,7 +1022,7 @@ Section ProofPipealloc.
               ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hslotb").
     all: try lkbelow.
-    iIntros (CID16 Hs16) "_". iIntros (mD) "Hcg Hcnt Hpc %HcsD Hpost1".
+    iIntros (CID16 Hs16) "_"; iIntros (mD) "Hcg Hcnt Hpc %HcsD Hpost1".
     assert (Hpc24 : ret_pc (mC !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x24))
       by (rewrite HmCra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".
@@ -1186,7 +1186,7 @@ Section ProofPipealloc.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hkmem Hav").
     all: try lkbelow.
-    iIntros (CID21 Hs21) "_". iIntros (mF) "Hcg Hcnt Hpc %HcsF Hkp".
+    iIntros (CID21 Hs21) "_"; iIntros (mF) "Hcg Hcnt Hpc %HcsF Hkp".
     assert (Hpc30 : ret_pc (mE !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x30))
       by (rewrite HmEra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc30) in "Hpc".
@@ -1553,7 +1553,7 @@ Section ProofPipealloc.
     { iEval (rewrite HG5a0). iExact "Hlkw". }
     { iEval (rewrite HG5a0). iExact "Hlkn". }
     { iEval (rewrite HG5a0). iExact "Hlkc". }
-    iIntros (CID33 Hs33) "_". iIntros (mH) "Hcg Hpc %HcsH Hlkw Hlkn Hlkc".
+    iIntros (CID33 Hs33) "_"; iIntros (mH) "Hcg Hpc %HcsH Hlkw Hlkn Hlkc".
     assert (Hpc54 : ret_pc (G5 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x54))
       by (rewrite HG5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc54) in "Hpc".

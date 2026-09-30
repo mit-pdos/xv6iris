@@ -428,7 +428,7 @@ Section ProofUvmfree.
         bare_pt uroot ∅ -∗
         mWP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hgap]" as "Hjoin".
-    { iIntros (CIDj Hcrossj) "_". iIntros (mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hlend Hpc Hpt".
+    { iIntros (CIDj Hcrossj) "_"; iIntros (mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hlend Hpc Hpt".
       (* +0x0e c.mv a0,s1 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmfree + 0x0e)) Ra0 Rs1 mj (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -490,7 +490,7 @@ Section ProofUvmfree.
       iApply (Freewalk.wp_freewalk_sconf γa J1 t 2%nat (K - 4)%nat eb p ilvl b lks
                 HKfw Hilvl HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv").
       all: try lkbelow.
-      iIntros (CIDk3 Hsk3) "_". iIntros (mr) "Hcg Hcpu Hpc %Hcs".
+      iIntros (CIDk3 Hsk3) "_"; iIntros (mr) "Hcg Hcpu Hpc %Hcs".
       assert (Hret14 : ret_pc (J1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmfree + 0x14)).
       { rewrite HJ1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret14) in "Hpc".
@@ -874,7 +874,7 @@ Section ProofUvmfree.
               HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID15 Hs15) "_". iIntros (mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
+    iIntros (CID15 Hs15) "_"; iIntros (mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
     iEval (rewrite HB7a1) in "Hpt".
     (* everything the table still mapped was inside the run it just cleared *)
     assert (Hempty : um_del_run um (svpn_of (mword_of_int 0 : mword 64)) n = ∅)

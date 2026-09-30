@@ -381,7 +381,7 @@ Section ProofBrelse.
     { iFrame "Hllbtl' Hscan'". }
     { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
                 with "Hllbtl'"). }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -820,7 +820,7 @@ Section ProofBrelse.
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hstok". }
-    iIntros (CID11 Hs11) "_". iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
+    iIntros (CID11 Hs11) "_"; iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
     iEval (rewrite HmAa0) in "Hstok".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x18)).
@@ -904,7 +904,7 @@ Section ProofBrelse.
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hstok". }
     { rewrite /bslp_dep /bown. iFrame "Hbown Hrp". }
-    iIntros (CID15 Hs15) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc _".
+    iIntros (CID15 Hs15) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc _".
     assert (Hpc20 : ret_pc (H2 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x20)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc20) in "Hpc".
@@ -987,7 +987,7 @@ Section ProofBrelse.
        whole critical section below runs at the literal [false] index and
        [wp_next_off] pins the hart at [CIDa] -- which is what keeps [Htok]
        ([locked _ cpu_id]) and [Hpay] usable across every leaf. *)
-    iIntros (CIDa Hsa) "_". iIntros (ms mQ) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDa Hsa) "_"; iIntros (ms mQ) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc2c : ret_pc (U3 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x2c)).
     { rewrite HU3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2c) in "Hpc".
@@ -1402,7 +1402,7 @@ Section ProofBrelse.
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
       iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p lks tl HK HE9sp HE9thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok Hafter Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid [Hfd]").
       { exact Hcsf. }
@@ -1503,7 +1503,7 @@ Section ProofBrelse.
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
       iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p lks tl HK HD2sp HD2thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok Hafter Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid [Hout]").
       { exact Hcsf. }

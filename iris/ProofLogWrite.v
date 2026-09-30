@@ -610,7 +610,7 @@ Section LogWriteBlocks.
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CID1 Hs1) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CID1 Hs1) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     rewrite Hbeq in Hs1.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
     (* release hands back [({[rank "log"]} ∪ lks) ∖ {[rank "log"]}]; the bound
@@ -1992,7 +1992,7 @@ Section ProofLogWrite.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CID10 Hs10) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CID10 Hs10) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.log_write + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".

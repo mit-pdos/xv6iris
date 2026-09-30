@@ -682,7 +682,7 @@ Section WriteHeadBlocks.
       { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
       { iPureIntro. exact Hhn_early. }
       iPureIntro. exact Hdec_early. }
-    iIntros (CID3 Hs3) "_". iIntros (mB) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold HQ".
+    iIntros (CID3 Hs3) "_"; iIntros (mB) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".
@@ -784,7 +784,7 @@ Section WriteHeadBlocks.
               _ Upr HKbl Hk HT4a0 Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID6 Hs6) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
+    iIntros (CID6 Hs6) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
     assert (Hpc52 : ret_pc (T4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x52)).
     { rewrite HT4ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc52) in "Hpc".
@@ -1614,7 +1614,7 @@ Section ProofWriteHead.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot").
     all: try lkbelow.
-    iIntros (CID12 Hs12) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CID12 Hs12) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x20)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }

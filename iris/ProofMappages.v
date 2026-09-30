@@ -613,7 +613,7 @@ Section ProofMappages.
               HW4'tp
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     all: try lkbelow.
-    iIntros (CIDw Hsw) "_". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hoffw %Hpresw %Hmissw %Hpay".
+    iIntros (CIDw Hsw) "_"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hoffw %Hpresw %Hmissw %Hpay".
     iEval (rewrite <- (avail_sub_add on consumed g)) in "Henv".
     assert (Ht'nodes : pt_nodes t' = (pt_nodes t + (consumed + g))%nat) by lia.
     (* pc back at +0x48 *)
@@ -1650,7 +1650,7 @@ Section ProofMappages.
        and finish every "%"-obligation with a bare [exact] instead, which
        goes through ordinary term elaboration (full conversion) rather than
        the automatic matcher. *)
-    iIntros (CIDf Hcrossf) "Hlc". iIntros (mr t' kf g)
+    iIntros (CIDf Hcrossf) "Hlc"; iIntros (mr t' kf g)
       "Hcgf Hcntf Hpcf Hptreef %Hnodesf Henvf %Hcsf %Hbasef %Hrepf %Hpresf %Hmissf %Hpayf".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mr t' kf g

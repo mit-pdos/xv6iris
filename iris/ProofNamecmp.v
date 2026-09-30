@@ -300,7 +300,7 @@ Section ProofNamecmpMain.
               with "Hcg Htext Hpc [Hb1] [Hb2]").
     { iEval (rewrite HR4a0). iExact "Hb1". }
     { iEval (rewrite HR4a1). iExact "Hb2". }
-    iIntros (CID7 Hq7) "_". iIntros (mS) "Hcg Hpc Hb1 Hb2 %HcsS %Hres".
+    iIntros (CID7 Hq7) "_"; iIntros (mS) "Hcg Hpc Hb1 Hb2 %HcsS %Hres".
     iEval (rewrite HR4a0) in "Hb1".
     iEval (rewrite HR4a1) in "Hb2".
     assert (Hpc0e : ret_pc (R4 !!! Regidx Rra : mword 64)

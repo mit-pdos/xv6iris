@@ -1131,7 +1131,7 @@ Section UtRet.
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) pid U
               M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
-    iIntros (CIDp Hkp) "_". iIntros (mf ksat kroot vb)
+    iIntros (CIDp Hkp) "_"; iIntros (mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn #Hkinv Hcg Hcpu Hclmpay Hsepc Hscause Hstval
        Hsret Hstvec Hq4 Hkptr Hpv Hpc".
     assert (Hpc0b2 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0xb2))
@@ -1775,7 +1775,7 @@ Section UtA6.
               ltac:(lkbelow)
               with "Hkacc Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
-    iIntros (CID3 Hk3) "_". iIntros (mf kl)
+    iIntros (CID3 Hk3) "_"; iIntros (mf kl)
       "[%Hcskl %Hkla0] (#Hkw & Hkores & Hqp & Hrg & Hlvres & Htear) Hcg Hcpu Hpc".
     iDestruct ("Hpvback" with "Hqp Hrg") as "Hpv".
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
@@ -2209,7 +2209,7 @@ Section UtFa.
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
                 M2 nx b Hj Hjl ltac:(lia)
                 with "Hcg Hcpu Htext Hpc Hpi Hcsrs Hclm [-]").
-      iIntros (CID4 Hk4) "_". iIntros (mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
+      iIntros (CID4 Hk4) "_"; iIntros (mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
       assert (Hret106 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0x106))
         by (rewrite HM2ra; pcw).
       iEval (rewrite Hret106) in "Hpc".

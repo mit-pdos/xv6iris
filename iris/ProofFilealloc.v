@@ -338,7 +338,7 @@ Section ProofFilealloc.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.filealloc + 0x16)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc16) in "Hpc".
@@ -903,7 +903,7 @@ Section ProofFilealloc.
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
-      iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+      iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
       (* filealloc is BALANCED on this arm: the set release hands back
          collapses to the entry [lks] -- [Hfresh] makes the singleton
          insert/delete cancel. *)
@@ -936,7 +936,7 @@ Section ProofFilealloc.
          CIDr; NOW (with the FULL chain -- Hs1..Hs8, Hsacq, the acquire-to-
          release hop, Hsr, and Hepi's own internal steps -- all in scope) is
          where the real outer [Hcont] gets closed. *)
-      iIntros (CIDfin Hsfin) "Hlc". iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
+      iIntros (CIDfin Hsfin) "Hlc"; iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
       iSpecialize ("Hcont" $! CIDfin with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcnt Hpc [%] Hpost").
       exact Hfin. }
@@ -1008,7 +1008,7 @@ Section ProofFilealloc.
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
-      iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+      iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
       (* filealloc is BALANCED on this arm too. *)
       assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
@@ -1070,7 +1070,7 @@ Section ProofFilealloc.
         (* the scan created no reference, so the unit the caller supplied is
            still untouched -- it goes straight back out. *)
         iExact "Hfdslot". }
-      iIntros (CIDfin Hsfin) "Hlc". iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
+      iIntros (CIDfin Hsfin) "Hlc"; iIntros (mfin) "Hcg Hcnt Hpc %Hfin Hpost".
       iSpecialize ("Hcont" $! CIDfin with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcnt Hpc [%] Hpost").
       exact Hfin. }

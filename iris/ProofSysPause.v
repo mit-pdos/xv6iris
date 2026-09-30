@@ -666,7 +666,7 @@ Section SpBodies.
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mrl) "Hcg Hpc %HcsX2 Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mrl) "Hcg Hpc %HcsX2 Hown".
     (* sp_exit0 is BALANCED at the tail: release strips exactly the rank it
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
     pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
@@ -788,7 +788,7 @@ Section SpBodies.
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mrk) "Hcg Hpc %HcsK2 Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mrk) "Hcg Hpc %HcsK2 Hown".
     (* sp_exitk is BALANCED at the tail: release strips exactly the rank it
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
     pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
@@ -1396,7 +1396,7 @@ Section SpBodies.
                 0%nat eb (proc_addr j) (av - 8)%nat ({["time"]} ∪ lks)
                 ltac:(rewrite HL5a0; apply sp_add_vec_0) ltac:(lia)
                 with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
-      iIntros (CIDr Hsr) "_". iIntros (mfr) "Hcg Hpc %Hrcs Hown".
+      iIntros (CIDr Hsr) "_"; iIntros (mfr) "Hcg Hpc %Hrcs Hown".
       (* the release/re-acquire window: nothing is held across sleep() *)
       pose proof (locks_below_not_elem lks "time" Hfresh) as Hnotin.
       assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
@@ -1440,7 +1440,7 @@ Section SpBodies.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       (* SLEEP RETURNS ON HART [CIDs]. *)
-      iIntros (CIDs Hss) "_". iIntros (mfs) "%Hscs Hcg Hown Hpc Htcx Hclmx".
+      iIntros (CIDs Hss) "_"; iIntros (mfs) "%Hscs Hcg Hown Hpc Htcx Hclmx".
       iClear "Htcx". iClear "Hclmx".
       assert (Hl64 : ret_pc (L6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x64))
         by (rewrite HL6ra; pcstep).
@@ -1492,7 +1492,7 @@ Section SpBodies.
                 (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HL8a0). iExact "Hlk2". }
-      iIntros (CIDa Hsa) "_". iIntros (msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR _ Hown Hpay".
+      iIntros (CIDa Hsa) "_"; iIntros (msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR _ Hown Hpay".
       assert (Hl6a : ret_pc (L8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x6a))
         by (rewrite HL8ra; pcstep).
       iEval (rewrite Hl6a) in "Hpc".
@@ -1599,7 +1599,7 @@ Section SpBodies.
               Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
-    iIntros (CIDa Hsa) "Hlc". iIntros (msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc"; iIntros (msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR _ Hown Hpay".
     assert (Hq26 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x26))
       by (rewrite HQ2ra; pcstep).
     iEval (rewrite Hq26) in "Hpc".
@@ -1818,7 +1818,7 @@ Section SpBodies.
       iAssert (sp_exitk CID0 γt j m av eb sp0 pj (sign_extend' 64 (t0 : mword 32)) lks)
         with "[]" as "Hexitk".
       { rewrite /sp_exitk.
-        iIntros (CIDx Hsx) "_". iIntros (N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htl".
+        iIntros (CIDx Hsx) "_"; iIntros (N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htl".
         destruct Hg as (Hbn & Hln).
         iApply (sp_exitk_body (CID := CIDx) CID0 γt j m N av eb sp0 pj (sign_extend' 64 (t0 : mword 32)) lks
                   Hav Heb Hsx Hbn Hln Hfresh
@@ -1828,7 +1828,7 @@ Section SpBodies.
       iAssert (sp_loop CID0 γt j m av eb sp0 pj (sign_extend' 64 (t0 : mword 32)) nv lks)
         with "[]" as "Hloop".
       { iLöb as "IH". rewrite /sp_loop.
-        iIntros (CIDy Hsy) "_". iIntros (N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc Hex0 Hexk Htl".
+        iIntros (CIDy Hsy) "_"; iIntros (N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc Hex0 Hexk Htl".
         destruct Hg as (Hbn & Hln).
         iApply (sp_loop_body (CID := CIDy) CID0 γs γt γl j m N av eb sp0 pj
                   (sign_extend' 64 (t0 : mword 32)) nv lks
@@ -1839,7 +1839,7 @@ Section SpBodies.
       (* ============ the normal (return 0) exit at +0x70, anchored ============ *)
       iAssert (sp_exit0 CID0 γt j m av eb sp0 pj lks) with "[]" as "Hexit0".
       { rewrite /sp_exit0.
-        iIntros (CIDz Hsz) "_". iIntros (N) "%Hg Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htl".
+        iIntros (CIDz Hsz) "_"; iIntros (N) "%Hg Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htl".
         destruct Hg as (Hbn & Hsn).
         iApply (sp_exit0_body (CID := CIDz) CID0 γt j m N av eb sp0 pj lks
                   Hav Heb Hsz Hbn Hsn Hfresh
@@ -2045,7 +2045,7 @@ Section ProofSysPause.
               0%nat tfp ws v (word_hi w7) dqt true lks
               ltac:(unfold NARG; lia) HR5a0 Hws Hn0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hs7hi").
-    iIntros (CID8 Hs8) "_". iIntros (A) "%HcsA Hcg Hown Hpc Htf Hpage Hs7hi".
+    iIntros (CID8 Hs8) "_"; iIntros (A) "%HcsA Hcg Hown Hpc Htf Hpage Hs7hi".
     iEval (rewrite HR5a1) in "Hs7hi".
     assert (Hpc12 : ret_pc (R5 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sys_pause + 0x12)) by (rewrite HR5ra; pcstep).
@@ -2081,7 +2081,7 @@ Section ProofSysPause.
     (* ================ the shared epilogue continuation ================ *)
     iAssert (sp_tail CID j m av eb sp0 pj lks) with "[Hcont Htf Hpage]" as "Htail".
     { rewrite /sp_tail.
-      iIntros (CIDt Hst) "_". iIntros (M r) "%Hfacts Hx1 Hx2 Hfree Hx7 Hcg Hown Hpc".
+      iIntros (CIDt Hst) "_"; iIntros (M r) "%Hfacts Hx1 Hx2 Hfree Hx7 Hcg Hown Hpc".
       destruct Hfacts as (Hbase & Hsav & Hra0 & Hrv).
       iApply (sp_tail_body (CID := CIDt) CID j m M r av eb sp0 pj tfp ws dqt lks
                 Hav Hst Hbase Hsav Hra0 Hrv Hsp0v
@@ -2090,7 +2090,7 @@ Section ProofSysPause.
     (* ===================== the acquire continuation ===================== *)
     iAssert (sp_acq CID γt j m av eb sp0 pj lks) with "[]" as "Hacq".
     { rewrite /sp_acq.
-      iIntros (CIDq Hsq) "_". iIntros (M nv) "%Hf Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl".
+      iIntros (CIDq Hsq) "_"; iIntros (M nv) "%Hf Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl".
       destruct Hf as (Hbb & Hss).
       iApply (sp_acq_body (CID := CIDq) CID γs γt γl j m M nv av eb sp0 pj lks
                 Hav Heb Hj Hjl Hpjv Hsq Hbb Hss Hfresh

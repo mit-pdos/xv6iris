@@ -234,7 +234,7 @@ Section ProofKilled.
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hp12 : ret_pc (B1 !!! Regidx kl_ra) = mword_of_int (KernelSyms.killed + 0x12))
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
@@ -337,7 +337,7 @@ Section ProofKilled.
     iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string (proc_lock_pay γs γl (proc_addr j)) C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
-    iIntros (CIDrel Hsrel) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcpu".

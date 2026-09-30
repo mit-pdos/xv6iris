@@ -488,9 +488,9 @@ Section ProofProcdumpLoop.
         pdl_loop_body CID0 spv p m0 K' eb b lks fuel CIDf))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDf Hsf) "_". iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
+      { iIntros (CIDf Hsf) "_"; iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
         exfalso. exact (pdl_no_fuel j Hfuel Hj). }
-      iIntros (CIDf Hsf) "_". iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
+      iIntros (CIDf Hsf) "_"; iIntros (j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
       destruct Hregs as [Hrl Hrh].
       pose proof (pdl_j_le j Hj) as HjLe.
       (* ---- the slot at [j], out of the head of the remaining suffix ---- *)
@@ -521,7 +521,7 @@ Section ProofProcdumpLoop.
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDa : CpuId) =>
         pdl_adv_body CID0 spv p m0 K' eb b lks j CIDa))%I
         with "[]" as "#Hadv".
-      { iModIntro. iIntros (CIDa Hsa) "_". iIntros (Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
+      { iModIntro. iIntros (CIDa Hsa) "_"; iIntros (Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
         destruct Hra as [Hral Hrah].
         (* ---- +0x66 addi s1,s1,360 ---- *)
         assert (Hrg66 : rget (CID := CIDa) Ma Rs1 = Ma !!! Regidx Rs1)
@@ -607,7 +607,7 @@ Section ProofProcdumpLoop.
         pdl_print_body CID0 spv p m0 K' eb b lks j CIDp))%I
         with "[]" as "#Hprint".
       { iModIntro.
-        iIntros (CIDp Hsp) "_". iIntros (Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)
+        iIntros (CIDp Hsp) "_"; iIntros (Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)
           "%Hrp %Hav %Hstr #Hss Hqx2 Hcg Hown Hpc Hst2 Hpid2 Hnmc2 Hpre2 Hsuf2".
         destruct Hrp as [Hrpl Hrph].
         destruct Hav as [Ha2v Ha3v].
@@ -716,7 +716,7 @@ Section ProofProcdumpLoop.
         { iApply (pdl_descs_mk CIDq3 P5c sptr (pd_cur j) ss nm2 dq3
                     Ha2_5c Ha3_5c Hssn Hssz Hnm2 (pd_cur_nonzero j HjLe)
                     with "Hss Hnmc2"). }
-        iIntros (CIDq4 Hsq4) "_". iIntros (mP1) "Hcg Hpc %Hcsp1 Hown _ Hdescs".
+        iIntros (CIDq4 Hsq4) "_"; iIntros (mP1) "Hcg Hpc %Hcsp1 Hown _ Hdescs".
         destruct Hcsp1 as [Hcs1 Hra1].
         iDestruct (pdl_descs_take CIDq4 P5c sptr (pd_cur j) ss nm2 dq3
                      Ha2_5c Ha3_5c with "Hdescs") as "Hnmc2".
@@ -791,7 +791,7 @@ Section ProofProcdumpLoop.
         all: try lkbelow.
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }
-        iIntros (CIDq7 Hsq7) "Hlc". iIntros (mP2) "Hcg Hpc %Hcsp2 Hown _ _".
+        iIntros (CIDq7 Hsq7) "Hlc"; iIntros (mP2) "Hcg Hpc %Hcsp2 Hown _ _".
         destruct Hcsp2 as [Hcs2 Hra2].
         assert (Hpc66 : ret_pc (P62 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.procdump + 0x66))

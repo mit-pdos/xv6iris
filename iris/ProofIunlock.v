@@ -387,7 +387,7 @@ Section ProofIunlockMain.
     (* the holder token carries the lock's own [pid] field now, so it is
        indexed by the lock ADDRESS -- which the callee spells as its own a0. *)
     { iEval (rewrite HR6a0). iExact "Hstok". }
-    iIntros (CID12 Hq12) "_". iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
+    iIntros (CID12 Hq12) "_"; iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
     iEval (rewrite HR6a0) in "Hstok".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
@@ -614,7 +614,7 @@ Section ProofIunlockMain.
     (* the lock hands the deposit back at the holder's OWN fraction, which is
        what rebuilds the caller's share: the handle's body kept the other two
        slices, and the park stamped its fragment at [Tp] (mass [s]). *)
-    iIntros (CID18 Hq18) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
+    iIntros (CID18 Hq18) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
     iAssert (IcacheRef.inode_shr_genlo k s dev inum g lo)
       with "[Hbody Href Hslh]" as "Href".
     { rewrite /IcacheRef.inode_shr_genlo (ic_body_of_shr k d s dev inum g lo Hdshr).

@@ -879,7 +879,7 @@ Section ProofSysPipe.
               Hnav sp_noff0 HD2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href0 Hpbare Hiru Hfcenv0 Hcpay0").
     all: try lkbelow.
-    iIntros (CID7 Hcr7) "_". iIntros (E1 ka) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 %Hka Hunit0 Hiru Hout0 Hcpost0 Hpbare".
+    iIntros (CID7 Hcr7) "_"; iIntros (E1 ka) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 %Hka Hunit0 Hiru Hout0 Hcpost0 Hpbare".
     (* the second close's payment, out of the first close's answer *)
     iDestruct ("Hcwand" with "Hcpost0") as "Hcpay1".
     iDestruct ("Hfcback0" with "Hout0") as "[Hpenv Hfenv]".
@@ -932,7 +932,7 @@ Section ProofSysPipe.
               Hnav sp_noff0 HF2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href1 Hpbare Hiru Hfcenv1 Hcpay1").
     all: try lkbelow.
-    iIntros (CID10 Hcr10) "_". iIntros (G1 kb) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 %Hkb Hunit1 Hiru Hout1 _ Hpbare".
+    iIntros (CID10 Hcr10) "_"; iIntros (G1 kb) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 %Hkb Hunit1 Hiru Hout1 _ Hpbare".
     assert (Hkab : (pv_ev (us_V Upr) <= kb)%nat) by (cbn in Hkb; lia).
     iDestruct ("Hfcback1" with "Hout1") as "[Hpenv Hfenv]".
     assert (HpcG1 : ret_pc (F2 !!! Regidx Rra) = mword_of_int ze)
@@ -1336,7 +1336,7 @@ Section ProofSysPipe.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDE HsE) "_". iIntros (mj P' d bs res Ub) "(%Hjsp & %Hja5 & %Hjthr) %Hub %Hext %Hd8 Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
+      iIntros (CIDE HsE) "_"; iIntros (mj P' d bs res Ub) "(%Hjsp & %Hja5 & %Hjthr) %Hub %Hext %Hd8 Hcg Hcpu Hextc Hextm Hpc Hiru Hpenv Hfenv Hrest Hslot8 Hpost".
       iDestruct "Hrest" as (w5 w6 w7) "(Hb5 & Hb6 & Hb7)".
       iDestruct "Hslot8" as (lo hi) "[Hlo Hhi]".
       iDestruct (ctx_word_pointsto_join4 (KTR := KT1) _ _ _ _ _ Hal8 with "Hlo Hhi") as "Hb8".
@@ -1344,7 +1344,7 @@ Section ProofSysPipe.
                 (word_of_words lo hi) p b
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-      iIntros (CID23 Hcr23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hcr23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDE CID23 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* [sp_epi] does not mention the complement, so the hop spans only its
@@ -1382,7 +1382,7 @@ Section ProofSysPipe.
                  with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf R3 (av - 8)%nat 0%nat eb p b lks
               sp_noff0 Hav10 with "Hcg Hcpu Htext Hpc").
-    iIntros (CID25 Hcr25) "_". iIntros (ms P0) "%Hms Hcg Hcpu Hpc %HcsP0".
+    iIntros (CID25 Hcr25) "_"; iIntros (ms P0) "%Hms Hcg Hcpu Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
     assert (Hpc0e : ret_pc (R3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0xe))
       by (rewrite HR3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1501,7 +1501,7 @@ Section ProofSysPipe.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v u5 (DfracOwn (1/4)) b lks
               sp_arg0 HP4a0 Harg sp_noff0
               Havaa Hpv with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hb5").
-    iIntros (CID30 Hcr30) "_". iIntros (Q0) "%HcsQ0 Hcg Hcpu Hpc Htfc Htfp Hb5".
+    iIntros (CID30 Hcr30) "_"; iIntros (Q0) "%HcsQ0 Hcg Hcpu Hpc Htfc Htfp Hb5".
     iEval (rewrite HP4a1) in "Hb5".
     iDestruct ("Hpback" with "Htfc Htfp") as "Hpriv".
     assert (Hpc1a : ret_pc (P4 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x1a))
@@ -1616,7 +1616,7 @@ Section ProofSysPipe.
               Hav24 eq_refl sp_noff0
               with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpe Hua Hub Hb6 Hb7 Hpbare Hiru").
     all: try lkbelow.
-    iIntros (CID34 Hcr34) "_". iIntros (W0 kp) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 %Hkp Hpost Hpbare Hiru".
+    iIntros (CID34 Hcr34) "_"; iIntros (W0 kp) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 %Hkp Hpost Hpbare Hiru".
     iDestruct ("Hpvback" $! kp with "Hpbare") as "Hpriv".
     (* THE BLOCK'S NEW BASE (permit sweep L1b): pipealloc lent its counter
        and gave the block back at [kp]; everything below runs at [U1], which
@@ -1838,7 +1838,7 @@ Section ProofSysPipe.
     iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p pid U1 b lks
               HX1a0 Hk0lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
-    iIntros (CID41 Hcr41) "_". iIntros (Y0) "%HcsY0 Hcg Hcpu Hpc Hcore Hpost1".
+    iIntros (CID41 Hcr41) "_"; iIntros (Y0) "%HcsY0 Hcg Hcpu Hpc Hcore Hpost1".
     assert (Hpc38 : ret_pc (X1 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x38))
       by (rewrite HX1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc38) in "Hpc".
@@ -1910,7 +1910,7 @@ Section ProofSysPipe.
       { iApply (sp_fc_cpay_frag γp true false with "Hqf"). }
       (* ...and the write end's, out of whatever that close hands back *)
       { iIntros "H". iApply (sp_fc_cpay_of_cpost with "H"). }
-      iIntros (CID44 Hcr44) "_". iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
+      iIntros (CID44 Hcr44) "_"; iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
       (* the block, back into [proc_priv] -- at the count the closes left
          (permit sweep L1b) *)
       iDestruct ("Hpback" $! k2 with "Hpbare Hfenv") as "[Hpriv Hfenv]".
@@ -2032,7 +2032,7 @@ Section ProofSysPipe.
               (us_ofile U1 fd0 (fnode k0)) b lks
               HZ1a0 Hk1lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
-    iIntros (CID48 Hcr48) "_". iIntros (U0) "%HcsU0 Hcg Hcpu Hpc Hcore Hpost2".
+    iIntros (CID48 Hcr48) "_"; iIntros (U0) "%HcsU0 Hcg Hcpu Hpc Hcore Hpost2".
     assert (Hpc48 : ret_pc (Z1 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x48))
       by (rewrite HZ1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc48) in "Hpc".
@@ -2137,7 +2137,7 @@ Section ProofSysPipe.
       { iApply (spi_be with "Htext"). }
       { iApply (spi_c2 with "Htext"). }
       { iApply (spi_c4 with "Htext"). }
-      iIntros (CID53 Hcr53) "_". iIntros (F2) "%HF2thr Hcg Hpc Hcell".
+      iIntros (CID53 Hcr53) "_"; iIntros (F2) "%HF2thr Hcg Hpc Hcell".
       assert (HF2s0 : F2 !!! Regidx Rs0 = sp0)
         by (rewrite (HF2thr Rs0 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact HF1s0).
       (* the descriptor is nulled again on this failure path, so its state
@@ -2186,7 +2186,7 @@ Section ProofSysPipe.
       { iApply (spi_d8 with "Htext"). }
       { rewrite Hst0eq. iApply (sp_fc_cpay_frag γp true false with "Hqf"). }
       { rewrite Hst0eq. iIntros "H". iApply (sp_fc_cpay_of_cpost with "H"). }
-      iIntros (CID54 Hcr54) "_". iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
+      iIntros (CID54 Hcr54) "_"; iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
       (* the block, back into [proc_priv] -- at the count the closes left
          (permit sweep L1b) *)
       iDestruct ("Hpback" $! k2 with "Hpbare Hfenv") as "[Hpriv Hfenv]".
@@ -2526,7 +2526,7 @@ Section ProofSysPipe.
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hlend Hbufhi").
     all: try lkbelow.
-    iIntros (CID61 Hcr61) "_". iIntros (B0 Pa M1) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
+    iIntros (CID61 Hcr61) "_"; iIntros (B0 Pa M1) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
     (* the window's base is [A6]'s a2, i.e. [v] (HA6a2) *)
     rewrite HA6a2 in Hret1.
     iEval (rewrite HA6a3) in "Hbufhi".
@@ -2607,7 +2607,7 @@ Section ProofSysPipe.
        SHARE the epilogue rather than split it. *)
     iAssert (EPI ∧ T7C)%I with "[Hepi]" as "HK".
     { iSplit; [iExact "Hepi"|]. rewrite /T7C.
-      iIntros (CIDT HsT) "_". iIntros (Mt P' d bs Ub) "(%Htsp & %Hts0 & %Hts1 & %Htthr) %Hub %Hxt %Hd8 Hcg Hcpu
+      iIntros (CIDT HsT) "_"; iIntros (Mt P' d bs Ub) "(%Htsp & %Hts0 & %Hts1 & %Htthr) %Hub %Hxt %Hd8 Hcg Hcpu
                        Hextc Hextm Hpc
                        Hiru Hpenv Hfenv Hpriv Hfrag Hqf Hua Hub Hb5 Hb6 Hb7 Hlo Hhi".
       (* the base the copyouts left (permit sweep L1b) *)
@@ -2657,7 +2657,7 @@ Section ProofSysPipe.
       { iApply (spi_86 with "Htext"). }
       { iApply (spi_8a with "Htext"). }
       { iApply (spi_8c with "Htext"). }
-      iIntros (CID63 Hcr63) "_". iIntros (E2) "%HE2thr Hcg Hpc Hcell".
+      iIntros (CID63 Hcr63) "_"; iIntros (E2) "%HE2thr Hcg Hpc Hcell".
       iDestruct (fd_frags_acc_lt (pv_fdg (us_V U2)) _ fd0 Hfd0N with "Hfrag")
         as (stqz) "(%Hlkstqz & Hfrz & _ & Hfrbackz)".
       (* the read end's row, off the NAMED table (site 2's note) *)
@@ -2719,7 +2719,7 @@ Section ProofSysPipe.
       { iApply (spi_96 with "Htext"). }
       { iApply (spi_9a with "Htext"). }
       { iApply (spi_9c with "Htext"). }
-      iIntros (CID65 Hcr65) "_". iIntros (E4) "%HE4thr Hcg Hpc Hcell1".
+      iIntros (CID65 Hcr65) "_"; iIntros (E4) "%HE4thr Hcg Hpc Hcell1".
       iDestruct (fd_frags_acc_lt (pv_fdg (us_V U2)) _ fd1 Hfd1N with "Hfrag")
         as (stqy) "(%Hlkstqy & Hfry & _ & Hfrbacky)".
       (* ...and the write end's *)
@@ -2778,7 +2778,7 @@ Section ProofSysPipe.
       { iApply (spi_b0 with "Htext"). }
       { rewrite Hst0eq. iApply (sp_fc_cpay_frag γp true false with "Hqf"). }
       { rewrite Hst0eq Hst1eq. iIntros "H". iApply (sp_fc_cpay_of_cpost with "H"). }
-      iIntros (CID66 Hcr66) "_". iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
+      iIntros (CID66 Hcr66) "_"; iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
       (* the block, back into [proc_priv] -- at the count the closes left *)
       iDestruct ("Hpback" $! k2 with "Hpbare Hfenv") as "[Hpriv Hfenv]".
       assert (Hkt2 : (kt <= k2)%nat) by exact Hk2.
@@ -3124,7 +3124,7 @@ Section ProofSysPipe.
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hlend Hbuflo").
     all: try lkbelow.
-    iIntros (CID76 Hcr76) "_". iIntros (D0 Pb M2) "Hcg Hcpu (%kc2 & %Hkc2 & Hlend) Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
+    iIntros (CID76 Hcr76) "_"; iIntros (D0 Pb M2) "Hcg Hcpu (%kc2 & %Hkc2 & Hlend) Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
     (* the window's base is [C7]'s a2, i.e. [v+4] (HC7a2) *)
     rewrite HC7a2 in Hret2.
     iEval (rewrite HC7a3) in "Hbuflo".

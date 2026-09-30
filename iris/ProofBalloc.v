@@ -909,7 +909,7 @@ Section BallocOut.
               with "Hcg Htext Hkdata Hpc Hcnt Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HQAa0. iExact "Hstr". }
-    iIntros (CID11 Hq11) "_". iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
+    iIntros (CID11 Hq11) "_"; iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
     destruct Hcsp as (Hcs1 & Hraeq).
     assert (Hpc102 : ret_pc (QA !!! Regidx Rra : mword 64)
                      = mword_of_int (KernelSyms.balloc + 0x102))
@@ -1096,7 +1096,7 @@ Section BallocExhaust.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID3 Hq3) "_". iIntros (mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID3 Hq3) "_"; iIntros (mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc90 : ret_pc (E1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x90))
       by (rewrite HE1ra; pcw).
@@ -1642,7 +1642,7 @@ Section BallocBzero.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID4 Hq4) "_". iIntros (mB kk2 bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CID4 Hq4) "_"; iIntros (mB kk2 bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc54 : ret_pc (Z2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x54)) by (rewrite HZ2ra; pcw).
@@ -1823,7 +1823,7 @@ Section BallocBzero.
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
               with "Hcg Htext Hpc Hby").
-    iIntros (CID10 Hq10) "_". iIntros (mM) "Hcg Hpc Hby %Hcs2".
+    iIntros (CID10 Hq10) "_"; iIntros (mM) "Hcg Hpc Hby %Hcs2".
     iEval (rewrite HZ7a0) in "Hby".
     assert (Hpc64 : ret_pc (Z7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x64)) by (rewrite HZ7ra; pcw).
@@ -1918,7 +1918,7 @@ Section BallocBzero.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop HfsbD Hheld").
     all: try lkbelow.
-    iIntros (CID13 Hq13) "_". iIntros (mL2) "Hcg Hcnt Hpc %Hcs3 Hop HfsbD Hlk Hsl".
+    iIntros (CID13 Hq13) "_"; iIntros (mL2) "Hcg Hcnt Hpc %Hcs3 Hop HfsbD Hlk Hsl".
     assert (HsetD : (Sb ∪ {[bmapstart]} ∪ {[uint bnoD]} : gset Z)
                     = Sb ∪ {[bmapstart]} ∪ {[bv_unsigned bnoD]})
       by (rewrite bb_uint32; reflexivity).
@@ -2000,7 +2000,7 @@ Section BallocBzero.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID16 Hq16) "_". iIntros (mR2) "%Hcs4 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID16 Hq16) "_"; iIntros (mR2) "%Hcs4 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc70 : ret_pc (ZB !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x70)) by (rewrite HZBra; pcw).
     iEval (rewrite Hpc70) in "Hpc".
@@ -2363,7 +2363,7 @@ Section BallocAlloc.
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite HbnoB). iExact "Hau". }
-    iIntros (CID6 Hq6) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcs1 Hop Hblk Hlk Hsl".
+    iIntros (CID6 Hq6) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcs1 Hop Hblk Hlk Hsl".
     (* the registry row is dropped: balloc's caller threads the plain
        ledger, and nothing below the bitmap needs a witness *)
     iDestruct (log_opSwe_opSw with "Hop") as "Hop".
@@ -2460,7 +2460,7 @@ Section BallocAlloc.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID9 Hq9) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID9 Hq9) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc4c : ret_pc (A5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x4c)) by (rewrite HA5ra; pcw).
     iEval (rewrite Hpc4c) in "Hpc".
@@ -4157,7 +4157,7 @@ Section BallocMain.
               with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CIDb29 Hq29) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CIDb29 Hq29) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc0ac : ret_pc (RA !!! Regidx Rra : mword 64)
                      = mword_of_int (KernelSyms.balloc + 0xac))

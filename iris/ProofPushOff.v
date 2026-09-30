@@ -702,7 +702,7 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hcnt Hpc []").
     { iApply (poi_0a with "Htext"). }
-    iIntros (CID6 Hh6) "Hlc". iIntros (mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
+    iIntros (CID6 Hh6) "Hlc"; iIntros (mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
     iDestruct (po_cells_transport CID5 CID6 n eb p b lks ltac:(wp_next_chain) with "Hcells0") as "Hcells0".
     iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
     (* THE HART IS PINNED AT CID6 FROM HERE ON (push_off never re-enables),
@@ -1915,7 +1915,7 @@ Section ProofPushOff.
                   with "Hcg Htext Hpc [Hr8] [Hr0]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
-        iIntros (CIDe Hse) "Hlc". iIntros (mf) "Hcg Hpc %Hmf".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mf) "Hcg Hpc %Hmf".
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.

@@ -390,7 +390,7 @@ Section ProofKerneltrap.
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
-        iIntros (CIDy Hsy) "Hlc". iIntros (myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
+        iIntros (CIDy Hsy) "Hlc"; iIntros (myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.

@@ -1705,7 +1705,7 @@ Section ProofConsoleintr.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     iIntros "#Ht #Hlk Hsaved Hcont".
     rewrite /ct_exit_prop.
-    iIntros (CIDx Hsx) "_". iIntros (M)
+    iIntros (CIDx Hsx) "_"; iIntros (M)
       "%Hsp %Hcs Hcg Hpc Hcnt Hpay Hlocked Hres Hrest Hhiout Hlgh Hwin".
     (* THE APPEND IS ALREADY FIRED (lane CONS-IO, milestone B, ruling F2):
        every arm files its entry where its own ring transition is, because
@@ -1768,7 +1768,7 @@ Section ProofConsoleintr.
               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hcnt". rgall.
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hcnt". rgall.
     assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -1853,7 +1853,7 @@ Section ProofConsoleintr.
       lkbelow. }
     iIntros "#Ht #Hpinv".
     rewrite /ct_wake_prop.
-    iIntros (CIDw Hsw) "Hlc". iIntros (M rr ww ee bs ts)
+    iIntros (CIDw Hsw) "Hlc"; iIntros (M rr ww ee bs ts)
       "%Hsp %Ha2 %Hcs %Hlenb %Hlent %Hok %Hrow Hcg Hpc Hcnt Hpay Hlocked
        Hrc Hwc Hec Hdat Hts Hgh Hrest Hhiout Howed Hwin EXIT".
     (* +0x156 auipc a5,0x12 *)
@@ -2150,7 +2150,7 @@ Section ProofConsoleintr.
     iDestruct "Hpy" as "(_ & _ & #Hwlb & #Hp)".
     rewrite /ct_kill_prop.
     iLöb as "IH".
-    iIntros (CIDk Hsk) "_". iIntros (M rr ww ee bs ts)
+    iIntros (CIDk Hsk) "_"; iIntros (M rr ww ee bs ts)
       "%Hsp %Hs1 %Hs2 %Hs3 %Ha5 %Hthr %Hlenb %Hlent %Hok %Hrow %Hne
        EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hhiout Hrun
        H4 H5 H6".
@@ -4607,7 +4607,7 @@ Section ProofConsoleintr.
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq) "_". iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq) "_"; iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP5ra) in "Hpc".
     assert (Hp018 : ret_pc (add_vec_int (mword_of_int (CT + 0x14) : mword 64) 4)
                     = (mword_of_int (CT + 0x18) : mword 64)) by pcw.

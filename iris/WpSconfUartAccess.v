@@ -230,7 +230,7 @@ Section WpSconfUartAccess.
         iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown". iIntros (_). iExact "Hlb".
       + iModIntro. iFrame "Hs Hout Htx Hdl Hcol Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc [Hown Hlb]".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc"; iIntros (bt) "Hcg Hpc [Hown Hlb]".
       iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc Hown Hlb").
   Qed.
@@ -330,7 +330,7 @@ Section WpSconfUartAccess.
                 ltac:(exact (proj1 (uart_read_stable _ _ _ _ Hread)))
                 ltac:(exact (uart_read_recv _ _ _ _ Hread))
                 with "Hcol").
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc _".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc"; iIntros (bt) "Hcg Hpc _".
       iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc").
   Qed.
@@ -515,7 +515,7 @@ Section WpSconfUartAccess.
         iSplitL "Hcol"; [iExact "Hcol"|].
         iSplitL "Htok"; [iExact "Htok"|].
         iIntros (Hbit). rewrite (uart_nodr_beqz u Hdr) in Hbit. discriminate.
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (bt) "Hcg Hpc [Htok Hlb]".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc"; iIntros (bt) "Hcg Hpc [Htok Hlb]".
       iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! bt with "Hcg Hpc Htok Hlb").
   Qed.
@@ -607,7 +607,7 @@ Section WpSconfUartAccess.
       iExists hh. iFrame "Htg Hlbh Hwlb Htok". iPureIntro.
       split_and!; [exact He | exact Hx | exact Hbts | exact Hnum | exact Hanum
                   | exact Hshh].
-    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc". iIntros (c) "Hcg Hpc Hh".
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hlc"; iIntros (c) "Hcg Hpc Hh".
       iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
       iApply ("Hcont" $! c with "Hcg Hpc Hh").
   Qed.

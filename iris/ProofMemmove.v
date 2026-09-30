@@ -535,7 +535,7 @@ Section ProofMemmove.
       assert (Hchain' : b = false \/ pcur = zero_reg -> (CID5 : CPU) = (CIDh : CPU)) by wp_next_chain.
       iApply (IH (S off) m3 CID5 Hchain' ltac:(lia) ltac:(lia) Ha1_3 Ha4v Ha5_3
                 with "Hcg Htext Hpc Hsrc Hdst").
-      iIntros (CIDr Hsr) "Hlc". iIntros (mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
+      iIntros (CIDr Hsr) "Hlc"; iIntros (mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
       iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc [Hs0 Hsrc] [Hd0 Hdst] [%] [%]").
       + iSplitL "Hs0"; [ iExact "Hs0" | iExact "Hsrc" ].
@@ -700,7 +700,7 @@ Section ProofMemmove.
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
               HM4a1 HM4a4 HM4a5
               with "Hcg Htext Hpc Hsrc Hdst").
-    iIntros (CIDl Hsl) "_". iIntros (mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
+    iIntros (CIDl Hsl) "_"; iIntros (mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
     (* ---- +0x28..+0x2e: the epilogue ---- *)
     assert (HmfA0 : mf !!! Regidx a0_idx = p_dst).
     { rewrite Ha0f. unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
@@ -718,7 +718,7 @@ Section ProofMemmove.
       exact (HMcs c Hc Hc8 Hcsp). }
     iApply (mm_epilogue m0 mf n b pcur Hn Hmfsp HmfCs
               with "Htext Hcg Hpc Hb1 Hb2").
-    iIntros (CID5 Hs5) "Hlc". iIntros (mfin) "Hcg Hpc %Ha0fin %Hcsfin".
+    iIntros (CID5 Hs5) "Hlc"; iIntros (mfin) "Hcg Hpc %Ha0fin %Hcsfin".
     iSpecialize ("Hcont" $! CID5 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc Hsrc Hdst [%] [%]").
     - rewrite Ha0fin. exact HmfA0.
@@ -860,7 +860,7 @@ Section ProofMemmove.
       iEval (rewrite Hpsuf) in "Hpc".
       iApply (mm_epilogue m0 m2 n b pcur Hn Hm2sp Hm2cs
                 with "Htext Hcg Hpc Hb1 Hb2").
-      iIntros (CID6 Hs6) "Hlc". iIntros (mfin) "Hcg Hpc %Ha0fin %Hcsfin".
+      iIntros (CID6 Hs6) "Hlc"; iIntros (mfin) "Hcg Hpc %Ha0fin %Hcsfin".
       iSpecialize ("Hcont" $! CID6 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hpc Hsrc Hdst [%] [%]").
       + rewrite Ha0fin. exact Hm2a0.
@@ -1002,7 +1002,7 @@ Section ProofMemmove.
                     ltac:(intros c Hc Hc8 Hcsp; unfold m5, m4, m3;
                           strip_caller Hc; exact (Hm2cs c Hc Hc8 Hcsp))
                     with "Htext Hcg Hpc Hb1 Hb2 Hsrc Hdst").
-          iIntros (CID11 Hs11) "Hlc". iIntros (mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".
+          iIntros (CID11 Hs11) "Hlc"; iIntros (mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".
           iSpecialize ("Hcont" $! CID11 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! mfin with "Hcg Hpc Hsrc Hdst [%] [%]").
           -- exact Ha0fin.
@@ -1047,7 +1047,7 @@ Section ProofMemmove.
         iApply (mm_fwd m0 m2 n (S len') src_bytes dst_olds dqs b pcur Hn Hlen0 Hlen32
                   Hm2a0 Hm2a1 Hm2a2 Hm2sp Hm2cs
                   with "Htext Hcg Hpc Hb1 Hb2 Hsrc Hdst").
-        iIntros (CID7 Hs7) "Hlc". iIntros (mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".
+        iIntros (CID7 Hs7) "Hlc"; iIntros (mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".
         iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mfin with "Hcg Hpc Hsrc Hdst [%] [%]").
         -- exact Ha0fin.

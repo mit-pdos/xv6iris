@@ -241,7 +241,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID2 Hq2) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID2 Hq2) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpcd6 : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0xd6)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpcd6) in "Hpc".
@@ -449,7 +449,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID2 Hq2) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID2 Hq2) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc110 : ret_pc (M1 !!! Regidx Rra : mword 64)
                      = mword_of_int (SO + 0x110)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpc110) in "Hpc".
@@ -757,7 +757,7 @@ Section ProofSysOpenTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -811,7 +811,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x106)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".
@@ -1108,7 +1108,7 @@ Section ProofSysOpenTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -1162,7 +1162,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x120)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".
@@ -1454,7 +1454,7 @@ Section ProofSysOpenTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -1503,7 +1503,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x138)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".
@@ -1869,7 +1869,7 @@ Section ProofSysOpenTails.
                     Hfcpay").
     (* the close post is [emp] at the untyped descriptor this arm closes,
        and nothing downstream is owed it. *)
-    iIntros (CID3 Hq3) "_". iIntros (mfc kev) "Hcg Hown Htce Hcce Hpc %Hcsfc %Hkev Hfd Hiru Hfout Hcpost Hpid".
+    iIntros (CID3 Hq3) "_"; iIntros (mfc kev) "Hcg Hown Htce Hcce Hpc %Hcsfc %Hkev Hfd Hiru Hfout Hcpost Hpid".
     iClear "Hcpost".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x12c)) by (rewrite HM2ra; pcw).
@@ -2118,7 +2118,7 @@ Section ProofSysOpenTails.
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                     Hpid Hprocs [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid Hload Hshot Hfrz").
-    iIntros (CID3 Hq3) "_". iIntros (miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr Htx".
+    iIntros (CID3 Hq3) "_"; iIntros (miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr Htx".
 
     iDestruct (log_opb_op with "Hop Htx") as "Hop".
     iDestruct (inode_shr_gen_forget _ _ _ _ _ _ _ Hley
@@ -2173,7 +2173,7 @@ Section ProofSysOpenTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0xc2)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".

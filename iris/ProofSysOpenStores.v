@@ -841,7 +841,7 @@ Section ProofSysOpenStores.
                     Hdev Hgeo Hdlk Hbsl [] Hop").
     { iApply (log_credit_own icfg_log false Sb2 e2 (IBLOCK inum icfg_ist)
                 ltac:(discriminate)). }
-    iIntros (CID16 Hq16) "_". iIntros (mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
+    iIntros (CID16 Hq16) "_"; iIntros (mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
                               Hsbb Hsbi Hmeta Hmap Hblk Hat Hbsl Hop".
     iDestruct "Hop" as (wit u3 Sb3)
       "(%Hsb3 & %Hib3 & %Hwit & %Hcrb3 & %Hu3g & Hop)".

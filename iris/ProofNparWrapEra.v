@@ -314,7 +314,7 @@ Section ProofNparWrapEraMain.
                     Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Htr").
     all: try lkbelow.
-    iIntros (CID8 Hq8) "_". iIntros (mf n' Sb' ok nf ipv w)
+    iIntros (CID8 Hq8) "_"; iIntros (mf n' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
              Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".

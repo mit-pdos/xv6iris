@@ -634,7 +634,7 @@ Section ProofSysUnlinkTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID2 Hq2) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID2 Hq2) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpce6 : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xe6)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpce6) in "Hpc".
@@ -946,7 +946,7 @@ Section ProofSysUnlinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc160 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -1000,7 +1000,7 @@ Section ProofSysUnlinkTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc164 : ret_pc (Q1 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x164)) by (rewrite HQ1ra; pcw).
     iEval (rewrite Hpc164) in "Hpc".
@@ -1504,7 +1504,7 @@ Section ProofSysUnlinkTails.
                     Hivalidi Hloadi Hshoti Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl [] Hop").
     { iEval (cbn beta iota). iEmpIntro. }
-    iIntros (CID3 Hq3) "_". iIntros (mup n2 SbE2 wgE)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2 SbE2 wgE)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %HsbE2 %HwgE
        %HwgcE %Hn2 Hop Hislot Htd".
     (* ...and [dp]'s arm GROWS back to a half, which is where a one-lock

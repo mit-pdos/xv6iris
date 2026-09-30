@@ -1491,7 +1491,7 @@ Section KexecB3Body.
                     Hblocks [Hphb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { iSplitL "Hphb"; [iExact "Hphb" | iExact "Hppid"]. }
-    iIntros (CIDrd Hsrd) "_". iIntros (M2 tot Pr) "%Hcsrd %Huptr %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
+    iIntros (CIDrd Hsrd) "_"; iIntros (M2 tot Pr) "%Hcsrd %Huptr %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
              Hidev Hmeta Hmap Hblocks [Hphb Hppid] Hbs1".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
     iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
@@ -1747,7 +1747,7 @@ Section KexecB3Body.
           iSplitL "Hargv"; [iExact "Hargv" |].
           iSplitL "Hargs"; [iExact "Hargs" |].
           iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-        iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
+        iIntros (CIDh Hsh) "Hlc"; iIntros (M') "Hdisj".
         assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
                   (CIDh : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CIDh true (proc_addr jp) _ Hcrh
@@ -2429,7 +2429,7 @@ Section KexecB3Body.
                 iApply (Flags2perm.wp_flags2perm_sconf U15 (K - 68)%nat eb
                           (proc_addr jp) ltac:(lia)
                           with "Hcg Htext Hpc").
-                iIntros (CIDz2 Hsz2) "_". iIntros (M3) "Hcg Hpc %Hcsf %Hf2p".
+                iIntros (CIDz2 Hsz2) "_"; iIntros (M3) "Hcg Hpc %Hcsf %Hf2p".
                 assert (Hpc174 : ret_pc (U15 !!! Regidx Rra)
                                  = mword_of_int (KXB + 0x174))
                   by (rewrite HU15ra; bpcw).
@@ -2678,7 +2678,7 @@ Section KexecB3Body.
                                          ltac:(lia)))
                           with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
                 all: try lkbelow.
-                iIntros (CIDz8 Hsz8) "_". iIntros (M4) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsu Hpost".
+                iIntros (CIDz8 Hsz8) "_"; iIntros (M4) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsu Hpost".
                 iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]";
                   [exact Hkl|].
                 iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uv with "Hcont")
@@ -3273,7 +3273,7 @@ Section KexecB3Body.
                          iSplitL "Hargv"; [iExact "Hargv" |].
                          iSplitL "Hargs"; [iExact "Hargs" |].
                          iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-                       iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
+                       iIntros (CIDh Hsh) "Hlc"; iIntros (M') "Hdisj".
                        assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
                                  (CIDh : CPU) = (CID0 : CPU)) by wp_next_chain.
                        iDestruct (wp_next_retarget CID0 CIDh true (proc_addr jp)
@@ -3528,7 +3528,7 @@ Section KexecB3Body.
                          iSplitL "Hargs"; [iExact "Hargs" |].
                          iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
                        (* ---- +0x116: the segment is in memory ---- *)
-                       iIntros (CIDq1 Hsq1) "_". iIntros (Mx Mls) "%Hmx Hcg Hcnt Hextc Hclmc Hpc Hres Hcont".
+                       iIntros (CIDq1 Hsq1) "_"; iIntros (Mx Mls) "%Hmx Hcg Hcnt Hextc Hclmc Hpc Hres Hcont".
                        destruct Hmx as (HMxsp & HMxs0 & HMxs4 & HMxs5 & HMxs6 &
                                         HMxs9 & HMxs10 & HMxs11 &
                                         Hlswin & Hlsout).
@@ -3678,7 +3678,7 @@ Section KexecB3Body.
                          iSplitL "Hargv"; [iExact "Hargv" |].
                          iSplitL "Hargs"; [iExact "Hargs" |].
                          iSplitL "Helf"; [iExact "Helf" | iExact "Hframe"]. }
-                       iIntros (CIDh Hsh) "Hlc". iIntros (M') "Hdisj".
+                       iIntros (CIDh Hsh) "Hlc"; iIntros (M') "Hdisj".
                        (* [Hcont] is the one [kxc_ls] HANDED BACK, so it is
                           anchored at the loop's exit hart, not at [CID0]. *)
                        assert (Hcrh : true = false \/ proc_addr jp = zero_reg ->
@@ -3884,7 +3884,7 @@ Section KexecB3Loop.
                 Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 Hsp Hra Hs0 Hs1 Hs2
                 with "Htext Hfab Hst Hcont [Hc1a4]");
-      iIntros (CIDn Hsn) "_". iIntros (M' P' Mo szv' U') "%HU' [Hnext | Hexit] Hcont".
+      iIntros (CIDn Hsn) "_"; iIntros (M' P' Mo szv' U') "%HU' [Hnext | Hexit] Hcont".
     - (* NO FUEL, and the back edge is what refutes it. *)
       iDestruct "Hnext" as "(_ & _ & %Hp3 & _)".
       destruct Hp3 as (HSi & _ & _ & _ & _).
@@ -3906,7 +3906,7 @@ Section KexecB3Loop.
                       lia)
                 with "Htext Hfab [Hrest] Hcont [Hc1a4]").
       2:{ (* the exit, at the later count: [ev_after] composes *)
-          iIntros (CIDq Hsq) "_". iIntros (M'' P'' Mo'' szv'' U'') "%HU'' Hst Hc".
+          iIntros (CIDq Hsq) "_"; iIntros (M'' P'' Mo'' szv'' U'') "%HU'' Hst Hc".
           iApply ("Hc1a4" $! CIDq Hsq M'' P'' Mo'' szv'' U'' with "[%] Hst Hc").
           exact (ev_after_trans _ _ _ HU' HU''). }
       rewrite /kxc_at_12c.
@@ -4213,7 +4213,7 @@ Section KexecB3Close.
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
     all: try lkbelow.
-    iIntros (CIDu Hsu) "_". iIntros (M1 n3) "%Hcsu Hcg Hcnt Hextc Hclmc Hpc Hppid Hbm Hins
+    iIntros (CIDu Hsu) "_"; iIntros (M1 n3) "%Hcsu Hcg Hcnt Hextc Hclmc Hpc Hppid Hbm Hins
              Hbs %Hn3 Hlog Hirs1".
     assert (Hpc1aa : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXB + 0x1aa))
       by (rewrite HB2ra; cpcw).
@@ -4274,7 +4274,7 @@ Section KexecB3Close.
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
-    iIntros (CIDe Hse) "Hlc". iIntros (M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
+    iIntros (CIDe Hse) "Hlc"; iIntros (M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc1ae : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXB + 0x1ae))
       by (rewrite HB3ra; cpcw).
     iEval (rewrite Hpc1ae) in "Hpc".
@@ -4391,7 +4391,7 @@ Section KexecB3Main.
                     [ pose proof (Nat2Z.is_nonneg i); lia
                     | pose proof (eh_phnum_bound ef); lia ])
               with "Htext Hfab Hst Hcont [Hc1ae]").
-    iIntros (CIDn Hsn) "_". iIntros (M' P' Mo szv' U') "%HU' Hst4 Hcont".
+    iIntros (CIDn Hsn) "_"; iIntros (M' P' Mo szv' U') "%HU' Hst4 Hcont".
     assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
@@ -4406,7 +4406,7 @@ Section KexecB3Main.
               w67 ef P' Mo szv' (m !!! Regidx Rs11)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               with "Htext Hfab Hst4 [Hc1ae Hcont]").
-    iIntros (CIDm Hsm) "_". iIntros (M'') "Hst1ae".
+    iIntros (CIDm Hsm) "_"; iIntros (M'') "Hst1ae".
     assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
               (CIDm : CPU) = (CIDn : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CIDn CIDm true (proc_addr jp) _ Hcr2
@@ -4445,7 +4445,7 @@ Section KexecB3Main.
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13
               w67 ef P Mi with "Htext Hst [Hc1ae]").
-    iIntros (CIDn Hsn) "_". iIntros (M') "Hst4".
+    iIntros (CIDn Hsn) "_"; iIntros (M') "Hst4".
     assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
@@ -4460,7 +4460,7 @@ Section KexecB3Main.
               w67 ef P Mi (mword_of_int 0 : mword 64) (m !!! Regidx Rs11)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               with "Htext Hfab Hst4 [Hc1ae]").
-    iIntros (CIDm Hsm) "_". iIntros (M'') "Hst1ae".
+    iIntros (CIDm Hsm) "_"; iIntros (M'') "Hst1ae".
     iSpecialize ("Hc1ae" $! CIDm with "[%]"); [wp_next_chain |].
     iApply ("Hc1ae" $! M'' with "Hst1ae").
   Qed.

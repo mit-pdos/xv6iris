@@ -401,7 +401,7 @@ Section ProofKfree.
               ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
               with "Hcg Htext Hpc [Hpown]").
     { iEval (rewrite HMmsa0). iExact "Hpown". }
-    iIntros (CIDms Hsms) "_". iIntros (mfp) "Hcg Hpc Hpage %Hpinsf".
+    iIntros (CIDms Hsms) "_"; iIntros (mfp) "Hcg Hpc Hpage %Hpinsf".
     iEval (rewrite HMmsa0) in "Hpage".
     pose proof Hpinsf as Hpinsf_cs.
     unfold callee_saved in Hpinsf.
@@ -499,7 +499,7 @@ Section ProofKfree.
               with "Hcg Hcnt Htext Hpc [Hkmem]").
     all: try lkbelow.
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc44 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
@@ -624,7 +624,7 @@ Section ProofKfree.
        -- literally the term [Hbmatch] equates with [b] -- so the fresh hart
        it hands back is at [wp_next b], matching kfree's own top-level index. *)
     rewrite -Hbmatch.
-    iIntros (CIDrel Hsrel) "_". iIntros (mrel) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["kmem"]} ∪ lks) ∖ {["kmem"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
@@ -801,7 +801,7 @@ Section ProofKfree.
     iIntros "Hcg Hcnt Htext Hpc Hkmem Hpre Havail Hcont".
     iApply (wp_kfree_led_sconf γl γk lk fl m on n eb pcur K b lks HK Hlk Hfl Hn Hfresh
               with "Hcg Hcnt Htext Hpc Hkmem Hpre Havail").
-    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpost".
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc"; iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpost".
     iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
     by iApply kfree_post_led_avail.
   Qed.

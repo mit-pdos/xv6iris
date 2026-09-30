@@ -1126,7 +1126,7 @@ Section ProofCopyinstr.
     { rewrite HW4a0 -Hrootc Hbase. reflexivity. }
     iApply (Walkaddr.wp_walkaddr_sconf W4 t m_ad (K - 12)%nat (DfracOwn 1) b pcur
               ltac:(lia) HW4root Hrep with "Hcg Htext Hpc Hptree").
-    iIntros (CIDl5 Hsl5) "_". iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwv".
+    iIntros (CIDl5 Hsl5) "_"; iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hwv".
     rewrite HW4a1 in Hwv.
     iDestruct (proc_ptm_rebuild Pc (uint szv) M t m_ad Hwf Hview Hrep Hbase
                  with "Hptree Hown") as "Hpt".
@@ -1407,7 +1407,7 @@ Section ProofCopyinstr.
                     ltac:(rewrite /G1 upd_eq; reflexivity)
                     ltac:(left; split; [exact cs_xor_1 | reflexivity])
                     with "Hcg Htext Hpc").
-          iIntros (CIDn3 Hsn3) "_". iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
+          iIntros (CIDn3 Hsn3) "_"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
           (* the answer: the buffer now holds a NUL-terminated string *)
           assert (Hcstr : bb_cstr (bb_upd g (done + i')%nat (mword_of_int 0 : mword 8))
                             (done + i')%nat) by (apply bb_cstr_upd; exact Hnulg).
@@ -1612,7 +1612,7 @@ Section ProofCopyinstr.
                       ltac:(rewrite /E1 upd_eq; reflexivity)
                       ltac:(right; split; [exact cs_xor_0 | reflexivity])
                       with "Hcg Htext Hpc").
-            iIntros (CIDd8 Hsd8) "_". iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
+            iIntros (CIDd8 Hsd8) "_"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
             iDestruct (cpu_own_transport CIDc CIDd8 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
             iSpecialize ("HEXIT" $! CIDd8 with "[]"); [ iPureIntro; wp_next_chain | ].
@@ -1879,7 +1879,7 @@ Section ProofCopyinstr.
                 _ kx ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv Hlend").
       all: try lkbelow.
-      iIntros (CIDvf Hsvf) "_". iIntros (mv) "Hcg Hcnt Hlend Hpc %Hvcs Hvpost".
+      iIntros (CIDvf Hsvf) "_"; iIntros (mv) "Hcg Hcnt Hlend Hpc %Hvcs Hvpost".
       iDestruct "Hlend" as (ky Hky) "Hlend".
       iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend pcur k')%I with "[Hlend]" as "Hlend".
       { iExists ky. iFrame "Hlend". iPureIntro. lia. }
@@ -2552,7 +2552,7 @@ Section ProofCopyinstr.
                 HM8s8 HM8s9 HM8s10 HM8s11
                 Hlkbelow
                 with "Hcg Hcnt Hlend Htext Hpc Hpt Henv Hdst").
-      iIntros (CIDj Hsj) "_". iIntros (mj res P' g)
+      iIntros (CIDj Hsj) "_"; iIntros (mj res P' g)
         "%Hjsp %Hj10 %Hj11 %Hja0 %Hjret %Hjext Hcg Hcnt Hlend Hpc Hpt Hdst".
       (* ---- the epilogue ---- *)
       iApply (cs_epilogue mm mj K res sp0 ra0 s00 s10 s20 s30 s40 s50 s60 s70 s80 s90 u12 b p
@@ -2560,7 +2560,7 @@ Section ProofCopyinstr.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hjsp Hja0 Hj10 Hj11
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDj CIDf lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[] Hlc"); [ iPureIntro; wp_next_chain | ].

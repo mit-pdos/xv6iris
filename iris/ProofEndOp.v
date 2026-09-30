@@ -1554,7 +1554,7 @@ Section EndOpBlocks.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HE4a0). iExact "Hlock". }
-    iIntros (CIDb1 Hsb1) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
+    iIntros (CIDb1 Hsb1) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
     assert (Hpc50 : ret_pc (E4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x50)).
     { rewrite HE4ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc50) in "Hpc".
@@ -1895,7 +1895,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Klk K HK); lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CIDc1 Hsc1) "_". iIntros (mr) "Hcg Hpc %Hrel Hcnt".
+    iIntros (CIDc1 Hsc1) "_"; iIntros (mr) "Hcg Hpc %Hrel Hcnt".
     assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -2167,7 +2167,7 @@ Section EndOpBlocks.
                                  ltac:(apply lookup_lt_Some in Hv; lia));
                       exact (HLw i v Hv))
                 with "Hseamg Hregc Hswlb Hmirc Hepoch"). }
-    iIntros (CIDb1 Hsb1) "_". iIntros (mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
+    iIntros (CIDb1 Hsb1) "_"; iIntros (mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
     (* the mirror half back, and the era's token, still under the write's
        later: it is stripped at the [c.j] into [eo_tail] below (sync K3-3) *)
@@ -2365,7 +2365,7 @@ Section EndOpBlocks.
                 ltac:(apply HMihdr; apply lookup_lt_Some in Hwi; lia)
                 with "Hseam Hregc Hswlb"). }
     { iApply bi.later_intro. iExact "Hmirc". }
-    iIntros (CIDb2 Hsb2) "_". iIntros (mf2) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid
+    iIntros (CIDb2 Hsb2) "_"; iIntros (mf2) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid
                               Hncell HW HauthL HauthD _ Hent Hu2 >Hmirc".
     assert (Hpc10e : ret_pc (A3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x10e)).
     { rewrite HA3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2486,7 +2486,7 @@ Section EndOpBlocks.
                 ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
                 Hn30 (HMihdr n ltac:(lia)) (fun _ _ => eq_refl) Hcaught
                 with "Hseam Hregc Hswlb Hmirc"). }
-    iIntros (CIDb3 Hsb3) "_". iIntros (mf3 bs2) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid
+    iIntros (CIDb3 Hsb3) "_"; iIntros (mf3 bs2) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell _ HauthL Hhdr %Hhdrn2 %Hhdec2 Hu3
                                   >Hmirc".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x11a)).
@@ -3068,7 +3068,7 @@ Section EndOpBlocks.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu1").
     all: try lkbelow.
-    iIntros (CIDb1 Hsb1) "_". iIntros (mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
+    iIntros (CIDb1 Hsb1) "_"; iIntros (mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
     destruct Hpair1 as [Hcs1 Hmf1a0].
     assert (Hpcc6 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xc6)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3242,7 +3242,7 @@ Section EndOpBlocks.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu2").
     all: try lkbelow.
-    iIntros (CIDb2 Hsb2) "_". iIntros (mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
+    iIntros (CIDb2 Hsb2) "_"; iIntros (mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
     destruct Hpair2 as [Hcs2 Hmf2a0].
     assert (Hpcd4 : ret_pc (B4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xd4)).
     { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3457,7 +3457,7 @@ Section EndOpBlocks.
               (DfracOwn 1) eb (proc_addr j)
               ltac:(pose proof (eo_Kmm K HK); lia) ltac:(vm_compute; reflexivity) HG5a2
               with "Hcg Htext Hpc Hdata2 Hdata1").
-    iIntros (CIDa15 Hsa15) "_". iIntros (mf3) "Hcg Hpc Hdata2 Hdata1 %Hmf3a0 %Hcs3".
+    iIntros (CIDa15 Hsa15) "_"; iIntros (mf3) "Hcg Hpc Hdata2 Hdata1 %Hmf3a0 %Hcs3".
     iEval (rewrite HG5a1) in "Hdata2".
     iEval (rewrite HG5a0) in "Hdata1".
     iDestruct (eo_data_back (b_data (bpa k2)) bs2 1024%nat Hlen2 with "Hdata2") as "Hdata2".
@@ -3604,7 +3604,7 @@ Section EndOpBlocks.
       iApply (fs_logfill_v_seq_permit cov logstart t Mc bs2 Hlen2
                 ltac:(exact (eo_t_lt_lb t n Ht Hn30)) HMchdr
                 with "Hseam Hregc Hswlb Hmirc"). }
-    iIntros (CIDb3 Hsb3) "_". iIntros (mf4) "%Hcs4 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold >Hmirc".
+    iIntros (CIDb3 Hsb3) "_"; iIntros (mf4) "%Hcs4 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold >Hmirc".
     assert (Hpcec : ret_pc (H2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xec)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcec) in "Hpc".
@@ -3713,7 +3713,7 @@ Section EndOpBlocks.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk2").
     all: try lkbelow.
-    iIntros (CIDb4 Hsb4) "_". iIntros (mf5) "%Hcs5 Hcg Hcnt Hpc Hppid Hu2".
+    iIntros (CIDb4 Hsb4) "_"; iIntros (mf5) "%Hcs5 Hcg Hcnt Hpc Hppid Hu2".
     assert (Hpcf2 : ret_pc (H4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf2)).
     { rewrite HH4ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcf2) in "Hpc".
@@ -3810,7 +3810,7 @@ Section EndOpBlocks.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk1").
     all: try lkbelow.
-    iIntros (CIDb5 Hsb5) "_". iIntros (mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu1".
+    iIntros (CIDb5 Hsb5) "_"; iIntros (mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu1".
     assert (Hpcf8 : ret_pc (H6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf8)).
     { rewrite HH6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcf8) in "Hpc".
@@ -4305,7 +4305,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Klk K HK); lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CIDc1 Hsc1) "_". iIntros (mr) "Hcg Hpc %Hrel Hcnt".
+    iIntros (CIDc1 Hsc1) "_"; iIntros (mr) "Hcg Hpc %Hrel Hcnt".
     assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -4636,7 +4636,7 @@ Section ProofEndOp.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hlock". }
-    iIntros (CIDq Hsq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
+    iIntros (CIDq Hsq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x1a)).
     { rewrite HR6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1a) in "Hpc".
@@ -5061,7 +5061,7 @@ Section ProofEndOp.
                 ltac:(pose proof (eo_Klk K HK); lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
-      iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrel Hcnt".
+      iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrel Hcnt".
       assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
         by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".

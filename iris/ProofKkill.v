@@ -256,9 +256,9 @@ Section ProofKkill.
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x22)) -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc".
+      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc".
+      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc".
       destruct Hregs as (Hm9 & Hmsp & Hm18 & Hm19 & Hmcs).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
@@ -307,7 +307,7 @@ Section ProofKkill.
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM24a0). iExact "Hlockk". }
-      iIntros (CIDf Hsf) "_". iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
+      iIntros (CIDf Hsf) "_"; iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
       assert (Hpc28 : ret_pc (M24 !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x28))
         by (rewrite HM24ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc28) in "Hpc".
@@ -456,7 +456,7 @@ Section ProofKkill.
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
           rewrite -Hbmatch.
-          iIntros (CIDg Hsg) "_". iIntros (mr) "Hcg Hpc %Hpinsr Hown".
+          iIntros (CIDg Hsg) "_"; iIntros (mr) "Hcg Hpc %Hpinsr Hown".
           (* acquire handed back [{[rank "proc"]} ∪ lks]; release hands back
              that set minus the same singleton, and [Hno] (via
              [locks_below_not_elem]) says the round trip is a no-op: this
@@ -769,7 +769,7 @@ Section ProofKkill.
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
-        iIntros (CIDg Hsg) "_". iIntros (mr) "Hcg Hpc %Hpinsr Hown".
+        iIntros (CIDg Hsg) "_"; iIntros (mr) "Hcg Hpc %Hpinsr Hown".
         (* see the +0x4e release above: [Hno] kills the difference. *)
         pose proof (locks_below_not_elem lks "proc" Hno) as Hnotin2.
         assert (Heqlks2 : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks)
@@ -1216,7 +1216,7 @@ Section ProofKkillMain.
                  pc_is (mword_of_int (KernelSyms.kkill + 0x54)) -∗
                  mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hqexit".
-    { iIntros (CIDx Hsx) "_". iIntros (Mx rv) "%Hx Hcg Hown Hpc".
+    { iIntros (CIDx Hsx) "_"; iIntros (Mx rv) "%Hx Hcg Hown Hpc".
       destruct Hx as (Hxsp & Hxa0 & Hxrv & Hxcs).
       (* +0x54 c.ldsp ra,40(sp) *)
       iEval (rewrite -Hqa1 -Hxsp) in "Hb1".

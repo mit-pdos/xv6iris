@@ -245,7 +245,7 @@ Section ProofHoldingsleep.
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hlk". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     iDestruct (sl_pay_open with "HR") as "HR".
     assert (Hpc18 : ret_pc (M5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.holdingsleep + 0x18))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
@@ -508,7 +508,7 @@ Section ProofHoldingsleep.
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR2". }
-    iIntros (CIDrel Hsrel) "_". iIntros (MR) "Hcg Hpc %HcsMR Hcnt".
+    iIntros (CIDrel Hsrel) "_"; iIntros (MR) "Hcg Hpc %HcsMR Hcnt".
     (* release handed back the FULL entry set minus the rank it just gave up;
        [Hfresh]'s bound gives the non-membership that collapses it back to
        the untouched [lks]. *)
@@ -755,7 +755,7 @@ Section ProofHoldingsleep.
     iDestruct "Hsl" as (q) "Hsl".
     iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb b lks Upr
               Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidproc").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidproc"); [ exact Hcs |].
     iExists q. iExact "Hsl".

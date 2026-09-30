@@ -333,7 +333,7 @@ Section ProofFileclose.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (FC + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -575,7 +575,7 @@ Section ProofFileclose.
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
-      iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+      iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
       (* fileclose is BALANCED on this arm: the set release hands back
          collapses to the entry [lks] -- [Hfresh] makes the singleton
          insert/delete cancel. *)
@@ -610,7 +610,7 @@ Section ProofFileclose.
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) u4 u5 u6 u7 u8 p b
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsf Hcg Hpc".
       iDestruct (cpu_own_transport CIDr CIDe n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* ONE WIDE HOP for the complement: nothing on this path threads it
@@ -986,7 +986,7 @@ Section ProofFileclose.
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
-      iIntros (CIDr2 Hsr2) "_". iIntros (mr2) "Hcg Hpc %Hrel2 Hcnt".
+      iIntros (CIDr2 Hsr2) "_"; iIntros (mr2) "Hcg Hpc %Hrel2 Hcnt".
       (* fileclose is BALANCED on this arm too. *)
       assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
@@ -1188,7 +1188,7 @@ Section ProofFileclose.
                   ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hispipe Hpref Hcpay Hkmem Hav Hlend Hprocs").
         all: try lkbelow.
-        iIntros (CIDp5 Hsp5) "_". iIntros (mp) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc %Hpcs Hav Hcpost".
+        iIntros (CIDp5 Hsp5) "_"; iIntros (mp) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc %Hpcs Hav Hcpost".
         iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
         iDestruct ("Hpback" $! kc2 with "Hev") as "Hpbare".
         (* pipeclose ALWAYS clears its flag word, so the post is the FIRED
@@ -1224,7 +1224,7 @@ Section ProofFileclose.
         { iApply (fci_a4 with "Htext"). }
         { iApply (fci_a6 with "Htext"). }
         { iApply (fci_a8 with "Htext"). }
-        iIntros (CIDp6 Hsp6) "_". iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
+        iIntros (CIDp6 Hsp6) "_"; iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
                                  Hcg Hpc Hb4 Hb5 Hb6 Hb7".
         assert (HMrall : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                   r <> Rs0 -> r <> Rs1 -> Mr !!! Regidx r = m !!! Regidx r).
@@ -1255,7 +1255,7 @@ Section ProofFileclose.
                   (m !!! Regidx Rs5) u8 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-        iIntros (CIDp7 Hsp7) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
+        iIntros (CIDp7 Hsp7) "Hlc"; iIntros (mf) "%Hcsf Hcg Hpc".
         iDestruct (cpu_own_transport CIDp5 CIDp7 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* ONE WIDE HOP again: pipeclose does not thread the complement
@@ -1477,7 +1477,7 @@ Section ProofFileclose.
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hlog Hpbare Hprocs").
           all: try lkbelow.
-          iIntros (CIDf3 Hsf3) "_". iIntros (mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpbare Hop".
+          iIntros (CIDf3 Hsf3) "_"; iIntros (mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpbare Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
           { rewrite HB1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1555,7 +1555,7 @@ Section ProofFileclose.
           (* the two superblock cells come back at [□] and are dropped: they
              are persistent conjuncts of [fs_ready], which this proof still
              holds. *)
-          iIntros (CIDf6 Hsf6) "_". iIntros (mi ni) "%Hics Hcg Hcnt Hextc Hextm Hpc Hpbare _ _
+          iIntros (CIDf6 Hsf6) "_"; iIntros (mi ni) "%Hics Hcg Hcnt Hextc Hextm Hpc Hpbare _ _
                                       Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
@@ -1598,7 +1598,7 @@ Section ProofFileclose.
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpbare
                           Hprocs Hdev Hgeod Hdlkd Hop").
           all: try lkbelow.
-          iIntros (CIDf8 Hsf8) "_". iIntros (me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpbare".
+          iIntros (CIDf8 Hsf8) "_"; iIntros (me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpbare".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).
           { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1633,7 +1633,7 @@ Section ProofFileclose.
           { iApply (fci_bc with "Htext"). }
           { iApply (fci_be with "Htext"). }
           { iApply (fci_c0 with "Htext"). }
-          iIntros (CIDf9 Hsf9) "_". iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
+          iIntros (CIDf9 Hsf9) "_"; iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
                                    Hcg Hpc Hb4 Hb5 Hb6 Hb7".
           assert (HMrall : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                     r <> Rs0 -> r <> Rs1 -> Mr !!! Regidx r = m !!! Regidx r).
@@ -1669,7 +1669,7 @@ Section ProofFileclose.
                     (m !!! Regidx Rs5) u8 (proc_addr (fcn_j fn)) b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                     with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-          iIntros (CIDf10 Hsf10) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
+          iIntros (CIDf10 Hsf10) "Hlc"; iIntros (mf) "%Hcsf Hcg Hpc".
           iDestruct (cpu_own_transport CIDf8 CIDf10 0 eb (proc_addr (fcn_j fn)) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
@@ -1732,7 +1732,7 @@ Section ProofFileclose.
           { iApply (fci_68 with "Htext"). }
           { iApply (fci_6a with "Htext"). }
           { iApply (fci_6c with "Htext"). }
-          iIntros (CIDz2 Hsz2) "_". iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
+          iIntros (CIDz2 Hsz2) "_"; iIntros (Mr) "(%HMrsp & %HMr2 & %HMr3 & %HMr4 & %HMr5 & %HMrthr)
                                    Hcg Hpc Hb4 Hb5 Hb6 Hb7".
           assert (HMrall : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                     r <> Rs0 -> r <> Rs1 -> Mr !!! Regidx r = m !!! Regidx r).
@@ -1762,7 +1762,7 @@ Section ProofFileclose.
                     (m !!! Regidx Rs5) u8 p b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HMrsp HMrall
                     with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
-          iIntros (CIDz3 Hsz3) "Hlc". iIntros (mf) "%Hcsf Hcg Hpc".
+          iIntros (CIDz3 Hsz3) "Hlc"; iIntros (mf) "%Hcsf Hcg Hpc".
           iDestruct (cpu_own_transport CIDr2 CIDz3 n eb p b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)

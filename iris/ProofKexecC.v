@@ -411,7 +411,7 @@ Section KexecCSetup.
     iApply (Myproc.wp_myproc_sconf T0 (K - 68)%nat 0%nat eb (proc_addr jp)
               eb ∅ ltac:(lia) ltac:(lia) with "Hcg Hcnt Htext Hpc").
     all: try lkbelow.
-    iIntros (CID2 Hs2) "_". iIntros (ms M1) "%Hmsf Hcg Hcnt Hpc %HM1".
+    iIntros (CID2 Hs2) "_"; iIntros (ms M1) "%Hmsf Hcg Hcnt Hpc %HM1".
     destruct HM1 as [Hcs1 HM1a0].
     assert (Hpc1b2 : ret_pc (T0 !!! Regidx Rra) = mword_of_int (KXC + 0x1b2))
       by (rewrite HT0ra; pcw).
@@ -905,7 +905,7 @@ Section KexecCSetup.
               with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
     all: try lkbelow.
 
-    iIntros (CID16 Hs16) "_". iIntros (Mu) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsu Hpost".
+    iIntros (CID16 Hs16) "_"; iIntros (Mu) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsu Hpost".
     iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
     iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uv with "Hcont") as "Hcont";
       [exact HUv|].
@@ -1282,7 +1282,7 @@ Section KexecCSetup.
                       exact Hb38)
                 ltac:(rewrite HZ1a1; exact Hleafeq) Hpermok
                 with "Hcg Htext Hpc Hptnew").
-      iIntros (CID23 Hs23) "_". iIntros (Z2) "Hcg Hpc %Hcsz2 Hptcl".
+      iIntros (CID23 Hs23) "_"; iIntros (Z2) "Hcg Hpc %Hcsz2 Hptcl".
       assert (Hpc200 : ret_pc (Z1 !!! Regidx Rra) = mword_of_int (KXC + 0x200))
         by (rewrite HZ1ra; pcw).
       iEval (rewrite Hpc200) in "Hpc".
@@ -2596,7 +2596,7 @@ Section KexecCLoop.
     iApply (Strlen.wp_strlen_sconf KT0 Z0 (aslen c) (alen c) (afun c) (K - 68)%nat
               dqas eb (proc_addr jp) HK2 Halenlt Hcstr Halen31
               with "Hcg Htext Hpc Hargc").
-    iIntros (CID2 Hs2) "_". iIntros (T0) "Hcg Hpc Hargc %Hcs0 %HT0a0".
+    iIntros (CID2 Hs2) "_"; iIntros (T0) "Hcg Hpc Hargc %Hcs0 %HT0a0".
     assert (Hpc21e_ret : ret_pc (Z0 !!! Regidx Rra) = mword_of_int (KXC + 0x21c))
       by (rewrite HZ0ra; pcw).
     iEval (rewrite Hpc21e_ret) in "Hpc".
@@ -3032,7 +3032,7 @@ Section KexecCLoop.
       iApply (Strlen.wp_strlen_sconf KT0 Z1 (aslen c) (alen c) (afun c) (K - 68)%nat
                 dqas eb (proc_addr jp) HK2 Halenlt Hcstr Halen31
                 with "Hcg Htext Hpc Hargc").
-      iIntros (CID12 Hs12) "_". iIntros (T7) "Hcg Hpc Hargc %Hcs1 %HT7a0".
+      iIntros (CID12 Hs12) "_"; iIntros (T7) "Hcg Hpc Hargc %Hcs1 %HT7a0".
       assert (Hpc23c_ret : ret_pc (Z1 !!! Regidx Rra) = mword_of_int (KXC + 0x23a))
         by (rewrite HZ1ra; pcw).
       iEval (rewrite Hpc23c_ret) in "Hpc".
@@ -3354,7 +3354,7 @@ Section KexecCLoop.
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
                 Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hlend Hargc1").
-      iIntros (CID19 Hs19) "_". iIntros (T13 Pfinal2 M0') "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc Hpt Hargc1 %Hcs2 %Hextsz %Hco_wrote".
+      iIntros (CID19 Hs19) "_"; iIntros (T13 Pfinal2 M0') "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc Hpt Hargc1 %Hcs2 %Hextsz %Hco_wrote".
       iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
       iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uv with "Hcont") as "Hcont";
         [exact HUv|].
@@ -4104,7 +4104,7 @@ Section KexecCArgvLoop.
               Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
               Hmw12
               with "Htext Hst Hcont [Hout]").
-    iIntros (CIDn Hsn) "_". iIntros (M' P' Mo U1) "%HU1 [Hnext | Hexit] Hcont".
+    iIntros (CIDn Hsn) "_"; iIntros (M' P' Mo U1) "%HU1 [Hnext | Hexit] Hcont".
     - (* another argument: the BACK EDGE, re-entered at [S c] and at the hart
          this iteration ended on. *)
       iEval (rewrite /kxc_at_21a) in "Hnext".
@@ -5171,7 +5171,7 @@ Section KexecCClose.
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
                 Hsz1max38 ltac:(lia) (locks_below_empty _)
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hlend Hubytes").
-      iIntros (CID16 Hs16c) "_". iIntros (X13 P2 M0') "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc Hpt Hubytes %Hcs %Hextsz %Hco_wrote".
+      iIntros (CID16 Hs16c) "_"; iIntros (X13 P2 M0') "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc Hpt Hubytes %Hcs %Hextsz %Hco_wrote".
       iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
       iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uv with "Hcont") as "Hcont";
         [exact HUv|].

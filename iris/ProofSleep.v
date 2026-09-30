@@ -311,7 +311,7 @@ Section SleepJoin.
        its LAST instruction, so the hart can move there and the epilogue
        below is hart-GENERIC; at [eb = false] it does not, and the chain
        pins every step to this hart.  Either way the leaves run at [eb]. *)
-    iIntros (CIDr Hsr) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDr Hsr) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     (* SLEEP IS BALANCED IN THE HELD SET: what its acquire took, this release
        gives back, so the singleton insert and delete cancel -- which is
        exactly what [Hno] buys, once its ORDER bound is cashed for the
@@ -616,7 +616,7 @@ Section ProofSleepBody.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID7 Hs7) "_". iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
+    iIntros (CID7 Hs7) "_"; iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
     assert (Hpc0e : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x0e)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
@@ -668,7 +668,7 @@ Section ProofSleepBody.
        [false] and every leaf collapses with [wp_next_off] -- and the held SET
        is [{["proc"]} ∪ lks] for exactly the same stretch, which is
        what sched and the join half below are instantiated at. *)
-    iIntros (CIDa Hsa) "_". iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu [Hpay Hclmp]".
+    iIntros (CIDa Hsa) "_"; iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -939,7 +939,7 @@ Section ProofSleepBody.
       { iIntros "_". iApply (park_pay_needs_ctx (proc_addr j) SLEEPING needs_ctx_SLEEPING). }
       (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
          [sleep_join] at [(CID0 := CIDs)]. *)
-      iIntros (CIDs Hss) "_". iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
+      iIntros (CIDs Hss) "_"; iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
       (* what the join half needs about [msch], read off this tower. *)
       assert (Hsp_msch : msch !!! Regidx csp_rs1 = spd).
       { rewrite (callee_saved_lookup Hcs_sch csp_rs1 ltac:(vm_compute; reflexivity)).

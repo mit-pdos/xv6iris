@@ -431,7 +431,7 @@ Section KexecB2Body.
               ltac:(rewrite HT3a1; exact Hbelow)
               with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
     all: try lkbelow.
-    iIntros (CID4 Hsq4) "_". iIntros (mr) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcspf".
+    iIntros (CID4 Hsq4) "_"; iIntros (mr) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcspf".
     iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uev) "[%HUev Hpriv]"; [exact Hkl|].
     iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uev with "Hcont") as "Hcont";
       [exact HUev|].
@@ -984,7 +984,7 @@ Section KexecB2Loops.
     iApply (Walkaddr.wp_walkaddr_sconf N5 t m_ad (K - 68)%nat (DfracOwn 1)
               eb (proc_addr jp) ltac:(lia) HN5a0 Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CIDw Hsw) "_". iIntros (mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
+    iIntros (CIDw Hsw) "_"; iIntros (mr) "Hcg Hpc Hptree %Hwacs %Hwapay".
     rewrite HN5a1 in Hwapay.
     assert (Hpc104 : ret_pc (N5 !!! Regidx Rra) = mword_of_int (KXB + 0x104))
       by (rewrite HN5ra; lpcw).
@@ -1432,7 +1432,7 @@ Section KexecB2Loops.
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
       all: try lkbelow.
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }
-      iIntros (CIDrd Hsrd) "_". iIntros (M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
+      iIntros (CIDrd Hsrd) "_"; iIntros (M2 tot P') "%Hcsrd %Hupt %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
                Hidev Hmeta Hmap Hblocks [Hdst Hppid] Hbs1".
       iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
       iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".

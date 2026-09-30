@@ -397,7 +397,7 @@ Section ProofSysOpenFullBody.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) vom (word_hi u23) (DfracOwn (1/4))
               b lks so_arg1_lt HM5a0 Hargvom so_noff0 HKai Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage H23hi").
-    iIntros (CID8 Hq8) "_". iIntros (mai) "%Hcsai Hcg Hown Hpc Htf Hpage H23hi".
+    iIntros (CID8 Hq8) "_"; iIntros (mai) "%Hcsai Hcg Hown Hpc Htf Hpage H23hi".
     iEval (rewrite HM5a1) in "H23hi".
     iDestruct ("Hback" with "Htf Hpage") as "Hpriv".
     assert (Hpc12 : ret_pc (M5 !!! Regidx Rra : mword 64)
@@ -560,7 +560,7 @@ Section ProofSysOpenFullBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13) "_". iIntros (mas P' bf kA) "%Hcsas %Huptz %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
+    iIntros (CID13 Hq13) "_"; iIntros (mas P' bf kA) "%Hcsas %Huptz %HkA Hcg Hown Hpc Hpriv Hbuf %Hfsr %Hfgot".
     (* argstr lent the block's counter (permit sweep L1b): the rest of the
        run is at the record it came back at *)
     set (UA := upd_usV U (upd_ev (us_V U) kA)).
@@ -756,7 +756,7 @@ Section ProofSysOpenFullBody.
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID19 Hq19) "_". iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpbare Hop".
+    iIntros (CID19 Hq19) "_"; iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpbare Hop".
     assert (Hpc2e : ret_pc (R3 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x2e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc2e) in "Hpc".

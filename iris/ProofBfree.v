@@ -666,7 +666,7 @@ Section BfreeTail.
     (* the registry row log_write hands back is dropped here: bfree's caller
        threads the ENTRY, at its own epoch, and nothing below the bitmap
        needs a witness *)
-    iIntros (CID2 Hq2) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcs1 HopS _ Hlk Hsl".
+    iIntros (CID2 Hq2) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcs1 HopS _ Hlk Hsl".
     iDestruct (log_opSwe_opSe with "HopS") as "Hop".
     (* log_write recorded the block under its own name; it is the bitmap
        block, which is how the credit bfree returns matches the one its
@@ -744,7 +744,7 @@ Section BfreeTail.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID5 Hq5) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID5 Hq5) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc54 : ret_pc (T2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bfree + 0x54)) by (rewrite HT2ra; pcw).
     iEval (rewrite Hpc54) in "Hpc".
@@ -1343,7 +1343,7 @@ Section ProofBfreeMain.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID13 Hq13) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CID13 Hq13) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (RA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bfree + 0x20)) by (rewrite HRAra; pcw).

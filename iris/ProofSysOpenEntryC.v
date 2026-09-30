@@ -551,7 +551,7 @@ Section ProofSysOpenEntryC.
                     [Hwp] Hdl Hcre").
     { iEval (rewrite HN5a0). iExact "Hbufk". }
     { iExact "Hwp". }
-    iIntros (CID6 Hq6) "_". iIntros (mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
+    iIntros (CID6 Hq6) "_"; iIntros (mcr ok made kk qi ss gy inum dn bm u1 Sb1 ns1)
       "%Hcscr Hcg Hown Hpc Hsbn Hsbi Hsbs Hsbb Hpriv Hbufk Hbsl
        %Hns1 Hisl %Hu1 HopS Hok".
     iEval (rewrite HN5a0) in "Hbufk".

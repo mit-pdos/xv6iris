@@ -820,7 +820,7 @@ Section UtSysBlock.
          descriptor up to a lazy-fault extension, the size).  Framed, not
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
-      iIntros (CID2 Hk2) "_". iIntros (mg U2 stsR csR)
+      iIntros (CID2 Hk2) "_"; iIntros (mg U2 stsR csR)
         "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg %Hsecg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))

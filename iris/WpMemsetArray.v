@@ -109,7 +109,7 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hlc". iIntros (mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hlc"; iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
     iSpecialize ("Hcont" $! CID3 with "[%] Hlc"); [wp_next_chain|].
@@ -270,7 +270,7 @@ Section WpMemsetArray.
     { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
-    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hlc". iIntros (mfin) "Hcg Hpc %Hmeq".
+    iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hlc"; iIntros (mfin) "Hcg Hpc %Hmeq".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
     (* hand the all-cbyte buffer back directly (KEEP the written bytes) *)

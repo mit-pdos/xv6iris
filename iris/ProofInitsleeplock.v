@@ -292,7 +292,7 @@ Section ProofInitsleeplock.
     { iEval (rewrite HA7a0). iExact "Hlk". }
     { iEval (rewrite HA7a0). iExact "Hlkname". }
     { iEval (rewrite HA7a0). iExact "Hcpu". }
-    iIntros (CID13 Hs13) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
+    iIntros (CID13 Hs13) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
     iEval (rewrite HA7a0) in "Hlk". iEval (rewrite HA7a0 HA7a1) in "Hlname". iEval (rewrite HA7a0) in "Hcpu".
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (A7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.initsleeplock + 0x1e)).

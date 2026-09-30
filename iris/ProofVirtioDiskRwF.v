@@ -822,7 +822,7 @@ Section VdrwfP6.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hdinv #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
-    iIntros (CIDx Hsx) "_". iIntros (M q np nr cm fr h m2 t pin)
+    iIntros (CIDx Hsx) "_"; iIntros (M q np nr cm fr h m2 t pin)
             "%Hrh %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
              Hbody Hact Hinfob Hhcm Hbdisk Hu Hfm Hft Hrm Hrt Hidx".
     (* SPLIT AT THE INDEX, ONCE, RIGHT HERE: [Hpay] rides UNCHANGED through
@@ -1412,7 +1412,7 @@ Section VdrwfP6.
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (MR) "Hcg Hpc %HcsR Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (MR) "Hcg Hpc %HcsR Hown".
     (* the release gave the virtio rank back; hand the caller the bare set
        P1-P4 name (see the two-conventions note in lock-set.md). *)
     iEval (rewrite (locks_add_del_below "virtio_disk" lks Hbelow)) in "Hown".
@@ -1897,7 +1897,7 @@ Section ProofVirtioDiskRwF.
     (* ---- P1: prologue + acquire ---- *)
     iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) bno lks HK Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hlk Hbno").
-    iIntros (CIDa Hsa) "_". iIntros (M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
+    iIntros (CIDa Hsa) "_"; iIntros (M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).
     (* JOIN AT THE INDEX: P1's own acquire freed the pair at [eb = true] and
        nothing at [eb = false], where the caller (our own precondition)
@@ -1935,7 +1935,7 @@ Section ProofVirtioDiskRwF.
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               ltac:(lkbelow)
               with "Htext Hpinv Hqinv Hrcpt Hdinv Hgeom Hlk Hsaved Hbno").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].

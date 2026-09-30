@@ -414,7 +414,7 @@ Section ProofUvmcreate.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
-    iIntros (CID7 Hs7) "_". iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
+    iIntros (CID7 Hs7) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -562,7 +562,7 @@ Section ProofUvmcreate.
          flipped with ↦ₘ), so no shim crossing here: only the address form
          differs. *)
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID13 Hs13) "_". iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID13 Hs13) "_"; iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret1a : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x1a)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret1a) in "Hpc".

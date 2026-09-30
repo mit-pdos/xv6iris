@@ -1055,7 +1055,7 @@ Section ProofKwait.
     iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
               (wait_res_at) T2 0%nat eb pme (K - 10)%nat _ Hlka ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok Hres Hown Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
     assert (Hpf8 : ret_pc (T2 !!! Regidx Rra) = mword_of_int (KW + 0x106))
       by (rewrite HT2ra; apply bv_eq; vm_compute; reflexivity).
@@ -1281,7 +1281,7 @@ Section ProofKwait.
     iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
               (wait_res_at) U4 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok Hres Hown Hpay0").
-    iIntros (CIDr2 Hsr2) "_". iIntros (mr) "Hcg Hpc %Hcsr Hown".
+    iIntros (CIDr2 Hsr2) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
     assert (Hpa6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (KW + 0xa6))
       by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1794,7 +1794,7 @@ Section ProofKwait.
               (wait_res_at) R6 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok [Hcols] Hown Hpay0").
     { iApply (kw_pay_res with "Hcols"). }
-    iIntros (CIDr2 Hsr2) "_". iIntros (mr) "Hcg Hpc %Hcsr Hown".
+    iIntros (CIDr2 Hsr2) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
     assert (Hp7c : ret_pc (R6 !!! Regidx Rra) = mword_of_int (KW + 0x7c))
       by (rewrite HR6ra; apply bv_eq; vm_compute; reflexivity).
@@ -1808,7 +1808,7 @@ Section ProofKwait.
     iApply (kw_epilogue mm mr pme (sign_extend' 64 pidc) K 0%nat eb eb lks
               ltac:(pose proof (kw_K10K K HK); lia) Hmrsp Hmrs3 Hmrcs with "Hcg Hown Htext Hpc Hframe").
     iApply (kw_next_reanchor CIDp CIDr2 eb pme with "[Hcont Hmyrow Hesc Hsgq Hlend]"); [wp_next_chain |].
-    iIntros (CIDx Hsx) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcgf Hownf Hpcf".
+    iIntros (CIDx Hsx) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcgf Hownf Hpcf".
     iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hsx |].
     (* THE ANSWER, at the generation this walk reaped: the row lost it, its
        escrow is in the caller's hands at the status the copyout placed, and
@@ -2942,7 +2942,7 @@ Section ProofKwait.
               with "Hcg Hown Hpay Htext Hpc Hlk Htok [Hcols] Hframe [Hqfn Hpriv Hmyrow]").
     { iApply (kw_pay_res with "Hcols"). }
     rewrite /kw_exit_fn.
-    iIntros (CIDx Hsx) "Hlc". iIntros (mf) "%Hcsx %Ha0x Hcgx Hownx Hpcx".
+    iIntros (CIDx Hsx) "Hlc"; iIntros (mf) "%Hcsx %Ha0x Hcgx Hownx Hpcx".
     iSpecialize ("Hqfn" $! CIDx with "[%] Hlc"); [exact Hsx |].
     iApply ("Hqfn" $! mf (pv_upt (us_V U)) (mword_of_int (-1) : mword 32) 0%nat
               (mword_of_int 0 : mword 32) cs (pv_ev (us_V U))
@@ -3318,7 +3318,7 @@ Section ProofKwait.
                   ltac:(pose proof (kw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok [Hcols] Hown Hpay").
         { iApply (kw_pay_res with "Hcols"). }
-        iIntros (CIDr Hsr) "_". iIntros (mfr) "Hcg Hpc %Hrcs Hown".
+        iIntros (CIDr Hsr) "_"; iIntros (mfr) "Hcg Hpc %Hrcs Hown".
         iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
         assert (Hpe4 : ret_pc (T5 !!! Regidx Rra) = mword_of_int (KW + 0xe4))
           by (rewrite HT5ra; pcstep).
@@ -3358,7 +3358,7 @@ Section ProofKwait.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         (* SLEEP RETURNS ON HART [CIDs]: the outer loop's one crossing. *)
-        iIntros (CIDs Hss) "_". iIntros (mfs) "%Hscs Hcg Hown Hpc Htcx Hclmx".
+        iIntros (CIDs Hss) "_"; iIntros (mfs) "%Hscs Hcg Hown Hpc Htcx Hclmx".
         iClear "Htcx". iClear "Hclmx".
         assert (Hpe8 : ret_pc (T6 !!! Regidx Rra) = mword_of_int (KW + 0xe8))
           by (rewrite HT6ra; pcstep).
@@ -3417,7 +3417,7 @@ Section ProofKwait.
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HT8a0). iExact "Hlk". }
-        iIntros (CIDa Hsa) "Hlc". iIntros (msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
+        iIntros (CIDa Hsa) "Hlc"; iIntros (msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
         assert (Hpee : ret_pc (T8 !!! Regidx Rra) = mword_of_int (KW + 0xee))
           by (rewrite HT8ra; pcstep).
         iEval (rewrite Hpee) in "Hpc".
@@ -3863,7 +3863,7 @@ Section ProofKwaitMain.
                  with "Hown") as "Hown".
     iApply (Myproc.wp_myproc_sconf P3 (av - 10)%nat 0%nat eb pj eb lks
               kw_ilvl0 ltac:(pose proof (kw_K10 av Hav); lia) with "Hcg Hown Htext Hpc").
-    iIntros (CID14 Hs14) "_". iIntros (msm mfm) "%Hms Hcg Hown Hpc %Hmy".
+    iIntros (CID14 Hs14) "_"; iIntros (msm mfm) "%Hms Hcg Hown Hpc %Hmy".
     destruct Hmy as (Hmycs & Hmya0).
     assert (Hp1c : ret_pc (P3 !!! Regidx Rra) = mword_of_int (KW + 0x1c))
       by (rewrite HP3ra; pcstep).
@@ -3968,7 +3968,7 @@ Section ProofKwaitMain.
               with "Hcg Hown Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HP7a0). iExact "Hlk". }
-    iIntros (CID19 Hs19) "Hlc". iIntros (msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
+    iIntros (CID19 Hs19) "Hlc"; iIntros (msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
     assert (Hp2a : ret_pc (P7 !!! Regidx Rra) = mword_of_int (KW + 0x2a))
       by (rewrite HP7ra; pcstep).
     iEval (rewrite Hp2a) in "Hpc".
@@ -4110,7 +4110,7 @@ Section ProofKwaitMain.
     iAssert (kw_exit_fn CID19 γf m pj adr av eb pid U (pv_chg (us_V U)) cs lks)
       with "[Hcont]" as "Hqfn".
     { rewrite /kw_exit_fn.
-      iIntros (CIDx Hsx) "Hlc". iIntros (mf P' rv d xw cs' k')
+      iIntros (CIDx Hsx) "Hlc"; iIntros (mf P' rv d xw cs' k')
         "%Hcsx %Ha0x %Hextx %Hdx %Hnullx %Hfullx Hansx Hzrx Hcgx Hownx Hpcx %Hkx Hprivx Hrowx".
       iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [wp_next_chain |].
       (* THE STEP ACROSS, taken once (lane TRAP-ROWS-3/4, T4(b)) *)
@@ -4133,7 +4133,7 @@ Section ProofKwaitMain.
     iAssert (kw_round CID γf γw j m pj adr av eb pid U (pv_chg (us_V U)) cs lks)
       with "[]" as "Hround".
     { iLöb as "IH". rewrite /kw_round.
-      iIntros (CIDz Hsz) "_". iIntros (N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hrowz Hprivz Hframez Hqfnz".
+      iIntros (CIDz Hsz) "_"; iIntros (N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hrowz Hprivz Hframez Hqfnz".
       iApply (kw_round_body (CIDy := CIDz) CID γs γa γp γf γw γl j m N pj adr av eb pid U
                 (pv_chg (us_V U)) cs lks
                 Hav Heb Hj Hgl Hlen Hpjv Hsz Hrz Hbelow
@@ -4164,7 +4164,7 @@ Section ProofKwaitMain.
     iApply (wp_kwait_led_sconf γa γp γf γw γs j γl m av eb b pid U lks cs
               Hj Hgl Hav Heb Hbelow
               with "Hcg Hown Htext Hpc Hpinv Hlk Henv Hplk Hpriv Hmyrow Hipis").
-    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mf P' rv d xw cs' k') "%Hr %Hext %Hd %Hnull %Hfull Hans".
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc"; iIntros (mf P' rv d xw cs' k') "%Hr %Hext %Hd %Hnull %Hfull Hans".
     iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mf P' rv d xw cs' k' with "[%] [%] [%] [%] [%] [Hans]");
       [ exact Hr | exact Hext | exact Hd | exact Hnull | exact Hfull | ].
     iApply (wait_ans_led_post with "Hans").

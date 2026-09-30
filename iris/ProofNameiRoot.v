@@ -286,7 +286,7 @@ Section ProofNameiRoot.
               R5 n (K - 4)%nat eb p b lks
               Vpr Knx Hn Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").
-    iIntros (CID8 Hq8) "_". iIntros (mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
+    iIntros (CID8 Hq8) "_"; iIntros (mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).
     iEval (rewrite HR5a0) in "Hp0".
     iEval (rewrite HR5a0) in "Hp1".

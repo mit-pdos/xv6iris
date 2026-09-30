@@ -241,7 +241,7 @@ Section ProofUvmclear.
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CID7 Hs7) "_". iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
+    iIntros (CID7 Hs7) "_"; iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
     iEval (rewrite Hret0e) in "Hpc".
     assert (HW4vpn : svpn_of (W4 !!! Regidx (mword_of_int 11 : mword 5)) = vpn)
       by (rewrite HW4a1; reflexivity).

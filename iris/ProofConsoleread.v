@@ -1716,7 +1716,7 @@ Section CrBodies.
     intros Hm0sp Hav.
     iIntros "#Ht Hsaved Hcont".
     rewrite /cr_epi_prop.
-    iIntros (CIDe Hse) "_". iIntros (M P' Mo r hs kv)
+    iIntros (CIDe Hse) "_"; iIntros (M P' Mo r hs kv)
       "Hwin %Hsp %Ha0 %Hcs %Hext %Hr Hshotq #Htags Hcg Hpc Hcnt %Hkv Hpriv Hrest".
     iApply (cr_epi (CID := CIDe) CIDe cn Wd ord (cr_fault U (m0 !!! Regidx Ra1))
               jp m0 M av true sp0 pid
@@ -1817,7 +1817,7 @@ Section ProofConsoleread.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     iIntros "#Ht #Hlk #Huinv #Hpr EPI".
     rewrite /cr_retx_prop.
-    iIntros (CIDx Hsx) "_". iIntros (M P' Mo nc hs kv)
+    iIntros (CIDx Hsx) "_"; iIntros (M P' Mo nc hs kv)
       "Hwin %Hsp %Hs3 %Hs7 %Hcs %Hrng %Hext #Htags Hcg Hpc Hcnt Hpay Hlocked Hres %Hkv Hpriv Hrest".
     (* THE MARKER, CASHED.  Reading the credential out of the escrow costs a
        [▷] -- [Wd] is an arbitrary application [iProp] and an invariant's
@@ -1886,7 +1886,7 @@ Section ProofConsoleread.
               ltac:(lia)
               with "Hcg Ht Hpc [Hlk] Hlocked Hres Hcnt Hpay").
     { iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hcnt". rgall.
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hcnt". rgall.
     assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -2114,7 +2114,7 @@ Section ProofConsoleread.
   Proof using fdslotG0.
     intros Hn31 Hav Hbelow. iIntros "#Ht #Hlk #Hpr #Henv HEAD".
     rewrite /cr_have_prop.
-    iIntros (CIDv Hsv) "Hlc". iIntros (M nc cur P' Mo rr ww ee bs ts hs kv)
+    iIntros (CIDv Hsv) "Hlc"; iIntros (M nc cur P' Mo rr ww ee bs ts hs kv)
       "Hrn %Hregs %Ha5 %Hnb %Hlen %Hext %Hlent %Hok %Hrow %Hrw #Htags
        EX Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh %Hkv Hpriv Hsl7 Hq10 Hq11 Hq12".
     (* the tag column is persistent: move it out of the spatial context so
@@ -3176,7 +3176,7 @@ Section ProofConsoleread.
     iIntros "#Ht #Hlk #Huinv #Hpr #Henv #Hpinv #HAVE".
     rewrite /cr_wait_prop.
     iLöb as "IH".
-    iIntros (CIDw Hsw) "_". iIntros (M nc cur P' Mo hs kv)
+    iIntros (CIDw Hsw) "_"; iIntros (M nc cur P' Mo hs kv)
       "Hrn %Hregs %Hs5 %Hnb %Hext #Htags EX Hcg Hpc Hcnt Hpay Hlocked Hres %Hkv Hpriv Hrest".
     iDestruct "Hrn" as (bsacc) "(%Hcur & %Hmoeq & %Htagacc & Hacc)".
     pose proof Hregs as Hregs'.
@@ -3378,7 +3378,7 @@ Section ProofConsoleread.
                 ltac:(lia)
                 with "Hcg Ht Hpc [Hlk] Hlocked Hres Hcnt Hpay").
       { iApply (is_conslock_lock with "Hlk"). }
-      iIntros (CIDr Hsr) "_". iIntros (mrl) "Hcg Hpc %Hcsrl Hcnt". rgall.
+      iIntros (CIDr Hsr) "_"; iIntros (mrl) "Hcg Hpc %Hcsrl Hcnt". rgall.
       assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
@@ -3520,7 +3520,7 @@ Section ProofConsoleread.
               ltac:(lia)
               with "Hcg Ht Hpc [Hlk] Hlocked Hres Hcnt Hpay").
     { iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDr0 Hsr0) "_". iIntros (mrl0) "Hcg Hpc %Hcsrl0 Hcnt". rgall.
+    iIntros (CIDr0 Hsr0) "_"; iIntros (mrl0) "Hcg Hpc %Hcsrl0 Hcnt". rgall.
     assert (Hsetback2 : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback2) in "Hcnt".
@@ -3558,7 +3558,7 @@ Section ProofConsoleread.
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
-    iIntros (CIDs1 Hss1) "_". iIntros (msl) "%Hcssl Hcg Hcnt Hpc _ _". rgall.
+    iIntros (CIDs1 Hss1) "_"; iIntros (msl) "%Hcssl Hcg Hcnt Hpc _ _". rgall.
     iEval (rewrite HS5ra) in "Hpc".
     assert (Hp62 : ret_pc (add_vec_int (mword_of_int (CR + 0x5e) : mword 64) 4)
                    = (mword_of_int (CR + 0x62) : mword 64)) by pcw.
@@ -3606,7 +3606,7 @@ Section ProofConsoleread.
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HS7a0). iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDq2 Hsq2) "Hlc". iIntros (ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
+    iIntros (CIDq2 Hsq2) "Hlc"; iIntros (ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HS7ra) in "Hpc".
     assert (Hp68 : ret_pc (add_vec_int (mword_of_int (CR + 0x64) : mword 64) 4)
                    = (mword_of_int (CR + 0x68) : mword 64)) by pcw.
@@ -3762,7 +3762,7 @@ Section ProofConsoleread.
     intros Hjp Hjl Hn31 Hav Hbelow.
     induction fl as [| fl IHfl].
     { iIntros "#Ht #Hlk #Huinv #Hpr #Henv #Hpinv". rewrite /cr_head_prop.
-      iIntros (CIDh Hsh) "_". iIntros (M nc cur P' Mo hs kv)
+      iIntros (CIDh Hsh) "_"; iIntros (M nc cur P' Mo hs kv)
         "Hrn %Hregs %Hs5 %Hrng %Hfl %Hext Htags EX Hcg Hpc Hcnt Hpay Hlocked Hres %Hkv Hpriv Hrest".
       exfalso. lia. }
     iIntros "#Ht #Hlk #Huinv #Hpr #Henv #Hpinv".
@@ -3777,7 +3777,7 @@ Section ProofConsoleread.
                   Hjp Hjl Hn31 Hav Hbelow
                   with "Ht Hlk Huinv Hpr Henv Hpinv HAVE") as "WAIT".
     rewrite /cr_head_prop.
-    iIntros (CIDh Hsh) "Hlc". iIntros (M nc cur P' Mo hs kv)
+    iIntros (CIDh Hsh) "Hlc"; iIntros (M nc cur P' Mo hs kv)
       "Hrn %Hregs %Hs5 %Hrng %Hfl %Hext #Htags EX Hcg Hpc Hcnt Hpay Hlocked Hres %Hkv Hpriv Hrest".
     iDestruct "Hrn" as (bsacc) "(%Hcur & %Hmoeq & %Htagacc & Hacc)".
     pose proof Hregs as Hregs'.
@@ -4324,7 +4324,7 @@ Section ProofConsoleread.
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP8a0). iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDaq Hsaq) "_". iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq) "_"; iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP8ra) in "Hpc".
     assert (Hpc28 : ret_pc (add_vec_int (mword_of_int (CR + 0x24) : mword 64) 4)
                     = (mword_of_int (CR + 0x28) : mword 64)) by pcw.

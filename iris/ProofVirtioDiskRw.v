@@ -546,7 +546,7 @@ Section ProofVirtioDiskRw.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq) "Hlc". iIntros (ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
+    iIntros (CIDaq Hsaq) "Hlc"; iIntros (ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
     (* THE COMPLEMENT RIDES ALONG, UNTOUCHED, THROUGH THE WHOLE PROLOGUE --
        transport it to the acquire-return hart in ONE step, using exactly the
        chain of per-instruction guards [cpu_own_transport] above already

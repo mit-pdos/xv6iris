@@ -536,7 +536,7 @@ Section ProofPMS.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
-    iIntros (CIDl2 Hsl2) "_". iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
+    iIntros (CIDl2 Hsl2) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_mapstacks + 0x56)).
     { rewrite HJ1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret56) in "Hpc".
@@ -824,7 +824,7 @@ Section ProofPMS.
     all: try lkbelow.
     all: try exact Hp0.
     { rewrite avail_sub_Some. iExact "Henv". }
-    iIntros (CIDl16 Hsl16) "_". iIntros (mr1 t' g') "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs1 %Hbase' %Hrep' %Hpres %Hg'miss".
+    iIntros (CIDl16 Hsl16) "_"; iIntros (mr1 t' g') "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs1 %Hbase' %Hrep' %Hpres %Hg'miss".
     assert (Henveq : avail_sub (Some ((nb - (i + gk + 1))%nat)) g' = avail_sub (Some nb) (S i + (gk + g'))).
     { rewrite !avail_sub_Some. f_equal. lia. }
     iEval (rewrite Henveq) in "Henv".

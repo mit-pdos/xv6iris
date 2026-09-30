@@ -502,7 +502,7 @@ Section ProofPipeclose.
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { iEval (rewrite Ha0A4). iExact "Hopen". }
-    iIntros (CIDaq Hsaq) "_". iIntros (ms M0) "%Hms Href Hcg Hpc %HcsM0 Hlocked Hres _ Hown Hpay".
+    iIntros (CIDaq Hsaq) "_"; iIntros (ms M0) "%Hms Href Hcg Hpc %HcsM0 Hlocked Hres _ Hown Hpay".
     iEval (rewrite HraA4) in "Hpc".
     assert (Hpc14 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipeclose + 0x10) : mword 64) 4)
                     = (mword_of_int (KernelSyms.pipeclose + 0x14) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -604,7 +604,7 @@ Section ProofPipeclose.
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
-        iIntros (CIDrl Hsrl) "_". iIntros (mr) "_ Hcg Hpc %Hcsr Hown".
+        iIntros (CIDrl Hsrl) "_"; iIntros (mr) "_ Hcg Hpc %Hcsr Hown".
         (* BALANCED: the rank acquire put in comes straight back out.  [Hno]
            is the ORDER premise; [locks_below_not_elem] turns it into the
            non-membership the set algebra needs. *)
@@ -762,7 +762,7 @@ Section ProofPipeclose.
       { iExists nr, nw, ro, wo, vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq". iPureIntro. exact (conj Hcnt Hbslen). }
       { iIntros "Hfrag Hres". iModIntro.
         iApply (pipe_res_dead with "Hs0 Hs1 Hfrag Hres"). }
-      iIntros (CIDrc Hsrc) "_". iIntros (mr) "Hword Hcpu Hbytes Hcg Hpc %Hcsr Hown".
+      iIntros (CIDrc Hsrc) "_"; iIntros (mr) "Hword Hcpu Hbytes Hcg Hpc %Hcsr Hown".
       (* BALANCED on the freeing path too: release_cancel gives the rank back
          BEFORE kfree runs, so kfree (and its own "kmem" acquire) sees [lks].
          Same [locks_below_not_elem] step as at the plain release above. *)
@@ -828,7 +828,7 @@ Section ProofPipeclose.
          does not have to -- kfree wants only the page's FUTURE. *)
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
         iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }
-      iIntros (CIDkf Hskf) "_". iIntros (mk) "Hcg Hown Hpc %Hcsk Havail".
+      iIntros (CIDkf Hskf) "_"; iIntros (mk) "Hcg Hown Hpc %Hcsk Havail".
       assert (HraK4 : K4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.pipeclose + 0x58) : mword 64) 4)
         by (rewrite /K4; apply upd_eq).
       iEval (rewrite HraK4) in "Hpc".

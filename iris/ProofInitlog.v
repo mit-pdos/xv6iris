@@ -903,7 +903,7 @@ Section InitlogBlocks.
       iEval (rewrite Htgt52) in "Hpc".
       iApply (IH CIDc5 (S t) E3 ltac:(lia) ltac:(lia) HE3a5 HE3a4 HE3a2 HE3a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso) "Hlc". iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc"; iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
       iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HE3cs c Hc).
@@ -1127,7 +1127,7 @@ Section InitlogBlocks.
       iApply (il_copy nh kk nh bs_hdr pj nK b Hkk Hnh Hlen CIDh6 0%nat F5
                 Hposn ltac:(lia) HF5a5 HF5a4 HF5a2 HF5a0
                 with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
-      rewrite /wp_next. iIntros (CIDo Hso) "Hlc". iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      rewrite /wp_next. iIntros (CIDo Hso) "Hlc"; iIntros (M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
       iSpecialize ("Hcont" $! CIDo with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
       + intros c Hc. rewrite (HcsX c Hc). exact (HF5cs c Hc).
@@ -1567,7 +1567,7 @@ Section ProofInitlog.
     { iEval (rewrite HRAa0). iExact "Hlock". }
     { iEval (rewrite HRAa0). iExact "Hname". }
     { iEval (rewrite HRAa0). iExact "Hcpu". }
-    iIntros (CID16 Hs16) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iIntros (CID16 Hs16) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HRAa0) in "Hlock".
     iEval (rewrite HRAa0 HRAa1) in "Hlname".
     iEval (rewrite HRAa0) in "Hcpu".
@@ -1763,7 +1763,7 @@ Section ProofInitlog.
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
     all: try lkbelow.
-    iIntros (CID22 Hs22) "_". iIntros (mB kk bs0 bsd0 d0)
+    iIntros (CID22 Hs22) "_"; iIntros (mB kk bs0 bsd0 d0)
       "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc3a : ret_pc (T3 !!! Regidx Rra : mword 64)
@@ -1858,7 +1858,7 @@ Section ProofInitlog.
     iApply (il_hd kk ((hdr_dec bs_hdr).1) bs_hdr pj (K - 6)%nat b B1
               HA Hbnd eq_refl Hlen HB1a2 HB1a0
               with "Hcg Hpc Htext Hby Hblk").
-    iIntros (CID25 Hs25) "_". iIntros (B1x) "%HB1xcs %HB1xa0 Hcg Hpc Hby Hcells Hjunk".
+    iIntros (CID25 Hs25) "_"; iIntros (B1x) "%HB1xcs %HB1xa0 Hcg Hpc Hby Hcells Hjunk".
     (* the head's register facts, carried across the dispatch *)
     assert (HB1xsp : B1x !!! Regidx csp_rs1 = spr).
     { rewrite (HB1xcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HB1sp. }
@@ -1920,7 +1920,7 @@ Section ProofInitlog.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
-    iIntros (CID27 Hs27) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
+    iIntros (CID27 Hs27) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hs1u".
     assert (Hpc62 : ret_pc (B2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x62)).
     { rewrite HB2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2165,7 +2165,7 @@ Section ProofInitlog.
                 with "Hseam Hregc2 Hswlb [Hmi]").
       iNext. iExact "Hmi". }
     { iNext. iExact "Hmirh". }
-    iIntros (CID30 Hs30) "_". iIntros (mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
+    iIntros (CID30 Hs30) "_"; iIntros (mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
                              Hncell Hcells HLauth HDauth Hxo Hents Hs2 HRcust".
     (* RECOVERY IS DONE (durable-disk lane E-except): every entry has been
        landed, so the residue is empty and the handle is spent for the
@@ -2376,7 +2376,7 @@ Section ProofInitlog.
                 Hlen' ltac:(rewrite Hhn'; reflexivity) Hbnd HMn
                 (fun c (_ : c <> log_hdr_bno logstart) => eq_refl) Hcaught
                 with "Hseam Hregc Hswlb Hmirn"). }
-    iIntros (CID34 Hs34) "_". iIntros (mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
+    iIntros (CID34 Hs34) "_"; iIntros (mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x74)).

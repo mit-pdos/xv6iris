@@ -597,7 +597,7 @@ Section BoBodies.
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
     (* back to the OUTER set, matching [Hcont]'s expectation unmodified. *)
     assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
@@ -908,7 +908,7 @@ Section BoBodies.
               ({["log"]} ∪ lks)
               HArel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
-    iIntros (CIDAr HAsr) "_". iIntros (mfr) "Hcg Hpc %HArcs Hown".
+    iIntros (CIDAr HAsr) "_"; iIntros (mfr) "Hcg Hpc %HArcs Hown".
     (* between the interior release and the re-acquire this thread holds no
        lock: back to the bare, order-bounded [lks]. *)
     assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
@@ -952,7 +952,7 @@ Section BoBodies.
               HbelowA4
               with "Hcg Hown Htext Hpc Hpinv Htcx Hclmx").
     all: try lkbelow.
-    iIntros (CIDAs HAss) "_". iIntros (mfs) "%HAscs Hcg Hown Hpc Htcx Hclmx".
+    iIntros (CIDAs HAss) "_"; iIntros (mfs) "%HAscs Hcg Hown Hpc Htcx Hclmx".
     assert (HAp6 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x34))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HAp6) in "Hpc".
@@ -1004,7 +1004,7 @@ Section BoBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDAa HAsa) "Hlc". iIntros (msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
+    iIntros (CIDAa HAsa) "Hlc"; iIntros (msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
     assert (HAp8 : ret_pc (A6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x3a))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HAp8) in "Hpc".
@@ -1173,7 +1173,7 @@ Section BoBodies.
               ({["log"]} ∪ lks)
               HBrel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
-    iIntros (CIDBr HBsr) "_". iIntros (mfr) "Hcg Hpc %HBrcs Hown".
+    iIntros (CIDBr HBsr) "_"; iIntros (mfr) "Hcg Hpc %HBrcs Hown".
     assert (Hsetback : ({["log"]} ∪ lks) ∖ {["log"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
@@ -1213,7 +1213,7 @@ Section BoBodies.
               HbelowB4
               with "Hcg Hown Htext Hpc Hpinv Htcx Hclmx").
     all: try lkbelow.
-    iIntros (CIDBs HBss) "_". iIntros (mfs) "%HBscs Hcg Hown Hpc Htcx Hclmx".
+    iIntros (CIDBs HBss) "_"; iIntros (mfs) "%HBscs Hcg Hown Hpc Htcx Hclmx".
     assert (HBp6 : ret_pc (B4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x64))
       by (rewrite HB4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HBp6) in "Hpc".
@@ -1265,7 +1265,7 @@ Section BoBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
-    iIntros (CIDBa HBsa) "Hlc". iIntros (msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
+    iIntros (CIDBa HBsa) "Hlc"; iIntros (msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
     assert (HBp8 : ret_pc (B6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x6a))
       by (rewrite HB6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HBp8) in "Hpc".
@@ -2000,7 +2000,7 @@ Section ProofBeginOp.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa) "Hlc". iIntros (ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
+    iIntros (CIDa Hsa) "Hlc"; iIntros (ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.
@@ -2024,14 +2024,14 @@ Section ProofBeginOp.
     (* ============ the anchored EXIT continuation (+0x58 -> ret) ============ *)
     iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Upr) with "[Hcont]" as "Hexit".
     { rewrite /bo_exit.
-      iIntros (CIDx Hsx) "_". iIntros (Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc".
+      iIntros (CIDx Hsx) "_"; iIntros (Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc".
       iApply (bo_exit_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx pidv dq K eb spd sp0 lks
                 Upr HK Hsx Hspd Hsp0 HboE Hbelow
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ======== *)
     iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Upr) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /bo_loop.
-      iIntros (CIDy Hsy) "_". iIntros (My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit".
+      iIntros (CIDy Hsy) "_"; iIntros (My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb spd sp0 lks
                 Upr HK Hj Hjl Hsy HboL Hbelow
                 with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc"). }

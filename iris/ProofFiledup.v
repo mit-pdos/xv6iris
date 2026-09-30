@@ -285,7 +285,7 @@ Section ProofFiledup.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.filedup + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -462,7 +462,7 @@ Section ProofFiledup.
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     (* filedup is BALANCED: the set release hands back collapses to the entry
        [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
     assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)

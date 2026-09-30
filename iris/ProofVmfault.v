@@ -377,7 +377,7 @@ Section ProofVmfault.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hk1 Hk2 Hk6]" as "Hepi".
     { rewrite /EPI.
-      iIntros (CIDe Hbe) "_". iIntros (mj res) "(%Hjsp & %Hjs4 & %Hjthr) Hcg Hcnt Hlend Hpc Hjunk Hpost".
+      iIntros (CIDe Hbe) "_"; iIntros (mj res) "(%Hjsp & %Hjs4 & %Hjthr) Hcg Hcnt Hlend Hpc Hjunk Hpost".
       iDestruct "Hjunk" as (w3 w4 w5) "(Hk3 & Hk4 & Hk5)".
       (* +0x10 c.mv a0,s4 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.vmfault + 0x10)) Ra0 Rs4

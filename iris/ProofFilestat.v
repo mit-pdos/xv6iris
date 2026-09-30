@@ -403,7 +403,7 @@ Section ProofFilestat.
                  with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj b
               _ fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
-    iIntros (CID10 Hs10) "_". iIntros (ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
+    iIntros (CID10 Hs10) "_"; iIntros (ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
     assert (Hpc14 : ret_pc (R5 !!! Regidx Rra) = mword_of_int (FST + 0x14))
       by (rewrite HR5ra; apply bv_eq; vm_compute; reflexivity).
@@ -714,7 +714,7 @@ Section ProofFilestat.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { rewrite /ic_dep_side. done. }
-      iIntros (CIDil Hsil) "_". iIntros (mil dnl bml fl_)
+      iIntros (CIDil Hsil) "_"; iIntros (mil dnl bml fl_)
         "%Hcsil _ Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep Hoffr
          Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
@@ -895,7 +895,7 @@ Section ProofFilestat.
                 (K - 10)%nat (DfracOwn (1/2)) (DfracOwn (1/2)) b pj
                 (fst_av_stati K HK) HI4a0 HI4a1
                 with "Hcg Htext Hpc Hidev Hinum Hmeta Hstat").
-      iIntros (CID24 Hs24) "_". iIntros (mst) "%Hcsst Hcg Hpc Hidev Hinum Hmeta Hstat".
+      iIntros (CID24 Hs24) "_"; iIntros (mst) "%Hcsst Hcg Hpc Hidev Hinum Hmeta Hstat".
       assert (Hpc36 : ret_pc (I4 !!! Regidx Rra) = mword_of_int (FST + 0x36)).
       { rewrite HI4ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc36) in "Hpc".
@@ -1015,7 +1015,7 @@ Section ProofFilestat.
                       Hheld Hppid Hprocs
                       [//] Hflsh Hclaimsfs Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
-      iIntros (CIDiu Hsiu) "_". iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr _".
+      iIntros (CIDiu Hsiu) "_"; iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr _".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER (A6.145): the kept half PINS the returned half's
          (g, lo) by agreement, and the two genlo halves rejoin. *)
@@ -1223,7 +1223,7 @@ Section ProofFilestat.
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hlend Hbuf").
       all: try lkbelow.
-      iIntros (CID32 Hs32) "_". iIntros (mco P' Mo) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsco %Hext %Hwrote".
+      iIntros (CID32 Hs32) "_"; iIntros (mco P' Mo) "Hcg Hcnt (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsco %Hext %Hwrote".
       iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       iEval (rewrite HU6a3) in "Hbuf".
       (* WHAT THE WINDOW IS: copyout's own disjunction, read as "a prefix of
@@ -1355,7 +1355,7 @@ Section ProofFilestat.
                 (fst_K10 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HC3sp HC3a0 HC3thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
-      iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1437,7 +1437,7 @@ Section ProofFilestat.
                 (fst_K10 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HE1thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
-      iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".

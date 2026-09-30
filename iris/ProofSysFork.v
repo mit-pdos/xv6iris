@@ -218,7 +218,7 @@ Section ProofSysFork.
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl Hpe
                     Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken HjRc Hjslot Hjkw Hfdone Hpriv Hpfrag
                     Hpchrow").
-    iIntros (CID6 Hs6) "_". iIntros (MF) "%HcsMF Hpc Hpost".
+    iIntros (CID6 Hs6) "_"; iIntros (MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Hpfrag & #Henv & Hrv)".
     iDestruct "Hpriv" as (kev) "[%Hkev Hpriv]".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

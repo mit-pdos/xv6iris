@@ -1274,7 +1274,7 @@ Section ProofFilewrite.
       { iApply (fwri_0ee with "Htext"). }
       { iApply (fwri_0f0 with "Htext"). }
       { iApply (fwri_0f2 with "Htext"). }
-      iIntros (CIDr Hqr) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      iIntros (CIDr Hqr) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
       destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
       assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int nz : mword 64))
         by (rewrite HMra0'; exact HE1a0).
@@ -1295,7 +1295,7 @@ Section ProofFilewrite.
                 (mword_of_int nz) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int nz) with "[%] Hcg Hpc").
@@ -1349,7 +1349,7 @@ Section ProofFilewrite.
       { iApply (fwri_132 with "Htext"). }
       { iApply (fwri_134 with "Htext"). }
       { iApply (fwri_136 with "Htext"). }
-      iIntros (CIDr Hqr) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      iIntros (CIDr Hqr) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
       destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
       assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
         by (rewrite HMra0'; exact HE1a0).
@@ -1383,7 +1383,7 @@ Section ProofFilewrite.
                 (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 pp b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int (-1)) with "[%] Hcg Hpc").
@@ -2090,7 +2090,7 @@ Section ProofFilewrite.
     iApply (fw_test (CID0 := CID0) M (K - 12)%nat n iz (proc_addr jx) b
               Hiz (proj2 Hn) HMs4 HMs5 HMs7 HMs9
               with "Hcg Htext Hpc").
-    iIntros (CIDt Hst) "_". iIntros (c P) "%Hc Hcg Hpc".
+    iIntros (CIDt Hst) "_"; iIntros (c P) "%Hc Hcg Hpc".
     destruct Hc as (Hcrange & Hcrem & Hcpick & HPs3 & HPthr).
     (* the register facts travel through the test untouched *)
     assert (HPsp : P !!! Regidx csp_rs1 = pa_stk sp0 12)
@@ -2277,7 +2277,7 @@ Section ProofFilewrite.
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDbo Hsbo) "_". iIntros (mbo) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hlogop".
+    iIntros (CIDbo Hsbo) "_"; iIntros (mbo) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hlogop".
     (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
        durable-disk B''-tx).  The transaction token goes INTO [ilock], which
        parks half of it in the escrow's checked-out arm for the whole locked
@@ -2374,7 +2374,7 @@ Section ProofFilewrite.
     all: try (exact Hlex).
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDil Hsil) "_". iIntros (mil dnl bml fl_)
+    iIntros (CIDil Hsil) "_"; iIntros (mil dnl bml fl_)
       "%Hcsil Hflk Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep Hoffr
        Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
     iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
@@ -2652,7 +2652,7 @@ Section ProofFilewrite.
        AS WRITTEN is what the walk holds -- it is what stops compiling if
        SpecWritei's bracket changes shape again. *)
     { iExact "Hpriv". }
-    iIntros (CIDwi Hswi) "_". iIntros (mwi tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
+    iIntros (CIDwi Hswi) "_"; iIntros (mwi tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%Hcswi %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
        %Hdist %Hdistn %Hdistk %Hwhyw %Hrange %Hkbytes %Hubytes %Harms %Hbud
        %HSbsub %Hwi16p %Hwi16sp %Hwi16at %Hupt
@@ -2808,7 +2808,7 @@ Section ProofFilewrite.
     iApply (fw_offupd (CID0 := CIDb1) W1 (K - 12)%nat kx v rz (proc_addr jx) b
               HW1a0 HW1s2 ltac:(lia) Hwf Hrzadv
               with "Hcg Htext Hpc Hcell").
-    iIntros (CIDb2 Hsb2) "_". iIntros (X0 v2) "%Hx Hcg Hpc Hcell".
+    iIntros (CIDb2 Hsb2) "_"; iIntros (X0 v2) "%Hx Hcg Hpc Hcell".
     destruct Hx as (Hwf2 & Hv2 & Hxcs).
     assert (HX0s1 : X0 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite (Hxcs Rs1 ltac:(vm_compute; reflexivity)); exact HW1s1).
@@ -3357,7 +3357,7 @@ Section ProofFilewrite.
     all: try lkbelow.
     all: try (exact Hlex).
     { rewrite Htyq. iExact "Hshot". }
-    iIntros (CIDiu Hsiu) "_". iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb Htx".
+    iIntros (CIDiu Hsiu) "_"; iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
        descriptor named the share, so the token is whole again and [end_op]
        gets its [log_op] back. *)
@@ -3422,7 +3422,7 @@ Section ProofFilewrite.
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDeo Hseo) "_". iIntros (meo) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
+    iIntros (CIDeo Hseo) "_"; iIntros (meo) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
     iDestruct ("Hpbk4" with "Hppid") as "Hpriv".
     assert (Hpcc0 : ret_pc (X3 !!! Regidx Rra) = mword_of_int (FW + 0xc8)).
     { rewrite HX3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3567,7 +3567,7 @@ Section ProofFilewrite.
                   eq_refl HY1sp HY1s5 HY1s4 HY1thr2
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                         Hb10 Hb11 Hb12").
-        iIntros (CIDe Hse) "Hlc". iIntros (mfin rv) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mfin rv) "%Hcsr Hcg Hpc".
         destruct Hcsr as (Hcsf & Hrv & Hdisj).
         (* AU EDIT: the tail's KEYED post.  [iz + c = n] here, so the
            answer is [n] and not [-1] -- which is the whole reason
@@ -3708,7 +3708,7 @@ Section ProofFilewrite.
                 eq_refl Heosp Heos5 Heos4 Heothr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                       Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse) "Hlc". iIntros (mfin rv) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mfin rv) "%Hcsr Hcg Hpc".
       destruct Hcsr as (Hcsf & Hrv & Hdisj).
       (* AU EDIT: [iz < n] on this arm, so the tail's keyed post answers
          [-1]; and the chunk that ended the loop was not full, so it did
@@ -3897,7 +3897,7 @@ Section ProofFilewrite.
       (* ---- +0x08 .. +0x14 : the whole prologue, [fw_pro] ---- *)
       iApply (fw_pro (CID0 := CID2) R1 K sp0 pj b (fw_K12 K HK) HR1sp
                 with "Hcg Htext Hpc").
-      iIntros (CID3 Hs3) "_". iIntros (Mr w3 w5 w6 w9 w10 w11 w12)
+      iIntros (CID3 Hs3) "_"; iIntros (Mr w3 w5 w6 w9 w10 w11 w12)
         "%Hmr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12".
       destruct Hmr as (HMsp & HMs0 & HMthr).
       (* the five spilled words are the CALLER's, because [R1] differs from
@@ -4056,7 +4056,7 @@ Section ProofFilewrite.
                   with "Hcg Hpc [] []").
         { iApply (fwri_11a with "Htext"). }
         { iApply (fwri_11c with "Htext"). }
-        iIntros (CIDg3 Hsg3) "_". iIntros (Mg) "%Hmg Hcg Hpc".
+        iIntros (CIDg3 Hsg3) "_"; iIntros (Mg) "%Hmg Hcg Hpc".
         destruct Hmg as (Hmga0 & Hmgthr).
         assert (HMgsp : Mg !!! Regidx csp_rs1 = pa_stk sp0 12).
         { rewrite (Hmgthr csp_rs1 ltac:(vm_compute; reflexivity)). exact HG3gsp. }
@@ -4073,7 +4073,7 @@ Section ProofFilewrite.
                   HMgsp Hmga0 HMgthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                         Hb10 Hb11 Hb12").
-        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4292,7 +4292,7 @@ Section ProofFilewrite.
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpay Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HP2a0). iExact "Hpipe". }
-        iIntros (CIDpw Hspw) "_". iIntros (mf P' kpw)
+        iIntros (CIDpw Hspw) "_"; iIntros (mf P' kpw)
           "%Hcspw %Hupt %Hretpw %Hkpw Hcg Hcnt Hpc Hpref Hwpost Hpriv".
         assert (Hpc5a : ret_pc (P2 !!! Regidx Rra) = mword_of_int (FW + 0x62)).
         { rewrite HP2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -4329,7 +4329,7 @@ Section ProofFilewrite.
                   Hmfsp eq_refl Hmfthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                         Hb11 Hb12").
-        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CIDpw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
@@ -4589,7 +4589,7 @@ Section ProofFilewrite.
                        (bv_unsigned (fc_major Cf)) (fwn_wp fn (dev_major Cf)) (fwn_dqv fn (dev_major Cf)) pj b
                        (conj Hmj0 Hmj16) HD4a5m
                        with "Hcg Htext Hpc Hslot").
-             iIntros (CID17 Hs17) "_". iIntros (Dr) "%Hdr Hcg Hpc Hslot".
+             iIntros (CID17 Hs17) "_"; iIntros (Dr) "%Hdr Hcg Hpc Hslot".
              destruct Hdr as (HDra5 & HDrthr).
              iEval (rewrite -(_ : a_devsw_write (dev_major Cf)
                                   = mword_of_int (KernelSyms.devsw
@@ -4634,7 +4634,7 @@ Section ProofFilewrite.
                           with "Hcg Hpc [] []").
                 { iApply (fwri_122 with "Htext"). }
                 { iApply (fwri_124 with "Htext"). }
-                iIntros (CID19 Hs19) "_". iIntros (Er) "%Her Hcg Hpc".
+                iIntros (CID19 Hs19) "_"; iIntros (Er) "%Her Hcg Hpc".
                 destruct Her as (HEra0 & HErthr).
                 assert (HErsp : Er !!! Regidx csp_rs1 = pa_stk sp0 12).
                 { rewrite (HErthr csp_rs1 ltac:(vm_compute; reflexivity)). exact HDrsp. }
@@ -4652,7 +4652,7 @@ Section ProofFilewrite.
                           HErsp HEra0 HErthr2
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                                 Hb11 Hb12").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
@@ -4793,7 +4793,7 @@ Section ProofFilewrite.
                 (* consolewrite copies FROM user memory, so its post hands
                    the block back at a fresh image -- and the CALLER'S OWN
                    CURSOR at the count it pushed (lane OUT-FUPD). *)
-                iIntros (CIDcw Hscw) "_". iIntros (mf r P' kcw)
+                iIntros (CIDcw Hscw) "_"; iIntros (mf r P' kcw)
                   "%Hcscw %Hupt %Hrr %Hshort %Hra0 %Hkcw Hcg Hcnt Hpc Hpriv Hrcpt".
                 (* the short-write reason arrives at the CALLEE's register
                    file; [HE2a1] is the same buffer this contract names *)
@@ -4833,7 +4833,7 @@ Section ProofFilewrite.
                           Hmfsp Hra0 Hmfthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                                 Hb11 Hb12").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDcw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
@@ -4911,7 +4911,7 @@ Section ProofFilewrite.
                        with "Hcg Hpc [] []").
              { iApply (fwri_11e with "Htext"). }
              { iApply (fwri_120 with "Htext"). }
-             iIntros (CID17 Hs17) "_". iIntros (Er) "%Her Hcg Hpc".
+             iIntros (CID17 Hs17) "_"; iIntros (Er) "%Her Hcg Hpc".
              destruct Her as (HEra0 & HErthr).
              assert (HErsp : Er !!! Regidx csp_rs1 = pa_stk sp0 12).
              { rewrite (HErthr csp_rs1 ltac:(vm_compute; reflexivity)). exact HD4sp. }
@@ -4928,7 +4928,7 @@ Section ProofFilewrite.
                        HErsp HEra0 HErthr2
                        with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                              Hb11 Hb12").
-             iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+             iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
              destruct Hcsr as [Hcsf Hrv].
              iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                           with "Hcnt") as "Hcnt".
@@ -5136,7 +5136,7 @@ Section ProofFilewrite.
                            eq_refl HZ1sp HZ1a0 HZ1thr
                            with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                  Hb10 Hb11 Hb12").
-                 iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                 iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                  destruct Hcsr as [Hcsf Hrv].
                  iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -5591,7 +5591,7 @@ Section ProofFilewrite.
                    iApply (filewrite_in_inode_any rx omfx (bv_unsigned inumx) γox n
                              (us_M U) uaddr Q Qe with "[Hfin]").
                    rewrite Hstx. iExact "Hfin". }
-                 iIntros (CIDx Hsx) "Hlc". iIntros (mf rv P' kx')
+                 iIntros (CIDx Hsx) "Hlc"; iIntros (mf rv P' kx')
                    "%Hcs %Hup %Hra %Hkx' Hcg Hcnt Hpc Href Hpriv Henvo Harms".
                  iSpecialize ("Hcont" $! CIDx with "[] Hlc"); [iPureIntro; wp_next_chain|].
                  iApply ("Hcont" $! mf rv P' kx'

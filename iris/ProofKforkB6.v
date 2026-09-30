@@ -830,7 +830,7 @@ Section KforkPrologue.
     iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme b _
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID8 Hs8) "_". iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID8 Hs8) "_"; iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc10 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (KF + 0x10))
       by (rewrite HM2ra; apply bv_eq; vm_compute; reflexivity).
@@ -909,7 +909,7 @@ Section KforkPrologue.
               ltac:(lia) ltac:(lia) Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpavf Hlend").
     all: try lkbelow.
-    iIntros (CID11 Hs11) "Hlc". iIntros (mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
+    iIntros (CID11 Hs11) "Hlc"; iIntros (mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
     iDestruct ("Hpvb" $! kl with "[%] Hlend") as (Up1) "[%HUp1 Hpv]"; [exact Hkl|].
     destruct HUp1 as (k1 & Hk1 & ->).
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
@@ -1257,7 +1257,7 @@ Section KforkPrologue.
                       intros a Ha; unfold uva_live; lia)
                 with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb Hlend").
       all: try lkbelow.
-      iIntros (CID19 Hs19) "_". iIntros (mf9) "Hcg Hcpu (%kl2 & %Hkl2 & Hlend) Hpc %HcsD HPpt Hpost9".
+      iIntros (CID19 Hs19) "_"; iIntros (mf9) "Hcg Hcpu (%kl2 & %Hkl2 & Hlend) Hpc %HcsD HPpt Hpost9".
       iDestruct ("Hlb" $! kl2 with "[%] Hlend") as (k2) "[%Hk2 HPcnt]"; [exact Hkl2|].
       assert (Hk2' : (pv_ev (us_V Up) <= k2)%nat) by (cbn in Hk2; lia).
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))

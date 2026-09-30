@@ -324,7 +324,7 @@ Proof.
   iDestruct (ut_tf_length with "Hpv") as %Htflen0.
   iApply (PR.wp_prepare_return_sconf γf ks pid U T5 av2 p epc eb ∅
             Hpr Hepc with "Hcg Hcpu Hext Htext Hpc Hks Hpv").
-  iIntros (CIDf Hkf) "_". iIntros (mf ksat kroot0 vb)
+  iIntros (CIDf Hkf) "_"; iIntros (mf ksat kroot0 vb)
     "%Hcsf %HksatM %Hksata %Hksatp #Hkinv0 Hcg Hcpu Hcpay Hsepc Hscause Hstval
      Hsret Hstvec Hq4 Hkptr Hpv Hpc".
   assert (Hpc58 : ret_pc (T5 !!! Regidx Rra) = mword_of_int (FR + 0x58))
@@ -1222,7 +1222,7 @@ Proof.
                   Hlhn Hlhblk HauthL HauthD Hdirty Hhdr Hlslots Hpbare Hpinv
                   Hdevi Hdgeom Hdlock Hsl35 Hirs1").
   all: try lkbelow.
-  iIntros (CIDf1 Hkf1) "_". iIntros (mf1)
+  iIntros (CIDf1 Hkf1) "_"; iIntros (mf1)
     "%Hcsf1 Hcg Hcpu Hextc Hclmc Hpc Hpbare Hmg Hsz Hnb Hni Hnl Hls Hist Hbms
      #Hlctx Hsl3 Hirs1 Hboot".
   assert (Hpcf1 : ret_pc (B4 !!! Regidx Rra : mword 64)
@@ -1586,7 +1586,7 @@ Proof.
   (* ================================================================== *)
   (*  +0x46 .. +0x50: [p->trapframe->a0 = kexec(...)], then the test.     *)
   (* ================================================================== *)
-  iIntros (CIDk Hkk) "_". iIntros (mf Ux)
+  iIntros (CIDk Hkk) "_"; iIntros (mf Ux)
     "%Hcsk Harms Hcg Hcpu Hextc Hclmc Hpc Hbms2 Hist2 Hka2 Hpriv
      Hpath2 Hargv Hargs2 Hsl3 Hirs2".
   destruct Ux as [V' M'].
@@ -2082,7 +2082,7 @@ Proof.
   iApply (RL.wp_release_sconf KT1 γl p "proc"%string
             (proc_lock_pay γs γl p) M5 0%nat eb p av2 {["proc"%string]}
             Hlka ltac:(lia) with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
-  iIntros (CIDr Hkr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hcpu".
+  iIntros (CIDr Hkr) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hcpu".
   assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (FR + 0x14))
     by (rewrite HM5ra; pcw).
   iEval (rewrite Hpc14) in "Hpc".

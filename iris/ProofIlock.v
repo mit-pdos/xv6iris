@@ -1069,7 +1069,7 @@ Section IlockLoad.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
-    iIntros (CID9 Hq9) "_". iIntros (mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CID9 Hq9) "_"; iIntros (mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc4e : ret_pc (L7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x4e)) by (rewrite HL7ra; pcw).
@@ -1879,7 +1879,7 @@ Section IlockLoad.
               (fun jj => ind_bytes l0 !!! jj)
               (DfracOwn 1) b (proc_addr j) HKmm Hlen32 HG3a2
               with "Hcg Htext Hpc Hda Hdst").
-    iIntros (CID30 Hq30) "_". iIntros (mM) "Hcg Hpc Hda Hdst %Hmma0 %Hcsmm".
+    iIntros (CID30 Hq30) "_"; iIntros (mM) "Hcg Hpc Hda Hdst %Hmma0 %Hcsmm".
     assert (Hpc8e : ret_pc (G3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x8e)) by (rewrite HG3ra; pcw).
     iEval (rewrite Hpc8e) in "Hpc".
@@ -1979,7 +1979,7 @@ Section IlockLoad.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
-    iIntros (CID33 Hq33) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl".
+    iIntros (CID33 Hq33) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl".
     assert (Hpc94 : ret_pc (H1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x94)) by (rewrite HH1ra; pcw).
     iEval (rewrite Hpc94) in "Hpc".
@@ -2568,7 +2568,7 @@ Section ProofIlockMain.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement
        back too -- and the floor at the fragment's stamps, and the L2 row. *)
-    iIntros (CIDa Hqa) "_". iIntros (mf) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hflk Hstok Hslp Hppid".
+    iIntros (CIDa Hqa) "_"; iIntros (mf) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hflk Hstok Hslp Hppid".
     iEval (rewrite HR6a0) in "Hstok".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x1a)) by (rewrite HR6ra; pcw).

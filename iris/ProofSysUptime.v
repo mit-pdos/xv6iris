@@ -268,7 +268,7 @@ Section ProofSysUptime.
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hlk". }
-    iIntros (CID9 Hs9) "_". iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+    iIntros (CID9 Hs9) "_"; iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc16 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x16))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -395,7 +395,7 @@ Section ProofSysUptime.
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR". }
-    iIntros (CID10 Hs10) "_". iIntros (MR) "Hcg Hpc %HcsR Hcnt".
+    iIntros (CID10 Hs10) "_"; iIntros (MR) "Hcg Hpc %HcsR Hcnt".
     (* the SIE index release hands back is [outb := match n with O => eb |
        S _ => false end]; [Hbeq] identifies it with [b], derived up front. *)
     rewrite Hbeq in Hs10.
@@ -627,7 +627,7 @@ Section ProofSysUptime.
     iIntros "Hcg Hcnt Htext Hpc Hlock Hcont".
     iApply (wp_sys_uptime_led_sconf γl m n eb p av b lks Hn Hav Hfresh
               with "Hcg Hcnt Htext Hpc Hlock").
-    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mf t) "%Hpost _".
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc"; iIntros (mf t) "%Hpost _".
     iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mf t with "[%]"); exact Hpost.
   Qed.
 

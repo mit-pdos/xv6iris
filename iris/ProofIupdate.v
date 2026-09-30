@@ -585,7 +585,7 @@ Section IupdateTail.
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno). iExact "Hau". }
-    iIntros (CID3 Hq3) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
+    iIntros (CID3 Hq3) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
     (* log_write returned the set grown by the block it logged, and [Hbno]
        names that block: it is THIS inum's inode block, so the growth the
        public contract promises is exact rather than existential. *)
@@ -665,7 +665,7 @@ Section IupdateTail.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID6 Hq6) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID6 Hq6) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc72 : ret_pc (T3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x72)) by (rewrite HT3ra; pcw).
     iEval (rewrite Hpc72) in "Hpc".
@@ -1370,7 +1370,7 @@ Section ProofIupdateMain.
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID15 Hq15) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
+    iIntros (CID15 Hq15) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc24 : ret_pc (RA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x24)) by (rewrite HRAra; pcw).
@@ -1913,7 +1913,7 @@ Section ProofIupdateMain.
               (fun jj => ind_bytes (di_addrs (ds !!! islot inum)) !!! jj)
               (DfracOwn 1) b (proc_addr j) HKmm Hlen32 HG3a2
               with "Hcg Htext Hpc Hsrc Hda").
-    iIntros (CID36 Hq36) "_". iIntros (mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+    iIntros (CID36 Hq36) "_"; iIntros (mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
     assert (Hpc66 : ret_pc (G3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x66)) by (rewrite HG3ra; pcw).
     iEval (rewrite Hpc66) in "Hpc".

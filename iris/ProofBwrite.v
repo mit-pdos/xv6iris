@@ -343,7 +343,7 @@ Section ProofBwrite.
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hstok". }
-    iIntros (CID9 Hs9) "_". iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
+    iIntros (CID9 Hs9) "_"; iIntros (mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
     iEval (rewrite HmAa0) in "Hstok".
     iAssert (SleepLock.sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
@@ -465,7 +465,7 @@ Section ProofBwrite.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
     all: try lkbelow.
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
+    iIntros (CID14 Hs14) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".

@@ -574,7 +574,7 @@ Section ProofFdalloc.
     iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID8 Hs8) "_". iIntros (ms MP) "%Hms Hcg Hcpu Hpc %HcsMP".
+    iIntros (CID8 Hs8) "_"; iIntros (ms MP) "%Hms Hcg Hcpu Hpc %HcsMP".
     destruct HcsMP as [HcsMP HMPa0].
     assert (Hpc10 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.fdalloc + 0x10))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -881,7 +881,7 @@ Section ProofFdalloc.
                   (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl HG3sp HG3a0 HG3cs
                   with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4").
-        iIntros (CIDfx HsFx) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CIDfx HsFx) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID0 CIDfx n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CIDfx with "[%] Hlc"); [wp_next_chain|].
         destruct (fda_frees_found _ fd Hw Hpre) as [l Hfrees].
@@ -1001,7 +1001,7 @@ Section ProofFdalloc.
                     (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HF1sp HF1a0 HF1cs
                     with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4").
-          iIntros (CIDfy HsFy) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+          iIntros (CIDfy HsFy) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
           iDestruct (cpu_own_transport CID0 CIDfy n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDfy with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv]"); [exact Hcsf|].

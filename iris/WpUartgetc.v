@@ -259,7 +259,7 @@ Section WpUartgetc.
               ltac:(rdok)
               ltac:(rewrite Hlsr; apply ug_imm0)
               with "Hcg Hpc HiL Huinv Htok [-]").
-    iIntros (CID1 Hs1) "_". iIntros (bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
+    iIntros (CID1 Hs1) "_"; iIntros (bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
     (* --- [c.andi a5,a5,1] --- *)
     iApply (wp_candi_s_sconf pcA Ra5 (mword_of_int 1 : mword 6)
               (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of bt)]> m) n b
@@ -308,7 +308,7 @@ Section WpUartgetc.
                 with "Hcg Hpc HiR Huinv Hdlab [Htok] [Hlb]").
       { iExact "Htok". }
       { iApply "Hlb". iPureIntro. reflexivity. }
-      iIntros (CID4 Hs4) "_". iIntros (c) "Hcg Hpc Hh". iEval (rewrite HZ) in "Hpc".
+      iIntros (CID4 Hs4) "_"; iIntros (c) "Hcg Hpc Hh". iEval (rewrite HZ) in "Hpc".
       (* --- [andi a0,a0,255]: the zext.b, absorbed --- *)
       iApply (wp_andi_s_sconf (CID:=CID4) pcZ Ra0 Ra0 (mword_of_int 255 : mword 12)
                 (lsr_ldval_of c)

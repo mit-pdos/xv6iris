@@ -1149,7 +1149,7 @@ Section IreclaimOrphan.
     all: try lkbelow.
     { rewrite HO3a0. iExact "Hstr". }
     { simpl. iSplit; done. }
-    iIntros (CID4 Hq4) "_". iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
+    iIntros (CID4 Hq4) "_"; iIntros (mP) "Hcg Hpc %Hcsp Hcnt _ _".
     destruct Hcsp as (Hcspk & Hrapk).
     assert (Hpc40 : ret_pc (O3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x40))
@@ -1339,7 +1339,7 @@ Section IreclaimOrphan.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hiregr Hpanenv Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID8 Hq8) "_". iIntros (mI kslot q) "Hcg Hcnt Hpc %Higfacts [Href Hru] Hlic".
+    iIntros (CID8 Hq8) "_"; iIntros (mI kslot q) "Hcg Hcnt Hpc %Higfacts [Href Hru] Hlic".
     (* the minted unit.  [BufL] is not the claim licence, so what iget
        minted is the PLAIN unit, which under RULING C' is exactly what a
        rest home carries. *)
@@ -1493,7 +1493,7 @@ Section IreclaimOrphan.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID12 Hq12) "_". iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID12 Hq12) "_"; iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc50 : ret_pc (O9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x50))
       by (rewrite HO9ra; pcw).
@@ -1584,7 +1584,7 @@ Section IreclaimOrphan.
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlctx Hppid Hprocs").
     all: try lkbelow.
-    iIntros (CID15 Hq15) "_". iIntros (mB) "%Hcsbo Hcg Hcnt Hextc Hclmc Hpc Hppid Hop".
+    iIntros (CID15 Hq15) "_"; iIntros (mB) "%Hcsbo Hcg Hcnt Hextc Hclmc Hpc Hppid Hop".
     (* ---- THE WRITE ARM (durable-fs-plan.md section 3, [ilock];
        durable-disk B''-tx).  The transaction's token is handed to [ilock],
        which parks HALF of it in the escrow's checked-out arm for the whole
@@ -1712,7 +1712,7 @@ Section IreclaimOrphan.
                     [%] Hflsh Hclaims2 Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1 Htx Hllb0").
     all: try lkbelow.
     all: try (exact Hlesh).
-    iIntros (CID18 Hq18) "_". iIntros (mL dnl bml fl_)
+    iIntros (CID18 Hq18) "_"; iIntros (mL dnl bml fl_)
       "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hoffr Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
@@ -1828,7 +1828,7 @@ Section IreclaimOrphan.
                     Hloaded Hshot Hfrz").
     all: try lkbelow.
     all: try (exact Hlesh).
-    iIntros (CID21 Hq21) "_". iIntros (mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr Htx".
+    iIntros (CID21 Hq21) "_"; iIntros (mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr Htx".
     (* ...AND THE WRITE ARM COMES HOME inside [iunlock] (B''-tx): the
        descriptor named the share, so the token is whole again. *)
     iDestruct (log_opb_op with "Hopb Htx") as "Hop".
@@ -1967,7 +1967,7 @@ Section IreclaimOrphan.
        [ireg_regime false = ireg_boot] -- re-bound here under its own name, so
        the next loop iteration has it.  This is the round-trip §2.3 asked for
        and integration-2's un-indexed disjunction could not close. *)
-    iIntros (CID24 Hq24) "_". iIntros (mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
+    iIntros (CID24 Hq24) "_"; iIntros (mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
                                       Hop Htx1 Hiref Hboot".
     iDestruct (log_tx_join icfg_log t0 with "Htx1 Htx2") as "Htx".
@@ -2044,7 +2044,7 @@ Section IreclaimOrphan.
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
-    iIntros (CID26 Hq26) "_". iIntros (mE) "%Hcseo Hcg Hcnt Hextc Hclmc Hpc Hppid".
+    iIntros (CID26 Hq26) "_"; iIntros (mE) "%Hcseo Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc6e : ret_pc (OH !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6e))
       by (rewrite HOHra; pcw).
@@ -2215,7 +2215,7 @@ Section IreclaimRelease.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID3 Hq3) "_". iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID3 Hq3) "_"; iIntros (mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hppb0 : ret_pc (V2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0xb0))
       by (rewrite HV2ra; pcw).
@@ -2592,7 +2592,7 @@ Section IreclaimScan.
                 with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
-      iIntros (CID7 Hq7) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
+      iIntros (CID7 Hq7) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
       destruct Hfacts as [Hcsb HmBa0].
       assert (Hpc90 : ret_pc (W6 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.ireclaim + 0x90))

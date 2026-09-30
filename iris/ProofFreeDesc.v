@@ -721,7 +721,7 @@ Section ProofFreeDesc.
     iApply (wp_fd_clear (CID0 := CIDd11) pd i A6 (K - 2)%nat pme byte_zero va vl vf vn b
               Hi8 HA6a0
               with "Hcg Htext Hpc Hdp Hfree Hva Hvl Hvf Hvn").
-    iIntros (CIDd12 Hd12) "_". iIntros (M9) "%Hthr9 Hcg Hpc Hfree Hva Hvl Hvf Hvn".
+    iIntros (CIDd12 Hd12) "_"; iIntros (M9) "%Hthr9 Hcg Hpc Hfree Hva Hvl Hvf Hvn".
     (* the registers the block leaves alone, back at [m] *)
     assert (HM9 : forall r : mword 5, r <> a0_idx -> r <> a3_idx -> r <> a4_idx -> r <> a5_idx ->
                     r <> csp_rs1 -> r <> s0_idx -> M9 !!! Regidx r = m !!! Regidx r).
@@ -815,7 +815,7 @@ Section ProofFreeDesc.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hpi").
     all: try lkbelow.
-    iIntros (CIDw Hdw) "_". iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
+    iIntros (CIDw Hdw) "_"; iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
     destruct HcsW as [HcsW HdomW].
     assert (Hpc56 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.free_desc + 0x56))
       by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).

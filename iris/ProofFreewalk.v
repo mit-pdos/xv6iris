@@ -494,7 +494,7 @@ Section ProofFreewalk.
               with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail").
     all: try lkbelow.
     { rewrite HE1a0. iExact "Hpre". }
-    iIntros (CIDkf Hskf) "_". iIntros (mk) "Hcg Hcnt Hpc %Hkcs _".
+    iIntros (CIDkf Hskf) "_"; iIntros (mk) "Hcg Hcnt Hpc %Hkcs _".
     iEval (rewrite Hret4e) in "Hpc".
     assert (Hmksp : mk !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hkcs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -996,7 +996,7 @@ Section ProofFreewalk.
     iApply (REC l Hlt CIDb9 XI γa B6 c (K - 6)%nat eb p ilvl b _ HKrec Hilvl HB6a0 Hfok
               Hbelow
               with "Hcg Hcnt Htext Hpc Hch Henv").
-    iIntros (CIDrec Hsrec) "_". iIntros (mr) "Hcg Hcnt Hpc %Hrcs".
+    iIntros (CIDrec Hsrec) "_"; iIntros (mr) "Hcg Hcnt Hpc %Hrcs".
     iEval (rewrite Hret42) in "Hpc".
     assert (Hmrsp : mr !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hrcs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -1277,14 +1277,14 @@ Section ProofFreewalk.
               HR6sp HR6s1 HR6s2 HR6s3 HR6thr Hbelow
               with "Hcg Hcnt Htext Hpc Hclaim [] Htodo Henv").
     { rewrite /fw_done. rewrite (seqZ_nil 0 0 ltac:(lia)). done. }
-    iIntros (CIDj Hsj) "_". iIntros (mj) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
+    iIntros (CIDj Hsj) "_"; iIntros (mj) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
     iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p b lks
               ltac:(lia) Hilvl Hspm Hjsp Hjs3 Hjthr
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
     { iExists u6. iExact "Hk6". }
-    iIntros (CIDy Hsy) "Hlc". iIntros (mf) "Hcg Hcnt Hpc %Hcs".
+    iIntros (CIDy Hsy) "Hlc"; iIntros (mf) "Hcg Hcnt Hpc %Hcs".
     iSpecialize ("Hcont" $! CIDy with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%]").
     exact Hcs.

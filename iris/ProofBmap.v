@@ -1092,7 +1092,7 @@ Section BmapRelease.
               _ Upr HKbl Hkk HT1a0 Hbc
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID3 Hq3) "_". iIntros (mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID3 Hq3) "_"; iIntros (mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc88 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bmap + 0x88)).
     { rewrite HT1ra. pcw. }
@@ -1394,7 +1394,7 @@ Section BmapTail.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID4 Hq4) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
+    iIntros (CID4 Hq4) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc6c : ret_pc (I2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bmap + 0x6c)) by (rewrite HI2ra; pcw).
@@ -1735,7 +1735,7 @@ Section BmapTail.
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbminv
                       Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
       all: try lkbelow.
-      iIntros (CID15 Hq15) "_". iIntros (mA) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl Harm".
+      iIntros (CID15 Hq15) "_"; iIntros (mA) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl Harm".
       assert (Hpca2 : ret_pc (A1 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.bmap + 0xa2)) by (rewrite HA1ra; pcw).
       iEval (rewrite Hpca2) in "Hpc".
@@ -1983,7 +1983,7 @@ Section BmapTail.
                         exact (bmset_in_l3 _ _ _ _ (Hcri Hc)))
                   Hbelow_log
                   with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl1 Hop Hindblk Hheld").
-        iIntros (CID21 Hq21) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
+        iIntros (CID21 Hq21) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
         iDestruct (fsblock_q_1_to (fs_bytes γfs) dq _ _ Hd1 with "Hindblk")
           as "Hindblk".
         assert (Hpcb0 : ret_pc (G2 !!! Regidx Rra : mword 64)
@@ -2639,7 +2639,7 @@ Section ProofBmapMain.
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbminv
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
         all: try lkbelow.
-        iIntros (CID18 Hq18) "_". iIntros (mD) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
+        iIntros (CID18 Hq18) "_"; iIntros (mD) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
         assert (Hpc2e : ret_pc (D5 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0x2e)) by (rewrite HD5ra; pcw).
         iEval (rewrite Hpc2e) in "Hpc".
@@ -3214,7 +3214,7 @@ Section ProofBmapMain.
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbminv
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
         all: try lkbelow.
-        iIntros (CID20 Hq20) "_". iIntros (mP) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
+        iIntros (CID20 Hq20) "_"; iIntros (mP) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
         assert (Hpc54 : ret_pc (P1 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0x54)) by (rewrite HP1ra; pcw).
         iEval (rewrite Hpc54) in "Hpc".

@@ -436,7 +436,7 @@ Section ProofWalkaddr.
     iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 W4 t m (K - 2)%nat dq b p
               HKw HW4a0 HW4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CID13 Hs13) "_". iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
+    iIntros (CID13 Hs13) "_"; iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
     iEval (rewrite Hret1a) in "Hpc".
     assert (HW4vpn : svpn_of (W4 !!! Regidx (mword_of_int 11 : mword 5)) = vpn)
       by (rewrite HW4a1; reflexivity).

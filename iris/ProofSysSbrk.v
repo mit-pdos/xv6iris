@@ -411,7 +411,7 @@ Section ProofSysSbrk.
     iApply (Growproc.wp_growproc_sconf γa γf G2 (av - 6)%nat eb p pid U b lks
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv Henv").
-    iIntros (CIDg Hsg) "_". iIntros (mg P' szv' M' k') "%Hcsg %Hok %Hk' Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDg Hsg) "_"; iIntros (mg P' szv' M' k') "%Hcsg %Hok %Hk' Hcg Hcpu Hpc Hpriv".
     rewrite HG2a0 in Hok.
     assert (Hpc60 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x60))
       by (rewrite HG2ra; apply bv_eq; vm_compute; reflexivity).
@@ -695,7 +695,7 @@ Section ProofSysSbrk.
               ltac:(vm_compute; lia) HM5a0 Harg0 ss_n0 ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage [Hs5lo]").
     { iEval (rewrite HM5a1). iExact "Hs5lo". }
-    iIntros (CIDA HqA) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5lo".
+    iIntros (CIDA HqA) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5lo".
     iEval (rewrite HM5a1) in "Hs5lo".
     iDestruct ("Hpbacktf" with "Htfp Hpage") as "Hpriv".
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x14))
@@ -784,7 +784,7 @@ Section ProofSysSbrk.
               ltac:(vm_compute; lia) HA3a0 Harg1 ss_n0 ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage [Hs5hi]").
     { iEval (rewrite HA3a1). iExact "Hs5hi". }
-    iIntros (CIDB HqB) "_". iIntros (B) "%HcsB Hcg Hcpu Hpc Htfp Hpage Hs5hi".
+    iIntros (CIDB HqB) "_"; iIntros (B) "%HcsB Hcg Hcpu Hpc Htfp Hpage Hs5hi".
     iEval (rewrite HA3a1) in "Hs5hi".
     iDestruct ("Hpbacktf" with "Htfp Hpage") as "Hpriv".
     assert (Hpc1e : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x1e))
@@ -830,7 +830,7 @@ Section ProofSysSbrk.
     iApply (Myproc.wp_myproc_sconf (CID := CIDs12) B1 (av - 6)%nat 0%nat eb p b lks
               ss_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CIDD HqD) "_". iIntros (ms1 D) "%Hms1 Hcg Hcpu Hpc %HcsD".
+    iIntros (CIDD HqD) "_"; iIntros (ms1 D) "%Hms1 Hcg Hcpu Hpc %HcsD".
     destruct HcsD as [HcsD HDa0].
     assert (Hpc22 : ret_pc (B1 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x22))
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
@@ -963,7 +963,7 @@ Section ProofSysSbrk.
       iApply (ss_tail (CID0 := CIDx) m Mf av b p rv sp0 ra0 s00 s10 u4 w5 u6
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hfsp Hfs1 Hfthr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDy Hqy) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CIDy Hqy) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' szv' lz' M' k' with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
@@ -999,7 +999,7 @@ Section ProofSysSbrk.
       iApply (ss_eager (CID0 := CIDs16) γa γf m D3 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD3sp HD3s0 HD3s1 HthrD3
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
-      iIntros (CIDe Hqe) "_". iIntros (Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
+      iIntros (CIDe Hqe) "_"; iIntros (Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
       iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U)) k'
                 with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
       - exact Hk'.
@@ -1092,7 +1092,7 @@ Section ProofSysSbrk.
       iApply (ss_eager (CID0 := CIDs19) γa γf m D4 av eb p pid (upd_usM U (us_M U)) sp0 (trunc32 v0) b lks
                 ltac:(lia) HD4sp HD4s0 HD4s1 HthrD4
                 with "Hcg Hcpu Htext Hpc Hpriv Henv Hs5lo").
-      iIntros (CIDe Hqe) "_". iIntros (Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
+      iIntros (CIDe Hqe) "_"; iIntros (Mf P' M' szv' rv k') "%Hfsp %Hfs1 %Hfthr %Hres %Hk' Hcg Hcpu Hpc Hpriv Hs5lo".
       iApply ("EXIT" $! CIDe Mf P' M' szv' rv (pv_lazy (us_V U)) k'
                 with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv [Hs5lo Hs5hi]").
       - exact Hk'.
@@ -1335,7 +1335,7 @@ Section ProofSysSbrk.
     iApply (Myproc.wp_myproc_sconf (CID := CIDs30) L5 (av - 6)%nat 0%nat eb p b lks
               ss_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CIDE HqE) "_". iIntros (ms2 E) "%Hms2 Hcg Hcpu Hpc %HcsE".
+    iIntros (CIDE HqE) "_"; iIntros (ms2 E) "%Hms2 Hcg Hcpu Hpc %HcsE".
     destruct HcsE as [HcsE HEa0].
     assert (Hpc4c : ret_pc (L5 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_sbrk + 0x4c))
       by (rewrite HL5ra; apply bv_eq; vm_compute; reflexivity).

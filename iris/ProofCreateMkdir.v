@@ -300,7 +300,7 @@ Section ProofCreateMkdir.
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
-    iIntros (CIDm Hsm) "_".
+    iIntros (CIDm Hsm) "_";
     iIntros (Mx kslot q g gil gisl lo tl cinum dnc bmc datc n3 Sb3).
     iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok
              %Hddix %Hduq %Hrl %Hnpname %Hnone %Hkslt %Hcpos %Hcinb %Hfresh
@@ -619,7 +619,7 @@ Section ProofCreateMkdir.
                     Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop Htxs").
     all: try lkbelow.
-    iIntros (CIDd1 Hsd1) "_". iIntros (md1 found1 bm1 dat1 dc1 dc01 n4 Sb4 tot1)
+    iIntros (CIDd1 Hsd1) "_"; iIntros (md1 found1 bm1 dat1 dc1 dc01 n4 Sb4 tot1)
       "%Hcsd1 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw1 Hsbi
        Hsbs Hsbb Hcdiat Hppid Hbsl Hislk Hcdlnk0 %Hn4c %Hsb4 %Hdlp1 %Hfd1
        Hop Htxs %Hcap1 %Hsizedp1 %Harm1".
@@ -1088,7 +1088,7 @@ Section ProofCreateMkdir.
                       Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                       Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop Htxs").
       all: try lkbelow.
-      iIntros (CIDd2 Hsd2) "_". iIntros (md2 found2 bm2 dat2 dc2 dc02 n5 Sb5 tot2)
+      iIntros (CIDd2 Hsd2) "_"; iIntros (md2 found2 bm2 dat2 dc2 dc02 n5 Sb5 tot2)
         "%Hcsd2 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw2 Hsbi
          Hsbs Hsbb Hcdiat Hppid Hbsl Hislk Hcdlnk1 %Hn5c %Hsb5 %Hdlp2 %Hfd2
          Hop Htxs %Hcap2 %Hsizedp2 %Harm2".
@@ -1507,7 +1507,7 @@ Section ProofCreateMkdir.
                         Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop Htxs").
         all: try lkbelow.
-        iIntros (CIDd3 Hsd3) "_". iIntros (md3 found3 bm3 dat3 dp3 dp03 n6 Sb6 tot3)
+        iIntros (CIDd3 Hsd3) "_"; iIntros (md3 found3 bm3 dat3 dp3 dp03 n6 Sb6 tot3)
           "%Hcsd3 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi
            Hsbs Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn6c %Hsb6 %Hdlp3 %Hfd3
            Hop Htxs %Hcap3 %Hsizedp3 %Harm3".
@@ -1873,7 +1873,7 @@ Section ProofCreateMkdir.
                directory create locked at +0x2e, whose [dp->nlink == 0]
                refusal is exactly [Hdpnl0]. *)
             rewrite /InodeRegion.ireg_link_pin. exact Hp3nlnz. }
-          iIntros (CIDh7 Hsh7) "_". iIntros (mmt)
+          iIntros (CIDh7 Hsh7) "_"; iIntros (mmt)
             "%Hcsmt Hcg Hcnt Hpc Hppid Hidev Hiinum Hmeta Hmap Hsbi Hdiat
              (%vend & [%Hvokend _] & Htokend) Hpin Hbs2 Hop".
           (* [dp] is a LIVE directory, so its multiplicity rises by one *)
@@ -2424,7 +2424,7 @@ Section ProofCreateMkdir.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { iEval (cbn beta iota). iEmpIntro. }
-          iIntros (CIDT3 HqT3) "_". iIntros (mu2 n7 Sb7 wf7)
+          iIntros (CIDT3 HqT3) "_"; iIntros (mu2 n7 Sb7 wf7)
             "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
              %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2 Htq2".
           assert (Hpcu2 : ret_pc (T2 !!! Regidx Rra : mword 64)
@@ -2513,7 +2513,7 @@ Section ProofCreateMkdir.
                     "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
           { exact (cr_tregs_of_regs3 m sp0 (ientry kd) (ientry kslot)
                      ty major minor T4 HT4regs). }
-          iIntros (CIDfm Hsfm) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDfm Hsfm) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CIDT3 CIDfm 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (iref_slots_combine with "Hislk Hisl2") as "Hisl".

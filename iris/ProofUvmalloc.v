@@ -666,7 +666,7 @@ Section ProofUvmalloc.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
-    iIntros (CIDu2 Hsu2) "_". iIntros (mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
+    iIntros (CIDu2 Hsu2) "_"; iIntros (mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
     assert (Hret3a : ret_pc (B1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x3a)).
     { rewrite HB1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret3a) in "Hpc".
@@ -826,7 +826,7 @@ Section ProofUvmalloc.
                 _ klc1 HKud HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt Henv Hlend").
       all: try lkbelow.
-      iIntros (CIDu9 Hsu9) "_". iIntros (md) "Hcg Hcnt Hlend Hpc %Hdcs _ Hpt".
+      iIntros (CIDu9 Hsu9) "_"; iIntros (md) "Hcg Hcnt Hlend Hpc %Hdcs _ Hpt".
       iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
       iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
       { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
@@ -1013,7 +1013,7 @@ Section ProofUvmalloc.
               HKms Hmspv HB5a1 HB5a2 with "Hcg Htext Hpc [Hpage]").
     (* A6.87: kalloc's run downgrades to the ownership this memset wants *)
     { iEval (rewrite HB5a0). iApply (page_own_of_filled with "Hpage"). }
-    iIntros (CIDu18 Hsu18) "_". iIntros (ms) "Hcg Hpc Hpage %Hmscs".
+    iIntros (CIDu18 Hsu18) "_"; iIntros (ms) "Hcg Hpc Hpage %Hmscs".
     (* the page really READS AS ZERO now -- what the lazily-backed vas at
        these addresses already claimed, and what makes the view's growth
        honest rather than vacuous *)
@@ -1228,7 +1228,7 @@ Section ProofUvmalloc.
               HB11a4 (proj1 Hperm) Hmpvab Hmppab Hrep Hmpfresh
               with "Hcg Hcnt Htext Hpc Hptree Henvn Hlend").
     all: try lkbelow.
-    iIntros (CIDu25 Hsu25) "_". iIntros (mg t' k g) "Hcg Hcnt Hlend Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
+    iIntros (CIDu25 Hsu25) "_"; iIntros (mg t' k g) "Hcg Hcnt Hlend Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
     iDestruct "Hlend" as (klr3 Hklr3) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr3. iFrame "Hlend". iPureIntro. lia. }
@@ -1620,7 +1620,7 @@ Section ProofUvmalloc.
       iApply page_own_of_named_ex.
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
       iExists _. iExact "Hj". }
-    iIntros (CIDu38 Hsu38) "_". iIntros (mfk) "Hcg Hcnt Hpc %Hfcs _".
+    iIntros (CIDu38 Hsu38) "_"; iIntros (mfk) "Hcg Hcnt Hpc %Hfcs _".
     assert (Hret8e : ret_pc (F2 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x8e)).
     { rewrite HF2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret8e) in "Hpc".
@@ -1723,7 +1723,7 @@ Section ProofUvmalloc.
               _ klc2 HKud HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDu43 Hsu43) "_". iIntros (md2) "Hcg Hcnt Hlend Hpc %Hd2cs _ Hpt".
+    iIntros (CIDu43 Hsu43) "_"; iIntros (md2) "Hcg Hcnt Hlend Hpc %Hd2cs _ Hpt".
     iDestruct "Hlend" as (klr2 Hklr2) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr2. iFrame "Hlend". iPureIntro. lia. }

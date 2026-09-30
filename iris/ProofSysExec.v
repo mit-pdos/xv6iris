@@ -527,7 +527,7 @@ Section SysExecBreakAU.
     { rewrite Hebt /cpu_claim_ext. done. }
     { (* the bundle kexec takes is the pay fact BESIDE the AU half *)
       iSplitR; [ iExact "Hmp" | iExact "Hau" ]. }
-    iIntros (CID8 Hq8) "_". iIntros (mf U') "%Hcsf Harms Hcg Hcnt _ _ Hpc
+    iIntros (CID8 Hq8) "_"; iIntros (mf U') "%Hcsf Harms Hcg Hcnt _ _ Hpc
              Hbmp Hisp Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
     iEval (rewrite HN6ra) in "Hpc".
     iEval (rewrite HN6a0) in "Hpb".
@@ -657,7 +657,7 @@ Section SysExecWhole.
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
     iApply (sx_head γf j pid U v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
-    iIntros (CID1 Hq1) "Hlc". iIntros (M P' plen pfun rst v60 kh) "[Hm1 | Hft]".
+    iIntros (CID1 Hq1) "Hlc"; iIntros (M P' plen pfun rst v60 kh) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0 & %Hkh) & Hcg & Hcnt & Hpc & Hpriv)".
       iSpecialize ("Hcont" $! CID1 with "[%] Hlc"); [wp_next_chain |].
@@ -690,7 +690,7 @@ Section SysExecWhole.
     iApply (sx_setup (CID0 := CID1) m M sp0 K true (proc_addr j)
               HK eq_refl Hsp Hs0 Hthr2 Hala
               with "Hcg Htext Hpc F3 F4 F5 F6 F7 F8 F9 Hab").
-    iIntros (CID2 Hq2) "_". iIntros (M2) "%Hst2 Hpc Hcg S3 S4 S5 S6 S7 S8 S9 Hargv".
+    iIntros (CID2 Hq2) "_"; iIntros (M2) "%Hst2 Hpc Hcg S3 S4 S5 S6 S7 S8 S9 Hargv".
     destruct Hst2 as (H2sp & H2thr & H2s0 & H2s1 & H2s2 & H2s3 & H2s4 & H2s5 &
                       H2s6 & H2s7).
     iDestruct (cpu_own_transport CID1 CID2 0%nat true (proc_addr j) true
@@ -735,7 +735,7 @@ Section SysExecWhole.
               (fun _ _ => (mword_of_int 0 : mword 8))
               (fun _ => (mword_of_int 0 : mword 64)) ltac:(lia)
               with "Htext Hka Hbody").
-    iIntros (CID3 Hq3) "_". iIntros (M3 P3 k3 i3 pg3 al3 af3 uv3) "[[%Hnul3 Hbrk] | Hbad]".
+    iIntros (CID3 Hq3) "_"; iIntros (M3 P3 k3 i3 pg3 al3 af3 uv3) "[[%Hnul3 Hbrk] | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v1
@@ -744,7 +744,7 @@ Section SysExecWhole.
                 eq_refl eq_refl Hnul3 Halp Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hmp Hau Hbrk").
-      iIntros (CID4 Hq4) "Hlc". iIntros (mf Ubk)
+      iIntros (CID4 Hq4) "Hlc"; iIntros (mf Ubk)
         "%Hcs Harms %Hargs %Hext3 %Hk3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M Ubk) k3
@@ -781,7 +781,7 @@ Section SysExecWhole.
       iApply (sx_bad_tail (CID0 := CID3) γf j pid U K true true ∅ sp0 m
                 plen pfun rst v1 M3 P3 k3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
-      iIntros (CID4 Hq4) "Hlc". iIntros (mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
+      iIntros (CID4 Hq4) "Hlc"; iIntros (mf) "%Hcs %Ha0 %Hext3 %Hk3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P3 (us_M U) k3
                with "[%] [%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka

@@ -249,7 +249,7 @@ Section ProofReleasesleep.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl _ Hown Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl _ Hown Hpay".
     iDestruct (sl_pay_open with "HRsl") as "HRsl".
     assert (Hpc18 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.releasesleep + 0x18)).
@@ -405,7 +405,7 @@ Section ProofReleasesleep.
     (* release's own exit index is [match 0 with O => eb | S _ => false end]
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)
-    iIntros (CIDrel Hsrel) "_". iIntros (Mrel) "Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDrel Hsrel) "_"; iIntros (Mrel) "Hcg Hpc %Hrelcs Hown".
     (* BALANCED: the rank acquire put in comes back out.  [Hno] is the ORDER
        premise; [locks_below_not_elem] turns it into the non-membership the
        set algebra needs, and then the round trip is the identity -- which is
@@ -614,7 +614,7 @@ Section ProofReleasesleep.
     iDestruct "Hslk" as (q) "Hslk".
     iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb b lks
               Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk HR Hpinv").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf Hcs) "Hcg Hown Hpc _".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf Hcs) "Hcg Hown Hpc _".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc"). exact Hcs.
   Qed.

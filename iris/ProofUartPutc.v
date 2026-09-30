@@ -330,7 +330,7 @@ Section ProofUartPutc.
                 m n l b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(rgne; exact Ha4m)
                 with "Hcg Hpc [] Huinv Hown").
       { iApply (upi_40 with "Ht"). }
-      iIntros (CIDr Hsr) "_". iIntros (bt) "Hcg Hpc Hown Hlb".
+      iIntros (CIDr Hsr) "_"; iIntros (bt) "Hcg Hpc Hown Hlb".
       iEval (rewrite P44) in "Hpc".
       (* 0x44  andi a5,a5,32 *)
       iApply (wp_andi_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x44)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 32 : mword 12)
@@ -369,11 +369,11 @@ Section ProofUartPutc.
                   ltac:(rgne; rewrite upd_eq; unfold regval_into_reg, lsr_masked; exact Hcase)
                   with "Hcg Hpc []").
         { iApply (upi_48 with "Ht"). }
-        iIntros (CIDf Hsf) "_ Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc Hcg Hpc".
         iEval (rewrite P4a) in "Hpc".
         iEval (rewrite (Hagm (regval_into_reg (lsr_masked bt)))) in "Hcg".
         assert (Hchainf : b = false \/ p = zero_reg -> (CIDf : CPU) = (CID1 : CPU)) by wp_next_chain.
-        iSpecialize ("Hk" $! CIDf with "[%]"); [exact Hchainf|].
+        iSpecialize ("Hk" $! CIDf with "[%] Hlc"); [exact Hchainf|].
         iApply ("Hk" $! bt with "Hcg Hpc Hown").
         by iApply "Hlb". }
     iApply ("Loop" $! CID0 mentry with "[%] [%] Hcg Hpc Hown Hcont").
@@ -443,7 +443,7 @@ Section ProofUartPutc.
     (* 0x40 -> 0x4a  the poll loop *)
     iApply (wp_uartputc_poll_sconf (CID0:=CID2) i γd (ppc_f2 i m) n l b p (ppc_f2_a4 i m)
               with "Hcg Ht Hpc Huinv Hown").
-    iIntros (CIDp Hsp) "_". iIntros (bt) "Hcg Hpc Hown #Hlb".
+    iIntros (CIDp Hsp) "_"; iIntros (bt) "Hcg Hpc Hown #Hlb".
     iEval (change (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> (ppc_f2 i m))
              with (ppc_f4' i m bt)) in "Hcg".
     (* 0x4a  andi a5,s5,255 *)
@@ -791,7 +791,7 @@ Section ProofUartPutc.
               Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HG2ea0). iExact "Hlk". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hret2e : ret_pc (G2e !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x32))
       by (rewrite HG2era; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hret2e) in "Hpc".
@@ -917,7 +917,7 @@ Section ProofUartPutc.
               ({[uart_lock_name i]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }
-    iIntros (CIDrel Hsrel) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".
     pose proof (locks_below_not_elem lks (uart_lock_name i) Hfresh) as Hnotin.

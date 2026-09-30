@@ -664,9 +664,9 @@ Section ProofReparentLoop.
                    parents_own (rp_upto pv ip k ps) -∗
                    mWP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar".
+      { iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar".
         exfalso. lia. }
-      iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe Hinit Hpar".
+      iIntros (CIDk Hsk) "_"; iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe Hinit Hpar".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & Hdom).
       (* ---- the shared p++/test tail at +0x2c, reached from BOTH arms of the
          [bne] -- and from different harts, hence the [wp_next] wrapper.  Both
@@ -682,7 +682,7 @@ Section ProofReparentLoop.
                    parents_own (rp_upto pv ip (S k) ps) -∗
                    mWP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst) "_". iIntros (Mt) "%Hmt Hcg Hown Hpc Hframe Hinit Hpar".
+      { iIntros (CIDt Hst) "_"; iIntros (Mt) "%Hmt Hcg Hown Hpc Hframe Hinit Hpar".
         destruct Hmt as (Ht9 & Htsp & Ht18 & Ht19 & Ht20 & Ht21 & Ht22 & Ht23 & Ht24 & Ht25 & Ht26 & Ht27 & Htdom).
         (* +0x2c addi s1,s1,360 : s1 := &proc[k+1] *)
         assert (Hrgt9 : rget (CID := CIDt) Mt (mword_of_int 9 : mword 5)
@@ -927,7 +927,7 @@ Section ProofReparentLoop.
                   Hno
                   with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
-        iIntros (CIDq Hsq) "_". iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
+        iIntros (CIDq Hsq) "_"; iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
         assert (Hpc44 : ret_pc (M40 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KernelSyms.reparent + 0x44)).
         { rewrite HM40ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1063,7 +1063,7 @@ Section ProofReparent.
     (* ---- prologue ---- *)
     iApply (rp_prologue (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
-    iIntros (CIDpro Hspro) "_". iIntros (M) "%Hpro Hcg Hpc Hframe".
+    iIntros (CIDpro Hspro) "_"; iIntros (M) "%Hpro Hcg Hpc Hframe".
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ---- the scan, with the epilogue as its exit continuation ---- *)
@@ -1082,7 +1082,7 @@ Section ProofReparent.
                   with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* exit continuation = the epilogue at +0x46 *)
-      iIntros (CIDex Hsex) "_". iIntros (Mexit) "%Hex Hcg Hown Htextx Hpc Hframe Hinit Hpar".
+      iIntros (CIDex Hsex) "_"; iIntros (Mexit) "%Hex Hcg Hown Htextx Hpc Hframe Hinit Hpar".
       destruct Hex as (Hecsp & He21 & He22 & He23 & He24 & He25 & He26 & He27 & Hedom).
       iApply (rp_epilogue (CID := CIDex) Mexit K
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
@@ -1092,7 +1092,7 @@ Section ProofReparent.
                 ltac:(lia) Hedom
                 with "Hcg Htextx Hpc [Hframe]").
       { iEval (rewrite Hecsp). iExact "Hframe". }
-      iIntros (CIDend Hsend) "Hlc". iIntros (Mf) "%Hepi Hcg Hpc".
+      iIntros (CIDend Hsend) "Hlc"; iIntros (Mf) "%Hepi Hcg Hpc".
       destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hfcsp & Hf21v & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))
                           = m !!! Regidx csp_rs1)

@@ -1010,7 +1010,7 @@ Section ProofNamexMain.
                   nx_tail_body j eb b lks K m sp0 ret_tgt CIDt))%I
       with "[]" as "#Htail".
     { iModIntro.
-      iIntros (CIDt Hst) "_". iIntros (Mt rv) "%HTr %HTs4 Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
+      iIntros (CIDt Hst) "_"; iIntros (Mt rv) "%HTr %HTs4 Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                 Hb8 Hb9 Hb10 Hb11 Hb12 Hqc".
       destruct HTr as [HTsp HTthr].
       (* +0x5c c.mv a0,s4 *)
@@ -1400,10 +1400,10 @@ Section ProofNamexMain.
       with "[]" as "#Hsk1".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHs".
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
         assert (Hbad : False) by lia. destruct Hbad.
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
         (* +0xfc c.addi s1,s1,1 *)
         iApply (wp_caddi_s_sconf (mword_of_int (NX + 0xfc)) Rs1
                   (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
@@ -1470,7 +1470,7 @@ Section ProofNamexMain.
           * exact Hsl2.
           * exact HQ2s1.
           * exact HQ2s3.
-          * iIntros (CIDe Hqe) "Hlc". iIntros (off' Ms')
+          * iIntros (CIDe Hqe) "Hlc"; iIntros (off' Ms')
               "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
             iSpecialize ("Hqc" $! CIDe with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hqc" $! off' Ms'
@@ -1516,10 +1516,10 @@ Section ProofNamexMain.
       with "[]" as "#Hsk2".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHt".
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
         assert (Hbad : False) by lia. destruct Hbad.
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Hf %Holt %Hsl %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
         (* +0xb6 c.addi s1,s1,1 *)
         iApply (wp_caddi_s_sconf (mword_of_int (NX + 0xb6)) Rs1
                   (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
@@ -1585,7 +1585,7 @@ Section ProofNamexMain.
           * exact Hsl2.
           * exact HT2s1.
           * exact HT2s3.
-          * iIntros (CIDe Hqe) "Hlc". iIntros (off' Ms')
+          * iIntros (CIDe Hqe) "Hlc"; iIntros (off' Ms')
               "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
             iSpecialize ("Hqc" $! CIDe with "[%] Hlc"); [wp_next_chain |].
             iApply ("Hqc" $! off' Ms'
@@ -1632,10 +1632,10 @@ Section ProofNamexMain.
       with "[]" as "#Hscn".
     { iIntros (fuel). iInduction fuel as [|fuel] "IHe".
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
         assert (Hbad : False) by lia. destruct Hbad.
       - iModIntro.
-        iIntros (CIDs Hss) "_". iIntros (ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
+        iIntros (CIDs Hss) "_"; iIntros (ii Ms) "%Hf %Hilt %Hs2 Hcg Hpc Hpath Hqc".
         (* +0x116 c.addi s2,s2,1 *)
         iApply (wp_caddi_s_sconf (mword_of_int (NX + 0x116)) Rs2
                   (mword_of_int 1 : mword 6) Ms (K - 12)%nat b
@@ -1791,7 +1791,7 @@ Section ProofNamexMain.
             -- lia.
             -- exact (Hnult (S ii) ltac:(lia) Hnl2).
             -- exact HE3s2.
-            -- iIntros (CIDe7 Hqe7) "Hlc". iIntros (e Ms')
+            -- iIntros (CIDe7 Hqe7) "Hlc"; iIntros (e Ms')
                  "%B1 %B2 %B3 %B4 %B5 %B6 Hcg Hpc Hpath".
                iSpecialize ("Hqc" $! CIDe7 with "[%] Hlc"); [wp_next_chain |].
                iApply ("Hqc" $! e Ms'
@@ -1815,7 +1815,7 @@ Section ProofNamexMain.
                   nx_mid_body j b K plen pfun pv dqpv CIDs))%I
       with "[]" as "#Hmid".
     { iModIntro.
-      iIntros (CIDs Hss) "_". iIntros (a Ms) "%Halt %Hns %Hs1 %Ha5 Hcg Hpc Hpath HqA HqB".
+      iIntros (CIDs Hss) "_"; iIntros (a Ms) "%Halt %Hns %Hs1 %Ha5 Hcg Hpc Hpath HqA HqB".
       assert (Ht130 : add_vec (mword_of_int (NX + 0x106) : mword 64)
                 (sign_extend' 64 (sign_extend' 13
                    (concat_vec (mword_of_int 29 : mword 8) ('b"0"))))
@@ -1948,7 +1948,7 @@ Section ProofNamexMain.
                   nx_head_body j b K plen pfun pv dqpv CIDs))%I
       with "[]" as "#Hhead".
     { iModIntro.
-      iIntros (CIDs Hss) "_". iIntros (off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath HqA HqB".
+      iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath HqA HqB".
       (* +0xf4 lbu a5,0(s1) *)
       iDestruct (nx_buf_acc pv dqpv pfun (S plen) off ltac:(lia)
                    with "Hpath") as "[Hpb Hpback]".
@@ -2000,7 +2000,7 @@ Section ProofNamexMain.
         + exact Hsl0.
         + exact HH1s1.
         + exact HH1s3.
-        + iIntros (CIDh3 Hqh3) "Hlc". iIntros (a M2) "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
+        + iIntros (CIDh3 Hqh3) "Hlc"; iIntros (a M2) "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
           iSpecialize ("Hmid" $! CIDh3 with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hmid" $! a M2
                     with "[%] [%] [%] [%] Hcg Hpc Hpath [HqA] [HqB]").
@@ -2016,7 +2016,7 @@ Section ProofNamexMain.
                ++ apply A3; lia.
             -- rewrite -Hap. exact A5.
             -- intros c N9 N15. rewrite (A7 c N9 N15). exact (HH1o c N15).
-          * iIntros (CIDh4 Hqh4) "Hlc". iIntros (M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
+          * iIntros (CIDh4 Hqh4) "Hlc"; iIntros (M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
             iSpecialize ("HqB" $! CIDh4 with "[%] Hlc"); [wp_next_chain |].
             iApply ("HqB" $! a M3
                       with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
@@ -2056,7 +2056,7 @@ Section ProofNamexMain.
           * intros i Hi1 Hi2. exfalso. lia.
           * rewrite -Hap. exact HH1s1.
           * intros c N9 N15. exact (HH1o c N15).
-        + iIntros (CIDh3 Hqh3) "Hlc". iIntros (M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
+        + iIntros (CIDh3 Hqh3) "Hlc"; iIntros (M3) "%B1 %B2 %B3 %B4 %B5 Hcg Hpc Hpath".
           iSpecialize ("HqB" $! CIDh3 with "[%] Hlc"); [wp_next_chain |].
           iApply ("HqB" $! off M3
                     with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hpath").
@@ -2078,7 +2078,7 @@ Section ProofNamexMain.
                   nx_trail_body j b K plen pfun pv dqpv CIDs))%I
       with "[]" as "#Htrail".
     { iModIntro.
-      iIntros (CIDs Hss) "_". iIntros (off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
+      iIntros (CIDs Hss) "_"; iIntros (off Ms) "%Holt %Hs1 %Hs3 Hcg Hpc Hpath Hqc".
       (* +0xae lbu a5,0(s1) *)
       iDestruct (nx_buf_acc pv dqpv pfun (S plen) off ltac:(lia)
                    with "Hpath") as "[Hpb Hpback]".
@@ -2129,7 +2129,7 @@ Section ProofNamexMain.
         + exact Hsl0.
         + exact HG1s1.
         + exact HG1s3.
-        + iIntros (CIDr3 Hqr3) "Hlc". iIntros (off' M2)
+        + iIntros (CIDr3 Hqr3) "Hlc"; iIntros (off' M2)
             "%A1 %A2 %A3 %A4 %A5 %A6 %A7 Hcg Hpc Hpath".
           iSpecialize ("Hqc" $! CIDr3 with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hqc" $! off' M2
@@ -2198,13 +2198,13 @@ Section ProofNamexMain.
       assert (Hplen' : (Z.of_nat plen < 2147483648)%Z)
         by (change (2 ^ 31)%Z with 2147483648%Z in Hplen; exact Hplen).
       iIntros (fuel). iInduction fuel as [|fuel] "IHl".
-      - iIntros (CIDl Hsl) "_". iIntros (off ipv Ml ncur Scur es0 nf wc)
+      - iIntros (CIDl Hsl) "_"; iIntros (off ipv Ml ncur Scur es0 nf wc)
           "%Hfu %Hoff %Hes0 %HbA %HbB %HbD %HbC %HbW %Hsbc %Hregs Hcg Hcnt Hextc Hclmc Hpc
            Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
            Hip Hisl Hbmap Hinos Hppid Hcwdr Hpath Hname Hbslot
            [Hlog Htx] Hcont".
         exfalso. lia.
-      - iIntros (CIDl Hsl) "Hlc". iIntros (off ipv Ml ncur Scur es0 nf wc)
+      - iIntros (CIDl Hsl) "Hlc"; iIntros (off ipv Ml ncur Scur es0 nf wc)
           "%Hfu %Hoff %Hes0 %HbA %HbB %HbD %HbC %HbW %Hsbc %Hregs Hcg Hcnt Hextc Hclmc Hpc
            Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
            Hip Hisl Hbmap Hinos Hppid Hcwdr Hpath Hname Hbslot
@@ -2221,7 +2221,7 @@ Section ProofNamexMain.
           * exact G9.
           * exact G19.
           * (* ---- the +0x140 tail ---- *)
-            iIntros (CIDa Hsa) "_". iIntros (Ma) "%HA1 %HA2 %HA3 Hcg Hpc Hpath".
+            iIntros (CIDa Hsa) "_"; iIntros (Ma) "%HA1 %HA2 %HA3 Hcg Hpc Hpath".
             (* the suffix has no elements left *)
             assert (Hpes : pe_skip (drop off pl) = []).
             { rewrite (nx_pe_skip_at off plen plen pfun Hoff ltac:(lia)
@@ -2336,7 +2336,7 @@ Section ProofNamexMain.
                { iExact "Hropen". }
                { iEval (cbn beta iota). iEmpIntro. }
                { rewrite /log_opSet. iFrame "Hlog Htxa". }
-               iIntros (CIDip Hqip) "_". iIntros (mip nip Sip wip)
+               iIntros (CIDip Hqip) "_"; iIntros (mip nip Sip wip)
                  "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos Hbslot
                   %Hsip %Hwip %Hwipc %Hbdip Hlog Htxa Hisl2 _".
 
@@ -2414,7 +2414,7 @@ Section ProofNamexMain.
                         ").
                ++ exact HT3tr.
                ++ exact HT3s4.
-               ++ iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+               ++ iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                   iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
                   iDestruct (iref_slots_combine 1 1 with "Hisl Hisl2")
                     as "Hisl".
@@ -2455,7 +2455,7 @@ Section ProofNamexMain.
                         ").
                ++ exact HAtr.
                ++ exact HAs4.
-               ++ iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+               ++ iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                   iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
                   iApply ("Hcont" $! mf ncur Scur true nf ipv wc
                             with "[%] Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid
@@ -2469,7 +2469,7 @@ Section ProofNamexMain.
                      iPureIntro. split; [exact Hfa0 |].
                      intro Hc. discriminate.
           * (* exit B is impossible: [afst] would be a non-separator *)
-            iIntros (CIDb Hsb) "_". iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
+            iIntros (CIDb Hsb) "_"; iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
                                      Hcg Hpc Hpath".
             exfalso. exact (B4 (Hallsl a B1 B2)).
         + (* ================= EXIT B: an element starts here =========== *)
@@ -2478,9 +2478,9 @@ Section ProofNamexMain.
           * exact G9.
           * exact G19.
           * (* exit A is impossible *)
-            iIntros (CIDa Hsa) "_". iIntros (Ma) "%HA1 %HA2 %HA3 Hcg Hpc Hpath".
+            iIntros (CIDa Hsa) "_"; iIntros (Ma) "%HA1 %HA2 %HA3 Hcg Hpc Hpath".
             exfalso. exact (Hfa3 (HA1 afst Hfa1 Hfa2)).
-          * iIntros (CIDb Hsb) "_". iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
+          * iIntros (CIDb Hsb) "_"; iIntros (a Mb) "%B1 %B2 %B3 %B4 %B5 %B6 %B7 %B8
                                      Hcg Hpc Hpath".
             (* the register bundle, carried across the loop head *)
             assert (HBregs : nx_regs m sp0 (pa_add pv a) ipv nb
@@ -2514,7 +2514,7 @@ Section ProofNamexMain.
             -- lia.
             -- exact B2.
             -- exact B7.
-            -- iIntros (CIDe Hse) "_". iIntros (e Me) "%E1 %E2 %E3 %E4 %E5 %E6
+            -- iIntros (CIDe Hse) "_"; iIntros (e Me) "%E1 %E2 %E3 %E4 %E5 %E6
                                         Hcg Hpc Hpath".
                assert (HEregs : nx_regs m sp0 (pa_add pv a) ipv nb
                           (m !!! Regidx Ra1 : mword 64) Me).
@@ -2636,7 +2636,7 @@ Section ProofNamexMain.
  pidv dq dqb dqs dqpv
                                           CIDt lks Upr))%I
                  with "[IHl Hcont]" as "Hrest".
-               { iIntros (CIDt Hst) "Hlc". iIntros (Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
+               { iIntros (CIDt Hst) "Hlc"; iIntros (Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
                           Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                           Hip Hisl Hbmap Hinos Hppid Hcwdr
                           Hpath Hname Hbslot [Hlog Htx]".
@@ -2649,7 +2649,7 @@ Section ProofNamexMain.
                  - exact E2.
                  - exact Q9.
                  - exact Q19.
-                 - iIntros (CIDr Hsr) "_". iIntros (o2 Mr) "%J1 %J2 %J3 %J4 %J5 %J6
+                 - iIntros (CIDr Hsr) "_"; iIntros (o2 Mr) "%J1 %J2 %J3 %J4 %J5 %J6
                                              Hcg Hpc Hpath".
                    assert (Hpse : pe_skip (drop e pl) = drop o2 pl)
                      by exact (nx_pe_skip_at e o2 plen pfun J1 J2 J3 J4).
@@ -2793,7 +2793,7 @@ Section ProofNamexMain.
                                    Hireg Hslkk [//] Hflkp Hclaimsnx Hshr Hru Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1 Htx Hllb0").
                    all: try lkbelow.
-                   iIntros (CIDil Hqil) "_". iIntros (mil dnl bml fl_)
+                   iIntros (CIDil Hqil) "_"; iIntros (mil dnl bml fl_)
                      "%Hcsil _ Hcg Hcnt Hextc Hclmc Hpc Hppid Hinos Hbs1 Hslkd Hdep Hoffr
                       Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_
                       Hru %Hilkp".
@@ -3026,7 +3026,7 @@ Section ProofNamexMain.
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
-                     iIntros (CIDup Hqup) "_". iIntros (mup nup Sup wup)
+                     iIntros (CIDup Hqup) "_"; iIntros (mup nup Sup wup)
                        "%Hcsup Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos
                         Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Htx Hisl2".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
@@ -3096,7 +3096,7 @@ Section ProofNamexMain.
                                Hb12 [-]").
                      * exact HND3tr.
                      * exact HND3s4.
-                     * iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+                     * iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                        iSpecialize ("Hcont" $! CIDf with "[%] Hlc");
                          [wp_next_chain |].
                        iDestruct (iref_slots_combine 1 1 with "Hisl Hisl2")
@@ -3310,7 +3310,7 @@ Section ProofNamexMain.
                                        Hidev Hiinum Hivalid Hload Hshot Hfrz").
                        all: try (exact Hlekp).
                        all: try lkbelow.
-                       iIntros (CIDiu Hqiu) "_". iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid
+                       iIntros (CIDiu Hqiu) "_"; iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr Htx".
                        iDestruct (IcacheRef.inode_shr_genlo_gen with "Hshr")
                          as "Hshr".
@@ -3400,7 +3400,7 @@ Section ProofNamexMain.
                                  Hb11 Hb12").
                        ** exact Hmiutr.
                        ** exact Z20.
-                       ** iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+                       ** iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                           iSpecialize ("Hcont" $! CIDf with "[%] Hlc");
                             [wp_next_chain |].
                           (* L_par calls no iput, so the epoch the mint
@@ -3479,7 +3479,7 @@ Section ProofNamexMain.
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                                Hdlnk Htopl]"
                          as "Hdlblk".
-                       { iIntros (CIDz Hsz) "_". iIntros (Mz) "%Hregz Hcg Hcnt Hextc Hclmc Hpc Hpath".
+                       { iIntros (CIDz Hsz) "_"; iIntros (Mz) "%Hregz Hcg Hcnt Hextc Hclmc Hpc Hpath".
                          pose proof Hregz as Hrz.
                          destruct Hrz as (X2 & X8 & X9 & X19 & X20 & X21 & X22
                                           & X23 & X24 & X25 & Xthr).
@@ -3662,7 +3662,7 @@ Section ProofNamexMain.
                             [eb = true], where the complement is [emp]. *)
                          { iEval (rewrite HGA4a1). iExact "Hname". }
                          { done. }
-                         iIntros (CIDdl Hqdl) "_". iIntros (mdl found kdir kslot qq)
+                         iIntros (CIDdl Hqdl) "_"; iIntros (mdl found kdir kslot qq)
                            "%Hcsdl Hcg Hcnt Hextc Hclmc Hpc Hidev Hmeta Hmap Hblocks
                             Hname Hppid Hbs1 Hdlnk Hdiat Harm".
                          iEval (rewrite HGA4a1) in "Hname".
@@ -3863,7 +3863,7 @@ Section ProofNamexMain.
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
                            { iExact "Hropen". }
-                           iIntros (CIDup Hqup) "_". iIntros (mup nup Sup wup)
+                           iIntros (CIDup Hqup) "_"; iIntros (mup nup Sup wup)
                              "%Hcsup Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos
                               Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Htx Hisl".
                            assert (Hpce2 : ret_pc (GB3 !!! Regidx Rra)
@@ -4097,7 +4097,7 @@ Section ProofNamexMain.
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
                            { iExact "Hropen". }
-                           iIntros (CIDup Hqup) "_". iIntros (mup nup Sup wup)
+                           iIntros (CIDup Hqup) "_"; iIntros (mup nup Sup wup)
                              "%Hcsup Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos
                               Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Htx Hisl3".
                            assert (Hpc88 : ret_pc (GC3 !!! Regidx Rra)
@@ -4174,7 +4174,7 @@ Section ProofNamexMain.
                                      Hb10 Hb11 Hb12").
                            -- exact HGC4tr.
                            -- exact HGC4s4.
-                           -- iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+                           -- iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                               iSpecialize ("Hcont" $! CIDf with "[%] Hlc");
                                 [wp_next_chain |].
                               iDestruct (iref_slots_combine 1 1
@@ -4407,7 +4407,7 @@ Section ProofNamexMain.
                      (* RULING G: a runtime caller lends the SEALED arm. *)
                      { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
-                     iIntros (CIDup Hqup) "_". iIntros (mup nup Sup wup)
+                     iIntros (CIDup Hqup) "_"; iIntros (mup nup Sup wup)
                        "%Hcsup Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos
                         Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Htx Hisl2".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
@@ -4459,7 +4459,7 @@ Section ProofNamexMain.
                                Hb12").
                      * exact HND3tr.
                      * exact HND3s4.
-                     * iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
+                     * iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Hfa0 Hcg Hcnt Hextc Hclmc Hpc".
                        iSpecialize ("Hcont" $! CIDf with "[%] Hlc");
                          [wp_next_chain |].
                        iDestruct (iref_slots_combine 1 1 with "Hisl Hisl2")
@@ -4606,7 +4606,7 @@ Section ProofNamexMain.
                             with "Hcg Htext Hpc [Hsrc] [Hdlo]").
                   { iEval (rewrite HS4a1). iExact "Hsrc". }
                   { iEval (rewrite HS4a0). iExact "Hdlo". }
-                  iIntros (CIDmm Hqmm) "_". iIntros (mmf) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+                  iIntros (CIDmm Hqmm) "_"; iIntros (mmf) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
                   iEval (rewrite HS4a1) in "Hsrc".
                   iDestruct ("Hpback" with "Hsrc") as "Hpath".
                   iEval (rewrite HS4a0) in "Hdst".
@@ -4897,7 +4897,7 @@ Section ProofNamexMain.
                             with "Hcg Htext Hpc [Hsrc] [Hname]").
                   { iEval (rewrite HT4a1). iExact "Hsrc". }
                   { iEval (rewrite HT4a0). iExact "Hname". }
-                  iIntros (CIDmm Hqmm) "_". iIntros (mmf) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+                  iIntros (CIDmm Hqmm) "_"; iIntros (mmf) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
                   iEval (rewrite HT4a1) in "Hsrc".
                   iDestruct ("Hpback" with "Hsrc") as "Hpath".
                   iEval (rewrite HT4a0) in "Hdst".
@@ -5193,7 +5193,7 @@ Section ProofNamexMain.
                 with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hiregr Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
-      iIntros (CIDig Hqig) "_". iIntros (mig kig qig) "Hcg Hcnt Hpc %Higp [Href Hru] _".
+      iIntros (CIDig Hqig) "_"; iIntros (mig kig qig) "Hcg Hcnt Hpc %Higp [Href Hru] _".
       destruct Higp as (Hcsig & Hkig & Higa0).
       assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
       { rewrite HA3ra. pcw. }
@@ -5415,7 +5415,7 @@ Section ProofNamexMain.
       iApply (MP.wp_myproc_sconf B1 (K - 12)%nat 0%nat eb (proc_addr j) b _
                 ltac:(vm_compute; reflexivity) Kmp
                 with "Hcg Hcnt Htext Hpc").
-      iIntros (CIDmp Hqmp) "_". iIntros (msv mf1) "%Hmsf Hcg Hcnt Hpc %Hmpp".
+      iIntros (CIDmp Hqmp) "_"; iIntros (msv mf1) "%Hmsf Hcg Hcnt Hpc %Hmpp".
       destruct Hmpp as [Hcsmp Hmpa0].
       assert (Hpc032 : ret_pc (B1 !!! Regidx Rra) = mword_of_int (NX + 0x32)).
       { rewrite HB1ra. pcw. }
@@ -5493,7 +5493,7 @@ Section ProofNamexMain.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcheld").
       all: try lkbelow.
-      iIntros (CIDid Hqid) "_". iIntros (mid) "Hcg Hcnt Hpc %Hidp Hcwdr Hip0".
+      iIntros (CIDid Hqid) "_"; iIntros (mid) "Hcg Hcnt Hpc %Hidp Hcwdr Hip0".
       destruct Hidp as [Hcsid Hida0].
       (* the cwd's own package, back whole -- the carve and the gather
          happened inside the call (SIMP-2). *)

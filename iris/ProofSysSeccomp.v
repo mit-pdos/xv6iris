@@ -243,7 +243,7 @@ Section ProofSysSeccomp.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 w3 (DfracOwn (1/4)) b
               _ scc_arg0 HA4a0 Hv0 Hn (scc_Kaa av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3").
-    iIntros (CID8 Hk8) "_". iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
+    iIntros (CID8 Hk8) "_"; iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
     iEval (rewrite HA4a1) in "Hb3".
     iDestruct ("Hback" with "Htf Hpage") as "Hpriv".
     assert (Hpp12 : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SC + 0x12))
@@ -277,7 +277,7 @@ Section ProofSysSeccomp.
     iApply (Myproc.wp_myproc_sconf B1 (av - 4)%nat n eb p b
               _ Hn (scc_Kmp av Hav)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID10 Hk10) "_". iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
+    iIntros (CID10 Hk10) "_"; iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc16 : ret_pc (B1 !!! Regidx Rra) = mword_of_int (SC + 0x16))
       by (rewrite HB1ra; pcstep).

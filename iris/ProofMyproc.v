@@ -274,7 +274,7 @@ Section ProofMyproc.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    iIntros (CIDpo Hspo) "_". iIntros (ms MP1) "%Hmsf Hcg Hown Hpay Hpc %Hmp1".
+    iIntros (CIDpo Hspo) "_"; iIntros (ms MP1) "%Hmsf Hcg Hown Hpay Hpc %Hmp1".
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc0e : ret_pc (add_vec_int (mword_of_int (KernelSyms.myproc + 0x0a) : mword 64) 4)
                     = (mword_of_int (KernelSyms.myproc + 0x0e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -438,7 +438,7 @@ Section ProofMyproc.
               ltac:(lia) Hszlks
               with "Hcg Hown Hpay Htext Hpc").
     rewrite -Hbmatch.
-    iIntros (CIDpp Hspp) "_". iIntros (MP2) "Hcg Hown Hpc %Hmp2".
+    iIntros (CIDpp Hspp) "_"; iIntros (MP2) "Hcg Hown Hpc %Hmp2".
     iEval (rewrite HB9ra) in "Hpc".
     assert (Hpc26 : ret_pc (mword_of_int (KernelSyms.myproc + 0x26) : mword 64)
                     = (mword_of_int (KernelSyms.myproc + 0x26) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

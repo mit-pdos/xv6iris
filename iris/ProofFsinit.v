@@ -844,7 +844,7 @@ Section FsinitMain.
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID10 Hq10) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
+    iIntros (CID10 Hq10) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
     destruct Hfacts as [Hcsb HmBa0].
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x14))
@@ -1060,7 +1060,7 @@ Section FsinitMain.
               (fun jj => bs_sb !!! jj) sb_old (DfracOwn 1) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HN6a2
               with "Hcg Htext Hpc Hsrc Hsbold").
-    iIntros (CID17 Hq17) "_". iIntros (mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+    iIntros (CID17 Hq17) "_"; iIntros (mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
     assert (Hpc2a : ret_pc (N6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x2a))
       by (rewrite HN6ra; pcw).
@@ -1236,7 +1236,7 @@ Section FsinitMain.
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs [Hheld]").
     all: try lkbelow.
     { rewrite /bio_locked. iExact "Hheld". }
-    iIntros (CID20 Hq20) "_". iIntros (mR) "%Hcsbl Hcg Hcnt Hpc Hppid Hslot".
+    iIntros (CID20 Hq20) "_"; iIntros (mR) "%Hcsbl Hcg Hcnt Hpc Hppid Hslot".
     assert (Hpc30 : ret_pc (Q1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x30))
       by (rewrite HQ1ra; pcw).
@@ -1489,7 +1489,7 @@ Section FsinitMain.
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk Hbinv Hxo HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34 Hfsb Hlawf Hlawg Hcinv").
     all: try lkbelow.
-    iIntros (CID30 Hq30) "_". iIntros (mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
+    iIntros (CID30 Hq30) "_"; iIntros (mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
     (* RECOVERY IS DONE (durable-disk lane E-except): [initlog] has sealed
        the byte view's exception set into [LogInv.log_ctx], so the region
        and the bitmap can be upgraded from their PowerOn forms to the ones
@@ -1580,7 +1580,7 @@ Section FsinitMain.
                     Hgen Hni Hist Hbms HiregS Hboot Hitb2 Hitbl Hesc Hslks HbmS Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.
-    iIntros (CID33 Hq33) "_". iIntros (mf) "%Hcsir Hcg Hcnt Hextc Hclmc Hpc Hni Hist Hbms Hppid
+    iIntros (CID33 Hq33) "_"; iIntros (mf) "%Hcsir Hcg Hcnt Hextc Hclmc Hpc Hni Hist Hbms Hppid
                              Hsl3 Hiref Hboot".
     assert (Hpc58 : ret_pc (R1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x58))

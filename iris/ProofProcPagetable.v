@@ -338,7 +338,7 @@ Section ProofProcPagetable.
         ppt_post γa γk on tfp rv -∗
         mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hc1 Hc2 Hc3 Hc4]" as "EPI".
-    { iIntros (CIDe Hse) "_". iIntros (me rv).
+    { iIntros (CIDe Hse) "_"; iIntros (me rv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcnt Hlend Hpc Htfcell Hpost".
       (* the instruction facts must be re-posed INSIDE with FRESH NAMES: the
          outer [iPoseProof]s are spatial and the [with "[...]"] selection
@@ -536,7 +536,7 @@ Section ProofProcPagetable.
               _ Hlvl Hc18 HcidJp
               with "Hcg Hcnt Htext Hpc Henv").
     all: try lkbelow.
-    iIntros (CIDuv Hsuv) "_". iIntros (mr0) "Hcg Hcnt Hpc %Hucs Hpost".
+    iIntros (CIDuv Hsuv) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hucs Hpost".
     assert (Hjpra : Jp !!! Regidx (mword_of_int 1 : mword 5) = J !!! Regidx (mword_of_int 1 : mword 5)).
     { rewrite /Jp. apply (rget_ne J (mword_of_int 1) ltac:(vm_compute; discriminate)). }
     assert (Hret12 : ret_pc (Jp !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x12)).
@@ -734,7 +734,7 @@ Section ProofProcPagetable.
               ltac:(intros i Hi; apply lookup_empty)
               with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDmp1 Hsmp1) "_". iIntros (mr1 t1 k1 g1) "Hcg Hcnt Hlend Hpc Hptree %Hnodes1 Henv %Hcs1 %Hbase1 %Hrep1 %Hmono1 %Hg1miss %Hret1".
+    iIntros (CIDmp1 Hsmp1) "_"; iIntros (mr1 t1 k1 g1) "Hcg Hcnt Hlend Hpc Hptree %Hnodes1 Henv %Hcs1 %Hbase1 %Hrep1 %Hmono1 %Hg1miss %Hret1".
     iDestruct "Hlend" as (klr1 Hklr1) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr1. iFrame "Hlend". iPureIntro. lia. }
@@ -841,7 +841,7 @@ Section ProofProcPagetable.
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
                   with "Hcg Hcnt Htext Hpc Hbare Henv0b Hlend").
         all: try lkbelow.
-        iIntros (CIDa5 Hsa5) "_". iIntros (mr3) "Hcg Hcnt Hlend Hpc %Hcsuf".
+        iIntros (CIDa5 Hsa5) "_"; iIntros (mr3) "Hcg Hcnt Hlend Hpc %Hcsuf".
         iDestruct "Hlend" as (klr2 Hklr2) "Hlend".
         iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
         { iExists klr2. iFrame "Hlend". iPureIntro. lia. }
@@ -1013,7 +1013,7 @@ Section ProofProcPagetable.
                     rewrite vpn_at_0; exact ppt_m1_tf)
               with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
-    iIntros (CIDmp2 Hsmp2) "_". iIntros (mr2 t2 k2 g2) "Hcg Hcnt Hlend Hpc Hptree %Hnodes2 Henv %Hcs2 %Hbase2 %Hrep2 %Hmono2 %Hg2miss %Hret2".
+    iIntros (CIDmp2 Hsmp2) "_"; iIntros (mr2 t2 k2 g2) "Hcg Hcnt Hlend Hpc Hptree %Hnodes2 Henv %Hcs2 %Hbase2 %Hrep2 %Hmono2 %Hg2miss %Hret2".
     iDestruct "Hlend" as (klr3 Hklr3) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists klr3. iFrame "Hlend". iPureIntro. lia. }
@@ -1168,7 +1168,7 @@ Section ProofProcPagetable.
                   ltac:(rewrite HV7a1; rewrite uint_unsigned;
                         apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   with "Hcg Hcnt Htext Hpc Hupt Henv0b Hlend").
-        iIntros (CIDb9 Hsb9) "_". iIntros (mr3) "Hcg Hcnt Hlend Hpc %Hcsuu Hupt".
+        iIntros (CIDb9 Hsb9) "_"; iIntros (mr3) "Hcg Hcnt Hlend Hpc %Hcsuu Hupt".
         iDestruct "Hlend" as (klr4 Hklr4) "Hlend".
         iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
         { iExists klr4. iFrame "Hlend". iPureIntro. lia. }
@@ -1238,7 +1238,7 @@ Section ProofProcPagetable.
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
                   with "Hcg Hcnt Htext Hpc Hupt Henv0b Hlend").
         all: try lkbelow.
-        iIntros (CIDc4 Hsc4) "_". iIntros (mr4) "Hcg Hcnt Hlend Hpc %Hcsuf2".
+        iIntros (CIDc4 Hsc4) "_"; iIntros (mr4) "Hcg Hcnt Hlend Hpc %Hcsuf2".
         iDestruct "Hlend" as (klr5 Hklr5) "Hlend".
         iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
         { iExists klr5. iFrame "Hlend". iPureIntro. lia. }
@@ -1352,7 +1352,7 @@ Section SealProcPagetable.
     iApply (Core.wp_proc_pagetable_core γa γk mm tf dqtf lvl K eb p (Some nb) b lks kl
               Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv Hlend [Hcont]").
     all: try lkbelow.
-    iIntros (CIDr Hsr) "Hlc". iIntros (mr) "Hcg Hcnt Hlend Hpc Htfcell Hpost %Hcs".
+    iIntros (CIDr Hsr) "Hlc"; iIntros (mr) "Hcg Hcnt Hlend Hpc Htfcell Hpost %Hcs".
     iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrep & %Hnt & Henv)
                            | (_ & %Hfail & _)]";
       [| destruct Hfail as (n & Hn & Hz);

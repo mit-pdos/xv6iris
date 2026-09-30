@@ -696,7 +696,7 @@ Section ProofArgfd.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v (word_hi w5) (DfracOwn (1/4)) b
               _ Hi HM6a0 Harg Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
-    iIntros (CID11 Hk11) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
+    iIntros (CID11 Hk11) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
     iDestruct ("Hpback" with "Htfp Hpage") as "Hpriv".
     assert (Hpc18 : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.argfd + 0x18))
@@ -838,7 +838,7 @@ Section ProofArgfd.
       iApply (Myproc.wp_myproc_sconf B (av - 6)%nat n eb p b
                 _ Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
-      iIntros (CID16 Hk16) "_". iIntros (ms P) "%Hms Hcg Hcpu Hpc %HcsP".
+      iIntros (CID16 Hk16) "_"; iIntros (ms P) "%Hms Hcg Hcpu Hpc %HcsP".
       destruct HcsP as [HcsP HPa0].
       assert (Hpc26 : ret_pc (B !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.argfd + 0x26))
@@ -1075,7 +1075,7 @@ Section ProofArgfd.
         iApply (af_tail m D av (mword_of_int (-1) : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HDsp HDa0 HthrD
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-        iIntros (CID25 Hk25) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+        iIntros (CID25 Hk25) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID16 CID25 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID25 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
@@ -1166,7 +1166,7 @@ Section ProofArgfd.
         iApply (af_tail m E1 av (zero_reg : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HE1sp HE1a0 HthrE1
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-        iIntros (CID28 Hk28) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+        iIntros (CID28 Hk28) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID16 CID28 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID28 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
@@ -1232,7 +1232,7 @@ Section ProofArgfd.
       iApply (af_tail m F av (mword_of_int (-1) : mword 64) sp0 ra0 s00 s10 s20 _ w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HFsp HFa0 HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID17 Hk17) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID17 Hk17) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID11 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].

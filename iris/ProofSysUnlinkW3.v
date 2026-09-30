@@ -521,7 +521,7 @@ Section ProofSysUnlinkW3.
     { rewrite Heb /cpu_claim_ext. done. }
     { iSplitL "Hbuf"; [| iExact "Hpidq"].
       iEval (rewrite HN6a2). iExact "Hbuf". }
-    iIntros (CID7 Hq7) "_". iIntros (mrd tot P')
+    iIntros (CID7 Hq7) "_"; iIntros (mrd tot P')
       "%Hcsrd %Hupt' %Htotle %Harm Hcg Hown _ _ Hpc Hidev Hmeta Hmap Hblocks
        [Hbuf Hpidq] Hbslot".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -1521,7 +1521,7 @@ Section ProofSysUnlinkW3.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
-    iIntros (CID3 Hq3) "_". iIntros (mil dni bmi fldi)
+    iIntros (CID3 Hq3) "_"; iIntros (mil dni bmi fldi)
       "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hdepi Hoffri
        Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
     iEval (rewrite /ic_dep_held /=) in "Hloadi".

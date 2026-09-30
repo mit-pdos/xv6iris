@@ -982,7 +982,7 @@ Section ProofSysLinkBody.
               sl_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbO]").
     { iEval (rewrite HM6a1). iExact "HbO". }
-    iIntros (CID9 Hq9) "_". iIntros (mas P1 bo1 k1) "%Hcsas %Hupt1 %Hk1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
+    iIntros (CID9 Hq9) "_"; iIntros (mas P1 bo1 k1) "%Hcsas %Hupt1 %Hk1 Hcg Hown Hpc Hpriv HbO %Hfsr1 _".
     iEval (rewrite HM6a1) in "HbO".
     assert (Hpc16 : ret_pc (M6 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x16)) by (rewrite HM6ra; pcw).
@@ -1120,7 +1120,7 @@ Section ProofSysLinkBody.
                 sl_maxpath_lt (Hlb "kmem"%string)
                 with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbW]").
       { iEval (rewrite HN3a1). iExact "HbW". }
-      iIntros (CID16 Hq16) "_". iIntros (mas2 P2 bw1 k2)
+      iIntros (CID16 Hq16) "_"; iIntros (mas2 P2 bw1 k2)
         "%Hcsas2 %Hupt2 %Hk2 Hcg Hown Hpc Hpriv HbW %Hfsr2 _".
       iEval (rewrite HN3a1) in "HbW".
       (* the two fetches lent the block's counter in turn (permit sweep
@@ -1244,7 +1244,7 @@ Section ProofSysLinkBody.
                   with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CID21 Hq21) "_". iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
+        iIntros (CID21 Hq21) "_"; iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
         assert (Hpc36 : ret_pc (Q0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SL + 0x36)) by (rewrite HQ0ra; pcw).
         iEval (rewrite Hpc36) in "Hpc".
@@ -1309,7 +1309,7 @@ Section ProofSysLinkBody.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
-        iIntros (CID24 Hq24) "_". iIntros (mna n1 Sb1 ok ipv w1)
+        iIntros (CID24 Hq24) "_"; iIntros (mna n1 Sb1 ok ipv w1)
           "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
            Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
@@ -1424,7 +1424,7 @@ Section ProofSysLinkBody.
                           Hbs1 Htx Hllb0").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CID28 Hq28) "_". iIntros (mil dn bm fl)
+          iIntros (CID28 Hq28) "_"; iIntros (mil dn bm fl)
             "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep Hoffr
              Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
@@ -1912,7 +1912,7 @@ Section ProofSysLinkBody.
                                 Hmeta Hmap Hsbi Hireg Hdiat [Hfrz] Hpidq Hprocs
                                 Hdev Hgeo Hdlk Hbs2 HopS").
                 { rewrite /InodeRegion.ireg_link_pin. iExact "Hfrz". }
-                iIntros (CID41 Hq41) "_". iIntros (miu)
+                iIntros (CID41 Hq41) "_"; iIntros (miu)
                   "%Hcsiu Hcg Hown Hpc Hpidq Hidev Hiinum Hmeta Hmap Hsbi Hdiat
                    (%vtok & [%Hvok _] & Htoken) Hpin Hbs2 HopS".
                 (* the minted fragment's VALUE, read off [ip]'s own record:
@@ -2110,7 +2110,7 @@ Section ProofSysLinkBody.
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hpidq Hprocs [//] Hflsh Hclaimssl Hdep Hoffd Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
-                iIntros (CID44 Hq44) "_". iIntros (mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
+                iIntros (CID44 Hq44) "_"; iIntros (mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
 
                 (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
                    caller that needs it: the share it still holds denies the
@@ -2216,7 +2216,7 @@ Section ProofSysLinkBody.
                 { rewrite Heb /cpu_claim_ext. done. }
                 { iEval (rewrite HT2a0). iExact "Hbufw". }
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
-                iIntros (CID48 Hq48) "_". iIntros (mnp n2 Sb2 ok2 nf dpv w2)
+                iIntros (CID48 Hq48) "_"; iIntros (mnp n2 Sb2 ok2 nf dpv w2)
                   "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq
                    Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 [HopS Htx] Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
@@ -2352,7 +2352,7 @@ Section ProofSysLinkBody.
                                    Hdev Hgeo Hdlk Hbs1d Htx Hllb0b").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
-                   iIntros (CID52 Hq52) "_". iIntros (mild dnd bmd fld)
+                   iIntros (CID52 Hq52) "_"; iIntros (mild dnd bmd fld)
                      "%Hcsild _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd
                       Hdepd Hoffrd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
                       %Hfld Hrud %Hilkpd".
@@ -2784,7 +2784,7 @@ Section ProofSysLinkBody.
                                    Hprocs Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows
                                    Hslks Hir1c Hdlnkd HopS Htxs").
                    { iEval (rewrite HU6a1). iExact "Hnm14". }
-                   iIntros (CID60 Hq60) "_". iIntros (mdl found bmd' datd' dnd' dnd0' n3 Sb3 tot)
+                   iIntros (CID60 Hq60) "_"; iIntros (mdl found bmd' datd' dnd' dnd0' n3 Sb3 tot)
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
                       Hnm14 Hsbi Hsbs Hsbb Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
                       %HSb3 %Hdlp %Hfnd HopS Htxs %Hcapd %Hsizedd %Harm".
@@ -3368,7 +3368,7 @@ Section ProofSysLinkBody.
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
                             { done. }
-                            iIntros (CID64 Hq64) "_". iIntros (mupd n4 Sb4 wd)
+                            iIntros (CID64 Hq64) "_"; iIntros (mupd n4 Sb4 wd)
                               "%Hcsupd Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Htx Hislotd".
                             assert (Hpcaa : ret_pc (W1 !!! Regidx Rra : mword 64)
@@ -3464,7 +3464,7 @@ Section ProofSysLinkBody.
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
                             { iApply (log_opS_op with "HopS Htx"). }
-                            iIntros (CID67 Hq67) "_". iIntros (mip n5)
+                            iIntros (CID67 Hq67) "_"; iIntros (mip n5)
                               "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi
                                Hbsl %Hn5 Hop Hisloti".
                             assert (Hpcb0 : ret_pc (W3 !!! Regidx Rra : mword 64)
@@ -3507,7 +3507,7 @@ Section ProofSysLinkBody.
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
-                            iIntros (CID69 Hq69) "_". iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpidq".
+                            iIntros (CID69 Hq69) "_"; iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpidq".
                             assert (Hpcb4 : ret_pc (W4 !!! Regidx Rra : mword 64)
                                       = mword_of_int (SL + 0xb4))
                               by (rewrite HW4ra; pcw).

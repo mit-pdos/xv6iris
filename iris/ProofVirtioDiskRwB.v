@@ -423,7 +423,7 @@ Section ProofVirtioDiskRwB.
     iAssert (vdrw_p2_loop CID γk γs j γd pd pav pu K eb sp0 b wr sector m0 lks)
       with "[]" as "Hloop".
     { iLöb as "IH". rewrite /vdrw_p2_loop.
-      iIntros (CIDlp Hslp) "Hlc". iIntros (M) "%Hinv Hcg Hown Htc Hclm Hpc Htok HR Hscr Hexit".
+      iIntros (CIDlp Hslp) "Hlc"; iIntros (M) "%Hinv Hcg Hown Htc Hclm Hpc Htok HR Hscr Hexit".
       destruct Hinv as (Hregs' & Hs1 & Hs4 & Hs5 & Hhi).
       iDestruct (disk_geom_desc_ptr with "Hgeom") as "#Hdp".
       destruct Hregs' as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
@@ -712,7 +712,7 @@ Section ProofVirtioDiskRwB.
                   ({["virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
-        iIntros (CIDrl Hsrl) "_". iIntros (mfr) "Hcg Hpc %Hrcs Hown". rgall.
+        iIntros (CIDrl Hsrl) "_"; iIntros (mfr) "Hcg Hpc %Hrcs Hown". rgall.
         (* the balanced acquire/release pair leaves the held set where P2.3
            started: cancel the release's [∪ ∖] back down to the bare [lks]
            the sleep/re-acquire steps below (and [IH]) expect. *)
@@ -761,7 +761,7 @@ Section ProofVirtioDiskRwB.
                   with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
         all: try lkbelow.
         (* SLEEP RETURNS ON HART [CIDsl]. *)
-        iIntros (CIDsl Hssl) "_". iIntros (mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
+        iIntros (CIDsl Hssl) "_"; iIntros (mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
         assert (Hr0b0 : ret_pc (C4 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0b0))
           by (rewrite HC4ra; apply bv_eq; vm_compute; reflexivity).
@@ -840,7 +840,7 @@ Section ProofVirtioDiskRwB.
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
-        iIntros (CIDaq Hsaq) "_". iIntros (msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
+        iIntros (CIDaq Hsaq) "_"; iIntros (msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc))
           by (rewrite HD3ra; apply bv_eq; vm_compute; reflexivity).

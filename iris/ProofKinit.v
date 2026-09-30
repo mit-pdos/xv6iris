@@ -213,7 +213,7 @@ Section ProofKinit.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iIntros (CIDil Hsil) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iIntros (CIDil Hsil) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0 HR7a1) in "Hlname". iEval (rewrite HR7a0) in "Hcpu".
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kinit + 0x1c)).
@@ -332,7 +332,7 @@ Section ProofKinit.
               with "Hcg Hcnt Htext Hpc Hkmem Hpages [Havail]").
     all: try lkbelow.
     { iExact "Havail". }
-    iIntros (CIDfr Hsfr) "_". iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
+    iIntros (CIDfr Hsfr) "_"; iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
     assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kinit + 0x2c)).
     { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcfr) in "Hpc".

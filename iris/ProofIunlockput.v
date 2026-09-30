@@ -276,7 +276,7 @@ Section ProofIunlockputMain.
                     Hprocs [%] Hfly Hclaims Hdep Hoffd Hidev Hinumc Hvalid Hlk Hshot Hfrz").
     all: try lkbelow.
     { exact Hley. }
-    iIntros (CID8 Hq8) "_". iIntros (mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
+    iIntros (CID8 Hq8) "_"; iIntros (mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr Hside".
     (* THE SHARE IPUT'S WINDOWS PARK IS THE ONE THE ARM JUST HANDED BACK
        (durable-disk B''-tx5): [ic_dep_side] at the write arm IS the parked
        share, so iunlockput lends it on to its own [iput] and takes it back
@@ -372,7 +372,7 @@ Section ProofIunlockputMain.
                     Hbslots Hnlz [Hlogop Htx]").
     all: try lkbelow.
     { rewrite /log_opSet. iFrame "Hlogop Htx". }
-    iIntros (CID11 Hq11) "_". iIntros (mP n' Sb' wp)
+    iIntros (CID11 Hq11) "_"; iIntros (mP n' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins Hbslots
              %Hssub %Hwbm %Hwc %Hbud Hlogop Htx Hslot _".
 

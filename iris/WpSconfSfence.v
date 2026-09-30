@@ -297,7 +297,7 @@ Section SfenceLeaf.
                    ⌜forall i, 0 <= i < 64 -> vec_access_dec tv i = None⌝ ∗
                    tlb ↦ᵣ tv)%I
               with "Hcg Hpc Hinstr [Htlb Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
     iSplitL "Htlb".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -336,7 +336,7 @@ Section SfenceLeaf.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & Htlb)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       (* [wp_next]'s continuation leads with its own hart-identity premise *)
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Htlb Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Htlb Hpc'"). done.
   Qed.
 
   (* THE LEAF INTERFACE IS CELLS, and deliberately so: the wrapper-shape
@@ -386,8 +386,8 @@ Section SfenceLeaf.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
@@ -448,7 +448,7 @@ Section SfenceLeaf.
       iFrame "Hfile". iSplitR; [done|]. iSplitR; [done|]. done.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hkptr Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hkptr Hpc'"). done.
   Qed.
 
 End SfenceLeaf.

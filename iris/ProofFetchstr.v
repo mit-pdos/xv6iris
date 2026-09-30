@@ -640,7 +640,7 @@ Section ProofFetchstr.
     iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID12 Hk12) "_". iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID12 Hk12) "_"; iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc18 : ret_pc (M6 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x18))
       by (rewrite HM6ra; apply bv_eq; vm_compute; reflexivity).
@@ -839,7 +839,7 @@ Section ProofFetchstr.
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hbuf").
     all: try lkbelow.
-    iIntros (CID18 Hk18) "_". iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+    iIntros (CID18 Hk18) "_"; iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
     iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
     rewrite HA5a3 in Hret.
     iEval (rewrite HA5a2) in "Hbuf".
@@ -934,7 +934,7 @@ Section ProofFetchstr.
       iApply (Strlen.wp_strlen_sconf ktb B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
                 ltac:(lia) Hkmax Hcstr Hk31
                 with "Hcg Htext Hpc Hbuf").
-      iIntros (CID22 Hk22) "_". iIntros (msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".
+      iIntros (CID22 Hk22) "_"; iIntros (msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".
       iEval (rewrite HB2a0) in "Hbuf".
       assert (Hpc30 : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x30))
         by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
@@ -950,7 +950,7 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hslsp Hsla0 Hthrsl
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID23 Hk23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hk23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] has been sitting at [CID12] (myproc's exit hart) ever since;
          re-anchor it at the final hart before it can feed the function's own
          [Hcont]. *)
@@ -1020,7 +1020,7 @@ Section ProofFetchstr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CID22 Hk22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hk22) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%] [%]").

@@ -1574,7 +1574,7 @@ Section ProofDirlinkMain.
                dl_tail_body j m sp0 ret_tgt K b CIDt))%I
       with "[]" as "#Htail".
     { iModIntro.
-      iIntros (CIDt Hst) "_". iIntros (Mt w3 w5 w6 dnew)
+      iIntros (CIDt Hst) "_"; iIntros (Mt w3 w5 w6 dnew)
         "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde Hqc".
       destruct HTr as [HTsp HTthr].
       (* +0x9c c.ldsp ra,72(sp) *)
@@ -1805,7 +1805,7 @@ Section ProofDirlinkMain.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { done. }
-    iIntros (CIDdl Hsdl) "_". iIntros (mdl found kk kslot qq)
+    iIntros (CIDdl Hsdl) "_"; iIntros (mdl found kk kslot qq)
       "%Hcsdl Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1
        Hlinks Hdat Hres".
     iEval (rewrite HR7a1) in "Hnm".
@@ -1903,7 +1903,7 @@ Section ProofDirlinkMain.
       { iExact "Hropen". }
       { iEval (cbn beta iota). iEmpIntro. }
       { rewrite /log_opSet. iFrame "Hop Htx". }
-      iIntros (CIDip Hsip) "_". iIntros (mip nn Sbp wdl)
+      iIntros (CIDip Hsip) "_"; iIntros (mip nn Sbp wdl)
         "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl %Hsbp %Hwdl %Hwdc %Hnn Hop
          Htx Hislot _".
       (* GR-2c FINDING 5, verbatim: the credited bound is STRONGER
@@ -1958,7 +1958,7 @@ Section ProofDirlinkMain.
       iApply ("Ht" $! E2 u3 u5 u6 dolds0 with
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde").
       { exact (dl_tregs_of_eregs m sp0 ip nb _ E2 HE2e). }
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
@@ -2053,7 +2053,7 @@ Section ProofDirlinkMain.
                    nrec s ret_tgt CIDa lks Upr))%I
         with "[]" as "#Hafter".
       { iModIntro.
-        iIntros (CIDa Hsa) "_". iIntros (Mp dolz w5 w6)
+        iIntros (CIDa Hsa) "_"; iIntros (Mp dolz w5 w6)
           "%Hpr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde Hidev Hiinum
            Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hdat Hppid Hbsl Hislot
            Hop Htx Hlinks Hqc".
@@ -2155,7 +2155,7 @@ Section ProofDirlinkMain.
                   (K - 10)%nat dqn b (proc_addr j)
                   ltac:(exact HK2) HW4a2 ltac:(vm_compute; reflexivity)
                   with "Hcg Htext Hpc Hnm Hdenm").
-        iIntros (CIDsn Hssn) "_". iIntros (msn hh) "Hcg Hpc Hnm Hdenm %Hcssn %Hsna0 %Hsnp".
+        iIntros (CIDsn Hssn) "_"; iIntros (msn hh) "Hcg Hpc Hnm Hdenm %Hcssn %Hsna0 %Hsnp".
         iEval (rewrite HW4a1) in "Hnm".
         iEval (rewrite HW4a0) in "Hdenm".
         assert (Hsnc : dl_snc fn hh 14%nat).
@@ -2392,7 +2392,7 @@ Section ProofDirlinkMain.
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        iIntros (CIDwi Hswi) "_". iIntros (mwi tot bm' data' dn' dn0' nn wrote dist dstb P'
+        iIntros (CIDwi Hswi) "_"; iIntros (mwi tot bm' data' dn' dn0' nn wrote dist dstb P'
                  Sbw)
           "%Hcswi %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
@@ -2575,7 +2575,7 @@ Section ProofDirlinkMain.
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj) with
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc").
         { exact HV10t. }
-        iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+        iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
         iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hqc" $! CIDf with "[%] Hlc"); [wp_next_chain |].
@@ -2809,7 +2809,7 @@ Section ProofDirlinkMain.
               fuel CIDl lks Upr))%I
           with "[]" as "Hloop".
         { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-          { iIntros (CIDl Hsl) "_". iIntros (i Ml dol)
+          { iIntros (CIDl Hsl) "_"; iIntros (i Ml dol)
               "%Hfuel %Hilt16 %Hffn %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6
                Hb7 Hb8 Hde Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
                Hdat Hppid Hbs1 Hbs2 Hislot Hop Htx Hlinks Hqc".
@@ -2817,7 +2817,7 @@ Section ProofDirlinkMain.
             assert (Hile : (i <= nrec)%nat)
               by exact (dlk_le_nrec (bv_unsigned (di_size dn)) i Hsznn Hilt16).
             lia. }
-          iIntros (CIDl Hsl) "_". iIntros (i Ml dol)
+          iIntros (CIDl Hsl) "_"; iIntros (i Ml dol)
             "%Hfuel %Hilt16 %Hffn %Hregs Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6
              Hb7 Hb8 Hde Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
              Hdat Hppid Hbs1 Hbs2 Hislot Hop Htx Hlinks Hqc".
@@ -3014,7 +3014,7 @@ Section ProofDirlinkMain.
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CIDrd Hsrd) "_". iIntros (mrd tot P')
+          iIntros (CIDrd Hsrd) "_"; iIntros (mrd tot P')
             "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
           iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".

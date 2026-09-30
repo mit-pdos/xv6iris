@@ -356,7 +356,7 @@ Section ProofSysOpenAlloc.
               (proc_addr jx) (K - 24)%nat b lks HKfa so_noff0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htext Hpc Hftab Hfds").
-    iIntros (CID3 Hq3) "_". iIntros (mfa) "Hcg Hown Hpc %Hcsfa Hfapost".
+    iIntros (CID3 Hq3) "_"; iIntros (mfa) "Hcg Hown Hpc %Hcsfa Hfapost".
     assert (Hpcfa : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x64)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpcfa) in "Hpc".
@@ -542,7 +542,7 @@ Section ProofSysOpenAlloc.
     iApply (Fdalloc.wp_fdalloc_sconf (CID := CID7) gf kf ∅ M3 (K - 24)%nat
               0%nat eb (proc_addr jx) pidv U b lks HM3a0 Hkf so_noff0 HKfd
               with "Hcg Hown Htext Hdata Hpc Hcore Howe").
-    iIntros (CID8 Hq8) "_". iIntros (mfd) "%Hcsfd Hcg Hown Hpc Hcore Hfdpost".
+    iIntros (CID8 Hq8) "_"; iIntros (mfd) "%Hcsfd Hcg Hown Hpc Hcore Hfdpost".
     assert (Hpcfd : ret_pc (M3 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x6e)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpcfd) in "Hpc".

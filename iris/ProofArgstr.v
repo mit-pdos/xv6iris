@@ -297,7 +297,7 @@ Section ProofArgstr.
               i (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v (DfracOwn (1/4)) b
               _ Hi HM5a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
-    iIntros (CID10 Hk10) "_". iIntros (A) "[%HcsA %HAa0] Hcg Hcpu Hpc Htfp Htfa".
+    iIntros (CID10 Hk10) "_"; iIntros (A) "[%HcsA %HAa0] Hcg Hcpu Hpc Htfp Htfa".
     iDestruct ("Hpbacktf" with "Htfp Htfa") as "Hpriv".
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x14))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
@@ -395,7 +395,7 @@ Section ProofArgstr.
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.
-    iIntros (CID14 Hk14) "_". iIntros (mr P' buf_new kev) "%Hcsr %Hext %Hkev Hcg Hcpu Hpc Hpriv Hbuf %Hret %Hgot".
+    iIntros (CID14 Hk14) "_"; iIntros (mr P' buf_new kev) "%Hcsr %Hext %Hkev Hcg Hcpu Hpc Hpriv Hbuf %Hret %Hgot".
     rewrite HA3a0 in Hgot.
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))

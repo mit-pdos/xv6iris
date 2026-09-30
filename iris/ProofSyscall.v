@@ -4024,7 +4024,7 @@ Section SyscallArms.
     iApply (SysGetpid.wp_sys_getpid_sconf γf M (av - 4)%nat 0%nat true pj pid U true lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv").
-    iIntros (CIDy Hsy) "_". iIntros (mf) "%Hmf Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy) "_"; iIntros (mf) "%Hmf Hcg Hcpu Hpc Hpriv".
     (* THE SECOND CONJUNCT IS KEPT, and this is the whole of the PID-KEY
        lane inside the dispatcher: [a0 = sign_extend' 64 pid] is what
        getpid ANSWERS, and [sysc_ret_pid] is that reading carried out to
@@ -4350,7 +4350,7 @@ Section SyscallArms.
     iApply (SysSbrk.wp_sys_sbrk_sconf fsc_kalloc γf M (av - 4)%nat true pj pid U v0 v1 true lks
               Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
-    iIntros (CIDy Hsy) "_". iIntros (mf P' szv' lz' M' k') "%Hcs %Hok %Hk' Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' szv' lz' M' k') "%Hcs %Hok %Hk' Hcg Hcpu Hpc Hpriv".
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U)))
       by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0) lz'
                   (us_M U) M' Hok).
@@ -4489,7 +4489,7 @@ Section SyscallArms.
     iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γp γf γw' γs j γl M (av - 4)%nat true true lks pid U v0 cs
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hnextpid Hpriv Hrow Hipis").
-    iIntros (CIDy Hsy) "_". iIntros (mf P' rv dw xw cs' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' rv dw xw cs' kev)
       "%Hcs %Hext %Hdwle %Hnullw %Hfullw Hans Hcg Hcpu Hpc %Hkev Hpriv Hrow".
     destruct Hcs as [Hcs Ha0w].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
@@ -4637,7 +4637,7 @@ Section SyscallArms.
     iApply (SysUptime.wp_sys_uptime_sconf γtk M 0%nat true pj (av - 4)%nat true ∅
               sysc_noff0 ltac:(lia) (locks_below_empty "time")
               with "Hcg Hcpu Htext Hpc Hticks").
-    iIntros (CIDy Hsy) "_". iIntros (mf t) "%Hmf Hcg Hcpu Hpc".
+    iIntros (CIDy Hsy) "_"; iIntros (mf t) "%Hmf Hcg Hcpu Hpc".
     destruct Hmf as [Hcs _].
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -4741,7 +4741,7 @@ Section SyscallArms.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 (DfracOwn (1/4)) true ∅
               Hlen Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "proc") Hpv
               with "Hkc Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hprocs").
-    iIntros (CIDy Hsy) "_". iIntros (mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
+    iIntros (CIDy Hsy) "_"; iIntros (mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
     destruct Hmf as [Hcs _].
     iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
@@ -4842,7 +4842,7 @@ Section SyscallArms.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 (DfracOwn (1/4)) true ∅
               Hj Hgamma eq_refl Hv0 ltac:(lia) eq_refl (locks_below_empty "time") Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hticks Hprocs").
-    iIntros (CIDy Hsy) "_". iIntros (mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
+    iIntros (CIDy Hsy) "_"; iIntros (mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
     destruct Hmf as [Hcs _].
     iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
@@ -5117,7 +5117,7 @@ Section SyscallArms.
     iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid U sts true ∅
               Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "ftable")
               with "Hcg Hcpu Htext Hdata Hpc Hftable Hpriv Hufrag").
-    iIntros (CIDy Hsy) "_". iIntros (mf) "%Hcs Hcg Hcpu Hpc Hpost".
+    iIntros (CIDy Hsy) "_"; iIntros (mf) "%Hcs Hcg Hcpu Hpc Hpost".
     (* the adapter hands back the EXIT table and the row beside the record *)
     iDestruct (sysc_dup_priv _ _ _ _ _ _ _ Hnum
                  (list_lookup_total_correct _ _ _ Hv0) Hoflen with "Hpost")
@@ -5272,7 +5272,7 @@ Section SyscallArms.
     (* THE PARENT'S DESCRIPTOR STATES COME BACK AT THE VERY LIST THEY WENT
        IN AT: fork reads [p->ofile] and writes none of it, and what the CHILD
        got is that same list ([SpecKfork]'s post says so). *)
-    iIntros (CIDy Hsy) "_". iIntros (mf kev) "%Hcs Hcg Hcpu Hpc %Hkev Hpriv Hufrag Hka Hrv".
+    iIntros (CIDy Hsy) "_"; iIntros (mf kev) "%Hcs Hcg Hcpu Hpc %Hkev Hpriv Hufrag Hka Hrv".
     (* THE RETURN VALUE'S TWO ARMS, and on the pid arm the CHILD TOKEN --
        kfork's split, relayed here.  The pure half is what the dispatcher's
        own fork clause says; the token is what this arm hands the trap
@@ -5516,7 +5516,7 @@ Section SyscallArms.
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hfab Hbmp Hisp Hbmr Hbs
                     Hkalloc Hire Hpriv Hmp Hau").
-    iIntros (CIDy Hsy) "_". iIntros (mf P' M' kev) "%Hcs %Hext %Hkev Hcg Hcpu Htcx' Hccx' Hpc
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' M' kev) "%Hcs %Hext %Hkev Hcg Hcpu Htcx' Hccx' Hpc
                               _ _ Hbs Hka' Hire' Harms".
     rewrite /sys_exec_arms.
     iDestruct "Harms" as (Uk) "[Hpriv Harm]".
@@ -5857,7 +5857,7 @@ Section SyscallArms.
               M (av - 4)%nat true true ∅ (sy_oQ fdep)
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
               with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hhook Hprocs").
-    iIntros (CIDy Hsy) "_". iIntros (mf) "%Hcs %Hr0 Hcg Hcpu _ _ HQo Hpc".
+    iIntros (CIDy Hsy) "_"; iIntros (mf) "%Hcs %Hr0 Hcg Hcpu _ _ HQo Hpc".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).
@@ -6043,7 +6043,7 @@ Section SyscallArms.
               Hv1 Hv2 eq_refl eq_refl eq_refl Htbw
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs
                     Hfse Hcaps Htbl Hswin").
-    iIntros (CIDy Hsy) "_". iIntros (mf r P' kev) "%Hcs %Hextz %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
+    iIntros (CIDy Hsy) "_"; iIntros (mf r P' kev) "%Hcs %Hextz %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* THE ANSWER'S RANGE, off the contract's own blanket and BEFORE the
        arms are spent (lane NIL-RET): row 16 states it at the process's
        key, as row 5 does, and [SpecSysWrite.sys_write_ret]'s two
@@ -6212,7 +6212,7 @@ Section SyscallArms.
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Huinv Hera Hsrin Hnil").
-    iIntros (CIDy Hsy) "_". iIntros (mf r P' dw bsw kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf r P' dw bsw kev)
       "%Hcs %Hextz %Hdwle %Htie %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* WHAT THE PROCESS GETS BACK: the arm's own payout, at the descriptor
        key the DEPOSIT was made at.  The landed blanket ([sys_read_ret])
@@ -6361,7 +6361,7 @@ Section SyscallArms.
               pid U v0 v1 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
-    iIntros (CIDy Hsy) "_". iIntros (mf r P' dw bsw kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf r P' dw bsw kev)
       "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 %Hkev Hcg Hcpu Hpc Hpriv _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -6497,7 +6497,7 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv [Hxin]").
     { iApply (sysc_dep_chdir U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
-    iIntros (CIDy Hsy) "_". iIntros (mf P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Harms".
     (* THE SPLIT.  Its premise is the contract's own instantiation: the arms
        are stated at [cw := pv_cwi (us_V U)] and the block they return is
@@ -6688,7 +6688,7 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv [Hxin]").
     { iApply (sysc_dep_unlink U sts gn cs pid fdep v0
                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin"). }
-    iIntros (CIDy Hsy) "_". iIntros (mf P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -6817,7 +6817,7 @@ Section SyscallArms.
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv [Hxin]").
     { iApply (sysc_dep_link U sts gn cs pid fdep ltac:(rewrite Hnum; reflexivity)
                 with "Hxin"). }
-    iIntros (CIDy Hsy) "_". iIntros (mf P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -6948,7 +6948,7 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hftable Hpanic Hpriv
                     Hufrag Hiru Hpenv Hfenv Hdepc").
-    iIntros (CIDy Hsy) "_". iIntros (mf kev) "%Hcs %Hkev Hcg Hcpu _ _ Hpc Hpost Hcpost Hpe' Hfe' Hiru".
+    iIntros (CIDy Hsy) "_"; iIntros (mf kev) "%Hcs %Hkev Hcg Hcpu _ _ Hpc Hpost Hcpost Hpe' Hfe' Hiru".
     iEval (rewrite Hfdk) in "Hcpost".
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
@@ -7167,7 +7167,7 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
                     Hpriv Hufrag Hfd0 Hfd1 Hiru Hpenv Hfenv").
-    iIntros (CIDy Hsy) "_". iIntros (mf P' dw bsw kev) "%Hcs %Huptz %Hdwle %Hkev Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    iIntros (CIDy Hsy) "_"; iIntros (mf P' dw bsw kev) "%Hcs %Huptz %Hdwle %Hkev Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
     (* [Huptz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -7528,7 +7528,7 @@ Section SyscallArms.
                     [Hxin]").
     { iApply (sysc_dep_mkdir U sts gn cs pid fdep v0
                 ltac:(rewrite Hnum; reflexivity) Hv0 with "Hxin"). }
-    iIntros (CIDy Hsy) "_". iIntros (mf ns' P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf ns' P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0 Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -7669,7 +7669,7 @@ Section SyscallArms.
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv [Hxin]").
     { iApply (sysc_dep_mknod U sts gn cs pid fdep v0 v1 v2
                 ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 Hv2 with "Hxin"). }
-    iIntros (CIDy Hsy) "_". iIntros (mf ns' P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf ns' P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv Harms".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -7889,14 +7889,14 @@ Section SyscallArms.
                       Hfd0 Hpriv Hufrag [Hxin]").
       { iApply (sysc_dep_open U sts gn cs pid fdep v0 v1
                   ltac:(rewrite Hnum; reflexivity) Hv0 Hv1 with "Hxin"). }
-      iIntros (CIDy Hsy) "_". iIntros (mf ns' P' k')
+      iIntros (CIDy Hsy) "_"; iIntros (mf ns' P' k')
         "%Hcs %Hextz %Hk' Hcg Hcpu Htcx2 Hccx2 Hpc Hbs _ _ _ _ %Hns Hir Harms".
       iSpecialize ("Hcont'" $! CIDy with "[//]").
       iApply ("Hcont'" $! mf ns' P' k' with "[//] [//] [//] Hcg Hcpu Htcx2 Hccx2 Hpc Hbs
                 Hsbn Hisp Hsbs Hbmp [//] Hir [Harms]").
       iApply (open_arms_split with "Harms"). }
     iApply "Hk".
-    iIntros (CIDy Hsy) "_". iIntros (mf ns' P' kev)
+    iIntros (CIDy Hsy) "_"; iIntros (mf ns' P' kev)
       "%Hcs %Hextz %Hkev Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
@@ -8089,7 +8089,7 @@ Section SyscallArms.
     iApply (SysSeccomp.wp_sys_seccomp_sconf γf M (av - 4)%nat 0%nat true pj pid U v0 true lks
               Hv0 ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv").
-    iIntros (CIDy Hsy) "_". iIntros (mf) "%Hmf Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy) "_"; iIntros (mf) "%Hmf Hcg Hcpu Hpc Hpriv".
     destruct Hmf as [Hcs Hret0].
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -8414,7 +8414,7 @@ Section SyscallArms.
     { rewrite HF4a0. iExact "Hfmt". }
     { iApply (sysc_descs_mk F4 (p_name (proc_addr j) 0) nm (DfracOwn 1)
                 HF4va1 Hnonul (sysc_name_nonzero j Hj) with "Hstr"). }
-    iIntros (CIDf Hsf) "_". iIntros (mf) "Hcg Hpc %Hcsp Hcpu Hfmt2 Hdescs".
+    iIntros (CIDf Hsf) "_"; iIntros (mf) "Hcg Hpc %Hcsp Hcpu Hfmt2 Hdescs".
     destruct Hcsp as [Hcs Hra0].
     iDestruct (sysc_descs_take F4 (p_name (proc_addr j) 0) nm (DfracOwn 1) HF4va1
                  with "Hdescs") as "Hstr".
@@ -8862,7 +8862,7 @@ Section SyscallMain.
     iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0%nat true pj true lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID8 Hs8) "_". iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
+    iIntros (CID8 Hs8) "_"; iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hp10 : ret_pc (A2 !!! Regidx Rra) = mword_of_int (KernelSyms.syscall + 0x10))
       by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).

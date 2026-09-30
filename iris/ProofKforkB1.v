@@ -336,7 +336,7 @@ Section KforkB1Proof.
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hcpu".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hcsr Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcpu".
@@ -423,7 +423,7 @@ Section KforkB1Proof.
               (match lvl with O => eb | S _ => false end)
               (kfkb1_K8 K HK) Hsp0 Hra0 Hs00 Hs10 Hs50 HT5sp HT5s1 HT5thr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hpost Hcg Hpc".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hpost Hcg Hpc".
     iDestruct (cpu_own_transport CIDr CIDf lvl eb pme
                 (match lvl with O => eb | S _ => false end)
                 ltac:(wp_next_chain) with "Hcpu") as "Hcpu".

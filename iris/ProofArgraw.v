@@ -649,7 +649,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -769,7 +769,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -889,7 +889,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -1009,7 +1009,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -1129,7 +1129,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -1249,7 +1249,7 @@ Section ProofArgraw.
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMsp. }
     iApply (ar_tail C1 sp0 ra0 s00 s10 vgap av' b p HC1sp
               with "Hcg Htext Hpc Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID7 Hs7) "Hlc". iIntros (Mf) "%HMf Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hpc Htfp Htf").
@@ -1395,7 +1395,7 @@ Section ProofArgraw.
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia) with "Hcg Hcpu Htext Hpc").
-    iIntros (CID8 Hs8) "_". iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
+    iIntros (CID8 Hs8) "_"; iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hp10 : ret_pc (A3 !!! Regidx ar_ra) = mword_of_int (KernelSyms.argraw + 0x10))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1539,7 +1539,7 @@ Section ProofArgraw.
                    (m !!! Regidx ar_s1) vgap p tfp ws v dqt b
               Hi Hargs HB4s1 HB4a4 HB4a0 HB4sp Hpv
               with "Htext Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap").
-    iIntros (CID15 Hs15) "Hlc". iIntros (Mf) "%HMf Hcg Hpc Htfp Htf".
+    iIntros (CID15 Hs15) "Hlc"; iIntros (Mf) "%HMf Hcg Hpc Htfp Htf".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".

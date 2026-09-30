@@ -284,7 +284,7 @@ Section ProofBpin.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CID10 Hs10) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CID10 Hs10) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bpin + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -435,7 +435,7 @@ Section ProofBpin.
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CID11 Hs11) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CID11 Hs11) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     (* bpin is BALANCED: the set release hands back collapses to the entry
        [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)

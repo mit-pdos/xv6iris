@@ -369,7 +369,7 @@ Section ProofAcquire.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    iIntros (CIDpo Hspo) "Hlc". iIntros (ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
+    iIntros (CIDpo Hspo) "Hlc"; iIntros (ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
     destruct Hmp as (Hcspp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     (* ===== from here on b = false LITERALLY (push_off's own flip) and the
        hart is pinned at CIDpo for the rest of the function: every remaining
@@ -910,7 +910,7 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg) "Hlc". iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
+    iIntros (CIDg Hsg) "Hlc"; iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hlb Hown Hpay".
     iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hlb Hown Hpay").
   Qed.
@@ -931,7 +931,7 @@ Section OfGen.
               with "Hcg Hown Htext Hpc [] Hllb []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
-    iIntros (CIDg Hsg) "Hlc". iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
+    iIntros (CIDg Hsg) "Hlc"; iIntros (ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hfl Hlb Hown Hpay".
     iSpecialize ("Hcont" $! CIDg with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! ms mfin with "[//] Hcg Hpc [//] Htok HRes Hfl Hlb Hown Hpay").
   Qed.

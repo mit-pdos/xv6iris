@@ -297,7 +297,7 @@ Section ProofSysUnlinkW1.
       sys_unlink_closer (CID := CIDx) gf pj pid (upd_usV U (upd_ev (us_V U) k))
         m rt K eb b lks dqb dqs dqbs ARMS).
   Proof using .
-    iIntros (Hk) "H". iIntros (CIDx Hs) "_". iIntros (mf P' k') "%Hcs %Hext %Hk'".
+    iIntros (Hk) "H". iIntros (CIDx Hs) "_"; iIntros (mf P' k') "%Hcs %Hext %Hk'".
     iApply ("H" $! CIDx Hs mf P' k' with "[%] [%] [%]");
       [exact Hcs | exact Hext | cbn in Hk'; lia].
   Qed.
@@ -586,7 +586,7 @@ Section ProofSysUnlinkW1.
               su_maxpath_lt (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [HbP]").
     { iEval (rewrite HM6a1). iExact "HbP". }
-    iIntros (CID9 Hq9) "_". iIntros (mas P1 bp1 kA) "%Hcsas %Hupt1 %HkA Hcg Hown Hpc Hpriv HbP %Hfsr1 %Hfgot1".
+    iIntros (CID9 Hq9) "_"; iIntros (mas P1 bp1 kA) "%Hcsas %Hupt1 %HkA Hcg Hown Hpc Hpriv HbP %Hfsr1 %Hfgot1".
     (* the walk runs at the record argstr handed back (permit sweep L1b) *)
     set (U1 := upd_usV U (upd_ev (us_V U) kA)).
     iEval (rewrite HM6a1) in "HbP".
@@ -683,7 +683,7 @@ Section ProofSysUnlinkW1.
                 with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      iIntros (CID13 Hq13) "_". iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
+      iIntros (CID13 Hq13) "_"; iIntros (mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
       assert (Hpc20 : ret_pc (N0 !!! Regidx Rra : mword 64)
                       = mword_of_int (SU + 0x20)) by (rewrite HN0ra; pcw).
       iEval (rewrite Hpc20) in "Hpc".
@@ -792,7 +792,7 @@ Section ProofSysUnlinkW1.
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (rewrite HN3a0). iExact "Hbufp". }
       { iEval (rewrite HN3a1). iExact "Hnm14". }
-      iIntros (CID17 Hq17) "_". iIntros (mnp n1 Sb1 ok1 nf dpv w1)
+      iIntros (CID17 Hq17) "_"; iIntros (mnp n1 Sb1 ok1 nf dpv w1)
         "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
          Hbufp Hnm14 Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres1".
       iEval (rewrite HN3a0) in "Hbufp".

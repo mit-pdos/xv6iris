@@ -378,7 +378,7 @@ Section ItruncTail.
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hlb0 Hcrdu Hop").
     all: try lkbelow.
-    iIntros (CID4 Hq4) "_". iIntros (mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
+    iIntros (CID4 Hq4) "_"; iIntros (mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hdn Hsl Hop Hwit".
     (* §16.4: iupdate's payout is conditional on the flushed record's type,
        and [di_trunc] keeps the type -- so this is the allocated branch *)
@@ -1064,7 +1064,7 @@ Section ItruncDLoop.
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
-      iIntros (CID4 Hq4) "_". iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
+      iIntros (CID4 Hq4) "_"; iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
                              Hsl Hop".
       assert (Hpc2c : ret_pc (L3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x2c)) by (rewrite HL3ra; pcw).
@@ -1618,7 +1618,7 @@ Section ItruncELoop.
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hfsb
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
-      iIntros (CIDf Hqf) "_". iIntros (mfE) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
+      iIntros (CIDf Hqf) "_"; iIntros (mfE) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb
                               Hsl Hop".
       assert (Hpc78 : ret_pc (E3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x78)) by (rewrite HE3ra; pcw).
@@ -1991,7 +1991,7 @@ Section ItruncIArm.
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID4 Hq4) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc
+    iIntros (CID4 Hq4) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc
                                           Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc5a : ret_pc (A1 !!! Regidx Rra : mword 64)
@@ -2143,7 +2143,7 @@ Section ItruncIArm.
               HA4sp HA4thr HA4s1 HA4s2 HA4s3 HA4s4 Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hbmi Hdevi Hdgeom Hdlock Hsl Hbuf Hst").
     (* ===== the loop is done: +0x7a onwards ===== *)
-    iIntros (CID9 Hq9) "_". iIntros (Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hextc Hextm Hpc
+    iIntros (CID9 Hq9) "_"; iIntros (Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hextc Hextm Hpc
                            Hppid Hidev Hsbb Hsl Hbuf Hst".
     (* the buffer goes back into the handle unchanged: the loop only read *)
     iDestruct ("Hheldback" $! (ind_bytes (bm_ent bm)) with "Hbuf") as "Hheld".
@@ -2220,7 +2220,7 @@ Section ItruncIArm.
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
-    iIntros (CID12 Hq12) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID12 Hq12) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc80 : ret_pc (B1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x80)) by (rewrite HB1ra; pcw).
     iEval (rewrite Hpc80) in "Hpc".
@@ -2360,7 +2360,7 @@ Section ItruncIArm.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsbb Hbmi Hindblk
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
     all: try lkbelow.
-    iIntros (CID16 Hq16) "_". iIntros (mZ) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hsl Hop".
+    iIntros (CID16 Hq16) "_"; iIntros (mZ) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hsl Hop".
     assert (Hpc8c : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x8c)) by (rewrite HC2ra; pcw).
     iEval (rewrite Hpc8c) in "Hpc".
@@ -2781,7 +2781,7 @@ Section ItruncMain.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs
                     Hppid Hidev Hsbb Hbmi Hdevi Hdgeom Hdlock Hsl Hst").
     (* ===== the direct loop is done: +0x32 onwards ===== *)
-    iIntros (CID12x Hq12x) "_". iIntros (Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hextc Hextm Hpc Hppid
+    iIntros (CID12x Hq12x) "_"; iIntros (Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                Hidev Hsbb Hsl Hst".
     iDestruct (it_dir_state_open with "Hst") as "(Hmap & Hblks & Hpaid)".
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
@@ -2952,7 +2952,7 @@ Section ItruncMain.
         rewrite H3c bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
       (* ===== the arm rejoins at +0x38: hand on to the tail ===== *)
       rewrite /it_armexit.
-      iIntros (CID15y Hq15y) "_". iIntros (Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hextc Hextm Hpc Hppid
+      iIntros (CID15y Hq15y) "_"; iIntros (Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                  Hidev Hsbb Hslot6 Hmap Hblks Hsl Hpaid".
       iDestruct (bm_paidS_elim with "Hpaid") as (wr n2 Sr)
         "(%Hrsub & %Hrbm & %Hwrc & %Hn2 & Hop)".

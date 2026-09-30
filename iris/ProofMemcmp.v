@@ -796,7 +796,7 @@ Section ProofMemcmp.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HZ1sp HZ1a0 HZ1thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID8 Hs8) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.
@@ -915,14 +915,14 @@ Section ProofMemcmp.
                 ltac:(intros j Hj; exfalso; lia)
                 HR5sp HR5a0 HR5a1 HR5a3 HR5thr
                 with "Hcg Htext Hpc Hbuf1 Hbuf2").
-      iIntros (CID9 Hs9) "_". iIntros (Mt) "%HMtsp %HMtres %HMtthr Hcg Hpc Hbuf1 Hbuf2".
+      iIntros (CID9 Hs9) "_"; iIntros (Mt) "%HMtsp %HMtres %HMtthr Hcg Hpc Hbuf1 Hbuf2".
       (* ---- +0x2e .. +0x34: the epilogue ---- *)
       iApply (mc_tail mm Mt K (Mt !!! Regidx Ra0) sp0
                 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HMtsp ltac:(reflexivity) HMtthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID10 Hs10) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID10 Hs10) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID10 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf1 Hbuf2 [%] [%]").
       + exact Hcs.

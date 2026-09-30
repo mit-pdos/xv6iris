@@ -702,7 +702,7 @@ Section ProofUartintr.
           all: try lkbelow.
           (* the contract takes the ARM's half now (redesign R2), not the
              application's window token, which is gone. *)
-          iIntros (CIDc Hsc) "_". iIntros (Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc Hhi Hlgh Harm".
+          iIntros (CIDc Hsc) "_"; iIntros (Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc Hhi Hlgh Harm".
           iEval (rewrite HH2ra) in "Hpc".
           assert (P5cr : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x5a) : mword 64) 2)
                          = mword_of_int (KernelSyms.uartintr + 0x5c)) by pcw.
@@ -1231,7 +1231,7 @@ Section ProofUartintr.
               ltac:(unfold uart_size; lia) ltac:(nz) ltac:(nz) ltac:(rdok) (HA9ad2 _)
               with "Hcg Hpc [] Huinv").
     { iApply (uii2_20 with "Ht"). }
-    iIntros (CID14 Hs14) "_". iIntros (bisr) "Hcg Hpc". iEval (rewrite P24) in "Hpc".
+    iIntros (CID14 Hs14) "_"; iIntros (bisr) "Hcg Hpc". iEval (rewrite P24) in "Hpc".
     set (B0 := <[Regidx Ra4 := regval_into_reg (lsr_ldval_of bisr)]> A9).
     change (<[Regidx Ra4 := regval_into_reg (lsr_ldval_of bisr)]> A9) with B0.
     assert (HB0a5 : B0 !!! Regidx Ra5 = uart_pa i 0)
@@ -1246,7 +1246,7 @@ Section ProofUartintr.
               ltac:(unfold uart_size; lia) ltac:(nz) ltac:(nz) ltac:(rdok) (HB0ad5 _)
               with "Hcg Hpc [] Huinv").
     { iApply (uii2_24 with "Ht"). }
-    iIntros (CID15 Hs15) "_". iIntros (blsr) "Hcg Hpc". iEval (rewrite P28) in "Hpc".
+    iIntros (CID15 Hs15) "_"; iIntros (blsr) "Hcg Hpc". iEval (rewrite P28) in "Hpc".
     set (B1 := <[Regidx Ra5 := regval_into_reg (lsr_ldval_of blsr)]> B0).
     change (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of blsr)]> B0) with B1.
     (* +0x28 andi a5,a5,32 *)
@@ -1421,7 +1421,7 @@ Section ProofUartintr.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkbelow.
-      iIntros (CIDW8 HsW8) "_". iIntros (Mw) "[%Hcsw %Hdomw] Hcg Hcnt Ht2 Hpc".
+      iIntros (CIDW8 HsW8) "_"; iIntros (Mw) "[%Hcsw %Hdomw] Hcg Hcnt Ht2 Hpc".
       iEval (rewrite HT6ra P74) in "Hpc".
       assert (HcsMw : callee_saved B2 Mw) by (apply (callee_saved_trans B2 T6 Mw HcsB2T6 Hcsw)).
       assert (HregsW : ui_regs m Mw spd)

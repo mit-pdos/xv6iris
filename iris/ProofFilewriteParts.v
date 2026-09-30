@@ -1614,7 +1614,7 @@ Section ProofFilewriteParts.
       { iApply (fwri_0ee with "Htext"). }
       { iApply (fwri_0f0 with "Htext"). }
       { iApply (fwri_0f2 with "Htext"). }
-      iIntros (CIDr Hqr) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      iIntros (CIDr Hqr) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
       destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
       assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int nz : mword 64)) by (rewrite HMra0'; exact HE1a0).
       assert (HMrthr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1636,7 +1636,7 @@ Section ProofFilewriteParts.
                 (mword_of_int nz) cs1 cs3 s40 cs7 cs8 cs9 w12 p b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int nz) with "[%] Hcg Hpc").
@@ -1689,7 +1689,7 @@ Section ProofFilewriteParts.
       { iApply (fwri_132 with "Htext"). }
       { iApply (fwri_134 with "Htext"). }
       { iApply (fwri_136 with "Htext"). }
-      iIntros (CIDr Hqr) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+      iIntros (CIDr Hqr) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
       destruct Hmr as (HMrsp & HMra0' & HMr1 & HMr3 & HMr4 & HMr7 & HMr8 & HMr9 & HMrthr).
       assert (HMra0 : Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)) by (rewrite HMra0'; exact HE1a0).
       assert (HMrthr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1725,7 +1725,7 @@ Section ProofFilewriteParts.
                 (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 p b
                 HK Hsp0 Hra0 Hs00 Hs20 Hs50 Hs60 HMrsp HMra0 HMrthr2
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iSpecialize ("Hcont" $! CIDe with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mf (mword_of_int (-1)) with "[%] Hcg Hpc").

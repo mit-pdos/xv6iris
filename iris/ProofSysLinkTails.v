@@ -241,7 +241,7 @@ Section ProofSysLinkTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID2 Hq2) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID2 Hq2) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpcc0 : ret_pc (M1 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xc0)) by (rewrite HM1ra; pcw).
     iEval (rewrite Hpcc0) in "Hpc".
@@ -529,7 +529,7 @@ Section ProofSysLinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -578,7 +578,7 @@ Section ProofSysLinkTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xd0)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".
@@ -855,7 +855,7 @@ Section ProofSysLinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd [//] Hfly Hclaimsy Hdep Hoffd Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3) "_". iIntros (mup n2)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -904,7 +904,7 @@ Section ProofSysLinkTails.
               Upr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
-    iIntros (CID5 Hq5) "_". iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    iIntros (CID5 Hq5) "_"; iIntros (meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xe0)) by (rewrite HM3ra; pcw).
     iEval (rewrite Hpc3) in "Hpc".
@@ -1223,7 +1223,7 @@ Section ProofSysLinkTails.
                     Hslkk [//] Hfly Hclaimsy Hshr Hru Hsbi Hpid Hprocs Hdev Hgeo Hdlk Hbs1 Htx Hllb0").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID3 Hq3) "_". iIntros (mil dn bm fl)
+    iIntros (CID3 Hq3) "_"; iIntros (mil dn bm fl)
       "%Hcsil _ Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hoffr Hidev Hiinum
        Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     assert (Hpcfa : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -1411,7 +1411,7 @@ Section ProofSysLinkTails.
         by (rewrite /dn' sl_setnl_type; exact Hnotdir).
       rewrite (InodeRegion.ireg_dot_delta_not_dir _ _ Hdn'ty)
         FsStateLink.link_reps_1. iExact "Htoken". }
-    iIntros (CID9 Hq9) "_". iIntros (miu)
+    iIntros (CID9 Hq9) "_"; iIntros (miu)
       "%Hcsiu Hcg Hown Hpc Hpid Hidev Hiinum Hmeta Hmap Hsbi Hdiat Hbs2 Hop".
     assert (Hpc10a : ret_pc (P4 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0x10a)) by (rewrite HP4ra; pcw).
@@ -1575,7 +1575,7 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iApply (log_opS_opb with "Hop"). }
-    iIntros (CID12 Hq12) "_". iIntros (mup n2)
+    iIntros (CID12 Hq12) "_"; iIntros (mup n2)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc110 : ret_pc (Q2 !!! Regidx Rra : mword 64)
@@ -1617,7 +1617,7 @@ Section ProofSysLinkTails.
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID14 Hq14) "_". iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpid".
+    iIntros (CID14 Hq14) "_"; iIntros (meo) "%Hcseo Hcg Hown _ _ Hpc Hpid".
     assert (Hpc114 : ret_pc (Q3 !!! Regidx Rra : mword 64)
                      = mword_of_int (SL + 0x114)) by (rewrite HQ3ra; pcw).
     iEval (rewrite Hpc114) in "Hpc".
@@ -1954,7 +1954,7 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { done. }
-    iIntros (CID3 Hq3) "_". iIntros (mup n1 Sb1 w)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hsb1 %Hwm
        %Hcrbw %Hn1 Hop Htx Hislot".
     assert (Hpcf4 : ret_pc (M2 !!! Regidx Rra : mword 64)
@@ -2240,7 +2240,7 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { done. }
-    iIntros (CID3 Hq3) "_". iIntros (mup n1 Sb1 w)
+    iIntros (CID3 Hq3) "_"; iIntros (mup n1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hsb1 %Hwm
        %Hcrbw %Hn1 Hop Htx Hislot".
     assert (Hpcec : ret_pc (M2 !!! Regidx Rra : mword 64)

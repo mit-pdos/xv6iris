@@ -222,7 +222,7 @@ Section ProofArgint.
     iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p i tfp ws v dqt b lks
               Hi HA3a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
-    iIntros (CID8 Hs8) "_". iIntros (MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
+    iIntros (CID8 Hs8) "_"; iIntros (MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc10 : ret_pc (A3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.argint + 0x10))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).

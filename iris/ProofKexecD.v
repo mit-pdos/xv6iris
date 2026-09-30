@@ -571,7 +571,7 @@ Section KexecDName.
               Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha4 Ha5
               with "Htext Hpc Hcg Hpath Hlast [Hout]").
     rewrite /kxd_scan_out.
-    iIntros (CIDn Hsn) "_". iIntros (M' q') "%Hpres [[%Hnext Hpc] | Hpc] Hcg Hpath Hlast".
+    iIntros (CIDn Hsn) "_"; iIntros (M' q') "%Hpres [[%Hnext Hpc] | Hpc] Hcg Hpath Hlast".
     - (* the back edge, at [S i] *)
       destruct Hnext as (HSi & Ha3' & Ha4' & Ha5').
       destruct Hpres as (Hq' & Hsp' & Hs0' & Hv1' & Hv2' & Hv4' & Hv5' & Hv6' & Hv10' & Hv11').
@@ -1198,7 +1198,7 @@ Section KexecDCommit.
               ltac:(unfold PNAMELEN; change (2 ^ 31)%Z with 2147483648%Z; lia)
               Hsrcok
               with "Hcg Htext Hpc Hsrc Hnmseq").
-    iIntros (CID5 Hs5) "_". iIntros (mr h) "Hcg Hpc Hsrc Hnmseq %Hcsn %Hnra0 %Hnpost".
+    iIntros (CID5 Hs5) "_"; iIntros (mr h) "Hcg Hpc Hsrc Hnmseq %Hcsn %Hnra0 %Hnpost".
     assert (Hpc2dc : ret_pc (E4 !!! Regidx Rra) = mword_of_int (KXD + 0x2dc))
       by (rewrite HE4ra; pcw).
     iEval (rewrite Hpc2dc) in "Hpc".
@@ -1649,7 +1649,7 @@ Section KexecDCommit.
               HF6a0 ltac:(rewrite HF6a1; exact Hszmax)
               ltac:(rewrite HF6a1; exact Hbelold) (locks_below_empty _)
               with "Hcg Hcnt Htext Hpc Hptold Hka Hlend").
-    iIntros (CID16 Hs16) "_". iIntros (mr2) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsf".
+    iIntros (CID16 Hs16) "_"; iIntros (mr2) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcsf".
     iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uv) "[%HUv Hpriv]"; [exact Hkl|].
     destruct HUv as (kev & Hkev & ->).
     assert (Hpc300 : ret_pc (F6 !!! Regidx Rra) = mword_of_int (KXD + 0x300))
@@ -1881,7 +1881,7 @@ Section KexecDCommit.
     iApply (kxc_epi_frame m G10 K sp0 ra0 s00 s10 s20 (proc_addr jp) eb
               ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms2 HG10sp HG10thr
               with "Hcg Htext Hpc Hfr").
-    iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcs %Hpres Hcg Hpc".
+    iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcs %Hpres Hcg Hpc".
     iDestruct (cpu_own_transport CID16 CIDe 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID15 CIDe eb (proc_addr jp)
@@ -2485,7 +2485,7 @@ Section KexecDMain.
                 HD5sp HD5s0 HD5s1 HD5s2 HD5s4 HD5s5 HD5s6 HD5s10 HD5s11
                 HD5a3 HD5a4 HD5a5
                 with "Htext Hpc Hcg Hpath Hf66").
-      iIntros (CID9 Hs9) "_". iIntros (Mf q') "%Hpres Hpc Hcg Hpath Hf66".
+      iIntros (CID9 Hs9) "_"; iIntros (Mf q') "%Hpres Hpc Hcg Hpath Hf66".
       destruct Hpres as (Hq' & Hfsp & Hfs0 & Hfs1 & Hfs2 & Hfs4 & Hfs5 & Hfs6 & Hfs10 & Hfs11).
       iDestruct ("Hmk" $! (pa_add pv q') with "Hf66 Hpath") as "Hres".
       iDestruct (cpu_own_transport CID0 CID9 0%nat eb (proc_addr jp) eb

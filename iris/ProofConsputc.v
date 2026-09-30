@@ -398,7 +398,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT2uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT2a1 cp_byte_bs1. }
-      iIntros (CID8 Hs8) "_". iIntros (mf1) "Hcg Hcpu Hpc %Hcs1 HΨ".
+      iIntros (CID8 Hs8) "_"; iIntros (mf1) "Hcg Hcpu Hpc %Hcs1 HΨ".
       destruct Hcs1 as [Hcs1 Hra1].
       assert (Hret1 : ret_pc (T2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x28)).
       { rewrite /T2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -445,7 +445,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT4uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT4a1 cp_byte_bs2. }
-      iIntros (CID11 Hs11) "_". iIntros (mf2) "Hcg Hcpu Hpc %Hcs2 HΨ".
+      iIntros (CID11 Hs11) "_"; iIntros (mf2) "Hcg Hcpu Hpc %Hcs2 HΨ".
       destruct Hcs2 as [Hcs2 Hra2].
       assert (Hret2 : ret_pc (T4 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x32)).
       { rewrite /T4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -491,7 +491,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT6uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT6a1 cp_byte_bs1. }
-      iIntros (CID14 Hs14) "_". iIntros (mf3) "Hcg Hcpu Hpc %Hcs3 HΨ".
+      iIntros (CID14 Hs14) "_"; iIntros (mf3) "Hcg Hcpu Hpc %Hcs3 HΨ".
       destruct Hcs3 as [Hcs3 Hra3].
       assert (Hret3 : ret_pc (T6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x3a)).
       { rewrite /T6 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -533,7 +533,7 @@ Section ProofConsputc.
       { rewrite (Hthread0 csp_rs1 ltac:(vm_compute; reflexivity)). exact HW3sp. }
       iApply (wp_consputc_epi m mf3 K b p Hc2 Hmf3sp Hthread
                 with "Hcg Htext Hpc Hc1 Hc2").
-      iIntros (CID16 Hs16) "Hlc". iIntros (mfin) "Hcg Hpc %Hfin".
+      iIntros (CID16 Hs16) "Hlc"; iIntros (mfin) "Hcg Hpc %Hfin".
       iDestruct (cpu_own_transport CID14 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID16 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcpu Hpc [%] HΨ").
@@ -593,7 +593,7 @@ Section ProofConsputc.
       iApply (wp_uartputc γl γd F1 (K - 2)%nat Φ n eb b p lks HK4 HF1uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HF1a1'. }
-      iIntros (CID8' Hs8') "_". iIntros (mf) "Hcg Hcpu Hpc %Hcsf HΨ".
+      iIntros (CID8' Hs8') "_"; iIntros (mf) "Hcg Hcpu Hpc %Hcsf HΨ".
       destruct Hcsf as [Hcsf Hraf].
       assert (Hretf : ret_pc (F1 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x18)).
       { rewrite /F1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -618,7 +618,7 @@ Section ProofConsputc.
          ARGUMENT's low byte. *)
       iApply (wp_consputc_epi m mf K b p Hc2 Hmfsp Hthread
                 with "Hcg Htext Hpc Hc1 Hc2").
-      iIntros (CID9' Hs9') "Hlc". iIntros (mfin) "Hcg Hpc %Hfin".
+      iIntros (CID9' Hs9') "Hlc"; iIntros (mfin) "Hcg Hpc %Hfin".
       iDestruct (cpu_own_transport CID8' CID9' n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID9' with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mfin with "Hcg Hcpu Hpc [%] HΨ").

@@ -325,7 +325,7 @@ Section ProofCreateAlloc.
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
-    iIntros (CIDa Hsa) "_".
+    iIntros (CIDa Hsa) "_";
     iIntros (Ma w5 kd qd gd γil γisl dind dn bm data nf nsl n1 Sb1 w t).
     iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hddix %Hduq %Hrl %Hnpname
              %Hnone %Hsb1 %Hwmem %Hnp1".
@@ -416,7 +416,7 @@ Section ProofCreateAlloc.
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").
     all: try lkbelow.
-    iIntros (CIDo Hso) "_". iIntros (Mo alloc kslot q g cinum gil gisl dnc bmc)
+    iIntros (CIDo Hso) "_"; iIntros (Mo alloc kslot q g cinum gil gisl dnc bmc)
       "%Hcs3 Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev Hres".
     destruct alloc.
     - (* ============================================================== *)
@@ -679,7 +679,7 @@ Section ProofCreateAlloc.
       all: try lkbelow.
       { rewrite /InodeRegion.ireg_link_pin. iExact "Hcfrz". }
       all: try lkbelow.
-      iIntros (CIDiu Hsiu) "_". iIntros (miu)
+      iIntros (CIDiu Hsiu) "_"; iIntros (miu)
         "%Hcsiu Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
          (%vfill & [%Hvok %Hvchoice] & Htoken) Hpin Hbs2 Hop".
       (* the FILL's value IS the one this site chose ([oty = Some _]) *)
@@ -1062,7 +1062,7 @@ Section ProofCreateAlloc.
                         Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop Htx").
         all: try lkbelow.
-        iIntros (CIDdl Hsdl) "_". iIntros (mdl found bm' data' dn' dn0' n' Sb' tot)
+        iIntros (CIDdl Hsdl) "_"; iIntros (mdl found bm' data' dn' dn0' n' Sb' tot)
           "%Hcsdl Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs
            Hsbb Hdiat Hppid Hbsl Hislk Hdlnk %Hn' %Hsb' %Hdl16 %Hfd0 Hop Htx
            %Hcapp %Hsizedp %Harm".
@@ -1466,7 +1466,7 @@ Section ProofCreateAlloc.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              { iEval (cbn beta iota). iEmpIntro. }
-             iIntros (CIDU2 HqU2) "_". iIntros (mu2 n2 Sb2 wf2)
+             iIntros (CIDU2 HqU2) "_"; iIntros (mu2 n2 Sb2 wf2)
                "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
                 %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2 Htp".
              assert (Hpcu2 : ret_pc (Y2 !!! Regidx Rra : mword 64)
@@ -1555,7 +1555,7 @@ Section ProofCreateAlloc.
                        "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
              { exact (cr_tregs_of_regs3 m sp0 (ientry kd) (ientry kslot)
                         ty major minor Y4 HY4regs). }
-             iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+             iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
              iDestruct (cpu_own_transport CIDU2 CIDf 0%nat eb (proc_addr j) b
                           ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
              iDestruct (iref_slots_combine with "Hislk Hisl2") as "Hisl".
@@ -1887,7 +1887,7 @@ Section ProofCreateAlloc.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (cbn beta iota). iEmpIntro. }
-      iIntros (CIDU HqU) "_". iIntros (mu n2 Sb2 wf)
+      iIntros (CIDU HqU) "_"; iIntros (mu n2 Sb2 wf)
         "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
          %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl Htp".
       iDestruct (log_tx_add icfg_log t 1 (1/2) (1/2)
@@ -1976,7 +1976,7 @@ Section ProofCreateAlloc.
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
       { exact (cr_tregs_of_regs3 m sp0 (ientry kd)
                  (mword_of_int 0 : mword 64) ty major minor Z4 HZ4regs). }
-      iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CIDU CIDf 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (iref_slots_combine with "Hislg Hisl") as "Hisl".

@@ -1418,7 +1418,7 @@ Section ProofPipewrite.
     (* EPI -- the common epilogue at +0x58.                              *)
     (* ================================================================= *)
     iAssert (pw_epi CID γf γs j γp w q m av true pid U n sp0 addr Q Qe) with "[Hcont]" as "EPI".
-    { rewrite /pw_epi. iIntros (CIDep Hsep) "_". iIntros (M P' k') "%Hbr %Hrw %Hext %Hkev (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href HWP Hpriv".
+    { rewrite /pw_epi. iIntros (CIDep Hsep) "_"; iIntros (M P' k') "%Hbr %Hrw %Hext %Hkev (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href HWP Hpriv".
       destruct Hbr as (Hsp & B6 & B7 & B8 & B9 & B10 & B11).
       assert (Hb1 : add_vec (pa_stk sp0 14%nat) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) = pa_stk sp0 1%nat)
         by (apply pw_slot_bridge; apply bv_eq; vm_compute; reflexivity).
@@ -1657,7 +1657,7 @@ Section ProofPipewrite.
     iAssert (pw_exits CID γf γs j γl γp w q m av true lks pid U n sp0 pi addr Q Qe) with "[EPI]" as "EXITS".
     { rewrite /pw_exits. iSplit.
       - (* ---------------- +0x108: wakeup(&pi->nread); release ---------------- *)
-        rewrite /pw_tail. iIntros (CIDtl Hstl) "_".
+        rewrite /pw_tail. iIntros (CIDtl Hstl) "_";
         iIntros (M P' k') "%Hbr %Hs1M %Hrw %Hext %Hkev HF7 Hhi Hcg Hown Hpay Hlocked Hres Hpc Href HWP Hpriv".
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x108)) Ra0 Rs1
                   (mword_of_int 536 : mword 12) M (trap_res true + (av - 14))%nat false ltac:(nz) ltac:(rdok)
@@ -1737,7 +1737,7 @@ Section ProofPipewrite.
                   ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
-        iIntros (CIDrr Hsrr) "_". iIntros (mr) "_ Hcg Hpc %Hcsr Hown". rgall.
+        iIntros (CIDrr Hsrr) "_"; iIntros (mr) "_ Hcg Hpc %Hcsr Hown". rgall.
         assert (HraT4 : T4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x112) : mword 64) 4)
           by (rewrite /T4; apply upd_eq).
         iEval (rewrite HraT4) in "Hpc".
@@ -1777,7 +1777,7 @@ Section ProofPipewrite.
         + exact Hext.
         + exact Hkev.
       - (* ---------------- +0x46: release; i := -1; reload s6..s10 ---------------- *)
-        rewrite /pw_minus1. iIntros (CIDmn Hsmn) "_".
+        rewrite /pw_minus1. iIntros (CIDmn Hsmn) "_";
         iIntros (M P' k') "%Hmr %Hext %Hkev HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href HWP Hpriv".
         destruct Hmr as (Hsp & Hs1M & Hs11M).
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x46)) Ra0 Rs1 M (trap_res true + (av - 14))%nat false
@@ -1812,7 +1812,7 @@ Section ProofPipewrite.
                   ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
-        iIntros (CIDrr Hsrr) "_". iIntros (mr) "_ Hcg Hpc %Hcsr Hown". rgall.
+        iIntros (CIDrr Hsrr) "_"; iIntros (mr) "_ Hcg Hpc %Hcsr Hown". rgall.
         assert (HraQ2 : Q2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x48) : mword 64) 4)
           by (rewrite /Q2; apply upd_eq).
         iEval (rewrite HraQ2) in "Hpc".
@@ -1857,7 +1857,7 @@ Section ProofPipewrite.
         { iApply (pwi_52 with "Htext"). }
         { iApply (pwi_54 with "Htext"). }
         { iApply (pwi_56 with "Htext"). }
-        iIntros (CIDrs Hsrs) "Hlc". iIntros (M') "%Hrst Hcg Hpc HF5".
+        iIntros (CIDrs Hsrs) "Hlc"; iIntros (M') "%Hrst Hcg Hpc HF5".
         destruct Hrst as (R6 & R7 & R8 & R9 & R10 & Rrest).
         assert (Hsp' : M' !!! Regidx csp_rs1 = pa_stk sp0 14%nat).
         { rewrite (Rrest csp_rs1 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)). exact HspQ3. }
@@ -2081,7 +2081,7 @@ Section ProofPipewrite.
                  with "Hown") as "Hown".
     iApply (Myproc.wp_myproc_sconf A5 (av - 14)%nat 0%nat true pj true _
               Hlvl0 Hav10 with "Hcg Hown Htext Hpc").
-    iIntros (CIDmp Hsmp) "_". iIntros (ms M0) "%Hms Hcg Hown Hpc %HcsM0". rgall.
+    iIntros (CIDmp Hsmp) "_"; iIntros (ms M0) "%Hms Hcg Hown Hpc %HcsM0". rgall.
     destruct HcsM0 as [HcsM0 Ha0M0].
     assert (Hpp1c : ret_pc (A5 !!! Regidx Rra) = (mword_of_int (KernelSyms.pipewrite + 0x1c) : mword 64))
       by (rewrite HraA5; apply bv_eq; vm_compute; reflexivity).
@@ -2142,7 +2142,7 @@ Section ProofPipewrite.
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
-    iIntros (CIDaq Hsaq) "Hlc". iIntros (ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres _ Hown Hpay". rgall.
+    iIntros (CIDaq Hsaq) "Hlc"; iIntros (ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres _ Hown Hpay". rgall.
     iEval (rewrite HraB3) in "Hpc".
     assert (Hpp24 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x20) : mword 64) 4)
                     = (mword_of_int (KernelSyms.pipewrite + 0x24) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2448,7 +2448,7 @@ Section ProofPipewrite.
       { (* unfold the CONCLUSION only: a bare [rewrite /pw_loop] also unfolds
            [IH], whose ~2 KB statement then rides in Δ through the round *)
         iLöb as "IH". iEval (rewrite /pw_loop).
-        iIntros (CIDlp Hslp) "Hlc". iIntros (i M Pc kc) "%Hi %Hext %Hkev %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ HW HEX".
+        iIntros (CIDlp Hslp) "Hlc"; iIntros (i M Pc kc) "%Hi %Hext %Hkev %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ HW HEX".
         pose proof Hregs as Hregs2.
         destruct Hregs2 as (Hsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 &
                             Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
@@ -2900,7 +2900,7 @@ Section ProofPipewrite.
                         ltac:(exact (locked_dead _ _ _)) ltac:(exact (locked_pre_dead _ _ _))
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
               { iApply lock_finisher_close. }
-              iIntros (CIDrs Hsrs) "_". iIntros (Mrl) "_ Hcg Hpc %Hcsrl Hown". rgall.
+              iIntros (CIDrs Hsrs) "_"; iIntros (Mrl) "_ Hcg Hpc %Hcsrl Hown". rgall.
               iEval (rewrite HraG4) in "Hpc".
               assert (Hpp7e : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x7a) : mword 64) 4)
                               = (mword_of_int (KernelSyms.pipewrite + 0x7e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2938,7 +2938,7 @@ Section ProofPipewrite.
               all: try lkbelow.
               { rewrite /trap_csrs_ext. done. }
               { rewrite /cpu_claim_ext. done. }
-              iIntros (CIDsl0 Hssl0) "_". iIntros (Msl) "%Hslcs Hcg Hown Hpc _ _". rgall.
+              iIntros (CIDsl0 Hssl0) "_"; iIntros (Msl) "%Hslcs Hcg Hown Hpc _ _". rgall.
               iEval (rewrite HraG5) in "Hpc".
               assert (Hpp82 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x7e) : mword 64) 4)
                               = (mword_of_int (KernelSyms.pipewrite + 0x82) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2984,7 +2984,7 @@ Section ProofPipewrite.
                         with "Hcg Hown Htext Hpc [] Href").
               all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }
-              iIntros (CIDsl Hssl) "_". iIntros (ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
+              iIntros (CIDsl Hssl) "_"; iIntros (ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
               iEval (rewrite HraG7) in "Hpc".
               assert (Hpp88 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x84) : mword 64) 4)
                               = (mword_of_int (KernelSyms.pipewrite + 0x88) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

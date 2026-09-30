@@ -1150,7 +1150,7 @@ Qed.
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HR3sp HR3a0 HR3thr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID8 Hs8) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf g with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.
@@ -1167,12 +1167,12 @@ Qed.
                 ltac:(lia) ltac:(intros j Hj; lia) ltac:(intros j Hj; reflexivity)
                 (bb_nonul_0 f) HR3sp HR3a0 HR3a1' HR3a2 HR3a5' HR3thr
                 with "Hcg Htext Hpc Hsrc Hdst").
-      iIntros (CID7 Hs7) "_". iIntros (Mt hf) "%Hpost %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
+      iIntros (CID7 Hs7) "_"; iIntros (Mt hf) "%Hpost %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
       iApply (snc_tail mm Mt K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID8 Hs8) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID8 Hs8) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID8 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf hf with "Hcg Hpc Hsrc Hdst [%] [%] [%]").
       + exact Hcs.

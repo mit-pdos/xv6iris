@@ -692,7 +692,7 @@ Section ProofWalk.
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (CIDm Hsm) "Hlc". iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iIntros (CIDm Hsm) "Hlc"; iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CIDm with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc Hbuf [%]").
     exact Hcs.
@@ -833,7 +833,7 @@ Section ProofWalk.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
-    iIntros (CIDa3 Hsa3) "_". iIntros (mr) "Hcg Hcnt Hpc %Hkcs Hkpost".
+    iIntros (CIDa3 Hsa3) "_"; iIntros (mr) "Hcg Hcnt Hpc %Hkcs Hkpost".
     (* the return pc: +0x7a *)
     assert (Hret7a : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.walk + 0x7a)).
     { rewrite HJ1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -973,7 +973,7 @@ Section ProofWalk.
     (* A6.87: kalloc hands back its own memset run; this memset only wants
        the ownership, so it downgrades. *)
     { iEval (rewrite HN4a0). iApply (page_own_of_filled with "Hpage"). }
-    iIntros (CIDa9 Hsa9) "_". iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CIDa9 Hsa9) "_"; iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret86 : ret_pc (N4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.walk + 0x86)).
     { rewrite /N4 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret86) in "Hpc".
@@ -1535,7 +1535,7 @@ Section ProofWalk.
                 Hbelow
                 with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF").
       + (* ---- Hok: kalloc succeeded; continue the loop with the grafted subtree ---- *)
-        iIntros (CIDok Hsok) "_". iIntros (Mo bn) "%Hcs %Hb9 Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownb Henv HF".
+        iIntros (CIDok Hsok) "_"; iIntros (Mo bn) "%Hcs %Hb9 Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownb Henv HF".
         iDestruct "HF" as "[Hrestore Hcont]".
         iDestruct (ptree_own_descend L' (DfracOwn 1) (pt_graft cur (vpn_idx (S L') vpn) bn) (pt_empty_node bn) (vpn_idx (S L') vpn) (pt_graft_kid cur (vpn_idx (S L') vpn) bn) with "Hownb") as "[Hownc Hframe]".
         iAssert (∀ (curf : ptree) (d : nat), ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' (pt_empty_node bn) curf⌝ -∗
@@ -1665,7 +1665,7 @@ Section ProofWalk.
                     with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownc Hrestore' Henv Hcont").
         * exfalso; lia.
       + (* ---- Hfail: kalloc returned 0; return 0 through the tail's epilogue ---- *)
-        iIntros (CIDfl Hsfl) "_". iIntros (Mo) "%Hcs %Ha0 %Havz Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF".
+        iIntros (CIDfl Hsfl) "_"; iIntros (Mo) "%Hcs %Ha0 %Havz Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF".
         iDestruct "HF" as "[Hrestore Hcont]".
         iDestruct ("Hrestore" $! cur 0%nat with "Hown [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
         { apply ptree_same_rep0_lvl_refl. }

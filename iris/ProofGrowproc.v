@@ -577,7 +577,7 @@ Section ProofGrowproc.
     iApply (Myproc.wp_myproc_sconf M4 (av - 4)%nat 0%nat eb p b
               _ gp_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID9 Hn9) "_". iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID9 Hn9) "_"; iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc12 : ret_pc (M4 !!! Regidx Rra) = mword_of_int (KernelSyms.growproc + 0x12))
       by (rewrite HM4ra; apply bv_eq; vm_compute; reflexivity).
@@ -764,7 +764,7 @@ Section ProofGrowproc.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                 Hfsp Hfa0 Hfthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4").
-      iIntros (CIDf Hnf) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CIDf Hnf) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CIDx CIDf 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain|].
@@ -1122,7 +1122,7 @@ Section ProofGrowproc.
                 ltac:(rewrite HC3pa1 HC3pa2; exact Hfresh)
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
       all: try lkbelow.
-      iIntros (CID21 Hn21) "_". iIntros (mr) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc %Hcsr Hpost".
+      iIntros (CID21 Hn21) "_"; iIntros (mr) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc %Hcsr Hpost".
       iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hcnt]"; [exact Hkc1|].
       iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
       { iExists kc2. iFrame "Hcnt". iPureIntro; lia. }
@@ -1257,7 +1257,7 @@ Section ProofGrowproc.
       iApply (gp_store D1 av p (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) b
                 ltac:(rewrite HD1a1; exact Hret') HD1s2
                 with "Hcg Htext Hpc Hszc").
-      iIntros (CID24 Hn24) "_". iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
+      iIntros (CID24 Hn24) "_"; iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
       iDestruct (cpu_own_transport CID21 CID24 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply ("EXIT" $! CID24 Ms' P' (add_vec (pv_sz (us_V U)) nv) (mword_of_int 0 : mword 64)
@@ -1343,7 +1343,7 @@ Section ProofGrowproc.
       iEval (rewrite Htgt36) in "Hpc".
       iApply (gp_store A2 av p (pv_sz (us_V U)) (pv_sz (us_V U)) b HA2a1 HA2s2
                 with "Hcg Htext Hpc Hszc").
-      iIntros (CID14 Hn14) "_". iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
+      iIntros (CID14 Hn14) "_"; iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
       iDestruct (cpu_own_transport CID9 CID14 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply ("EXIT" $! CID14 Ms' (pv_upt (us_V U)) (pv_sz (us_V U)) (mword_of_int 0 : mword 64)
@@ -1463,7 +1463,7 @@ Section ProofGrowproc.
               ltac:(rewrite HE3a1; exact Hszmax)
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID17 Hn17) "_". iIntros (md) "Hcg Hcpu (%kd1 & %Hkd1 & Hlend) Hpc %Hcsd %Hdret Hpt".
+    iIntros (CID17 Hn17) "_"; iIntros (md) "Hcg Hcpu (%kd1 & %Hkd1 & Hlend) Hpc %Hcsd %Hdret Hpt".
     iDestruct ("Hlback" $! kd1 with "[%] Hlend") as (kd2) "[%Hkd2 Hcnt]"; [exact Hkd1|].
     iAssert (∃ k' : nat, ⌜(pv_ev (us_V U) <= k')%nat⌝ ∗ act_cnt p k')%I with "[Hcnt]" as "Hcnt".
     { iExists kd2. iFrame "Hcnt". iPureIntro; lia. }
@@ -1547,7 +1547,7 @@ Section ProofGrowproc.
         rewrite uvm_maxsz_val. exact Hszmaxz. }
     iApply (gp_store F2 av p (pv_sz (us_V U)) (md !!! Regidx Ra0) b HF2a1 HF2s2
               with "Hcg Htext Hpc Hszc").
-    iIntros (CID20 Hn20) "_". iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
+    iIntros (CID20 Hn20) "_"; iIntros (Ms') "%Hs'a0 %Hs'thr Hcg Hpc Hszc".
     iDestruct (cpu_own_transport CID17 CID20 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply ("EXIT" $! CID20 Ms'

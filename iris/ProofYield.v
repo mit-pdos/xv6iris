@@ -284,7 +284,7 @@ Section YieldPostSched.
        its LAST instruction, so the hart can move there and the epilogue
        below is hart-GENERIC; at [eb = false] it does not, and the chain
        pins every step to this hart.  Either way the leaves run at [eb]. *)
-    iIntros (CIDr Hsr) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDr Hsr) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     (* yield is BALANCED: what it acquired it released, so the set release
        hands back collapses to the entry [lks]. *)
     pose proof (locks_below_not_elem lks "proc" Hfresh) as Hnotin.
@@ -580,7 +580,7 @@ Section ProofYield.
               _ ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID7 Hs7) "_". iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
+    iIntros (CID7 Hs7) "_"; iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
     assert (Hpc0e : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x0e)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
@@ -630,7 +630,7 @@ Section ProofYield.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off]. *)
-    iIntros (CIDa Hsa) "_". iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu [Hpay Hclmp]".
+    iIntros (CIDa Hsa) "_"; iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -755,7 +755,7 @@ Section ProofYield.
     { iIntros "_". iApply (park_pay_needs_ctx (proc_addr j) RUNNABLE needs_ctx_RUNNABLE). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [yield_post_sched] at [(CID0 := CIDs)]. *)
-    iIntros (CIDs Hss) "_". iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
+    iIntros (CIDs Hss) "_"; iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
     (* what the post-resume half needs about [msch], read off this tower. *)
     assert (Hsp_msch : msch !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup Hcs_sch csp_rs1 ltac:(vm_compute; reflexivity)).

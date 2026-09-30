@@ -220,7 +220,7 @@ Section ProofSysKill.
     iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p 0%nat tfp ws v (word_hi w3) dqt b lks
               ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
-    iIntros (CID8 Hk8) "_". iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
+    iIntros (CID8 Hk8) "_"; iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
     iEval (rewrite HA4a1) in "Hb3hi".
     assert (Hpp12 : ret_pc (A4 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_kill + 0x12))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
@@ -271,7 +271,7 @@ Section ProofSysKill.
               Hlen Hn ltac:(lia) Hbelow
               with "Hkc Hcg Hcpu Htext Hpc Hprocs").
     all: try lkbelow.
-    iIntros (CID11 Hk11) "_". iIntros (Mkk rv) "%Hkk Hcg Hcpu Hpc".
+    iIntros (CID11 Hk11) "_"; iIntros (Mkk rv) "%Hkk Hcg Hcpu Hpc".
     destruct Hkk as (HcsKk & HKka0 & Hrv).
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_kill + 0x1a))
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).

@@ -541,7 +541,7 @@ Section ProofSysClose.
     { (* sys_close DOES want the descriptor index, so its [pfd] is a real
          stack address -- [ofd_out]'s non-null case *)
       iApply (ofd_out_intro _ _ Hnzfd with "Hs3hi"). }
-    iIntros (CID9 Hs9) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
+    iIntros (CID9 Hs9) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
     assert (Hpc16 : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sys_close + 0x16))
       by (rewrite HM6ra; apply bv_eq; vm_compute; reflexivity).
@@ -620,7 +620,7 @@ Section ProofSysClose.
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
-      iIntros (CID12 Hs12) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID12 Hs12) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID9 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* [Hextc]/[Hextm] never moved: argfd does not mention them, so they
          rode along in the frame at the ENTRY hart.  ONE WIDE HOP from there,
@@ -678,7 +678,7 @@ Section ProofSysClose.
       iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p b lks
                 Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
-      iIntros (CID13 Hs13) "_". iIntros (ms P) "%Hms Hcg Hcpu Hpc %HcsP".
+      iIntros (CID13 Hs13) "_"; iIntros (ms P) "%Hms Hcg Hcpu Hpc %HcsP".
       destruct HcsP as [HcsP HPa0].
       assert (Hpc20 : ret_pc (B !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x20))
@@ -885,7 +885,7 @@ Section ProofSysClose.
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv Hcpay").
       all: try lkbelow.
-      iIntros (CID21 Hs21) "_". iIntros (R kev) "Hcg Hcpu Hextc Hextm Hpc %HcsR %Hkev Hfdslot Hiru Hout Hcpost Hpbare".
+      iIntros (CID21 Hs21) "_"; iIntros (R kev) "Hcg Hcpu Hextc Hextm Hpc %HcsR %Hkev Hfdslot Hiru Hout Hcpost Hpbare".
       iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
@@ -966,7 +966,7 @@ Section ProofSysClose.
       iApply (sc_tail (CID0 := CID22) m R8 av (zero_reg : mword 64) sp0 ra0 s00 _ fv b p
                 ltac:(lia) eq_refl eq_refl eq_refl HR8sp HR8a5 HthrR
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
-      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID21 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* fileclose gave the complement back re-indexed at its own return hart
          [CID21], so this hop starts THERE -- it does not have to span

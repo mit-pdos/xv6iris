@@ -546,7 +546,7 @@ Section ProofSysDup.
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs5").
     { (* sys_dup passes [pfd = 0]: no cell, and none is written *)
       iApply (ofd_out_null _ (word_lo w5)). exact HM6a1. }
-    iIntros (CID9 Hk9) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
+    iIntros (CID9 Hk9) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
     assert (Hpc14 : ret_pc (M6 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x14))
       by (rewrite HM6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -609,7 +609,7 @@ Section ProofSysDup.
                 sp0 ra0 s00 u3 u4 w5 w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl HB1sp HB1a5 HB1thr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDz1 Hkz1) "Hlc". iIntros (Fz1) "%HcsF Hcg Hpc".
+      iIntros (CIDz1 Hkz1) "Hlc"; iIntros (Fz1) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
       iDestruct (cpu_own_transport CID9 CIDz1 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
@@ -742,7 +742,7 @@ Section ProofSysDup.
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
-    iIntros (CID17 Hk17) "_". iIntros (D0) "%HcsD0 Hcg Hcpu Hpc Hcore Hpost2".
+    iIntros (CID17 Hk17) "_"; iIntros (D0) "%HcsD0 Hcg Hcpu Hpc Hcore Hpost2".
     assert (Hpc28 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x28))
       by (rewrite HB4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
@@ -914,7 +914,7 @@ Section ProofSysDup.
                 sp0 ra0 s00 (m !!! Regidx Rs1) (m !!! Regidx Rs2) fv w6 p b
                 ltac:(lia) eq_refl eq_refl eq_refl HF2sp HF2a5 HF2thr
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-      iIntros (CIDz2 Hkz2) "Hlc". iIntros (Fz2) "%HcsF Hcg Hpc".
+      iIntros (CIDz2 Hkz2) "Hlc"; iIntros (Fz2) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
       iDestruct (cpu_own_transport CID17 CIDz2 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
@@ -999,7 +999,7 @@ Section ProofSysDup.
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hunit Href").
     all: try lkbelow.
-    iIntros (CID23 Hk23) "_". iIntros (G3) "Hcg Hcpu Hpc [%HcsG3 %HG3a0] Href0 Href1".
+    iIntros (CID23 Hk23) "_"; iIntros (G3) "Hcg Hcpu Hpc [%HcsG3 %HG3a0] Href0 Href1".
     assert (Hpc36 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x36))
       by (rewrite HG2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc36) in "Hpc".
@@ -1142,7 +1142,7 @@ Section ProofSysDup.
               sp0 ra0 s00 (m !!! Regidx Rs1) (m !!! Regidx Rs2) fv w6 p b
               ltac:(lia) eq_refl eq_refl eq_refl HG6sp HG6a5 HG6thr
               with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
-    iIntros (CIDz3 Hkz3) "Hlc". iIntros (Fz3) "%HcsF Hcg Hpc".
+    iIntros (CIDz3 Hkz3) "Hlc"; iIntros (Fz3) "%HcsF Hcg Hpc".
     destruct HcsF as [HcsF HFa0].
     iDestruct (cpu_own_transport CID23 CIDz3 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".

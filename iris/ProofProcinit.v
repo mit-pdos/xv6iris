@@ -671,7 +671,7 @@ Section ProofProcinit.
     { iEval (rewrite HM3a0). iExact "Hlkw". }
     { iEval (rewrite HM3a0). iExact "Hlkn". }
     { iEval (rewrite HM3a0). iExact "Hlkc". }
-    iIntros (CID54 Hs54) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlkw Hlkn Hlkc".
+    iIntros (CID54 Hs54) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlkw Hlkn Hlkc".
     iEval (rewrite HM3a0) in "Hlkw".
     iEval (rewrite HM3a0 HM3a1) in "Hlkn".
     iMod (lock_name_intro with "Hstr_proc Hlkn") as "#Hnm_p".
@@ -909,7 +909,7 @@ Section ProofProcinit.
       iDestruct (wp_next_shift Hshift with "Hpost") as "Hpost".
       iApply (piepi m N8 K b p ltac:(lia) HN8sp HN8cs
                 with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8").
-      iIntros (CIDg Hsg) "Hlc". iIntros (mr) "Hcg Hpc %Hcs".
+      iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "Hcg Hpc %Hcs".
       iSpecialize ("Hpost" $! CIDg with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hpost" $! mr with "Hcg Hpc [//] Hdone").
     - (* more processes: bne TAKEN -> back edge to +0x78 at cursor S j *)
@@ -1189,7 +1189,7 @@ Section ProofProcinit.
     { iEval (rewrite HR7a0). iExact "Hpl". }
     { iEval (rewrite HR7a0). iExact "Hpn". }
     { iEval (rewrite HR7a0). iExact "Hpc0". }
-    iIntros (CID26 Hs26) "_". iIntros (mil1) "Hcg Hpc %Hil1cs Hpl Hpn Hpcpu".
+    iIntros (CID26 Hs26) "_"; iIntros (mil1) "Hcg Hpc %Hil1cs Hpl Hpn Hpcpu".
     iEval (rewrite HR7a0) in "Hpl".
     iEval (rewrite HR7a0 HR7a1) in "Hpn".
     iMod (lock_name_intro with "Hstr_nextpid Hpn") as "#Hnm_pid".
@@ -1284,7 +1284,7 @@ Section ProofProcinit.
     { iEval (rewrite HT5a0). iExact "Hwl". }
     { iEval (rewrite HT5a0). iExact "Hwn". }
     { iEval (rewrite HT5a0). iExact "Hwc". }
-    iIntros (CID32 Hs32) "_". iIntros (mil2) "Hcg Hpc %Hil2cs Hwl Hwn Hwc".
+    iIntros (CID32 Hs32) "_"; iIntros (mil2) "Hcg Hpc %Hil2cs Hwl Hwn Hwc".
     iEval (rewrite HT5a0) in "Hwl".
     iEval (rewrite HT5a0 HT5a1) in "Hwn".
     iMod (lock_name_intro with "Hstr_waitlock Hwn") as "#Hnm_wait".
@@ -1534,7 +1534,7 @@ Section ProofProcinit.
               ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpidfresh Hwaitfresh]" as "Hpost".
-    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hready".
+    { iIntros (CID' Hs') "Hlc"; iIntros (mr) "Hcg Hpc %Hcs Hready".
       iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hpidfresh Hwaitfresh Hready"). }
     (* enter the loop at cursor 0 with NPROC units of fuel, at the hart the

@@ -658,7 +658,7 @@ Section AslBodies.
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
     { iApply (is_sleeplock_genl_lock with "Hslk"). }
-    iIntros (CIDr Hsr) "_". iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
     (* asl_exit_body's own [lks] is OUTER: the set release hands back
        collapses to it, matching [Hcont]'s expectation unmodified. *)
     assert (Hsetback : ({["sleep lock"]} ∪ lks) ∖ {["sleep lock"]} = lks)
@@ -1060,7 +1060,7 @@ Section AslBodies.
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
     { iApply (is_sleeplock_genl_lock with "Hslk"). }
-    iIntros (CIDr Hsr) "_". iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
+    iIntros (CIDr Hsr) "_"; iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
     (* back to the OUTER set across the sleep_prepare/release/sleep/acquire
        round trip -- [Hfresh] is what makes the singleton insert/delete
        cancel. *)
@@ -1109,7 +1109,7 @@ Section AslBodies.
               with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
     all: try lkbelow.
     (* SLEEP RETURNS ON HART [CIDs]. *)
-    iIntros (CIDs Hss) "_". iIntros (mfs) "%Hs_cs Hcg Hown Hpc Hextc Hextm".
+    iIntros (CIDs Hss) "_"; iIntros (mfs) "%Hs_cs Hcg Hown Hpc Hextc Hextm".
     assert (Hpc2c : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x2c)) by (rewrite HL5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
@@ -1160,7 +1160,7 @@ Section AslBodies.
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HL7a0). iApply (is_sleeplock_genl_lock with "Hslk"). }
-    iIntros (CIDq Hsq) "_". iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR _ Hown Hpay".
+    iIntros (CIDq Hsq) "_"; iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR _ Hown Hpay".
     iDestruct (trap_csrs_ext_transport CIDs CIDq eb pj ltac:(wp_next_chain)
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDs CIDq eb pj ltac:(wp_next_chain)
@@ -1374,7 +1374,7 @@ Section ProofAcquiresleep.
               with "Hcg Hown Htext Hpc [] Hllb").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_genl_lock with "Hslk"). }
-    iIntros (CID11 Hs11) "_". iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR #Hpaira _ Hown Hpay".
+    iIntros (CID11 Hs11) "_"; iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR #Hpaira _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.
@@ -1408,7 +1408,7 @@ Section ProofAcquiresleep.
     (* ============ the anchored EXIT continuation (+0x36 -> ret) ============ *)
     iAssert (asl_exit CID γs j γl γsl R H q m pidv av Upr slk spd sp0 eb lks) with "[Hcont]" as "Hexit".
     { rewrite /asl_exit.
-      iIntros (CIDx Hsx) "_". iIntros (M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc".
+      iIntros (CIDx Hsx) "_"; iIntros (M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc".
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R H q m M pidv av Upr slk spd sp0 eb lks
                 Hav Hsx Hspd Hsp0 HaslE Hbelow
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc [Hcont]").
@@ -1421,7 +1421,7 @@ Section ProofAcquiresleep.
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
     iAssert (asl_loop CID γs j γl γsl R H q m pidv av Upr slk spd sp0 eb lks) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /asl_loop.
-      iIntros (CIDy Hsy) "_". iIntros (M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit".
+      iIntros (CIDy Hsy) "_"; iIntros (M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R H q m M pidv av Upr slk spd sp0 eb lks
                 Hav Hj Hjpl Hsy HaslL Hbelow
                 with "Htext Hslk Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit"). }
@@ -2819,7 +2819,7 @@ Section ProofAcquiresleep.
     iApply (wp_acquiresleep_gen_sconf γs j γl γsl s R sl_untracked 1%Qp m pidv Upr av eb b lks
               Hj Hav Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hemp Hpid Hpinv [Hcont]").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf) "%Hcs Hcg Hown Hextc Hextm Hpc Hstok HR Hpid".
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf) "%Hcs Hcg Hown Hextc Hextm Hpc Hstok HR Hpid".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [ exact Hsf |].
     iAssert (sleeplocked γsl slk pidv) with "[Hstok]" as "Hstok";
       [ iExists 1%Qp; iFrame |].

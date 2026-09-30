@@ -435,7 +435,7 @@ Section ProofStrlen.
       iDestruct (bb_byte_acc (KTR := kts) s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
       iApply (sl_probe M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte").
-      iIntros (CIDp Hspp) "_". iIntros (Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
+      iIntros (CIDp Hspp) "_"; iIntros (Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
       iDestruct ("Hback" $! f with "[%] Hbyte") as "Hbuf"; [done |].
       (* the byte is zero, so the [bnez] falls through *)
       assert (Hzero : f (S t) = (mword_of_int 0 : mword 8))
@@ -496,7 +496,7 @@ Section ProofStrlen.
       iDestruct (bb_byte_acc (KTR := kts) s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
       iApply (sl_probe M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte").
-      iIntros (CIDp Hspp) "_". iIntros (Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
+      iIntros (CIDp Hspp) "_"; iIntros (Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
       iDestruct ("Hback" $! f with "[%] Hbyte") as "Hbuf"; [done |].
       assert (Hnz : f (S t) <> (mword_of_int 0 : mword 8))
         by (apply (proj1 Hcstr); lia).
@@ -714,7 +714,7 @@ Section ProofStrlen.
                       [ apply HR3thr; assumption
                       | apply cs_ne; [vm_compute; reflexivity | exact Hr] ])
                 with "Hcg Htext Hpc Hb1 Hb2").
-      iIntros (CID9 Hs9) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+      iIntros (CID9 Hs9) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
       iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hpc Hbuf [%] [%]").
       - exact Hcs.
@@ -768,13 +768,13 @@ Section ProofStrlen.
                     [ apply HR3thr; assumption
                     | apply cs_ne; [vm_compute; reflexivity | exact Hr] ])
               with "Hcg Htext Hpc Hbuf").
-    iIntros (CID8 Hs8) "_". iIntros (Mt) "%Htsp %Hta0 %Htthr Hcg Hpc Hbuf".
+    iIntros (CID8 Hs8) "_"; iIntros (Mt) "%Htsp %Hta0 %Htthr Hcg Hpc Hbuf".
     iApply (sl_tail mm Mt K (mword_of_int (Z.of_nat k)) sp0
               (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
               HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
               Htsp Hta0 Htthr
               with "Hcg Htext Hpc Hb1 Hb2").
-    iIntros (CID9 Hs9) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+    iIntros (CID9 Hs9) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
     iSpecialize ("Hcont" $! CID9 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hpc Hbuf [%] [%]").
     - exact Hcs.

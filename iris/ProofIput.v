@@ -967,7 +967,7 @@ Section IputTail.
               with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hlock"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
@@ -983,7 +983,7 @@ Section IputTail.
               (m !!! Regidx Rs1) vg4 vg5 vg6
               ltac:(lia) Hmrsp
               with "Htext Hpc Hcg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6").
-    iIntros (CIDe5 Hse5) "Hlc". iIntros (P4) "%Hep Hcg Hpc".
+    iIntros (CIDe5 Hse5) "Hlc"; iIntros (P4) "%Hep Hcg Hpc".
     destruct Hep as (HP4ra & Hc8 & Hc9 & Hc2 & Hthread0).
     assert (Hretf : ret_pc (m !!! Regidx Rra) = ret_tgt) by reflexivity.
     iEval (rewrite Hretf) in "Hpc".
@@ -1980,7 +1980,7 @@ Section IputFreePath.
               with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    iIntros (CID15 Hq15) "_". iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
+    iIntros (CID15 Hq15) "_"; iIntros (mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc_ac : ret_pc (R0 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iput + 0xac)) by (rewrite HR0ra; pcw).
@@ -2220,7 +2220,7 @@ Section IputFreePath.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS Hau Hheld").
     all: try lkbelow.
-    iIntros (CID22 Hq22) "_". iIntros (mL) "Hcg Hcnt Hpc %Hcs2 HopS
+    iIntros (CID22 Hq22) "_"; iIntros (mL) "Hcg Hcnt Hpc %Hcs2 HopS
                               (#Hcom & Hgreg & Hfpin & Htxc) Hlk Hsl".
     (* NO POOL ENTRY IS ASSEMBLED HERE (IVd).  The bundle was parked at the
        +0x94 release on the AWAIT arm, which is the arm's own stated purpose;
@@ -2294,7 +2294,7 @@ Section IputFreePath.
               lks Upr HKbl Hkk HT1a0 ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
-    iIntros (CID25 Hq25) "_". iIntros (mR) "%Hcs3 Hcg Hcnt Hpc Hppid Hsl1".
+    iIntros (CID25 Hq25) "_"; iIntros (mR) "%Hcs3 Hcg Hcnt Hpc Hppid Hsl1".
     pose proof Hcs3 as Hcs3_cs.
     assert (Hpcc4 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iput + 0xc4)) by (rewrite HT1ra; pcw).
@@ -2987,7 +2987,7 @@ Section IputFreePath.
               with "Hcg Htext Hpc [Hitlk] Htok HRres [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDrl Hsrl) "_". iIntros (mr1) "Hcg Hpc %Hpins1 Hcnt".
+    iIntros (CIDrl Hsrl) "_"; iIntros (mr1) "Hcg Hpc %Hpins1 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hpins1 as Hpins1_cs.
@@ -3109,7 +3109,7 @@ Section IputFreePath.
     all: try lkbelow.
     { rewrite /inode_map. iFrame. }
     { rewrite Hun. iExact "Hop". }
-    iIntros (CIDit Hsit) "_". iIntros (mfi)
+    iIntros (CIDit Hsit) "_"; iIntros (mfi)
       "%Hcsi Hcg Hcnt Hextc Hclm Hpc Hppid Hidv Hinh Hbms Hins Hmeta Hmap Hblks
        Hdat Hbslots Hopx".
     assert (Hpc70 : ret_pc (J2 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x70))
@@ -3241,7 +3241,7 @@ Section IputFreePath.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hstok". }
     { iExact "Hdepc". }
-    iIntros (CIDrs Hsrs) "_". iIntros (mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
+    iIntros (CIDrs Hsrs) "_"; iIntros (mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
     (* the sleeplock's share comes home; the live slice is in [islot2]'s
        frozen park until +0x82.  Across the lock-free span this thread holds
        the REDUCED reference -- the count fragment, the identity slice and
@@ -3311,7 +3311,7 @@ Section IputFreePath.
               with "Hcg Hcnt Htext Hpc [Hitlk] HllbT").
     all: try lkbelow.
     { iEval (rewrite HJ9a0). iApply (is_itable2_lock with "Hitlk"). }
-    iIntros (CIDac2 Hsac2) "_". iIntros (ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hflk2 _ Hcnt Hpay".
+    iIntros (CIDac2 Hsac2) "_"; iIntros (ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hflk2 _ Hcnt Hpay".
     iDestruct "Hflk2" as (Kt2) "[%HKt2 #Hflt2]".
     assert (Hpc86 : ret_pc (J9 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x86))
       by (rewrite HJ9ra; pcw).
@@ -3780,7 +3780,7 @@ Section IputFreePath.
               with "Hcg Htext Hpc [Hitlk] Htok HRres3 [] Hcnt Hpay").
     { iApply (is_itable2_lock with "Hitlk"). }
     { iApply itable_ctx_hook. }
-    iIntros (CIDrl2 Hsrl2) "_". iIntros (mr2) "Hcg Hpc %Hpins2 Hcnt".
+    iIntros (CIDrl2 Hsrl2) "_"; iIntros (mr2) "Hcg Hpc %Hpins2 Hcnt".
     iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc98 : ret_pc (G3 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x98))
@@ -3969,7 +3969,7 @@ Section IputFreePath.
                     Hins Hbs2
                     Hvlb2 Hcrd2 Hop Hra Hs0f Hs1f Hs2f Hs3f Hs4f [-]").
     (* ---- the continuation: offlock's post at 0x30, re-shaped into ours ---- *)
-    iIntros (CIDf Hstf) "Hlc".
+    iIntros (CIDf Hstf) "Hlc";
     iIntros (mf) "%Hthr Hcg Hcnt Hextc Hclm Hpc Hppid Hins Hbs2 Hop2 Hwit Hgreg Hfpin
                   Htx Hra Hs0f Hs1f Hs2f Hs3f Hs4f".
     (* the whole walk never touched a callee-saved register, so [P5] agrees
@@ -5301,7 +5301,7 @@ Section ProofIput.
               with "Hcg Hcnt Htext Hpc [Hitab] Hllbm").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hitab"). }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hflk _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hflk _ Hcnt Hpay".
     iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x18)).
     { rewrite HmAra. pcw. }
@@ -5592,7 +5592,7 @@ Section ProofIput.
       { exact HTKw. }
       { exact Hcik5. }
       (* ===== the +0x30 seam: the shared epilogue, then iput's own post ==== *)
-      iIntros (CIDoff Hstoff) "_".
+      iIntros (CIDoff Hstoff) "_";
       iIntros (mf n'' Sb'' w) "%Hthr Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
                  Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Htx Hiu Hgreg Hfpin
                  Hr24 Hr16 Hr8 Hg4 Hg5 Hg6".
@@ -5611,7 +5611,7 @@ Section ProofIput.
                 (m !!! Regidx (mword_of_int 20 : mword 5))
                 ltac:(lia) Hmfsp
                 with "Htext Hpc Hcg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6").
-      iIntros (CIDe Hse) "Hlc". iIntros (P4) "%Hep Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (P4) "%Hep Hcg Hpc".
       destruct Hep as (HP4ra & HP4s0 & HP4s1 & HP4sp & HP4thr).
       assert (Hretf : ret_pc (m !!! Regidx Rra) = ret_tgt) by reflexivity.
       iEval (rewrite Hretf) in "Hpc".

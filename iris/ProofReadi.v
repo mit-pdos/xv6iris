@@ -1318,7 +1318,7 @@ Section ReadiLoop.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hrow Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
-    iIntros (CIDa4 Hqa4) "_". iIntros (mB)
+    iIntros (CIDa4 Hqa4) "_"; iIntros (mB)
       "%Hcs1 %Ha0v Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap Hblocks Hsl".
     assert (Hpc86 : ret_pc (A3 !!! Regidx Rra : mword 64)
                     = mword_of_int (RI + 0x86)) by (rewrite HA3ra; pcw).
@@ -1452,7 +1452,7 @@ Section ReadiLoop.
               eq_refl Hj Hgl HB3a0 HB3a1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
-    iIntros (CIDa9 Hqa9) "_". iIntros (mBr kkb bsB bsdB dB)
+    iIntros (CIDa9 Hqa9) "_"; iIntros (mBr kkb bsB bsdB dB)
       "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     (* the borrow closes: either_copyout wants the block whole *)
     iDestruct ("Hdstback" with "Hppid") as "Hdst".
@@ -1831,7 +1831,7 @@ Section ReadiLoop.
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                 with "Hcg Hcnt Htext Hpc Hkenv Hwin Hdstw").
       all: try lkbelow.
-      iIntros (CIDb9 Hqb9) "_". iIntros (mE) "%HcsE Hcg Hcnt Hpc Hwin Hpost".
+      iIntros (CIDb9 Hqb9) "_"; iIntros (mE) "%HcsE Hcg Hcnt Hpc Hwin Hpost".
       assert (Hpc64 : ret_pc (D8 !!! Regidx Rra : mword 64)
                       = mword_of_int (RI + 0x64)) by (rewrite HD8ra; pcw).
       iEval (rewrite Hpc64) in "Hpc".
@@ -2062,7 +2062,7 @@ Section ReadiLoop.
                   HKbl Hkklt HF2a0 Hbelow
                   with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
         all: try lkbelow.
-        iIntros (CIDc7 Hqc7) "_". iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
+        iIntros (CIDc7 Hqc7) "_"; iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
         iDestruct ("Hdstback" with "Hppid") as "Hdst2".
         assert (Hpc6e : ret_pc (F2 !!! Regidx Rra : mword 64)
                         = mword_of_int (RI + 0x6e)) by (rewrite HF2ra; pcw).
@@ -2349,7 +2349,7 @@ Section ReadiLoop.
                   HKbl Hkklt HJ2a0 Hbelow
                   with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
         all: try lkbelow.
-        iIntros (CIDd7 Hqd7) "_". iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
+        iIntros (CIDd7 Hqd7) "_"; iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
         iDestruct ("Hdstback" with "Hppid") as "Hdst2".
         assert (Hpcb0 : ret_pc (J2 !!! Regidx Rra : mword 64)
                         = mword_of_int (RI + 0xb0)) by (rewrite HJ2ra; pcw).
@@ -2633,7 +2633,7 @@ Section ReadiMain.
                dst_olds U pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { (* the loop's count, packed into the user arm's ∃ (permit sweep L1b) *)
       rewrite /rd_cont.
-      iIntros (CIDq Hq) "Hlc". iIntros (mf tot P' kv) "%Hcs %Hext %Hkv %Htot %Harm Hcg Hcnt Hextc Hextm Hpc
+      iIntros (CIDq Hq) "Hlc"; iIntros (mf tot P' kv) "%Hcs %Hext %Hkv %Htot %Harm Hcg Hcnt Hextc Hextm Hpc
                                       Hidev Hmeta Hmap Hblocks Hdst Hsl".
       iSpecialize ("Hcont" $! CIDq Hq with "Hlc"). iApply ("Hcont" $! mf tot P'
                 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks

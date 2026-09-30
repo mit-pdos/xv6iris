@@ -409,7 +409,7 @@ Section ProofIinit.
     { iEval (rewrite HM3a0). iExact "Hf4". }
     { iEval (rewrite HM3a0). iExact "Hf5". }
     { iEval (rewrite HM3a0). iExact "Hf6p". }
-    iIntros (CIDd Hsd) "_". iIntros (msl) "Hcg Hpc %Hslcs Hg1 Hg2 Hg3 Hg4 Hg5 Hg6".
+    iIntros (CIDd Hsd) "_"; iIntros (msl) "Hcg Hpc %Hslcs Hg1 Hg2 Hg3 Hg4 Hg5 Hg6".
     iEval (rewrite HM3a0) in "Hg1". iEval (rewrite HM3a0) in "Hg2".
     iEval (rewrite HM3a0) in "Hg3". iEval (rewrite HM3a0) in "Hg4".
     iEval (rewrite HM3a0) in "Hg5". iEval (rewrite HM3a0) in "Hg6".
@@ -495,7 +495,7 @@ Section ProofIinit.
       iDestruct (wp_next_shift Hshift with "Hpost") as "Hpost".
       iApply (iiepi m N1 K b p ltac:(lia) HN1sp HN1cs
                 with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hf6").
-      iIntros (CIDg Hsg) "Hlc". iIntros (mr) "Hcg Hpc %Hcs".
+      iIntros (CIDg Hsg) "Hlc"; iIntros (mr) "Hcg Hpc %Hcs".
       iSpecialize ("Hpost" $! CIDg with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hpost" $! mr with "Hcg Hpc [//] Hdone").
     - (* more inodes: bne TAKEN -> back edge to +0x3a at cursor S j *)
@@ -746,7 +746,7 @@ Section ProofIinit.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iIntros (CID13 Hs13) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iIntros (CID13 Hs13) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
     iEval (rewrite HR7a0 HR7a1) in "Hlname".
     iMod (lock_name_intro with "Hstr_itable Hlname") as "#Hlnm".
@@ -856,7 +856,7 @@ Section ProofIinit.
               ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
               mWP (Loop : expr riscv_lang)))%I
       with "[Hcont Hlock Hcpu]" as "Hpost".
-    { iIntros (CID' Hs') "Hlc". iIntros (mr) "Hcg Hpc %Hcs Hfresh".
+    { iIntros (CID' Hs') "Hlc"; iIntros (mr) "Hcg Hpc %Hcs Hfresh".
       iSpecialize ("Hcont" $! CID' with "[%] Hlc"); [exact Hs'|].
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh"). }
     (* the loop is entered at the hart the loop-setup leaves migrated to

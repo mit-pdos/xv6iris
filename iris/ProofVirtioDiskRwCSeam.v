@@ -143,7 +143,7 @@ Section ProofVirtioDiskRwCSeam.
   Proof using .
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
-    iIntros (CIDx Hsx) "Hlc". iIntros (M np nr cm fr h m2 t) "%Hrh %Hfacts %Hal
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M np nr cm fr h m2 t) "%Hrh %Hfacts %Hal
              Hcg Hown Htc Hclm Hpc Htok Hbody [Hbh Hfh] [Hbm Hfm] [Hbt Hft] Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).

@@ -189,7 +189,7 @@ Section ProofKalloc.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x16)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc16) in "Hpc".
@@ -305,7 +305,7 @@ Section ProofKalloc.
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       rewrite -Hbmatch.
-      iIntros (CIDrel Hsrel) "_". iIntros (mr0) "Hcg Hpc %Hrelpins Hcnt".
+      iIntros (CIDrel Hsrel) "_"; iIntros (mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
       pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
       iEval (rewrite (_ : ({["kmem"]} ∪ lks) ∖ {["kmem"]} = lks);
@@ -602,7 +602,7 @@ Section ProofKalloc.
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       rewrite -Hbmatch.
-      iIntros (CIDrel Hsrel) "_". iIntros (mr0) "Hcg Hpc %Hrelpins Hcnt".
+      iIntros (CIDrel Hsrel) "_"; iIntros (mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
       pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
       iEval (rewrite (_ : ({["kmem"]} ∪ lks) ∖ {["kmem"]} = lks);
@@ -690,7 +690,7 @@ Section ProofKalloc.
                 ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
                 with "Hcg Htext Hpc [Hpage]").
       { iEval (rewrite HMmsa0). iExact "Hpage". }
-      iIntros (CIDms Hsms) "_". iIntros (mfp) "Hcg Hpc Hpage %Hpinsf".
+      iIntros (CIDms Hsms) "_"; iIntros (mfp) "Hcg Hpc Hpage %Hpinsf".
       iEval (rewrite HMmsa0) in "Hpage".
       pose proof Hpinsf as Hpinsf_cs.
       unfold callee_saved in Hpinsf.
@@ -854,7 +854,7 @@ Section ProofKalloc.
     iIntros "Hcg Hcnt Htext Hpc Hlock Havail Hcont".
     iApply (wp_kalloc_led_sconf γl γk fl m on n eb p K b lks HK Hfl Hn Hfresh
               with "Hcg Hcnt Htext Hpc Hlock Havail").
-    rewrite /wp_next. iIntros (CID' Hs) "Hlc". iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpost".
+    rewrite /wp_next. iIntros (CID' Hs) "Hlc"; iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpost".
     iSpecialize ("Hcont" $! CID' Hs with "Hlc"). iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpost]"); [exact Hcs|].
     by iApply kalloc_post_led_post.
   Qed.

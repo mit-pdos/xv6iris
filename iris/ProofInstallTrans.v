@@ -1138,7 +1138,7 @@ Section InstallTransBlocks.
                                ltac:(vm_compute; lia)))
                 with "Hcg Htext Hkd Hpc Hcnt Hpenvpk [Hfmt] Hdescs").
       { iEval (rewrite HMh4a0). iExact "Hfmt". }
-      iIntros (CIDh6 Hsh6) "_". iIntros (mfp) "Hcg Hpc %Hpks Hcnt _ _".
+      iIntros (CIDh6 Hsh6) "_"; iIntros (mfp) "Hcg Hpc %Hpks Hcnt _ _".
       destruct Hpks as [Hcsp Hrap].
       assert (Hpc52 : ret_pc (Mh4 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.install_trans + 0x52)).
@@ -1309,7 +1309,7 @@ Section InstallTransBlocks.
                 Hbelow
                 with "Hcg Hcnt Htext Hpc Hbio Hbref").
       all: try lkbelow.
-      iIntros (CIDk4 Hsk4) "_". iIntros (mf5) "Hcg Hcnt Hpc %Hcs5 Hu3".
+      iIntros (CIDk4 Hsk4) "_"; iIntros (mf5) "Hcg Hcnt Hpc %Hcs5 Hu3".
       assert (Hpcb0 : ret_pc (B9 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.install_trans + 0xb0)).
       { rewrite HB9ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1895,7 +1895,7 @@ Section InstallTransBlocks.
     iApply (it_head γpr γu γd recovering j t w m M K eb lks
               HK Hbelow Hregs
               with "Hcg Hcnt Htext Hkd Hpc Hpenvpk Hblk").
-    iIntros (CIDa1 Hsa1) "_". iIntros (M0) "%HM0regs Hcg Hcnt Hpc Hblk".
+    iIntros (CIDa1 Hsa1) "_"; iIntros (M0) "%HM0regs Hcg Hcnt Hpc Hblk".
     pose proof HM0regs as (HMsp & HMs3 & HMs4 & HMs5 & HMs6 & HMs7 & HMs8 & HMs9 & HMs10 & HMs11).
     (* ===== +0x70 lw a1,24(s4) : a1 := log.start ===== *)
     assert (Hastart : add_vec (rget M0 Rs4) (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2025,7 +2025,7 @@ Section InstallTransBlocks.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu1").
     all: try lkbelow.
-    iIntros (CIDb1 Hsb1) "_". iIntros (mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
+    iIntros (CIDb1 Hsb1) "_"; iIntros (mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
     destruct Hpair1 as [Hcs1 Hmf1a0].
     assert (Hpc82 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x82)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2141,7 +2141,7 @@ Section InstallTransBlocks.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu2").
     all: try lkbelow.
-    iIntros (CIDb2 Hsb2) "_". iIntros (mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
+    iIntros (CIDb2 Hsb2) "_"; iIntros (mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
     destruct Hpair2 as [Hcs2 Hmf2a0].
     assert (Hpc90 : ret_pc (A9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x90)).
     { rewrite HA9ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2288,7 +2288,7 @@ Section InstallTransBlocks.
               (it_Kmm K HK)
               ltac:(vm_compute; reflexivity) HB5a2
               with "Hcg Htext Hpc Hdata1 Hdata2").
-    iIntros (CIDa16 Hsa16) "_". iIntros (mf3) "Hcg Hpc Hdata1 Hdata2 %Hmf3a0 %Hcs3".
+    iIntros (CIDa16 Hsa16) "_"; iIntros (mf3) "Hcg Hpc Hdata1 Hdata2 %Hmf3a0 %Hcs3".
     iEval (rewrite HB5a1) in "Hdata1".
     iEval (rewrite HB5a0) in "Hdata2".
     iDestruct (it_data_back (b_data (bpa k1)) (Lw t) 1024%nat Hlen1 with "Hdata1") as "Hdata1".
@@ -2367,7 +2367,7 @@ Section InstallTransBlocks.
        code is about to overwrite: the threaded resource goes in and comes
        back through the write's own [▷ Q]. *)
     { iApply ("Hperm" $! t w with "[%] [%] HR"); [exact Hw | exact Hlen1]. }
-    iIntros (CIDb3 Hsb3) "_". iIntros (mf4) "%Hcs4 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold HR".
+    iIntros (CIDb3 Hsb3) "_"; iIntros (mf4) "%Hcs4 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold HR".
     assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xa6)).
     { rewrite HB7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca6) in "Hpc".
@@ -2403,7 +2403,7 @@ Section InstallTransBlocks.
     iApply (it_skip (CID0 := CIDb3) bn γfs γd dev w cov recovering j t k2
               m mf4 K eb lks HK Hbelow Hmf4regs Hk2 Hmf4s1
               with "Hcg Hcnt Htext Hpc Hbio Hbref").
-    iIntros (CIDa22 Hsa22) "_". iIntros (mf5) "%Hmf5regs %Hmf5s1 %Hmf5s2r Hcg Hcnt Hpc Hu3".
+    iIntros (CIDa22 Hsa22) "_"; iIntros (mf5) "%Hmf5regs %Hmf5s1 %Hmf5s2r Hcg Hcnt Hpc Hu3".
     assert (Hmf5s2 : mf5 !!! Regidx Rs2 = bnode k1)
       by (rewrite Hmf5s2r; exact Hmf4s2).
     (* ===== +0x54 c.mv a0,s2 ; +0x56 jal brelse(lbuf) ===== *)
@@ -2464,7 +2464,7 @@ Section InstallTransBlocks.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk1").
     all: try lkbelow.
-    iIntros (CIDb5 Hsb5) "_". iIntros (mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu4".
+    iIntros (CIDb5 Hsb5) "_"; iIntros (mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu4".
     assert (Hpc5a : ret_pc (B11 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x5a)).
     { rewrite HB11ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc5a) in "Hpc".
@@ -2524,7 +2524,7 @@ Section InstallTransBlocks.
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk2").
     all: try lkbelow.
-    iIntros (CIDb6 Hsb6) "_". iIntros (mf7) "%Hcs7 Hcg Hcnt Hpc Hppid Hu5".
+    iIntros (CIDb6 Hsb6) "_"; iIntros (mf7) "%Hcs7 Hcg Hcnt Hpc Hppid Hu5".
     assert (Hpc60 : ret_pc (B13 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x60)).
     { rewrite HB13ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc60) in "Hpc".

@@ -693,7 +693,7 @@ Section ProofEitherCopyout.
     iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b
               _ Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
-    iIntros (CID14 Hs14) "_". iIntros (ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID14 Hs14) "_"; iIntros (ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc1c : ret_pc (R7 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x1c))
       by (rewrite HR7ra; apply bv_eq; vm_compute; reflexivity).
@@ -911,7 +911,7 @@ Section ProofEitherCopyout.
                 HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hsrc").
       all: try lkbelow.
-      iIntros (CID21 Hs21) "_". iIntros (mr P' Mo) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hsrc %Hcsr %Hext %Hwrote".
+      iIntros (CID21 Hs21) "_"; iIntros (mr P' Mo) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hsrc %Hcsr %Hext %Hwrote".
       iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       (* the window equation, with the prefix length named: on the 0 arm the
          whole buffer crossed, on the -1 arm some prefix of it did. *)
@@ -955,7 +955,7 @@ Section ProofEitherCopyout.
       { iApply (eco_36 with "Htext"). }
       { iApply (eco_38 with "Htext"). }
       { iApply (eco_3a with "Htext"). }
-      iIntros (CID22 Hs22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hs22) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyout handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
@@ -1081,7 +1081,7 @@ Section ProofEitherCopyout.
       iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds (DfracOwn 1) b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hsrc Hres").
-      iIntros (CID20 Hs20) "_". iIntros (mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+      iIntros (CID20 Hs20) "_"; iIntros (mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
       assert (Hpc48 : ret_pc (K4 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x48))
         by (rewrite HK4ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc48) in "Hpc".
@@ -1142,7 +1142,7 @@ Section ProofEitherCopyout.
       { iApply (eco_36 with "Htext"). }
       { iApply (eco_38 with "Htext"). }
       { iApply (eco_3a with "Htext"). }
-      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)
@@ -1451,7 +1451,7 @@ Section ProofEitherCopyin.
     iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b _
               Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
-    iIntros (CID14 Hs14) "_". iIntros (ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID14 Hs14) "_"; iIntros (ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc1c : ret_pc (R7 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyin + 0x1c))
       by (rewrite HR7ra; apply bv_eq; vm_compute; reflexivity).
@@ -1667,7 +1667,7 @@ Section ProofEitherCopyin.
                 HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hdst").
       all: try lkbelow.
-      iIntros (CID21 Hs21) "_". iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hdst %Hcsr %Hext %Hgot".
+      iIntros (CID21 Hs21) "_"; iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hdst %Hcsr %Hext %Hgot".
       iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
       rewrite HU5a3 in Hgot.
       (* THE CONTENT SEAM (RULING A).  The memory-indexed contract names the
@@ -1723,7 +1723,7 @@ Section ProofEitherCopyin.
       { iApply (eci_36 with "Htext"). }
       { iApply (eci_38 with "Htext"). }
       { iApply (eci_3a with "Htext"). }
-      iIntros (CID22 Hs22) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID22 Hs22) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyin handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
       iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
@@ -1851,7 +1851,7 @@ Section ProofEitherCopyin.
       iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds (DfracOwn 1) b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hres Hdst").
-      iIntros (CID20 Hs20) "_". iIntros (mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
+      iIntros (CID20 Hs20) "_"; iIntros (mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
       assert (Hpc48 : ret_pc (K4 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyin + 0x48))
         by (rewrite HK4ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc48) in "Hpc".
@@ -1912,7 +1912,7 @@ Section ProofEitherCopyin.
       { iApply (eci_36 with "Htext"). }
       { iApply (eci_38 with "Htext"). }
       { iApply (eci_3a with "Htext"). }
-      iIntros (CID23 Hs23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID23 Hs23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)

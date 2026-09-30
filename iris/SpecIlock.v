@@ -763,7 +763,7 @@ Proof.
                   Hdlock Hsl Hllb [Ht2 Hcont]").
   { exact Hle. }
   { rewrite /ic_dep_side. iExact "Ht1". }
-  iIntros (CIDx Hqx) "Hlc". iIntros (mf dn bm filled)
+  iIntros (CIDx Hqx) "Hlc"; iIntros (mf dn bm filled)
     "%Hcs Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hoffr Hidev Hiinum
      Hivalid Hload #Hshot Hfrz %Hfl Hlicb %Hilk".
   iEval (rewrite /ic_dep_held; cbn [ic_dep_rd]) in "Hload".

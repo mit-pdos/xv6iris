@@ -182,7 +182,7 @@ Section WpInitlockWrapper.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
-    iEval (rewrite /wp_next). iIntros (CID10 Hs10) "_". iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
+    iEval (rewrite /wp_next). iIntros (CID10 Hs10) "_"; iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
     iEval (rewrite HR7a0 HR7a1) in "Hlname".
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".

@@ -1131,7 +1131,7 @@ Section KvmmakeBody.
               ltac:(vm_compute; reflexivity)
               Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
-    iIntros (CID7 Hs7) "_". iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
+    iIntros (CID7 Hs7) "_"; iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -1200,7 +1200,7 @@ Section KvmmakeBody.
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
-    iIntros (CID12 Hs12) "Hlc". iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
+    iIntros (CID12 Hs12) "Hlc"; iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -1390,7 +1390,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x28)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1532,7 +1532,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x38)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1668,7 +1668,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x48)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1804,7 +1804,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID7 Hs7) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x5a)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -1956,7 +1956,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID9 Hs9) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID9 Hs9) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x70)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2134,7 +2134,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID12 Hs12) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID12 Hs12) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x92)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2291,7 +2291,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
-    iIntros (CID10 Hs10) "Hlc". iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
+    iIntros (CID10 Hs10) "Hlc"; iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0xac)).
     { rewrite /Wk upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret) in "Hpc".
@@ -2331,49 +2331,49 @@ Section KvmmakeBody.
     (* ---- prologue: frame + root kalloc + memset -> pt_empty_node bppn ---- *)
     iApply (wp_kmk_prologue_node γa γk mm K eb p nb b lks Hp0 Hbelow HK Hnbk
               with "Hcg Hcnt Htext Hpc Henv").
-    iIntros (CIDpr Hspr) "_". iIntros (M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
+    iIntros (CIDpr Hspr) "_"; iIntros (M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
     (* ---- region 1: UART ---- *)
     iApply (wp_kmk_region_uart γa γk mm M0 bppn K eb p nb 0%nat b lks
               Hp0 Hbelow HK Hnb (Nat.le_0_l 0) Hsp0 H9
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID1 Hs1) "_". iIntros (mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
+    iIntros (CID1 Hs1) "_"; iIntros (mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
     (* ---- region 2: UART1 (the second 16550; grows the tree by nothing) ---- *)
     assert (Bu1 : (0 + g1 <= 2)%nat) by (rewrite Nat.add_0_l; exact Hg1).
     iApply (wp_kmk_region_uart1 γa γk mm mr1 bppn t1 K eb p nb (0 + g1)%nat b lks
               Hp0 Hbelow HK Hnb Bu1 Hsp1 H9_1 Hbase1 Hrep1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CIDu1 Hsu1) "_". iIntros (mru1 tu1 gu1) "Hcg Hcnt Hpc Hptree Henv %Hcsu1 %H9_u1 %Hspu1 %Hbaseu1 %Hrepu1 %Hnodesu1 %Hgu1".
+    iIntros (CIDu1 Hsu1) "_"; iIntros (mru1 tu1 gu1) "Hcg Hcnt Hpc Hptree Henv %Hcsu1 %H9_u1 %Hspu1 %Hbaseu1 %Hrepu1 %Hnodesu1 %Hgu1".
     (* ---- region 3: VIRTIO ---- *)
     assert (Bv : (0 + g1 + gu1 <= 2)%nat)
       by exact (acc_step (0+g1) gu1 2 0 2 Bu1 Hgu1 ltac:(nat_le)).
     iApply (wp_kmk_region_virtio γa γk mm mru1 bppn tu1 K eb p nb (0 + g1 + gu1)%nat b lks
               Hp0 Hbelow HK Hnb Bv Hspu1 H9_u1 Hbaseu1 Hrepu1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID2 Hs2) "_". iIntros (mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
+    iIntros (CID2 Hs2) "_"; iIntros (mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
     (* ---- region 4: PLIC ---- *)
     assert (Bp : (0 + g1 + gu1 + g2 <= 2)%nat) by exact (acc_step (0+g1+gu1) g2 2 0 2 Bv Hg2 ltac:(nat_le)).
     iApply (wp_kmk_region_plic γa γk mm mr2 bppn t2 K eb p nb (0 + g1 + gu1 + g2)%nat b lks
               Hp0 Hbelow HK Hnb Bp Hsp2 H9_2 Hbase2 Hrep2
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID3 Hs3) "_". iIntros (mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
+    iIntros (CID3 Hs3) "_"; iIntros (mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
     (* ---- region 5: text ---- *)
     assert (Bt : (0 + g1 + gu1 + g2 + g3 <= 34)%nat) by exact (acc_step (0+g1+gu1+g2) g3 2 32 34 Bp Hg3 ltac:(nat_le)).
     iApply (wp_kmk_region_text γa γk mm mr3 bppn t3 K eb p nb (0 + g1 + gu1 + g2 + g3)%nat b lks
               Hp0 Hbelow HK Hnb Bt Hsp3 H9_3 Hbase3 Hrep3
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID4 Hs4) "_". iIntros (mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
+    iIntros (CID4 Hs4) "_"; iIntros (mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
     (* ---- region 6: data ---- *)
     assert (Bd : (0 + g1 + gu1 + g2 + g3 + g4 <= 36)%nat) by exact (acc_step (0+g1+gu1+g2+g3) g4 34 2 36 Bt Hg4 ltac:(nat_le)).
     iApply (wp_kmk_region_data γa γk mm mr4 bppn t4 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4)%nat b lks
               Hp0 Hbelow HK Hnb Bd Hsp4 H9_4 Hbase4 Hrep4
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID5 Hs5) "_". iIntros (mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
+    iIntros (CID5 Hs5) "_"; iIntros (mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
     (* ---- region 7: trampoline ---- *)
     assert (Br : (0 + g1 + gu1 + g2 + g3 + g4 + g5 <= 99)%nat) by exact (acc_step (0+g1+gu1+g2+g3+g4) g5 36 63 99 Bd Hg5 ltac:(nat_le)).
     iApply (wp_kmk_region_tramp γa γk mm mr5 bppn t5 K eb p nb (0 + g1 + gu1 + g2 + g3 + g4 + g5)%nat b lks
               Hp0 Hbelow HK Hnb Br Hsp5 H9_5 Hbase5 Hrep5
               with "Hcg Hcnt Htext Hpc Hptree Henv").
-    iIntros (CID6 Hs6) "_". iIntros (mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
+    iIntros (CID6 Hs6) "_"; iIntros (mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
     (* ---- census pin: pt_nodes t6 = 102, growth-sum = 101 ---- *)
     assert (HN : pt_nodes t6 = (1 + g1 + gu1 + g2 + g3 + g4 + g5 + g6)%nat).
     { rewrite Hnodes6 Hnodes5 Hnodes4 Hnodes3 Hnodes2 Hnodesu1 Hnodes1. reflexivity. }
@@ -2412,7 +2412,7 @@ Section KvmmakeBody.
               Hp0 Hbelow
               with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { rewrite avail_sub_Some. iExact "Henv". }
-    iIntros (CID9 Hs9) "_". iIntros (mr7 t7 g7 pas) "Hcg Hcnt Hpc Hptree %Hnodes7' Henv %Hcs7 %Hbase7' %Hpasok %Hrep7 %Hg7le Hpages".
+    iIntros (CID9 Hs9) "_"; iIntros (mr7 t7 g7 pas) "Hcg Hcnt Hpc Hptree %Hnodes7' Henv %Hcs7 %Hbase7' %Hpasok %Hrep7 %Hg7le Hpages".
     (* g7 = 0 (no growth left) and pt_nodes t7 = 102 *)
     assert (Hg7 : g7 = 0%nat).
     { pose proof (kstacks_missing_zero t6 Hrep6) as Hkm0. rewrite Hkm0 in Hg7le. exact (proj1 (Nat.le_0_r g7) Hg7le). }

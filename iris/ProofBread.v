@@ -930,7 +930,7 @@ Section BreadBlocks.
       { rewrite disk_seq_permit_none. iApply disk_write_permit_trivial. }
       (* rw PARKS: it returns on hart [CIDrw], handing the trap-CSR
          complement back too. *)
-      iIntros (CIDrw Hsrw) "_". iIntros (mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _".
+      iIntros (CIDrw Hsrw) "_"; iIntros (mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _".
       iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hbuf".
       iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hdb".
       iEval (rewrite -Hgd) in "Hdb".
@@ -1215,7 +1215,7 @@ Section BreadBlocks.
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -1282,7 +1282,7 @@ Section BreadBlocks.
     all: try lkbelow.
     { iEval (rewrite HH7a0). iExact "Hslk". }
     { rewrite /SleepLock.sl_untracked. done. }
-    iIntros (CIDs Hss) "_". iIntros (mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc (%Kt & %HKt & #Hflt) Hstok Hslp Hppid".
+    iIntros (CIDs Hss) "_"; iIntros (mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc (%Kt & %HKt & #Hflt) Hstok Hslp Hppid".
     iEval (rewrite HH7a0) in "Hstok".
     iAssert (sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
     { iExists 1%Qp. iExact "Hstok". }
@@ -1569,7 +1569,7 @@ Section BreadBlocks.
     { iFrame "Hllbtl' Hscan'". }
     { iApply (lock_hook_llb _ _ tl' (bcache_res2_fold_in bn V M' ord' devs' bnos' tl')
                 with "Hllbtl'"). }
-    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+    iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
@@ -1634,7 +1634,7 @@ Section BreadBlocks.
     all: try lkbelow.
     { iEval (rewrite HC6a0). iExact "Hslk". }
     { rewrite /SleepLock.sl_untracked. done. }
-    iIntros (CIDs Hss) "_". iIntros (mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc (%Kt & %HKt & #Hflt) Hstok Hslp Hppid".
+    iIntros (CIDs Hss) "_"; iIntros (mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc (%Kt & %HKt & #Hflt) Hstok Hslp Hppid".
     iEval (rewrite HC6a0) in "Hstok".
     iAssert (sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv) with "[Hstok]" as "Hstok".
     { iExists 1%Qp. iExact "Hstok". }
@@ -2856,7 +2856,7 @@ Section ProofBread.
        runs at the literal [false] index and the hart is pinned at [CIDq].
        [Hcont] is re-anchored here, ONCE, and travels the rest of the way as
        an ordinary frame. *)
-    iIntros (CIDq Hsq) "_". iIntros (ms mq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDq Hsq) "_"; iIntros (ms mq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc1e : ret_pc (R7 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0x1e)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1e) in "Hpc".

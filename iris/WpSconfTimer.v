@@ -806,8 +806,8 @@ Section WpSconfTimer.
                  ⌜∃ tv : mword 64,
                     m' = <[Regidx rd := regval_into_reg tv]> m⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
-    iSplitR "Hcont".
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -897,7 +897,7 @@ Section WpSconfTimer.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       destruct Hex as (tv & ->).
-      iApply ("Hcont" $! tv cpu_id with "[%] Hcg' Hpc'"). done.
+      iApply ("Hcont" $! tv cpu_id with "[%] Hlc Hcg' Hpc'"). done.
   Qed.
 
   (* ---- csrw stimecmp,rs1.  The deadline cell is NOT threaded: it lives in
@@ -932,8 +932,8 @@ Section WpSconfTimer.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl_clock.
-    iSplitR "Hcont".
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc". rewrite /sconf_step_obl_clock.
+    iSplitR "Hcont Hlc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -1032,7 +1032,7 @@ Section WpSconfTimer.
     - (* ---- the continuation ---- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! cpu_id with "[%] Hcg' Hpc'"). done.
+      iApply ("Hcont" $! cpu_id with "[%] Hlc Hcg' Hpc'"). done.
   Qed.
 
 End WpSconfTimer.

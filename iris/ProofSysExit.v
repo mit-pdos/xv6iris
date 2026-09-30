@@ -278,7 +278,7 @@ Section ProofSysExit.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 (word_hi w3) (DfracOwn (1/4)) b
               _ sex_arg0 HA4a0 Hv0 sex_ilvl0 (sex_Kai av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
-    iIntros (CID8 Hk8) "_". iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
+    iIntros (CID8 Hk8) "_"; iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
     iEval (rewrite HA4a1) in "Hb3hi".
     iDestruct ("Hback" with "Htf Hpage") as "Hpriv".
     assert (Hpp12 : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SE + 0x12))

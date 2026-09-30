@@ -1260,7 +1260,7 @@ Section CwBodies.
                 with "Hcg Hcnt Ht Hpc Hkenv [Hb1] Hpriv").
       all: try lkbelow.
       { iEval (rewrite HB6a0). iExact "Hb1". }
-      iIntros (CIDc7 Hsc7) "_". iIntros (mf1) "%Hcs1 Hcg Hcnt Hpc Hpost".
+      iIntros (CIDc7 Hsc7) "_"; iIntros (mf1) "%Hcs1 Hcg Hcnt Hpc Hpost".
       iEval (rewrite HB6ra) in "Hpc".
       assert (P4a : ret_pc (add_vec_int (mword_of_int (CW + 0x46) : mword 64) 4)
                     = mword_of_int (CW + 0x4a)) by pcw.
@@ -1449,7 +1449,7 @@ Section CwBodies.
                   with "Hcg Hcnt Ht Hpc Hupin Huinv Htxl Hpid [Hb1] Hch Hpinv").
         all: try lkbelow.
         { iEval (rewrite HD3a1). iExact "Hb1". }
-        iIntros (CIDcc Hscc) "_". iIntros (mf2) "%Hcs2 Hcg Hcnt Hpc Hb1 Hpid Hrcpt'".
+        iIntros (CIDcc Hscc) "_"; iIntros (mf2) "%Hcs2 Hcg Hcnt Hpc Hb1 Hpid Hrcpt'".
         assert (Hcur : (Z.to_nat i + nnN)%nat = Z.to_nat (nn + i)) by lia.
         assert (Hrem2 : (Z.to_nat (n - i) - nnN)%nat = Z.to_nat (n - (nn + i))) by lia.
         iEval (rewrite Hcur Hrem2) in "Hrcpt'".

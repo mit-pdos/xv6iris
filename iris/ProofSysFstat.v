@@ -498,7 +498,7 @@ Section ProofSysFstat.
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs4").
-    iIntros (CID8 Hs8) "_". iIntros (A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs4".
+    iIntros (CID8 Hs8) "_"; iIntros (A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs4".
     iEval (rewrite HM5a1) in "Hs4".
     iDestruct ("Hpback" with "Htfc Htfp") as "Hpriv".
     assert (Hpc12 : ret_pc (M5 !!! Regidx Rra)
@@ -606,7 +606,7 @@ Section ProofSysFstat.
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
-    iIntros (CID13 Hs13) "_". iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
+    iIntros (CID13 Hs13) "_"; iIntros (A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
     assert (Hpc1e : ret_pc (N4 !!! Regidx Rra)
                     = mword_of_int (KernelSyms.sys_fstat + 0x1e))
       by (rewrite HN4ra; apply bv_eq; vm_compute; reflexivity).
@@ -700,7 +700,7 @@ Section ProofSysFstat.
                 sp0 ra0 s00 _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HA2sp HA2a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
-      iIntros (CID17 Hs17) "Hlc". iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
+      iIntros (CID17 Hs17) "Hlc"; iIntros (mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%] Hlc"); [wp_next_chain|].
@@ -819,7 +819,7 @@ Section ProofSysFstat.
                 ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID20 Hs20) "_". iIntros (mf rv P' dw bsw kev)
+      iIntros (CID20 Hs20) "_"; iIntros (mf rv P' dw bsw kev)
         "%Hcsf %Hupt %Hrvok %Hdwle %Hrva %Hkev Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "Henv".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
@@ -865,7 +865,7 @@ Section ProofSysFstat.
       iApply (sfs_tail (CID0 := CID20) m mf av rv sp0 ra0 s00 _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
-      iIntros (CID21 Hs21) "Hlc". iIntros (mg) "[%Hcsg %Hmga0] Hcg Hpc".
+      iIntros (CID21 Hs21) "Hlc"; iIntros (mg) "[%Hcsg %Hmga0] Hcg Hpc".
       iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%] Hlc"); [wp_next_chain|].

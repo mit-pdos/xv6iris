@@ -600,7 +600,7 @@ Section ProofFetchaddr.
     iApply (Myproc.wp_myproc_sconf M5 (av - 4)%nat 0%nat eb p b
               _ fa_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID10 Hk10) "_". iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID10 Hk10) "_"; iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x14))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
@@ -724,7 +724,7 @@ Section ProofFetchaddr.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-      iIntros (CID15 Hk15) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+      iIntros (CID15 Hk15) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
       iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
@@ -847,7 +847,7 @@ Section ProofFetchaddr.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                   HE2sp HE2a0 HthrE2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-        iIntros (CID17 Hk17) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CID17 Hk17) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U))⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt (us_V U)) (us_M U) (pv_ev (us_V U)) with "Hxr Hszc Hptc Hpt Hev") as "Hpriv".
@@ -1009,7 +1009,7 @@ Section ProofFetchaddr.
                   _ (pv_ev (us_V U)) HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hlend Hbuf").
         all: try lkbelow.
-        iIntros (CID20 Hk20) "_". iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
+        iIntros (CID20 Hk20) "_"; iIntros (mr P' dst_new) "Hcg Hcpu (%kc1 & %Hkc1 & Hlend) Hpc Hpt Hbuf %Hcsr %Hext %Hret".
         iDestruct ("Hlback" $! kc1 with "[%] Hlend") as (kc2) "[%Hkc2 Hev]"; [exact Hkc1|].
         rewrite HA7a3 in Hret.
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))
@@ -1105,7 +1105,7 @@ Section ProofFetchaddr.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl
                   HB2sp HB2a0 HthrB2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
-        iIntros (CID23 Hk23) "Hlc". iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
+        iIntros (CID23 Hk23) "Hlc"; iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iDestruct (cpu_own_transport CID20 CID23 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID23 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont" $! mf P' kc2 with "[%] [%] [%] Hcg Hcpu Hpc Hpriv [Hip]").

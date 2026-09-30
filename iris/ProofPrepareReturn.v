@@ -244,7 +244,7 @@ Section ProofPrepareReturn.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
-    iIntros (CID6 Hk6) "_". iIntros (msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
+    iIntros (CID6 Hk6) "_"; iIntros (msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc0c : ret_pc (M3 !!! Regidx ra_idx) = mword_of_int (PRR + 0x0c))
       by (rewrite HM3ra; pcw).
@@ -269,7 +269,7 @@ Section ProofPrepareReturn.
        interrupt can be taken ON this very instruction, so the hart may have
        moved.  Every step AFTER this one is at [false] and introduces with
        [wp_next_off_intro]; this one alone rebinds. *)
-    iIntros (CID7 Hk7) "Hlc". iIntros (ms0) "%Hms0f Hcg Hcpu Hcsrs Hclm Hpc".
+    iIntros (CID7 Hk7) "Hlc"; iIntros (ms0) "%Hms0f Hcg Hcpu Hcsrs Hclm Hpc".
     assert (Hpp10 : add_vec_int (mword_of_int (PRR + 0x0c) : mword 64) 4
                     = mword_of_int (PRR + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".

@@ -160,7 +160,7 @@ Section ProofVirtioDiskRwDSeam.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
     rewrite /P3.vdrw_p3_exit.
-    iIntros (CIDx Hsx) "Hlc". iIntros (M np nr cm fr h m2 t) "%Hrh %Hpin %Hfacts %Hal
+    iIntros (CIDx Hsx) "Hlc"; iIntros (M np nr cm fr h m2 t) "%Hrh %Hpin %Hfacts %Hal
              Hcg Hown Htc Hclm Hpc Htok Hbody Hchain Hfh Hfm Hft Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).

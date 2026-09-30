@@ -358,7 +358,7 @@ Section ProofIsmapped.
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (CID7 Hs7) "_". iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
+    iIntros (CID7 Hs7) "_"; iIntros (mw) "Hcg Hpc Hptree %Hkcs %Hpay".
     iEval (rewrite Hret0e) in "Hpc".
     assert (HW4vpn : svpn_of (W4 !!! Regidx (mword_of_int 11 : mword 5)) = vpn)
       by (rewrite HW4a1; reflexivity).
@@ -400,7 +400,7 @@ Section ProofIsmapped.
                 with "[%] Htext Hcg Hpc Hptree Hc1 Hc2 [%]").
       { apply callee_saved_refl. }
       { left. split; [exact Ha0z | exact Hnone]. }
-      iIntros (CID9 Hs9) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+      iIntros (CID9 Hs9) "Hlc"; iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
       iSpecialize ("Hcont" $! CID9 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
       { exact Hcs. } { exact Hpay2. } }
@@ -484,7 +484,7 @@ Section ProofIsmapped.
       { exact HcsB2. }
       { right. exists w0. split; [exact Hsome |].
         rewrite HB2a0. exact (pte_valid_bit0 w0 Hpv). }
-      iIntros (CID13 Hs13) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+      iIntros (CID13 Hs13) "Hlc"; iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
       iSpecialize ("Hcont" $! CID13 with "[] Hlc"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
       { exact Hcs. } { exact Hpay2. } }
@@ -494,7 +494,7 @@ Section ProofIsmapped.
     { exact HcsB2. }
     { left. split; [| exact Hnone].
       rewrite HB2a0 Hw0z. apply bv_eq; vm_compute; reflexivity. }
-    iIntros (CID14 Hs14) "Hlc". iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
+    iIntros (CID14 Hs14) "Hlc"; iIntros (mr) "Hcg Hpc Hptree %Hcs %Hpay2".
     iSpecialize ("Hcont" $! CID14 with "[] Hlc"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
     { exact Hcs. } { exact Hpay2. }

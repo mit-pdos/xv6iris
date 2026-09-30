@@ -430,7 +430,7 @@ Section ProofSysOpenWalk.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iEval (rewrite HN2a0). iExact "Hbufk". }
-    iIntros (CID3 Hq3) "_". iIntros (mna n1 Sb1 ok ipv w1)
+    iIntros (CID3 Hq3) "_"; iIntros (mna n1 Sb1 ok ipv w1)
       "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpbare Hcwdref
        Hbufk Hbsl %HSb1 %Hw1 %Hn1 [HopS Htx] Hres".
     iEval (rewrite HN2a0) in "Hbufk".
@@ -652,7 +652,7 @@ Section ProofSysOpenWalk.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
-    iIntros (CID7 Hq7) "_". iIntros (mil dn bm fl)
+    iIntros (CID7 Hq7) "_"; iIntros (mil dn bm fl)
       "%Hcsil _ Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep Hoffr
        Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     iEval (rewrite /ic_dep_held /=) in "Hload".

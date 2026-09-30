@@ -53,7 +53,7 @@ Section ProofMemsetPage.
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hpage]").
     { iApply (big_sepL_impl with "Hpage"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (CID1 Hs1) "Hlc". iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iIntros (CID1 Hs1) "Hlc"; iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H".

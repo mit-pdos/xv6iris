@@ -208,7 +208,7 @@ Section ProofSleepPrepare.
     iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb pj b
               _ ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID9 Hs9) "_". iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
+    iIntros (CID9 Hs9) "_"; iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
     assert (Hp12 : ret_pc (A3 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x12))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -259,7 +259,7 @@ Section ProofSleepPrepare.
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB2a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hp18 : ret_pc (B2 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x18))
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
@@ -342,7 +342,7 @@ Section ProofSleepPrepare.
               ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
-    iIntros (CIDrel Hsrel) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     (* acquire handed back [{[rank "proc"]} ∪ lks]; release hands back that
        set minus the same singleton.  [Hno], via [locks_below_not_elem],
        says "proc" was fresh in [lks], so the round trip is a no-op. *)

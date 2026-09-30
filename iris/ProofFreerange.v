@@ -684,7 +684,7 @@ Section ProofFreerange.
                   with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail").
         all: try lkbelow.
         { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
-        iIntros (CIDkf Hskf) "_". iIntros (mkf) "Hcg Hcnt Hpc %Hkfcs Havail".
+        iIntros (CIDkf Hskf) "_"; iIntros (mkf) "Hcg Hcnt Hpc %Hkfcs Havail".
         assert (Hkfret : ret_pc (M2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.freerange + 0x32)).
         { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hkfret) in "Hpc".

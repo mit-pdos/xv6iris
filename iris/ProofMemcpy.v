@@ -357,7 +357,7 @@ Section ProofMemcpy.
     iApply (MM.wp_memmove_sconf kt kts ktw R3 (n - 2)%nat len src_bytes dst_olds (DfracOwn 1) b p
               HKmm Hlen32 HR3a2
               with "Hcg Htext Hpc Hsrc Hdst").
-    iIntros (CID6 Hs6) "_". iIntros (mM) "Hcg Hpc Hsrc Hdst %HmMa0 %HcsM".
+    iIntros (CID6 Hs6) "_"; iIntros (mM) "Hcg Hpc Hsrc Hdst %HmMa0 %HcsM".
     (* memmove returns to memcpy+0x0c *)
     assert (Hpcret : ret_pc (R3 !!! Regidx Rra : mword 64)
                      = mword_of_int (KernelSyms.memcpy + 0x0c))
@@ -378,7 +378,7 @@ Section ProofMemcpy.
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
               HmMsp HmMa0' HmMthr
               with "Hcg Htext Hpc Hb1 Hb2").
-    iIntros (CID7 Hs7) "Hlc". iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
+    iIntros (CID7 Hs7) "Hlc"; iIntros (mf) "[%Hcs %Hfa0] Hcg Hpc".
     iSpecialize ("Hcont" $! CID7 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hpc Hsrc Hdst [%] [%]").
     - exact Hfa0.

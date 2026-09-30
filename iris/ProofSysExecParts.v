@@ -1192,7 +1192,7 @@ Section SysExecHead.
               sx_arg1_lt ltac:(rewrite HM5a0; reflexivity) Harg1 sx_noff0 Kaa
               Hpv
               with "Hcg Hcnt Htext Hdata Hpc Htfc Htfp F59").
-    iIntros (CID8 Hq8) "_". iIntros (M6) "%Hcs6 Hcg Hcnt Hpc Htfc Htfp F59".
+    iIntros (CID8 Hq8) "_"; iIntros (M6) "%Hcs6 Hcg Hcnt Hpc Htfc Htfp F59".
     iEval (rewrite HM5a1) in "F59".
     iDestruct ("Hprivback" with "Htfc Htfp") as "Hpriv".
     assert (Hpc012 : ret_pc (M5 !!! Regidx Rra : mword 64)
@@ -1321,7 +1321,7 @@ Section SysExecHead.
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
-    iIntros (CID13 Hq13) "_". iIntros (M11 P' bnew kev) "%Hcs11 %Hextz %Hkev Hcg Hcnt Hpc Hpriv Hbuf %Hret %Hgot0".
+    iIntros (CID13 Hq13) "_"; iIntros (M11 P' bnew kev) "%Hcs11 %Hextz %Hkev Hcg Hcnt Hpc Hpriv Hbuf %Hret %Hgot0".
     pose proof Hextz as Hext.
     iEval (rewrite HM10a1) in "Hbuf".
     assert (Hpc020 : ret_pc (M10 !!! Regidx Rra : mword 64)
@@ -1789,7 +1789,7 @@ Section SysExecSetup.
     iApply (Memset.wp_memset_sconf KT1 KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
               K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
-    iIntros (CIDa6 Hqa6) "_". iIntros (N6) "Hcg Hpc Haz %Hcsa6".
+    iIntros (CIDa6 Hqa6) "_"; iIntros (N6) "Hcg Hpc Haz %Hcsa6".
     iEval (rewrite HN5a0) in "Haz".
     assert (HN6sp : sx_sp sp0 N6).
     { rewrite /sx_sp (callee_saved_lookup Hcsa6 csp_rs1
@@ -2453,7 +2453,7 @@ Section SysExecFree.
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
     { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |]. iExact "Hpage". }
-    iIntros (CID4 Hq4) "_". iIntros (Mk) "Hcg Hcnt Hpc %Hcsk Hav2".
+    iIntros (CID4 Hq4) "_"; iIntros (Mk) "Hcg Hcnt Hpc %Hcsk Hav2".
     iEval (rewrite HM2ra Hret) in "Hpc".
     (* ===== +base+8 c.addi s1,8 ===== *)
     iApply (wp_caddi_s_sconf (mword_of_int (SX + base + 8) : mword 64) Rs1
@@ -3276,7 +3276,7 @@ Section SysExecStep.
     iApply (Fetchaddr.wp_fetchaddr_sconf fsc_kalloc γf N5 (K - 60)%nat eb (proc_addr jp)
               pid (us_upt (upd_usV U (upd_ev (us_V U) kc)) P) u0 b lks Kfa
               with "Hcg Hcnt Htext Hpc Hpriv Hka F60").
-    iIntros (CID6 Hq6) "_". iIntros (mf Pa ka) "%Hcsa %Hexta %Hkea Hcg Hcnt Hpc Hpriv Hfa".
+    iIntros (CID6 Hq6) "_"; iIntros (mf Pa ka) "%Hcsa %Hexta %Hkea Hcg Hcnt Hpc Hpriv Hfa".
     (* fetchaddr handed the block's counter back at [ka] (permit sweep L1b) *)
     assert (Hupa : us_upt (upd_usV (us_upt (upd_usV U (upd_ev (us_V U) kc)) P)
                               (upd_ev (us_V (us_upt (upd_usV U (upd_ev (us_V U) kc)) P)) ka)) Pa
@@ -3451,7 +3451,7 @@ Section SysExecStep.
               (mword_of_int (KernelSyms.kmem + 24)) Q2 None 0%nat eb
               (proc_addr jp) (K - 60)%nat b lks K14 eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk Hav").
-    iIntros (CID11 Hq11) "_". iIntros (mr) "Hcg Hcnt Hpc %Hcsr Hkp".
+    iIntros (CID11 Hq11) "_"; iIntros (mr) "Hcg Hcnt Hpc %Hcsr Hkp".
     iEval (rewrite HQ2ra) in "Hpc".
     assert (HRr : sx_regs sp0 m mr i)
       by exact (sx_regs_call sp0 m Q2 mr i Hcsr HRq2).
@@ -3623,7 +3623,7 @@ Section SysExecStep.
               (proc_addr jp) pid (us_upt (upd_usV U (upd_ev (us_V U) ka)) Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
-    iIntros (CID18 Hq18) "_". iIntros (mg Ps bnew ks) "%Hcsg %Hextsz %Hkes Hcg Hcnt Hpc Hpriv Hpg %Hfr %Hsgot".
+    iIntros (CID18 Hq18) "_"; iIntros (mg Ps bnew ks) "%Hcsg %Hextsz %Hkes Hcg Hcnt Hpc Hpriv Hpg %Hfr %Hsgot".
     (* WHICH STRING the page now holds: fetchstr relays copyinstr's content
        clause at the address it was handed, which is [u1] -- the very
        pointer this round read out of the argv vector.  The clause is keyed
@@ -3884,7 +3884,7 @@ Section SysExecStep.
     iApply (sx_step (CID0 := CID0) γf jp pid U K eb b lks sp0 m plen
               pfun rest uav M P k i pg alen afun uvf HK Hlb
               with "Htext Hka Hst [Hout]").
-    iIntros (CIDn Hqn) "_". iIntros (M' P' k' i' pg' alen' afun' uvf')
+    iIntros (CIDn Hqn) "_"; iIntros (M' P' k' i' pg' alen' afun' uvf')
       "[[%Hsi Hhead] | [[%Hnul Hbrk] | Hbad]]".
     - (* the BACK EDGE, re-entered at the hart the iteration ended on *)
       assert (Hcr : b = false \/ proc_addr jp = zero_reg ->
@@ -4375,7 +4375,7 @@ Section SysExecBadTail.
               sxi_096 sxi_098 sxi_09a sxi_09e sxi_0a0
               32%nat N1 0%nat ltac:(lia) ltac:(lia) ltac:(lia) HN1s1 HN1s4
               with "Htext Hka Hpc Hcg Hcnt Harr Hpgs").
-    iIntros (CID2 Hq2) "_". iIntros (M2 pcx) "%Hpcx %Hthr2 Hpc Hcg Hcnt Harr".
+    iIntros (CID2 Hq2) "_"; iIntros (M2 pcx) "%Hpcx %Hthr2 Hpc Hcg Hcnt Harr".
     assert (HM2sp : sx_sp sp0 M2)
       by (rewrite /sx_sp (Hthr2 csp_rs1 ltac:(csf) ltac:(nz)); exact HN1sp).
     assert (HM2thr : sx_thr m M2).
@@ -4409,7 +4409,7 @@ Section SysExecBadTail.
       iApply (sx_reload (CID0 := CID3) sp0 m M3 K b (proc_addr jp) 0xf6
                 HM3sp HM3thr sxi_0f6 sxi_0f8 sxi_0fa sxi_0fc sxi_0fe sxi_100
                 sxi_102 with "Htext Hpc Hcg Hspill").
-      iIntros (CID4 Hq4) "_". iIntros (M4) "%HRL Hpc Hcg Hspill".
+      iIntros (CID4 Hq4) "_"; iIntros (M4) "%HRL Hpc Hcg Hspill".
       destruct HRL as ((HM4sp & HM4thr & _ & HM4a0) & E1 & E2 & E3 & E4 & E5 & E6 & E7).
       iDestruct (sx_rest_build sp0 m plen pfun rest uav Hplen
                    with "Hspill F10 Hpb Hps F59 F60 Harr") as "Hrest".
@@ -4451,7 +4451,7 @@ Section SysExecBadTail.
       iApply (sx_reload (CID0 := CID3) sp0 m M3 K b (proc_addr jp) 0xa6
                 HM3sp HM3thr sxi_0a6 sxi_0a8 sxi_0aa sxi_0ac sxi_0ae sxi_0b0
                 sxi_0b2 with "Htext Hpc Hcg Hspill").
-      iIntros (CID4 Hq4) "_". iIntros (M4) "%HRL Hpc Hcg Hspill".
+      iIntros (CID4 Hq4) "_"; iIntros (M4) "%HRL Hpc Hcg Hspill".
       destruct HRL as ((HM4sp & HM4thr & _ & HM4a0) & E1 & E2 & E3 & E4 & E5 & E6 & E7).
       rewrite (_ : (SX + 0xa6 + 14)%Z = (SX + 0xb4)%Z); [| lia].
       (* ===== +0x0b4 c.j +0x104 ===== *)
@@ -4615,7 +4615,7 @@ Section SysExecSuccTail.
               sxi_0d4 sxi_0d6 sxi_0d8 sxi_0dc sxi_0de
               32%nat N2 0%nat ltac:(lia) ltac:(lia) ltac:(lia) HN2s1 HN2s4
               with "Htext Hka Hpc Hcg Hcnt Harr Hpgs").
-    iIntros (CID3 Hq3) "_". iIntros (M3 pcx) "%Hpcx %Hthr3 Hpc Hcg Hcnt Harr".
+    iIntros (CID3 Hq3) "_"; iIntros (M3 pcx) "%Hpcx %Hthr3 Hpc Hcg Hcnt Harr".
     (* BOTH exits are +0x0e2 *)
     assert (Hpce : pcx = (mword_of_int (SX + 0xe2) : mword 64)).
     { destruct Hpcx as [-> | ->]; [reflexivity |].
@@ -4653,7 +4653,7 @@ Section SysExecSuccTail.
     iApply (sx_reload (CID0 := CID4) sp0 m M4 K b (proc_addr jp) 0xe4
               HM4sp HM4thr sxi_0e4 sxi_0e6 sxi_0e8 sxi_0ea sxi_0ec sxi_0ee
               sxi_0f0 with "Htext Hpc Hcg Hspill").
-    iIntros (CID5 Hq5) "_". iIntros (M5) "%HRL Hpc Hcg Hspill".
+    iIntros (CID5 Hq5) "_"; iIntros (M5) "%HRL Hpc Hcg Hspill".
     destruct HRL as ((HM5sp & HM5thr & _ & HM5a0) & E1 & E2 & E3 & E4 & E5 & E6 & E7).
     rewrite (_ : (SX + 0xe4 + 14)%Z = (SX + 0xf2)%Z); [| lia].
     (* ===== +0x0f2 c.j +0x104 ===== *)

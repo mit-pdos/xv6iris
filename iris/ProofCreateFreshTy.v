@@ -509,7 +509,7 @@ Proof using .
             with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hsbn Hsbi Hireg Hiopen
                   Hppid Hprocs Hdevi Hdgeom Hdlk Hbs2 Hitb2 Hitbl Hesc Hisl Hop
                   Htc").
-  iIntros (CID4 Hq4) "_". iIntros (Mi alloc kslot q inum dn')
+  iIntros (CID4 Hq4) "_"; iIntros (Mi alloc kslot q inum dn')
     "%Hcsi Hcg Hcnt Hpc Hsbn Hsbi Hppid Hbs2 Hres".
   iEval (rewrite Hpcac) in "Hpc".
   (* ===== +0xac  c.mv s3,a0 : s3 := ip =============================== *)
@@ -616,7 +616,7 @@ Proof using .
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htx". }
-    iIntros (CID8 Hq8) "Hlc". iIntros (Mo dnc bmc filled)
+    iIntros (CID8 Hq8) "Hlc"; iIntros (Mo dnc bmc filled)
       "%Hcso _ Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep Hoffr
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     (* THE CLAIM ARM'S PAYOUT IS A PAIR since durable-disk C-5: the plain

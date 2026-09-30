@@ -237,7 +237,7 @@ Section ProofKvmmap.
               ltac:(rewrite HP6a1; exact Hnone)
               with "Hcg Hcnt Htext Hpc Hptree Henv Hlend").
     all: try lkbelow.
-    iIntros (CID9 Hs9) "_". iIntros (mr t' k g)
+    iIntros (CID9 Hs9) "_"; iIntros (mr t' k g)
       "Hcg Hcnt _ Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpresent %Hmiss %Hpay".
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x0e) : mword 64) 4).

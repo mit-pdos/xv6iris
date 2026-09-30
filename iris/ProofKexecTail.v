@@ -1348,7 +1348,7 @@ Section KexecAExit.
     iApply (kxc_epi_frame m Mt K sp0 ra0 s00 s10 s20 pj b
               HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hthr
               with "Hcg Htext Hpc Hframe").
-    iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcs %Hpres Hcg Hpc".
+    iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcs %Hpres Hcg Hpc".
     iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj b Hse
                  with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDe eb pj
@@ -1580,7 +1580,7 @@ Section KexecABad.
                     Hlog").
     all: try (exact Hley).
     all: try lkbelow.
-    iIntros (CIDu Hsu) "_". iIntros (M1 n3) "%Hcsu Hcg Hcnt Hextc Hclmc Hpc Hppid Hbm Hins
+    iIntros (CIDu Hsu) "_"; iIntros (M1 n3) "%Hcsu Hcg Hcnt Hextc Hclmc Hpc Hppid Hbm Hins
              Hbs %Hn3 Hlog Hirs1".
     assert (Hpc6a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXA + 0x06a))
       by (rewrite HB2ra; pcw).
@@ -1620,7 +1620,7 @@ Section KexecABad.
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
-    iIntros (CIDe Hse) "_". iIntros (M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
+    iIntros (CIDe Hse) "_"; iIntros (M2) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc6e : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KXA + 0x06e))
       by (rewrite HB3ra; pcw).
     iEval (rewrite Hpc6e) in "Hpc".
@@ -1724,7 +1724,7 @@ Section KexecABad.
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2").
-    iIntros (CIDf Hsf) "Hlc". iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
+    iIntros (CIDf Hsf) "Hlc"; iIntros (mf U' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hextc Hclmc Hpc
              Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hcont" $! mf U' entry spv szv'
@@ -1959,7 +1959,7 @@ Section KexecCBad.
               ltac:(rewrite HB3a1; exact Hbelow)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpt Hka Hlend").
-    iIntros (CID4 Hsc4) "_". iIntros (M1) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcs1".
+    iIntros (CID4 Hsc4) "_"; iIntros (M1) "Hcg Hcnt (%kl & %Hkl & Hlend) Hpc %Hcs1".
     iDestruct ("Hpback" $! kl with "[%] Hlend") as (Uev) "[%HUev Hpriv]"; [exact Hkl|].
     iDestruct (KexecOkQ.kexec_closer_after_next (CID0 := CID0) Uev with "Hcont") as "Hcont";
       [exact HUev|].

@@ -589,7 +589,7 @@ Section VtPrologue.
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
-    iIntros (CID11 Hs11) "Hlc". iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
+    iIntros (CID11 Hs11) "Hlc"; iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc1e : ret_pc (A6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x1e))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -766,7 +766,7 @@ Section VtEpilogue.
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR". }
-    iIntros (CID1 Hs1) "_". iIntros (MR) "Hcg Hpc %HcsR Hcnt".
+    iIntros (CID1 Hs1) "_"; iIntros (MR) "Hcg Hpc %HcsR Hcnt".
     rewrite Hbeq in Hs1.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
     (* virtio_disk_intr is BALANCED: what it acquired it released, so the set
@@ -3414,7 +3414,7 @@ Section ProofVirtioDiskIntr.
     iApply (Pro.wp_vt_prologue γk γd pd pav pu m K lvl eb pme b lks
               Hlvl1 HKav Hfresh
               with "Hcg Hown Htext Hpc Hlk").
-    iIntros (CIDa Hsa) "_". iIntros (MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
+    iIntros (CIDa Hsa) "_"; iIntros (MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
     destruct Hpro as (Hsp0 & HMAcsp & HMAs1 & HMAthr).
     (* ===================== the ISR read/ack ===================== *)
     iApply (wp_vt_isr γu γd MA (trap_res b + (K - 4))%nat pme with "Hcg Htext Hpc Hdinv").
@@ -3430,7 +3430,7 @@ Section ProofVirtioDiskIntr.
       iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme sp0 b lks
                 Hsp0 HBcsp HBthr HKav Hbeq Hfresh
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap").
-      iIntros (CIDz Hsz) "Hlc". iIntros (MF HcsF) "Hcg Hown Hpc".
+      iIntros (CIDz Hsz) "Hlc"; iIntros (MF HcsF) "Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hcont" $! MF with "[%] Hcg Hown Htext Hpc").
       split; [exact HcsF | intro r; apply rf_to_gmap_dom]. }

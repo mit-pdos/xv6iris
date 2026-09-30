@@ -270,7 +270,7 @@ Section ProofCreateFail.
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
-    iIntros (CIDf Hsf) "_".
+    iIntros (CIDf Hsf) "_";
     iIntros (Mx kslot q g gil gisl lo tl cinum dnc bmc datc bm' data' dn' dn0'
              tot n4 Sb4).
     iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hddix %Hduq %Hrl %Hkslt
@@ -406,7 +406,7 @@ Section ProofCreateFail.
     all: try lkbelow.
     { rewrite (cr_delta_eq ty major minor dnc (mword_of_int 0 : mword 16)
                  Htyc ltac:(vm_compute; reflexivity)). iExact "Htoken". }
-    iIntros (CIDG4 HsG4) "_". iIntros (mfl)
+    iIntros (CIDG4 HsG4) "_"; iIntros (mfl)
       "%Hcsfl Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
        Hbs2 Hop".
     assert (Hpcfl : ret_pc (G2 !!! Regidx Rra : mword 64)
@@ -594,7 +594,7 @@ Section ProofCreateFail.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iEval (cbn beta iota). iEmpIntro. }
-    iIntros (CIDG7 HqG7) "_". iIntros (mu1 n5 Sb5 w1)
+    iIntros (CIDG7 HqG7) "_"; iIntros (mu1 n5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
        %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 Htq1".
     (* THE LEDGER, at the body's disjunction (finding (3) in the banner) *)
@@ -830,7 +830,7 @@ Section ProofCreateFail.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iEval (cbn beta iota). iEmpIntro. }
-    iIntros (CIDGA HqGA) "_". iIntros (mu2 n6 Sb6 w2)
+    iIntros (CIDGA HqGA) "_"; iIntros (mu2 n6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
        %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 Htq2".
     iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
@@ -898,7 +898,7 @@ Section ProofCreateFail.
               "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
     { exact (cr_tregs_of_regs3 m sp0 (ientry kd)
                (mword_of_int 0 : mword 64) ty major minor G7 HG7regs). }
-    iIntros (CIDfin Hsfin) "Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDfin Hsfin) "Hlc"; iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CIDGA CIDfin 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (iref_slots_combine with "Hisl1 Hisl2") as "Hisl".

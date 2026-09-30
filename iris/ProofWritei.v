@@ -1255,7 +1255,7 @@ Section WriteiJoin.
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl2 Hlb0 Hcrdu Hop").
     all: try lkbelow.
-    iIntros (CID3 Hq3) "_". iIntros (mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
+    iIntros (CID3 Hq3) "_"; iIntros (mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsb Hdn Hsl2 Hop Hwit".
     (* the borrow closes: nothing below wi_join wants the fraction *)
     iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
@@ -2329,7 +2329,7 @@ Section WriteiLoop.
                     Hszc Hbmsc Hbminv
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
     all: try lkbelow.
-    iIntros (CIDa4 Hqa4) "_". iIntros (mB bm2 nB data2 Sb2)
+    iIntros (CIDa4 Hqa4) "_"; iIntros (mB bm2 nB data2 Sb2)
       "%Hcs1 %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hextc Hextm Hpc Hppid
        Hszc Hbmsc Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
     (* the pid borrow closes *)
@@ -2620,7 +2620,7 @@ Section WriteiLoop.
                 ltac:(lkbelow)
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
-      iIntros (CIDa9 Hqa9) "_". iIntros (mBr kkb bsB bsdB dB)
+      iIntros (CIDa9 Hqa9) "_"; iIntros (mBr kkb bsB bsdB dB)
         "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
       iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
       destruct Hfacts as [Hcs2 HmBra0].
@@ -3011,7 +3011,7 @@ Section WriteiLoop.
                   ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                   with "Hcg Hcnt Htext Hpc Hkenv Hwin Hsrcw").
         all: try lkbelow.
-        iIntros (CIDb9 Hqb9) "_". iIntros (mE) "%HcsE Hcg Hcnt Hpc Hpost".
+        iIntros (CIDb9 Hqb9) "_"; iIntros (mE) "%HcsE Hcg Hcnt Hpc Hpost".
         assert (Hpc64 : ret_pc (D8 !!! Regidx Rra : mword 64)
                         = mword_of_int (WI + 0x64)) by (rewrite HD8ra; pcw).
         iEval (rewrite Hpc64) in "Hpc".
@@ -3221,7 +3221,7 @@ Section WriteiLoop.
                     Hbelow
                     with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           all: try lkbelow.
-          iIntros (CIDc4 Hqc4) "_". iIntros (mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
+          iIntros (CIDc4 Hqc4) "_"; iIntros (mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
              [uX] when it spent.  Naming it keeps the rest of this iteration
              free of the case split. *)
@@ -3360,7 +3360,7 @@ Section WriteiLoop.
                     ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
           all: try lkbelow.
-          iIntros (CIDc7 Hqc7) "_". iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
+          iIntros (CIDc7 Hqc7) "_"; iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
           iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
           assert (Hpc74 : ret_pc (F4 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0x74)) by (rewrite HF4ra; pcw).
@@ -3763,7 +3763,7 @@ Section WriteiLoop.
                     Hbelow
                     with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsla Hop Hfsb1 Hheld").
           all: try lkbelow.
-          iIntros (CIDd4 Hqd4) "_". iIntros (mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
+          iIntros (CIDd4 Hqd4) "_"; iIntros (mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
              [uX] when it spent.  Naming it keeps the rest of this iteration
              free of the case split. *)
@@ -3882,7 +3882,7 @@ Section WriteiLoop.
                     ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
           all: try lkbelow.
-          iIntros (CIDd7 Hqd7) "_". iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
+          iIntros (CIDd7 Hqd7) "_"; iIntros (mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
           iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
           assert (Hpcbc : ret_pc (J4 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0xbc)) by (rewrite HJ4ra; pcw).

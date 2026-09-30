@@ -728,7 +728,7 @@ Section ProofSysUnlinkW2.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /ic_dep_side. iExact "Htp". }
-    iIntros (CID2 Hq2) "_". iIntros (mil dnd bmd fld)
+    iIntros (CID2 Hq2) "_"; iIntros (mil dnd bmd fld)
       "%Hcsil _ Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hdep Hoffr
        Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
     iEval (rewrite /ic_dep_held /=) in "Hload".
@@ -834,7 +834,7 @@ Section ProofSysUnlinkW2.
               ltac:(exact Knc) with "Hcg Htext Hpc [Hnm14] [Hdotw]").
     { iEval (rewrite HR4a0). iExact "Hnm14". }
     { iEval (rewrite HR4a1). iExact "Hdotw". }
-    iIntros (CID7 Hq7) "_". iIntros (mn1) "%Hcsn1 Hcg Hpc Hnm14 _ %Hnc1".
+    iIntros (CID7 Hq7) "_"; iIntros (mn1) "%Hcsn1 Hcg Hpc Hnm14 _ %Hnc1".
     iEval (rewrite HR4a0) in "Hnm14".
     assert (Hpc44 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x44)) by (rewrite HR4ra; pcw).
@@ -1002,7 +1002,7 @@ Section ProofSysUnlinkW2.
                 ltac:(exact Knc) with "Hcg Htext Hpc [Hnm14] [Hddw]").
       { iEval (rewrite HR8a0). iExact "Hnm14". }
       { iEval (rewrite HR8a1). iExact "Hddw". }
-      iIntros (CID13 Hq13) "_". iIntros (mn2) "%Hcsn2 Hcg Hpc Hnm14 _ %Hnc2".
+      iIntros (CID13 Hq13) "_"; iIntros (mn2) "%Hcsn2 Hcg Hpc Hnm14 _ %Hnc2".
       iEval (rewrite HR8a0) in "Hnm14".
       assert (Hpc58 : ret_pc (R8 !!! Regidx Rra : mword 64)
                       = mword_of_int (SU + 0x58)) by (rewrite HR8ra; pcw).
@@ -1248,7 +1248,7 @@ Section ProofSysUnlinkW2.
         { iEval (rewrite HR12a1). iExact "Hnm14". }
         { cbn [negb]. iEval (rewrite HR12a2). iExact "H27hi". }
         (* ...and the borrow comes straight back, on both arms, verbatim *)
-        iIntros (CID20 Hq20) "_". iIntros (mdl found kk kslot qs)
+        iIntros (CID20 Hq20) "_"; iIntros (mdl found kk kslot qs)
           "%Hcsdl Hcg Hown _ _ Hpc Hidev Hmeta Hmap Hblocks Hnm14 Hpidq Hbs1
            Hdlnk Hdiat Hres".
         iEval (rewrite HR12a1) in "Hnm14".

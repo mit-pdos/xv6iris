@@ -196,7 +196,7 @@ Section ProofSetkilled.
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hp10 : ret_pc (B1 !!! Regidx sk_ra) = mword_of_int (KernelSyms.setkilled + 0x10))
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
@@ -327,7 +327,7 @@ Section ProofSetkilled.
               ({["proc"%string]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
-    iIntros (CIDrel Hsrel) "_". iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    iIntros (CIDrel Hsrel) "_"; iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     (* BALANCED: acquire handed the set out as [{[rank "proc"]} ∪ lks] and
        release takes that same rank back out.  [Hno] is the ORDER premise;
        [locks_below_not_elem] turns it into the non-membership the set

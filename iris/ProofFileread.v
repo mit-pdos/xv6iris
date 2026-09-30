@@ -759,7 +759,7 @@ Section ProofFileread.
                 u3 u5 u6 pj b
                 (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl HA2sp HA2s2 HA2thr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-      iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
       iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1076,7 +1076,7 @@ Section ProofFileread.
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                   (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl HG4sp HG4s2 HG4thr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-        iIntros (CIDe Hse) "Hlc". iIntros (mf) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mf) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
@@ -1297,7 +1297,7 @@ Section ProofFileread.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         (* the pipe's copyout writes user memory, so piperead's post binds a
            fresh image ([SpecPiperead], mirroring [SpecPipewrite]). *)
-        iIntros (CIDpr Hspr) "_". iIntros (mf P' dpr bspr kpr)
+        iIntros (CIDpr Hspr) "_"; iIntros (mf P' dpr bspr kpr)
           "%Hcspr %Hupt %Hdpr %Hretpr %Htiepr %Hkpr Hcg Hcnt Hpc Hpref Hrpost Hpriv".
         (* THE ARM'S WINDOW IS THE DISPATCHER'S: piperead copies to its own
            a1, which is fileread's [addr] carried in s2.  Bringing the two
@@ -1358,7 +1358,7 @@ Section ProofFileread.
                   with "Hcg Hpc [] [] Hb3 Hb5").
         { iApply (fri_72 with "Htext"). }
         { iApply (fri_74 with "Htext"). }
-        iIntros (CID19 Hs19) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+        iIntros (CID19 Hs19) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
         destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
         (* ---- +0x70 c.j -> +0x58 ---- *)
         assert (Htgt58p : add_vec (mword_of_int (FR + 0x76) : mword 64)
@@ -1389,7 +1389,7 @@ Section ProofFileread.
                   (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                   (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                   with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-        iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+        iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
         destruct Hcsr as [Hcsf Hrv].
         iDestruct (cpu_own_transport CIDpr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
@@ -1794,7 +1794,7 @@ Section ProofFileread.
                 { iApply (fri_c8 with "Htext"). }
                 { iApply (fri_ca with "Htext"). }
                 { iApply (fri_cc with "Htext"). }
-                iIntros (CID57 Hs57) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+                iIntros (CID57 Hs57) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
                 destruct Hmr as (Hmrsp & Hmrs2 & Hmrs1 & Hmrs3 & Hmrthr).
                 assert (HMrthr : forall c : mword 5, is_cs_idx c = true -> c <> csp_rs1 ->
                           c <> Rs0 -> c <> Rs2 -> Mr !!! Regidx c = m !!! Regidx c).
@@ -1808,7 +1808,7 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
@@ -1935,7 +1935,7 @@ Section ProofFileread.
                           with "Hcg Hcnt Htext Hpc Hclk Hpay Hrin Huinv Hpriv
                                 Hkenv Hprocs").
                 all: try lkbelow.
-                iIntros (CIDcr Hscr) "_". iIntros (mf r P' dcr dccr curcr bscr hscr slcr kcr)
+                iIntros (CIDcr Hscr) "_"; iIntros (mf r P' dcr dccr curcr bscr hscr slcr kcr)
                   "%Hcscr %Hupt %Hrr Hshotcr %Hdcr %Htiecr %Hb1cr %Hb4cr %Hra0
                    %Htagcr #Htagsc
                    #Hlbcr Hwin Hout %Hkcr Hcg Hcnt Hpc
@@ -2001,7 +2001,7 @@ Section ProofFileread.
                           with "Hcg Hpc [] [] Hb3 Hb5").
                 { iApply (fri_9e with "Htext"). }
                 { iApply (fri_a0 with "Htext"). }
-                iIntros (CID60 Hs60) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+                iIntros (CID60 Hs60) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
                 destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
                 assert (Htgt58d : add_vec (mword_of_int (FR + 0xa2) : mword 64)
                           (sign_extend' 64 (sign_extend' 21
@@ -2031,7 +2031,7 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDcr CIDe 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
@@ -2159,7 +2159,7 @@ Section ProofFileread.
              { iApply (fri_be with "Htext"). }
              { iApply (fri_c0 with "Htext"). }
              { iApply (fri_c2 with "Htext"). }
-             iIntros (CID51 Hs51) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+             iIntros (CID51 Hs51) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
              destruct Hmr as (Hmrsp & Hmrs2 & Hmrs1 & Hmrs3 & Hmrthr).
              assert (HMrthr : forall c : mword 5, is_cs_idx c = true -> c <> csp_rs1 ->
                        c <> Rs0 -> c <> Rs2 -> Mr !!! Regidx c = m !!! Regidx c).
@@ -2172,7 +2172,7 @@ Section ProofFileread.
                        (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                        (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrs2 HMrthr
                        with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-             iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+             iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
              destruct Hcsr as [Hcsf Hrv].
              iDestruct (cpu_own_transport CID CIDe 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
@@ -2461,7 +2461,7 @@ Section ProofFileread.
              (* v3: ilock also hands back the checkout descriptor's other
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
-             iIntros (CIDil Hsil) "_". iIntros (mil dnl bml fl_)
+             iIntros (CIDil Hsil) "_"; iIntros (mil dnl bml fl_)
                "%Hcsil Hflk Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep Hoffr
                 Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
              iDestruct "Hflk" as (Kt) "[%HKt #Hflt]".
@@ -2769,7 +2769,7 @@ Section ProofFileread.
              all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
-             iIntros (CIDrd Hsrd) "_". iIntros (mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
+             iIntros (CIDrd Hsrd) "_"; iIntros (mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
                                               Hpriv Hbslot".
              (* the user arm's block, at the count readi returned it at
                 (permit sweep L1b) *)
@@ -3015,7 +3015,7 @@ Section ProofFileread.
                                 Hheld Hppid Hprocs
                                 [//] Hflsh Hclaimsfr Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
-                iIntros (CIDiu Hsiu) "_". iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
+                iIntros (CIDiu Hsiu) "_"; iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER (A6.145): the kept half PINS the returned
                    half's (g, lo) by agreement; the genlo halves rejoin. *)
@@ -3052,7 +3052,7 @@ Section ProofFileread.
                           with "Hcg Hpc [] [] Hb3 Hb5").
                 { iApply (fri_5a with "Htext"). }
                 { iApply (fri_5c with "Htext"). }
-                iIntros (CID83 Hs83) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+                iIntros (CID83 Hs83) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
                 destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
                 assert (HMrs2 : Mr !!! Regidx Rs2 = (mrd !!! Regidx Ra0)).
                 { rewrite (Hmrthr Rs2 ltac:(vm_compute; reflexivity)
@@ -3070,7 +3070,7 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3374,7 +3374,7 @@ Section ProofFileread.
                                 Hheld Hppid Hprocs
                                 [//] Hflsh Hclaimsfr Hdep Hoffd Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
-                iIntros (CIDiu Hsiu) "_". iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
+                iIntros (CIDiu Hsiu) "_"; iIntros (miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout _".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER (A6.145): the kept half PINS the returned
                    half's (g, lo) by agreement; the genlo halves rejoin. *)
@@ -3411,7 +3411,7 @@ Section ProofFileread.
                           with "Hcg Hpc [] [] Hb3 Hb5").
                 { iApply (fri_5a with "Htext"). }
                 { iApply (fri_5c with "Htext"). }
-                iIntros (CID93 Hs93) "_". iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
+                iIntros (CID93 Hs93) "_"; iIntros (Mr) "%Hmr Hcg Hpc Hb3 Hb5".
                 destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
                 assert (HMrs2 : Mr !!! Regidx Rs2 = (mword_of_int (Z.of_nat tot))).
                 { rewrite (Hmrthr Rs2 ltac:(vm_compute; reflexivity)
@@ -3429,7 +3429,7 @@ Section ProofFileread.
                           (m !!! Regidx Rs1) (m !!! Regidx Rs3) u6 pj b
                           (fr_K6 K HK) eq_refl eq_refl eq_refl eq_refl Hmrsp HMrs2 HMrthr
                           with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
-                iIntros (CIDe Hse) "Hlc". iIntros (mfin) "%Hcsr Hcg Hpc".
+                iIntros (CIDe Hse) "Hlc"; iIntros (mfin) "%Hcsr Hcg Hpc".
                 destruct Hcsr as [Hcsf Hrv].
                 iDestruct (cpu_own_transport CIDiu CIDe 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

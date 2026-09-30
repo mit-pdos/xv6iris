@@ -527,7 +527,7 @@ Section KexecBBody.
               with "Hcg Hcnt Htext Hpc [Htfc] Hkan Hlend").
     all: try lkbelow.
     { iEval (rewrite HG2a0). iExact "Htfc". }
-    iIntros (CID4 Hsq4) "_". iIntros (mr) "Hcg Hcnt (%kb & %Hkb & Hlend) Hpc Htfc Hppt %Hcspt".
+    iIntros (CID4 Hsq4) "_"; iIntros (mr) "Hcg Hcnt (%kb & %Hkb & Hlend) Hpc Htfc Hppt %Hcspt".
     (* the counter comes home at [kb]: the block closes at [Ub] below, and
        kexec's exit follows it there *)
     iDestruct (act_lend_back with "Hlend") as "Hev"; [exact (proc_addr_nonzero jp Hjp)|].

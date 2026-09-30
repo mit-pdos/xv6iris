@@ -690,7 +690,7 @@ Section ProofIget.
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hlock0"). }
-    iIntros (CIDacq Hsacq) "_". iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
+    iIntros (CIDacq Hsacq) "_"; iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
     { rewrite HmAra. pcw. }
     iEval (rewrite Hpc20) in "Hpc".
@@ -829,7 +829,7 @@ Section ProofIget.
         mWP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
-    { rewrite /TAILC. iIntros (CIDt Hst) "_".
+    { rewrite /TAILC. iIntros (CIDt Hst) "_";
       iIntros (mt kk q) "%Hmt Hcg Hcnt Hpc Href Hru Hlic".
       destruct Hmt as (Hkk & Hmts3 & Hmtsp & Hmtcs).
       (* +0x8c c.mv a0,s3 *)
@@ -1761,7 +1761,7 @@ Section ProofIget.
             { (* A6.144: the hook re-floors every live row at the lock's
                  stamped context ([itable_ctx_hook]) *)
               iApply itable_ctx_hook. }
-            iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+            iIntros (CIDr Hsr) "Hlc"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
             iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
@@ -1786,7 +1786,7 @@ Section ProofIget.
               rewrite (callee_saved_lookup Hrelpins_cs c Hcs) (HV4thr c Hcs)
                       (HV1cs c Hcs N9 N19). by apply Hmcs. }
             iEval (rewrite /TAILC) in "Hcont2".
-            iSpecialize ("Hcont2" $! CIDr with "[]"); [ iPureIntro; wp_next_chain | ].
+            iSpecialize ("Hcont2" $! CIDr with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
             iApply ("Hcont2" $! mr e (1/2/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2 Hstnew] Hru Hlic").
             * split; [exact He|]. split; [exact Hmrs3|].
               split; [exact Hmrsp | exact Hmrcs].
@@ -2402,7 +2402,7 @@ Section ProofIget.
                   with "Hcg Htext Hpc [Hlock] Htok HRres [] Hcnt Hpay").
         { iExact "Hlock". }
         { iApply itable_ctx_hook. }
-        iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
+        iIntros (CIDr Hsr) "_"; iIntros (mr) "Hcg Hpc %Hrelpins Hcnt".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
         iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);

@@ -1128,7 +1128,7 @@ Section ProofUvmdealloc.
               Hrange Hlvrun
               with "Hcg Hcpu Htext Hpc Hpt Henv Hlend").
     all: try lkbelow.
-    iIntros (CID24 Hs24) "_". iIntros (mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
+    iIntros (CID24 Hs24) "_"; iIntros (mr) "Hcg Hcpu Hlend Hpc %Hcs Hpt".
     iDestruct "Hlend" as (k1 Hk1) "Hlend".
     iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
     { iExists k1. iFrame "Hlend". iPureIntro. lia. }
