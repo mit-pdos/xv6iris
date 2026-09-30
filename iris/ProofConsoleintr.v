@@ -2038,9 +2038,9 @@ Section ProofConsoleintr.
     iEval (rewrite Hq2) in "Hpc".
     iApply (wp_cj_s_sconf pc3 (sign_extend' 21 (concat_vec jimm ('b"0")))
               R2 (trap_res b + (K - 6))%nat false Hal with "Hcg Hpc Hi3").
-    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
     iEval (rewrite Hjt) in "Hpc".
-    iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+    iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
     iApply ("EXIT" $! R2 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres
               [H4 H5 H6] Hhiout Howed Hwin").
     - rewrite /R2 upd_ne; [| reg_neq]. exact HR1sp.
@@ -2150,7 +2150,7 @@ Section ProofConsoleintr.
     iDestruct "Hpy" as "(_ & _ & #Hwlb & #Hp)".
     rewrite /ct_kill_prop.
     iLöb as "IH".
-    iIntros (CIDk Hsk) "_"; iIntros (M rr ww ee bs ts)
+    iIntros (CIDk Hsk) "Hlc"; iIntros (M rr ww ee bs ts)
       "%Hsp %Hs1 %Hs2 %Hs3 %Ha5 %Hthr %Hlenb %Hlent %Hok %Hrow %Hne
        EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hhiout Hrun
        H4 H5 H6".
@@ -2495,7 +2495,7 @@ Section ProofConsoleintr.
                       (sign_extend' 64 (mword_of_int 8158 : mword 13))
                     = mword_of_int (CT + 0xb8)) by pcw.
       iEval (rewrite Hbk) in "Hpc".
-      iSpecialize ("IH" $! CIDk with "[%]"); [wp_next_chain|].
+      iSpecialize ("IH" $! CIDk with "[%] Hlc"); [wp_next_chain|].
       iApply ("IH" $! L8 rr ww ee' bs ts with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                 EXIT Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts [Hgh]
                 Hhiout Hrun H4 H5 H6").
@@ -2829,7 +2829,7 @@ Section ProofConsoleintr.
               D10 (trap_res b + (K - 6))%nat db false with "Hcg Hpc [] [Hbyte]").
     { iApply (cnti_152 with "Ht"). }
     { rgall. iEval (rewrite Hbaddr). iExact "Hbyte". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall.
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc Hbyte". rgall.
     iEval (rewrite Hbaddr HD10a4) in "Hbyte".
     iDestruct ("Hdback" with "Hbyte") as "Hdat".
     assert (Hp156 : add_vec_int (mword_of_int (CT + 0x152) : mword 64) 4
@@ -2868,7 +2868,7 @@ Section ProofConsoleintr.
             ltac:(intros _; reflexivity) Hk1
             with "Huinv Hhi Hlgh Hap Hgh") as "(Hhi & Hlgh & Hwin & _ & Hgh)".
     iModIntro.
-    iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+    iSpecialize ("WAKE" $! CIDq with "[%] Hlc"); [exact Hchain|].
     iApply ("WAKE" $! D10 rr ww ee1
               (<[idx := trunc8 (mword_of_int 10 : mword 64)]> bs)
               (<[idx := Some h]> ts)
@@ -3012,11 +3012,11 @@ Section ProofConsoleintr.
                 Ra5 Ra4 B4 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HB4a4 HB4a5; exact Hne) with "Hcg Hpc []").
       { iApply (cnti_100 with "Ht"). }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hp104 : add_vec_int (mword_of_int (CT + 0x100) : mword 64) 4
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hp104) in "Hpc".
-      iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
       iAssert (ct_hi_out γu hb cb) with "[Hhi]" as "Hhiout".
       { iApply (ct_hi_kill_out γu hb cb). iExists hk. iFrame "Hhi".
         iPureIntro; exact Hxk. }
@@ -3462,11 +3462,11 @@ Section ProofConsoleintr.
               Ra5 Ra4 E8 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HE8a4 HE8a5; exact Hemp) with "Hcg Hpc []").
     { iApply (cnti_0b4 with "Ht"). }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
     assert (Hp0b8 : add_vec_int (mword_of_int (CT + 0xb4) : mword 64) 4
                     = mword_of_int (CT + 0xb8)) by pcw.
     iEval (rewrite Hp0b8) in "Hpc".
-    iSpecialize ("KILL" $! CIDq with "[%]"); [exact Hchain|].
+    iSpecialize ("KILL" $! CIDq with "[%] Hlc"); [exact Hchain|].
     (* the [beq] the loop is entered THROUGH is what supplies its invariant's
        [cons.e != cons.w] clause -- the body decrements before the back edge
        re-tests. *)
@@ -3850,13 +3850,13 @@ Section ProofConsoleintr.
                 ltac:(rgall; rewrite HF10a4; exact Hnl)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnti_078 with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj156 : add_vec (mword_of_int (CT + 0x78) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
                            (concat_vec (mword_of_int 111 : mword 8) ('b"0"))))
                       = mword_of_int (CT + 0x156)) by pcw.
       iEval (rewrite Hj156) in "Hpc".
-      iSpecialize ("WAKE" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("WAKE" $! CIDq with "[%] Hlc"); [exact Hchain|].
       iApply ("WAKE" $! F10 rr ww ee1 (<[idx := cons_xlate c]> bs)
                 (<[idx := Some h]> ts) with "[%] [%] [%] [%] [%] [%] [%]
                 Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hts Hgh Hrest
@@ -4135,13 +4135,13 @@ Section ProofConsoleintr.
                 ltac:(rgall; rewrite Hs1; exact Hnul)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_02c with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj104 : add_vec (mword_of_int (CT + 0x2c) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
                            (concat_vec (mword_of_int 108 : mword 8) ('b"0"))))
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hj104) in "Hpc".
-      iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
       (* A NUL BYTE IS AN ACCEPTED BYTE, AND IT IS LOGGED (lane CONS-IO,
          milestone B): [cs = []], the ring does not move, and the arm files
          the entry itself -- EXIT no longer fires anything. *)

@@ -878,7 +878,7 @@ Section ItruncDLoop.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (iti_1c with "Htext"). }
-        iApply bi.later_intro. iIntros (CID4 Hq4) "_ Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID4 Hq4) "Hlc Hcg Hpc".
         assert (Htgt32 : add_vec (mword_of_int (IT + 0x1c) : mword 64)
                            (sign_extend' 64 (mword_of_int 22 : mword 13))
                          = mword_of_int (IT + 0x32)) by pcw.
@@ -890,7 +890,7 @@ Section ItruncDLoop.
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr jx)
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-        iSpecialize ("Hexit" $! CID4 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CID4 with "[%] Hlc"); [wp_next_chain|].
         rewrite Hlast.
         iApply ("Hexit" $! L1 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
@@ -1446,7 +1446,7 @@ Section ItruncELoop.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
       { iApply (iti_68 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDb Hqb) "_ Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDb Hqb) "Hlc Hcg Hpc".
         assert (Htgt7a : add_vec (mword_of_int (IT + 0x68) : mword 64)
                            (sign_extend' 64 (mword_of_int 18 : mword 13))
                          = mword_of_int (IT + 0x7a)) by pcw.
@@ -1460,7 +1460,7 @@ Section ItruncELoop.
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
-        iSpecialize ("Hexit" $! CIDb with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CIDb with "[%] Hlc"); [wp_next_chain|].
         rewrite Hlast.
         iApply ("Hexit" $! E1 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");
@@ -2452,7 +2452,7 @@ Section ItruncIArm.
               D0 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (iti_92 with "Htext"). }
-    iApply bi.later_intro. iIntros (CID19 Hq19) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID19 Hq19) "Hlc". iIntros "Hcg Hpc".
     assert (Htgt38 : add_vec (mword_of_int (IT + 0x92) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
@@ -2468,7 +2468,7 @@ Section ItruncIArm.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID19)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
-    iSpecialize ("Hexit" $! CID19 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hexit" $! CID19 with "[%] Hlc"); [wp_next_chain|].
     iAssert (bslots 3) with "[Hsl Hsl1]" as "Hsl3".
     { assert (H3 : (3 = 2 + 1)%nat) by lia.
       rewrite H3 bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hsl1"]. }

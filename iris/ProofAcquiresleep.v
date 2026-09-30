@@ -884,13 +884,13 @@ Section AslBodies.
                 ltac:(rgne; rewrite HLa5_15 Hvp0; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (asl_34 with "Htext"). }
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
+      iApply wp_next_off_intro_lc.
+      iIntros "Hlc Hcg Hpc".
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x34) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
       iEval (rewrite Hvp0) in "Hwp".
       rewrite /asl_exit.
-      iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hexit" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRu Hwp Hpid Hown Htc Hclm Hcg Hpc").
       exact HaslLa5.
     - (* HELD: vp <> 0 -> bnez TAKEN, back edge to +0x1c (the Löb IH).  Hand the
@@ -1374,7 +1374,7 @@ Section ProofAcquiresleep.
               with "Hcg Hown Htext Hpc [] Hllb").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_genl_lock with "Hslk"). }
-    iIntros (CID11 Hs11) "_"; iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR #Hpaira _ Hown Hpay".
+    iIntros (CID11 Hs11) "Hlc"; iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR #Hpaira _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.
@@ -1465,7 +1465,7 @@ Section ProofAcquiresleep.
       iEval (rewrite Htgt36) in "Hpc".
       iEval (rewrite Hv00) in "Hw0".
       rewrite /asl_exit.
-      iSpecialize ("Hexit" $! CID11 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CID11 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hexit" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRu Hw0 Hpid Hown Htc Hclm Hcg Hpc").
       exact HaslMe.
     - (* HELD at entry: v0 <> 0 -> c.beqz falls through -> +0x1c (the loop) *)

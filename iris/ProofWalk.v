@@ -865,7 +865,7 @@ Section ProofWalk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (wi_7c with "Htext"). }
-      iNext. iIntros (CIDa5 Hsa5) "_". iIntros "Hcg Hpc".
+      iNext. iIntros (CIDa5 Hsa5) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt52 : add_vec (mword_of_int (KernelSyms.walk + 0x7c) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 235 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.walk + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
@@ -878,7 +878,7 @@ Section ProofWalk.
       iDestruct (wp_next_shift HcntCA1 with "Hfail") as "Hfail".
       assert (HcntCA1' : b = false \/ p = zero_reg -> (CIDa5 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CIDa3 CIDa5 lvl eb p b HcntCA1' with "Hcnt") as "Hcnt".
-      iSpecialize ("Hfail" $! CIDa5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hfail" $! CIDa5 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hfail" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc
                 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree Henv HF").
       { intros c Hcs Hc9.

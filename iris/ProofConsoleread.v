@@ -2965,13 +2965,13 @@ Section ProofConsoleread.
                 G10 (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnri_0be with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj38 : add_vec (mword_of_int (CR + 0xbe) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1981 : mword 11) ('b"0"))))
                      = mword_of_int (CR + 0x38)) by pcw.
       iEval (rewrite Hj38) in "Hpc".
-      iSpecialize ("HEAD" $! CIDv with "[%]"); [wp_next_chain|].
+      iSpecialize ("HEAD" $! CIDv with "[%] Hlc"); [wp_next_chain|].
       iPoseProof (cr_runR_intro Rin cn Wd ord (us_M U) M'' (m0 !!! Regidx Ra1)
                     (add_vec cur (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
                     n (nc - 1) bs'' hs''
@@ -4324,7 +4324,7 @@ Section ProofConsoleread.
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP8a0). iApply (is_conslock_lock with "Hlk"). }
-    iIntros (CIDaq Hsaq) "_"; iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq) "Hlc"; iIntros (ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP8ra) in "Hpc".
     assert (Hpc28 : ret_pc (add_vec_int (mword_of_int (CR + 0x24) : mword 64) 4)
                     = (mword_of_int (CR + 0x28) : mword 64)) by pcw.
@@ -4421,7 +4421,7 @@ Section ProofConsoleread.
                   (S (Z.to_nat n)) lks
                   Hj Hjl Hn31 Hav Hbelow
                   with "Ht Hlk Huinv Hprice Henv Hpinv") as "HEAD".
-    iSpecialize ("HEAD" $! CIDaq with "[%]"); [wp_next_chain|].
+    iSpecialize ("HEAD" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
     (* THE RUN, AT ITS FIRST LOOK AT THE RING.  Nothing has been copied yet,
        the cursor IS the entry address, the ledger is empty -- and what the
        run will earn about the ring starts either at the caller's own

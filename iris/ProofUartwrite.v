@@ -1487,10 +1487,10 @@ Section UwBodies.
                 with "Ht Huinv Hbw Htxl Hpinv Hcg Hcnt Hpc Hpid Hch Hfull Hbuf [Hexit]").
       iSplit.
       + rewrite /uw_next_cont.
-        iIntros (CIDx Hsx) "_"; iIntros (M') "%Hlt %Hregs' Hcg Hcnt Hpc Hpid Hch Hfull Hbuf".
+        iIntros (CIDx Hsx) "Hlc"; iIntros (M') "%Hlt %Hregs' Hcg Hcnt Hpc Hpid Hch Hfull Hbuf".
         iPoseProof (IH (S i) ltac:(lia) with "Ht Huinv Hbw Htxl Hpinv") as "Next".
         rewrite /uw_head.
-        iSpecialize ("Next" $! CIDx with "[%]"); [wp_next_chain|].
+        iSpecialize ("Next" $! CIDx with "[%] Hlc"); [wp_next_chain|].
         iApply ("Next" $! M' with "[%] Hcg Hcnt Hpc Hpid Hch Hfull Hbuf Hexit").
         exact Hregs'.
       + iExact "Hexit".
@@ -1918,7 +1918,7 @@ Section ProofUartwrite.
                 A13 (av - 8)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uwi_38 with "Ht"). }
-      iApply bi.later_intro. iIntros (CID25 Hs25) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID25 Hs25) "Hlc". iIntros "Hcg Hpc".
       assert (Jhead : add_vec (mword_of_int (KernelSyms.uartwrite + 0x38) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.uartwrite + 0x48)) by pcw.
@@ -1930,7 +1930,7 @@ Section ProofUartwrite.
                     pidv dqp Φ (n - 1)%nat lks ltac:(lia) Hj Hjlp Hav Heb Hfresh 0%nat ltac:(lia)
                     with "Ht Huinv Hbw Htxl Hpinv") as "Iter".
       rewrite /uw_head.
-      iSpecialize ("Iter" $! CID25 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Iter" $! CID25 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Iter" $! A13 with "[%] Hcg Hcnt Hpc Hpid Hch Hfull Hbuf [Hcont]").
       { exact HA13regs. }
       (* ============ the loop's exit: +0x78 -> the epilogue ============ *)

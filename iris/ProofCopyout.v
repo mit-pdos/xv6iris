@@ -1207,7 +1207,7 @@ Section ProofCopyout.
                     X1 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (coi_98 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDc12 Hsc12) "_". iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDc12 Hsc12) "Hlc". iIntros "Hcg Hpc".
           assert (Hjt98 : add_vec (mword_of_int (KernelSyms.copyout + 0x98) : mword 64)
                     (sign_extend' 64 (sign_extend' 21
                        (concat_vec (mword_of_int 4 : mword 11) ('b"0"))))
@@ -1216,7 +1216,7 @@ Section ProofCopyout.
           iEval (rewrite Hjt98) in "Hpc".
           iDestruct (cpu_own_transport CIDc CIDc12 lvl eb p b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          iSpecialize ("Hexit" $! CIDc12 with "[%]"); [wp_next_chain|].
+          iSpecialize ("Hexit" $! CIDc12 with "[%] Hlc"); [wp_next_chain|].
           iApply ("Hexit" $! X1 (mword_of_int 0) Pd
                     (umem_wr Mu dstva0 (done + nn)%nat src_bytes)
                     with "[%] Hcg Hcnt Hlend Hpc Hpt Hsrc").

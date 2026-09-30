@@ -1117,14 +1117,14 @@ Section ProofCopyin.
                     ltac:(apply bv_eq; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cii_7a with "Htext"). }
-          iIntros (CIDg5 Hsg5) "_ Hcg Hpc".
+          iIntros (CIDg5 Hsg5) "Hlc Hcg Hpc".
           set (G4 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> G3).
           assert (Hp7c : add_vec_int (mword_of_int (KernelSyms.copyin + 0x7a) : mword 64) 2
                          = mword_of_int (KernelSyms.copyin + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp7c) in "Hpc".
           iDestruct (cpu_own_transport CIDb CIDg5 lvl eb p b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          iSpecialize ("HEXIT" $! CIDg5 with "[]"); [iPureIntro; wp_next_chain|].
+          iSpecialize ("HEXIT" $! CIDg5 with "[] Hlc"); [iPureIntro; wp_next_chain|].
           iApply ("HEXIT" $! G4 (mword_of_int 0) Pd fd'
                     with "[%] [%] [%] [%] [%] Hcg Hcnt Hlend Hpc Hpt Hdst").
           + lkp.

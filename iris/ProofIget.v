@@ -2450,12 +2450,12 @@ Section ProofIget.
                   Z1 (K - 6)%nat b ltac:(rewrite Htgt8c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (igi_68 with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDh2 Hsh2) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDh2 Hsh2) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htgt8c) in "Hpc".
         iDestruct (cpu_own_transport CIDr CIDh2 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iEval (rewrite /TAILC) in "Hcont2".
-        iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].
+        iSpecialize ("Hcont2" $! CIDh2 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
         iApply ("Hcont2" $! Z1 j (qj'/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2 Hstnew] Hru Hlic").
         + split; [exact Hk|]. split; [exact HZ1s3|]. split; [exact HZ1sp | exact HZ1cs].
         + rewrite /IcacheRef.inode_ref.

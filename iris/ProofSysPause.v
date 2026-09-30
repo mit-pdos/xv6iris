@@ -1024,13 +1024,13 @@ Section SpBodies.
       { iApply (spi_76 with "Htext"). }
       (* the back edge applies the Löb IH, which arrives under a [▷]: this is
          the one site that needs a real [iNext] (it strips exactly that). *)
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
       assert (Htg4a : add_vec (mword_of_int (KernelSyms.sys_pause + 0x76) : mword 64)
                         (sign_extend' 64 (mword_of_int 8148 : mword 13))
                       = mword_of_int (KernelSyms.sys_pause + 0x4a)) by pcstep.
       iEval (rewrite Htg4a) in "Hpc".
       rewrite /sp_loop.
-      iSpecialize ("IH" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("IH" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("IH" $! L7 with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc Hex0 Hexk Htl").
       split; [exact HbL7 | exact HlL7].
     - (* enough ticks: fall through, restore s1/s2/s3, take the 0 exit *)
@@ -1264,14 +1264,14 @@ Section SpBodies.
                 ltac:(rgne; exact Hkz)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (spi_52 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
       assert (Htg8c : add_vec (mword_of_int (KernelSyms.sys_pause + 0x52) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 37 : mword 8) ('b"0"))))
                       = mword_of_int (KernelSyms.sys_pause + 0x9c)) by pcstep.
       iEval (rewrite Htg8c) in "Hpc".
       iDestruct ("Hjoin7" with "Hnc") as "Hy7".
       rewrite /sp_exitk.
-      iSpecialize ("Hexk" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexk" $! CID with "[%] Hlc"); [wp_next_chain|].
       iApply ("Hexk" $! mfk with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htl").
       split; [exact HbKl | exact HlKl].
     - (* not killed: fall through to the sleep *)

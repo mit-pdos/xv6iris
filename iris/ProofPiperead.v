@@ -1721,8 +1721,8 @@ Section ProofPiperead.
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
-        iIntros (CIDx Hsx) "_"; iIntros (M P' dw bsw rv k') "%Hrg %Hext %Hret %Hdwle %Hrvtie %Hkev Hcg Hpc Hown Href HRP Hpriv Hz8 Hz9 Hz10 Hz11 Hz12".
-        iSpecialize ("EPI" $! CIDx with "[%]"); [wp_next_chain|].
+        iIntros (CIDx Hsx) "Hlc"; iIntros (M P' dw bsw rv k') "%Hrg %Hext %Hret %Hdwle %Hrvtie %Hkev Hcg Hpc Hown Href HRP Hpriv Hz8 Hz9 Hz10 Hz11 Hz12".
+        iSpecialize ("EPI" $! CIDx with "[%] Hlc"); [wp_next_chain|].
         iApply ("EPI" $! M P' dw bsw rv k' with "[%] [%] [%] [%] [%] [%] Hcg Hpc Hown Href HRP Hpriv
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hz8 Hz9 Hz10 Hz11 Hz12").
         { exact Hrg. }

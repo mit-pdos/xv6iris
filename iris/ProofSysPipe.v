@@ -1680,7 +1680,7 @@ Section ProofSysPipe.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_28 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID36 Hcr36) "_ Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID36 Hcr36) "Hlc Hcg Hpc".
       assert (Hbt : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x28) : mword 64)
                       (sign_extend' 64 (mword_of_int 178 : mword 13))
                     = mword_of_int (KernelSyms.sys_pipe + 0xda))
@@ -1692,7 +1692,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID36 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iSpecialize ("Hepi" $! CID36 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! CID36 with "[%] Hlc"); [wp_next_chain|].
       (* nothing ran, so the window is EMPTY -- [d := 0], any [bs] does *)
       iApply ("Hepi" $! W1 (pv_upt (us_V U1)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64) U1
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").

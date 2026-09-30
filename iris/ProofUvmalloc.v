@@ -892,7 +892,7 @@ Section ProofUvmalloc.
                 with "Hcg Hpc [] [Hk8]").
       { iApply (uai_76 with "Htext"). }
       { iEval (rewrite HN7sp Hb8). iExact "Hk8". }
-      iIntros (CIDu13 Hsu13) "_ Hcg Hpc Hk8". iEval (rewrite HN7sp Hb8) in "Hk8".
+      iIntros (CIDu13 Hsu13) "Hlc Hcg Hpc Hk8". iEval (rewrite HN7sp Hb8) in "Hk8".
       set (N8 := <[Regidx Rs6 := regval_into_reg (mm !!! Regidx Rs6)]> N7).
       assert (Hq78 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x76) : mword 64) 2
                      = mword_of_int (KernelSyms.uvmalloc + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
@@ -902,7 +902,7 @@ Section ProofUvmalloc.
                    Hext Hdom Hfreshi Hlvsame
                    with "Hpt") as "Hpt".
       iEval (rewrite /ua_exit) in "Hexit".
-      iSpecialize ("Hexit" $! CIDu13 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hexit" $! CIDu13 with "[%] Hlc"); [wp_next_chain|].
       iDestruct (cpu_own_transport CIDu9 CIDu13 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hexit" $! N8 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk5 Hk8] [Hpt]").

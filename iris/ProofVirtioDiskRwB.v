@@ -840,7 +840,7 @@ Section ProofVirtioDiskRwB.
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
-        iIntros (CIDaq Hsaq) "_"; iIntros (msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
+        iIntros (CIDaq Hsaq) "Hlc"; iIntros (msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc))
           by (rewrite HD3ra; apply bv_eq; vm_compute; reflexivity).
@@ -862,7 +862,7 @@ Section ProofVirtioDiskRwB.
           eapply callee_saved_trans; [exact Hscs|].
           eapply callee_saved_trans; [exact HcsD3|].
           exact Hacs. }
-        iSpecialize ("IH" $! CIDaq with "[%]"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
         iApply ("IH" $! mfa with "[%] Hcg Hown Htc Hclm Hpc Htok HR Hscr Hexit").
         unfold vdrw_regs. split_and!.
         - rewrite (proj1 Hcsf). exact Hspz.

@@ -679,13 +679,13 @@ Section ProofUvmcopy.
               N6 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uci_7c with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDe8 Hse8) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDe8 Hse8) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjt7c) in "Hpc".
     iDestruct (cpu_own_transport CIDe6 CIDe8 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     assert (Hshift : b = false \/ p = zero_reg -> (CIDe8 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift with "Hexit") as "Hexit".
-    iSpecialize ("Hexit" $! CIDe8 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hexit" $! CIDe8 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hexit" $! N6 (mword_of_int (-1)) with "[%] Hcg Hcnt Hlend Hpc Hpo [Hpt]").
     { split_and!.
       - rewrite /N6. rewrite upd_ne; [exact Husp | reg_neq].
@@ -942,7 +942,7 @@ Section ProofUvmcopy.
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (uci_7e with "Htext"). }
-        iIntros (CIDt3 Hst3) "_ Hcg Hpc".
+        iIntros (CIDt3 Hst3) "Hlc Hcg Hpc".
         set (T2 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> T1).
         assert (Hq80 : add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x7e) : mword 64) 2
                        = mword_of_int (KernelSyms.uvmcopy + 0x80)) by (apply bv_eq; vm_compute; reflexivity).
@@ -951,7 +951,7 @@ Section ProofUvmcopy.
                      with "Hcnt") as "Hcnt".
         assert (Hshiftexit : b = false \/ p = zero_reg -> (CIDt3 : CPU) = (CIDt : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftexit with "Hexit") as "Hexit".
-        iSpecialize ("Hexit" $! CIDt3 with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CIDt3 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hexit" $! T2 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc Hpo [Hpt]").
         { split_and!.
           - rewrite /T2. rewrite upd_ne; [exact HT1sp | reg_neq].

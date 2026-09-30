@@ -1409,8 +1409,8 @@ Section ProofPrintk.
                 HKE HAV Houtb Hh7 HQ4sp HQ4cs
                 with "Hcg Htext Hpc Hfr Hlk Hheld Hcnt [Hfmt HR]").
       { iFrame "Hfmt HR". }
-      iIntros (CIDe Hse) "_"; iIntros (mf) "Hcg Hpc %Hfin Hcnt [Hfmt HR]".
-      iSpecialize ("Kend" $! CIDe with "[%]"); [wp_next_chain|].
+      iIntros (CIDe Hse) "Hlc"; iIntros (mf) "Hcg Hpc %Hfin Hcnt [Hfmt HR]".
+      iSpecialize ("Kend" $! CIDe with "[%] Hlc"); [wp_next_chain|].
       iApply ("Kend" $! mf with "Hcg Hpc [%] [%] Hcnt Hfmt HR").
       { assert (HQ4a0 : Q4 !!! Regidx a0_idx = zero_extend' 64 (pk_fbyte f 0%nat))
           by (rewrite /Q4 upd_eq; reflexivity).
@@ -1797,10 +1797,10 @@ Section ProofPrintk.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
     { iApply (pki_76 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID5 Hst5) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hst5) "Hlc". iIntros "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.printk + 0x76) : mword 64) (sign_extend' 64 (mword_of_int 460 : mword 13)) = mword_of_int (KernelSyms.printk + 0x242)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
-      iSpecialize ("Kend" $! CID5 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Kend" $! CID5 with "[%] Hlc"); [wp_next_chain|].
       iApply ("Kend" $! A4 with "[%] Hcg Hpc Hfmt HR").
       split; [exact Hkept | ].
       (* the loaded byte is zero, so the string ended here *)
@@ -7807,9 +7807,9 @@ Section ProofPrintk.
                      ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d))%I bo pcur lks
                     HKE HAV Houtb Hhd Hfsp Hfs9
                     with "Hcg Htext Hpc H9 H10 H12 Hsv Hrest Hlk Hheld Hcnt [$Hfmt $Hdescs]").
-          iIntros (CIDexit Hstexit) "_"; iIntros (mz) "Hcg Hpc %Hfin2 Hcnt (Hfmt & Hdescs)".
+          iIntros (CIDexit Hstexit) "Hlc"; iIntros (mz) "Hcg Hpc %Hfin2 Hcnt (Hfmt & Hdescs)".
           iEval (rewrite /pk_loop_post) in "Hfin".
-          iSpecialize ("Hfin" $! CIDexit with "[%]");
+          iSpecialize ("Hfin" $! CIDexit with "[%] Hlc");
             [ intros Hdx; etransitivity; [ exact (Hstexit Hdx) | exact (Hccd (or_introl eq_refl)) ] | ].
           iSpecialize ("Hfin" $! mz).
           iApply ("Hfin" with "Hcg Hpc [%] Hfmt Hdescs Hcnt").
@@ -8093,9 +8093,9 @@ Section ProofPrintk.
                   HKE HAV Houtb Hhe Hesp Hes9 Hnext
                   with "Hcg Htext [] Hpc H9 H10 H12 Hsv Hrest Hlk Hheld Hcnt [$Hfmt $Hdescs]").
         { iApply (pk_restore_at_242 with "Htext"). }
-        iIntros (CIDex Hstex) "_"; iIntros (mz) "Hcg Hpc %Hfin2 Hcnt (Hfmt & Hdescs)".
+        iIntros (CIDex Hstex) "Hlc"; iIntros (mz) "Hcg Hpc %Hfin2 Hcnt (Hfmt & Hdescs)".
         iEval (rewrite /pk_loop_post) in "Hfin".
-        iSpecialize ("Hfin" $! CIDex with "[%]");
+        iSpecialize ("Hfin" $! CIDex with "[%] Hlc");
           [ intros Hdx; etransitivity; [ exact (Hstex Hdx) | exact (Hcce (or_introl eq_refl)) ] | ].
         iSpecialize ("Hfin" $! mz).
         iApply ("Hfin" with "Hcg Hpc [%] Hfmt Hdescs Hcnt").

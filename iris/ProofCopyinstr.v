@@ -1407,7 +1407,7 @@ Section ProofCopyinstr.
                     ltac:(rewrite /G1 upd_eq; reflexivity)
                     ltac:(left; split; [exact cs_xor_1 | reflexivity])
                     with "Hcg Htext Hpc").
-          iIntros (CIDn3 Hsn3) "_"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
+          iIntros (CIDn3 Hsn3) "Hlc"; iIntros (Mo) "%Hoa0 %Hothr Hcg Hpc".
           (* the answer: the buffer now holds a NUL-terminated string *)
           assert (Hcstr : bb_cstr (bb_upd g (done + i')%nat (mword_of_int 0 : mword 8))
                             (done + i')%nat) by (apply bb_cstr_upd; exact Hnulg).
@@ -1431,7 +1431,7 @@ Section ProofCopyinstr.
                 exact (Hcpg (j - done)%nat ltac:(lia)). }
           iDestruct (cpu_own_transport CIDc CIDn3 lvl eb pcur b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          iSpecialize ("HEXIT" $! CIDn3 with "[]"); [ iPureIntro; wp_next_chain | ].
+          iSpecialize ("HEXIT" $! CIDn3 with "[] Hlc"); [ iPureIntro; wp_next_chain | ].
           iApply ("HEXIT" $! Mo (mword_of_int 0 : mword 64) Pd
                     (bb_upd g (done + i')%nat (mword_of_int 0 : mword 8))
                     with "[%] [%] [%] [%] [%] [%] Hcg Hcnt Hlend Hpc Hpt Hdst").

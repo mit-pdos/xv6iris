@@ -255,7 +255,7 @@ Section KforkB7.
               ltac:(rewrite Htgt7a; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_07a with "Htext"). }
-    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
     iEval (rewrite Htgt7a) in "Hpc".
     (* ---- assemble the exit and hand off to Hcont ---- *)
     assert (HT4thr : forall r : mword 5, is_cs_idx r = true ->
@@ -266,7 +266,7 @@ Section KforkB7.
       rewrite /T2 upd_ne; [| congruence].
       rewrite /T1 upd_ne; [| regne].
       reflexivity. }
-    iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
+    iSpecialize ("Hcont" $! CID0 with "[%] Hlc"); [intros _; reflexivity |].
     iApply ("Hcont" $! T4 with "[%] Hcg Hpc Hpv").
     split_and!; [exact HT4s1 | exact HT4s2 | exact HT4s3 | exact HT4s4 | exact HT4s5 | exact HT4thr].
   Qed.
