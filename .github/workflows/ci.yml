@@ -20,7 +20,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [rocq]
   pull_request:
 
 # A new push does NOT cancel the in-flight run: it finishes, and the new push
