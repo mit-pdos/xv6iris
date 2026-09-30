@@ -1,6 +1,6 @@
 DRIFT WAVE — common brief (every drift lane reads this first). Sept 29 2026.
 
-The Lean xv6 port (/shared/lean-xv6, branch lean-v2) is complete against Rocq 1900b8a43: system theorem
+The Lean xv6 port (/shared/lean-xv6, branch lean) is complete against Rocq 1900b8a43: system theorem
 xv6FsAdequacy_closed, userProof : USER, unionAdequacyClosed, all closed at the axiom baseline. The user
 wants it updated to the LATEST Rocq (/shared/xv6rocq origin/main; was 456141b5b on Sept 29 — `git -C
 /shared/xv6rocq fetch` and re-check: Rocq is actively developed). The plan is notes/rocq_drift.md (themes
@@ -16,7 +16,7 @@ Rules:
   origin/main -- <files>` for your theme and the current files.
 - Perf: stage lemmas ≤ ~5 s; never kernel-evaluate literal ELFs/images (state lemmas over an arbitrary
   file); don't intro the xv6 instance's unreduced post as a proof-mode hypothesis (union_residuals.md).
-- Worktree lanes: commit on your branch (don't push); rebase onto origin/lean-v2 before the final full
+- Worktree lanes: commit on your branch (don't push); rebase onto origin/lean before the final full
   `lake build Xv6 MachCSL` on the VM; tools/check_layering.sh; no sorry; `#print axioms` of
   Xv6.unionAdequacyClosed, Xv6.xv6FsAdequacy_closed, Xv6.userProof unchanged in kind (propext,
   Classical.choice, Quot.sound, bv_decide certs). Report: branch/commits, Rocq commits covered, files,

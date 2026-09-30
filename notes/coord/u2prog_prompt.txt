@@ -1,10 +1,10 @@
 Union wave U2 — program walks: common brief (every program lane reads this first)
 
 You are one lane of the union-adequacy port for the Lean xv6 verification (/shared/lean-xv6, branch
-lean-v2; Rocq authority /shared/xv6rocq main 1900b8a43, union cone pinned there). Read:
+lean; Rocq authority /shared/xv6rocq main 1900b8a43, union cone pinned there). Read:
  - notes/coord/gcp_rule.txt — HARD RULE: NO lake/lean on the local machine, ever. All elaboration on
    the GCP VM from your own worktree /shared/lean-xv6/.claude/worktrees/lane-<L> (created off
-   origin/lean-v2 per the rule, seeded from /mnt/rocq/lean-seed). Copy not-yet-landed files you need
+   origin/lean per the rule, seeded from /mnt/rocq/lean-seed). Copy not-yet-landed files you need
    from /shared/lean-xv6; copy your final files back into /shared/lean-xv6.
  - notes/coord/wave7b_prompt.txt (conventions), notes/briefs/union.md (§5 wave U2, rulings DU2 engine
    is a parameter `UL : UK_LEAVES`, DU3 text tables instead of catalogs, DU4 printf once, DU8 general

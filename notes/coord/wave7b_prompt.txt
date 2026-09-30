@@ -1,4 +1,4 @@
-You are one agent of WAVE 7b (era walk layer, create, the sys_open family, kexec) of the xv6 port from Rocq (/shared/xv6rocq/iris/*.v) to Lean 4 (/shared/lean-xv6, branch lean-v2).
+You are one agent of WAVE 7b (era walk layer, create, the sys_open family, kexec) of the xv6 port from Rocq (/shared/xv6rocq/iris/*.v) to Lean 4 (/shared/lean-xv6, branch lean).
 
 Read IN FULL before starting: /shared/lean-xv6/notes/briefs/fs7b_era_create_open_exec.md (THE brief — the DECISIONS block at its top, your item in §8, the inventory section for your family, §10 risks); skim notes/briefs/fs7_file_layer.md for the wave-7 context, notes/briefs/fs0_common.md (porting rules). Skim notes/briefs/fs1_leaves.md §1 for the Lean proof idioms and the layering rule.
 
@@ -6,11 +6,11 @@ User rules (verbatim, binding): "for process abstractions in particular, look at
 
 Session design rules (binding): ONE capacity instance per camera type (never add a per-class ghost field; shared ones live in Xv6G / MachGS); every NEW contract is interrupt-generic ("eb-generic": field `wp_X_eb` over `wp_X_eb_body`, `trapCsrsExt`/`cpuClaimExt` from MachCSL/WpSmodeIntr.lean, `hnoff : k.noff = 0`, no hsie/hlocks; tactics `k_step_e`/`k_next_e`/`k_ext_move`), as the landed fs cone is; REPORT (don't silently accept) every process-layer deviation from Rocq; the sanctioned `procPrivExt` descriptor form; stage files WITHOUT the Proof prefix, one Proof<Fn>.lean imports them (tools/check_layering.sh); prefix helpers with the function/area name and check new top-level names don't clash in Xv6/ or MachCSL/; reuse the shared call-site files (FsCallSites, FsCallSitesF, FsCallSitesI, FsWords, BlkmapBuf, DinodeSlot) instead of copying; proofs FAST (no theorem over a few seconds); no `sorry`; live panics stay live.
 
-Main-tree agents: build only your modules (`timeout 1800 lake build Xv6.<M>`), never a bare `lake build`; no edits to existing files (report exact old→new); no Xv6.lean edits (report imports); no git. Worktree agents: `git fetch origin && git reset --hard origin/lean-v2` first, seed .lake from /shared/lean-xv6/.lake if cold, full build `timeout 3500 lake build Xv6 MachCSL` + tools/check_layering.sh + sorry grep after each logical commit, commit on your branch (do NOT push), messages ending with:
+Main-tree agents: build only your modules (`timeout 1800 lake build Xv6.<M>`), never a bare `lake build`; no edits to existing files (report exact old→new); no Xv6.lean edits (report imports); no git. Worktree agents: `git fetch origin && git reset --hard origin/lean` first, seed .lake from /shared/lean-xv6/.lake if cold, full build `timeout 3500 lake build Xv6 MachCSL` + tools/check_layering.sh + sorry grep after each logical commit, commit on your branch (do NOT push), messages ending with:
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
 
 Report: files/commits, contract shapes (old → new for edits), the Rocq lemmas mirrored, deviations (process-layer ones flagged), cleanups with checked uses, reused names, what's left.
-LANDED SINCE (lean-v2 08fb8e122): C0 — Xv6/SlotSupply.lean (fixed-name `FdslotG`/`BioslotG`; `fdSlots n`/`fdSlot`/`bslots n`/`bslot`, no gname argument; NPROC/NOFILE/NFILE/FDSPARE/FDSLOTS/BSLOTS live there), `ProcDefs.dormantAllow` (Rocq proc_dormant allowances), `procPrivBareAt` (Rocq proc_priv_bare + lazy claim), `procPrivCoreNoctxAt = procPrivBareAt ∗ cwdRefAt V.cwd V.cwi` (Rocq proc_priv_core), `procPrivFd γ pa pid V M = core ∗ procOfiles γ V.fdg pa V.ofile` (Rocq's one block proc_priv, named by pv_fdg), `FdstUR` descriptor-state camera, `fdFrags V.fdg sts`. The file payload (FileDefs/FilePay), fileclose re-spec (eb-generic, env keyed on state, over fsReady), filestat, FsReady, the D8 definitional files (ChildTok, SlotGen, UserChildren, WaitInv(+Ties), KillRow, FirstTok), the era base (FsAbsWalk/FsAbsEra), FsAbs*Fire files, the create/open/unlink/link defs, ELF + Kexec* defs/image. USER D16: state Rocq's WHOLE block (procPrivFd) wherever Rocq states proc_priv.
+LANDED SINCE (lean 08fb8e122): C0 — Xv6/SlotSupply.lean (fixed-name `FdslotG`/`BioslotG`; `fdSlots n`/`fdSlot`/`bslots n`/`bslot`, no gname argument; NPROC/NOFILE/NFILE/FDSPARE/FDSLOTS/BSLOTS live there), `ProcDefs.dormantAllow` (Rocq proc_dormant allowances), `procPrivBareAt` (Rocq proc_priv_bare + lazy claim), `procPrivCoreNoctxAt = procPrivBareAt ∗ cwdRefAt V.cwd V.cwi` (Rocq proc_priv_core), `procPrivFd γ pa pid V M = core ∗ procOfiles γ V.fdg pa V.ofile` (Rocq's one block proc_priv, named by pv_fdg), `FdstUR` descriptor-state camera, `fdFrags V.fdg sts`. The file payload (FileDefs/FilePay), fileclose re-spec (eb-generic, env keyed on state, over fsReady), filestat, FsReady, the D8 definitional files (ChildTok, SlotGen, UserChildren, WaitInv(+Ties), KillRow, FirstTok), the era base (FsAbsWalk/FsAbsEra), FsAbs*Fire files, the create/open/unlink/link defs, ELF + Kexec* defs/image. USER D16: state Rocq's WHOLE block (procPrivFd) wherever Rocq states proc_priv.
 
 AUTO-IMPLICITS ARE OFF (2026-09-25, lakefile leanOptions autoImplicit=false, relaxedAutoImplicit=false): every variable in a signature must be bound explicitly (`{GF : BundledGFunctors}`, `{n : Nat}`, …). This caught a real bug: `Fscfg` fields were silently `∀ α, α` because FsCfgDefs lacked `open Iris`.
 
@@ -22,7 +22,7 @@ elaboration happens on the GCP VM (96 cores, 365 GB).
 Setup (once per agent; <L> = your lane name, e.g. u1c, k5, printf):
   MAIN-TREE lanes get a PRIVATE worktree so they get a private remote tree:
     cd /shared/lean-xv6 && git fetch -q origin && \
-      git worktree add --detach /shared/lean-xv6/.claude/worktrees/lane-<L> origin/lean-v2
+      git worktree add --detach /shared/lean-xv6/.claude/worktrees/lane-<L> origin/lean
   (worktree lanes already have one: use it.)
   Seed its remote .lake so the first build is incremental, not full:
     cd <your worktree> && /shared/xv6rocq/gcp-rocq/run-on-gcp --sync-only && \
@@ -42,6 +42,6 @@ Work:
       run-on-gcp --no-sync bash -lc 'tail -5 /mnt/rocq/<L>.log'
     Short module checks may run in the foreground under `timeout 600`. Worktree lanes do the full
     `lake build Xv6 MachCSL` there before their final commit.
-  - To pick up newly landed work: `git fetch origin && git checkout --detach origin/lean-v2`
+  - To pick up newly landed work: `git fetch origin && git checkout --detach origin/lean`
     in your worktree (untracked files survive), then re-sync.
   - The VM is a COLLABORATOR's shared machine: never pkill -f / killall there; kill by PID.

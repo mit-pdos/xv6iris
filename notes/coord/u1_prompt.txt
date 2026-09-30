@@ -1,7 +1,7 @@
 USER wave U1 — common brief (all U1 lanes read this first)
 
 You are one lane of the USER proof for the Lean port of the xv6 verification (/shared/lean-xv6,
-branch lean-v2; Rocq authority at /shared/xv6rocq main 1900b8a43). USER is the premise
+branch lean; Rocq authority at /shared/xv6rocq main 1900b8a43). USER is the premise
 `Xv6.USER` of the final theorem `Xv6.xv6FsAdequacy_xv6GF`: arbitrary user code, run by the
 real Sail model at User privilege, preserves the kernel's user invariant. Plan:
 notes/briefs/user_layer.md (read §0, §2.1 for your gap row, §3, §5, §6.2 for your lane).
@@ -10,7 +10,7 @@ never run run-on-gcp from /tmp, Rocq is the authority, one function/family per f
 names). Memory notes worth reading: /root/.claude-kmit/projects/-shared-lean-xv6/memory/
 {gcp-vm-lean-build,iris-lean-and-sail-lean-gotchas,lean-runaway-memory,keep-lean-runs-short}.md
 
-LANDED FOUNDATIONS (on origin/lean-v2; read them before writing anything):
+LANDED FOUNDATIONS (on origin/lean; read them before writing anything):
  - MachCSL/URunRW.lean (U0-B): the walker `runRW D orc s m`, `swp_runRW` (the ONE Iris bridge),
    `URegFrame` (per-register fractions; a frame is just an instance), `uRegFrameLF`,
    `uNoBytesF`, the bind toolkit `runRW_bind/_bind_some/_bind_none/_seq_some/_bind_nest`

@@ -6,7 +6,7 @@ elaboration happens on the GCP VM (96 cores, 365 GB).
 Setup (once per agent; <L> = your lane name, e.g. u1c, k5, printf):
   MAIN-TREE lanes get a PRIVATE worktree so they get a private remote tree:
     cd /shared/lean-xv6 && git fetch -q origin && \
-      git worktree add --detach /shared/lean-xv6/.claude/worktrees/lane-<L> origin/lean-v2
+      git worktree add --detach /shared/lean-xv6/.claude/worktrees/lane-<L> origin/lean
   (worktree lanes already have one: use it.)
   Seed its remote .lake so the first build is incremental, not full:
     cd <your worktree> && /shared/xv6rocq/gcp-rocq/run-on-gcp --sync-only && \
@@ -26,6 +26,6 @@ Work:
       run-on-gcp --no-sync bash -lc 'tail -5 /mnt/rocq/<L>.log'
     Short module checks may run in the foreground under `timeout 600`. Worktree lanes do the full
     `lake build Xv6 MachCSL` there before their final commit.
-  - To pick up newly landed work: `git fetch origin && git checkout --detach origin/lean-v2`
+  - To pick up newly landed work: `git fetch origin && git checkout --detach origin/lean`
     in your worktree (untracked files survive), then re-sync.
   - The VM is a COLLABORATOR's shared machine: never pkill -f / killall there; kill by PID.
