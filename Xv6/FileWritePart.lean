@@ -108,7 +108,7 @@ theorem fileAwritePart_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   ihave %hz := uoff_agree_k γo _ (off : Int) $$ Hu Hk
   have hoff : off = (subseq (echoChunks ws) sel).length := by omega
   icases fileWq_cases (hlc := hlc) c r N s i ws sel _ $$ Hq with
-    (⟨%ls, -, -, %hline, %hsel, -, %hin⟩ | #HTf)
+    (⟨%ls, -, -, %hline, %hsel, -, %hlast, -⟩ | #HTf)
   rotate_left
   · subst hoff
     imod uoff_advance γo _ bs.length $$ Hu Hk with ⟨Hk, Hu⟩
@@ -127,8 +127,8 @@ theorem fileAwritePart_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   -- ... and the content is a line's worth, so the chunk does NOT straddle
   exfalso
   apply hns
-  have hshort := f_bytes_typed_short ls N (subseq (echoChunks ws) sel)
-    ⟨ws, sel, hin, hline, hsel, rfl⟩
+  have hshort := f_bytes_typed_short (flRedirs ls) N (subseq (echoChunks ws) sel)
+    ⟨ws, sel, flRedirs_last ls ws N hlast, hline, hsel, rfl⟩
   apply fwpSingleBlock _ _ hnpos
   unfold BSIZE
   unfold lineMax at hshort hnle

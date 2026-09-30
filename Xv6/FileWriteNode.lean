@@ -138,7 +138,7 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   subst hoffk
   iintro #Hinv Hq Hka
   icases fileWq_cases (hlc := hlc) c r N s i ws sel offk $$ Hq with
-    (⟨%ls, ⟨Hd, Htk⟩, %hoff, %hline, %hsel, #Hlb, %hin⟩ | #HT)
+    (⟨%ls, ⟨Hd, Htk⟩, %hoff, %hline, %hsel, #Hlb, %hlast, Hpos⟩ | #HT)
   rotate_left
   · -- THE TAINT: the step is free and the cursor comes back tainted
     imodintro
@@ -194,16 +194,21 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   have hT : ⊢@{IProp GF} fTyped c (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗
       fTyped c (s.insert N (i, subseq (echoChunks ws) (sel ++ [jx]))) := by
     rw [← hs01]
-    exact fTyped_some c _ ls N ws (sel ++ [jx]) i (fOk_dom _ _ N _ hok hs0N) hin hline hselok
+    exact fTyped_some c _ ls N ws (sel ++ [jx]) i (fOk_dom _ _ N _ hok hs0N)
+      (flRedirs_last ls ws N hlast) hline hselok
   ihave #Hty' := hT $$ Hty Hlb
+  ihave ⟨Hq1, Hq2⟩ := fpos_quarters r ls.length $$ Hpos
+  ihave Hre := syncRedir_intro c r (dstContent (s.insert N (i, subseq (echoChunks ws) sel)))
+    (dstContent (s.insert N (i, subseq (echoChunks ws) (sel ++ [jx])))) ls ws N (sel ++ [jx])
+    hlast hselok (by rw [dstContent_insert, dstContent_insert, fstate_insert_insert]) $$ Hlb Hq1
   imodintro
   isplitl [Hka]
   · iexact Hka
-  isplitl [Hd]
+  isplitl [Hd Hre]
   · iapply fileAppStep_park (hlc := hlc) c r i I _ _ _ heq
       (fileFsPure_write i offk bs (absView I) hi1 hi2 hi3 hi4 hi5 hi6 hi7)
       (consAbsent_write i offk bs (absView I))
-      (fun jc => consPresent_write jc i offk bs (absView I)) hstep $$ Hd Hty'
+      (fun jc => consPresent_write jc i offk bs (absView I)) hstep $$ Hd Hty' Hre
   -- PHASE 2
   iintro %I' %hav Hka'
   have hokpost : fOk (absView I') (s.insert N (i, subseq (echoChunks ws) (sel ++ [jx]))) := by
@@ -217,14 +222,14 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     have h3 := congrArg List.length h2
     rw [hsnoc, List.length_append] at h3
     omega
-  imod fileResync (hlc := hlc) γfs c r _ _ I' appE (fun _ h => h) heq
-      (fOk_fcontent _ _ hokpost) hne $$ Hinv Htk Hka' with ⟨Hka', Hout⟩
+  imod fileResync (hlc := hlc) γfs c r _ _ ls.length I' appE (fun _ h => h) heq
+      (fOk_fcontent _ _ hokpost) hne $$ Hinv Htk Hq2 Hka' with ⟨Hka', Hout⟩
   imodintro
   isplitl [Hka']
   · iexact Hka'
-  icases Hout with (Hown | ⟨-, #HT⟩)
+  icases Hout with (⟨Hown, Hpos⟩ | ⟨-, #HT⟩)
   · iapply fileWq_intro_own (hlc := hlc) c r N s i ws (sel ++ [jx]) _ ls
-      (by rw [hsnoc, List.length_append, hoff]) hline hselok hin $$ Hown Hlb
+      (by rw [hsnoc, List.length_append, hoff]) hline hselok hlast $$ Hown Hlb Hpos
   · iapply fileWq_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) _ $$ HT
 
 variable [FsBytesG GF]
@@ -300,7 +305,7 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   subst hoff
   -- ... and RELAY 1 comes off the claim, read through the deed
   icases fileWq_cases (hlc := hlc) c r N s i ws sel _ $$ Hq with
-    (⟨%ls, ⟨Hd, Htk⟩, %hoff0, %hline, %hsel, #Hlb, %hin⟩ | #HTf)
+    (⟨%ls, ⟨Hd, Htk⟩, %hoff0, %hline, %hsel, #Hlb, %hin, Hpos⟩ | #HTf)
   rotate_left
   · -- the cursor's own taint arm
     imod uoff_advance γo _ bs.length $$ Hu Hk with ⟨Hk, Hu⟩
@@ -337,7 +342,8 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   have hnode : astep (absView I) ROOTINO N = some i :=
     (fOk_pin _ _ N i _ hok Std.ExtTreeMap.getElem?_insert_self).1
   -- the cursor goes back together for the phase lemma
-  ihave Hq := fileWq_intro (hlc := hlc) c r N s i ws sel _ ls hoff0 hline hsel hin $$ Hd Htk Hlb
+  ihave Hq := fileWq_intro (hlc := hlc) c r N s i ws sel _ ls hoff0 hline hsel hin
+    $$ Hd Htk Hlb Hpos
   imod fileAwritePhases (hlc := hlc) γfs c r N s i ws sel jx _ _ I bs bs0 nl heq hpre hnode
       rfl hbs hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 $$ Hinv Hq Hka with ⟨Hka, Hstep, Hph2⟩
   imod uoff_advance γo _ bs.length $$ Hu Hk with ⟨Hk, Hu⟩

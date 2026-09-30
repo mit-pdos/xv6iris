@@ -238,6 +238,27 @@ instance syncRedir_timeless (c : FileFixed) (r : FileAppNames) (S S' : Fstate) :
     Timeless (syncRedir (GF := GF) c r S S') := by
   unfold syncRedir; infer_instance
 
+/-- The permit, built (Rocq: `rewrite /sync_redir; iExists …; iFrame`). -/
+theorem syncRedir_intro (c : FileFixed) (r : FileAppNames) (S S' : Fstate) (ls_w : List FlLine)
+    (ws : List (List (BitVec 8))) (N : List (BitVec 8)) (sel : List Nat)
+    (hlast : ls_w.getLast? = some (Uline.LEchoF ws N)) (hsel : selOk (echoChunks ws) sel)
+    (hS : S' = S.insert N (subseq (echoChunks ws) sel)) :
+    ⊢@{IProp GF} flLb c ls_w -∗ fposq r ls_w.length -∗ syncRedir c r S S' := by
+  iintro #Hlb Hq
+  unfold syncRedir
+  iexists ls_w, ws, N, sel, ls_w.length
+  iframe Hlb Hq
+  ipureintro
+  exact ⟨hlast, hsel, rfl, hS⟩
+
+/-- Two writes at one name are the last one. -/
+theorem fstate_insert_insert (S : Fstate) (N : List (BitVec 8)) (a b : List (BitVec 8)) :
+    (S.insert N a).insert N b = S.insert N b := by
+  apply Std.ExtTreeMap.ext_getElem?
+  intro k
+  simp only [Std.ExtTreeMap.getElem?_insert]
+  by_cases h : compare N k = .eq <;> simp [h]
+
 /-- ...and the move: the running claim at the new files, the quarter out
 (Rocq `sync_claim_redir`). -/
 theorem syncClaim_redir (c : FileFixed) (r : FileAppNames) (av av' : Aview) :

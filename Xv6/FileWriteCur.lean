@@ -29,7 +29,7 @@ Rocq's notes, abridged (the reasons are the content):
    `fileWq_taint`, `fileCur_cases`, `fileCur_fired_at` (additions, no Rocq
    counterpart).
 -/
-import Xv6.AppFileDeed
+import Xv6.AppFilePos
 import Xv6.UserOff
 
 namespace Xv6
@@ -44,15 +44,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-- THE CURSOR (Rocq `file_wq`): the deed and the ticket at the content
 written so far, the offset its length, the line admissible, the selection a
-subset of its chunks and the line in the ledger -- or the taint. -/
+subset of its chunks, and THE ROUND'S LINE (sync SY3-A3bc): a lower bound
+of the ledger's list ENDING at the writer's own line, with the round position's
+half at its length -- what a move of the line's file hands the claim's sync
+part (`syncRedir`) -- or the taint. -/
 def fileWq (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (off : Nat) : IProp GF :=
-  iprop((∃ ls : List Fwline,
+  iprop((∃ ls : List FlLine,
       fown r (s.insert N (i, subseq (echoChunks ws) sel)) ∗
       ⌜off = (subseq (echoChunks ws) sel).length⌝ ∗
       ⌜lineOk ws⌝ ∗
       ⌜selOk (echoChunks ws) sel⌝ ∗
-      flLb c ls ∗ ⌜(N, ws) ∈ ls⌝)
+      flLb c ls ∗ ⌜ls.getLast? = some (Uline.LEchoF ws N)⌝ ∗ fpos r ls.length)
     ∨ fileTaint (hlc := hlc) c)
 
 instance fileWq_timeless (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
@@ -65,13 +68,13 @@ deviation 3). -/
 theorem fileWq_cases (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (off : Nat) :
     fileWq (hlc := hlc) (GF := GF) c r N s i ws sel off ⊢
-      iprop((∃ ls : List Fwline,
+      iprop((∃ ls : List FlLine,
           (fdeed r (s.insert N (i, subseq (echoChunks ws) sel)) ∗
             ftkt r (s.insert N (i, subseq (echoChunks ws) sel))) ∗
           ⌜off = (subseq (echoChunks ws) sel).length⌝ ∗
           ⌜lineOk ws⌝ ∗
           ⌜selOk (echoChunks ws) sel⌝ ∗
-          flLb c ls ∗ ⌜(N, ws) ∈ ls⌝)
+          flLb c ls ∗ ⌜ls.getLast? = some (Uline.LEchoF ws N)⌝ ∗ fpos r ls.length)
         ∨ fileTaint (hlc := hlc) c) := by
   unfold fileWq fown
   exact .rfl
@@ -79,14 +82,14 @@ theorem fileWq_cases (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i
 /-- the exact arm's introduction (Rocq folds `file_wq` in place;
 deviation 3). -/
 theorem fileWq_intro (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
-    (ws : Wordline) (sel : List Nat) (off : Nat) (ls : List Fwline)
+    (ws : Wordline) (sel : List Nat) (off : Nat) (ls : List FlLine)
     (hoff : off = (subseq (echoChunks ws) sel).length) (hline : lineOk ws)
-    (hsel : selOk (echoChunks ws) sel) (hin : (N, ws) ∈ ls) :
+    (hsel : selOk (echoChunks ws) sel) (hin : ls.getLast? = some (Uline.LEchoF ws N)) :
     ⊢@{IProp GF} fdeed r (s.insert N (i, subseq (echoChunks ws) sel)) -∗
-      ftkt r (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗
+      ftkt r (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗ fpos r ls.length -∗
       fileWq (hlc := hlc) c r N s i ws sel off := by
   unfold fileWq fown
-  iintro Hd Ht #Hlb
+  iintro Hd Ht #Hlb Hpos
   ileft
   iexists ls
   isplitl [Hd Ht]
@@ -99,19 +102,21 @@ theorem fileWq_intro (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i
   · ipureintro; exact hsel
   isplitr
   · iexact Hlb
+  isplitr
   · ipureintro; exact hin
+  · iexact Hpos
 
 /-- ... and the fired arm's, at a whole deed (Rocq's `iLeft; iExists ls;
 iFrame`). -/
 theorem fileWq_intro_own (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
-    (ws : Wordline) (sel : List Nat) (off : Nat) (ls : List Fwline)
+    (ws : Wordline) (sel : List Nat) (off : Nat) (ls : List FlLine)
     (hoff : off = (subseq (echoChunks ws) sel).length) (hline : lineOk ws)
-    (hsel : selOk (echoChunks ws) sel) (hin : (N, ws) ∈ ls) :
+    (hsel : selOk (echoChunks ws) sel) (hin : ls.getLast? = some (Uline.LEchoF ws N)) :
     ⊢@{IProp GF} fown r (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗
-      fileWq (hlc := hlc) c r N s i ws sel off := by
+      fpos r ls.length -∗ fileWq (hlc := hlc) c r N s i ws sel off := by
   unfold fown
-  iintro ⟨Hd, Ht⟩ #Hlb
-  iapply fileWq_intro c r N s i ws sel off ls hoff hline hsel hin $$ Hd Ht Hlb
+  iintro ⟨Hd, Ht⟩ #Hlb Hpos
+  iapply fileWq_intro c r N s i ws sel off ls hoff hline hsel hin $$ Hd Ht Hlb Hpos
 
 /-- the tainted arm's introduction -/
 theorem fileWq_taint (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
