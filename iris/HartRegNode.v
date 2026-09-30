@@ -200,7 +200,7 @@ Section regnode.
     iExists (C (K (register_lookup r σ.(sregs)))), σ, log, tv, itv, hr, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. split_and!; reflexivity. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     cbv beta iota delta [mnode_step] in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     rewrite -(Hres (register_lookup r σ.(sregs))).
@@ -239,7 +239,7 @@ Section regnode.
     iExists (C (K tt)), (set_reg σ r v), log, tv, itv, hr, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. split_and!; reflexivity. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     cbv beta iota delta [mnode_step] in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     rewrite -Hres.
@@ -333,7 +333,7 @@ Section regnode.
     iExists (C (K tt)), (set_reg σ r v), log, tv, itv, hr, rv.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. split_and!; reflexivity. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     cbv beta iota delta [mnode_step] in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     rewrite -Hres.

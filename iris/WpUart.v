@@ -3957,7 +3957,7 @@ Section DevLoops.
     (* the observation list [κ] is the arm's own I/O event (RiscvLang §3b');
        no ghost here tracks it -- [uart_ghosts] mirrors the DEVICE state, and
        the wire trace is already pinned by [u_wire] ([uart_step_wire]) *)
-    iNext. iIntros (κ d' Hstep).
+    iNext. iIntros (κ d' Hstep) "_".
     iMod "Hmask" as "_".
     pose proof Hstep as Hstep0.
     destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch |].
@@ -4156,7 +4156,7 @@ Section DevLoops.
        so the openings compose ([solve_ndisj]). *)
     iInv "Hqinv" as "Hpbody" "Hpclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' W log') "%Hstep %Hlog".
+    iNext. iIntros (d' W log') "%Hstep %Hlog _".
     iMod "Hmask" as "_".
     destruct Hstep as [mv vnew Hview Hpop | mv h vnew Hview Hfetch
                       | mv h vnew Hview Hcap | h vnew w Hwrite
@@ -4678,7 +4678,7 @@ Section DevLoops.
     iApply (wp_plic_step with "Hcert").
     iIntros (gr m d) "(Hgr & Hmem & Hdev)".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (gr' Hstep).
+    iNext. iIntros (gr' Hstep) "_".
     iMod "Hmask" as "_".
     (* ONE ARM PER PIN: the PLIC drives hart [c]'s S pin from context 2c+1 and
        its M pin from context 2c, and both cells are borrowed from

@@ -178,7 +178,7 @@ Section barrier.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. rewrite Hfi.
       by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep. rewrite Hfi in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_". iModIntro.
@@ -291,7 +291,7 @@ Section barrier.
     iExists (C (K tt)), σ, log, tvn, itvn, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_".
@@ -369,7 +369,7 @@ Section barrier.
     iExists (C (K tt)), σ, log, tv, itvn, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_". iModIntro.
@@ -473,7 +473,7 @@ Section barrier.
     iExists (C (Kc tt)), σ, log, tvn, itvn, hr, rv.
     iSplitR.
     { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
-    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep".
+    iNext. iIntros (m' σ' log' tv' itv' hr' rv') "%Hstep _".
     rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
     destruct Hstep as (-> & -> & -> & -> & -> & -> & ->).
     iMod "Hclose" as "_".
