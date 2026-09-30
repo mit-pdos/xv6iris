@@ -37,8 +37,8 @@ instance (the quiet leaf); the xv6 instance discharges it at every `oQ`
 2. **The hook form** (drift lane D2-dur, Rocq sync K4 6ec6feccd):
    `sync_pay P Qr R := P -∗ Qr -∗ R`, the `ksync_leaf oQ` parameter and
    `hookOpt`/`qOpt` (`Xv6.SyncHook`).  The union's lend split (Rocq A4
-   a2417c11e: `usync_q`/`usync_lend`, the record's hook family) is lane E's:
-   the union deposits no hook (`none`).
+   a2417c11e: `usync_q`/`usync_lend`, the record's hook family) is in
+   `UshURoundSync` (drift D3-app).
 -/
 import Xv6.UkStub
 import Xv6.UkRunMem

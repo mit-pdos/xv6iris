@@ -1,0 +1,293 @@
+no clean name: Xv6.ushRI_ca6 Xv6.ushMI_ca6
+no clean name: Xv6.pr_acquire Xv6.pw_acquire
+no clean name: Xv6.pw_killed_r Xv6.kw_killed
+instance: Xv6.GenCparams.gcW_persistent Xv6.GenCparams.gcW_pers
+no clean name: Xv6.cr_cbuf_carve Xv6.pr_ch_carve
+no clean name: Xv6.sext_0 Xv6.sys_unlink_li0 Xv6.sys_unlink_li0_d8 Xv6.co_sext_0
+no clean name: Xv6.ss_addiw Xv6.ssr_addiw
+core statement outside BitVec: Xv6.ulibRange_set_self Xv6.uRange_set_self
+instance: Xv6.GenParams.gWb_tl Xv6.GenParams.gWb_timeless
+name clash ite_bne: Xv6.uf_ite_bne Xv6.fw_ite_bne
+no clean name: Xv6.ushRI_9c0 Xv6.ushMI_9c0 Xv6.ushEI_9c0
+no clean name: Xv6.il_hold_bytes Xv6.it_hold_open
+no clean name: Xv6.ialloc_andi15' Xv6.ireclaim_andi15'
+core statement outside BitVec: Xv6.ss_filter Xv6.bo_filter Xv6.eo_filter Xv6.lw_filter
+no clean name: Xv6.seccMain_bge Xv6.echoMain_bge Xv6.catMain_bge
+no clean name: Xv6.ushRI_c9e Xv6.ushMI_c9e
+no clean name: Xv6.pi_h3 Xv6.pms_h3
+no clean name: Xv6.pi_h4 Xv6.pms_h4
+no clean name: Xv6.kxcB2_bne Xv6.kxcA_bne
+no clean name: Xv6.sk_pid_addr Xv6.sysx_n_addr Xv6.sc_fd_addr
+no clean name: Xv6.gp_minus_one Xv6.writei_li_m1 Xv6.cs_sext_neg1
+no clean name: Xv6.pw_gen_open Xv6.pr_gen_lend
+no clean name: Xv6.ireclaim_slli6 Xv6.ialloc_slli6
+no clean name: Xv6.fp_addr_pid Xv6.ap_pPid Xv6.kw_pPid
+no clean name: Xv6.calleeSaved_refl Xv6.lw_cs_refl
+no clean name: Xv6.gp_uvmMaxsz_toNat Xv6.sys_sbrk_trapframe_toNat
+instance: Xv6.GenParams.gPIN_timeless Xv6.GenParams.gPIN_tl
+instance: Xv6.GenCparams.gcT_pers Xv6.GenCparams.gcT_persistent
+no clean name: Xv6.cr_sext4015 Xv6.pr_sext4015
+no clean name: Xv6.ushMI_934 Xv6.ushRI_934
+no clean name: Xv6.kx_needsCtx_zombie Xv6.kw_zombie_not_needsCtx
+no clean name: Xv6.ushMI_cb4 Xv6.ushRI_cb4
+no clean name: Xv6.sys_pipe_a64 Xv6.sys_unlink_bufde
+no clean name: Xv6.uHtkill Xv6.uHktaint_rev Xv6.uHktaint_inv
+no clean name: Xv6.pw_pSz_lit Xv6.gp_sz_off Xv6.pw_pSz_lit'
+instance: Xv6.AppIface.tag_persistent_inst Xv6.AppIface.tag_persistent
+instance: Xv6.AppIface.kill_persistent_inst Xv6.AppIface.kill_persistent
+no clean name: Xv6.ushGets_nth0 Xv6.kgrep_nth_setWidth Xv6.kcat_nthByte0_zext
+no clean name: Xv6.ec_addiw_id Xv6.sn_sext32 Xv6.fwr_sextw Xv6.kxd_sext Xv6.sy_sext32 Xv6.ialloc_sextw Xv6.pk_sx_ofNat Xv6.ba_sext_w32 Xv6.cw_sext_id Xv6.namex_sextw0 Xv6.ireclaim_sextw
+no clean name: Xv6.pw_idx_mod Xv6.pr_idx_eq
+no clean name: Xv6.sysx_hi Xv6.sk_ec Xv6.sc_ec
+no clean name: Xv6.ush_usysno Xv6.ushR_usysno Xv6.ushRS_usysno Xv6.fh_usysno Xv6.kinit_usysno
+no clean name: Xv6.ss_succ' Xv6.cs_a5_step Xv6.sn_succ' Xv6.kxcC_ofNat_succ Xv6.kxd_succ Xv6.sy_succ' Xv6.ssr_succ'
+no clean name: Xv6.sys_chdir_pcwd' Xv6.kx_pCwd Xv6.kx_pCwd0
+no clean name: Xv6.ushRI_0d2 Xv6.ushEI_d2
+no clean name: Xv6.it_bge_add Xv6.cw_bge_add
+no clean name: Xv6.pr_addr_wo' Xv6.pc_addr_wo
+no clean name: Xv6.swr_bltz_0 Xv6.kw_blt_zero_false Xv6.sc_bltz_0 Xv6.sys_exec_bltz0 Xv6.create_bltz_zero Xv6.sfs_bltz_0 Xv6.sd_bltz_0 Xv6.sys_link_bltz_0 Xv6.fetchstr_blt_zero Xv6.sys_pipe_bltz_0 Xv6.srd_bltz_0
+no clean name: Xv6.ig_bnez_a5zero Xv6.ut_bne_sext0 Xv6.asl_bne_z
+no clean name: Xv6.ireclaim_succ Xv6.ialloc_succ
+no clean name: Xv6.fp_acquire Xv6.ap_acq_pid
+no clean name: Xv6.shl_shr_32_ofNat Xv6.shl_shr32 Xv6.shl_shr32_ms Xv6.rd_zext32
+no clean name: Xv6.ushRI_c8c Xv6.ushMI_c8c
+core statement outside BitVec: Xv6.ap_filter_cons Xv6.ups_filter_cons
+instance: Xv6.GenParams.gW_pers Xv6.GenParams.gW_persistent
+name clash procAddr_toNat: Xv6.rp_procAddr_toNat Xv6.wk_procAddr_toNat Xv6.kw_procAddr_toNat Xv6.kk_procAddr_toNat
+no clean name: Xv6.pw_release Xv6.pr_release
+no clean name: Xv6.sy_E_negone Xv6.sys_pipe_trunc_m1
+no clean name: Xv6.create_trunc16_zero Xv6.fd_s16 Xv6.vdrw3_next0
+no clean name: Xv6.asl_withSpie_self_nb Xv6.uw_ws_self Xv6.sys_link_withSpie_self
+no clean name: Xv6.ushMI_97e Xv6.ushRI_97e
+instance: Xv6.instCtxMorphChainAt Xv6.chainAt_morph
+no clean name: Xv6.ap_ctxByte_joinA Xv6.fp_ctxByte_join
+no clean name: Xv6.ushMI_9c6 Xv6.ushRI_9c6 Xv6.ushEI_9c6
+no clean name: Xv6.kxcB2_beq Xv6.kxcA_beq
+core statement outside BitVec: Xv6.blkDfrac_full_nvalid Xv6.dfracFullNvalid
+no clean name: Xv6.kcat_blt0 Xv6.kgrep_blt0 Xv6.catMain_blt0
+core statement outside BitVec: Xv6.fif_slot_ne Xv6.cif_slot_ne
+no clean name: Xv6.ireclaim_end_op Xv6.endOp_callF
+core statement outside BitVec: Xv6.ui_filter_one Xv6.yield_filter_proc
+name clash ptRep_setLeaf: Xv6.UPtAlloc.ptRep_setLeaf Xv6.UPtFault.ptRep_setLeaf
+no clean name: Xv6.ig_ci_some Xv6.iput_lk_ci_live
+no clean name: Xv6.fd_descAt Xv6.vdrw3_desc0 Xv6.vdrw6_descAt
+instance: Xv6.GenParams.gPIN_persistent Xv6.GenParams.gPIN_pers
+instance: Xv6.GenParams.gT_pers Xv6.GenParams.gT_persistent
+no clean name: Xv6.fa_sext4 Xv6.co_sext_4
+no clean name: Xv6.fda_ofile_step' Xv6.kx_pOfile_succ
+no clean name: Xv6.sys_unlink_li32_16 Xv6.sext_16 Xv6.ulibPutc_sext_16 Xv6.sys_unlink_li16
+no clean name: Xv6.kw_pParent Xv6.kx_pParent
+no clean name: Xv6.ushRI_0d6 Xv6.ushEI_d6
+no clean name: Xv6.pms_page_range Xv6.UPtPpt.pageValid_pa_bound
+no clean name: Xv6.fp_addr_pagetable Xv6.kw_pPagetable Xv6.ap_pPagetable Xv6.filestat_pt' Xv6.sys_pipe_pt'
+no clean name: Xv6.sc_pContext Xv6.ap_pContext0 Xv6.sched_pContext
+no clean name: Xv6.eo_o_nc Xv6.ss_nc_addr
+no clean name: Xv6.vdrw4_and7 Xv6.vdis_and7
+no clean name: Xv6.sie0_and2 Xv6.and_2_of_sie0
+no clean name: Xv6.ups_byteOk0 Xv6.uw_thr_io
+no clean name: Xv6.sys_open_walk_bud Xv6.sys_chdir_bud_walk Xv6.kxcA_walkNeed
+no clean name: Xv6.pa_ext8_1' Xv6.fd_s8
+no clean name: Xv6.UPtAlloc.procPtAt_split Xv6.UPt.procPtAt_cases
+no clean name: Xv6.ushRI_cb0 Xv6.ushMI_cb0
+no clean name: Xv6.sys_open_tails_env Xv6.sys_open_sysfileEnv
+instance: Xv6.AppIface.rdwild_persistent_inst Xv6.AppIface.rdwild_persistent
+no clean name: Xv6.ushMI_cf6 Xv6.ushRI_cf6
+no clean name: Xv6.ushRI_cf8 Xv6.ushMI_cf8
+no clean name: Xv6.pw_priv_pid Xv6.pr_bare_pid
+no clean name: Xv6.ushRI_cae Xv6.ushMI_cae
+no clean name: Xv6.sc_bcond_end_ne Xv6.ap_bcond_beq_end
+no clean name: Xv6.ups_kmapClass Xv6.ui_kmapRw Xv6.uartKmapRw
+no clean name: Xv6.uw_thr_dec Xv6.ups_decode0
+name clash withSpie_pushOffAt: Xv6.pc_withSpie_pushOffAt Xv6.pr_withSpie_pushOffAt Xv6.pw_withSpie_pushOffAt
+no clean name: Xv6.ushRI_ca0 Xv6.ushMI_ca0
+no clean name: Xv6.fp_beq_taken Xv6.af_beq_z
+no clean name: Xv6.nparWrapEra_slots_2 Xv6.nameiparent_slots_2
+no clean name: Xv6.sys_pipe_bltz_m1' Xv6.create_bltz_m1 Xv6.kw_blt_neg1_true
+no clean name: Xv6.ushm_zext32 Xv6.ushPc_zext32 Xv6.kgrep_zext32 Xv6.ushMs_zext32
+no clean name: Xv6.ushRI_932 Xv6.ushMI_932
+no clean name: Xv6.ush_cs_wr Xv6.echoMain_csw
+no clean name: Xv6.ofNat64_eq_zero_iff' Xv6.ofNat64_eq_zero_iff
+no clean name: Xv6.ushRI_cc6 Xv6.ushMI_cc6
+no clean name: Xv6.ite_bne_eq_ms Xv6.ite_bne Xv6.ite_bne_eq
+name clash toNat_mod8: Xv6.UPtAlloc.toNat_mod8 Xv6.UPtFault.toNat_mod8
+no clean name: Xv6.pms_h5 Xv6.pi_h5
+no clean name: Xv6.ialloc_succ' Xv6.ireclaim_succ'
+no clean name: Xv6.ushMI_cac Xv6.ushRI_cac
+no clean name: Xv6.asl_pushed_spie_nb Xv6.fd_withSpie
+no clean name: Xv6.kw_sleep Xv6.pw_sleep Xv6.pr_sleep Xv6.cr_sleep Xv6.uw_sleep Xv6.sp_sleep
+no clean name: Xv6.dsSet_self Xv6.mvSet_self
+no clean name: Xv6.fd_descAt8 Xv6.vdrw3_desc8
+no clean name: Xv6.pr_wakeup Xv6.pw_wakeup Xv6.cki_wakeup Xv6.pc_wakeup
+no clean name: Xv6.ii_u1e Xv6.fi_u1e Xv6.bi_u1e Xv6.fd_u_1e
+instance: Xv6.GenParams.gW_timeless Xv6.GenParams.gW_tl
+name clash withSpie_sec: Xv6.pw_withSpie_sec Xv6.pr_withSpie_sec
+name clash popExit_off: Xv6.pw_popExit_off Xv6.pr_popExit_off
+no clean name: Xv6.bo_popArm Xv6.ss_popArm
+no clean name: Xv6.uservecTf_low Xv6.uservecTf_lo
+no clean name: Xv6.ap_bcond_pid Xv6.lw_beq_sext
+no clean name: Xv6.pw_addiw_nat' Xv6.pi_addiw_succ
+no clean name: Xv6.ss_negone Xv6.ssr_negone Xv6.sysfile_sext_m1
+core statement outside BitVec: Xv6.set_getElem!_self Xv6.getElem!_set_self
+instance: Xv6.GenCparams.gcW_tl Xv6.GenCparams.gcW_timeless
+core statement outside BitVec: Xv6.gopPrefix_snoc_lookup Xv6.wild_prefix_snoc_lookup
+no clean name: Xv6.UPtAlloc.delRunL_get_out Xv6.UPtFree.get?_delRunL_not_mem
+no clean name: Xv6.fp_addr_trapframe Xv6.ap_pTrapframe
+no clean name: Xv6.ushMI_ccc Xv6.ushRI_ccc
+no clean name: Xv6.sd_sp16' Xv6.pa_sp16'
+no clean name: Xv6.BSIZE_pos_nat Xv6.BSIZE_pos
+no clean name: Xv6.UPt.ptOwnRep_cases Xv6.UPtAlloc.ptOwnRep_split
+instance: Xv6.AppIface.tag_timeless Xv6.AppIface.tag_timeless_inst
+no clean name: Xv6.pw_withLocks_self Xv6.pc_withLocks_self'
+no clean name: Xv6.ushEI_9c2 Xv6.ushMI_9c2 Xv6.ushRI_9c2
+no clean name: Xv6.ushMI_ca8 Xv6.ushRI_ca8
+no clean name: Xv6.UPtCopy.procPtAt_intro Xv6.UPtFault.procPtAt_close
+no clean name: Xv6.sg_myproc Xv6.ssc_myproc
+name clash ofNat_mul4096: Xv6.ofNat_mul4096 Xv6.mp_ofNat_mul4096
+no clean name: Xv6.hsl_acquire Xv6.rsl_acquire
+no clean name: Xv6.sys_sbrk_myproc Xv6.sc_myproc Xv6.sys_pipe_myproc
+name clash initlock_call: Xv6.ci_initlock_call Xv6.ki_initlock_call
+instance: Xv6.AppIface.wild_persistent_inst Xv6.AppIface.wild_persistent
+no clean name: Xv6.pr_ch_addr Xv6.cr_cbuf_addr
+no clean name: Xv6.eo_re Xv6.lw_re
+name clash ptRep_congr: Xv6.UPtAlloc.ptRep_congr Xv6.UPtFault.ptRep_congr
+no clean name: Xv6.sc_ofile_addr Xv6.af_ofile_addr' Xv6.sys_pipe_ofile_addr2'
+no clean name: Xv6.fp_release Xv6.ap_rel_pid
+no clean name: Xv6.ushRI_92c Xv6.ushMI_92c
+core statement outside BitVec: Xv6.su_filter_time Xv6.cki_filter_time
+no clean name: Xv6.ss_sl Xv6.bo_sl
+no clean name: Xv6.uc_page_add Xv6.page_add
+no clean name: Xv6.ialloc_bno Xv6.ireclaim_bno
+instance: Xv6.GenCparams.gcT_tl Xv6.GenCparams.gcT_timeless
+core statement outside BitVec: Xv6.UPtWalkaddr.and1_zero Xv6.w_zero_invalid
+no clean name: Xv6.ti_u5 Xv6.km_u5
+instance: Xv6.GenParams.gWb_pers Xv6.GenParams.gWb_persistent
+no clean name: Xv6.kw_pChan Xv6.sp_pChan Xv6.sl_pChan
+no clean name: Xv6.co_ofNat_sub Xv6.bcOfNatSub Xv6.UPtAlloc.ofNat_sub_ofNat
+no clean name: Xv6.UPtFault.procPtAt_open Xv6.UPtCopy.procPtAt_cases
+core statement outside BitVec: Xv6.covList_nodup Xv6.lw_cov_nodup Xv6.toList_nodup Xv6.eo_cov_nodup
+instance: Xv6.GenParams.gH_timeless Xv6.GenParams.gH_tl
+instance: Xv6.AppIface.rdwild_timeless Xv6.AppIface.rdwild_timeless_inst
+no clean name: Xv6.nameiEra_slots_4 Xv6.namei_slots_4
+name clash bne_eq: Xv6.rp_bne_eq Xv6.wk_bne_eq
+no clean name: Xv6.sched_bcond_bne_11 Xv6.vdrw5_bne_one_eq
+instance: Xv6.AppIface.kill_timeless_inst Xv6.AppIface.kill_timeless
+name clash complete_of_walk: Xv6.UPtFault.complete_of_walk Xv6.UPtAlloc.complete_of_walk
+no clean name: Xv6.ci_u12 Xv6.pki_u12 Xv6.ki_u12
+no clean name: Xv6.vdrw3_desc12 Xv6.fd_descAt12
+no clean name: Xv6.bo_cmt_addr Xv6.eo_o_cmt
+no clean name: Xv6.sl_pState Xv6.sc_pState Xv6.sched_pState Xv6.kx_pState Xv6.kw_pState Xv6.ap_pState
+instance: Xv6.GenParams.gT_tl Xv6.GenParams.gT_timeless
+no clean name: Xv6.af_dc Xv6.sys_sbrk_t_addr'
+attribute: MachCSL.xv6Pmpaddr_getNat0 MachCSL.xv6Pmpaddr_0
+name clash ctx_entry: Xv6.dirlink_ctx_entry Xv6.filestat_ctx_entry
+no clean name: Xv6.dv_ret_of_ext Xv6.devintrRet_ext
+no clean name: Xv6.pms_h2 Xv6.pi_h2
+no clean name: Xv6.bi_u15 Xv6.su_u_15
+no clean name: Xv6.ushRI_c88 Xv6.ushMI_c88
+no clean name: Xv6.pi_lui_4000 Xv6.km_u4000 Xv6.UPtPpt.u20_4000 Xv6.pms_lui_4000
+no clean name: Xv6.uf_vpn0 Xv6.uc_vpnOf_zero
+no clean name: Xv6.mp_page_add Xv6.un_page_add
+core statement outside BitVec: Xv6.rsl_filter_sleep Xv6.hsl_filter_sleep Xv6.asl_filter_nb
+no clean name: Xv6.ua_setReg_spie Xv6.uc_setReg_as
+no clean name: Xv6.vdrw_ac Xv6.vdrw5_ac Xv6.vdrw_acquire
+core statement outside BitVec: Xv6.ssr_a3 Xv6.ss_a3
+name clash ite_bne: Xv6.kw_ite_bne Xv6.kx_ite_bne
+no clean name: Xv6.ups_uart_elt Xv6.ui_elt'
+instance: Xv6.CifEnv.Kc_pers Xv6.CifEnv.hKc
+no clean name: Xv6.bw_holdingsleep Xv6.br_holdingsleep
+name clash mapRun_one: Xv6.ua_mapRun_one Xv6.uc_mapRun_one
+attribute: MachCSL.zext64_self MachCSL.zero_extend_64
+no clean name: Xv6.mp_lui_4096 Xv6.pms_lui_1 Xv6.km_u1 Xv6.fw_lui_4096 Xv6.vf_lui_4096 Xv6.UPtPpt.u20_1 Xv6.uc_lui_4096 Xv6.kf_c4096 Xv6.lui_1k Xv6.UPtAlloc.lui_4096 Xv6.uc_u1 Xv6.ka_lui_4096 Xv6.un_lui_4096 Xv6.ap_lui_4096 Xv6.uf_lui_4096 Xv6.w_lui_4096 Xv6.co_lui_4096
+no clean name: Xv6.ushMI_c86 Xv6.ushRI_c86
+no clean name: Xv6.isl_u3 Xv6.fi_u3
+no clean name: Xv6.ushRI_cc8 Xv6.ushMI_cc8
+no clean name: Xv6.kx_invDormant_zombie Xv6.kw_zombie_invDormant
+no clean name: Xv6.iput_lk_env_parts Xv6.iput_tail_env
+instance: Xv6.GenCparams.gcPIN_persistent Xv6.GenCparams.gcPIN_pers
+name clash ptePpn_uLeaf: Xv6.UPtCopy.ptePpn_leafOf Xv6.UPt.ptePpn_uLeaf Xv6.UPtAlloc.ptePpn_uLeaf
+no clean name: Xv6.sn_E_add Xv6.sy_E_add
+no clean name: Xv6.bo_sp Xv6.ss_sp
+no clean name: Xv6.fc_ext0 Xv6.fd_s32 Xv6.sys_open_alloc_x0 Xv6.bd_ext_zero Xv6.il_ext0 Xv6.rsl_ext0 Xv6.pa_ext0
+no clean name: Xv6.ushEI_d0 Xv6.ushRI_0d0
+no clean name: Xv6.ialloc_bgeu_dead Xv6.ireclaim_bgeu_dead
+instance: Xv6.instCtxMorphPtreeOwn Xv6.ctxMorph_ptreeOwn
+no clean name: Xv6.kcat_bge0 Xv6.kgrep_bge0
+name clash beq_ne: Xv6.ec_beq_ne Xv6.un_beq_ne Xv6.vf_beq_ne Xv6.wa_beq_ne Xv6.uc_beq_ne Xv6.mp_beq_ne Xv6.pms_beq_ne
+name clash strip_locks: Xv6.pw_strip_locks Xv6.pr_strip_locks
+no clean name: Xv6.sy_extract Xv6.extractLsb'_setWidth8 Xv6.ba_ext8_zext Xv6.bf_sb_byte Xv6.ss_extract Xv6.uw_ext8 Xv6.ssr_extract Xv6.cs_extract_setw Xv6.ci_byte_lo
+no clean name: Xv6.sn_sub1 Xv6.sy_sub1
+name clash pteAD_pte2pa: Xv6.UPtCopy.pteAD_pte2pa Xv6.UPtUnmap.pteAD_pte2pa
+no clean name: Xv6.hsl_sp40' Xv6.pa_sp8'
+no clean name: Xv6.sy_addiw_dec Xv6.sn_addiw_dec
+no clean name: Xv6.ushRI_cfc Xv6.ushMI_cfc
+no clean name: Xv6.sys_pipe_a48 Xv6.sys_link_bufname
+no clean name: Xv6.kw_pXstate Xv6.kx_pXstate
+no clean name: Xv6.vdrw5_beq_one_eq Xv6.dv_beq_1_1
+name clash calleeSaved_mk: Xv6.bc_calleeSaved_epi Xv6.sl_calleeSaved_mk Xv6.fc_calleeSaved_mk Xv6.uf_calleeSaved_mk Xv6.sys_pipe_calleeSaved_mk
+no clean name: Xv6.argstr_argraw Xv6.ai_argraw Xv6.aa_argraw
+no clean name: Xv6.sys_chdir_dead Xv6.sys_open_walk_dead_rcpt
+no clean name: Xv6.ushMI_930 Xv6.ushRI_930
+no clean name: Xv6.kw_freeproc Xv6.ap_fp_call
+instance: Xv6.AppIface.cons_timeless_inst Xv6.AppIface.cons_timeless
+no clean name: Xv6.ushRI_97a Xv6.ushMI_97a
+no clean name: Xv6.pr_myproc Xv6.cr_myproc Xv6.ar_myproc Xv6.kw_myproc Xv6.pw_myproc Xv6.fetchstr_myproc Xv6.sp_myproc
+no clean name: Xv6.rd_addw Xv6.eo_addw Xv6.writei_addw Xv6.cw_addw Xv6.fwr_addw_nat Xv6.bo_addw
+name clash calleeSaved_mk: Xv6.fa_calleeSaved_mk Xv6.ar_calleeSaved_mk Xv6.ka_calleeSaved_mk Xv6.ai_calleeSaved_mk Xv6.aa_calleeSaved_mk Xv6.bc_calleeSaved_mk
+no clean name: Xv6.fa_beqz_zero Xv6.asl_beq_z
+no clean name: Xv6.syscArmExit_sp4 Xv6.sysx_sp4
+no clean name: Xv6.cw_beq_fail Xv6.rd_beq_m1_t
+core statement outside BitVec: Xv6.genTq_nvalid Xv6.blkDfrac_34_nvalid Xv6.dfrac34Nvalid
+no clean name: Xv6.beginOp_callF Xv6.ireclaim_begin_op
+no clean name: Xv6.pms_h7 Xv6.pi_h7
+core statement outside BitVec: Xv6.bootCarveFs_bigSepL_replicate Xv6.vdi_bigSepL_replicate
+no clean name: Xv6.sk_argint Xv6.sp_argint
+no clean name: Xv6.bcond_beq_ofNat Xv6.dirlink_beqz_nat Xv6.bcond_beq_ofNat' Xv6.rd_beqz
+no clean name: Xv6.ss_pred Xv6.sy_pred Xv6.kxd_pred Xv6.ssr_pred
+no clean name: Xv6.vdis_ext16 Xv6.dirlink_trunc16
+no clean name: Xv6.pi_h8 Xv6.pms_h8
+core statement outside BitVec: Xv6.getElem!_set_ne Xv6.set_getElem!_ne
+no clean name: Xv6.ialloc_srli4 Xv6.ireclaim_srli4
+no clean name: Xv6.su_u_7 Xv6.ci_u7
+no clean name: Xv6.pms_auipc_11 Xv6.pi_u11
+no clean name: Xv6.eo_range_push Xv6.bi_snoc
+no clean name: Xv6.pi_addiw_pred Xv6.cr_dec'
+no clean name: Xv6.pi_u17 Xv6.pms_auipc_17
+no clean name: Xv6.kxd_addiw_id Xv6.ireclaim_sextw' Xv6.fwr_addiw0 Xv6.cw_sextw Xv6.ialloc_sextw'
+no clean name: Xv6.pi_h6 Xv6.pms_h6
+no clean name: Xv6.fp_pid_join Xv6.ap_pid_joinA
+no clean name: Xv6.ap_word4_joinA' Xv6.fp_word4_join'
+no clean name: Xv6.ite_beq_ofNat' Xv6.ite_beq_ofNat_ms
+no clean name: Xv6.fda_ofile_step Xv6.kx_succ8
+no clean name: Xv6.bo_ac Xv6.ss_ac Xv6.lw_ac Xv6.eo_ac
+no clean name: Xv6.hsl_sp40 Xv6.pa_sp8
+no clean name: Xv6.catMain_scale Xv6.echoMain_scale
+no clean name: Xv6.UPtCopy.leaves_get Xv6.UPt.leaves_get_um
+no clean name: Xv6.ialloc_andi15 Xv6.ireclaim_andi15
+name clash calleeSaved_mk: Xv6.kxc_calleeSaved_epi Xv6.asl_calleeSaved_mk Xv6.ap_calleeSaved_mk Xv6.af_calleeSaved_mk Xv6.bo_calleeSaved_epi Xv6.argstr_calleeSaved_mk Xv6.eo_calleeSaved_epi Xv6.bc_calleeSaved_epi2 Xv6.sp_calleeSaved_mk Xv6.iul_calleeSaved_epi
+no clean name: Xv6.sys_sbrk_t_addr Xv6.af_fd_addr
+no clean name: Xv6.uw_thr_rw Xv6.ups_kmapClass0
+name clash slots_namex: Xv6.namei_slots_namex Xv6.nameiEra_slots_namex
+instance: Xv6.AppIface.wild_timeless Xv6.AppIface.wild_timeless_inst
+no clean name: Xv6.fa_ext1 Xv6.pa_ext1
+no clean name: Xv6.cw_beq_ok Xv6.cw_beq_0f Xv6.rd_beq_m1_f
+no clean name: Xv6.rp_off0 Xv6.sd_add0' Xv6.af_add0' Xv6.add_0_64 Xv6.sc_add0' Xv6.fda_add0' Xv6.pa_add0' Xv6.fstat_a0 Xv6.asl_add0 Xv6.sp_add0 Xv6.sys_pipe_add0'
+no clean name: Xv6.ti_u16 Xv6.cki_u_16
+no clean name: Xv6.UPtAlloc.uLeaf_isLeafPte Xv6.UPt.isLeafPte_uLeaf Xv6.UPtCopy.leafOf_isLeafPte
+no clean name: Xv6.ushMI_982 Xv6.ushRI_982
+no clean name: Xv6.sd_sp16 Xv6.pa_sp16
+no clean name: Xv6.sys_open_stores_li2 Xv6.sys_open_alloc_li2 Xv6.swr_li2 Xv6.sys_mknod_li2 Xv6.srd_li2
+no clean name: Xv6.ka_al8 Xv6.UPtCopy.toNat_mod8
+no clean name: Xv6.pw_pPagetable_lit Xv6.pw_pPagetable_lit'
+no clean name: Xv6.pw_ext8_setWidth Xv6.pi_extract_setWidth
+no clean name: Xv6.ui_u6 Xv6.km_u6 Xv6.ki_u6 Xv6.pki_u6 Xv6.pi_u6
+no clean name: Xv6.ap_word4_joinA Xv6.fp_word4_join
+name clash ptRep_fill: Xv6.UPtPpt.ptRep_fill Xv6.UPtFault.ptRep_fill Xv6.UPtAlloc.ptRep_fill
+no clean name: Xv6.ushEI_ce Xv6.ushRI_0ce
+no clean name: Xv6.ushRI_ca4 Xv6.ushMI_ca4
+no clean name: Xv6.hsl_myproc Xv6.asl_myproc
+instance: Xv6.GenCparams.gcPIN_timeless Xv6.GenCparams.gcPIN_tl
+name clash ite_bne: Xv6.co_ite_bne Xv6.w_ite_bne
+no clean name: Xv6.vdis_shl3 Xv6.fda_shl3
+no clean name: Xv6.sp_acquire Xv6.cki_acquire
+instance: Xv6.CifEnv.Sup_pers Xv6.CifEnv.hSup
+no clean name: Xv6.fd_descAt14 Xv6.vdrw3_desc14

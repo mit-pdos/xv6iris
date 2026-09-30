@@ -48,3 +48,4 @@ Drift wave 3: D3-app (theme E) agent a7c81c0f7b9bd7f51 (worktree). Then I+J.
 MILESTONE: drift theme E LANDED (tip 48785caa2): unionAdequacyClosed concludes unionPhiSync; unionSyncCutNeg, unionResults proved.
 Lean now matches Rocq main 456141b5b except themes I+J (NI ledgers / permit sweep) — awaiting user decision.
 Open small items: union_residuals.md still describes pre-hook SY2 shape.
+Small cleanup Sept 29: 236 landed agent worktrees removed (branches kept); lane B's duplicate finder saved in tools/dups/; stale sync notes fixed.

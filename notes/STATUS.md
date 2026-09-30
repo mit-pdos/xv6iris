@@ -1,4 +1,15 @@
-# Lean xv6 port — coordinator status (RESUME HERE)
+# Lean xv6 port — status (RESUME HERE: notes/coord/checkpoint_0929.md is the live checkpoint)
+
+CURRENT (2026-09-29): all three top theorems closed at the axiom baseline (propext, Classical.choice,
+Quot.sound, bv_decide certs) and in step with Rocq main 456141b5b:
+`Xv6.xv6FsAdequacy_closed` (system), `Xv6.userProof : USER`, `Xv6.unionAdequacyClosed` (concludes
+`unionPhiSync`; `unionSyncCutNeg`, `unionResults`).  Drift survey: notes/rocq_drift.md (1900b8a43 → main);
+only themes I+J (NI ledgers / permit sweep) are unported, pending the user's call.  Open items:
+notes/coord/union_residuals.md, notes/coord/user_residuals.md.  The Sept 26 text below is historical.
+
+---
+
+# (historical, Sept 26) Lean xv6 port — coordinator status
 
 MILESTONE 2026-09-26 (origin/lean-v2 = 455450293): **the xv6 system theorem is proved.**
 `Xv6.xv6FsAdequacy_xv6GF : USER → g.gen = 0 → g.pow = false → diskOf g.m.devs = fsImgDisk → NSteps … →
