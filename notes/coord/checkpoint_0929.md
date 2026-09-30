@@ -54,3 +54,6 @@ Sept 30: branch renamed lean-v2 -> lean. CI-PARITY WAVE (user: port everything R
 Agents (worktrees): V vtest a93577c4da3810840; A audits+TCB a5ee8f5813b3bae75; R coverage/profile/dead-code/check-gen a8f14ce73935a53ac.
 Then: lane W = .github/workflows/ci.yml for `lean` (runs-on coqdev like Rocq's; elan + lake; calls tools/ci/*).
 Build-time comparison (Sept 30, same VM): Rocq main 702 s wall / 16.4k s CPU; Lean 225 s / 5.6k s (logs /mnt/rocq/buildcmp).
+CI wave: lane A LANDED c0ee74e3b (tools/ci/audit.sh, tcb.sh); lane R LANDED b4f51e104 (lint, check_gen, coverage, profile, dead code/imports, Makefile).
+Lane R follow-up running (same agent a8f14ce73935a53ac): port `spin`, match Rocq on `unreachable`, byte-precise user coverage.
+Lane W (workflow) agent acbdaca0f65f4bde1. Lane V (vtest) a93577c4da3810840 still running.
