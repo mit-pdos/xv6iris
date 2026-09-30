@@ -78,11 +78,12 @@ Every one of those has its Lean counterpart below (deviations listed).
    (Rocq's C-3a shape) and not returned; Rocq's `fs_parse_sb … = Some
    sbrec` / `fs_sb_ok sbrec` are this contract's (a') premises.
 3. (RETIRED by crash batch C-4.)  THE CRASH LAYER IS ROCQ'S: the crash seam
-   at the application's guest (`fsCrashSeamAt appGuest`), the transport
-   `appXfer`, the era certificate and the era's born-true mirror
+   at the application's guest (`fsCrashSeamAt appGuest`), the merge
+   `appMerge` and the sync runner `appSyncRun` (sync K3-3), the era certificate and the era's born-true mirror
    `logMirrorBorn M` are premises, and fsinit BUILDS the file system's law
    here (`Xv6.fsSnapLawBuild`, Rocq `fs_snap_law_build`) out of the seam, the
-   transport and the four invariants it already holds, read at the record
+   merge and the four invariants (and its hooked twin
+   `Xv6.fsSnapLawGhostBuild` out of the runner too) it already holds, read at the record
    block 1 decodes to (the premises (a'') below are the bridge), and derives
    initlog's and ireclaim's arity-free seam (`Xv6.fsCrashSeam_ofAt`).
 4. (RETIRED by crash batch C-4, D42.)  The clean-header premise `hhdr0` is

@@ -356,14 +356,30 @@ theorem syscall_arm_pause
   · iapply syscForkOut_ne; rw [hnN]; decide
   · iapply syscWaitOut_ne; rw [hnN]; decide
 
+/-- **Rocq `sysc_dep_sync` + `sysc_out_sync`** (sync K4): sync's bundle is
+the process's optional hook (`hookOpt genId oQ`, `emp` at `none`), handed to
+the contract as it stands; the `qOpt oQ` the contract returns pays the armed
+post -- as close's payment and its answer do. -/
+def SyscDepSync : Prop :=
+  ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
+    UexecSG.sbundleAt (uslot (hlc := hlc)) 22 f (uvisOf V M sts gn cs pid) ⊢
+      ∃ oQ : Option (IProp GF), hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+        (∀ (r : BitVec 64) (M' : ElfMem) (sts' : List FdState) (cw' : Nat)
+            (cs' : ExtTreeSet GName compare),
+          qOpt oQ -∗ UexecSG.spostAt (uslot (hlc := hlc)) 22 f (uvisOf V M sts gn cs pid) r M' sts' cw' cs')
+
 set_option maxHeartbeats 4000000 in
-/-- **Arm 22, `sys_sync`** (Rocq `sysc_arm_sync`, D44): the log context off
-`fsReady`, the batch witness minted at 0 (`sync_witness_0`), `p->pid` at a
-quarter; the receipt `flushedSync γ 0` is DROPPED, as Rocq's arm 22 does. -/
+/-- **Arm 22, `sys_sync`** (Rocq `sysc_arm_sync`): the log context off
+`fsReady`, `p->pid` at a quarter.  THE HOOK IS THE PROCESS'S (sync K4): the
+deposit's row 22 is `hookOpt genId oQ` (`SyscDepSync`), handed to the
+contract as it stands, and the `qOpt oQ` the contract returns goes back on
+the post's row 22. -/
 theorem syscall_arm_sync
     (SY : SYS_SYNC)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ]
+    (hDS : SyscDepSync (hlc := hlc) (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -384,6 +400,9 @@ theorem syscall_arm_sync
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hnN : syscNum V = (22 : Int) := hnum
+  -- THE PROCESS'S HOOK (Rocq `sysc_dep_sync`): row 22 of the deposit
+  ihave HsIn := syscSysIn_at f V M sts gn cs pid 22 hnN (by decide) $$ HsIn
+  icases hDS f V M sts gn cs pid $$ HsIn with ⟨%oQ, Hhook, Hout⟩
   have hl0 : k.locks = [] := by
     have h := hwf.2.2.2.1
     k_norm_g at h
@@ -396,12 +415,9 @@ theorem syscall_arm_sync
   ihave #Hlog := fsReady_log $$ Hrdy
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   icases syscArmProc_pid hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hpid, Hback⟩
-  iapply wpLoop_bupd
-  imod sync_witness_0 (GF := GF) icfgLog with #Hlb0
-  imodintro
   have hU := SY.wp_sys_sync_eb (hlc := hlc) (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) icfgLog fscBio (fsView fscFs fscDisk icfgDev fscCov)
-    fscFs j fscLogst icfgDev 0 pid (DFrac.own (1 : Qp).half.half) hj hprocK
+    fscFs j fscLogst icfgDev oQ pid (DFrac.own (1 : Qp).half.half) hj hprocK
     (by k_norm_g; have : sysSyncSlots + 4 ≤ syscallSlots := by decide
         omega)
     hnoffK (by k_norm_g; exact htier)
@@ -414,10 +430,10 @@ theorem syscall_arm_sync
   ihave Hlog := (show logCtx (GF := GF) icfgLog fscBio fscFs fscCov fscLogst icfgDev ⊢
       logCtx icfgLog fscBio fscFs (fsView (GF := GF) fscFs fscDisk icfgDev fscCov).cov fscLogst icfgDev
     from .rfl) $$ Hlog
-  iframe Hk Hpi Hte Hce Hlog Hlb0 Hpid Hpc
+  iframe Hk Hpi Hte Hce Hlog Hhook Hpid Hpc
   iapply wpNext_intro_pin
   iintro %cpu %-
-  iintro %spie2 %spp2 %R2 %⟨hcs, ha0⟩ Hk Hpc Hte Hce - Hpid
+  iintro %spie2 %spp2 %R2 %⟨hcs, ha0⟩ Hk Hpc Hte Hce HQo Hpid
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr j) ⊢ cpuClaimExt cpu k.sie k.proc
     from by rw [hproc]) $$ Hce
   ihave Hpriv := Hback $$ Hpid
@@ -434,8 +450,10 @@ theorem syscall_arm_sync
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
   isplitr
   · iapply syscExecOut_ne; rw [hnN]; decide
-  isplitr
-  · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 22 hnN (by decide)
+  isplitl [HQo Hout]
+  · -- THE HOOK'S `Q` pays post 22 (Rocq `sysc_out_sync`)
+    iapply syscSysOut_at f V M sts gn cs pid _ _ sts _ cs 22 hnN (by decide) (by decide)
+    iapply Hout $$ %_ %_ %_ %_ %_ HQo
   isplitr
   · iapply syscForkOut_ne; rw [hnN]; decide
   · iapply syscWaitOut_ne; rw [hnN]; decide

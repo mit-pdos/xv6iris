@@ -188,9 +188,11 @@ abbrev syscNoChildren : ExtTreeSet GName compare := ∅
 
 /-- The numbers that owe nothing on the syscall channel (Rocq
 `sysc_num_nofs`): every number but read, chdir, open, write, mknod, unlink,
-link, mkdir, exec, pipe and close. -/
+link, mkdir, exec, pipe, close and sync (sync K4: sync hands the process's
+hook's `Q` back, so its arm pays the row itself). -/
 def syscNumNofs (k : Int) : Prop :=
-  ¬ (k = 5 ∨ k = 9 ∨ k = 15 ∨ k = 16 ∨ k = 17 ∨ k = 18 ∨ k = 19 ∨ k = 20 ∨ k = 7 ∨ k = 4 ∨ k = 21)
+  ¬ (k = 5 ∨ k = 9 ∨ k = 15 ∨ k = 16 ∨ k = 17 ∨ k = 18 ∨ k = 19 ∨ k = 20 ∨ k = 7 ∨ k = 4 ∨ k = 21 ∨
+    k = 22)
 
 instance syscNumNofs_dec (k : Int) : Decidable (syscNumNofs k) := by
   unfold syscNumNofs; infer_instance

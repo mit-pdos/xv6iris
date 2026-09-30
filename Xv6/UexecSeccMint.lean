@@ -221,6 +221,12 @@ theorem seccSbundleRows (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
     ihave #Hr := seccKey_rows W $$ Hk
     iapply seccFilecloseCpays W.fd $$ Hr
   rw [if_neg h2]
+  by_cases h22 : n = 22
+  · -- row 22: the point deposits no sync hook
+    rw [if_pos h22]
+    dsimp only [seccFam, xfamAt, xfamPt, hookOpt]
+    iempintro
+  rw [if_neg h22]
   iempintro
 
 /-- Rocq `secc_sbundle`, at the class's bundle (so its readers need no

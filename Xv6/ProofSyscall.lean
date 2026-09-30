@@ -110,7 +110,7 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
           cs ip f hE hj hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_close SCL PT Γ syscDepClose_holds c0 cpu k spie spp R γw γ j pid V M sts gn
           cs ip f hE hj hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
-        (fun h => syscall_arm_sync SSY PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
+        (fun h => syscall_arm_sync SSY PT Γ syscDepSync_holds c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_seccomp SSC PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)

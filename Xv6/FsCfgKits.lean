@@ -76,8 +76,8 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    outside users (`_fsinit_ghost_open`, `_kalloc_open`, `_icache_rest_open`)
    are kept.
 7. **Crash rows (D35, Rocq-literal)**: kit 2 carries `fsBytesInv … Pb`,
-   `excOwn fscFs.exc Xexc`, `fsCrashSeamAt appGuest fscCov fscLogst` and
-   `appXfer`, exactly Rocq's rows; `fsinit` takes all of them (SpecFsinit
+   `excOwn fscFs.exc Xexc`, `fsCrashSeamAt appGuest fscCov fscLogst`,
+   `appMerge` and `appSyncRun` (sync K3-3), exactly Rocq's rows; `fsinit` takes all of them (SpecFsinit
    deviations 3/7 retired, crash batch C-4) and `FirstTok.firstFsinit`
    holds this kit.
 -/

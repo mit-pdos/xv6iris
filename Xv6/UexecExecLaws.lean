@@ -196,6 +196,20 @@ theorem syscDepClose_holds : SyscDepClose (hlc := hlc) (GF := GF) := by
   iapply hsp
   iexact Hcp
 
+/-- **`SyscDepSync`** at the instance (Rocq `sysc_dep_sync` +
+`sysc_out_sync`, sync K4): row 22 is the family's hook, its `Q` pays post
+22. -/
+theorem syscDepSync_holds : SyscDepSync (hlc := hlc) (GF := GF) := by
+  intro f V M sts gn cs pid
+  refine (sbundleAt_sync_elim_xv6 (hlc := hlc) (uslot (hlc := hlc)) f (uvisOf V M sts gn cs pid)).trans ?_
+  iintro H
+  iexists (Xfam.syOQ f)
+  iframe H
+  iintro %r %M' %sts' %cw' %cs' HQ
+  iapply spostAt_sync_intro_xv6 (hlc := hlc) (uslot (hlc := hlc)) f (uvisOf V M sts gn cs pid) r M'
+    sts' cw' cs'
+  iexact HQ
+
 /-- **`SyscDepExit`** at the instance (Rocq `sysc_dep_exit`, over
 `sbundle_at_exit_elim`). -/
 theorem syscDepExit_holds : SyscDepExit (hlc := hlc) (GF := GF) := by

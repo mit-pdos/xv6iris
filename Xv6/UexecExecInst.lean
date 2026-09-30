@@ -100,6 +100,7 @@ import Xv6.SysExecNe
 import Xv6.SpecSyscall
 import Xv6.SpecFileclose
 import Xv6.PipeReg
+import Xv6.SyncHook
 
 namespace Xv6
 
@@ -282,6 +283,12 @@ structure Xfam (GF : BundledGFunctors) where
   kfLend : IProp GF
   /-- exit (2): THIS process's own exit payload (`UexecSG.sexitPay`) -/
   kfXpay : Int → IProp GF
+  /-- sync (22): THE PROCESS'S SYNC HOOK (Rocq `sy_oQ`, sync K4, design/sync.md
+  §4.3 item 4), `none` when the process deposits no hook.  The deposit's row
+  is `hookOpt genId` of it and the post's `qOpt` of it, so at `none` both
+  rows are `emp` and 22 stays a free number.  LAST, so every builder only
+  gains a trailing field. -/
+  syOQ : Option (IProp GF)
 
 section Fam
 variable {GF : BundledGFunctors}
@@ -338,6 +345,7 @@ def xfamPt : Xfam GF where
   kfPay := fun _ => iprop(True)
   kfLend := iprop(emp)
   kfXpay := fun _ => iprop(True)
+  syOQ := none
 
 /-- **Rocq `xfam_at`**: the same families at another own payload. -/
 def xfamAt (Q : Int → IProp GF) (f : Xfam GF) : Xfam GF := { f with kfXpay := Q }
@@ -351,6 +359,10 @@ def xfamExecAt (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat
     (Rs : IProp GF) (pay : Int → IProp GF) (lend : IProp GF) (xpay : Int → IProp GF) : Xfam GF :=
   { xfamPt with xP := P, xPmiss := Pmiss, xFo := Fo, xRs := Rs, kfPay := pay, kfLend := lend,
                 kfXpay := xpay }
+
+/-- **Rocq `xfam_sy`** (sync K4): the same families at another row-22 hook
+-- what a process that deposits a hook at `sync()` names. -/
+def xfamSy (oQ : Option (IProp GF)) (f : Xfam GF) : Xfam GF := { f with syOQ := oQ }
 
 end Fam
 
@@ -527,6 +539,10 @@ def xv6SbundleRest (n : Int) (f : Xfam GF) (W : Uvis) : IProp GF :=
   else if n = 6 then uKillCred (hlc := hlc)
   else if n = 21 then filecloseCpay (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP
   else if n = USYS_exit then filecloseCpays (hlc := hlc) W.fd
+  -- sync (22, Rocq sync K4): the process's optional hook -- `emp` at
+  -- `none`, the era's hook at `some Q`, fired once at a ghost commit.  AFTER
+  -- exit's row, so no reader above moves.
+  else if n = 22 then hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) f.syOQ
   else iprop(emp)
 
 /-- **Rocq `xv6_sbundle`**: ONE MATCH ON THE NUMBER. -/
@@ -549,6 +565,9 @@ def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : Bi
   else if n = 20 then xpostMkdir (hlc := hlc) f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok f.dFex W r
   else if n = USYS_pipe then xpostPipe W r fdv'
   else if n = 21 then filecloseCpostAny (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP
+  -- sync (22): the hook's `Q`, fired at a ghost commit covering every change
+  -- linearised before the call (`SpecSysSync`)
+  else if n = 22 then qOpt f.syOQ
   else iprop(emp)
 
 /-! ### Non-expansiveness, the key congruence, monotonicity -/
@@ -770,6 +789,13 @@ theorem xv6SbundleRest_supply (n : Int) (W : Uvis) :
     iintro #⟨-, Hkc, -⟩
     iapply filecloseCpays_taint _ $$ Hkc
   rw [if_neg h2]
+  by_cases h22 : n = 22
+  · -- the point deposits no sync hook
+    rw [if_pos h22]
+    dsimp only [xfamPt, hookOpt]
+    iintro _
+    iempintro
+  rw [if_neg h22]
   iintro _
   iempintro
 
@@ -893,6 +919,12 @@ theorem xv6Sbundle_free (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : Int �
   · rw [if_pos h9]; unfold xrowChdir; iapply fsabsChdirPre
   rw [if_neg h9, if_neg h15, if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6,
     if_neg h21, if_neg h2]
+  by_cases h22 : n = 22
+  · -- row 22 at the point: no hook
+    rw [if_pos h22]
+    dsimp only [hookOpt]
+    iempintro
+  rw [if_neg h22]
   iempintro
 
 /-! ## §5 THE PER-NUMBER READERS, and the laws the arms take
@@ -913,7 +945,7 @@ theorem syscSpostEmp_xv6 : SyscSpostEmp (GF := GF) := by
   have h7 : n ≠ USYS_exec := fun h => hno (by simp [h, USYS_exec])
   rw [if_neg h7, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
     if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega)]
+    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega), if_neg (by omega)]
   exact .rfl
 
 /-- pipe's out row (Rocq `spost_at_pipe_intro`): the receipt -- on
@@ -953,6 +985,43 @@ theorem sbundleAt_exit_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
     @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exit f W ⊢ filecloseCpays (hlc := hlc) W.fd := by
   show xv6Sbundle (hlc := hlc) X USYS_exit f W ⊢ _
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `sbundle_at_sync_elim`** (sync K4): row 22 is the process's
+optional hook. -/
+theorem sbundleAt_sync_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
+    @UexecSG.sbundleAt GF _ uexecSGXv6 X 22 f W ⊢
+      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) f.syOQ := by
+  show xv6Sbundle (hlc := hlc) X 22 f W ⊢ _
+  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `sbundle_at_sync_intro`**. -/
+theorem sbundleAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
+    hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) f.syOQ ⊢
+      @UexecSG.sbundleAt GF _ uexecSGXv6 X 22 f W := by
+  show _ ⊢ xv6Sbundle (hlc := hlc) X 22 f W
+  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `spost_at_sync_intro`**: the hook's `Q` pays post 22. -/
+theorem spostAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
+    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
+    qOpt f.syOQ ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 22 f W r M' fdv' cw' cs' := by
+  show _ ⊢ xv6Spost (hlc := hlc) X 22 f W r M' fdv' cw' cs'
+  unfold xv6Spost USYS_exec USYS_pipe
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `spost_at_sync_elim`**. -/
+theorem spostAt_sync_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
+    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
+    @UexecSG.spostAt GF _ uexecSGXv6 X 22 f W r M' fdv' cw' cs' ⊢ qOpt f.syOQ := by
+  show xv6Spost (hlc := hlc) X 22 f W r M' fdv' cw' cs' ⊢ _
+  unfold xv6Spost USYS_exec USYS_pipe
   simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
 

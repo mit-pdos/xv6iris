@@ -443,12 +443,12 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   imod hA $$ [Hrows Hok Hsnap Hstok] with ⟨%ξ0, %Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt,
     %γ0, %γ1, %cn, %γd, %I, %Fc, %ξd, Hout⟩
   · iframe Hrows Hok Hsnap
+    -- the era's generation is `gen` (the ambient `genId` at `eraM0 E gen`)
+    unfold appMerge appSyncRun eraSyncTok eraSyncHook genId
     isplitl []
-    · unfold appMerge
-      iapply (Happ_merge gen)
+    · iapply (Happ_merge gen)
     isplitl []
-    · unfold appSyncRun
-      iapply (Happ_sync_run gen)
+    · iapply (Happ_sync_run gen)
     isplitl []
     · unfold appGuest
       iapply hseam

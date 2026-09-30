@@ -4,11 +4,12 @@ of `acquire`, `release`, `sleep_prepare` and `sleep`.  A port of Rocq
 `ProofSysSync.v` against the Lean image.
 
     uint64 sys_sync(void) {
-      int n;
       acquire(&log.lock);
-      n = log.ncommit;
-      while (log.outstanding > 0 || log.committing || n == log.ncommit)
-        sleep(&log, &log.lock);
+      if (log.committing || log.outstanding > 0) {
+        int n = log.ncommit + 1;
+        while (log.ncommit < n)
+          sleep(&log, &log.lock);
+      }
       release(&log.lock);
       return 0;
     }
@@ -29,16 +30,23 @@ THE PROOF SHAPE.  The wait loop parks, so it is one `iloeb` anchored at
 `s1 = &log`, `s2` the saved `ncommit`) -- a `wpNext`-anchored proposition,
 because a park can resume the thread on a hart nobody knew about.
 
-NOTHING GHOST HAPPENS.  `sys_sync` only READS `log.committing`,
-`log.outstanding` and `log.ncommit`; every arm re-closes `logResAt`
-VERBATIM, and the loop's exit test compares two readings of `ncommit`
-whose relation the proof never needs -- both arms of the `bge` are taken
-as they come.  The durability receipt needs no wait-loop invariant either
-(Rocq `ProofSysSync.v`): the caller's witness `logEpochLb γ e` rides
-beside `logCtx` through the loop, and at the final `release` the lock's
-resource hands out `flushedSync γ e` and closes unchanged
-(`flushedSync_ofRes`, in `ss_tail`, which both arms reach).  So the post is
-`a0 = 0`, the callee-saved map and the receipt.
+THE HOOK (Rocq sync K3-4, `ProofSysSync.v`).  The caller's
+`hookOpt genId oQ` is fired exactly once, at a ghost commit:
+  - on the FAST arm (`committing == 0`, `outstanding <= 0` at the first
+    look, so `outstanding = 0` by `logResAt`'s bound) the log is quiescent:
+    `logResAt_quietAcc` lends the quiescent state and the era's sync token,
+    and this call runs `logGhostCommit_loop` itself, at `oQ.toList`;
+  - on the two WAITING arms the hook is DEPOSITED in the helping slot at the
+    guard (`ss_deposit`, `logHelp_deposit`: `committing` set or
+    `outstanding ≠ 0` is the entry's Pending clause) at the `ncommit` word
+    the set-up then loads into `s2`; the loop carries the waiter's TICKET
+    (`ssTicket`: the slot's fragment at `(γw, n0)` and the escrow invariant)
+    with `s2 = sext n0`.  The loop's exit test fails exactly when the second
+    reading differs from `n0`, where the entry is Done and the waiter
+    COLLECTS `▷ Q` (`ss_collect`, `logHelp_collect`); the tail strips the
+    later at its first instruction.
+Everything else re-closes `logResAt` VERBATIM.  So the post is `a0 = 0`,
+the callee-saved map and `qOpt oQ`.
 
 EITHER ENTRY SIE (Rocq `cpu_own 0 eb`), the begin_op recipe.  The caller
 brings the complement `trapCsrsExt`/`cpuClaimExt`; the entry acquire's arm
@@ -58,6 +66,7 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import MachCSL.WpLock
 import Xv6.VirtioDiskRwDefs2
+import Xv6.LogGhostCommit
 
 namespace Xv6
 
@@ -282,56 +291,117 @@ theorem ss_a0_epi (KR R : RegMap) (h10 : R 10#5 = 0#64) :
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
   exact h10
 
-/-! ## Opening and re-closing the log lock's payload
+/-! ## The hook, the deposit and the collect
 
-`sys_sync` only READS the three cells it looks at, so the accessor hands
-them out and takes them back unchanged -- there is no ghost transition
-anywhere in this function. -/
+`sys_sync` reads the three cells through `Xv6.logResAt_quietAcc`: the left
+conjunct closes the resource verbatim, the right one (at `out = 0`,
+`cmt = false`) lends the quiescent state and the era's token to the ghost
+commit. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
-/-- `Xv6.logResAt`, opened for its three word cells. -/
-theorem ss_res_acc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (ξ : CtxId) :
-    logResAt (GF := GF) γ γb γfs cov ls ξ ⊢
-      ∃ (out : Nat) (cmt : Bool) (nc : BitVec 32),
-        wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
-        wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
-        wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-        (wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) -∗
-          wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) -∗
-          wordAtN ξ lNcommit 4 (DFrac.own 1) nc -∗
-          logResAt γ γb γfs cov ls ξ) := by
-  unfold logResAt
-  iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-    Hout, Hcmt, Hnc, Hops, %hlen, %hp, %hfresho, Hep, %hE, Hreg, %hfreshl, %hlive, %hcap,
-    Htx, %hfresht, %hTlen, Harm⟩
-  iexists out, cmt, nc
-  iframe Hout Hcmt Hnc
-  iintro Hout Hcmt Hnc
-  iexists out, cmt, nc, om, E, X, T, nxo, nxt, nxl
-  iframe Hout Hcmt Hnc Hops Hep Hreg Htx
-  isplitr [Harm]
-  · ipureintro; exact hlen
-  isplitr [Harm]
-  · ipureintro; exact hp
-  isplitr [Harm]
-  · ipureintro; exact hfresho
-  isplitr [Harm]
-  · ipureintro; exact hE
-  isplitr [Harm]
-  · ipureintro; exact hfreshl
-  isplitr [Harm]
-  · ipureintro; exact hlive
-  isplitr [Harm]
-  · ipureintro; exact hcap
-  isplitr [Harm]
-  · ipureintro; exact hfresht
-  isplitr [Harm]
-  · ipureintro; exact hTlen
-  iexact Harm
+/-- The optional hook as the ghost commit's list. -/
+theorem ss_hook_list (oQ : Option (IProp GF)) :
+    hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ⊢
+      [∗list] Q ∈ oQ.toList, eraSyncHook (hlc := hlc) Q := by
+  cases oQ with
+  | none =>
+    iintro _
+    exact BigSepL.bigSepL_nil_intro
+  | some Q =>
+    rw [show (some Q).toList = [Q] from rfl]
+    unfold hookOpt
+    iintro H
+    iapply BigSepL.bigSepL_cons.2
+    iframe H
+    exact BigSepL.bigSepL_nil_intro
+
+/-- The ghost commit's receipts as the optional `Q`. -/
+theorem ss_q_list (oQ : Option (IProp GF)) :
+    ([∗list] Q ∈ oQ.toList, Q) ⊢ qOpt (GF := GF) oQ := by
+  cases oQ with
+  | none =>
+    unfold qOpt
+    iintro _
+    iempintro
+  | some Q =>
+    rw [show (some Q).toList = [Q] from rfl]
+    unfold qOpt
+    iintro H
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨HQ, -⟩
+    iexact HQ
+
+/-- **The waiter's ticket** (Rocq: the loop invariant's deposit): at
+`some Q`, the helping slot's fragment for the waiter's entry at the
+`ncommit` word `n0` it read, and the entry's escrow; nothing at `none`. -/
+def ssTicket (γ : LogNames) (oQ : Option (IProp GF)) (n0 : BitVec 32) : IProp GF :=
+  match oQ with
+  | none => iprop(emp)
+  | some Q => iprop(∃ (w : Nat) (γw : GName),
+      (γ.help ↪◯MAP[w] ((γw, n0) : GName × BitVec 32)) ∗ inv (ndot helpN w) (esc Q γw))
+
+/-- **The deposit**, at the guard (`committing` set or `outstanding ≠ 0`). -/
+theorem ss_deposit (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
+    (oQ : Option (IProp GF)) (hg : cmt = true ∨ out ≠ 0) :
+    logHelp (hlc := hlc) γ nc out cmt ⊢
+      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗
+      |={⊤}=> logHelp (hlc := hlc) γ nc out cmt ∗ ssTicket γ oQ nc := by
+  cases oQ with
+  | none =>
+    iintro H _
+    imodintro
+    iframe H
+    unfold ssTicket
+    iempintro
+  | some Q =>
+    unfold hookOpt ssTicket
+    iintro H Hh
+    imod logHelp_deposit γ nc out cmt Q hg $$ H Hh with ⟨%w, %γw, H, Hw, #Hinv⟩
+    imodintro
+    iframe H
+    iexists w, γw
+    iframe Hw Hinv
+
+/-- **The collect**, at the loop's exit (`ncommit` moved past `n0`). -/
+theorem ss_collect (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
+    (oQ : Option (IProp GF)) (n0 : BitVec 32) (hne : n0 ≠ nc) :
+    ssTicket γ oQ n0 ⊢ logHelp (hlc := hlc) γ nc out cmt -∗
+      |={⊤}=> logHelp (hlc := hlc) γ nc out cmt ∗ ▷ qOpt (GF := GF) oQ := by
+  cases oQ with
+  | none =>
+    iintro _ H
+    imodintro
+    iframe H
+    unfold qOpt
+    inext
+    iempintro
+  | some Q =>
+    unfold ssTicket qOpt
+    iintro ⟨%w, %γw, Hw, #Hinv⟩ H
+    iapply logHelp_collect γ nc out cmt w γw n0 Q hne $$ Hw Hinv H
+
+/-- `bge s2,a5` falls through only when the second reading differs. -/
+theorem ss_exit_ne (n0 nc : BitVec 32)
+    (hb : bcond bop.BGE (BitVec.signExtend 64 n0) (BitVec.signExtend 64 nc) = false) :
+    n0 ≠ nc := by
+  intro h
+  subst h
+  simp [bcond, BitVec.slt] at hb
+
+/-- `outstanding <= 0` at `out ≤ 3` is `out = 0`. -/
+theorem ss_out0 (out : Nat) (h3 : out ≤ 3)
+    (hb : bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 out)) = true) : out = 0 := by
+  rcases (by omega : out = 0 ∨ out = 1 ∨ out = 2 ∨ out = 3) with h | h | h | h <;> subst h
+  · rfl
+  all_goals exact absurd hb (by decide)
+
+/-- `outstanding > 0` (the `blez` not taken) is `out ≠ 0`. -/
+theorem ss_out_ne (out : Nat)
+    (hb : bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 out)) = false) : out ≠ 0 := by
+  rintro rfl
+  exact absurd hb (by decide)
 
 end
 
@@ -342,27 +412,28 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on. -/
-def ssPost (k : KCtx) (γ : LogNames) (pidv : BitVec 32) (dqp : DFrac) (e : Nat) :
+def ssPost (k : KCtx) (γ : LogNames) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) :
     CPU → IProp GF :=
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    flushedSync (hlc := hlc) γ e -∗
+    qOpt oQ -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu')
 
-theorem ssPost_elim (k : KCtx) (γ : LogNames) (pidv : BitVec 32) (dqp : DFrac) (e : Nat)
+theorem ssPost_elim (k : KCtx) (γ : LogNames) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF))
     (cpu' : CPU) :
-    ssPost (GF := GF) k γ pidv dqp e cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap),
+    ssPost (GF := GF) k γ pidv dqp oQ cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-      flushedSync (hlc := hlc) γ e -∗
+      qOpt oQ -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu' := by
   unfold ssPost; iintro H; iexact H
 
 theorem ssPost_ws (k : KCtx) (γ : LogNames) (a b : Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (e : Nat) : ssPost (GF := GF) (k.withSpie a b) γ pidv dqp e = ssPost k γ pidv dqp e := rfl
+    (oQ : Option (IProp GF)) :
+    ssPost (GF := GF) (k.withSpie a b) γ pidv dqp oQ = ssPost k γ pidv dqp oQ := rfl
 
 theorem ss_kctx_ws (cpu : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) cpu (k.withRegs R) ⊢ kctx cpu ((k.withSpie k.spie k.spp).withRegs R) := by
@@ -375,40 +446,43 @@ spare frame cells.  The `bge` at `+0x56` comes back here, at whichever hart
 def ssLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (nv : BitVec 64) (R : RegMap) : IProp GF := iprop%
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) : IProp GF := iprop%
   ⌜ssRegs k nv R⌝ ∗
   kctx cpu ((ssK k).withRegs R) ∗ pcIs cpu (KA.«sys_sync» + 0x3e#64) ∗
   procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
+  logCtx γ γb γfs cov ls dev ∗ (∃ n0 : BitVec 32, ⌜nv = BitVec.signExtend 64 n0⌝ ∗ ssTicket γ oQ n0) ∗
+  locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
   frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  wpNext true k.proc cpu (ssPost k γ pidv dqp e)
+  wpNext true k.proc cpu (ssPost k γ pidv dqp oQ)
 
 theorem ssLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (nv : BitVec 64) (R : RegMap) :
-    ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp e nv R ⊢
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) :
+    ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp oQ nv R ⊢
       ⌜ssRegs k nv R⌝ ∗
       kctx cpu ((ssK k).withRegs R) ∗ pcIs cpu (KA.«sys_sync» + 0x3e#64) ∗
       procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-      logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
+      logCtx γ γb γfs cov ls dev ∗ (∃ n0 : BitVec 32, ⌜nv = BitVec.signExtend 64 n0⌝ ∗ ssTicket γ oQ n0) ∗
+      locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
       frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
       wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-      wpNext true k.proc cpu (ssPost k γ pidv dqp e) := by
+      wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) := by
   unfold ssLoopHead; iintro H; iexact H
 
 theorem ssLoopHead_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (nv : BitVec 64) (R : RegMap) (hR : ssRegs k nv R) :
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) (hR : ssRegs k nv R) :
     kctx cpu ((ssK k).withRegs R) ∗ pcIs cpu (KA.«sys_sync» + 0x3e#64) ∗
     procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-    logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
+    logCtx γ γb γfs cov ls dev ∗ (∃ n0 : BitVec 32, ⌜nv = BitVec.signExtend 64 n0⌝ ∗ ssTicket γ oQ n0) ∗
+    locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc cpu (ssPost k γ pidv dqp e)
-    ⊢ ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp e nv R := by
+    wpNext true k.proc cpu (ssPost k γ pidv dqp oQ)
+    ⊢ ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp oQ nv R := by
   unfold ssLoopHead
   iintro ⟨Hk, Hpc, Hpi, Htc, Hcc, Hir, Hctx, Hlb, Hlocked, Hpay, Hfr, Hpid, Hnext⟩
   isplitr [Hk Hpc Hpi Htc Hcc Hir Hctx Hlb Hlocked Hpay Hfr Hpid Hnext]
@@ -418,9 +492,9 @@ theorem ssLoopHead_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 theorem ssLoopHead_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (nv : BitVec 64) (R : RegMap) :
-    ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp e nv R ⊢
-      ssLoopHead Γ cpu (k.withSpie k.spie k.spp) γ γb γfs cov ls dev pidv dqp e nv R := by
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) :
+    ssLoopHead (GF := GF) Γ cpu k γ γb γfs cov ls dev pidv dqp oQ nv R ⊢
+      ssLoopHead Γ cpu (k.withSpie k.spie k.spp) γ γb γfs cov ls dev pidv dqp oQ nv R := by
   rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]
 
 /-! ## The four call sites -/
@@ -548,27 +622,36 @@ complement. -/
 theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames)
     (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (R : RegMap) (jp : Nat)
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (R : RegMap) (jp : Nat)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
     (hK : sysSyncSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hint : k.intena = k.sie)
     (hR : ssRegsE k R) :
     kctx c ((ssK k).withRegs R) ∗ pcIs c (KA.«sys_sync» + 0x5e#64) ∗
-    logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗
+    logCtx γ γb γfs cov ls dev ∗ ▷ qOpt oQ ∗ locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc c (ssPost k γ pidv dqp e)
+    wpNext true k.proc c (ssPost k γ pidv dqp oQ)
     ⊢ wpLoop (GF := GF) c := by
   have hK4 : 4 ≤ k.avail := by unfold sysSyncSlots sleepSlots at hK; omega
   have hKs : 20 ≤ k.avail - 4 := by unfold sysSyncSlots sleepSlots at hK; omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
   have hsie : (ssK k).sie = false := rfl
-  iintro ⟨Hk, Hpc, #Hctx, #Hlb, Hlocked, Hpay, Hfr, Htc, Hcc, Hir, Hpid, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hctx, HQ, Hlocked, Hpay, Hfr, Htc, Hcc, Hir, Hpid, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x5e auipc a0,0x1e ; +0x62 addi a0,a0,974 ; +0x66 jal release
-  k_step (wp_s_auipc c _ (KA.«sys_sync» + 0x5e#64) false 0x1e#20 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k]
+  -- (the first step also strips the collected hook's later: `k_step` with a
+  -- whole-context `inext`)
+  iapply (wp_s_auipc c _ (KA.«sys_sync» + 0x5e#64) false 0x1e#20 10#5 (by decide)) $$ [- $Hk $Hpc]
+  rotate_right 1
+  k_code (text_instr _ _ _ _ rfl rfl) Htext
+  iframe #
+  k_norm_goal [hsie, ssK_sie k]
+  iframe
+  inext
+  iapply wpNext_off_intro
+  try (case hs => k_norm)
   iintro Hk Hpc
   k_step (wp_s_addi c _ (KA.«sys_sync» + 0x62#64) false 1464#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_log]
@@ -577,9 +660,6 @@ theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_br_rel]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
-  -- THE RECEIPT (Rocq `flushed_sync_of_res`): the lock's resource yields the
-  -- bank at a batch at or past the caller's own, and closes unchanged
-  icases flushedSync_ofRes γ γb γfs cov ls curCtx e $$ Hlb Hpay with ⟨#Hfs, Hpay⟩
   icases armExt_split c k.sie k.proc $$ [$Htc $Hcc $Hir] with ⟨Harm, Hte, Hce⟩
   iapply (ss_re RE c _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie k.proc ?hpr ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hpay $Harm]
@@ -623,9 +703,9 @@ theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   ihave Hpost := wpNext_at true k.proc _ cpu _
     (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp))) $$ Hnext
-  ihave Hpost := ssPost_elim k γ pidv dqp e cpu $$ Hpost
+  ihave Hpost := ssPost_elim k γ pidv dqp oQ cpu $$ Hpost
   ihave Hk := ss_kctx_ws cpu k _ $$ Hk
-  iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce Hfs Hpid
+  iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce HQ Hpid
   · ipureintro
     exact ⟨MachCSL.calleeSaved_mk k.regs _ d9 d18 d19 d20 d21 d22 d23 d24 d25 d26 d27,
       ss_a0_epi k.regs _ h10⟩
@@ -650,26 +730,27 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (nv : BitVec 64) (R : RegMap)
+    (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : sysSyncSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hint : k.intena = k.sie)
     (hR : ssRegs k nv R) :
     kctx cpu ((ssK k).withRegs R) ∗ pcIs cpu (KA.«sys_sync» + 0x3e#64) ∗
     procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-    logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
+    logCtx γ γb γfs cov ls dev ∗ (∃ n0 : BitVec 32, ⌜nv = BitVec.signExtend 64 n0⌝ ∗ ssTicket γ oQ n0) ∗
+    locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc cpu (ssPost k γ pidv dqp e) ∗
+    wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) ∗
     ▷ (∀ (cpu' : CPU) (a b : Bool) (nv' : BitVec 64) (R' : RegMap),
-      ssLoopHead Γ cpu' (k.withSpie a b) γ γb γfs cov ls dev pidv dqp e nv' R' -∗ wpLoop cpu')
+      ssLoopHead Γ cpu' (k.withSpie a b) γ γb γfs cov ls dev pidv dqp oQ nv' R' -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK4 : 4 ≤ k.avail := by unfold sysSyncSlots sleepSlots at hK; omega
   have hKs : 20 ≤ k.avail - 4 := by unfold sysSyncSlots sleepSlots at hK; omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
   -- the critical section: interrupts off while `log.lock` is held
   have hsie : (ssK k).sie = false := rfl
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, #Hlb, Hlocked, Hpay, Hfr, Hpid, Hnext, IH⟩
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Htk, Hlocked, Hpay, Hfr, Hpid, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   -- +0x3e mv a0,s1 ; +0x40 jal sleep_prepare
@@ -789,7 +870,8 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   -- the log lock is held again: interrupts off
   have hsie' : (ssK (k.withSpie s4 p4)).sie = false := rfl
   -- +0x54 lw a5,40(s1): the second reading of log.ncommit
-  icases ss_res_acc γ γb γfs cov ls curCtx $$ Hpay with ⟨%out, %cmt, %nc, Hout, Hcmt, Hnc, Hclose⟩
+  icases logResAt_quietAcc γ γb γfs cov ls curCtx $$ Hpay
+    with ⟨%out, %cmt, %nc, -, Hout, Hcmt, Hnc, Hhelp, ⟨Hclose, -⟩⟩
   isimp only [wordAtN_cur] at Hnc
   k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x54#64) true 40#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) nc)
@@ -797,9 +879,9 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     with [ssK_sie (k.withSpie s4 p4), u9, ss_nc_addr]
   iintro Hk Hpc Hnc
   isimp only [← wordAtN_cur] at Hnc
-  ihave Hpay := Hclose $$ Hout Hcmt Hnc
   by_cases hb : bcond bop.BGE nv (BitVec.signExtend 64 nc) = true
   · -- ==== round again ====
+    ihave Hpay := Hclose $$ Hout Hcmt Hnc Hhelp
     k_step (wp_s_branch cpu _ (KA.«sys_sync» + 0x56#64) false 8168#13 18#5 15#5 (by decide)
         bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -808,13 +890,21 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     iapply IH $$ %cpu %s4 %p4 %nv %(R3.set 15#5 (BitVec.signExtend 64 nc))
     unfold ssLoopHead
     isimp only [ssPost_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
-    isplitr [Hk Hpc Hpi Htc Hcc Hir Hctx Hlb Hlocked Hpay Hfr Hpid Hnext]
+    isplitr [Hk Hpc Hpi Htc Hcc Hir Hctx Htk Hlocked Hpay Hfr Hpid Hnext]
     · ipureintro
       exact ssRegs_set _ nv _ hR3 15#5 _ (by decide)
-    iframe Hk Hpc Hpi Htc Hcc Hir Hctx Hlb Hlocked Hpay Hfr Hpid Hnext
+    iframe Hk Hpc Hpi Htc Hcc Hir Hctx Htk Hlocked Hpay Hfr Hpid Hnext
   · -- ==== out: restore s1/s2 and fall into the tail ====
     have hb' : bcond bop.BGE nv (BitVec.signExtend 64 nc) = false := by
       simpa using hb
+    -- THE COLLECT: `ncommit` moved past the waiter's word, so its entry is
+    -- Done and the escrow hands out `▷ Q`
+    icases Htk with ⟨%n0, %hn0, Htk⟩
+    have hne : n0 ≠ nc := ss_exit_ne n0 nc (by rw [← hn0]; exact hb')
+    iapply wpLoop_fupd
+    imod ss_collect γ nc out cmt oQ n0 hne $$ Htk Hhelp with ⟨Hhelp, HQ⟩
+    imodintro
+    ihave Hpay := Hclose $$ Hout Hcmt Hnc Hhelp
     k_step (wp_s_branch cpu _ (KA.«sys_sync» + 0x56#64) false 8168#13 18#5 15#5 (by decide)
         bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -851,12 +941,12 @@ theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       · iexists (k.regs 9#5); iexact H3
       · iexists (k.regs 18#5); iexact H4) $$ [Hc1 Hc2 Hc3 Hc4]
     case' _ => iframe Hc1 Hc2 Hc3 Hc4
-    iapply (ss_tail RE Γ cpu (k.withSpie s4 p4) γ γb γfs cov ls dev pidv dqp e _ jp
+    iapply (ss_tail RE Γ cpu (k.withSpie s4 p4) γ γb γfs cov ls dev pidv dqp oQ _ jp
       hjp hproc ?hKt ?hnt ?hlt htier ?hit ?hRt) $$ [- $Hk $Hpc]
     rotate_right 1
     isimp only [ssPost_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
     iframe #
-    iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext
+    iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext HQ
     case hKt => exact hK
     case hnt => exact hnoff
     case hlt => exact hlocks
@@ -892,20 +982,20 @@ theorem ss_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (e : Nat)
+    (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF))
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : sysSyncSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hint : k.intena = k.sie) :
     ⊢ ∀ (c : CPU) (a b : Bool) (nv : BitVec 64) (R : RegMap),
-        ssLoopHead (GF := GF) Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp e nv R -∗
+        ssLoopHead (GF := GF) Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp oQ nv R -∗
           wpLoop c := by
   iloeb as IH
   iintro %c %a %b %nv %R HL
-  icases ssLoopHead_elim Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp e nv R $$ HL
-    with ⟨%hR, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, #Hlb, Hlocked, Hpay, Hfr, Hpid, Hnext⟩
-  iapply (ss_body SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp e nv R
+  icases ssLoopHead_elim Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp oQ nv R $$ HL
+    with ⟨%hR, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Htk, Hlocked, Hpay, Hfr, Hpid, Hnext⟩
+  iapply (ss_body SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp oQ nv R
       hjp hproc hK hnoff hlocks htier hint hR)
-    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hlocked $Hpay $Hfr $Hpid $Hnext]
+    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Htk $Hlocked $Hpay $Hfr $Hpid $Hnext]
   iframe #
   isimp only [MachCSL.KCtx.withSpie_twice]
   iexact IH
@@ -958,19 +1048,22 @@ reload of `&log` into `s1`, falling through into the loop head. -/
 theorem ss_setup (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (R : RegMap)
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nc0 : BitVec 32) (R : RegMap)
     (hK : sysSyncSlots ≤ k.avail) (hR : ssRegsE k R) :
     kctx cpu ((ssK k).withRegs R) ∗ pcIs cpu (KA.«sys_sync» + 0x2a#64) ∗
     procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-    logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
+    logCtx γ γb γfs cov ls dev ∗ locked γ.lk cpu ∗
+    wordAtN curCtx lNcommit 4 (DFrac.own 1) nc0 ∗
+    (wordAtN curCtx lNcommit 4 (DFrac.own 1) nc0 -∗ logResAt γ γb γfs cov ls curCtx) ∗
+    ssTicket γ oQ nc0 ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc cpu (ssPost k γ pidv dqp e) ∗
+    wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) ∗
     (∀ (c : CPU) (a b : Bool) (nv : BitVec 64) (R' : RegMap),
-      ssLoopHead Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp e nv R' -∗ wpLoop c)
+      ssLoopHead Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp oQ nv R' -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : (ssK k).sie = false := rfl
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, #Hlb, Hlocked, Hpay, Hfr, Hpid, Hnext, Hloop⟩
+  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Hlocked, Hnc, Hclose, Htk, Hfr, Hpid, Hnext, Hloop⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   icases (show frame4s0 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ⊢
@@ -997,17 +1090,16 @@ theorem ss_setup (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     unfold frame4s2; iintro H; iexact H) $$ [Hc1 Hc2 Hc3 Hc4]
   case' _ => iframe Hc1 Hc2 Hc3 Hc4
   -- +0x2e auipc s2,0x1e ; +0x32 lw s2,1062(s2)
-  icases ss_res_acc γ γb γfs cov ls curCtx $$ Hpay with ⟨%out, %cmt, %nc, Hout, Hcmt, Hnc, Hclose⟩
   isimp only [wordAtN_cur] at Hnc
   k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x2e#64) false 0x1e#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k]
   iintro Hk Hpc
   k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x32#64) false 1552#12 18#5 18#5 (by decide) (by decide)
-      (DFrac.own 1) nc)
+      (DFrac.own 1) nc0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_lnc]
   iintro Hk Hpc Hnc
   isimp only [← wordAtN_cur] at Hnc
-  ihave Hpay := Hclose $$ Hout Hcmt Hnc
+  ihave Hpay := Hclose $$ Hnc
   -- +0x36 auipc s1,0x1e ; +0x3a addi s1,s1,1014
   k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x36#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k]
@@ -1015,12 +1107,16 @@ theorem ss_setup (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_step (wp_s_addi cpu _ (KA.«sys_sync» + 0x3a#64) false 1504#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie k, ss_log]
   iintro Hk Hpc
-  iapply Hloop $$ %cpu %(k.spie) %(k.spp) %(BitVec.signExtend 64 nc) %_
-  iapply (ssLoopHead_self Γ cpu k γ γb γfs cov ls dev pidv dqp e _ _)
-  iapply (ssLoopHead_intro Γ cpu k γ γb γfs cov ls dev pidv dqp e (BitVec.signExtend 64 nc) _
-    (ssRegs_setup k R hR (BitVec.signExtend 64 nc) _ _))
+  iapply Hloop $$ %cpu %(k.spie) %(k.spp) %(BitVec.signExtend 64 nc0) %_
+  iapply (ssLoopHead_self Γ cpu k γ γb γfs cov ls dev pidv dqp oQ _ _)
+  iapply (ssLoopHead_intro Γ cpu k γ γb γfs cov ls dev pidv dqp oQ (BitVec.signExtend 64 nc0) _
+    (ssRegs_setup k R hR (BitVec.signExtend 64 nc0) _ _))
   iframe #
   iframe Hk Hpc Htc Hcc Hir Hlocked Hpay Hfr Hpid Hnext
+  iexists nc0
+  isplitr
+  · ipureintro; rfl
+  iexact Htk
 
 set_option maxHeartbeats 32000000 in
 /-- **The entry stretch**: the prologue and `acquire(&log.lock)` at the
@@ -1032,19 +1128,20 @@ set-up at `+0x2a`. -/
 theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac) (e : Nat) (jp : Nat) (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
+    (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (jp : Nat) (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
     (hK : sysSyncSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hint : k.intena = k.sie) :
     kctx cpu k ∗ pcIs cpu KA.«sys_sync» ∗ procsInv Γ ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    logCtx γ γb γfs cov ls dev ∗ logEpochLb γ e ∗ wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc cpu (ssPost k γ pidv dqp e) ∗
+    logCtx γ γb γfs cov ls dev ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+    wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) ∗
     (∀ (c : CPU) (a b : Bool) (nv : BitVec 64) (R' : RegMap),
-      ssLoopHead Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp e nv R' -∗ wpLoop c)
+      ssLoopHead Γ c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp oQ nv R' -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK4 : 4 ≤ k.avail := by unfold sysSyncSlots sleepSlots at hK; omega
   have hKa : 10 ≤ k.avail - 4 := by unfold sysSyncSlots sleepSlots at hK; omega
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, #Hlb, Hpid, Hnext, Hloop⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, Hhook, Hpid, Hnext, Hloop⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   iapply (ss_prologue cpu k hK4) $$ [- $Hk $Hpc]
   k_next_e
@@ -1085,8 +1182,8 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
   have hRE : ssRegsE (k.withSpie s0 p0) R1 :=
     ssRegsE_entry k R1 c2 c8 c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
   -- the three cells, opened once
-  icases ss_res_acc γ γb γfs cov ls curCtx $$ Hpay
-    with ⟨%out, %cmt, %nc, Hout, Hcmt, Hnc, Hclose⟩
+  icases logResAt_quietAcc γ γb γfs cov ls curCtx $$ Hpay
+    with ⟨%out, %cmt, %nc, %hout3, Hout, Hcmt, Hnc, Hhelp, Hacc⟩
   isimp only [wordAtN_cur] at Hout
   isimp only [wordAtN_cur] at Hcmt
   cases cmt
@@ -1115,20 +1212,33 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
     k_norm
-    ihave Hpay := Hclose $$ Hout Hcmt Hnc
     by_cases hbz : bcond bop.BGE 0#64 (BitVec.signExtend 64 (BitVec.ofNat 32 out)) = true
     · -- ==== the FAST arm: nothing to wait for ====
+      -- THE GHOST COMMIT (Rocq sync K3-4): the log is quiescent, so this call
+      -- fires its own hook, with the quiescent loan and the era's token
+      have hout0 : out = 0 := ss_out0 out hout3 hbz
+      icases Hacc with ⟨-, Hq⟩
+      ihave Hq := Hq $$ [] []
+      · ipureintro; first | exact hout0 | trivial
+      · ipureintro; first | exact hout0 | trivial
+      icases Hq with ⟨%L, %M, Hquiet, Hstok, Hback⟩
+      ihave Hhs := ss_hook_list (hlc := hlc) oQ $$ Hhook
+      iapply (logGhostCommit_loop cpu oQ.toList γ γb γfs cov ls dev L M) $$ Hctx Hquiet Hstok Hhs
+      iintro Hquiet Hstok HQs
+      ihave HQ := ss_q_list oQ $$ HQs
+      ihave HQ := (BI.later_intro (PROP := IProp GF) (P := qOpt oQ)) $$ HQ
+      ihave Hpay := Hback $$ Hquiet Hstok Hout Hcmt Hnc Hhelp
       k_step (wp_s_branch0 cpu _ (KA.«sys_sync» + 0x26#64) false 56#13 15#5 (by decide)
           bop.BGE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, hbz]
       iintro Hk Hpc
-      iapply (ss_tail RE Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ jp
+      iapply (ss_tail RE Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp oQ _ jp
           hjp hproc hK hnoff hlocks htier hint ?hRt) $$ [- $Hk $Hpc]
       rotate_right 1
       isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
       iframe #
-      iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext
+      iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext HQ
       case hRt =>
         repeat refine ssRegsE_set _ _ ?_ _ _ (by decide)
         exact hRE
@@ -1140,11 +1250,22 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [ssK_sie (k.withSpie s0 p0), KCtx.rget_zero, hbz']
       iintro Hk Hpc
-      iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ hK ?hRs) $$ [- $Hk $Hpc]
+      -- THE DEPOSIT (Rocq sync K3-4): the hook goes into the helping slot at
+      -- the `ncommit` word the set-up loads into `s2`
+      iapply wpLoop_fupd
+      imod ss_deposit γ nc out false oQ (Or.inr (ss_out_ne out hbz')) $$ Hhelp Hhook with ⟨Hhelp, Htk⟩
+      imodintro
+      icases Hacc with ⟨Hclose, -⟩
+      ihave Hcl : iprop(wordAtN curCtx lNcommit 4 (DFrac.own 1) nc -∗
+          logResAt (hlc := hlc) γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
+      · iintro Hnc
+        iapply Hclose $$ Hout Hcmt Hnc Hhelp
+      iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp oQ nc _ hK ?hRs)
+        $$ [- $Hk $Hpc]
       rotate_right 1
       isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
       iframe #
-      iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext Hloop
+      iframe Hlocked Hnc Hcl Htk Hfr Htc Hcc Hir Hpid Hnext Hloop
       case hRs =>
         repeat refine ssRegsE_set _ _ ?_ _ _ (by decide)
         exact hRE
@@ -1164,12 +1285,22 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
     k_norm
-    ihave Hpay := Hclose $$ Hout Hcmt Hnc
-    iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp e _ hK ?hRs2) $$ [- $Hk $Hpc]
+    -- THE DEPOSIT (Rocq sync K3-4): the hook goes into the helping slot at
+    -- the `ncommit` word the set-up loads into `s2`
+    iapply wpLoop_fupd
+    imod ss_deposit γ nc out true oQ (Or.inl rfl) $$ Hhelp Hhook with ⟨Hhelp, Htk⟩
+    imodintro
+    icases Hacc with ⟨Hclose, -⟩
+    ihave Hcl : iprop(wordAtN curCtx lNcommit 4 (DFrac.own 1) nc -∗
+        logResAt (hlc := hlc) γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
+    · iintro Hnc
+      iapply Hclose $$ Hout Hcmt Hnc Hhelp
+    iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp oQ nc _ hK ?hRs2)
+      $$ [- $Hk $Hpc]
     rotate_right 1
     isimp only [KCtx.withSpie_regs, KCtx.withSpie_proc, ssPost_ws, MachCSL.KCtx.withSpie_twice]
     iframe #
-    iframe Hlocked Hpay Hfr Htc Hcc Hir Hpid Hnext Hloop
+    iframe Hlocked Hnc Hcl Htk Hfr Htc Hcc Hir Hpid Hnext Hloop
     case hRs2 =>
       repeat refine ssRegsE_set _ _ ?_ _ _ (by decide)
       exact hRE
@@ -1183,19 +1314,19 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_sync` meets its specification**, at either entry `SIE`. -/
 theorem sysSync_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     SYS_SYNC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev e pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev oQ pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_sys_sync_eb_body
   simp only [sysSyncAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, #Hlb, Hpid, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, Hhook, Hpid, Hnext⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hint : k.intena = k.sie := (hwf.1 hnoff).symm
-  ihave Hloop := ss_loop SP AC RE SL Γ k γ γb γfs V.cov logstart dev j pidv dqp e
+  ihave Hloop := ss_loop SP AC RE SL Γ k γ γb γfs V.cov logstart dev j pidv dqp oQ
     hj hproc hK hnoff hlocks htier hint
-  iapply (ss_entry AC RE Γ cpu k γ γb γfs V.cov logstart dev pidv dqp e j hj hproc
+  iapply (ss_entry AC RE Γ cpu k γ γb γfs V.cov logstart dev pidv dqp oQ j hj hproc
     hK hnoff hlocks htier hint)
   unfold ssPost
-  iframe Hk Hpc Hpi Hte Hce Hctx Hlb Hpid Hnext Hloop⟩
+  iframe Hk Hpc Hpi Hte Hce Hctx Hhook Hpid Hnext Hloop⟩
 
 end Xv6
