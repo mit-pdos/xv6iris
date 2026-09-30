@@ -3084,8 +3084,8 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
-      iApply ("Hcont" $! ms with "[%] Hlc Hcg' Hpc'"). exact Hmsf.
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
+      iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
   Lemma wp_csrsi_sstatus_x0_idem_s_sconf
@@ -3235,8 +3235,8 @@ Section WpSconfCsr.
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & %Hex)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
-      iApply ("Hcont" $! ms with "[%] Hlc Hcg' Hpc'"). exact Hmsf.
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
+      iApply ("Hcont" $! ms with "[%] Hcg' Hpc'"). exact Hmsf.
   Qed.
 
   Lemma wp_csrw_sstatus_val_s_sconf
@@ -3394,8 +3394,8 @@ Section WpSconfCsr.
            hand-through. ---- *)
       iIntros (npc ms' m' n')
         "Hcg' Hpc' (-> & -> & -> & %Hsie & %Hspp & %Hspie & Hsppc)".
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
-      iApply ("Hcont" $! ms' with "[%] Hlc [%] [%] Hcg' Hsppc Hpc'").
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
+      iApply ("Hcont" $! ms' with "[%] [%] [%] Hcg' Hsppc Hpc'").
       { exact Hsie. }
       { exact Hspp. }
       { exact Hspie. }
@@ -3592,8 +3592,8 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       iDestruct "Hex" as (sp0 root) "(%Hex & #Hkinv)".
       destruct Hex as (-> & Hmode & Hasid & Hppn).
-      iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
-      iApply ("Hcont" $! sp0 root with "[%] Hlc [%] [%] Hkinv Hcg' Hkptr Hpc'").
+      iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
+      iApply ("Hcont" $! sp0 root with "[%] [%] [%] Hkinv Hcg' Hkptr Hpc'").
       { exact Hmode. }
       { exact Hasid. }
       { exact Hppn. }
@@ -4000,8 +4000,8 @@ Section WpSconfCsr.
       iDestruct "Hown" as "(Hms & Hhalf & Htie & %Hmsf)".
       iDestruct (sie_arm_half_agree (CID := CID) b p ms' with "Hhalf Harm")
         as %Hb.
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
-      iApply ("Hcont" $! ms' with "[%] Hlc Hhs [Hms Hhalf Htie Hcl] Htr Hpc' Hfile
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
+      iApply ("Hcont" $! ms' with "[%] Hhs [Hms Hhalf Htie Hcl] Htr Hpc' Hfile
                 [Hstk Harm Hctx]").
       { exact Hmsf. }
       { rewrite /sconf_at. iSplitL "Hms Hhalf Htie".
@@ -4215,8 +4215,8 @@ Section WpSconfCsr.
         "Hcg' Hpc' (-> & -> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
       destruct Hex as (ms & Hmsf).
-      iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
-      iApply ("Hcont" $! ms with "[%] Hlc Hcg' Hcnt Htr Hclm Hcells Hpc'").
+      iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
+      iApply ("Hcont" $! ms with "[%] Hcg' Hcnt Htr Hclm Hcells Hpc'").
       exact Hmsf.
   Qed.
 
@@ -4414,8 +4414,8 @@ Section WpSconfCsr.
           "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
         iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
         destruct Hex as (ms & -> & Hmsf & Hsie).
-        iSpecialize ("Hcont" $! CID with "[%]"); [exact Hs|].
-        iApply ("Hcont" $! ms with "[%] Hlc [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
+        iSpecialize ("Hcont" $! CID with "[%] Hlc"); [exact Hs|].
+        iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
           [ exact Hmsf | exact Hsie ].
     - (* ================= b = false: the IDEMPOTENT write ================= *)
       iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
@@ -4562,8 +4562,8 @@ Section WpSconfCsr.
           "Hcg' Hpc' (-> & -> & %Hex & Hcnt & Htr & Hclm & Hcells)".
         iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
         destruct Hex as (ms & -> & Hmsf & Hsie).
-        iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
-        iApply ("Hcont" $! ms with "[%] Hlc [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
+        iSpecialize ("Hcont" $! cpu_id with "[%] Hlc"); [done|].
+        iApply ("Hcont" $! ms with "[%] [%] Hcg' Hcnt Htr Hclm Hcells Hpc'");
           [ exact Hmsf | exact Hsie ].
   Qed.
 

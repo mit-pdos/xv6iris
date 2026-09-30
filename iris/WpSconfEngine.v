@@ -1190,16 +1190,4 @@ Section WpSconfEngine.
     repeat split; try assumption; reflexivity.
   Qed.
 
-  (* A LEAF THAT HANDS ITS CALLER THE STEP'S LATER states it INSIDE the
-     [wp_next] binder; the funnel wants it outermost.  The two are the same
-     proposition: [▷] commutes with [∀], and the guard is PURE, so it
-     commutes with that wand too. *)
-  Lemma wp_next_later (b : bool) (pv : mword 64) (K : CpuId -> iProp Σ) :
-    wp_next b pv (fun CIDx => ▷ K CIDx) -∗ ▷ wp_next b pv K.
-  Proof using .
-    rewrite /wp_next. iIntros "H".
-    rewrite bi.later_forall. iIntros (CIDx). iSpecialize ("H" $! CIDx).
-    rewrite !bi.pure_wand_forall bi.later_forall. iExact "H".
-  Qed.
-
 End WpSconfEngine.
