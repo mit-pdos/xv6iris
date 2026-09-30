@@ -93,36 +93,39 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-! ## §3a. The create's families, at an escrowed deed -/
 
 /-- THE ESCROWED RESOURCE (Rocq `fesc_res`): the ticket and the escrow's
-unspent token. -/
-def fescRes (r : FileAppNames) (s : Dst) (g : GName) : IProp GF :=
-  iprop(ftkt r s ∗ escTok (hlc := hlc) g)
+unspent token, AND THE WRITER'S ROUND POSITION (sync SY3-A3bc): the create and
+the truncate move the line's file, so the move's two phases park and hand back
+a quarter of it (`syncRedir`); it travels with the ticket and comes home in
+every receipt. -/
+def fescRes (r : FileAppNames) (s : Dst) (g : GName) (np : Nat) : IProp GF :=
+  iprop(ftkt r s ∗ escTok (hlc := hlc) g ∗ fpos r np)
 
 /-- Rocq `file_arm_fam`. -/
-def fileArmFam (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (s : Dst) (g : GName) :
-    Pfam GF (Aview → Nat → IProp GF) :=
+def fileArmFam (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (s : Dst) (g : GName)
+    (np : Nat) : Pfam GF (Aview → Nat → IProp GF) :=
   ⟨fun (av : Aview) (_ : Nat) =>
-      iprop((⌜fclaimFacts jo s av⌝ ∗ fescRes (hlc := hlc) r s g) ∨ fileTaint (hlc := hlc) c),
-    fescRes (hlc := hlc) r s g⟩
+      iprop((⌜fclaimFacts jo s av⌝ ∗ fescRes (hlc := hlc) r s g np) ∨ fileTaint (hlc := hlc) c),
+    fescRes (hlc := hlc) r s g np⟩
 
 /-- Rocq `file_unarm_fam`. -/
-def fileUnarmFam (c : FileFixed) (r : FileAppNames) (s : Dst) (g : GName) :
+def fileUnarmFam (c : FileFixed) (r : FileAppNames) (s : Dst) (g : GName) (np : Nat) :
     Pfam GF (Aview → Nat → IProp GF) :=
-  ⟨fun (_ : Aview) (_ : Nat) => iprop(fescRes (hlc := hlc) r s g ∨ fileTaint (hlc := hlc) c),
+  ⟨fun (_ : Aview) (_ : Nat) => iprop(fescRes (hlc := hlc) r s g np ∨ fileTaint (hlc := hlc) c),
     iprop(True)⟩
 
 /-- THE PARENT LEG'S RECEIPT (Rocq `file_cre_recv`): the deed AT THE NEW
 STATE -- the line's file `N` present and empty at the inum the arm chose --
 or the taint. -/
 def fileCreRecv (c : FileFixed) (r : FileAppNames) (_jo : Option Nat) (N : Fname) (s : Dst)
-    (_g : GName) : Aview → Nat → Fname → Nat → IProp GF :=
+    (_g : GName) (np : Nat) : Aview → Nat → Fname → Nat → IProp GF :=
   fun (_ : Aview) (d : Nat) (nm : Fname) (i : Nat) =>
-    iprop((⌜s[N]? = none ∧ d = ROOTINO ∧ nm = N⌝ ∗ fown r (s.insert N (i, [])))
+    iprop((⌜s[N]? = none ∧ d = ROOTINO ∧ nm = N⌝ ∗ fown r (s.insert N (i, [])) ∗ fpos r np)
       ∨ fileTaint (hlc := hlc) c)
 
 /-- Rocq `file_cre_fam`. -/
 def fileCreFam (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (N : Fname) (s : Dst)
-    (g : GName) : Pfam GF (Aview → Nat → Fname → Nat → IProp GF) :=
-  ⟨fileCreRecv (hlc := hlc) c r jo N s g, iprop(True)⟩
+    (g : GName) (np : Nat) : Pfam GF (Aview → Nat → Fname → Nat → IProp GF) :=
+  ⟨fileCreRecv (hlc := hlc) c r jo N s g np, iprop(True)⟩
 
 /-! ## §3e'. The observations -/
 
@@ -152,41 +155,45 @@ def fileOdlkFam (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) (g : GNam
 
 /-- THE TRUNCATE'S RECEIPT (Rocq `file_trunc_recv`): `N` present and EMPTY
 at the row the truncate reached, or the taint. -/
-def fileTruncRecv (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) :
+def fileTruncRecv (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (np : Nat) :
     Aview → Nat → List (BitVec 8) → IProp GF :=
   fun (_ : Aview) (i : Nat) (_ : List (BitVec 8)) =>
-    iprop(fown r (s.insert N (i, [])) ∨ fileTaint (hlc := hlc) c)
+    iprop((fown r (s.insert N (i, [])) ∗ fpos r np) ∨ fileTaint (hlc := hlc) c)
 
 /-- Rocq `file_trunc_fam`. -/
-def fileTruncFam (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) :
+def fileTruncFam (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (np : Nat) :
     Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF) :=
-  ⟨fileTruncRecv (hlc := hlc) c r N s, iprop(True)⟩
+  ⟨fileTruncRecv (hlc := hlc) c r N s np, iprop(True)⟩
 
 /-! ## §3g. What the deed is worth after the call -/
 
 /-- WHAT A FAILED CREATE-OPEN LEAVES (Rocq `file_open_pay`). -/
-def fileOpenPay (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) : IProp GF :=
-  iprop(fown r s ∨ (⌜s[N]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert N (i, [])))
+def fileOpenPay (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (np : Nat) :
+    IProp GF :=
+  iprop((fown r s ∗ fpos r np)
+    ∨ (⌜s[N]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert N (i, [])) ∗ fpos r np)
     ∨ fileTaint (hlc := hlc) c)
 
 /-- ...AND THE SAME BEFORE THE ESCROW COMES HOME (Rocq `file_esc_pay`). -/
-def fileEscPay (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (g : GName) :
-    IProp GF :=
-  iprop(fescRes (hlc := hlc) r s g ∨ (⌜s[N]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert N (i, [])))
+def fileEscPay (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (g : GName)
+    (np : Nat) : IProp GF :=
+  iprop(fescRes (hlc := hlc) r s g np
+    ∨ (⌜s[N]? = none⌝ ∗ ∃ i : Nat, fown r (s.insert N (i, [])) ∗ fpos r np)
     ∨ fileTaint (hlc := hlc) c)
 
 /-- THE PERMIT, READ AT THE TIE (Rocq `file_permit_read`). -/
 def filePermitRead (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (g : GName)
-    (i : Nat) : IProp GF :=
-  iprop((∃ avx : Aview, ⌜astep avx ROOTINO N = some i⌝ ∗ ⌜fOk avx s⌝ ∗ fescRes (hlc := hlc) r s g)
+    (np : Nat) (i : Nat) : IProp GF :=
+  iprop((∃ avx : Aview, ⌜astep avx ROOTINO N = some i⌝ ∗ ⌜fOk avx s⌝
+      ∗ fescRes (hlc := hlc) r s g np)
     ∨ fileTaint (hlc := hlc) c)
 
 /-- WHAT THE FD ARM HANDS THE ROUND, AT THE DESCRIPTOR'S TYPE (Rocq
 `file_open_fd_K`). -/
 def fileOpenFdK (omo : OffMode) (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst)
-    (ty : FdType) : IProp GF :=
+    (np : Nat) (ty : FdType) : IProp GF :=
   iprop((∃ (i : Nat) (γo : GName), ⌜ty = .inode i γo omo⌝ ∗ fown r (s.insert N (i, [])) ∗
-      foffPub omo γo)
+      fpos r np ∗ foffPub omo γo)
     ∨ fileTaint (hlc := hlc) c)
 
 /-! ## §4. The read at `f`'s inum -/

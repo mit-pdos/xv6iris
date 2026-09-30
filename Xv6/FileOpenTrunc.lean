@@ -60,15 +60,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-- THE FRESH RUN: the create at `N` put the deed at `s.insert N (i, [])` and
 the truncate is the identity there (Rocq `file_trunc_of_cre`). -/
 theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (i : Nat)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (i : Nat)
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      creAcreFired (fileCreFam (hlc := hlc) c r jo N s g) ROOTINO N i (.AFile []) -∗
-      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s) := by
+      creAcreFired (fileCreFam (hlc := hlc) c r jo N s g np) ROOTINO N i (.AFile []) -∗
+      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s np) := by
   unfold atruncCommitI creAcreFired fileCreFam fileCreRecv fileTruncRecv fown
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv #Hm ⟨%av0, %ents, %nl0, %_hpre, Hrec⟩ %I %bs0 %nl %_hrow Hka
-  icases Hrec with (⟨-, Hd, Ht⟩ | #HT)
+  icases Hrec with (⟨-, ⟨Hd, Ht⟩, Hpos⟩ | #HT)
   · ihave Hd := fdq_of_fdeed r _ $$ Hd
     imod (fileClaim_read γfs c r jo (s.insert N (i, [])) (1 : Qp).half I heq) $$ Hinv Hm Hd Hka
       with ⟨Hka, Hd, Hc⟩
@@ -87,7 +87,7 @@ theorem fileTrunc_of_cre (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
         iframe Hka'
         ileft
         ihave Hd := fdeed_of_fdq r _ $$ Hd
-        iframe Hd Ht
+        iframe Hd Ht Hpos
     · imodintro
       iframe Hka
       isplitl []
@@ -110,23 +110,26 @@ identifies the row, the token refutes the spent disjunct, and the move at `N`
 is the escrow's fire and resync (or, at an empty file, the escrow comes home
 unspent). -/
 theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (ls : List Fwline)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (i : Nat) (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare)
     (nlx : Nat)
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
     (hN : uname N) (hrowx : PartialMap.get? avx ROOTINO = some ⟨.ADir entsx, nlx⟩)
-    (hentx : entsx[N]? = some i) (hin : (N, ws) ∈ ls) (hokw : lineOk ws) :
+    (hentx : entsx[N]? = some i) (hlast : ls.getLast? = some (Uline.LEchoF ws N))
+    (hnp : np = ls.length) (hokw : lineOk ws) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
       escKey (hlc := hlc) c r n s g -∗ flLb c ls -∗
       iprop((⌜fclaimFree avx⌝ ∗ (⌜fOk avx s⌝ ∨ escSpent (hlc := hlc) g))
         ∨ fileTaint (hlc := hlc) c) -∗
-      fescRes (hlc := hlc) r s g -∗
-      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s) := by
+      fescRes (hlc := hlc) r s g np -∗
+      atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i (fileTruncRecv (hlc := hlc) c r N s np) := by
+  have hin := flRedirs_last ls ws N hlast
+  subst hnp
   have hstx : astep avx ROOTINO N = some i := by
     rw [astep_of_dir avx ROOTINO entsx nlx N hrowx]; exact hentx
   unfold atruncCommitI fileTruncRecv fescRes
   simp only [fileOpen_fsGammaL_top]
-  iintro #Hinv #Hm #Hwit #Hlb Hfree ⟨Htk, Htok⟩ %I %bs0 %nl %_hrow Hka
+  iintro #Hinv #Hm #Hwit #Hlb Hfree ⟨Htk, Htok, Hpos⟩ %I %bs0 %nl %_hrow Hka
   icases Hfree with (⟨%hfree, Hval⟩ | #HT)
   · icases Hval with (%hokx | #Hsp)
     · obtain ⟨hpurex, hrowf⟩ := hfree
@@ -172,14 +175,17 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
               iframe Hka'
               rw [fileOpen_dst_insert_self s N (i, []) hsN]
               icases Hres with (Hown | #HT)
-              · ileft; iexact Hown
+              · ileft; iframe Hown Hpos
               · iright; iexact HT
           · have hp4 := fOk_trunc_at N i bs (absView I) s hsN hok
+            ihave ⟨Hq1, Hq2⟩ := fpos_quarters r ls.length $$ Hpos
+            ihave Hre := syncRedir_intro c r (dstContent s) (dstContent (s.insert N (i, []))) ls ws N
+              [] hlast (selOk_nil _) (by rw [dstContent_insert, subseq_nil]) $$ Hlb Hq1
             imodintro
             iframe Hka
-            isplitl [Htok]
+            isplitl [Htok Hre]
             · iapply (fileAppStep_escrow (hlc := hlc) c r i I _ n s (s.insert N (i, [])) g heq
-                (fun _ => hp1) hp2 hp3 (fun _ => hp4)) $$ Hwit Htok []
+                (fun _ => hp1) hp2 hp3 (fun _ => hp4)) $$ Hwit Htok [] Hre
               have hty := fTyped_some (GF := GF) c s ls N ws [] i hN hin hokw (selOk_nil _)
               rw [subseq_nil] at hty
               iapply hty $$ Hty Hlb
@@ -188,12 +194,12 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
                 fileOpen_dst_ne_insert s N (i, []) (by rw [hsN]; simpa using hbs)
               have hcont : fcontentOf (absView I') = s.insert N (i, []) := by
                 rw [hav]; exact fOk_fcontent _ _ hp4
-              imod (fileResync (hlc := hlc) γfs c r s (s.insert N (i, [])) I' appE (fun _ h => h)
-                heq hcont hne) $$ Hinv Htk Hka' with ⟨Hka', Hres⟩
+              imod (fileResync (hlc := hlc) γfs c r s (s.insert N (i, [])) ls.length I' appE
+                (fun _ h => h) heq hcont hne) $$ Hinv Htk Hq2 Hka' with ⟨Hka', Hres⟩
               imodintro
               iframe Hka'
-              icases Hres with (Hown | ⟨-, #HT⟩)
-              · ileft; iexact Hown
+              icases Hres with (⟨Hown, Hpos⟩ | ⟨-, #HT⟩)
+              · ileft; iframe Hown Hpos
               · iright; iexact HT
         · imodintro
           iframe Hka
@@ -217,19 +223,19 @@ theorem fileTrunc_of_exists (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
 /-- ...AND THE PIECE, as a bundle would carry it (Rocq `file_trunc_piece`):
 the keyed AU beside a refund of `True`. -/
 theorem fileTrunc_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (ls : List Fwline)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
     (hN : uname N) (hpath : argPathOf M pv pl) (hlast : (pathElems pl).getLast? = some N)
-    (hin : (N, ws) ∈ ls) (hokw : lineOk ws) :
+    (hlst : ls.getLast? = some (Uline.LEchoF ws N)) (hnp : np = ls.length) (hokw : lineOk ws) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
       escKey (hlc := hlc) c r n s g -∗ flLb c ls -∗
       pfAt (atruncOfPermit (hlc := hlc) (fsGammaL γfs) appE
           (truncPermitOf (hlc := hlc) (fsGammaL γfs)
             (truncTieArg M pv (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)))
-            (fileArmFam (hlc := hlc) c r jo s g) (fileCreFam (hlc := hlc) c r jo N s g)
+            (fileArmFam (hlc := hlc) c r jo s g np) (fileCreFam (hlc := hlc) c r jo N s g np)
             (fileDlkFam (hlc := hlc) c r n s g)))
-        (fileTruncFam (hlc := hlc) c r N s) := by
+        (fileTruncFam (hlc := hlc) c r N s np) := by
   unfold pfAt atruncOfPermit truncPermitOf truncTieArg nparCur fileTruncFam
   iintro #Hinv #Hm #Hwit #Hlb
   isplit
@@ -243,14 +249,14 @@ theorem fileTrunc_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     subst hnmf
     subst hd
     icases Hrest with (Hfresh | ⟨Hex, Harm⟩)
-    · iapply (fileTrunc_of_cre γfs c r jo n nm s g i heq) $$ Hinv Hm Hfresh
+    · iapply (fileTrunc_of_cre γfs c r jo n nm s g np i heq) $$ Hinv Hm Hfresh
     · unfold creExFired
       icases Hex with ⟨%avx, %entsx, %nlx, %hrx, %hex, Hrec⟩
       unfold pfAt
       dsimp only [fileDlkFam, fileDlkRecv, fileArmFam]
       icases Harm with ⟨-, Harm⟩
-      iapply (fileTrunc_of_exists γfs c r jo n nm s g ls ws i avx entsx nlx heq hN hrx hex hin
-        hokw) $$ Hinv Hm Hwit Hlb Hrec Harm
+      iapply (fileTrunc_of_exists γfs c r jo n nm s g np ls ws i avx entsx nlx heq hN hrx hex hlst
+        hnp hokw) $$ Hinv Hm Hwit Hlb Hrec Harm
   · ipureintro; trivial
 
 end FileOpenTrunc

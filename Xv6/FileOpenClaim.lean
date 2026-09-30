@@ -70,7 +70,7 @@ theorem fileDeed_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) :
       (⌜fOk v s ∧ fileFsPure v⌝ ∨ fileTaint (hlc := hlc) c)) := by
   iintro !> %v %s Hd Hp
   unfold filePred
-  icases Hp with (#Ht | ⟨%hpins, Hc, Hf⟩)
+  icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · iframe Hd
     isplitl []
     · ileft; iexact Ht
@@ -78,13 +78,13 @@ theorem fileDeed_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) :
   unfold fState
   icases Hf with (⟨Hw, Hf⟩ | Hf)
   · unfold fCore
-    icases Hf with (⟨%s', Hd', Ht, #Hty, %hok⟩ | ⟨%s0, %s1, Hwh, -, -, -⟩)
+    icases Hf with (⟨%s', Hd', Ht, #Hty, %hok⟩ | ⟨%s0, %s1, %np, Hwh, -, -, -, -⟩)
     · ihave %heq := fdq_fdeed_agree r q s s' $$ Hd Hd'
       subst heq
       iframe Hd
-      isplitl [Hc Hw Hd' Ht]
+      isplitl [Hc Hw Hd' Ht Hsy]
       · iright
-        iframe Hc
+        iframe Hc Hsy
         isplitr
         · ipureintro; exact hpins
         ileft
@@ -276,7 +276,7 @@ theorem fclaimFree_of (c : FileFixed) (v : Aview) (s : Dst) (hpins : fileFsPure 
   · iintro %N %i %bs %hs
     ihave ⟨%ls, -, %hbt⟩ := fTyped_lookup c s N i bs hs $$ Hty
     ipureintro
-    exact f_bytes_typed_short ls N bs hbt
+    exact f_bytes_typed_short _ N bs hbt
   ipureintro
   refine ⟨hpins, ?_⟩
   intro N i hN hst
@@ -314,7 +314,7 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   ihave ⟨Hp, Hres⟩ : iprop(filePred (hlc := hlc) c r (absView I) ∗
       (⌜fclaimFree (absView I)⌝ ∨ fileTaint (hlc := hlc) c)) $$ [Hp]
   · unfold filePred
-    icases Hp with (#Ht | ⟨%hpins, Hc, Hf⟩)
+    icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
     · isplitl []
       · ileft; iexact Ht
       · iright; iexact Ht
@@ -323,7 +323,7 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     · unfold fState
       icases Hf with (⟨Hw, Hf⟩ | Hf)
       · unfold fCore
-        icases Hf with (⟨%s', Hd, Htk, #Hty, %hok⟩ | ⟨%s0, %s1, Hwh, Htk, #Hty, %hok⟩)
+        icases Hf with (⟨%s', Hd, Htk, #Hty, %hok⟩ | ⟨%s0, %s1, %np, Hwh, Htk, #Hty, %hok, Hq⟩)
         · ihave %hfree := fclaimFree_of c (absView I) s' hpins hok $$ Hty
           isplitl
           · ileft
@@ -338,8 +338,8 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
           · ileft
             iframe Hw
             iright
-            iexists s0, s1
-            iframe Hwh Htk Hty
+            iexists s0, s1, np
+            iframe Hwh Htk Hty Hq
             ipureintro; exact hok
           · ipureintro; exact hfree
       · unfold fEscLive
@@ -351,9 +351,9 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
           iframe Ha Hrec Hwh Htk Hty
           ipureintro; exact hok
         · ipureintro; exact hfree
-    isplitl [Hc Hf]
+    isplitl [Hc Hf Hsy]
     · iright
-      iframe Hc Hf
+      iframe Hc Hf Hsy
       ipureintro; exact hpins
     · ileft; ipureintro; exact hfree
   imod Hclose $$ [Hh Hp]
