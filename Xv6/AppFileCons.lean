@@ -85,13 +85,13 @@ theorem fileFsPure_acc (c : FileFixed) (r : FileAppNames) (av : Aview) :
       filePred (hlc := hlc) c r av ∗ (⌜fileFsPure av⌝ ∨ fileTaint (hlc := hlc) c) := by
   unfold filePred
   iintro H
-  icases H with (#Ht | ⟨%hp, Hcs, Hf⟩)
+  icases H with (#Ht | ⟨%hp, Hcs, Hf, Hsy⟩)
   · isplitl []
     · ileft; iexact Ht
     · iright; iexact Ht
-  · isplitl [Hcs Hf]
+  · isplitl [Hcs Hf Hsy]
     · iright
-      iframe Hcs Hf
+      iframe Hcs Hf Hsy
       ipureintro; exact hp
     · ileft; ipureintro; exact hp
 
@@ -133,7 +133,7 @@ theorem fileConsAbs_law (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (∀ v : Aview, consKey r.fnCons -∗ filePred (hlc := hlc) c r v -∗
       filePred (hlc := hlc) c r v ∗ consKey r.fnCons ∗
       (⌜consAbsent v⌝ ∨ fileTaint (hlc := hlc) c)) := by
-  ihave #Hl := echoConsAbs_law (hlc := hlc) (GF := GF) c.1 r.fnCons
+  ihave #Hl := echoConsAbs_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons
   iintro !> %v Hk Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r v $$ Hp
   ihave ⟨He, Hk, Hc⟩ := Hl $$ %v Hk He
@@ -148,7 +148,7 @@ theorem fileConsNever_law (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (consNever r.fnCons -∗
       □ (∀ v : Aview, filePred (hlc := hlc) c r v -∗
         filePred (hlc := hlc) c r v ∗ (⌜consAbsent v⌝ ∨ fileTaint (hlc := hlc) c))) := by
-  ihave #Hl := echoConsNever_law (hlc := hlc) (GF := GF) c.1 r.fnCons
+  ihave #Hl := echoConsNever_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons
   iintro !> #Hn
   ihave #Hl' := Hl $$ Hn
   iintro !> %v Hp
@@ -165,7 +165,7 @@ theorem fileConsSealStep (c : FileFixed) (r : FileAppNames) (av : Aview) :
       filePred (hlc := hlc) c r av ∗ (consNever r.fnCons ∨ fileTaint (hlc := hlc) c) := by
   iintro Hk Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r av $$ Hp
-  imod echoConsSealStep (hlc := hlc) c.1 r.fnCons av $$ [Hk He] with ⟨He, Hc⟩
+  imod echoConsSealStep (hlc := hlc) c.ffEcho r.fnCons av $$ [Hk He] with ⟨He, Hc⟩
   · iframe Hk He
   imodintro
   isplitl [He Hback]
@@ -180,7 +180,7 @@ theorem fileConsShoot (c : FileFixed) (r : FileAppNames) (av : Aview) (i : Nat)
       filePred (hlc := hlc) c r av ∗ (consMade r.fnCons i ∨ fileTaint (hlc := hlc) c) := by
   iintro Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r av $$ Hp
-  imod echoConsShoot (hlc := hlc) c.1 r.fnCons av i hpr $$ He with ⟨He, Hc⟩
+  imod echoConsShoot (hlc := hlc) c.ffEcho r.fnCons av i hpr $$ He with ⟨He, Hc⟩
   imodintro
   isplitl [He Hback]
   · iapply Hback $$ He
@@ -208,18 +208,13 @@ theorem fileConsMknod (c : FileFixed) (r : FileAppNames) (av : Aview)
       filePred (hlc := hlc) c r (deltaCreate ROOTINO fnameConsole i cdev av) := by
   iintro Hk Hp
   ihave ⟨He, Hres⟩ := filePred_split c r av $$ Hp
-  ihave He := echoConsMknod (hlc := hlc) c.1 r.fnCons av ents nl i hpre $$ [Hk He]
+  ihave He := echoConsMknod (hlc := hlc) c.ffEcho r.fnCons av ents nl i hpre $$ [Hk He]
   · iframe Hk He
   iapply filePred_join c r _ $$ He
-  icases Hres with (#Ht | ⟨%hp, Hf⟩)
-  · ileft; iexact Ht
-  iright
-  isplitr
-  · ipureintro
-    exact fileFsPure_create ROOTINO fnameConsole ents nl i cdev av hpre fileConsArm_nd hp
-  iapply fState_mono c r av (deltaCreate ROOTINO fnameConsole i cdev av)
+  iapply fileRest_mono c r av (deltaCreate ROOTINO fnameConsole i cdev av)
+    (fun hp => fileFsPure_create ROOTINO fnameConsole ents nl i cdev av hpre fileConsArm_nd hp)
     (fun s hok => fOk_create_other ROOTINO fnameConsole ents nl i cdev av s hpre fileConsArm_nd
-      (Or.inr (fun hu => uname_ne_console _ hu rfl)) hok) $$ Hf
+      (Or.inr (fun hu => uname_ne_console _ hu rfl)) hok) $$ Hres
 
 /-! ## The credential -/
 
@@ -277,7 +272,7 @@ theorem fileConsCred_law (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
   cases jo with
   | some j =>
     unfold consFlag
-    ihave #Hl := echoCons_law (hlc := hlc) (GF := GF) c.1 r.fnCons j $$ Hf
+    ihave #Hl := echoCons_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons j $$ Hf
     iintro !> %v Hp
     ihave ⟨He, Hback⟩ := filePred_cons c r v $$ Hp
     ihave ⟨He, Hc⟩ := Hl $$ %v He
