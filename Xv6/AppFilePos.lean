@@ -229,6 +229,24 @@ theorem fpos_alloc (n : Nat) :
   unfold fposf at e
   iapply e $$ H
 
+/-- The holder's share, as its half and its witness quarter. -/
+theorem fposh_split (r : FileAppNames) (n : Nat) :
+    fposh (GF := GF) r n ⊢ fpos r n ∗ fposq r n := by
+  unfold fposh; exact .rfl
+
+theorem fposh_join (r : FileAppNames) (n : Nat) :
+    ⊢@{IProp GF} fpos r n -∗ fposq r n -∗ fposh r n := by
+  unfold fposh
+  iintro H1 H2
+  iframe H1 H2
+
+/-- Only a running claim has a position. -/
+theorem fposh_role (r : FileAppNames) (n : Nat) :
+    ⊢@{IProp GF} fposh r n -∗ ⌜r.fnRole = false⌝ := by
+  unfold fposh fpos
+  iintro ⟨⟨%h, -⟩, -⟩
+  ipureintro; exact h
+
 /-- Rocq `fposh_rec_eq`. -/
 theorem fposh_rec_eq (r1 r2 : FileAppNames) (n : Nat) (hr : r1.fnRole = r2.fnRole)
     (hp : r1.fnPos = r2.fnPos) : fposh (GF := GF) r1 n ⊢ fposh r2 n := by
