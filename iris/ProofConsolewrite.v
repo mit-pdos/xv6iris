@@ -342,8 +342,8 @@ Section CwBodies.
       n lks Q Pe.
   Proof using .
     intros Hext Hk1. rewrite /cw_ret /wp_next.
-    iIntros "H" (CID) "%Hg".
-    iSpecialize ("H" $! CID with "[%]"); [exact Hg|].
+    iIntros "H" (CID) "%Hg Hlc".
+    iSpecialize ("H" $! CID with "[%] Hlc"); [exact Hg|].
     iIntros (mf r P' kv) "%Hcs %Hx %Hr %Hsh %Ha0 %Hkv".
     iApply ("H" $! mf r P' kv with "[%] [%] [%] [%] [%] [%]").
     - exact Hcs.

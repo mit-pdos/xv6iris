@@ -909,7 +909,7 @@ Section KforkPrologue.
               ltac:(lia) ltac:(lia) Hbelow
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpavf Hlend").
     all: try lkbelow.
-    iIntros (CID11 Hs11) "Hlc"; iIntros (mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
+    iIntros (CID11 Hs11) "_"; iIntros (mf6) "%HcsB Hpc (%kl & %Hkl & Hlend) Hpost".
     iDestruct ("Hpvb" $! kl with "[%] Hlend") as (Up1) "[%HUp1 Hpv]"; [exact Hkl|].
     destruct HUp1 as (k1 & Hk1 & ->).
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
@@ -1340,7 +1340,7 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6) in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont7c" $! CID11 with "[%] Hlc"); [wp_next_chain|].
+        iSpecialize ("Hcont7c" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! CID20 with "[%] Hlc"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! mf9 npa j γl2 pid_c ch (MkUstate Vc MCo) k2
                   with "[%] [%] [%] [%] [%] [%] [%]").
@@ -1662,7 +1662,7 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont4a" $! CID11 with "[%] Hlc"); [wp_next_chain|].
+        iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
                   (MkUstate (upd_lazy (upd_pt (upd_sz Vc (pv_sz (us_V Up))) P' (pv_tf Vc))

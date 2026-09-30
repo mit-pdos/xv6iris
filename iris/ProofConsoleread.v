@@ -1689,9 +1689,9 @@ Section CrBodies.
     cr_ret (CID0 := CID0) cn Wd ord fault jp m0 av true pid
       (upd_usM (us_upt (upd_usV U (upd_ev (us_V U) k0)) P') Mo) Ment n lks.
   Proof using .
-    intros Hx Hk0. iIntros "H" (CIDx Hsx mf r P'' Mo' hs kv)
+    intros Hx Hk0. iIntros "H" (CIDx Hsx) "Hlc"; iIntros (mf r P'' Mo' hs kv)
       "%Hcs %Hex %Hr Hshotq Hwin %Ha0 #Htags Hcg Hcnt Hpc %Hkv Hpriv".
-    iSpecialize ("H" $! CIDx with "[%]"); [exact Hsx|].
+    iSpecialize ("H" $! CIDx with "[%] Hlc"); [exact Hsx|].
     iApply ("H" $! mf r P'' Mo' hs kv
               with "[%] [%] [%] Hshotq Hwin [%] Htags Hcg Hcnt Hpc [%] [Hpriv]").
     - exact Hcs.

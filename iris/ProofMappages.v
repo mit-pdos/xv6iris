@@ -1175,8 +1175,8 @@ Section ProofMappages.
     wp_next b0 p0 (fun CID => ∀ (x : R1) (y : R2) (z : R3) (w : R4),
        A CID x y z w -∗ B CID x y z w -∗ C CID x y z w).
   Proof using .
-    iIntros "H Hl" (CID0 Hs x y z w) "HA HB".
-    iApply ("H" $! CID0 Hs x y z w with "HA HB"). iExists k. iFrame "Hl". done.
+    iIntros "H Hl" (CID0 Hs) "Hlc". iIntros (x y z w) "HA HB".
+    iSpecialize ("H" $! CID0 Hs with "Hlc"). iApply ("H" $! x y z w with "HA HB"). iExists k. iFrame "Hl". done.
   Qed.
 
   Lemma wp_mappages_sconf
