@@ -1,7 +1,7 @@
 /-
 MachCSL: **the TLB at User privilege** (lookup, hit, miss, fill) as pure
 walker facts, and **the user TLB invariant** and its preservation (brief
-`notes/briefs/user_layer.md` §2.1 G7, lane U1-P1).  Rocq: `CommonWalk`
+`notes/design-rulings.md` §2.1 G7, lane U1-P1).  Rocq: `CommonWalk`
 (`u_walk_entry`, `exec_add_to_TLB_user`, `exec_translate_TLB_miss_user`,
 the fault propagation `exec_translate_TLB_miss_user_walk_err`),
 `PtTreeAdue` (`pt_fill_ent`, `tlb_set_pte_uwe`, the hit refresh),

@@ -1,5 +1,5 @@
 /-
-MachCSL: the D50 go/no-go spike for `runRW` (brief `notes/briefs/user_layer.md`
+MachCSL: the D50 go/no-go spike for `runRW` (brief `notes/design-rulings.md`
 §6.1 U0-B): the walker run at a SYMBOLIC state on
 
 * one RTYPE (`add x3, x1, x2`), at symbolic register values, and at symbolic

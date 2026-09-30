@@ -2,7 +2,7 @@
 THE UNION MODEL -- a port of Rocq `UnionDisc.v`
 (`/shared/xv6rocq/iris/UnionDisc.v`, 871 lines, pinned `1900b8a43`; cuts C9b,
 C9b2; design union.md section 1 with review amendments B2 and S3), row U0-5
-of `notes/briefs/union.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f, f31dfba4c):
+of `notes/design-rulings.md`.  Pure.  DRIFT SY1 (Rocq 3d74ec49f, f31dfba4c):
 a pipeline admits `UR ROom` (sh's node-0 child parses the line and may die of
 out-of-memory there, saying so), `uok_pipe` has that arm, `unoc` is `some`
 at pipelines only, and the out-of-memory code `uoom` with its laws.

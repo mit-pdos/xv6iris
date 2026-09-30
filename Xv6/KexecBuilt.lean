@@ -1,7 +1,7 @@
 /-
 **kexec's image algebra and the fact bundle its cone carries** (Rocq
 `KexecBuilt.v`), RE-BASED onto the Lean user memory (wave 7b, decision D18;
-plan: notes/briefs/kexec_image_plan.md).
+plan: notes/design-rulings.md).
 
 Sections: §0 the view and the laws that move it; §1 the push geometry; §2 the
 argument block's addresses; §3 the zero fill and the two argv copyouts

@@ -1,7 +1,7 @@
 /-
 THE MODEL'S CLASS OF USER FILE NAMES, `stem.txt` -- a port of Rocq
 `FileClass.v` (`/shared/xv6rocq/iris/FileClass.v`, pinned `1900b8a43`), row
-U0-2 of `notes/briefs/union.md`.  Pure.
+U0-2 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, kept because the reasons are the content:
 

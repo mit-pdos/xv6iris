@@ -1,7 +1,7 @@
 /-
 THE CONSOLE UART'S ACCEPTED-INPUT LOG -- the pure vocabulary of the console
 boundary contract.  A port of Rocq `ConsLog.v` (`/shared/xv6rocq/iris/ConsLog.v`,
-382 lines), step (3) of `notes/briefs/io_trace_track.md`.
+382 lines), step (3) of `notes/design-rulings.md`.
 
 An entry is `(h, c, cs)`: the history the byte was received at
 (`obsEndsIn .uart0 h c`), the byte, and what the kernel put on the wire for

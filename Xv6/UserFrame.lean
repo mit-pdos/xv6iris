@@ -1,7 +1,7 @@
 /-
 **The user tier's register frame: the footprint, the reference file, and
 the bridge from `userInv`** (Rocq `UserFrame.v` and `UserStepFull.u_open` /
-`UserStep.u_close_inv`; lane U1-F, brief `notes/briefs/user_layer.md` §2.2
+`UserStep.u_close_inv`; lane U1-F, brief `notes/design-rulings.md` §2.2
 X4).
 
 * §1 THE FOOTPRINT (Rocq `u_rw_list` / `u_ro_list`): the written list

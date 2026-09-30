@@ -1,6 +1,6 @@
 /-
 MachCSL: **`uft_run`, the stepper for fetch-walks** (`UFetchRun.uftRun`) --
-lane U2-F (brief `notes/briefs/user_layer.md` §2.1 G8).
+lane U2-F (brief `notes/design-rulings.md` §2.1 G8).
 
 `UWalkRun.uwk_run` builds a `runRW` walk equation step by step, deciding
 every branch with a proof.  A fetch-walk is a `runRW` walk except at its

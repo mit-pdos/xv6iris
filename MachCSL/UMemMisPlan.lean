@@ -1,6 +1,6 @@
 /-
 MachCSL: **the misaligned access's PURE plan** (lane U2-M2, brief
-`notes/briefs/user_layer.md` §2.1 G9, §5 risk 4; Rocq `UserMemMis` §a/§b).
+`notes/design-rulings.md` §2.1 G9, §5 risk 4; Rocq `UserMemMis` §a/§b).
 
 The model splits a misaligned user access in TWO places, neither of which
 needs a walk of the model at a symbolic address:

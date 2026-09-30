@@ -8,7 +8,7 @@ of the SHARED part of Rocq `ProofBmapParts.v`
 
 In Lean a stage file belongs to ONE function, so the lemmas those four
 consumers share need a DEFINITIONAL home; this is it (coordinator decision
-(1) of `notes/briefs/fs2_bmap_ialloc_itrunc.md`, item W2-P).  The bmap-only
+(1) of `notes/design-rulings.md`, item W2-P).  The bmap-only
 rest of `ProofBmapParts.v` (`bm_slli32_srli30`, `bm_addiw_m12`, `bm_sext32`,
 `bm_uint_moi`, `bm_sext_zero`, `bm_data_addr`, `bm_slot_addr`, `bm_off0`,
 `bm_cells_insert_*`, `bm_slots_*`, `bm_held_swap` / `bm_held_k`) stays with

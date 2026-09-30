@@ -1,6 +1,6 @@
 /-
 MachCSL: the GPR access leaves of the user-mode execute facts (lane U1-X1,
-brief `notes/briefs/user_layer.md` G10), and the ONE statement shape every
+brief `notes/design-rulings.md` G10), and the ONE statement shape every
 register-only ALU family fact is stated in.  Rocq `UserExecFacts.v`
 (`exec_rX_bits_gpr`/`goodmb_rX_bits_gpr`, `exec_wX_bits_gpr`/
 `goodmb_wX_bits_gpr`, `gpr_write_state`).

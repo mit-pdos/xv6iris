@@ -2,7 +2,7 @@
 **ONE ERA OF THE SYSTEM** (Rocq `SystemAdequacy.v` §SystemBoot,
 `xv6_boot_era` :451-1006, and the hart split helpers `cpu_enum_cons` /
 `big_sepL_cpu_peel` / `big_sepL_cpu_glue`).  Batch 8-5, item SA-7
-(brief `notes/briefs/w8_5_final.md` §4.2).
+(brief `notes/design-rulings.md` §4.2).
 
 What `MachCSL.riscvPowerAdequacy`'s `Hboot` owes at every power-on: out of
 the trace invariant and `powerBootRes` (the era's rows beside the crash

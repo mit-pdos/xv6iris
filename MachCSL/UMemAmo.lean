@@ -2,7 +2,7 @@
 MachCSL: **AMO at User privilege** (`execute (AMO …)`: every `amoop`, every
 width -- Zabha's byte and half, the base word and double, Zacas' `AMOCAS.Q`
 at 16 --, every `aq`/`rl`), as PURE walker facts (lane U2-M3, brief
-`notes/briefs/user_layer.md` §2.1 G9).  Rocq `UserMemClassifyAmo.v` (the
+`notes/design-rulings.md` §2.1 G9).  Rocq `UserMemClassifyAmo.v` (the
 AMO engines `mem_exec_amo_k` / `mem_exec_amo_16`, `exec_execute_AMO_u_*`,
 the translate-fault composer) and `UserMemArmsA.v` (the AMO arm).
 

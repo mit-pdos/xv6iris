@@ -27,7 +27,7 @@
 #     test -d xv6-riscv || timeout 60 git clone --depth 1 \
 #         https://github.com/mit-pdos/xv6-riscv xv6-riscv || true
 #
-# Runs lean: on the build machine only (notes/coord/gcp_rule.txt).
+# Runs lean: on the build machine only (README: "Reproducing it").
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 LOG=${1:-}

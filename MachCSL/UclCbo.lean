@@ -1,6 +1,6 @@
 /-
 MachCSL: the configuration-refused members of the memory opcode space at
-User privilege (lane U3-A, brief `notes/briefs/user_layer.md` §2.2 X5): the
+User privilege (lane U3-A, brief `notes/design-rulings.md` §2.2 X5): the
 cache-block management/zero instructions `ZICBOM`/`ZICBOZ` (refused by
 `menvcfg`/`senvcfg`'s `CBCFE`/`CBIE`/`CBZE` = 0) and the shadow-stack swap
 `SSAMOSWAP` (refused by `senvcfg.SSE = 0`) are `Illegal_Instruction` before

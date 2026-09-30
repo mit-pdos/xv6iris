@@ -1,7 +1,7 @@
 /-
 THE UNION MODEL'S HOOKS -- the reached part of Rocq `UnionDiscDec.v`
 (`/shared/xv6rocq/iris/UnionDiscDec.v`, 714 lines, pinned `1900b8a43`), row
-U0-5 of `notes/briefs/union.md`.  Pure.
+U0-5 of `notes/design-rulings.md`.  Pure.
 
 ## DU9 (classical decidability) -- what is and is not here
 

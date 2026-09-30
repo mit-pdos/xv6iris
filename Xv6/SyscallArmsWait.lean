@@ -2,7 +2,7 @@
 **syscall()'s WAIT ARM** (wave 8 W8-S1; Rocq `ProofSyscall.v`
 `sysc_arm_wait`): table index 3, `SYSWAIT.wp_sys_wait_eb` (kwait's
 eb-generic contract, crossing `true`: kwait parks on the wait lock) from the
-dispatch's rows, per the frozen recipe (notes/coord/syscall_arms_interfaces.txt).
+dispatch's rows, per the frozen recipe (notes/design-rulings.md).
 
 * The environment: `wait_lock` is the dispatch's `γw`; `nextpid`
   (`syscallEnv_pid`), the allocator at `fsReady`'s names (`syscallEnv_kmem`),

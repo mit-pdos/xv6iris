@@ -1,7 +1,7 @@
 /-
 THE TYPED LINE'S WITNESS, PURELY -- a port of Rocq `FileLineWit.v`
 (`/shared/xv6rocq/iris/FileLineWit.v`, pinned `1900b8a43`), row U0-2 of
-`notes/briefs/union.md`.  The statements are pure (no `IProp`); the file
+`notes/design-rulings.md`.  The statements are pure (no `IProp`); the file
 imports `Xv6/EchoOut.lean` for `segOf`, as Rocq's imports `EchoOut`.
 
 Rocq's header, kept because the reasons are the content:

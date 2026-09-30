@@ -1,6 +1,6 @@
 /-
 MachCSL: the user-tier INSTRUCTION FETCH leaf (brief
-`notes/briefs/user_layer.md` §2.1 G5, Finding 6).
+`notes/design-rulings.md` §2.1 G5, Finding 6).
 
 The kernel's fetch leaf `swp_sail_mem_read_ifetch` reads never-written
 image bytes (`imgBytes`).  A user hart fetches from pages it OWNS (bytes of

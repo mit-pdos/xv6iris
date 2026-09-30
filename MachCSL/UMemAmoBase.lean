@@ -1,6 +1,6 @@
 /-
 MachCSL: the common layer of the user-mode ATOMIC memory facts (lane U2-M3,
-brief `notes/briefs/user_layer.md` §2.1 G9, §6.3): the footprint and
+brief `notes/design-rulings.md` §2.1 G9, §6.3): the footprint and
 configuration premises, the data-address front `get_transformed_data_addr`
 at User privilege (pointer masking off), the AMO access kind and its PMA
 grant on RAM, the GPR-pair leaves of `AMOCAS.Q`, and the AMO result

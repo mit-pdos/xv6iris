@@ -1,6 +1,6 @@
 /-
 MachCSL: the compressed ALU forms at User privilege (lane U1-X1, brief
-`notes/briefs/user_layer.md` G10), at symbolic register indices, immediates
+`notes/design-rulings.md` G10), at symbolic register indices, immediates
 and data, from ANY walker state.  Rocq `UserExecFacts.v` (`…_C_ADDW` …
 `…_C_MUL`, `…_C_NOT_total`, `…_C_ZEXT_B_total`, `…_C_NOP`) and
 `UserTotalU.v` (`goodmb_execute_C_LI` … `goodmb_execute_C_ADDIW`).

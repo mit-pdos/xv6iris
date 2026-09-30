@@ -2,7 +2,7 @@
 MachCSL: the WRITE-CAPABLE walker (`runRW`), its one soundness rule
 (`swp_runRW`), and its bind toolkit.  Rocq `HartMemRun.v` (`hmrun`,
 `swp_hmrun`, `goodmb`) and `HartMemAsm.v` (the `gm_*` combinators); the
-brief is `notes/briefs/user_layer.md` §3 / D50(a).
+brief is `notes/design-rulings.md` §3 / D50(a).
 
 `DecodeBridge.runRead` walks a computation that only READS registers.  The
 user tier executes ARBITRARY user code at a symbolic state, and the hart

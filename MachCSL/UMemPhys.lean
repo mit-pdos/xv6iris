@@ -1,6 +1,6 @@
 /-
 MachCSL: **the physical side of a user data access**, as PURE walker facts
-(`runRW` equations; brief `notes/briefs/user_layer.md` §2.1 G9, lane U2-M1).
+(`runRW` equations; brief `notes/design-rulings.md` §2.1 G9, lane U2-M1).
 
 Rocq: `UserMemPt` (the physical composers: PMP/PMA grants, the RAM read and
 write leaves, the `mem_read`/`mem_write_ea`/`mem_write_value` wraps),

@@ -1,6 +1,6 @@
 /-
 MachCSL: **the aligned physical access over the owned byte map**, as PURE
-walker facts (brief `notes/briefs/user_layer.md` §2.1 G9, lane U2-M1).
+walker facts (brief `notes/design-rulings.md` §2.1 G9, lane U2-M1).
 
 Rocq: `UserMemPt` §4 (`exec_mem_read_*`, `exec_mem_write_ea_*`,
 `exec_mem_write_value_*` and their `goodmb` twins), `UserMemCert`

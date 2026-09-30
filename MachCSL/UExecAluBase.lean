@@ -1,6 +1,6 @@
 /-
 MachCSL: the base integer ALU families at User privilege (lane U1-X1, brief
-`notes/briefs/user_layer.md` G10): `ITYPE`, `RTYPE`, `ADDIW`, `RTYPEW`, at
+`notes/design-rulings.md` G10): `ITYPE`, `RTYPE`, `ADDIW`, `RTYPEW`, at
 symbolic register indices and symbolic data, from ANY walker state.  Rocq
 `UserExecFacts.v` (`exec_execute_ITYPE_total`/`goodmb_execute_ITYPE_total`,
 `…_RTYPE_total`, `…_ADDIW_total`, `…_RTYPEW_total`).  Shape: `UxaRetire`

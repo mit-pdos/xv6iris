@@ -1,6 +1,6 @@
 /-
 MachCSL: **the U cycle rules in Iris** (lane U1-C; brief
-`notes/briefs/user_layer.md` G3; Rocq `HartStepFull.swp_try_step_full`,
+`notes/design-rulings.md` G3; Rocq `HartStepFull.swp_try_step_full`,
 `HartStepFull.swp_try_step_waiting`, `HartRunFull.swp_run_hart_active_res`).
 
 The one Iris wrapper over the walks of `UCycle`/`UWait`.  Every stretch but

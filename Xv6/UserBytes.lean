@@ -1,6 +1,6 @@
 /-
 **The byte-map view of the user address space** (Rocq `UserBytes.v`; lane
-U1-F, brief `notes/briefs/user_layer.md` §2.2 X3).
+U1-F, brief `notes/design-rulings.md` §2.2 X3).
 
 `userPtInv` owns the user page table as a tree of entry WORDS (`ptreeOwn`)
 and the user pages as byte BUFFERS (`umPages`), both kernel-virtual

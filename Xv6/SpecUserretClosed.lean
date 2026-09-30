@@ -27,7 +27,7 @@ trapframe page, and the pinned residue `usertrapResAt PT Γ j cpu P ksp V sts
 cs pid` (Rocq `usertrap_res_bare`).  Beside it, as in Rocq: `wire_inv` and
 the trampoline claim `kmap_at tramp_vpn tramp_ppn KP_rx`.
 
-THE STACK GAP (the uservec obligation, notes/coord/pending_edits.txt).  The
+THE STACK GAP (the uservec obligation, notes/design-rulings.md).  The
 next trap enters uservec with `sp = kernel_sp`, the WHOLE page
 (`UsertrapRes.utStackTop`).  usertrap's exit is already there; forkret's tail
 is `m` slots deeper (its frame is never popped).  The entry therefore takes

@@ -368,8 +368,8 @@ theorems use no `native_decide` and no axiom outside the baseline.  The
 (one compiler-trust axiom per capture, confined to the `Vtest` library, which
 is not a default target and which nothing in the proofs imports).
 
-**Reproducing it.**  Never on the development machine
-(`notes/coord/gcp_rule.txt`); on the build VM, from your worktree:
+**Reproducing it.**  Never on the development machine (Lean elaboration of this tree needs
+the build VM's memory; running it locally has OOM-killed the machine); on the build VM, from your worktree:
 
 ```sh
 /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh          # the whole sequence (= make ci)

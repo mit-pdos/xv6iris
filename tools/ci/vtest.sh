@@ -37,7 +37,7 @@
 # or the harness broke).  A run with NO proof is a FINDING, not a failure: it
 # is absent from Vtest.lean and its row in the table says `no proof`.
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (notes/coord/gcp_rule.txt): run this on
+# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Reproducing it"): run this on
 # the build VM or in CI, e.g.
 #   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/vtest.sh check-ci
 # Needs only `lake build MachCSL.Lang`'s cone (the model and the device

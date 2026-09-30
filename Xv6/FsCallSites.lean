@@ -5,7 +5,7 @@ unpacked out of its interface structure into the `kctx ∗ pcIs ∗ … ∗ wpNe
 … ⊢ wpLoop` shape a stage lemma `iapply`s at its `jal`.
 
 In Rocq every `Proof<F>.v` restates these call-site forms; in Lean a stage
-file belongs to ONE function (`notes/briefs/fs2_bmap_ialloc_itrunc.md`), so
+file belongs to ONE function (`notes/design-rulings.md`), so
 each function's stage files had grown a copy.  This definitional file holds
 them once.  Merged here (old names, all deleted):
 

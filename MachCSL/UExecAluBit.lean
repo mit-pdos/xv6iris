@@ -1,6 +1,6 @@
 /-
 MachCSL: the bit-manipulation families live at User privilege (lane U1-X1,
-brief `notes/briefs/user_layer.md` G10): Zbkb's `ZBB_RTYPE`
+brief `notes/design-rulings.md` G10): Zbkb's `ZBB_RTYPE`
 (`ANDN`/`ORN`/`XNOR`/`ROL`/`ROR`; the Zbb-only ops are covered too),
 `ZBB_RTYPEW` (`ROLW`/`RORW`), `REV8`, `RORI`, `RORIW`, and Zbc/Zbkc's
 `CLMUL`/`CLMULH`/`CLMULR`, at symbolic register indices and data, from ANY

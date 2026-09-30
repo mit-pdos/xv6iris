@@ -3,7 +3,7 @@
 §SyscallArms, the arms `sysc_arm_uptime` / `_getpid` / `_kill` / `_pause` /
 `_sync`): each proves `SyscallTable.syscArmBody n` for its table index from
 the callee's landed interface, per the frozen recipe
-(notes/coord/syscall_arms_interfaces.txt §2, §6).
+(notes/design-rulings.md §2, §6).
 
 These five arms hand the block back at the entry record with only `a0`
 stored (`SyscallRet.syscRows_keep`).

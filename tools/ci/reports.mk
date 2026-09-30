@@ -8,7 +8,7 @@
 #
 # Targets marked [lean] elaborate against the built tree: run them on the
 # build machine / CI, never on the development machine
-# (notes/coord/gcp_rule.txt).  The others are Python and shell only.
+# (README: "Reproducing it").  The others are Python and shell only.
 
 PYTHON    ?= python3
 CI_OUT    ?= .lake/ci

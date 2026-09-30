@@ -1,6 +1,6 @@
 /-
 MachCSL: **the waiting hart at User**, as walks (lane U1-C; brief
-`notes/briefs/user_layer.md` G3; Rocq `HartStepFull.v` §2 and
+`notes/design-rulings.md` G3; Rocq `HartStepFull.v` §2 and
 `swp_try_step_waiting`, `UserStep.v` §2).
 
 A user `WRS.NTO`/`WRS.STO` (Zawrs) returns `Enter_Wait`, and the cycle parks

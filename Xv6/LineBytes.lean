@@ -1,7 +1,7 @@
 /-
 The byte-level facts the line model's determinacy argument spends -- a port
 of Rocq `LineBytes.v` (`/shared/xv6rocq/iris/LineBytes.v`, 285 lines, pinned
-`1900b8a43`), row U0-1 of `notes/briefs/union.md`.  Pure.
+`1900b8a43`), row U0-1 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged: two outputs below one wire are compared by where
 their `'$'`-free runs end; the prompt's `'$'` settles the comparison, and the

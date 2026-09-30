@@ -1,6 +1,6 @@
 /-
 MachCSL: the common layer of the user-mode CONTROL execute facts (lane U1-X2,
-brief `notes/briefs/user_layer.md` G10): the footprint and configuration
+brief `notes/design-rulings.md` G10): the footprint and configuration
 premises, the read-only transfer of a configuration walk, the three
 configuration sub-walks the control families call, the `SailME` stepping
 leaves, and `jump_to` with its three outcomes.  Rocq `UserExecFacts.v`

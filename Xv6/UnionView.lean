@@ -1,7 +1,7 @@
 /-
 THE UNION MODEL'S PIPELINE VIEW -- a port of Rocq `UnionView.v`
 (`/shared/xv6rocq/iris/UnionView.v`, 119 lines, pinned `1900b8a43`; cut C9c',
-design union.md amendment B4), row U0-5 of `notes/briefs/union.md`.  Pure.
+design union.md amendment B4), row U0-5 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged: `UnionDisc.ulm adm admS` read at its pipeline lines
 (`PipesView.PView`): a line `LPipe p fs` is the pipeline `LPipes p fs`, its

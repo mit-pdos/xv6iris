@@ -1,7 +1,7 @@
 /-
 **kexec's page borrow at the NAMED image** (Rocq `KexecPtImage.v`), RE-BASED
 onto the Lean user memory (wave 7b, decision D18; plan:
-notes/briefs/kexec_image_plan.md §4).
+notes/design-rulings.md §4).
 
 Rocq's problem: loadseg reads a file page straight into a page of the NEW
 address space, and the anonymous borrow (`proc_pt_page_acc`) loses the bytes.

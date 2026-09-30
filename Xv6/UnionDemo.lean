@@ -1,6 +1,6 @@
 /-
 ANTI-VACUITY DEMOS FOR THE UNION MODEL -- row U0-5 of
-`notes/briefs/union.md` (DU9: "keep a few `decide` demos as anti-vacuity
+`notes/design-rulings.md` (DU9: "keep a few `decide` demos as anti-vacuity
 checks").  Pure.  Not in the cone of `union_adequacy_closed`; nothing imports
 this file.
 

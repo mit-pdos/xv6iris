@@ -2,7 +2,7 @@
 **THE SYSTEM THEOREM** (Rocq `SystemAdequacy.v` §3-§4:
 `xv6_power_adequacy_gen` :1075, `init_boot_of_triv` :1056,
 `xv6_power_adequacy` :1611, `xv6_fs_adequacy_xv6Σ` :2150).  Batch 8-5,
-item SA-7 (brief `notes/briefs/w8_5_final.md` §3, §4.1).
+item SA-7 (brief `notes/design-rulings.md` §3, §4.1).
 
 * §2 **`xv6PowerAdequacyGen`**: `MachCSL.riscvPowerAdequacy` at the
   composite crash slot (`SystemSlot.xv6Slot`), its hooks filled by SA-4's

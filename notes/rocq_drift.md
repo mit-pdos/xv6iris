@@ -76,7 +76,7 @@ these by statement or by named marker:
   OFF-HAND, S0/S2/S2k (`rdwild`, `consEra`) and pipe-queue (K2/K4).
 - SUP-ONE's `app_taint` is Lean's `uKillCred`. This is a naming difference only.
 
-Known deviations from the pin, all already recorded (`notes/coord/union_residuals.md`, `user_residuals.md`):
+Known deviations from the pin, all already recorded (`notes/design-rulings.md`, `user_residuals.md`):
 
 - `UkFork` kill price `□ (uKillCred -∗ Q (-1))` vs Rocq's `app_taint`.
 - `udepwfK` carries `⌜uszOk sz⌝`.

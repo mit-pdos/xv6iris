@@ -1,6 +1,6 @@
 /-
 MachCSL: the SHAPE of one machine cycle, as the user tier cuts it (lane U1-C;
-brief `notes/briefs/user_layer.md` G3; Rocq `RiscvTryStep.v` /
+brief `notes/design-rulings.md` G3; Rocq `RiscvTryStep.v` /
 `HartStepFull.v` / `HartRunFull.v`).
 
 `try_step 0 false` is one `do` block with two join points and an early-return

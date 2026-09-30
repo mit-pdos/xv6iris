@@ -2,7 +2,7 @@
 MachCSL: decoder totality at User privilege, over a SYMBOLIC word.  Rocq
 `DecodeTotalU.v` (`D_u`, `decode_total_u`) and `DecodeSetU.v`
 (`decodable_u`, `decodable_c`, `decode_total_u_set`, `decode_total_c_set`);
-the brief is `notes/briefs/user_layer.md` G6 / U0-C (risk 1).
+the brief is `notes/design-rulings.md` G6 / U0-C (risk 1).
 
 * `drefU` -- Rocq `D_u` at `dstateU`: the registers the decoder reads at
   User privilege (`cur_privilege`, `misa`, `menvcfg`, `senvcfg`), at the

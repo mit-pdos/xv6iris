@@ -19,7 +19,7 @@ to short-circuit `&`/`|` with effectful operands, the generated model reached
 `currentlyEnabled Ext_Zkr` -- which has no clause, `assert false` -- on a user
 access to `mseccfg`/`mseccfgh`, and this theorem carried a hypothesis `hZkr`
 for those two CSR rows.  The model is now regenerated with the fix,
-`tools/regen_sail_model.sh`; see notes/coord/user_residuals.md.)
+`tools/regen_sail_model.sh`; see notes/design-rulings.md.)
 -/
 import Xv6.SpecUser
 import Xv6.UserStep

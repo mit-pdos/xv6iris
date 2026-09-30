@@ -3,7 +3,7 @@ THE CONSOLE RING'S PURE ALGEBRA -- the first stage file of the port of Rocq
 `ConsoleInv.v` (`/shared/xv6rocq/iris/ConsoleInv.v`, lines 1--400 and
 760--1330: the geometry, the coupling as pure arithmetic, the stored
 sequence, the 32-bit/slot kit and the four moves), step (4) of
-`notes/briefs/io_trace_track.md`.
+`notes/design-rulings.md`.
 
 ```
 #define INPUT_BUF_SIZE 128

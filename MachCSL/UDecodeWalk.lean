@@ -2,7 +2,7 @@
 MachCSL: the leaf-predicate decode walk (`runReadP`) and its symbolic walker
 (`udecode_walk`).  Rocq `DecodeSetU.v` (`goodbP` + the `dtp_*` traversal
 driver) and `DecodeTotalU.v` (`goodb_bind_forall`, the mapper lemmas); the
-brief is `notes/briefs/user_layer.md` G6 / U0-C.
+brief is `notes/design-rulings.md` G6 / U0-C.
 
 `runReadP dref P m` is `DecodeBridge.runRead` refined by a leaf predicate: it
 walks the free-monad computation `m` answering register reads from the

@@ -7,7 +7,7 @@ return value, and `sw` / `sh` of a sign-extended word.
 
 Iris-free.  In Rocq each function's `Proof<F>Parts.v` states its own copy
 (`ba_sext32`, `bm_sext32`, `ba_sext_zero`, `bm_sext_zero`, ...); in Lean a
-stage file belongs to ONE function (`notes/briefs/fs2_bmap_ialloc_itrunc.md`),
+stage file belongs to ONE function (`notes/design-rulings.md`),
 so the copies had multiplied the same way.  This definitional file holds
 them once.  Merged here (statement identical, only the name changed):
 

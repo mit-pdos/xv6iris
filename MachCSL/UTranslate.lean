@@ -1,7 +1,7 @@
 /-
 MachCSL: **`translateAddr` at User privilege, and the physical checks
 (PMP, PMA) at User**, as PURE walker facts (`runRW` equations; brief
-`notes/briefs/user_layer.md` §2.1 G7, §6.2 lane U1-P, the "translate" half:
+`notes/design-rulings.md` §2.1 G7, §6.2 lane U1-P, the "translate" half:
 the page walk and the TLB are lane U1-P1's `UWalk`/`UTlb`).
 
 Rocq: `UserFaultCert` §1 (access hygiene) and §3 (the fault-side

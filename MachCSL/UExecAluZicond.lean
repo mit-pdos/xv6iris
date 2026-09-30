@@ -1,6 +1,6 @@
 /-
 MachCSL: Zicond (`CZERO.EQZ`/`CZERO.NEZ`) at User privilege (lane U1-X1,
-brief `notes/briefs/user_layer.md` G10), at symbolic register indices and
+brief `notes/design-rulings.md` G10), at symbolic register indices and
 data, from ANY walker state.  Rocq `ZicondGpr.v`
 (`exec_execute_ZICOND_RTYPE_gpr`, with its explicit `zicond_rd_val`) and
 `UserExecFacts.v` (`…_ZICOND_RTYPE_total`).  The model branches on the

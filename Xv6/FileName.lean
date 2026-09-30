@@ -1,7 +1,7 @@
 /-
 THE CLASS OF USER FILE NAMES and the laws every layer above it may use --
 a PARTIAL port of Rocq `FileName.v` (`/shared/xv6rocq/iris/FileName.v`,
-pinned `1900b8a43`), row U0-2 of `notes/briefs/union.md`.  Pure.
+pinned `1900b8a43`), row U0-2 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged (cut W0; claude-notes/design/filenames.md section
 0): a class is a predicate on names; nothing above this file reads a

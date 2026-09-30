@@ -1,6 +1,6 @@
 /-
 MachCSL: the jump and branch families at User privilege (lane U1-X2, brief
-`notes/briefs/user_layer.md` G10): `JAL`, `JALR`, `BTYPE` (all six
+`notes/design-rulings.md` G10): `JAL`, `JALR`, `BTYPE` (all six
 conditions), with the misaligned-target trap, and their compressed forms
 `C.J`, `C.JR`, `C.JALR`, `C.BEQZ`, `C.BNEZ`; at symbolic register indices,
 offsets, `PC` and data, from ANY walker state.  Rocq `UserExecFacts.v`

@@ -1,6 +1,6 @@
 /-
 MachCSL: the immediate-shift families at User privilege (lane U1-X1, brief
-`notes/briefs/user_layer.md` G10): `SHIFTIOP` (`SLLI`/`SRLI`/`SRAI`) and
+`notes/design-rulings.md` G10): `SHIFTIOP` (`SLLI`/`SRLI`/`SRAI`) and
 `SHIFTIWOP` (`SLLIW`/`SRLIW`/`SRAIW`), at symbolic register indices, shift
 amounts and data, from ANY walker state.  Rocq `UserExecFacts.v`
 (`…_SHIFTIOP_total`, `…_SHIFTIWOP_total`).  Shape: `UxaRetire`.

@@ -1,7 +1,7 @@
 /-
 A CONSOLE LINE AS A LIST OF WORDS -- a port of Rocq `LineWords.v`
 (`/shared/xv6rocq/iris/LineWords.v`, 1762 lines, pinned `1900b8a43`), row
-U0-1 of `notes/briefs/union.md`.  Pure: no Iris, no machine.
+U0-1 of `notes/design-rulings.md`.  Pure: no Iris, no machine.
 
 Rocq's header, abridged: a line is a list of WORDS joined by single spaces
 and closed by a newline (`wlLine`), and word `i` of it sits at `wlOff` and

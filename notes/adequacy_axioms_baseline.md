@@ -199,4 +199,4 @@ Measured on lean-v2 e3ba2e72e + the lane's commit (GCP full build, 2476 jobs):
 
 No `sorryAx`, no plain `axiom` of Xv6/MachCSL. (The extra certificates are the per-branch `bv_decide`s of
 `UWalk.uwk_pte_is_invalid`, whose walk now splits on the entry's bits.) The model's `currentlyEnabled`
-still has no `Ext_Zkr` clause; no proved path reaches it (see notes/coord/user_residuals.md).
+still has no `Ext_Zkr` clause; no proved path reaches it (see notes/design-rulings.md).

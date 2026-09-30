@@ -1,6 +1,6 @@
 /-
 MachCSL: execute totality at User privilege, the CONTROL part (lane U1-X2,
-brief `notes/briefs/user_layer.md` G10).  Rocq `UserExecFacts.v` (the
+brief `notes/design-rulings.md` G10).  Rocq `UserExecFacts.v` (the
 trap-producing families and control flow) and the control part of
 `UserTotalU.v`.
 

@@ -1,7 +1,7 @@
 /-
 MachCSL: the concrete BYTE FRAME of the user walker (Rocq `PtBytes.bytes_own`
 and `HartMemRun`'s `bytes_own mm`; lane U1-F, brief
-`notes/briefs/user_layer.md` X3/X4).
+`notes/design-rulings.md` X3/X4).
 
 `URunRW.UByteFrame ξ` is the interface `swp_runRW` reads the owned byte map
 through: hand out any owned footprint at the map's value, take it back at

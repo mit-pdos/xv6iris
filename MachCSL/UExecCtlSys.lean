@@ -1,6 +1,6 @@
 /-
 MachCSL: the system control families at User privilege (lane U1-X2, brief
-`notes/briefs/user_layer.md` G10): the fences and hints (`FENCE`,
+`notes/design-rulings.md` G10): the fences and hints (`FENCE`,
 `FENCE.TSO`, `FENCE.I`, `PAUSE`, `NTL`, `C.NTL`), `ECALL`/`EBREAK`/
 `C.EBREAK` → `Trap`, the privileged-illegal family (`MRET`, `SRET`, `WFI`,
 `SFENCE.VMA`, `SFENCE.W.INVAL`, `SFENCE.INVAL.IR`, `SINVAL.VMA`) →

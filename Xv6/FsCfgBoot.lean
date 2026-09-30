@@ -1,7 +1,7 @@
 /-
 **THE BOOT-SIDE FILE-SYSTEM VOCABULARY** -- a PARTIAL port of Rocq
 `FsCfgBoot.v` (`/shared/xv6rocq/iris/FsCfgBoot.v`), batch C-0 item CD of
-`notes/briefs/crash_layer.md`.
+`notes/design-rulings.md`.
 
 **WHAT IS HERE.**
 * The inode region's block set (`ireg_blk_set`, Rocq :449) and its list/set

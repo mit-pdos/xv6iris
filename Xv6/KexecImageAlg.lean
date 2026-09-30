@@ -1,6 +1,6 @@
 /-
 **kexec's image algebra, at the contract's own names** (Rocq
-`KexecImageAlg.v`), wave 7b (D18; plan: notes/briefs/kexec_image_plan.md §7).
+`KexecImageAlg.v`), wave 7b (D18; plan: notes/design-rulings.md §7).
 
 Rocq's file is the bridge between `KexecBuilt`'s `kxb_` spellings (kept below
 SpecKexec so the kernel-side kexec proofs could name them) and SpecKexec's

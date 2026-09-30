@@ -1,7 +1,7 @@
 /-
 MachCSL: **the whole user fetch** -- the geometry case tree over every PC
 and every oracle, and its Iris form (lane U2-F; brief
-`notes/briefs/user_layer.md` §2.1 G8; Rocq `UserActiveClass`'s `va` case
+`notes/design-rulings.md` §2.1 G8; Rocq `UserActiveClass`'s `va` case
 tree over `UserFetch`/`UserFetchCert`/`UserFaultCert`).
 
 The translations are a hypothesis, `UftTr D I`: at every walker state of an

@@ -3,7 +3,7 @@
 of Rocq `App.v` (`/shared/xv6rocq/iris/App.v` @ 1900b8a43): the class
 `xv6_app_laws` (:275-423), `xv6_app_adequacy` (:431-523), `app_triv_laws`
 (:614-644, with `app_triv_init_boot` :570) and `xv6_app_adequacy_triv_xv6Σ`
-(:659).  Union brief `notes/briefs/union.md` §3.1, agent U0-A.
+(:659).  Union brief `notes/design-rulings.md` §3.1, agent U0-A.
 
 The data half, the record `Xv6App`, is `Xv6/AppIface.lean`.  The theorem is
 `SystemAdequacy.xv6PowerAdequacyGen` applied POSITIONALLY at the record's

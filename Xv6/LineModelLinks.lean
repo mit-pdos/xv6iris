@@ -1,7 +1,7 @@
 /-
 THE WRITER'S PURE READING OF A LINE MODEL, once -- a port of Rocq
 `LineModelLinks.v` (`/shared/xv6rocq/iris/LineModelLinks.v`, 1653 lines,
-pinned `1900b8a43`), row U0-1 of `notes/briefs/union.md`.  Pure.  DRIFT
+pinned `1900b8a43`), row U0-1 of `notes/design-rulings.md`.  Pure.  DRIFT
 SY1 (Rocq 3d74ec49f): `lmhNoc` is OPTIONAL (`Option Nat`, its laws under
 `some`), and `lmWrBlk_dollar` files any alternative whose block is the bare
 prompt.

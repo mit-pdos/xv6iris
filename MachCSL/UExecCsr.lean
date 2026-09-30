@@ -1,6 +1,6 @@
 /-
 MachCSL: **the CSR family at User privilege** (lane U1-X3, brief
-`notes/briefs/user_layer.md` G10): `execute (CSRReg …)` and `execute (CSRImm …)`
+`notes/design-rulings.md` G10): `execute (CSRReg …)` and `execute (CSRImm …)`
 for EVERY csr number, operation, source and destination, as `runRW` walk
 equations from any walker state (the statement shape of lanes U1-X1/U1-X2).
 Rocq `UserCsr.v` (`exec_doCSR_U`/`goodmb_doCSR_U`,

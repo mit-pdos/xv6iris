@@ -1,5 +1,5 @@
 /-
-Two supervisor-mode leaf rules the fs.c wave needs (notes/briefs/fs1_leaves.md §4,
+Two supervisor-mode leaf rules the fs.c wave needs (notes/design-rulings.md §4,
 W1-M1 and W1-M3):
 
 * `execSpecF_lh` / `wp_s_lh` -- the owned SIGNED halfword load

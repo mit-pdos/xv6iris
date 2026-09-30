@@ -6,7 +6,7 @@ readers / post writers `sysc_dep_{chdir,open,mknod,unlink,link,mkdir}`
 :3343–3440 / `sysc_out_*` :3527–3725).
 
 Each arm proves `SyscallTable.syscArmBody n` for its table index (9, 15,
-17, 18, 19, 20) by the frozen recipe (notes/coord/syscall_arms_interfaces.txt
+17, 18, 19, 20) by the frozen recipe (notes/design-rulings.md
 §2): take the left conjunct of the exit slot, open the process's deposit at
 its own number (`syscSysIn_at` + the arm's `SyscDep<Name>` law), call the
 entry's eb-generic contract at the pushed context, read the arms back, and

@@ -2,7 +2,7 @@
 **syscall()'s FORK ARM** (wave 8 W8-S1; Rocq `ProofSyscall.v`
 `sysc_arm_fork`): table index 1, `SYSFORK.wp_sys_fork_eb` (kfork's balanced
 contract, crossing `k.sie`) from the dispatch's rows, per the frozen recipe
-(notes/coord/syscall_arms_interfaces.txt §2, §5 S1 fork).
+(notes/design-rulings.md §2, §5 S1 fork).
 
 * The environment: `wait_lock` is the dispatch's `γw`; `nextpid` and the
   ledger (`syscallEnv_pid`), the allocator (`syscallEnv_kmem`), the file

@@ -1,6 +1,6 @@
 /-
 MachCSL: **the walker with instruction fetches** (`uftRun`), and its Iris
-rule (`swp_uftRun`) -- lane U2-F (brief `notes/briefs/user_layer.md` §2.1
+rule (`swp_uftRun`) -- lane U2-F (brief `notes/design-rulings.md` §2.1
 G8, §6.3); the fetch geometry itself is `UFetch`.
 
 `URunRW.runRW` refuses an instruction-fetch read: the machine's instruction

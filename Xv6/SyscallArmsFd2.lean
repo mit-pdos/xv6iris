@@ -1,7 +1,7 @@
 /-
 **syscall()'s DESCRIPTOR ARMS, part 2** (wave 8 W8-S2; Rocq `ProofSyscall.v`
 §SyscallArms `sysc_arm_pipe` / `sysc_arm_read` / `sysc_arm_write`), per the
-frozen recipe (notes/coord/syscall_arms_interfaces.txt §2, §6).  The shared
+frozen recipe (notes/design-rulings.md §2, §6).  The shared
 vocabulary is `SyscallArmsFdDefs`; dup, fstat and close are `SyscallArmsFd`.
 
 * pipe (4): two `fdSlot`s out of `fdSlots FDSPARE` and back, the iref loan

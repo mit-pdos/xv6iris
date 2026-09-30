@@ -1,7 +1,7 @@
 /-
 THE FILE APPLICATION'S PURE RESIDUE -- a port of Rocq `FileOutPure.v`
 (`/shared/xv6rocq/iris/FileOutPure.v`, pinned `1900b8a43`), row U0-2 of
-`notes/briefs/union.md`.  Pure.
+`notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged: the console claim's stage machine is `GenOutPure`'s
 and its pure history layer `GenOutHist`'s, at `FileDisc.file_lm` (app-both

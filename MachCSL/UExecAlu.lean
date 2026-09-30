@@ -1,6 +1,6 @@
 /-
 MachCSL: execute totality at User privilege, the REGISTER-ONLY ALU part
-(lane U1-X1, brief `notes/briefs/user_layer.md` G10).  Rocq
+(lane U1-X1, brief `notes/design-rulings.md` G10).  Rocq
 `UserExecFacts.v`, `ZicondGpr.v` and the register-only part of
 `UserTotalU.v`.
 

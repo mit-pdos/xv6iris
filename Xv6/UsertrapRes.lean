@@ -52,7 +52,7 @@ explicit in the Lean uservec/userret contracts, which take `Rut` opaque.
     `park_own` / `ut_res_bare_park`       |   `parkOwn` / `utResBare_park`
   `wp_next_true_swap`                     | `wpNext_true_swap`
 
-THE WHOLE-PAGE STACK (the uservec obligation, notes/coord/pending_edits.txt):
+THE WHOLE-PAGE STACK (the uservec obligation, notes/design-rulings.md):
 uservec is entered at a context `k` whose `sp` is the trapframe's
 `kernel_sp` (`uservecKWords`: `tfW ws 1 = k.sp`), and usertrap's kexit arm
 hands the WHOLE page back (`SpecKexit`'s stack closer), so the loop runs

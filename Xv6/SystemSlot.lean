@@ -4,7 +4,7 @@ transport and durable claim, the lend's unpacking, and the trace hooks** -- a
 port of Rocq `SystemAdequacy.v` §2 (:140-450) and of the lend-unpack of
 `xv6_boot_era` (:680-760), plus the two hook bodies `xv6_power_adequacy_gen`
 inlines at its `riscv_power_adequacy` call (:1428-1540).  Batch 8-5, item
-SA-4 (gap G8, brief `notes/briefs/w8_5_final.md` §4.1-4.2).
+SA-4 (gap G8, brief `notes/design-rulings.md` §4.1-4.2).
 
 Everything here is at the RAW gnames and at an application predicate
 `appFs : CT → N → Aview → IProp GF` over the application's fixed part `CT`,

@@ -1,6 +1,6 @@
 /-
 MachCSL: **the aligned user STORE and SC through `vmem_write_addr`**, as
-PURE walker facts (brief `notes/briefs/user_layer.md` §2.1 G9, §5 risk 5,
+PURE walker facts (brief `notes/design-rulings.md` §2.1 G9, §5 risk 5,
 lane U2-M1).  The read side and the conventions are `UMemAccess`'s.
 
 Rocq: `UserMemAccess` §1b (the STORE reduction), §1c

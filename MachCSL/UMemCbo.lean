@@ -2,7 +2,7 @@
 MachCSL: **the cache-block operations at User privilege** (Zicboz
 `cbo.zero`, Zicbom `cbo.clean`/`cbo.flush`/`cbo.inval`, Zicbop
 `prefetch.r`/`.w`/`.i`), as PURE walker facts (lane U2-M3, brief
-`notes/briefs/user_layer.md` §2.1 G9).  Rocq `UserMemClassifyAmo.v` (the
+`notes/design-rulings.md` §2.1 G9).  Rocq `UserMemClassifyAmo.v` (the
 ZICBOP arm `arm_ZICBOP_u`) and `UserTotalU.v`'s CBO rows.
 
 **`cbo.*` are Illegal at xv6's configuration** (`umo_cbo_zero`,

@@ -1,6 +1,6 @@
 /-
 MachCSL: **the six-armed U cycle, as walks** (lane U1-C; brief
-`notes/briefs/user_layer.md` G3; Rocq `HartStepFull.v` §1–3,
+`notes/design-rulings.md` G3; Rocq `HartStepFull.v` §1–3,
 `HartRunFull.v` §2, `RiscvTryStep.v`).
 
 The cycle is cut into stretches by `UCycleDefs` (`uc_tryStep_eq`,

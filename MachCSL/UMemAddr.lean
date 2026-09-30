@@ -1,6 +1,6 @@
 /-
 MachCSL: **the data address of a user access, and `vmem_read` /
-`vmem_write`** (brief `notes/briefs/user_layer.md` §2.1 G9, lane U2-M1).
+`vmem_write`** (brief `notes/design-rulings.md` §2.1 G9, lane U2-M1).
 
 Rocq: `UserMemAccess` §9 (`exec_transform_effective_address_u`: at User,
 with `senvcfg.PMM = 0`, pointer masking is the identity), and the

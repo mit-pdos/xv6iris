@@ -1,6 +1,6 @@
 /-
 MachCSL: `uwk_run`, a symbolic stepper for walk equations (lane U1-P1; the
-brief is `notes/briefs/user_layer.md` G7).
+brief is `notes/design-rulings.md` G7).
 
 `kernel_rfl` closes a walk equation `runRW D orc s m = r` by evaluation, which
 needs every value the model BRANCHES on to be closed.  The Sv39 walk branches

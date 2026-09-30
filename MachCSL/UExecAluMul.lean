@@ -1,6 +1,6 @@
 /-
 MachCSL: the M extension at User privilege (lane U1-X1, brief
-`notes/briefs/user_layer.md` G10): `MUL` (all four `mul_op`s), `MULW`,
+`notes/design-rulings.md` G10): `MUL` (all four `mul_op`s), `MULW`,
 `DIV`/`DIVU`, `DIVW`/`DIVUW`, `REM`/`REMU`, `REMW`/`REMUW`, at symbolic
 register indices and data (division by zero and overflow are data, not
 branches of the walk), from ANY walker state.  Rocq `UserExecFacts.v`

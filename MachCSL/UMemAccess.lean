@@ -1,7 +1,7 @@
 /-
 MachCSL: **the aligned user data access through `vmem_read_addr` /
 `vmem_write_addr`** -- LOAD, STORE, LR and SC at User privilege -- as PURE
-walker facts (brief `notes/briefs/user_layer.md` §2.1 G9, §5 risk 5, lane
+walker facts (brief `notes/design-rulings.md` §2.1 G9, §5 risk 5, lane
 U2-M1).
 
 Rocq: `UserMemAccess` §1 (`exec_vmem_read_addr_aligned`), §1c

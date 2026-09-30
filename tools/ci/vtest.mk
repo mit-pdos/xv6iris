@@ -8,7 +8,7 @@
 # must not break `lake build Xv6 MachCSL`.  The suite needs only the cone of
 # MachCSL.Lang (the model and the device language).
 #
-# Targets marked [lean] are for the build VM and CI (notes/coord/gcp_rule.txt);
+# Targets marked [lean] are for the build VM and CI (README: "Reproducing it");
 # vtest-gen and vtest-table are Python only.
 
 .PHONY: vtest vtest-check vtest-check-ci vtest-passes vtest-table vtest-explain vtest-gen vtest-runs

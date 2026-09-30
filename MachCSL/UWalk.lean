@@ -1,6 +1,6 @@
 /-
 MachCSL: **the Sv39 page walk at User privilege over an OWNED table**, as
-pure walker facts (`runRW` equations; brief `notes/briefs/user_layer.md`
+pure walker facts (`runRW` equations; brief `notes/design-rulings.md`
 §2.1 G7, lane U1-P1).  Rocq: `CommonWalk` (the per-level walk, success and
 fault), `PtTree`'s entry predicates (`pte_valid`/`pte_invalid`/`pte_leaf`/
 `pte_check_ok`), `PtWalkCert` (the `goodmb` twins, here the same equations),

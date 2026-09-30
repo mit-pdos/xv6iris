@@ -1,6 +1,6 @@
 /-
 MachCSL: **the instruction fetch at User privilege** (lane U2-F; brief
-`notes/briefs/user_layer.md` §2.1 G8; Rocq `UserFetch`, `UserFetchCert`,
+`notes/design-rulings.md` §2.1 G8; Rocq `UserFetch`, `UserFetchCert`,
 `UserFaultCert`, the `va` case tree of `UserActiveClass`).
 
 The model's `fetch ()` at User, as fetch-walk equations (`UFetchRun.uftRun`,

@@ -1,6 +1,6 @@
 /-
 MachCSL: the CONTROL dispatch at User privilege with the TRAP CAUSES named
-(lane U3-A, brief `notes/briefs/user_layer.md` §2.2 X5; Rocq `UserTotalU.v`'s
+(lane U3-A, brief `notes/design-rulings.md` §2.2 X5; Rocq `UserTotalU.v`'s
 control rows, `UserExecFacts.v` `exec_execute_ECALL_U`/`…_EBREAK_U`/the
 `jump_to` misaligned arm).
 

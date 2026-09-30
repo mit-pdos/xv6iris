@@ -1,6 +1,6 @@
 /-
 MachCSL: `LUI`/`AUIPC` at User privilege (lane U1-X1, brief
-`notes/briefs/user_layer.md` G10), at a symbolic destination index,
+`notes/design-rulings.md` G10), at a symbolic destination index,
 immediate and `PC`, from ANY walker state.  Rocq `UserExecFacts.v`
 (`exec_execute_UTYPE_total`/`goodmb_execute_UTYPE_total`).  Shape:
 `UxaRetire`; AUIPC's `PC` read is the footprint's `UxaFoot.pc`.

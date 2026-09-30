@@ -2,7 +2,7 @@
 **syscall()'s DESCRIPTOR ARMS, part 1** (wave 8 W8-S2; Rocq `ProofSyscall.v`
 §SyscallArms `sysc_arm_dup` / `sysc_arm_fstat` / `sysc_arm_close`): each
 proves `SyscallTable.syscArmBody n` for its table index from the callee's
-landed interface, per the frozen recipe (notes/coord/syscall_arms_interfaces.txt
+landed interface, per the frozen recipe (notes/design-rulings.md
 §2, §6).  The shared vocabulary (descriptor key, agreement, rows, deposit
 laws, `syscall_ret_fd`) is `SyscallArmsFdDefs`; pipe, read and write are
 `SyscallArmsFd2`.

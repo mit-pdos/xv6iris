@@ -1,7 +1,7 @@
 /-
 THE LINE MODEL, once -- a port of Rocq `LineModel.v`
 (`/shared/xv6rocq/iris/LineModel.v`, 1192 lines, pinned `1900b8a43`), row
-U0-1 of `notes/briefs/union.md`.  Pure.
+U0-1 of `notes/design-rulings.md`.  Pure.
 
 Rocq's header, abridged: the applications' expected-session transcripts are
 ONE fold,

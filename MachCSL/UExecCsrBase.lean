@@ -1,7 +1,7 @@
 /-
 MachCSL: the CSR family at User privilege, part 1 -- the configuration it
 runs under and the read-only bridge (lane U1-X3, brief
-`notes/briefs/user_layer.md` G10; Rocq `UserCsr.v` §1).
+`notes/design-rulings.md` G10; Rocq `UserCsr.v` §1).
 
 **What a CSR instruction at User reads.**  `doCSR` reads `cur_privilege`,
 then `check_CSR_result`: `check_CSR_priv`, `check_CSR_access`,

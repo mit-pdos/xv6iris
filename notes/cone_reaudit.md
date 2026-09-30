@@ -2,7 +2,7 @@
 
 Sept 29 2026.  Rocq `/shared/xv6rocq` @ `1900b8a43` (the VM's pinned, built tree
 `/mnt/rocq/trees/_shared_xv6rocq`).  Lean `lean-v2` @ `b210bd3ea` (U4 landed).  Supersedes the
-reachability claims of `notes/briefs/union_cone.md` (U0-X), whose glob walk could not see typeclass
+reachability claims of `notes/design-rulings.md` (U0-X), whose glob walk could not see typeclass
 resolution (U4 found ~300 declarations reached only through the instance `union_laws_at`).
 
 ## 0. Verdict

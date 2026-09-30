@@ -3,7 +3,7 @@
 reaches** (Rocq `PipeOutPure.v`, 493 lines, pinned `1900b8a43`).
 
 Rocq's file is `EchoOutPure`'s twin at `PipeDisc.sessp` (the one-pipe
-application's stage machine).  The union's cone (notes/briefs/union_cone.md,
+application's stage machine).  The union's cone (notes/design-rulings.md,
 decl-level walk from `UInitUnion.union_adequacy_closed`) reaches only its
 three `removelast` list facts, which the N-stage claim files spend; the rest
 of the file (the one-pipe session's pending/`D_p` machine, `alts_pad_p`,
