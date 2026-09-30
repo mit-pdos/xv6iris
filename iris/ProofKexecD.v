@@ -374,10 +374,10 @@ Section KexecDName.
                 ltac:(rewrite Htgt2ce; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2c2 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID3 Hs3) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htgt2ce) in "Hpc".
       iEval (rewrite /kxd_scan_out) in "Hout".
-      iSpecialize ("Hout" $! CID3 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID3 with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! N2 q with "[%] [Hpc] Hcg Hpath Hlast").
       { split_and!; [exact Hq | exact HN2sp | exact HN2s0 | exact HN2s1
                     | exact HN2s2 | exact HN2s4 | exact HN2s5 | exact HN2s6
@@ -571,7 +571,7 @@ Section KexecDName.
               Hcstr Hiplen Hq Hsp Hs0 Hv1 Hv2 Hv4 Hv5 Hv6 Hv10 Hv11 Ha3 Ha4 Ha5
               with "Htext Hpc Hcg Hpath Hlast [Hout]").
     rewrite /kxd_scan_out.
-    iIntros (CIDn Hsn) "_"; iIntros (M' q') "%Hpres [[%Hnext Hpc] | Hpc] Hcg Hpath Hlast".
+    iIntros (CIDn Hsn) "Hlc"; iIntros (M' q') "%Hpres [[%Hnext Hpc] | Hpc] Hcg Hpath Hlast".
     - (* the back edge, at [S i] *)
       destruct Hnext as (HSi & Ha3' & Ha4' & Ha5').
       destruct Hpres as (Hq' & Hsp' & Hs0' & Hv1' & Hv2' & Hv4' & Hv5' & Hv6' & Hv10' & Hv11').
@@ -582,7 +582,7 @@ Section KexecDName.
                 Hsp' Hs0' Hv1' Hv2' Hv4' Hv5' Hv6' Hv10' Hv11' Ha3' Ha4' Ha5'
                 with "Htext Hpc Hcg Hpath Hlast Hout").
     - (* the scan is over *)
-      iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hout" $! M' q' with "[%] Hpc Hcg Hpath Hlast").
       exact Hpres.
   Qed.

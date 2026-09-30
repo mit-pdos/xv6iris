@@ -3884,14 +3884,14 @@ Section KexecB3Loop.
                 Hqfnl Hqfnm HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 Hsp Hra Hs0 Hs1 Hs2
                 with "Htext Hfab Hst Hcont [Hc1a4]");
-      iIntros (CIDn Hsn) "_"; iIntros (M' P' Mo szv' U') "%HU' [Hnext | Hexit] Hcont".
+      iIntros (CIDn Hsn) "Hlc"; iIntros (M' P' Mo szv' U') "%HU' [Hnext | Hexit] Hcont".
     - (* NO FUEL, and the back edge is what refutes it. *)
       iDestruct "Hnext" as "(_ & _ & %Hp3 & _)".
       destruct Hp3 as (HSi & _ & _ & _ & _).
       exfalso. rewrite Nat2Z.inj_succ in HSi.
       change (Z.of_nat 0%nat) with 0%Z in Hfuel. lia.
     - (* NO FUEL: the loop is over anyway. *)
-      iSpecialize ("Hc1a4" $! CIDn with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hc1a4" $! CIDn with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hc1a4" $! M' P' Mo szv' U' with "[%] Hexit Hcont");
         first [exact HU' | idtac].
     - (* another header *)
@@ -4406,12 +4406,12 @@ Section KexecB3Main.
               w67 ef P' Mo szv' (m !!! Regidx Rs11)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               with "Htext Hfab Hst4 [Hc1ae Hcont]").
-    iIntros (CIDm Hsm) "_"; iIntros (M'') "Hst1ae".
+    iIntros (CIDm Hsm) "Hlc"; iIntros (M'') "Hst1ae".
     assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
               (CIDm : CPU) = (CIDn : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CIDn CIDm true (proc_addr jp) _ Hcr2
                  with "Hcont") as "Hcont".
-    iSpecialize ("Hc1ae" $! CIDm with "[%]"); [wp_next_chain |].
+    iSpecialize ("Hc1ae" $! CIDm with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hc1ae" $! M'' P' Mo szv' U' with "[%] Hst1ae Hcont");
       first [exact HU' | idtac].
   Qed.
@@ -4460,8 +4460,8 @@ Section KexecB3Main.
               w67 ef P Mi (mword_of_int 0 : mword 64) (m !!! Regidx Rs11)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               with "Htext Hfab Hst4 [Hc1ae]").
-    iIntros (CIDm Hsm) "_"; iIntros (M'') "Hst1ae".
-    iSpecialize ("Hc1ae" $! CIDm with "[%]"); [wp_next_chain |].
+    iIntros (CIDm Hsm) "Hlc"; iIntros (M'') "Hst1ae".
+    iSpecialize ("Hc1ae" $! CIDm with "[%] Hlc"); [wp_next_chain |].
     iApply ("Hc1ae" $! M'' with "Hst1ae").
   Qed.
 

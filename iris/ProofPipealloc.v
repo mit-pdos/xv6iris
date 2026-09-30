@@ -2160,7 +2160,7 @@ Section ProofPipealloc.
               O3 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pai_92 with "Htext"). }
-    iApply bi.later_intro. iIntros (CID53 Hs53) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID53 Hs53) "Hlc". iIntros "Hcg Hpc".
     assert (HtgtD : add_vec (mword_of_int (KernelSyms.pipealloc + 0x92) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 19 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.pipealloc + 0xb8))
@@ -2174,7 +2174,7 @@ Section ProofPipealloc.
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID53 eb p ltac:(ext_chain Hbf)
                  with "Hextm") as "Hextm".
-    iSpecialize ("Hepi" $! CID53 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hepi" $! CID53 with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hepi" $! O3 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt Hextc Hextm [Hr16 Hr8] Hpbare Hiru").
     { split; [exact HO3sp|]. split; [exact HO3a0 | exact HO3thr]. }
     { iExists (mD !!! Regidx Rs2), (m !!! Regidx Rs3). iFrame "Hr16 Hr8". }

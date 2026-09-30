@@ -3407,7 +3407,7 @@ Section ProofAllocproc.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (api_30 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDi Hsi) "Hlc Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDi Hsi) "_ Hcg Hpc".
           assert (Htgt1c : add_vec (mword_of_int (KernelSyms.allocproc + 0x30) : mword 64)
                              (sign_extend' 64 (mword_of_int 8172 : mword 13)) = mword_of_int (KernelSyms.allocproc + 0x1c))
             by (apply bv_eq; vm_compute; reflexivity).

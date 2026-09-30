@@ -1651,7 +1651,7 @@ Section KexecABody.
                   ltac:(rewrite Htgt90; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_060 with "Htext"). }
-        iApply bi.later_intro. iIntros (CID15 Hsq15) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID15 Hsq15) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htgt90) in "Hpc".
         iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
         iDestruct (cpu_own_transport CIDrd CID15 0%nat eb (proc_addr jp) eb
@@ -1679,7 +1679,7 @@ Section KexecABody.
           iSplitL "Hmap"; [iExact "Hmap" |].
           iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Htopl"]. }
         iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
-        iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hcont90" $! CID15 with "[%] Hlc"); [wp_next_chain |].
         (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
            [subst]ed it, so the retarget names the literal. *)
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _

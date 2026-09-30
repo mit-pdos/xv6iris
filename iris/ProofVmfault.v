@@ -733,7 +733,7 @@ Section ProofVmfault.
     iApply (Ismapped.wp_ismapped_sconf L5 t m_ad (K - 6)%nat (DfracOwn 1) b p
               ltac:(lia) HL5root ltac:(rewrite HL5a1; exact Hva0b) Hrep
               with "Hcg Htext Hpc Hptree").
-    iIntros (Cir Hsir mi) "Hcg Hpc Hptree %Hics %Hiv".
+    iIntros (Cir Hsir) "_"; iIntros (mi) "Hcg Hpc Hptree %Hics %Hiv".
     rewrite HL5a1 in Hiv.
     assert (Hret2e : ret_pc (L5 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x2e)).
     { rewrite HL5ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -852,7 +852,7 @@ Section ProofVmfault.
                 ltac:(lia) ltac:(reflexivity) Hlvl Hbelow
                 with "Hcg Hcnt Htext Hpc Hlock Havail").
       all: try lkbelow.
-      iIntros (Ckr Hskr mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
+      iIntros (Ckr Hskr) "_"; iIntros (mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
       assert (Hret3e : ret_pc (A1 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x3e)).
       { rewrite HA1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret3e) in "Hpc".
@@ -963,7 +963,7 @@ Section ProofVmfault.
                   B3 (K - 6)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (vfi_7a with "Htext"). }
-        iApply bi.later_intro. iIntros (C10A Hs10A) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (C10A Hs10A) "Hlc". iIntros "Hcg Hpc".
         assert (Hjt7a : add_vec (mword_of_int (KernelSyms.vmfault + 0x7a) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1995 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -971,7 +971,7 @@ Section ProofVmfault.
         iDestruct (proc_ptm_rebuild P (uint szv) M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
         iDestruct (cpu_own_transport Ckr C10A lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iSpecialize ("Hepi" $! C10A with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hepi" $! C10A with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hepi" $! B3 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk4 Hk5] [Hpt]").
         { split_and!.
           - rewrite /B3. rewrite upd_ne; [exact HB2sp | reg_neq].
@@ -1120,7 +1120,7 @@ Section ProofVmfault.
                 with "Hcg Htext Hpc [Hpage]").
       (* A6.87: kalloc's run downgrades to the ownership this memset wants *)
       { iEval (rewrite HA6a0). iApply (page_own_of_filled with "Hpage"). }
-      iIntros (Cse Hsse ms) "Hcg Hpc Hzpage %Hmscs".
+      iIntros (Cse Hsse) "_"; iIntros (ms) "Hcg Hpc Hzpage %Hmscs".
       iEval (rewrite HA6a0) in "Hzpage".
       assert (Hcb : nth_byte (autocast (T := mword)
                       (subrange_vec_dec (mword_of_int 0 : mword 64)
@@ -1312,7 +1312,7 @@ Section ProofVmfault.
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh
                 with "Hcg Hcnt Htext Hpc Hptree Henv2 Hlend").
       all: try lkbelow.
-      iIntros (Cgr Hsgr mg t' k g) "Hcg Hcnt Hlend Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
+      iIntros (Cgr Hsgr) "_"; iIntros (mg t' k g) "Hcg Hcnt Hlend Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
       iDestruct "Hlend" as (kl1 Hkl1) "Hlend".
       iAssert (∃ k' : nat, ⌜(kl <= k')%nat⌝ ∗ act_lend p k')%I with "[Hlend]" as "Hlend".
       { iExists kl1. iFrame "Hlend". iPureIntro. lia. }
@@ -1544,7 +1544,7 @@ Section ProofVmfault.
         iApply page_own_of_named_ex.
         iApply (big_sepL_impl with "Hzpage"). iIntros "!>" (k x Hx) "Hj".
         iExists _. iExact "Hj". }
-      iIntros (Cfr Hsfr mfk) "Hcg Hcnt Hpc %Hfcs _".
+      iIntros (Cfr Hsfr) "_"; iIntros (mfk) "Hcg Hcnt Hpc %Hfcs _".
       assert (Hret6a : ret_pc (F2 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x6a)).
       { rewrite HF2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret6a) in "Hpc".

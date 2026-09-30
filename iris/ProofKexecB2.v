@@ -1599,7 +1599,7 @@ Section KexecB2Loops.
                     ltac:(rewrite Htgt116; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_0f2 with "Htext"). }
-          iApply bi.later_intro. iIntros (CIDx1 Hsx1) "_". iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDx1 Hsx1) "Hlc". iIntros "Hcg Hpc".
           iEval (rewrite Htgt116) in "Hpc".
           iDestruct (cpu_own_transport CIDrd CIDx1 0%nat eb (proc_addr jp)
                        eb ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1607,7 +1607,7 @@ Section KexecB2Loops.
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDrd CIDx1 eb (proc_addr jp)
                        ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-          iSpecialize ("Hc116" $! CIDx1 with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hc116" $! CIDx1 with "[%] Hlc"); [wp_next_chain |].
           assert (Hexit : (fz <= ii')%Z).
           { rewrite Z.geb_leb in Egf. apply Z.leb_le in Egf.
             exact (w32_uarg_ge_inv ii' fz Hii'r Hfzr Egf). }

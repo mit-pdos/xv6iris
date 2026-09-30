@@ -1713,12 +1713,12 @@ Section ProofCreateFound.
                       ltac:(rewrite Htg070b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (cri_0a0 with "Htext"). }
-            iApply bi.later_intro. iIntros (CIDB4 HqB4) "_". iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB4 HqB4) "Hlc". iIntros "Hcg Hpc".
             iEval (rewrite Htg070b) in "Hpc".
             iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2")
               as (nfjb) "Hnb16".
             iPoseProof ("Htail" $! CIDB4) as "Ht".
-            iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+            iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
             iApply ("Ht" $! B3 u5 nfjb with
                       "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
             { exact (cr_tregs_of_regs m sp0 ipv _ ty major minor B3 HB3regs). }

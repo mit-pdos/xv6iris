@@ -2227,7 +2227,7 @@ Section ProofDirlookupMain.
                       ltac:(rewrite Htgt96b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dli_92 with "Htext"). }
-            iApply bi.later_intro. iIntros (CIDB18 HqB18) "_". iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB18 HqB18) "Hlc". iIntros "Hcg Hpc".
             iEval (rewrite Htgt96b) in "Hpc".
             (* the de buffer goes back to sixteen raw bytes for the tail *)
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
@@ -2246,7 +2246,7 @@ Section ProofDirlookupMain.
             iDestruct (cpu_claim_ext_transport CIDB17 CIDB18 eb pj
                          ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iPoseProof ("Htail" $! CIDB18) as "Ht".
-            iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+            iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
             iApply ("Ht" $! mig mt10 (fun jj => file_byte data (16 * i + jj)%nat)
                       with "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10
                             Hde").

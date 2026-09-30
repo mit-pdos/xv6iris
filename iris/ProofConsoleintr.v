@@ -4014,12 +4014,12 @@ Section ProofConsoleintr.
                 ltac:(rgall; rewrite HF15a4 HF15a5; exact Hfull)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnti_08c with "Ht"). }
-      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc". rgall.
       assert (Hj104 : add_vec (mword_of_int (CT + 0x8c) : mword 64)
                         (sign_extend' 64 (mword_of_int 120 : mword 13))
                       = mword_of_int (CT + 0x104)) by pcw.
       iEval (rewrite Hj104) in "Hpc".
-      iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
+      iSpecialize ("EXIT" $! CIDq with "[%] Hlc"); [exact Hchain|].
       iApply ("EXIT" $! F15 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked
                 [Hrc Hwc Hec Hdat Hts Hgh] Hrest [Hhi] Hlgh Hwin").
       - exact Hsp15.

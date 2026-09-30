@@ -3321,7 +3321,7 @@ Section ProofPiperead.
                   (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0")))
                   N3 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (pri_7c with "Htext"). }
-        iApply bi.later_intro. iIntros (CIDp31 Hsp31) "Hlc". iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iIntros (CIDp31 Hsp31) "_". iIntros "Hcg Hpc". rgall.
         assert (Hje4 : add_vec (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.piperead + 0xe8)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3619,7 +3619,7 @@ Section ProofPiperead.
                 with "Hcg Hown Htext Hpc [] Href").
       all: try lkbelow.
       { rgall. iEval (rewrite HSl7a0). iExact "Hopen". }
-      iIntros (CIDsl Hssl) "Hlc"; iIntros (ms3 mfs) "%Hms3 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
+      iIntros (CIDsl Hssl) "_"; iIntros (ms3 mfs) "%Hms3 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
       iEval (rewrite HSl7ra) in "Hpc".
       clear HSl7ra.
       assert (Hw58 : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x54) : mword 64) 4)

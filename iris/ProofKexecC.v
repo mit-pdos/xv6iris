@@ -1698,7 +1698,7 @@ Section KexecCSetup.
                   ltac:(rewrite Htgt268; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_2ba with "Htext"). }
-        iApply bi.later_intro. iIntros (CID32c Hs32c) "_". iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID32c Hs32c) "Hlc". iIntros "Hcg Hpc".
         iEval (rewrite Htgt268) in "Hpc".
         iDestruct (cpu_own_transport CID22 CID32c 0%nat eb (proc_addr jp) eb
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1729,7 +1729,7 @@ Section KexecCSetup.
         { rewrite /V6 upd_ne; [| nz]. rewrite /V5 upd_ne; [| nz]. exact HW4s10. }
         assert (HV6a0 : V6 !!! Regidx Ra0 = avf 0%nat).
         { rewrite /V6 upd_ne; [| nz]. rewrite /V5 upd_ne; [| nz]. exact HW4a0. }
-        iSpecialize ("Hout" $! CID32c with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hout" $! CID32c with "[%] Hlc"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID32c true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hout" $! V6 Pfinal (umem_grow Mi (uint sz1)) sz1 Uev
@@ -3840,7 +3840,7 @@ Section KexecCLoop.
                           vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_266 with "Htext"). }
-          iIntros (CID29 Hs29) "_ Hcg Hpc".
+          iIntros (CID29 Hs29) "Hlc Hcg Hpc".
           assert (Hpp268 : add_vec_int (mword_of_int (KXC + 0x266) : mword 64) 2
                            = mword_of_int (KXC + 0x268)) by pcw.
           iEval (rewrite Hpp268) in "Hpc".
@@ -3854,7 +3854,7 @@ Section KexecCLoop.
                            (CID29 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_retarget CID0 CID29 true (proc_addr jp) _ Hcr29
                        with "Hcont") as "Hcont".
-          iSpecialize ("Hout" $! CID29 with "[%]"); [wp_next_chain |].
+          iSpecialize ("Hout" $! CID29 with "[%] Hlc"); [wp_next_chain |].
           iApply ("Hout" $! U4 Pfinal2 M0' Uev with "[%] [Hpc Hcg Hcnt Hextc Hclmc Hres] Hcont");
             [exact HUev|].
           iRight. rewrite /kxc_at_272.
@@ -4120,9 +4120,9 @@ Section KexecCArgvLoop.
       iApply (IH U1 CIDn M' P' Mo (S c) HScna ltac:(lia)
                 with "Htext [Hrest] Hcont [Hout]").
       2:{ (* the rest of the run starts at [U1]; its count only rises further *)
-        iEval (rewrite /wp_next). iIntros (CIDx) "%Hsx _".
+        iEval (rewrite /wp_next). iIntros (CIDx) "%Hsx Hlc".
         iIntros (M'' P'' Mo'' c'' U'') "%HU'' Hst Hc".
-        iApply ("Hout" $! CIDx Hsx M'' P'' Mo'' c'' U'' with "[%] Hst Hc").
+        iSpecialize ("Hout" $! CIDx Hsx with "Hlc"). iApply ("Hout" $! M'' P'' Mo'' c'' U'' with "[%] Hst Hc").
         exact (ev_after_trans _ _ _ HU1 HU''). }
       rewrite /kxc_at_21a.
       iSplitR; [iPureIntro; exact Hp1 |].
@@ -5333,7 +5333,7 @@ Section KexecCClose.
                         vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_298 with "Htext"). }
-        iIntros (CID17 Hs17c) "_ Hcg Hpc".
+        iIntros (CID17 Hs17c) "Hlc Hcg Hpc".
         assert (Hpp29c : add_vec_int (mword_of_int (KXC + 0x298) : mword 64) 4
                          = mword_of_int (KXC + 0x29c)) by pcw.
         iEval (rewrite Hpp29c) in "Hpc".
@@ -5347,7 +5347,7 @@ Section KexecCClose.
                          (CID17 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CID17 true (proc_addr jp) _ Hcr17
                      with "Hcont") as "Hcont".
-        iSpecialize ("Hout" $! CID17 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hout" $! CID17 with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hout" $! X13 P2 M0' Uev with "[%] [Hpc Hcg Hcnt Hextc Hclmc Hirs Hbm Hins Hbits Hbs Hpt
                                         Hpriv Hpath Hargv Hargs Helf HframeB]
                                        Hcont"); [exact HUev|].

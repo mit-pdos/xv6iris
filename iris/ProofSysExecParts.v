@@ -3398,9 +3398,9 @@ Section SysExecStep.
                 ltac:(rewrite Htb6; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_06e with "Htext"). }
-      iApply bi.later_intro. iIntros (CID9 Hq9) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID9 Hq9) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htb6) in "Hpc".
-      iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
+      iSpecialize ("Hout" $! CID9 with "[%] Hlc"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID9 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply ("Hout" $! Q1 Pa ka i pg alen afun uvf). iRight. iLeft.

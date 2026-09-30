@@ -2122,11 +2122,11 @@ Section ProofNamexTrMain.
                         exact (nx_nslash_eq _ Hsl0))
                   with "Hcg Hpc []").
       { iApply (nxi_0b2 with "Htext"). }
-        iIntros (CIDr2 Hqr2) "_ Hcg Hpc".
+        iIntros (CIDr2 Hqr2) "Hlc Hcg Hpc".
         assert (Hqac : add_vec_int (mword_of_int (NX + 0xb2) : mword 64) 4
                        = mword_of_int (NX + 0xb6)) by pcw.
         iEval (rewrite Hqac) in "Hpc".
-        iSpecialize ("Hsk2" $! plen CIDr2 with "[%]"); [wp_next_chain |].
+        iSpecialize ("Hsk2" $! plen CIDr2 with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hsk2" $! off G1
                   with "[%] [%] [%] [%] [%] Hcg Hpc Hpath [Hqc]").
         + lia.

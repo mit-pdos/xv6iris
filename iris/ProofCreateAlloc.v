@@ -1545,12 +1545,12 @@ Section ProofCreateAlloc.
                        ltac:(rewrite Htg070c; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_0ea with "Htext"). }
-             iApply bi.later_intro. iIntros (CIDD6 HqD6) "_". iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CIDD6 HqD6) "Hlc". iIntros "Hcg Hpc".
              iEval (rewrite Htg070c) in "Hpc".
              iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2")
                as (nfj) "Hnb16".
              iPoseProof ("Htail" $! CIDD6) as "Ht".
-             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+             iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
              iApply ("Ht" $! Y4 (m !!! Regidx Rs3 : mword 64) nfj with
                        "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb16").
              { exact (cr_tregs_of_regs3 m sp0 (ientry kd) (ientry kslot)

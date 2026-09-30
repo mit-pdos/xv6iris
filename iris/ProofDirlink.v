@@ -2665,7 +2665,7 @@ Section ProofDirlinkMain.
                   ltac:(rewrite Htgt70; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (dki_22 with "Htext"). }
-        iApply bi.later_intro. iIntros (CID16 Hq16) "_ Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID16 Hq16) "Hlc Hcg Hpc".
         iEval (rewrite Htgt70) in "Hpc".
         assert (Hk00 : k0 = 0%nat)
           by exact (eq_trans (f_equal (dir_slot data) (dl_nrec_zero _ Hsz0))
@@ -2680,7 +2680,7 @@ Section ProofDirlinkMain.
         iDestruct (cpu_own_transport CIDdl CID16 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iPoseProof ("Hafter" $! CID16) as "Ha".
-        iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
+        iSpecialize ("Ha" with "[%] Hlc"); [wp_next_chain |].
         iApply ("Ha" $! Q1 dolds0 u5 u6 with
                   "[%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde Hidev
                    Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hdat Hppid

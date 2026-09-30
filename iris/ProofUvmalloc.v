@@ -1804,14 +1804,14 @@ Section ProofUvmalloc.
               G8 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uai_a0 with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDu48 Hsu48) "_". iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDu48 Hsu48) "Hlc". iIntros "Hcg Hpc".
     iEval (rewrite Hjta0) in "Hpc".
     iDestruct (ua_restore_mem P Pi (svpn_of (pgroundup oldsz)) i
                    (uint (pgroundup oldsz)) (uint oldsz) Mv
                    Hext Hdom Hfreshi Hlvsame
                  with "Hpt") as "Hpt".
     iEval (rewrite /ua_exit) in "Hexit".
-    iSpecialize ("Hexit" $! CIDu48 with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hexit" $! CIDu48 with "[%] Hlc"); [wp_next_chain|].
     iDestruct (cpu_own_transport CIDu43 CIDu48 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply ("Hexit" $! G8 (mword_of_int 0) with "[%] Hcg Hcnt Hlend Hpc [Hk3 Hk5 Hk8] [Hpt]").

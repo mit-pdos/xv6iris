@@ -2186,14 +2186,14 @@ Section ProofSysPipe.
       { iApply (spi_d8 with "Htext"). }
       { rewrite Hst0eq. iApply (sp_fc_cpay_frag γp true false with "Hqf"). }
       { rewrite Hst0eq. iIntros "H". iApply (sp_fc_cpay_of_cpost with "H"). }
-      iIntros (CID54 Hcr54) "_"; iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
+      iIntros (CID54 Hcr54) "Hlc"; iIntros (Mr k2) "[%Hmrcs %Hmra5] %Hk2 Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hiru Hpenv Hfenv Hpbare".
       (* the block, back into [proc_priv] -- at the count the closes left
          (permit sweep L1b) *)
       iDestruct ("Hpback" $! k2 with "Hpbare Hfenv") as "[Hpriv Hfenv]".
       assert (Hkp2 : (kp <= k2)%nat) by exact Hk2.
       set (U2 := upd_usV U1 (upd_ev (us_V U1) k2)).
       assert (HU2 : ev_after U U2) by (exists k2; split; [lia | reflexivity]).
-      iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
+      iSpecialize ("Hepi" $! CID54 with "[%] Hlc"); [wp_next_chain|].
       (* nothing ran, so the window is EMPTY -- [d := 0], any [bs] does *)
       iApply ("Hepi" $! Mr (pv_upt (us_V U2)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64) U2
                 with "[%] [%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").

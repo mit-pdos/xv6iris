@@ -728,7 +728,7 @@ Section ProofVirtioDiskRwE.
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4)) by pcstep.
         iEval (rewrite Hback) in "Hpc".
         iDestruct (vdrw_body_close γd pd pav pu with "Hbody") as "HR".
-        iSpecialize ("IH" $! CIDaq with "[%]"); [wp_next_chain|].
+        iSpecialize ("IH" $! CIDaq with "[%] Hlc"); [wp_next_chain|].
         iApply ("IH" $! L4 with
                   "[%] Hcg Hown Htc Hclm Hpc Htok HR Hact Hfm Hft Hrm Hrt Hidx
                    [%] [%] [%] HexitL").
