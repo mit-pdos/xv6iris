@@ -60,3 +60,5 @@ Lane W (workflow) agent acbdaca0f65f4bde1. Lane V (vtest) a93577c4da3810840 stil
 CI wave LANDED (Sept 30): V vtest b54ac23e3 (+virtio narrow-access fix), R follow-up 57b4dc386 (spin, byte-precise user coverage),
 W workflow 98a5f98a4 (.github/workflows/lean-ci.yml on coqdev; tools/ci/run_all.sh; dead-import report as a step).
 First real run: gh run 36699549880 (watch result). Open: 937 dead import lines reported (not applied).
+First real Lean CI run GREEN: gh run 36699549880 on coqdev (24 cores), 32 min total (model+libs 6m38s uncached, proofs 16m14s,
+audit 1m30s, tcb 1m03s, reports ~3m, vtest ~1m40s, tests 89 OK, dead-imports 937 lines reported). Waited 3h14m in the queue behind Rocq jobs.
