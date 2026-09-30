@@ -39,6 +39,7 @@ The ghost half (the deed, the ticket, the escrow, the claim) is
 4. `prefix_of` is `List.IsPrefix` (`<+:`).
 -/
 import Xv6.FileDiscLine
+import Xv6.FileDisc
 import Xv6.FsAbsDefs
 
 namespace Xv6
@@ -51,9 +52,35 @@ open Iris Iris.Std Std MachCSL
 (Rocq `wordline`). -/
 abbrev Wordline : Type := List (List (BitVec 8))
 
-/-- The line the ledger files: the file the line redirects to beside its
-words (Rocq `fwline`). -/
+/-- A REDIRECT LINE AS THE FILE MODEL READS IT: the file the line redirects
+to beside its words (Rocq `fwline`, `FileDisc.echof_ws`'s shape). -/
 abbrev Fwline : Type := List (BitVec 8) × Wordline
+
+/-- THE LINE THE LEDGER FILES (Rocq `fl_line := FileDisc.uline`, sync
+SY3-A2): EVERY complete line, as the model parses it (a `sync` line an entry
+like a redirect), so a lower bound ending in a line names that line's global
+position; the redirect lines are the list's projection (`flRedirs`). -/
+abbrev FlLine : Type := Uline
+
+/-- The redirect lines of a line list (Rocq notation `fl_redirs ls := omap
+FileDisc.echof_ws ls`). -/
+def flRedirs (ls : List FlLine) : List Fwline := ls.filterMap echofWs
+
+/-- A list ending in a redirect line has the line among its redirects (Rocq
+`fl_redirs_last`). -/
+theorem flRedirs_last (ls : List FlLine) (ws : List (List (BitVec 8))) (N : List (BitVec 8))
+    (h : ls.getLast? = some (Uline.LEchoF ws N)) : (N, ws) ∈ flRedirs ls := by
+  unfold flRedirs
+  rw [List.mem_filterMap]
+  exact ⟨_, List.mem_of_getLast? h, rfl⟩
+
+/-- Rocq `fl_redirs_prefix`. -/
+theorem flRedirs_prefix (ls ls' : List FlLine) (h : ls <+: ls') :
+    flRedirs ls <+: flRedirs ls' := by
+  obtain ⟨z, rfl⟩ := h
+  unfold flRedirs
+  rw [List.filterMap_append]
+  exact List.prefix_append _ _
 
 /-- THE DEED'S STATE: each class name's inum beside its bytes (Rocq
 `dst`). -/

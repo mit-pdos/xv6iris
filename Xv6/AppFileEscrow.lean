@@ -39,7 +39,7 @@ Rocq's header, abridged (the reasons are the content):
    `[∗list]`.
 3. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`.
 -/
-import Xv6.AppFileDeed
+import Xv6.AppFilePos
 
 namespace Xv6
 
@@ -231,24 +231,35 @@ instance escKey_timeless (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) 
   unfold escKey; infer_instance
 
 /-- Fresh names, both halves of both ghosts, at any value, and the escrow
-ledger EMPTY (Rocq `fnames_alloc`). -/
-theorem fnamesAlloc (r1 : EchoNames) (s : Dst) :
+ledger EMPTY (Rocq `fnames_alloc`).  The SYNC PART's data (`fnSync`,
+`fnEra`, `fnRole`) is the caller's: it names ghosts the caller owns.  The
+ROUND POSITION is fresh, both halves at `n0` (sync SY3-A3b). -/
+theorem fnamesAlloc (r1 : EchoNames) (s : Dst) (γs : GName) (k : Nat) (b : Bool) (n0 : Nat) :
     ⊢@{IProp GF} |==> ∃ r : FileAppNames,
-      ⌜r.fnCons = r1⌝ ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s ∗ escAuth r [] := by
+      ⌜r.fnCons = r1⌝ ∗ ⌜r.fnSync = γs ∧ r.fnEra = k ∧ r.fnRole = b⌝
+      ∗ fdeed r s ∗ fdeed r s ∗ ftkt r s ∗ ftkt r s ∗ escAuth r []
+      ∗ fposf r (1 : Qp).half n0 ∗ fposf r (1 : Qp).half n0 := by
   imod (ghost_var_alloc (GF := GF) s) with ⟨%gd, Hd⟩
   imod (ghost_var_alloc (GF := GF) s) with ⟨%gt, Ht⟩
   imod (MonoList.own_alloc (GF := GF) ([] : List EscRec)) with ⟨%ge, He, -⟩
+  imod (posVar_alloc (GF := GF) n0) with ⟨%gp, Hp⟩
   imodintro
-  iexists ⟨r1, gd, gt, ge⟩
+  iexists ⟨r1, gd, gt, ge, γs, k, b, gp⟩
   have ed := ghost_var_split (GF := GF) gd s (1 : Qp).half (1 : Qp).half
   rw [Qp.half_add_half] at ed
   ihave ⟨Hd1, Hd2⟩ := ed $$ Hd
   have e := ghost_var_split (GF := GF) gt s (1 : Qp).half (1 : Qp).half
   rw [Qp.half_add_half] at e
   ihave ⟨Ht1, Ht2⟩ := e $$ Ht
-  unfold fdeed ftkt escAuth
-  iframe Hd1 Hd2 Ht1 Ht2 He
-  ipureintro; rfl
+  have ep := posVar_split (GF := GF) gp (1 : Qp).half (1 : Qp).half n0
+  rw [Qp.half_add_half] at ep
+  ihave ⟨Hp1, Hp2⟩ := ep $$ Hp
+  unfold fdeed ftkt escAuth fposf
+  isplitr
+  · ipureintro; rfl
+  isplitr
+  · ipureintro; exact ⟨rfl, rfl, rfl⟩
+  iframe Hd1 Hd2 Ht1 Ht2 He Hp1 Hp2
 
 end AppFileEscrow
 
