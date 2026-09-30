@@ -276,7 +276,7 @@ Section SysExecAU.
 
   (* non-expansive in the slot predicate, as [SpecKexec.exec_au_pre_ne]:
      what UexecExecInst.v's instance at the fixpoint variable needs *)
-  Lemma sys_exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+  Lemma sys_exec_slot_pre_ne n (S S' : uvis -d> iPropO Σ)
       (Q : Z -> iProp Σ) (P : nat -> Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ) (cw : Z) (secc : mword 64)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
@@ -294,7 +294,7 @@ Section SysExecAU.
              Φo cw secc na alen afun sts cs pidv HS).
   Qed.
 
-  Lemma sys_exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
+  Lemma sys_exec_au_pre_ne n (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
       Γ (γfs : fs_names) (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))

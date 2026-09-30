@@ -1387,8 +1387,7 @@ Section SchedCtxPay.
     own_context (CID := h) XIs -∗ ▷ valid_context p_sched (Some h) c p XIs -∗
     ▷ sched_vc_at h c p.
   Proof using .
-    iIntros "Hown Hrec". rewrite /sched_vc_at bi.later_exist. iExists XIs.
-    rewrite bi.later_sep. iFrame "Hrec". iNext. iExact "Hown".
+    iIntros "Hown Hrec". rewrite /sched_vc_at. iNext. iExists XIs. iFrame.
   Qed.
 
   Lemma sched_vc_at_tok (E : coPset) (h : CPU) (c p : mword 64) :

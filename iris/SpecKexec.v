@@ -1024,7 +1024,7 @@ Section KexecAU.
   (* non-expansive in the slot predicate: UexecExecInst.v instantiates
      [S] at a fixpoint variable, and the fixpoint's contractivity proof
      needs this of the bundle *)
-  Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
+  Lemma exec_slot_pre_ne n (S S' : uvis -d> iPropO Σ)
       (Q : Z -> iProp Σ) (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
       (cw : Z) (secc : mword 64)
@@ -1037,7 +1037,7 @@ Section KexecAU.
 
   (* ...and at the PAIR the bundle takes: the refund does not move with the
      fixpoint, so it is an ordinary binder here. *)
-  Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
+  Lemma exec_au_pre_ne n (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
       Γ (γfs : fs_names) (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))

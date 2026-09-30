@@ -246,8 +246,11 @@ Section StartedInv.
     - iModIntro. iFrame "Hw Hda Hpk Hprim HP".
       iIntros "Hr". iMod ("Hclose" with "[Hr]") as "_"; [| done].
       iNext. iFrame "Hcl". iSplitR; [iPureIntro; exact Himg |]. iRight. iExact "Hr".
-    - iDestruct "Hr" as (i T) "(_ & >Hda & _)".
-      iExFalso. iApply (dset_auth_excl with "Hda"). rewrite /started_prim. iExact "Hprim".
+    - (* the armed arm is refuted by the primary's token; at an ordinal index its ∃ (whose
+         payload P is not timeless) cannot leave the later, so refute under it *)
+      iAssert (▷ False)%I with "[Hr Hprim]" as ">[]".
+      iNext. iDestruct "Hr" as (i T) "(_ & Hda & _)".
+      iApply (dset_auth_excl with "Hda"). rewrite /started_prim. iExact "Hprim".
   Qed.
 
   Lemma started_inv_claim (E : coPset) (γi : gname) (ξd : CtxId)

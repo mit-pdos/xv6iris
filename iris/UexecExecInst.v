@@ -552,7 +552,7 @@ Section UexecExecInst.
        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
        (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W))%I.
 
-  Lemma exec_sbundle_ne (n : nat) :
+  Lemma exec_sbundle_ne n :
     Proper (dist n ==> eq ==> eq ==> dist n) exec_sbundle.
   Proof using .
     intros X Y HXY f ? <- W ? <-. rewrite /exec_sbundle.
@@ -903,7 +903,7 @@ Section UexecExecInst.
                 destruct (decide (n = k)) as [_ | _]; [| ]
             end).
 
-  Lemma xv6_sbundle_ne (k : nat) :
+  Lemma xv6_sbundle_ne k :
     Proper (dist k ==> eq ==> eq ==> eq ==> dist k) xv6_sbundle.
   Proof using .
     intros X Y HXY n ? <- f ? <- W ? <-. rewrite /xv6_sbundle.
@@ -912,7 +912,7 @@ Section UexecExecInst.
     xv6_num_cases; reflexivity.
   Qed.
 
-  Lemma xv6_spost_ne (k : nat) :
+  Lemma xv6_spost_ne k :
     Proper (dist k ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> dist k)
       xv6_spost.
   Proof using .

@@ -877,7 +877,7 @@ Section box.
       ⌜(T0 ≤ Nat.max Kd Kt)%nat⌝ ∗
       slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))) ∗
       P_hdr (sr_ident r) x0 ξ.
-  Proof using H0 H2 H3 Inhabited0.
+  Proof using H0 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hw HmD HKd HKt.
     apply (box_withdraw_L1_hook N γ ξ r c mD Kd Kt P_hdr (Q1 c) E HE Hw HmD HKd HKt).
     intros x ξ'. iIntros "[HQ Hh]". iModIntro. iFrame.
@@ -992,7 +992,7 @@ Section box.
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb loglen_name T'.
-  Proof using H0 H3 H4 Inhabited0.
+  Proof using H0 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hw Hx Hent.
     iIntros "#Hbox Hrun Hrd0 Hcnt Hhdr".
     iApply (box_deposit_L1_hook N γ ξ r c i' x0 x1 T0 P_hdr emp (Q1 c) E HE Hw Hx
@@ -1252,7 +1252,7 @@ Section box.
     own_context ξ ∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) ∗
     l2_hold γ i mh.
-  Proof using H1 H2 H3 Inhabited0. exact (box_checkout_hook N γ ξ i P_hdr' Qc mh s0 Kt Kp E). Qed.
+  Proof using H1 H2 H3 H4 Inhabited0 Timeless0. exact (box_checkout_hook N γ ξ i P_hdr' Qc mh s0 Kt Kp E). Qed.
 
   (* (e): the instance -- the caller's Q passes straight into the arm.  The
      split wand of (e′) is a pure entailment, so the caller's own Q cannot
@@ -1273,7 +1273,7 @@ Section box.
     own_context ξ ∗
     (∃ x, P_hdr i x ξ ∗ P_rest x ξ) ∗
     l2_hold γ i mh.
-  Proof using H0 H1 H2 H3 Inhabited0.
+  Proof using H0 H1 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hs0 HKt HKp.
     apply (box_checkout_hook N γ ξ i P_hdr Q2 mh s0 Kt Kp E HE Hs0 HKt HKp).
     intros x ξ'. iIntros "[HQ Hh]". iModIntro. iFrame.
@@ -1390,7 +1390,7 @@ Section box.
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb loglen_name T'.
-  Proof using H0 H1 Inhabited0 Timeless0.
+  Proof using H0 H1 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hjoin.
     apply (box_park_hook N γ ξ i P_hdr' Qc' Q' mh E HE).
     intros x ξ'. iIntros "H". iModIntro. by iApply Hjoin.
@@ -1410,7 +1410,7 @@ Section box.
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb loglen_name T'.
-  Proof using H0 H1 Inhabited0 Timeless0.
+  Proof using H0 H1 H2 H3 H4 Inhabited0 Timeless0.
     intros HE.
     iIntros "#Hbox Hrun Hbun Hhold".
     iApply (box_park_hook N γ ξ i P_hdr emp Q2 mh E HE with "Hbox Hrun Hbun [//] Hhold").
@@ -1517,7 +1517,7 @@ Section box.
     slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
     cnt_half γ 1 ∗
     ∃ m', ⌜qsum m' = nat_Qc 1⌝ ∗ l2_hold γ (sr_ident r) m'.
-  Proof using H1 H3 H4 Inhabited0.
+  Proof using H1 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hw Hx HTK Hs0.
     apply (box_l1_to_l2_hook N γ ξ r x0 T0 K s0 Q2 (Q1 1) E HE Hw Hx HTK Hs0).
     iIntros "[HQ2 HQ1]". iModIntro. iFrame.
