@@ -2026,6 +2026,7 @@ import Xv6.UnionAdmSync
 import Xv6.EflLines
 import Xv6.UnionOutPureSync
 import Xv6.UnionOutSyncPure
+import Xv6.UnionAdmDemo
 import Xv6.GenOutSeal
 import Xv6.PipeOutNEvSeal
 import Xv6.PipeOutWSeal
