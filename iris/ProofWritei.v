@@ -4174,7 +4174,7 @@ Section WriteiMain.
                ip inum bm data dn dn0 user off n src_bytes U ncount Sb
                pidv dq dqd dqn dqs A j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).
-      iIntros (CIDf) "%Hchain" Hlc.
+      iIntros (CIDf) "%Hchain Hlc".
       iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF kv)
         "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %Cwhy %C9 %C10 %C10u %C11 %C12 %Csb
          %Cwi %Cwiany %Cwiat %C13 %Ckv
@@ -5184,7 +5184,7 @@ Section WriteiMain.
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%D1 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %Dwhy %D10 %D11 %D11u %D12 %D13
        %Dsb %Dwi %Dwiany %Dwiat %D14

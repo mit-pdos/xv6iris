@@ -845,7 +845,7 @@ Section ProofAcquire.
               Hpos Hav Hfresh Href Hrefpre
               with "Hcg Hown Htext Hpc Hlock [] HTc [Hcont]").
     { iApply TsoGhost.llb_0. }
-    iIntros (CID2) "%Hs2" Hlc.
+    iIntros (CID2) "%Hs2 Hlc".
     iSpecialize ("Hcont" $! CID2 with "[%] Hlc"); [exact Hs2|].
     iIntros (ms mfin) "%Hms HTc Hcg Hpc %Hcs Htok HRes _ Hlb Hown Hpay".
     iApply ("Hcont" $! ms mfin with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay");

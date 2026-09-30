@@ -5702,7 +5702,7 @@ Section ProofIput.
     { iEval (cbn beta iota). iEmpIntro. }
     { rewrite /log_opSet. iFrame "Hop Htx1". }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Htx1 Hislot _".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].

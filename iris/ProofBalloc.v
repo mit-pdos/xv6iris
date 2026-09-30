@@ -4437,7 +4437,7 @@ Section BallocMain.
               Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
                     Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont Htx]").
-    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain Hlc". iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms Htx]");
       [exact Hcs|].

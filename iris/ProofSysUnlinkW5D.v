@@ -2219,7 +2219,7 @@ Section ProofSysUnlinkW5D.
                     [Hown Htce Hcce Hpidq Hsbb Hsbi Hsbs Hbsl Hisl
                      Hisl2 Hpre Hcont HP Hcex Hcmiss Hent Htgt]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     (* ONE hoisted premise for the whole triple, not three inline [ltac:]s.
        [wp_next_chain] is a [repeat match goal], i.e. a whole-context scan, and
        optimization.md's rule is that such a tactic spliced into ARGUMENT

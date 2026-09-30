@@ -2890,7 +2890,7 @@ Section ItruncMain.
       (* it_tail's continuation IS itrunc's postcondition, except that the
          budget arrives as a concrete level and the contract states a range *)
       rewrite /it_cont.
-      iIntros (CIDz) "%Hch" Hlc. iSpecialize ("Hcont" $! CIDz with "[%] Hlc");
+      iIntros (CIDz) "%Hch Hlc". iSpecialize ("Hcont" $! CIDz with "[%] Hlc");
         [exact Hch|].
       iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hdn Hsl Hop".
@@ -2974,7 +2974,7 @@ Section ItruncMain.
                       Hsl Hcru2 Hop [Hcont]").
       { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hslot6". }
       rewrite /it_cont.
-      iIntros (CIDw) "%Hchw" Hlc. iSpecialize ("Hcont" $! CIDw with "[%] Hlc");
+      iIntros (CIDw) "%Hchw Hlc". iSpecialize ("Hcont" $! CIDw with "[%] Hlc");
         [exact Hchw|].
       iIntros (mf) "%Hcsw Hsie Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hdn Hsl Hop".
@@ -3044,7 +3044,7 @@ Section ItruncMain.
                     Hdgeom Hdlock Hsl Hcru Hop [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum Hsbb Hsbi
                   Hmeta Hmap Hblks Hdn Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].

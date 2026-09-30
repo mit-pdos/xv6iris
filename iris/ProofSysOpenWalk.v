@@ -526,7 +526,7 @@ Section ProofSysOpenWalk.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                            Hpbare".
       iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
@@ -791,7 +791,7 @@ Section ProofSysOpenWalk.
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -887,7 +887,7 @@ Section ProofSysOpenWalk.
                           (ns - 1)%nat dqb dqs (proc_addr jx) pidv Mim pvv vom U sts
                           P Pmiss Fo Ft m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -962,7 +962,7 @@ Section ProofSysOpenWalk.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbsl
        Hislot".
     iDestruct ("Hpback2" with "Hpbare") as "Hpriv".

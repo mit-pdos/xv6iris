@@ -3648,7 +3648,7 @@ Section BmapSeal.
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont Htx]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -3732,7 +3732,7 @@ Section BmapSeal.
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl1 %Hled Hkit".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -3806,7 +3806,7 @@ Section BmapNoallocSeal.
     { iApply bm_prk_none. }
     { iApply bm_kit_none. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
               Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hmap %Hdat Hblocks Hsl %Hbud Hkit".
     (* NOTHING MOVED: that is the whole content of the no-alloc contract *)

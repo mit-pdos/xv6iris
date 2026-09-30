@@ -2033,7 +2033,7 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
@@ -2077,7 +2077,7 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
@@ -2130,7 +2130,7 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
@@ -2182,7 +2182,7 @@ Qed.
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont Htx]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].
@@ -2252,7 +2252,7 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".
@@ -2315,7 +2315,7 @@ Qed.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
                   Hiout Hsl Hop Hwit".
     iClear "Htc Hclm".

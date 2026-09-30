@@ -5717,7 +5717,7 @@ Section ProofNamexMain.
                     [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     rewrite /namex_postS.
     iIntros (mf n' Sb' ok nf ipv w)
       "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr Hpath

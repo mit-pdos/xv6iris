@@ -4146,7 +4146,7 @@ Section ProofConsoleread.
                j m av true pid U (us_M U) n lks)
       with "[Hcont]" as "Hcont".
     { rewrite /cr_ret /wp_next.
-      iIntros (CIDr) "%Hsr" Hlc.
+      iIntros (CIDr) "%Hsr Hlc".
       iSpecialize ("Hcont" $! CIDr with "[%] Hlc"); [exact Hsr|].
       iIntros (mf r P' Mo hs kv)
         "%Hcs %Hext %Hr Hshotq Hwin %Ha0 #Htags Hcg Hcnt Hpc %Hkv Hpriv".

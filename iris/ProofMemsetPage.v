@@ -70,7 +70,7 @@ Section ProofMemsetPage.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
     iApply (wp_memset_page_val_sconf m0 n cval b pcur Hn Hpv Hcval Ha2
               with "Hcg Htext Hpc Hpage").
-    rewrite /wp_next. iIntros (CID1) "%Hs1" Hlc.
+    rewrite /wp_next. iIntros (CID1) "%Hs1 Hlc".
     iSpecialize ("Hcont" $! CID1 with "[] Hlc"); [iPureIntro; exact Hs1|].
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].

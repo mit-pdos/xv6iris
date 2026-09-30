@@ -1820,7 +1820,7 @@ Section ProofSysUnlinkW3.
         { iApply su_bs3. iFrame "Hbslot Hbs2". }
         { iApply (log_opS_opb with "HopS"). }
         iEval (rewrite /wp_next).
-        iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce
+        iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce
                                         Hcce Hpc Hpidq Hsbb Hsbi Hbsl
                                         Hislots".
         iDestruct ("Hpre" with "Hpidq") as "Hpriv".

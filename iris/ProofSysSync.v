@@ -1448,7 +1448,7 @@ Section ProofSysSync.
       (* [ss_tail_body] promises an abstract exit, so the same tail serves
          whatever the contract adds above it; the hook's [Q] is injected
          here, on the way into the contract's own continuation *)
-      iIntros (CIDret) "%Hgret" Hlc. iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
+      iIntros (CIDret) "%Hgret Hlc". iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
       iDestruct ("Hcont" $! CIDret with "[%] Hlc") as "Hc"; [exact Hgret |].
       iSpecialize ("Hc" $! mfret).
       iSpecialize ("Hc" with "[%]"); [exact Hcsret |].

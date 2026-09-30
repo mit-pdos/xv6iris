@@ -1412,7 +1412,7 @@ Section ProofAcquiresleep.
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R H q m M pidv av Upr slk spd sp0 eb lks
                 Hav Hsx Hspd Hsp0 HaslE Hbelow
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HRx Hw Hpid Hown Htc Hclm Hcg Hpc [Hcont]").
-      iIntros (CIDz) "%Hsz" Hlc.
+      iIntros (CIDz) "%Hsz Hlc".
       iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
       iIntros (mf) "%Hcs Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hstok2 HR2 Hpid2".
       iApply ("Hcont" $! mf with "[%] Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hpaira Hstok2 HR2 Hpid2").
@@ -1503,7 +1503,7 @@ Section ProofAcquiresleep.
     specialize (HK Hj Hav Hbelow).
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk #Hllb HHq Hpid #Hpinv Hcont".
     iApply (HK with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hllb HHq Hpid Hpinv [Hcont]").
-    iIntros (CIDz) "%Hsz" Hlc.
+    iIntros (CIDz) "%Hsz Hlc".
     iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
     iIntros (mf) "%Hcs Hcg2 Hown2 Htce2 Hcce2 Hpc2 #Hpaira2 Hstok2 HR2 Hpid2".
     iApply ("Hcont" $! mf with "[%] Hcg2 Hown2 Htce2 Hcce2 Hpc2 Hpaira2 Hstok2 HR2 Hpid2").
@@ -2798,7 +2798,7 @@ Section ProofAcquiresleep.
               Hj Hav Hbelow
               with "Hcg Hown Hextc Hextm Htext Hpc Hslk [] HHq Hpid Hpinv [Hcont]").
     { iApply TsoGhost.llb_0. }
-    iIntros (CIDz) "%Hsz" Hlc.
+    iIntros (CIDz) "%Hsz Hlc".
     iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [exact Hsz|].
     iIntros (mf) "%Hcs Hcg Hown Htce Hcce Hpc _ Hstok HR Hpid".
     iApply ("Hcont" $! mf with "[%] Hcg Hown Htce Hcce Hpc Hstok HR Hpid").

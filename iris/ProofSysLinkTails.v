@@ -328,7 +328,7 @@ Section ProofSysLinkTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID5 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CIDy eb (proc_addr jx)
@@ -665,7 +665,7 @@ Section ProofSysLinkTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
@@ -991,7 +991,7 @@ Section ProofSysLinkTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
@@ -1709,7 +1709,7 @@ Section ProofSysLinkTails.
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hown Hpid Hsbb Hsbi Hbsl Hislot Huntgt Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID14 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
@@ -1988,7 +1988,7 @@ Section ProofSysLinkTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
        Hislot2 Huntgt".
     iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
@@ -2294,7 +2294,7 @@ Section ProofSysLinkTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Htx Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
       "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
        Hislot2 Huntgt".
     iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].

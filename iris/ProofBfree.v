@@ -1850,7 +1850,7 @@ Section ProofBfreeMain.
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont Htx]").
     all: try lkbelow.
-    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain Hlc". iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Hextc Hextm Hpc Hppid Hsb Hsl HopS".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
     iDestruct (log_opS_op with "HopS Htx") as "Hop".

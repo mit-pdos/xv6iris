@@ -874,7 +874,7 @@ Section ProofSysChdirM1Tail.
               HK20 Kpop Hsp0 HP1sp HP1thr HP1s1 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
     iDestruct (cpu_own_transport CID4 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID4 CIDy eb (proc_addr jx)
@@ -2093,7 +2093,7 @@ Section ProofSysChdirBody.
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
                           [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
-          iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDz) "%Hqz Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -2352,7 +2352,7 @@ Section ProofSysChdirBody.
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
                           [Hown Hbsl Hsbb Hsbi Hir Hpriv HP Hobs Hcont]").
           iEval (rewrite /wp_next).
-          iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+          iIntros (CIDz) "%Hqz Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -2429,7 +2429,7 @@ Section ProofSysChdirBody.
         { rewrite Heb /cpu_claim_ext. done. }
         { iApply (log_opS_op with "HopS Htx"). }
         iEval (rewrite /wp_next).
-        iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+        iIntros (CIDz) "%Hqz Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct (cwd_ref_at_of_held_at with "Hcwdref") as "Href".
         iAssert (proc_priv gf pj pid (us_upt (upd_usV U (upd_ev (us_V U) kA)) P'))
           with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
@@ -2481,7 +2481,7 @@ Section ProofSysChdirBody.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDz) "%Hqz" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
+      iIntros (CIDz) "%Hqz Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
       iApply ("Hcont" $! mf P' kA with "[%] [%] [%] Hcg Hown [] [] Hpc Hbsl

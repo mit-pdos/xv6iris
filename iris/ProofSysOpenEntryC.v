@@ -638,7 +638,7 @@ Section ProofSysOpenEntryC.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                            Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
@@ -761,7 +761,7 @@ Section ProofSysOpenEntryC.
                                 (fn_nlink (era_node dn bm data))))
                     (socr_ft (bview plen bp) P Phiarm Phiok Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -853,7 +853,7 @@ Section ProofSysOpenEntryC.
                        (abs_row (era_node dn bm data)) Phio)
                     (socr_ft_ex (bview plen bp) P Phiarm Phiex (bv_unsigned inum) Phit) m K eb b lks))
         with "[Hcont Hsbn Hsbs HR]" as "Hcontj".
-      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
+      { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
         iEval (rewrite /so_cont_au). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
         iIntros "Hcg Hown Htce Hcce Hpc Hsbb Hsbi Hbsl Hisl Hpost".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].

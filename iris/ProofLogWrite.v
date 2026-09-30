@@ -2913,7 +2913,7 @@ Section ProofLogWrite.
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(set_solver) Hno
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
     all: try lkbelow.
-    2: { iIntros (CIDx) "%Hchain" Hlc.
+    2: { iIntros (CIDx) "%Hchain Hlc".
          iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
          iIntros (mr) "Hsie Hcnt Hpc %Hcs HopW Hfsb Hlk Hslot".
          rewrite /log_opSwe.
@@ -2966,7 +2966,7 @@ Section ProofLogWrite.
        landed [wp_log_write_gen] caller byte-stable: only the epoch-exposed
        and atomic-update forms -- the walkers', and the one §G.3's receipt is
        deposited from -- carry the epoch-stamped row. *)
-    iIntros (CIDx) "%Hchain" Hlc.
+    iIntros (CIDx) "%Hchain Hlc".
     iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS _ Hfsb Hlk Hslot".
     iDestruct (log_opSe_opS with "HopS") as "HopS".
@@ -3001,7 +3001,7 @@ Section ProofLogWrite.
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(discriminate) Hno
               with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hop Hfsb Hheld [Hcont Htx]").
     all: try lkbelow.
-    iIntros (CIDx) "%Hchain" Hlc. iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
+    iIntros (CIDx) "%Hchain Hlc". iSpecialize ("Hcont" $! CIDx with "[%] Hlc"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS Hfsb Hlk Hslot".
     iDestruct (log_opS_op with "HopS Htx") as "Hop".
     iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] Hop Hfsb Hlk Hslot").

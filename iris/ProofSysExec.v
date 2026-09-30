@@ -557,7 +557,7 @@ Section SysExecBreakAU.
       iSplitL "P7"; [iExact "P7" |]. iSplitL "P8"; [iExact "P8" |].
       iSplitL "P9"; [iExact "P9" |]. iSplitL "F10"; [iExact "F10" |].
       iSplitL "Hpb"; [iExact "Hpb" | iExact "Hps"]. }
-    iIntros (CID9) "%Hq9" Hlc. iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
+    iIntros (CID9) "%Hq9 Hlc". iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
     (* kexec's crossing is the literal [true] now, so the chain back to this
        block's own [b]-indexed continuation goes through [Hbt] -- sys_exec is
        still an [eb = true] caller and that is exactly what pins it. *)

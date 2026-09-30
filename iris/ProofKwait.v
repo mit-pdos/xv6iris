@@ -1977,7 +1977,7 @@ Section ProofKwait.
                 with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                       Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                       [Hcont Hsgback]").
-      iIntros (CIDz) "%Hsz" Hlc. iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+      iIntros (CIDz) "%Hsz Hlc". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
       iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
       iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
@@ -2301,7 +2301,7 @@ Section ProofKwait.
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Hlkk Htokk HRk Hlk Htok
                         [Hcols] Hframe [Hcont Hpriv Hmyrow]").
         { iApply (kw_pay_res with "Hcols"). }
-        iIntros (CIDz) "%Hsz" Hlc. iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
+        iIntros (CIDz) "%Hsz Hlc". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d xs cs kc2
                   with "[%] [%] [%] [%] [%] [%] [] [] Hcg Hown Hpc [%] Hpriv Hmyrow").
@@ -2352,7 +2352,7 @@ Section ProofKwait.
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlend Hplk Hlkk Htokk Hstate Hpsg Hchan
                         Hkilled Hxstate Hpidhalf Hkrow Hdorm Hpark Hmk Hlk Htok Hsgq Hcols Hmyrow Hframe
                         [Hcont Hsgback]").
-        iIntros (CIDz) "%Hsz" Hlc. iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
+        iIntros (CIDz) "%Hsz Hlc". iIntros (mf cs') "%Hcsf %Ha0 Hans Hzr Hcg Hown (%kl2 & %Hkl2 & Hlend) Hpc Hsgq Hmyrow".
         iDestruct (act_lend_back with "Hlend") as "Hcnt"; [exact Hpmenz|].
         iDestruct ("Hsgback" $! kl2 with "Hsgq Hcnt") as "Hpriv".
         iSpecialize ("Hcont" $! CIDz with "[%] Hlc"); [wp_next_chain |].

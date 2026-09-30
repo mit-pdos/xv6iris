@@ -500,7 +500,7 @@ Section ProofSysOpenJoin.
                       HbP H23 H24
                       [Hpback Hfds Hfrag Hisl HP Hobs Htc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".

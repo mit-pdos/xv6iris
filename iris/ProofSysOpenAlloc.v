@@ -453,7 +453,7 @@ Section ProofSysOpenAlloc.
                       HbP H23 H24
                       [Hpback Hfds Hfrag Hisl Hires HP Hobs Htc Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf)
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
@@ -644,7 +644,7 @@ Section ProofSysOpenAlloc.
          nothing ([SpecFileclose.fileclose_cpay_none]) *)
       { iApply fileclose_cpay_none. }
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf kev)
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf kev)
         "%Hcsf %Ha0f %Hkev Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
          Hbsl Hislot Hfds Hfout".
       iDestruct ("Hcback" $! kev with "Hpbare") as "Hcore".

@@ -385,7 +385,7 @@ Section ProofSysOpenPub.
                     [Hkeep Hru Hfref Hflive Hflds Hfpn Hcoff Hiru Hcback Howe
                      Hsbb Hsbi Hbsl Hisl Hfds Hfrag Hauth Hpub Harm Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
+    iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
                                          Hpbare Hshr".
     iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)

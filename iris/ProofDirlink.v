@@ -3565,7 +3565,7 @@ Section ProofDirlinkMain.
                     Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop Htx1 [Hcont Htx2]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf found bm' data' dn' dn0' n' Sb' tot)
       "%E1 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
        Hdat Hppid Hbsl Hislot Hlinks %E2 %Esb %Ewi %Efd Hop Htx1 %E3 %E4 %E5".

@@ -2610,7 +2610,7 @@ Section ProofIlockMain.
     iAssert (il_cont (CID0 := CID11) gisl s g lo d o k ip
  inum pidv dq dqs j m K eb b lks Upr)%I
       with "[Hcont]" as "Hcont".
-    { rewrite /il_cont /wp_next. iIntros (CIDy) "%Hqy" Hlc. iIntros (mf2 dn2 bm2 fl2) "%Hcs2".
+    { rewrite /il_cont /wp_next. iIntros (CIDy) "%Hqy Hlc". iIntros (mf2 dn2 bm2 fl2) "%Hcs2".
       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [exact Hqy|].
       iApply ("Hcont" $! mf2 dn2 bm2 fl2 with "[%] []"); [exact Hcs2|].
       iExists Kt. iFrame "Hflt". iPureIntro. lia. }

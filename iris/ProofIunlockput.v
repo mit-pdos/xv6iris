@@ -634,7 +634,7 @@ Section ProofIunlockputMain.
     { exact Hley. }
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf n' Sb' wf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins
                                Hbslots %Hssub %Hwbm %Hwc %Hbnd Hlogop Hslot Hside".
     iSpecialize ("Hcont" $! CIDf with "[%] Hlc"); [exact Hchain|].

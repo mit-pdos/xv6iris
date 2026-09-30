@@ -658,7 +658,7 @@ Section ProofSysOpenFullBody.
                       [Hown Hpriv Hisl Hfds Hbsl Hsbn Hsbi Hsbs Hsbb
                        Hfrag Hwp Hac Hdl Hoc Htc Hclegs Hcont]").
       iEval (rewrite /wp_next).
-      iIntros (CIDy) "%Hqy" Hlc. iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+      iIntros (CIDy) "%Hqy Hlc". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
       iDestruct (cpu_own_transport CID16 CIDy 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDy with "[%] Hlc"); [wp_next_chain |].
@@ -836,7 +836,7 @@ Section ProofSysOpenFullBody.
  ns dqb dqs dqbs dqn (proc_addr j) pid (us_M U) v vom
                          (us_upt UA P') sts P Pmiss Farm Fun Fok Fex Fo Ft m K eb b lks))
       with "[Hcont]" as "Hcont0".
-    { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz" Hlc.
+    { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz Hlc".
       iEval (rewrite /so_cont0_au_create). iIntros (mf ns2 k2) "%Hcsf %Hns2 %Hk2".
       iIntros "Hcg Hown Htce Hcce Hpc Hsbn Hsbi Hsbs Hsbb Hbsl Hisl
                Hpost".

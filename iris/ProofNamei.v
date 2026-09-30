@@ -645,7 +645,7 @@ Section ProofNameiMain.
               _ Upr HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDf) "%Hchain" Hlc.
+    iIntros (CIDf) "%Hchain Hlc".
     iIntros (mf n' Sb' ok ipv w)
       "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
        Hpath Hbslot %Hssub %Hwbm %Hbnd Hlog Hok".
