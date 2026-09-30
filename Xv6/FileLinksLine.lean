@@ -51,7 +51,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 state, filed, at the CONSOLE era (Rocq `f0w`). -/
 def f0w (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
   iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
-    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb vf s0)
+    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb (hlc := hlc) g vf s0)
 
 instance f0w_persistent (g : FileGn) (k : Nat) (s : Fstate) :
     Persistent (f0w (hlc := hlc) (GF := GF) g k s) := by
@@ -63,7 +63,7 @@ instance f0w_timeless (g : FileGn) (k : Nat) (s : Fstate) :
 /-- THE READER'S BOOT WITNESS: the boot ledger's entry alone (Rocq `f0bw`). -/
 def f0bw (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
   iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
-    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl vf s0)
+    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0)
 
 instance f0bw_persistent (g : FileGn) (k : Nat) (s : Fstate) :
     Persistent (f0bw (hlc := hlc) (GF := GF) g k s) := by
@@ -83,7 +83,7 @@ theorem f0bw_agree (g : FileGn) (k k' : Nat) (s s' : Fstate) :
     · iexact Hp
     · iexact Hp'
   subst he
-  iapply f0Bl_agree
+  iapply f0Bl_agree g
   isplitl [Hl]
   · iexact Hl
   · iexact Hl'
@@ -97,7 +97,7 @@ theorem f0w_bw (g : FileGn) (k : Nat) (s : Fstate) :
   · ipureintro; exact hk
   · iexists vf
     iframe Hp
-    iapply f0Lb_bl $$ Hl
+    iapply f0Lb_bl g $$ Hl
 
 /-- Rocq `f0w_agree`. -/
 theorem f0w_agree (g : FileGn) (k k' : Nat) (s s' : Fstate) :
@@ -138,15 +138,22 @@ instance fhead_timeless (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8
     Timeless (fhead (hlc := hlc) (GF := GF) g k v I) := by
   unfold fhead; infer_instance
 
-/-- THE TYPED LINES' WITNESS: every `echo … > f` line of the consumed input is
-in a list the ledger has a lower bound of (Rocq `flw`). -/
-def flw (g : FileGn) (I : List (BitVec 8)) : IProp GF :=
-  iprop(⌜echofLinesIn I = []⌝ ∨ ∃ ls : List Fwline,
-    flLb g.fgnCl ls ∗ ⌜∀ w, w ∈ echofLinesIn I → w ∈ ls⌝)
+/-- THE ROUND'S LINE WITNESS (Rocq `flw`, sync SY3-A3bc, design 4.5 ruling (ii)
+as amended): the ledger's list as of the consumed input's last complete line --
+the era's pinned BASE (`FileEra.feBase`, the list at the era's PowerOn)
+followed by the lines of the input the reader has consumed.  So its last
+element is the round's line, every redirect line of the input is in it, and
+its length is the round position.  It is read off the consumed bytes' TAGS
+(`UnionOut.utag`); at the era's head it is the base itself. -/
+noncomputable def flw (g : FileGn) (I : List (BitVec 8)) : IProp GF :=
+  iprop(∃ vf : FileEra, fileEraPin g (genId (hlc := hlc) (GF := GF) + 1) vf
+    ∗ flLb g.fgnCl (vf.feBase ++ ulinesIn I))
 
-instance flw_persistent (g : FileGn) (I : List (BitVec 8)) : Persistent (flw (GF := GF) g I) := by
+instance flw_persistent (g : FileGn) (I : List (BitVec 8)) :
+    Persistent (flw (hlc := hlc) (GF := GF) g I) := by
   unfold flw; infer_instance
-instance flw_timeless (g : FileGn) (I : List (BitVec 8)) : Timeless (flw (GF := GF) g I) := by
+instance flw_timeless (g : FileGn) (I : List (BitVec 8)) :
+    Timeless (flw (hlc := hlc) (GF := GF) g I) := by
   unfold flw; infer_instance
 
 /-- THE ERA'S TURN (Rocq `fturn_pre`: `GenLinksLine.gen_link_inst`'s TURN at
