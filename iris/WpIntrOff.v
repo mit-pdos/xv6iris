@@ -100,7 +100,7 @@ Section WpIntrOff.
       iDestruct "Hcpu" as "%Hpure". destruct Hpure as (_ & _ & ->).
       iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [Hcont]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
-      iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
+      iIntros (CIDn Hk) "_". iIntros (ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
       iDestruct (wp_next_at true p _ CIDn Hk with "Hcont") as "Hcont".
       iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt] Hcsrs [Hclm] Hpc").
       { rewrite /cpu_own /cpu_hart /cpu_priv_pay. iFrame "Hcells Hcnt". }

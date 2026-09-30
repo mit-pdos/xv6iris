@@ -244,9 +244,9 @@ Section ProofWakeup.
                    vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
+      { iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
         exfalso. lia. }
-      iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
+      iIntros (CIDk Hsk) "_". iIntros (k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11 & Hdom).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       (* ---- shared tail [pc = wakeup+0x30]: p++ (0x30 addi s1,s1,360), then the
@@ -263,7 +263,7 @@ Section ProofWakeup.
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    mWP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst Mt) "%Hmt Hcg Hown Hpc Hframe".
+      { iIntros (CIDt Hst) "_". iIntros (Mt) "%Hmt Hcg Hown Hpc Hframe".
         destruct Hmt as (Ht1 & Htsp & Ht18 & Ht19 & Ht20 & Ht21 & Ht22 & Ht23 & Ht24 & Ht25 & Ht26 & Ht27 & Htdom).
         (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
         assert (Hrgt9 : rget (CID := CIDt) Mt (mword_of_int 9 : mword 5)
@@ -273,7 +273,7 @@ Section ProofWakeup.
                   Mt av b ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (wki_30 with "Htext"). }
-        iIntros (CIDt1 Hst1) "Hcg Hpc".
+        iIntros (CIDt1 Hst1) "_ Hcg Hpc".
         iEval (rewrite Hrgt9) in "Hcg".
         set (Mt30 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
              (add_vec (Mt !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 368 : mword 12)))]> Mt).
@@ -372,7 +372,7 @@ Section ProofWakeup.
                 M av b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (wki_38 with "Htext"). }
-      iIntros (CIDd Hsd) "Hcg Hpc".
+      iIntros (CIDd Hsd) "_ Hcg Hpc".
       iEval (rewrite Hrgk9) in "Hcg".
       set (M38 := <[Regidx (mword_of_int 10 : mword 5) :=
                     regval_into_reg (add_vec zero_reg (M !!! Regidx (mword_of_int 9 : mword 5)))]> M).
@@ -386,7 +386,7 @@ Section ProofWakeup.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (wki_3a with "Htext"). }
-      iIntros (CIDe Hse) "Hcg Hpc".
+      iIntros (CIDe Hse) "_ Hcg Hpc".
       set (M3a := <[Regidx (mword_of_int 1 : mword 5) :=
                     regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x3a) : mword 64) 4)]> M38).
       assert (Hjtgt_aq : add_vec (mword_of_int (KernelSyms.wakeup + 0x3a) : mword 64)
@@ -412,7 +412,7 @@ Section ProofWakeup.
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
-      iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
+      iIntros (CIDf Hsf) "_". iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
       (* acquire returned: pc = wakeup+0x3e, cpu_own (S lvl) + trap_csrs_pay lvl eb.
          FROM HERE TO THE RELEASE the index is the literal [false] (a held lock
          pins noff >= 1), so no leaf can migrate and everything stays at CIDf. *)
@@ -866,7 +866,7 @@ Section ProofWakeup.
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
     iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
-    iIntros (CIDpro Hspro M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
+    iIntros (CIDpro Hspro) "_". iIntros (M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM19 & HM20 & HM21 & HM18 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
@@ -885,7 +885,7 @@ Section ProofWakeup.
                   with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hf0 Hcont]").
     { (* exit continuation = epilogue at wakeup+0x54 *)
-      iIntros (CIDex Hsex Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
+      iIntros (CIDex Hsex) "_". iIntros (Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
                        Hcg Hown Htextx Hpc Hframe".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
       iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Mexit K

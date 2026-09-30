@@ -81,7 +81,7 @@ Section ProofArgaddr.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (aai_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
@@ -110,7 +110,7 @@ Section ProofArgaddr.
               A0 (av - 4)%nat vr24 b with "Hcg Hpc [] [Hr24]").
     { iApply (aai_02 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hr24".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hr24".
     iEval (rgne) in "Hr24".
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
@@ -118,7 +118,7 @@ Section ProofArgaddr.
               A0 (av - 4)%nat vr16 b with "Hcg Hpc [] [Hr16]").
     { iApply (aai_04 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hr16".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hr16".
     iEval (rgne) in "Hr16".
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
@@ -126,7 +126,7 @@ Section ProofArgaddr.
               A0 (av - 4)%nat vr8 b with "Hcg Hpc [] [Hr8]").
     { iApply (aai_06 with "Htext"). }
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hr8".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hr8".
     iEval (rgne) in "Hr8".
     assert (Hpc08 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc08) in "Hpc".
@@ -147,7 +147,7 @@ Section ProofArgaddr.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (aai_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (A1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -160,7 +160,7 @@ Section ProofArgaddr.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (aai_0a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (A2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (A1 !!! Regidx (mword_of_int 11 : mword 5)))]> A1).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (A1 !!! Regidx (mword_of_int 11 : mword 5)))]> A1) with A2.
@@ -176,7 +176,7 @@ Section ProofArgaddr.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (aai_0c with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (A3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.argaddr + 0x0c) : mword 64) 4)]> A2).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.argaddr + 0x0c) : mword 64) 4)]> A2) with A3.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.argaddr + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2096876 : mword 21)) = mword_of_int KernelSyms.argraw)
@@ -196,7 +196,7 @@ Section ProofArgaddr.
     iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p i tfp ws v dqt b lks
               Hi HA3a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
-    iIntros (CID8 Hs8 MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
+    iIntros (CID8 Hs8) "_". iIntros (MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc10 : ret_pc (A3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.argaddr + 0x10))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -213,7 +213,7 @@ Section ProofArgaddr.
               with "Hcg Hpc [] [Hip]").
     { iApply (aai_10 with "Htext"). }
     { iEval (rewrite Haddr10). iExact "Hip". }
-    iIntros (CID9 Hs9) "Hcg Hpc Hip".
+    iIntros (CID9 Hs9) "_ Hcg Hpc Hip".
     iEval (rewrite Haddr10) in "Hip".
     iEval (rgne) in "Hip".
     iEval (rewrite HMFa0) in "Hip".
@@ -231,7 +231,7 @@ Section ProofArgaddr.
               with "Hcg Hpc [] [Hr24]").
     { iApply (aai_12 with "Htext"). }
     { iEval (rewrite HMFcsp). iExact "Hr24". }
-    iIntros (CID10 Hs10) "Hcg Hpc Hr24".
+    iIntros (CID10 Hs10) "_ Hcg Hpc Hr24".
     set (E2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> MF).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> MF) with E2.
     assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -244,7 +244,7 @@ Section ProofArgaddr.
               with "Hcg Hpc [] [Hr16]").
     { iApply (aai_14 with "Htext"). }
     { iEval (rewrite HE2csp). iExact "Hr16". }
-    iIntros (CID11 Hs11) "Hcg Hpc Hr16".
+    iIntros (CID11 Hs11) "_ Hcg Hpc Hr16".
     set (E3 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E2).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E2) with E3.
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
@@ -257,7 +257,7 @@ Section ProofArgaddr.
               with "Hcg Hpc [] [Hr8]").
     { iApply (aai_16 with "Htext"). }
     { iEval (rewrite HE3csp). iExact "Hr8". }
-    iIntros (CID12 Hs12) "Hcg Hpc Hr8".
+    iIntros (CID12 Hs12) "_ Hcg Hpc Hr8".
     set (E4 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E3).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E3) with E4.
     assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.argaddr + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.argaddr + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -285,7 +285,7 @@ Section ProofArgaddr.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.argaddr + 0x18)) (mword_of_int 2 : mword 6) E4 (av - 4)%nat 4 b Hpop
               with "Hcg Hpc [] Hframe4").
     { iApply (aai_18 with "Htext"). }
-    iIntros (CID13 Hs13) "Hcg Hpc".
+    iIntros (CID13 Hs13) "_ Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg

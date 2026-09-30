@@ -365,7 +365,7 @@ Section SysExecBreakAU.
               (mword_of_int 0 : mword 12) M (K - 60)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (sxi_0b6 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID1 Hq1) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N1 := <[Regidx Ra5 := regval_into_reg
                   (sign_extend' 64 (subrange_vec_dec
                      (add_vec (M !!! Regidx Rs2)
@@ -383,7 +383,7 @@ Section SysExecBreakAU.
               (mword_of_int 3632 : mword 12) N1 (K - 60)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (sxi_0ba with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID2 Hq2) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N2 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (N1 !!! Regidx Rs0)
                      (sign_extend' 64 (mword_of_int 3632 : mword 12)))]> N1).
@@ -402,7 +402,7 @@ Section SysExecBreakAU.
               Ra5 (mword_of_int 3 : mword 6) N2 (K - 60)%nat b
               eq_refl ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (sxi_0be with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID3 Hq3) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N3 := <[Regidx Ra5 := regval_into_reg
                   (shift_bits_left (N2 !!! Regidx Ra5)
                      (subrange_vec_dec (mword_of_int 3 : mword 6)
@@ -421,7 +421,7 @@ Section SysExecBreakAU.
     iApply (wp_cadd_s_sconf (mword_of_int (SX + 0xc0) : mword 64) Ra5 Ra1
               N3 (K - 60)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (sxi_0c0 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc". iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
+    iIntros (CID4 Hq4) "_ Hcg Hpc". iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
     set (N4 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (N3 !!! Regidx Ra5) (N3 !!! Regidx Ra1))]> N3).
     assert (HR4 : sx_regs sp0 m N4 i)
@@ -446,7 +446,7 @@ Section SysExecBreakAU.
               (mword_of_int 0 : mword 12) N4 (K - 60)%nat
               (mword_of_int 0 : mword 64) b with "Hcg Hpc [] Hcell").
     { iApply (sxi_0c2 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc Hcell".
+    iIntros (CID5 Hq5) "_ Hcg Hpc Hcell".
     iEval (rewrite Hca5 sx_zreg0) in "Hcell".
     iDestruct (sx_argv0_shut sp0 i pg ltac:(lia) with "Hcell Hrest") as "Harr".
     assert (Hpc6 : add_vec_int (mword_of_int (SX + 0xc2) : mword 64) 4
@@ -457,7 +457,7 @@ Section SysExecBreakAU.
               (mword_of_int 3888 : mword 12) N4 (K - 60)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (sxi_0c6 with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID6 Hq6) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (N4 !!! Regidx Rs0)
                      (sign_extend' 64 (mword_of_int 3888 : mword 12)))]> N4).
@@ -480,7 +480,7 @@ Section SysExecBreakAU.
               ltac:(rewrite Htkx; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sxi_0ca with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc". iEval (rewrite Htkx) in "Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc". iEval (rewrite Htkx) in "Hpc".
     set (N6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SX + 0xca) : mword 64) 4)]> N5).
     assert (HR6 : sx_regs sp0 m N6 i)
@@ -527,7 +527,7 @@ Section SysExecBreakAU.
     { rewrite Hebt /cpu_claim_ext. done. }
     { (* the bundle kexec takes is the pay fact BESIDE the AU half *)
       iSplitR; [ iExact "Hmp" | iExact "Hau" ]. }
-    iIntros (CID8 Hq8 mf U') "%Hcsf Harms Hcg Hcnt _ _ Hpc
+    iIntros (CID8 Hq8) "_". iIntros (mf U') "%Hcsf Harms Hcg Hcnt _ _ Hpc
              Hbmp Hisp Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
     iEval (rewrite HN6ra) in "Hpc".
     iEval (rewrite HN6a0) in "Hpb".
@@ -690,7 +690,7 @@ Section SysExecWhole.
     iApply (sx_setup (CID0 := CID1) m M sp0 K true (proc_addr j)
               HK eq_refl Hsp Hs0 Hthr2 Hala
               with "Hcg Htext Hpc F3 F4 F5 F6 F7 F8 F9 Hab").
-    iIntros (CID2 Hq2 M2) "%Hst2 Hpc Hcg S3 S4 S5 S6 S7 S8 S9 Hargv".
+    iIntros (CID2 Hq2) "_". iIntros (M2) "%Hst2 Hpc Hcg S3 S4 S5 S6 S7 S8 S9 Hargv".
     destruct Hst2 as (H2sp & H2thr & H2s0 & H2s1 & H2s2 & H2s3 & H2s4 & H2s5 &
                       H2s6 & H2s7).
     iDestruct (cpu_own_transport CID1 CID2 0%nat true (proc_addr j) true
@@ -735,7 +735,7 @@ Section SysExecWhole.
               (fun _ _ => (mword_of_int 0 : mword 8))
               (fun _ => (mword_of_int 0 : mword 64)) ltac:(lia)
               with "Htext Hka Hbody").
-    iIntros (CID3 Hq3 M3 P3 k3 i3 pg3 al3 af3 uv3) "[[%Hnul3 Hbrk] | Hbad]".
+    iIntros (CID3 Hq3) "_". iIntros (M3 P3 k3 i3 pg3 al3 af3 uv3) "[[%Hnul3 Hbrk] | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break_au (CID0 := CID3) Fs gs j gl pd pav pu γf
                 dqb dqs pid U K true true ∅ sp0 m plen pfun rst v1

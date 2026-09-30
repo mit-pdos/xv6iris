@@ -718,7 +718,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
        where the complement is [emp]. *)
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CIDd Hgd mf found k kslot q)
+    iIntros (CIDd Hgd) "_". iIntros (mf found k kslot q)
       "%Hcs Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
     iEval (rewrite Hkeq) in "Hedges".

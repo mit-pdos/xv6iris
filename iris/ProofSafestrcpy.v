@@ -493,7 +493,7 @@ Section ProofSafestrcpy.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb1").
     { iApply (sscp_2e with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc Hb1".
+    iIntros (CID1 Hs1) "_ Hcg Hpc Hb1".
     iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     change (<[Regidx Rra := regval_into_reg ra0]> Mt) with T1.
@@ -515,7 +515,7 @@ Section ProofSafestrcpy.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb2").
     { iApply (sscp_30 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb2".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb2".
     iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     change (<[Regidx Rs0 := regval_into_reg s00]> T1) with T2.
@@ -539,7 +539,7 @@ Section ProofSafestrcpy.
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (sscp_32 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     pose proof (ssc_K_restore K HK) as Hnk.
     iEval (rewrite Hnk) in "Hcg".
     set (T3 := <[Regidx csp_rs1 := regval_into_reg
@@ -654,7 +654,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sscp_18 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID1 Hs1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "_ Hcg Hpc".
       assert (Ht2a : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x18) : mword 64)
                 (sign_extend' 64 (mword_of_int 18 : mword 13))
                 = mword_of_int (KernelSyms.safestrcpy + 0x2a))
@@ -702,7 +702,7 @@ Section ProofSafestrcpy.
                       exact (ssc_eqb_dn_false n d rem Hsum))
                 with "Hcg Hpc []").
       { iApply (sscp_18 with "Htext"). }
-      iIntros (CID1 Hs1) "Hcg Hpc".
+      iIntros (CID1 Hs1) "_ Hcg Hpc".
       assert (Hq1c : add_vec_int (mword_of_int (KernelSyms.safestrcpy + 0x18) : mword 64) 4
                      = mword_of_int (KernelSyms.safestrcpy + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -720,7 +720,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_1c with "Htext"). }
-      iIntros (CID2 Hs2) "Hcg Hpc".
+      iIntros (CID2 Hs2) "_ Hcg Hpc".
       iEval (rewrite (Ha1' _) (ssc_bump1 t d)) in "Hcg".
       set (Q1 := <[Regidx Ra1 := regval_into_reg (pa_add t (S d))]> M).
       assert (HQ1a1 : Q1 !!! Regidx Ra1 = pa_add t (S d)) by (rewrite /Q1 upd_eq; reflexivity).
@@ -737,7 +737,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_1e with "Htext"). }
-      iIntros (CID3 Hs3) "Hcg Hpc".
+      iIntros (CID3 Hs3) "_ Hcg Hpc".
       iEval (rewrite (HQ1a5' _) (ssc_bump1 s d)) in "Hcg".
       set (Q2 := <[Regidx Ra5 := regval_into_reg (pa_add s (S d))]> Q1).
       assert (HQ2a5 : Q2 !!! Regidx Ra5 = pa_add s (S d)) by (rewrite /Q2 upd_eq; reflexivity).
@@ -774,7 +774,7 @@ Section ProofSafestrcpy.
                 with "Hcg Hpc [] [Hsb]").
       { iApply (sscp_20 with "Htext"). }
       { iEval (rewrite (HQ2a1' _) (ssc_back1 t d)). iExact "Hsb". }
-      iIntros (CID4 Hs4) "Hcg Hpc Hsb".
+      iIntros (CID4 Hs4) "_ Hcg Hpc Hsb".
       iEval (rewrite (HQ2a1' _) (ssc_back1 t d)) in "Hsb".
       iDestruct ("Hsback" $! f with "[%] Hsb") as "Hsrc"; [done |].
       set (Q3 := <[Regidx Ra4 := regval_into_reg (zero_extend' 64 (f d : mword 8))]> Q2).
@@ -796,7 +796,7 @@ Section ProofSafestrcpy.
                 with "Hcg Hpc [] [Hdb]").
       { iApply (sscp_24 with "Htext"). }
       { iEval (rewrite (HQ3a5' _) (ssc_back1 s d)). iExact "Hdb". }
-      iIntros (CID5 Hs5) "Hcg Hpc Hdb".
+      iIntros (CID5 Hs5) "_ Hcg Hpc Hdb".
       iEval (rewrite (HQ3a5' _) (ssc_back1 s d)) in "Hdb".
       iEval (rewrite (HQ3a4' _) trunc8_zext8) in "Hdb".
       iDestruct ("Hdback" $! (bb_upd h d (f d)) with "[%] [Hdb]") as "Hdst".
@@ -824,7 +824,7 @@ Section ProofSafestrcpy.
                   ltac:(rgne; unfold neq_vec; rewrite HQ3a4 Hz bc_zext8_iszero; reflexivity)
                   with "Hcg Hpc []").
         { iApply (sscp_28 with "Htext"). }
-        iIntros (CID6 Hs6) "Hcg Hpc".
+        iIntros (CID6 Hs6) "_ Hcg Hpc".
         assert (Hq2a : add_vec_int (mword_of_int (KernelSyms.safestrcpy + 0x28) : mword 64) 2
                        = mword_of_int (KernelSyms.safestrcpy + 0x2a))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -868,7 +868,7 @@ Section ProofSafestrcpy.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (sscp_28 with "Htext"). }
-        iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hs6) "_ Hcg Hpc".
         assert (Hback18 : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x28) : mword 64)
                   (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 248 : mword 8) ('b"0"))))
                 = mword_of_int (KernelSyms.safestrcpy + 0x18))
@@ -901,7 +901,7 @@ Section ProofSafestrcpy.
               HK (ssc_push (mm !!! Regidx csp_rs1))
               with "Hcg Hpc []").
     { iApply (sscp_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (mm !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
@@ -930,7 +930,7 @@ Section ProofSafestrcpy.
               with "Hcg Hpc [] [Hb1]").
     { iApply (sscp_02 with "Htext"). }
     { iEval (rewrite Hpa1). iExact "Hb1". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     assert (HR1ra : R1 !!! Regidx Rra = mm !!! Regidx Rra)
       by (rewrite /R1 upd_ne; [reflexivity | reg_neq]).
     assert (HR1ra' : forall CID' : CpuId, rget (CID := CID') R1 Rra = mm !!! Regidx Rra)
@@ -946,7 +946,7 @@ Section ProofSafestrcpy.
               with "Hcg Hpc [] [Hb2]").
     { iApply (sscp_04 with "Htext"). }
     { iEval (rewrite Hpa2). iExact "Hb2". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     assert (HR1s0 : R1 !!! Regidx Rs0 = mm !!! Regidx Rs0)
       by (rewrite /R1 upd_ne; [reflexivity | reg_neq]).
     assert (HR1s0' : forall CID' : CpuId, rget (CID := CID') R1 Rs0 = mm !!! Regidx Rs0)
@@ -963,7 +963,7 @@ Section ProofSafestrcpy.
               ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (sscp_06 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> R1).
@@ -1005,7 +1005,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sscp_08 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "_ Hcg Hpc".
       assert (Ht2e : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x08) : mword 64)
                 (sign_extend' 64 (mword_of_int 38 : mword 13))
                 = mword_of_int (KernelSyms.safestrcpy + 0x2e))
@@ -1030,7 +1030,7 @@ Section ProofSafestrcpy.
                 ltac:(rewrite (HR2a2' _); exact Hn0geb)
                 with "Hcg Hpc []").
       { iApply (sscp_08 with "Htext"). }
-      iIntros (CID5 Hs5) "Hcg Hpc".
+      iIntros (CID5 Hs5) "_ Hcg Hpc".
       assert (Hq0c : add_vec_int (mword_of_int (KernelSyms.safestrcpy + 0x08) : mword 64) 4
                      = mword_of_int (KernelSyms.safestrcpy + 0x0c))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -1042,7 +1042,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_0c with "Htext"). }
-      iIntros (CID6 Hs6) "Hcg Hpc".
+      iIntros (CID6 Hs6) "_ Hcg Hpc".
       iEval (rewrite (HR2a2' _) (ssc_addiw_m1 n Hn1 Hn31)) in "Hcg".
       set (R3 := <[Regidx Ra3 := regval_into_reg
                     (mword_of_int (Z.of_nat n - 1) : mword 64)]> R2).
@@ -1061,7 +1061,7 @@ Section ProofSafestrcpy.
                 eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_10 with "Htext"). }
-      iIntros (CID7 Hs7) "Hcg Hpc".
+      iIntros (CID7 Hs7) "_ Hcg Hpc".
       iEval (rewrite (HR3a3' _)) in "Hcg".
       set (R4 := <[Regidx Ra3 := regval_into_reg
                     (shift_bits_left (mword_of_int (Z.of_nat n - 1) : mword 64)
@@ -1081,7 +1081,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_12 with "Htext"). }
-      iIntros (CID8 Hs8) "Hcg Hpc".
+      iIntros (CID8 Hs8) "_ Hcg Hpc".
       iEval (rewrite (HR4a3' _)
                (slli32_srli32 (mword_of_int (Z.of_nat n - 1) : mword 64)
                   (ssc_nm1_lt32 n Hn1 Hn31))) in "Hcg".
@@ -1106,7 +1106,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_14 with "Htext"). }
-      iIntros (CID9 Hs9) "Hcg Hpc".
+      iIntros (CID9 Hs9) "_ Hcg Hpc".
       iEval (rewrite (HR5a3' _) (HR5a1' _) (ssc_nm1 n Hn1) (pa_add_comm t (n - 1))) in "Hcg".
       set (R6 := <[Regidx Ra3 := regval_into_reg (pa_add t (n - 1))]> R5).
       assert (HR6a3 : R6 !!! Regidx Ra3 = pa_add t (n - 1))
@@ -1125,7 +1125,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (sscp_16 with "Htext"). }
-      iIntros (CID10 Hs10) "Hcg Hpc".
+      iIntros (CID10 Hs10) "_ Hcg Hpc".
       iEval (rewrite (HR6a0' _) add_vec_zero_l) in "Hcg".
       set (R7 := <[Regidx Ra5 := regval_into_reg s]> R6).
       assert (HR7a5 : R7 !!! Regidx Ra5 = s) by (rewrite /R7 upd_eq; reflexivity).
@@ -1162,7 +1162,7 @@ Section ProofSafestrcpy.
                 HR7sp HR7a0 HR7a1' HR7a3 HR7a5'
                 HR7thr
                 with "Hcg Htext Hpc Hsrc Hdst").
-      iIntros (CID11 Hs11 Mt hf) "%Hex %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
+      iIntros (CID11 Hs11) "_". iIntros (Mt hf) "%Hex %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
       iApply (ssc_tail mm Mt K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr

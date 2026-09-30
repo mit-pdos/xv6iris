@@ -191,7 +191,7 @@ Section ProofNameiparentMain.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) m K 2 b
               K2 Hpush with "Hcg Hpc []").
     { iApply (npi_00 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
@@ -216,7 +216,7 @@ Section ProofNameiparentMain.
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat v1 b
               with "Hcg Hpc [] Hf1").
     { iApply (npi_02 with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (NP + 0x02) : mword 64) 2
                     = mword_of_int (NP + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
@@ -225,7 +225,7 @@ Section ProofNameiparentMain.
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat v2 b
               with "Hcg Hpc [] Hf2").
     { iApply (npi_04 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (NP + 0x04) : mword 64) 2
                     = mword_of_int (NP + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
@@ -242,7 +242,7 @@ Section ProofNameiparentMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (npi_06 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> R1).
@@ -264,7 +264,7 @@ Section ProofNameiparentMain.
     iApply (wp_cmv_s_sconf (mword_of_int (NP + 0x08)) Ra2 Ra1
               R2 (K - 2)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (npi_08 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (R3 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R2 Ra1))]> R2).
     assert (HR3a2 : (R3 !!! Regidx Ra2 : mword 64) = nb).
@@ -287,7 +287,7 @@ Section ProofNameiparentMain.
               R3 (K - 2)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc []").
     { iApply (npi_0a with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (R4 := <[Regidx Ra1 := regval_into_reg (mword_of_int 1 : mword 64)]> R3).
     assert (HR4a1 : (R4 !!! Regidx Ra1 : mword 64) = (mword_of_int 1 : mword 64))
       by (rewrite /R4; apply upd_eq).
@@ -311,7 +311,7 @@ Section ProofNameiparentMain.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (npi_0c with "Htext"). }
-    iIntros (CID7 Hq7) "Hcg Hpc".
+    iIntros (CID7 Hq7) "_ Hcg Hpc".
     set (R5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (NP + 0x0c) : mword 64) 4)]> R4).
     assert (Htgt : add_vec (mword_of_int (NP + 0x0c) : mword 64)
@@ -353,7 +353,7 @@ Section ProofNameiparentMain.
                     Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mf n' Sb' ok nf ipv w)
+    iIntros (CID8 Hq8) "_". iIntros (mf n' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hextc Hclmc Hpc Hbmap Hinos Hppid Hcwdr
              Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".
@@ -385,7 +385,7 @@ Section ProofNameiparentMain.
               with "Hcg Hpc [] [Hf1]").
     { iApply (npi_10 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID9 Hq9) "Hcg Hpc Hf1".
+    iIntros (CID9 Hq9) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> mf).
     assert (HP1sp : npi_sp m P1)
@@ -406,7 +406,7 @@ Section ProofNameiparentMain.
               with "Hcg Hpc [] [Hf2]").
     { iApply (npi_12 with "Htext"). }
     { iEval (rewrite HP1sp -Hmfsp Hc2). iExact "Hf2". }
-    iIntros (CID10 Hq10) "Hcg Hpc Hf2".
+    iIntros (CID10 Hq10) "_ Hcg Hpc Hf2".
     iEval (rewrite HP1sp -Hmfsp Hc2) in "Hf2".
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : npi_sp m P2)
@@ -440,7 +440,7 @@ Section ProofNameiparentMain.
               (mword_of_int 16 : mword 6) P2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (npi_14 with "Htext"). }
-    iIntros (CID11 Hq11) "Hcg Hpc".
+    iIntros (CID11 Hq11) "_ Hcg Hpc".
     set (P3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> P2).

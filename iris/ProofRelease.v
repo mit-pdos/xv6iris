@@ -318,7 +318,7 @@ Section ProofRelease.
               ltac:(lia)
               ltac:(exact (size_del_lt s lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
-    iIntros (CIDpo Hspo) "_". iIntros (mf) "Hcg Hown Hpc %Hmf".
+    iIntros (CIDpo Hspo) "_ _". iIntros (mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc22 : ret_pc (add_vec_int (mword_of_int (KernelSyms.release + 0x1e) : mword 64) 4)
                     = (mword_of_int (KernelSyms.release + 0x22) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -342,7 +342,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr24]").
     { iApply (rli_22 with "Htext"). }
     { iEval (rewrite Hcspmf). iExact "Hr24". }
-    iIntros (CIDe1 Hse1) "_ Hcg Hpc Hr24".
+    iIntros (CIDe1 Hse1) "_ _ Hcg Hpc Hr24".
     set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mf).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> mf) with E1.
     assert (Hpc24 : add_vec_int (mword_of_int (KernelSyms.release + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
@@ -355,7 +355,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr16]").
     { iApply (rli_24 with "Htext"). }
     { iEval (rewrite HcspE1). iExact "Hr16". }
-    iIntros (CIDe2 Hse2) "_ Hcg Hpc Hr16".
+    iIntros (CIDe2 Hse2) "_ _ Hcg Hpc Hr16".
     set (E2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1).
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> E1) with E2.
     assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.release + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -368,7 +368,7 @@ Section ProofRelease.
               with "Hcg Hpc [] [Hr8]").
     { iApply (rli_26 with "Htext"). }
     { iEval (rewrite HcspE2). iExact "Hr8". }
-    iIntros (CIDe3 Hse3) "_ Hcg Hpc Hr8".
+    iIntros (CIDe3 Hse3) "_ _ Hcg Hpc Hr8".
     set (E3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> E2) with E3.
     assert (Hpc28 : add_vec_int (mword_of_int (KernelSyms.release + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.release + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
@@ -402,7 +402,7 @@ Section ProofRelease.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.release + 0x28)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 (match n with O => eb | S _ => false end) Hpop
               with "Hcg Hpc [] Hframe4").
     { iApply (rli_28 with "Htext"). }
-    iIntros (CIDe4 Hse4) "_ Hcg Hpc".
+    iIntros (CIDe4 Hse4) "_ _ Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg

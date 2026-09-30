@@ -332,7 +332,7 @@ Section KexecAUABody.
     (* ---- +0x000 .. +0x01c ---- *)
     iApply (kxc_prologue m K eb (proc_addr jp) sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1 with "Hcg Htext Hpc").
-    iIntros (CIDp Hsp1 M1) "%HM1 Hcg Hpc Hframe".
+    iIntros (CIDp Hsp1) "_". iIntros (M1) "%HM1 Hcg Hpc Hframe".
     destruct HM1 as (HM1sp & HM1s0 & HM1s2 & HM1a0 & HM1a1 & HM1thr).
     (* ---- +0x020: jal ra,myproc ---- *)
     assert (Htmp : add_vec (mword_of_int (KXA + 0x020) : mword 64)
@@ -344,7 +344,7 @@ Section KexecAUABody.
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_020 with "Htext"). }
-    iIntros (CIDj1 Hsj1) "Hcg Hpc". iEval (rewrite Htmp) in "Hpc".
+    iIntros (CIDj1 Hsj1) "_ Hcg Hpc". iEval (rewrite Htmp) in "Hpc".
     set (N1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x020) : mword 64) 4)]> M1).
     change (<[Regidx Rra := regval_into_reg
@@ -361,7 +361,7 @@ Section KexecAUABody.
     iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat eb (proc_addr jp) eb lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
-    iIntros (CIDm Hsm ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
+    iIntros (CIDm Hsm) "_". iIntros (ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
     destruct Hmp as (Hcsm & Hm2a0).
     assert (Hpc24 : ret_pc (N1 !!! Regidx Rra) = mword_of_int (KXA + 0x024))
       by (rewrite HN1ra; pcw).
@@ -371,7 +371,7 @@ Section KexecAUABody.
               M2 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kxc_024 with "Htext"). }
-    iIntros (CIDv1 Hsv1) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDv1 Hsv1) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N2 := <[Regidx Rs1 := regval_into_reg
                   (add_vec zero_reg (M2 !!! Regidx Ra0))]> M2).
     assert (HN2s1 : N2 !!! Regidx Rs1 = (proc_addr jp)).
@@ -389,7 +389,7 @@ Section KexecAUABody.
               ltac:(rewrite Htbo; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_026 with "Htext"). }
-    iIntros (CIDj2 Hsj2) "Hcg Hpc". iEval (rewrite Htbo) in "Hpc".
+    iIntros (CIDj2 Hsj2) "_ Hcg Hpc". iEval (rewrite Htbo) in "Hpc".
     set (N3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x026) : mword 64) 4)]> N2).
     change (<[Regidx Rra := regval_into_reg
@@ -410,7 +410,7 @@ Section KexecAUABody.
               U ltac:(lia) Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlogc Hppid Hprocs").
     all: try lkbelow.
-    iIntros (CIDb Hsb M3) "%Hcsb Hcg Hcnt Hextc Hclmc Hpc Hppid Hlog".
+    iIntros (CIDb Hsb) "_". iIntros (M3) "%Hcsb Hcg Hcnt Hextc Hclmc Hpc Hppid Hlog".
     assert (Hpc2a : ret_pc (N3 !!! Regidx Rra) = mword_of_int (KXA + 0x02a))
       by (rewrite HN3ra; pcw).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -424,7 +424,7 @@ Section KexecAUABody.
               M3 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kxc_02a with "Htext"). }
-    iIntros (CIDv2 Hsv2) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDv2 Hsv2) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (N4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec zero_reg (M3 !!! Regidx Rs2))]> M3).
     assert (HN4a0 : N4 !!! Regidx Ra0 = pv).
@@ -442,7 +442,7 @@ Section KexecAUABody.
               ltac:(rewrite Htnm; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_02c with "Htext"). }
-    iIntros (CIDj3 Hsj3) "Hcg Hpc". iEval (rewrite Htnm) in "Hpc".
+    iIntros (CIDj3 Hsj3) "_ Hcg Hpc". iEval (rewrite Htnm) in "Hpc".
     set (N5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x02c) : mword 64) 4)]> N4).
     change (<[Regidx Rra := regval_into_reg
@@ -492,7 +492,7 @@ Section KexecAUABody.
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcref Hpath Hbs Hirs [$Hlog $Htx] Hstart").
     (* namei is eb-generic now; kexec is still at [eb = true]. *)
-    iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
+    iIntros (CIDn Hsn) "_". iIntros (M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hextc Hclmc Hpc Hbm Hins
              Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 [Hlog Htx] Harm".
     iDestruct (log_opS_op with "Hlog Htx") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
@@ -628,7 +628,7 @@ Section KexecAUABody.
                 ltac:(rewrite Htgt88; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_030 with "Htext"). }
-      iIntros (CIDz Hsz1). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iIntros (CIDz Hsz1) "_". iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt88) in "Hpc".
       (* ---- +0x088: jal ra,end_op ---- *)
       assert (Hteo : add_vec (mword_of_int (KXA + 0x088) : mword 64)
@@ -640,7 +640,7 @@ Section KexecAUABody.
                 ltac:(rewrite Hteo; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_088 with "Htext"). }
-      iIntros (CIDj4 Hsj4) "Hcg Hpc". iEval (rewrite Hteo) in "Hpc".
+      iIntros (CIDj4 Hsj4) "_ Hcg Hpc". iEval (rewrite Hteo) in "Hpc".
       set (P1 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KXA + 0x088) : mword 64) 4)]> M4).
       change (<[Regidx Rra := regval_into_reg
@@ -660,7 +660,7 @@ Section KexecAUABody.
                 with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
-      iIntros (CIDe1 Hse1 M5) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
+      iIntros (CIDe1 Hse1) "_". iIntros (M5) "%Hcse Hcg Hcnt Hextc Hclmc Hpc Hppid".
       assert (Hpc8c : ret_pc (P1 !!! Regidx Rra) = mword_of_int (KXA + 0x08c))
         by (rewrite HP1ra; pcw).
       iEval (rewrite Hpc8c) in "Hpc".
@@ -671,7 +671,7 @@ Section KexecAUABody.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_08c with "Htext"). }
-      iIntros (CIDl1 Hsl1) "Hcg Hpc".
+      iIntros (CIDl1 Hsl1) "_ Hcg Hpc".
       set (P2 := <[Regidx Ra0 := regval_into_reg
                     (mword_of_int (-1) : mword 64)]> M5).
       assert (HP2a0 : P2 !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
@@ -690,7 +690,7 @@ Section KexecAUABody.
                 ltac:(rewrite Htj72; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_08e with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDz2 Hsz2). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz2 Hsz2) "_". iIntros "Hcg Hpc".
       iEval (rewrite Htj72) in "Hpc".
       (* ---- close the private block and take the shared exit ---- *)
       iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".
@@ -1184,7 +1184,7 @@ Section KexecAUAMain.
       iIntros "H". iApply (kxa_fail_dead Fs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
                              na alen afun sts cs pidv (bview plen pfun) with "H"). }
     (* ---- the seam at +0x032: [kxc_a2_r] takes it, at the receipt ---- *)
-    iIntros (CIDs Hss M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
+    iIntros (CIDs Hss) "_". iIntros (M32 ipv zi n1) "HP [Hoc Hsl] Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
     iApply (LA.kxc_a2_r (CID0 := CIDs) Q QF gs jp gl pd pav pu gf
@@ -1226,7 +1226,7 @@ Section KexecAUAMain.
                 cs pidv (bview plen pfun) dn bm data ef ltac:(reflexivity) Hbad
                 with "HR"). }
     (* ---- and the +0x090 exit: [kxc_phaseA]'s rows, plus the receipt ---- *)
-    { iEval (rewrite /wp_next). iIntros (CIDx) "%Hqx".
+    { iEval (rewrite /wp_next). iIntros (CIDx) "%Hqx _".
       iSpecialize ("Hcont90" $! CIDx with "[%]"); [exact Hqx |].
       rewrite /LA.kxc_a2_exit1_r.
       iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef datl).

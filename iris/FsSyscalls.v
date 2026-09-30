@@ -396,7 +396,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iApply (SpecSysMkdir.mkdir_au_at_unit with "Hsup"). }
-    iIntros (CIDn) "%Hgd".
+    iIntros (CIDn) "%Hgd _".
     iIntros (mf ns' P' kev)
       "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret _".
@@ -566,7 +566,7 @@ Module FsSysChdir (M : SYSCHDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iApply fsabs_chdir_pre. }
-    iIntros (CIDn) "%Hgd".
+    iIntros (CIDn) "%Hgd _".
     iIntros (mf P' kev)
       "%Hcs %Hupt %Hkev Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Harms".
     (* THE BRIDGE, once: the arms imply the blanket the friendly post is. *)

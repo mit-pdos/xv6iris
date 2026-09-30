@@ -826,7 +826,7 @@ Section ProofSysLinkEpilogue.
     iApply (wp_cmv_s_sconf (mword_of_int (SL + 0x11a)) Ra0 Ra5
               M (K - 38)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (slki_11a with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hpc".
     set (M1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec zero_reg (M !!! Regidx Ra5))]> M).
     assert (HM1a0 : (M1 !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra5 : mword 64)).
@@ -853,7 +853,7 @@ Section ProofSysLinkEpilogue.
               with "Hcg Hpc [] [Hf1]").
     { iApply (slki_11c with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (M2 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> M1).
     assert (HM2sp : sl_sp sp0 M2)
@@ -882,7 +882,7 @@ Section ProofSysLinkEpilogue.
               with "Hcg Hpc [] [Hf2]").
     { iApply (slki_11e with "Htext"). }
     { iEval (rewrite Hc2). iExact "Hf2". }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
     set (M3 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> M2).
     assert (HM3sp : sl_sp sp0 M3)
@@ -922,7 +922,7 @@ Section ProofSysLinkEpilogue.
               (mword_of_int 19 : mword 6) M3 (K - 38)%nat 38 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (slki_120 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (M4 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (M3 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 19 : mword 6))))]> M3).

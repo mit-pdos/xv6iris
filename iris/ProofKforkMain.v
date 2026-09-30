@@ -251,7 +251,7 @@ Lemma kfork_cont_ev `{!riscvGS Σ, FSC : fscfg}
          (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
        mWP (Loop : expr riscv_lang))%I).
 Proof.
-  iIntros (Hk) "H". iIntros (CID Hs mr) "Hcs Hpc Hpost".
+  iIntros (Hk) "H". iIntros (CID Hs) "_". iIntros (mr) "Hcs Hpc Hpost".
   iApply ("H" $! CID Hs mr with "Hcs Hpc [Hpost]").
   iApply (kfork_post_ev kp with "Hpost"). exact Hk.
 Qed.
@@ -1001,7 +1001,7 @@ Section KforkArms.
          SS4.3x): PURE, so it lands in the Coq context here and is spent
          at [kfork_post]'s pid arm below -- the tail between the two
          ([ProofKfork.kfk_tail_succ]) never has to carry it. *)
-      iIntros (CID5 Hcross5 mf5) "%Hcs5 Hsc5 Hown5 Hpc5 %Hgfresh Hprow".
+      iIntros (CID5 Hcross5) "_". iIntros (mf5) "%Hcs5 Hsc5 Hown5 Hpc5 %Hgfresh Hprow".
       (* the row comes back MOVED, at the generation the block records;
          [kfork_post]'s pid arm names it at [Uc']'s field.  The equation is
          restated at the literal spelling the row carries, so the rewrite
@@ -1138,7 +1138,7 @@ Section KforkMain.
                     Hitbl Hitinv Henv Hpav Hpv Hpfrag HR0 [] [] [Hjslot]").
     all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x112 ---- *)
-      iIntros (CID1 Hx1 Mt kp) "%Hkp %HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hpfrag Hke HR".
+      iIntros (CID1 Hx1) "_". iIntros (Mt kp) "%Hkp %HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hpfrag Hke HR".
       iDestruct "HR" as "(Hrow & HRc & HR)".
       (* THE COLLAPSE.  allocproc's two not-found disjuncts are the same
          resource at [None]: [avail_sub None n] is [None] and
@@ -1160,7 +1160,7 @@ Section KforkMain.
       iApply (kfk_reanchor CID0 CID1 b pme _ Hx1 with "HR").
     - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
       (* the child's image, as uvmcopy left it -- [kfk_pro_exit2]'s own ∀ *)
-      iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Uc kp).
+      iIntros (CIDh Hxh) "_". iIntros (CID2 Hx2) "_". iIntros (Mt npa j γl2 pid_c ch Uc kp).
       destruct Uc as [Vc Mc].
       iIntros "%Hkp %HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcrow Hcsg Hcpr Hcxb Hheld Hhart Hfd Hir Hbslp Hctx Hkstk Hpay Hcpu Hke HR".
@@ -1184,7 +1184,7 @@ Section KforkMain.
       { intro Hd. rewrite (Hx2 (or_introl eq_refl)). exact (Hxh Hd). }
       iApply (kfk_reanchor CID0 CID2 b pme _ Hcr2 with "HR").
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
-      iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Uc' tfsrc tfdst kp).
+      iIntros (CIDh Hxh) "_". iIntros (CID3 Hx3) "_". iIntros (Mt npa j γl2 pid_c ch Uc' tfsrc tfdst kp).
       destruct Uc' as [Vc' Mc].
       iIntros "%Hkp %HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures %Hshare".
       iIntros "Hcg #Ht Hpc Hframe Hpv Hpfrag HCp Hcgen Hcsg Hcpr Hcfrag Hcrow Hcxb #Hmk Hheld Hhart Hfd Hirs Hbsl Hkst Hctx Hpay Hcpu

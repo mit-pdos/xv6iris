@@ -732,7 +732,7 @@ Section ProofFilestatParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb1").
     { iApply (fsti_56 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
+    iIntros (CID1 Hs1) "_ Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /T1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
@@ -749,7 +749,7 @@ Section ProofFilestatParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb2").
     { iApply (fsti_58 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /T2 upd_ne; [exact HT1sp | vm_compute; discriminate]).
@@ -766,7 +766,7 @@ Section ProofFilestatParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb3").
     { iApply (fsti_5a with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /T3 upd_ne; [exact HT2sp | vm_compute; discriminate]).
@@ -783,7 +783,7 @@ Section ProofFilestatParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb6").
     { iApply (fsti_5c with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (T4 := <[Regidx Rs4 := regval_into_reg s40]> T3).
     assert (HT4sp : T4 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /T4 upd_ne; [exact HT3sp | vm_compute; discriminate]).
@@ -816,7 +816,7 @@ Section ProofFilestatParts.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FST + 0x5e)) (mword_of_int 5 : mword 6)
               T4 (K - 10)%nat 10 b Hpop with "Hcg Hpc [] Hframe").
     { iApply (fsti_5e with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     assert (Hnk : ((K - 10) + 10)%nat = K) by exact (fst_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
     set (T5 := <[Regidx csp_rs1 := regval_into_reg

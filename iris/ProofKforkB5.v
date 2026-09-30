@@ -473,7 +473,7 @@ Section ProofKforkB5.
               Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
+    iIntros (CID1 Hs1) "_". iIntros (mr1) "Hcg Hpc %Hcs_2_r1 Hown".
     assert (Hfresh_proc : locks_below lks "proc")
       by lkbelow.
     pose proof (locks_below_not_elem _ _ Hfresh_proc) as Hfresh_proc_ne.
@@ -491,7 +491,7 @@ Section ProofKforkB5.
               mr1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_0d0 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     set (M3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KF + 0xd0) : mword 64) (auipc_off (mword_of_int 16 : mword 20)))]> mr1).
     assert (HM3a0 : M3 !!! Regidx Ra0
@@ -504,7 +504,7 @@ Section ProofKforkB5.
               M3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_0d4 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (M4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget M3 Ra0) (sign_extend' 64 (mword_of_int 1670 : mword 12)))]> M3).
     assert (HM4a0 : M4 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
@@ -524,7 +524,7 @@ Section ProofKforkB5.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_0d8 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     iEval (rewrite Htgt_acq1) in "Hpc".
     set (M5 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xd8) : mword 64) 4)]> M4).
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0xd8) : mword 64) 4)
@@ -543,7 +543,7 @@ Section ProofKforkB5.
               with "Hcg Hown Htext Hpc [Hwl]").
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hwl". }
-    iIntros (CID5 Hs5 ms mr5) "%Hms5 Hcg Hpc %Hcs_5_r5 Htokw Hwaitres _ Hown Hpay".
+    iIntros (CID5 Hs5) "_". iIntros (ms mr5) "%Hms5 Hcg Hpc %Hcs_5_r5 Htokw Hwaitres _ Hown Hpay".
     assert (Hpc_d4 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0xdc)).
     { rewrite HM5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc_d4) in "Hpc".
@@ -679,7 +679,7 @@ Section ProofKforkB5.
               ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc Hwl Htokw Hwaitres Hown Hpay").
-    iIntros (CID6 Hs6 mr6) "Hcg Hpc %Hcs_8_r6 Hown".
+    iIntros (CID6 Hs6) "_". iIntros (mr6) "Hcg Hpc %Hcs_8_r6 Hown".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["wait_lock"]} ∪ lks) ∖ {["wait_lock"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hown".
@@ -701,7 +701,7 @@ Section ProofKforkB5.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_0ec with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (M9 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget mr6 Rs3))]> mr6).
     assert (HM9a0 : M9 !!! Regidx Ra0 = (proc_addr j)).
     { rewrite /M9 upd_eq. rgne. rewrite Hr6s4. apply add_vec_zero_l. }
@@ -720,7 +720,7 @@ Section ProofKforkB5.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_0ee with "Htext"). }
-    iIntros (CID8 Hs8) "Hcg Hpc".
+    iIntros (CID8 Hs8) "_ Hcg Hpc".
     iEval (rewrite Htgt_acq2) in "Hpc".
     set (M10 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xee) : mword 64) 4)]> M9).
     assert (HM10ra : M10 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0xee) : mword 64) 4)
@@ -734,7 +734,7 @@ Section ProofKforkB5.
               with "Hcg Hown Htext Hpc [Hpinv]").
     all: try lkbelow.
     { iEval (rewrite HM10a0). iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    iIntros (CID9 Hs9 ms2 mr9) "%Hms9 Hcg Hpc %Hcs_10_r9 Htok2 HR2 _ Hown Hpay".
+    iIntros (CID9 Hs9) "_". iIntros (ms2 mr9) "%Hms9 Hcg Hpc %Hcs_10_r9 Htok2 HR2 _ Hown Hpay".
     assert (Hpc_ea : ret_pc (M10 !!! Regidx Rra) = mword_of_int (KF + 0xf2)).
     { rewrite HM10ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc_ea) in "Hpc".

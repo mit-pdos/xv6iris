@@ -257,7 +257,7 @@ Section ProofMemmove.
               with "Hcg Hpc [] [Hb1]").
     { iApply (minstr_mm_28 with "Htext"). }
     { iEval (rewrite Hsp). iEval (rewrite Hoff1). iExact "Hb1". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hb1".
+    iIntros (CID1 Hs1) "_ Hcg Hpc Hb1".
     iEval (rewrite Hsp) in "Hb1". iEval (rewrite Hoff1) in "Hb1".
     assert (Hp2a : add_vec_int (mword_of_int (KernelSyms.memmove + 0x28) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -272,7 +272,7 @@ Section ProofMemmove.
               with "Hcg Hpc [] [Hb2]").
     { iApply (minstr_mm_2a with "Htext"). }
     { iEval (rewrite HspM4). iEval (rewrite Hoff2). iExact "Hb2". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb2".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb2".
     iEval (rewrite HspM4) in "Hb2". iEval (rewrite Hoff2) in "Hb2".
     assert (Hp2c : add_vec_int (mword_of_int (KernelSyms.memmove + 0x2a) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -292,7 +292,7 @@ Section ProofMemmove.
               M5 (n - 2) 2 b Hpop with "Hcg Hpc [] [Hb1 Hb2]").
     { iApply (minstr_mm_2c with "Htext"). }
     { iEval (rewrite Hup). iApply (stack_own_2_intro (KTR := kt) with "Hb1 Hb2"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     assert (Hp2e : add_vec_int (mword_of_int (KernelSyms.memmove + 0x2c) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2e) in "Hpc".
@@ -395,7 +395,7 @@ Section ProofMemmove.
               m n b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_18 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     assert (Ha1' : rget (CID := CID0) m a1_idx = pa_add p_src off) by (rgne; exact Ha1).
     assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.memmove + 0x18) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -408,7 +408,7 @@ Section ProofMemmove.
               m1 n b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_1a with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     assert (Hm1a4 : m1 !!! Regidx a4_idx = pa_add p_dst off).
     { unfold m1. rewrite upd_ne; [exact Ha4 | vm_compute; discriminate]. }
     assert (Hm1a4' : rget (CID := CID1) m1 a4_idx = pa_add p_dst off)
@@ -446,7 +446,7 @@ Section ProofMemmove.
               with "Hcg Hpc [] [Hs0]").
     { iApply (minstr_mm_1c with "Htext"). }
     { iEval (rewrite Ha1_2' (Hback p_src off)). iExact "Hs0". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hs0".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hs0".
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x1c) : mword 64) 4
                    = mword_of_int (KernelSyms.memmove + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp20) in "Hpc".
@@ -466,7 +466,7 @@ Section ProofMemmove.
               with "Hcg Hpc [] [Hd0]").
     { iApply (minstr_mm_20 with "Htext"). }
     { iEval (rewrite Ha4v' (Hback p_dst off)). iExact "Hd0". }
-    iIntros (CID4 Hs4) "Hcg Hpc Hd0".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hd0".
     assert (Hp24 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x20) : mword 64) 4
                    = mword_of_int (KernelSyms.memmove + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp24) in "Hpc".
@@ -527,7 +527,7 @@ Section ProofMemmove.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (minstr_mm_24 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "_ Hcg Hpc".
       assert (Hback18 : add_vec (mword_of_int (KernelSyms.memmove + 0x24) : mword 64)
                           (sign_extend' 64 (mword_of_int 0x1ff4 : mword 13))
                         = mword_of_int (KernelSyms.memmove + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -609,7 +609,7 @@ Section ProofMemmove.
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_0e with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hpc".
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x0e) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
@@ -625,7 +625,7 @@ Section ProofMemmove.
               ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_10 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc".
     assert (Hp12 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x10) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
@@ -663,7 +663,7 @@ Section ProofMemmove.
               ltac:(rewrite HM2a1'; rewrite HM2a2'; reflexivity)
               with "Hcg Hpc []").
     { iApply (minstr_mm_12 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     assert (Hp16 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x12) : mword 64) 4
                    = mword_of_int (KernelSyms.memmove + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
@@ -677,7 +677,7 @@ Section ProofMemmove.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_16 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x16) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
@@ -700,7 +700,7 @@ Section ProofMemmove.
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
               HM4a1 HM4a4 HM4a5
               with "Hcg Htext Hpc Hsrc Hdst").
-    iIntros (CIDl Hsl mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
+    iIntros (CIDl Hsl) "_". iIntros (mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
     (* ---- +0x28..+0x2e: the epilogue ---- *)
     assert (HmfA0 : mf !!! Regidx a0_idx = p_dst).
     { rewrite Ha0f. unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
@@ -762,7 +762,7 @@ Section ProofMemmove.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int (KernelSyms.memmove + 0x00)) imm_entry m0 n 2 b Hn Hsp'
               with "Hcg Hpc []").
     { iApply (minstr_mm_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     assert (Hp02 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x00) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
@@ -784,7 +784,7 @@ Section ProofMemmove.
     iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x02)) (mword_of_int 1 : mword 6)
               ra_idx m1 (n - 2) v1 b with "Hcg Hpc [] Hb1").
     { iApply (minstr_mm_02 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb1".
     assert (Hp04 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x02) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
@@ -792,7 +792,7 @@ Section ProofMemmove.
     iApply (wp_csdsp_s_sconf (kt := kt) (ktd := kt) (mword_of_int (KernelSyms.memmove + 0x04)) (mword_of_int 0 : mword 6)
               s0_idx m1 (n - 2) v2 b with "Hcg Hpc [] Hb2").
     { iApply (minstr_mm_04 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc Hb2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hb2".
     assert (Hp06 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x04) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp06) in "Hpc".
@@ -813,7 +813,7 @@ Section ProofMemmove.
               ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (minstr_mm_06 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     assert (Hp08 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x06) : mword 64) 2
                    = mword_of_int (KernelSyms.memmove + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
@@ -853,7 +853,7 @@ Section ProofMemmove.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (minstr_mm_08 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "_ Hcg Hpc".
       assert (Hpsuf : add_vec (mword_of_int (KernelSyms.memmove + 0x08) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))
                       = mword_of_int (KernelSyms.memmove + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
@@ -878,7 +878,7 @@ Section ProofMemmove.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hnz
                 with "Hcg Hpc []").
       { iApply (minstr_mm_08 with "Htext"). }
-      iIntros (CID5 Hs5) "Hcg Hpc".
+      iIntros (CID5 Hs5) "_ Hcg Hpc".
       assert (Hp0a : add_vec_int (mword_of_int (KernelSyms.memmove + 0x08) : mword 64) 2
                      = mword_of_int (KernelSyms.memmove + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp0a) in "Hpc".
@@ -891,7 +891,7 @@ Section ProofMemmove.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (minstr_mm_0a with "Htext"). }
-        iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hs6) "_ Hcg Hpc".
         assert (Hp30 : add_vec (mword_of_int (KernelSyms.memmove + 0x0a) : mword 64)
                          (sign_extend' 64 (mword_of_int 0x26 : mword 13))
                        = mword_of_int (KernelSyms.memmove + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
@@ -910,7 +910,7 @@ Section ProofMemmove.
                         rewrite Hm2a2; reflexivity)
                   with "Hcg Hpc []").
         { iApply (minstr_mm_30 with "Htext"). }
-        iIntros (CID7 Hs7) "Hcg Hpc".
+        iIntros (CID7 Hs7) "_ Hcg Hpc".
         assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x30) : mword 64) 4
                        = mword_of_int (KernelSyms.memmove + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp34) in "Hpc".
@@ -932,7 +932,7 @@ Section ProofMemmove.
                   ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (minstr_mm_34 with "Htext"). }
-        iIntros (CID8 Hs8) "Hcg Hpc".
+        iIntros (CID8 Hs8) "_ Hcg Hpc".
         assert (Hp36 : add_vec_int (mword_of_int (KernelSyms.memmove + 0x34) : mword 64) 2
                        = mword_of_int (KernelSyms.memmove + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp36) in "Hpc".
@@ -963,7 +963,7 @@ Section ProofMemmove.
                   ltac:(rewrite Hm4a1' Hm4a3'; apply add_vec64_comm)
                   with "Hcg Hpc []").
         { iApply (minstr_mm_36 with "Htext"). }
-        iIntros (CID9 Hs9) "Hcg Hpc".
+        iIntros (CID9 Hs9) "_ Hcg Hpc".
         assert (Hp3a : add_vec_int (mword_of_int (KernelSyms.memmove + 0x36) : mword 64) 4
                        = mword_of_int (KernelSyms.memmove + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp3a) in "Hpc".
@@ -983,7 +983,7 @@ Section ProofMemmove.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (minstr_mm_3a with "Htext"). }
-          iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10) "_ Hcg Hpc".
           assert (Hp0e : add_vec (mword_of_int (KernelSyms.memmove + 0x3a) : mword 64)
                            (sign_extend' 64 (mword_of_int 0x1fd4 : mword 13))
                          = mword_of_int (KernelSyms.memmove + 0x0e))
@@ -1042,7 +1042,7 @@ Section ProofMemmove.
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hbltu
                   with "Hcg Hpc []").
         { iApply (minstr_mm_0a with "Htext"). }
-        iIntros (CID6 Hs6) "Hcg Hpc".
+        iIntros (CID6 Hs6) "_ Hcg Hpc".
         iEval (rewrite Hp0e) in "Hpc".
         iApply (mm_fwd m0 m2 n (S len') src_bytes dst_olds dqs b pcur Hn Hlen0 Hlen32
                   Hm2a0 Hm2a1 Hm2a2 Hm2sp Hm2cs

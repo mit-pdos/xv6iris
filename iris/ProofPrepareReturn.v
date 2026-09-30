@@ -164,7 +164,7 @@ Section ProofPrepareReturn.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) m av 2 b
               ltac:(lia) Hpush with "Hcg Hpc []").
     { iApply (prr_00 with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
                (add_vec (m !!! Regidx csp_rs1)
                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with M1.
@@ -189,7 +189,7 @@ Section ProofPrepareReturn.
     iApply (wp_csdsp_s_sconf (mword_of_int (PRR + 0x02)) (mword_of_int 1 : mword 6)
               ra_idx M1 (av - 2)%nat vra b with "Hcg Hpc [] Hbra").
     { iApply (prr_02 with "Htext"). }
-    iIntros (CID2 Hk2) "Hcg Hpc Hbra".
+    iIntros (CID2 Hk2) "_ Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (PRR + 0x02) : mword 64) 2
                     = mword_of_int (PRR + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
@@ -197,7 +197,7 @@ Section ProofPrepareReturn.
     iApply (wp_csdsp_s_sconf (mword_of_int (PRR + 0x04)) (mword_of_int 0 : mword 6)
               s0_idx M1 (av - 2)%nat vs0 b with "Hcg Hpc [] Hbs0").
     { iApply (prr_04 with "Htext"). }
-    iIntros (CID3 Hk3) "Hcg Hpc Hbs0".
+    iIntros (CID3 Hk3) "_ Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (PRR + 0x04) : mword 64) 2
                     = mword_of_int (PRR + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
@@ -207,7 +207,7 @@ Section ProofPrepareReturn.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (prr_06 with "Htext"). }
-    iIntros (CID4 Hk4) "Hcg Hpc".
+    iIntros (CID4 Hk4) "_ Hcg Hpc".
     set (M2 := <[Regidx s0_idx := regval_into_reg
                    (add_vec (M1 !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> M1).
@@ -227,7 +227,7 @@ Section ProofPrepareReturn.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (prr_08 with "Htext"). }
-    iIntros (CID5 Hk5) "Hcg Hpc".
+    iIntros (CID5 Hk5) "_ Hcg Hpc".
     set (M3 := <[Regidx ra_idx := regval_into_reg
                    (add_vec_int (mword_of_int (PRR + 0x08) : mword 64) 4)]> M2).
     change (<[Regidx ra_idx := regval_into_reg
@@ -244,7 +244,7 @@ Section ProofPrepareReturn.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
-    iIntros (CID6 Hk6 msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
+    iIntros (CID6 Hk6) "_". iIntros (msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc0c : ret_pc (M3 !!! Regidx ra_idx) = mword_of_int (PRR + 0x0c))
       by (rewrite HM3ra; pcw).

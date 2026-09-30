@@ -462,7 +462,7 @@ Lemma kexec_closer_ev_next (k : nat) `{XI : CtxIdDefs.CurCtx}
     kexec_closer Q QF gf ga pj pidv (upd_usV U (upd_ev (us_V U) k)) m ret_tgt K b eb
       lks dqb dqs bmapstart na alen plen pv dqpv pfun av dqa avf aslen dqas afun).
 Proof.
-  iIntros (Hk) "H". iIntros (CIDx Hs).
+  iIntros (Hk) "H". iIntros (CIDx Hs) "_".
   iApply (kexec_closer_ev k with "[H]"); [exact Hk|]. iApply ("H" $! CIDx Hs).
 Qed.
 

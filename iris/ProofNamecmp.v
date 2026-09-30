@@ -175,7 +175,7 @@ Section ProofNamecmpMain.
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) mm K 2 b
               ltac:(lia) Hpush with "Hcg Hpc []").
     { iApply (nci_00 with "Htext"). }
-    iIntros (CID1 Hq1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hq1) "_ Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (mm !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
@@ -202,7 +202,7 @@ Section ProofNamecmpMain.
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat v1 b
               with "Hcg Hpc [] Hf1").
     { iApply (nci_02 with "Htext"). }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.namecmp + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.namecmp + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
@@ -210,7 +210,7 @@ Section ProofNamecmpMain.
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat v2 b
               with "Hcg Hpc [] Hf2").
     { iApply (nci_04 with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc Hf2".
+    iIntros (CID3 Hq3) "_ Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.namecmp + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.namecmp + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
@@ -227,7 +227,7 @@ Section ProofNamecmpMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (nci_06 with "Htext"). }
-    iIntros (CID4 Hq4) "Hcg Hpc".
+    iIntros (CID4 Hq4) "_ Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> R1).
@@ -249,7 +249,7 @@ Section ProofNamecmpMain.
               R2 (K - 2)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc []").
     { iApply (nci_08 with "Htext"). }
-    iIntros (CID5 Hq5) "Hcg Hpc".
+    iIntros (CID5 Hq5) "_ Hcg Hpc".
     set (R3 := <[Regidx Ra2 := regval_into_reg
                   (mword_of_int (Z.of_nat 14) : mword 64)]> R2).
     assert (HR3a2 : R3 !!! Regidx Ra2 = (mword_of_int (Z.of_nat 14) : mword 64))
@@ -272,7 +272,7 @@ Section ProofNamecmpMain.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nci_0a with "Htext"). }
-    iIntros (CID6 Hq6) "Hcg Hpc".
+    iIntros (CID6 Hq6) "_ Hcg Hpc".
     set (R4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.namecmp + 0x0a) : mword 64) 4)]> R3).
     assert (Htgt : add_vec (mword_of_int (KernelSyms.namecmp + 0x0a) : mword 64)
@@ -300,7 +300,7 @@ Section ProofNamecmpMain.
               with "Hcg Htext Hpc [Hb1] [Hb2]").
     { iEval (rewrite HR4a0). iExact "Hb1". }
     { iEval (rewrite HR4a1). iExact "Hb2". }
-    iIntros (CID7 Hq7 mS) "Hcg Hpc Hb1 Hb2 %HcsS %Hres".
+    iIntros (CID7 Hq7) "_". iIntros (mS) "Hcg Hpc Hb1 Hb2 %HcsS %Hres".
     iEval (rewrite HR4a0) in "Hb1".
     iEval (rewrite HR4a1) in "Hb2".
     assert (Hpc0e : ret_pc (R4 !!! Regidx Rra : mword 64)
@@ -333,7 +333,7 @@ Section ProofNamecmpMain.
               with "Hcg Hpc [] [Hf1]").
     { iApply (nci_0e with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID8 Hq8) "Hcg Hpc Hf1".
+    iIntros (CID8 Hq8) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (P1 := <[Regidx Rra := regval_into_reg (mm !!! Regidx Rra : mword 64)]> mS).
     assert (HP1sp : nc_sp mm P1)
@@ -354,7 +354,7 @@ Section ProofNamecmpMain.
               with "Hcg Hpc [] [Hf2]").
     { iApply (nci_10 with "Htext"). }
     { iEval (rewrite HP1sp -HmSsp Hc2). iExact "Hf2". }
-    iIntros (CID9 Hq9) "Hcg Hpc Hf2".
+    iIntros (CID9 Hq9) "_ Hcg Hpc Hf2".
     iEval (rewrite HP1sp -HmSsp Hc2) in "Hf2".
     set (P2 := <[Regidx Rs0 := regval_into_reg (mm !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : nc_sp mm P2)
@@ -407,7 +407,7 @@ Section ProofNamecmpMain.
               (mword_of_int 16 : mword 6) P2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (nci_12 with "Htext"). }
-    iIntros (CID10 Hq10) "Hcg Hpc".
+    iIntros (CID10 Hq10) "_ Hcg Hpc".
     set (P3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> P2).

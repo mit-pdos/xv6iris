@@ -270,7 +270,7 @@ Section ProofCreateFail.
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
-    iIntros (CIDf Hsf).
+    iIntros (CIDf Hsf) "_".
     iIntros (Mx kslot q g gil gisl lo tl cinum dnc bmc datc bm' data' dn' dn0'
              tot n4 Sb4).
     iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hddix %Hduq %Hrl %Hkslt
@@ -321,7 +321,7 @@ Section ProofCreateFail.
               with "Hcg Hpc [] [Hcinl]").
     { iApply (cri_146 with "Htext"). }
     { iEval (rgne; rewrite X19). iExact "Hcinl". }
-    iIntros (CIDG1 HqG1) "Hcg Hpc Hcinl".
+    iIntros (CIDG1 HqG1) "_ Hcg Hpc Hcinl".
     iEval (rgne; rgne; rewrite X19 Hx0 cr_trunc16_zero) in "Hcinl".
     assert (Hq14a : add_vec_int (mword_of_int (CK + 0x146) : mword 64) 4
                     = mword_of_int (CK + 0x14a)) by pcw.
@@ -335,7 +335,7 @@ Section ProofCreateFail.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x14a)) Ra0 Rs3 Mx
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_14a with "Htext"). }
-    iIntros (CIDG2 HqG2) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDG2 HqG2) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     pose (G1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mx !!! Regidx Rs3))]> Mx).
     change (<[Regidx Ra0 := regval_into_reg
@@ -357,7 +357,7 @@ Section ProofCreateFail.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_14c with "Htext"). }
-    iIntros (CIDG3 HqG3) "Hcg Hpc".
+    iIntros (CIDG3 HqG3) "_ Hcg Hpc".
     iEval (rewrite Htgiu) in "Hpc".
     pose (G2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)]> G1).
@@ -406,7 +406,7 @@ Section ProofCreateFail.
     all: try lkbelow.
     { rewrite (cr_delta_eq ty major minor dnc (mword_of_int 0 : mword 16)
                  Htyc ltac:(vm_compute; reflexivity)). iExact "Htoken". }
-    iIntros (CIDG4 HsG4 mfl)
+    iIntros (CIDG4 HsG4) "_". iIntros (mfl)
       "%Hcsfl Hcg Hcnt Hpc Hppid Hcidev Hciinum Hcmeta Hcmap Hsbi Hcdiat
        Hbs2 Hop".
     assert (Hpcfl : ret_pc (G2 !!! Regidx Rra : mword 64)
@@ -424,7 +424,7 @@ Section ProofCreateFail.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x150)) Ra0 Rs3 mfl
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_150 with "Htext"). }
-    iIntros (CIDG5 HqG5) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDG5 HqG5) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     pose (G3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mfl !!! Regidx Rs3))]> mfl).
     change (<[Regidx Ra0 := regval_into_reg
@@ -446,7 +446,7 @@ Section ProofCreateFail.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_152 with "Htext"). }
-    iIntros (CIDG6 HqG6) "Hcg Hpc".
+    iIntros (CIDG6 HqG6) "_ Hcg Hpc".
     iEval (rewrite Htgu1) in "Hpc".
     pose (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3).
@@ -594,7 +594,7 @@ Section ProofCreateFail.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iEval (cbn beta iota). iEmpIntro. }
-    iIntros (CIDG7 HqG7 mu1 n5 Sb5 w1)
+    iIntros (CIDG7 HqG7) "_". iIntros (mu1 n5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
        %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 Htq1".
     (* THE LEDGER, at the body's disjunction (finding (3) in the banner) *)
@@ -621,7 +621,7 @@ Section ProofCreateFail.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x156)) Ra0 Rs1 mu1
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_156 with "Htext"). }
-    iIntros (CIDG8 HqG8) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDG8 HqG8) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     pose (G5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mu1 !!! Regidx Rs1))]> mu1).
     change (<[Regidx Ra0 := regval_into_reg
@@ -643,7 +643,7 @@ Section ProofCreateFail.
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_158 with "Htext"). }
-    iIntros (CIDG9 HqG9) "Hcg Hpc".
+    iIntros (CIDG9 HqG9) "_ Hcg Hpc".
     iEval (rewrite Htgu2) in "Hpc".
     pose (G6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5).
@@ -830,7 +830,7 @@ Section ProofCreateFail.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { iEval (cbn beta iota). iEmpIntro. }
-    iIntros (CIDGA HqGA mu2 n6 Sb6 w2)
+    iIntros (CIDGA HqGA) "_". iIntros (mu2 n6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi Hbsl
        %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 Htq2".
     iDestruct (log_tx_add icfg_log t (1/2) (1/4) (1/4)
@@ -860,7 +860,7 @@ Section ProofCreateFail.
               (m !!! Regidx Rs3 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc [] Hb5").
     { iApply (cri_15c with "Htext"). }
-    iIntros (CIDGB HqGB) "Hcg Hpc Hb5".
+    iIntros (CIDGB HqGB) "_ Hcg Hpc Hb5".
     iEval (rewrite HT5) in "Hb5".
     pose (G7 := <[Regidx Rs3 := regval_into_reg
                   (m !!! Regidx Rs3 : mword 64)]> mu2).
@@ -889,7 +889,7 @@ Section ProofCreateFail.
               ltac:(rewrite Htg070f; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_15e with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDGC HqGC). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDGC HqGC) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htg070f) in "Hpc".
     iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
     iPoseProof ("Htail" $! CIDGC) as "Ht".

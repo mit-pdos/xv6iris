@@ -703,7 +703,7 @@ Section KforkPrologue.
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int KF) (mword_of_int 60 : mword 6) m K 8 b
               ltac:(lia) Hpush with "Hcg Hpc []").
     { iApply (kfk_000 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     fold K1.
     set (M0' := <[Regidx csp_rs1 := regval_into_reg (pa_stk sp0 8)]> m).
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0
@@ -739,7 +739,7 @@ Section KforkPrologue.
     iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x2)) (mword_of_int 7 : mword 6) Rra
               M0' K1 u1 b with "Hcg Hpc [] Hb1").
     { iApply (kfk_002 with "Htext"). }
-    iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rgne) in "Hb1". iEval (rewrite Hf1) in "Hb1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hb1". iEval (rgne) in "Hb1". iEval (rewrite Hf1) in "Hb1".
     assert (HM0ra : M0' !!! Regidx Rra = ra0)
       by (rewrite /M0' upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HM0ra) in "Hb1".
@@ -750,7 +750,7 @@ Section KforkPrologue.
     iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x4)) (mword_of_int 6 : mword 6) Rs0
               M0' K1 u2 b with "Hcg Hpc [] Hb2").
     { iApply (kfk_004 with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rgne) in "Hb2". iEval (rewrite Hf2) in "Hb2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hb2". iEval (rgne) in "Hb2". iEval (rewrite Hf2) in "Hb2".
     assert (HM0s0 : M0' !!! Regidx Rs0 = s00)
       by (rewrite /M0' upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HM0s0) in "Hb2".
@@ -761,7 +761,7 @@ Section KforkPrologue.
     iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x6)) (mword_of_int 5 : mword 6) Rs1
               M0' K1 u3 b with "Hcg Hpc [] Hb3").
     { iApply (kfk_006 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc Hb3". iEval (rgne) in "Hb3". iEval (rewrite Hf3) in "Hb3".
+    iIntros (CID4 Hs4) "_ Hcg Hpc Hb3". iEval (rgne) in "Hb3". iEval (rewrite Hf3) in "Hb3".
     assert (HM0s1 : M0' !!! Regidx Rs1 = s10)
       by (rewrite /M0' upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HM0s1) in "Hb3".
@@ -772,7 +772,7 @@ Section KforkPrologue.
     iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x8)) (mword_of_int 1 : mword 6) Rs5
               M0' K1 u7 b with "Hcg Hpc [] Hb7").
     { iApply (kfk_008 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc Hb7". iEval (rgne) in "Hb7". iEval (rewrite Hf7) in "Hb7".
+    iIntros (CID5 Hs5) "_ Hcg Hpc Hb7". iEval (rgne) in "Hb7". iEval (rewrite Hf7) in "Hb7".
     assert (HM0s5 : M0' !!! Regidx Rs5 = s50)
       by (rewrite /M0' upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite HM0s5) in "Hb7".
@@ -785,7 +785,7 @@ Section KforkPrologue.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_00a with "Htext"). }
-    iIntros (CID6 Hs6) "Hcg Hpc".
+    iIntros (CID6 Hs6) "_ Hcg Hpc".
     set (M1 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (M0' !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))))]> M0').
     assert (HM1s0 : M1 !!! Regidx Rs0 = sp0).
@@ -808,7 +808,7 @@ Section KforkPrologue.
               M1 K1 b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_00c with "Htext"). }
-    iIntros (CID7 Hs7) "Hcg Hpc".
+    iIntros (CID7 Hs7) "_ Hcg Hpc".
     set (M2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KF + 0xc) : mword 64) 4)]> M1).
     assert (Hjmyp : add_vec (mword_of_int (KF + 0xc) : mword 64)
@@ -830,7 +830,7 @@ Section KforkPrologue.
     iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme b _
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
-    iIntros (CID8 Hs8 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
+    iIntros (CID8 Hs8) "_". iIntros (ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc10 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (KF + 0x10))
       by (rewrite HM2ra; apply bv_eq; vm_compute; reflexivity).
@@ -854,7 +854,7 @@ Section KforkPrologue.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (kfk_010 with "Htext"). }
-    iIntros (CID9 Hs9) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CID9 Hs9) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     set (M4 := <[Regidx Rs5 := regval_into_reg (add_vec zero_reg (A !!! Regidx Ra0))]> A).
     assert (HM4s5 : M4 !!! Regidx Rs5 = pme)
       by (rewrite /M4 upd_eq HAa0; apply add_vec_zero_l).
@@ -878,7 +878,7 @@ Section KforkPrologue.
               M4 K1 b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_012 with "Htext"). }
-    iIntros (CID10 Hs10) "Hcg Hpc".
+    iIntros (CID10 Hs10) "_ Hcg Hpc".
     set (M5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)]> M4).
     assert (Hjalp : add_vec (mword_of_int (KF + 0x12) : mword 64)
@@ -987,7 +987,7 @@ Section KforkPrologue.
                 ltac:(rewrite Hrget_mf6_a0 HBa0; apply eq_vec_false_iff; exact Hnpanz)
                 with "Hcg Hpc []").
       { iApply (kfk_016 with "Htext"). }
-      iIntros (CID12 Hs12) "Hcg Hpc".
+      iIntros (CID12 Hs12) "_ Hcg Hpc".
       assert (Hpp01a : add_vec_int (mword_of_int (KF + 0x16) : mword 64) 4 = mword_of_int (KF + 0x1a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp01a) in "Hpc".
@@ -999,7 +999,7 @@ Section KforkPrologue.
       iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x1a)) (mword_of_int 3 : mword 6) Rs3
                 mf6 (trap_res b + K1)%nat u6 false with "Hcg Hpc [] Hb6").
       { iApply (kfk_01a with "Htext"). }
-      iIntros (CID13 Hs13) "Hcg Hpc Hb6". iEval (rewrite Hf6) in "Hb6".
+      iIntros (CID13 Hs13) "_ Hcg Hpc Hb6". iEval (rewrite Hf6) in "Hb6".
       assert (Hpp01c : add_vec_int (mword_of_int (KF + 0x1a) : mword 64) 2 = mword_of_int (KF + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp01c) in "Hpc".
@@ -1008,7 +1008,7 @@ Section KforkPrologue.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (kfk_01c with "Htext"). }
-      iIntros (CID14 Hs14) "Hcg Hpc". iEval (rgne) in "Hcg".
+      iIntros (CID14 Hs14) "_ Hcg Hpc". iEval (rgne) in "Hcg".
       set (N1 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (mf6 !!! Regidx Ra0))]> mf6).
       assert (HN1s4 : N1 !!! Regidx Rs3 = npa)
         by (rewrite /N1 upd_eq HBa0; apply add_vec_zero_l).
@@ -1049,7 +1049,7 @@ Section KforkPrologue.
                 with "Hcg Hpc [] [HPsz]").
       { iApply (kfk_01e with "Htext"). }
       { iEval (rewrite Hszaddr_p). iExact "HPsz". }
-      iIntros (CID15 Hs15) "Hcg Hpc HPsz". iEval (rewrite Hszaddr_p) in "HPsz".
+      iIntros (CID15 Hs15) "_ Hcg Hpc HPsz". iEval (rewrite Hszaddr_p) in "HPsz".
       set (N2 := <[Regidx Ra2 := regval_into_reg (pv_sz (us_V Up))]> N1).
       assert (HN2a2 : N2 !!! Regidx Ra2 = pv_sz (us_V Up)) by (rewrite /N2 upd_eq; reflexivity).
       assert (HN2sp : N2 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -1080,7 +1080,7 @@ Section KforkPrologue.
                 with "Hcg Hpc [] [HCpg]").
       { iApply (kfk_022 with "Htext"). }
       { iEval (rewrite Hpgaddr_c). iExact "HCpg". }
-      iIntros (CID16 Hs16) "Hcg Hpc HCpg". iEval (rewrite Hpgaddr_c) in "HCpg".
+      iIntros (CID16 Hs16) "_ Hcg Hpc HCpg". iEval (rewrite Hpgaddr_c) in "HCpg".
       set (N3 := <[Regidx Ra1 := regval_into_reg (page_base (ud_root (pv_upt Vc)))]> N2).
       assert (HN3sp : N3 !!! Regidx csp_rs1 = pa_stk sp0 8)
         by (rewrite /N3 upd_ne; [exact HN2sp | vm_compute; discriminate]).
@@ -1110,7 +1110,7 @@ Section KforkPrologue.
                 with "Hcg Hpc [] [HPpg]").
       { iApply (kfk_024 with "Htext"). }
       { iEval (rewrite Hpgaddr_p). iExact "HPpg". }
-      iIntros (CID17 Hs17) "Hcg Hpc HPpg". iEval (rewrite Hpgaddr_p) in "HPpg".
+      iIntros (CID17 Hs17) "_ Hcg Hpc HPpg". iEval (rewrite Hpgaddr_p) in "HPpg".
       set (N4 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root (pv_upt (us_V Up))))]> N3).
       assert (HN4sp : N4 !!! Regidx csp_rs1 = pa_stk sp0 8)
         by (rewrite /N4 upd_ne; [exact HN3sp | vm_compute; discriminate]).
@@ -1140,7 +1140,7 @@ Section KforkPrologue.
                 N4 (trap_res b + K1)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_028 with "Htext"). }
-      iIntros (CID18 Hs18) "Hcg Hpc".
+      iIntros (CID18 Hs18) "_ Hcg Hpc".
       set (N5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KF + 0x28) : mword 64) 4)]> N4).
       assert (Hjuvc : add_vec (mword_of_int (KF + 0x28) : mword 64)
@@ -1257,7 +1257,7 @@ Section KforkPrologue.
                       intros a Ha; unfold uva_live; lia)
                 with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb Hlend").
       all: try lkbelow.
-      iIntros (CID19 Hs19 mf9) "Hcg Hcpu (%kl2 & %Hkl2 & Hlend) Hpc %HcsD HPpt Hpost9".
+      iIntros (CID19 Hs19) "_". iIntros (mf9) "Hcg Hcpu (%kl2 & %Hkl2 & Hlend) Hpc %HcsD HPpt Hpost9".
       iDestruct ("Hlb" $! kl2 with "[%] Hlend") as (k2) "[%Hk2 HPcnt]"; [exact Hkl2|].
       assert (Hk2' : (pv_ev (us_V Up) <= k2)%nat) by (cbn in Hk2; lia).
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))
@@ -1382,7 +1382,7 @@ Section KforkPrologue.
                   ltac:(rewrite Hrget_mf9_a0 HDa0; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_02c with "Htext"). }
-        iIntros (CID20 Hs20) "Hcg Hpc".
+        iIntros (CID20 Hs20) "_ Hcg Hpc".
         assert (Hpp030 : add_vec_int (mword_of_int (KF + 0x2c) : mword 64) 4 = mword_of_int (KF + 0x30))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp030) in "Hpc".
@@ -1394,7 +1394,7 @@ Section KforkPrologue.
         iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x30)) (mword_of_int 4 : mword 6) Rs2
                   mf9 (trap_res b + K1)%nat u4 false with "Hcg Hpc [] Hb4").
         { iApply (kfk_030 with "Htext"). }
-        iIntros (CID21 Hs21) "Hcg Hpc Hb4". iEval (rewrite Hf4) in "Hb4".
+        iIntros (CID21 Hs21) "_ Hcg Hpc Hb4". iEval (rewrite Hf4) in "Hb4".
         assert (Hpp032 : add_vec_int (mword_of_int (KF + 0x30) : mword 64) 2 = mword_of_int (KF + 0x32))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp032) in "Hpc".
@@ -1406,7 +1406,7 @@ Section KforkPrologue.
         iApply (wp_csdsp_s_sconf (mword_of_int (KF + 0x32)) (mword_of_int 2 : mword 6) Rs4
                   mf9 (trap_res b + K1)%nat u5 false with "Hcg Hpc [] Hb5").
         { iApply (kfk_032 with "Htext"). }
-        iIntros (CID22 Hs22) "Hcg Hpc Hb5". iEval (rewrite Hf5) in "Hb5".
+        iIntros (CID22 Hs22) "_ Hcg Hpc Hb5". iEval (rewrite Hf5) in "Hb5".
         assert (Hpp034 : add_vec_int (mword_of_int (KF + 0x32) : mword 64) 2 = mword_of_int (KF + 0x34))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp034) in "Hpc".
@@ -1419,7 +1419,7 @@ Section KforkPrologue.
                   with "Hcg Hpc [] [HPsz]").
         { iApply (kfk_034 with "Htext"). }
         { iEval (rewrite Hszaddr_p2). iExact "HPsz". }
-        iIntros (CID23 Hs23) "Hcg Hpc HPsz". iEval (rewrite Hszaddr_p2) in "HPsz".
+        iIntros (CID23 Hs23) "_ Hcg Hpc HPsz". iEval (rewrite Hszaddr_p2) in "HPsz".
         set (N6 := <[Regidx Ra5 := regval_into_reg (pv_sz (us_V Up))]> mf9).
         assert (HN6sp : N6 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite /N6 upd_ne; [exact HDsp | vm_compute; discriminate]).
@@ -1439,7 +1439,7 @@ Section KforkPrologue.
                   with "Hcg Hpc [] [HCsz]").
         { iApply (kfk_038 with "Htext"). }
         { iEval (rewrite Hszaddr_c). iExact "HCsz". }
-        iIntros (CID24 Hs24) "Hcg Hpc HCsz". iEval (rewrite Hszaddr_c) in "HCsz".
+        iIntros (CID24 Hs24) "_ Hcg Hpc HCsz". iEval (rewrite Hszaddr_c) in "HCsz".
         iEval (rgne) in "HCsz". iEval (rewrite HN6a5) in "HCsz".
         assert (Hpp03c : add_vec_int (mword_of_int (KF + 0x38) : mword 64) 4 = mword_of_int (KF + 0x3c))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1453,7 +1453,7 @@ Section KforkPrologue.
                   with "Hcg Hpc [] [HPtf]").
         { iApply (kfk_03c with "Htext"). }
         { iEval (rewrite Htfaddr_p). iExact "HPtf". }
-        iIntros (CID25 Hs25) "Hcg Hpc HPtf". iEval (rewrite Htfaddr_p) in "HPtf".
+        iIntros (CID25 Hs25) "_ Hcg Hpc HPtf". iEval (rewrite Htfaddr_p) in "HPtf".
         set (N7 := <[Regidx Ra3 := regval_into_reg (page_base (ud_tfp (pv_upt (us_V Up))))]> N6).
         assert (HN7sp : N7 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite /N7 upd_ne; [exact HN6sp | vm_compute; discriminate]).
@@ -1471,7 +1471,7 @@ Section KforkPrologue.
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc []").
         { iApply (kfk_040 with "Htext"). }
-        iIntros (CID26 Hs26) "Hcg Hpc". iEval (rgne) in "Hcg".
+        iIntros (CID26 Hs26) "_ Hcg Hpc". iEval (rgne) in "Hcg".
         set (N8 := <[Regidx Ra5 := regval_into_reg (add_vec zero_reg (N7 !!! Regidx Ra3))]> N7).
         assert (HN8a5 : N8 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V Up)))).
         { rewrite /N8 upd_eq HN7a3. apply add_vec_zero_l. }
@@ -1495,7 +1495,7 @@ Section KforkPrologue.
                   with "Hcg Hpc [] [HCtf]").
         { iApply (kfk_042 with "Htext"). }
         { iEval (rewrite Htfaddr_c). iExact "HCtf". }
-        iIntros (CID27 Hs27) "Hcg Hpc HCtf". iEval (rewrite Htfaddr_c) in "HCtf".
+        iIntros (CID27 Hs27) "_ Hcg Hpc HCtf". iEval (rewrite Htfaddr_c) in "HCtf".
         set (N9 := <[Regidx Ra4 := regval_into_reg (page_base (ud_tfp (pv_upt Vc)))]> N8).
         assert (HN9sp : N9 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite /N9 upd_ne; [exact HN8sp | vm_compute; discriminate]).

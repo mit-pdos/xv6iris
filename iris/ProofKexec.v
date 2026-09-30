@@ -245,7 +245,7 @@ Section KexecAUTail.
               Hqfnm Hqfaf HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               with "Htext Hst Hcont []").
-    iIntros (CIDd) "%Hsd". iIntros (Md Pd Mid U2) "%HU2 Hst2a6 Hcont".
+    iIntros (CIDd) "%Hsd _". iIntros (Md Pd Mid U2) "%HU2 Hst2a6 Hcont".
     (* the pointer vector's copyout took the block's counter (permit sweep
        L1b): phase D runs at the record it came back at *)
     destruct HU2 as (k2 & Hk2 & ->).
@@ -332,7 +332,7 @@ Section KexecAUTail.
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
-    iIntros (CID1) "%Hs1". iIntros (M1 P1 Mim1 sz1 U1) "%HU1 %Hsz1ge Hdisj Hcont".
+    iIntros (CID1) "%Hs1 _". iIntros (M1 P1 Mim1 sz1 U1) "%HU1 %Hsz1ge Hdisj Hcont".
     (* phase C's uvmalloc took the block's counter (permit sweep L1b): the
        rest of the run is at the record it came back at *)
     destruct HU1 as (k1 & Hk1 & ->).
@@ -364,7 +364,7 @@ Section KexecAUTail.
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12
                 na M1 P1 Mim1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
-      iIntros (CID2) "%Hs2". iIntros (M2 P2 Mim2 c2 U2) "%HU2 Hst272 Hcont".
+      iIntros (CID2) "%Hs2 _". iIntros (M2 P2 Mim2 c2 U2) "%HU2 Hst272 Hcont".
       (* the argv loop's copyouts took the block's counter (permit sweep
          L1b): the tail runs at the record it came back at *)
       destruct HU2 as (k2 & Hk2 & ->).
@@ -918,7 +918,7 @@ Section KexecAUMain.
                 sts gn cs m (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs na alen
                 aslen afun plen (m !!! Regidx Ra0) dqpv pfun (m !!! Regidx Ra1)
                 dqa avf dqas with "HK Hfail"). }
-    iIntros (CIDa) "%Hsa".
+    iIntros (CIDa) "%Hsa _".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf loyf tlyf n2 ef datl)
             "%Hregs90 %Hn2 %Hef Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked %Hle90 #Hfl90 #Hclaims90 Hdep Hoffr Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
@@ -998,7 +998,7 @@ Section KexecAUMain.
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz Miz w13z w67z Uz) "%HUz Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1 _". iIntros (Mz Pz Miz w13z w67z Uz) "%HUz Hst1a2 Hcont".
       (* proc_pagetable took the block's counter (permit sweep L2) *)
       destruct HUz as (kz & Hkz & ->).
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl pd pav pu
@@ -1010,7 +1010,7 @@ Section KexecAUMain.
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1) w13z w67z ef Pz Miz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 with "Htext Hfab Hst1a2 [Hcont]").
-      iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
+      iIntros (CIDy) "%Hsy _". iIntros (My) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (kxc_cd (CID0 := CIDy)
@@ -1035,7 +1035,7 @@ Section KexecAUMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
-      iIntros (CIDl) "%Hsl". iIntros (Ml Pl Mil Ul) "%HUl Hst12c Hcont".
+      iIntros (CIDl) "%Hsl _". iIntros (Ml Pl Mil Ul) "%HUl Hst12c Hcont".
       destruct HUl as (kl0 & Hkl0 & ->).
       iApply (PB3.kxc_b2 (CID0 := CIDl)
                 (KexecBridge.exec_built_Q (kxc_fb datl dnf) ef na alen afun)
@@ -1053,7 +1053,7 @@ Section KexecAUMain.
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
-      iIntros (CIDy) "%Hsy". iIntros (My Py Miy szvy Ub) "%HUb Hst1ae Hcont".
+      iIntros (CIDy) "%Hsy _". iIntros (My Py Miy szvy Ub) "%HUb Hst1ae Hcont".
       (* phase B's uvmallocs took the block's counter (permit sweep L1b) *)
       destruct HUb as (kb & Hkb & ->).
       iApply (kxc_cd (CID0 := CIDy)

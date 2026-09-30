@@ -151,7 +151,7 @@ Section ProofConsputc.
               with "Hcg Hpc [] [Hc1]").
     { iApply (cpi_18 with "Htext"). }
     { iEval (rewrite Hsp Hb1). iExact "Hc1". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hc1". iEval (rewrite Hsp Hb1) in "Hc1".
+    iIntros (CID1 Hs1) "_ Hcg Hpc Hc1". iEval (rewrite Hsp Hb1) in "Hc1".
     set (E1 := <[Regidx ra_idx := regval_into_reg (m !!! Regidx ra_idx)]> mc).
     assert (HE1sp : E1 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /E1 upd_ne; [exact Hsp | reg_neq]).
@@ -164,7 +164,7 @@ Section ProofConsputc.
               with "Hcg Hpc [] [Hc2]").
     { iApply (cpi_1a with "Htext"). }
     { iEval (rewrite HE1sp Hb2). iExact "Hc2". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hc2". iEval (rewrite HE1sp Hb2) in "Hc2".
     set (E2 := <[Regidx s0_idx := regval_into_reg (m !!! Regidx s0_idx)]> E1).
     assert (HE2sp : E2 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /E2 upd_ne; [exact HE1sp | reg_neq]).
@@ -184,7 +184,7 @@ Section ProofConsputc.
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.consputc + 0x1c)) (mword_of_int 16 : mword 6)
               E2 (K - 2)%nat 2 b Hpop with "Hcg Hpc [] Hframe").
     { iApply (cpi_1c with "Htext"). }
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hs3) "_ Hcg Hpc".
     set (E3 := <[Regidx csp_rs1 := regval_into_reg (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2).
     iEval (rewrite (cp_nk K HK)) in "Hcg".
     assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.consputc + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -255,7 +255,7 @@ Section ProofConsputc.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.consputc) (mword_of_int 48 : mword 6) m K 2 b Hc2 Hpush
               with "Hcg Hpc []").
     { iApply (cpi_00 with "Htext"). }
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "_ Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
@@ -269,7 +269,7 @@ Section ProofConsputc.
               W1 (K - 2)%nat v1 b with "Hcg Hpc [] [Hc1]").
     { iApply (cpi_02 with "Htext"). }
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hc1".
+    iIntros (CID2 Hs2) "_ Hcg Hpc Hc1".
     assert (HW1r1 : forall (CID' : CpuId), rget (CID := CID') W1 ra_idx = m !!! Regidx ra_idx)
       by (intros CID'; rgne; rewrite /W1 upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HspW1 Hb1 HW1r1) in "Hc1".
@@ -280,7 +280,7 @@ Section ProofConsputc.
               W1 (K - 2)%nat v2 b with "Hcg Hpc [] [Hc2]").
     { iApply (cpi_04 with "Htext"). }
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
-    iIntros (CID3 Hs3) "Hcg Hpc Hc2".
+    iIntros (CID3 Hs3) "_ Hcg Hpc Hc2".
     assert (HW1r8 : forall (CID' : CpuId), rget (CID := CID') W1 s0_idx = m !!! Regidx s0_idx)
       by (intros CID'; rgne; rewrite /W1 upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HspW1 Hb2 HW1r8) in "Hc2".
@@ -291,7 +291,7 @@ Section ProofConsputc.
               W1 (K - 2)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (cpi_06 with "Htext"). }
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hs4) "_ Hcg Hpc".
     set (W2 := <[Regidx s0_idx := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> W1).
     assert (Hp08 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
@@ -303,7 +303,7 @@ Section ProofConsputc.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cpi_08 with "Htext"). }
-    iIntros (CID5 Hs5) "Hcg Hpc".
+    iIntros (CID5 Hs5) "_ Hcg Hpc".
     set (W3 := <[Regidx a5_idx := regval_into_reg (mword_of_int 256 : mword 64)]> W2).
     assert (Hp0c : add_vec_int (mword_of_int (KernelSyms.consputc + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.consputc + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
@@ -344,7 +344,7 @@ Section ProofConsputc.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_0c with "Htext"). }
-      iApply bi.later_intro. iIntros (CIDta Hsta) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDta Hsta) "_ Hcg Hpc".
       assert (Htgt20 : add_vec (mword_of_int (KernelSyms.consputc + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 20 : mword 13)) = mword_of_int (KernelSyms.consputc + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt20) in "Hpc".
       (* +0x20 c.li a1,8 : the BYTE, in a1 since the bump *)
@@ -354,7 +354,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_20 with "Htext"). }
-      iIntros (CID6 Hs6) "Hcg Hpc".
+      iIntros (CID6 Hs6) "_ Hcg Hpc".
       set (T1 := <[Regidx a1_idx := regval_into_reg (mword_of_int 8 : mword 64)]> W3).
       assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
@@ -365,7 +365,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_22 with "Htext"). }
-      iIntros (CID6b Hs6b) "Hcg Hpc".
+      iIntros (CID6b Hs6b) "_ Hcg Hpc".
       set (T1b := <[Regidx a0_idx := regval_into_reg (mword_of_int 0 : mword 64)]> T1).
       assert (Hp24 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp24) in "Hpc".
@@ -374,7 +374,7 @@ Section ProofConsputc.
                 T1b (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_24 with "Htext"). }
-      iIntros (CID7 Hs7) "Hcg Hpc".
+      iIntros (CID7 Hs7) "_ Hcg Hpc".
       set (T2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x24) : mword 64) 4)]> T1b).
       assert (Htgtu1 : add_vec (mword_of_int (KernelSyms.consputc + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 1788 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu1) in "Hpc".
@@ -398,7 +398,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT2uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT2a1 cp_byte_bs1. }
-      iIntros (CID8 Hs8 mf1) "Hcg Hcpu Hpc %Hcs1 HΨ".
+      iIntros (CID8 Hs8) "_". iIntros (mf1) "Hcg Hcpu Hpc %Hcs1 HΨ".
       destruct Hcs1 as [Hcs1 Hra1].
       assert (Hret1 : ret_pc (T2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x28)).
       { rewrite /T2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -410,7 +410,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_28 with "Htext"). }
-      iIntros (CID9 Hs9) "Hcg Hpc".
+      iIntros (CID9 Hs9) "_ Hcg Hpc".
       set (T3 := <[Regidx a1_idx := regval_into_reg (mword_of_int 32 : mword 64)]> mf1).
       assert (Hp2c : add_vec_int (mword_of_int (KernelSyms.consputc + 0x28) : mword 64) 4 = mword_of_int (KernelSyms.consputc + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp2c) in "Hpc".
@@ -421,7 +421,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_2c with "Htext"). }
-      iIntros (CID9b Hs9b) "Hcg Hpc".
+      iIntros (CID9b Hs9b) "_ Hcg Hpc".
       set (T3b := <[Regidx a0_idx := regval_into_reg (mword_of_int 0 : mword 64)]> T3).
       assert (Hp2e : add_vec_int (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp2e) in "Hpc".
@@ -430,7 +430,7 @@ Section ProofConsputc.
                 T3b (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_2e with "Htext"). }
-      iIntros (CID10 Hs10) "Hcg Hpc".
+      iIntros (CID10 Hs10) "_ Hcg Hpc".
       set (T4 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x2e) : mword 64) 4)]> T3b).
       assert (Htgtu2 : add_vec (mword_of_int (KernelSyms.consputc + 0x2e) : mword 64) (sign_extend' 64 (mword_of_int 1778 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu2) in "Hpc".
@@ -445,7 +445,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT4uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT4a1 cp_byte_bs2. }
-      iIntros (CID11 Hs11 mf2) "Hcg Hcpu Hpc %Hcs2 HΨ".
+      iIntros (CID11 Hs11) "_". iIntros (mf2) "Hcg Hcpu Hpc %Hcs2 HΨ".
       destruct Hcs2 as [Hcs2 Hra2].
       assert (Hret2 : ret_pc (T4 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x32)).
       { rewrite /T4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -457,7 +457,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_32 with "Htext"). }
-      iIntros (CID12 Hs12) "Hcg Hpc".
+      iIntros (CID12 Hs12) "_ Hcg Hpc".
       set (T5 := <[Regidx a1_idx := regval_into_reg (mword_of_int 8 : mword 64)]> mf2).
       assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp34) in "Hpc".
@@ -468,7 +468,7 @@ Section ProofConsputc.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_34 with "Htext"). }
-      iIntros (CID12b Hs12b) "Hcg Hpc".
+      iIntros (CID12b Hs12b) "_ Hcg Hpc".
       set (T5b := <[Regidx a0_idx := regval_into_reg (mword_of_int 0 : mword 64)]> T5).
       assert (Hp36 : add_vec_int (mword_of_int (KernelSyms.consputc + 0x34) : mword 64) 2 = mword_of_int (KernelSyms.consputc + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp36) in "Hpc".
@@ -477,7 +477,7 @@ Section ProofConsputc.
                 T5b (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_36 with "Htext"). }
-      iIntros (CID13 Hs13) "Hcg Hpc".
+      iIntros (CID13 Hs13) "_ Hcg Hpc".
       set (T6 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.consputc + 0x36) : mword 64) 4)]> T5b).
       assert (Htgtu3 : add_vec (mword_of_int (KernelSyms.consputc + 0x36) : mword 64) (sign_extend' 64 (mword_of_int 1770 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu3) in "Hpc".
@@ -491,7 +491,7 @@ Section ProofConsputc.
                 n eb b p lks HK4 HT6uid Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Huinv Hubw Htxl [HΨ]").
       { by rewrite cp_byte_sb HT6a1 cp_byte_bs1. }
-      iIntros (CID14 Hs14 mf3) "Hcg Hcpu Hpc %Hcs3 HΨ".
+      iIntros (CID14 Hs14) "_". iIntros (mf3) "Hcg Hcpu Hpc %Hcs3 HΨ".
       destruct Hcs3 as [Hcs3 Hra3].
       assert (Hret3 : ret_pc (T6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.consputc + 0x3a)).
       { rewrite /T6 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -501,7 +501,7 @@ Section ProofConsputc.
                 mf3 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_3a with "Htext"). }
-      iApply bi.later_intro. iIntros (CID15 Hs15). iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID15 Hs15) "_". iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.consputc + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.consputc + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
       (* the three calls' callee-saved hops, composed back to the map at the
@@ -551,7 +551,7 @@ Section ProofConsputc.
                 W3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc []").
       { iApply (cpi_10 with "Htext"). }
-      iIntros (CID6a Hs6a) "Hcg Hpc". iEval (rgne) in "Hcg".
+      iIntros (CID6a Hs6a) "_ Hcg Hpc". iEval (rgne) in "Hcg".
       set (G1 := <[Regidx a1_idx := regval_into_reg (add_vec zero_reg (W3 !!! Regidx a0_idx))]> W3).
       change (<[Regidx a1_idx := regval_into_reg (add_vec zero_reg (W3 !!! Regidx a0_idx))]> W3) with G1.
       assert (HG1a1 : G1 !!! Regidx a1_idx = m !!! Regidx a0_idx)

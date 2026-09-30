@@ -2148,14 +2148,14 @@ Section ProofCreateMain.
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iIntros "#Htext". iModIntro.
-    iIntros (CIDt Hst Mt w5 dnew)
+    iIntros (CIDt Hst) "_". iIntros (Mt w5 dnew)
       "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb Hqc".
     destruct HTr as [HTsp HTthr].
     (* +0x70 c.mv a0,s2 : the answer register *)
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x70)) Ra0 Rs2 Mt
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (cri_070 with "Htext"). }
-    iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
+    iIntros (CIDT0 HqT0) "_ Hcg Hpc". iEval (rgne) in "Hcg".
     pose (P0 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt).
     change (<[Regidx Ra0 := regval_into_reg
@@ -2174,7 +2174,7 @@ Section ProofCreateMain.
               Rra P0 (K - 10)%nat (m !!! Regidx Rra : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb1").
     { iApply (cri_072 with "Htext"). }
-    iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
+    iIntros (CIDT1 HqT1) "_ Hcg Hpc Hb1".
     pose (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
     change (<[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0) with P1.
     assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2190,7 +2190,7 @@ Section ProofCreateMain.
               Rs0 P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb2").
     { iApply (cri_074 with "Htext"). }
-    iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
+    iIntros (CIDT2 HqT2) "_ Hcg Hpc Hb2".
     pose (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     change (<[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1) with P2.
     assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2206,7 +2206,7 @@ Section ProofCreateMain.
               Rs1 P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb3").
     { iApply (cri_076 with "Htext"). }
-    iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
+    iIntros (CIDT3 HqT3) "_ Hcg Hpc Hb3".
     pose (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     change (<[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2) with P3.
     assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2222,7 +2222,7 @@ Section ProofCreateMain.
               Rs2 P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb4").
     { iApply (cri_078 with "Htext"). }
-    iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
+    iIntros (CIDT4 HqT4) "_ Hcg Hpc Hb4".
     pose (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
     change (<[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3) with P4.
     assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2238,7 +2238,7 @@ Section ProofCreateMain.
               Rs4 P4 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb6").
     { iApply (cri_07a with "Htext"). }
-    iIntros (CIDT5 HqT5) "Hcg Hpc Hb6".
+    iIntros (CIDT5 HqT5) "_ Hcg Hpc Hb6".
     pose (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
     change (<[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4) with P5.
     assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2254,7 +2254,7 @@ Section ProofCreateMain.
               Rs5 P5 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb7").
     { iApply (cri_07c with "Htext"). }
-    iIntros (CIDT6 HqT6) "Hcg Hpc Hb7".
+    iIntros (CIDT6 HqT6) "_ Hcg Hpc Hb7".
     pose (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
     change (<[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5) with P6.
     assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2270,7 +2270,7 @@ Section ProofCreateMain.
               Rs6 P6 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hb8").
     { iApply (cri_07e with "Htext"). }
-    iIntros (CIDT7 HqT7) "Hcg Hpc Hb8".
+    iIntros (CIDT7 HqT7) "_ Hcg Hpc Hb8".
     pose (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
     change (<[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6) with P7.
     assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2312,7 +2312,7 @@ Section ProofCreateMain.
               (mword_of_int 5 : mword 6) P7 (K - 10)%nat 10 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (cri_080 with "Htext"). }
-    iIntros (CIDT8 HqT8) "Hcg Hpc".
+    iIntros (CIDT8 HqT8) "_ Hcg Hpc".
     pose (P8 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7).

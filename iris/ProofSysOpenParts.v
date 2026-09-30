@@ -1404,7 +1404,7 @@ Section ProofSysOpenEpilogue.
               with "Hcg Hpc [] [Hf1]").
     { iApply (soi_0ca with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
-    iIntros (CID1 Hq1) "Hcg Hpc Hf1".
+    iIntros (CID1 Hq1) "_ Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
     set (M1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> M).
     assert (HM1sp : so_sp sp0 M1)
@@ -1435,7 +1435,7 @@ Section ProofSysOpenEpilogue.
               with "Hcg Hpc [] [Hf2]").
     { iApply (soi_0cc with "Htext"). }
     { iEval (rewrite Hc2). iExact "Hf2". }
-    iIntros (CID2 Hq2) "Hcg Hpc Hf2".
+    iIntros (CID2 Hq2) "_ Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
     set (M2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> M1).
     assert (HM2sp : so_sp sp0 M2)
@@ -1475,7 +1475,7 @@ Section ProofSysOpenEpilogue.
               (mword_of_int 12 : mword 6) M2 (K - 24)%nat 24 b Hpop
               with "Hcg Hpc [] Hstk").
     { iApply (soi_0ce with "Htext"). }
-    iIntros (CID3 Hq3) "Hcg Hpc".
+    iIntros (CID3 Hq3) "_ Hcg Hpc".
     set (M3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (M2 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 12 : mword 6))))]> M2).

@@ -259,13 +259,13 @@ Section WpUartgetc.
               ltac:(rdok)
               ltac:(rewrite Hlsr; apply ug_imm0)
               with "Hcg Hpc HiL Huinv Htok [-]").
-    iIntros (CID1 Hs1 bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
+    iIntros (CID1 Hs1) "_". iIntros (bt) "Hcg Hpc Htok Hlb". iEval (rewrite HA) in "Hpc".
     (* --- [c.andi a5,a5,1] --- *)
     iApply (wp_candi_s_sconf pcA Ra5 (mword_of_int 1 : mword 6)
               (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of bt)]> m) n b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc HiA [-]").
-    iIntros (CID2 Hs2) "Hcg Hpc". iEval (rewrite HB) in "Hpc".
+    iIntros (CID2 Hs2) "_ Hcg Hpc". iEval (rewrite HB) in "Hpc".
     iEval (rewrite (rget_ne _ Ra5 HR5tp) upd_eq upd_upd) in "Hcg".
     change (and_vec (lsr_ldval_of bt) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
       with (rx_masked bt) in *.
@@ -296,7 +296,7 @@ Section WpUartgetc.
                 ug_cr7 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hlk; exact Hempty)
                 with "Hcg Hpc HiB [-]").
-      iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HR) in "Hpc".
+      iIntros (CID3 Hs3) "_ Hcg Hpc". iEval (rewrite HR) in "Hpc".
       iApply (UAcc.wp_uart_rhr_pop_s_sconf_at (CID:=CID3) i γd pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n k hl b
                 ltac:(vm_compute; discriminate)
@@ -308,7 +308,7 @@ Section WpUartgetc.
                 with "Hcg Hpc HiR Huinv Hdlab [Htok] [Hlb]").
       { iExact "Htok". }
       { iApply "Hlb". iPureIntro. reflexivity. }
-      iIntros (CID4 Hs4 c) "Hcg Hpc Hh". iEval (rewrite HZ) in "Hpc".
+      iIntros (CID4 Hs4) "_". iIntros (c) "Hcg Hpc Hh". iEval (rewrite HZ) in "Hpc".
       (* --- [andi a0,a0,255]: the zext.b, absorbed --- *)
       iApply (wp_andi_s_sconf (CID:=CID4) pcZ Ra0 Ra0 (mword_of_int 255 : mword 12)
                 (lsr_ldval_of c)

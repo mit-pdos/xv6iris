@@ -147,7 +147,7 @@ Section ProofSysExit.
               (sex_frame av Hav) (stk_push_32 (m !!! Regidx csp_rs1))
               with "Hcg Hpc []").
     { iApply (se_00 with "Htext"). }
-    iIntros (CID1 Hk1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hk1) "_ Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with M1.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (SE + 0x02)) by pcstep.
@@ -178,14 +178,14 @@ Section ProofSysExit.
     iApply (wp_csdsp_s_sconf (mword_of_int (SE + 0x02)) (mword_of_int 3 : mword 6) Rra
               M1 (av - 4)%nat u1 b with "Hcg Hpc [] Hb1").
     { iApply (se_02 with "Htext"). }
-    iIntros (CID2 Hk2) "Hcg Hpc Hb1".
+    iIntros (CID2 Hk2) "_ Hcg Hpc Hb1".
     assert (Hpp04 : add_vec_int (mword_of_int (SE + 0x02) : mword 64) 2 = mword_of_int (SE + 0x04)) by pcstep.
     iEval (rewrite Hpp04) in "Hpc".
     iEval (rewrite -Hpa2) in "Hb2".
     iApply (wp_csdsp_s_sconf (mword_of_int (SE + 0x04)) (mword_of_int 2 : mword 6) Rs0
               M1 (av - 4)%nat u2 b with "Hcg Hpc [] Hb2").
     { iApply (se_04 with "Htext"). }
-    iIntros (CID3 Hk3) "Hcg Hpc Hb2".
+    iIntros (CID3 Hk3) "_ Hcg Hpc Hb2".
     assert (Hpp06 : add_vec_int (mword_of_int (SE + 0x04) : mword 64) 2 = mword_of_int (SE + 0x06)) by pcstep.
     iEval (rewrite Hpp06) in "Hpc".
     assert (HM1ra : M1 !!! Regidx Rra = m !!! Regidx Rra)
@@ -200,7 +200,7 @@ Section ProofSysExit.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (se_06 with "Htext"). }
-    iIntros (CID4 Hk4) "Hcg Hpc".
+    iIntros (CID4 Hk4) "_ Hcg Hpc".
     set (A1 := <[Regidx Rs0 := regval_into_reg
         (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> M1).
     change (<[Regidx Rs0 := regval_into_reg
@@ -217,7 +217,7 @@ Section ProofSysExit.
               A1 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (se_08 with "Htext"). }
-    iIntros (CID5 Hk5) "Hcg Hpc".
+    iIntros (CID5 Hk5) "_ Hcg Hpc".
     iEval (rewrite Hrg08) in "Hcg".
     set (A2 := <[Regidx Ra1 := regval_into_reg
         (add_vec (A1 !!! Regidx Rs0) (sign_extend' 64 (mword_of_int 0xfec : mword 12)))]> A1).
@@ -234,7 +234,7 @@ Section ProofSysExit.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (se_0c with "Htext"). }
-    iIntros (CID6 Hk6) "Hcg Hpc".
+    iIntros (CID6 Hk6) "_ Hcg Hpc".
     set (A3 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> A2).
     change (<[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> A2) with A3.
     assert (Hpp0e : add_vec_int (mword_of_int (SE + 0x0c) : mword 64) 2 = mword_of_int (SE + 0x0e)) by pcstep.
@@ -245,7 +245,7 @@ Section ProofSysExit.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (se_0e with "Htext"). }
-    iIntros (CID7 Hk7) "Hcg Hpc".
+    iIntros (CID7 Hk7) "_ Hcg Hpc".
     set (A4 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x0e) : mword 64) 4)]> A3).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x0e) : mword 64) 4)]> A3) with A4.
     assert (Hjai : add_vec (mword_of_int (SE + 0x0e) : mword 64)
@@ -278,7 +278,7 @@ Section ProofSysExit.
               (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) v0 (word_hi w3) (DfracOwn (1/4)) b
               _ sex_arg0 HA4a0 Hv0 sex_ilvl0 (sex_Kai av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
-    iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
+    iIntros (CID8 Hk8) "_". iIntros (Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
     iEval (rewrite HA4a1) in "Hb3hi".
     iDestruct ("Hback" with "Htf Hpage") as "Hpriv".
     assert (Hpp12 : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SE + 0x12))
@@ -297,7 +297,7 @@ Section ProofSysExit.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb3hi").
     { iApply (se_12 with "Htext"). }
-    iIntros (CID9 Hk9) "Hcg Hpc Hb3hi".
+    iIntros (CID9 Hk9) "_ Hcg Hpc Hb3hi".
     set (B1 := <[Regidx Ra0 := regval_into_reg (sign_extend' 64 (arg_int32 v0))]> Mai).
     change (<[Regidx Ra0 := regval_into_reg (sign_extend' 64 (arg_int32 v0))]> Mai) with B1.
     assert (Hpp16 : add_vec_int (mword_of_int (SE + 0x12) : mword 64) 4 = mword_of_int (SE + 0x16)) by pcstep.
@@ -308,7 +308,7 @@ Section ProofSysExit.
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (se_16 with "Htext"). }
-    iIntros (CID10 Hk10) "Hcg Hpc".
+    iIntros (CID10 Hk10) "_ Hcg Hpc".
     set (B2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x16) : mword 64) 4)]> B1).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x16) : mword 64) 4)]> B1) with B2.
     (* ---- THE CLOSER, RE-ANCHORED PAST sys_exit'S OWN FRAME.  Nothing

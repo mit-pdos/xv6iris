@@ -336,7 +336,7 @@ Section KforkB1Proof.
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
-    iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcpu".
+    iIntros (CIDr Hsr) "_". iIntros (mr) "Hcg Hpc %Hcsr Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcpu".
@@ -360,7 +360,7 @@ Section KforkB1Proof.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_088 with "Htext"). }
-    iIntros (CIDs1 Hss1) "Hcg Hpc".
+    iIntros (CIDs1 Hss1) "_ Hcg Hpc".
     set (T4 := <[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr).
     change (<[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr) with T4.
     assert (HT4s1 : T4 !!! Regidx Rs1 = (mword_of_int (-1) : mword 64))
@@ -385,7 +385,7 @@ Section KforkB1Proof.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb6").
     { iApply (kfk_08a with "Htext"). }
-    iIntros (CIDs2 Hss2) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
+    iIntros (CIDs2 Hss2) "_ Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (T5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> T4).
     change (<[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> T4) with T5.
     assert (HT5sp : T5 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -413,7 +413,7 @@ Section KforkB1Proof.
               ltac:(rewrite Htgt8c; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_08c with "Htext"). }
-    iApply bi.later_intro. iIntros (CIDs3 Hss3). iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDs3 Hss3) "_". iIntros "Hcg Hpc".
     iEval (rewrite Htgt8c) in "Hpc".
     (* ---- fall into the shared epilogue ---- *)
     iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".

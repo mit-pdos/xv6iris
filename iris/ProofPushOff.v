@@ -148,7 +148,7 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hp8").
     { iApply (ppi_28 with "Htext"). }
-    iIntros (CID1 Hh1) "Hcg Hpc Hp8".
+    iIntros (CID1 Hh1) "_ Hcg Hpc Hp8".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -162,7 +162,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hp0]").
     { iApply (ppi_2a with "Htext"). }
     { iEval (rewrite Hsp4). iExact "Hp0". }
-    iIntros (CID2 Hh2) "Hcg Hpc Hp0".
+    iIntros (CID2 Hh2) "_ Hcg Hpc Hp0".
     assert (Hpc2c : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
@@ -195,7 +195,7 @@ Section ProofPushOff.
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.pop_off + 0x2c)) (mword_of_int 16 : mword 6) M5 av 2 b Hpop
               with "Hcg Hpc [] Hframe").
     { iApply (ppi_2c with "Htext"). }
-    iIntros (CID3 Hh3) "Hcg Hpc".
+    iIntros (CID3 Hh3) "_ Hcg Hpc".
     assert (Hpc2e : add_vec_int (mword_of_int (KernelSyms.pop_off + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.pop_off + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -647,7 +647,7 @@ Section ProofPushOff.
               ltac:(lia) Hpush
               with "Hcg Hpc []").
     { iApply (poi_00 with "Htext"). }
-    iIntros (CID1 Hh1) "Hcg Hframe Hpc".
+    iIntros (CID1 Hh1) "_ Hcg Hframe Hpc".
     iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24".
@@ -664,7 +664,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr24]").
     { iApply (poi_02 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr24". }
-    iIntros (CID2 Hh2) "Hcg Hpc Hr24".
+    iIntros (CID2 Hh2) "_ Hcg Hpc Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,16(sp) ---- *)
@@ -673,7 +673,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr16]").
     { iApply (poi_04 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr16". }
-    iIntros (CID3 Hh3) "Hcg Hpc Hr16".
+    iIntros (CID3 Hh3) "_ Hcg Hpc Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.sdsp s1,8(sp) ---- *)
@@ -682,7 +682,7 @@ Section ProofPushOff.
               with "Hcg Hpc [] [Hr8]").
     { iApply (poi_06 with "Htext"). }
     { iEval (rewrite Hcsp0). iExact "Hr8". }
-    iIntros (CID4 Hh4) "Hcg Hpc Hr8".
+    iIntros (CID4 Hh4) "_ Hcg Hpc Hr8".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.push_off + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* ---- 0x08: c.addi4spn s0,sp,32 ---- *)
@@ -691,7 +691,7 @@ Section ProofPushOff.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (poi_08 with "Htext"). }
-    iIntros (CID5 Hh5) "Hcg Hpc".
+    iIntros (CID5 Hh5) "_ Hcg Hpc".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.push_off + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: csrrci a5,sstatus,2 -- THE FLIP, and the arm seam ---- *)
