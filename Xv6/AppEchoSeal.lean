@@ -19,7 +19,7 @@ audit trimmed from `Xv6/AppEcho.lean` (its deviation 5).
 
 ## DEVIATIONS from Rocq
 
-1. `echo_xfer_boot` is stated at `SystemSlot.appXferBootRaw` (whose unfolding
+1. `echo_xfer_boot` is stated at `SystemSlot.appCloneRaw` (whose unfolding
    is Rocq's literal `□ ∀ r av, ▷ echo_pred γ r av ==∗ …` statement), so it
    is directly an `al_xfer`-shaped fact.
 2. Rocq's single proof is split into the two copy lemmas
@@ -178,8 +178,8 @@ theorem echoPred_copyPresent (γ : EchoGn) (r : EchoNames) (g1 g2 : GName) (av :
 function of the view, which is exactly why the fresh flag is allocated at
 it. -/
 theorem echoXferBoot (γ : EchoGn) (k : Nat) :
-    ⊢@{IProp GF} appXferBootRaw (echoPred (hlc := hlc) γ) (echoBoot γ k) := by
-  unfold appXferBootRaw
+    ⊢@{IProp GF} appCloneRaw (echoPred (hlc := hlc) γ) (echoBoot γ k) := by
+  unfold appCloneRaw
   imodintro
   iintro %r %av H
   imod (MonoList.own_alloc (GF := GF) (consInum av)) with ⟨%g1, Ha, #Hl⟩

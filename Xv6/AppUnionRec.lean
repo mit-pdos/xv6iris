@@ -163,6 +163,19 @@ noncomputable def appUnion : Xv6App GF where
   R := unionR (hlc := hlc)
   ifc := unionIfc (hlc := hlc)
   turn := unionTurn (hlc := hlc)
+  -- THE SYNC FIELDS (Rocq SY3-A1 / SY3-A3b), TRIVIAL FOR NOW (drift D3-app/S):
+  -- the turn the same at all four stages, nothing for the crash slot at birth,
+  -- no record/copy predicates, no sync ledger.  Lanes F/U replace them with
+  -- the union's real fields (Rocq `AppUnionRec.app_union` at main).
+  turn' := unionTurn (hlc := hlc)
+  turn'' := unionTurn (hlc := hlc)
+  iturn := unionTurn (hlc := hlc)
+  cls := appTrivCls
+  born := appTrivBorn
+  ok := appTrivOk
+  okc := appTrivOkc
+  tk := appTrivTk
+  hk := appTrivHk
   phi := unionPhiApp
 
 /-- Rocq `union_al_Rt`. -/

@@ -331,8 +331,8 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         (vlock vStart vDev vNc vN : BitVec 32) (vname vcpu : BitVec 64)
         (sbOld : List (BitVec 8)),
         ⌜firstFsinitPures dk sb Pb⌝ ∗ ⌜sbOld.length = 32⌝ ∗
-        fsCrashSeamAt (hlc := hlc) appGuest fscCov fscLogst ∗ appMerge (hlc := hlc) ∗
-        appSyncRun (hlc := hlc) ∗
+        fsCrashSeamAt (hlc := hlc) appGuestK fscCov fscLogst ∗ appMergeK (hlc := hlc) ∗
+        appSyncRunK (hlc := hlc) ∗
         logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
         logFreeTok icfgLog ∗
         fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗

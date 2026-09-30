@@ -408,8 +408,8 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     (hcovmeta : ∀ b, 1 ≤ b → b < fsDataStart S.fssSb → b ∈ cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
+      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
@@ -550,8 +550,8 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
+      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
@@ -594,8 +594,8 @@ theorem fsCfgAllocSnap [CurCtx]
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
+      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗

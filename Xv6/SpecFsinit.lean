@@ -236,12 +236,12 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   -- builds the commit's law from them (`fsSnapLawBuild`) and derives
   -- initlog's arity-free seam from the first.  Then the era certificate and
   -- the era's BORN-TRUE mirror half.
-  fsCrashSeamAt (hlc := hlc) (GF := GF) appGuest fscCov fscLogst ∗
+  fsCrashSeamAt (hlc := hlc) (GF := GF) appGuestK fscCov fscLogst ∗
   -- THE MERGE (SY3-K2) and THE SYNC RUNNER (sync K3-3), kit 2's last rows:
   -- fsinit builds the commit's law and the ghost commit's hooked law from
   -- them (`fsSnapLawBuild`, `fsSnapLawGhostBuild`)
-  appMerge (hlc := hlc) (GF := GF) ∗
-  appSyncRun (hlc := hlc) (GF := GF) ∗
+  appMergeK (hlc := hlc) (GF := GF) ∗
+  appSyncRunK (hlc := hlc) (GF := GF) ∗
   genCert (hlc := hlc) (GF := GF) ∗
   -- ...and THE CRASH INVARIANT (sync K3-3), off `firstBootPersist` beside the
   -- certificate: initlog parks it into `logCtx` for the ghost commit to open

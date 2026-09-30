@@ -217,6 +217,11 @@ theorem appXferRaw_pers_or_pure {N : Type} (A : N → Aview → IProp GF)
 
 /-! ### 1c.  THE MERGE (Rocq `app_merge_raw`, SY3-K2 / K3-3) -/
 
+/- LEGACY (D3-app/S interface checkpoint, WIP): the D2-dur forms the
+kernel WAL still consumes until the kernel side is re-threaded at Rocq's
+final shape (Okc, the record predicate `Ok`, the started-auth loan).  To be
+DELETED before hand-off. -/
+
 /-- THE COMMIT'S LAW (Rocq's `app_merge_raw`): the new durable copy is built
 from the running claim AND the old durable copy, so a durable-only resource
 can move from the old copy to the new one instead of being dropped with it.
@@ -228,22 +233,22 @@ stripped.  ...AND THE TOKEN `T` (sync K3-3): the collection hands it in with
 the running claim, and the law returns an ADDITIVE pair -- the wand that
 turns the old copy into the new one and gives the token back (the header
 write's permit applies it), or the token alone (the empty-log commit). -/
-def appMergeRaw {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) : IProp GF :=
+def appMergeRawK {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) : IProp GF :=
   iprop(□ ∀ (r : N) (av : Aview), ▷ A r av -∗ T ==∗ ▷ A r av ∗
     ∃ r' : N, (((▷ ∃ (r_o : N) (av_o : Aview), A r_o av_o) ==∗ ▷ A r' av ∗ T) ∧ T))
 
-instance appMergeRaw_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) :
-    Persistent (appMergeRaw A T) := by
-  unfold appMergeRaw; infer_instance
+instance appMergeRawK_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) :
+    Persistent (appMergeRawK A T) := by
+  unfold appMergeRawK; infer_instance
 
 /-- EVERY TRANSPORT IS A MERGE, AT ANY TOKEN (Rocq's `app_merge_raw_of_xfer`):
 drop the old copy, copy the running claim, and hand the token back on either
 arm.  What every application with nothing to carry across the commit
 instantiates the merge with. -/
-theorem appMergeRaw_ofXfer {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
-    (hx : ⊢ appXferRaw A) : ⊢ appMergeRaw A T := by
+theorem appMergeRawK_ofXfer {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (hx : ⊢ appXferRaw A) : ⊢ appMergeRawK A T := by
   ihave #Hx := hx
-  unfold appXferRaw appMergeRaw
+  unfold appXferRaw appMergeRawK
   imodintro
   iintro %r %av Hp HT
   imod Hx $$ %r %av Hp with ⟨Hp, ⟨%r', Hn⟩⟩
@@ -258,6 +263,62 @@ theorem appMergeRaw_ofXfer {N : Type} (A : N → Aview → IProp GF) (T : IProp 
 
 end AppCredsRaw
 
+/-! ### 1c'.  THE MERGE AT ROCQ MAIN'S SHAPE (Rocq `app_merge_raw`, SY3-A1 / SY3-A3b) -/
+
+section AppMergeRaw
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+
+/-- THE COMMIT'S LAW (Rocq's `app_merge_raw`, main): the new durable copy is
+built from the running claim AND the old durable copy, curried at the
+collection (the running claim is in hand only where `appN` opens, the old
+copy only inside the header write's permit, at mask `∅`).  At the token `T`
+(K3-3: an ADDITIVE pair -- the wand that turns the old copy into the new one
+and gives the token back, or the token alone for the empty-log commit).
+...THE WAND IS LENT THE MACHINE'S STARTED AUTH (SY3-A1): `startAuth n` at
+`n = gd + 1`, `gd` the era's generation, handed back untouched.
+...AT THE ERA'S RECORD PREDICATE `Ok` (SY3-A1 re-cut): the running record
+satisfies it and the new copy's record is born satisfying it.
+...AT THE DURABLE-COPY PREDICATE `Okc` (SY3-A3b): the old copy arrives with
+it, and the new copy's record is born satisfying it. -/
+def appMergeRaw {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop) (T : IProp GF)
+    (gd : Nat) : IProp GF :=
+  iprop(□ ∀ (r : N) (av : Aview), ⌜Ok r⌝ -∗ ▷ A r av -∗ T ==∗ ▷ A r av ∗
+    ∃ r' : N, ⌜Ok r'⌝ ∗ ⌜Okc r'⌝ ∗
+      ((∀ n : Nat, ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+          (▷ ∃ (r_o : N) (av_o : Aview), ⌜Okc r_o⌝ ∗ A r_o av_o) ==∗
+          ▷ A r' av ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n) ∧ T))
+
+instance appMergeRaw_persistent {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
+    (T : IProp GF) (gd : Nat) : Persistent (appMergeRaw (hlc := hlc) A Ok Okc T gd) := by
+  unfold appMergeRaw; infer_instance
+
+/-- EVERY TRANSPORT IS A MERGE, AT ANY TOKEN AND ANY ERA (Rocq's
+`app_merge_raw_of_xfer`): drop the old copy, copy the running claim, and
+hand the token and the loan back on either arm -- at a TOTAL `Ok` and
+`Okc`. -/
+theorem appMergeRaw_ofXfer {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
+    (T : IProp GF) (gd : Nat) (hOk : ∀ r, Ok r) (hOkc : ∀ r, Okc r)
+    (hx : ⊢ appXferRaw A) : ⊢ appMergeRaw (hlc := hlc) A Ok Okc T gd := by
+  ihave #Hx := hx
+  unfold appXferRaw appMergeRaw
+  imodintro
+  iintro %r %av _ Hp HT
+  imod Hx $$ %r %av Hp with ⟨Hp, ⟨%r', Hn⟩⟩
+  imodintro
+  iframe Hp
+  iexists r'
+  isplitr
+  · ipureintro; exact hOk r'
+  isplitr
+  · ipureintro; exact hOkc r'
+  isplit
+  · iintro %n _ Hsa _
+    imodintro
+    iframe Hn HT Hsa
+  · iexact HT
+
+end AppMergeRaw
+
 /-! ### 1d.  THE SYNC RUNNER (Rocq `app_sync_run_raw`, sync K3-3) -/
 
 section AppSyncRaw
@@ -271,23 +332,23 @@ the fresh guest half, the new durable claim, the running claim and the token
 all at ONE map (`FsCollectAll.fsCollectGhost`).  The hook returns every
 resource it is handed and yields its `Q`.  A fupd at mask `∅`: it runs inside
 the collection, with the file system's invariants open. -/
-def appSyncRunRaw {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+def appSyncRunRawK {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
     (Hk : IProp GF → IProp GF) : IProp GF :=
   iprop(□ ∀ (Q : IProp GF) (gt : GName) (I : RegMapF FsNode) (r r' : N),
     Hk Q -∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
     T ={∅}=∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗ ▷ A r (absView I) ∗
       T ∗ Q)
 
-instance appSyncRunRaw_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
-    (Hk : IProp GF → IProp GF) : Persistent (appSyncRunRaw (hlc := hlc) A T Hk) := by
-  unfold appSyncRunRaw; infer_instance
+instance appSyncRunRawK_persistent {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) : Persistent (appSyncRunRawK (hlc := hlc) A T Hk) := by
+  unfold appSyncRunRawK; infer_instance
 
 /-- AN APPLICATION WITH NO SYNC LEDGER (Rocq's `app_sync_run_raw_triv`): every
 hook is its own `Q`, and the runner hands it straight back. -/
-theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+theorem appSyncRunRawK_triv {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
     (Hk : IProp GF → IProp GF) (hid : ∀ Q : IProp GF, Hk Q ⊣⊢ Q) :
-    ⊢ appSyncRunRaw (hlc := hlc) A T Hk := by
-  unfold appSyncRunRaw
+    ⊢ appSyncRunRawK (hlc := hlc) A T Hk := by
+  unfold appSyncRunRawK
   imodintro
   iintro %Q %gt %I %r %r' HQ Hh Hn Hp HT
   imodintro
@@ -296,10 +357,73 @@ theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (T : IProp 
 
 /-- ...FIRED ONCE PER HOOK (Rocq's `app_sync_run_list`): the collection's
 reading of a list of waiters' hooks, at any mask. -/
-theorem appSyncRun_list {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
+theorem appSyncRunK_list {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
     (Hk : IProp GF → IProp GF) (E : CoPset) (Qs : List (IProp GF)) (gt : GName)
     (I : RegMapF FsNode) (r r' : N) :
-    appSyncRunRaw (hlc := hlc) A T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
+    appSyncRunRawK (hlc := hlc) A T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
+      (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
+      T -∗ |={E}=> ((gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗
+        ▷ A r (absView I) ∗ T ∗ ([∗list] Q ∈ Qs, Q)) := by
+  induction Qs with
+  | nil =>
+    iintro _ _ Hh Hn Hp HT
+    imodintro
+    iframe Hh Hn Hp HT
+    exact BigSepL.bigSepL_nil_intro
+  | cons Q Qs IH =>
+    iintro #Hrun HQs Hh Hn Hp HT
+    icases BigSepL.bigSepL_cons.1 $$ HQs with ⟨HQ, HQs⟩
+    imod IH $$ Hrun HQs Hh Hn Hp HT with ⟨Hh, Hn, Hp, HT, HQs⟩
+    unfold appSyncRunRawK
+    imod (fupd_mask_mono (E1 := ∅) (E2 := E) LawfulSet.empty_subset) $$
+      (Hrun $$ %Q %gt %I %r %r' HQ Hh Hn Hp HT) with ⟨Hh, Hn, Hp, HT, HQ⟩
+    imodintro
+    iframe Hh Hn Hp HT
+    iapply BigSepL.bigSepL_cons.2
+    iframe HQ HQs
+
+end AppSyncRaw
+
+/-! ### 1d'.  THE SYNC RUNNER AT ROCQ MAIN'S SHAPE (Rocq `app_sync_run_raw`) -/
+
+section AppSyncRawMain
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsTopG GF]
+
+/-- THE ONE PLACE A SYNC HOOK'S MEANING IS USED (Rocq's `app_sync_run_raw`,
+main): fired by the ghost commit with the fresh guest half, the new durable
+claim, the running claim and the token at ONE map; returns every resource
+and yields the hook's `Q`, a fupd at mask `∅`.  Both instances satisfy the
+era's record predicate `Ok` (SY3-A1 re-cut), and the new copy's the
+durable-copy predicate `Okc` (SY3-A3b). -/
+def appSyncRunRaw {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop) (T : IProp GF)
+    (Hk : IProp GF → IProp GF) : IProp GF :=
+  iprop(□ ∀ (Q : IProp GF) (gt : GName) (I : RegMapF FsNode) (r r' : N),
+    ⌜Ok r⌝ -∗ ⌜Ok r'⌝ -∗ ⌜Okc r'⌝ -∗
+    Hk Q -∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
+    T ={∅}=∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗ ▷ A r (absView I) ∗
+      T ∗ Q)
+
+instance appSyncRunRaw_persistent {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
+    (T : IProp GF) (Hk : IProp GF → IProp GF) :
+    Persistent (appSyncRunRaw (hlc := hlc) A Ok Okc T Hk) := by
+  unfold appSyncRunRaw; infer_instance
+
+/-- AN APPLICATION WITH NO SYNC LEDGER (Rocq's `app_sync_run_raw_triv`). -/
+theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
+    (T : IProp GF) (Hk : IProp GF → IProp GF) (hid : ∀ Q : IProp GF, Hk Q ⊣⊢ Q) :
+    ⊢ appSyncRunRaw (hlc := hlc) A Ok Okc T Hk := by
+  unfold appSyncRunRaw
+  imodintro
+  iintro %Q %gt %I %r %r' _ _ _ HQ Hh Hn Hp HT
+  imodintro
+  iframe Hh Hn Hp HT
+  iapply (hid Q).1 $$ HQ
+
+/-- ...FIRED ONCE PER HOOK (Rocq's `app_sync_run_list`), at any mask. -/
+theorem appSyncRun_list {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
+    (T : IProp GF) (Hk : IProp GF → IProp GF) (E : CoPset) (Qs : List (IProp GF)) (gt : GName)
+    (I : RegMapF FsNode) (r r' : N) (hr : Ok r) (hr' : Ok r') (hrc : Okc r') :
+    appSyncRunRaw (hlc := hlc) A Ok Okc T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
       (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
       T -∗ |={E}=> ((gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗
         ▷ A r (absView I) ∗ T ∗ ([∗list] Q ∈ Qs, Q)) := by
@@ -315,13 +439,13 @@ theorem appSyncRun_list {N : Type} (A : N → Aview → IProp GF) (T : IProp GF)
     imod IH $$ Hrun HQs Hh Hn Hp HT with ⟨Hh, Hn, Hp, HT, HQs⟩
     unfold appSyncRunRaw
     imod (fupd_mask_mono (E1 := ∅) (E2 := E) LawfulSet.empty_subset) $$
-      (Hrun $$ %Q %gt %I %r %r' HQ Hh Hn Hp HT) with ⟨Hh, Hn, Hp, HT, HQ⟩
+      (Hrun $$ %Q %gt %I %r %r' %hr %hr' %hrc HQ Hh Hn Hp HT) with ⟨Hh, Hn, Hp, HT, HQ⟩
     imodintro
     iframe Hh Hn Hp HT
     iapply BigSepL.bigSepL_cons.2
     iframe HQ HQs
 
-end AppSyncRaw
+end AppSyncRawMain
 
 /-! ## 2.  The invariant, at the ambient configuration -/
 
@@ -391,24 +515,42 @@ theorem appRdcred_elim [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
 since SY3-K2) at the era's sync token (K3-3): the application-side premise
 of the era mint, which hands it to fsinit on the kit.  The commit is its one
 runner. -/
-def appMerge [MachGS hlc GF] [Appcfg GF] : IProp GF :=
-  appMergeRaw appPred (eraSyncTok (hlc := hlc) (GF := GF))
+def appMergeK [MachGS hlc GF] [Appcfg GF] : IProp GF :=
+  appMergeRawK appPred (eraSyncTok (hlc := hlc) (GF := GF))
 
-instance appMerge_persistent [MachGS hlc GF] [Appcfg GF] :
-    Persistent (appMerge (hlc := hlc) (GF := GF)) := by
-  unfold appMerge; infer_instance
+instance appMergeK_persistent [MachGS hlc GF] [Appcfg GF] :
+    Persistent (appMergeK (hlc := hlc) (GF := GF)) := by
+  unfold appMergeK; infer_instance
 
 /-- THE SYNC RUNNER, PINNED (Rocq's `app_sync_run`, sync K3-3): at the era's
 token and hook family, the two slots of the fixed record.  It rides beside the
 merge from the mint to fsinit on the kit, where the hooked law is built out
 of it. -/
-def appSyncRun [MachGS hlc GF] [FsTopG GF] [Appcfg GF] : IProp GF :=
-  appSyncRunRaw (hlc := hlc) appPred (eraSyncTok (hlc := hlc) (GF := GF))
+def appSyncRunK [MachGS hlc GF] [FsTopG GF] [Appcfg GF] : IProp GF :=
+  appSyncRunRawK (hlc := hlc) appPred (eraSyncTok (hlc := hlc) (GF := GF))
     (eraSyncHook (hlc := hlc) (GF := GF))
 
-instance appSyncRun_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF] :
-    Persistent (appSyncRun (hlc := hlc) (GF := GF)) := by
-  unfold appSyncRun; infer_instance
+instance appSyncRunK_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF] :
+    Persistent (appSyncRunK (hlc := hlc) (GF := GF)) := by
+  unfold appSyncRunK; infer_instance
+
+/-- THE ERA'S DURABILITY LAWS, PINNED, AS ONE PACKAGE (Rocq's `app_merge`,
+main): the merge and the sync runner at the era's token, hook family and
+generation, both at ONE record predicate `Ok` the era's running record
+satisfies (existential, so `Appcfg` need not carry it), at the durable-copy
+predicate `Okc` (the package's parameter; `AppDur.appDurLaws` closes it with
+the crash seam). -/
+def appMerge [MachGS hlc GF] [FsTopG GF] [Appcfg GF] (Okc : appNames (GF := GF) → Prop) :
+    IProp GF :=
+  iprop(∃ Ok : appNames (GF := GF) → Prop, ⌜Ok (appRun (GF := GF))⌝ ∗
+    appMergeRaw (hlc := hlc) appPred Ok Okc (eraSyncTok (hlc := hlc) (GF := GF))
+      (genId (hlc := hlc) (GF := GF)) ∗
+    appSyncRunRaw (hlc := hlc) appPred Ok Okc (eraSyncTok (hlc := hlc) (GF := GF))
+      (eraSyncHook (hlc := hlc) (GF := GF)))
+
+instance appMerge_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+    (Okc : appNames (GF := GF) → Prop) : Persistent (appMerge (hlc := hlc) Okc) := by
+  unfold appMerge; infer_instance
 
 /-- THE DOMAIN ROW (round C; Rocq's `app_dom`).  The abstract map names
 EXACTLY the region's inums.  `InodeRegion.ftop_body` carries no such row,
@@ -437,8 +579,8 @@ theorem appDom_insert [Icfg] (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
 authority, the claim about the map it carries (read through the view) and
 the domain row.  NOT timeless: the claim is an arbitrary iProp and stays
 under the later.  THE MERGE IS NOT PARKED HERE (sync K3-3): it is pinned at
-the era's token (`appMerge`), so parking it would make the invariant era-
-dependent, and nothing read it here anyway.  The commit takes `appMerge`
+the era's token (`appMergeK`), so parking it would make the invariant era-
+dependent, and nothing read it here anyway.  The commit takes `appMergeK`
 off fsinit's kit. -/
 def appBody [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
   iprop(∃ I : RegMapF FsNode,

@@ -246,6 +246,33 @@ structure Xv6App (GF : BundledGFunctors) where
   /-- THE ERA'S CONSOLE TURN: minted at the era's power-on step, handed to
   `<init>` (Rocq `app_turn`) -/
   turn : fixed → Nat → IProp GF
+  /-- ...IN STAGES (Rocq sync SY3-A1, design/sync.md §4.5 "PowerOn"): `turn`
+  is what the power-on step yields; the crash slot's swap is LENT it and hands
+  on `turn'` (`al_xfer`) -/
+  turn' : fixed → Nat → IProp GF
+  /-- ...what the trace slot's RETURN PATH (`al_back`) makes of `turn'` after
+  the swap; the FOUNDING (`al_found`) splits it -/
+  turn'' : fixed → Nat → IProp GF
+  /-- ...and what the founding leaves for `<init>` (`al_programs`) -/
+  iturn : fixed → Nat → IProp GF
+  /-- THE BIRTH'S CRASH-SLOT PART (Rocq `app_cls`, SY3-A1): `al_birth` yields
+  it beside `cl`, and it founds era 0's durable copy (`Happ_init`) -/
+  cls : fixed → IProp GF
+  /-- WHAT THE BIRTH SAYS ABOUT WHERE IT KEPT THE MACHINE'S GNAMES (Rocq
+  `app_born`, SY3-A1 re-cut): the durable disk's, the swap counter's, the
+  generation registry's and the started counter's names -/
+  born : GName → GName → GName → GName → fixed → Prop
+  /-- THE ERA'S RECORD PREDICATE (Rocq `app_ok`, SY3-A1 re-cut): what a record
+  of the era numbered `k` satisfies; the boot resource carries it -/
+  ok : fixed → Nat → names → Prop
+  /-- THE DURABLE-COPY PREDICATE (Rocq `app_okc`, SY3-A3b): what every record
+  the crash slot holds satisfies -/
+  okc : fixed → names → Prop
+  /-- THE TWO SYNC SLOTS (Rocq `app_tk`/`app_hk`, design/sync.md §4.2): the
+  era's opaque token and the family of a `sync` waiter's hooks; the machine's
+  fixed record carries both (`MachFixedGS.syncTok`/`syncHook`) -/
+  tk : fixed → Nat → IProp GF
+  hk : fixed → Nat → IProp GF → IProp GF
   /-- the conclusion, over the operational state and the run's trace -/
   phi : GState → List Obs → Prop
 
@@ -273,8 +300,35 @@ instance Xv6App.cons_timeless (A : Xv6App GF) (c : A.fixed) (k : Nat) (h : List 
 
 end Xv6AppProj
 
+/-! ## The trivial sync values (Rocq `SystemAdequacy.app_triv_*`, SY3-A1) -/
+
+section AppTrivVals
+variable {GF : BundledGFunctors}
+
+/-- Rocq `app_triv_tk`: a token that says nothing. -/
+@[reducible] def appTrivTk {CT : Type} (_ : CT) (_ : Nat) : IProp GF := iprop(True)
+/-- Rocq `app_triv_hk`: a hook that is its own `Q`. -/
+@[reducible] def appTrivHk {CT : Type} (_ : CT) (_ : Nat) (Q : IProp GF) : IProp GF := Q
+/-- Rocq `app_triv_cls`: nothing for the crash slot at birth. -/
+@[reducible] def appTrivCls {CT : Type} (_ : CT) : IProp GF := iprop(True)
+/-- Rocq `app_triv_born`: nothing kept of the machine's names. -/
+def appTrivBorn {CT : Type} (_ _ _ _ : GName) (_ : CT) : Prop := True
+/-- Rocq `app_triv_ok`: no record predicate. -/
+def appTrivOk {CT N : Type} (_ : CT) (_ : Nat) (_ : N) : Prop := True
+/-- Rocq `app_triv_okc`: the durable-copy predicate that says nothing. -/
+def appTrivOkc {CT N : Type} (_ : CT) (_ : N) : Prop := True
+
+/-- Rocq `app_triv_tk_intro`. -/
+theorem appTrivTk_intro {CT : Type} (c : CT) (k : Nat) : ⊢@{IProp GF} appTrivTk c k :=
+  BI.true_intro
+/-- Rocq `app_triv_cls_intro`. -/
+theorem appTrivCls_intro {CT : Type} (c : CT) : ⊢@{IProp GF} appTrivCls c :=
+  BI.true_intro
+
+end AppTrivVals
+
 /-- THE GENERIC APPLICATION (Rocq `app_triv`): no fixed part, nothing
-claimed, nothing read. -/
+claimed, nothing read; the turn `emp` at all four stages, no sync ledger. -/
 def appTriv (GF : BundledGFunctors) : Xv6App GF where
   fixed := Unit
   cl := fun _ => iprop(True)
@@ -284,6 +338,15 @@ def appTriv (GF : BundledGFunctors) : Xv6App GF where
   R := fun _ _ => iprop(emp)
   ifc := fun _ => appIfaceTriv GF
   turn := fun _ _ => iprop(emp)
+  turn' := fun _ _ => iprop(emp)
+  turn'' := fun _ _ => iprop(emp)
+  iturn := fun _ _ => iprop(emp)
+  cls := appTrivCls
+  born := appTrivBorn
+  ok := appTrivOk
+  okc := appTrivOkc
+  tk := appTrivTk
+  hk := appTrivHk
   phi := fun _ _ => True
 
 end Xv6

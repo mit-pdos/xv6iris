@@ -56,7 +56,8 @@ theorem unionAdequacyAtImg (Hprog : UnionProgLaw (hlc := hlc) (GF := GF))
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ (appUnion (hlc := hlc) (GF := GF)).phi g2 κs :=
   haveI : Xv6AppLaws (hlc := hlc) (appUnion (hlc := hlc) (GF := GF)) := unionLaws Hprog
   xv6AppAdequacy (hlc := hlc) (GF := GF) g sb nib cov appUnion
-    (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov)
+    (appInit_ofValidOkc (appUnion (hlc := hlc) (GF := GF)) _ (fun _ _ => trivial)
+      (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' h => by
       iintro ⟨-, Hauth, -, -, Hled⟩
       iapply (obsLedgerAt_phi ((appUnion (hlc := hlc) (GF := GF)).R c)

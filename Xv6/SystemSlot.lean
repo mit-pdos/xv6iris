@@ -18,7 +18,7 @@ take the console interface `Ai : AppIface GF` (Rocq's `app_iface`).
 
 | hook | here |
 |---|---|
-| `Pc` | `xv6Slot N appFs cov ls` (Rocq `xv6_slot`) |
+| `Pc` | `xv6Slot N appFs appOkc cov ls` (Rocq `xv6_slot`) |
 | `HPc` | `xv6Slot_alloc` (Rocq: the inline `ltac:` at :1433-1456) |
 | `Ppure`/`Hproj` | `fsBootPure cov ls` / `xv6Slot_project` |
 | `Mof` | `fun dk => mirrorOf (fsBlocks dk)` |
@@ -127,27 +127,25 @@ interpretation -- the memory model's invariant whenever the power is on. -/
 def xv6TracePure (cov : ExtTreeSet Nat compare) (ls : Nat) (g : GState) : Prop :=
   fsBootPure cov ls (diskOf g.m.devs) ∧ (g.pow = true → mmOk g.m)
 
-/-! ## 2.  The application's transport, with the clone's boot resource -/
+/-! ## 2.  The application's clone and the power-on transport -/
 
 section AppXferBoot
 variable {GF : BundledGFunctors}
 
-/-- THE TRANSPORT WITH THE BOOT RESOURCE (Rocq `app_xfer_boot_raw`):
-`appXferRaw A` with the clone's own `B r'` beside it.  The PowerOn arm is the
-only reader of the new conjunct; everything else takes the old obligation
-(`appXferRaw_ofBoot`). -/
-def appXferBootRaw {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) : IProp GF :=
+/-- THE CLONE WITH THE BOOT RESOURCE (Rocq `app_clone_raw`): `appXferRaw A`
+with the clone's own `B r'` beside it.  The PowerOn transport
+`appXferBootRaw` is built around it (`appXferBootRaw_ofClone`). -/
+def appCloneRaw {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) : IProp GF :=
   iprop(□ ∀ (r : N) (av : Aview), ▷ A r av ==∗ ▷ A r av ∗ ∃ r' : N, ▷ A r' av ∗ B r')
 
-instance appXferBootRaw_persistent {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) :
-    Persistent (appXferBootRaw A B) := by
-  unfold appXferBootRaw; infer_instance
+instance appCloneRaw_persistent {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) :
+    Persistent (appCloneRaw A B) := by
+  unfold appCloneRaw; infer_instance
 
-/-- It is STRICTLY STRONGER than the plain transport (the entailment behind
-Rocq `app_xfer_raw_of_boot`). -/
-theorem appXferBootRaw_raw {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) :
-    appXferBootRaw A B ⊢ appXferRaw A := by
-  unfold appXferBootRaw appXferRaw
+/-- It is STRICTLY STRONGER than the plain transport. -/
+theorem appCloneRaw_raw {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF) :
+    appCloneRaw A B ⊢ appXferRaw A := by
+  unfold appCloneRaw appXferRaw
   iintro #H
   imodintro
   iintro %r %av HA
@@ -158,17 +156,18 @@ theorem appXferBootRaw_raw {N : Type} (A : N → Aview → IProp GF) (B : N → 
   · iexists r'
     iexact HA'
 
-/-- Rocq `app_xfer_raw_of_boot`. -/
-theorem appXferRaw_ofBoot {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF)
-    (hb : ⊢ appXferBootRaw A B) : ⊢ appXferRaw A :=
-  hb.trans (appXferBootRaw_raw A B)
+/-- The plain transport off a clone (what every landed application's merge is
+made of, `AppInv.appMergeRaw_ofXfer`). -/
+theorem appXferRaw_ofClone {N : Type} (A : N → Aview → IProp GF) (B : N → IProp GF)
+    (hb : ⊢ appCloneRaw A B) : ⊢ appXferRaw A :=
+  hb.trans (appCloneRaw_raw A B)
 
-/-- The generic application's: nothing claimed and nothing handed over (Rocq
-`app_xfer_boot_raw_triv`). -/
-theorem appXferBootRaw_triv {N : Type} (A : N → Aview → IProp GF)
+/-- The generic application's clone: nothing claimed and nothing handed over
+(Rocq `app_clone_raw_triv`). -/
+theorem appCloneRaw_triv {N : Type} (A : N → Aview → IProp GF)
     (htriv : ∀ r av, A r av ⊣⊢ iprop(True)) :
-    ⊢ appXferBootRaw A (fun _ => iprop(emp)) := by
-  unfold appXferBootRaw
+    ⊢ appCloneRaw A (fun _ => iprop(emp)) := by
+  unfold appCloneRaw
   imodintro
   iintro %r %av H
   imodintro
@@ -181,7 +180,75 @@ theorem appXferBootRaw_triv {N : Type} (A : N → Aview → IProp GF)
       ipureintro; trivial
     · iempintro
 
+/-- THE POWER-ON TRANSPORT (Rocq `app_xfer_boot_raw`, main; sync SY3-A1,
+SY3-A3b, SY3-A3bc).  LENT the era's turn `Tn` and handing on the boot's
+`Tn'`; REPACKING the slot at an instance `r_s` of its choosing beside the
+clone `r'` and its boot resource; at the durable-copy predicate `Okc` (the
+slot's copy comes in satisfying it, the repacked one goes back satisfying
+it); and LENT the machine's started auth `γst` at `gen + 1` at the camera
+`HSt` the swap holds it at (passed EXPLICITLY: a scope has several
+`MonoNatG`s). -/
+def appXferBootRaw {N : Type} (HSt : MonoNatG GF) (A : N → Aview → IProp GF) (Okc : N → Prop)
+    (B : N → IProp GF) (Tn Tn' : IProp GF) (γst : GName) (gen : Nat) : IProp GF :=
+  iprop(□ ∀ (r : N) (av : Aview) (n : Nat),
+    ⌜n = gen + 1⌝ -∗ @MonoNat.auth_own GF HSt γst (DFrac.own 1) (.ofNat n) -∗
+    ⌜Okc r⌝ -∗ Tn -∗ ▷ A r av ==∗
+    ◇ (@MonoNat.auth_own GF HSt γst (DFrac.own 1) (.ofNat n) ∗ Tn' ∗
+      ∃ r_s r' : N, ⌜Okc r_s⌝ ∗ ▷ A r_s av ∗ ▷ A r' av ∗ B r'))
+
+instance appXferBootRaw_persistent {N : Type} (HSt : MonoNatG GF) (A : N → Aview → IProp GF)
+    (Okc : N → Prop) (B : N → IProp GF) (Tn Tn' : IProp GF) (γst : GName) (gen : Nat) :
+    Persistent (appXferBootRaw HSt A Okc B Tn Tn' γst gen) := by
+  unfold appXferBootRaw; infer_instance
+
+/-- A CLONE IS A POWER-ON TRANSPORT AT THE IDENTITY ON THE TURN (Rocq
+`app_xfer_boot_raw_of_clone`): the slot keeps its copy and the turn crosses
+untouched. -/
+theorem appXferBootRaw_ofClone {N : Type} (HSt : MonoNatG GF) (A : N → Aview → IProp GF)
+    (Okc : N → Prop) (B : N → IProp GF) (Tn : IProp GF) (γst : GName) (gen : Nat)
+    (hc : ⊢ appCloneRaw A B) : ⊢ appXferBootRaw HSt A Okc B Tn Tn γst gen := by
+  ihave #H := hc
+  unfold appCloneRaw appXferBootRaw
+  imodintro
+  iintro %r %av %n _ Hsa %hr Htn HA
+  imod H $$ %r %av HA with ⟨HA, %r', HA', HB⟩
+  imodintro
+  imodintro
+  iframe Hsa Htn
+  iexists r, r'
+  iframe HA HA' HB
+  ipureintro; exact hr
+
+/-- The generic application's (Rocq `app_xfer_boot_raw_triv`). -/
+theorem appXferBootRaw_triv {N : Type} (HSt : MonoNatG GF) (A : N → Aview → IProp GF)
+    (Okc : N → Prop) (Tn : IProp GF) (γst : GName) (gen : Nat)
+    (htriv : ∀ r av, A r av ⊣⊢ iprop(True)) :
+    ⊢ appXferBootRaw HSt A Okc (fun _ => iprop(emp)) Tn Tn γst gen :=
+  appXferBootRaw_ofClone HSt A Okc _ Tn γst gen (appCloneRaw_triv A htriv)
+
 end AppXferBoot
+
+/-! ## 2b.  The trivial sync values' laws (Rocq `app_triv_found`,
+`app_triv_sync_run`) -/
+
+section AppTrivSync
+variable {GF : BundledGFunctors}
+
+/-- THE TRIVIAL FOUNDING (Rocq `app_triv_found`): the token is `True`, so the
+turn the swap handed on goes to `<init>` whole. -/
+theorem appTriv_found {CT : Type} (c : CT) (k : Nat) (T : IProp GF) :
+    ⊢@{IProp GF} T -∗ |==> (appTrivTk c k ∗ T) := by
+  iintro HT
+  imodintro
+  iframe HT
+
+/-- ...and the trivial RUNNER (Rocq `app_triv_sync_run`). -/
+theorem appTriv_syncRun {hlc : HasLC} [MachFixedGS hlc GF] [FsTopG GF] {CT N : Type}
+    (A : N → Aview → IProp GF) (Ok Okc : N → Prop) (c : CT) (k : Nat) :
+    ⊢ appSyncRunRaw (hlc := hlc) A Ok Okc (appTrivTk c k) (appTrivHk c k) :=
+  appSyncRunRaw_triv A Ok Okc _ _ (fun _ => .rfl)
+
+end AppTrivSync
 
 /-! ## 3.  The durable claim at a NAMED instance -/
 
@@ -237,18 +304,20 @@ record at its snapshot's map name, beside the application's durable claim at
 that SAME name, tied by the guest half of the map's authority and by nothing
 else. -/
 def xv6Slot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (γd γsw γreg γst : GName) (c : CT) : IProp GF :=
   iprop(∃ gt : GName, pFsNamedAt gt γd XV6_DISK_BYTES γsw γreg γst cov ls ∗
-    appDurRaw (appFs c) gt)
+    appDurRaw (appFs c) (appOkc c) gt)
 
 /-- THE PURE PROJECTION OF THE COMPOSITE, `Hproj`'s shape (Rocq
 `xv6_slot_project`): the file system's half is projected (`pFs_project`) and
 the guest is framed. -/
 theorem xv6Slot_project {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (γd γsw γreg γst : GName) (c : CT)
     (dk : Nat → BitVec 8) :
-    diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs cov ls γd γsw γreg γst c ⊢@{IProp GF}
-      ◇ (diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs cov ls γd γsw γreg γst c ∗
+    diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ⊢@{IProp GF}
+      ◇ (diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗
         ⌜fsBootPure cov ls dk⌝) := by
   iintro ⟨Ha, HP⟩
   unfold xv6Slot
@@ -271,15 +340,16 @@ theorem xv6Slot_project {CT : Type} (N : Type) (appFs : CT → N → Aview → I
 variable nothing can unfold the durable fragments' byte list, which at the
 literal `XV6_DISK_BYTES` costs a minute of kernel time. -/
 theorem xv6Slot_alloc_gen {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop) (Cls : CT → IProp GF)
     (dk0 : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (ndisk : Nat) (himg : fsBootImageWf dk0 ndisk sb nib cov)
-    (Happ_init : ∀ c : CT, ⊢@{IProp GF} |==> ∃ r : N,
+    (Happ_init : ∀ c : CT, Cls c ⊢@{IProp GF} |==> ∃ r : N, ⌜appOkc c r⌝ ∗
       appFs c r (absView (imgState (fsBlocks dk0) sb nib).fssInodes))
     (γd γsw γreg γst : GName) (c : CT) :
-    diskImgBytes γd 0 (Virtio.diskRead dk0 0 ndisk) ∗
+    Cls c ∗ diskImgBytes γd 0 (Virtio.diskRead dk0 0 ndisk) ∗
         MonoNat.auth_own γsw (DFrac.own 1) (.ofNat 0) ⊢@{IProp GF}
       |==> ∃ gt : GName, pFsNamedAt gt γd ndisk γsw γreg γst cov sb.sbLogstart ∗
-        appDurRaw (appFs c) gt := by
+        appDurRaw (appFs c) (appOkc c) gt := by
   obtain ⟨D0, hrec⟩ := fsRecovery_total (fsBlocks dk0) cov sb.sbLogstart
   have hw := himg
   obtain ⟨hwf, -, -, -, -, hnibeq, hcin, hcmeta, -⟩ := hw
@@ -290,10 +360,10 @@ theorem xv6Slot_alloc_gen {CT : Type} (N : Type) (appFs : CT → N → Aview →
   have hsnap : ⊢@{IProp GF} |==> ∃ gt : GName,
       pDurAt gt D0 ∗ snapGuest gt (imgState (fsBlocks dk0) sb nib).fssInodes := by
     rw [hD0]; exact imgPDurAlloc dk0 ndisk sb nib cov himg
-  iintro ⟨Hfr, Hsw⟩
+  iintro ⟨Hcls, Hfr, Hsw⟩
   imod pFs_alloc γsw γreg γst dk0 D0 (imgState (fsBlocks dk0) sb nib) cov sb.sbLogstart
     hrec hhwf hsnap $$ Hsw with ⟨%γs, %gt, %hseq, HP, Hguest, -⟩
-  imod Happ_init c with ⟨%r, Hcl⟩
+  imod Happ_init c $$ Hcls with ⟨%r, %hr, Hcl⟩
   imodintro
   iexists gt
   isplitl [Hfr HP]
@@ -310,6 +380,8 @@ theorem xv6Slot_alloc_gen {CT : Type} (N : Type) (appFs : CT → N → Aview →
     · iexact HP
   · unfold appDurRaw snapGuest
     iexists r, (imgState (fsBlocks dk0) sb nib).fssInodes
+    isplitr
+    · ipureintro; exact hr
     isplitl [Hguest]
     · iexact Hguest
     · iexact Hcl
@@ -321,15 +393,16 @@ image (`fsRecovery_total`), its clean log (`hdrWf_zero`), era 0's epoch
 extent (`fsExtent_ofImage`), and the application's era-0 claim packed on the
 image snapshot's guest half. -/
 theorem xv6Slot_alloc {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop) (Cls : CT → IProp GF)
     (dk0 : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (himg : fsBootImageWf dk0 XV6_DISK_BYTES sb nib cov)
-    (Happ_init : ∀ c : CT, ⊢@{IProp GF} |==> ∃ r : N,
+    (Happ_init : ∀ c : CT, Cls c ⊢@{IProp GF} |==> ∃ r : N, ⌜appOkc c r⌝ ∗
       appFs c r (absView (imgState (fsBlocks dk0) sb nib).fssInodes))
     (γd γsw γreg γst : GName) (c : CT) :
-    diskImgBytes γd 0 (Virtio.diskRead dk0 0 XV6_DISK_BYTES) ∗
+    Cls c ∗ diskImgBytes γd 0 (Virtio.diskRead dk0 0 XV6_DISK_BYTES) ∗
         MonoNat.auth_own γsw (DFrac.own 1) (.ofNat 0) ⊢@{IProp GF}
-      |==> xv6Slot N appFs cov sb.sbLogstart γd γsw γreg γst c :=
-  xv6Slot_alloc_gen N appFs dk0 sb nib cov XV6_DISK_BYTES himg Happ_init γd γsw γreg γst c
+      |==> xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γst c :=
+  xv6Slot_alloc_gen N appFs appOkc Cls dk0 sb nib cov XV6_DISK_BYTES himg Happ_init γd γsw γreg γst c
 
 /-- WHAT THE POWER-ON ARM LENDS THE BOOT, `Rb`'s value (Rocq: the inline
 `fun c k dk => …` at :1491): the crash predicate's cloned epoch at the map the
@@ -348,30 +421,37 @@ lend with its guest), copy the claim onto the clone by the transport
 `Happ_boot` (which also yields the era's boot resource), and put the original
 back.  Every conjunct is placed by name (Rocq's note on the disk big-op). -/
 theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop)
     (appBoot : CT → Nat → N → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (Happ_boot : ∀ (c : CT) (k : Nat), ⊢@{IProp GF} appXferBootRaw (appFs c) (appBoot c k))
-    (γd γsw γreg γst : GName) (c : CT) (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8) :
+    (Born : GName → GName → GName → GName → CT → Prop) (Tn Tn' : CT → Nat → IProp GF)
+    (Happ_boot : ∀ (c : CT) (gen : Nat) (γd γsw γreg γst : GName), Born γd γsw γreg γst c →
+      ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (appFs c) (appOkc c)
+        (appBoot c (gen + 1)) (Tn c (gen + 1)) (Tn' c (gen + 1)) γst gen)
+    (γd γsw γreg γst : GName) (c : CT) (hborn : Born γd γsw γreg γst c)
+    (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8) :
     (γreg ↪◯MAP[gen]{.discard} E) ∗ MonoNat.lb_own γst (.ofNat (gen + 1)) ∗
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
         diskImgAuthSized γd XV6_DISK_BYTES dk ∗
         (E.mirrorName ↪VAR (mirrorOf (fsBlocks dk))) ∗
-        ▷ xv6Slot N appFs cov ls γd γsw γreg γst c ⊢@{IProp GF}
+        ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗ Tn c (gen + 1) ⊢@{IProp GF}
       |==> ◇ (MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
-        diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs cov ls γd γsw γreg γst c ∗
+        diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗
         (E.mirrorName ↪VAR{.own (1 : Qp).half} (mirrorOf (fsBlocks dk))) ∗
-        MonoNat.lb_own γsw (.ofNat (gen + 1)) ∗ xv6Lend N appFs appBoot cov ls c gen dk) := by
-  iintro ⟨#Hreg, #Hst, Hsa, Ha, HM, HP⟩
+        MonoNat.lb_own γsw (.ofNat (gen + 1)) ∗ xv6Lend N appFs appBoot cov ls c gen dk ∗
+        Tn' c (gen + 1)) := by
+  iintro ⟨#Hreg, #Hst, Hsa, Ha, HM, HP, Htn⟩
   unfold xv6Slot
   ihave ⟨%gt, HP⟩ := (later_exists (α := GName)).2 $$ HP
   icases later_sep.1 $$ HP with ⟨HP, HG⟩
-  imod appDurRaw_open (appFs c) gt $$ HG with ⟨%r, %I, Hh, Hcl⟩
+  imod appDurRaw_open (appFs c) (appOkc c) gt $$ HG with ⟨%r, %I, %hr, Hh, Hcl⟩
   ihave Hh : snapGuest (GF := GF) gt I $$ [Hh]
   · unfold snapGuest; iexact Hh
   imod pFs_swap gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk E gen I
     $$ Hreg Hst Hsa Ha HM Hh HP with >⟨Hsa, Ha, HP, HM, #Hsw, Hh, Hl⟩
-  ihave #Hxfer := Happ_boot c (gen + 1)
+  ihave #Hxfer := Happ_boot c gen γd γsw γreg γst hborn
   unfold appXferBootRaw
-  imod Hxfer $$ %r %(absView I) Hcl with ⟨Hcl, %rnew, Hnew, Hbnew⟩
+  imod Hxfer $$ %r %(absView I) %(gen + 1) %rfl Hsa %hr Htn Hcl
+    with >⟨Hsa, Htn, %rs, %rnew, %hrs, Hcl, Hnew, Hbnew⟩
   icases Hl with ⟨%gt', Hl, Hg'⟩
   unfold snapGuest
   imodintro
@@ -380,27 +460,32 @@ theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
   · iexact Hsa
   isplitl [Ha]
   · iexact Ha
+  -- the slot is REPACKED at the transport's own instance `rs` (Rocq SY3-A1)
   isplitl [HP Hh Hcl]
   · inext
     iexists gt
     isplitl [HP]
     · iexact HP
     · unfold appDurRaw
-      iexists r, I
+      iexists rs, I
+      isplitr
+      · ipureintro; exact hrs
       isplitl [Hh]
       · iexact Hh
       · iexact Hcl
   isplitl [HM]
   · iexact HM
-  isplitr [Hl Hg' Hnew Hbnew]
+  isplitr [Hl Hg' Hnew Hbnew Htn]
   · iexact Hsw
-  unfold xv6Lend
-  iexists gt', rnew
-  isplitl [Hl]
-  · iexact Hl
-  isplitl [Hg' Hnew]
-  · iapply appDurAt_pack (appFs c) gt' rnew I $$ Hg' Hnew
-  · iexact Hbnew
+  isplitr [Htn]
+  · unfold xv6Lend
+    iexists gt', rnew
+    isplitl [Hl]
+    · iexact Hl
+    isplitl [Hg' Hnew]
+    · iapply appDurAt_pack (appFs c) gt' rnew I $$ Hg' Hnew
+    · iexact Hbnew
+  · iexact Htn
 
 end Slot
 
@@ -479,34 +564,36 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF]
 record literal with the composite slot, `diskProjTrace` promotes
 `xv6Slot_project` to the end-of-run shape. -/
 theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
-      ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
+        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
+      ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜fsBootPure cov ls (diskOf g'.m.devs)⌝ :=
   @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-      (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist)
-    XV6_DISK_BYTES γd (xv6Slot N appFs cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
-    (fun dk => xv6Slot_project N appFs cov ls γd γsw γreg γstart c dk) rfl rfl g'
+      (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist)
+    XV6_DISK_BYTES γd (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
+    (fun dk => xv6Slot_project N appFs appOkc cov ls γd γsw γreg γstart c dk) rfl rfl g'
 
 /-- THE TRACE HOOK (Rocq `xv6_trace_hook`): the memory model's invariant off
 the era conjunct (pure, nothing spent), then the disk's reading off the crash
 invariant. -/
 theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
+    (appOkc : CT → N → Prop)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) (g' : GState) :
     @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-        (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
-      ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
+        (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g' ∗
+      ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜xv6TracePure cov ls g'⌝ := by
   iintro ⟨Hsi, HP⟩
   ihave %hresv := (@powerInterp_mmOk hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
-    XV6_DISK_BYTES γsw (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g')
+    XV6_DISK_BYTES γsw (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist) g')
     $$ Hsi
-  imod fsTraceHook N appFs cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp g'
+  imod fsTraceHook N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp g'
     $$ [Hsi HP] with %hdisk
   · isplitl [Hsi]
     · iexact Hsi

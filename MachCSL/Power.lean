@@ -469,22 +469,33 @@ theorem wp_power [KernelMap]
         ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ ⌜Ppure dk⌝))
     (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF)
-    (Tn : Nat → IProp GF)
+    -- THE ERA'S TURN IN THREE STAGES (Rocq sync SY3-A1): `Tn` is what `Hobs`'s
+    -- on-arm yields; `Hswap` is LENT it and hands on `Tn'`; the RETURN PATH
+    -- `Hback` (the trace slot once more, at the same history) makes `Tn''` of
+    -- it, which `powerBootRes` carries to the boot
+    (Tn Tn' Tn'' : Nat → IProp GF)
     (Hswap : ∀ (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       eraRegistered gen E ∗ genStarted gen ∗ startAuth (gen + 1) ∗ diskFixedAuth dk ∗
-        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)
+        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗
+        Tn (gen + 1)
       ⊢@{IProp GF} |==> ◇ (startAuth (gen + 1) ∗ diskFixedAuth dk ∗
         ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗
-        (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof dk)) ∗ swapLb (gen + 1) ∗ Rb gen dk))
+        (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof dk)) ∗ swapLb (gen + 1) ∗ Rb gen dk ∗
+        Tn' (gen + 1)))
     (Hobs : ∀ (h : List Obs) (on : Bool) (dk : Nat → BitVec 8), traceShape h on →
       diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗
           obsHalf (h ++ [powerEv on]) ∗ powerYield Tn on h))
+    (Hback : ∀ h : List Obs,
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
+          Tn' (obsBoots h + 1) ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [Obs.powerOn]) ∗
+          Tn'' (obsBoots h + 1)))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
       bootFacts σ →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
       Ppure (diskOf σ.devs) →
-      obsInv ∗ powerBootRes Mof Rb Tn E gen σ ⊢@{IProp GF} |={⊤}=>
+      obsInv ∗ powerBootRes Mof Rb Tn'' E gen σ ⊢@{IProp GF} |={⊤}=>
         ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
         ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()))) :
     crashInv ∗ obsInv ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
@@ -572,15 +583,26 @@ theorem wp_power [KernelMap]
       CoPset.subseteq_top) $$ Hcinv with ⟨HPc, Hcclose⟩
     imod (Hproj (diskOf g.m.devs)) $$ [Hdisk HPc] with ⟨Hdisk, HPc, %hpure⟩
     · iframe Hdisk HPc
+    icases Hyield with ⟨Hyield, Hturn⟩
+    -- THE SWAP, LENT THE ERA'S TURN (Rocq sync SY3-A1)
     imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen
-      (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc]
-      with >⟨Hstart, Hdisk, HPc, Hmir, #Hswlb, HRb⟩
-    · iframe Hstart Hdisk Hmir HPc
+      (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc Hturn]
+      with >⟨Hstart, Hdisk, HPc, Hmir, #Hswlb, HRb, Hturn⟩
+    · iframe Hstart Hdisk Hmir HPc Hturn
       unfold genStarted
       isplit
       · iexact Hreg
       · iexact Hstarted
     imod Hcclose $$ HPc
+    -- THE RETURN PATH (Rocq sync SY3-A1 re-cut): the trace slot once more, at
+    -- the history the on-arm left, turning the swap's yield into the boot's
+    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+      CoPset.subseteq_top) $$ Hoinv with ⟨HP2, Hoclose2⟩
+    have hback := Hback h
+    rw [hbt'] at hback
+    imod hback $$ [HP2 Hhalf Hturn] with >⟨HP2, Hhalf, Hturn⟩
+    · iframe HP2 Hhalf Hturn
+    imod Hoclose2 $$ HP2
     -- the reservation fragments, one per hart
     ihave Hfrags' := bigSepM_cpus (fun k v => γresv ↪◯MAP[k] v)
       (fun c => (g₂.m.resv c, (g₂.m.hr c).acq)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
@@ -608,8 +630,7 @@ theorem wp_power [KernelMap]
     imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ ⊤
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ Hpins with #Hwire
-    icases Hyield with ⟨Hyield, Hturn⟩
-    ihave Hres : powerBootRes Mof Rb Tn ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Hmir HRb]
+    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk]
       iframe Hmir HRb Hswlb Hcinv

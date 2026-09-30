@@ -36,17 +36,33 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Dis
 
 attribute [local instance] appPreGS
 
-/-- **Rocq `union_al_birth`**. -/
-theorem union_al_birth : ⊢@{IProp GF} |==> ∃ c : (appUnion (hlc := hlc) (GF := GF)).fixed,
-    (appUnion (hlc := hlc) (GF := GF)).cl c :=
-  unionBirthAll (hlc := hlc) (GF := GF)
+/-- **Rocq `union_al_birth`** (at the trivial sync fields for now, drift
+D3-app/S: nothing for the crash slot, nothing kept of the machine's names). -/
+theorem union_al_birth (γd γsw γreg γst : GName) :
+    ⊢@{IProp GF} |==> ∃ c : (appUnion (hlc := hlc) (GF := GF)).fixed,
+      ⌜(appUnion (hlc := hlc) (GF := GF)).born γd γsw γreg γst c⌝ ∗
+      (appUnion (hlc := hlc) (GF := GF)).cls c ∗ (appUnion (hlc := hlc) (GF := GF)).cl c :=
+  appBirth_ofValidCls (appUnion (hlc := hlc) (GF := GF)) (fun c => appTrivCls_intro c)
+    (fun _ _ _ _ _ => trivial) (unionBirthAll (hlc := hlc) (GF := GF)) γd γsw γreg γst
 
-/-- **Rocq `union_al_xfer`**: the transport, with the first process's boot
-resource -- the file application's. -/
-theorem union_al_xfer (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
-    ⊢@{IProp GF} appXferBootRaw ((appUnion (hlc := hlc) (GF := GF)).pred c)
+/-- The union's clone, with the first process's boot resource -- the file
+application's (Rocq `file_xfer_boot` at the pin's shape; lanes F/U re-state it
+at main's re-base). -/
+theorem union_clone (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
+    ⊢@{IProp GF} appCloneRaw ((appUnion (hlc := hlc) (GF := GF)).pred c)
       ((appUnion (hlc := hlc) (GF := GF)).boot c k) :=
   fileXferBoot (hlc := hlc) (GF := GF) c.ugnFile.fgnCl k
+
+/-- **Rocq `union_al_xfer`** at the trivial sync fields for now (drift
+D3-app/S): the clone at the identity on the turn. -/
+theorem union_al_xfer (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (gen : Nat)
+    (γd γsw γreg γst : GName) (_ : (appUnion (hlc := hlc) (GF := GF)).born γd γsw γreg γst c) :
+    ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc))
+      ((appUnion (hlc := hlc) (GF := GF)).pred c) ((appUnion (hlc := hlc) (GF := GF)).okc c)
+      ((appUnion (hlc := hlc) (GF := GF)).boot c (gen + 1))
+      ((appUnion (hlc := hlc) (GF := GF)).turn c (gen + 1))
+      ((appUnion (hlc := hlc) (GF := GF)).turn' c (gen + 1)) γst gen :=
+  appXferBootRaw_ofClone _ _ _ _ _ γst gen (union_clone c (gen + 1))
 
 /-- **Rocq `union_al_R0`**. -/
 theorem union_al_R0 (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
@@ -182,8 +198,15 @@ theorem unionLaws (Hprog : UnionProgLaw (hlc := hlc) (GF := GF)) :
   al_tx := fun c i γ hm hu => union_al_tx c i γ hm hu
   al_rx := fun c i γ hm hu => union_al_rx c i γ hm hu
   al_xfer := union_al_xfer
-  al_programs := fun c htag hkill hcons hwild hrdw hmono => Hprog c htag hkill hcons hwild hrdw hmono
+  al_programs := fun c htag hkill hcons hwild hrdw hmono _ => Hprog c htag hkill hcons hwild hrdw hmono
   al_echo := fun c htag hkill hcons hwild hrdw hmono => union_al_echo c htag hkill hcons hwild hrdw hmono
+  -- THE SYNC LAWS AT THE TRIVIAL FIELDS (drift D3-app/S; lanes F/U replace them)
+  al_found := fun c k => appTriv_found c k _
+  al_back := fun c h => appBack_id (appUnion (hlc := hlc) (GF := GF)) c h (fun _ => rfl)
+  al_boot_ok := fun _ _ _ => by iintro _; ipureintro; trivial
+  al_merge := fun c k _ _ => appMergeRaw_ofXfer _ _ _ _ _ (fun _ => trivial) (fun _ => trivial)
+    (appXferRaw_ofClone _ _ (union_clone c 0))
+  al_sync_run := fun c k => appTriv_syncRun _ _ _ c k
 
 end UnionLaws
 

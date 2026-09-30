@@ -91,40 +91,61 @@ at a generic application: its fixed part `CT` (born by `Hbirth`), its names
 `appBoot`, its console interface `Ai`, its per-era turn `Tnn`, its trace
 slot `Pt` and conclusion `phi` -- the components of an `Xv6App` record, positionally. -/
 theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
-    (CT : Type) (Cl : CT → IProp GF)
-    (Hbirth : ⊢@{IProp GF} |==> ∃ c : CT, Cl c)
+    -- THE BIRTH (Rocq SY3-A1): its yield split between the crash slot's era-0
+    -- copy (`Cls`) and the trace slot (`Clt`); handed the machine's four fixed
+    -- gnames, `Born` what it says of where it kept them
+    (CT : Type) (Cls Clt : CT → IProp GF)
+    (Born : GName → GName → GName → GName → CT → Prop)
+    (Hbirth : ∀ γd γsw γreg γst : GName,
+      ⊢@{IProp GF} |==> ∃ c : CT, ⌜Born γd γsw γreg γst c⌝ ∗ Cls c ∗ Clt c)
     (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF)
+    -- THE DURABLE-COPY PREDICATE (Rocq `app_okc`, SY3-A3b)
+    (appOkc : CT → N → Prop)
     (Ai : CT → AppIface GF)
-    (Tnn : CT → Nat → IProp GF)
-    (Happ_boot : ∀ (c : CT) (k : Nat), ⊢@{IProp GF} appXferBootRaw (appFs c) (appBoot c k))
-    (Happ_init : ∀ c : CT, ⊢@{IProp GF} |==> ∃ r : N,
+    -- THE ERA'S TURN IN FOUR STAGES (Rocq SY3-A1): the power-on step's yield
+    -- `Tnn`, the swap's `Tnn'`, the return path's `Tnn''`, `<init>`'s `TnnInit`
+    (Tnn Tnn' Tnn'' TnnInit : CT → Nat → IProp GF)
+    -- THE TWO SYNC SLOTS (Rocq sync K3-2), at the fixed part alone
+    (Tk : CT → Nat → IProp GF) (Hk : CT → Nat → IProp GF → IProp GF)
+    -- THE FOUNDING (Rocq `Hfound`, SY3-A1)
+    (Hfound : ∀ (c : CT) (k : Nat),
+      ⊢@{IProp GF} Tnn'' c (k + 1) -∗ |==> (Tk c k ∗ TnnInit c (k + 1)))
+    -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hboot_ok`, SY3-A1 re-cut)
+    (Ok : CT → Nat → N → Prop)
+    (Hboot_ok : ∀ (c : CT) (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok c k r⌝)
+    -- THE MERGE (Rocq `Happ_merge`, SY3-K2 / SY3-A1): at any machine record
+    -- whose generation counter is the pre-structure's, at a fixed part born at
+    -- that record's own four gnames
+    (Happ_merge : ∀ [F : MachFixedGS hlc GF] (c : CT) (k : Nat),
+      MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
+      Born (MachFixedGS.diskName (hlc := hlc) (GF := GF)) (MachFixedGS.swapName (hlc := hlc) (GF := GF))
+        (MachFixedGS.registryName (hlc := hlc) (GF := GF))
+        (MachFixedGS.startName (hlc := hlc) (GF := GF)) c →
+      ⊢@{IProp GF} appMergeRaw (hlc := hlc) (appFs c) (Ok c (k + 1)) (appOkc c) (Tk c k) k)
+    -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at any machine record
+    (Happ_sync_run : ∀ [F : MachFixedGS hlc GF] (c : CT) (k : Nat),
+      ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Ok c (k + 1)) (appOkc c) (Tk c k) (Hk c k))
+    -- THE POWER-ON TRANSPORT (Rocq `Happ_boot`, SY3-A1 / SY3-A3bc)
+    (Happ_boot : ∀ (c : CT) (gen : Nat) (γd γsw γreg γst : GName), Born γd γsw γreg γst c →
+      ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (appFs c) (appOkc c)
+        (appBoot c (gen + 1)) (Tnn c (gen + 1)) (Tnn' c (gen + 1)) γst gen)
+    -- ERA 0, out of the birth's crash-slot part (Rocq SY3-A1)
+    (Happ_init : ∀ c : CT, Cls c ⊢@{IProp GF} |==> ∃ r : N, ⌜appOkc c r⌝ ∗
       appFs c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
-    -- THE TWO SYNC SLOTS (Rocq sync K3-2, design/sync.md §4.2): the era's
-    -- opaque token and the family of a waiter's hooks, at the raw names and
-    -- the fixed part, minted at every era (`HTk`), and the application's one
-    -- law about what a hook means (`HHk`, the runner, K3-3) at any record
-    (Tk : GName → GName → GName → GName → CT → Nat → IProp GF)
-    (Hk : GName → GName → GName → GName → CT → Nat → IProp GF → IProp GF)
-    (HTk : ∀ (γd γsw γreg γst : GName) (c : CT) (k : Nat), ⊢@{IProp GF} |==> Tk γd γsw γreg γst c k)
-    (HHk : ∀ (F : MachFixedGS hlc GF) (γd γsw γreg γst : GName) (c : CT) (k : Nat),
-      ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Tk γd γsw γreg γst c k)
-        (Hk γd γsw γreg γst c k))
     (Pt : GName → CT → IProp GF)
     (Hinit_boot : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
-      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c)
-        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
-      EraInitBoot (hlc := hlc) N appFs appBoot Tnn c)
+      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c))
+      EraInitBoot (hlc := hlc) N appFs appBoot TnnInit c)
     (Happ_echo : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
-      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c)
-        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
+      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c))
       EraEcho (hlc := hlc) (GF := GF))
     (HPt : ∀ (γobs : GName) (c : CT),
-      Cl c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
+      Clt c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
     (Hobs : ∀ (γd γobs : GName) (c : CT) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
       traceShape h on →
       diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h)
@@ -133,19 +154,24 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
           (if on then iprop(emp)
            else iprop((Ai c).cons (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
              Tnn c (obsBoots h + 1)))))
+    -- THE RETURN PATH (Rocq `Hback`, SY3-A1 re-cut)
+    (Hback : ∀ (γobs : GName) (c : CT) (h : List Obs),
+      ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
+          Tnn' c (obsBoots h + 1) ⊢@{IProp GF}
+        |==> ◇ (▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} (h ++ [Obs.powerOn])) ∗
+          Tnn'' c (obsBoots h + 1)))
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
-      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (Pt γobs c)
-        (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c))
+      letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c))
       EraPerm (hlc := hlc) (GF := GF))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
-      @powerInterp hlc GF (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg γd γsw
-          γobs γhist c T (Pt γobs c) (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)) g' ∗
+      @powerInterp hlc GF (xv6FixedGS N appFs appOkc cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg
+          γd γsw γobs γhist c T (Pt γobs c) (Tk c) (Hk c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
-        ▷ xv6Slot N appFs cov sb.sbLogstart γd γsw γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF}
+        ▷ xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γstart c ∗ ▷ Pt γobs c ⊢@{IProp GF}
         ◇ ⌜phi g' h⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
     (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
@@ -153,31 +179,31 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
   obtain ⟨hcovin, hlogsub, hls2⟩ := covFacts_ofImage _ _ sb nib cov Himg
-  refine riscvPowerAdequacy (hlc := hlc) (GF := GF) XV6_DISK_BYTES g CT Cl Hbirth
-    (fun γd γsw γreg γst c => xv6Slot N appFs cov sb.sbLogstart γd γsw γreg γst c)
-    (xv6Slot_alloc N appFs (diskOf g.m.devs) sb nib cov Himg Happ_init)
+  refine riscvPowerAdequacy (hlc := hlc) (GF := GF) XV6_DISK_BYTES g CT Cls Clt Born Hbirth
+    (fun γd γsw γreg γst c => xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γst c)
+    (xv6Slot_alloc N appFs appOkc Cls (diskOf g.m.devs) sb nib cov Himg Happ_init)
     Tk Hk
     (fsBootPure cov sb.sbLogstart)
-    (xv6Slot_project N appFs cov sb.sbLogstart)
+    (xv6Slot_project N appFs appOkc cov sb.sbLogstart)
     (fun dk => mirrorOf (fsBlocks dk))
     (fun c gen dk => xv6Lend N appFs appBoot cov sb.sbLogstart c gen dk)
-    (xv6Slot_swap N appFs appBoot cov sb.sbLogstart Happ_boot)
+    Tnn Tnn' Tnn''
+    (xv6Slot_swap N appFs appOkc appBoot cov sb.sbLogstart Born Tnn Tnn' Happ_boot)
     Pt (fun c => (Ai c).tag) (fun c h => (Ai c).tag_persistent h) (fun c h => (Ai c).tag_timeless h)
     (fun c => (Ai c).kill) (fun c => (Ai c).kill_persistent) (fun c => (Ai c).kill_timeless)
     (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H)
     (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
     (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
-    (fun c k => (Ai c).rdwild_timeless k) Tnn
-    HPt Hobs phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
-  intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF E gen σ hbf hdv hpp
-  have hrun := fun k => HHk F γd γsw γreg γstart c k
+    (fun c k => (Ai c).rdwild_timeless k)
+    HPt Hobs Hback phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
+  intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF hborn E gen σ hbf hdv hpp
+  -- the merge and the runner at the record literal, read off the equations
+  -- the literal satisfies by `rfl` (Rocq's `Hmergefix`/`Hrunfix`)
+  have hmerge := fun k => @Happ_merge F c k (by rw [hF]) (by rw [hF]; exact hborn)
+  have hrun := fun k => @Happ_sync_run F c k
   subst hF
-  exact xv6BootEra N appFs appBoot Tnn sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
-    (Pt γobs c) (Tk γd γsw γreg γstart c) (Hk γd γsw γreg γstart c)
-    -- every landed application's merge is its transport's (SY3-K2): the old
-    -- durable copy dropped, the running claim copied
-    (fun k => appMergeRaw_ofXfer _ _ (appXferRaw_ofBoot _ _ (Happ_boot c (gen + 1))))
-    (fun k => HTk γd γsw γreg γstart c k) hrun
+  exact xv6BootEra N appFs appBoot Tnn'' TnnInit sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs
+    γhist c T (Pt γobs c) (Tk c) (Hk c) (Ok c) (Hboot_ok c) appOkc hmerge (Hfound c) hrun
     (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -199,15 +225,15 @@ is the generic user-execution WP `uexecWp_gen US` -- the ONE place `USER`
 enters (brief §0.1). -/
 theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
-    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv)
+      (appTrivTk c) (appTrivHk c))
     EraInitBoot (hlc := hlc) (GF := GF) Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp))
       (fun _ _ => iprop(emp)) c := by
   intro E gen cP cI W HFd HBs HIr I Fc r
-  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv
+      (appTrivTk c) (appTrivHk c)
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   letI : Appcfg GF := ⟨Unit, fun _ _ => iprop(True), r⟩
   have hsup : ⊢@{IProp GF} appSup := appSup_of_triv (fun _ _ => .rfl)
@@ -228,28 +254,28 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
 /-- The generic application's echo (Rocq `cons_echo_shift_triv`). -/
 theorem xv6Triv_echo (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
-    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv)
+      (appTrivTk c) (appTrivHk c))
     EraEcho (hlc := hlc) (GF := GF) := by
   intro E gen cP cI
-  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv
+      (appTrivTk c) (appTrivHk c)
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact consEchoShift_triv rfl
 
 /-- The trivial trace slot's permits (Rocq `uart_obs_permit_triv`). -/
 theorem xv6Triv_perm (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
-    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+    letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv)
+      (appTrivTk c) (appTrivHk c))
     EraPerm (hlc := hlc) (GF := GF) := by
   intro E gen cP cI Fc i γ _
-  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
+  letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv
+      (appTrivTk c) (appTrivHk c)
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact uartObsPermit_triv i γ rfl rfl
 
@@ -270,26 +296,40 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare) (phi : GState → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit)
         (T : List Obs) (g' : GState),
-      @powerInterp hlc GF (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart
+      @powerInterp hlc GF (xv6FixedGS Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart
           (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-      syncTokTriv syncHookTriv) g' ∗
-        ▷ xv6Slot Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart γd γsw γreg γstart c ⊢@{IProp GF}
-        ◇ ⌜phi g'⌝)
+          (appTrivTk c) (appTrivHk c)) g' ∗
+        ▷ xv6Slot Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart γd γsw γreg γstart c
+          ⊢@{IProp GF} ◇ ⌜phi g'⌝)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
     (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 :=
   xv6PowerAdequacyGen (hlc := hlc) (GF := GF) g sb nib cov
-    Unit (fun _ => iprop(True)) (by imodintro; iexists (); itrivial)
-    Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp)) (fun _ => appIfaceTriv GF)
-    (fun _ _ => iprop(emp))
-    (fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl))
-    (fun _ => by imodintro; iexists (); itrivial)
-    -- no sync ledger: the token is `True`, a hook is its own `Q`
-    (fun _ _ _ _ _ _ => syncTokTriv (GF := GF) 0) (fun _ _ _ _ _ _ => syncHookTriv (GF := GF) 0)
-    (fun _ _ _ _ _ _ => by imodintro; itrivial)
-    (fun _ _ _ _ _ _ _ => appSyncRunRaw_triv _ _ _ (fun _ => .rfl))
+    Unit appTrivCls (fun _ => iprop(True)) appTrivBorn
+    (fun _ _ _ _ => by
+      imodintro
+      iexists ()
+      isplitr
+      · ipureintro; trivial
+      isplitl [] <;> itrivial)
+    Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp)) appTrivOkc (fun _ => appIfaceTriv GF)
+    (fun _ _ => iprop(emp)) (fun _ _ => iprop(emp)) (fun _ _ => iprop(emp)) (fun _ _ => iprop(emp))
+    appTrivTk appTrivHk
+    (fun c k => appTriv_found c k _)
+    appTrivOk (fun _ _ _ => by iintro _; ipureintro; trivial)
+    (fun c k _ _ => appMergeRaw_ofXfer _ _ _ _ _ (fun _ => trivial) (fun _ => trivial)
+      (appXferRaw_triv _ (fun _ _ => .rfl)))
+    (fun c k => appTriv_syncRun _ _ _ c k)
+    (fun _ _ _ _ _ _ _ => appXferBootRaw_triv _ _ _ _ _ _ (fun _ _ => .rfl))
+    (fun _ => by
+      iintro _
+      imodintro
+      iexists ()
+      isplitr
+      · ipureintro; trivial
+      itrivial)
     (fun γobs _ => obsPredAt γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_initBoot US cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -298,6 +338,7 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun γobs c => obsPredAt_alloc_cl (fun _ => iprop(True)) γobs c)
     (fun γd γobs _ h on dk hs => obsPredAt_step XV6_DISK_BYTES consResTriv (fun _ => iprop(emp))
       (fun _ => .rfl) (fun _ => .rfl) γd γobs h on dk hs)
+    (fun _ _ _ => backId _ _ _)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_perm cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (fun g' _ => phi g')
@@ -325,8 +366,8 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6TracePure cov sb.sbLogstart g2 :=
   xv6PowerAdequacy (hlc := hlc) (GF := GF) US g sb nib cov (xv6TracePure cov sb.sbLogstart)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
-      xv6TraceHook Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart (appIfaceTriv GF) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) syncTokTriv syncHookTriv g')
+      xv6TraceHook Unit (fun _ _ _ => iprop(True)) appTrivOkc cov sb.sbLogstart (appIfaceTriv GF)
+        Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) (appTrivTk c) (appTrivHk c) g')
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
 include hlc GF in

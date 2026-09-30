@@ -97,7 +97,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
   -- the arity-free seam initlog and ireclaim take, off the one at the
   -- application's guest (Rocq `fs_crash_seam_of_at`)
-  ihave #Hseam := fsCrashSeam_ofAt appGuest fscCov fscLogst $$ Hseamg
+  ihave #Hseam := fsCrashSeam_ofAt appGuestK fscCov fscLogst $$ Hseamg
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (Rocq's `Hlawf`): assembled
   -- out of the invariants fsinit already holds, read at the record block 1
   -- DECODES to -- the three ties (a'') are that bridge.  The park itself is
@@ -112,7 +112,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     $$ Hit2
   ihave #Hpool := isItable2_pool fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
     $$ Hit2
-  unfold appMerge appSyncRun
+  unfold appMergeK appSyncRunK
   ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
       (eraSyncTok (hlc := hlc) (GF := GF))) $$ []
   · imodintro

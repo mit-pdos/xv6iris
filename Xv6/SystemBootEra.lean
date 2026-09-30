@@ -291,9 +291,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [F
 
 /-- THE SEAM, off the slot equation (Rocq `xv6_boot_era`'s `Hseamg`): both
 directions are the identity once the crash predicate is the composite. -/
-theorem xv6Era_seam {N : Type} (A : N → Aview → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (Hcp : MachFixedGS.crashPred (hlc := hlc) (GF := GF) = pFsComp (hlc := hlc) (appDurRaw A) cov ls) :
-    ⊢@{IProp GF} fsCrashSeamAt (hlc := hlc) (appDurRaw A) cov ls := by
+theorem xv6Era_seam {N : Type} (A : N → Aview → IProp GF) (Okc : N → Prop)
+    (cov : ExtTreeSet Nat compare) (ls : Nat)
+    (Hcp : MachFixedGS.crashPred (hlc := hlc) (GF := GF) = pFsComp (hlc := hlc) (appDurRaw A Okc) cov ls) :
+    ⊢@{IProp GF} fsCrashSeamAt (hlc := hlc) (appDurRaw A Okc) cov ls := by
   unfold fsCrashSeamAt
   rw [Hcp]
   iintro !>
@@ -362,50 +363,56 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Wch
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
-/-- THE TWO SYNC SLOTS AT AN APPLICATION WITH NO SYNC LEDGER (Rocq's
-`(fun _ => True%I) (fun _ Q => Q)` at every landed application, sync K3-2):
-the token is `True` and a hook is its own `Q`. -/
-@[reducible] def syncTokTriv : Nat → IProp GF := fun _ => iprop(True)
-@[reducible] def syncHookTriv : Nat → IProp GF → IProp GF := fun _ Q => Q
-
 /-- THE MACHINE'S RECORD at the system's crash slot (Rocq: `boot_fixedGS …
 (xv6_slot …) … Ai …`, the literal `xv6_power_adequacy_gen` substitutes into
 the era). -/
 @[reducible] def xv6FixedGS {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
-    (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
+    (appOkc : CT → N → Prop) (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs) (Ptp : IProp GF)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF) :
     MachFixedGS hlc GF :=
   Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
-    (xv6Slot N appFs cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
+    (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist
 
 set_option maxHeartbeats 800000 in
 /-- **ONE ERA** (Rocq `SystemAdequacy.xv6_boot_era`): at the machine's record
 literal, out of the trace invariant and what the power thread hands the
 boot, every hart's and every device's thread. -/
 theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
-    (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (sb : FsSb)
+    (appBoot : CT → Nat → N → IProp GF)
+    -- THE ERA'S TURN (Rocq `Tn`/`Tn_init`, sync SY3-A1): what the power arm
+    -- carried here (the slot's swap's yield through the return path), and what
+    -- the founding `Hfound` leaves of it for `<init>`
+    (Tn TnInit : CT → Nat → IProp GF) (sb : FsSb)
     (cov : ExtTreeSet Nat compare) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName)
     (c : CT) (T : List Obs) (Ptp : IProp GF)
-    -- THE TWO SYNC SLOTS of the record (Rocq sync K3-2), at the raw names
+    -- THE TWO SYNC SLOTS of the record (Rocq sync K3-2)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
-    -- THE MERGE (Rocq `Happ_merge`, SY3-K2 / K3-3): the application's
-    -- durability obligation at the commit, at the era's token
-    (Happ_merge : ∀ k : Nat, ⊢@{IProp GF} appMergeRaw (appFs c) (Tkp k))
-    -- THE ERA'S SYNC TOKEN (Rocq `Htok`, K3-2): what the token IS is the
-    -- application's; the system theorem discharges it from its `Tk`
-    (Htok : ∀ k : Nat, ⊢@{IProp GF} |==> Tkp k)
-    -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at the record's slots
-    (Happ_sync_run : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv
+    -- THE ERA'S RECORD PREDICATE (Rocq `Ok`/`Hbok`, SY3-A1 re-cut), read off
+    -- the boot resource, at the era's number
+    (Ok : Nat → N → Prop) (Hbok : ∀ (k : Nat) (r : N), appBoot c k r ⊢@{IProp GF} ⌜Ok k r⌝)
+    -- THE DURABLE-COPY PREDICATE (Rocq `Okc`, SY3-A3b)
+    (appOkc : CT → N → Prop)
+    -- THE MERGE (Rocq `Happ_merge`, SY3-K2; its wand lent the started auth at
+    -- the era's `gen + 1`, SY3-A1), at the record literal
+    (Happ_merge : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv
       γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
-      ∀ k : Nat, ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Tkp k) (Hkp k))
-    (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen
+      ∀ k : Nat, ⊢@{IProp GF} appMergeRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k) k)
+    -- THE FOUNDING (Rocq `Hfound`, SY3-A1): the era's sync token out of the
+    -- turn, the rest for `<init>`
+    (Hfound : ∀ k : Nat, ⊢@{IProp GF} Tn c (k + 1) -∗ |==> (Tkp k ∗ TnInit c (k + 1)))
+    -- THE SYNC RUNNER (Rocq `Happ_sync_run`, K3-3), at the record's slots
+    (Happ_sync_run : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv
+      γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
+      ∀ k : Nat, ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (appFs c) (Ok (k + 1)) (appOkc c) (Tkp k)
+        (Hkp k))
+    (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen
       γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
-      EraInitBoot (hlc := hlc) N appFs appBoot Tn c)
-    (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart
+      EraInitBoot (hlc := hlc) N appFs appBoot TnInit c)
+    (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
       γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
       EraEcho (hlc := hlc) (GF := GF))
-    (Hperm : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart
+    (Hperm : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart
       γreg γd γsw γobs γhist c T Ptp Tkp Hkp)
       EraPerm (hlc := hlc) (GF := GF))
     (E : EraGS) (gen : Nat) (σ : MState) (hbf : bootFacts σ)
@@ -413,13 +420,13 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (hpure : fsBootPure cov sb.sbLogstart (diskOf σ.devs))
     (hcovin : fsCovIn cov XV6_DISK_BYTES)
     (hlogsub : ∀ b, logRegion sb.sbLogstart b = true → b ∈ cov) (hls2 : sb.sbLogstart = 2) :
-    letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
+    letI : MachFixedGS hlc GF := (xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
       γsw γobs γhist c T Ptp Tkp Hkp)
     obsInv ∗ powerBootRes (fun dk => mirrorOf (fsBlocks dk))
         (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen σ ⊢@{IProp GF} |={⊤}=>
       ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
       ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())) := by
-  letI F : MachFixedGS hlc GF := xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
+  letI F : MachFixedGS hlc GF := xv6FixedGS N appFs appOkc cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
     γsw γobs γhist c T Ptp Tkp Hkp
   obtain ⟨-, D, hrec, hhwf, -⟩ := hpure
   obtain ⟨ds0, hds⟩ := hdv
@@ -431,28 +438,24 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   imod xv6Era_lend N appFs appBoot c cov sb.sbLogstart gen (diskOf σ.devs) D hrec hhwf hcovin hlogsub
     hls2 $$ Hlend with ⟨%r, %gt, %gsn, %gln, %S, %⟨hlseq, hwf⟩, Hok, Hsnap, Hbres⟩
   -- the seam at the era's superblock, off the slot's value (the literal)
-  have hseam := xv6Era_seam (hlc := hlc) (GF := GF) (appFs c) cov S.fssSb.sbLogstart
+  have hseam := xv6Era_seam (hlc := hlc) (GF := GF) (appFs c) (appOkc c) cov S.fssSb.sbLogstart
     (by rw [hlseq]; rfl)
   -- THE SHARED ALLOCATION, at the provisional instance, under the era's record
   have hA := (letI : MachGS hlc GF := eraM0 E gen; letI : Appcfg GF := ⟨N, appFs c, r⟩;
     bootSharedAlloc (hlc := hlc) (GF := GF) σ hbf ds0 hds XV6_DISK_BYTES S S.fssSb (fsNib S) cov
       gsn gln gt (fsRecView (fsBlocks (diskOf σ.devs)) D) hwf)
-  -- THE ERA'S SYNC TOKEN (Rocq `Htok`, K3-3), minted here and handed to the
-  -- mint, which puts it into the log's free bundle
-  imod (Htok gen) with Hstok
+  -- THE FOUNDING (Rocq `Hfound`, SY3-A1): the era's sync token out of the
+  -- turn the power arm carried, handed to the mint, which puts it into the
+  -- log's free bundle; the rest goes to `<init>`
+  imod (Hfound gen) $$ Hturn with ⟨Hstok, Hturn⟩
   imod hA $$ [Hrows Hok Hsnap Hstok] with ⟨%ξ0, %Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt,
     %γ0, %γ1, %cn, %γd, %I, %Fc, %ξd, Hout⟩
   · iframe Hrows Hok Hsnap
-    -- the era's generation is `gen` (the ambient `genId` at `eraM0 E gen`)
-    unfold appMerge appSyncRun eraSyncTok eraSyncHook genId
-    isplitl []
-    · iapply (Happ_merge gen)
-    isplitl []
-    · iapply (Happ_sync_run gen)
-    isplitl []
-    · unfold appGuest
-      iapply hseam
-    iexact Hstok
+    -- CHECKPOINT BRIDGE (D3-app/S, WIP): the kernel WAL still takes the
+    -- D2-dur forms (`appMergeK`/`appSyncRunK`/the seam at `appGuestK`); the
+    -- kernel re-threading at Rocq main's shape (Okc, `Ok`, the started-auth
+    -- loan) replaces this sorry.
+    sorry
   -- THE FINAL INSTANCE: the claim is the proc table's
   letI : Appcfg GF := ⟨N, appFs c, r⟩
   let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)
@@ -468,7 +471,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     xv6Era_run (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb
       (fsNib S) cov XV6_DISK_BYTES S (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S))
       hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) i γ hu)
-      iprop(appBoot c (gen + 1) r ∗ Tn c (gen + 1)) (by
+      iprop(appBoot c (gen + 1) r ∗ TnInit c (gen + 1)) (by
         iintro Hai ⟨Hb, Ht⟩
         iapply hI $$ Hai Hb Ht))
   imod hR $$ Hoinv [] [Hbres Hturn] Hout with ⟨Hharts, Hdevs, #Hcert⟩

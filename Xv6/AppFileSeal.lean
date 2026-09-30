@@ -24,7 +24,7 @@ lists).
 
 ## DEVIATIONS from Rocq
 
-1. `file_xfer_boot` is stated at `SystemSlot.appXferBootRaw (filePred c)
+1. `file_xfer_boot` is stated at `SystemSlot.appCloneRaw (filePred c)
    (fileBoot c k)` (Rocq states the unfolded `□ ∀ r av, …`; its use site
    `union_al_xfer` rewrites `app_xfer_boot_raw` away), i.e. exactly
    `AppLaws.AppLaws.al_xfer`'s shape at `AppFileBoot`'s `filePred`/`fileBoot`.
@@ -181,12 +181,12 @@ theorem fState_typedAt (c : FileFixed) (r : FileAppNames) (av : Aview) :
       ipureintro; exact hok
     · iexact Hty
 
-/-- THE BOOT TRANSPORT (Rocq `file_xfer_boot`), at `appXferBootRaw`'s shape
+/-- THE BOOT TRANSPORT (Rocq `file_xfer_boot`), at `appCloneRaw`'s shape
 (deviation 1). -/
 theorem fileXferBoot (c : FileFixed) (k : Nat) :
-    ⊢@{IProp GF} appXferBootRaw (filePred (hlc := hlc) c) (fileBoot (hlc := hlc) c k) := by
+    ⊢@{IProp GF} appCloneRaw (filePred (hlc := hlc) c) (fileBoot (hlc := hlc) c k) := by
   have hex := echoXferBoot (hlc := hlc) (GF := GF) c.1 k
-  unfold appXferBootRaw at hex ⊢
+  unfold appCloneRaw at hex ⊢
   ihave #Hex := hex
   imodintro
   iintro %r %av H

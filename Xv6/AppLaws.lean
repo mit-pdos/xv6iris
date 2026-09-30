@@ -96,8 +96,11 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     (A : Xv6App GF) : Prop where
-  /-- THE BIRTH STEP: one value of the fixed part, with what `cl` says of it. -/
-  al_birth : ⊢@{IProp GF} |==> ∃ c : A.fixed, A.cl c
+  /-- THE BIRTH STEP: one value of the fixed part, its yield split between the
+  two slots (Rocq SY3-A1), handed the machine's four fixed gnames and saying
+  where it kept them (`born`, SY3-A1 re-cut). -/
+  al_birth : ∀ γd γsw γreg γst : GName,
+    ⊢@{IProp GF} |==> ∃ c : A.fixed, ⌜A.born γd γsw γreg γst c⌝ ∗ A.cls c ∗ A.cl c
   /-- the ledger is timeless -/
   al_Rt : ∀ (c : A.fixed) (h : List Obs), Timeless (A.R c h)
   /-- the supply pays the kill credential -/
@@ -142,8 +145,13 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
       uartGhosts γ u' -∗ A.R c h ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
       uartGhosts γ u' ∗ A.R c (h ++ [Obs.dev (.uartIn i b)]) ∗
         A.tag c (h ++ [Obs.dev (.uartIn i b)]))
-  /-- THE TRANSPORT with the clone's boot resource -/
-  al_xfer : ∀ (c : A.fixed) (k : Nat), ⊢@{IProp GF} appXferBootRaw (A.pred c) (A.boot c k)
+  /-- THE POWER-ON TRANSPORT (Rocq `al_xfer`, SY3-A1 / SY3-A3bc): lent the
+  era's turn and handing on `turn'`, at the durable-copy predicate, LENT the
+  machine's started auth at the era's generation `gen`, at a fixed part born at
+  the machine's names. -/
+  al_xfer : ∀ (c : A.fixed) (gen : Nat) (γd γsw γreg γst : GName), A.born γd γsw γreg γst c →
+    ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (A.pred c) (A.okc c)
+      (A.boot c (gen + 1)) (A.turn c (gen + 1)) (A.turn' c (gen + 1)) γst gen
   /-- THE FIRST PROCESS'S EXEC BUNDLE at every era, at any record whose
   interface slots are the application's and whose generation counter is the
   pre-structure's (deviation 2), handed the era's turn, at the first process's full
@@ -155,7 +163,10 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     MachFixedGS.wild (hlc := hlc) (GF := GF) = (A.ifc c).wild →
     MachFixedGS.rdwild (hlc := hlc) (GF := GF) = (A.ifc c).rdwild →
     MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
-    EraInitBoot (hlc := hlc) A.names A.pred A.boot A.turn c
+    -- THE SYNC-HOOK EQUATION (Rocq SY3-A4): the record's hook family IS the
+    -- application's
+    MachFixedGS.syncHook (hlc := hlc) (GF := GF) = A.hk c →
+    EraInitBoot (hlc := hlc) A.names A.pred A.boot A.iturn c
   /-- THE ECHO'S JUSTIFICATION at every era, at any record whose interface
   slots are the application's. -/
   al_echo : ∀ [F : MachFixedGS hlc GF] (c : A.fixed),
@@ -166,6 +177,35 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     MachFixedGS.rdwild (hlc := hlc) (GF := GF) = (A.ifc c).rdwild →
     MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
     EraEcho (hlc := hlc) (GF := GF)
+  /-- THE FOUNDING (Rocq `al_found`, SY3-A1): the era's sync token out of the
+  turn the swap handed on (through the return path), the rest for `<init>`.
+  The token is indexed by the era's generation `k`, the turns by its number
+  `k + 1`. -/
+  al_found : ∀ (c : A.fixed) (k : Nat),
+    ⊢@{IProp GF} A.turn'' c (k + 1) -∗ |==> (A.tk c k ∗ A.iturn c (k + 1))
+  /-- THE RETURN PATH (Rocq `al_back`, SY3-A1 re-cut): the ledger's second step
+  at the power-on, at the history the power-on left and the era it founded. -/
+  al_back : ∀ (c : A.fixed) (h : List Obs),
+    ⊢@{IProp GF} A.R c (h ++ [Obs.powerOn]) -∗ A.turn' c (obsBoots h + 1) ==∗
+      A.R c (h ++ [Obs.powerOn]) ∗ A.turn'' c (obsBoots h + 1)
+  /-- the era's record predicate, off the boot resource (Rocq `al_boot_ok`) -/
+  al_boot_ok : ∀ (c : A.fixed) (k : Nat) (r : A.names), A.boot c k r ⊢@{IProp GF} ⌜A.ok c k r⌝
+  /-- THE MERGE (Rocq `al_merge`, SY3-K2 / SY3-A1): the commit's law, at the
+  era's token and the generation its wand's loan of the started auth is bound
+  at, at any machine record whose generation counter is the pre-structure's
+  and whose four gnames the fixed part was born at; at the record of the era
+  numbered `k + 1`. -/
+  al_merge : ∀ [F : MachFixedGS hlc GF] (c : A.fixed) (k : Nat),
+    MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
+    A.born (MachFixedGS.diskName (hlc := hlc) (GF := GF)) (MachFixedGS.swapName (hlc := hlc) (GF := GF))
+      (MachFixedGS.registryName (hlc := hlc) (GF := GF))
+      (MachFixedGS.startName (hlc := hlc) (GF := GF)) c →
+    ⊢@{IProp GF} appMergeRaw (hlc := hlc) (A.pred c) (A.ok c (k + 1)) (A.okc c) (A.tk c k) k
+  /-- THE SYNC RUNNER (Rocq `al_sync_run`, K3-3): the one place a hook's
+  meaning is used. -/
+  al_sync_run : ∀ [F : MachFixedGS hlc GF] (c : A.fixed) (k : Nat),
+    ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) (A.pred c) (A.ok c (k + 1)) (A.okc c) (A.tk c k)
+      (A.hk c k)
 
 section inst
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF]
@@ -177,6 +217,69 @@ instance Xv6AppLaws.R_timeless (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] 
   AL.al_Rt c h
 
 end inst
+
+/-! ## §1b The triv lemmas (Rocq `App.app_birth_of_valid_cls`, `app_back_id`,
+`app_init_of_valid`, `app_init_of_valid_okc`, `app_triv_init`) -/
+
+section trivLemmas
+variable {GF : BundledGFunctors}
+
+/-- A LANDED APPLICATION WITH NOTHING FOR THE CRASH SLOT AT BIRTH (Rocq
+`app_birth_of_valid_cls`): its birth is its old one. -/
+theorem appBirth_ofValidCls (A : Xv6App GF) (hc : ∀ c : A.fixed, ⊢@{IProp GF} A.cls c)
+    (hn : ∀ (γd γsw γreg γst : GName) (c : A.fixed), A.born γd γsw γreg γst c)
+    (hb : ⊢@{IProp GF} |==> ∃ c : A.fixed, A.cl c) (γd γsw γreg γst : GName) :
+    ⊢@{IProp GF} |==> ∃ c : A.fixed, ⌜A.born γd γsw γreg γst c⌝ ∗ A.cls c ∗ A.cl c := by
+  imod hb with ⟨%c, H⟩
+  imodintro
+  iexists c
+  isplitr
+  · ipureintro; exact hn γd γsw γreg γst c
+  iframe H
+  iapply hc c
+
+/-- ...and its return path (Rocq `app_back_id`): nothing to file, the turn
+goes on whole. -/
+theorem appBack_id (A : Xv6App GF) (c : A.fixed) (h : List Obs)
+    (heq : ∀ k, A.turn'' c k = A.turn' c k) :
+    ⊢@{IProp GF} A.R c (h ++ [Obs.powerOn]) -∗ A.turn' c (obsBoots h + 1) ==∗
+      A.R c (h ++ [Obs.powerOn]) ∗ A.turn'' c (obsBoots h + 1) := by
+  rw [heq]
+  iintro HR HT
+  imodintro
+  iframe HR HT
+
+/-- Rocq `app_init_of_valid`. -/
+theorem appInit_ofValid (A : Xv6App GF) (P : A.fixed → IProp GF) (hP : ∀ c, ⊢@{IProp GF} P c)
+    (c : A.fixed) : A.cls c ⊢@{IProp GF} P c := by
+  iintro _
+  iapply hP c
+
+/-- ...at an application whose durable-copy predicate holds of every record
+(Rocq `app_init_of_valid_okc`, SY3-A3b). -/
+theorem appInit_ofValidOkc (A : Xv6App GF) (av : Aview) (hok : ∀ c r, A.okc c r)
+    (hP : ∀ c : A.fixed, ⊢@{IProp GF} |==> ∃ r : A.names, A.pred c r av) (c : A.fixed) :
+    A.cls c ⊢@{IProp GF} |==> ∃ r : A.names, ⌜A.okc c r⌝ ∗ A.pred c r av := by
+  iintro _
+  imod hP c with ⟨%r, Hp⟩
+  imodintro
+  iexists r
+  iframe Hp
+  ipureintro; exact hok c r
+
+/-- ERA 0 at the generic application (Rocq `app_triv_init`). -/
+theorem appTriv_init (c : (appTriv GF).fixed) (av : Aview) :
+    (appTriv GF).cls c ⊢@{IProp GF} |==> ∃ r : (appTriv GF).names,
+      ⌜(appTriv GF).okc c r⌝ ∗ (appTriv GF).pred c r av := by
+  iintro _
+  imodintro
+  iexists ()
+  isplitr
+  · ipureintro; trivial
+  · dsimp only [appTriv]
+    itrivial
+
+end trivLemmas
 
 /-! ## §2 THE APPLICATION THEOREM (Rocq `App.xv6_app_adequacy`) -/
 
@@ -193,15 +296,16 @@ is reducible and satisfies the application's conclusion over the run's
 trace. -/
 theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A]
-    (Happ_init : ∀ c : A.fixed, ⊢@{IProp GF} |==> ∃ r : A.names,
+    -- ...founded out of the birth's crash-slot part (Rocq SY3-A1)
+    (Happ_init : ∀ c : A.fixed, A.cls c ⊢@{IProp GF} |==> ∃ r : A.names, ⌜A.okc c r⌝ ∗
       A.pred c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : A.fixed)
         (T : List Obs) (g' : GState) (h : List Obs),
-      @powerInterp hlc GF (xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-          γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
-        syncTokTriv syncHookTriv) g' ∗
+      @powerInterp hlc GF (xv6FixedGS A.names A.pred A.okc cov sb.sbLogstart (A.ifc c) Hinv γgen
+          γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
+        (A.tk c) (A.hk c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
-        ▷ xv6Slot A.names A.pred cov sb.sbLogstart γd γsw γreg γstart c ∗
+        ▷ xv6Slot A.names A.pred A.okc cov sb.sbLogstart γd γsw γreg γstart c ∗
         ▷ obsLedgerAt (A.R c) γobs ⊢@{IProp GF}
         ◇ ⌜A.phi g' h⌝)
     (Hgen0 : g.gen = 0) (Hpow0 : g.pow = false)
@@ -210,35 +314,35 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ A.phi g2 κs :=
   xv6PowerAdequacyGen (hlc := hlc) (GF := GF) g sb nib cov
-    A.fixed A.cl AL.al_birth
-    A.names A.pred A.boot A.ifc A.turn
+    A.fixed A.cls A.cl A.born AL.al_birth
+    A.names A.pred A.boot A.okc A.ifc A.turn A.turn' A.turn'' A.iturn
+    -- THE TWO SYNC SLOTS, off the record, and their laws (Rocq SY3-A1)
+    A.tk A.hk AL.al_found
+    A.ok AL.al_boot_ok
+    (fun c k hm hb => AL.al_merge c k hm hb)
+    (fun c k => AL.al_sync_run c k)
     AL.al_xfer Happ_init
-    -- THE TWO SYNC SLOTS (Rocq sync K3-2): no application states a sync ledger
-    -- yet, so the token is `True` and a hook is its own `Q` (lane E gives the
-    -- record fields)
-    (fun _ _ _ _ _ _ => syncTokTriv (GF := GF) 0) (fun _ _ _ _ _ _ => syncHookTriv (GF := GF) 0)
-    (fun _ _ _ _ _ _ => by imodintro; itrivial)
-    (fun _ _ _ _ _ _ _ => appSyncRunRaw_triv _ _ _ (fun _ => .rfl))
     (fun γobs c => obsLedgerAt (A.R c) γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
-      AL.al_programs (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
-        syncTokTriv syncHookTriv) c rfl rfl rfl rfl rfl rfl)
+      AL.al_programs (F := xv6FixedGS A.names A.pred A.okc cov sb.sbLogstart (A.ifc c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs) (A.tk c) (A.hk c))
+        c rfl rfl rfl rfl rfl rfl rfl)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
-      AL.al_echo (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
-        syncTokTriv syncHookTriv) c rfl rfl rfl rfl rfl rfl)
+      AL.al_echo (F := xv6FixedGS A.names A.pred A.okc cov sb.sbLogstart (A.ifc c) Hinv γgen
+        γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs) (A.tk c) (A.hk c))
+        c rfl rfl rfl rfl rfl rfl)
     (fun γobs c => obsLedgerAt_alloc_cl (A.R c) γobs (A.cl c) (AL.al_R0 c))
     (fun γd γobs c h on dk hs =>
       obsLedgerAt_step (A.R c) (A.cons c) (A.turn c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk
         hs)
+    -- THE RETURN PATH: the ledger's own second step (Rocq SY3-A1)
+    (fun γobs c h => obsLedgerAt_back (A.R c) _ _ (h ++ [Obs.powerOn]) (AL.al_back c h) γobs)
     -- the permit at the ledger (Rocq's `Hperm` assertion): the application's
     -- two wands at the era's instance, the ledger/tag/claim equations by `rfl`
     -- at the literal
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T => by
-      letI : MachFixedGS hlc GF := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen
-        γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)
-        syncTokTriv syncHookTriv
+      letI : MachFixedGS hlc GF := xv6FixedGS A.names A.pred A.okc cov sb.sbLogstart (A.ifc c) Hinv
+        γgen γstart γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs) (A.tk c) (A.hk c)
       intro E gen cP cI Fc i γ hu
       letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
       exact uartObsPermit_ledger i (A.R c) (A.tag c) (A.cons c) γ rfl rfl rfl
@@ -297,9 +401,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Wch
 /-- **THE GENERIC APPLICATION'S LAWS** (Rocq `App.app_triv_laws`).  `USER`
 enters at `al_programs` only (`uexecWp_gen`). -/
 theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
-  al_birth := by
-    show ⊢@{IProp GF} |==> ∃ _c : Unit, iprop(True)
-    imodintro; iexists (); itrivial
+  al_birth := appBirth_ofValidCls (appTriv GF) (fun c => appTrivCls_intro c)
+    (fun _ _ _ _ _ => trivial)
+    (by
+      show ⊢@{IProp GF} |==> ∃ _c : Unit, iprop(True)
+      imodintro; iexists (); itrivial)
   al_Rt := fun _ _ => by show Timeless iprop(emp); infer_instance
   al_kill := fun _ _ => by
     show appSupRaw _ _ ⊢@{IProp GF} iprop(□ True)
@@ -340,12 +446,18 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
     isplitl [HR]
     · iexact HR
     · itrivial
-  al_xfer := fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl)
-  al_programs := fun c _ hkill hcons _ _ _ => appTriv_initBoot US c hkill hcons
+  al_xfer := fun _ _ _ _ _ _ _ => appXferBootRaw_triv _ _ _ _ _ _ (fun _ _ => .rfl)
+  al_programs := fun c _ hkill hcons _ _ _ _ => appTriv_initBoot US c hkill hcons
   al_echo := fun c _ _ hcons _ _ _ => by
     intro E gen cP cI
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     exact consEchoShift_triv hcons
+  al_found := fun c k => appTriv_found c k _
+  al_back := fun c h => appBack_id (appTriv GF) c h (fun _ => rfl)
+  al_boot_ok := fun _ _ _ => by iintro _; ipureintro; trivial
+  al_merge := fun c k _ _ => appMergeRaw_ofXfer _ _ _ _ _ (fun _ => trivial) (fun _ => trivial)
+    (appXferRaw_triv _ (fun _ _ => .rfl))
+  al_sync_run := fun c k => appTriv_syncRun _ _ _ c k
 
 end triv
 
@@ -363,9 +475,7 @@ theorem xv6AppAdequacyTriv_xv6GF {hlc : HasLC} (US : USER) (g : GState)
   letI : MachGpreS hlc xv6GF := xv6GF_machGpreS hlc 0
   haveI : Xv6AppLaws (hlc := hlc) (appTriv xv6GF) := appTriv_laws US
   (xv6AppAdequacy (hlc := hlc) (GF := xv6GF) g fsimgSb fsimgNib fsimgCov (appTriv xv6GF)
-    (fun _ => by
-      show ⊢@{IProp xv6GF} |==> ∃ _r : Unit, iprop(True)
-      imodintro; iexists (); itrivial)
+    (fun c => appTriv_init c _)
     (fun _ _ _ _ _ _ _ _ _ _ _ _ => by iintro -; imodintro; ipureintro; trivial)
     Hgen0 Hpow0 (fsimgHimg g Hdisk) n κs t2 g2 hsteps).1
 

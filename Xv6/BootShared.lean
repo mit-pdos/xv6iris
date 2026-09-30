@@ -532,8 +532,8 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
     (hwf : fsBootSnapWf (diskOf σ.devs) ndisk S Pb sb nib cov) :
     powerBootRows (hlc := hlc) (GF := GF) (fun dk => mirrorOf (fsBlocks dk)) σ ∗
-      ▷ appPred appRun (absView S.fssInodes) ∗ appMerge (hlc := hlc) ∗ appSyncRun (hlc := hlc) ∗
-      fsCrashSeamAt (hlc := hlc) appGuest cov sb.sbLogstart ∗
+      ▷ appPred appRun (absView S.fssInodes) ∗ appMergeK (hlc := hlc) ∗ appSyncRunK (hlc := hlc) ∗
+      fsCrashSeamAt (hlc := hlc) appGuestK cov sb.sbLogstart ∗
       eraSyncTok (hlc := hlc) (GF := GF) ∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S ⊢
       |={⊤}=> ∃ (ξ0 : CtxId) (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)

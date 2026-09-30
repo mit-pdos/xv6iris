@@ -77,8 +77,8 @@ theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsName
     (hwf : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γd b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMerge (hlc := hlc) -∗ appSyncRun (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuest cov sb.sbLogstart -∗
+      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
+      fsCrashSeamAt (hlc := hlc) appGuestK cov sb.sbLogstart -∗
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S -∗
       logMirrorHalf (hlc := hlc) (mirrorOf (fsBlocks dk)) -∗
@@ -92,7 +92,7 @@ theorem bootSharedFs [CurCtx] (γ0 : UartNames) (γd : DiskNames) (cn : ConsName
   iintro Hblk Happ #Hmerge #Hrun #Hseam Hstok Hsnap Hmir #Hsw Hib Hia Hbs #Hcert #Hcinv
   imod fsCfgAllocSnap (hlc := hlc) (GF := GF) ⊤ γ0 γd cn dk ndisk S cov nib gsn gln gtn Pb hwf
     $$ Hblk Happ Hmerge Hrun Hseam Hstok Hsnap with ⟨%I, %F, Hsup⟩
-  ihave #Hs := fsCrashSeam_ofAt (hlc := hlc) (GF := GF) appGuest cov S.fssSb.sbLogstart $$ Hseam
+  ihave #Hs := fsCrashSeam_ofAt (hlc := hlc) (GF := GF) appGuestK cov S.fssSb.sbLogstart $$ Hseam
   imodintro
   iexists I, F
   unfold fsCfgSnapPost at *
