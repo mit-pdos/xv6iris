@@ -2023,6 +2023,7 @@ import Xv6.PipeOutNEvSealPure
 import Xv6.UnionOutPureSeal
 import Xv6.UnionAdm
 import Xv6.UnionAdmSync
+import Xv6.EflLines
 import Xv6.GenOutSeal
 import Xv6.PipeOutNEvSeal
 import Xv6.PipeOutWSeal
