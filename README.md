@@ -328,7 +328,7 @@ branch `verified` at `ded23f2a`.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `lean` and on pull requests
+`.github/workflows/lean-ci.yml` runs on every push to `lean` and on pull requests
 targeting it, on the self-hosted runner `coqdev`.  It is the Lean counterpart
 of the Rocq tree's CI job, step for step, and **every step is one call of
 `tools/ci/run_all.sh <step>`**, so CI and a developer run the same commands.
@@ -416,8 +416,6 @@ checks into real ones.  Memory: the build runs one `lean` per core; on the
 20-35 GB during the two build steps and 13 GB during `vtest`, and by well
 under 1 GB in every other step.
 
-**The nightly dead-import sweep** is `.github/workflows/lean-dead-imports.yml`:
-the same build, then `tools/ci/run_all.sh dead-imports`
-(`tools/ci/dead_imports.sh`), report only.  GitHub fires scheduled workflows
-only from the default branch, so that file takes effect once it is copied to
-`main`; it checks out `lean` itself.
+**The dead-import report** is the job's last step: `tools/ci/run_all.sh dead-imports`
+(`tools/ci/dead_imports.sh`), report only, never blocking.  Rocq runs its sweep as a scheduled workflow;
+GitHub fires scheduled workflows only from the default branch, so on `lean` it is a step instead.

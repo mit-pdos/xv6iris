@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tools/ci/run_all.sh [-k] [--from STEP] [--list] [STEP...]
 #
-# THE CI SEQUENCE, as one entry point.  .github/workflows/ci.yml runs exactly
+# THE CI SEQUENCE, as one entry point.  .github/workflows/lean-ci.yml runs exactly
 # these steps, one `tools/ci/run_all.sh <step>` per workflow step, so what CI
 # checks and what a developer can reproduce are the same commands:
 #
@@ -42,7 +42,7 @@
 # WHAT IT DOES NOT DO (nor does CI): regenerate the Sail model (needs the
 # patched `sail`), rebuild the xv6 kernel or re-dump the kernel/user images,
 # or run QEMU.  Those outputs are checked in; see the header of
-# .github/workflows/ci.yml.
+# .github/workflows/lean-ci.yml.
 #
 # THE JOB SUMMARY.  Each step's markdown goes to $GITHUB_STEP_SUMMARY; outside
 # GitHub it is collected in $XV6_CI_OUT/summary.md.  GitHub rejects a step
