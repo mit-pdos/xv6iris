@@ -116,7 +116,7 @@ theorem ucat_short_of_typed (c : FileFixed) (s : Dst) (nm : List (BitVec 8)) :
     ipureintro
     intro i' bs' h
     cases h
-    have hb := f_bytes_typed_short ls nm bs hbt
+    have hb := f_bytes_typed_short (flRedirs ls) nm bs hbt
     unfold lineMax at hb
     omega
 
@@ -166,25 +166,26 @@ theorem ucat_execfail_law (UL : UK_LEAVES) (ug : UnionGn) (r : FileAppNames) (s0
     (I nm : List (BitVec 8)) (s : Dst) (hul : ul I = .LCat nm) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       ushExecfailLawAt (hlc := hlc) altExeccat (13 + ((ucatWs nm)[0]!).length)
-        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s)
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ urpos (hlc := hlc) ug r I))
         iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
           lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I (ualtCode (UR .RCExec))
-          ∗ fown r s) := by
+          ∗ (fown r s ∗ urpos (hlc := hlc) ug r I)) := by
   have hnp : ulineNopipe (ul I) := by rw [hul]; exact ulineNopipe_cat nm
   have hab : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkAb I (ualtCode (UR .RCExec)) = altExeccat := by
     rw [ufi_ab, ulm_ab_R I .RCExec hnp (by rw [hul]; trivial) rfl, hul] <;> rfl
   have hn : altExeccat.length - 2 = 13 + ((ucatWs nm)[0]!).length := by
     rw [ucat_ws_head]; decide
-  have hx := ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) (fown r s) I
-    (ualtCode (UR .RCExec))
+  have hx := ushDiagLaw_hold_at_alt UL (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0)
+    iprop(fown r s ∗ urpos (hlc := hlc) ug r I) I (ualtCode (UR .RCExec))
   have el : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLinks = unionLinks (hlc := hlc) (GF := GF) ug := rfl
   rw [hab, hn, el] at hx
   have hx' : ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       ushExecfailLawAt (hlc := hlc) altExeccat (13 + ((ucatWs nm)[0]!).length)
-        iprop(lkLcred (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) I 3 ∗ fown r s)
+        iprop(lkLcred (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) I 3
+          ∗ (fown r s ∗ urpos (hlc := hlc) ug r I))
         iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
           lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I (ualtCode (UR .RCExec))
-          ∗ fown r s) := by
+          ∗ (fown r s ∗ urpos (hlc := hlc) ug r I)) := by
     iintro #Hlk
     iapply hx
     · ileft
@@ -220,7 +221,7 @@ theorem ucat_entry_at (UL : UK_LEAVES)
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs' -∗
       fTyped ug.ugnFile.fgnCl s -∗ urunNopipe (hlc := hlc) sts -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv)
-        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) (uslot (hlc := hlc)) := by
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ urpos (hlc := hlc) ug r I)) (uslot (hlc := hlc)) := by
   obtain ⟨-, ⟨rb1, hr1⟩, ⟨rb2, hr2⟩⟩ := hrows
   have hnp : ulineNopipe (ul I) := by rw [hul]; exact ulineNopipe_cat nm
   have hnw : uwild (ul I) = false := by rw [hul]; rfl
@@ -240,7 +241,7 @@ theorem ucat_entry_at (UL : UK_LEAVES)
   iintro #HQt #HQw #Hdep #Hinv #Hgen #Hmade #Hpin' #Hcs' #Hty #Hnp
   unfold imageEntry
   imodintro
-  iintro %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp ⟨Hc, Hd⟩
+  iintro %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp ⟨Hc, Hd, Hup⟩
   ihave ⟨%v, #Hpin, Hc⟩ := uWcl_elim ug s0 I 3 $$ Hc
   rw [ufi_lpr3]
   unfold gwcBlk
@@ -255,7 +256,7 @@ theorem ucat_entry_at (UL : UK_LEAVES)
     subst cs0
     ihave %hshort := ucat_short_of_typed ug.ugnFile.fgnCl s nm $$ Hty
     ihave #He := ucat_image_entry UL hlic ug hcons nm (ucatWs nm) M Mv sa t gn sts ROOTINO cs pidv v' ps cs' s0 I P
-      r (1 : Qp).half s rb1 rb2 jo (fun _ => Qv) (ftkt r s) (fun _ _ => rfl) heq hw hu hul htie.2.symm hshort
+      r (1 : Qp).half s rb1 rb2 jo (fun _ => Qv) iprop(ftkt r s ∗ urpos (hlc := hlc) ug r I) (fun _ _ => rfl) heq hw hu hul htie.2.symm hshort
       (ucat_ws_exec_ok nm hu) himg hbytes hag hfdl (ucat_ws_len nm) (ucat_ws_alen nm) (ucat_ws_fname nm) rfl
       hr1 hr2 $$ [] [] [] HQt Hmade Hinv Hpin Hnp Hdep
     · imodintro
@@ -266,21 +267,23 @@ theorem ucat_entry_at (UL : UK_LEAVES)
       iapply uHktaint_rev ug hkill $$ HT
     · -- WHAT cat PRODUCES, AND THE TICKET, PAY THE ROUND
       imodintro
-      iintro %a %ha Hpost Hdq Htk
+      iintro %a %ha Hpost Hdq ⟨Htk, Hup⟩
       iapply HQw
       simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
       rcases ha with rfl | rfl
       · iapply uWcf0_of_posts_alt ug r s0 I (ualtCode (UR .RCRan)) v' v' cs' s
-          (ulm_aprs_R I .RCRan hnp (by rw [hul]; trivial) rfl) hnw hlen hpos (hc .RCRan)
-          $$ [] Hpost [Hdq Htk] Hty Hpin Hcs'
+          (ulm_aprs_R I .RCRan hnp (by rw [hul]; trivial) rfl) hnw (ucode_nsync .RCRan (by decide))
+          hlen hpos (hc .RCRan)
+          $$ [] Hpost [Hdq Htk] Hup Hty Hpin Hcs'
         · rw [ufi_pin]; iexact Hpin
         · iapply hown2
           isplitl [Hdq]
           · iexact Hdq
           · iexact Htk
       · iapply uWcf0_of_posts_alt ug r s0 I (ualtCode (UR .RCNoOpen)) v' v' cs' s
-          (ulm_aprs_R I .RCNoOpen hnp (by rw [hul]; trivial) rfl) hnw hlen hpos (hc .RCNoOpen)
-          $$ [] Hpost [Hdq Htk] Hty Hpin Hcs'
+          (ulm_aprs_R I .RCNoOpen hnp (by rw [hul]; trivial) rfl) hnw (ucode_nsync .RCNoOpen (by decide))
+          hlen hpos (hc .RCNoOpen)
+          $$ [] Hpost [Hdq Htk] Hup Hty Hpin Hcs'
         · rw [ufi_pin]; iexact Hpin
         · iapply hown2
           isplitl [Hdq]
@@ -289,7 +292,7 @@ theorem ucat_entry_at (UL : UK_LEAVES)
     ihave ⟨Hdq, Htk⟩ := hown $$ Hd
     iapply imageEntry_use _ _ _ _ _ _ _ _ _ _ _ na alen afun W' h1 h2 h3 h4 h5 h6 h7 $$ He Hmp
     unfold consCur
-    iframe Htn Hps Hcs HE HW Hdq Htk
+    iframe Htn Hps Hcs HE HW Hdq Htk Hup
   · -- the lend was the taint: the slot's generic continuation
     rw [unionParamsAt_gT]
     iapply Hgen $$ %Qv %W' HT Hmp
@@ -316,14 +319,14 @@ theorem ucat_exec_sup (UL : UK_LEAVES)
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs' -∗
       fTyped ug.ugnFile.fgnCl s -∗
       ushExecSupEchoAt E ucatRows (ucatWs nm) (fun _ => ushfWq X I)
-        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) := by
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ urpos (hlc := hlc) ug r I)) := by
   iintro #Hdep #Hslot #Hmade #Hpin' #Hcs' #Hty
   ihave #Hs := (shCatSlot_unfold (hlc := hlc) (fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl)).1 $$ Hslot
   unfold shCatSlot
   icases Hslot with ⟨#Hinv, -, #Hgen⟩
   iapply shExecSupXOfEntry (ushExecPinEcho_holds E) ucatRows (ucatWs nm) catPl era0CatPins [ROOTINO, CAT_INO]
     CAT_INO User.Cat.elf (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) (ushfWq X I)
-    iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) (ucat_ws_exec_ok nm hu) (ucat_ws_head nm) catElfLoadable
+    iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ urpos (hlc := hlc) ug r I)) (ucat_ws_exec_ok nm hu) (ucat_ws_head nm) catElfLoadable
     shCatPinResolves $$ [] [] Hs
   · imodintro
     iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hfdl %hrows #Hnp
@@ -372,25 +375,27 @@ theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (hent
   have hnp : ulineNopipe (ul I) := by rw [hul]; exact ulineNopipe_cat nm
   ihave ⟨Hc, Hpre⟩ := uX_wc3 ug r s0 PT PD X hW I hnw $$ Hcr
   unfold ushPreAt ushDeedAt
-  icases Hpre with ⟨(⟨%cs, %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs, %hnw'⟩ | #HT), #Hwit⟩
+  icases Hpre with ⟨(⟨%cs, %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs, %hnw', Hup⟩ | #HT), #Hwit⟩
   · -- THE WALK, at 8 more steps of budget than it needs
     have hlen := htie.1
     have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
     have H := SC.wp_shChildXGen E hps (fun γ l => ustd γ l) (fun _ _ => .rfl) ucatRows (ucatWs nm) altExeccat
-      (fun _ => ushfWq X I) iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s)
+      (fun _ => ushfWq X I) iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ urpos (hlc := hlc) ug r I))
       iprop(∃ v : EraPins, (unionLinkInstAt (hlc := hlc) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
         lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I (ualtCode (UR .RCExec))
-        ∗ fown r s)
+        ∗ (fown r s ∗ urpos (hlc := hlc) ug r I))
       N' hc h m dw dv sa len g sz ld (n + 8) hpeq hs1 (ucat_xline nm g len hlat) (ucat_execfail_bytes nm) hs0 hs64
       hs38 hszlo hszal hszok hrows hrows.2.2
     rw [eD, eJ, eL, show 60 + (8 + (ushDg + (n + 8))) = 68 + (8 + (ushDg + n)) by omega] at H
-    iapply H $$ Hcode [] [] [] [] Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM [Hc Hd] Hrun
+    iapply H $$ Hcode [] [] [] [] Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM [Hc Hd Hup] Hrun
     · -- exec /cat
       iapply ucat_exec_sup ug r s0 PT PD UL hlic heq hcons hkill E X hW I nm s v' cs jo hu hul htie hpos
         $$ Hdep Hslot Hmade Hpin' Hcs Hty
     · -- the parse ran out of memory: "out of memory", the deed as found
       iapply ushp_oom_of_diag SP N' _ _ ld _ (by unfold ushDg; omega) hrows.2.2 $$ [] [] Hcode
-      · iapply uoom_law_deed ug r s0 PT PD UL I cs s v' hnw htie hpos $$ Hlk Hty Hpin' Hcs
+      · iapply uoom_law_deed ug r s0 PT PD UL I cs s v' (urpos (hlc := hlc) ug r I) hnw htie hpos
+          $$ Hlk Hty Hpin' Hcs []
+        imodintro; iintro H; iexact H
       · imodintro
         iintro H
         rw [hpeq]
@@ -400,12 +405,12 @@ theorem uHchild_cat_at (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (hent
     · -- exec failed: the diagnostic at `RCExec`
       iapply ucat_execfail_law UL ug r s0 I nm s hul $$ Hlk
     · imodintro
-      iintro ⟨%v, Hp, Hblk, Hd⟩
+      iintro ⟨%v, Hp, Hblk, Hd, Hup⟩
       iapply uX_wq_of ug r s0 PT PD X hW I
       iapply uWcf0_of_post_alt ug r s0 I (ualtCode (UR .RCExec)) v v' cs s
-        (ulm_apr_R I .RCExec hnp (by rw [hul]; trivial) rfl rfl) hnw hlen hpos
-        (by rw [hul, ustep_id_cat]; exact htie.2) $$ Hp Hblk Hd Hty Hpin' Hcs
-    · iframe Hc Hd
+        (ulm_apr_R I .RCExec hnp (by rw [hul]; trivial) rfl rfl) hnw (ucode_nsync .RCExec (by decide))
+        hlen hpos (by rw [hul, ustep_id_cat]; exact htie.2) $$ Hp Hblk Hd Hup Hty Hpin' Hcs
+    · iframe Hc Hd Hup
   · -- the deed is the taint: the slot's generic continuation
     ihave ⟨%v0, #Hpin0, -⟩ := uWcl_elim ug s0 I 3 $$ Hc
     unfold shCatSlot

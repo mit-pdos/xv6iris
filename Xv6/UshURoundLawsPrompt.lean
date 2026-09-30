@@ -168,7 +168,7 @@ theorem udone_deed (I : List (BitVec 8)) (lR : Pline') (hlR : pviewUnionU.pvLine
     exact ustep_pipe _ _ _ _
   iintro Hdp #Hpin #Hcs
   icases uDeed_elim ug r upreTie s0 I $$ Hdp with
-    (⟨%cs, %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
+    (⟨%cs, %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw, Hup⟩ | #HT)
   · ihave %hv := uera_pin_agree (fgnEcho ug.ugnFile) _ v v' $$ Hpin Hpin'
     subst hv
     have hn : nlines I = cs''.length := hw.1.1.2.2.1
@@ -176,7 +176,7 @@ theorem udone_deed (I : List (BitVec 8)) (lR : Pline') (hlR : pviewUnionU.pvLine
     ihave %hpre := ucs_lb_prefix_len v cs'' cs (by omega) $$ Hcs Hcs'
     iapply ushDeed_intro ug r udoneTie s0 I cs'' s v
       (udone_tie_of_pre_prefix cs'' cs s0 I _ htie hn.symm hpre (fun h => hid h cs)) hnw
-      $$ Hd Hty Hpin Hcs
+      $$ Hd Hty Hpin Hcs Hup
   · iapply ush_deed_taint ug r udoneTie s0 I $$ HT
 
 /-- The terminal shape is the widened credential's below index 3. -/

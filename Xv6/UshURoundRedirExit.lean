@@ -73,28 +73,57 @@ theorem uredir_ran_tie (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 
   · rw [ulm_cont_R, hul]; rfl
   · rw [ulm_step_R, hul, dstContent_insert, htp.2]; rfl
 
+/-- **Rocq `urpos_of_halves`**: the holder's half and the witness quarter
+back from the writer, at a bounded value, are the round position. -/
+theorem urpos_of_halves (I : List (BitVec 8)) (vf : FileEra) (n n' : Nat)
+    (hle : n' ≤ vf.feBase.length + nlines I) :
+    ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗ fpos r n -∗ fposq r n' -∗
+      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
+      urpos (hlc := hlc) ug r I := by
+  iintro #Hp H1 H2 #Hrr
+  unfold fpos fposq
+  icases H1 with ⟨%hr, H1⟩
+  icases H2 with ⟨-, H2⟩
+  ihave %he := fposf_agree r _ _ n n' $$ H1 H2
+  subst he
+  unfold urpos fposh fpos fposq
+  iexists vf, n
+  iframe Hp Hrr
+  isplitl [H1 H2]
+  · isplitl [H1]
+    · iframe H1; ipureintro; exact hr
+    · iframe H2; ipureintro; exact hr
+  · ipureintro; exact hle
+
 /-- **Rocq `uredir_ran_exit`**: echo RAN -- nothing on the console (fd 1 is
 `f`); the block is still owed whole and the deed is PEND at `RFRan sel`. -/
 theorem uredir_ran_exit (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 8)) (i : Nat)
-    (sel : List Nat) (v' : EraPins) (cs : List Nat) (sp : Dst)
+    (sel : List Nat) (v' : EraPins) (cs : List Nat) (sp : Dst) (vf : FileEra) (np : Nat)
     (hu : uname nm) (hul : ul I = .LEchoF ws nm) (htp : upreTie cs s0 I (dstContent sp))
-    (hlen : cs.length = nlines I - 1) (hpos : 0 < nlines I) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗
+    (hlen : cs.length = nlines I - 1) (hpos : 0 < nlines I)
+    (hnp : np ≤ vf.feBase.length + nlines I) :
+    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗ fposq r np -∗
+      fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗
+      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       fTyped ug.ugnFile.fgnCl sp -∗
       fileWq (hlc := hlc) ug.ugnFile.fgnCl r nm sp i ws sel (subseq (echoChunks ws) sel).length -∗
       uWcf (hlc := hlc) ug r s0 I 0 := by
-  iintro Hc #Hpin #Hcs #Hty Hq
+  iintro Hc Hwq #Hvf #Hrr #Hpin #Hcs #Hty Hq
   unfold fileWq
-  icases Hq with (⟨%ls, Hd, -, %hok, %hsel, #Hlb, %hin⟩ | #HT)
-  · rw [uWcf_0]
+  icases Hq with (⟨%ls, Hd, -, %hok, %hsel, #Hlb, %hlst, Hposn⟩ | #HT)
+  · have hin := flRedirs_last ls ws nm hlst
+    ihave Hup := urpos_of_halves ug r I vf _ np hnp $$ Hvf Hposn Hwq Hrr
+    rw [uWcf_0]
     iright
     isplitl [Hc]
     · iexact Hc
-    iapply ushDeed_intro ug r upendTie s0 I cs _ v'
-      (uredir_ran_tie s0 I ws nm i sel cs sp hul htp hlen hpos hsel) (uredir_nw I ws nm hul)
-      $$ Hd [] Hpin Hcs
-    iapply fTyped_some ug.ugnFile.fgnCl sp ls nm ws sel i hu hin hok hsel $$ Hty Hlb
+    isplitl [Hd Hup]
+    · iapply ushDeed_intro ug r upendTie s0 I cs _ v'
+        (uredir_ran_tie s0 I ws nm i sel cs sp hul htp hlen hpos hsel) (uredir_nw I ws nm hul)
+        $$ Hd [] Hpin Hcs Hup
+      iapply fTyped_some ug.ugnFile.fgnCl sp ls nm ws sel i hu hin hok hsel $$ Hty Hlb
+    · unfold usyncRec; iright; ileft; ipureintro; rw [hul]; intro h; cases h
   · iapply uWcf_taint ug r s0 I 0 v' $$ Hpin HT
 
 /-- **Rocq `uredir_execfail_exit`**: the exec FAILED after the open
@@ -106,12 +135,13 @@ theorem uredir_execfail_exit (I : List (BitVec 8)) (ws : Wordline) (nm : List (B
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
         (ualtCode (.UR .RFExec)) -∗
-      fown r (sp.insert nm (i, [])) -∗ fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
+      fown r (sp.insert nm (i, [])) -∗ urpos (hlc := hlc) ug r I -∗
+      fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       uWcf (hlc := hlc) ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs _
     (ulm_apr_R I .RFExec (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
-    (uredir_nw I ws nm hul) hlen hpos
+    (uredir_nw I ws nm hul) (ucode_nsync .RFExec (by decide)) hlen hpos
     (by rw [ulm_step_R, hul, dstContent_insert, htp.2]; rfl)
 
 /-- **Rocq `uredir_openfail_exit_u`**: the open FAILED, `f` as the round
@@ -122,12 +152,12 @@ theorem uredir_openfail_exit_u (I : List (BitVec 8)) (ws : Wordline) (nm : List 
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
         (ualtCode (.UR .RFOpenU)) -∗
-      fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗
+      fown r s -∗ urpos (hlc := hlc) ug r I -∗ fTyped ug.ugnFile.fgnCl s -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       uWcf (hlc := hlc) ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs s
     (ulm_apr_R I .RFOpenU (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
-    (uredir_nw I ws nm hul) htp.1 hpos
+    (uredir_nw I ws nm hul) (ucode_nsync .RFOpenU (by decide)) htp.1 hpos
     (by rw [ulm_step_R, hul]; exact htp.2)
 
 /-- The `RFOpenM` step at an absent `f` creates it empty. -/
@@ -149,12 +179,13 @@ theorem uredir_openfail_exit_m (I : List (BitVec 8)) (ws : Wordline) (nm : List 
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I
         (ualtCode (.UR .RFOpenM)) -∗
-      fown r (sp.insert nm (i, [])) -∗ fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
+      fown r (sp.insert nm (i, [])) -∗ urpos (hlc := hlc) ug r I -∗
+      fTyped ug.ugnFile.fgnCl (sp.insert nm (i, [])) -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       uWcf (hlc := hlc) ug r s0 I 0 :=
   uWcf0_of_post_alt ug r s0 I _ v v' cs _
     (ulm_apr_R I .RFOpenM (uredir_nopipe I ws nm hul) (by rw [hul]; trivial) rfl rfl)
-    (uredir_nw I ws nm hul) htp.1 hpos (uredir_openm_step s0 I ws nm i cs sp hul htp hsN)
+    (uredir_nw I ws nm hul) (ucode_nsync .RFOpenM (by decide)) htp.1 hpos (uredir_openm_step s0 I ws nm i cs sp hul htp hsN)
 
 /-- **Rocq `uexecfail_law_at_wand`**: the diagnostic's law is monotone in
 its conclusion (deviation 2). -/

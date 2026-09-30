@@ -170,20 +170,22 @@ theorem uHoom (UL : UK_LEAVES) (I : List (BitVec 8)) (hnw : uwild (ul I) = false
   iintro Hp
   icases He $$ Hp with ⟨%v, #Hpin, Hblk, Hpre⟩
   iapply uWcu_of ug r s0 PT PD I 0
-  iapply uWcf0_of_post_pre_id ug r s0 I uoom v (ulm_apr_oom I) hnw hpos (fun s => ulm_step_oom s (ul I))
+  iapply uWcf0_of_post_pre_id ug r s0 I uoom v (ulm_apr_oom I) hnw uoom_nsync hpos (fun s => ulm_step_oom s (ul I))
     $$ Hpin Hblk Hpre
 
 /-- **Rocq `uoom_law_deed`**: THE OUT-OF-MEMORY DIAGNOSTIC WITH THE DEED
 OPENED (the cat and redirect children open the lend before the parse). -/
 theorem uoom_law_deed (UL : UK_LEAVES) (I : List (BitVec 8)) (cs : List Nat) (s : Dst) (v' : EraPins)
+    (X : IProp GF)
     (hnw : uwild (ul I) = false) (htie : upreTie cs s0 I (dstContent s)) (hpos : 0 < nlines I) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ fTyped ug.ugnFile.fgnCl s -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
+      □ (X -∗ urpos (hlc := hlc) ug r I) -∗
       ushExecfailLawAt (hlc := hlc) altOom 14
-        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ fown r s) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
-  have hx := uoom_diag (hlc := hlc) (GF := GF) ug s0 UL (fown r s) I hnw
+        iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (fown r s ∗ X)) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+  have hx := uoom_diag (hlc := hlc) (GF := GF) ug s0 UL iprop(fown r s ∗ X) I hnw
   unfold ushExecfailLawAt at hx
-  iintro #Hlk #Hty #Hpin' #Hcs
+  iintro #Hlk #Hty #Hpin' #Hcs #HX
   ihave #Hx := hx $$ Hlk
   unfold ushExecfailLawAt
   imodintro
@@ -193,10 +195,11 @@ theorem uoom_law_deed (UL : UK_LEAVES) (I : List (BitVec 8)) (cs : List Nat) (s 
   iframe H0 Hs
   imodintro
   iintro Hp
-  icases He $$ Hp with ⟨%v, #Hp, Hblk, Hd⟩
+  icases He $$ Hp with ⟨%v, #Hp, Hblk, Hd, Hup⟩
+  ihave Hup := HX $$ Hup
   iapply uWcu_of ug r s0 PT PD I 0
-  iapply uWcf0_of_post_alt ug r s0 I uoom v v' cs s (ulm_apr_oom I) hnw htie.1 hpos
-    (by rw [ulm_step_oom]; exact htie.2) $$ Hp Hblk Hd Hty Hpin' Hcs
+  iapply uWcf0_of_post_alt ug r s0 I uoom v v' cs s (ulm_apr_oom I) hnw uoom_nsync htie.1 hpos
+    (by rw [ulm_step_oom]; exact htie.2) $$ Hp Hblk Hd Hup Hty Hpin' Hcs
 
 /-- **Rocq `uHwbwc_u`**: the banner-owed credential is a boundary one, its
 wild arm the wild arm. -/

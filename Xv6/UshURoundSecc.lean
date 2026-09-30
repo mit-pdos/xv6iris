@@ -229,7 +229,7 @@ theorem uHchild_secc (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
     ihave ⟨Hc, Hpre⟩ := uWcf3_open ug r s0 I $$ Hcr
     ihave ⟨%v0, #Hpin0, -⟩ := uWcl_elim ug s0 I 3 $$ Hc
     ihave ⟨Hd, -⟩ := ushPreAt_open ug r s0 I $$ Hpre
-    icases ushDeedAt_open ug r upreTie s0 I $$ Hd with (⟨%cs, %s, %v', -, -, -, -, -, %hnw⟩ | #HT)
+    icases ushDeedAt_open ug r upreTie s0 I $$ Hd with (⟨%cs, %s, %v', -, -, -, -, -, %hnw, -⟩ | #HT)
     · exact absurd (hw.symm.trans hnw) (by decide)
     · iapply urun_gen N' (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) h m (BitVec.ofNat 64 0x99c)
         (68 + (8 + (ushDg + n))) (by decide) $$ [] HT Hrun

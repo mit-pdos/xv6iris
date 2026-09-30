@@ -66,12 +66,13 @@ theorem ushDeed_intro (ug : UnionGn) (r : FileAppNames)
     (cs : List Nat) (s : Dst) (v : EraPins) (ht : tie cs sb I (dstContent s)) (hnw : uwild (ul I) = false) :
     ⊢ fown (GF := GF) r s -∗ fTyped ug.ugnFile.fgnCl s -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ csLb v cs -∗
+      urpos (hlc := hlc) ug r I -∗
       ushDeedAt (hlc := hlc) ug r tie sb I := by
-  iintro Hd #Hty #Hpin #Hcs
+  iintro Hd #Hty #Hpin #Hcs Hup
   unfold ushDeedAt
   ileft
   iexists cs, s, v
-  iframe Hd Hty Hpin Hcs
+  iframe Hd Hty Hpin Hcs Hup
   isplitr
   · ipureintro; exact ht
   · ipureintro; exact hnw
@@ -188,7 +189,7 @@ credential beside a deed at PRE is a position-0 credential whenever every
 alternative of the line leaves `f` alone, at a file line (the X arm
 refuted). -/
 theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8))
-    (hnp : ulineNopipe (ul I))
+    (hnp : ulineNopipe (ul I)) (hns : ul I ≠ .LSync)
     (hid : ∀ (s : Fstate) (a : ulmG.lmAlt), ulmG.lmStep s (ul I) a = s) :
     ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 0 -∗ ushPreAt (hlc := hlc) ug r s0 I -∗
       uWcf (hlc := hlc) ug r s0 I 0 := by
@@ -197,7 +198,7 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
   unfold ushPreAt
   icases Hp with ⟨Hp, -⟩
   unfold ushDeedAt
-  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
+  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw, Hup⟩ | #HT)
   · have hlen := htie.1
     have hdone : ∀ cs : List Nat, cs.length = nlines I → cs' <+: cs →
         udoneTie cs s0 I (dstContent s) := fun cs hl hp =>
@@ -219,7 +220,7 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
       isplitl [Htn]
       · iapply uWcl0_of_pro ug s0 I v ps cs P hw $$ Hpin
         iapply ugcur_intro $$ Htn Hps Hcs HE Hf
-      · iapply ushDeed_intro ug r udoneTie s0 I cs s v (hdone cs (by omega) hpx) hnw $$ Hd Hty Hpin Hcs
+      · iapply ushDeed_intro ug r udoneTie s0 I cs s v (hdone cs (by omega) hpx) hnw $$ Hd Hty Hpin Hcs Hup
     · -- the head
       ihave ⟨⟨%hI, #Hcs0⟩, Hhd⟩ := ufheadAt_facts ug.ugnFile s0 _ v I $$ Hhd
       subst hI
@@ -230,7 +231,7 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
           rw [nlines_nil] at hlen; exact List.eq_nil_of_length_eq_zero hlen
         subst hc0
         iapply ushDeed_intro ug r udoneTie s0 [] [] s v
-          (hdone [] (by rw [nlines_nil]; rfl) (List.prefix_refl _)) hnw $$ Hd Hty Hpin Hcs0
+          (hdone [] (by rw [nlines_nil]; rfl) (List.prefix_refl _)) hnw $$ Hd Hty Hpin Hcs0 Hup
     · ileft
       isplitr
       · iapply uHcltaint ug s0 I 0 v $$ Hpin HT
@@ -258,9 +259,11 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
           isplitl [Htn]
           · iapply uWcl3_close ug s0 I v ps cs P hw $$ Hpin
             iapply ugcur_intro $$ Htn Hps Hcs HE Hf
+          isplitl [Hd Hup]
           · iapply ushDeed_intro ug r upendTie s0 I cs s v
               ⟨a, htie.1, by omega, hapr.1 _, hapr.2.2, hpr, by rw [hid]; exact htie.2⟩ hnw
-              $$ Hd Hty Hpin Hcs
+              $$ Hd Hty Hpin Hcs Hup
+          · unfold usyncRec; iright; ileft; ipureintro; exact hns
         | succ i =>
           -- a byte before the prompt: the alternative is filed, deed DONE
           have hbc : lmBlkcs cs a (i + 1) = cs ++ [a] := rfl
@@ -271,7 +274,7 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
           · iapply uWcl0_of_post ug s0 I v a hapr $$ Hpin
             iapply uwrap_post ug s0 I v a ps cs P (i + 1) hw hi (Nat.succ_ne_zero i) $$ Htn Hps Hcs HE Hf
           · iapply ushDeed_intro ug r udoneTie s0 I (lmBlkcs cs a (i + 1)) s v
-              (hdone _ (by rw [hbc]; simp; omega) hpx) hnw $$ Hd Hty Hpin Hcs
+              (hdone _ (by rw [hbc]; simp; omega) hpx) hnw $$ Hd Hty Hpin Hcs Hup
       · ileft
         isplitr
         · iapply uHcltaint ug s0 I 0 v $$ Hpin HT
@@ -287,15 +290,16 @@ theorem uWcf0_of_pre_line_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
 deed whose content is `a`'s own step from the round's entry state. -/
 theorem uWcf0_of_posts_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat)
     (v v' : EraPins) (cs' : List Nat) (s : Dst) (hapr : lmAprs ulmG I a) (hnw : uwild (ul I) = false)
+    (hna : ulmG.lmDec a ≠ Ualt.UR .RSyncRan)
     (hlen : cs'.length = nlines I - 1) (hpos : 0 < nlines I)
     (hc : dstContent s = ulmG.lmStep (ust cs' s0 I) (ul I) (ulmG.lmDec a)) :
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       gwcPost (unionParamsAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
-      fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗
+      fown r s -∗ urpos (hlc := hlc) ug r I -∗ fTyped ug.ugnFile.fgnCl s -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs' -∗
       uWcf (hlc := hlc) ug r s0 I 0 := by
   rw [ufi_pin, uWcf_0]
-  iintro #Hpin Hblk Hd #Hty #Hpin' #Hcs'
+  iintro #Hpin Hblk Hd Hup #Hty #Hpin' #Hcs'
   ihave %hv := uera_pin_agree (fgnEcho ug.ugnFile) _ v v' $$ Hpin Hpin'
   subst hv
   unfold gwcPost
@@ -322,8 +326,16 @@ theorem uWcf0_of_posts_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : 
       isplitl [Htn]
       · iapply uWcl3_close ug s0 I v ps cs P hw $$ Hpin
         iapply ugcur_intro $$ Htn Hps Hcs HE Hf
+      isplitl [Hd Hup]
       · iapply ushDeed_intro ug r upendTie s0 I cs s v
-          ⟨a, hlen, hpos, hapr.1 _, hapr.2.2, hpr, hc⟩ hnw $$ Hd Hty Hpin Hcs
+          ⟨a, hlen, hpos, hapr.1 _, hapr.2.2, hpr, hc⟩ hnw $$ Hd Hty Hpin Hcs Hup
+      · -- not /sync's run, so not a `sync` line
+        unfold usyncRec; iright; ileft; ipureintro
+        intro hl
+        apply hna
+        have hok : ulmG.lmOk (ust cs s0 I) (ul I) (ulmG.lmDec a) := hapr.1 (ust cs s0 I)
+        rw [hl] at hok hpr
+        exact usync_prompt_ran (ust cs s0 I) a hok hpr
     | succ i =>
       -- a byte before the prompt: `a` is filed, deed DONE
       have hbc : lmBlkcs cs a (i + 1) = cs ++ [a] := rfl
@@ -342,7 +354,7 @@ theorem uWcf0_of_posts_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : 
       · iapply uWcl0_of_post ug s0 I v a hapr $$ Hpin
         iapply uwrap_post ug s0 I v a ps cs P (i + 1) hw hi (Nat.succ_ne_zero i) $$ Htn Hps Hcs HE Hf
       · iapply ushDeed_intro ug r udoneTie s0 I (lmBlkcs cs a (i + 1)) s v
-          (udone_tie_snoc cs a s0 I _ hlen hpos hc) hnw $$ Hd Hty Hpin Hcs
+          (udone_tie_snoc cs a s0 I _ hlen hpos hc) hnw $$ Hd Hty Hpin Hcs Hup
   · ileft
     isplitr
     · iapply uHcltaint ug s0 I 0 v $$ Hpin HT
@@ -352,21 +364,21 @@ theorem uWcf0_of_posts_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : 
 (`lk_post`): the instance. -/
 theorem uWcf0_of_post_alt (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat)
     (v v' : EraPins) (cs' : List Nat) (s : Dst) (hapr : lmApr ulmG ulmGHooks I a)
-    (hnw : uwild (ul I) = false)
+    (hnw : uwild (ul I) = false) (hna : ulmG.lmDec a ≠ Ualt.UR .RSyncRan)
     (hlen : cs'.length = nlines I - 1) (hpos : 0 < nlines I)
     (hc : dstContent s = ulmG.lmStep (ust cs' s0 I) (ul I) (ulmG.lmDec a)) :
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
-      fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗
+      fown r s -∗ urpos (hlc := hlc) ug r I -∗ fTyped ug.ugnFile.fgnCl s -∗
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs' -∗
       uWcf (hlc := hlc) ug r s0 I 0 := by
   have hpost : lkPost (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a =
       gwcBlk (unionParamsAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a
         ((lmAb ulmG (unionParamsAt (hlc := hlc) (GF := GF) ug s0).gK I a).length - 2) := rfl
   rw [hpost]
-  iintro #Hpin Hblk Hd #Hty #Hpin' #Hcs'
-  iapply uWcf0_of_posts_alt ug r s0 I a v v' cs' s (lmApr_aprs ulmG ulmGHooks I a hapr) hnw hlen hpos hc
-    $$ Hpin [Hblk] Hd Hty Hpin' Hcs'
+  iintro #Hpin Hblk Hd Hup #Hty #Hpin' #Hcs'
+  iapply uWcf0_of_posts_alt ug r s0 I a v v' cs' s (lmApr_aprs ulmG ulmGHooks I a hapr) hnw hna hlen hpos hc
+    $$ Hpin [Hblk] Hd Hup Hty Hpin' Hcs'
   have h := gwcPost_of_blk (unionParamsAt (hlc := hlc) (GF := GF) ug s0) (genId (hlc := hlc) (GF := GF) + 1)
     v I a hapr
   iapply h
@@ -389,7 +401,8 @@ out-of-memory death is the one caller (`uHoom`): it dies in the parse, before
 any line shape moves `f`.  (DRIFT SY1, Rocq 7adb0cba2: replaces `uHwbl_f`,
 the silent conversion `uWcf I 3 -∗ uWcf I 0`.) -/
 theorem uWcf0_of_post_pre_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) (a : Nat)
-    (v : EraPins) (hapr : lmApr ulmG ulmGHooks I a) (hnw : uwild (ul I) = false) (hpos : 0 < nlines I)
+    (v : EraPins) (hapr : lmApr ulmG ulmGHooks I a) (hnw : uwild (ul I) = false)
+    (hna : ulmG.lmDec a ≠ Ualt.UR .RSyncRan) (hpos : 0 < nlines I)
     (hid : ∀ s : Fstate, ulmG.lmStep s (ul I) (ulmG.lmDec a) = s) :
     ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗
       lkPost (unionLinkInstAt (hlc := hlc) ug s0) (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
@@ -398,9 +411,9 @@ theorem uWcf0_of_post_pre_id (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I 
   unfold ushPreAt
   icases Hp with ⟨Hp, -⟩
   unfold ushDeedAt
-  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', -⟩ | #HT)
-  · iapply uWcf0_of_post_alt ug r s0 I a v v' cs' s hapr hnw htie.1 hpos (by rw [hid]; exact htie.2)
-      $$ Hpin Hblk Hd Hty Hpin' Hcs'
+  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', -, Hup⟩ | #HT)
+  · iapply uWcf0_of_post_alt ug r s0 I a v v' cs' s hapr hnw hna htie.1 hpos (by rw [hid]; exact htie.2)
+      $$ Hpin Hblk Hd Hup Hty Hpin' Hcs'
   · iapply uWcf_taint ug r s0 I 0 v $$ [] HT
     rw [← ufi_pin ug s0]
     iexact Hpin
@@ -442,7 +455,7 @@ theorem ush_done_of_pre_ban (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I :
   unfold ushPreAt
   icases Hp with ⟨Hp, -⟩
   unfold ushDeedAt
-  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
+  icases Hp with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw, Hup⟩ | #HT)
   · have hlen := htie.1
     unfold uWbl
     icases Hb with ⟨%v, #Hpin, Hb⟩
@@ -467,7 +480,7 @@ theorem ush_done_of_pre_ban (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I :
         · ipureintro; exact hw
         · ipureintro; rfl
       · iapply ushDeed_intro ug r udoneTie s0 I cs s v
-          (udone_tie_of_pre_ban cs cs' s0 I _ htie (by omega) hpx hw'.2.2.2.1) hnw $$ Hd Hty Hpin Hcs
+          (udone_tie_of_pre_ban cs cs' s0 I _ htie (by omega) hpx hw'.2.2.2.1) hnw $$ Hd Hty Hpin Hcs Hup
     · ihave ⟨⟨%hI, #Hcs0⟩, Hhd⟩ := ufheadAt_facts ug.ugnFile s0 _ v I $$ Hhd
       subst hI
       have hc0 : cs' = [] := by
@@ -481,7 +494,7 @@ theorem ush_done_of_pre_ban (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I :
         ipureintro; exact hi0
       · iapply ushDeed_intro ug r udoneTie s0 [] [] s v
           (udone_tie_of_pre_ban [] [] s0 [] _ htie (by rw [nlines_nil]; rfl) (List.prefix_refl _)
-            (Or.inl rfl)) hnw $$ Hd Hty Hpin Hcs0
+            (Or.inl rfl)) hnw $$ Hd Hty Hpin Hcs0 Hup
     · isplitr
       · iexists v
         iframe Hpin

@@ -133,7 +133,7 @@ theorem ushDeedAt_open (ug : UnionGn) (r : FileAppNames)
           ∗ ⌜tie cs sb I (dstContent s)⌝
           ∗ fTyped ug.ugnFile.fgnCl s
           ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
-          ∗ ⌜uwild (ul I) = false⌝)
+          ∗ ⌜uwild (ul I) = false⌝ ∗ urpos (hlc := hlc) ug r I)
         ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := .rfl
 
 /-- The holder's pair, as the deed's half and the ticket. -/
@@ -207,7 +207,7 @@ theorem uHexecfail_D (UL : UK_LEAVES) (HF : USH_FPRINTF) (ug : UnionGn) (r : Fil
   iintro Hp
   icases Hend $$ Hp with ⟨Hc, Hh⟩
   iapply uWcu_of ug r s0 PT PD I 0
-  iapply uWcf0_of_pre_line_id ug r s0 I (union_D_nopipe I HD)
+  iapply uWcf0_of_pre_line_id ug r s0 I (union_D_nopipe I HD) (by rw [HD.2]; intro h; cases h)
     (fun s a => by rw [HD.2]; exact ustep_id_echo s _ a) $$ Hc Hh
 
 /-- **Rocq `uwc3`**: the lend, opened -- its era pin, its block at the first
@@ -265,7 +265,8 @@ theorem uwc0 (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     exact h
   iintro #Hp Hc HR
   iapply uWcu_of ug r s0 PT PD I0 0
-  iapply uWcf0_of_pre_line_id ug r s0 I0 hnp (fun s a => by rw [HD.2]; exact ustep_id_echo s _ a) $$ [Hc] HR
+  iapply uWcf0_of_pre_line_id ug r s0 I0 hnp (by rw [HD.2]; intro h; cases h)
+    (fun s a => by rw [HD.2]; exact ustep_id_echo s _ a) $$ [Hc] HR
   iapply uWcl0_of_post ug s0 I0 v0 0 haprs $$ Hp Hc
 
 /-- The pinned supply at the lend's era pin `v` (deviation 3). -/
@@ -307,12 +308,12 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
     ihave ⟨%v, #Hpin, Hc, HR⟩ := uwc3 ug r s0 PT PD I (union_D_nw I HDI) $$ Hc
     ihave ⟨HR, #Hwit⟩ := ushPreAt_open ug r s0 I $$ HR
     icases ushDeedAt_open ug r upreTie s0 I $$ HR with
-      (⟨%cs', %s, %v', Hown, %htie, #Hty, #Hpin', #Hcs, %hnw⟩ | #HT)
+      (⟨%cs', %s, %v', Hown, %htie, #Hty, #Hpin', #Hcs, %hnw, Hup⟩ | #HT)
     · ihave ⟨Hdq, Htk⟩ := ufown_split r s $$ Hown
       ihave He := uecho_cons_image_entry UL hlic ug hcons (lastWs I) M Mv sa t gb sts ROOTINO cs pidv v s0 I r
         (1 : Qp).half s rb jo
         (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0)
-        (ftkt r s) (fun _ _ => rfl) heq HDI.1 himg hbytes hag hflen rfl hl1 HDI.2 (ush_line_len _ HDI.1)
+        iprop(ftkt r s ∗ urpos (hlc := hlc) ug r I) (fun _ _ => rfl) heq HDI.1 himg hbytes hag hflen rfl hl1 HDI.2 (ush_line_len _ HDI.1)
         $$ [] [] [] [] Hmade Hinv Hpin Hnp Hdep
       · imodintro
         iintro Hk
@@ -322,11 +323,11 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
         iapply uHtkill ug hkill $$ HT
       · -- THE BLOCK'S END PAYS THE EXIT: the deed comes back and PRE with it
         imodintro
-        iintro Hpost Hdq Htk
-        iapply uwc0 ug r s0 PT PD I v HDI $$ Hpin Hpost [Hdq Htk]
+        iintro Hpost Hdq ⟨Htk, Hup⟩
+        iapply uwc0 ug r s0 PT PD I v HDI $$ Hpin Hpost [Hdq Htk Hup]
         iapply ushPreAt_intro ug r s0 I
-        isplitl [Hdq Htk]
-        · iapply ushDeed_intro ug r upreTie s0 I cs' s v' htie hnw $$ [Hdq Htk] Hty Hpin' Hcs
+        isplitl [Hdq Htk Hup]
+        · iapply ushDeed_intro ug r upreTie s0 I cs' s v' htie hnw $$ [Hdq Htk] Hty Hpin' Hcs Hup
           iapply ufown_join r s
           isplitl [Hdq]
           · iexact Hdq
@@ -336,12 +337,12 @@ theorem uecho_sup_at (UL : UK_LEAVES) (HF : USH_FPRINTF)
         iintro #HT
         iapply uWcu_taint ug r s0 PT PD I 0 v $$ Hpin HT
       unfold imageEntry
-      iapply He $$ %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp [Hc Hdq Htk]
+      iapply He $$ %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmp [Hc Hdq Htk Hup]
       isplitl [Hc]
       · iexact Hc
       isplitl [Hdq]
       · iexact Hdq
-      · iexact Htk
+      · iframe Htk Hup
     · -- the deed's taint arm: the slot's generic continuation
       iapply Hgen $$ %(uWcu (hlc := hlc) ug r s0 PT PD I 0)
         %W' HT Hmp

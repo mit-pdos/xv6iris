@@ -47,6 +47,9 @@ import Xv6.UnionLinkInstAt
 import Xv6.UnionOut
 import Xv6.AppFileTyped
 import Xv6.AppFileDeed
+import Xv6.AppFilePos
+import Xv6.AppFileSyncReg
+import Xv6.AppFileSync
 
 namespace Xv6
 
@@ -83,9 +86,35 @@ instance uWbl_timeless (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
   have := fun v => (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkBan_tl (genId (hlc := hlc) (GF := GF) + 1) v I 0
   infer_instance
 
+/-- **Rocq `urpos`**: THE ROUND POSITION'S HOLDER SHARE (sync SY3-A3bc,
+design 4.5 "The round position"; `AppFilePos.fposh`, the half and the
+round's witness quarter): at most the round's line count -- the era's base
+(`FileEra.feBase`, pinned at the era's record) and the lines of the input
+consumed so far -- and the running claim's registration at the era (sync
+SY3-A4: the record a sync hook is fired at is this one). -/
+def urpos (ug : UnionGn) (r : FileAppNames) (I : List (BitVec 8)) : IProp GF :=
+  iprop(∃ (vf : FileEra) (n : Nat), fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf
+    ∗ fposh r n ∗ ⌜n ≤ vf.feBase.length + nlines I⌝
+    ∗ runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed)
+
+instance urpos_timeless (ug : UnionGn) (r : FileAppNames) (I : List (BitVec 8)) :
+    Timeless (urpos (hlc := hlc) (GF := GF) ug r I) := by
+  unfold urpos; infer_instance
+
+/-- **Rocq `urpos_mono`**: a later round only grows the bound. -/
+theorem urpos_mono (ug : UnionGn) (r : FileAppNames) (I I' : List (BitVec 8))
+    (hle : nlines I ≤ nlines I') :
+    urpos (hlc := hlc) (GF := GF) ug r I ⊢ urpos ug r I' := by
+  unfold urpos
+  iintro ⟨%vf, %n, #Hp, Hpos, %hn, #Hrr⟩
+  iexists vf, n
+  iframe Hp Hpos Hrr
+  ipureintro; omega
+
 /-- **Rocq `ush_deed_at`**: THE DEED, tied to the model's state by a pure tie
 over the choice list the holder has a lower bound of; its line is not a
-`seccomp x` line (seccomp design 10.10) -- or the taint. -/
+`seccomp x` line (seccomp design 10.10) -- AND THE ROUND POSITION (sync
+SY3-A3bc) -- or the taint. -/
 noncomputable def ushDeedAt (ug : UnionGn) (r : FileAppNames)
     (tie : List Nat → Fstate → List (BitVec 8) → Fstate → Prop)
     (sb : Fstate) (I : List (BitVec 8)) : IProp GF :=
@@ -94,7 +123,8 @@ noncomputable def ushDeedAt (ug : UnionGn) (r : FileAppNames)
       ∗ ⌜tie cs sb I (dstContent s)⌝
       ∗ fTyped ug.ugnFile.fgnCl s
       ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
-      ∗ ⌜uwild (ul I) = false⌝)
+      ∗ ⌜uwild (ul I) = false⌝
+      ∗ urpos (hlc := hlc) ug r I)
     ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
 
 /-- **Rocq `uline_wit`**: the line's witness rides with the deed from the read
@@ -204,12 +234,12 @@ theorem ush_deed_nw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   rw [ufi_T, ufi_wild]
   iintro Hd
   unfold ushDeedAt
-  icases Hd with (⟨%cs, %s, %v, Hd, %ht, Hty, Hpin, Hcs, %hnw⟩ | #HT)
+  icases Hd with (⟨%cs, %s, %v, Hd, %ht, Hty, Hpin, Hcs, %hnw, Hup⟩ | #HT)
   · isplitr
     · ileft; ipureintro; rw [hnw]; simp
     · ileft
       iexists cs, s, v
-      iframe Hd Hty Hpin Hcs
+      iframe Hd Hty Hpin Hcs Hup
       isplitr
       · ipureintro; exact ht
       · ipureintro; exact hnw
@@ -245,12 +275,65 @@ theorem ush_pre_taint (ug : UnionGn) (r : FileAppNames) (sb : Fstate) (I : List 
   · iapply ush_deed_taint ug r upreTie sb I $$ HT
   · iright; iexact HT
 
+/-- **Rocq `usync_pay`**: THE SYNC ROUND'S RECORD (sync SY3-A4), what /sync's
+receipt carries back to sh and sh files at the round's prompt: the choices
+before the round (their lower bound at the era's pin), the era's record, and
+a lower bound of the RUN-LONG sync history ending at the round's record --
+the position the line list `feBase ++ ulinesIn I` has, the state the model
+reaches before the round.  Persistent. -/
+noncomputable def usyncPay (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) : IProp GF :=
+  iprop(∃ (v : EraPins) (cs : List Nat) (vf : FileEra) (L : List Srec),
+    eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
+    ∗ ⌜cs.length = nlines I - 1⌝ ∗ fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf
+    ∗ slLb ug.ugnFile.fgnCl.ffHist (L ++ [(((vf.feBase ++ ulinesIn I).length, ust cs s0 I) : Srec)]))
+
+/-- **Rocq `usync_rec`**: ...owed at a PEND deed of a `sync` line, and only
+there. -/
+noncomputable def usyncRec (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) : IProp GF :=
+  iprop(fileTaint (hlc := hlc) ug.ugnFile.fgnCl ∨ ⌜ul I ≠ .LSync⌝ ∨ usyncPay (hlc := hlc) ug s0 I)
+
+instance usyncPay_persistent (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
+    Persistent (usyncPay (hlc := hlc) (GF := GF) ug s0 I) := by
+  unfold usyncPay; infer_instance
+instance usyncPay_timeless (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
+    Timeless (usyncPay (hlc := hlc) (GF := GF) ug s0 I) := by
+  unfold usyncPay; infer_instance
+instance usyncRec_persistent (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
+    Persistent (usyncRec (hlc := hlc) (GF := GF) ug s0 I) := by
+  unfold usyncRec; infer_instance
+instance usyncRec_timeless (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
+    Timeless (usyncRec (hlc := hlc) (GF := GF) ug s0 I) := by
+  unfold usyncRec; infer_instance
+
+/-- **Rocq `upr_of_rec`**: ...and it is the round's payload at the filing
+(`UnionOut.upr`). -/
+theorem upr_of_rec (ug : UnionGn) (s0 : Fstate) (v : EraPins) (I : List (BitVec 8)) (a : Nat) :
+    ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
+      f0cw (hlc := hlc) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 -∗
+      usyncRec (hlc := hlc) ug s0 I -∗ upr (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) v I a := by
+  unfold usyncRec upr usyncPay
+  iintro #Hpin #Hcw #Hr
+  icases Hr with (#HT | %hn | ⟨%v', %cs, %vf, %L, #Hpin', #Hcs, %hl, #Hfp, #Hsl⟩)
+  · iright; ileft; iexact HT
+  · ileft; ipureintro; exact fun h => hn h.1
+  · ihave %hv := fileOut_eraPin_agree (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v v'
+      $$ Hpin Hpin'
+    subst hv
+    iright; iright
+    iexists cs, s0, vf, L
+    iframe Hcs Hcw Hfp
+    isplitr
+    · ipureintro; exact hl
+    · rw [show lmUpto ulmG cs s0 (bodiesOf I) (nlines I - 1) = ust cs s0 I from rfl]
+      iexact Hsl
+
 /-- **Rocq `uWcf`**: THE FILE FAMILY AT THE UNION (`UShRound.Wcf`'s
-positions). -/
+positions); the position-0 PEND arm carries the sync round's record (sync
+SY3-A4). -/
 noncomputable def uWcf (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
     Nat → IProp GF
   | 0 => iprop((uWcl (hlc := hlc) ug s0 I 0 ∗ ushDoneAt (hlc := hlc) ug r s0 I)
-      ∨ (uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I))
+      ∨ (uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I ∗ usyncRec (hlc := hlc) ug s0 I))
   | 1 => iprop(uWcl (hlc := hlc) ug s0 I 1 ∗ ushDoneAt (hlc := hlc) ug r s0 I)
   | 2 => iprop(uWcl (hlc := hlc) ug s0 I 2 ∗ ushDoneAt (hlc := hlc) ug r s0 I)
   | _ + 3 => iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ ushPreAt (hlc := hlc) ug r s0 I)
@@ -297,7 +380,7 @@ noncomputable def uWbf (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List
 theorem uWcf_0 (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
     uWcf (hlc := hlc) (GF := GF) ug r s0 I 0 =
       iprop((uWcl (hlc := hlc) ug s0 I 0 ∗ ushDoneAt (hlc := hlc) ug r s0 I)
-        ∨ (uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I)) := rfl
+        ∨ (uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I ∗ usyncRec (hlc := hlc) ug s0 I)) := rfl
 /-- **Rocq `uWcf_1`**. -/
 theorem uWcf_1 (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) :
     uWcf (hlc := hlc) (GF := GF) ug r s0 I 1 =
@@ -329,13 +412,13 @@ instance uWbf_timeless (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List
 boot value. -/
 theorem ush_done_head (ug : UnionGn) (r : FileAppNames) (s : Dst) (v : EraPins) :
     ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ csLb v [] -∗
-      fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗
+      fown r s -∗ fTyped ug.ugnFile.fgnCl s -∗ urpos (hlc := hlc) ug r [] -∗
       ushDoneAt (hlc := hlc) ug r (dstContent s) [] := by
-  iintro #Hpin #Hcs Hd #Hty
+  iintro #Hpin #Hcs Hd #Hty Hup
   unfold ushDoneAt ushDeedAt
   ileft
   iexists [], s, v
-  iframe Hd Hty Hpin Hcs
+  iframe Hd Hty Hpin Hcs Hup
   isplitr
   · ipureintro; exact ⟨rfl, rfl⟩
   · ipureintro; exact ush_uwild_nil

@@ -34,6 +34,7 @@ import Xv6.UnionDiscDec
 import Xv6.UshFileRedir
 import Xv6.FileLinksLine
 import Xv6.EchoLinks
+import Xv6.UnionDemo
 
 namespace Xv6
 
@@ -68,6 +69,31 @@ def upendTieAt (cs : List Nat) (sb : Fstate) (I : List (BitVec 8)) (c : Fstate) 
 /-- **Rocq `upend_tie`**. -/
 def upendTie (cs : List Nat) (sb : Fstate) (I : List (BitVec 8)) (c : Fstate) : Prop :=
   ∃ a : Nat, upendTieAt cs sb I c a
+
+/-- **Rocq `usync_prompt_ran`** (sync SY3-A4): /sync RAN is the one
+alternative of a `sync` line whose block is the bare prompt; the others print
+a diagnostic first. -/
+theorem usync_prompt_ran (s : Fstate) (a : Nat) (hok : ulmG.lmOk s .LSync (ulmG.lmDec a))
+    (hc : ulmG.lmCont s .LSync (ulmG.lmDec a) = uPrompt) : ulmG.lmDec a = Ualt.UR .RSyncRan := by
+  rcases UnionDemo.demo_sync_only s _ hok with h | h | h | h
+  · exact h
+  all_goals
+    exfalso
+    rw [h] at hc
+    revert hc
+    first
+      | (simp [ulmG, ulm, ucont, cont]; done)
+      | (simp [ulmG, ulm, ucont, cont]; decide)
+
+/-- the out-of-memory alternative is not /sync's run -/
+theorem uoom_nsync : ulmG.lmDec uoom ≠ Ualt.UR .RSyncRan := by
+  show ualtDec uoom ≠ _
+  rw [uoom_dec]; intro h; injection h with h; cases h
+
+/-- a file line's code is /sync's run only at it -/
+theorem ucode_nsync (a : Ralt) (ha : a ≠ .RSyncRan) : ulmG.lmDec (ualtCode (Ualt.UR a)) ≠ Ualt.UR .RSyncRan := by
+  show ualtDec (ualtCode (Ualt.UR a)) ≠ _
+  rw [ualtDec_code]; intro h; injection h with h; exact ha h
 
 /-! ### the identity steps -/
 

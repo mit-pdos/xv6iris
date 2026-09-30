@@ -79,7 +79,7 @@ theorem uDeed_elim (tie : List Nat → Fstate → List (BitVec 8) → Fstate →
           ∗ ⌜tie cs sb I (dstContent s)⌝
           ∗ fTyped ug.ugnFile.fgnCl s
           ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
-          ∗ ⌜uwild (ul I) = false⌝)
+          ∗ ⌜uwild (ul I) = false⌝ ∗ urpos (hlc := hlc) ug r I)
         ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := .rfl
 
 /-- The line's witness, from the typed lines' witness. -/
@@ -257,9 +257,11 @@ theorem ush_pre_of_done_u (I l : List (BitVec 8)) (hr : restOf I = []) (hl : wlN
   unfold ushPreAt
   isplitl [Hd]
   · icases uDeed_elim ug r udoneTie s0 I $$ Hd with
-      (⟨%cs, %s, %v, Hd, %htie, #Hty, #Hpin, #Hcs, -⟩ | #HT)
-    · iapply ushDeed_intro ug r upreTie s0 (I ++ l ++ [wlNl]) cs s v
-        (upre_tie_of_done cs s0 I l _ hr hl htie) hnwJ $$ Hd Hty Hpin Hcs
+      (⟨%cs, %s, %v, Hd, %htie, #Hty, #Hpin, #Hcs, -, Hup⟩ | #HT)
+    · ihave Hup := urpos_mono ug r I (I ++ l ++ [wlNl])
+        (by rw [List.append_assoc]; exact nlines_app_le I (l ++ [wlNl])) $$ Hup
+      iapply ushDeed_intro ug r upreTie s0 (I ++ l ++ [wlNl]) cs s v
+        (upre_tie_of_done cs s0 I l _ hr hl htie) hnwJ $$ Hd Hty Hpin Hcs Hup
     · iapply ush_deed_taint ug r upreTie s0 _ $$ HT
   · iexact Hlw
 

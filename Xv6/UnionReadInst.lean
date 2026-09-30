@@ -256,23 +256,25 @@ theorem uri_arms (ug : UnionGn)
   ihave #Hty' : utag (hlc := hlc) ug y.1 $$ []
   · rw [← htag]; iexact Hty
   unfold utag
-  icases Hty' with ⟨%hsh, -, #Hfl⟩
+  icases Hty' with ⟨%hsh, -, #Hfl, %vf, #Hvp, %hu⟩
+  have hidx' : eIndex (segOf (dl ++ ws)) := by
+    intro j x hx
+    exact hidx j x (MonoList.prefix_getElem? (hpref.map _) hx)
+  have hlast' : (dl ++ ws).getLast? = some (y.1, y.2) := by
+    simp [List.getLast?_append, hlast]
+  have hins := consumed_ins_last (genId (hlc := hlc) (GF := GF) + 1) (dl ++ ws) y.1 y.2 hidx'
+    hrok.2.1 hboots hlast' hsh
+  have hby : obsBoots y.1 = genId (hlc := hlc) (GF := GF) + 1 :=
+    hboots (y.1, y.2) (List.mem_of_getLast? hlast')
+  have hu' : ulinesOf y.1 = vf.feBase ++ ulinesIn (I ++ J) := by
+    rw [hu, ulastCyc_io y.1 hsh]; unfold ulinesCyc; rw [hins, ← hJ]
+  -- THE WITNESS AT THE FAR END: the era's base and the consumed input's lines
   ihave #Hwn : flw ug.ugnFile (I ++ J) $$ []
   · unfold flw
-    iright
-    iexists (eflOf y.1)
-    iframe Hfl
-    ipureintro
-    intro w hw
-    rw [hJ] at hw
-    obtain ⟨hy, cy⟩ := y
-    have hidx' : eIndex (segOf (dl ++ ws)) := by
-      intro j x hx
-      exact hidx j x (MonoList.prefix_getElem? (hpref.map _) hx)
-    have hlast' : (dl ++ ws).getLast? = some (hy, cy) := by
-      simp [List.getLast?_append, hlast]
-    exact echofLinesOf_consumed (genId (hlc := hlc) (GF := GF) + 1) (dl ++ ws) hy cy w hidx'
-      hrok.2.1 hboots hlast' hsh hw
+    iexists vf
+    isplitr
+    · rw [← hby]; iexact Hvp
+    · rw [← hu']; iexact Hfl
   ileft
   iframe Hdlr
   iexists J

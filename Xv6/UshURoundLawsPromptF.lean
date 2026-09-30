@@ -165,12 +165,12 @@ theorem uksh_w_prompt_taint (UL : UK_LEAVES) (N : UkNames GF) (I : List (BitVec 
 cursor with the deed beside it; positions 1 and 2 are the record's settled
 shapes with the deed DONE. -/
 noncomputable def upfam (v : EraPins) (P : Nat) (I : List (BitVec 8)) (s : Dst) : Nat → IProp GF
-  | 0 => iprop(turn v P ∗ fown r s)
+  | 0 => iprop(turn v P ∗ fown r s ∗ urpos (hlc := hlc) ug r I)
   | p + 1 => iprop((unionLinkInstAt (hlc := hlc) ug s0).lkLpr (genId (hlc := hlc) (GF := GF) + 1) v I (p + 1)
       ∗ ushDoneAt (hlc := hlc) ug r s0 I)
 
 theorem upfam_0 (v : EraPins) (P : Nat) (I : List (BitVec 8)) (s : Dst) :
-    upfam (hlc := hlc) (GF := GF) ug r s0 v P I s 0 = iprop(turn v P ∗ fown r s) := rfl
+    upfam (hlc := hlc) (GF := GF) ug r s0 v P I s 0 = iprop(turn v P ∗ fown r s ∗ urpos (hlc := hlc) ug r I) := rfl
 
 theorem upfam_S (v : EraPins) (P : Nat) (I : List (BitVec 8)) (s : Dst) (p : Nat) :
     upfam (hlc := hlc) (GF := GF) ug r s0 v P I s (p + 1) =
@@ -186,6 +186,7 @@ theorem upfam_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl 
     ⊢ eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
       psLb v ps -∗ csLb v cs -∗ inpLb v I -∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 -∗
       fTyped ug.ugnFile.fgnCl s -∗
+      upr (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
       upfam (hlc := hlc) ug r s0 v P I s 0 -∗ (upfam (hlc := hlc) ug r s0 v P I s (0 + 1) -∗ Φ) -∗
       outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (uPrompt[0]!) Φ := by
   have hcont := htie.2.2.2.2.1
@@ -196,10 +197,10 @@ theorem upfam_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl 
     change (ulmG.lmCont (ust cs s0 I) (ul I) (ulmG.lmDec a))[0]? = _
     rw [hcont]; exact wrPrompt_head
   rw [upfam_0, upfam_S, Nat.zero_add]
-  iintro #Hpin #Hps #Hcs #HE #Hcw #Hty ⟨Htn, Hd⟩ HΦ
+  iintro #Hpin #Hps #Hcs #HE #Hcw #Hty #HR ⟨Htn, Hd, Hup⟩ HΦ
   iapply union_write_link_blk ug hcons (genId (hlc := hlc) (GF := GF) + 1) v P a (uPrompt[0]!) ps cs s0 I Φ
     hnw hne hw.1.2.1 (Nat.le_of_eq hw.1.2.2.1) hw.1.1 hw.1.2.2.2 htie.2.2.1 htie.2.2.2.1 hhead
-    $$ Hpin Htn Hps Hcs HE Hcw
+    $$ Hpin Htn Hps Hcs HE Hcw HR
   iintro Hres
   iapply HΦ
   icases Hres with (⟨Htn', -, #Hcs', -, -⟩ | #HT)
@@ -229,7 +230,7 @@ theorem upfam_dollar (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl 
       · ipureintro; rfl
     · -- the deed, DONE: the filed alternative is the deed's own
       iapply ushDeed_intro ug r udoneTie s0 I (cs ++ [a]) s v (udone_tie_of_pend cs s0 I _ a htie) hnw
-        $$ Hd Hty Hpin Hcs'
+        $$ Hd Hty Hpin Hcs' Hup
   · isplitl
     · iapply ulpr_taint ug s0 _ v I 1 $$ HT
     · iapply ush_deed_taint ug r udoneTie s0 I $$ HT
@@ -244,8 +245,10 @@ theorem upfam_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (h
       eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
       psLb v ps -∗ csLb v cs -∗ inpLb v I -∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 -∗
       fTyped ug.ugnFile.fgnCl s -∗
+      -- ...and the round's payload (sync SY3-A4)
+      upr (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) v I a -∗
       promptStep (hlc := hlc) (upfam (hlc := hlc) ug r s0 v P I s) := by
-  iintro #Hlk #Hpin #Hps #Hcs #HE #Hcw #Hty
+  iintro #Hlk #Hpin #Hps #Hcs #HE #Hcw #Hty #HR
   unfold promptStep
   imodintro
   iintro %p %b %Φ %hb %hp Hc HΦ
@@ -253,7 +256,7 @@ theorem upfam_step (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (h
   · have hb0 : b = uPrompt[0]! := by
       rw [wrPrompt_head] at hb; exact (Option.some.inj hb).symm
     subst hb0
-    iapply upfam_dollar ug r s0 hcons v ps cs P a I s Φ hw htie hnw $$ Hpin Hps Hcs HE Hcw Hty Hc HΦ
+    iapply upfam_dollar ug r s0 hcons v ps cs P a I s Φ hw htie hnw $$ Hpin Hps Hcs HE Hcw Hty HR Hc HΦ
   · -- ' ': the record's own step, the deed framed
     rw [upfam_S]
     icases Hc with ⟨Hc, Hd⟩
@@ -274,14 +277,15 @@ theorem uksh_w_prompt_pend (UL : UK_LEAVES)
     (rb : Bool) (hl2 : l[2]? = some (.open rb true (.device CONSOLE))) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
-        iprop(ustdAt N.fd l vw ∗ (uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I))
+        iprop(ustdAt N.fd l vw ∗ (uWcl (hlc := hlc) ug s0 I 3 ∗ (ushPendAt (hlc := hlc) ug r s0 I
+          ∗ usyncRec (hlc := hlc) ug s0 I)))
         iprop(ustdAt N.fd l vw ∗ (uWcl (hlc := hlc) ug s0 I 2 ∗ ushDoneAt (hlc := hlc) ug r s0 I)) := by
   iintro #Hlk
   have Htaint := uksh_w_prompt_taint ug r s0 UL N I l vw rb hl2
   unfold kshW at Htaint ⊢
-  iintro %h %m %avail %ha0 %ha1 %ha2 #Hcode ⟨Hstd, Hc, Hp⟩ Hrun Hcont
+  iintro %h %m %avail %ha0 %ha1 %ha2 #Hcode ⟨Hstd, Hc, Hp, #Hsrec⟩ Hrun Hcont
   icases uDeed_elim ug r upendTie s0 I $$ Hp with
-    (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
+    (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw, Hup⟩ | #HT)
   · obtain ⟨a, htie⟩ := htie
     -- the console: the block owed at the round's stage, or the taint
     icases uWcl_blk_lend ug s0 I $$ Hc with ⟨%v, #Hpin, Hl⟩
@@ -296,17 +300,18 @@ theorem uksh_w_prompt_pend (UL : UK_LEAVES)
       ihave %hcs := ucs_lb_agree_len v cs cs' (by have := htie.1; omega) $$ Hcs Hcs'
       subst hcs
       ihave #Hcw := uf0w_cw ug _ s0 $$ Hf
-      ihave #Hst := upfam_step ug r s0 hcons v ps cs P a I s hw htie hnw $$ Hlk Hpin Hps Hcs HE Hcw Hty
+      ihave #Hupr := upr_of_rec ug s0 v I a $$ Hpin Hcw Hsrec
+      ihave #Hst := upfam_step ug r s0 hcons v ps cs P a I s hw htie hnw $$ Hlk Hpin Hps Hcs HE Hcw Hty Hupr
       have H2 := kshW_of_link_prompt_fam (hlc := hlc) UL N (upfam (hlc := hlc) ug r s0 v P I s) l vw rb hl2
       unfold kshW at H2
       ihave Hw := H2 $$ Hst
-      iapply Hw $$ %h %m %avail %ha0 %ha1 %ha2 Hcode [Hstd Htn Hd] Hrun
+      iapply Hw $$ %h %m %avail %ha0 %ha1 %ha2 Hcode [Hstd Htn Hd Hup] Hrun
       · rw [upfam_0]
         isplitl [Hstd]
         · iexact Hstd
         isplitl [Htn]
         · iexact Htn
-        · iexact Hd
+        · iframe Hd Hup
       iintro %h' %ret ⟨Hstd, Hc⟩ Hrun
       rw [show (2 : Nat) = 1 + 1 from rfl, upfam_S]
       icases Hc with ⟨Hc, Hd⟩
@@ -364,7 +369,7 @@ theorem ush_prompt_law_f (UL : UK_LEAVES)
     rw [uWcf_0, uWcf_2]
     iapply uksh_w_or N _ _ _ (ustdAt N.fd l vw)
       iprop(uWcl (hlc := hlc) ug s0 I 0 ∗ ushDoneAt (hlc := hlc) ug r s0 I)
-      iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ ushPendAt (hlc := hlc) ug r s0 I) _ $$ [] []
+      iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ (ushPendAt (hlc := hlc) ug r s0 I ∗ usyncRec (hlc := hlc) ug s0 I)) _ $$ [] []
     · iapply Hdopen $$ %I %l %vw %hfd
     · iapply uksh_w_prompt_pend ug r s0 UL hcons N I l vw rb hl2 $$ Hlk
   · iexact Hdclosed
