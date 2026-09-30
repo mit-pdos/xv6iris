@@ -1750,6 +1750,11 @@ import Xv6.AppEcho
 import Xv6.AppFilePure
 import Xv6.AppFileNames
 import Xv6.AppFileDeed
+import Xv6.AppFilePos
+import Xv6.AppFileSyncReg
+import Xv6.AppFileChain
+import Xv6.AppFileSync
+import Xv6.AppFileSyncClose
 import Xv6.AppFileEscrow
 import Xv6.AppFileTyped
 import Xv6.AppFileClaim
@@ -2004,6 +2009,8 @@ import Xv6.FileDiscSeal
 import Xv6.PipeOutSeal
 import Xv6.AppEchoSeal
 import Xv6.AppFileSeal
+import Xv6.AppFileHook
+import Xv6.AppFileXfer
 import Xv6.FileOutSeal
 import Xv6.LineWordsSeal
 import Xv6.EchoDiscSeal
