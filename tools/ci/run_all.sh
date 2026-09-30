@@ -61,7 +61,7 @@
 # runs under `pipefail` and every `| tee` below is checked through it.
 #
 # THIS RUNS LEAN (every step from build-deps to vtest, and dead-imports).
-# NEVER on the development machine (README: "Reproducing it"); the steps
+# NEVER on the development machine (README: "Build"); the steps
 # toolchain-check (without lake: tools/ci/toolchain_check.sh), lint, check-gen
 # and test-tools are Python and shell only and run anywhere.  On the GCP VM,
 # from your worktree:

@@ -12,7 +12,7 @@ Their axioms are `propext`, `Classical.choice`, `Quot.sound` and `bv_decide` cer
 this (`tools/ci/audit.sh`, baseline `tools/audit/baseline.json`).
 
 - **CI**: `.github/workflows/lean-ci.yml` (branch `lean`); every step is `tools/ci/run_all.sh <step>`
-  (`make ci`); see README "Continuous integration".
+  (`make ci`); see README "Checks, reports and CI".
 - **Design and project notes** (imported from the Rocq tree; the design this port follows):
   `claude-notes/` — start with `claude-notes/LEAN.md`, then `claude-notes/README.md`.
 - **Design rulings** cited in source comments: `notes/design-rulings.md`.

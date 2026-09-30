@@ -14,7 +14,7 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 - **Track Rocq main**: keep the Lean proofs in step with Rocq's latest proofs (drift waves A–F ported
   Sept 29, Rocq 456141b5b), EXCEPT the noninterference work (drift themes I+J), which is not ported.
 - **No Lean on the development machine**: all elaboration runs on the build VM or in CI (README,
-  "Continuous integration").
+  "Build").
 - **Standing rules**: Rocq is the authority (port its big ideas, clean up its gunk only with the full
   picture); one function per Spec/Proof/Link triple; one capacity instance per camera; full root build
   before every push; eb-generic contracts.

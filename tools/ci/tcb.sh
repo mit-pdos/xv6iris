@@ -19,7 +19,7 @@
 # the plain tables (`=== TCB <theorem> ===`) go to stdout, so they are in the
 # run log.
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Reproducing it"): run this on
+# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Build"): run this on
 # the build VM or in CI, e.g.
 #   /shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/tcb.sh
 #   /shared/xv6rocq/gcp-rocq/run-on-gcp --pull tools/tcb/expected.json tools/ci/tcb.sh --update

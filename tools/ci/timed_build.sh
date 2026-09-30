@@ -20,7 +20,7 @@
 #
 # Exit status is lake's (the pipe does not mask it).  CI:
 #     tools/ci/timed_build.sh "$RUNNER_TEMP/lake-build.log" --clean
-# GCP VM, detached (README: "Reproducing it"), from your worktree:
+# GCP VM, detached (README: "Build"), from your worktree:
 #     run-on-gcp --no-sync bash -lc 'setsid nohup tools/ci/timed_build.sh \
 #        /mnt/rocq/<lane>.log --clean >/dev/null 2>&1 < /dev/null &'
 #     run-on-gcp --no-sync tail -3 /mnt/rocq/<lane>.log      # until `@end`

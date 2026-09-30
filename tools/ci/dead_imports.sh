@@ -34,7 +34,7 @@
 #
 # INFORMATIONAL: without --apply the exit status is 0 whatever is found
 # (non-zero only if the analysis itself could not run).  Needs a built tree;
-# run on the build machine (never the dev machine: README: "Reproducing it").
+# run on the build machine (never the dev machine: README: "Build").
 # ~2 min.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."

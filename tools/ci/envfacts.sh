@@ -11,7 +11,7 @@
 # tools/ci/roots.txt that no longer exists, a stale allowlist row, or a pc
 # predicate that was renamed.  Each of those would silently empty a report.
 #
-# NEVER run this on the development machine (README: "Reproducing it"): on
+# NEVER run this on the development machine (README: "Build"): on
 # the GCP VM it is
 #   cd <worktree> && /shared/xv6rocq/gcp-rocq/run-on-gcp bash tools/ci/envfacts.sh
 #   /shared/xv6rocq/gcp-rocq/run-on-gcp --no-sync --pull .lake/ci/envfacts.tsv true
