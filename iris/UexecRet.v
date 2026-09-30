@@ -2079,7 +2079,7 @@ Section UexecRet.
             /uexec_wait_F /uwait_ans_pid_m /uwait_ans_at_m.
     solve_proper_core ltac:(fun _ => first [f_equiv | f_equiv_wide]).
   Qed.
-  Local Lemma ukb_F_ne (n : nat) (X Y : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : CtxIdDefs.CurCtx}
+  Local Lemma ukb_F_ne n (X Y : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : CtxIdDefs.CurCtx}
       C pt Rfd Rut sz π fdv cw g cs pidv lz secc :
     X ≡{n}≡ Y ->
     ukb_F X C pt Rfd Rut sz π fdv cw g cs pidv lz secc
