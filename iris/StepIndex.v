@@ -9,12 +9,17 @@
    may declare one, and every file that mentions [gFunctors] or [iProp]
    imports it.
 
-   [natSI] (finite indices, upstream's own [Global Existing Instance natSI]
-   in [stepindex_finite]) keeps every proof of the tree as it was: [SIdxFinite
-   natSI] holds, so the finite-only later laws are available.  The ordinal
-   phase of the port switches this line to [ordI]
-   ([transfinite.stepindex.ordinals]); local-plan/transfinite-integration.md. *)
+   The index is the ORDINALS, [ordI] ([transfinite.stepindex.ordinals]):
+   [SIdxFinite] does not hold, so the later laws that are true only at finite
+   indices ([later_sep_1], [later_exist_false] and what upstream derives from
+   them, e.g. destructing [▷ (P ∗ Q)] or [▷ ∃ x, P x] in the proof mode) are
+   unavailable; what the ordinals give instead is the existential property
+   the liveness work needs.  [iris.algebra.stepindex_finite] must NOT be
+   imported anywhere: it declares [natSI] a global instance, and two [sidx]
+   instances in scope make every [iProp] ambiguous.  (The finite-index state
+   of the port, [natSI], is branch [transfinite] before the ordinal port;
+   local-plan/port-ordinal.md.) *)
 From iris.algebra Require Import stepindex.
-From iris.algebra Require Import stepindex_finite.
+From transfinite.stepindex Require Import ordinals.
 
-#[export] Instance xv6_sidx : sidx := natSI.
+#[export] Instance xv6_sidx : sidx := ordI.
