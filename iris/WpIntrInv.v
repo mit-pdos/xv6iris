@@ -2722,7 +2722,7 @@ Proof.
             i_disj i_w_cy i_w_ti i_w_ip
             with "Hcert Hresv [-] []").
   { (* ==================== THE CYCLE'S BODY ==================== *)
-    iNext. iIntros "Hfrag".
+    iNext. iIntros "Hfrag Hlc".
     iApply (swp_mono with "[] [-]").
     2:{ iApply (swp_try_step_any_ex i_Drw i_Dro i_Df
                   (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
@@ -2790,6 +2790,7 @@ Proof.
                       (intr_ret kt p b' R)
                       (wp_next true p (fun CID =>
                          intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))
+                       ∗ £ 1   (* the boundary credit: the instruction arm pays the obligation with it *)
                        ∗ ghost_var_frac sie_gname (1/2) (_get_Mstatus_SIE mst0)
                        ∗ sret_tie mst0
                        ∗ stack_own (KTR := kt) (m !!! Regidx csp_rs1)
@@ -2817,7 +2818,7 @@ Proof.
                       Hmisaval HSXL (proj1 Hmsf) Hmm Helpnp
                       (pma_all_ram Hpmaall) Hsatpf Hpmpf
                       with "Hcert Hinstr Hbit1 Hkinv Hcreds Hsnap Hfrag
-                            [$Hbody $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
+                            [$Hbody $Hlc $Hhalf $Htie $Hstk $Hq1 $Hq4 $Hstv
                              $Hsepcx $Hscausex $Hstvalx $Hsppc $Hclm $Hcpu
                              $Hfile $Hctx]
                             Hsrw Hsro [] []").
@@ -2826,7 +2827,7 @@ Proof.
             destruct Hd as (meip & seip & Hd).
             pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hd) as Hpr.
             subst pr.
-            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 & Hq4 &
+            iDestruct "HW" as "(Hwn & _ & Hhalf & Htie & Hstk & Hq1 & Hq4 &
                                 Hstv & Hsepcx & Hscausex & Hstvalx & Hsppc &
                                 Hclm & Hcpu & Hfile & Hctx)".
             iDestruct "Hsepcx" as (se_old) "Hsepc".
@@ -2914,7 +2915,7 @@ Proof.
             iApply (resv_any_intro with "Hfrag").
             (* ---------- THE INSTRUCTION ---------- *)
             iIntros (tlbf) "HW Hbit1 Hsnap' Hresv' Hsrw Hsro".
-            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hstk & Hq1 &
+            iDestruct "HW" as "(Hwn & Hlc & Hhalf & Htie & Hstk & Hq1 &
                                 Hq4 & Hstv & Hsepcx & Hscausex & Hstvalx &
                                 Hsppc & Hclm & Hcpu & Hfile & Hctx)".
             pose proof (s_rs_set_nPC pc0 pc0
@@ -2954,7 +2955,7 @@ Proof.
               iApply (intr_res_intro Ecap handler vb Htvd Hsb
                         with "Hq4 Hstv [] HEcap HEmvcap").
               iNext. iExact "Hsp". }
-            iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn")
+            iDestruct (wp_next_at true p _ CID0 (fun _ => eq_refl) with "Hwn Hlc")
               as "[Hobl Hcont]".
             (* THE CLOCK CELLS ARE LENT, NOT KEPT: [csrr time] reads mtime and
                [csrw stimecmp] rewrites mip, and both are inside the cycle's
@@ -3138,7 +3139,7 @@ Proof.
       iApply (intr_handler_spec_apply Etrap
                 (register_lookup (R_bitvector_64 nextPC) rs2) m av p pc0 sc
                 (zeros' 64) Hpc0 HscT with "HspT HET Hentry").
-      iIntros (c' Hs'). rewrite /ihs_post_of. iIntros "Hcg Hpc".
+      iIntros (c' Hs'). rewrite /ihs_post_of. iIntros "_ Hcg Hpc".
       iEval (rewrite -sie_cap_gpr_of_eq) in "Hcg".
       iDestruct (wp_next_retarget CID0 c' true p _ Hs' with "Hwn") as "Hwn".
       iApply ("IH" $! c' with "Hcg Hpc [Hwn]"). iNext. iExact "Hwn". }
@@ -3163,8 +3164,8 @@ Proof.
   intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
   iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i b' R Hpc0
             with "Hcg Hpc Hinstr [Hbody]").
-  iNext. iIntros (CID Hs).
-  iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
+  iNext. iIntros (CID Hs) "Hlc".
+  iDestruct (wp_next_at true p _ CID Hs with "Hbody Hlc") as "Hb".
   iEval (rewrite /intr_cb) in "Hb".
   iDestruct "Hb" as "[Hobl Hcont]".
   rewrite /intr_cb_clock.

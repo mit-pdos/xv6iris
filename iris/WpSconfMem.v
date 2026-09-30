@@ -513,7 +513,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -776,7 +776,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HPsi)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HPsi"). exact Hs.
   Qed.
 
   (* THE ORIGINAL, character-identical, as an instance of the above at the
@@ -951,7 +951,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1191,7 +1191,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
   Qed.
 
   (* ==================================================================== *)
@@ -1302,7 +1302,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1553,7 +1553,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
 
   (* ==================================================================== *)
@@ -1669,7 +1669,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -1908,7 +1908,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
 
   (* A6.126 §6: [_au_rel] with an iProp-valued [Q].  The continuation gets
@@ -2014,7 +2014,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2267,7 +2267,7 @@ Section WpSconfMem.
       iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
       iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+      iApply ("Hcont" $! v CID with "[%] Hlc Hcg' Hpc' HQv HT"); [exact Hs].
   Qed.
   (* The non-atomic instance: the caller owns the cell throughout.  Generic
      in BOTH the width and the extension flag [uns], so every RAM load leaf
@@ -2324,9 +2324,9 @@ Section WpSconfMem.
               Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes]").
     { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
-    iIntros (w CID1 Hs1) "Hcg Hpc [-> Hbw]".
+    iIntros (w CID1 Hs1) "Hlc Hcg Hpc [-> Hbw]".
     iEval (rewrite Hlv) in "Hcg".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2485,12 +2485,12 @@ Section WpSconfMem.
          SC-era crossing here was already an identity.  Deleted, not
          replaced. *)
       iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite /wordw_pointsto) in "Hbw".
     iDestruct "Hbw" as "(_ & Hbw)".
     iEval (change (Z.to_nat 1) with 1%nat;
            rewrite big_sepL_singleton pa_add_0 nth_byte0_id) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2564,9 +2564,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2596,9 +2596,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -2781,7 +2781,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr [HAU Hcont]").
     iNext.
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -2967,7 +2967,7 @@ Section WpSconfMem.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HPsi)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HPsi"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc' HPsi"). exact Hs.
   Qed.
   (* THE CTX-WORD INSTANCE, character-identical to what this leaf always was:
      [Res] is the cell before the store, [Post] the cell after it, and the
@@ -3063,8 +3063,8 @@ Section WpSconfMem.
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes]").
     { iModIntro. iExists vold. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3119,8 +3119,8 @@ Section WpSconfMem.
       iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
                 pa ppn sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
     { iModIntro. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3177,9 +3177,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3216,9 +3216,9 @@ Section WpSconfMem.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3429,8 +3429,8 @@ Section WpSconfMem.
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
     { iApply (wordw1_byte (KTR := ktd) ea (DfracOwn 1) vold). iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[%] Hlc Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
     iExact "Hbw".
   Qed.
@@ -3469,8 +3469,8 @@ Section WpSconfMem.
               exec_write_ram_plain_1 eq_refl
               with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
     { iApply (wordw1_free (KTR := ktd) ea). iExact "Hbyte". }
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
-    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[%] Hlc Hcg Hpc [Hbw]"); [ exact Hs1 | ].
     iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
     iExact "Hbw".
   Qed.
@@ -3638,9 +3638,9 @@ Section WpSconfMem.
               ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 Hsv
               with "Hcg Hpc Hinstr Hbytes [Hcont]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hbw".
     iEval (rewrite (wordw8_ctx (KTR2 := ktd))) in "Hbw".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
 
@@ -3924,9 +3924,9 @@ Section WpSconfMem.
       iExists (S (length log)). rewrite (Hz j ltac:(apply lookup_seq in Hj; lia)).
       iExact "H". }
     { iModIntro. iFrame "Hwin". iIntros "Hp". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hp".
     iDestruct "Hp" as (pl own') "(-> & %Hown' & Hp)".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc [Hp]").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc [Hp]").
     { iPureIntro. exact Hs1. }
     { iExists own'. by iFrame "Hp". }
   Qed.
@@ -4036,9 +4036,9 @@ Section WpSconfMem.
       iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | ].
       iFrame "Hlb Hw". iExact "Hpay". }
     { iModIntro. iFrame "Hbytes". iIntros "Hp". by iModIntro. }
-    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iIntros (CID1 Hs1) "Hlc Hcg Hpc Hp".
     iDestruct "Hp" as (pl lo) "(-> & #Hlb & #Hw & Hp)".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hclaim [Hp]").
+    iApply ("Hcont" $! CID1 with "[] Hlc Hcg Hpc Hclaim [Hp]").
     { iPureIntro. exact Hs1. }
     { iExists lo. iFrame "Hlb Hw". iExact "Hp". }
   Qed.

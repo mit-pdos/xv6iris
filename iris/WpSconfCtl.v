@@ -92,8 +92,8 @@ Section WpSconfCtl.
       iIntros (e) "(-> & Hpriv & Hmenv)". iSplitR; [done|].
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc". iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   Lemma wp_fencei_s_sconf
@@ -120,8 +120,8 @@ Section WpSconfCtl.
         [| iApply (swp_execute_FENCEI_s (CID := CIDn) imm rs rd with "Hcert") ].
       iIntros (e) "->". iSplitR; [done|]. iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
@@ -277,8 +277,8 @@ Section WpSconfCtl.
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b Hsp
                 with "Hcap").
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -355,8 +355,8 @@ Section WpSconfCtl.
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
       rewrite (Htgt_all CIDn). iFrame.
     - iIntros (CIDx) "Hcap". iSplitL; [ iExact "Hcap" | done ].
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -436,8 +436,8 @@ Section WpSconfCtl.
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg (add_vec_int pc 2)]> m) n b Hsp
                 with "Hcap").
-    - iNext. iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iNext. iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)

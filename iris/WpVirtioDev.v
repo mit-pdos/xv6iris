@@ -577,7 +577,7 @@ Proof using .
             with "Hcg Hpc Hinstr [HR Hacc Hcont]").
   iApply bi.later_intro.
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
+  iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -772,7 +772,7 @@ Proof using .
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
     iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-    iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
+    iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc' HS"). exact Hs.
 Qed.
 
 (* ===================================================================== *)

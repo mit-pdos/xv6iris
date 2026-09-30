@@ -763,7 +763,7 @@ Section WpSconfEngine.
     (* FREE THE NAME [CID] FOR THE REBOUND HART -- the statement never sees
        the rename, so callers naming this engine's hart keep working. *)
     rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "Hex Hrecap".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "Hex Hrecap".
     - (* the instruction *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
@@ -803,7 +803,7 @@ Section WpSconfEngine.
     - (* the continuation: the engine resumes on the hart [Hs] names *)
       iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' HP Hpc'"). exact Hs.
   Qed.
 
   (* THE PC-FREE OBLIGATION, the shape 99 % of the leaves want: the cell is
@@ -882,8 +882,8 @@ Section WpSconfEngine.
     - iIntros (CIDx) "Hcap". iSplitL; [| done].
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap").
-    - iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* the two width instances every leaf actually names *)
@@ -1005,8 +1005,8 @@ Section WpSconfEngine.
     - iIntros (CIDx) "Hcap". iSplitL; [| done].
       iApply (sie_cap_retarget (CID := CIDx) m
                 (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap").
-    - iIntros (CIDx Hs) "Hcg' _ Hpc'".
-      iApply ("Hcont" $! CIDx with "[%] Hcg' Hpc'"). exact Hs.
+    - iIntros (CIDx Hs) "Hlc Hcg' _ Hpc'".
+      iApply ("Hcont" $! CIDx with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ================================================================== *)
@@ -1048,7 +1048,7 @@ Section WpSconfEngine.
                  ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
               with "Hcg Hpc Hinstr [Hcmp Hcont]").
     iNext. rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitR "Hcont Hlc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
@@ -1065,7 +1065,7 @@ Section WpSconfEngine.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
     - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   Lemma wp_btype_taken_s_sconf
@@ -1094,7 +1094,7 @@ Section WpSconfEngine.
                                       ⌜m2 = m⌝ ∗ ⌜n2 = n⌝)%I
               with "Hcg Hpc Hinstr [Hcmp Hcont]").
     iNext. rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitR "Hcont Hlc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
@@ -1113,7 +1113,7 @@ Section WpSconfEngine.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile". done.
     - iIntros (npc ms' m2 n2) "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc'"). exact Hs.
   Qed.
 
   (* ================================================================== *)
@@ -1151,7 +1151,7 @@ Section WpSconfEngine.
                  ⌜npc2 = npc⌝ ∗ ⌜m2 = m'⌝ ∗ ⌜n2 = n'⌝ ∗ P)%I
               with "Hcg Hpc Hinstr [Hex Hrecap Hcont]").
     iNext. rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "Hex Hrecap".
+    iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "Hex Hrecap".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct ("Hrecap" $! CID with "Hcap") as "[Hcap HP]".
       iDestruct ("Hex" $! CID with "Hsc Hfile HPC HnPC") as "Hexx".
@@ -1164,7 +1164,7 @@ Section WpSconfEngine.
       iFrame "HPC HnPC Hresv Hscp Hcap Hfile HP". done.
     - iIntros (npc2 ms' m2 n2) "Hcg' Hpc' (-> & -> & -> & HP)".
       iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' HP Hpc'"). exact Hs.
+      iApply ("Hcont" $! CID with "[%] Hlc Hcg' HP Hpc'"). exact Hs.
   Qed.
 
   (* everything a fence or a jump needs out of [sconf], with the two

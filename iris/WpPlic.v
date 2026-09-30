@@ -211,7 +211,7 @@ Proof using .
      WpSconfMem.v.  At [b = false] the two harts coincide, but the obligation
      is stated hart-generically, so the body is annotated all the same. *)
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
+  iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -405,7 +405,7 @@ Proof using .
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".
     iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
-    iApply ("Hcont" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
+    iApply ("Hcont" $! CID with "[%] Hlc Hcg' Hpc' HS"). exact Hs.
 Qed.
 
 (* The bundle-taking RESTATEMENT of the leaf above, for the consumer whose
@@ -543,7 +543,7 @@ Proof using .
             with "Hcg Hpc Hinstr [HR Hacc Hcont]").
   iApply bi.later_intro.
   rename CID into CID0.
-  iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
+  iIntros (CID Hs) "Hlc". rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
     iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
@@ -749,7 +749,7 @@ Proof using .
     iDestruct "Hpay" as (v) "(-> & -> & -> & %HPv & HS)".
     iDestruct (sie_cap_gpr_at_close (CID := CID) with "Hcg'") as "Hcg'".
     iDestruct ("Hcont" $! v with "[%]") as "Hcont2"; [ exact HPv | ].
-    iApply ("Hcont2" $! CID with "[%] Hcg' Hpc' HS"). exact Hs.
+    iApply ("Hcont2" $! CID with "[%] Hlc Hcg' Hpc' HS"). exact Hs.
 Qed.
 
 (* ------------------------------------------------------------------- *)
