@@ -2064,3 +2064,6 @@ import Xv6.LinkSync
 import Xv6.UshSync
 import Xv6.UkSyncEntry
 import Xv6.UshURoundSync
+import Xv6.SpecSpin
+import Xv6.ProofSpin
+import Xv6.LinkSpin
