@@ -740,7 +740,7 @@ Section box.
       ⌜(T0 ≤ Nat.max Kd Kt)%nat⌝ ∗
       slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))) ∗
       P_hdr' (sr_ident r) x0 ξ.
-  Proof using H2 H3 Inhabited0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw HmD HKd HKt Hhook) "#Hbox Hrun #Hfld #Hflt #HllbD Hrd0 Hcnt HfD HQc".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
@@ -807,7 +807,7 @@ Section box.
     llb loglen_name (max_stamp mD) -∗ Qc ={E}=∗
     cnt_half γ c ∗ Q' ∗
     ∃ (x0 : X) (T0 : nat), slotd_half γ (SlotReg (sr_td r) true (sr_ident r) (Some (x0, T0))).
-  Proof using H2 H3 Inhabited0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw HmD Hhook) "#Hbox Hrd0 Hcnt HfD #HllbD HQc".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
@@ -918,7 +918,7 @@ Section box.
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb loglen_name T'.
-  Proof using H0 H3 H4 Inhabited0.
+  Proof using H0 H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw Hx Hhook) "#Hbox Hrun Hrd0 Hcnt HQc Hhdr'".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
@@ -1017,7 +1017,7 @@ Section box.
       cnt_half γ (Nat.max 1 c) ∗
       reference γ i' {[ (i', T') := unit_mass c ]} ∗
       llb loglen_name T'.
-  Proof using H0 H3 H4 Inhabited0.
+  Proof using H0 H2 H3 H4 Inhabited0 Timeless0.
     intros HE Hw Hx.
     apply (box_deposit_L1_shape N γ ξ r c i' x0 x0 T0 E HE Hw Hx).
     intros ξb. reflexivity.
@@ -1045,7 +1045,7 @@ Section box.
     slotd_half γ r ∗
     cnt_half γ (S c) ∗
     ∃ T : nat, reference γ (sr_ident r) {[ (sr_ident r, T) := 1%Qp ]}.
-  Proof using Inhabited0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw) "#Hbox Hrd0 Hcnt".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
@@ -1100,7 +1100,7 @@ Section box.
     slotd_half γ (SlotReg (Nat.max (sr_td r) (max_stamp mD)) false (sr_ident r) (sr_x r)) ∗
     cnt_half γ c ∗
     llb loglen_name (Nat.max (sr_td r) (max_stamp mD)).
-  Proof using Inhabited0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw HmD) "#Hbox Hrd0 #Hllbtd Hcnt Href".
     iDestruct "Href" as "(%Hne & %Hkeyed & HfD & #HllbD)".
     rewrite /is_box. box_open "Hbox" "Hcl".
@@ -1157,7 +1157,7 @@ Section box.
     own_context ξ ∗
     (∃ x, P_hdr' i x ξ ∗ P_rest x ξ) ∗
     l2_hold γ i mh.
-  Proof using H1 H2 H3 Inhabited0.
+  Proof using H1 H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hs0 HKt HKp Hhook) "#Hbox Hrun #Hflt #Hflp Href HQc Hrp0".
     iDestruct "Href" as "(%Hne & %Hkeyed & Hfh & #Hllbh)".
     rewrite /is_box. box_open "Hbox" "Hcl".
@@ -1304,7 +1304,7 @@ Section box.
       slotp_half γ (L2Reg T' None) ∗
       reference γ i {[ (i, T') := q ]} ∗
       llb loglen_name T'.
-  Proof using H0 H1 Inhabited0 Timeless0.
+  Proof using H0 H1 H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hhook) "#Hbox Hrun Hbun HQc Hhold".
     iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
     rewrite /is_box. box_open "Hbox" "Hcl".
@@ -1445,7 +1445,7 @@ Section box.
     slotd_half γ (SlotReg (sr_td r) false (sr_ident r) None) ∗
     cnt_half γ 1 ∗
     ∃ m', ⌜qsum m' = nat_Qc 1⌝ ∗ l2_hold γ (sr_ident r) m'.
-  Proof using H1 H3 H4 Inhabited0.
+  Proof using H1 H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw Hx HTK Hs0 Hhook) "#Hbox Hrun #Hfl Hrd0 Hcnt HQc Hrp0".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.
@@ -1540,7 +1540,7 @@ Section box.
        caller (a shrink/grow's updated descriptor half rides out as R) *)
     (Q2 ={E ∖ ↑N}=∗ Q2 ∗ R) ={E}=∗
     l2_hold γ i mh ∗ R.
-  Proof using Inhabited0 Timeless0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE) "#Hbox Hhold Hupd".
     iDestruct "Hhold" as (tp) "[Hrp0 #Hllbh]".
     rewrite /is_box. box_open "Hbox" "Hcl".
@@ -1574,7 +1574,7 @@ Section box.
     cnt_half γ c -∗
     (Q1 c ={E ∖ ↑N}=∗ Q1 c ∗ R) ={E}=∗
     slotd_half γ r ∗ cnt_half γ c ∗ R.
-  Proof using H3 H4 Inhabited0.
+  Proof using H2 H3 H4 Inhabited0 Timeless0.
     iIntros (HE Hw) "#Hbox Hrd0 Hcnt Hupd".
     rewrite /is_box. box_open "Hbox" "Hcl".
     iDestruct (ghost_var_agree with "Hrd Hrd0") as %->.

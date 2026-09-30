@@ -5,7 +5,7 @@ roots: [
   "coq-lsp.0.2.5+9.0"
   "ocaml-base-compiler.5.3.0"
   "rocq-iris.dev.2026-09-24.0.8e490959+transfinite.ad972179"
-  "rocq-iris-transfinite.dev.2026-09-29.0.57dcd565"
+  "rocq-iris-transfinite.dev.2026-09-29.0.9691db5a"
   "rocq-sail-stdpp.0.20.3"
   "rocq-stdpp.dev.2026-09-17.0.d510b616"
   "rocq-stdpp-bitvector.dev.2026-09-17.0.d510b616"
@@ -83,7 +83,7 @@ installed: [
   "rocq-core.9.0.1"
   "rocq-elpi.3.5.1"
   "rocq-iris.dev.2026-09-24.0.8e490959+transfinite.ad972179"
-  "rocq-iris-transfinite.dev.2026-09-29.0.57dcd565"
+  "rocq-iris-transfinite.dev.2026-09-29.0.9691db5a"
   "rocq-prover.9.0.0"
   "rocq-runtime.9.0.1"
   "rocq-sail-stdpp.0.20.3"
@@ -106,7 +106,7 @@ installed: [
 ]
 pinned: [
   "rocq-iris.dev.2026-09-24.0.8e490959+transfinite.ad972179"
-  "rocq-iris-transfinite.dev.2026-09-29.0.57dcd565"
+  "rocq-iris-transfinite.dev.2026-09-29.0.9691db5a"
   "rocq-sail-stdpp.0.20.3"
 ]
 package "angstrom" {
@@ -3410,7 +3410,7 @@ for an instantiation of the program logic to a particular programming language."
 }
 package "rocq-iris-transfinite" {
   opam-version: "2.0"
-  version: "dev.2026-09-29.0.57dcd565"
+  version: "dev.2026-09-29.0.9691db5a"
   synopsis:
     "Transfinite Iris on upstream Iris: ordinal step-indexed uPred/iProp, base-logic libraries and program logic"
   maintainer: "Dongjae Lee <dongjael@mit.edu>"
@@ -3429,7 +3429,7 @@ package "rocq-iris-transfinite" {
   dev-repo: "git+https://github.com/dongjaelee1/transfinite-iris.git"
   url {
     src:
-      "git+https://github.com/dongjaelee1/transfinite-iris.git#57dcd56503f695944761375cf949960274792089"
+      "git+file:///work/transfinite-iris#9691db5a1af897b6f92364634a9f51cb550781fd"
   }
 }
 package "rocq-prover" {
