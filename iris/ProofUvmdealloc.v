@@ -1162,7 +1162,7 @@ Section ProofUvmdealloc.
               mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (udi_42 with "Htext"). }
-    iIntros (CID25 Hs25). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID25 Hs25). iIntros "Hcg Hpc".
     assert (Htgt26' : add_vec (mword_of_int (KernelSyms.uvmdealloc + 0x42) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2034 : mword 11) ('b"0"))))

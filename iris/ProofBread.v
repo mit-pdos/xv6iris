@@ -981,7 +981,7 @@ Section BreadBlocks.
                 T5 (K - 6)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (bdi_d4 with "Htext"). }
-      iIntros (CIDt8 Hst8). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDt8 Hst8). iIntros "Hcg Hpc".
       assert (Htgtb8 : add_vec (mword_of_int (KernelSyms.bread + 0xd4) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 2034 : mword 11) ('b"0"))))
@@ -1308,7 +1308,7 @@ Section BreadBlocks.
               mf (K - 6)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (bdi_62 with "Htext"). }
-    iIntros (CIDh3 Hsh3). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDh3 Hsh3). iIntros "Hcg Hpc".
     assert (Htgtb4 : add_vec (mword_of_int (KernelSyms.bread + 0x62) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 41 : mword 11) ('b"0"))))
@@ -3021,8 +3021,8 @@ Section ProofBread.
               W5 (trap_res eb + (K - 6))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (bdi_34 with "Htext"). }
-    iApply wp_next_off_intro.
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgt3c : add_vec (mword_of_int (KernelSyms.bread + 0x34) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 4 : mword 11) ('b"0"))))

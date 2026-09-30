@@ -4464,7 +4464,7 @@ Section SysExecBadTail.
                 M4 (K - 60)%nat b ltac:(rewrite Htj; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sxi_0b4 with "Htext"). }
-      iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hq5). iIntros "Hcg Hpc".
       iEval (rewrite Htj) in "Hpc".
       iDestruct (sx_rest_build sp0 m plen pfun rest uav Hplen
                    with "Hspill F10 Hpb Hps F59 F60 Harr") as "Hrest".
@@ -4666,7 +4666,7 @@ Section SysExecSuccTail.
               M5 (K - 60)%nat b ltac:(rewrite Htj; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sxi_0f2 with "Htext"). }
-    iIntros (CID6 Hq6). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID6 Hq6). iIntros "Hcg Hpc".
     iEval (rewrite Htj) in "Hpc".
     iDestruct (sx_rest_build sp0 m plen pfun rest uav Hplen
                  with "Hspill F10 Hpb Hps F59 F60 Harr") as "Hrest".

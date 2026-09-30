@@ -2790,7 +2790,7 @@ Section ProofSysPipe.
                 Mr (av - 8)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (spi_b2 with "Htext"). }
-      iIntros (CID67 Hcr67). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID67 Hcr67). iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.sys_pipe + 0xb2) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 20 : mword 11) ('b"0"))))

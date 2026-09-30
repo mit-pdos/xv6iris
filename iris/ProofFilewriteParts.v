@@ -1083,7 +1083,7 @@ Section ProofFilewriteParts.
     iApply (wp_cj_s_sconf (mword_of_int zb) jimm W1 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hib").
-    iIntros (CID2 Hq2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hq2). iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
     iSpecialize ("Hcont" $! CID2 with "[]"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! W1 with "[%] Hcg Hpc").
@@ -1150,7 +1150,7 @@ Section ProofFilewriteParts.
     iApply (wp_cj_s_sconf (mword_of_int zc) jimm W2 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hic").
-    iIntros (CID3 Hq3). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID3 Hq3). iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
     iSpecialize ("Hcont" $! CID3 with "[]"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! W2 with "[%] Hcg Hpc Hb6").
@@ -1719,7 +1719,7 @@ Section ProofFilewriteParts.
                 ltac:(rewrite Htgtf4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwri_138 with "Htext"). }
-      iIntros (CIDj Hqj). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDj Hqj). iIntros "Hcg Hpc".
       iEval (rewrite Htgtf4) in "Hpc".
       iApply (fw_epi (CID0 := CIDj) m Mr K sp0 ra0 s00 s20 s50 s60
                 (mword_of_int (-1)) cs1 cs3 s40 cs7 cs8 cs9 w12 p b

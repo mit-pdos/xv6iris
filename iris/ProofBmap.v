@@ -2014,8 +2014,8 @@ Section BmapTail.
                   mL (K - 6)%nat b ltac:(rewrite Hjmpb; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (bmi_b0 with "Htext"). }
-        iIntros (CID22 Hq22).
         iApply bi.later_intro.
+        iIntros (CID22 Hq22).
         iIntros "Hcg Hpc".
         iEval (rewrite Hjmpb) in "Hpc".
         (* ---- THE NEW MAP, and everything it has to satisfy ---- *)
@@ -2790,8 +2790,8 @@ Section ProofBmapMain.
                     N0 (K - 6)%nat b ltac:(rewrite Hjmp8a; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (bmi_36 with "Htext"). }
-          iIntros (CID22 Hq22).
           iApply bi.later_intro.
+          iIntros (CID22 Hq22).
           iIntros "Hcg Hpc".
           iEval (rewrite Hjmp8a) in "Hpc".
           (* ---- the new map ---- *)
@@ -3380,8 +3380,8 @@ Section ProofBmapMain.
                     P2 (K - 6)%nat b ltac:(rewrite Hjmp62; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (bmi_5e with "Htext"). }
-          iIntros (CID25 Hq25).
           iApply bi.later_intro.
+          iIntros (CID25 Hq25).
           iIntros "Hcg Hpc".
           iEval (rewrite Hjmp62) in "Hpc".
           (* ---- the map with the new indirect block ---- *)

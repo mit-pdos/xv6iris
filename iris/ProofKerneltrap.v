@@ -416,7 +416,7 @@ Section ProofKerneltrap.
                   myd (av - 6)%nat false ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kti_90 with "Htext"). }
-        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpcj : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x90) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.

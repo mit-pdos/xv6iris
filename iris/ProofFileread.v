@@ -751,7 +751,7 @@ Section ProofFileread.
                 ltac:(rewrite Htgt58a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fri_b8 with "Htext"). }
-      iIntros (CID10 Hs10). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID10 Hs10). iIntros "Hcg Hpc".
       iEval (rewrite Htgt58a) in "Hpc".
       (* ---- the shared epilogue ---- *)
       iApply (fr_epi (CID0 := CID10) m A2 K sp0 (m !!! Regidx Rra)
@@ -1069,7 +1069,7 @@ Section ProofFileread.
                   ltac:(rewrite Htgt5eg; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fri_b8 with "Htext"). }
-        iIntros (CIDg7 Hsg7). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDg7 Hsg7). iIntros "Hcg Hpc".
         iEval (rewrite Htgt5eg) in "Hpc".
         iApply (fr_epi (CID0 := CIDg7) m G4 K sp0 (m !!! Regidx Rra)
                   (m !!! Regidx Rs0) (m !!! Regidx Rs2) (mword_of_int (-1))
@@ -1372,7 +1372,7 @@ Section ProofFileread.
                   ltac:(rewrite Htgt58p; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fri_76 with "Htext"). }
-        iIntros (CID20 Hs20). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID20 Hs20). iIntros "Hcg Hpc".
         iEval (rewrite Htgt58p) in "Hpc".
         assert (HMrs2 : Mr !!! Regidx Rs2 = mf !!! Regidx Ra0).
         { rewrite (Hmrthr Rs2 ltac:(vm_compute; reflexivity)
@@ -2014,7 +2014,7 @@ Section ProofFileread.
                           ltac:(rewrite Htgt58d; vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (fri_a2 with "Htext"). }
-                iIntros (CID61 Hs61). iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CID61 Hs61). iIntros "Hcg Hpc".
                 iEval (rewrite Htgt58d) in "Hpc".
                 assert (HMrs2 : Mr !!! Regidx Rs2 = (mword_of_int r : mword 64)).
                 { rewrite (Hmrthr Rs2 ltac:(vm_compute; reflexivity)

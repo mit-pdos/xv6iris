@@ -890,7 +890,7 @@ Section ProofSysDup.
                 F2 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sdi_4a with "Htext"). }
-      iIntros (CID23 Hk23). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID23 Hk23). iIntros "Hcg Hpc".
       assert (Htgt3c : add_vec (mword_of_int (KernelSyms.sys_dup + 0x4a) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.sys_dup + 0x3c))

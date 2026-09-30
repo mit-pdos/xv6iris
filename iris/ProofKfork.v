@@ -222,7 +222,7 @@ Section ProofKfork.
               ltac:(rewrite Htgt; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_114 with "Htext"). }
-    iIntros (CID2 Hs2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hs2). iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /T1 upd_ne; [exact Hmtsp | vm_compute; discriminate]).

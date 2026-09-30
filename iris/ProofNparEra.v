@@ -1787,7 +1787,7 @@ Section ProofNparEraMain.
                       ltac:(rewrite Ht8c2; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (nxi_124 with "Htext"). }
-            iIntros (CIDe6 Hqe6). iApply bi.later_intro. iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDe6 Hqe6). iIntros "Hcg Hpc".
             iEval (rewrite Ht8c2) in "Hpc".
             (* the terminator pins the index: [bb_cstr] has no earlier NUL *)
             assert (Hep : (S ii = plen)%nat).
@@ -2437,7 +2437,7 @@ Section ProofNparEraMain.
                          ltac:(rewrite Htj5c; vm_compute; reflexivity)
                          with "Hcg Hpc []").
                { iApply (nxi_14c with "Htext"). }
-               iIntros (CIDA5 HqA5). iApply bi.later_intro. iIntros "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDA5 HqA5). iIntros "Hcg Hpc".
                iEval (rewrite Htj5c) in "Hpc".
                iDestruct (cpu_own_transport CIDip CIDA5 0%nat eb (proc_addr j) b
                             ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3115,7 +3115,7 @@ Section ProofNparEraMain.
                                ltac:(rewrite Htgj5c; vm_compute; reflexivity)
                                with "Hcg Hpc []").
                      { iApply (nxi_082 with "Htext"). }
-                     iIntros (CIDN4 HqN4). iApply bi.later_intro. iIntros "Hcg Hpc".
+                     iApply bi.later_intro. iIntros (CIDN4 HqN4). iIntros "Hcg Hpc".
                      iEval (rewrite Htgj5c) in "Hpc".
                      iDestruct (cpu_own_transport CIDup CIDN4 0%nat eb (proc_addr j) b
                                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3455,7 +3455,7 @@ Section ProofNparEraMain.
                                  ltac:(rewrite Htj5cP; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (nxi_08a with "Htext"). }
-                       iIntros (CIDP6 HqP6). iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CIDP6 HqP6). iIntros "Hcg Hpc".
                        iEval (rewrite Htj5cP) in "Hpc".
                        iDestruct (cpu_own_transport CIDiu CIDP6 0%nat eb (proc_addr j) b
                                     ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4338,7 +4338,7 @@ Section ProofNparEraMain.
                                            reflexivity)
                                      with "Hcg Hpc []").
                            { iApply (nxi_094 with "Htext"). }
-                           iIntros (CIDGa HqGa). iApply bi.later_intro. iIntros "Hcg Hpc".
+                           iApply bi.later_intro. iIntros (CIDGa HqGa). iIntros "Hcg Hpc".
                            iEval (rewrite Htj5cM) in "Hpc".
                            iDestruct (cpu_own_transport CIDup CIDGa 0%nat eb (proc_addr j) b
                                         ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4933,7 +4933,7 @@ Section ProofNparEraMain.
                             ltac:(rewrite Htj0a4; vm_compute; reflexivity)
                             with "Hcg Hpc []").
                   { iApply (nxi_13e with "Htext"). }
-                  iIntros (CIDS8 HqS8). iApply bi.later_intro. iIntros "Hcg Hpc".
+                  iApply bi.later_intro. iIntros (CIDS8 HqS8). iIntros "Hcg Hpc".
                   iEval (rewrite Htj0a4) in "Hpc".
                   iDestruct (cpu_own_transport CIDl CIDS8 0%nat eb
                                (proc_addr j) b ltac:(wp_next_chain)
@@ -5391,7 +5391,7 @@ Section ProofNparEraMain.
                 ltac:(rewrite Htgt03c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (nxi_052 with "Htext"). }
-      iIntros (CIDA2 HqA2). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDA2 HqA2). iIntros "Hcg Hpc".
       iEval (rewrite Htgt03c) in "Hpc".
       (* ---- the register facts iget's [callee_saved] carries over ---- *)
       assert (HA4sp : A4 !!! Regidx csp_rs1 = pa_stk sp0 12).
@@ -5518,7 +5518,7 @@ Section ProofNparEraMain.
                 ltac:(rewrite HtgtA0e4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (nxi_046 with "Htext"). }
-      iIntros (CIDK5 HqK5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDK5 HqK5). iIntros "Hcg Hpc".
       iEval (rewrite HtgtA0e4) in "Hpc".
       (* ---- ENTER THE WALK at off = 0, es0 = [], ncur = n ---- *)
       iDestruct (cpu_own_transport CIDig CIDK5 0%nat eb (proc_addr j) b
@@ -5854,7 +5854,7 @@ Section ProofNparEraMain.
                 ltac:(rewrite HtgtB0e4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (nxi_046 with "Htext"). }
-      iIntros (CIDB5 HqB5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDB5 HqB5). iIntros "Hcg Hpc".
       iEval (rewrite HtgtB0e4) in "Hpc".
       (* ---- ENTER THE WALK at off = 0, es0 = [], ncur = n ---- *)
       iDestruct (cpu_own_transport CIDid CIDB5 0%nat eb (proc_addr j) b

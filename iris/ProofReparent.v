@@ -357,8 +357,8 @@ Section ProofReparentEnds.
               R9 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (rpi_2a with "Htext"). }
-    iIntros (CID16 Hst16).
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro.
+    iIntros (CID16 Hst16). iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.reparent + 0x2a) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.reparent + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".
@@ -938,8 +938,8 @@ Section ProofReparentLoop.
                   Mw av b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (rpi_44 with "Htext"). }
-        iIntros (CIDr Hsr).
-        iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro.
+        iIntros (CIDr Hsr). iIntros "Hcg Hpc".
         assert (Htgt2c : add_vec (mword_of_int (KernelSyms.reparent + 0x44) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.reparent + 0x2c))

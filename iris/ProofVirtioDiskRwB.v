@@ -1095,7 +1095,7 @@ Section ProofVirtioDiskRwB.
               A5 (trap_res eb + (K - 12))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (rwi_044 with "Htext"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hj0a8 : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x044) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 60 : mword 11) ('b"0"))))

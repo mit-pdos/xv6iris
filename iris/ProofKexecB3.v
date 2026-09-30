@@ -1907,7 +1907,7 @@ Section KexecB3Body.
                     ltac:(rewrite Hbtgt; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kxc_33e with "Htext"). }
-          iIntros (CIDy2 Hsy2). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDy2 Hsy2). iIntros "Hcg Hpc".
           iEval (rewrite Hbtgt) in "Hpc".
           iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb") as "Hph7".
           iDestruct (kxc_stack8_of_ph sp0 w62 with "Hph7 Hf62") as "Hph8".
@@ -2090,7 +2090,7 @@ Section KexecB3Body.
                        ltac:(rewrite Hbtgt; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (kxc_344 with "Htext"). }
-             iIntros (CIDy2 Hsy2). iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CIDy2 Hsy2). iIntros "Hcg Hpc".
              iEval (rewrite Hbtgt) in "Hpc".
              iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb") as "Hph7".
              iDestruct (kxc_stack8_of_ph sp0 w62 with "Hph7 Hf62") as "Hph8".
@@ -2281,7 +2281,7 @@ Section KexecB3Body.
                           ltac:(rewrite Hbtgt; vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (kxc_34a with "Htext"). }
-                iIntros (CIDy2 Hsy2). iApply bi.later_intro. iIntros "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CIDy2 Hsy2). iIntros "Hcg Hpc".
                 iEval (rewrite Hbtgt) in "Hpc".
                 iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb") as "Hph7".
                 iDestruct (kxc_stack8_of_ph sp0 w62 with "Hph7 Hf62") as "Hph8".
@@ -2940,7 +2940,7 @@ Section KexecB3Body.
                              ltac:(rewrite Htgt324b; vm_compute; reflexivity)
                              with "Hcg Hpc []").
                    { iApply (kxc_350 with "Htext"). }
-                   iIntros (CIDw3 Hsw3). iApply bi.later_intro. iIntros "Hcg Hpc".
+                   iApply bi.later_intro. iIntros (CIDw3 Hsw3). iIntros "Hcg Hpc".
                    iEval (rewrite Htgt324b) in "Hpc".
                    iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb") as "Hph7".
                    iDestruct (kxc_stack8_of_ph sp0 w62 with "Hph7 Hf62")
@@ -3149,7 +3149,7 @@ Section KexecB3Body.
                                  ltac:(rewrite Htgt11ab; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (kxc_1a0 with "Htext"). }
-                       iIntros (CIDv3 Hsv3). iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CIDv3 Hsv3). iIntros "Hcg Hpc".
                        iEval (rewrite Htgt11ab) in "Hpc".
                        iDestruct (kxc_pin_intro sp0 ra0 s00 s10 s20 pv av
                                     (m !!! Regidx Rs3) (m !!! Regidx Rs4)
@@ -3381,7 +3381,7 @@ Section KexecB3Body.
                                  ltac:(rewrite Htgt0f6; vm_compute; reflexivity)
                                  with "Hcg Hpc []").
                        { iApply (kxc_19a with "Htext"). }
-                       iIntros (CIDv5 Hsv5). iApply bi.later_intro. iIntros "Hcg Hpc".
+                       iApply bi.later_intro. iIntros (CIDv5 Hsv5). iIntros "Hcg Hpc".
                        iEval (rewrite Htgt0f6) in "Hpc".
                        (* ---- the ph buffer goes home ---- *)
                        iDestruct (kxc_ph_give sp0 pf Hphal with "Hphb")
@@ -4033,7 +4033,7 @@ Section KexecB3Close.
               ltac:(rewrite Htgt1a4; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_1f4 with "Htext"). }
-    iIntros (CID1b Hsq1b). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID1b Hsq1b). iIntros "Hcg Hpc".
     iEval (rewrite Htgt1a4) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID1b 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

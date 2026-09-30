@@ -1477,7 +1477,7 @@ Section ProofUvmalloc.
                 X4 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uai_64 with "Htext"). }
-      iIntros (CIDu34 Hsu34). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu34 Hsu34). iIntros "Hcg Hpc".
       iEval (rewrite Hjt64) in "Hpc".
       iEval (rewrite /ua_exit) in "Hexit".
       iSpecialize ("Hexit" $! CIDu34 with "[%]"); [wp_next_chain|].
@@ -1804,7 +1804,7 @@ Section ProofUvmalloc.
               G8 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uai_a0 with "Htext"). }
-    iIntros (CIDu48 Hsu48). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDu48 Hsu48). iIntros "Hcg Hpc".
     iEval (rewrite Hjta0) in "Hpc".
     iDestruct (ua_restore_mem P Pi (svpn_of (pgroundup oldsz)) i
                    (uint (pgroundup oldsz)) (uint oldsz) Mv
@@ -2501,7 +2501,7 @@ Section ProofUvmalloc.
                 Z1 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uai_a8 with "Htext"). }
-      iIntros (CIDu79 Hsu79). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu79 Hsu79). iIntros "Hcg Hpc".
       iEval (rewrite Hjta8) in "Hpc".
       iEval (rewrite /ua_exit) in "Hepi".
       iSpecialize ("Hepi" $! CIDu79 with "[%]"); [wp_next_chain|].

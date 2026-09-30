@@ -1396,7 +1396,7 @@ Section UwBodies.
                   G5 (av - 8)%nat true ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (uwi_76 with "Ht"). }
-        iIntros (CIDa7 Hsa7). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDa7 Hsa7). iIntros "Hcg Hpc".
         iEval (rewrite Jback) in "Hpc".
         (* --- +0x44  bge s1,s3 --- *)
         assert (Hcmp : zopz0zKzJ_s (rget G5 Rs1) (rget G5 Rs3)
@@ -1918,7 +1918,7 @@ Section ProofUartwrite.
                 A13 (av - 8)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uwi_38 with "Ht"). }
-      iIntros (CID25 Hs25). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID25 Hs25). iIntros "Hcg Hpc".
       assert (Jhead : add_vec (mword_of_int (KernelSyms.uartwrite + 0x38) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.uartwrite + 0x48)) by pcw.

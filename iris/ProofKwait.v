@@ -1088,7 +1088,7 @@ Section ProofKwait.
               T3 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_108 with "Htext"). }
-    iIntros (CIDj Hsj). iNext. iIntros "Hcg Hpc".
+    iNext. iIntros (CIDj Hsj). iIntros "Hcg Hpc".
     assert (Htgt7c : add_vec (mword_of_int (KW + 0x108) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1978 : mword 11) ('b"0"))))
@@ -1313,7 +1313,7 @@ Section ProofKwait.
               U5 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_a8 with "Htext"). }
-    iIntros (CIDj Hsj). iNext. iIntros "Hcg Hpc".
+    iNext. iIntros (CIDj Hsj). iIntros "Hcg Hpc".
     assert (Htgt7c : add_vec (mword_of_int (KW + 0xa8) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2026 : mword 11) ('b"0"))))
@@ -2878,7 +2878,7 @@ Section ProofKwait.
                     S6 (trap_res eb + (K - 10))%nat false ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kwi_cc with "Htext"). }
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (Htgtaa' : add_vec (mword_of_int (KW + 0xcc) : mword 64)
                               (sign_extend' 64 (sign_extend' 21
                                  (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
@@ -3546,7 +3546,7 @@ Section ProofKwait.
               D2 (trap_res eb + (K - 10))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_f8 with "Htext"). }
-    iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+    iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgb2 : add_vec (mword_of_int (KW + 0xf8) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 2013 : mword 11) ('b"0"))))
@@ -4093,7 +4093,7 @@ Section ProofKwaitMain.
               Q5 (trap_res eb + (av - 10))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kwi_3e with "Htext"). }
-    iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+    iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htge0 : add_vec (mword_of_int (KW + 0x3e) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 88 : mword 11) ('b"0"))))

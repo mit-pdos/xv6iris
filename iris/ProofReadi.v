@@ -1015,7 +1015,7 @@ Section ReadiExit.
     (* ===== c.j +0xd8 ===== *)
     iApply (wp_cj_s_sconf (mword_of_int zf) jimm Q5 (K - 14)%nat b Hal
               with "Hcg Hpc Hif").
-    iIntros (CID6 Hq6). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID6 Hq6). iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     iAssert (rd_fr8 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 HfA HfB HfC HfD HfE]"
       as "Hframe".
@@ -2492,7 +2492,7 @@ Section ReadiLoop.
                 E6 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (rdi_0a8 with "Htext"). }
-      iIntros (CIDa17 Hqa17). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDa17 Hqa17). iIntros "Hcg Hpc".
       assert (Htgt4c : add_vec (mword_of_int (RI + 0xa8) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
@@ -3214,7 +3214,7 @@ Section ReadiMain.
                   Z1 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (rdi_0cc with "Htext"). }
-        iIntros (CIDz3 Hqz3). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDz3 Hqz3). iIntros "Hcg Hpc".
         assert (Htgtd8 : add_vec (mword_of_int (RI + 0xcc) : mword 64)
                   (sign_extend' 64 (sign_extend' 21
                      (concat_vec (mword_of_int 6 : mword 11) ('b"0"))))
@@ -3373,7 +3373,7 @@ Section ReadiMain.
                 U3 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (rdi_04a with "Htext"). }
-      iIntros (CIDu9 Hqu9). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDu9 Hqu9). iIntros "Hcg Hpc".
       assert (Htgt7c : add_vec (mword_of_int (RI + 0x4a) : mword 64)
                 (sign_extend' 64 (sign_extend' 21
                    (concat_vec (mword_of_int 25 : mword 11) ('b"0"))))

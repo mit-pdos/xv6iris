@@ -662,7 +662,7 @@ Section ProofKkill.
                     M62 (trap_res b + av)%nat false ltac:(rewrite Htgt4c; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_66 with "Htext"). }
-          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt4c) in "Hpc".
           iApply ("Hret0" $! M62 with "[%] Hcg Hpc Htok HR").
           split; [exact HE9|]. split; [exact HEsp|]. exact HEcs.
@@ -881,7 +881,7 @@ Section ProofKkill.
                     M3c av b ltac:(rewrite Htgt54; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_3e with "Htext"). }
-          iIntros (CIDm Hsm). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDm Hsm). iIntros "Hcg Hpc".
           iEval (rewrite Htgt54) in "Hpc".
           iDestruct (cpu_own_transport CIDg CIDm lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".

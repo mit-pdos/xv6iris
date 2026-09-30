@@ -2345,7 +2345,7 @@ Section IputFreePath.
               (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
               P3 K b ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (ipi_ca with "Htext"). }
-    iIntros (CID29 Hst29). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID29 Hst29). iIntros "Hcg Hpc".
     assert (Htgt30 : add_vec (mword_of_int (KernelSyms.iput + 0xca) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1971 : mword 11) ('b"0"))))
@@ -4798,7 +4798,7 @@ Section IputFreePath.
                 G2 (trap_res eb + (K - 6))%nat false
                 ltac:(rewrite Htgtd0; vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (ipi_d0 with "Htext"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgtd0) in "Hpc".
       assert (HG2regs : iput_regs m G2 spd k).
       { destruct HF4hi as (P21&P22&P23&P24&P25&P26&P27).

@@ -869,7 +869,7 @@ Section ProofWalkaddr.
               B6 (K - 2)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wai_38 with "Htext"). }
-    iIntros (CID28 Hs28). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID28 Hs28). iIntros "Hcg Hpc".
     assert (Htgt2a' : add_vec (mword_of_int (KernelSyms.walkaddr + 0x38) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walkaddr + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).

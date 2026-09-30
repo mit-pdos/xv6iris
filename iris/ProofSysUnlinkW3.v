@@ -764,7 +764,7 @@ Section ProofSysUnlinkW3.
                   N10 (K - 30)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (suli_12c with "Htext"). }
-        iIntros (CID15 Hq15). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID15 Hq15). iIntros "Hcg Hpc".
         assert (Htg8a : add_vec (mword_of_int (SU + 0x12c) : mword 64)
                           (sign_extend' 64
                              (sign_extend' 21

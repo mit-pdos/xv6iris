@@ -1698,7 +1698,7 @@ Section KexecCSetup.
                   ltac:(rewrite Htgt268; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_2ba with "Htext"). }
-        iIntros (CID32c Hs32c). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID32c Hs32c). iIntros "Hcg Hpc".
         iEval (rewrite Htgt268) in "Hpc".
         iDestruct (cpu_own_transport CID22 CID32c 0%nat eb (proc_addr jp) eb
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2276,7 +2276,7 @@ Section KexecCExitM1.
               Mt (K - 68)%nat eb
               ltac:(rewrite Htgt; vm_compute; reflexivity)
               with "Hcg Hpc Hi2").
-    iIntros (CID2 Hsc2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID2 Hsc2). iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     (* ---- the frame collapse, and the two hart re-anchorings ---- *)
     iDestruct (kxc_frameC_collapse sp0 ra0 s00 s10 s20 pv av

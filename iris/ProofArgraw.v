@@ -484,7 +484,7 @@ Section ProofArgraw.
               M av' b ltac:(rewrite (ar_cj_tgt k Hk1); vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ar_i_cj k Hk1 with "Htext"). }
-    iIntros (CID1 Hs1). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID1 Hs1). iIntros "Hcg Hpc".
     iEval (rewrite (ar_cj_tgt k Hk1)) in "Hpc".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" with "Hcg Hpc").

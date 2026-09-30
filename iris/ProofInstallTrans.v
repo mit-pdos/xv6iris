@@ -1152,7 +1152,7 @@ Section InstallTransBlocks.
                 mfp (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_52 with "Htext"). }
-      iIntros (CIDh7 Hsh7). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDh7 Hsh7). iIntros "Hcg Hpc".
       assert (Htgt52 : add_vec (mword_of_int (KernelSyms.install_trans + 0x52) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 15 : mword 11) ('b"0"))))
@@ -1328,7 +1328,7 @@ Section InstallTransBlocks.
                 mf5 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_b0 with "Htext"). }
-      iIntros (CIDk5 Hsk5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDk5 Hsk5). iIntros "Hcg Hpc".
       assert (Htgtb0 : add_vec (mword_of_int (KernelSyms.install_trans + 0xb0) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
@@ -3220,7 +3220,7 @@ Section ProofInstallTrans.
                 Q11 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_44 with "Htext"). }
-      iIntros (CIDq12 Hsq12). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDq12 Hsq12). iIntros "Hcg Hpc".
       assert (Htgt6c : add_vec (mword_of_int (KernelSyms.install_trans + 0x44) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 20 : mword 11) ('b"0"))))

@@ -719,7 +719,7 @@ Section ProofUartintr.
                     (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")))
                     Mf (av - 4)%nat b ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
           { iApply (uii2_5c with "Ht"). }
-          iIntros (CIDz Hsz). iNext. iIntros "Hcg Hpc". iEval (rewrite Jb40) in "Hpc".
+          iNext. iIntros (CIDz Hsz). iIntros "Hcg Hpc". iEval (rewrite Jb40) in "Hpc".
           (* --- +0x40  c.ld a4,0(s1) --- *)
           assert (Hldb : forall (CID' : CpuId),
                     add_vec (rget (CID := CID') Mf Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
@@ -1437,7 +1437,7 @@ Section ProofUartintr.
                 (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")))
                 Mw (av - 4)%nat b ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (uii2_74 with "Ht"). }
-      iIntros (CIDW9 HsW9). iNext. iIntros "Hcg Hpc". iEval (rewrite Jrel) in "Hpc".
+      iNext. iIntros (CIDW9 HsW9). iIntros "Hcg Hpc". iEval (rewrite Jrel) in "Hpc".
       iDestruct (cpu_own_transport CIDW8 CIDW9 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (ui_ret_cont_shift CID CIDW9 i γu m av lvl eb pme b lks
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".

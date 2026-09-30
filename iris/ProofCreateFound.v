@@ -976,7 +976,7 @@ Section ProofCreateFound.
                   ltac:(rewrite Htg070g; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_08c with "Htext"). }
-        iIntros (CID23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID23 Hq23). iIntros "Hcg Hpc".
         iEval (rewrite Htg070g) in "Hpc".
         iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
         iPoseProof ("Htail" $! CID23) as "Ht".
@@ -1713,7 +1713,7 @@ Section ProofCreateFound.
                       ltac:(rewrite Htg070b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (cri_0a0 with "Htext"). }
-            iIntros (CIDB4 HqB4). iApply bi.later_intro. iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB4 HqB4). iIntros "Hcg Hpc".
             iEval (rewrite Htg070b) in "Hpc".
             iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2")
               as (nfjb) "Hnb16".
@@ -2290,7 +2290,7 @@ Section ProofCreateFound.
                   ltac:(rewrite Htg070h; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (cri_096 with "Htext"). }
-        iIntros (CID23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID23 Hq23). iIntros "Hcg Hpc".
         iEval (rewrite Htg070h) in "Hpc".
         iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
         iPoseProof ("Htail" $! CID23) as "Ht".
@@ -2549,7 +2549,7 @@ Section ProofCreateFound.
                 ltac:(rewrite Htg070n; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cri_162 with "Htext"). }
-      iIntros (CID18 Hq18). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID18 Hq18). iIntros "Hcg Hpc".
       iEval (rewrite Htg070n) in "Hpc".
       iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
       iPoseProof ("Htail" $! CID18) as "Ht".

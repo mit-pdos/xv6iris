@@ -791,7 +791,7 @@ Section ProofIget.
               D5 (trap_res b + (K - 6))%nat false ltac:(rewrite Htgt44; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (igi_32 with "Htext"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt44) in "Hpc".
     (* ================================================================= *)
     (*  THE SHARED TAIL, +0x8c .. +0x9c, proven ONCE and handed to the    *)
@@ -2450,7 +2450,7 @@ Section ProofIget.
                   Z1 (K - 6)%nat b ltac:(rewrite Htgt8c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (igi_68 with "Htext"). }
-        iIntros (CIDh2 Hsh2). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDh2 Hsh2). iIntros "Hcg Hpc".
         iEval (rewrite Htgt8c) in "Hpc".
         iDestruct (cpu_own_transport CIDr CIDh2 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".

@@ -2137,7 +2137,7 @@ Section ProofCreateMkdir.
                     ltac:(rewrite Htg0e0; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_144 with "Htext"). }
-          iIntros (CIDh8 Hqh8). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDh8 Hqh8). iIntros "Hcg Hpc".
           iEval (rewrite Htg0e0) in "Hpc".
           (* ============================================================ *)
           (*  ARM C-OK, RE-WALKED (+0xe0..+0xea).  The join is BELOW      *)
@@ -2503,7 +2503,7 @@ Section ProofCreateMkdir.
                     ltac:(rewrite Htg070m; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (cri_0ea with "Htext"). }
-          iIntros (CIDT6 HqT6). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDT6 HqT6). iIntros "Hcg Hpc".
           iEval (rewrite Htg070m) in "Hpc".
           iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2")
             as (nfj) "Hnb16".

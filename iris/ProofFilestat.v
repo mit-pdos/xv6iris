@@ -1428,7 +1428,7 @@ Section ProofFilestat.
                 ltac:(rewrite Htgt56; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsti_64 with "Htext"). }
-      iIntros (CID16 Hs16). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hs16). iIntros "Hcg Hpc".
       iEval (rewrite Htgt56) in "Hpc".
       (* ---- the shared epilogue ---- *)
       iApply (fst_epi (CID0 := CID16) m E1 K sp0 (m !!! Regidx Rra)

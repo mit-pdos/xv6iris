@@ -518,7 +518,7 @@ Section ProofWalkNoalloc.
               F1 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_98 with "Htext"). }
-    iIntros (CIDc Hsc). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDc Hsc). iIntros "Hcg Hpc".
     assert (Htgt52 : add_vec (mword_of_int (KernelSyms.walk + 0x98) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walk + 0x52)) by (apply bv_eq; vm_compute; reflexivity).

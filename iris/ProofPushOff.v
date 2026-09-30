@@ -883,8 +883,8 @@ Section ProofPushOff.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (poi_38 with "Htext"). }
-      iApply wp_next_off_intro.
       iApply bi.later_intro.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Htgt18t : add_vec (mword_of_int (KernelSyms.push_off + 0x38) : mword 64)
                  (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.push_off + 0x18))

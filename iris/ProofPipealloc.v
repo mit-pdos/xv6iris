@@ -1319,7 +1319,7 @@ Section ProofPipealloc.
                 C2 (K - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pai_9a with "Htext"). }
-      iIntros (CID27 Hs27). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID27 Hs27). iIntros "Hcg Hpc".
       assert (HtgtC4 : add_vec (mword_of_int (KernelSyms.pipealloc + 0x9a) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.pipealloc + 0xa4))
@@ -2160,7 +2160,7 @@ Section ProofPipealloc.
               O3 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pai_92 with "Htext"). }
-    iIntros (CID53 Hs53). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID53 Hs53). iIntros "Hcg Hpc".
     assert (HtgtD : add_vec (mword_of_int (KernelSyms.pipealloc + 0x92) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 19 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.pipealloc + 0xb8))

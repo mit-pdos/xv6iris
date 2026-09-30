@@ -2248,7 +2248,7 @@ Section IreclaimRelease.
               mR (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (irci_b0 with "Htext"). }
-    iIntros (CID4 Hq4). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID4 Hq4). iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0xb0) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2015 : mword 11) ('b"0"))))
@@ -3568,7 +3568,7 @@ Section IreclaimMain.
               RB (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (irci_36 with "Htext"). }
-    iIntros (CID21 Hq21). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID21 Hq21). iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ireclaim + 0x36) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 35 : mword 11) ('b"0"))))

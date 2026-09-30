@@ -782,7 +782,7 @@ Section KforkB3Proof.
                   mr (rsv + (K - 8))%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_0a2 with "Htext"). }
-        iIntros (CIDq Hstq). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDq Hstq). iIntros "Hcg Hpc".
         assert (Htgt8e' : add_vec (mword_of_int (KF + 0xa2) : mword 64)
                            (sign_extend' 64 (sign_extend' 21
                               (concat_vec (mword_of_int 2038 : mword 11) ('b"0"))))

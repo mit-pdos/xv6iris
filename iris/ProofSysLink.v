@@ -3608,7 +3608,7 @@ Section ProofSysLinkBody.
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc []").
                             { iApply (slki_ba with "Htext"). }
-                            iIntros (CID73 Hq73). iApply bi.later_intro. iIntros "Hcg Hpc".
+                            iApply bi.later_intro. iIntros (CID73 Hq73). iIntros "Hcg Hpc".
                             iEval (rewrite Htg11aba) in "Hpc".
                             iDestruct (sl_nm_join (pa_stk sp0 6) bn0 nf
                                          with "Hnm14 Hnm2") as "HbN".

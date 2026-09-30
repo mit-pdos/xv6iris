@@ -501,7 +501,7 @@ Section ProofConsputc.
                 mf3 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cpi_3a with "Htext"). }
-      iIntros (CID15 Hs15). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID15 Hs15). iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.consputc + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.consputc + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
       (* the three calls' callee-saved hops, composed back to the map at the

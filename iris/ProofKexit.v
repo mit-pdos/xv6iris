@@ -1033,8 +1033,8 @@ Section KexitLoop.
                   mr av b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxi_4a with "Htext"). }
-        iIntros (CIDr Hsr).
-        iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro.
+        iIntros (CIDr Hsr). iIntros "Hcg Hpc".
         assert (Htgt38 : add_vec (mword_of_int (KX + 0x4a) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                          = mword_of_int (KX + 0x38))

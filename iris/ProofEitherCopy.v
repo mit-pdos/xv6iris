@@ -1108,7 +1108,7 @@ Section ProofEitherCopyout.
                 L1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (eco_4a with "Htext"). }
-      iIntros (CID22 Hs22). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID22 Hs22). iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.either_copyout + 0x4a) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyout + 0x2c))
@@ -1878,7 +1878,7 @@ Section ProofEitherCopyin.
                 L1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (eci_4a with "Htext"). }
-      iIntros (CID22 Hs22). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID22 Hs22). iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.either_copyin + 0x4a) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.either_copyin + 0x2c))

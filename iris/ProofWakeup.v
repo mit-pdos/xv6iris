@@ -831,8 +831,8 @@ Section ProofWakeup.
                     M48 (trap_res b + av)%nat false ltac:(rewrite H52tgt; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wki_52 with "Htext"). }
-          iApply wp_next_off_intro.
-          iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc".
           iEval (rewrite H52tgt) in "Hpc".
           iApply ("Hrel" $! M48 with "[%] Hcg Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_18

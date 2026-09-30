@@ -490,7 +490,7 @@ Section KexecDName.
                 M n b ltac:(rewrite Htgt2cc; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2cc with "Htext"). }
-      iIntros (CID3 Hs3). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3). iIntros "Hcg Hpc".
       iEval (rewrite Htgt2cc) in "Hpc".
       iApply (kxd_scan_tail (CID0 := CID3) pj b n plen pfun dqpv sp0 pv
                 vsp v1 v2 v4 v5 v6 v10 v11 M i (S i)
@@ -1823,7 +1823,7 @@ Section KexecDCommit.
               ltac:(rewrite Htgt72; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_314 with "Htext"). }
-    iIntros (CID27 Hs27). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID27 Hs27). iIntros "Hcg Hpc".
     iEval (rewrite Htgt72) in "Hpc".
     (* ---- the threading clause: all NINE came back from THIS block's own
        reload, so [kxc_cs_cases] lands the symbolic [r] on the register each
@@ -2473,7 +2473,7 @@ Section KexecDMain.
                 ltac:(rewrite Htgt2c4; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_2b4 with "Htext"). }
-      iIntros (CID8 Hs8). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8). iIntros "Hcg Hpc".
       iEval (rewrite Htgt2c4) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
       iApply (kxd_name_loop (CID0 := CID8) (proc_addr jp) eb (K - 68)%nat

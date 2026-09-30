@@ -255,7 +255,7 @@ Section KforkB7.
               ltac:(rewrite Htgt7a; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_07a with "Htext"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt7a) in "Hpc".
     (* ---- assemble the exit and hand off to Hcont ---- *)
     assert (HT4thr : forall r : mword 5, is_cs_idx r = true ->

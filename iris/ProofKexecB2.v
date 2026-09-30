@@ -649,7 +649,7 @@ Section KexecB2Body.
               ltac:(rewrite Htgt64; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_338 with "Htext"). }
-    iIntros (CID13 Hsq13). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID13 Hsq13). iIntros "Hcg Hpc".
     iEval (rewrite Htgt64) in "Hpc".
     iDestruct (cpu_own_transport CID4 CID13 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1865,7 +1865,7 @@ Section KexecB2Loops.
                 ltac:(rewrite Htgtj; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_114 with "Htext"). }
-      iIntros (CIDf3 Hsf3). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDf3 Hsf3). iIntros "Hcg Hpc".
       iEval (rewrite Htgtj) in "Hpc".
       iDestruct (cpu_own_transport CID0 CIDf3 0%nat eb (proc_addr jp) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

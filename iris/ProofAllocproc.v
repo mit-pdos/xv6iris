@@ -924,7 +924,7 @@ Section ProofAllocprocPid.
               (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0"))) B6 (trap_res false + av)%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (api_5a with "Htext"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgt62 : add_vec (mword_of_int (KernelSyms.allocproc + 0x5a) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.allocproc + 0x62)) by pcstep.
@@ -2445,7 +2445,7 @@ Section ProofAllocproc.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (api_ee with "Htext"). }
-          iIntros (CIDn Hsn). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDn Hsn). iIntros "Hcg Hpc".
           assert (Htgt78a : add_vec (mword_of_int (KernelSyms.allocproc + 0xee) : mword 64)
                               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0"))))
                             = mword_of_int (KernelSyms.allocproc + 0xd2))
@@ -2823,7 +2823,7 @@ Section ProofAllocproc.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (api_fe with "Htext"). }
-          iIntros (CIDn Hsn). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDn Hsn). iIntros "Hcg Hpc".
           assert (Htgt78b : add_vec (mword_of_int (KernelSyms.allocproc + 0xfe) : mword 64)
                               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0"))))
                             = mword_of_int (KernelSyms.allocproc + 0xd2))
@@ -3368,7 +3368,7 @@ Section ProofAllocproc.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (api_36 with "Htext"). }
-          iIntros (CIDn Hsn). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDn Hsn). iIntros "Hcg Hpc".
           assert (Htgt78 : add_vec (mword_of_int (KernelSyms.allocproc + 0x36) : mword 64)
                              (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 78 : mword 11) ('b"0"))))
                            = mword_of_int (KernelSyms.allocproc + 0xd2))

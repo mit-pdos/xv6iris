@@ -1122,7 +1122,7 @@ Qed.
               R3 (K - 2)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sncp_0a with "Htext"). }
-    iIntros (CID6 Hs6). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID6 Hs6). iIntros "Hcg Hpc".
     assert (Ht0e : add_vec (mword_of_int (KernelSyms.strncpy + 0x0a) : mword 64)
                      (sign_extend' 64
                        (sign_extend' 21

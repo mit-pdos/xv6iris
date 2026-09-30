@@ -1041,7 +1041,7 @@ Section ProofFreewalk.
               mr (K - 6) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fwi_46 with "Htext"). }
-    iIntros (CIDb11 Hsb11). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDb11 Hsb11). iIntros "Hcg Hpc".
     assert (Htgt24' : add_vec (mword_of_int (KernelSyms.freewalk + 0x46) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
@@ -1254,7 +1254,7 @@ Section ProofFreewalk.
               R6 (K - 6) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fwi_16 with "Htext"). }
-    iIntros (CID12 Hs12). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID12 Hs12). iIntros "Hcg Hpc".
     assert (Htgt2a : add_vec (mword_of_int (KernelSyms.freewalk + 0x16) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 10 : mword 11) ('b"0"))))

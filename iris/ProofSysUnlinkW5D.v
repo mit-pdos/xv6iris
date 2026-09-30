@@ -1468,7 +1468,7 @@ Section ProofSysUnlinkW5D.
               mtu (K - 30)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_156 with "Htext"). }
-    iIntros (D18 Hd18). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (D18 Hd18). iIntros "Hcg Hpc".
     assert (Htgb8 : add_vec (mword_of_int (SU + 0x156) : mword 64)
                       (sign_extend' 64
                          (sign_extend' 21
@@ -2167,7 +2167,7 @@ Section ProofSysUnlinkW5D.
               F4 (K - 30)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0e0 with "Htext"). }
-    iIntros (D37 Hd37). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (D37 Hd37). iIntros "Hcg Hpc".
     assert (Htg168 : add_vec (mword_of_int (SU + 0xe0) : mword 64)
                        (sign_extend' 64
                           (sign_extend' 21

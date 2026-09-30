@@ -1199,7 +1199,7 @@ Section ProofUvmunmap.
               mk (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uui_74 with "Htext"). }
-    iIntros (CIDk2 Hsk2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDk2 Hsk2). iIntros "Hcg Hpc".
     assert (Htgt46 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x74) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
@@ -1617,7 +1617,7 @@ Section ProofUvmunmap.
               R9 (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uui_2c with "Htext"). }
-    iIntros (CIDr5 Hsr5). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDr5 Hsr5). iIntros "Hcg Hpc".
     assert (Htgt50 : add_vec (mword_of_int (KernelSyms.uvmunmap + 0x2c) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 18 : mword 11) ('b"0"))))

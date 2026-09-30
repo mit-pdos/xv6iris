@@ -1281,8 +1281,8 @@ Section BoBodies.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (boi_6a with "Htext"). }
-    iApply wp_next_off_intro.
     iNext.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hbk : add_vec (mword_of_int (KernelSyms.begin_op + 0x6a) : mword 64)
                     (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2024 : mword 11) ('b"0"))))
@@ -2112,8 +2112,8 @@ Section ProofBeginOp.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (boi_22 with "Htext"). }
-    iApply wp_next_off_intro.
     iNext.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Htgt2c : add_vec (mword_of_int (KernelSyms.begin_op + 0x22) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 12 : mword 11) ('b"0"))))

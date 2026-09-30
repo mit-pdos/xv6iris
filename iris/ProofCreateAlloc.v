@@ -1545,7 +1545,7 @@ Section ProofCreateAlloc.
                        ltac:(rewrite Htg070c; vm_compute; reflexivity)
                        with "Hcg Hpc []").
              { iApply (cri_0ea with "Htext"). }
-             iIntros (CIDD6 HqD6). iApply bi.later_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iIntros (CIDD6 HqD6). iIntros "Hcg Hpc".
              iEval (rewrite Htg070c) in "Hpc".
              iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2")
                as (nfj) "Hnb16".
@@ -1967,7 +1967,7 @@ Section ProofCreateAlloc.
                 ltac:(rewrite Htg070a; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cri_0f6 with "Htext"). }
-      iIntros (CIDF5 HqF5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDF5 HqF5). iIntros "Hcg Hpc".
       iEval (rewrite Htg070a) in "Hpc".
       iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
       iPoseProof ("Htail" $! CIDF5) as "Ht".

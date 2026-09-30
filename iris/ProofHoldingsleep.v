@@ -444,8 +444,8 @@ Section ProofHoldingsleep.
               C46 (trap_res b + (av - 6))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (hsl_48 with "Htext"). }
-    iApply wp_next_off_intro.
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgt1e : add_vec (mword_of_int (KernelSyms.holdingsleep + 0x48) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.holdingsleep + 0x1e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt1e) in "Hpc".

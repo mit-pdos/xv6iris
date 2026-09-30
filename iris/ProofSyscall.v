@@ -3082,7 +3082,7 @@ Section SyscallRet.
               E (av - 4)%nat true ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (syci_4a with "Htext"). }
-    iIntros (CIDb Hsb). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDb Hsb). iIntros "Hcg Hpc".
     assert (Hp58 : add_vec (mword_of_int (KernelSyms.syscall + 0x4a) : mword 64)
                      (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 17 : mword 11) ('b"0"))))
                    = mword_of_int (KernelSyms.syscall + 0x6c)) by pcw.
@@ -8682,7 +8682,7 @@ Section SyscallArms.
               E (av - 4)%nat true ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (syci_52 with "Htext"). }
-    iIntros (CIDc Hsc). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDc Hsc). iIntros "Hcg Hpc".
     assert (Hp6c : add_vec (mword_of_int (KernelSyms.syscall + 0x52) : mword 64)
                      (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                    = mword_of_int (KernelSyms.syscall + 0x6c)) by pcw.

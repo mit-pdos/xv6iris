@@ -464,7 +464,7 @@ Section ProofSysSbrk.
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_72 with "Htext"). }
-      iIntros (CIDv Hsv). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDv Hsv). iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct (cpu_own_transport CIDg CIDv 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
@@ -1250,7 +1250,7 @@ Section ProofSysSbrk.
                 ltac:(rewrite Htgt64; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (ssi_76 with "Htext"). }
-      iIntros (CIDs27 Hq27). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDs27 Hq27). iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpback" $! (pv_upt (us_V U)) (pv_sz (us_V U)) (us_M U)
                    (pv_lazy (us_V U))
@@ -1457,7 +1457,7 @@ Section ProofSysSbrk.
               ltac:(rewrite Htgt64l; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ssi_56 with "Htext"). }
-    iIntros (CIDs35 Hq35). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDs35 Hq35). iIntros "Hcg Hpc".
     iEval (rewrite Htgt64l) in "Hpc".
     (* the new size still bounds the map: it only went UP.  The image at the
        lazy view moves exactly as growproc's GREW arm does: more zeros

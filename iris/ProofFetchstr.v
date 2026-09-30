@@ -999,7 +999,7 @@ Section ProofFetchstr.
                 E1 (av - 6)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsi_40 with "Htext"). }
-      iIntros (CID21 Hk21). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID21 Hk21). iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchstr + 0x40) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.fetchstr + 0x30))

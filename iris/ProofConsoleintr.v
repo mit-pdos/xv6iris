@@ -1955,7 +1955,7 @@ Section ProofConsoleintr.
               Mw (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_16a with "Ht"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hj104 : add_vec (mword_of_int (CT + 0x16a) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 1997 : mword 11) ('b"0"))))
@@ -2038,7 +2038,7 @@ Section ProofConsoleintr.
     iEval (rewrite Hq2) in "Hpc".
     iApply (wp_cj_s_sconf pc3 (sign_extend' 21 (concat_vec jimm ('b"0")))
               R2 (trap_res b + (K - 6))%nat false Hal with "Hcg Hpc Hi3").
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite Hjt) in "Hpc".
     iSpecialize ("EXIT" $! CIDq with "[%]"); [exact Hchain|].
     iApply ("EXIT" $! R2 with "[%] [%] Hcg Hpc Hcnt Hpay Hlocked Hres
@@ -3203,7 +3203,7 @@ Section ProofConsoleintr.
               mcp (trap_res b + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_12c with "Ht"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hj104 : add_vec (mword_of_int (CT + 0x12c) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 2028 : mword 11) ('b"0"))))
@@ -4043,7 +4043,7 @@ Section ProofConsoleintr.
               F15 (trap_res b + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnti_090 with "Ht"). }
-    iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+    iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hj156 : add_vec (mword_of_int (CT + 0x90) : mword 64)
                       (sign_extend' 64 (sign_extend' 21
                          (concat_vec (mword_of_int 99 : mword 11) ('b"0"))))

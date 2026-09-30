@@ -703,7 +703,7 @@ Section ProofFetchaddr.
                 E1 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fai_44 with "Htext"). }
-      iIntros (CID14 Hk14). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID14 Hk14). iIntros "Hcg Hpc".
       assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x44) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.fetchaddr + 0x36))
@@ -827,7 +827,7 @@ Section ProofFetchaddr.
                   E2 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fai_48 with "Htext"). }
-        iIntros (CID16 Hk16). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID16 Hk16). iIntros "Hcg Hpc".
         assert (Hjc : add_vec (mword_of_int (KernelSyms.fetchaddr + 0x48) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.fetchaddr + 0x36))

@@ -961,8 +961,8 @@ Section LogWriteBlocks.
               A6 (trap_res b + (K - 4))%nat false ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (lwi_7a with "Htext"). }
-    iApply wp_next_off_intro.
-    iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Htgtae : add_vec (mword_of_int (KernelSyms.log_write + 0x7a) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 26 : mword 11) ('b"0"))))

@@ -1953,7 +1953,7 @@ Section IallocClaim.
               V6 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (iali_ba with "Htext"). }
-    iIntros (CID23 Hq23). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID23 Hq23). iIntros "Hcg Hpc".
     assert (Hjt : add_vec (mword_of_int (KernelSyms.ialloc + 0xba) : mword 64)
                     (sign_extend' 64 (sign_extend' 21
                        (concat_vec (mword_of_int 2019 : mword 11) ('b"0"))))

@@ -1951,7 +1951,7 @@ Section ProofDirlinkMain.
                 ltac:(rewrite Htgt9c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dki_5e with "Htext"). }
-      iIntros (CID16 Hq16). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hq16). iIntros "Hcg Hpc".
       iEval (rewrite Htgt9c) in "Hpc".
       iPoseProof ("Htail" $! CID16) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
@@ -3475,7 +3475,7 @@ Section ProofDirlinkMain.
                          ltac:(rewrite Htgt70b; vm_compute; reflexivity)
                          with "Hcg Hpc []").
                { iApply (dki_56 with "Htext"). }
-               iIntros (CIDB15 HqB15). iApply bi.later_intro. iIntros "Hcg Hpc".
+               iApply bi.later_intro. iIntros (CIDB15 HqB15). iIntros "Hcg Hpc".
                iEval (rewrite Htgt70b) in "Hpc".
                iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].

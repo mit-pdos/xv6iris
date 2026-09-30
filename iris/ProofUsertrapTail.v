@@ -2221,7 +2221,7 @@ Section UtFa.
                 mf nx b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_106 with "Htext"). }
-      iIntros (CID5 Hk5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hk5). iIntros "Hcg Hpc".
       assert (Hpae2 : add_vec (mword_of_int (UT + 0x106) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 2004 : mword 11) ('b"0"))))

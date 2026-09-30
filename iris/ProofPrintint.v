@@ -1542,7 +1542,7 @@ Section ProofPrintint.
                   G2 (K - 8)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (pii_94 with "Htext"). }
-        iIntros (CID10b Hs10b). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID10b Hs10b). iIntros "Hcg Hpc".
         assert (Htgt12 : add_vec (mword_of_int (KernelSyms.printint + 0x94) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1983 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.printint + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt12) in "Hpc".
         assert (HshiftB : b = false \/ pcur = zero_reg -> (CID10b : CPU) = (CID : CPU)) by wp_next_chain.

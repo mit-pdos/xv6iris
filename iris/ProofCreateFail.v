@@ -889,7 +889,7 @@ Section ProofCreateFail.
               ltac:(rewrite Htg070f; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cri_15e with "Htext"). }
-    iIntros (CIDGC HqGC). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDGC HqGC). iIntros "Hcg Hpc".
     iEval (rewrite Htg070f) in "Hpc".
     iDestruct (cr_join14 (pa_stk sp0 10) with "Hnb14 Hnb2") as (nfj) "Hnb16".
     iPoseProof ("Htail" $! CIDGC) as "Ht".

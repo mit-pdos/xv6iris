@@ -2189,8 +2189,8 @@ Section IlockLoad.
               Z0 (K - 4)%nat b ltac:(rewrite Hjmp; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ili_a0 with "Htext"). }
-    iIntros (CID39 Hq39).
     iApply bi.later_intro.
+    iIntros (CID39 Hq39).
     iIntros "Hcg Hpc".
     iEval (rewrite Hjmp) in "Hpc".
     (* ---- into the join ---- *)

@@ -679,7 +679,7 @@ Section ProofUvmcopy.
               N6 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uci_7c with "Htext"). }
-    iIntros (CIDe8 Hse8). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDe8 Hse8). iIntros "Hcg Hpc".
     iEval (rewrite Hjt7c) in "Hpc".
     iDestruct (cpu_own_transport CIDe6 CIDe8 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -2486,7 +2486,7 @@ Section ProofUvmcopy.
               R7 (K - 10)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (uci_22 with "Htext"). }
-    iIntros (CIDr18 Hsr18). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDr18 Hsr18). iIntros "Hcg Hpc".
     iEval (rewrite Hjt22) in "Hpc".
     assert (Hiv0 : bv_unsigned (mword_of_int 0 : mword 64) = (4096 * Z.of_nat 0)%Z)
       by (vm_compute; reflexivity).

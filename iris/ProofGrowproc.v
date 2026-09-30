@@ -922,7 +922,7 @@ Section ProofGrowproc.
                   ltac:(rewrite Htgt3c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (gpi_5c with "Htext"). }
-        iIntros (CID19 Hn19). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID19 Hn19). iIntros "Hcg Hpc".
         iEval (rewrite Htgt3c) in "Hpc".
         iDestruct (cpu_own_transport CID9 CID19 0%nat eb p b ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
@@ -1204,7 +1204,7 @@ Section ProofGrowproc.
                   ltac:(rewrite Htgt3c2; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (gpi_60 with "Htext"). }
-        iIntros (CID25 Hn25). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID25 Hn25). iIntros "Hcg Hpc".
         iEval (rewrite Htgt3c2) in "Hpc".
         iDestruct (cpu_own_transport CID21 CID25 0%nat eb p b ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
@@ -1527,7 +1527,7 @@ Section ProofGrowproc.
               ltac:(rewrite Htgt362; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (gpi_58 with "Htext"). }
-    iIntros (CID19 Hn19). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID19 Hn19). iIntros "Hcg Hpc".
     iEval (rewrite Htgt362) in "Hpc".
     (* what the new size is, and that it still bounds the map *)
     assert (Hszb' : (uint (md !!! Regidx Ra0) <= uvm_maxsz)%Z).

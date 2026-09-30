@@ -1233,7 +1233,7 @@ Section ProofDirlookupMain.
                 ltac:(rewrite Htgt96; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dli_38 with "Htext"). }
-      iIntros (CID25 Hq25). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID25 Hq25). iIntros "Hcg Hpc".
       iEval (rewrite Htgt96) in "Hpc".
       assert (Hnone : dir_first data nrec s = None).
       { apply dlk_first_none_zero. apply dlk_nrec_zero. exact Hsz0. }
@@ -2227,7 +2227,7 @@ Section ProofDirlookupMain.
                       ltac:(rewrite Htgt96b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dli_92 with "Htext"). }
-            iIntros (CIDB18 HqB18). iApply bi.later_intro. iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB18 HqB18). iIntros "Hcg Hpc".
             iEval (rewrite Htgt96b) in "Hpc".
             (* the de buffer goes back to sixteen raw bytes for the tail *)
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj

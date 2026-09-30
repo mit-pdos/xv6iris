@@ -1054,7 +1054,7 @@ Section ProofArgfd.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (afi_58 with "Htext"). }
-        iIntros (CID24 Hk24). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID24 Hk24). iIntros "Hcg Hpc".
         assert (Hjt : add_vec (mword_of_int (KernelSyms.argfd + 0x58) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.argfd + 0x46))
@@ -1210,7 +1210,7 @@ Section ProofArgfd.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (afi_54 with "Htext"). }
-      iIntros (CID16 Hk16). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hk16). iIntros "Hcg Hpc".
       assert (Hjt2 : add_vec (mword_of_int (KernelSyms.argfd + 0x54) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.argfd + 0x46))

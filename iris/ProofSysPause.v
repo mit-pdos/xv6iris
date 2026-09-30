@@ -868,7 +868,7 @@ Section SpBodies.
               (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))
               K6 (av - 8)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (spi_b0 with "Htext"). }
-    iIntros (CIDk5 Hsk5). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDk5 Hsk5). iIntros "Hcg Hpc".
     assert (Htg7e : add_vec (mword_of_int (KernelSyms.sys_pause + 0xb0) : mword 64)
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
                     = mword_of_int (KernelSyms.sys_pause + 0x8e)) by pcstep.
@@ -2130,7 +2130,7 @@ Section ProofSysPause.
                 (sign_extend' 21 (concat_vec (mword_of_int 1984 : mword 11) ('b"0")))
                 A1 (av - 8)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (spi_9a with "Htext"). }
-      iIntros (CID12 Hs12). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12). iIntros "Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.sys_pause + 0x9a) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1984 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.sys_pause + 0x1a)) by pcstep.

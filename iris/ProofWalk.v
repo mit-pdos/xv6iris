@@ -1080,7 +1080,7 @@ Section ProofWalk.
               P3 (K - 8)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wi_94 with "Htext"). }
-    iIntros (CIDa14 Hsa14). iNext. iIntros "Hcg Hpc".
+    iNext. iIntros (CIDa14 Hsa14). iIntros "Hcg Hpc".
     assert (Htgt40 : add_vec (mword_of_int (KernelSyms.walk + 0x94) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walk + 0x40)) by (apply bv_eq; vm_compute; reflexivity).

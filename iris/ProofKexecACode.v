@@ -788,7 +788,7 @@ Section KexecABody.
                 ltac:(rewrite Htj72; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kxc_08e with "Htext"). }
-      iIntros (CIDz2 Hsz2). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDz2 Hsz2). iIntros "Hcg Hpc".
       iEval (rewrite Htj72) in "Hpc".
       (* ---- close the private block and take the shared exit ---- *)
       iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".

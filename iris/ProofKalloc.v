@@ -327,8 +327,8 @@ Section ProofKalloc.
                 mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kai_58 with "Htext"). }
-      iIntros (CIDe1 Hse1).
-      iNext. iIntros "Hcg Hpc".
+      iNext.
+      iIntros (CIDe1 Hse1). iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.kalloc + 0x58) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.kalloc + 0x40))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".

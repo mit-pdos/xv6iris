@@ -854,7 +854,7 @@ Section ProofFdalloc.
                   G3 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fdi_3e with "Htext"). }
-        iIntros (CIDcj HsCj). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDcj HsCj). iIntros "Hcg Hpc".
         assert (Htgt28 : add_vec (mword_of_int (KernelSyms.fdalloc + 0x3e) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.fdalloc + 0x28))

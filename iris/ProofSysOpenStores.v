@@ -935,7 +935,7 @@ Section ProofSysOpenStores.
               mit (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_154 with "Htext"). }
-    iIntros (CID17 Hq17). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID17 Hq17). iIntros "Hcg Hpc".
     assert (Htg154 : add_vec (mword_of_int (SO + 0x154) : mword 64)
                        (sign_extend' 64
                           (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0"))))

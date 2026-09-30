@@ -2924,7 +2924,7 @@ Section ProofPiperead.
                     (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
                     E1 (trap_res true + (av - 12))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
           { iApply (pri_102 with "Htext"). }
-          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           assert (Hjfe : add_vec (mword_of_int (KernelSyms.piperead + 0x102) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.piperead + 0xd4)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3321,7 +3321,7 @@ Section ProofPiperead.
                   (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0")))
                   N3 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (pri_7c with "Htext"). }
-        iIntros (CIDp31 Hsp31). iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iIntros (CIDp31 Hsp31). iIntros "Hcg Hpc". rgall.
         assert (Hje4 : add_vec (mword_of_int (KernelSyms.piperead + 0x7c) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 54 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.piperead + 0xe8)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3754,7 +3754,7 @@ Section ProofPiperead.
                 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                 L8 (trap_res true + (av - 12))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (pri_6a with "Htext"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj84 : add_vec (mword_of_int (KernelSyms.piperead + 0x6a) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.piperead + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3828,7 +3828,7 @@ Section ProofPiperead.
                 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
                 W0 (trap_res true + (av - 12))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (pri_72 with "Htext"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj84b : add_vec (mword_of_int (KernelSyms.piperead + 0x72) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.piperead + 0x84)) by (apply bv_eq; vm_compute; reflexivity).

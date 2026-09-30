@@ -787,7 +787,7 @@ Section CwBodies.
               R8 (av - 16)%nat true ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (cnwi_80 with "Ht"). }
-    iIntros (CIDj Hsj). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDj Hsj). iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
     iApply (cw_epi (CID := CIDj) CID0 jp m0 R8 av eb sp0 pid U n r lks Q Pe
               Hm0sp HR8sp Hs1v Hhi Hr Hshort Hav Heb ltac:(wp_next_chain)
@@ -1743,7 +1743,7 @@ Section CwBodies.
                 A3 (av - 16)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cnwi_6c with "Ht"). }
-      iIntros (CIDh5 Hsh5). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDh5 Hsh5). iIntros "Hcg Hpc".
       iEval (rewrite Htgt38b) in "Hpc".
       iApply ("BODY" $! CIDh5 A3 with "[%] [%] [%] [%] Hcg Hpc").
       + exact HA3regs.
@@ -1922,7 +1922,7 @@ Section CwBodies.
                 A2 (av - 16)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cnwi_84 with "Ht"). }
-      iIntros (CID8 Hs8). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8). iIntros "Hcg Hpc".
       iEval (rewrite Htgt98) in "Hpc".
       iAssert (cw_rest sp0) with "[F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16]"
         as "Hrest".
@@ -2198,7 +2198,7 @@ Section CwBodies.
                 G8 (av - 16)%nat true ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cnwi_36 with "Ht"). }
-      iIntros (CIDg9 Hsg9). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDg9 Hsg9). iIntros "Hcg Hpc".
       iEval (rewrite Htgt60) in "Hpc".
       (* the ten roles, as [cw_regs] states them *)
       assert (HA9regs : cw_regs G8 (pa_stk sp0 16%nat) sp0 src n 0).

@@ -1003,7 +1003,7 @@ Section ProofMappages.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (mi_b4 with "Htext"). }
-      iIntros (CIDl3 Hsl3). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDl3 Hsl3). iIntros "Hcg Hpc".
       assert (Htgt9c : add_vec (mword_of_int (KernelSyms.mappages + 0xb4) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.mappages + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1067,7 +1067,7 @@ Section ProofMappages.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (mi_68 with "Htext"). }
-    iIntros (CIDm3 Hsm3). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDm3 Hsm3). iIntros "Hcg Hpc".
     assert (Htgt3e : add_vec (mword_of_int (KernelSyms.mappages + 0x68) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.mappages + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).

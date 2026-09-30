@@ -633,7 +633,7 @@ Section ProofStrncmp.
                     M6 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (snci_22 with "Htext"). }
-          iIntros (CID10 Hs10). iApply bi.later_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10). iIntros "Hcg Hpc".
           assert (Ht32 : add_vec (mword_of_int (KernelSyms.strncmp + 0x22) : mword 64)
                     (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                   = mword_of_int (KernelSyms.strncmp + 0x32))
@@ -1335,7 +1335,7 @@ Section ProofStrncmp.
                 Z1 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (snci_26 with "Htext"). }
-      iIntros (CID7 Hs7). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hs7). iIntros "Hcg Hpc".
       assert (Ht32 : add_vec (mword_of_int (KernelSyms.strncmp + 0x26) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 6 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.strncmp + 0x32))

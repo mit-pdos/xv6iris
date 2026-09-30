@@ -1922,7 +1922,7 @@ Section ProofConsoleread.
               (sign_extend' 21 (concat_vec (mword_of_int 2017 : mword 11) ('b"0")))
               X4 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
     { iApply (cnri_10c with "Ht"). }
-    iIntros (CIDj Hsj). iNext. iIntros "Hcg Hpc". rgall.
+    iNext. iIntros (CIDj Hsj). iIntros "Hcg Hpc". rgall.
     assert (Hjce : add_vec (mword_of_int (CR + 0x10c) : mword 64)
                      (sign_extend' 64 (sign_extend' 21
                         (concat_vec (mword_of_int 2017 : mword 11) ('b"0"))))
@@ -2355,7 +2355,7 @@ Section ProofConsoleread.
                   H9 (trap_res true + (av - 12))%nat false
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (cnri_0f8 with "Ht"). }
-        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjfc : add_vec (mword_of_int (CR + 0xf8) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 2 : mword 11) ('b"0"))))
@@ -2470,7 +2470,7 @@ Section ProofConsoleread.
                 E2 (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnri_0f0 with "Ht"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hjfc2 : add_vec (mword_of_int (CR + 0xf0) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 6 : mword 11) ('b"0"))))
@@ -2894,7 +2894,7 @@ Section ProofConsoleread.
                   G10 (trap_res true + (av - 12))%nat false
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
         { iApply (cnri_110 with "Ht"). }
-        iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjfc3 : add_vec (mword_of_int (CR + 0x110) : mword 64)
                           (sign_extend' 64 (sign_extend' 21
                              (concat_vec (mword_of_int 2038 : mword 11) ('b"0"))))
@@ -2965,7 +2965,7 @@ Section ProofConsoleread.
                 G10 (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnri_0be with "Ht"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj38 : add_vec (mword_of_int (CR + 0xbe) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1981 : mword 11) ('b"0"))))
@@ -3921,7 +3921,7 @@ Section ProofConsoleread.
                 D2 (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (cnri_0f4 with "Ht"). }
-      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj76 : add_vec (mword_of_int (CR + 0xf4) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 1985 : mword 11) ('b"0"))))

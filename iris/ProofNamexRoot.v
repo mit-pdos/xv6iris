@@ -567,7 +567,7 @@ Section ProofNamexRoot.
               ltac:(rewrite Htgt03c; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nxi_052 with "Htext"). }
-    iIntros (CIDA2 HqA2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDA2 HqA2). iIntros "Hcg Hpc".
     iEval (rewrite Htgt03c) in "Hpc".
     (* ---- the register facts iget's [callee_saved] carries over ---- *)
     assert (HA4sp : A4 !!! Regidx csp_rs1 = pa_stk sp0 12).
@@ -678,7 +678,7 @@ Section ProofNamexRoot.
               ltac:(rewrite Htgt0f4; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (nxi_046 with "Htext"). }
-    iIntros (CIDK5 HqK5). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDK5 HqK5). iIntros "Hcg Hpc".
     iEval (rewrite Htgt0f4) in "Hpc".
     (* ===== +0x0f4 lbu a5,0(s1) : path[0] again ===== *)
     iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (NX + 0xf4)) Ra5 Rs1

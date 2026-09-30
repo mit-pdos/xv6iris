@@ -1923,7 +1923,7 @@ Section EndOpBlocks.
               mr (K - 8)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (eoi_66 with "Htext"). }
-    iIntros (CIDc2 Hsc2). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDc2 Hsc2). iIntros "Hcg Hpc".
     assert (Htgt66 : add_vec (mword_of_int (KernelSyms.end_op + 0x66) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 22 : mword 11) ('b"0"))))
@@ -2726,7 +2726,7 @@ Section EndOpBlocks.
               with "Hcg Hpc []").
     { iApply (eoi_120 with "Htext"). }
     (* the jump's later strips the token's (sync K3-3) *)
-    iIntros (CIDa10 Hsa10). iNext. iIntros "Hcg Hpc".
+    iNext. iIntros (CIDa10 Hsa10). iIntros "Hcg Hpc".
     assert (Htgt120 : add_vec (mword_of_int (KernelSyms.end_op + 0x120) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 1937 : mword 11) ('b"0"))))
