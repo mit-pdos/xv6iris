@@ -232,16 +232,14 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  -- THE CRASH SEAM AT THE APPLICATION'S GUEST AND THE TRANSPORT: fsinit
-  -- builds the commit's law from them (`fsSnapLawBuild`) and derives
-  -- initlog's arity-free seam from the first.  Then the era certificate and
-  -- the era's BORN-TRUE mirror half.
-  fsCrashSeamAt (hlc := hlc) (GF := GF) appGuestK fscCov fscLogst ∗
-  -- THE MERGE (SY3-K2) and THE SYNC RUNNER (sync K3-3), kit 2's last rows:
-  -- fsinit builds the commit's law and the ghost commit's hooked law from
-  -- them (`fsSnapLawBuild`, `fsSnapLawGhostBuild`)
-  appMergeK (hlc := hlc) (GF := GF) ∗
-  appSyncRunK (hlc := hlc) (GF := GF) ∗
+  -- THE CRASH SEAM AT THE APPLICATION'S GUEST, THE MERGE AND THE SYNC RUNNER
+  -- (SY3-K2, K3-3), kit 2's last row -- ONE package at the guest's
+  -- durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b): fsinit builds the
+  -- commit's law and the ghost commit's hooked law from it
+  -- (`fsSnapLawBuild`, `fsSnapLawGhostBuild`) and derives initlog's arity-free
+  -- seam from the seam.  Then the era certificate and the era's BORN-TRUE
+  -- mirror half.
+  appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst ∗
   genCert (hlc := hlc) (GF := GF) ∗
   -- ...and THE CRASH INVARIANT (sync K3-3), off `firstBootPersist` beside the
   -- certificate: initlog parks it into `logCtx` for the ghost commit to open

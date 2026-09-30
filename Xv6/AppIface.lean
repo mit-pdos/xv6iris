@@ -52,6 +52,11 @@ Rocq's header on the record, kept because the reasons are the content:
 4. The three timelessness/persistence facts are fields, as Rocq's, and are
    also registered as instances on the projections (Rocq's `Global Instance
    app_tag_persistent` etc.).
+6. (drift D3-app/S, Rocq main SY3-A1 / SY3-A3b) the record's sync fields
+   `turn'`/`turn''`/`iturn`/`cls`/`born`/`ok`/`okc`/`tk`/`hk` are Rocq's
+   `app_turn'`...`app_hk` in Rocq's order; the trivial values Rocq defines in
+   `SystemAdequacy.v` (`app_triv_tk` …) are defined here (`appTrivTk` …),
+   before `appTriv`, since this file sits below `SystemSlot`.
 5. (seccomp S0, K3.)  The wild credentials `wild`/`rdwild` are Rocq's
    `ai_wild`/`ai_rdwild`; the machine's record gets two slots
    (`MachFixedGS.wild`/`rdwild`, deviation 1) fed from here.  The law

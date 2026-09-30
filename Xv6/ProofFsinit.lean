@@ -91,13 +91,21 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_fsinit_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hseamg, #Hmerge, #Hrun, #Hcert, #Hcinv, Hborn, Hfree,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hdurl, #Hcert, #Hcinv, Hborn, Hfree,
     #Hbinv, Hfsb, Hold, Hxo, #Hreg, #Hbreg,
     Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
   -- the arity-free seam initlog and ireclaim take, off the one at the
   -- application's guest (Rocq `fs_crash_seam_of_at`)
-  ihave #Hseam := fsCrashSeam_ofAt appGuestK fscCov fscLogst $$ Hseamg
+  -- the durable side at the guest's durable-copy predicate (Rocq SY3-A3b):
+  -- the seam at the guest, and the merge package
+  unfold appDurLaws
+  icases Hdurl with ⟨%Okc, #Hseamg, #Hmerge⟩
+  -- ...and the package at the era's record predicate (Rocq SY3-A1): the merge,
+  -- the runner, and the running record's membership
+  unfold appMerge
+  icases Hmerge with ⟨%Ok, %hOk, #Hmergeo, #Hrun⟩
+  ihave #Hseam := fsCrashSeam_ofAt (appGuest Okc) fscCov fscLogst $$ Hseamg
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (Rocq's `Hlawf`): assembled
   -- out of the invariants fsinit already holds, read at the record block 1
   -- DECODES to -- the three ties (a'') are that bridge.  The park itself is
@@ -112,21 +120,20 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     $$ Hit2
   ihave #Hpool := isItable2_pool fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
     $$ Hit2
-  unfold appMergeK appSyncRunK
   ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
-      (eraSyncTok (hlc := hlc) (GF := GF))) $$ []
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) $$ []
   · imodintro
     iintro #Hpark
-    iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ rfl rfl hcg'
-      $$ Hseamg Hmerge Hreg' Hbreg' Hesc Hpool Hpark
+    iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ Ok Okc _ rfl
+      rfl hcg' hOk $$ Hseamg Hmergeo Hreg' Hbreg' Hesc Hpool Hpark
   -- ...AND THE GHOST COMMIT'S HOOKED LAW (Rocq sync K3-3), the same assembly
   -- over the runner beside the merge, at the era's two fixed-record slots
   ihave #Hlawg : □ (sbPark fscFs sbrec -∗ snapLawGhost (hlc := hlc) icfgLog fscFs fscCov fscLogst
-      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) $$ []
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) $$ []
   · imodintro
     iintro #Hpark
-    iapply fsSnapLawGhostBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ _ rfl
-      rfl hcg' $$ Hseamg Hmerge Hrun Hreg' Hbreg' Hesc Hpool Hpark
+    iapply fsSnapLawGhostBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec _ Ok Okc _ _
+      rfl rfl hcg' hOk $$ Hseamg Hmergeo Hrun Hreg' Hbreg' Hesc Hpool Hpark
   ihave Hcr : fsinitCrash (hlc := hlc) M sbrec Xv $$ [Hborn]
   · unfold fsinitCrash
     iframe Hborn

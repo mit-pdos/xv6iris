@@ -96,8 +96,8 @@ theorem logCtx_mk (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     isLock γ.lk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart) ∗
     swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
-    snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
+    snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
       (eraSyncHook (hlc := hlc) (GF := GF)) ∗
     crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF)
     ⊢ logCtx γ γb γfs cov logstart dev := by

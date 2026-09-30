@@ -408,8 +408,9 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     (hcovmeta : ∀ b, 1 ≤ b → b < fsDataStart S.fssSb → b ∈ cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
+      -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
+      -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
+      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
@@ -418,7 +419,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
   -- the WAL's own row (b): every block of the committed view is whole
   have hdf : dblkFull (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) := fun b bs h => by
     rw [← snapRestrict_val Pb _ b bs h]; exact hlPb b
-  iintro Hdisk Hclaim #Hmerge #Hrun #Hseam Hstok Hsnap
+  iintro Hdisk Hclaim #Hdurl Hstok Hsnap
   -- THE TIE IS A READING
   ihave %hok := fsSnap_readOk gsn gln gtn _ S hdf $$ Hsnap
   -- 1. the log's gnames
@@ -525,9 +526,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     isplitr; · iexact Hbinv
     isplitl [Hxo]; · iexact Hxo
     isplitr; · iexact Henv
-    isplitr; · iexact Hseam
-    isplitr; · iexact Hmerge
-    iexact Hrun
+    iexact Hdurl
   -- the NINODE off-box set authorities, EMPTY
   iapply (BigSepL.bigSepL_mono (l := List.range NINODE)
     (Φ := fun _ k => iOwn (GF := GF) (F := constOF OffSetUR) (I.icfgOff k)
@@ -550,8 +549,9 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
+      -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
+      -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
+      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
@@ -594,8 +594,9 @@ theorem fsCfgAllocSnap [CurCtx]
     (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
     ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
       ▷ appPred appRun (absView S.fssInodes) -∗
-      appMergeK (hlc := hlc) -∗ appSyncRunK (hlc := hlc) -∗
-      fsCrashSeamAt (hlc := hlc) appGuestK cov S.fssSb.sbLogstart -∗
+      -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE, ONE row closed over
+      -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
+      appDurLaws (hlc := hlc) cov S.fssSb.sbLogstart -∗
       -- THE ERA'S SYNC TOKEN (Rocq sync K3-2/K3-3), into the log's free bundle
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗

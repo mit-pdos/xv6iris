@@ -608,13 +608,13 @@ def logCtx (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   -- THE FILE SYSTEM'S LAW (Rocq's `snap_law`), at the era's sync token
   -- (sync K3-3): the law carries the application's opaque token into the
   -- durable pair and back
-  snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
+  snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
   -- THE GHOST COMMIT'S THREE (Rocq sync K3-3, `log_ctx`'s last rows): the
   -- HOOKED LAW pinned at the era's two fixed-record slots, the CRASH
   -- INVARIANT it opens (`MachCSL.wpHart_crash_fupd`), and the ERA
   -- CERTIFICATE the record's squeeze reads.  All persistent, all parked by
   -- `initlog`.  LAST, so no pattern that opens this bundle moves.
-  snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+  snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
     (eraSyncHook (hlc := hlc) (GF := GF)) ∗
   crashInv (hlc := hlc) (GF := GF) ∗
   genCert (hlc := hlc) (GF := GF)
@@ -658,7 +658,7 @@ variable [FsLinkG GF] [FsTopG GF] in
 theorem logCtx_snapLaw (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
-      snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) := by
+      snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, H, -⟩; iexact H
 
 variable [FsLinkG GF] [FsTopG GF] in
@@ -666,7 +666,7 @@ variable [FsLinkG GF] [FsTopG GF] in
 theorem logCtx_snapLawGhost (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢
-      snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+      snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
         (eraSyncHook (hlc := hlc) (GF := GF)) := by
   unfold logCtx; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H
 

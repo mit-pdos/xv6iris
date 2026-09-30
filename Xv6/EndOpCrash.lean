@@ -194,7 +194,7 @@ theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       -- the law puts it into the pair
       eraSyncTok (hlc := hlc) (GF := GF) -∗
       |={⊤}=> ((∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov ls ∗
-          snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) L (fsHomeList cov ls)) ∗
+          snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) L (fsHomeList cov ls)) ∗
         fsCacheAuth γfs L ∗ logTxAuth γ ∅) := by
   iintro #Hctx HcL Ht HT
   ihave #Hlaw := logCtx_snapLaw γ γb γfs cov ls dev $$ Hctx
@@ -217,7 +217,7 @@ theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   ihave %hsub := ghost_map_lookup_big C $$ HcL HC
   have hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov ls b := by
     intro b; rw [hok.dom b, mem_fsHomeList]
-  imod snapLaw_run γ γfs cov ls _ Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht HT
+  imod snapLaw_run γ γfs cov ls _ _ Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht HT
     with ⟨⟨%G, #Hseam, Hout⟩, Ha, Ht⟩
   imod Hclose $$ [Ha HC Hxa] with -
   · inext
@@ -253,7 +253,7 @@ theorem eo_commit_fam (G : GName → IProp GF) (cov : Std.ExtTreeSet Nat compare
         (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) Mc -∗
-      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       ∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
         ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
         diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))

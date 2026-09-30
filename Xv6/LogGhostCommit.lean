@@ -77,7 +77,7 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
   ihave #Hseal := logCtx_seal γ γb γfs cov ls dev $$ Hctx
   ihave #Hrow := logCtx_bytes γ γb γfs cov ls dev $$ Hctx
   ihave #Hlg := logCtx_snapLawGhost γ γb γfs cov ls dev $$ Hctx
-  icases snapLawGhost_run γ γfs cov ls _ _ $$ Hlg with ⟨%G, #Hseam, #Hlaw⟩
+  icases snapLawGhost_run γ γfs cov ls _ _ _ $$ Hlg with ⟨%G, #Hseam, #Hlaw⟩
   iapply wpHart_crash_fupd cpu m iprop(logQuiet (hlc := hlc) γ γfs cov ls L M ∗
       eraSyncTok (hlc := hlc) (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv [Hq HT HQs]
   · iintro %n %hn Hsa Hc
@@ -115,8 +115,8 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
     have hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov ls b := by
       intro b; rw [hok.dom b, mem_fsHomeList]
     -- ---- 4. the hooked law
-    imod Hlaw $$ %Lb %C %Qs %gt_o %hdom %hok.lens %hbt %hok.bdom Ha Htx HG HT HQs
-      with ⟨⟨%gt, Hdur, HG⟩, HT, HQs, Ha, Htx⟩
+    imod Hlaw $$ %Lb %C %Qs %gt_o %n %hdom %hok.lens %hbt %hok.bdom Ha Htx HG HT %hn Hsa HQs
+      with ⟨⟨%gt, Hdur, HG⟩, HT, Hsa, HQs, Ha, Htx⟩
     imod Hclose $$ [Ha HC Hxa] with -
     · inext
       iexists Lb, C, []

@@ -307,7 +307,7 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (T : IProp GF) (cov : Ext
       (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      durPair G T (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      durPair (hlc := hlc) G T (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
         (some (logHdrBno ls * BSIZE + 0, bs.take Virtio.sectorSize))
         iprop(logMirrorHalf (hlc := hlc)
@@ -338,8 +338,9 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (T : IProp GF) (cov : Ext
     rw [← hnew]; exact logMirrorOk_upd_sector M0 dk cov ls (logHdrBno ls) 0 _ hfit hok
   -- THE SNAPSHOT STEPS: the old copy dropped, the old guest MERGED into the
   -- new one, the token back
-  imod dsnapStep_merge G T gt r.frD (fsRestrict (dvOfD L) (fsHomeList cov ls)) $$ Hepoch Hdur HG
-    with ⟨Hpair, HT⟩
+  imod dsnapStep_merge G T (genId (hlc := hlc) (GF := GF)) gt r.frD
+    (fsRestrict (dvOfD L) (fsHomeList cov ls)) n hn1 $$ Hepoch Hdur Hsa HG
+    with ⟨Hpair, HT, Hsa⟩
   icases Hpair with ⟨%gt', Hdur, HG⟩
   imod fsHist_update γs.hist r.frHist (r.frHist ++ [fsRestrict (dvOfD L) (fsHomeList cov ls)])
     (List.prefix_append _ _) $$ Hhist with Hhist

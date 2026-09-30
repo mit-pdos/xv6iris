@@ -10,11 +10,18 @@ application's durable claim is a SEPARATE conjunct of the crash slot, holding
 the GUEST half at the same gname beside its claim about the map's view.
 Agreement is the identification.
 
-THREE CROSSINGS, ONE TRANSPORT (`Xv6/AppInv.lean`'s `appXferRaw`): at the
-COMMIT the file system's law mints a fresh snapshot and hands its guest half
-here, where the running claim is copied onto it (`appDurRaw_clone`); at
-POWER-ON the clone (`Xv6/FsCrash.lean`, `pFs_swap`) does the same off the crash
-slot's own guest; at the BOOT the lent guest meets the clone's kernel half.
+THREE CROSSINGS (Rocq main, SY3-K2 / SY3-A1 / SY3-A3b): at the COMMIT the file
+system's law mints a fresh snapshot and hands its guest half here, where the
+MERGE (`AppInv.appMergeRaw`) turns the running claim into a wand from the old
+guest to the new one (`appDurRaw_merge`, lent the machine's started auth), which
+the header write applies; at POWER-ON the crash slot's swap runs the
+application's POWER-ON TRANSPORT (`SystemSlot.appXferBootRaw`) on the slot's own
+guest; at the BOOT the lent guest meets the clone's kernel half.
+
+THE DURABLE-COPY PREDICATE `Okc` (Rocq SY3-A3b): every guest's record satisfies
+a pure predicate the application chooses (`Xv6App.okc`); `Appcfg` does not
+carry it, so the crash seam at the era's guest and the merge package are closed
+over it TOGETHER (`appDurLaws`, Rocq `app_dur_laws`).
 
 RAW FIRST, PINNED SECOND.  `appDurRaw` takes the predicate as an argument, so
 the system theorem can state the crash slot before any era's record exists;
@@ -31,10 +38,15 @@ supplies.
 2. `appDurRaw_open` pulls the two existentials through the later separately
    (`later_exists_except0`, then `later_exists` over the inhabited node map),
    where Rocq's one `bi.later_exist_except_0` plus `iDestruct` does both.
+3. (drift D3-app/S) `appDurLaws_seam` is a named lemma for Rocq's inline
+   `fs_crash_seam_of_at` at the package's guest (BootSharedFs).
+4. (drift D3-app/S) `appDurRaw_merge` sits in its own section over
+   `[MachFixedGS]` (Rocq's `AppDurMerge` over `riscvFixedGS`), since its wand
+   names `startAuth`.
 
 ## NOT PORTED (crash brief D36; uses checked over `/shared/xv6rocq/iris/*.v`)
 
-* `app_dur_raw_agree` -- no use outside AppDur.v.
+* `app_dur_raw_clone` -- deleted at Rocq main (the commit takes the merge).
 -/
 import Xv6.AppInv
 import Xv6.FsCrashSeam
@@ -183,106 +195,14 @@ instance appDurLaws_persistent (cov : ExtTreeSet Nat compare) (ls : Nat) :
     Persistent (appDurLaws (hlc := hlc) (GF := GF) cov ls) := by
   unfold appDurLaws; infer_instance
 
+/-- The arity-free seam off the package (Rocq's inline
+`fs_crash_seam_of_at` at the package's guest). -/
+theorem appDurLaws_seam (cov : ExtTreeSet Nat compare) (ls : Nat) :
+    appDurLaws (hlc := hlc) (GF := GF) cov ls ⊢ fsCrashSeam (hlc := hlc) cov ls := by
+  unfold appDurLaws
+  iintro ⟨%Okc, #Hseam, -⟩
+  iapply fsCrashSeam_ofAt (hlc := hlc) (GF := GF) (appGuest Okc) cov ls $$ Hseam
+
 end AppDurLaws
-
-/-! ## LEGACY (D3-app/S interface checkpoint, WIP): the D2-dur forms the kernel
-WAL still consumes until it is re-threaded at Rocq main's shape.  To be DELETED
-before hand-off. -/
-
-section AppDurRawK
-variable {GF : BundledGFunctors} [FsTopG GF]
-
-/-- THE DURABLE CLAIM at a predicate and a snapshot map name `gt`: the guest
-half of the map's authority beside the claim at the map's view, at SOME
-instance of the application's names (Rocq `app_dur_raw`). -/
-def appDurRawK {N : Type} (A : N → Aview → IProp GF) (gt : GName) : IProp GF :=
-  iprop(∃ (r : N) (I : RegMapF FsNode),
-    (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ A r (absView I))
-
-/-- OPENING A LATER-SHAPED GUEST: the half is timeless and comes out, the claim
-stays under its later (Rocq `app_dur_raw_open`). -/
-theorem appDurRawK_open {N : Type} (A : N → Aview → IProp GF) (gt : GName) :
-    ▷ appDurRawK A gt ⊢
-      ◇ ∃ (r : N) (I : RegMapF FsNode),
-        (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r (absView I) := by
-  unfold appDurRawK
-  iintro H
-  imod later_exists_except0 $$ H with ⟨%r, H⟩
-  ihave ⟨%I, H⟩ := (later_exists (α := RegMapF FsNode)).2 $$ H
-  icases later_sep.1 $$ H with ⟨>Hh, Hp⟩
-  imodintro
-  iexists r, I
-  iframe Hh Hp
-
-/-- PACKING: the guest half beside a claim at the same map, under the later the
-transport left on the claim (Rocq `app_dur_raw_pack`). -/
-theorem appDurRawK_pack {N : Type} (A : N → Aview → IProp GF) (gt : GName)
-    (I : RegMapF FsNode) :
-    (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ⊢
-      (∃ r : N, ▷ A r (absView I)) -∗ ▷ appDurRawK A gt := by
-  iintro Hh ⟨%r, Hp⟩
-  inext
-  unfold appDurRawK
-  iexists r, I
-  iframe Hh Hp
-
-/-- THE CLONE (the commit and the PowerOn arm): run the transport on a claim,
-keep the original, and pack the copy onto a fresh guest half at the same map
-(Rocq `app_dur_raw_clone`). -/
-theorem appDurRawK_clone {N : Type} (A : N → Aview → IProp GF) (gt : GName)
-    (I : RegMapF FsNode) (r : N) :
-    appXferRaw A ⊢ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r (absView I) ==∗
-      ▷ A r (absView I) ∗ ▷ appDurRawK A gt := by
-  iintro #Hx Hh Hp
-  unfold appXferRaw
-  imod Hx $$ %r %(absView I) Hp with ⟨Hp, Hnew⟩
-  imodintro
-  iframe Hp
-  iapply appDurRawK_pack A gt I $$ Hh Hnew
-
-/-- THE MERGE (the commit, SY3-K2 / K3-3; Rocq `app_dur_raw_merge`): run the
-merge on the running claim, keep the original, and hand out the guest-level
-wand the WAL applies to the old guest at the header write
-(`FsDurSnap.durMerge`).  The fresh guest half goes INTO the wand beside the
-merge's own; the old guest's half is dropped with it, its claim goes to the
-merge.  The token `T` goes in with the running claim and comes back on
-either arm of the additive pair. -/
-theorem appDurRawK_merge {N : Type} (A : N → Aview → IProp GF) (T : IProp GF) (gt : GName)
-    (I : RegMapF FsNode) (r : N) :
-    appMergeRawK A T ⊢ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r (absView I) -∗ T ==∗
-      ▷ A r (absView I) ∗
-      ((∀ gt_o : GName, ▷ appDurRawK A gt_o ==∗ ▷ appDurRawK A gt ∗ T) ∧ T) := by
-  iintro #Hm Hh Hp HT
-  unfold appMergeRawK
-  imod Hm $$ %r %(absView I) Hp HT with ⟨Hp, ⟨%r', Hw⟩⟩
-  imodintro
-  iframe Hp
-  isplit
-  · icases Hw with ⟨Hw, -⟩
-    iintro %gt_o Hold
-    imod Hw $$ [Hold] with ⟨Hnew, HT⟩
-    · inext
-      unfold appDurRawK
-      icases Hold with ⟨%r_o, %I_o, -, Hold⟩
-      iexists r_o, (absView I_o)
-      iexact Hold
-    imodintro
-    iframe HT
-    iapply appDurRawK_pack A gt I $$ Hh
-    iexists r'
-    iexact Hnew
-  · icases Hw with ⟨-, HT⟩
-    iexact HT
-
-end AppDurRawK
-
-section AppDurK
-variable {GF : BundledGFunctors} [FsTopG GF] [Appcfg GF]
-
-/-- THE GUEST, at the application's own predicate: the one value the WAL's
-opaque index `G : GName → IProp` ever takes (Rocq `app_guest`). -/
-def appGuestK (gt : GName) : IProp GF := appDurRawK appPred gt
-
-end AppDurK
 
 end Xv6

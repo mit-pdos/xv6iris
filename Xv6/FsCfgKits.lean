@@ -76,8 +76,9 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    outside users (`_fsinit_ghost_open`, `_kalloc_open`, `_icache_rest_open`)
    are kept.
 7. **Crash rows (D35, Rocq-literal)**: kit 2 carries `fsBytesInv … Pb`,
-   `excOwn fscFs.exc Xexc`, `fsCrashSeamAt appGuestK fscCov fscLogst`,
-   `appMerge` and `appSyncRun` (sync K3-3), exactly Rocq's rows; `fsinit` takes all of them (SpecFsinit
+   `excOwn fscFs.exc Xexc` and `appDurLaws fscCov fscLogst` (the crash seam
+   at the guest and the merge package, ONE row at the guest's durable-copy
+   predicate, Rocq SY3-A3b), exactly Rocq's rows; `fsinit` takes all of them (SpecFsinit
    deviations 3/7 retired, crash batch C-4) and `FirstTok.firstFsinit`
    holds this kit.
 -/
@@ -170,11 +171,11 @@ def fsKitFsinitGhost [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
   fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
   excOwn fscFs.exc Xexc ∗
   appInv (hlc := hlc) fscFs ∗
-  fsCrashSeamAt (hlc := hlc) appGuestK fscCov fscLogst ∗
-  appMergeK (hlc := hlc) (GF := GF) ∗
-  -- ...AND THE SYNC RUNNER (Rocq sync K3-3), beside the merge: fsinit builds the
-  -- ghost commit's hooked law from the two
-  appSyncRunK (hlc := hlc) (GF := GF))
+  -- THE CRASH SEAM AT THE GUEST AND THE MERGE PACKAGE (merge + sync runner),
+  -- ONE row closed over the guest's durable-copy predicate (Rocq
+  -- `app_dur_laws`, SY3-A3b): fsinit builds the commit's law and the ghost
+  -- commit's hooked law from it
+  appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst)
 
 /-- **Rocq `fs_kit_fsinit_ghost_open`**: the kit's rows by name. -/
 theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
@@ -196,8 +197,7 @@ theorem fsKitFsinitGhost_open [Fscfg] [Icfg] (P : Nat → List (BitVec 8))
       fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Pb ∗
       excOwn fscFs.exc Xexc ∗
       appInv (hlc := hlc) fscFs ∗
-      fsCrashSeamAt (hlc := hlc) appGuestK fscCov fscLogst ∗
-      appMergeK (hlc := hlc) (GF := GF) ∗ appSyncRunK (hlc := hlc) (GF := GF) := by
+      appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst := by
   unfold fsKitFsinitGhost
   iintro H
   iexact H

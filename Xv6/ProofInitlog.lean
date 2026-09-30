@@ -389,8 +389,8 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
     swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) ∗
-    snapLawGhost (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF))
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
+    snapLawGhost (hlc := hlc) γ γfs V.cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
       (eraSyncHook (hlc := hlc) (GF := GF)) ∗
     crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF) ∗
     logMirrorHalf (hlc := hlc) M ∗

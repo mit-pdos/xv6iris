@@ -181,7 +181,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     -- output, already read: the next durable epoch at the law's guest `G`,
     -- with the seam at that same `G`
     logMirrorHalf (hlc := hlc) Mc ∗ fsCrashSeamAt (hlc := hlc) G V.cov ls ∗
-    durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
+    durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
     (∀ c' : CPU, eoPost k pidv dqp c')

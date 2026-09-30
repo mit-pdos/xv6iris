@@ -532,8 +532,10 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
     (hwf : fsBootSnapWf (diskOf σ.devs) ndisk S Pb sb nib cov) :
     powerBootRows (hlc := hlc) (GF := GF) (fun dk => mirrorOf (fsBlocks dk)) σ ∗
-      ▷ appPred appRun (absView S.fssInodes) ∗ appMergeK (hlc := hlc) ∗ appSyncRunK (hlc := hlc) ∗
-      fsCrashSeamAt (hlc := hlc) appGuestK cov sb.sbLogstart ∗
+      ▷ appPred appRun (absView S.fssInodes) ∗
+      -- the crash seam at the guest and the merge package, ONE row closed over
+      -- the guest's durable-copy predicate (Rocq `app_dur_laws`, SY3-A3b)
+      appDurLaws (hlc := hlc) cov sb.sbLogstart ∗
       eraSyncTok (hlc := hlc) (GF := GF) ∗
       fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov sb.sbLogstart)) S ⊢
       |={⊤}=> ∃ (ξ0 : CtxId) (Γ : SchedNames) (W : WchG GF) (HFd : FdslotG GF) (HBs : BioslotG GF)
@@ -544,7 +546,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   unfold powerBootRows
   rw [hds] at hwf ⊢
   iintro ⟨⟨Hkpt, #Hcert, Hregs, Hmem, Htoks, Hlocks, Hkauth, #Hkst, #Hwire, Hdevs, Hch, Hmir, #Hsw,
-    #Hcinv⟩, Happ, #Hmerge, #Hrun, #Hseam, Hstok, Hsnap⟩
+    #Hcinv⟩, Happ, #Hdurl, Hstok, Hsnap⟩
   -- the gname-only mints (the instances first)
   imod bootSharedDev_names (hlc := hlc) (GF := GF) with
     ⟨%Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt, Hn⟩
@@ -569,7 +571,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   -- the file system
   have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn
     (diskOf ds0.reset) ndisk S sb cov nib gsn gln gtn Pb hwf)
-  imod hF $$ Hblk Happ Hmerge Hrun Hseam Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv
+  imod hF $$ Hblk Happ Hdurl Hstok Hsnap Hmir Hsw Hi3 Hia Hb2 Hcert Hcinv
     with ⟨%I, %F, Hfs⟩
   unfold bsfRows
   icases Hfs with ⟨Hsup, Hmb, Hib, Hiau, Hbs, -, #Hcs, -⟩

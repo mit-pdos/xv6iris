@@ -76,6 +76,15 @@ Rocq's header on the laws, kept because the reasons are the content:
    pre-era instance `AppPreGS.appPreGS` and read at the era's instance
    through this equation (`AppPreGS.preGS_transport`).  Discharged by `rfl`
    at the literal, as the other equations.
+9. (drift D3-app/S, Rocq main SY3-A1 / SY3-A3b / SY3-A4) The sync laws:
+   `al_programs` takes the sync-hook equation as `MachFixedGS.syncHook =
+   A.hk c`; `al_merge` quantifies over a `MachFixedGS` with the
+   mono-camera equation and the born fact at the record's four gnames
+   (Rocq: a `riscvGS` with `riscvF_genGS = riscv_pre_genGS`); `al_sync_run`
+   over a `MachFixedGS` (Rocq: a `riscvGS`).  `al_xfer` is at
+   `MachGpreS.mono_pre` (Rocq `riscv_pre_genGS`).  The triv lemmas are
+   `appBirth_ofValidCls`, `appBack_id` (its premise is `∀ k, turn'' c k =
+   turn' c k`), `appInit_ofValid`, `appInit_ofValidOkc`, `appTriv_init`.
 -/
 import Xv6.SystemAdequacy
 

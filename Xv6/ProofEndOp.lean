@@ -342,9 +342,9 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx Hstok
       with ⟨⟨%G, #HseamG, Hepoch⟩, HauthL, Htx⟩
     imodintro
-    ihave Hepoch := (show snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) L
+    ihave Hepoch := (show snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) L
           (fsHomeList V.cov ls) ⊢
-        durPair G (eraSyncTok (hlc := hlc) (GF := GF))
+        durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
           (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) from by
       unfold snapLawOut; exact .rfl) $$ Hepoch
     ihave Hopen := eoOpen_intro γb γfs V.cov ls n W L D eoNullLw 0
@@ -510,7 +510,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       iintro Hk Hpc
       -- THE TOKEN COMES BACK OUT OF THE PAIR'S RIGHT ARM (Rocq sync K3-3): no
       -- header write, so the merge is never applied
-      ihave Hstok := durPair_tok G _ _ $$ Hepoch
+      ihave Hstok := durPair_tok G _ _ _ $$ Hepoch
       iapply (eo_tail AC RE WK Γ cpu k s0 p0 γ γb γfs V.cov ls dev L D eoNullLw 0 pidv dqp _
           logAddr (BitVec.ofNat 64 0) hK hwf hnoff hlocks htier hintena
           (by unfold LOGBLOCKS; omega) ?hRt M0 hM0hdr hM0tie)

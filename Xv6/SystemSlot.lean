@@ -72,6 +72,17 @@ mint's ledger, the claim at its view, and `fsBootSnapWf`).
    byte list is reachable by unfolding; Rocq's "no bare iFrame past the disk
    big-op" note); at a variable size it is instant.
 
+9. (drift D3-app/S, Rocq main SY3-A1 / SY3-A3b / SY3-A3bc) Rocq's
+   `app_clone_raw` is `appCloneRaw` (the pin's `app_xfer_boot_raw` shape);
+   `appXferBootRaw HSt A Okc B Tn Tn' γst gen` takes the mono-nat camera
+   `HSt : MonoNatG GF` explicitly (Rocq `HSt : mono_natG Σ`) and spells the
+   loan `@MonoNat.auth_own GF HSt γst (DFrac.own 1) (.ofNat n)`.  The trivial
+   sync values (`appTrivTk/Hk/Cls/Born/Ok/Okc`) live in `Xv6/AppIface.lean`
+   (below this file, beside `appTriv` which uses them); `appTriv_found`/
+   `appTriv_syncRun` are here.  `xv6Slot_swap` takes `Born`, the turn stages
+   `Tn Tn'` and the born fact, as Rocq's inline `Hswap` does.
+   `appXferRaw_ofClone` is the pin's `app_xfer_raw_of_boot` at the clone.
+
 ## NOT PORTED here (Rocq §1-§2 items owned elsewhere)
 
 * `cpu_enum_cons`, `big_sepL_cpu_split/peel/glue`, `fin_FS_nz`, `fin_0_z`

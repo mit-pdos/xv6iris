@@ -46,6 +46,10 @@ the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
    specialisation uses.  `fsSnapWit` / `fsSnap_parts` / `fsSnap_readW` are
    that bundle and its two halves (helpers; Rocq inlines them in
    `fs_snap_read_ok`).
+6. (drift D3-app/S, Rocq SY3-A1) `durMerge`/`durPair`/`dsnapStep_merge`/
+   `durPair_tok` live in their own section `SnapMerge` over `[MachFixedGS]`
+   beside the bare byte camera, as Rocq's `SnapMerge` over `riscvFixedGS`:
+   the merge's left arm is lent `startAuth n` at `n = gd + 1`.
 5. `inode_dat_owns` / `inode_phi_owns` conclude `∃ bs, blkOwned Γ b bs`
    exactly as Rocq; `inodeDat_slotInj` / `fsInodes_phiDisj` read their
    refutations through `FsView.blkOwned_ne` (the landed "distinctness is the
@@ -67,6 +71,7 @@ the one pure conjunct `SnapShape`); the GUEST half `snapGuest`; the pair
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurRead
 import Xv6.FsDurXfer
+import MachCSL.Resources
 
 namespace Xv6
 
@@ -199,26 +204,6 @@ theorem pDurAt_intro (g gl gt : GName) (D : BlockMap) (S : FsStateRec) :
 instance pDurAt_timeless (gt : GName) (D : BlockMap) : Timeless (pDurAt (GF := GF) gt D) := by
   unfold pDurAt; infer_instance
 
-/-- THE GUEST'S MERGE (Rocq's `dur_merge`, SY3-K2 / K3-3): the new guest
-at `gt` out of whichever old guest the crash slot holds.  The commit builds
-it at the collection, where the running claim is in hand and the old guest
-is not, and the header write's permit -- where the old guest is in hand and
-the running claim is not -- applies it (`dsnapStep_merge`).  A BASIC update,
-so it runs at the permit's mask `∅`; the guest stays OPAQUE.
-...AND THE APPLICATION'S TOKEN `T` RIDES IT (sync K3-3): the collection
-hands the token in, and whichever arm the commit takes gives it back -- the
-header write's permit applies the LEFT arm to the old guest (the token comes
-out beside the new guest), the EMPTY-LOG commit, which writes no header,
-takes the RIGHT arm.  An additive pair because exactly one of the two
-fires. -/
-def durMerge (G : GName → IProp GF) (T : IProp GF) (gt : GName) : IProp GF :=
-  iprop((∀ gt_o : GName, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T)
-
-/-- THE PAIR (Rocq's `dur_pair`): the snapshot AND the MERGE of an opaque
-guest at its map name (since SY3-K2 the merge rather than the guest itself,
-so the old durable copy is read, not dropped), at the token `T`. -/
-def durPair (G : GName → IProp GF) (T : IProp GF) (D : BlockMap) : IProp GF :=
-  iprop(∃ gt : GName, pDurAt gt D ∗ durMerge G T gt)
 
 /-! ## 6b.  The epoch off an instance -/
 
@@ -739,30 +724,6 @@ theorem fsSnap_readOk_keep (g gl gt : GName) (D : BlockMap) (S : FsStateRec) (hf
       ⌜snapOk S D⌝ ∗ fsSnap (snapGamma g gl gt) g D S :=
   fsDurKeep (fsSnap_readOk g gl gt D S hf)
 
-/-- THE COMMIT'S STEP (Rocq's `dsnap_step_merge`, SY3-K2 / K3-3): the old
-snapshot is DISCARDED, the old GUEST goes to the pair's merge, which yields
-the new one; the token comes back beside it. -/
-theorem dsnapStep_merge (G : GName → IProp GF) (T : IProp GF) (gt : GName) (D D' : BlockMap) :
-    durPair G T D' ⊢ pDurAt gt D -∗ ▷ G gt ==∗
-      (∃ gt' : GName, pDurAt gt' D' ∗ ▷ G gt') ∗ T := by
-  iintro H - HG
-  unfold durPair durMerge
-  icases H with ⟨%gt', Hd, ⟨Hm, -⟩⟩
-  imod Hm $$ %gt HG with ⟨HG, HT⟩
-  imodintro
-  iframe HT
-  iexists gt'
-  iframe Hd HG
-
-/-- THE PAIR'S RIGHT ARM (Rocq's `snap_law_out_tok`, stated here at the
-pair): a commit that writes no header -- the EMPTY-LOG commit -- never
-applies the merge, and takes the token back out of the pair instead. -/
-theorem durPair_tok (G : GName → IProp GF) (T : IProp GF) (D : BlockMap) :
-    durPair G T D ⊢ T := by
-  iintro H
-  unfold durPair durMerge
-  icases H with ⟨%gt, -, ⟨-, HT⟩⟩
-  iexact HT
 
 /-! ## 8.  What a consumer reads off the current snapshot -/
 
@@ -787,5 +748,58 @@ theorem pDurAt_tieKeep (gt : GName) (D : BlockMap) (hf : dblkFull D) :
   · iapply pDurAt_intro g gl gt D S $$ Hs
 
 end ReadOk
+
+/-! ## 9.  THE GUEST'S MERGE, WITH THE MACHINE'S LOAN (Rocq section `SnapMerge`, sync SY3-A1)
+
+Its own section because the merge's left arm is LENT the machine's
+started-generations auth `startAuth`, a `MachFixedGS` resource. -/
+
+section SnapMerge
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+
+/-- THE GUEST'S MERGE (Rocq's `dur_merge`, SY3-K2 / K3-3 / SY3-A1): the new
+guest at `gt` out of whichever old guest the crash slot holds, built at the
+collection and applied by the header write's permit (`dsnapStep_merge`), a
+BASIC update so it runs at the permit's mask `∅`; the guest stays OPAQUE.
+The application's token `T` rides it (an additive pair: the permit applies the
+LEFT arm, the EMPTY-LOG commit takes the RIGHT).  The LEFT arm is LENT the
+machine's started auth `startAuth n` at `n = gd + 1`, `gd` the era's
+generation (pinned to `genId` by `LogInv.logCtx`), and hands it back. -/
+def durMerge (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (gt : GName) : IProp GF :=
+  iprop((∀ (gt_o : GName) (n : Nat), ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+      ▷ G gt_o ==∗ ▷ G gt ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n) ∧ T)
+
+/-- THE PAIR (Rocq's `dur_pair`): the snapshot AND the MERGE of an opaque
+guest at its map name, at the token `T` and the era `gd`. -/
+def durPair (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (D : BlockMap) : IProp GF :=
+  iprop(∃ gt : GName, pDurAt gt D ∗ durMerge (hlc := hlc) G T gd gt)
+
+/-- THE COMMIT'S STEP (Rocq's `dsnap_step_merge`): the old snapshot is
+DISCARDED, the old GUEST goes to the pair's merge, which yields the new one;
+the token and the loaned started auth come back beside it. -/
+theorem dsnapStep_merge (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (gt : GName)
+    (D D' : BlockMap) (n : Nat) (hn : n = gd + 1) :
+    durPair (hlc := hlc) G T gd D' ⊢ pDurAt gt D -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+      ▷ G gt ==∗
+      (∃ gt' : GName, pDurAt gt' D' ∗ ▷ G gt') ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n := by
+  iintro H - Hsa HG
+  unfold durPair durMerge
+  icases H with ⟨%gt', Hd, ⟨Hm, -⟩⟩
+  imod Hm $$ %gt %n %hn Hsa HG with ⟨HG, HT, Hsa⟩
+  imodintro
+  iframe HT Hsa
+  iexists gt'
+  iframe Hd HG
+
+/-- THE PAIR'S RIGHT ARM (Rocq's `snap_law_out_tok`, stated at the pair). -/
+theorem durPair_tok (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (D : BlockMap) :
+    durPair (hlc := hlc) G T gd D ⊢ T := by
+  iintro H
+  unfold durPair durMerge
+  icases H with ⟨%gt, -, ⟨-, HT⟩⟩
+  iexact HT
+
+end SnapMerge
 
 end Xv6

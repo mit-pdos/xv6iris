@@ -52,6 +52,14 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
    (`uartObsPermit` reads no `Appcfg`) and keeps the console tie
    `i = .uart0 → fscUart = γ`; `EraEcho` is context-free (Lean's
    `consEchoShift` is).
+3'. (drift D3-app/S, Rocq main SY3-A1 / SY3-A3b) `xv6BootEra` takes Rocq's
+   `Tn`/`Tn_init`/`Ok`/`Hbok`/`Okc`/`Happ_merge`/`Hfound`/`Happ_sync_run`, but
+   `Ok`, `Hbok`, `Happ_merge`, `Hfound`, `Happ_sync_run` are quantified over
+   the era's generation `k` (the era's `gen` is bound after the hypotheses,
+   deviation 2), and `Happ_merge`/`Happ_sync_run` are stated at the record
+   literal.  Rocq's `power_boot_res_turn` is not needed: `powerBootRes_unpack`
+   already separates the turn.  The founding runs before the mint, which gets
+   the token; `<init>` gets `TnInit`.
 3. **The era's turn `Tn`** (union DU6, reversing D49 (a)) is a function of
    the era number, `Tn : CT → Nat → IProp GF`, applied inside (`Tn c
    (gen + 1)`), where Rocq's `xv6_boot_era` takes it already applied (`Tn :
@@ -448,14 +456,33 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   -- turn the power arm carried, handed to the mint, which puts it into the
   -- log's free bundle; the rest goes to `<init>`
   imod (Hfound gen) $$ Hturn with ⟨Hstok, Hturn⟩
+  -- THE ERA'S RECORD PREDICATE at the running instance, off its boot
+  -- resource (Rocq `Hbok`, SY3-A1 re-cut)
+  ihave ⟨%hokr, Hbres⟩ := fsDurKeep (Hbok (gen + 1) r) $$ Hbres
   imod hA $$ [Hrows Hok Hsnap Hstok] with ⟨%ξ0, %Γ, %W, %HFd, %HBs, %HIr, %γc, %γl0, %γl1, %γt,
     %γ0, %γ1, %cn, %γd, %I, %Fc, %ξd, Hout⟩
   · iframe Hrows Hok Hsnap
-    -- CHECKPOINT BRIDGE (D3-app/S, WIP): the kernel WAL still takes the
-    -- D2-dur forms (`appMergeK`/`appSyncRunK`/the seam at `appGuestK`); the
-    -- kernel re-threading at Rocq main's shape (Okc, `Ok`, the started-auth
-    -- loan) replaces this sorry.
-    sorry
+    -- THE DURABLE SIDE (Rocq `app_dur_laws`, SY3-A3b): the seam at the guest
+    -- and the merge package, at the durable-copy predicate `appOkc c`; the
+    -- package at the era's record predicate `Ok (gen + 1)`, which the running
+    -- record `r` satisfies (its boot resource says so), at the era's token,
+    -- hook family and generation `gen` (the ambient `genId` at `eraM0 E gen`)
+    isplitl []
+    · unfold appDurLaws
+      iexists (appOkc c)
+      isplitl []
+      · unfold appGuest
+        iapply hseam
+      unfold appMerge
+      iexists (Ok (gen + 1))
+      isplitr
+      · ipureintro; exact hokr
+      unfold eraSyncTok eraSyncHook genId
+      isplitl []
+      · iapply (Happ_merge gen)
+      · iapply (Happ_sync_run gen)
+    unfold eraSyncTok genId
+    iexact Hstok
   -- THE FINAL INSTANCE: the claim is the proc table's
   letI : Appcfg GF := ⟨N, appFs c, r⟩
   let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)

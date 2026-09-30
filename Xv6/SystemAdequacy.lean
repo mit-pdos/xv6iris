@@ -60,6 +60,16 @@ no table of reset values is trusted (`MachCSL.BootReset`).
 4. The conclusion is over `nsteps` (`-<κs>->ₜₚ^[n]`), as
    `riscvPowerAdequacy`'s; Rocq's unit corollaries restate it over
    `rtc erased_step` via `erased_steps_nsteps`.
+6. (drift D3-app/S, Rocq main SY3-A1 / SY3-A3b) `xv6PowerAdequacyGen`'s
+   new binders are Rocq's in Rocq's order (`Cls Clt Born Hbirth`, `appOkc`,
+   `Tnn Tnn' Tnn'' TnnInit`, `Tk Hk` at the fixed part, `Hfound`, `Ok
+   Hboot_ok`, `Happ_merge`, `Happ_sync_run`, `Happ_boot`, `Happ_init` from
+   `Cls`, `Hback`).  Rocq's `Happ_merge`/`Happ_sync_run` quantify over a
+   `riscvGS` with the equation `riscvF_genGS = riscv_pre_genGS`; here over a
+   `MachFixedGS` with `MachFixedGS.mono = MachGpreS.mono_pre` (AppLaws
+   deviation 2) and the born fact at `MachFixedGS.diskName/swapName/
+   registryName/startName`.  The per-era `Hinit_boot` stays at the literal
+   (deviation 3), so Rocq's sync-hook equation holds there by `rfl`.
 5. D48's trace corollaries (`xv6_trace_adequacy`, `xv6_obs_wf_xv6Σ`) are not
    ported here: the user's target is union adequacy through the generic
    theorem (D48 ruling).

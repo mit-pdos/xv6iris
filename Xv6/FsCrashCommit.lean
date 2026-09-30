@@ -50,7 +50,7 @@ theorem fsCommitL_seqPermit (G : GName → IProp GF) (T : IProp GF) (cov : ExtTr
         (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) M0 -∗
-      durPair G T (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      durPair (hlc := hlc) G T (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
         (some (1024 * logHdrBno ls, bs))
         iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 (logHdrBno ls) bs) ∗ T) := by

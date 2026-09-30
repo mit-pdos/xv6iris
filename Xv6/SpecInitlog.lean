@@ -170,12 +170,12 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
   -- the era's sync token (sync K3-3)
   □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF))) ∗
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) ∗
   -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
   -- park for the same reason, and the crash invariant the ghost commit opens;
   -- both parked into `logCtx` beside `genCert`
   □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
   crashInv (hlc := hlc) (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -275,12 +275,12 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
   -- the era's sync token (sync K3-3)
   □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF))) ∗
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) ∗
   -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
   -- park for the same reason, and the crash invariant the ghost commit opens;
   -- both parked into `logCtx` beside `genCert`
   □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
+      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
   crashInv (hlc := hlc) (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗

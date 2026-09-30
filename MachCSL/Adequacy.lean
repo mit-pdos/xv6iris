@@ -51,6 +51,12 @@ introduced here):
   D49 (a));
 * the record has no application fields (`riscv_client_T`/`riscv_client`):
   the value `c` is named by the hooks and the slots, not by the record.
+* (drift D3-app/S, Rocq main SY3-A1) the birth is handed the four fixed
+  gnames and yields `Cls`/`Clt` with `Born`; `HPc` gains `Cls c`; `Tk`/`Hk`
+  are at the fixed part alone; the era's turn runs `Tn` (on-arm) → `Hswap`
+  (lent, yields `Tn'`) → `Hback` (the return path, yields `Tn''`) →
+  `powerBootRes`; `Hboot` is told `Born`.  `riscvTraceAdequacy` wraps its
+  turn-free `Hswap` (turn `emp`) and uses `backId`.
 
 ## CRASH (C-M, crash_layer.md D39/D40): landed
 
