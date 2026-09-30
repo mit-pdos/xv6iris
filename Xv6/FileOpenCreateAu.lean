@@ -31,20 +31,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-- THE WHOLE CREATE BUNDLE (Rocq `file_open_create_au`). -/
 theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
-    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (ls : List Fwline)
+    (jo : Option Nat) (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine)
     (ws : Wordline) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (pl : List (BitVec 8))
     (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
     (hN : uname N) (hpath : argPathOf M pv pl) (hnp : npElems pl = [])
     (hstart : umStartOf cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some N)
-    (hin : (N, ws) ∈ ls) (hokw : lineOk ws) :
+    (hlst : ls.getLast? = some (Uline.LEchoF ws N)) (hnpl : np = ls.length) (hokw : lineOk ws) :
     ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
-      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g -∗
+      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
       openAuCreateAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom
         (fun (_ : Nat) (d : Nat) => iprop(⌜d = ROOTINO⌝)) (fun _ _ => iprop(True))
-        (fileArmFam (hlc := hlc) c r jo s g) (fileUnarmFam (hlc := hlc) c r s g)
-        (fileCreFam (hlc := hlc) c r jo N s g) (fileDlkFam (hlc := hlc) c r n s g)
-        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s) := by
+        (fileArmFam (hlc := hlc) c r jo s g np) (fileUnarmFam (hlc := hlc) c r s g np)
+        (fileCreFam (hlc := hlc) c r jo N s g np) (fileDlkFam (hlc := hlc) c r n s g)
+        (fileOdlkFam (hlc := hlc) c r n s g) (fileTruncFam (hlc := hlc) c r N s np) := by
   have hle : ∀ nm : Fname, nparNm M pv nm → redirAt N nm := by
     intro nm hnm
     have hn := nparNm_elim M pv pl nm hpath hnm
@@ -82,7 +82,7 @@ theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
         unfold nparCur
         iintro %pl0 %_
         ipureintro; exact hd
-      · iapply (fileAcre_commit γfs c r jo n N s g ls ws heq hN hin hokw) $$ Hinv Hm Hwit Hlb
+      · iapply (fileAcre_commit γfs c r jo n N s g np ls ws heq hN hlst hnpl hokw) $$ Hinv Hm Hwit Hlb
     · dsimp only [fileCreFam]
       ipureintro; trivial
   isplitl []
@@ -92,18 +92,18 @@ theorem fileOpenCreate_au (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   isplitl []
   · unfold openTruncPiece
     split
-    · iapply (fileTrunc_piece γfs c r jo n N s g ls ws M pv pl heq hN hpath hlast hin hokw) $$
+    · iapply (fileTrunc_piece γfs c r jo n N s g np ls ws M pv pl heq hN hpath hlast hlst hnpl hokw) $$
         Hinv Hm Hwit Hlb
     · iempintro
   · -- THE CHILD'S TWO LEGS: the escrow goes in HERE
     unfold creChildUnfired pfAt
     isplitl [Hres]
     · isplit
-      · iapply (fileArm_commit γfs c r jo n s g [] heq) $$ Hinv Hm Hwit Hres
+      · iapply (fileArm_commit γfs c r jo n s g np [] heq) $$ Hinv Hm Hwit Hres
       · dsimp only [fileArmFam]
         iexact Hres
     · isplit
-      · iapply (fileUnarm_commit γfs c r jo n s g heq) $$ Hinv Hm Hwit
+      · iapply (fileUnarm_commit γfs c r jo n s g np heq) $$ Hinv Hm Hwit
       · dsimp only [fileUnarmFam]
         ipureintro; trivial
 
