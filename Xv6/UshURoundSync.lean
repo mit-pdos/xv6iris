@@ -18,9 +18,11 @@ PORTED: `usync_ran_pay`, `usync_exec_sup`, `usync_execfail_law`,
 
 ## Deviations from Rocq
 
-1. **Pre-hook** (`UkSyncDefs` deviation 2): b23e6791f's arm.  Rocq main's
-   A4 form (the lend split into the credential and the hook, `usync_q` /
-   `usync_lend`, the record's hook family `Hhk`) is the durability lanes'.
+1. **The hook form at K4** (`UkSyncDefs` deviation 2): Rocq 6ec6feccd's arm
+   -- the round deposits NO hook (`none`), and `usync_ran_pay` is at any
+   `oQ`, not spending the receipt.  Rocq main's A4 form (the lend split into
+   the credential and the hook, `usync_q` / `usync_lend`, the record's hook
+   family `Hhk`) is lane E's.
 2. As `UshURoundSecc` 1-4: sh-exec's child walk is `SH_CHILD_EXEC` at
    `UshURoundEcho.ushURoundEnv UL HF`; the law is stated at the parent's
    context `ushURoundCtx ug r s0 PT PD γp`; the child's pid row is dropped,
@@ -83,14 +85,16 @@ theorem usync_line_facts (I : List (BitVec 8)) (hlws : ulineWs .LSync = lastWs I
 
 /-- **Rocq `usync_ran_pay`**: THE PAYMENT AT RAN -- the lend is the round's
 credential at the block's head, and the deed moves from PRE to PEND at
-`RSyncRan`; its step is the identity. -/
+`RSyncRan`; its step is the identity.  AT ANY HOOK `oQ` (sync K4): the
+kernel's receipt `qOpt oQ` is `syncPay`'s second premise, and this payment
+does not spend it -- filing it on the ledger is lane E's. -/
 theorem usync_ran_pay (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
-    (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) :
-    ⊢ syncPay (uWcu (hlc := hlc) (GF := GF) ug r s0 PT PD I 3) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+    (I : List (BitVec 8)) (oQ : Option (IProp GF)) (hul : ul I = .LSync) (hpos : 0 < nlines I) :
+    ⊢ syncPay (uWcu (hlc := hlc) (GF := GF) ug r s0 PT PD I 3) (qOpt oQ) (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
   have hnw : uwild (ul I) = false := by rw [hul]; rfl
   unfold syncPay
-  iintro Hc
+  iintro Hc -
   ihave ⟨Hc, Hpre⟩ := uWcu3_nw_open ug r s0 PT PD I hnw $$ Hc
   iapply uWcu_of ug r s0 PT PD I 0
   rw [uWcf_0]
@@ -116,7 +120,6 @@ theorem usync_ran_pay (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 /sync entry, the lend going whole to the program (at any sh-exec record
 `E`). -/
 theorem usync_exec_sup (UL : UK_LEAVES)
-    (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (PT : List (BitVec 8) → Nat → IProp GF) (PD : List (BitVec 8) → IProp GF)
     (I : List (BitVec 8)) (hul : ul I = .LSync) (hpos : 0 < nlines I) {E : UshExecEnv (hlc := hlc) (GF := GF)} :
@@ -129,7 +132,9 @@ theorem usync_exec_sup (UL : UK_LEAVES)
     simp [ulineWs]
   unfold shSyncSlot
   iintro #Hdep #Hslot #Hkt
-  have hpay := usync_ran_pay (hlc := hlc) (GF := GF) ug r s0 PT PD I hul hpos
+  -- NO HOOK: the round deposits none (sync K4; the union's `some Q` is
+  -- lane E's)
+  have hpay := usync_ran_pay (hlc := hlc) (GF := GF) ug r s0 PT PD I none hul hpos
   iapply shExecSupXOfEntry (ushExecPinEcho_holds E) (fun ld => ushFd0c ld ∧ ushFd1p ld ∧ ushFd2p ld)
     (ulineWs .LSync) syncPl era0SyncPins [ROOTINO, SYNC_INO] SYNC_INO User.Sync.elf
     (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
@@ -139,7 +144,7 @@ theorem usync_exec_sup (UL : UK_LEAVES)
   imodintro
   iintro %M %Mv %sa %t %gn %sts %cs %pidv %himg %hag %hbytes %hlen - #Hnp
   iapply syncImageEntry_of_leaves UL (ulineWs .LSync) M Mv sa t gn sts ROOTINO cs pidv
-    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcu (hlc := hlc) ug r s0 PT PD I 3) hps
+    (fun _ => uWcu (hlc := hlc) ug r s0 PT PD I 0) (uWcu (hlc := hlc) ug r s0 PT PD I 3)
     (fun _ _ => rfl) usync_ws_exec_ok himg hag hbytes hlen $$ [] Hnp Hdep
   imodintro
   iapply hpay
@@ -228,7 +233,7 @@ theorem uHchild_sync (UL : UK_LEAVES) (HF : USH_FPRINTF) (SP : SH_PANIC) (SC : S
   rw [show 68 + (8 + (ushDg + n)) = 60 + (8 + (ushDg + (n + 8))) by omega]
   iapply H $$ Hcode [] [] [] [] Hjt Hstr Hwsp Hsy Hstd Hcwd Hch HM Hcr Hrun
   · -- exec /sync
-    iapply usync_exec_sup UL hps ug r s0 PT PD I hul hpos $$ Hdep Hslot Hkillq
+    iapply usync_exec_sup UL ug r s0 PT PD I hul hpos $$ Hdep Hslot Hkillq
   · -- the parse ran out of memory: "out of memory", the deed as found
     iapply ushp_oom_of_diag SP N' _ _ ld _ (by unfold ushDg; omega) hrows.2.2 $$ [] [] Hcode
     · iapply uHoom ug r s0 PT PD UL I hnw hpos $$ Hlk

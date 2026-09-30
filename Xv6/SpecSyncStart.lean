@@ -20,9 +20,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
 
 /-- **Rocq `wp_ksync_start`**. -/
 def wpSyncStartBody : Prop :=
-    (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →
-    ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF), UknConst N → 4 ≤ n →
-    ⊢ ukCode N.t User.Sync.code.byte -∗ P -∗ syncPay P (N.pay (-1)) -∗
+    ∀ (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF)
+      (c : Nat), UknConst N → 4 ≤ n →
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
+      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+      P -∗ syncPay P (qOpt oQ) (N.pay (-1)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«start») n -∗ wpLoop h
 
 end

@@ -24,13 +24,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 
 /-- **Rocq `wp_ksync_start`**. -/
 theorem wp_syncStart (HM : SYNC_MAIN) (UL : UK_LEAVES)
-    (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF) (hc : UknConst N) (hn : 4 ≤ n) :
-    ⊢ ukCode N.t User.Sync.code.byte -∗ P -∗ syncPay P (N.pay (-1)) -∗
+    (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF) (c : Nat)
+    (hc : UknConst N) (hn : 4 ≤ n) :
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
+      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+      P -∗ syncPay P (qOpt oQ) (N.pay (-1)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«start») n -∗ wpLoop h := by
   obtain ⟨n', rfl⟩ : ∃ n', n = n' + 4 := ⟨n - 4, by omega⟩
   rw [show n' + 4 = 2 + (2 + n') by omega, show User.Sync.Sym.«start» = 0x12 from rfl]
-  iintro #Hc HP Hsp Hrun
+  iintro #Hc Hleaf Hhook Hcwd HP Hsp Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x12  c.addi sp,sp,-16
@@ -80,11 +82,11 @@ theorem wp_syncStart (HM : SYNC_MAIN) (UL : UK_LEAVES)
   iintro %h5 Hrun
   rw [show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x1fffe6#21 = BitVec.ofNat 64 User.Sync.Sym.«main»
     from by decide]
-  iapply HM.wp_syncMain Hps N h5 _ n' P hc $$ Hc HP Hsp Hrun
+  iapply HM.wp_syncMain N oQ h5 _ n' P c hc $$ Hc Hleaf Hhook Hcwd HP Hsp Hrun
 
 /-- **sync's `start` holds** (at the engine `UL`, over main's interface). -/
 theorem syncStart_holds (UL : UK_LEAVES) (HM : SYNC_MAIN) : SYNC_START :=
-  ⟨fun Hps N h m n P hc hn => wp_syncStart HM UL Hps N h m n P hc hn⟩
+  ⟨fun N oQ h m n P c hc hn => wp_syncStart HM UL N oQ h m n P c hc hn⟩
 
 end
 

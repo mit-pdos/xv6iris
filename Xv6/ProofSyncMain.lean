@@ -26,12 +26,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 
 /-- **Rocq `wp_ksync_main`**. -/
 theorem wp_syncMain (UL : UK_LEAVES) (HS : UK_SYS_P)
-    (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF) (hc : UknConst N) :
-    ⊢ ukCode N.t User.Sync.code.byte -∗ P -∗ syncPay P (N.pay (-1)) -∗
+    (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU) (m : RegMap) (n : Nat) (P : IProp GF) (c : Nat)
+    (hc : UknConst N) :
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
+      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+      P -∗ syncPay P (qOpt oQ) (N.pay (-1)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«main») (2 + n) -∗ wpLoop h := by
   rw [show User.Sync.Sym.«main» = 0x0 from rfl]
-  iintro #Hc HP Hsp Hrun
+  iintro #Hc Hleaf Hhook Hcwd HP Hsp Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x0  c.addi sp,sp,-16
@@ -82,12 +84,13 @@ theorem wp_syncMain (UL : UK_LEAVES) (HS : UK_SYS_P)
   rw [show BitVec.ofNat 64 0x8 + BitVec.signExtend 64 0x360#21 = BitVec.ofNat 64 User.Sync.Sym.«sync»
     from by decide]
   let mj := ukWr (ukWr m1 8#5 (ukItypeVal .ADDI (m1.get 2#5) 16#12)) 1#5 (BitVec.ofNat 64 0x8 + instrLen false)
-  -- the call: sync()
-  iapply wp_ksync_sync UL HS Hps N h5 mj n $$ Hc Hrun
-  iintro %h6 %ret Hrun
+  -- the call: sync(), the hook in (the leaf's), its receipt out
+  iapply wp_ksync_sync UL N oQ h5 mj n c $$ Hc Hleaf Hhook Hcwd Hrun
+  iintro %h6 %ret HQ Hrun
   rw [show retPc (mj.get 1#5) = BitVec.ofNat 64 0xc from by ureg <;> decide]
-  -- sync() RETURNED: the payment is made here and nowhere earlier
-  ihave Hpay := Hsp $$ HP
+  -- sync() RETURNED: the payment is made here and nowhere earlier, and it
+  -- spends the call's receipt
+  ihave Hpay := Hsp $$ HP HQ
   -- 0xc  c.li a0,0
   ihave Hi := sync_uis N.t 0xc true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) ⟨_, _, _, rfl⟩
     (by decide) $$ Hc
@@ -109,7 +112,7 @@ theorem wp_syncMain (UL : UK_LEAVES) (HS : UK_SYS_P)
 
 /-- **sync's `main` holds** (at the engine `UL`, the ecall leaves `HS`). -/
 theorem syncMain_holds (UL : UK_LEAVES) (HS : UK_SYS_P) : SYNC_MAIN :=
-  ⟨fun Hps N h m n P hc => wp_syncMain UL HS Hps N h m n P hc⟩
+  ⟨fun N oQ h m n P c hc => wp_syncMain UL HS N oQ h m n P c hc⟩
 
 end
 
