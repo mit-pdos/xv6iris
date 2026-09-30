@@ -1,0 +1,275 @@
+name: CI (Lean)
+
+# The Lean tree's counterpart of the Rocq job (.github/workflows/ci.yml on
+# `main`), step for step.  It builds the Sail-generated Lean model
+# (model/Lean_RV64D/), lean-sail (vendor/lean-sail/), iris-lean, and the
+# proofs (MachCSL/, Xv6/ -- the checked-in kernel and user-program dumps are
+# Lean files of Xv6/ and are compiled with them), and then audits what was
+# built: the axioms under the top theorems, the trusted base of their
+# statements, proof coverage, and the device-conformance tests against the
+# captures checked in beside them.
+#
+# It deliberately does NOT:
+#   * build the xv6 kernel ELF or the user programs (`xv6-riscv/` is
+#     .gitignored / absent),
+#   * regenerate the kernel dumps (Xv6/KernelImage.lean, KernelData.lean,
+#     MachCSL/KernelElf.lean) -- that needs the ELF; by hand it is
+#     `make check-gen-kernel`.  The three dumps are checked against each other
+#     by the build (`Xv6.bootImage_wf`),
+#   * regenerate the Sail model (model/Lean_RV64D/ needs the patched `sail`
+#     compiler; by hand: tools/regen_sail_model.sh, then
+#     `git diff --exit-code model/`),
+#   * run QEMU to look for new hardware behaviours (the captures are checked
+#     in, and CI only re-checks the model against them).
+# The .lean files for all of these are checked in; CI only compiles them.
+# What CI DOES re-derive, because it needs no ELF and no `sail`, is every file
+# generated FROM those (the text trees, ModelFacts, Platform, the user
+# images' derived files): the `check-gen` step.
+#
+# EVERY STEP IS `tools/ci/run_all.sh <step>`.  That script is the one entry
+# point CI and developers share (`tools/ci/run_all.sh` with no argument runs
+# the whole sequence; on the build VM:
+# `/shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh`), so a step is
+# reproduced by running the same command, and the comments here say only what
+# a reader of the run page needs: why the step exists and what makes it fail.
+# The scripts' own headers have the rest.
+#
+# THIS FILE LIVES ON THE `lean` BRANCH ONLY, at the same path as the Rocq
+# workflow on `main`.  GitHub runs the workflow file of the commit being
+# built, so a push to `lean` (or a pull request whose merge base is `lean`)
+# gets this one and never the Rocq one, and vice versa.
+
+on:
+  push:
+    branches: [lean]
+  pull_request:
+    branches: [lean]
+
+# A new push does NOT cancel the in-flight run: it finishes, and the new push
+# waits as pending.  GitHub keeps at most one pending run per group, so a burst
+# of pushes coalesces -- each new push supersedes the previously-pending one --
+# and the latest commit is built as soon as the running build completes.  (With
+# cancel-in-progress, a push faster than the build time would starve CI: every
+# run cancelled before finishing, so nothing ever completes.)  The group name
+# says `lean` so it can never collide with the Rocq workflow's `ci-<ref>`.
+concurrency:
+  group: ci-lean-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: coqdev
+    # Measured on the 96-core build VM: the whole job, from nothing, is about
+    # 9 minutes of wall clock and 2.5 hours of CPU (the README's CI section
+    # has the per-step table), so roughly 2.5 h / cores + 5 min elsewhere.
+    # Three hours is "something hung" on anything with a handful of cores.
+    timeout-minutes: 180
+
+    # WITHOUT THIS, a `run:` step gets GitHub's *default* shell, `bash -e {0}` --
+    # which does NOT set pipefail, so a `… | tee log` written into a step
+    # would exit with tee's status and a failed build would go green.  Naming
+    # `bash` explicitly selects `bash --noprofile --norc -eo pipefail {0}`.
+    # (The scripts set pipefail themselves; this is for whatever is written
+    # inline here.)
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # A self-hosted runner keeps its workspace, and checkout's `git clean
+      # -ffdx` is what empties it: .lake/ is .gitignored, so every run starts
+      # with no build products at all.  What is worth keeping across runs
+      # comes back through the two caches below.
+      - uses: actions/checkout@v5
+
+      # ---- 1. Toolchain: elan + the Lean of lean-toolchain ----
+      # elan goes into $HOME/.elan (no sudo; nothing but that directory is
+      # written -- `--no-modify-path`).  On a persistent self-hosted runner it
+      # is simply there from the previous run, which is the fast path and
+      # needs no cache at all.  The probe decides: when the pinned toolchain
+      # is already installed, the cache step is SKIPPED, so a multi-GB
+      # toolchain is neither downloaded from the cache nor unpacked over
+      # binaries another job may be running.  The cache serves the other case
+      # (a new or rebuilt runner): restore if there is one, else the install
+      # step downloads the toolchain and the cache is saved for next time.
+      #
+      # The cache holds elan itself and THIS toolchain only, not all of
+      # ~/.elan: a developer's other toolchains on the runner are none of its
+      # business, and the repository's cache quota (10 GB, shared with the
+      # Rocq job's opam switch) would not survive them.
+      - name: Probe for the pinned Lean toolchain
+        id: elan
+        run: |
+          tc=$(tr -d '[:space:]' < lean-toolchain)
+          # elan's directory name for `leanprover/lean4:v4.32.2` is
+          # `leanprover--lean4---v4.32.2`.
+          dir=$(printf '%s' "$tc" | sed -e 's|/|--|g' -e 's|:|---|g')
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          if [ -x "$HOME/.elan/bin/elan" ] && [ -x "$HOME/.elan/toolchains/$dir/bin/lean" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "$tc is installed in $HOME/.elan; no cache needed."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "$tc is not installed in $HOME/.elan; trying the cache."
+          fi
+
+      - name: Cache elan + the pinned toolchain (only when the runner lacks it)
+        if: steps.elan.outputs.present != 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.elan/bin
+            ~/.elan/settings.toml
+            ~/.elan/toolchains/${{ steps.elan.outputs.dir }}
+          key: ${{ runner.os }}-${{ runner.name }}-elan-${{ hashFiles('lean-toolchain') }}
+
+      # ---- 2. Cache: the fetched packages and everything built from inputs
+      #         that no proof edit touches ----
+      #   .lake/packages               iris-lean, batteries, Qq: the clones
+      #                                 AND their build (it lives inside them)
+      #   model/Lean_RV64D/.lake       the build of the Sail model
+      #   vendor/lean-sail/.lake       the build of lean-sail
+      # Keyed on exactly what those are built from: the toolchain, the pinned
+      # package revisions, and the model's and lean-sail's sources (hashed --
+      # "the model hash").  No restore-keys on purpose, as in the Rocq job: a
+      # miss rebuilds from nothing, and a stale restore would only make lake
+      # work out what to throw away.  Lake validates what is restored by
+      # content hash (its .trace files), not by mtime, so a fresh checkout
+      # over a restored build rebuilds nothing.  Scoped to runner.name for the
+      # reason the Rocq job gives: nothing here is known to be relocatable
+      # across runners with different workspace paths.
+      #
+      # The proofs' own build (.lake/build) is NOT cached.  The Rocq job
+      # recompiles every .vo on every run, and so does this one: the build
+      # profile is only complete for a full build, and a cache key cannot
+      # follow the sources (actions/cache never updates an existing key).
+      - name: Cache lake packages + model build
+        uses: actions/cache@v5
+        with:
+          path: |
+            .lake/packages
+            model/Lean_RV64D/.lake
+            vendor/lean-sail/.lake
+          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**', 'vendor/lean-sail/**') }}
+
+      # Installs elan and the toolchain if (still) absent, puts elan's proxies
+      # on PATH for the later steps, and fetches -- without building or
+      # updating -- the packages lake-manifest.json pins.  All three are
+      # no-ops when the runner or the caches already had them.
+      - name: Install toolchain (elan, Lean per lean-toolchain) and fetch packages
+        run: tools/ci/run_all.sh toolchain
+
+      # ---- 3. Toolchain and pin check ----
+      # The counterpart of Rocq's `make toolchain-check`: the three
+      # lean-toolchain files agree, lakefile.toml and lake-manifest.json agree,
+      # the `lake` on PATH is the pinned Lean, and every fetched package is at
+      # its manifest revision -- so a restored cache that is not what the
+      # manifest says fails here, before an hour of building against it.
+      - name: Toolchain and pin check
+        run: tools/ci/run_all.sh toolchain-check
+
+      # ---- 4. Lint + generated-file check (no Lean; seconds) ----
+      # Before the build, so a `sorry`, a layering violation or a module the
+      # roots do not import fails in seconds.  See tools/ci/lint.sh.
+      - name: Lint (layering, sorry/axiom/native_decide, module drift, pins)
+        run: tools/ci/run_all.sh lint
+
+      # Every generated file must equal what its generator produces from the
+      # checked-in inputs.  NON-strict: the user-ELF re-dump needs
+      # `riscv64-linux-gnu-objdump`; on a runner without it those checks are
+      # reported as skipped (with a ::notice::) instead of failing, and the
+      # md5 / derived-file checks still run.  The kernel dump is always
+      # "skipped" here -- see the note atop this file.
+      - name: Generated-file check (tools/check_gen.py)
+        run: tools/ci/run_all.sh check-gen
+
+      # ---- 5. Build ----
+      # Two steps, so that the second one's log is the PROOFS' build and
+      # nothing else.  The first is a no-op on a cache hit.
+      - name: Build Sail model + lean-sail + iris-lean (no regen)
+        run: tools/ci/run_all.sh build-deps
+
+      # `lake build Xv6 MachCSL` through tools/ci/timed_build.sh, which stamps
+      # every line lake prints with its arrival time: that log is what the
+      # profile below is drawn from.  The step's status is lake's (the script
+      # reads PIPESTATUS, and run_all.sh does not pipe it); the log is read as
+      # well, belt and braces, for a `✖`/`error:` line under a zero status.
+      - name: Build proofs (lake build Xv6 MachCSL, timed)
+        run: tools/ci/run_all.sh build
+
+      # ---- 6. Assumption audit ----
+      # `#print axioms` of each top theorem, plus the `opaque` constants and
+      # Sail platform hooks in its cone (which `#print axioms` does not show),
+      # CHECKED against tools/audit/baseline.json: an axiom or opaque outside
+      # the baseline, a stale baseline entry, or a `sorryAx` anywhere fails
+      # the step.  (Stricter than the Rocq job, which reports and does not
+      # diff.)  The summary is written either way.
+      - name: Assumption audit (axioms and opaques of the top theorems vs baseline)
+        run: tools/ci/run_all.sh audit
+
+      # The other half: not what the PROOF assumes but what a human must READ
+      # for the statement to mean what they think -- the definitions each top
+      # theorem's STATEMENT unfolds to, per file.  Fails when the set of
+      # modules (or axioms/opaques) a statement reaches differs from
+      # tools/tcb/expected.json.  The plain tables also go to the log
+      # (`=== TCB <theorem> ===`), because a step summary is served by no API.
+      - name: Trusted base of the top theorems' statements
+        run: tools/ci/run_all.sh tcb
+
+      # ---- 7. Reports: profile, coverage, dead code ----
+      # One step because all three read the same dump of the elaborated
+      # environment (tools/ci/EnvFacts.lean, ~1-2 min).  BLOCKING: that dump
+      # (a top theorem of tools/ci/roots.txt that no longer exists would
+      # silently empty the reports) and the coverage check (a kernel function
+      # that is not proven, linked and reached and has no allowlist row; a
+      # user function below its baseline; a stale manifest row).  NOT
+      # blocking: the build profile and the dead-code report -- reports.sh
+      # guards each with `|| true`, which is this job's `continue-on-error`.
+      # The coverage report is written before its status is decided.  The
+      # step first clones xv6-riscv (never builds it; best effort, 60 s) so
+      # functions can be attributed to source files; the numbers do not
+      # depend on it.
+      - name: Reports (build profile, proof coverage, dead code)
+        run: tools/ci/run_all.sh reports
+
+      # ---- 8. Device conformance (vtest-lean/): the model against the captures ----
+      # `tools/ci/vtest.sh check-ci` (= `make vtest-check-ci`).  The
+      # regression test that the executions recorded from QEMU, the
+      # VisionFive 2 board and the CVA6 RTL -- CHECKED IN under
+      # vtest-lean/Vtest/ -- are still executions the machine model ADMITS.
+      # No QEMU here, no riscv toolchain, nothing regenerated.
+      #
+      # Every run proof's build products are deleted first and the green set
+      # (vtest-lean/Vtest.lean) is rebuilt keeping going, so one red run does
+      # not hide the rest; then THE RUN TABLE is printed, written to the
+      # summary, and is the verdict.  A run with NO passing proof is a
+      # finding, not a broken build: it is absent from the green set and its
+      # row says `no proof`.  What fails the step is a listed proof that
+      # stopped compiling -- a regression in something that used to hold.
+      #
+      # ITS TRUSTED BASE IS WIDER THAN THE PROOFS'.  Each capture's theorem
+      # is closed by `native_decide`, i.e. by running compiled code, so it
+      # rests on one compiler-trust axiom per capture: the Lean COMPILER and
+      # runtime are trusted here, not only the kernel.  That is confined to
+      # the `Vtest` library, which is not a default target and which nothing
+      # in Xv6/ or MachCSL/ imports: the lint's no-`native_decide` rule and
+      # the assumption audit above are about Xv6/ and MachCSL/ and keep
+      # holding for the top theorems.  See tools/vtest/README.md.
+      #
+      # It needs only the cone of MachCSL.Lang, on disk from the proof build
+      # (seconds on the build VM).  After the reports on purpose, as in the
+      # Rocq job: a red conformance run still leaves the reports above in the
+      # summary, and the failure that stops the run is at the bottom of it.
+      - name: Device conformance tests (vtest-lean/, checked-in captures)
+        run: tools/ci/run_all.sh vtest
+
+      # ---- 9. Unit tests of the Python tools ----
+      # The reports above are only as good as the tools that write them.
+      # Independent of everything before it, so it runs even when an earlier
+      # step failed (a red build must not hide a red tool test).
+      - name: Tool unit tests (make test-tools)
+        if: ${{ !cancelled() }}
+        run: tools/ci/run_all.sh test-tools

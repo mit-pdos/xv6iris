@@ -1,0 +1,4 @@
+# actionlint configuration: `coqdev` is the self-hosted runner both workflows use.
+self-hosted-runner:
+  labels:
+    - coqdev

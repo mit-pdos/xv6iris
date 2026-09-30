@@ -325,3 +325,99 @@ The model is generated from the MachCSL fork of sail-riscv
 (`zeldovich/sail-riscv`, branch `xv6`, commit `070832a1`), the same source and
 configuration as the Rocq prototype; the kernel image is `mit-pdos/xv6-riscv`
 branch `verified` at `ded23f2a`.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `lean` and on pull requests
+targeting it, on the self-hosted runner `coqdev`.  It is the Lean counterpart
+of the Rocq tree's CI job, step for step, and **every step is one call of
+`tools/ci/run_all.sh <step>`**, so CI and a developer run the same commands.
+
+| step | what it checks | fails when |
+|---|---|---|
+| `toolchain` | installs elan and the Lean of `lean-toolchain` into `$HOME/.elan` if absent (no sudo); fetches the packages of `lake-manifest.json` without building or updating them | the download fails, or lake wants to rewrite the manifest |
+| `toolchain-check` | the three `lean-toolchain` files agree, `lakefile.toml` and the manifest agree, the `lake` on `PATH` is the pinned Lean, every fetched package is at its pinned revision | any of them differs |
+| `lint` | layering (Spec/Proof/Link); no `sorry`/`axiom` in `Xv6/`, `MachCSL/` and `vtest-lean/`, no `native_decide` in `Xv6/` and `MachCSL/`; every module is imported from the roots; the audited theorems are the coverage roots | any lint fails |
+| `check-gen` | every generated file equals its generator's output (text trees, `ModelFacts`, `Platform`, the user images and what is derived from them) | a generated file is stale or hand-edited. Without `riscv64-linux-gnu-objdump` the user-ELF re-dump is *skipped*, not failed |
+| `build-deps` | builds the Sail model, lean-sail and iris-lean (cached in CI) | they do not build |
+| `build` | `lake build Xv6 MachCSL` from nothing, with a timed log | the proofs do not build |
+| `audit` | the axioms of each top theorem and the `opaque`s / Sail platform hooks in its cone, against `tools/audit/baseline.json` | anything outside the baseline, a stale baseline row, a `sorryAx` anywhere |
+| `tcb` | the definitions each top theorem's *statement* depends on, per file, against `tools/tcb/expected.json` | the set of modules (or axioms/opaques) a statement reaches changed |
+| `reports` | proof coverage of the pinned images; build profile and dead code | a kernel function is not proven, linked and reached (and has no allowlist row), a user program is below its baseline or has an unexplained unstepped byte, a top theorem is gone. The profile and the dead-code report never fail |
+| `vtest` | device conformance: the machine model against the captures checked in under `vtest-lean/` | a proof of the green set stopped compiling (a run with no proof is a finding, not a failure) |
+| `test-tools` | the unit tests of the Python tools | a test fails |
+
+The markdown of `check-gen`, `audit`, `tcb`, `reports` and `vtest` goes to the
+job summary (about 150 KB in all; GitHub's limit is 1 MiB per step, and
+`run_all.sh` cuts a step's summary to fit rather than lose it whole).
+
+**What CI deliberately does not do.**  It does not build the xv6 kernel or
+the user programs, does not re-dump the kernel images (`make check-gen-kernel`
+does, given the pinned ELF), does not regenerate the Sail model (that needs
+the patched `sail`: `tools/regen_sail_model.sh`, then `git diff --exit-code
+model/`), and never runs QEMU.  All of those outputs are checked in; CI
+compiles them, and re-derives only what needs neither an ELF nor `sail`.  The
+proofs' build is not cached: every run recompiles `Xv6/` and `MachCSL/`, as
+the Rocq job recompiles every `.vo`.  Only the toolchain and the builds that
+no proof edit touches (the fetched packages, the model, lean-sail) are.
+
+**Trust.**  `audit` and `lint` are about `Xv6/` and `MachCSL/`: the top
+theorems use no `native_decide` and no axiom outside the baseline.  The
+`vtest` suite is different and separate: each capture is checked by
+`native_decide`, so it trusts the Lean compiler as well as the kernel
+(one compiler-trust axiom per capture, confined to the `Vtest` library, which
+is not a default target and which nothing in the proofs imports).
+
+**Reproducing it.**  Never on the development machine
+(`notes/coord/gcp_rule.txt`); on the build VM, from your worktree:
+
+```sh
+/shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh          # the whole sequence (= make ci)
+/shared/xv6rocq/gcp-rocq/run-on-gcp tools/ci/run_all.sh audit    # one step
+tools/ci/run_all.sh --list                                        # the step names
+tools/ci/run_all.sh lint check-gen test-tools                     # the steps that need no Lean: anywhere
+```
+
+`-k` keeps going after a failure, `--from STEP` resumes.  Reports and logs go
+to `.lake/ci/` (`summary.md` is what the job summary would be), and a table of
+step times is printed at the end.  `run_all.sh build` builds incrementally
+over whatever `.lake/build` holds; CI starts from a clean checkout, and
+`make timed-build` is the clean build by hand.
+
+Measured on the build VM (96 cores), running the workflow's step commands in
+a fresh clone with an empty `$HOME`:
+
+| step | from nothing | caches restored |
+|---|---|---|
+| `toolchain` (elan + Lean download, package clones) | 19 s | 0 s |
+| `toolchain-check`, `lint`, `check-gen` | 7 s | 7 s |
+| `build-deps` (model, lean-sail, iris-lean) | 2 min 10 s | 0 s |
+| `build` (2657 jobs; 2.1-2.5 h of CPU; critical path 220-280 s) | 3 min 45 s | 3 min 49 s |
+| `audit` | 32 s | 33 s |
+| `tcb` | 14 s | 15 s |
+| `reports` | 61 s | 61 s |
+| `vtest` | 23 s | 23 s |
+| `test-tools` | 1 s | 1 s |
+| **total** | **8.5 min** | **6.2 min** |
+
+On 96 cores the build is bound by its critical path (average parallelism
+about 27); with fewer cores expect about 2.5 h / cores.  The two caches are 736 MB
+(elan and the toolchain; used only on a runner that does not already have
+the toolchain in `~/.elan`) and 150 MB (packages and the model build).
+
+**What the runner needs.**  `bash` 5 or later (`timed_build.sh` uses
+`EPOCHREALTIME`), `git`, `curl`, `python3` (standard library only), `make`,
+`tar`, and GNU coreutils/grep/sed/awk; a writable `$HOME` (elan goes to
+`~/.elan`, 2.8 GB); about 4 GB of workspace; network access to GitHub and, the
+first time, to `elan.lean-lang.org` and `releases.lean-lang.org`.  Optional:
+`riscv64-linux-gnu-objdump` (binutils), which turns the skipped `check-gen`
+checks into real ones.  Memory: the build runs one `lean` per core; on the
+96-core VM (shared, so these are upper bounds) available memory dropped by
+20-35 GB during the two build steps and 13 GB during `vtest`, and by well
+under 1 GB in every other step.
+
+**The nightly dead-import sweep** is `.github/workflows/lean-dead-imports.yml`:
+the same build, then `tools/ci/run_all.sh dead-imports`
+(`tools/ci/dead_imports.sh`), report only.  GitHub fires scheduled workflows
+only from the default branch, so that file takes effect once it is copied to
+`main`; it checks out `lean` itself.
