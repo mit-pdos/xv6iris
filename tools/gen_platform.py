@@ -35,6 +35,10 @@ def bootPmpcfg : Vector (BitVec 8) 64 := Vector.replicate 64 0#8
 
 def bootPmpaddr : Vector (BitVec 64) 64 := Vector.replicate 64 0#64
 
+end MachCSL
+
+namespace MachCSL
+
 @[sail_facts] theorem bootPmpcfg_get (i : Nat) : bootPmpcfg[i]! = 0#8 := by
   unfold bootPmpcfg
   by_cases h : i < 64
