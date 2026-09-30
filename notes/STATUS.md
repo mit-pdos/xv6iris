@@ -4,7 +4,7 @@ CURRENT (2026-09-29): all three top theorems closed at the axiom baseline (prope
 Quot.sound, bv_decide certs) and in step with Rocq main 456141b5b:
 `Xv6.xv6FsAdequacy_closed` (system), `Xv6.userProof : USER`, `Xv6.unionAdequacyClosed` (concludes
 `unionPhiSync`; `unionSyncCutNeg`, `unionResults`).  Drift survey: notes/rocq_drift.md (1900b8a43 → main);
-only themes I+J (NI ledgers / permit sweep) are unported, pending the user's call.  Open items:
+themes I+J (NI ledgers / permit sweep) are deliberately NOT ported (user ruling Sept 29).  Open items:
 notes/coord/union_residuals.md, notes/coord/user_residuals.md.  The Sept 26 text below is historical.
 
 ---

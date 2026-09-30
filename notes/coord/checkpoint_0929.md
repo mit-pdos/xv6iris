@@ -49,3 +49,4 @@ MILESTONE: drift theme E LANDED (tip 48785caa2): unionAdequacyClosed concludes u
 Lean now matches Rocq main 456141b5b except themes I+J (NI ledgers / permit sweep) — awaiting user decision.
 Open small items: union_residuals.md still describes pre-hook SY2 shape.
 Small cleanup Sept 29: 236 landed agent worktrees removed (branches kept); lane B's duplicate finder saved in tools/dups/; stale sync notes fixed.
+USER RULING Sept 29: do NOT port the NI work (themes I+J). Old coordinator checkpoint_0926.md deleted.
