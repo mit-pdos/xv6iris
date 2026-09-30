@@ -48,7 +48,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-! ## 1b. The line list -/
 
 /-- Rocq `fl_auth_lb`. -/
-theorem flAuth_lb (c : FileFixed) (ls : List Fwline) :
+theorem flAuth_lb (c : FileFixed) (ls : List FlLine) :
     flAuth (GF := GF) c ls ⊢ flAuth c ls ∗ flLb c ls := by
   unfold flAuth flLb
   iintro H
@@ -56,7 +56,7 @@ theorem flAuth_lb (c : FileFixed) (ls : List Fwline) :
   iframe H Hl
 
 /-- Rocq `fl_lb_prefix`. -/
-theorem flLb_prefix (c : FileFixed) (ls ls' : List Fwline) :
+theorem flLb_prefix (c : FileFixed) (ls ls' : List FlLine) :
     ⊢@{IProp GF} flAuth c ls -∗ flLb c ls' -∗ ⌜ls' <+: ls⌝ := by
   unfold flAuth flLb
   iintro Ha Hb
@@ -65,14 +65,26 @@ theorem flLb_prefix (c : FileFixed) (ls ls' : List Fwline) :
   exact h.2
 
 /-- THE BIRTH (Rocq `file_birth`): echo's counter and era map, and the line
-list empty. -/
-theorem fileBirth : ⊢@{IProp GF} |==> ∃ c : FileFixed, fileCl (hlc := hlc) c := by
+list empty -- handed the machine's started counter's name, which it stores.
+The sync registry, the commit-era counter (at 0), the run-long history (at
+`[]`) and the run registry (empty) are fresh; the birth's split founds them. -/
+theorem fileBirth (γst : GName) :
+    ⊢@{IProp GF} |==> ∃ c : FileFixed, ⌜c.ffSt = γst⌝ ∗ fileCl (hlc := hlc) c
+      ∗ syncRegAuth c ∅ ∗ syncCmAuth (hlc := hlc) c 0 ∗ slAuth c.ffHist 1 [] ∗ runAuth c 0 := by
   imod (echoBirth (hlc := hlc) (GF := GF)) with ⟨%γ, He⟩
-  imod (MonoList.own_alloc (GF := GF) ([] : List Fwline)) with ⟨%g, Hl, -⟩
+  imod (MonoList.own_alloc (GF := GF) ([] : List FlLine)) with ⟨%g, Hl, -⟩
+  imod (syncRegAuth_alloc (GF := GF)) with ⟨%greg, Hreg⟩
+  imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%gcm, Hcm, -⟩
+  imod (slAuth_alloc (GF := GF)) with ⟨%gh, Hh⟩
+  imod (runAuth_alloc (GF := GF)) with ⟨%grun, Hrun⟩
   imodintro
-  iexists (γ, g)
-  unfold fileCl flAuth
-  iframe He Hl
+  iexists (⟨γ, g, greg, gcm, γst, gh, grun⟩ : FileFixed)
+  isplitr
+  · ipureintro; rfl
+  ihave Hreg := Hreg $$ %(⟨γ, g, greg, gcm, γst, gh, grun⟩ : FileFixed) %rfl
+  ihave Hrun := Hrun $$ %(⟨γ, g, greg, gcm, γst, gh, grun⟩ : FileFixed) %rfl
+  unfold fileCl flAuth syncCmAuth
+  iframe He Hl Hreg Hcm Hh Hrun
 
 /-! ## 6. The transports -/
 
@@ -92,7 +104,7 @@ theorem fState_copy (c : FileFixed) (r r' : FileAppNames) (av : Aview) :
   unfold fState
   icases Hf with (⟨Hw, Hc⟩ | Hl)
   · unfold fCore
-    icases Hc with (⟨%s, Hd, Ht, #Hty, %hok⟩ | ⟨%s, %s', Hwh, Ht, #Hty, %hok⟩)
+    icases Hc with (⟨%s, Hd, Ht, #Hty, %hok⟩ | ⟨%s, %s', %np, Hwh, Ht, #Hty, %hok, Hq⟩)
     · have hc := fOk_fcontent av s hok
       subst hc
       isplitl [Hw Hd Ht]
@@ -110,12 +122,12 @@ theorem fState_copy (c : FileFixed) (r r' : FileAppNames) (av : Aview) :
         ipureintro; exact hok
     · have hc := fOk_fcontent av s' hok
       subst hc
-      isplitl [Hw Hwh Ht]
+      isplitl [Hw Hwh Ht Hq]
       · ileft
         iframe Hw
         iright
-        iexists s, (fcontentOf av)
-        iframe Hwh Ht Hty
+        iexists s, (fcontentOf av), np
+        iframe Hwh Ht Hty Hq
         ipureintro; exact hok
       · ileft
         iframe Hw'
@@ -149,7 +161,7 @@ theorem fState_typedAt (c : FileFixed) (r : FileAppNames) (av : Aview) :
   unfold fState
   icases Hf with (⟨Hw, Hc⟩ | Hl)
   · unfold fCore
-    icases Hc with (⟨%s, Hd, Ht, #Hty, %hok⟩ | ⟨%s, %s', Hwh, Ht, #Hty, %hok⟩)
+    icases Hc with (⟨%s, Hd, Ht, #Hty, %hok⟩ | ⟨%s, %s', %np, Hwh, Ht, #Hty, %hok, Hq⟩)
     · have hc := fOk_fcontent av s hok
       subst hc
       isplitl [Hw Hd Ht]
@@ -162,12 +174,12 @@ theorem fState_typedAt (c : FileFixed) (r : FileAppNames) (av : Aview) :
       · iexact Hty
     · have hc := fOk_fcontent av s' hok
       subst hc
-      isplitl [Hw Hwh Ht]
+      isplitl [Hw Hwh Ht Hq]
       · ileft
         iframe Hw
         iright
-        iexists s, (fcontentOf av)
-        iframe Hwh Ht Hty
+        iexists s, (fcontentOf av), np
+        iframe Hwh Ht Hty Hq
         ipureintro; exact hok
       · iexact Hty
   · unfold fEscLive
@@ -180,62 +192,6 @@ theorem fState_typedAt (c : FileFixed) (r : FileAppNames) (av : Aview) :
       iframe Ha Hh Hwh Ht Hty
       ipureintro; exact hok
     · iexact Hty
-
-/-- THE BOOT TRANSPORT (Rocq `file_xfer_boot`), at `appCloneRaw`'s shape
-(deviation 1). -/
-theorem fileXferBoot (c : FileFixed) (k : Nat) :
-    ⊢@{IProp GF} appCloneRaw (filePred (hlc := hlc) c) (fileBoot (hlc := hlc) c k) := by
-  have hex := echoXferBoot (hlc := hlc) (GF := GF) c.1 k
-  unfold appCloneRaw at hex ⊢
-  ihave #Hex := hex
-  imodintro
-  iintro %r %av H
-  ihave HS : iprop(▷ (echoPred (hlc := hlc) c.1 r.fnCons av ∗
-      (fileTaint (hlc := hlc) c ∨ (⌜fileFsPure av⌝ ∗ fState (hlc := hlc) c r av)))) $$ [H]
-  · inext
-    iapply filePred_split c r av $$ H
-  icases HS with ⟨He, Hrest⟩
-  imod Hex $$ %r.fnCons %av He with ⟨He, %rc, He', Hb⟩
-  imod (fnamesAlloc (GF := GF) rc (fcontentOf av))
-    with ⟨%r', %hrc, Hd1, Hd2, Ht1, Ht2, Ha1⟩
-  subst hrc
-  ihave HH : iprop(▷ (filePred (hlc := hlc) c r av ∗ filePred (hlc := hlc) c r' av ∗
-      (fTyped c (fcontentOf av) ∨ fileTaint (hlc := hlc) c)))
-    $$ [He He' Hrest Hd1 Ht1 Ha1]
-  · inext
-    icases Hrest with (#Ht | ⟨%hp, Hf⟩)
-    · isplitl [He]
-      · iapply filePred_join c r av $$ He
-        ileft; iexact Ht
-      · isplitl [He']
-        · iapply filePred_join c r' av $$ He'
-          ileft; iexact Ht
-        · iright; iexact Ht
-    · ihave ⟨Hf, #Hty⟩ := fState_typedAt c r av $$ Hf
-      ihave ⟨Hf, Hf'⟩ := fState_copy c r r' av $$ Ha1 Hd1 Ht1 Hf
-      isplitl [He Hf]
-      · iapply filePred_join c r av $$ He
-        iright
-        iframe Hf
-        ipureintro; exact hp
-      · isplitl [He' Hf']
-        · iapply filePred_join c r' av $$ He'
-          iright
-          iframe Hf'
-          ipureintro; exact hp
-        · ileft; iexact Hty
-  icases HH with ⟨H1, H2, H3⟩
-  imodintro
-  isplitl [H1]
-  · iexact H1
-  · iexists r'
-    isplitl [H2]
-    · iexact H2
-    · unfold fileBoot
-      iframe Hb
-      iexists (fcontentOf av)
-      unfold fown
-      iframe Hd2 Ht2 H3
 
 end AppFileSeal
 
