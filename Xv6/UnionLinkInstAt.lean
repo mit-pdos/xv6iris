@@ -117,7 +117,7 @@ theorem union_links_gl_at (ug : UnionGn) (s0 : Fstate) :
   ihave %hc := unionLinks_eq ug $$ Hlk
   unfold glinks glW glBlk glPro glHead glTaint
   simp only [unionParamsAt_gT, unionParamsAt_gPIN, unionParamsAt_gW, unionParamsAt_gH,
-    unionParamsAt_gwild]
+    unionParamsAt_gwild, unionParamsAt_gR]
   isplitr
   · imodintro
     iintro %k %v %P0 %b %ps0 %cs0 %s0' %I0 %Φ %h1 %h2 %h3 #Hpin #Hw Ht #Hps #Hcs #HE HΦ

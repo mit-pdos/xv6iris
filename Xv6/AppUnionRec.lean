@@ -28,8 +28,9 @@ Rocq's header, abridged:
 2. Names: Rocq `union_phi` (the record's `gstate → list mobs → Prop`) is
    `unionPhiApp` (Lean's `unionPhi` is `UnionOutPure.union_phi`);
    `union_R`/`union_tag`/`union_kill`/`union_cons`/`union_ifc`/
-   `union_turn`/`app_union` are `unionR`/`unionTag`/`unionKill`/`unionCons`/
-   `unionIfc`/`unionTurn`/`appUnion`.
+   `union_boot`/`app_union` are `unionR`/`unionTag`/`unionKill`/`unionCons`/
+   `unionIfc`/`unionBoot`/`appUnion`; the turns are `UnionOutLed`'s
+   (`uturn`/`uturn'`/`uturn''`/`uturnI`, Rocq `union_turn` is `uturn`).
 3. `union_wild_lic` reads the interface's `wildEv ev` premise into
    `ucl_wild_lic`'s two-arm disjunction by cases on the event, as Rocq's.
 4. The laws are `Xv6AppLaws` fields' types, stated here as theorems at the
@@ -41,6 +42,8 @@ import Xv6.AppPreGS
 import Xv6.UnionOutLed
 import Xv6.AppFileBoot
 import Xv6.AppFileSteps
+import Xv6.AppFileHook
+import Xv6.AppFilePos
 
 namespace Xv6
 
@@ -52,9 +55,9 @@ set_option linter.unusedVariables false
 
 /-! ## 1. The conclusion -/
 
-/-- THE CONCLUSION (Rocq `AppUnionRec.union_phi`): `UnionOutPure.union_phi`
-verbatim; it reads the trace alone. -/
-def unionPhiApp : GState → List Obs → Prop := fun _ h => unionPhi h
+/-- THE CONCLUSION (Rocq `AppUnionRec.union_phi`): `UnionOutPure.union_phi_sync`
+verbatim (sync SY3-A4); it reads the trace alone. -/
+def unionPhiApp : GState → List Obs → Prop := fun _ h => unionPhiSync h
 
 section UnionApp
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
@@ -146,8 +149,20 @@ noncomputable def unionIfc (ug : UnionGn) : AppIface GF where
   rdwild_persistent := fun _ => inferInstance
   rdwild_timeless := fun _ => inferInstance
 
-/-- Rocq `union_turn`: the file application's turn. -/
-def unionTurn (ug : UnionGn) : Nat → IProp GF := fturn (hlc := hlc) ug.ugnFile
+/-- THE BOOT RESOURCE (Rocq `union_boot`, sync SY3-A3bc/A4): the file
+application's, and the deed holder's share of the running claim's round
+position, founded at the length of the copy's line list the era's record
+pins (or the taint) -- AND THE BOOT FACT at the deed's state, the deed's
+typed witness and the running claim's registration at the era. -/
+noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp GF :=
+  iprop(∃ s : Dst, fileBootAt (hlc := hlc) ug.ugnFile.fgnCl k r s
+    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+       ∨ ∃ (vf : FileEra) (ls : List FlLine),
+           fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ fposh r ls.length
+           ∗ flLb ug.ugnFile.fgnCl ls
+           ∗ ⌜uadm ls (slast vf.feFloor) (dstContent s)⌝
+           ∗ fTyped (hlc := hlc) ug.ugnFile.fgnCl s
+           ∗ runReg ug.ugnFile.fgnCl k r.fnPos r.fnDeed))
 
 /-! ## 2. The record -/
 
@@ -159,23 +174,23 @@ noncomputable def appUnion : Xv6App GF where
   cl := unionClAll (hlc := hlc)
   names := FileAppNames
   pred := fun c => filePred (hlc := hlc) c.ugnFile.fgnCl
-  boot := fun c k r => fileBoot (hlc := hlc) c.ugnFile.fgnCl k r
+  boot := unionBoot (hlc := hlc)
   R := unionR (hlc := hlc)
   ifc := unionIfc (hlc := hlc)
-  turn := unionTurn (hlc := hlc)
-  -- THE SYNC FIELDS (Rocq SY3-A1 / SY3-A3b), TRIVIAL FOR NOW (drift D3-app/S):
-  -- the turn the same at all four stages, nothing for the crash slot at birth,
-  -- no record/copy predicates, no sync ledger.  Lanes F/U replace them with
-  -- the union's real fields (Rocq `AppUnionRec.app_union` at main).
-  turn' := unionTurn (hlc := hlc)
-  turn'' := unionTurn (hlc := hlc)
-  iturn := unionTurn (hlc := hlc)
-  cls := appTrivCls
-  born := appTrivBorn
-  ok := appTrivOk
-  okc := appTrivOkc
-  tk := appTrivTk
-  hk := appTrivHk
+  -- THE TURN IN ITS FOUR STAGES (Rocq sync SY3-A3bc)
+  turn := uturn (GF := GF)
+  turn' := uturn' (hlc := hlc)
+  turn'' := uturn'' (hlc := hlc)
+  iturn := uturnI (GF := GF)
+  -- the birth's crash-slot part, what it keeps of the machine's names, the
+  -- era's and the durable copy's record predicates, the token and the hook
+  -- family (sync SY3-A3bc)
+  cls := unionCls (hlc := hlc)
+  born := unionBorn
+  ok := fun _ k r => r.fnEra = k
+  okc := fun _ r => r.fnRole = true
+  tk := fun c k => unionTk (hlc := hlc) c.ugnFile.fgnCl k
+  hk := fun c k Q => unionHk (hlc := hlc) (filePred (hlc := hlc)) c.ugnFile.fgnCl k Q
   phi := unionPhiApp
 
 /-- Rocq `union_al_Rt`. -/
@@ -211,17 +226,21 @@ theorem union_al_sup (c : (appUnion (hlc := hlc) (GF := GF)).fixed)
   iapply hl
   iexact Ht
 
-/-- Rocq `union_Happ_init`: era 0's claim at the literal image, the file
-application's. -/
+/-- Rocq `union_Happ_init`: era 0's durable copy at the literal image, out
+of the birth's crash-slot part: the file application's. -/
 theorem union_Happ_init (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (hdk : fsBlocks (diskOf g.m.devs) = fsimgP) (hsb : sb = fsimgSb) (hcov : cov = fsimgCov)
     (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
-    ⊢@{IProp GF} |==> ∃ r : (appUnion (hlc := hlc) (GF := GF)).names,
+    (appUnion (hlc := hlc) (GF := GF)).cls c ⊢@{IProp GF} |==> ∃ r : (appUnion (hlc := hlc) (GF := GF)).names,
+      ⌜(appUnion (hlc := hlc) (GF := GF)).okc c r⌝ ∗
       (appUnion (hlc := hlc) (GF := GF)).pred c r
-        (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes) :=
-  fileInit_img (hlc := hlc) c.ugnFile.fgnCl (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov
-    himg hdk hsb hcov
+        (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes) := by
+  show unionCls (hlc := hlc) c ⊢ _
+  unfold unionCls
+  iintro ⟨%γ0, #Hreg, Hh, Hcm, Hhi, Hra, #Hlb⟩
+  iapply (fileInit_img (hlc := hlc) c.ugnFile.fgnCl (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov γ0
+    himg hdk hsb hcov) $$ Hreg Hh Hcm Hhi Hra Hlb
 
 /-- Rocq `union_Hphi_R`: the conclusion's one ingredient. -/
 theorem union_Hphi_R (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (g : GState) (h : List Obs) :

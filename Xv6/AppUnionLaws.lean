@@ -2,7 +2,8 @@
 **THE UNION RECORD'S LAWS, AS THE CLASS INSTANCE** (lane U4) -- Rocq
 `AppUnionRec.v` §2-§3 (`/shared/xv6rocq/iris/AppUnionRec.v` @ 1900b8a43):
 `union_al_birth`, `union_al_R0`, `union_al_pow`, `union_al_tx`,
-`union_al_rx`, `union_al_xfer`, `union_al_echo`, and `union_laws` (with
+`union_al_rx`, `union_al_xfer`, `union_al_merge`, `union_al_sync_run`,
+`union_al_boot_ok`, `union_al_echo`, and `union_laws` (with
 `al_programs` the argument `Hprog : UnionProgLaw`).  The laws that read no
 ledger step (`union_al_Rt`/`_kill`/`_sup`) are `Xv6/AppUnionRec.lean`.
 
@@ -22,6 +23,7 @@ import Xv6.UnionOutSeal
 import Xv6.AppFileSeal
 import Xv6.UnionOutSealSteps
 import Xv6.UnionLinksSeal
+import Xv6.AppFileXfer
 
 namespace Xv6
 
@@ -36,33 +38,105 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Dis
 
 attribute [local instance] appPreGS
 
-/-- **Rocq `union_al_birth`** (at the trivial sync fields for now, drift
-D3-app/S: nothing for the crash slot, nothing kept of the machine's names). -/
+/-- **Rocq `union_al_birth`**: the birth, handed the machine's four names,
+keeping the started counter's. -/
 theorem union_al_birth (γd γsw γreg γst : GName) :
     ⊢@{IProp GF} |==> ∃ c : (appUnion (hlc := hlc) (GF := GF)).fixed,
       ⌜(appUnion (hlc := hlc) (GF := GF)).born γd γsw γreg γst c⌝ ∗
       (appUnion (hlc := hlc) (GF := GF)).cls c ∗ (appUnion (hlc := hlc) (GF := GF)).cl c :=
-  appBirth_ofValidCls (appUnion (hlc := hlc) (GF := GF)) (fun c => appTrivCls_intro c)
-    (fun _ _ _ _ _ => trivial) (unionBirthAll (hlc := hlc) (GF := GF)) γd γsw γreg γst
+  unionBirthAll (hlc := hlc) (GF := GF) γst
 
-/-- The union's clone, with the first process's boot resource -- the file
-application's (Rocq `file_xfer_boot` at the pin's shape; lanes F/U re-state it
-at main's re-base). -/
-theorem union_clone (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
-    ⊢@{IProp GF} appCloneRaw ((appUnion (hlc := hlc) (GF := GF)).pred c)
-      ((appUnion (hlc := hlc) (GF := GF)).boot c k) :=
-  fileXferBoot (hlc := hlc) (GF := GF) c.ugnFile.fgnCl k
-
-/-- **Rocq `union_al_xfer`** at the trivial sync fields for now (drift
-D3-app/S): the clone at the identity on the turn. -/
+/-- **Rocq `union_al_xfer`** (sync SY3-A3bc/A4): THE POWER-ON TRANSPORT --
+the file application's re-base (`AppFileXfer.fileXferBoot`) at the turn the
+on-arm yielded, the copy's line list pinned at the era's record. -/
 theorem union_al_xfer (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (gen : Nat)
-    (γd γsw γreg γst : GName) (_ : (appUnion (hlc := hlc) (GF := GF)).born γd γsw γreg γst c) :
+    (γd γsw γreg γst : GName) (hborn : (appUnion (hlc := hlc) (GF := GF)).born γd γsw γreg γst c) :
     ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc))
       ((appUnion (hlc := hlc) (GF := GF)).pred c) ((appUnion (hlc := hlc) (GF := GF)).okc c)
       ((appUnion (hlc := hlc) (GF := GF)).boot c (gen + 1))
       ((appUnion (hlc := hlc) (GF := GF)).turn c (gen + 1))
-      ((appUnion (hlc := hlc) (GF := GF)).turn' c (gen + 1)) γst gen :=
-  appXferBootRaw_ofClone _ _ _ _ _ γst gen (union_clone c (gen + 1))
+      ((appUnion (hlc := hlc) (GF := GF)).turn' c (gen + 1)) γst gen := by
+  have hb : c.ugnFile.fgnCl.ffSt = γst := hborn
+  subst hb
+  show ⊢ appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (filePred (hlc := hlc) c.ugnFile.fgnCl)
+      (fun r => r.fnRole = true) (unionBoot (hlc := hlc) c (gen + 1)) (uturn (GF := GF) c (gen + 1))
+      (uturn' (hlc := hlc) c (gen + 1)) c.ugnFile.fgnCl.ffSt gen
+  unfold appXferBootRaw
+  iintro !> %r %av %n %hn Hsa %hr Htn Hp
+  subst hn
+  unfold uturn unionTn
+  icases Htn with ⟨Hft, %γ, %vf, #Hreg, Hγ, #Hpin, Hcp, #Hbase, #HF⟩
+  imod (fileXferBoot (hlc := hlc) (GF := GF) c.ugnFile.fgnCl gen r av γ vf.feBase vf.feFloor hr)
+    $$ Hsa Hγ Hreg Hbase HF Hp with Hx
+  iapply bupd_except0_elim
+  imod Hx with ⟨Hsa, Hs, %r', %ls, %hr', Hr'p, Hb, #Hls, Hrest⟩
+  imodintro
+  imod (fcp_set (GF := GF) vf ls) $$ Hcp with #Hcpp
+  imodintro
+  imodintro
+  iframe Hsa
+  unfold uturn' unionBoot
+  icases Hrest with (#HT | ⟨Hpos, Htk, #Hty, #Hrr, %Ls_c, -, -, %hFb⟩)
+  · isplitl [Hft]
+    · iframe Hft
+      iexists vf, ls
+      iframe Hpin Hcpp Hls
+      ileft; iexact HT
+    iexists (fnWith r γ (gen + 1) true), r'
+    isplitr
+    · ipureintro; rfl
+    iframe Hs Hr'p
+    iexists (fcontentOf av)
+    iframe Hb
+    ileft; iexact HT
+  unfold unionTkb
+  icases Htk with ⟨%γ', %Ls, #Hreg', Hq, #Hcm⟩
+  ihave #Hql := slLb_get (GF := GF) γ' _ Ls $$ Hq
+  isplitl [Hft Hq]
+  · iframe Hft
+    iexists vf, ls
+    iframe Hpin Hcpp Hls
+    iright
+    iexists γ', Ls
+    iframe Hreg' Hq Hql Hcm
+  iexists (fnWith r γ (gen + 1) true), r'
+  isplitr
+  · ipureintro; rfl
+  iframe Hs Hr'p
+  iexists (fcontentOf av)
+  iframe Hb
+  iright
+  iexists vf, ls
+  iframe Hpin Hcpp Hpos Hls Hty Hrr
+  ipureintro; exact hFb.2
+
+/-- **Rocq `union_al_boot_ok`**: the era's record predicate off the boot
+resource. -/
+theorem union_al_boot_ok (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat)
+    (r : (appUnion (hlc := hlc) (GF := GF)).names) :
+    (appUnion (hlc := hlc) (GF := GF)).boot c k r ⊢@{IProp GF} ⌜(appUnion (hlc := hlc) (GF := GF)).ok c k r⌝ := by
+  show unionBoot (hlc := hlc) c k r ⊢ ⌜r.fnEra = k⌝
+  unfold unionBoot fileBootAt
+  iintro ⟨%s, ⟨-, %h, -, -⟩, -⟩
+  ipureintro; exact h
+
+/-- **Rocq `union_al_sync_run`**: THE SYNC RUNNER -- the hook IS the
+runner's body. -/
+theorem union_al_sync_run [MachFixedGS hlc GF] (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat) :
+    ⊢@{IProp GF} appSyncRunRaw (hlc := hlc) ((appUnion (hlc := hlc) (GF := GF)).pred c)
+      ((appUnion (hlc := hlc) (GF := GF)).ok c (k + 1)) ((appUnion (hlc := hlc) (GF := GF)).okc c)
+      ((appUnion (hlc := hlc) (GF := GF)).tk c k) ((appUnion (hlc := hlc) (GF := GF)).hk c k) := by
+  show ⊢ appSyncRunRaw (hlc := hlc) (filePred (hlc := hlc) (GF := GF) c.ugnFile.fgnCl)
+      (fun r => r.fnEra = k + 1) (fun r => r.fnRole = true) (unionTk (hlc := hlc) c.ugnFile.fgnCl k)
+      (fun Q => unionHk (hlc := hlc) (filePred (hlc := hlc)) c.ugnFile.fgnCl k Q)
+  unfold appSyncRunRaw unionHk
+  iintro !> %Q %gt %I %r %r' %hr %hr' %hrc HQ Hh Hn Hp HT
+  iapply fupd_except0
+  imod (HQ $$ %I %r %r' %hr %hr' %hrc Hn Hp HT) with Hx
+  imodintro
+  imod Hx with ⟨Hn, Hp, HT, HQ⟩
+  imodintro
+  iframe Hh Hn Hp HT HQ
 
 /-- **Rocq `union_al_R0`**. -/
 theorem union_al_R0 (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
@@ -128,7 +202,7 @@ theorem union_al_tx [MachGS hlc GF] [Fscfg] (c : (appUnion (hlc := hlc) (GF := G
   cases i with
   | uart1 =>
     imod (unionLed_tx (hlc := hlc) (GF := GF) c h .uart1 b hsh) $$ [] Hled with Hled
-    · iright; unfold unionTxGo; itrivial
+    · simp only [unionTxGo]; ipureintro; trivial
     imodintro
     iframe Ho Hg Hled
   | uart0 =>
@@ -149,19 +223,44 @@ theorem union_al_tx [MachGS hlc GF] [Fscfg] (c : (appUnion (hlc := hlc) (GF := G
     ihave ⟨Ho, Hd⟩ := (ucl_drain (hlc := hlc) (GF := GF) c (genId (hlc := hlc) (GF := GF) + 1) h ho H
       (openSeg h ++ [Obs.dev (.uartOut .uart0 b)]) hsh hbt hpo hins hpre hne) $$ Ho
     imod (unionLed_tx (hlc := hlc) (GF := GF) c h .uart0 b hsh) $$ [Hd] Hled with Hled
-    · unfold udrainRet
-      icases Hd with (#HT | ⟨%s0, %vf, %hgo, -, #Hty, #Hfp, #Hlb⟩)
-      · ileft; iexact HT
-      · iright
-        unfold unionTxGo
-        iexists s0, vf
-        rw [hbt]
-        iframe Hty Hfp Hlb
-        ipureintro; exact hgo
+    · simp only [unionTxGo]
+      rw [hbt]
+      iexact Hd
     imodintro
     iframe Ho Hg Hled
 
 end UnionLawsEra
+
+section UnionMerge
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+  [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
+
+/-- **Rocq `union_al_merge`** (sync SY3-A3bc): THE MERGE -- the file
+application's, the started auth read at the union's copy of the started
+counter's name (`born`), at the machine record's own fixed layer. -/
+theorem union_al_merge [F : MachFixedGS hlc GF] (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (k : Nat)
+    (hmono : MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc))
+    (hborn : (appUnion (hlc := hlc) (GF := GF)).born (MachFixedGS.diskName (hlc := hlc) (GF := GF))
+      (MachFixedGS.swapName (hlc := hlc) (GF := GF)) (MachFixedGS.registryName (hlc := hlc) (GF := GF))
+      (MachFixedGS.startName (hlc := hlc) (GF := GF)) c) :
+    ⊢@{IProp GF} appMergeRaw (hlc := hlc) ((appUnion (hlc := hlc) (GF := GF)).pred c)
+      ((appUnion (hlc := hlc) (GF := GF)).ok c (k + 1)) ((appUnion (hlc := hlc) (GF := GF)).okc c)
+      ((appUnion (hlc := hlc) (GF := GF)).tk c k) k := by
+  letI : MachGS hlc GF := atFixedGS F
+  have hm : MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) := hmono
+  have hb : c.ugnFile.fgnCl.ffSt = MachFixedGS.startName (hlc := hlc) (GF := GF) := hborn
+  have hst1 : ∀ n, startAuth (hlc := hlc) (GF := GF) n ⊢ syncStAuth (hlc := hlc) c.ugnFile.fgnCl n := by
+    intro n; unfold startAuth syncStAuth; rw [hb]
+  have hst2 : ∀ n, syncStAuth (hlc := hlc) (GF := GF) c.ugnFile.fgnCl n ⊢ startAuth (hlc := hlc) n := by
+    intro n; unfold startAuth syncStAuth; rw [hb]
+  have h := fileMerge (hlc := hlc) (GF := GF) c.ugnFile.fgnCl k hst1 hst2
+  have hp := appUnion_pred_era hm c
+  have htk : unionTk (hlc := hlc) (GF := GF) c.ugnFile.fgnCl k = (appUnion (hlc := hlc) (GF := GF)).tk c k :=
+    congrFun (appUnion_tk_era hm c) k
+  rw [hp, htk] at h
+  exact h
+
+end UnionMerge
 
 section UnionLaws
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
@@ -200,13 +299,12 @@ theorem unionLaws (Hprog : UnionProgLaw (hlc := hlc) (GF := GF)) :
   al_xfer := union_al_xfer
   al_programs := fun c htag hkill hcons hwild hrdw hmono hhk => Hprog c htag hkill hcons hwild hrdw hmono hhk
   al_echo := fun c htag hkill hcons hwild hrdw hmono => union_al_echo c htag hkill hcons hwild hrdw hmono
-  -- THE SYNC LAWS AT THE TRIVIAL FIELDS (drift D3-app/S; lanes F/U replace them)
-  al_found := fun c k => appTriv_found c k _
-  al_back := fun c h => appBack_id (appUnion (hlc := hlc) (GF := GF)) c h (fun _ => rfl)
-  al_boot_ok := fun _ _ _ => by iintro _; ipureintro; trivial
-  al_merge := fun c k _ _ => appMergeRaw_ofXfer _ _ _ _ _ (fun _ => trivial) (fun _ => trivial)
-    (appXferRaw_ofClone _ _ (union_clone c 0))
-  al_sync_run := fun c k => appTriv_syncRun _ _ _ c k
+  -- THE SYNC LAWS (Rocq sync SY3-A3bc/A4)
+  al_found := fun c k => BI.entails_wand (union_found (hlc := hlc) (GF := GF) c k)
+  al_back := fun c h => unionLed_back (hlc := hlc) (GF := GF) c h
+  al_boot_ok := union_al_boot_ok
+  al_merge := fun c k hm hb => union_al_merge c k hm hb
+  al_sync_run := fun c k => union_al_sync_run c k
 
 end UnionLaws
 
