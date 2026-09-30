@@ -26,3 +26,12 @@ leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
 [[lean_lib]]
 name = "Xv6"
 leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
+
+# The device-conformance suite (vtest-lean/): the machine model re-checked
+# against behaviours captured from QEMU.  NOT a default target: a red test is
+# a finding about the model and must not break the proof build
+# (`make vtest-check`; see tools/vtest/README.md).
+[[lean_lib]]
+name = "Vtest"
+srcDir = "vtest-lean"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }

@@ -5,3 +5,4 @@
 .claude/worktrees/
 /xv6-riscv/
 __pycache__/
+/tools/vtest/build/
