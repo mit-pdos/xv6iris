@@ -10,13 +10,13 @@ camera the union's classes add (union_cone.md §4.1, the one-instance-per-
 camera rule, brief risk 5), and every capacity class of the system theorem
 re-instantiated over the same slots.
 
-## The new slots (95-107)
+## The new slots (95-108)
 
 | slot | camera | the class field |
 |---|---|---|
 | 95 | `ghost_map Nat EraPins` | `EchoOutG.pinG` (Rocq `echoOutG`'s `eo_pin`) |
 | 96 | `ghost_var Dst` | `FileAppG.deedG` |
-| 97 | `mono_list Fwline` | `FileAppG.flG` |
+| 97 | `mono_list FlLine` | `FileAppG.flG` |
 | 98 | `mono_list EscRec` | `FileAppG.escG` |
 | 99 | `ghost_map Nat FileEra` | `FileOutG.eraG` |
 | 100 | `mono_list Fstate` | `FileOutG.f0G` |
@@ -27,6 +27,7 @@ re-instantiated over the same slots.
 | 105 | `ghost_var (Option (List (BitVec 8)))` | `PipesNG.modeG` (Rocq `pipesNG`) |
 | 106 | `Nat → Option (DFracAgree CfDev)` | `CifRegG` (Rocq `cifRegG`) |
 | 107 | `Nat → Option (DFracAgree Fdev)` | `FifRegG.regG` (Rocq `fifRegG`) |
+| 108 | `mono_list Srec` | `FileAppG.syncG` (Rocq `fa_sync`, sync SY3-A3a) |
 
 ## The union's components that REUSE a slot (no new camera)
 
@@ -70,7 +71,7 @@ def unionGF : BundledGFunctors :=
   xv6GF
   |>.set 95 ⟨xgfGm Nat EraPins RegMapF, inferInstance⟩
   |>.set 96 ⟨GhostVarF Dst, inferInstance⟩
-  |>.set 97 ⟨xgfMl Fwline, inferInstance⟩
+  |>.set 97 ⟨xgfMl FlLine, inferInstance⟩
   |>.set 98 ⟨xgfMl EscRec, inferInstance⟩
   |>.set 99 ⟨xgfGm Nat FileEra RegMapF, inferInstance⟩
   |>.set 100 ⟨xgfMl Fstate, inferInstance⟩
@@ -81,6 +82,7 @@ def unionGF : BundledGFunctors :=
   |>.set 105 ⟨GhostVarF (Option (List (BitVec 8))), inferInstance⟩
   |>.set 106 ⟨HfpReg.RegF CfDev, inferInstance⟩
   |>.set 107 ⟨HfpReg.RegF Fdev, inferInstance⟩
+  |>.set 108 ⟨xgfMl Srec, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -212,7 +214,7 @@ instance ugfHelp : GhostMapG unionGF Nat (GName × BitVec 32) RegMapF := ⟨ugf_
 -- the union's new cameras
 instance ugfEraPins : GhostMapG unionGF Nat EraPins RegMapF := ⟨ugf_slot 95⟩
 instance ugfDeed : GhostVarG unionGF Dst := { elemG := ugf_slot 96 }
-instance ugfFwline : MonoListG unionGF Fwline := ⟨ugf_slot 97⟩
+instance ugfFlLine : MonoListG unionGF FlLine := ⟨ugf_slot 97⟩
 instance ugfEscRec : MonoListG unionGF EscRec := ⟨ugf_slot 98⟩
 instance ugfFileEra : GhostMapG unionGF Nat FileEra RegMapF := ⟨ugf_slot 99⟩
 instance ugfFstate : MonoListG unionGF Fstate := ⟨ugf_slot 100⟩
@@ -223,6 +225,7 @@ instance ugfPnsReg : ElemG unionGF (HfpReg.RegF Pdev) := ugf_slot 104
 instance ugfPipesMode : GhostVarG unionGF (Option (List (BitVec 8))) := { elemG := ugf_slot 105 }
 instance ugfCifReg : ElemG unionGF (HfpReg.RegF CfDev) := ugf_slot 106
 instance ugfFifReg : ElemG unionGF (HfpReg.RegF Fdev) := ugf_slot 107
+instance ugfSrec : MonoListG unionGF Srec := ⟨ugf_slot 108⟩
 
 end cameras
 
@@ -262,6 +265,8 @@ instance unionGF_fifRegG : FifRegG unionGF := {}
 /-! ## The merges are ONE instance (the one-camera rule, checked) -/
 
 example : (inferInstance : GhostMapG unionGF Nat Agent RegMapF) = ugfNatNat := rfl
+example : (FileAppG.regG : GhostMapG unionGF Nat GName RegMapF) = ugfNatNat := rfl
+example : (FileAppG.runG : GhostMapG unionGF Nat (GName × GName) RegMapF) = ugfNatPair := rfl
 example : (BcacheG.gmRefG : GhostMapG unionGF Nat Nat RegMapF) = ugfNatNat := rfl
 example : (LogG.gmLg : GhostMapG unionGF Nat (Nat × Nat) RegMapF) = ugfNatPair := rfl
 example : (inferInstance : GhostMapG unionGF Nat (BitVec 8) DiskMapF) = ugfBytes := rfl
