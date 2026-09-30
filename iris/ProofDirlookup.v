@@ -1233,7 +1233,7 @@ Section ProofDirlookupMain.
                 ltac:(rewrite Htgt96; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dli_38 with "Htext"). }
-      iApply bi.later_intro. iIntros (CID25 Hq25) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID25 Hq25) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htgt96) in "Hpc".
       assert (Hnone : dir_first data nrec s = None).
       { apply dlk_first_none_zero. apply dlk_nrec_zero. exact Hsz0. }
@@ -1244,7 +1244,7 @@ Section ProofDirlookupMain.
       iDestruct (cpu_claim_ext_transport CID CID25 eb pj
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iPoseProof ("Htail" $! CID25) as "Ht".
-      iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+      iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
       iApply ("Ht" $! R13 u10 dolds0 with
                 "[%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hde").
       { exact HR13tr. }

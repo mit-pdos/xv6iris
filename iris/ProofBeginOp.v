@@ -1657,8 +1657,8 @@ Section BoBodies.
                   with "Hcg Hpc [] [Hout]").
         { iApply (boi_70 with "Htext"). }
         { iEval (rewrite Hsta). iExact "Hout". }
-        iApply wp_next_off_intro.
-        iIntros "Hcg Hpc Hout".
+        iApply wp_next_off_intro_lc.
+        iIntros "Hlc Hcg Hpc Hout".
         iEval (rewrite Hsta) in "Hout".
         assert (Hstv : trunc32 (rget E9 (mword_of_int 14 : mword 5))
                        = (mword_of_int (Z.of_nat out + 1) : mword 32)).
@@ -1760,7 +1760,7 @@ Section BoBodies.
           iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpm).
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
-        iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
+        iSpecialize ("Hexit" $! CID with "[%] Hlc"); [wp_next_chain|].
         iApply ("Hexit" $! E9 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc").
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)

@@ -820,8 +820,8 @@ Section IunlockputOfDep.
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
 
-    iApply ("Hcont" $! CIDx Hqx mf n' with
-              "[%] Hlc Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%]
+    iSpecialize ("Hcont" $! CIDx Hqx with "Hlc"). iApply ("Hcont" $! mf n' with
+              "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%]
                [Hopb Htx] Hslot"); [exact Hcs | exact Hbnd |].
     iApply (log_opb_op with "Hopb Htx").
   Qed.
@@ -870,8 +870,8 @@ Section IunlockputOfDep.
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
 
-    iApply ("Hcont" $! CIDx Hqx mf n' Sb' w with
-              "[%] Hlc Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%] [%] [%]
+    iSpecialize ("Hcont" $! CIDx Hqx with "Hlc"). iApply ("Hcont" $! mf n' Sb' w with
+              "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%] [%] [%]
                [%] Hops Htx Hslot");
       [exact Hcs | exact Hsub | exact Hw | exact Hcrb | exact Hnn].
   Qed.

@@ -829,7 +829,7 @@ Section UtRet2.
     iApply (wp_cret_s_sconf (mword_of_int (UT + 0xc6)) Rra S9 av false
               ltac:(vm_compute; discriminate) with "Hcg Hpc [] [-]").
     { iApply (uti_0c6 with "Htext"). }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
     iEval (rewrite HS9ra) in "Hpc".
     (* ================================================================== *)
     (*  THE EXIT: the payload back into the boundary's pieces.             *)
@@ -897,7 +897,7 @@ Section UtRet2.
     destruct Hptwf as (Hmapwf & Haccwf & _ & _ & _).
     iDestruct "Hscause" as (scv) "Hscause".
     iDestruct "Hstval" as (stv) "Hstval".
-    iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
+    iSpecialize ("Hcont" $! CID with "[%] Hlc"); [intros _; reflexivity|].
     iDestruct ("Hownback" $! U sts cs2 with "Hpv Hufr Hch Hsy") as "Hown".
     iAssert (⌜ut_live_out scw (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epw]> (pv_tf (us_V U0))) sts0
                 (pv_tf (us_V U) !!! tf_arg_idx 0) cs2⌝)%I as "Hlv";

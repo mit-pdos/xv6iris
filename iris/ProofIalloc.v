@@ -2800,7 +2800,7 @@ Section IallocScan.
                     ltac:(nz) ltac:(nz) Hcmp2 ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (iali_62 with "Htext"). }
-          iApply bi.later_intro. iIntros (CID19 Hq19) "_ Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID19 Hq19) "Hlc Hcg Hpc".
           assert (Hjt : add_vec (mword_of_int (KernelSyms.ialloc + 0x62) : mword 64)
                           (sign_extend' 64 (mword_of_int 8142 : mword 13))
                         = mword_of_int (KernelSyms.ialloc + 0x30)) by pcw.
@@ -2814,7 +2814,7 @@ Section IallocScan.
              caller picks -- so the induction hypothesis is instantiated at
              [CIDl] itself, where the guard is exactly [Hql], and the turn's
              anchor is handed over as [CIDc := CID19]. *)
-          iPoseProof ("IH" $! CIDl with "[%]") as "IHx"; [exact Hql |].
+          iPoseProof ("IH" $! CIDl with "[%] Hlc") as "IHx"; [exact Hql |].
           iApply ("IHx" $! GE inum1 CID19
                     with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
                           Hppid Hsbn Hsbi Hsl Hiref Hop Htx Hcont").
@@ -3288,7 +3288,7 @@ Section IallocMain.
               (mword_of_int 2418 : mword 12) R9 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { iApply (iali_2c with "Htext"). }
-    iIntros (CID19 Hq19) "_ Hcg Hpc".
+    iIntros (CID19 Hq19) "Hlc Hcg Hpc".
     set (RA := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R9 Rs4)
                      (sign_extend' 64 (mword_of_int 2418 : mword 12)))]> R9).
@@ -3332,7 +3332,7 @@ Section IallocMain.
        with resolution ON, which is the whole fix (rank 1d). *)
     let fl := constr:(Z.to_nat (fsc_ninodes - 1)) in
     iSpecialize ("Hscan" $! fl).
-    iPoseProof ("Hscan" $! CID19 with "[%]") as "Hscan1";
+    iPoseProof ("Hscan" $! CID19 with "[%] Hlc") as "Hscan1";
       [intros _; reflexivity |].
     iApply ("Hscan1" $! RA (mword_of_int 1 : mword 32) CID19
               with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe Hppid

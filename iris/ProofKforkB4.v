@@ -704,7 +704,7 @@ Section KforkB4Proof.
               with "Hcg Hpc [] [Hcpid]").
     { iApply (kfk_0c6 with "Htext"). }
     { iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4). iExact "Hcpid". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcpid".
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc Hcpid".
     iEval (rewrite (rget_ne mr3 Rs3 ltac:(vm_compute; discriminate)) Hmr3s4) in "Hcpid".
     iDestruct ("Hcpidback" with "Hcpid") as "Hchild4".
     set (Mf := <[Regidx Rs1 := regval_into_reg (sign_extend' 64 pid_c)]> mr3).
@@ -753,7 +753,7 @@ Section KforkB4Proof.
              pv_lazy pv_secc].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
-    iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
+    iSpecialize ("Hcont" $! CID0 with "[%] Hlc"); [intros _; reflexivity |].
     iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal Hirsp").
     exact (conj HMfcs HMfs1).
   Qed.

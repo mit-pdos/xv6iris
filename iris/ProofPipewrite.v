@@ -1281,7 +1281,7 @@ Section PwGuard.
       { iApply (pwi_102 with "Htext"). }
       { iApply (pwi_104 with "Htext"). }
       { iApply (pwi_106 with "Htext"). }
-      iApply wp_next_off_intro. iIntros (M') "%Hrst Hcg Hpc HF5".
+      iApply wp_next_off_intro_lc. iIntros "Hlc"; iIntros (M') "%Hrst Hcg Hpc HF5".
       destruct Hrst as (R6 & R7 & R8 & R9 & R10 & Rrest).
       assert (Hsp' : M' !!! Regidx csp_rs1 = pa_stk sp0 14%nat).
       { rewrite (Rrest csp_rs1 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1300,7 +1300,7 @@ Section PwGuard.
                    ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                    ltac:(vm_compute; discriminate)). exact Hs11. }
       iDestruct "HEX" as "[TAIL _]". rewrite /pw_tail.
-      iSpecialize ("TAIL" $! CID with "[%]"); [wp_next_chain|].
+      iSpecialize ("TAIL" $! CID with "[%] Hlc"); [wp_next_chain|].
       (* the loop ran to the end: the answer IS the cursor, at [k = n] *)
       assert (Hin : i = Z.of_nat (Z.to_nat n)) by (rewrite Z2Nat.id; lia).
       assert (Hkn : Z.to_nat i = Z.to_nat n) by lia.

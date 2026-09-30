@@ -1951,10 +1951,10 @@ Section ProofDirlinkMain.
                 ltac:(rewrite Htgt9c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dki_5e with "Htext"). }
-      iApply bi.later_intro. iIntros (CID16 Hq16) "_". iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hq16) "Hlc". iIntros "Hcg Hpc".
       iEval (rewrite Htgt9c) in "Hpc".
       iPoseProof ("Htail" $! CID16) as "Ht".
-      iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
+      iSpecialize ("Ht" with "[%] Hlc"); [wp_next_chain |].
       iApply ("Ht" $! E2 u3 u5 u6 dolds0 with
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde").
       { exact (dl_tregs_of_eregs m sp0 ip nb _ E2 HE2e). }

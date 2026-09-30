@@ -3684,7 +3684,7 @@ Section ProofConsoleread.
                         (sign_extend' 64 (mword_of_int 8152 : mword 13))
                       = mword_of_int (CR + 0x48)) by pcw.
       iEval (rewrite Hbk48) in "Hpc".
-      iSpecialize ("IH" $! CIDq2 with "[%]"); [wp_next_chain|].
+      iSpecialize ("IH" $! CIDq2 with "[%] Hlc"); [wp_next_chain|].
       iPoseProof (cr_runR_intro Rin cn Wd ord (us_M U) Mo (m0 !!! Regidx Ra1) cur n nc
                     bsacc hs Hcur Hmoeq Htagacc with "Hacc") as "Hrn".
       iApply ("IH" $! S9 nc cur P' Mo hs kv
@@ -3953,7 +3953,7 @@ Section ProofConsoleread.
     assert (Hp48 : add_vec_int (mword_of_int (CR + 0x44) : mword 64) 4
                    = mword_of_int (CR + 0x48)) by pcw.
     iEval (rewrite Hp48) in "Hpc".
-    iSpecialize ("WAIT" $! CIDh with "[%]"); [wp_next_chain|].
+    iSpecialize ("WAIT" $! CIDh with "[%] Hlc"); [wp_next_chain|].
     iPoseProof (cr_runR_intro Rin cn Wd ord (us_M U) Mo (m0 !!! Regidx Ra1) cur n nc
                   bsacc hs Hcur Hmoeq Htagacc with "Hacc") as "Hrn".
     iApply ("WAIT" $! D2 nc cur P' Mo hs kv

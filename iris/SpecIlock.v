@@ -768,8 +768,8 @@ Proof.
      Hivalid Hload #Hshot Hfrz %Hfl Hlicb %Hilk".
   iEval (rewrite /ic_dep_held; cbn [ic_dep_rd]) in "Hload".
   iDestruct (ic_tx_dep_intro with "Hdep Ht2") as "Hdep".
-  iApply ("Hcont" $! CIDx Hqx mf dn bm filled with
-            "[%] Hlc Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hoffr Hidev
+  iSpecialize ("Hcont" $! CIDx Hqx with "Hlc"). iApply ("Hcont" $! mf dn bm filled with
+            "[%] Hflk Hcg Hown Hextc Hextm Hpc Hppid Hsb Hsl Hslkd Hdep Hoffr Hidev
              Hiinum Hivalid Hload Hshot Hfrz [%] Hlicb [%]");
     [exact Hcs | exact Hfl | exact Hilk].
 Qed.

@@ -333,8 +333,8 @@ Proof.
   { rewrite /ic_dep_held /=. iExact "Hload". }
   iIntros (CIDx Hqx) "Hlc"; iIntros (mf) "%Hcs Hcg Hown Hpc Hppid Hshr Ht1".
   rewrite /ic_dep_side.
-  iApply ("Hcont" $! CIDx Hqx mf with
-            "[%] Hlc Hcg Hown Hpc Hppid Hshr [Ht1 Ht2]"); [exact Hcs |].
+  iSpecialize ("Hcont" $! CIDx Hqx with "Hlc"). iApply ("Hcont" $! mf with
+            "[%] Hcg Hown Hpc Hppid Hshr [Ht1 Ht2]"); [exact Hcs |].
   iApply (log_tx_join icfg_log t with "Ht1 Ht2").
 Qed.
 

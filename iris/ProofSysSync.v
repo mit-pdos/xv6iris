@@ -997,7 +997,7 @@ Section SsBodies.
       iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt3e) in "Hpc".
       rewrite /ss_loop.
-      iSpecialize ("IH" $! CIDa with "[%]"); [wp_next_chain|].
+      iSpecialize ("IH" $! CIDa with "[%] Hlc"); [wp_next_chain|].
       iApply ("IH" $! Z1 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk Hexit").
       exact HssZ1.
     - (* ---- FALL: the counter advanced; restore s1/s2 and take the tail ---- *)
@@ -1219,7 +1219,7 @@ Section SsBodies.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (ssi_3a with "Htext"). }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (Y4 := <[Regidx Rs1 := regval_into_reg
         (add_vec (Y3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1504 : mword 12)))]> Y3).
@@ -1242,7 +1242,7 @@ Section SsBodies.
       - rewrite /Y4 upd_ne; [| reg_neq]. rewrite /Y3 upd_ne; [| reg_neq].
         rewrite /Y2 upd_eq. reflexivity. }
     rewrite /ss_loop.
-    iSpecialize ("Hloop" $! nc CID with "[%]"); [wp_next_chain|].
+    iSpecialize ("Hloop" $! nc CID with "[%] Hlc"); [wp_next_chain|].
     iApply ("Hloop" $! Y4 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Htk Hexit").
     exact HssY4.
   Qed.

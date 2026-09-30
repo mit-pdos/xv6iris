@@ -273,7 +273,7 @@ Section ProofKerneltrap.
                   Hp0 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kti_8a with "Htext"). }
-        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro_lc. iIntros "Hlc Hcg Hpc".
         assert (Hpcb : add_vec (mword_of_int (KernelSyms.kerneltrap + 0x8a) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
@@ -296,7 +296,7 @@ Section ProofKerneltrap.
            the handler spec -- the repair its predecessor [intr_handler_avail]
            needed at all three of this proof's continuation sites. *)
         iRename "Havail" into "Havz".
-        iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
+        iSpecialize ("Hcont" $! CID with "[] Hlc"); [iPureIntro; intros _; reflexivity|].
         iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hkptr Hcpu
                               Hsepc Hscause Hstval Hpc Hclm").
         { exact Hcsf. }
