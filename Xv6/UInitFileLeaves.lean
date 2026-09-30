@@ -14,7 +14,7 @@ so nothing here names a record.
 
 ## Ported (reached from `union_adequacy_closed`)
 
-`boot_at` (as `fileBootAt`, deviation 3), `file_f0bw_of_boot`,
+`boot_at` (as `initBootAt`, deviation 3), `file_f0bw_of_boot`,
 `file_f0pre_at_of_bw`, `file_sup_of_taint_at`, `file_taint_of_sup_at`,
 `file_fs_pure_law`, `file_era0_pins_law`, `file_init_deps_of_laws`,
 `file_init_deps`, `file_gen_mint`, `kinit_banner_pay_frame`,
@@ -34,7 +34,7 @@ Nothing else (15 declarations: 14 reached + the instance).
 2. **`Hkill : app_taint = FT`** is `hkill : uKillCred = fileTaint
    g.fgnCl` (Lean's `app_taint` is `MachFixedGS.killCred`, `UexecRet.
    uKillCred`).
-3. `boot_at` is `fileBootAt` (a generic name; prefixed against clashes).
+3. `boot_at` is `initBootAt` (a generic name; prefixed against clashes).
 4. **The console licence** (UexecExecMintW deviation 1): Lean's write
    deposit (`udepwLaw_of_sup_write`) and the mint (`uslotMint_all`) read
    `consLicence` explicitly, where Rocq reads it off the taint inside the
@@ -80,22 +80,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **Rocq `boot_at`** (deviation 3): THE BOOT FILING -- the deed's typed
 witness names the era's boot state; under the taint the state is empty. -/
-def fileBootAt (g : FileGn) (s0 : Fstate) (s : Dst) : IProp GF :=
+def initBootAt (g : FileGn) (s0 : Fstate) (s : Dst) : IProp GF :=
   iprop((⌜s0 = dstContent s⌝ ∗ fTyped g.fgnCl s) ∨ (⌜s0 = ∅⌝ ∗ fileTaint (hlc := hlc) g.fgnCl))
 
 /-- Rocq `boot_at_persistent`. -/
 instance fileBootAt_persistent (g : FileGn) (s0 : Fstate) (s : Dst) :
-    Persistent (fileBootAt (hlc := hlc) (GF := GF) g s0 s) := by
-  unfold fileBootAt; infer_instance
+    Persistent (initBootAt (hlc := hlc) (GF := GF) g s0 s) := by
+  unfold initBootAt; infer_instance
 
 /-- **Rocq `file_f0bw_of_boot`**: THE FILING, out of the boot ledger's
-authority alone. -/
+authority and the era's BOOT FACT (`FileOut.f0Bt`, sync SY3-A4), filed
+beside it. -/
 theorem file_f0bw_of_boot (g : FileGn) (s0 : Fstate) :
-    ⊢@{IProp GF} fturn g (genId (hlc := hlc) (GF := GF) + 1) ==∗
+    ⊢@{IProp GF} fturn g (genId (hlc := hlc) (GF := GF) + 1) -∗
+      (∃ vf : FileEra, fileEraPin g (genId (hlc := hlc) (GF := GF) + 1) vf ∗
+        f0Bt (hlc := hlc) g vf s0) ==∗
       fturnCore g (genId (hlc := hlc) (GF := GF) + 1) ∗
         f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s0 := by
-  iintro Ht
-  imod (fturnFile (GF := GF) g (genId (hlc := hlc) (GF := GF) + 1) s0) $$ Ht with ⟨Ht, %vf, #Hvf, #Hbl⟩
+  iintro Ht Hbt
+  imod (fturnFile (hlc := hlc) (GF := GF) g (genId (hlc := hlc) (GF := GF) + 1) s0) $$ [Ht Hbt]
+    with ⟨Ht, %vf, #Hvf, #Hbl⟩
+  · iframe Ht Hbt
   imodintro
   isplitl [Ht]
   · iexact Ht
@@ -131,9 +136,9 @@ theorem fileBoot_fstateOk (c : FileFixed) (s : Dst) : fTyped (GF := GF) c s ⊢ 
 witness beside it. -/
 theorem file_f0pre_at_of_bw (g : FileGn) (s0 : Fstate) (s : Dst) :
     ⊢@{IProp GF} f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s0 -∗
-      fileBootAt (hlc := hlc) g s0 s -∗ f0preAt (hlc := hlc) g s0 := by
+      initBootAt (hlc := hlc) g s0 s -∗ f0preAt (hlc := hlc) g s0 := by
   iintro #Hbw Hb
-  unfold fileBootAt f0preAt
+  unfold initBootAt f0preAt
   icases Hb with (⟨%h0, #Hty⟩ | ⟨%h0, #HT⟩)
   · subst h0
     ihave %hok := fileBoot_fstateOk (GF := GF) g.fgnCl s $$ Hty

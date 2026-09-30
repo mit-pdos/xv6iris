@@ -22,6 +22,11 @@ lists).
   echo's boot resource, both halves of the fresh deed, and the typed witness
   of the content under one later (or the taint).
 
+* SYNC (Rocq main 456141b5b): `fileBirth γst` stores the machine's started
+  counter's name and yields the fresh registry, commit counter, run-long
+  history and run registry; the boot transport moved to `AppFileXfer.lean`
+  (`fileXferBoot`, Rocq main's shape).
+
 ## DEVIATIONS from Rocq
 
 1. `file_xfer_boot` is stated at `SystemSlot.appCloneRaw (filePred c)

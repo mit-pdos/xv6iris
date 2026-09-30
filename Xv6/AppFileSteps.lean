@@ -21,6 +21,12 @@ Rocq's header, abridged (the reasons are the content):
 * `filePred_split` / `filePred_join`: the claim as its echo half and its
   file half.
 
+* SYNC (Rocq main 456141b5b): `fileStep_park` and `fileEscrow_step` take the
+  writer's REDIRECT PERMIT `syncRedir c r (dstContent s) (dstContent s')`
+  (the sync part moves with the files, the quarter is parked);
+  `fileStep_free` moves the sync part along (`syncClaim_same`); the file half
+  is `fileRest` (Rocq `file_rest`), with `fileRest_mono`; `syncRedir_eq`.
+
 ## DEVIATIONS from Rocq
 
 1. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`.

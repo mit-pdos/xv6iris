@@ -6,8 +6,11 @@ The ghost half (the deed, the ticket, the escrow, the claim) is
 `Xv6/AppFile*.lean`.
 
 * `Wordline` / `Fwline` (Rocq `wordline` / `fwline`): a typed line's words,
-  and the line the ledger files -- the file it redirects to beside its words
-  (`FileDisc.echof_ws`'s shape);
+  and a redirect line as the file model reads it -- the file it redirects to
+  beside its words (`FileDisc.echof_ws`'s shape);
+* `FlLine` / `flRedirs` (Rocq `fl_line` / `fl_redirs`, sync SY3-A2): the line
+  the ledger files is EVERY complete line (`Uline`); its redirect lines are
+  the projection; `flRedirs_last`, `flRedirs_prefix`;
 * `Dst` (Rocq `dst`): the deed's state -- each class name's INUM beside its
   bytes; `dstContent` (Rocq `dst_content`) forgets the inums into the
   model's `Fstate`;

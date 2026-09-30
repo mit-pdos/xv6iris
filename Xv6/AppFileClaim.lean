@@ -25,6 +25,12 @@ Rocq's header, abridged (the reasons are the content):
   the ledger a premise); `filePred_cons` (THE ECHO APPLICATION'S CLAIM IS
   THIS ONE WITH THE FILE FORGOTTEN, as an accessor).
 
+* SYNC (Rocq main 456141b5b, SY3-A3bc): `filePred` carries the SYNC PART
+  `syncClaim c r av` in its non-taint arm (Rocq `file_pred := taint ∨ (⌜pure⌝ ∗
+  cons_state ∗ f_state ∗ sync_claim)`); the in-flight arm of `fCore` parks a
+  round-position QUARTER `fposq r n`; `fState_fok` (Rocq `f_state_fok`);
+  `filePred_exact` takes the sync part.
+
 ## DEVIATIONS from Rocq
 
 1. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`.

@@ -13,6 +13,12 @@ and §7 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
 * `fileInit_img` (Rocq `file_init_img`): ...at the theorem's own literal
   shape (`AppLaws.xv6AppAdequacy`'s `Happ_init`).
 
+* SYNC (Rocq main 456141b5b): `fileBootAt` (Rocq `file_boot_at`) names the
+  deed's state and pins the era (`⌜r.fnEra = k⌝`); `fileBoot` is `∃ s`;
+  `fileInit`/`fileInit_img` take the birth's slot share (era-0 list half,
+  its registration, the commit counter at 0, the run-long history, the run
+  registry, `flLb c []`) and return a COPY (`⌜r.fnRole = true⌝`).
+
 ## DEVIATIONS from Rocq
 
 1. Stated at Lean's era-0 vocabulary (`dk : Nat → BitVec 8`, `D :

@@ -139,7 +139,7 @@ theorem union_rres_at_of_boot (ug : UnionGn) (s0 : Fstate) :
 banner-owed family at the deed's own content and the empty input. -/
 theorem union_Wbf_at_of_boot (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (s : Dst) :
     ⊢ fturnCore (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) -∗
-      f0preAt (hlc := hlc) ug.ugnFile s0 -∗ fown r s -∗ fileBootAt (hlc := hlc) ug.ugnFile s0 s -∗
+      f0preAt (hlc := hlc) ug.ugnFile s0 -∗ fown r s -∗ initBootAt (hlc := hlc) ug.ugnFile s0 s -∗
       (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗
           dlCnt v (1 : Qp).half 0 ∗ inpLb v [] ∗ rposAuth v 0) ∗
         uWbf (hlc := hlc) ug r s0 [] := by
@@ -165,7 +165,7 @@ theorem union_Wbf_at_of_boot (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (s 
   ileft
   isplitl [Hwb]
   · iexact Hwb
-  unfold fileBootAt
+  unfold initBootAt
   icases Hb with (⟨%h0, #Hty⟩ | ⟨%h0, #HT⟩)
   · subst h0
     iapply (ush_done_head (hlc := hlc) (GF := GF) ug r s v) $$ Hpin Hcs Hd Hty

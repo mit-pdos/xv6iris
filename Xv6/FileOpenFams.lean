@@ -26,6 +26,11 @@ Rocq's notes, abridged (the reasons are the content):
 > EMPTY at that inode -- or the claim is TAINTED, the one state in which the
 > kernel's own `FdDevice` arm is a real outcome.
 
+* SYNC (Rocq main 456141b5b): the escrowed resource `fescRes`, the arm/unarm/
+  create/truncate families, `fileOpenPay`, `fileEscPay`, `filePermitRead` and
+  `fileOpenFdK` carry the writer's round position `fpos r np` (a new `np`
+  argument, Rocq's).
+
 ## DEVIATIONS from Rocq
 
 1. Inums are `Nat` (Rocq `Z`), so `jo : Option Nat`; maps as

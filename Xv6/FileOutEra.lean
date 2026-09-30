@@ -29,6 +29,12 @@ Rocq's `fileOutG` has two components, both NEW cameras: `ghost_map nat
 file_era` and `mono_list fstate`.  They are `FileOutG`'s two fields (two new
 xv6GF/unionGF slots, U4).
 
+* SYNC (Rocq main 456141b5b, SY3-A3bc/A4): `FileEra` gains `feBase`, `feCp`,
+  `feFloor`; `f0Bt g v s0` (Rocq `f0_bt`, THE BOOT FACT), `f0Bl g v s0`
+  carries it (so `f0Bl`/`f0Lb`/`f0Wit` take the fixed record `g`),
+  `f0File` is handed it; the copy's line list `fcpAuth`/`fcpPin`/`fcp_set`/
+  `fcpPin_agree`; `f0Typed` at `flRedirs`.
+
 ## DEVIATIONS from Rocq
 
 1. **Scope: the reached declarations only** (union_cone.md §1.4: FileOut

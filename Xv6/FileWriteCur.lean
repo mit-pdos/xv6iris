@@ -18,6 +18,10 @@ Rocq's notes, abridged (the reasons are the content):
 > is: FIRED, and then the program's half of the offset IS at the content's
 > length; or TAINTED, and then the half is wherever the hijacker left it.
 
+* SYNC (Rocq main 456141b5b): the cursor's lower bound ENDS at the writer's
+  own line (`ls.getLast? = some (LEchoF ws N)`, Rocq `last ls = Some …`) and
+  carries the round position's half `fpos r ls.length`.
+
 ## DEVIATIONS from Rocq
 
 1. Inums are `Nat` (the Lean fs layer's convention); `echo_chunks ws !!! j`

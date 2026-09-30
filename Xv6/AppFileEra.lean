@@ -21,6 +21,11 @@ Rocq's header, abridged (the reasons are the content):
 * `fileAppStep_escrow` (Rocq `file_app_step_escrow`): the fire at a parked
   deed -- see deviation 3.
 
+* SYNC (Rocq main 456141b5b): `fileAppStep_park`/`_escrow` take the redirect
+  permit; `fileResync` takes the parked quarter's partner `fposq r n` and
+  hands back `fown r s' ∗ fpos r n`; `filePosAdvance` (Rocq
+  `file_pos_advance`).
+
 ## DEVIATIONS from Rocq
 
 1. **THE RECORD EQUATION.**  Rocq's `file_app = MkAppcfg file_names

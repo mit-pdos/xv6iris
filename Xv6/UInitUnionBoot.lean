@@ -32,7 +32,7 @@ Rocq's header, abridged:
    taken as `UshExecPin.shPinSlot_mono` at the claim's fixed part (the landed
    lemmas are stated over R-sh's record `UshExecPinEcho`, whose two fields
    they read are `rfl` here).
-5. Rocq's `▷ boot_at gf s0 s` is `▷ UInitFileLeaves.fileBootAt`; the era pin
+5. Rocq's `▷ boot_at gf s0 s` is `▷ UInitFileLeaves.initBootAt`; the era pin
    off the turn is `fturnCore_pin`.
 -/
 import Xv6.UInitUnionSup
@@ -186,18 +186,18 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
   unfold fileBoot
   icases Hb with ⟨Hcb, %s, Hd, Hty⟩
   ihave Hty := later_or.1 $$ Hty
-  ihave ⟨%s0, #Hbt⟩ : iprop(∃ s0 : Fstate, ▷ fileBootAt (hlc := hlc) ug.ugnFile s0 s) $$ [Hty]
+  ihave ⟨%s0, #Hbt⟩ : iprop(∃ s0 : Fstate, ▷ initBootAt (hlc := hlc) ug.ugnFile s0 s) $$ [Hty]
   · icases Hty with (#Hty | #HT)
     · iexists (dstContent s)
       inext
-      unfold fileBootAt
+      unfold initBootAt
       ileft
       isplitr
       · ipureintro; rfl
       · iexact Hty
     · iexists (∅ : Fstate)
       inext
-      unfold fileBootAt
+      unfold initBootAt
       iright
       isplitr
       · ipureintro; rfl

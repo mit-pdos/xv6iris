@@ -1,16 +1,19 @@
 /-
 **THE FILE APPLICATION'S NAMES, ITS CAMERA CLASS, THE TAINT AND THE LINE
-LIST** -- §1 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
-1900b8a43), the Iris half (the pure types are `Xv6/AppFilePure.lean`).
+LIST** -- §1 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v` @ origin/main
+456141b5b), the Iris half (the pure types are `Xv6/AppFilePure.lean`).
 
-* `FileFixed` (Rocq `file_fixed`): THE FIXED PART -- echo's (the taint
-  counter and the era map, `EchoGn`) beside the LINE LIST's name: a
-  `mono_list` of the `echo … > N` lines the console has received, in order,
-  whose authority the ledger keeps and whose lower bounds ride the input
-  tag.
+* `FileFixed` (Rocq `file_fixed`, a record since sync SY3-A3bc/A4): echo's
+  fixed part, the LINE LIST's name (a `mono_list` of the complete lines
+  `FlLine` the console has received, in order, whose authority the ledger
+  keeps and whose lower bounds ride the input tag), and THE SYNC PART's
+  run-long names: the sync registry, the commit-era counter, the machine's
+  started counter's name, the run-long sync history, the run registry.
 * `FileAppNames` (Rocq `file_names`): THE INSTANCE -- echo's console pair
-  beside THE DEED's, THE TICKET's and THE ESCROW LEDGER's names.
-* `FileAppG` (Rocq `fileAppG`): the application's three cameras.
+  beside THE DEED's, THE TICKET's and THE ESCROW LEDGER's names, and the
+  SYNC PART: the instance's sync list, its era (pure), its role, its round
+  position.
+* `FileAppG` (Rocq `fileAppG`): the application's cameras.
 * `fileTaint` (Rocq `file_taint`): echo's taint at the projection.
 * `flAuth`/`flLb` (Rocq `fl_auth`/`fl_lb`): the line list's authority and
   its persistent lower bounds; `flLb_lb`: two lower bounds are comparable.
@@ -19,12 +22,15 @@ LIST** -- §1 of Rocq `AppFile.v` (`/shared/xv6rocq/iris/AppFile.v`, pinned
 
 ## Camera classes (union_cone.md §4.1, one instance per camera)
 
-Rocq's `fileAppG` has three components, all at types no landed class
-carries, so all three are NEW (three xv6GF/unionGF slots for U4):
 * `ghost_varG dst` -> `FileAppG.deedG : GhostVarG GF Dst` (the deed and
   the ticket, two names of one camera);
-* `mono_list (leibnizO fwline)` -> `FileAppG.flG : MonoListG GF Fwline`;
-* `mono_list (leibnizO esc_rec)` -> `FileAppG.escG : MonoListG GF EscRec`.
+* `mono_list (leibnizO fl_line)` -> `FileAppG.flG : MonoListG GF FlLine`;
+* `mono_list (leibnizO esc_rec)` -> `FileAppG.escG : MonoListG GF EscRec`;
+* `mono_list (leibnizO srec)` (Rocq `fa_sync`) -> `FileAppG.syncG`;
+* `ghost_mapG nat gname` (Rocq `fa_reg`) -> `FileAppG.regG` (at unionGF the
+  existing `Nat ↦ Nat` slot, `ugfNatNat`);
+* `ghost_mapG nat (gname * gname)` (Rocq `fa_run`) -> `FileAppG.runG` (at
+  unionGF the existing slot `ugfNatPair`).
 The section's `inG Σ (mono_listR (leibnizO Z))` binder (echo's console
 flag) is `DiskG`'s `MonoListG GF Nat` (`Xv6/AppEchoCons.lean` deviation 1),
 hence the `[DiskG GF]` binder; the escrow's one-shot `mono_nat` is
@@ -34,16 +40,23 @@ hence the `[DiskG GF]` binder; the escrow's one-shot `mono_nat` is
 
 1. **`file_names` IS `FileAppNames`** (the Lean name `FileNames` is the
    kernel's file-layer names, `Xv6/FilereadDev.lean`); fields `fnCons`,
-   `fnDeed`, `fnTkt`, `fnEsc`.  `file_fixed` is the pair
-   `EchoGn × GName` (Rocq's `echo_fixed * gname`, `.1`/`.2` kept).
-2. `fileAppΣ` / `subG_fileAppΣ`: subsumed by `BundledGFunctors` (the class
-   is the capacity; the slots are U4's).
+   `fnDeed`, `fnTkt`, `fnEsc`, `fnSync`, `fnEra`, `fnRole`, `fnPos`.
+   `file_fixed`'s fields are `ffEcho` … `ffRun`.
+2. `fileAppΣ` / `subG_fileAppΣ` / `fileAppG_of`: subsumed by
+   `BundledGFunctors` (the class is the capacity; the slots are unionGF's).
 3. Scope: the reached declarations plus the `Persistent`/`Timeless`
    instances of the reached predicates.  `fl_auth_lb`, `fl_lb_prefix` and
-   `file_birth` are reached only through the instance `union_laws_at`, which the glob walk could not see: they are ported in `AppFileSeal.lean`
-   (U4).  `fl_auth_grow` is unreached (kernel-term re-audit, notes/cone_reaudit.md).
+   `file_birth` are ported in `AppFileSeal.lean`.  `fl_auth_grow` is
+   unreached (kernel-term re-audit, notes/cone_reaudit.md).
 4. Rocq's curried `A -∗ B -∗ C` lemmas are stated `⊢ A -∗ B -∗ C`
    (`Xv6/AppInv.lean` deviation 5).
+5. **Rocq's two NON-INSTANCE fields `fa_st : mono_natG` and `fa_pos :
+   ghost_varG nat` have no Lean field.**  The counters are read at the
+   machine's `MonoNatG` (`MachFixedGS.mono`, the ONE such camera, which is the
+   started counter's own: `AppFileSyncReg` deviation 1); the position at
+   `Xv6G.gvNatG`, named explicitly (`AppFilePos` deviation 1).  Rocq's
+   `fileAppG_of HS riscv_pre_genGS eo_turn` is thereby the plain unionGF
+   instance.
 -/
 import Xv6.AppEcho
 import Xv6.AppFilePure
