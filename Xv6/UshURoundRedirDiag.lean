@@ -131,87 +131,107 @@ theorem uexecfail_law_at_use (N : UkNames GF) (l : List FdState) (hfd : ushFd2p 
 /-! ## the three laws -/
 
 /-- The EXEC FAILED law at the open's receipt (Rocq's `(* exec failed *)`
-bullet). -/
+bullet): the round position comes back out of the receipt's half and the
+lend's witness quarter. -/
 theorem uredir_execfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordline) (file : Fname)
-    (v' : EraPins) (cs : List Nat) (ls : List Fwline) (s : Dst)
-    (hfile : uname file) (hin : (file, ws) ∈ ls) (hokws : lineOk ws)
+    (v' : EraPins) (cs : List Nat) (ls : List FlLine) (s : Dst) (vf : FileEra)
+    (hfile : uname file) (hlst : ls.getLast? = some (Uline.LEchoF ws file)) (hokws : lineOk ws)
+    (hnp : ls.length ≤ vf.feBase.length + nlines I)
     (hul : ul I = .LEchoF ws file) (htie : upreTie cs s0 I (dstContent s))
     (hlen : cs.length = nlines I - 1) (hpos : 0 < nlines I) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       fTyped ug.ugnFile.fgnCl s -∗ flLb ug.ugnFile.fgnCl ls -∗
+      fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗
+      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
       ∀ ty : FdType,
         ushdExecfailLaw (hlc := hlc)
-          iprop(uWcl (hlc := hlc) ug s0 I 3 ∗ UshFileRedir.redirK' (hlc := hlc) ug.ugnFile r file s ty)
+          iprop((uWcl (hlc := hlc) ug s0 I 3 ∗ fposq r ls.length)
+            ∗ UshFileRedir.redirK' (hlc := hlc) ug.ugnFile r file s ls.length ty)
           (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+  have hin := flRedirs_last ls ws file hlst
   have hnw := uredir_nw I ws file hul
   have hax := (uab_redir_alts (hlc := hlc) (GF := GF) ug s0 I ws file hul).1
   have hty0 : ∀ i : Nat, ⊢ fTyped (GF := GF) ug.ugnFile.fgnCl s -∗ flLb ug.ugnFile.fgnCl ls -∗
       fTyped ug.ugnFile.fgnCl (s.insert file (i, [])) :=
     fun i => fTyped_some ug.ugnFile.fgnCl s ls file ws [] i hfile hin hokws (selOk_nil _)
-  iintro #Hlk #Hpin' #Hcs #Hty #Hfl %ty
-  ihave #Hx := uredir_diag_at ug s0 UL (UshFileRedir.redirK' (hlc := hlc) ug.ugnFile r file s ty) I
+  iintro #Hlk #Hpin' #Hcs #Hty #Hfl #Hvf #Hrr %ty
+  ihave #Hx := uredir_diag_at ug s0 UL
+    iprop(fposq r ls.length ∗ UshFileRedir.redirK' (hlc := hlc) ug.ugnFile r file s ls.length ty) I
     (ualtCode (.UR .RFExec)) altExecfail 17 hax (by decide) hnw
       (ualtCode_R_nsync .RFExec (by decide)) $$ Hlk
-  iapply uexecfail_law_at_wand altExecfail 17 _ _ _ $$ Hx
+  iapply uexecfail_law_at_conv altExecfail 17 _ _ _ _ $$ Hx [] []
+  · imodintro
+    iintro ⟨⟨Hc, Hq⟩, HK⟩
+    iframe Hc Hq HK
   imodintro
   iintro H
   unfold UshFileRedir.redirK' UshFileRedir.redirK UkFileOpen.redirK fileOpenFdK
-  icases H with ⟨%v, #Hp, Hblk, ⟨(⟨%i, %γo, -, Hd, -⟩ | #HT), -⟩⟩
-  · ihave #Hti := hty0 i $$ Hty Hfl
+  icases H with ⟨%v, #Hp, Hblk, Hwq, ⟨(⟨%i, %γo, -, Hd, Hposn, -⟩ | #HT), -⟩⟩
+  · ihave Hup := urpos_of_halves ug r I vf _ ls.length hnp $$ Hvf Hposn Hwq Hrr
+    ihave #Hti := hty0 i $$ Hty Hfl
     iapply uWcu_of ug r s0 PT PD I 0
-    iapply uredir_execfail_exit ug r s0 I ws file i v v' cs s hul htie hlen hpos $$ Hp Hblk Hd Hti Hpin' Hcs
+    iapply uredir_execfail_exit ug r s0 I ws file i v v' cs s hul htie hlen hpos $$ Hp Hblk Hd Hup Hti Hpin' Hcs
   · iapply uWcu_taint ug r s0 PT PD I 0 v' $$ Hpin' HT
 
 /-- The OPEN FAILED law at the `-1` arm's receipt (Rocq's `(* open failed
 *)` bullet; deviation 2). -/
 theorem uredir_openfail_law (UL : UK_LEAVES) (I : List (BitVec 8)) (ws : Wordline) (file : Fname)
-    (v' : EraPins) (cs : List Nat) (ls : List Fwline) (s : Dst)
-    (hfile : uname file) (hin : (file, ws) ∈ ls) (hokws : lineOk ws)
+    (v' : EraPins) (cs : List Nat) (ls : List FlLine) (s : Dst) (vf : FileEra)
+    (hfile : uname file) (hlst : ls.getLast? = some (Uline.LEchoF ws file)) (hokws : lineOk ws)
+    (hnp : ls.length ≤ vf.feBase.length + nlines I)
     (hul : ul I = .LEchoF ws file) (htie : upreTie cs s0 I (dstContent s)) (hpos : 0 < nlines I) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
       eraPin (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v' -∗ csLb v' cs -∗
       fTyped ug.ugnFile.fgnCl s -∗ flLb ug.ugnFile.fgnCl ls -∗
+      fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗
+      runReg ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r.fnPos r.fnDeed -∗
       ushExecfailLawAt (hlc := hlc) (altOpenfailN file) (13 + file.length)
-        iprop(UshFileRedir.redirKf (hlc := hlc) ug.ugnFile r file s ∗ uWcl (hlc := hlc) ug s0 I 3)
+        iprop(UshFileRedir.redirKf (hlc := hlc) ug.ugnFile r file s ls.length
+          ∗ (uWcl (hlc := hlc) ug s0 I 3 ∗ fposq r ls.length))
         (uWcu (hlc := hlc) ug r s0 PT PD I 0) := by
+  have hin := flRedirs_last ls ws file hlst
   have hnw := uredir_nw I ws file hul
   have hau := (uab_redir_alts (hlc := hlc) (GF := GF) ug s0 I ws file hul).2.1
   have ham := (uab_redir_alts (hlc := hlc) (GF := GF) ug s0 I ws file hul).2.2
   have hty0 : ∀ i : Nat, ⊢ fTyped (GF := GF) ug.ugnFile.fgnCl s -∗ flLb ug.ugnFile.fgnCl ls -∗
       fTyped ug.ugnFile.fgnCl (s.insert file (i, [])) :=
     fun i => fTyped_some ug.ugnFile.fgnCl s ls file ws [] i hfile hin hokws (selOk_nil _)
-  iintro #Hlk #Hpin' #Hcs #Hty #Hfl
+  iintro #Hlk #Hpin' #Hcs #Hty #Hfl #Hvf #Hrr
   unfold ushExecfailLawAt
   imodintro
-  iintro %N %l %hfd ⟨HK, Hc⟩
+  iintro %N %l %hfd ⟨HK, Hc, Hwq⟩
   unfold UshFileRedir.redirKf
-  icases HK with (Hd | ⟨%hsN, %i, Hd⟩ | #HT)
+  icases HK with (⟨Hd, Hposn⟩ | ⟨%hsN, %i, Hd, Hposn⟩ | #HT)
   · -- `f` as the round found it
-    ihave #Hx := uredir_diag_at ug s0 UL (fown r s) I (ualtCode (.UR .RFOpenU)) (altOpenfailN file)
+    ihave Hup := urpos_of_halves ug r I vf _ ls.length hnp $$ Hvf Hposn Hwq Hrr
+    ihave #Hx := uredir_diag_at ug s0 UL iprop(fown r s ∗ urpos (hlc := hlc) ug r I) I
+      (ualtCode (.UR .RFOpenU)) (altOpenfailN file)
       (13 + file.length) hau (altOpenfailN_nlen file) hnw
       (ualtCode_R_nsync .RFOpenU (by decide)) $$ Hlk
-    iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd]
+    iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd Hup]
     · imodintro
-      iintro ⟨%v, #Hp, Hblk, Hd⟩
+      iintro ⟨%v, #Hp, Hblk, Hd, Hup⟩
       iapply uWcu_of ug r s0 PT PD I 0
-      iapply uredir_openfail_exit_u ug r s0 I ws file s v v' cs hul htie hpos $$ Hp Hblk Hd Hty Hpin' Hcs
+      iapply uredir_openfail_exit_u ug r s0 I ws file s v v' cs hul htie hpos $$ Hp Hblk Hd Hup Hty Hpin' Hcs
     · isplitl [Hc]
       · iexact Hc
-      · iexact Hd
+      · iframe Hd Hup
   · -- created empty at an absent `f`
+    ihave Hup := urpos_of_halves ug r I vf _ ls.length hnp $$ Hvf Hposn Hwq Hrr
     ihave #Hti := hty0 i $$ Hty Hfl
-    ihave #Hx := uredir_diag_at ug s0 UL (fown r (s.insert file (i, []))) I (ualtCode (.UR .RFOpenM))
+    ihave #Hx := uredir_diag_at ug s0 UL iprop(fown r (s.insert file (i, [])) ∗ urpos (hlc := hlc) ug r I) I
+      (ualtCode (.UR .RFOpenM))
       (altOpenfailN file) (13 + file.length) ham (altOpenfailN_nlen file) hnw
       (ualtCode_R_nsync .RFOpenM (by decide)) $$ Hlk
-    iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd]
+    iapply uexecfail_law_at_use N l hfd _ _ _ _ (uWcu (hlc := hlc) ug r s0 PT PD I 0) $$ Hx [] [Hc Hd Hup]
     · imodintro
-      iintro ⟨%v, #Hp, Hblk, Hd⟩
+      iintro ⟨%v, #Hp, Hblk, Hd, Hup⟩
       iapply uWcu_of ug r s0 PT PD I 0
-      iapply uredir_openfail_exit_m ug r s0 I ws file i v v' cs s hul htie hsN hpos $$ Hp Hblk Hd Hti Hpin' Hcs
+      iapply uredir_openfail_exit_m ug r s0 I ws file i v v' cs s hul htie hsN hpos $$ Hp Hblk Hd Hup Hti Hpin' Hcs
     · isplitl [Hc]
       · iexact Hc
-      · iexact Hd
+      · iframe Hd Hup
   · -- the taint
     ihave #Hx := uredir_diag_at ug s0 UL (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) I (ualtCode (.UR .RFOpenU))
       (altOpenfailN file) (13 + file.length) hau (altOpenfailN_nlen file) hnw

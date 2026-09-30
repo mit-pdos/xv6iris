@@ -56,8 +56,7 @@ theorem unionAdequacyAtImg (Hprog : UnionProgLaw (hlc := hlc) (GF := GF))
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ (appUnion (hlc := hlc) (GF := GF)).phi g2 κs :=
   haveI : Xv6AppLaws (hlc := hlc) (appUnion (hlc := hlc) (GF := GF)) := unionLaws Hprog
   xv6AppAdequacy (hlc := hlc) (GF := GF) g sb nib cov appUnion
-    (appInit_ofValidOkc (appUnion (hlc := hlc) (GF := GF)) _ (fun _ _ => trivial)
-      (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov))
+    (union_Happ_init g sb nib cov Himg Hdk Hsb Hcov)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' h => by
       iintro ⟨-, Hauth, -, -, Hled⟩
       iapply (obsLedgerAt_phi ((appUnion (hlc := hlc) (GF := GF)).R c)
@@ -73,14 +72,14 @@ end UnionAdequacy
 /-- **AT THE CLOSED FUNCTOR LIST** (Rocq `union_adequacy_unionΣ`): a concrete
 list, so the claim that the ghost state is realisable is CHECKED and the
 statement is not vacuous.  The conclusion mentions no Iris:
-`UnionOutPure.unionPhi` reads the trace alone. -/
+`UnionOutPureSync.unionPhiSync` reads the trace alone (sync SY3-A4). -/
 theorem unionAdequacy_unionGF {hlc : HasLC}
     (Hprog : letI : MachGpreS hlc unionGF := unionGF_machGpreS hlc 0
       UnionProgLaw (hlc := hlc) (GF := unionGF))
     (g : GState) (Hgen0 : g.gen = 0) (Hpow0 : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
-    (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ unionPhi κs :=
+    (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ unionPhiSync κs :=
   letI : MachGpreS hlc unionGF := unionGF_machGpreS hlc 0
   unionAdequacyAtImg (hlc := hlc) (GF := unionGF) Hprog g fsimgSb fsimgNib fsimgCov Hgen0 Hpow0
     (fsimgHimg g Hdisk) (fsimgHdk g Hdisk) rfl rfl n κs t2 g2 hsteps

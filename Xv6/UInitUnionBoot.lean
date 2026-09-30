@@ -42,6 +42,7 @@ import Xv6.UInitBoot
 import Xv6.UInitKernelSlot
 import Xv6.UInitConsFile
 import Xv6.UexecExecMintW
+import Xv6.AppUnionRec
 import Xv6.AppFileBoot
 
 namespace Xv6
@@ -144,9 +145,12 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
     (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
-    (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ fileBoot (hlc := hlc) ug.ugnFile.fgnCl (genId (hlc := hlc) (GF := GF) + 1) r -∗
-      fturn (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) ==∗
+    (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug)
+    -- the record's sync-hook family is the union's (Rocq sync SY3-A4)
+    (hhk : MachFixedGS.syncHook (hlc := hlc) (GF := GF)
+      = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl) :
+    ⊢ appInv (hlc := hlc) fscFs -∗ unionBoot (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) r -∗
+      uturnI (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) ==∗
       initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll fdt0 := by
   letI : UprogSG GF := uprogSGFree
   have UL := E.UL
@@ -183,26 +187,88 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     · ileft; ipureintro; exact fileFsPure_echo v hf
     · iright; iexact HT
   iintro #Hinv Hb Hturn
-  unfold fileBoot
-  icases Hb with ⟨Hcb, %s, Hd, Hty⟩
-  ihave Hty := later_or.1 $$ Hty
-  ihave ⟨%s0, #Hbt⟩ : iprop(∃ s0 : Fstate, ▷ initBootAt (hlc := hlc) ug.ugnFile s0 s) $$ [Hty]
-  · icases Hty with (#Hty | #HT)
+  unfold unionBoot uturnI
+  icases Hb with ⟨%s, Hb, Hbp⟩
+  icases Hturn with ⟨Hturn, %vf, %ls, #Hvf, #Hcp, %hls, #Hbase⟩
+  -- THE ROUND POSITION (sync SY3-A3bc): the boot's share, founded at the
+  -- copy's line count the era's record pins, is at most the era's base --
+  -- the turn's certificate; and THE BOOT FACT (sync SY3-A4) at the deed's
+  -- state, with the deed's typed witness out of the later
+  ihave ⟨Hup, #Hbf⟩ : iprop((fileTaint (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl ∨ urpos (hlc := hlc) ug r [])
+      ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+         ∨ ∃ ls1 : List FlLine, flLb ug.ugnFile.fgnCl ls1
+             ∗ ⌜uadm ls1 (slast vf.feFloor) (dstContent s)⌝ ∗ fTyped ug.ugnFile.fgnCl s)) $$ [Hbp]
+  · icases Hbp with (#HT | ⟨%vf', %ls', #Hvf', #Hcp', Hposh, #Hl1, %hu, #Hty1, #Hrr⟩)
+    · isplitl []
+      · ileft; iexact HT
+      · ileft; iexact HT
+    ihave %hv := fileEraPin_agree (GF := GF) ug.ugnFile _ vf vf' $$ [Hvf Hvf']
+    · iframe Hvf Hvf'
+    subst hv
+    ihave %hl := fcpPin_agree (GF := GF) vf ls ls' $$ [Hcp Hcp']
+    · iframe Hcp Hcp'
+    subst hl
+    isplitl [Hposh]
+    · iright
+      unfold urpos
+      iexists vf, ls.length
+      iframe Hvf Hposh Hrr
+      ipureintro
+      rw [nlines_nil, Nat.add_zero]
+      exact hls.length_le
+    · iright
+      iexists ls
+      iframe Hl1 Hty1
+      ipureintro; exact hu
+  -- THE DEED, AND THE BOOT STATE IT NAMES
+  unfold fileBootAt
+  icases Hb with ⟨Hcb, -, Hd, Hty⟩
+  ihave ⟨%s0, #Hbt, #Hbtf⟩ : iprop(∃ s0 : Fstate, ▷ initBootAt (hlc := hlc) (GF := GF) ug.ugnFile s0 s
+      ∗ ∃ vf0 : FileEra, fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf0
+          ∗ f0Bt (hlc := hlc) ug.ugnFile vf0 s0) $$ [Hty]
+  · icases Hbf with (#HT | ⟨%ls1, #Hl1, %hu, #Hty1⟩)
+    · ihave Hty := later_or.1 $$ Hty
+      icases Hty with (#Hty | #HT')
+      · iexists (dstContent s)
+        isplitr
+        · inext
+          unfold initBootAt
+          ileft
+          isplitr
+          · ipureintro; rfl
+          · iexact Hty
+        · iexists vf
+          iframe Hvf
+          unfold f0Bt
+          ileft; iexact HT
+      · iexists (∅ : Fstate)
+        isplitr
+        · inext
+          unfold initBootAt
+          iright
+          isplitr
+          · ipureintro; rfl
+          · iexact HT'
+        · iexists vf
+          iframe Hvf
+          unfold f0Bt
+          ileft; iexact HT
     · iexists (dstContent s)
-      inext
-      unfold initBootAt
-      ileft
       isplitr
-      · ipureintro; rfl
-      · iexact Hty
-    · iexists (∅ : Fstate)
-      inext
-      unfold initBootAt
-      iright
-      isplitr
-      · ipureintro; rfl
-      · iexact HT
-  imod (file_f0bw_of_boot (hlc := hlc) (GF := GF) ug.ugnFile s0) $$ Hturn with ⟨Hturn, #Hbw⟩
+      · inext
+        unfold initBootAt
+        ileft
+        isplitr
+        · ipureintro; rfl
+        · iexact Hty1
+      · iexists vf
+        iframe Hvf
+        unfold f0Bt
+        iright
+        iexists ls1
+        iframe Hl1
+        ipureintro; exact hu
+  imod (file_f0bw_of_boot (hlc := hlc) (GF := GF) ug.ugnFile s0) $$ Hturn Hbtf with ⟨Hturn, #Hbw⟩
   ihave #Hpre : iprop(▷ f0preAt (hlc := hlc) ug.ugnFile s0) $$ []
   · inext
     iapply (file_f0pre_at_of_bw (hlc := hlc) (GF := GF) ug.ugnFile s0 s) $$ Hbw Hbt
@@ -281,7 +347,7 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     · iintro %γp %N
       rw [← Xu_initShCtx]
       iapply (sh_round_holds_union_closed (hlc := hlc) (GF := GF) E ug r s0 γp heq hcons hkill hwild hrdws
-        shRsh (fun _ _ _ => rfl) N) $$ Hlks Hdep Hslot Hcat Hgrep Hsecc Hsync Hpine [Hcred]
+        hhk shRsh (fun _ _ _ => rfl) N) $$ Hlks Hdep Hslot Hcat Hgrep Hsecc Hsync Hpine [Hcred]
       iexists jo
       iexact Hcred
     ihave #Htg : iprop(∀ γp : GName, ushTagLaw (hlc := hlc)
@@ -312,11 +378,13 @@ theorem union_Hinit_boot_at (E : UPipesEng (hlc := hlc) (GF := GF) (PS := uprogS
     init_cons_fd_ne (initKillLaw_of_taint _ _ _ _ hkt) (initBootRoom 0 (by decide)) fdt0_length rfl
     (fdvNopipe_closed _) ushViewOk_fdt0 (fun _ h => h)) $$ Hdp Hdep Hxs
   -- the linear payload's two witness-paid pieces, one step later
-  ihave Hp1 : iprop(▷ ((unionCc (hlc := hlc) (GF := GF) ug r s0).ccRd 0 ∗ ccWbn (unionCc (hlc := hlc) (GF := GF) ug r s0) 0)) $$ [Hturn Hd]
+  ihave Hp1 : iprop(▷ ((unionCc (hlc := hlc) (GF := GF) ug r s0).ccRd 0 ∗ ccWbn (unionCc (hlc := hlc) (GF := GF) ug r s0) 0)) $$ [Hturn Hd Hup]
   · inext
-    ihave ⟨Hturn, %v0, #Hpin0, #Hres0⟩ := (union_rres_at_of_boot (hlc := hlc) (GF := GF) ug s0) $$ Hturn Hpre
+    ihave ⟨Hturn, %v0, #Hpin0, #Hres0⟩ := (union_rres_at_of_boot (hlc := hlc) (GF := GF) ug s0) $$ Hturn Hpre []
+    · iexists vf
+      iframe Hvf Hbase
     ihave ⟨⟨%v, #Hpin, Hdl, #HE, Hrp⟩, Hbn⟩ :=
-      (union_Wbf_at_of_boot (hlc := hlc) (GF := GF) ug r s0 s) $$ Hturn Hpre Hd Hbt
+      (union_Wbf_at_of_boot (hlc := hlc) (GF := GF) ug r s0 s) $$ Hturn Hpre Hd Hbt Hup
     ihave %hv := eraPin_agree (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v0 v
       $$ [Hpin0 Hpin]
     · iframe Hpin0 Hpin

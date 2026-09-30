@@ -166,7 +166,7 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
   ihave ⟨Hc, %v0, #Hpin0⟩ := uup_pin0 ug s0 I $$ Hc
   ihave #Hgenw := uup_genw ug r s0 γp hkill N' I v0 hpeq $$ Hcs Hpin0
   ihave Hop := uopen ug r s0 I $$ Hc Hpre
-  icases Hop with (#HT | ⟨%v, %cs, %s, %htie, #Hpin, #Hlb, #Hcsl, #Hcw, #Hty, Hown, HPW⟩)
+  icases Hop with (#HT | ⟨%v, %cs, %s, %htie, #Hpin, #Hlb, #Hcsl, #Hcw, #Hty, Hown, Hup, HPW⟩)
   · iapply urun_gen N' _ h' m' _ _ (by decide) $$ Hgenw HT Hrun
   ihave %hty := udeed_typed ug.ugnFile.fgnCl s $$ Hty
   obtain ⟨hsok, hshort⟩ := hty
@@ -175,14 +175,15 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
   unfold fown
   icases Hown with ⟨Hdq, Htk⟩
   have hdeed : iprop((ftkt r s ∗ fTyped ug.ugnFile.fgnCl s
-        ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs)
+        ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
+        ∗ urpos (hlc := hlc) ug r I)
       ∗ fdq r (1 : Qp).half s) ⊢ ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I := by
     unfold ushDeedAt
-    iintro ⟨⟨Htk, #Hty', #Hpin', #Hcs'⟩, Hdq⟩
+    iintro ⟨⟨Htk, #Hty', #Hpin', #Hcs', Hup⟩, Hdq⟩
     ileft
     iexists cs, s, v
     unfold fown
-    iframe Hty' Hpin' Hcs'
+    iframe Hty' Hpin' Hcs' Hup
     isplitl [Hdq Htk]
     · isplitl [Hdq]
       · iapply fdeed_of_fdq $$ Hdq
@@ -218,7 +219,8 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
       iprop(eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I
         ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0
         ∗ (ftkt r s ∗ fTyped ug.ugnFile.fgnCl s
-            ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs)) :=
+            ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
+            ∗ urpos (hlc := hlc) ug r I)) :=
     { ok := OK
       hkill := hkill
       hL31 := hL31
@@ -302,8 +304,8 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
       (ushqRebase (pc0 (prodWords (.PrCatF nm))) (wlToks (filtWords F)))) N' h' m' q (sz + 65536)
     (FdState.open true wr0 (.device CONSOLE)) (32 + (96 + nn - 6 * (fs'.length + 1))) rfl hpeq ha0' hl0
     (fun h => by cases h)
-    $$ Hfam Hpl Hss Hh Hnodes [Htk] HRd Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun
-  iframe Hpin Hlb Hcw Htk Hty Hcsl
+    $$ Hfam Hpl Hss Hh Hnodes [Htk Hup] HRd Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun
+  iframe Hpin Hlb Hcw Htk Hty Hcsl Hup
 
 end CatF
 

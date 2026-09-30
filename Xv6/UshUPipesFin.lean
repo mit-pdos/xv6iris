@@ -241,12 +241,12 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
         ⌜upreTie cs s0 I (dstContent s)⌝
         ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I ∗ csLb v cs
         ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0
-        ∗ fTyped ug.ugnFile.fgnCl s ∗ fown r s
+        ∗ fTyped ug.ugnFile.fgnCl s ∗ fown r s ∗ urpos (hlc := hlc) ug r I
         ∗ pwcBlkU ug v I (dstContent s) (genId (hlc := hlc) (GF := GF) + 1) [] false := by
   unfold ushPreAt ushDeedAt
   rw [uWcl3_eq]
   iintro Hc ⟨Hpre, -⟩
-  icases Hpre with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw⟩ | #HT)
+  icases Hpre with (⟨%cs', %s, %v', Hd, %htie, #Hty, #Hpin', #Hcs', %hnw, Hup⟩ | #HT)
   rotate_left
   · ileft; iexact HT
   icases Hc with ⟨%v, #Hpin, Hc⟩
@@ -273,7 +273,7 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     unfold upreTie ust at htie
     exact htie.2
   rw [hcon]
-  have hcw : ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗ f0Lb vf s0 -∗
+  have hcw : ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗ f0Lb (hlc := hlc) ug.ugnFile vf s0 -∗
       f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 := by
     unfold f0cw
     iintro #A #B
@@ -283,7 +283,7 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   ihave HPW := pwcBlkU_entry ug v I (genId (hlc := hlc) (GF := GF) + 1) ps cs s0 P0 hw
     $$ Hpin Hcw [Htn] Hps Hcs HE
   · iexact Htn
-  iframe Hpin HE Hcs Hcw Hty Hd HPW
+  iframe Hpin HE Hcs Hcw Hty Hd Hup HPW
 
 /-! ## S1c's helpers -/
 

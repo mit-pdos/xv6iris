@@ -204,6 +204,24 @@ theorem uexecfail_law_at_wand (dg : List (BitVec 8)) (n : Nat) (Cr Cd Cd' : IPro
   iapply Hw
   iapply He $$ Hp
 
+/-- **Rocq `uexecfail_law_at_conv`**: an exec-failure law read at a
+stronger hold and a weaker residue. -/
+theorem uexecfail_law_at_conv (dg : List (BitVec 8)) (n : Nat) (Cr Cr' Cd Cd' : IProp GF) :
+    ⊢ ushExecfailLawAt (hlc := hlc) dg n Cr Cd -∗ □ (Cr' -∗ Cr) -∗ □ (Cd -∗ Cd') -∗
+      ushExecfailLawAt (hlc := hlc) dg n Cr' Cd' := by
+  iintro #Hl #Hr #Hw
+  unfold ushExecfailLawAt
+  imodintro
+  iintro %N %l %hfd Hc
+  ihave Hc := Hr $$ Hc
+  icases Hl $$ %N %l %hfd Hc with ⟨%Pf, H0, #Hs, #He⟩
+  iexists Pf
+  iframe H0 Hs
+  imodintro
+  iintro Hp
+  iapply Hw
+  iapply He $$ Hp
+
 /-- **Rocq `uab_redir_alts`**: the redirect line's three diagnostics, at the
 union's codes. -/
 theorem uab_redir_alts (I : List (BitVec 8)) (ws : Wordline) (nm : List (BitVec 8))

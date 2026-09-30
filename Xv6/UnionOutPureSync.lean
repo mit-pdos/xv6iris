@@ -7,9 +7,9 @@ Rocq: `FileDisc.file_phi` at the union, each cycle carrying its
 resolution's last completed sync (`UnionAdm.lmGoodSync`), each later boot
 state admissible AT THE LAST COMPLETED SYNC OF THE EARLIER CYCLES
 (`uadm` at `ulastBefore`; with no sync, the landed `fadmBoot`,
-`uadm_srec0`).  The landed `unionPhi` (`Xv6/UnionOutPure.lean`) stays beside
-it until the union top switches (lane U deletes it with its steps in
-`UnionOutPureSeal.lean`).  Sections 1-2 of Rocq's file (the first drain's
+`uadm_srec0`).  It is the union's conclusion (`LinkUInitUnion.
+unionAdequacyClosed`); the landed `unionPhi` and its body lemmas are retired
+(Rocq 1fe9e7618).  Sections 1-2 of Rocq's file (the first drain's
 fact, `union_st_ok`) are landed in `UnionOutPureSeal.lean`.
 
 Names (Rocq → Lean): `union_phi_sync` → `unionPhiSync`,

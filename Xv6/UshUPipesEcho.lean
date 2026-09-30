@@ -132,7 +132,7 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
   ihave ⟨Hc, %v0, #Hpin0⟩ := uup_pin0 ug s0 I $$ Hc
   ihave #Hgenw := uup_genw ug r s0 γp hkill N' I v0 hpeq $$ Hcs Hpin0
   ihave Hop := uopen ug r s0 I $$ Hc Hpre
-  icases Hop with (#HT | ⟨%v, %cs, %s, %htie, #Hpin, #Hlb, #Hcsl, #Hcw, #Hty, Hown, HPW⟩)
+  icases Hop with (#HT | ⟨%v, %cs, %s, %htie, #Hpin, #Hlb, #Hcsl, #Hcw, #Hty, Hown, Hup, HPW⟩)
   · iapply urun_gen N' _ h' m' _ _ (by decide) $$ Hgenw HT Hrun
   ihave %hty := udeed_typed ug.ugnFile.fgnCl s $$ Hty
   obtain ⟨hsok, -⟩ := hty
@@ -214,12 +214,12 @@ theorem upipes_child_law_echo (E : UPipesEng (hlc := hlc) (GF := GF))
     (ushArgs sa (uGS ws (F :: fs') len gb) (ushqRebase (pc0 ws) (wlToks (filtWords F)))) N' h' m' q (sz + 65536)
     (FdState.open true wr0 (.device CONSOLE)) (32 + (96 + nn - 6 * (fs'.length + 1))) rfl hpeq ha0' hl0
     (fun h => by cases h)
-    $$ Hfam Hpl Hss Hh Hnodes [Hown] [] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun
+    $$ Hfam Hpl Hss Hh Hnodes [Hown Hup] [] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun
   · iframe Hpin Hlb Hcw
     unfold ushDeedAt
     ileft
     iexists cs, s, v
-    iframe Hown Hty Hpin Hcsl
+    iframe Hown Hty Hpin Hcsl Hup
     isplitr
     · ipureintro; exact htie
     · ipureintro; exact hnw

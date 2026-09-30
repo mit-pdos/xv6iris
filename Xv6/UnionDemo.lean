@@ -24,7 +24,7 @@ The demos:
 * `demo_disc` -- THE DISCIPLINE IS SATISFIABLE ON A NONEMPTY INPUT: a whole
   one-cycle history (power on, the expected console transcript, then the two
   lines typed) satisfies `lmDisc ulmG`, the antecedent of
-  `UnionOutPure.unionPhi`.  (The history is not a physical one -- the output
+  `UnionOutPure.unionPhi` (retired at drift D3-app, Rocq 1fe9e7618).  (The history is not a physical one -- the output
   precedes the input -- but the discipline is a property of the history, and
   this one meets every clause: the input discipline, the choice list's range,
   D4, the prologue pin and the transcript prefix at every input point.)

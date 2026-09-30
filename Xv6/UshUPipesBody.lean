@@ -106,6 +106,9 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
     (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
     (hwild : MachFixedGS.wild (hlc := hlc) (GF := GF) = useccTok (hlc := hlc) ug)
     (hrdw : ushRdwildOfShape (hlc := hlc) (GF := GF) ug)
+    -- THE RECORD'S SYNC-HOOK FAMILY IS THE UNION'S (Rocq sync SY3-A4)
+    (hhk : MachFixedGS.syncHook (hlc := hlc) (GF := GF)
+      = unionHk (hlc := hlc) (filePred (hlc := hlc)) ug.ugnFile.fgnCl)
     (shRsh : GName → GName → GName → IProp GF)
     (hRsh : ∀ γt γd γs, shRsh γt γd γs = iprop(ushlDat γd ∗ usz γs (kexecSz User.Sh.elf))) (N : UkNames GF) :
     ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗ udep (hlc := hlc) (GF := GF) -∗
@@ -129,7 +132,7 @@ theorem sh_round_holds_union_closed (E : UPipesEng (hlc := hlc) (GF := GF))
     $$ Hlk Hdep Hcat Hmade
   ihave #Hsecl := uHchild_secc E.UL E.HF E.SP E.SC E.US E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hwild hrdw hkill hcons
     $$ Hdep Hsecc
-  ihave #Hsyncl := uHchild_sync E.UL E.HF E.SP E.SC E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hkill
+  ihave #Hsyncl := uHchild_sync E.UL E.HF E.SP E.SC E.hps ug r s0 (uptermShape ug) (updoneShape ug) γp hkill hhk
     $$ Hlk Hdep Hsync
   ihave #Hplaw := uHpanic ug r s0 (uptermShape ug) (updoneShape ug) E.UL $$ Hlk
   ihave #Hche := upipes_child_law_echo E ug r s0 γp heq hcons hkill $$ Hlk Hslot Hcat Hgrep

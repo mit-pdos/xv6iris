@@ -10,7 +10,8 @@ file's, the sync REGISTRY, the ERA'S BASE and the FLOOR, and its conclusion
   record at its boot record), `unionReg`, `unionFloor`, `unionBase`,
   `unionLed` (the ledger), `unionClAll` / `unionCls` (the birth's two slot
   parts), the ERA'S TURN in its four stages (`unionTn`, `uturn`, `uturn'`,
-  `uturn''`, `uturnI`), `unionBorn`, and `unionLed_phi`.
+  `uturn''`, `uturnI`), the boot resource `unionBoot` (Rocq
+  `AppUnionRec.union_boot`), `unionBorn`, and `unionLed_phi`.
 
 ## DEVIATIONS from Rocq
 
@@ -29,6 +30,8 @@ import Xv6.UnionOutPureSync
 import Xv6.UnionOutSyncPure
 import Xv6.AppFileSyncReg
 import Xv6.AppFileSync
+import Xv6.AppFileBoot
+import Xv6.AppFilePos
 
 namespace Xv6
 
@@ -185,6 +188,21 @@ instance uturn''_timeless (ug : UnionGn) (k : Nat) :
   unfold uturn''; infer_instance
 instance uturnI_timeless (ug : UnionGn) (k : Nat) : Timeless (uturnI (GF := GF) ug k) := by
   unfold uturnI; infer_instance
+
+/-- THE BOOT RESOURCE (Rocq `union_boot`, sync SY3-A3bc/A4): the file
+application's, and the deed holder's share of the running claim's round
+position, founded at the length of the copy's line list the era's record
+pins (or the taint) -- AND THE BOOT FACT at the deed's state, the deed's
+typed witness and the running claim's registration at the era. -/
+noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp GF :=
+  iprop(∃ s : Dst, fileBootAt (hlc := hlc) ug.ugnFile.fgnCl k r s
+    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+       ∨ ∃ (vf : FileEra) (ls : List FlLine),
+           fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ fposh r ls.length
+           ∗ flLb ug.ugnFile.fgnCl ls
+           ∗ ⌜uadm ls (slast vf.feFloor) (dstContent s)⌝
+           ∗ fTyped ug.ugnFile.fgnCl s
+           ∗ runReg ug.ugnFile.fgnCl k r.fnPos r.fnDeed))
 
 /-- THE CONCLUSION'S READ at the end of the run (Rocq `union_led_phi`, sync
 SY3-A4). -/

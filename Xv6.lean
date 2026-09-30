@@ -1363,7 +1363,6 @@ import Xv6.PipesFire
 import Xv6.UnionDisc
 import Xv6.UnionDiscDec
 import Xv6.UnionView
-import Xv6.UnionOutPure
 import Xv6.UnionDemo
 import Xv6.UImgWordDefs
 import Xv6.UStrImg

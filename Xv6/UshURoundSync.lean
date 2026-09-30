@@ -96,18 +96,6 @@ theorem imageEntry_lend (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : BitVe
   iapply He $$ %na %alen %afun %W' %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hmy [HP]
   iapply Hc $$ HP
 
-/-- the round's line list ends in the round's line (Rocq `ulines_in_last`) -/
-theorem ulinesIn_last (I : List (BitVec 8)) (hp : 0 < nlines I) :
-    (ulinesIn I).getLast? = some (ul I) := by
-  have h : (bodiesOf I).getLast? = some ((bodiesOf I)[nlines I - 1]!) := by
-    unfold nlines at *
-    rw [List.getLast?_eq_getElem?, List.getElem!_eq_getElem?_getD,
-      List.getElem?_eq_getElem (by omega)]
-    rfl
-  unfold ulinesIn
-  rw [List.getLast?_map, h]
-  rfl
-
 /-- **Rocq `usync_q`**: /sync's RECEIPT (sync SY3-A4) -- the deed at PEND
 (`RSyncRan`, the identity) and the round's record, both built by the hook. -/
 noncomputable def usyncQ (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (I : List (BitVec 8)) : IProp GF :=

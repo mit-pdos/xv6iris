@@ -95,6 +95,18 @@ theorem ucode_nsync (a : Ralt) (ha : a ≠ .RSyncRan) : ulmG.lmDec (ualtCode (Ua
   show ualtDec (ualtCode (Ualt.UR a)) ≠ _
   rw [ualtDec_code]; intro h; injection h with h; exact ha h
 
+/-- the round's line list ends in the round's line (Rocq `ulines_in_last`) -/
+theorem ulinesIn_last (I : List (BitVec 8)) (hp : 0 < nlines I) :
+    (ulinesIn I).getLast? = some (ul I) := by
+  have h : (bodiesOf I).getLast? = some ((bodiesOf I)[nlines I - 1]!) := by
+    unfold nlines at *
+    rw [List.getLast?_eq_getElem?, List.getElem!_eq_getElem?_getD,
+      List.getElem?_eq_getElem (by omega)]
+    rfl
+  unfold ulinesIn
+  rw [List.getLast?_map, h]
+  rfl
+
 /-! ### the identity steps -/
 
 /-- **Rocq `ulm_step_oom`**: THE OUT-OF-MEMORY ALTERNATIVE (sync design

@@ -202,7 +202,7 @@ theorem udeed_typed (c : FileFixed) (s : Dst) :
       | some p =>
         rw [hs] at hc
         cases hc
-        have hb := f_bytes_typed_short ls nm p.2 (hall nm p hs).2
+        have hb := f_bytes_typed_short (flRedirs ls) nm p.2 (hall nm p hs).2
         unfold lineMax at hb
         omega
 

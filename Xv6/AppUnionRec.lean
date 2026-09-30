@@ -16,7 +16,7 @@ Rocq's header, abridged:
 > the FILE application's (`AppFile.file_pred` / `file_boot` /
 > `file_xfer_boot`); what is the union's own is the console half: the
 > ledger `UnionOut.union_led`, the tag `utag`, the claim `ucl` and the
-> conclusion `UnionOutPure.union_phi`.
+> conclusion `UnionOutPure.union_phi_sync`.
 
 ## DEVIATIONS from Rocq
 
@@ -26,7 +26,7 @@ Rocq's header, abridged:
    (`AppPreGS` header), while `Xv6App` is consumed before any era exists.
    The per-era laws read it back through `preGS_transport`.
 2. Names: Rocq `union_phi` (the record's `gstate → list mobs → Prop`) is
-   `unionPhiApp` (Lean's `unionPhi` is `UnionOutPure.union_phi`);
+   `unionPhiApp` (Lean's `unionPhiSync` is `UnionOutPure.union_phi_sync`);
    `union_R`/`union_tag`/`union_kill`/`union_cons`/`union_ifc`/
    `union_boot`/`app_union` are `unionR`/`unionTag`/`unionKill`/`unionCons`/
    `unionIfc`/`unionBoot`/`appUnion`; the turns are `UnionOutLed`'s
@@ -148,21 +148,6 @@ noncomputable def unionIfc (ug : UnionGn) : AppIface GF where
   rdwild := urdwild (hlc := hlc) ug
   rdwild_persistent := fun _ => inferInstance
   rdwild_timeless := fun _ => inferInstance
-
-/-- THE BOOT RESOURCE (Rocq `union_boot`, sync SY3-A3bc/A4): the file
-application's, and the deed holder's share of the running claim's round
-position, founded at the length of the copy's line list the era's record
-pins (or the taint) -- AND THE BOOT FACT at the deed's state, the deed's
-typed witness and the running claim's registration at the era. -/
-noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp GF :=
-  iprop(∃ s : Dst, fileBootAt (hlc := hlc) ug.ugnFile.fgnCl k r s
-    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
-       ∨ ∃ (vf : FileEra) (ls : List FlLine),
-           fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ fposh r ls.length
-           ∗ flLb ug.ugnFile.fgnCl ls
-           ∗ ⌜uadm ls (slast vf.feFloor) (dstContent s)⌝
-           ∗ fTyped ug.ugnFile.fgnCl s
-           ∗ runReg ug.ugnFile.fgnCl k r.fnPos r.fnDeed))
 
 /-! ## 2. The record -/
 

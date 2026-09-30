@@ -95,15 +95,18 @@ theorem unionLinkInstAt_lkPin (ug : UnionGn) (s0 : Fstate) :
 
 /-- **Rocq `union_rres_at_of_boot`**: THE READER'S RESIDUE AT THE HEAD -- the
 turn's bounds, the boot witness /init just filed, and the empty input's
-(vacuous) line witness. -/
+line witness -- the era's base itself, which the turn hands /init
+(`UnionOutLed.uturnI`, sync SY3-A3bc). -/
 theorem union_rres_at_of_boot (ug : UnionGn) (s0 : Fstate) :
     ⊢ fturnCore (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) -∗
       f0preAt (hlc := hlc) ug.ugnFile s0 -∗
+      (∃ vf : FileEra, fileEraPin ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf
+        ∗ flLb ug.ugnFile.fgnCl vf.feBase) -∗
       fturnCore (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) ∗
         ∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗
           urresw (hlc := hlc) ug v [] := by
   unfold fturnCore turn
-  iintro ⟨%v, %vf, #Hpin, #Hvf, Htn, Hdl, #Hcs, #Hps, #HE, Hrp⟩ #Hpre
+  iintro ⟨%v, %vf, #Hpin, #Hvf, Htn, Hdl, #Hcs, #Hps, #HE, Hrp⟩ #Hpre ⟨%vb, #Hvb, #Hlbb⟩
   ihave #Hlb0 := MonoNat.lb_own_get _ _ _ $$ Htn
   isplitl [Htn Hdl Hrp]
   · iexists v, vf
@@ -131,7 +134,11 @@ theorem union_rres_at_of_boot (ug : UnionGn) (s0 : Fstate) :
       iexists vf'
       iframe Hvf' Hbl
     isplitr
-    · unfold flw; ileft; ipureintro; rfl
+    · unfold flw
+      iexists vb
+      iframe Hvb
+      rw [show ulinesIn ([] : List (BitVec 8)) = [] from rfl, List.append_nil]
+      iexact Hlbb
     · iintro %hw
       exact absurd rfl hw.1
 
@@ -140,10 +147,11 @@ banner-owed family at the deed's own content and the empty input. -/
 theorem union_Wbf_at_of_boot (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (s : Dst) :
     ⊢ fturnCore (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) -∗
       f0preAt (hlc := hlc) ug.ugnFile s0 -∗ fown r s -∗ initBootAt (hlc := hlc) ug.ugnFile s0 s -∗
+      (fileTaint (hlc := hlc) ug.ugnFile.fgnCl ∨ urpos (hlc := hlc) ug r []) -∗
       (∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗
           dlCnt v (1 : Qp).half 0 ∗ inpLb v [] ∗ rposAuth v 0) ∗
         uWbf (hlc := hlc) ug r s0 [] := by
-  iintro Ht Hpre Hd #Hb
+  iintro Ht Hpre Hd #Hb Hup
   unfold fturnCore
   icases Ht with ⟨%v, %vf, #Hpin, #Hvf, Htn, Hdl, #Hcs, #Hps, #HE, Hrp⟩
   ihave Hturn : (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkTurn (genId (hlc := hlc) (GF := GF) + 1)
@@ -168,7 +176,10 @@ theorem union_Wbf_at_of_boot (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (s 
   unfold initBootAt
   icases Hb with (⟨%h0, #Hty⟩ | ⟨%h0, #HT⟩)
   · subst h0
-    iapply (ush_done_head (hlc := hlc) (GF := GF) ug r s v) $$ Hpin Hcs Hd Hty
+    icases Hup with (#HT | Hup)
+    · iapply (ush_deed_taint (hlc := hlc) (GF := GF) ug r udoneTie _ [])
+      iexact HT
+    iapply (ush_done_head (hlc := hlc) (GF := GF) ug r s v) $$ Hpin Hcs Hd Hty Hup
   · iapply (ush_deed_taint (hlc := hlc) (GF := GF) ug r udoneTie s0 [])
     iexact HT
 
