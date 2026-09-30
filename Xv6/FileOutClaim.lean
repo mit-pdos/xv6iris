@@ -43,6 +43,7 @@ Rocq's header, abridged:
 import Xv6.FileOutEra
 import Xv6.FileHooks
 import Xv6.GenOut
+import Xv6.EflLines
 
 namespace Xv6
 
@@ -59,13 +60,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 /-- The writer's state witness, as the claim reads it: the era's second record
 and the boot state, filed (Rocq `f0cw`). -/
 def f0cw (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb vf s0)
+  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb (hlc := hlc) g vf s0)
 
 instance f0cw_persistent (g : FileGn) (k : Nat) (s : Fstate) :
-    Persistent (f0cw (GF := GF) g k s) := by
+    Persistent (f0cw (hlc := hlc) (GF := GF) g k s) := by
   unfold f0cw; infer_instance
 instance f0cw_timeless (g : FileGn) (k : Nat) (s : Fstate) :
-    Timeless (f0cw (GF := GF) g k s) := by
+    Timeless (f0cw (hlc := hlc) (GF := GF) g k s) := by
   unfold f0cw; infer_instance
 
 /-- `eraPin_agree` in the curried form the parameter records ask for. -/
@@ -88,7 +89,7 @@ noncomputable def fileCparams (g : FileGn) : GenCparams hlc GF fileLm where
   gcPIN_pers := fun _ _ => inferInstance
   gcPIN_tl := fun _ _ => inferInstance
   gcPIN_agree := fileOut_eraPin_agree (fgnEcho g)
-  gcW := f0cw g
+  gcW := f0cw (hlc := hlc) g
   gcW_pers := fun _ _ => inferInstance
   gcW_tl := fun _ _ => inferInstance
 
@@ -97,19 +98,19 @@ noncomputable def fileCparams (g : FileGn) : GenCparams hlc GF fileLm where
 /-- THE STATE WITNESS'S AUTHORITY (Rocq `f0wa`). -/
 def f0wa (g : FileGn) (k : Nat) (st : Option Fstate) : IProp GF :=
   iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0fAuth vf (optList st)
-    ∗ f0Wit vf st ∗ f0Typed g (st.getD ∅))
+    ∗ f0Wit (hlc := hlc) g vf st ∗ f0Typed g (st.getD ∅))
 
 instance f0wa_timeless (g : FileGn) (k : Nat) (st : Option Fstate) :
-    Timeless (f0wa (GF := GF) g k st) := by
+    Timeless (f0wa (hlc := hlc) (GF := GF) g k st) := by
   unfold f0wa; infer_instance
 
 /-- The boot evidence the era's first writer holds (Rocq `f0boot`). -/
 def f0boot (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl vf s0 ∗ f0Typed g s0)
+  iprop(∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0 ∗ f0Typed g s0)
 
 /-- The writer's witness FILES the state (Rocq `f0wa_agree`). -/
 theorem f0wa_agree (g : FileGn) (k : Nat) (st : Option Fstate) (s0 : Fstate) :
-    ⊢ f0wa (GF := GF) g k st -∗ f0cw g k s0 -∗ ⌜st = some s0⌝ := by
+    ⊢ f0wa (hlc := hlc) (GF := GF) g k st -∗ f0cw (hlc := hlc) g k s0 -∗ ⌜st = some s0⌝ := by
   unfold f0wa f0cw f0Lb
   iintro ⟨%vf, #Hp, Ha, -, -⟩ ⟨%vf', #Hp', -, Hfd⟩
   ihave %he := fileEraPin_agree $$ [Hp Hp']
@@ -124,7 +125,7 @@ theorem f0wa_agree (g : FileGn) (k : Nat) (st : Option Fstate) (s0 : Fstate) :
 
 /-- Rocq `f0wa_agree_d`. -/
 theorem f0wa_agree_d (g : FileGn) (k : Nat) (st : Option Fstate) (s0 : Fstate) :
-    ⊢ f0wa (GF := GF) g k st -∗ f0cw g k s0 -∗ ⌜st.getD ∅ = s0⌝ := by
+    ⊢ f0wa (hlc := hlc) (GF := GF) g k st -∗ f0cw (hlc := hlc) g k s0 -∗ ⌜st.getD ∅ = s0⌝ := by
   iintro Ha Hw
   ihave %h := f0wa_agree g k st s0 $$ Ha Hw
   ipureintro
@@ -133,7 +134,7 @@ theorem f0wa_agree_d (g : FileGn) (k : Nat) (st : Option Fstate) (s0 : Fstate) :
 
 /-- A filed state hands the witness out again (Rocq `f0wa_W`). -/
 theorem f0wa_W (g : FileGn) (k : Nat) (s0 : Fstate) :
-    ⊢ f0wa (GF := GF) g k (some s0) -∗ f0wa g k (some s0) ∗ f0cw g k s0 ∗ f0Typed g s0 := by
+    ⊢ f0wa (hlc := hlc) (GF := GF) g k (some s0) -∗ f0wa (hlc := hlc) g k (some s0) ∗ f0cw (hlc := hlc) g k s0 ∗ f0Typed g s0 := by
   simp only [f0wa, f0cw, optList, f0Wit, Option.getD]
   iintro ⟨%vf, #Hp, Ha, #Hw, #Hty⟩
   ihave ⟨Ha, #Hfd⟩ := f0fLb_get vf s0 $$ Ha
@@ -149,7 +150,7 @@ theorem f0wa_W (g : FileGn) (k : Nat) (s0 : Fstate) :
 /-- The era's first process byte files the state out of the boot evidence
 (Rocq `f0wa_file`). -/
 theorem f0wa_file (g : FileGn) (k : Nat) (s0 : Fstate) :
-    ⊢ f0wa (GF := GF) g k none -∗ f0boot g k s0 ==∗ f0wa g k (some s0) ∗ f0cw g k s0 := by
+    ⊢ f0wa (hlc := hlc) (GF := GF) g k none -∗ f0boot (hlc := hlc) g k s0 ==∗ f0wa (hlc := hlc) g k (some s0) ∗ f0cw (hlc := hlc) g k s0 := by
   simp only [f0wa, f0boot, f0cw, optList, f0Wit, Option.getD]
   iintro ⟨%vf, #Hp, Ha, -, -⟩ ⟨%vf', #Hp', #Hbl, #Hty⟩
   ihave %he := fileEraPin_agree $$ [Hp Hp']
@@ -204,9 +205,11 @@ instance fecl_timeless (g : FileGn) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (fecl (hlc := hlc) (GF := GF) g k ho H) := by
   unfold fecl; infer_instance
 
-/-- THE LINE LIST the console has received, as a pure function of the history
-(Rocq `efl_of`). -/
-noncomputable def eflOf (h : List Obs) : List Fwline := echofLinesOf h
+/-- THE LINE LIST the console has received, as a pure function of the history:
+every complete line, in order, as the file model parses it (Rocq `efl_of`,
+sync SY3-A2: `EflLines.eflLines`); its redirect lines are `echofLinesOf h`
+(`eflLines_echof`). -/
+noncomputable def eflOf (h : List Obs) : List FlLine := eflLines h
 
 /-! ## The credential /init is handed at its era's first instruction -/
 
@@ -231,14 +234,20 @@ instance fturnCore_timeless (g : FileGn) (k : Nat) : Timeless (fturnCore (GF := 
 instance fturn_timeless (g : FileGn) (k : Nat) : Timeless (fturn (GF := GF) g k) := by
   unfold fturn; infer_instance
 
-/-- /init files the era's boot state out of its credential (Rocq
-`fturn_file`). -/
+/-- /init files the era's boot state out of its credential, handed the era's
+boot fact at the state it files (Rocq `fturn_file`, sync SY3-A4). -/
 theorem fturnFile (g : FileGn) (k : Nat) (s0 : Fstate) :
-    fturn (GF := GF) g k ⊢
-      |==> (fturnCore g k ∗ ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl vf s0) := by
+    fturn (GF := GF) g k ∗ (∃ vf : FileEra, fileEraPin g k vf ∗ f0Bt (hlc := hlc) g vf s0) ⊢
+      |==> (fturnCore g k ∗ ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0) := by
   unfold fturn fturnCore
-  iintro ⟨%v, %vf, #Hpin, #Hfp, Ht, Hdl, #Hcs, #Hps, #HE, Hrp, Hf0⟩
-  imod f0File vf s0 $$ Hf0 with #Hbl
+  iintro ⟨⟨%v, %vf, #Hpin, #Hfp, Ht, Hdl, #Hcs, #Hps, #HE, Hrp, Hf0⟩, ⟨%vf', #Hfp', #Hbt⟩⟩
+  ihave %he := fileEraPin_agree $$ [Hfp Hfp']
+  · isplitl [Hfp]
+    · iexact Hfp
+    · iexact Hfp'
+  subst he
+  imod f0File g vf s0 $$ [Hf0 Hbt] with #Hbl
+  · iframe Hf0 Hbt
   imodintro
   isplitl [Ht Hdl Hrp]
   · iexists v, vf
@@ -261,13 +270,13 @@ the era's boot state. -/
 def f0Pinned (g : FileGn) (h : List Obs) (s0s : List Fstate) : IProp GF :=
   if obsWire .uart0 (openSeg h) = [] then iprop(emp)
   else iprop(∃ (vf : FileEra) (s0 : Fstate),
-    ⌜∃ u1, s0s = u1 ++ [s0]⌝ ∗ fileEraPin g (obsBoots h) vf ∗ f0Lb vf s0)
+    ⌜∃ u1, s0s = u1 ++ [s0]⌝ ∗ fileEraPin g (obsBoots h) vf ∗ f0Lb (hlc := hlc) g vf s0)
 
 instance f0Pinned_persistent (g : FileGn) (h : List Obs) (s0s : List Fstate) :
-    Persistent (f0Pinned (GF := GF) g h s0s) := by
+    Persistent (f0Pinned (hlc := hlc) (GF := GF) g h s0s) := by
   unfold f0Pinned; split <;> infer_instance
 instance f0Pinned_timeless (g : FileGn) (h : List Obs) (s0s : List Fstate) :
-    Timeless (f0Pinned (GF := GF) g h s0s) := by
+    Timeless (f0Pinned (hlc := hlc) (GF := GF) g h s0s) := by
   unfold f0Pinned; split <;> infer_instance
 
 /-- THE BIRTH'S YIELD (Rocq `file_cl_all`). -/

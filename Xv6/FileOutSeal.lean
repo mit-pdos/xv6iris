@@ -61,7 +61,7 @@ theorem echofLinesOf_io (h : List Obs) (e : Obs) (hs : traceShape h true) (hio :
 /-- Rocq `efl_of_io`. -/
 theorem eflOf_io (h : List Obs) (e : Obs) (hs : traceShape h true) (hio : isIo e = true)
     (hin : consIns [e] = []) : eflOf (h ++ [e]) = eflOf h :=
-  echofLinesOf_io h e hs hio hin
+  eflLines_io h e hs hio hin
 
 /-- Rocq `efl_of_out`. -/
 theorem eflOf_out (h : List Obs) (i : UartId) (b : BitVec 8) (hs : traceShape h true) :
@@ -70,7 +70,11 @@ theorem eflOf_out (h : List Obs) (i : UartId) (b : BitVec 8) (hs : traceShape h 
 
 /-- Rocq `efl_of_snoc`. -/
 theorem eflOf_snoc (h : List Obs) (e : Obs) : eflOf h <+: eflOf (h ++ [e]) :=
-  echofLinesOf_snoc h e
+  eflLines_snoc h e
+
+/-- Rocq `efl_of_echof`: the ledger's redirect lines are the history's. -/
+theorem eflOf_echof (h : List Obs) : flRedirs (eflOf h) = echofLinesOf h :=
+  eflLines_echof h
 
 /-- Rocq `echof_lines_of_power`. -/
 theorem echofLinesOf_power (h : List Obs) (on : Bool) :
@@ -88,8 +92,8 @@ theorem echofLinesOf_power (h : List Obs) (on : Bool) :
       List.append_nil]
 
 /-- Rocq `efl_of_power`. -/
-theorem eflOf_power (h : List Obs) (on : Bool) : eflOf (h ++ [powerEv on]) = eflOf h :=
-  echofLinesOf_power h on
+theorem eflOf_power (h : List Obs) (on : Bool) : eflOf (h ++ [powerEv on]) = eflOf h := by
+  cases on <;> exact eflLines_power h _
 
 section FileOutSeal
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
@@ -97,14 +101,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
 
 /-! ## The era's boot-state record, allocated -/
 
-/-- Rocq `f0_alloc`. -/
-theorem f0Alloc : ⊢@{IProp GF} |==> ∃ v : FileEra, f0Auth v [] ∗ f0fAuth v [] := by
+/-- ...AT THE ON-ARM: the era's record at the ledger's list `base` and floor
+`floor` (Rocq `f0_alloc`, sync SY3-A3bc/A4). -/
+theorem f0Alloc (base : List FlLine) (floor : List Srec) :
+    ⊢@{IProp GF} |==> ∃ v : FileEra, ⌜v.feBase = base⌝ ∗ ⌜v.feFloor = floor⌝
+      ∗ f0Auth v [] ∗ f0fAuth v [] ∗ fcpAuth v [] := by
   imod (MonoList.own_alloc (GF := GF) ([] : List Fstate)) with ⟨%gf, Hf, -⟩
   imod (MonoList.own_alloc (GF := GF) ([] : List Fstate)) with ⟨%gl, Hl, -⟩
+  imod (MonoList.own_alloc (GF := GF) ([] : List FlLine)) with ⟨%gc, Hc, -⟩
   imodintro
-  iexists (⟨gf, gl⟩ : FileEra)
-  unfold f0Auth f0fAuth
-  iframe Hf Hl
+  iexists (⟨gf, gl, base, gc, floor⟩ : FileEra)
+  isplitr
+  · ipureintro; rfl
+  isplitr
+  · ipureintro; rfl
+  unfold f0Auth f0fAuth fcpAuth
+  iframe Hf Hl Hc
 
 /-! ## The second per-era map's two moves -/
 
@@ -158,7 +170,7 @@ theorem f0Pinned_io (g : FileGn) (h : List Obs) (e : Obs) (s0s : List Fstate)
 /-- The drain's read: the state the ledger fixed (Rocq `f0_pinned_drained`). -/
 theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : FileEra)
     (s0 : Fstate) (hw : obsWire .uart0 (openSeg h) ≠ []) :
-    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb vf s0 ∗ f0Pinned g h s0s ⊢
+    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb (hlc := hlc) g vf s0 ∗ f0Pinned g h s0s ⊢
       ⌜∃ u1, s0s = u1 ++ [s0]⌝ := by
   unfold f0Pinned
   rw [if_neg hw]
@@ -170,7 +182,7 @@ theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : F
     · iexact Hfp'
   subst hv
   ihave %hs : ⌜s0 = s0'⌝ $$ []
-  · iapply f0Lb_agree (GF := GF) vf s0 s0'
+  · iapply f0Lb_agree (hlc := hlc) (GF := GF) g vf s0 s0'
     isplitl []
     · iexact Hlb
     · iexact Hlb'
@@ -181,7 +193,7 @@ theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : F
 /-- The drain's fix (Rocq `f0_pinned_drain`). -/
 theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fstate)
     (vf : FileEra) (s0 : Fstate) :
-    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb vf s0 ⊢
+    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb (hlc := hlc) g vf s0 ⊢
       f0Pinned g (h ++ [Obs.dev (.uartOut .uart0 b)]) (u1 ++ [s0]) := by
   have hio := io_singleton (Obs.dev (.uartOut .uart0 b)) rfl
   have hs := openSeg_io h _ hio
@@ -204,29 +216,30 @@ theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fst
 
 /-- The deed's typed witness, read against the ledger's own line list (Rocq
 `f0_typed_adm`). -/
-theorem f0Typed_adm (g : FileGn) (Lp : List Fwline) (s0 : Fstate) :
-    flAuth (GF := GF) g.fgnCl Lp ∗ f0Typed g s0 ⊢ flAuth g.fgnCl Lp ∗ ⌜fadmBoot Lp s0⌝ := by
+theorem f0Typed_adm (g : FileGn) (Lp : List FlLine) (s0 : Fstate) :
+    flAuth (GF := GF) g.fgnCl Lp ∗ f0Typed g s0 ⊢ flAuth g.fgnCl Lp ∗ ⌜fadmBoot (flRedirs Lp) s0⌝ := by
   unfold f0Typed
   iintro ⟨Ha, Hs⟩
   icases Hs with (%he | ⟨%ls, #Hlb, %hall⟩)
   · subst he
     iframe Ha
     ipureintro
-    exact fadmBoot_empty Lp
+    exact fadmBoot_empty _
   · ihave %hpre := flLb_prefix g.fgnCl Lp ls $$ Ha Hlb
     iframe Ha
     ipureintro
     intro N bs hs
-    obtain ⟨ws, sel, hin, -, hsel, hbs⟩ := fBytesTyped_mono ls Lp N bs hpre (hall N bs hs).2
+    obtain ⟨ws, sel, hin, -, hsel, hbs⟩ :=
+      fBytesTyped_mono _ _ N bs (flRedirs_prefix ls Lp hpre) (hall N bs hs).2
     exact ⟨ws, sel, hin, hsel, hbs⟩
 
 /-- The line list grows by whatever the new input completed (Rocq
 `fl_auth_grow_pre`). -/
-theorem flAuth_grow_pre (g : FileGn) (ls ls' : List Fwline) (hp : ls <+: ls') :
+theorem flAuth_grow_pre (g : FileGn) (ls ls' : List FlLine) (hp : ls <+: ls') :
     flAuth (GF := GF) g.fgnCl ls ⊢ |==> (flAuth g.fgnCl ls' ∗ flLb g.fgnCl ls') := by
   unfold flAuth flLb
   iintro H
-  iapply MonoList.auth_own_update g.fgnCl.2 ls' hp $$ H
+  iapply MonoList.auth_own_update g.fgnCl.ffFl ls' hp $$ H
 
 end FileOutSeal
 
@@ -237,15 +250,21 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG 
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-- THE BIRTH STEP (Rocq `file_birth_all`): `AppFile.file_birth` beside one
-more `ghost_map` allocation. -/
-theorem fileBirthAll : ⊢@{IProp GF} |==> ∃ g : FileGn, fileClAll (hlc := hlc) g := by
-  imod (fileBirth (hlc := hlc) (GF := GF)) with ⟨%c, Hc⟩
+more `ghost_map` allocation, handed the machine's started counter's name,
+which the fixed part keeps. -/
+theorem fileBirthAll (γst : GName) :
+    ⊢@{IProp GF} |==> ∃ g : FileGn, ⌜g.fgnCl.ffSt = γst⌝ ∗ fileClAll (hlc := hlc) g
+      ∗ syncRegAuth g.fgnCl ∅ ∗ syncCmAuth (hlc := hlc) g.fgnCl 0
+      ∗ slAuth g.fgnCl.ffHist 1 [] ∗ runAuth g.fgnCl 0 := by
+  imod (fileBirth (hlc := hlc) (GF := GF) γst) with ⟨%c, %hst, Hc, Hreg, Hcm, Hh, Hrun⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := FileEra) (H := RegMapF))
     with ⟨%ge, Hm⟩
   imodintro
   iexists (⟨c, ge⟩ : FileGn)
+  isplitr
+  · ipureintro; exact hst
   unfold fileClAll
-  iframe Hc Hm
+  iframe Hc Hm Hreg Hcm Hh Hrun
 
 end FileOutSealBirth
 
