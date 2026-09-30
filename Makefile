@@ -8,7 +8,7 @@
 #
 #   lake build Xv6 MachCSL
 #
-# NO LEAN ON THE DEVELOPMENT MACHINE (notes/coord/gcp_rule.txt): targets
+# NO LEAN ON THE DEVELOPMENT MACHINE (README: "Reproducing it"): targets
 # marked [lean] are for the build VM and CI.
 
 .DEFAULT_GOAL := help

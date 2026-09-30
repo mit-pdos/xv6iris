@@ -1,0 +1,48 @@
+diff --git a/iris/UkShRedirAns.v b/iris/UkShRedirAns.v
+index afcbfc3fd..88cb123bf 100644
+--- a/iris/UkShRedirAns.v
++++ b/iris/UkShRedirAns.v
+@@ -116,10 +116,21 @@ Section UkShRedirAns.
+      fd ONE, which is the caller's business ([UserFd.ualloc_std]) -- the
+      redirect child closed fd 1 before it called, so 1 is the lowest closed
+      slot of its own table. *)
+-  Definition ush_open_call2 (N : uk_names Σ) (cwdv file mode : Z)
+-      (l : list fdstate) (K : fdtype -> iProp Σ) (Kf : iProp Σ) : iProp Σ :=
++  (* ...AND THE DEED IS HANDED AT THE CALL, not at the call's construction
++     (the PROGRAM STREAM).  It used to be an outer premise
++     ([fown r s -∗ ush_open_call2 …]), and that shape makes the walk
++     unprovable: the caller would have to spend its deed to BUILD the call
++     resource, so a walk that dies before reaching the open drops it, and
++     the lend it is holding -- which at the file era CONTAINS the deed --
++     can no longer pay the early exits.  Handed at the call instead, the
++     deed flows lend -> call -> receipt and every exit before the call
++     still holds the lend whole.  The index is abstract ([A], at [dst] for
++     the file application) because this file names no claim. *)
++  Definition ush_open_call2 {A : Type} (N : uk_names Σ) (cwdv file mode : Z)
++      (l : list fdstate) (K : fdtype -> iProp Σ)
++      (Dd Kf : A -> iProp Σ) : iProp Σ :=
+     (∀ (h : CpuId) (m : regfile) (av : nat)
+-       (Img : gmap Z (bv 8)) (pl : list (bv 8)),
++       (Img : gmap Z (bv 8)) (pl : list (bv 8)) (a : A),
+        ⌜ m !!! Regidx a0_idx = (mword_of_int file : mword 64) ⌝ -∗
+        ⌜ m !!! Regidx a1_idx = (mword_of_int mode : mword 64) ⌝ -∗
+        ⌜ forall M : gmap Z (bv 8), uimg_sub Img M ->
+@@ -128,7 +139,8 @@ Section UkShRedirAns.
+        ⌜ um_start_of cwdv pl = FsImg.ROOTINO ⌝ -∗
+        ⌜ list_basics.last (path_elems pl) = Some FsImgCheck.fname_f ⌝ -∗
+        ⌜ fd_lowest_closed l = Some 1%nat ⌝ -∗
+-       ([∗ map] a ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded a b) -∗
++       ([∗ map] ad ↦ b ∈ Img, ubyteq (ukn_d N) DfracDiscarded ad b) -∗
++       Dd a -∗
+        shk_code (ukn_t N) -∗
+        UserCwd.ucwd (ukn_cwd N) cwdv -∗
+        UserFd.ustd (ukn_fd N) l -∗
+@@ -137,7 +149,7 @@ Section UkShRedirAns.
+           ⌜ ucallee_saved m m' ⌝ -∗
+           ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
+           UserCwd.ucwd (ukn_cwd N) cwdv -∗
+-          ush_open_ans2 N l K Kf r -∗
++          ush_open_ans2 N l K (Kf a) r -∗
+           urun N h' m' (ret_pc (m !!! Regidx ra_idx)) av -∗
+           WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang))%I.

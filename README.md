@@ -221,6 +221,13 @@ both are hypotheses that later work removes without changing the statements.
 
 ## Design (how it follows the paper and the Rocq prototype)
 
+The Rocq development's design and project notes are imported under
+[`claude-notes/`](claude-notes/): they are the design this port follows.  Start
+with [`claude-notes/LEAN.md`](claude-notes/LEAN.md) (how Rocq names and paths
+map to this tree), then [`claude-notes/README.md`](claude-notes/README.md).
+Decisions the Lean port made differently are in
+[`notes/design-rulings.md`](notes/design-rulings.md).
+
 * **Model as a free monad.**  Sail's Lean backend targets `lean-sail`, whose
   concurrency-interface-V1 monad is a deterministic `EStateM`.  MachCSL needs
   the model's *events* (register/memory reads and writes, ...) to be explicit
