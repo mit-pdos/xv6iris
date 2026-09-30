@@ -1,0 +1,41 @@
+{
+  "comment": [
+    "THE ASSUMPTION BASELINE, read by tools/audit/Audit.lean (run: tools/ci/audit.sh).",
+    "Per theorem: `axioms` is the EXACT set of axioms allowed outside the `<decl>._native.bv_decide.ax_*`",
+    "certificate family (which is counted, shape-checked, and not pinned by name); `opaques` is the EXACT",
+    "set of this tree's `opaque` constants in the theorem's cone (Rocq's `Parameter`s; `#print axioms`",
+    "cannot see them).  Any difference fails the audit, in either direction.  Hand-kept on purpose:",
+    "adding a line here is the act of extending what a reader must trust."
+  ],
+  "theorems": [
+    { "name": "Xv6.xv6FsAdequacy_closed",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.xv6FsAdequacy_xv6GF",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.userProof",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.unionAdequacyClosed",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.unionSyncCutNeg",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] },
+    { "name": "Xv6.unionResults",
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "opaques": ["LeanRV64D.Functions.xv6_resv_is_valid", "LeanRV64D.Functions.xv6_resv_matches",
+                  "MachCSL.bootImageSealed"] }
+  ],
+  "platform_hooks": {
+    "realised": ["load_reservation", "cancel_reservation", "match_reservation", "valid_reservation",
+                 "plat_term_write", "sys_enable_experimental_extensions"],
+    "parameters": ["LeanRV64D.Functions.xv6_resv_matches", "LeanRV64D.Functions.xv6_resv_is_valid"]
+  }
+}
