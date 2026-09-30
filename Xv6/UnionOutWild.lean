@@ -42,4 +42,13 @@ theorem uwild_pv (l : Uline) (lR : Pline') (h : pviewUnionU.pvLine l = some lR) 
   obtain ⟨p, fs, rfl, -⟩ := uvLine_some l lR h
   rfl
 
+/-- Rocq `uwild_nsync` (sync SY3-A4): the sync line is not wild. -/
+theorem uwild_nsync (l : Uline) (h : uwild l = true) : l ≠ .LSync := by
+  rintro rfl; cases h
+
+/-- Rocq `upv_nsync` (sync SY3-A4): ...nor a pipeline. -/
+theorem upv_nsync (l : Uline) (lR : Pline') (h : pviewUnionU.pvLine l = some lR) : l ≠ .LSync := by
+  obtain ⟨p, fs, rfl, -⟩ := uvLine_some l lR h
+  intro h'; cases h'
+
 end Xv6
